@@ -25,10 +25,9 @@ func TestSchema(t *testing.T) {
 }
 
 func TestEncodeForDB(t *testing.T) {
-	t.Run("update JWTScopeToPolicyMapping when Scopes.JWT is not empty and OIDC is not enabled", func(t *testing.T) {
+	t.Run("update ScopeClaim when Scopes.JWT is not empty and OIDC is not enabled", func(t *testing.T) {
 		spec := DummyAPI()
 		defaultScopeName := "scope"
-		spec.JWTScopeClaimName = defaultScopeName
 		scopeToPolicyMap := map[string]string{
 			"user:read": "pID1",
 		}
@@ -40,10 +39,10 @@ func TestEncodeForDB(t *testing.T) {
 		assert.Equal(t, defaultScopeName, spec.JWTScopeClaimName)
 		assert.Equal(t, scopeToPolicyMap, spec.JWTScopeToPolicyMapping)
 	})
-	t.Run("update JWTScopeToPolicyMapping when Scopes.OIDC is not empty and OpenID is enabled", func(t *testing.T) {
+
+	t.Run("update ScopeClaim when Scopes.OIDC is not empty and OpenID is enabled", func(t *testing.T) {
 		spec := DummyAPI()
 		defaultScopeName := "scope"
-		spec.JWTScopeClaimName = defaultScopeName
 		scopeToPolicyMap := map[string]string{
 			"user:read": "pID1",
 		}
@@ -55,23 +54,6 @@ func TestEncodeForDB(t *testing.T) {
 		spec.EncodeForDB()
 		assert.Equal(t, defaultScopeName, spec.JWTScopeClaimName)
 		assert.Equal(t, scopeToPolicyMap, spec.JWTScopeToPolicyMapping)
-	})
-	t.Run("update Auth from AuthConfigs", func(t *testing.T) {
-		spec := DummyAPI()
-		authConfig := AuthConfig{
-			UseParam:          false,
-			AuthHeaderName:    "Authorization",
-			CookieName:        "",
-			ParamName:         "",
-			UseCookie:         false,
-			ValidateSignature: false,
-		}
-		spec.AuthConfigs = map[string]AuthConfig{
-			"jwt":       authConfig,
-			"authToken": authConfig,
-		}
-		spec.EncodeForDB()
-		assert.Equal(t, spec.Auth, authConfig)
 	})
 }
 
@@ -91,6 +73,7 @@ func TestDecodeFromDB(t *testing.T) {
 		}
 		assert.Equal(t, expectedJWTScope, spec.Scopes.JWT)
 	})
+
 	t.Run("update Scopes.OIDC when JWTScopeClaimName is not empty and OpenID is enabled", func(t *testing.T) {
 		spec := DummyAPI()
 		defaultScopeName := "scope"
@@ -106,23 +89,6 @@ func TestDecodeFromDB(t *testing.T) {
 			ScopeToPolicy:  scopeToPolicyMap,
 		}
 		assert.Equal(t, expectedOICScope, spec.Scopes.OIDC)
-	})
-	t.Run("update AuthConfigs from Auth", func(t *testing.T) {
-		spec := DummyAPI()
-		authConfig := AuthConfig{
-			UseParam:          false,
-			AuthHeaderName:    "Authorization",
-			CookieName:        "",
-			ParamName:         "",
-			UseCookie:         false,
-			ValidateSignature: false,
-		}
-		spec.Auth = authConfig
-		spec.DecodeFromDB()
-		assert.Equal(t, spec.AuthConfigs, map[string]AuthConfig{
-			"jwt":       authConfig,
-			"authToken": authConfig,
-		})
 	})
 }
 
