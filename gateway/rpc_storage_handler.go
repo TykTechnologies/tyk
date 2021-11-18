@@ -820,61 +820,70 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 	}
 }
 
+func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, event string) {
+	store, _, err := gw.GetStorageForApi(apiId)
+	if err != nil {
+		log.Error("Could not get oath storage for api")
+		return
+	}
+
+	switch event {
+	case OauthClientAdded:
+		// on add: pull from rpc and save it in local redis
+		client, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve new oauth client information")
+			return
+		}
+
+		store.SetClient(oauthClientId, orgID, client, false)
+		log.Info("oauth client created successfully")
+	case OauthClientRemoved:
+		// on remove: remove from local redis
+		err := store.DeleteClient(oauthClientId, orgID, false)
+		if err != nil {
+			log.Errorf("Could not delete oauth client with id: %v", oauthClientId)
+			return
+		}
+		log.Infof("Oauth Client deleted successfully")
+	case OauthClientUpdated:
+		// on update: delete from local redis and pull again from rpc
+		client, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve oauth client information")
+			return
+		}
+
+		err = store.DeleteClient(oauthClientId, orgID, false)
+		if err != nil {
+			log.WithError(err).Error("Could not delete oauth client")
+			return
+		}
+
+		client, err = store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve oauth client information")
+			return
+		}
+
+		store.SetClient(oauthClientId, orgID, client, false)
+		log.Info("oauth client updated successfully")
+	default:
+		log.Warningf("Oauth client event not supported:%v", event)
+	}
+}
+
 // ProcessOauthClientsOps performs the appropiate action for the received clients
 // it can be any of the Create,Update and Delete operations
 func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
-	for v, action := range clients {
-		// value is: APIID.ClientID.OrgID
-		eventValues := strings.Split(v, ".")
+	for clientInfo, action := range clients {
+		// clientInfo is: APIID.ClientID.OrgID
+		eventValues := strings.Split(clientInfo, ".")
 		apiId := eventValues[0]
 		oauthClientId := eventValues[1]
 		orgID := eventValues[2]
 
-		store, _, err := gw.GetStorageForApi(apiId)
-		if err != nil {
-			log.Error("Could not get oath storage for api")
-			continue
-		}
-		switch action {
-		case OauthClientAdded:
-			// on add: pull from rpc and save it in local redis
-			client, err := store.GetClient(oauthClientId)
-			if err != nil {
-				log.WithError(err).Error("Could not retrieve new oauth client information")
-				continue
-			}
-			store.SetClient(oauthClientId, orgID, client, false)
-			log.Info("oauth client created successfully")
-		case OauthClientRemoved:
-			// on remove: remove from local redis
-			err := store.DeleteClient(oauthClientId, orgID, false)
-			if err != nil {
-				log.Errorf("Could not delete oauth client with id: %v", oauthClientId)
-				continue
-			}
-			log.Infof("Oauth Client deleted successfully")
-		case OauthClientUpdated:
-			// on update: delete from local redis and pull again from rpc
-			client, err := store.GetClient(oauthClientId)
-			if err != nil {
-				log.WithError(err).Error("Could not retrieve oauth client information")
-				continue
-			}
-			err = store.DeleteClient(oauthClientId, orgID, false)
-
-			if err != nil {
-				log.WithError(err).Error("Could not delete oauth client")
-			}
-			client, err = store.GetClient(oauthClientId)
-			if err != nil {
-				log.WithError(err).Error("Could not retrieve oauth client information")
-				continue
-			}
-			store.SetClient(oauthClientId, orgID, client, false)
-			log.Info("oauth client updated successfully")
-		default:
-			log.Warningf("Oauth client event not supported:%v", action)
-		}
+		gw.ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, action)
 	}
 }
 
