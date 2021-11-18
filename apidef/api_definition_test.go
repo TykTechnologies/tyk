@@ -56,6 +56,23 @@ func TestEncodeForDB(t *testing.T) {
 		assert.Equal(t, defaultScopeName, spec.JWTScopeClaimName)
 		assert.Equal(t, scopeToPolicyMap, spec.JWTScopeToPolicyMapping)
 	})
+	t.Run("update Auth from AuthConfigs", func(t *testing.T) {
+		spec := DummyAPI()
+		authConfig := AuthConfig{
+			UseParam:          false,
+			AuthHeaderName:    "Authorization",
+			CookieName:        "",
+			ParamName:         "",
+			UseCookie:         false,
+			ValidateSignature: false,
+		}
+		spec.AuthConfigs = map[string]AuthConfig{
+			"jwt":       authConfig,
+			"authToken": authConfig,
+		}
+		spec.EncodeForDB()
+		assert.Equal(t, spec.Auth, authConfig)
+	})
 }
 
 func TestDecodeFromDB(t *testing.T) {
@@ -89,6 +106,23 @@ func TestDecodeFromDB(t *testing.T) {
 			ScopeToPolicy:  scopeToPolicyMap,
 		}
 		assert.Equal(t, expectedOICScope, spec.Scopes.OIDC)
+	})
+	t.Run("update AuthConfigs from Auth", func(t *testing.T) {
+		spec := DummyAPI()
+		authConfig := AuthConfig{
+			UseParam:          false,
+			AuthHeaderName:    "Authorization",
+			CookieName:        "",
+			ParamName:         "",
+			UseCookie:         false,
+			ValidateSignature: false,
+		}
+		spec.Auth = authConfig
+		spec.DecodeFromDB()
+		assert.Equal(t, spec.AuthConfigs, map[string]AuthConfig{
+			"jwt":       authConfig,
+			"authToken": authConfig,
+		})
 	})
 }
 
