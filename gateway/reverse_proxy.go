@@ -846,7 +846,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// set up TLS certificates for upstream if needed
 	var tlsCertificates []tls.Certificate
-	if cert := getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
+	if cert := getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec); cert != nil {
 		p.logger.Debug("Found upstream mutual TLS certificate")
 		tlsCertificates = []tls.Certificate{*cert}
 	}

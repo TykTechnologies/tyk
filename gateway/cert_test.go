@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -732,6 +733,8 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	upstream.StartTLS()
 	defer upstream.Close()
 
+	upstreamURL, _ := url.Parse(upstream.URL)
+
 	t.Run("Without API", func(t *testing.T) {
 		client := GetTLSClient(&clientCert, nil)
 
@@ -760,18 +763,34 @@ func TestUpstreamMutualTLS(t *testing.T) {
 
 		pool.AddCert(clientCert.Leaf)
 
-		BuildAndLoadAPI(func(spec *APISpec) {
+		// Host values should be different for the purpose of the test
+		const targetHost = "host1.target"
+		const proxyHost = "host2.proxy"
+
+		api := BuildAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
-			spec.Proxy.TargetURL = upstream.URL
+			spec.Proxy.TargetURL = fmt.Sprintf("https://%s:%s", targetHost, upstreamURL.Port())
 			spec.UpstreamCertificates = map[string]string{
-				"*": clientCertID,
+				"*.target:" + upstreamURL.Port(): clientCertID,
 			}
+		})[0]
+
+		t.Run("PreserveHostHeader=false", func(t *testing.T) {
+			api.Proxy.PreserveHostHeader = false
+			LoadAPI(api)
+
+			// Giving a different value to proxy host, it should not interfere upstream certificate matching
+			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost, Code: http.StatusOK})
 		})
 
-		// Should pass with valid upstream certificate
-		ts.Run(t, test.TestCase{Code: 200})
-	})
+		t.Run("PreserveHostHeader=true", func(t *testing.T) {
+			api.Proxy.PreserveHostHeader = true
+			LoadAPI(api)
 
+			// Giving a different value to proxy host, it should not interfere upstream certificate matching
+			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost, Code: http.StatusOK})
+		})
+	})
 }
 
 func TestSSLForceCommonName(t *testing.T) {
