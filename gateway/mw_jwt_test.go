@@ -207,7 +207,7 @@ func TestJWTHMACIdInSubClaim(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:token invalid, key not found`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 
