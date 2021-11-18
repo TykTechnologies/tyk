@@ -792,7 +792,6 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	k.reportLoginFailure(tykId, r)
 	if err != nil {
 		logger.WithError(err).Error("JWT validation error")
-		return errors.New("Key not authorized:" + err.Error()), http.StatusForbidden
 	}
 	return errors.New("Key not authorized"), http.StatusForbidden
 }
