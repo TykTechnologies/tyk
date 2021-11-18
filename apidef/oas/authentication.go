@@ -47,6 +47,17 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.StripAuthorizationData = api.StripAuthData
 	a.BaseIdentityProvider = api.BaseIdentityProvidedBy
 
+	// GoPlugin is at the beginning because it is not dependent to AuthConfigs map.
+	if a.GoPlugin == nil {
+		a.GoPlugin = &GoPlugin{}
+	}
+
+	a.GoPlugin.Fill(api)
+
+	if ShouldOmit(a.GoPlugin) {
+		a.GoPlugin = nil
+	}
+
 	if api.AuthConfigs == nil || len(api.AuthConfigs) == 0 {
 		return
 	}
@@ -109,16 +120,6 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 
 	if ShouldOmit(a.HMAC) {
 		a.HMAC = nil
-	}
-
-	if a.GoPlugin == nil {
-		a.GoPlugin = &GoPlugin{}
-	}
-
-	a.GoPlugin.Fill(api)
-
-	if ShouldOmit(a.GoPlugin) {
-		a.GoPlugin = nil
 	}
 
 	if _, ok := api.AuthConfigs["coprocess"]; ok {
