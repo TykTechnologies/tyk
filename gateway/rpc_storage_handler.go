@@ -853,7 +853,7 @@ func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, ev
 		log.Infof("Oauth Client deleted successfully")
 	case OauthClientUpdated:
 		// on update: delete from local redis and pull again from rpc
-		client, err := store.GetClient(oauthClientId)
+		_, err := store.GetClient(oauthClientId)
 		if err != nil {
 			log.WithError(err).Error("Could not retrieve oauth client information")
 			return
@@ -865,7 +865,7 @@ func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, ev
 			return
 		}
 
-		client, err = store.GetClient(oauthClientId)
+		client, err := store.GetClient(oauthClientId)
 		if err != nil {
 			log.WithError(err).Error("Could not retrieve oauth client information")
 			return
