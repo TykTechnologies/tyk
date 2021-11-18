@@ -95,6 +95,9 @@ const (
 	OAuthRevokeAccessToken  string = "oAuthRevokeAccessToken"
 	OAuthRevokeRefreshToken string = "oAuthRevokeRefreshToken"
 	OAuthRevokeAllTokens    string = "revoke_all_tokens"
+	OauthClientAdded        string = "OauthClientAdded"
+	OauthClientRemoved      string = "OauthClientRemoved"
+	OauthClientUpdated      string = "OauthClientUpdated"
 )
 
 // RPCStorageHandler is a storage manager that uses the redis database.
@@ -817,6 +820,82 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 	}
 }
 
+func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, event string) {
+	store, _, err := gw.GetStorageForApi(apiId)
+	if err != nil {
+		log.Error("Could not get oauth storage for api")
+		return
+	}
+
+	switch event {
+	case OauthClientAdded:
+		// on add: pull from rpc and save it in local redis
+		client, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve new oauth client information")
+			return
+		}
+
+		err = store.SetClient(oauthClientId, orgID, client, false)
+		if err != nil {
+			log.WithError(err).Error("Could not save oauth client.")
+			return
+		}
+
+		log.Info("oauth client created successfully")
+	case OauthClientRemoved:
+		// on remove: remove from local redis
+		err := store.DeleteClient(oauthClientId, orgID, false)
+		if err != nil {
+			log.Errorf("Could not delete oauth client with id: %v", oauthClientId)
+			return
+		}
+		log.Infof("Oauth Client deleted successfully")
+	case OauthClientUpdated:
+		// on update: delete from local redis and pull again from rpc
+		_, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve oauth client information")
+			return
+		}
+
+		err = store.DeleteClient(oauthClientId, orgID, false)
+		if err != nil {
+			log.WithError(err).Error("Could not delete oauth client")
+			return
+		}
+
+		client, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve oauth client information")
+			return
+		}
+
+		err = store.SetClient(oauthClientId, orgID, client, false)
+		if err != nil {
+			log.WithError(err).Error("Could not save oauth client.")
+			return
+		}
+		log.Info("oauth client updated successfully")
+	default:
+		log.Warningf("Oauth client event not supported:%v", event)
+	}
+}
+
+// ProcessOauthClientsOps performs the appropiate action for the received clients
+// it can be any of the Create,Update and Delete operations
+func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
+	for clientInfo, action := range clients {
+		// clientInfo is: APIID.ClientID.OrgID
+		eventValues := strings.Split(clientInfo, ".")
+		apiId := eventValues[0]
+		oauthClientId := eventValues[1]
+		orgID := eventValues[2]
+
+		gw.ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, action)
+	}
+}
+
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
@@ -824,6 +903,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	notRegularKeys := map[string]bool{}
 	CertificatesToRemove := map[string]string{}
 	CertificatesToAdd := map[string]string{}
+	OauthClients := map[string]string{}
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -844,12 +924,15 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			case OAuthRevokeAllTokens:
 				ClientsToBeRevoked[splitKeys[1]] = key
 				notRegularKeys[key] = true
+			case OauthClientAdded, OauthClientUpdated, OauthClientRemoved:
+				OauthClients[splitKeys[0]] = action
+				notRegularKeys[key] = true
 			default:
 				log.Debug("ignoring processing of action:", action)
 			}
 		}
 	}
-
+	r.Gw.ProcessOauthClientsOps(OauthClients)
 	for clientId, key := range ClientsToBeRevoked {
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[0]
