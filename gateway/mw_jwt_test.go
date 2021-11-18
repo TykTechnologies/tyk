@@ -2001,7 +2001,7 @@ func TestJWTRSAInvalidPublickKey(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "Failed to decode JWT key",
+			BodyMatch: "Key not authorized",
 		})
 	})
 }
