@@ -833,7 +833,7 @@ func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 		store, _, err := gw.GetStorageForApi(apiId)
 		if err != nil {
 			log.Error("Could not get oath storage for api")
-			return
+			continue
 		}
 		switch action {
 		case OauthClientAdded:
@@ -841,6 +841,7 @@ func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 			client, err := store.GetClient(oauthClientId)
 			if err != nil {
 				log.WithError(err).Error("Could not retrieve new oauth client information")
+				continue
 			}
 			store.SetClient(oauthClientId, orgID, client, false)
 			log.Info("oauth client created successfully")
@@ -849,7 +850,7 @@ func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 			err := store.DeleteClient(oauthClientId, orgID, false)
 			if err != nil {
 				log.Errorf("Could not delete oauth client with id: %v", oauthClientId)
-				return
+				continue
 			}
 			log.Infof("Oauth Client deleted successfully")
 		case OauthClientUpdated:
@@ -857,6 +858,7 @@ func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 			client, err := store.GetClient(oauthClientId)
 			if err != nil {
 				log.WithError(err).Error("Could not retrieve oauth client information")
+				continue
 			}
 			err = store.DeleteClient(oauthClientId, orgID, false)
 
@@ -866,6 +868,7 @@ func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 			client, err = store.GetClient(oauthClientId)
 			if err != nil {
 				log.WithError(err).Error("Could not retrieve oauth client information")
+				continue
 			}
 			store.SetClient(oauthClientId, orgID, client, false)
 			log.Info("oauth client updated successfully")
