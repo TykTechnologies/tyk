@@ -58,11 +58,11 @@ func TestJWT(t *testing.T) {
 func TestScopes(t *testing.T) {
 	var emptyScopes Scopes
 
-	var convertedAPI apidef.APIDefinition
-	emptyScopes.ExtractTo(&convertedAPI)
+	scopeClaim := apidef.ScopeClaim{}
+	emptyScopes.ExtractTo(&scopeClaim)
 
 	var resultScopes Scopes
-	resultScopes.Fill(convertedAPI)
+	resultScopes.Fill(&scopeClaim)
 
 	assert.Equal(t, emptyScopes, resultScopes)
 }
@@ -152,6 +152,18 @@ func TestHMAC(t *testing.T) {
 	resultHMAC.Fill(convertedAPI)
 
 	assert.Equal(t, emptyHMAC, resultHMAC)
+}
+
+func TestOIDC(t *testing.T) {
+	var emptyOIDC OIDC
+
+	var convertedAPI apidef.APIDefinition
+	emptyOIDC.ExtractTo(&convertedAPI)
+
+	var resultOIDC OIDC
+	emptyOIDC.Fill(convertedAPI)
+
+	assert.Equal(t, emptyOIDC, resultOIDC)
 }
 
 func TestGoPlugin(t *testing.T) {
