@@ -40,12 +40,26 @@ type Authentication struct {
 	OIDC *OIDC `bson:"oidc,omitempty" json:"oidc,omitempty"`
 	// GoPlugin contains the configurations related to GoPlugin authentication mode.
 	GoPlugin *GoPlugin `bson:"goPlugin,omitempty" json:"goPlugin,omitempty"`
+	// CustomPlugin contains the configurations related to CustomPlugin authentication mode.
+	// Old API Definition: `auth_configs["coprocess"]`
+	CustomPlugin *CustomPlugin `bson:"customPlugin,omitempty" json:"customPlugin,omitempty"`
 }
 
 func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.Enabled = !api.UseKeylessAccess
 	a.StripAuthorizationData = api.StripAuthData
 	a.BaseIdentityProvider = api.BaseIdentityProvidedBy
+
+	// GoPlugin is at the beginning because it is not dependent to AuthConfigs map.
+	if a.GoPlugin == nil {
+		a.GoPlugin = &GoPlugin{}
+	}
+
+	a.GoPlugin.Fill(api)
+
+	if ShouldOmit(a.GoPlugin) {
+		a.GoPlugin = nil
+	}
 
 	if api.AuthConfigs == nil || len(api.AuthConfigs) == 0 {
 		return
@@ -111,6 +125,18 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.HMAC = nil
 	}
 
+	if _, ok := api.AuthConfigs["coprocess"]; ok {
+		if a.CustomPlugin == nil {
+			a.CustomPlugin = &CustomPlugin{}
+		}
+
+		a.CustomPlugin.Fill(api)
+	}
+
+	if ShouldOmit(a.CustomPlugin) {
+		a.CustomPlugin = nil
+	}
+
 	if _, ok := api.AuthConfigs["oidc"]; ok {
 		if a.OIDC == nil {
 			a.OIDC = &OIDC{}
@@ -121,16 +147,6 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 
 	if ShouldOmit(a.OIDC) {
 		a.OIDC = nil
-	}
-
-	if a.GoPlugin == nil {
-		a.GoPlugin = &GoPlugin{}
-	}
-
-	a.GoPlugin.Fill(api)
-
-	if ShouldOmit(a.GoPlugin) {
-		a.GoPlugin = nil
 	}
 }
 
@@ -165,6 +181,10 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 	if a.GoPlugin != nil {
 		a.GoPlugin.ExtractTo(api)
+	}
+
+	if a.CustomPlugin != nil {
+		a.CustomPlugin.ExtractTo(api)
 	}
 }
 
@@ -331,18 +351,17 @@ func (s *Signature) ExtractTo(authConfig *apidef.AuthConfig) {
 type JWT struct {
 	Enabled                 bool `bson:"enabled" json:"enabled"` // required
 	AuthSources             `bson:",inline" json:",inline"`
-	Source                  string            `bson:"source,omitempty" json:"source,omitempty"`
-	SigningMethod           string            `bson:"signingMethod,omitempty" json:"signingMethod,omitempty"`
-	IdentityBaseField       string            `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
-	SkipKid                 bool              `bson:"skipKid,omitempty" json:"skipKid,omitempty"`
-	ScopeClaimName          string            `bson:"scopeClaimName,omitempty" json:"scopeClaimName,omitempty"`
-	ScopeToPolicyMapping    map[string]string `bson:"scopeToPolicyMapping,omitempty" json:"scopeToPolicyMapping,omitempty"`
-	PolicyFieldName         string            `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
-	ClientBaseField         string            `bson:"clientBaseField,omitempty" json:"clientBaseField,omitempty"`
-	DefaultPolicies         []string          `bson:"defaultPolicies,omitempty" json:"defaultPolicies,omitempty"`
-	IssuedAtValidationSkew  uint64            `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
-	NotBeforeValidationSkew uint64            `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
-	ExpiresAtValidationSkew uint64            `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
+	Source                  string   `bson:"source,omitempty" json:"source,omitempty"`
+	SigningMethod           string   `bson:"signingMethod,omitempty" json:"signingMethod,omitempty"`
+	IdentityBaseField       string   `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	SkipKid                 bool     `bson:"skipKid,omitempty" json:"skipKid,omitempty"`
+	PolicyFieldName         string   `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
+	ClientBaseField         string   `bson:"clientBaseField,omitempty" json:"clientBaseField,omitempty"`
+	Scopes                  *Scopes  `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	DefaultPolicies         []string `bson:"defaultPolicies,omitempty" json:"defaultPolicies,omitempty"`
+	IssuedAtValidationSkew  uint64   `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
+	NotBeforeValidationSkew uint64   `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
+	ExpiresAtValidationSkew uint64   `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
 }
 
 func (j *JWT) Fill(api apidef.APIDefinition) {
@@ -353,10 +372,18 @@ func (j *JWT) Fill(api apidef.APIDefinition) {
 	j.SigningMethod = api.JWTSigningMethod
 	j.IdentityBaseField = api.JWTIdentityBaseField
 	j.SkipKid = api.JWTSkipKid
-	j.ScopeClaimName = api.JWTScopeClaimName
-	j.ScopeToPolicyMapping = api.JWTScopeToPolicyMapping
 	j.PolicyFieldName = api.JWTPolicyFieldName
 	j.ClientBaseField = api.JWTClientIDBaseField
+
+	if j.Scopes == nil {
+		j.Scopes = &Scopes{}
+	}
+
+	j.Scopes.Fill(api)
+	if ShouldOmit(j.Scopes) {
+		j.Scopes = nil
+	}
+
 	j.DefaultPolicies = api.JWTDefaultPolicies
 	j.IssuedAtValidationSkew = api.JWTIssuedAtValidationSkew
 	j.NotBeforeValidationSkew = api.JWTNotBeforeValidationSkew
@@ -378,14 +405,52 @@ func (j *JWT) ExtractTo(api *apidef.APIDefinition) {
 	api.JWTSigningMethod = j.SigningMethod
 	api.JWTIdentityBaseField = j.IdentityBaseField
 	api.JWTSkipKid = j.SkipKid
-	api.JWTScopeClaimName = j.ScopeClaimName
-	api.JWTScopeToPolicyMapping = j.ScopeToPolicyMapping
 	api.JWTPolicyFieldName = j.PolicyFieldName
 	api.JWTClientIDBaseField = j.ClientBaseField
+
+	if j.Scopes != nil {
+		j.Scopes.ExtractTo(api)
+	}
+
 	api.JWTDefaultPolicies = j.DefaultPolicies
 	api.JWTIssuedAtValidationSkew = j.IssuedAtValidationSkew
 	api.JWTNotBeforeValidationSkew = j.NotBeforeValidationSkew
 	api.JWTExpiresAtValidationSkew = j.ExpiresAtValidationSkew
+}
+
+type Scopes struct {
+	ClaimName            string          `bson:"claimName,omitempty" json:"claimName,omitempty"`
+	ScopeToPolicyMapping []ScopeToPolicy `bson:"scopeToPolicyMapping,omitempty" json:"scopeToPolicyMapping,omitempty"`
+}
+
+func (s *Scopes) Fill(api apidef.APIDefinition) {
+	s.ClaimName = api.JWTScopeClaimName
+
+	s.ScopeToPolicyMapping = []ScopeToPolicy{}
+	for scope, policyID := range api.JWTScopeToPolicyMapping {
+		s.ScopeToPolicyMapping = append(s.ScopeToPolicyMapping, ScopeToPolicy{Scope: scope, PolicyID: policyID})
+	}
+
+	if len(s.ScopeToPolicyMapping) == 0 {
+		s.ScopeToPolicyMapping = nil
+	}
+}
+
+func (s *Scopes) ExtractTo(api *apidef.APIDefinition) {
+	api.JWTScopeClaimName = s.ClaimName
+
+	for _, v := range s.ScopeToPolicyMapping {
+		if api.JWTScopeToPolicyMapping == nil {
+			api.JWTScopeToPolicyMapping = make(map[string]string)
+		}
+
+		api.JWTScopeToPolicyMapping[v.Scope] = v.PolicyID
+	}
+}
+
+type ScopeToPolicy struct {
+	Scope    string `bson:"scope,omitempty" json:"scope,omitempty"`
+	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
 type Basic struct {
@@ -656,47 +721,9 @@ type Provider struct {
 	ClientToPolicyMapping []ClientToPolicy `bson:"clientToPolicyMapping,omitempty" json:"clientToPolicyMapping,omitempty"`
 }
 
-type Scopes struct {
-	DefaultClaimName     string          `bson:"defaultClaimName,omitempty" json:"defaultClaimName,omitempty"`
-	ClaimToPolicyMapping []ClaimToPolicy `bson:"claimToPolicyMapping,omitempty" json:"claimToPolicyMapping,omitempty"`
-}
-
-func (s *Scopes) Fill(api apidef.APIDefinition) {
-	s.DefaultClaimName = api.JWTScopeClaimName
-
-	s.ClaimToPolicyMapping = []ClaimToPolicy{}
-	for claimName, policyID := range api.JWTScopeToPolicyMapping {
-		s.ClaimToPolicyMapping = append(s.ClaimToPolicyMapping, ClaimToPolicy{ClaimName: claimName, PolicyID: policyID})
-	}
-
-	if len(s.ClaimToPolicyMapping) == 0 {
-		s.ClaimToPolicyMapping = nil
-	}
-}
-
-func (s *Scopes) ExtractTo(api *apidef.APIDefinition) {
-	api.JWTScopeClaimName = s.DefaultClaimName
-
-	for _, v := range s.ClaimToPolicyMapping {
-		if api.JWTScopeToPolicyMapping == nil {
-			api.JWTScopeToPolicyMapping = make(map[string]string)
-		}
-		api.JWTScopeToPolicyMapping[v.ClaimName] = v.PolicyID
-	}
-
-	if len(api.JWTScopeToPolicyMapping) == 0 {
-		api.JWTScopeToPolicyMapping = nil
-	}
-}
-
 type ClientToPolicy struct {
 	ClientID string `bson:"clientId,omitempty" json:"clientId,omitempty"`
 	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
-}
-
-type ClaimToPolicy struct {
-	ClaimName string `bson:"claimName,omitempty" json:"claimName,omitempty"`
-	PolicyID  string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
 type GoPlugin struct {
@@ -711,4 +738,30 @@ func (g *GoPlugin) Fill(api apidef.APIDefinition) {
 
 func (g *GoPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.UseGoPluginAuth = g.Enabled
+}
+
+type CustomPlugin struct {
+	// Enabled enables the CustomPlugin authentication mode.
+	// Old API Definition: `enable_coprocess_auth`
+	Enabled     bool `bson:"enabled" json:"enabled"` // required
+	AuthSources `bson:",inline" json:",inline"`
+}
+
+func (c *CustomPlugin) Fill(api apidef.APIDefinition) {
+	c.Enabled = api.EnableCoProcessAuth
+
+	c.AuthSources.Fill(api.AuthConfigs["coprocess"])
+}
+
+func (c *CustomPlugin) ExtractTo(api *apidef.APIDefinition) {
+	api.EnableCoProcessAuth = c.Enabled
+
+	authConfig := apidef.AuthConfig{}
+	c.AuthSources.ExtractTo(&authConfig)
+
+	if api.AuthConfigs == nil {
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	}
+
+	api.AuthConfigs["coprocess"] = authConfig
 }

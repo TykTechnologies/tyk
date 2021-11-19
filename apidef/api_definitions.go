@@ -439,6 +439,16 @@ type OpenIDOptions struct {
 	SegregateByClient bool                `bson:"segregate_by_client" json:"segregate_by_client"`
 }
 
+type ScopeClaim struct {
+	ScopeClaimName string            `bson:"scope_claim_name" json:"scope_claim_name"`
+	ScopeToPolicy  map[string]string `json:"scope_to_policy"`
+}
+
+type Scopes struct {
+	JWT  ScopeClaim `bson:"jwt" json:"jwt"`
+	OIDC ScopeClaim `bson:"oidc" json:"oidc"`
+}
+
 // APIDefinition represents the configuration for a single proxied API and it's versions.
 //
 // swagger:model
@@ -488,8 +498,9 @@ type APIDefinition struct {
 	JWTExpiresAtValidationSkew uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
 	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	JWTSkipKid                 bool                 `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
-	JWTScopeToPolicyMapping    map[string]string    `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"`
-	JWTScopeClaimName          string               `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`
+	Scopes                     Scopes               `bson:"scopes" json:"scopes"`
+	JWTScopeToPolicyMapping    map[string]string    `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
+	JWTScopeClaimName          string               `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
 	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
 	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
@@ -671,10 +682,11 @@ type GraphQLSubgraphConfig struct {
 
 type GraphQLSupergraphConfig struct {
 	// UpdatedAt contains the date and time of the last update of a supergraph API.
-	UpdatedAt     *time.Time              `bson:"updated_at" json:"updated_at,omitempty"`
-	Subgraphs     []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
-	MergedSDL     string                  `bson:"merged_sdl" json:"merged_sdl"`
-	GlobalHeaders map[string]string       `bson:"global_headers" json:"global_headers"`
+	UpdatedAt            *time.Time              `bson:"updated_at" json:"updated_at,omitempty"`
+	Subgraphs            []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
+	MergedSDL            string                  `bson:"merged_sdl" json:"merged_sdl"`
+	GlobalHeaders        map[string]string       `bson:"global_headers" json:"global_headers"`
+	DisableQueryBatching bool                    `bson:"disable_query_batching" json:"disable_query_batching"`
 }
 
 type GraphQLSubgraphEntity struct {
@@ -801,6 +813,14 @@ func (a *APIDefinition) EncodeForDB() {
 	if a.Auth.AuthHeaderName == "" {
 		a.Auth = a.AuthConfigs["authToken"]
 	}
+	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
+	if a.Scopes.JWT.ScopeClaimName != "" {
+		a.JWTScopeToPolicyMapping = a.Scopes.JWT.ScopeToPolicy
+		a.JWTScopeClaimName = a.Scopes.JWT.ScopeClaimName
+	} else if a.UseOpenID && a.Scopes.OIDC.ScopeClaimName != "" {
+		a.JWTScopeToPolicyMapping = a.Scopes.OIDC.ScopeToPolicy
+		a.JWTScopeClaimName = a.Scopes.OIDC.ScopeClaimName
+	}
 }
 
 func (a *APIDefinition) DecodeFromDB() {
@@ -867,6 +887,14 @@ func (a *APIDefinition) DecodeFromDB() {
 
 	makeCompatible("authToken")
 	makeCompatible("jwt")
+	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
+	if a.JWTScopeClaimName != "" && a.UseOpenID && a.Scopes.OIDC.ScopeClaimName == "" {
+		a.Scopes.OIDC.ScopeToPolicy = a.JWTScopeToPolicyMapping
+		a.Scopes.OIDC.ScopeClaimName = a.JWTScopeClaimName
+	} else if a.JWTScopeClaimName != "" && a.Scopes.JWT.ScopeClaimName == "" {
+		a.Scopes.JWT.ScopeToPolicy = a.JWTScopeToPolicyMapping
+		a.Scopes.JWT.ScopeClaimName = a.JWTScopeClaimName
+	}
 }
 
 // Expired returns true if this Version has expired
@@ -1064,17 +1092,24 @@ func DummyAPI() APIDefinition {
 	}
 
 	return APIDefinition{
-		VersionData:             versionData,
-		ConfigData:              map[string]interface{}{},
-		AllowedIPs:              []string{},
-		PinnedPublicKeys:        map[string]string{},
-		ResponseProcessors:      []ResponseProcessor{},
-		ClientCertificates:      []string{},
-		BlacklistedIPs:          []string{},
-		TagHeaders:              []string{},
-		UpstreamCertificates:    map[string]string{},
-		JWTScopeToPolicyMapping: map[string]string{},
-		HmacAllowedAlgorithms:   []string{},
+		VersionData:          versionData,
+		ConfigData:           map[string]interface{}{},
+		AllowedIPs:           []string{},
+		PinnedPublicKeys:     map[string]string{},
+		ResponseProcessors:   []ResponseProcessor{},
+		ClientCertificates:   []string{},
+		BlacklistedIPs:       []string{},
+		TagHeaders:           []string{},
+		UpstreamCertificates: map[string]string{},
+		Scopes: Scopes{
+			JWT: ScopeClaim{
+				ScopeToPolicy: map[string]string{},
+			},
+			OIDC: ScopeClaim{
+				ScopeToPolicy: map[string]string{},
+			},
+		},
+		HmacAllowedAlgorithms: []string{},
 		CustomMiddleware: MiddlewareSection{
 			Post:        []MiddlewareDefinition{},
 			Pre:         []MiddlewareDefinition{},

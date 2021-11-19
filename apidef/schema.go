@@ -114,6 +114,33 @@ const Schema = `{
         "jwt_scope_claim_name": {
             "type": "string"
         },
+		"scopes" : {
+		"type":["object", "null"],
+		"properties": {
+			"jwt": {
+				"type":["object", "null"],
+				"properties" : {
+					"scope_claim_name": {
+						"type": "string"
+					},
+					"scope_to_policy": {
+						"type":["object", "null"]
+					}
+				}
+			},
+			"oidc": {
+				"type":["object", "null"],
+				 "properties" : {
+					 "scope_claim_name": {
+						 "type": "string"
+					 },
+					 "scope_to_policy": {
+						 "type":["object", "null"]
+					 }
+				 }
+				}
+			}
+		},  
         "use_keyless": {
             "type": "boolean"
         },
@@ -582,6 +609,9 @@ const Schema = `{
                         "updated_at": {
                             "type": "string",
                             "format": "date-time"
+                        },
+                        "disable_query_batching": {
+                            "type": "boolean"
                         },
                         "subgraphs": {
                             "type": ["array", "null"],
