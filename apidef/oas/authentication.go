@@ -35,6 +35,9 @@ type Authentication struct {
 	// HMAC contains the configurations related to HMAC authentication mode.
 	// Old API Definition: `auth_configs["hmac"]`
 	HMAC *HMAC `bson:"hmac,omitempty" json:"hmac,omitempty"`
+	// OIDC contains the configurations related to OIDC authentication mode.
+	// Old API Definition: `auth_configs["oidc"]`
+	OIDC *OIDC `bson:"oidc,omitempty" json:"oidc,omitempty"`
 	// GoPlugin contains the configurations related to GoPlugin authentication mode.
 	GoPlugin *GoPlugin `bson:"goPlugin,omitempty" json:"goPlugin,omitempty"`
 	// CustomPlugin contains the configurations related to CustomPlugin authentication mode.
@@ -133,6 +136,18 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(a.CustomPlugin) {
 		a.CustomPlugin = nil
 	}
+
+	if _, ok := api.AuthConfigs["oidc"]; ok {
+		if a.OIDC == nil {
+			a.OIDC = &OIDC{}
+		}
+
+		a.OIDC.Fill(api)
+	}
+
+	if ShouldOmit(a.OIDC) {
+		a.OIDC = nil
+	}
 }
 
 func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
@@ -158,6 +173,10 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 	if a.HMAC != nil {
 		a.HMAC.ExtractTo(api)
+	}
+
+	if a.OIDC != nil {
+		a.OIDC.ExtractTo(api)
 	}
 
 	if a.GoPlugin != nil {
@@ -360,7 +379,7 @@ func (j *JWT) Fill(api apidef.APIDefinition) {
 		j.Scopes = &Scopes{}
 	}
 
-	j.Scopes.Fill(api)
+	j.Scopes.Fill(&api.Scopes.JWT)
 	if ShouldOmit(j.Scopes) {
 		j.Scopes = nil
 	}
@@ -390,7 +409,7 @@ func (j *JWT) ExtractTo(api *apidef.APIDefinition) {
 	api.JWTClientIDBaseField = j.ClientBaseField
 
 	if j.Scopes != nil {
-		j.Scopes.ExtractTo(api)
+		j.Scopes.ExtractTo(&api.Scopes.JWT)
 	}
 
 	api.JWTDefaultPolicies = j.DefaultPolicies
@@ -404,11 +423,12 @@ type Scopes struct {
 	ScopeToPolicyMapping []ScopeToPolicy `bson:"scopeToPolicyMapping,omitempty" json:"scopeToPolicyMapping,omitempty"`
 }
 
-func (s *Scopes) Fill(api apidef.APIDefinition) {
-	s.ClaimName = api.JWTScopeClaimName
+func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
+	s.ClaimName = scopeClaim.ScopeClaimName
 
 	s.ScopeToPolicyMapping = []ScopeToPolicy{}
-	for scope, policyID := range api.JWTScopeToPolicyMapping {
+
+	for scope, policyID := range scopeClaim.ScopeToPolicy {
 		s.ScopeToPolicyMapping = append(s.ScopeToPolicyMapping, ScopeToPolicy{Scope: scope, PolicyID: policyID})
 	}
 
@@ -417,15 +437,15 @@ func (s *Scopes) Fill(api apidef.APIDefinition) {
 	}
 }
 
-func (s *Scopes) ExtractTo(api *apidef.APIDefinition) {
-	api.JWTScopeClaimName = s.ClaimName
+func (s *Scopes) ExtractTo(scopeClaim *apidef.ScopeClaim) {
+	scopeClaim.ScopeClaimName = s.ClaimName
 
 	for _, v := range s.ScopeToPolicyMapping {
-		if api.JWTScopeToPolicyMapping == nil {
-			api.JWTScopeToPolicyMapping = make(map[string]string)
+		if scopeClaim.ScopeToPolicy == nil {
+			scopeClaim.ScopeToPolicy = make(map[string]string)
 		}
 
-		api.JWTScopeToPolicyMapping[v.Scope] = v.PolicyID
+		scopeClaim.ScopeToPolicy[v.Scope] = v.PolicyID
 	}
 }
 
@@ -621,6 +641,90 @@ func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 
 	api.HmacAllowedAlgorithms = h.AllowedAlgorithms
 	api.HmacAllowedClockSkew = h.AllowedClockSkew
+}
+
+type OIDC struct {
+	// Enabled enables the OIDC authentication mode.
+	// Old API Definition: `use_openid`
+	Enabled     bool `bson:"enabled" json:"enabled"` // required
+	AuthSources `bson:",inline" json:",inline"`
+
+	SegregateByClientId bool       `bson:"segregateByClientId,omitempty" json:"segregateByClientId,omitempty"`
+	Providers           []Provider `bson:"providers,omitempty" json:"providers,omitempty"`
+	Scopes              *Scopes    `bson:"scopes,omitempty" json:"scopes,omitempty"`
+}
+
+func (o *OIDC) Fill(api apidef.APIDefinition) {
+	o.Enabled = api.UseOpenID
+
+	o.AuthSources.Fill(api.AuthConfigs["oidc"])
+
+	o.SegregateByClientId = api.OpenIDOptions.SegregateByClient
+
+	o.Providers = []Provider{}
+	for _, v := range api.OpenIDOptions.Providers {
+		var mapping []ClientToPolicy
+		for clientID, polID := range v.ClientIDs {
+			mapping = append(mapping, ClientToPolicy{ClientID: clientID, PolicyID: polID})
+		}
+
+		if len(mapping) == 0 {
+			mapping = nil
+		}
+
+		o.Providers = append(o.Providers, Provider{Issuer: v.Issuer, ClientToPolicyMapping: mapping})
+	}
+
+	if len(o.Providers) == 0 {
+		o.Providers = nil
+	}
+
+	if o.Scopes == nil {
+		o.Scopes = &Scopes{}
+	}
+
+	o.Scopes.Fill(&api.Scopes.OIDC)
+	if ShouldOmit(o.Scopes) {
+		o.Scopes = nil
+	}
+}
+
+func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
+	api.UseOpenID = o.Enabled
+
+	authConfig := apidef.AuthConfig{}
+	o.AuthSources.ExtractTo(&authConfig)
+
+	if api.AuthConfigs == nil {
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	}
+
+	api.AuthConfigs["oidc"] = authConfig
+
+	api.OpenIDOptions.SegregateByClient = o.SegregateByClientId
+
+	for _, p := range o.Providers {
+		clientIDs := make(map[string]string)
+		for _, mapping := range p.ClientToPolicyMapping {
+			clientIDs[mapping.ClientID] = mapping.PolicyID
+		}
+
+		api.OpenIDOptions.Providers = append(api.OpenIDOptions.Providers, apidef.OIDProviderConfig{Issuer: p.Issuer, ClientIDs: clientIDs})
+	}
+
+	if o.Scopes != nil {
+		o.Scopes.ExtractTo(&api.Scopes.OIDC)
+	}
+}
+
+type Provider struct {
+	Issuer                string           `bson:"issuer,omitempty" json:"issuer,omitempty"`
+	ClientToPolicyMapping []ClientToPolicy `bson:"clientToPolicyMapping,omitempty" json:"clientToPolicyMapping,omitempty"`
+}
+
+type ClientToPolicy struct {
+	ClientID string `bson:"clientId,omitempty" json:"clientId,omitempty"`
+	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
 type GoPlugin struct {
