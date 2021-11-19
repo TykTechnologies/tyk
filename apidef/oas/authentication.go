@@ -424,27 +424,52 @@ type Scopes struct {
 }
 
 func (s *Scopes) Fill(api apidef.APIDefinition) {
-	s.ClaimName = api.JWTScopeClaimName
+	s.ClaimName = api.Scopes.JWT.ScopeClaimName
 
 	s.ScopeToPolicyMapping = []ScopeToPolicy{}
-	for scope, policyID := range api.JWTScopeToPolicyMapping {
+	for scope, policyID := range api.Scopes.JWT.ScopeToPolicy {
 		s.ScopeToPolicyMapping = append(s.ScopeToPolicyMapping, ScopeToPolicy{Scope: scope, PolicyID: policyID})
 	}
 
 	if len(s.ScopeToPolicyMapping) == 0 {
 		s.ScopeToPolicyMapping = nil
 	}
+	if api.UseOpenID {
+		s.ClaimName = api.Scopes.OIDC.ScopeClaimName
+
+		s.ScopeToPolicyMapping = []ScopeToPolicy{}
+		for scope, policyID := range api.Scopes.OIDC.ScopeToPolicy {
+			s.ScopeToPolicyMapping = append(s.ScopeToPolicyMapping, ScopeToPolicy{Scope: scope, PolicyID: policyID})
+		}
+
+		if len(s.ScopeToPolicyMapping) == 0 {
+			s.ScopeToPolicyMapping = nil
+		}
+	}
+
 }
 
 func (s *Scopes) ExtractTo(api *apidef.APIDefinition) {
-	api.JWTScopeClaimName = s.ClaimName
+	api.Scopes.JWT.ScopeClaimName = s.ClaimName
 
 	for _, v := range s.ScopeToPolicyMapping {
-		if api.JWTScopeToPolicyMapping == nil {
-			api.JWTScopeToPolicyMapping = make(map[string]string)
+		if api.Scopes.JWT.ScopeToPolicy == nil {
+			api.Scopes.JWT.ScopeToPolicy = make(map[string]string)
 		}
 
-		api.JWTScopeToPolicyMapping[v.Scope] = v.PolicyID
+		api.Scopes.JWT.ScopeToPolicy[v.Scope] = v.PolicyID
+	}
+
+	if api.UseOpenID {
+		api.Scopes.OIDC.ScopeClaimName = s.ClaimName
+
+		for _, v := range s.ScopeToPolicyMapping {
+			if api.Scopes.OIDC.ScopeToPolicy == nil {
+				api.Scopes.OIDC.ScopeToPolicy = make(map[string]string)
+			}
+
+			api.Scopes.OIDC.ScopeToPolicy[v.Scope] = v.PolicyID
+		}
 	}
 }
 

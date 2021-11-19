@@ -151,6 +151,7 @@ func FillTestAuthConfigs(t *testing.T, index int) map[string]apidef.AuthConfig {
 	authConfigs["oauth"] = a
 	authConfigs["hmac"] = a
 	authConfigs["coprocess"] = a
+	authConfigs["oidc"] = a
 
 	return authConfigs
 }
