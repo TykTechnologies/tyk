@@ -424,9 +424,9 @@ type Scopes struct {
 }
 
 func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
-	s.ScopeToPolicyMapping = []ScopeToPolicy{}
-
 	s.ClaimName = scopeClaim.ScopeClaimName
+
+	s.ScopeToPolicyMapping = []ScopeToPolicy{}
 
 	for scope, policyID := range scopeClaim.ScopeToPolicy {
 		s.ScopeToPolicyMapping = append(s.ScopeToPolicyMapping, ScopeToPolicy{Scope: scope, PolicyID: policyID})
