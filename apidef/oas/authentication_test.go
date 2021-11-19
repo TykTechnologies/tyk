@@ -58,11 +58,11 @@ func TestJWT(t *testing.T) {
 func TestScopes(t *testing.T) {
 	var emptyScopes Scopes
 
-	var convertedAPI apidef.APIDefinition
-	emptyScopes.ExtractTo(&convertedAPI)
+	scopeClaim := apidef.ScopeClaim{}
+	emptyScopes.ExtractTo(&scopeClaim)
 
 	var resultScopes Scopes
-	resultScopes.Fill(convertedAPI)
+	resultScopes.Fill(&scopeClaim)
 
 	assert.Equal(t, emptyScopes, resultScopes)
 }

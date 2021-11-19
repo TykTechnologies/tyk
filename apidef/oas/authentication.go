@@ -379,7 +379,7 @@ func (j *JWT) Fill(api apidef.APIDefinition) {
 		j.Scopes = &Scopes{}
 	}
 
-	j.Scopes.Fill(api)
+	j.Scopes.Fill(&api.Scopes.JWT)
 	if ShouldOmit(j.Scopes) {
 		j.Scopes = nil
 	}
@@ -409,7 +409,7 @@ func (j *JWT) ExtractTo(api *apidef.APIDefinition) {
 	api.JWTClientIDBaseField = j.ClientBaseField
 
 	if j.Scopes != nil {
-		j.Scopes.ExtractTo(api)
+		j.Scopes.ExtractTo(&api.Scopes.JWT)
 	}
 
 	api.JWTDefaultPolicies = j.DefaultPolicies
@@ -423,53 +423,29 @@ type Scopes struct {
 	ScopeToPolicyMapping []ScopeToPolicy `bson:"scopeToPolicyMapping,omitempty" json:"scopeToPolicyMapping,omitempty"`
 }
 
-func (s *Scopes) Fill(api apidef.APIDefinition) {
-	s.ClaimName = api.Scopes.JWT.ScopeClaimName
-
+func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	s.ScopeToPolicyMapping = []ScopeToPolicy{}
-	for scope, policyID := range api.Scopes.JWT.ScopeToPolicy {
+
+	s.ClaimName = scopeClaim.ScopeClaimName
+
+	for scope, policyID := range scopeClaim.ScopeToPolicy {
 		s.ScopeToPolicyMapping = append(s.ScopeToPolicyMapping, ScopeToPolicy{Scope: scope, PolicyID: policyID})
 	}
 
 	if len(s.ScopeToPolicyMapping) == 0 {
 		s.ScopeToPolicyMapping = nil
 	}
-	if api.UseOpenID {
-		s.ClaimName = api.Scopes.OIDC.ScopeClaimName
-
-		s.ScopeToPolicyMapping = []ScopeToPolicy{}
-		for scope, policyID := range api.Scopes.OIDC.ScopeToPolicy {
-			s.ScopeToPolicyMapping = append(s.ScopeToPolicyMapping, ScopeToPolicy{Scope: scope, PolicyID: policyID})
-		}
-
-		if len(s.ScopeToPolicyMapping) == 0 {
-			s.ScopeToPolicyMapping = nil
-		}
-	}
-
 }
 
-func (s *Scopes) ExtractTo(api *apidef.APIDefinition) {
-	api.Scopes.JWT.ScopeClaimName = s.ClaimName
+func (s *Scopes) ExtractTo(scopeClaim *apidef.ScopeClaim) {
+	scopeClaim.ScopeClaimName = s.ClaimName
 
 	for _, v := range s.ScopeToPolicyMapping {
-		if api.Scopes.JWT.ScopeToPolicy == nil {
-			api.Scopes.JWT.ScopeToPolicy = make(map[string]string)
+		if scopeClaim.ScopeToPolicy == nil {
+			scopeClaim.ScopeToPolicy = make(map[string]string)
 		}
 
-		api.Scopes.JWT.ScopeToPolicy[v.Scope] = v.PolicyID
-	}
-
-	if api.UseOpenID {
-		api.Scopes.OIDC.ScopeClaimName = s.ClaimName
-
-		for _, v := range s.ScopeToPolicyMapping {
-			if api.Scopes.OIDC.ScopeToPolicy == nil {
-				api.Scopes.OIDC.ScopeToPolicy = make(map[string]string)
-			}
-
-			api.Scopes.OIDC.ScopeToPolicy[v.Scope] = v.PolicyID
-		}
+		scopeClaim.ScopeToPolicy[v.Scope] = v.PolicyID
 	}
 }
 
@@ -707,7 +683,7 @@ func (o *OIDC) Fill(api apidef.APIDefinition) {
 		o.Scopes = &Scopes{}
 	}
 
-	o.Scopes.Fill(api)
+	o.Scopes.Fill(&api.Scopes.OIDC)
 	if ShouldOmit(o.Scopes) {
 		o.Scopes = nil
 	}
@@ -737,7 +713,7 @@ func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	if o.Scopes != nil {
-		o.Scopes.ExtractTo(api)
+		o.Scopes.ExtractTo(&api.Scopes.OIDC)
 	}
 }
 
