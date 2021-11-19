@@ -100,12 +100,12 @@ jobs:
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --tests=false --timeout=300s --max-issues-per-linter=0 --max-same-issues=0 --new-from-rev=${{ github.base_ref }} ./... > golanglint.xml
+          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --tests=false --timeout=300s --max-issues-per-linter=0 --max-same-issues=0 --new-from-rev=${{ github.base_ref }} --issues-exit-code=0 ./... > golanglint.xml
 
       - name: golangci-lint
         if: ${{ github.event_name == 'push' }}
         run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --tests=false --timeout=300s --max-issues-per-linter=0 --max-same-issues=0 ./... > golanglint.xml || true
+          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --tests=false --timeout=300s --max-issues-per-linter=0 --max-same-issues=0 --issues-exit-code=0 ./... > golanglint.xml
 
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
