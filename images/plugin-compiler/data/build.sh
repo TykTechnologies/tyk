@@ -1,6 +1,7 @@
 #!/bin/bash
-
 set -xe
+
+export PLUGIN_BUILD_PATH=`mktemp -d -p '/go/src'`
 
 plugin_name=$1
 
