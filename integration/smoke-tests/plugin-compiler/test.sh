@@ -18,6 +18,12 @@ compose='docker-compose'
 # composev2 is a client plugin
 [[ $(docker version --format='{{ .Client.Version }}') == "20.10.11" ]] && compose='docker compose'
 
+function logAndStopDocker {
+  $compose logs
+  $compose down
+  exit $1
+}
+
 [[ -z $1 ]] && usage $0
 export tag=$1
 
@@ -28,4 +34,8 @@ docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${t
 $compose up -d
 sleep 2 # Wait for init
 curl -vvv http://localhost:8080/goplugin/headers
-curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"' || $compose logs gw
+if curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"'; then
+  logAndStopDocker 0
+else
+  logAndStopDocker 1
+fi
