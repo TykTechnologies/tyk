@@ -792,7 +792,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	k.reportLoginFailure(tykId, r)
 	if err != nil {
 		logger.WithError(err).Error("JWT validation error")
-		return errors.New("Key not authorized:Unexpected signing method."), http.StatusForbidden
+		errorDetails := strings.Split(err.Error(), ":")
+		if errorDetails[0] == "Unexpected signing method" {
+			return errors.New("Key not authorized:" + errorDetails[0] + "."), http.StatusForbidden
+		}
 	}
 	return errors.New("Key not authorized"), http.StatusForbidden
 }
