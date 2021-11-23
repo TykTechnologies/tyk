@@ -394,7 +394,7 @@ func TestJWTSessionFailRSA_WrongJWT_Signature(t *testing.T) {
 	authHeaders := map[string]string{"authorization": invalidSignToken}
 
 	t.Run("Request with invalid JWT signature", func(t *testing.T) {
-		ts.Run(t, test.TestCase{
+		_, _ = ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
 			BodyMatch: `Key not authorized: Unexpected signing method`,
