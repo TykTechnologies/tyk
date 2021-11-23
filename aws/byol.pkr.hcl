@@ -5,20 +5,6 @@
 # ./pr.zsh -title [TT-2932] Fixes broken init services post-install procedures -branch fix/packaging -base master -repos tyk,tyk-analytics
 # m4 -E -DxREPO=tyk
 
-packer {
-  required_plugins {
-    amazon = {
-      version = ">= 0.0.2"
-      source  = "github.com/hashicorp/amazon"
-    }
-  }
-}
-
-variable "region" {
-  type    = string
-  default = "us-east-1"
-}
-
 variable "flavour" {
   description = "OS Flavour"
   type    = string
@@ -34,12 +20,17 @@ variable "ami_search_string" {
 
 variable "geoip_license" {
   type    = string
-  default = env("GEOIP_LICENSE")
+  default = "${env("GEOIP_LICENSE")}"
+}
+
+variable "region" {
+  type    = string
+  default = "sa-east-1"
 }
 
 variable "version" {
   type    = string
-  default = env("VERSION")
+  default = "${env("VERSION")}"
 }
 
 # Latest at this time
@@ -56,11 +47,6 @@ data "amazon-ami" "base-os" {
   owners      = ["${var.source_ami_owner}"]
 }
 
-# "timestamp" template function replacement
-locals {
-       timestamp = regex_replace(timestamp(), "[- TZ:]", "")
-}
-
 # source blocks are generated from your builders; a source can be referenced in
 # build blocks. A build block runs provisioner and post-processors on a
 # source. Read the documentation for source blocks here:
@@ -71,6 +57,7 @@ source "amazon-ebs" "byol" {
   force_delete_snapshot = true
   force_deregister      = true
   instance_type         = "t3.micro"
+  region                = "${var.region}"
   source_ami            = data.amazon-ami.base-os.id
   sriov_support = true
   ssh_username  = "ec2-user"
@@ -95,21 +82,20 @@ source "amazon-ebs" "byol" {
 build {
   sources = ["source.amazon-ebs.byol"]
 
-
   provisioner "file" {
     destination = "/tmp/semver.sh"
-    source      = "semver.sh"
+    source      = "utils/semver.sh"
   }
   provisioner "file" {
     destination = "/tmp/tyk-gateway.rpm"
-    source      = "deb/tyk-gateway_x86_64.rpm"
+    source      = "rpm/tyk-gateway-x86_64.rpm"
   }
   provisioner "file" {
     destination = "/tmp/10-run-tyk.conf"
-    source      = "10-run-tyk.conf"
+    source      = "utils/10-run-tyk.conf"
   }
   provisioner "shell" {
-    environment_vars = ["GEOIP_LICENSE=${var.geoip_license}"]
+    environment_vars = ["VERSION=${var.version}" , "GEOIP_LICENSE=${var.geoip_license}"]
     script           = "byol/install-tyk.sh"
   }
 }
