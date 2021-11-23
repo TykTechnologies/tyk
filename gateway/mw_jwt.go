@@ -38,6 +38,8 @@ const (
 	ECDSASign = "ecdsa"
 )
 
+const UnexpectedSigningMethod = "Unexpected signing method"
+
 var (
 	// List of common OAuth Client ID claims used by IDPs:
 	oauthClientIDClaims = []string{
@@ -729,20 +731,20 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		switch k.Spec.JWTSigningMethod {
 		case HMACSign:
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v and not HMAC signature", token.Header["alg"])
+				return nil, fmt.Errorf( "%v: %v and not HMAC signature", UnexpectedSigningMethod, token.Header["alg"])
 			}
 		case RSASign:
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v and not RSA signature", token.Header["alg"])
+				return nil, fmt.Errorf("%v: %v and not RSA signature", UnexpectedSigningMethod, token.Header["alg"])
 			}
 		case ECDSASign:
 			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v and not ECDSA signature", token.Header["alg"])
+				return nil, fmt.Errorf("%v: %v and not ECDSA signature", UnexpectedSigningMethod, token.Header["alg"])
 			}
 		default:
 			logger.Warning("No signing method found in API Definition, defaulting to HMAC signature")
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+				return nil, fmt.Errorf("%v: %v", UnexpectedSigningMethod, token.Header["alg"])
 			}
 		}
 
@@ -793,8 +795,8 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	if err != nil {
 		logger.WithError(err).Error("JWT validation error")
 		errorDetails := strings.Split(err.Error(), ":")
-		if errorDetails[0] == "Unexpected signing method" {
-			return errors.New("Key not authorized:" + errorDetails[0] + "."), http.StatusForbidden
+		if errorDetails[0] == UnexpectedSigningMethod {
+			return errors.New(MsgKeyNotAuthorizedUnexpectedSigningMethod), http.StatusForbidden
 		}
 	}
 	return errors.New("Key not authorized"), http.StatusForbidden
