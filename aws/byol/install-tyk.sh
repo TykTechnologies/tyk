@@ -5,7 +5,8 @@ set -ex
 sudo yum update -y
 
 python_pkgs="python3-libs python3-pip python3-devel"
-pip='pip3 install grpcio protobuf'
+
+pip='pip3 install --only-binary ":all:" grpcio protobuf'
 
 # RHEL 7.7 onwards has its own Python3 that interferes with EPEL's Python
 source /etc/os-release
@@ -13,7 +14,7 @@ if [[ $ID == 'rhel' ]]; then
     sudo yum-config-manager --enable rhel-server-rhui-rhscl-$(rpm -E '%{rhel}')-rpms
     python_pkgs='rh-python36'
     cat > /tmp/pip <<EOF
-scl enable rh-python36 'pip install grpcio protobuf'
+scl enable rh-python36 'pip install --only-binary ":all:" grpcio protobuf'
 EOF
     chmod +x /tmp/pip
     pip='/tmp/pip'
