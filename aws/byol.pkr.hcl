@@ -5,6 +5,15 @@
 # ./pr.zsh -title [TT-2932] Fixes broken init services post-install procedures -branch fix/packaging -base master -repos tyk,tyk-analytics
 # m4 -E -DxREPO=tyk
 
+packer {
+  required_plugins {
+    amazon = {
+      version = ">= 0.0.2"
+      source  = "github.com/hashicorp/amazon"
+    }
+  }
+}
+
 variable "flavour" {
   description = "OS Flavour"
   type    = string
