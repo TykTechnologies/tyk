@@ -185,3 +185,61 @@ func TestNotVersioned(t *testing.T) {
 		_, _ = g.Run(t, test.TestCase{Code: http.StatusOK})
 	})
 }
+
+func TestNewVersioning(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	versionedAPI := BuildAPI(func(a *APISpec) {
+		a.APIID = "versioned"
+		a.Name = "versioned"
+		a.Proxy.ListenPath = "/new"
+		a.UseKeylessAccess = false
+		a.VersionData.Versions = map[string]apidef.VersionInfo{
+			"Default": {},
+		}
+	})[0]
+
+	baseAPI := BuildAPI(func(a *APISpec) {
+		a.APIID = "base"
+		a.Proxy.ListenPath = "/default"
+		a.UseKeylessAccess = true
+		a.VersionData.NotVersioned = false
+		a.VersionData.DefaultVersion = "v1"
+		a.VersionData.Versions = map[string]apidef.VersionInfo{
+			"v1": {
+				Name: "v1",
+			},
+			"v2": {
+				Name:  "v2",
+				APIID: versionedAPI.APIID,
+			},
+		}
+		a.VersionDefinition.Location = "url-param"
+		a.VersionDefinition.Key = "version"
+	})[0]
+
+	ts.Gw.LoadAPI(baseAPI, versionedAPI)
+
+	_, key := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{versionedAPI.APIID: {
+			APIID: versionedAPI.APIID,
+		}}
+	})
+
+	headers := map[string]string{
+		"Authorization": key,
+	}
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/default", Code: http.StatusOK},
+		// default listen path with version param should route to v2
+		{Path: "/default?version=v2", Code: http.StatusUnauthorized},
+		{Path: "/default?version=v2", Headers: headers, Code: http.StatusOK},
+		// For not found version, it should fallback to default
+		{Path: "/default?version=notFound", BodyMatch: string(VersionDoesNotExist), Code: http.StatusForbidden},
+		// v2 should be accessible by its own listen path
+		{Path: "/new", Code: http.StatusUnauthorized},
+		{Path: "/new", Headers: headers, Code: http.StatusOK},
+	}...)
+}

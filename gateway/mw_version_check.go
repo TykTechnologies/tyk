@@ -54,6 +54,33 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	}
 
 	versionInfo, _ := v.Spec.Version(r)
+	if !v.Spec.VersionData.NotVersioned && versionInfo.APIID != "" {
+		handler, targetAPI, found := v.Gw.findInternalHttpHandlerByNameOrID(versionInfo.APIID)
+		if !found {
+			return errors.New("couldn't detect target"), http.StatusNotFound
+		}
+
+		var targetAPIBaseVersion apidef.VersionInfo
+		if targetAPI.VersionData.DefaultVersion == "" {
+			if def, ok := targetAPI.VersionData.Versions["Default"]; ok {
+				targetAPIBaseVersion = def
+			} else {
+				for _, v := range targetAPI.VersionData.Versions {
+					targetAPIBaseVersion = v
+					break
+				}
+			}
+		} else {
+			targetAPIBaseVersion = targetAPI.VersionData.Versions[targetAPI.VersionData.DefaultVersion]
+		}
+
+		ctxSetVersionInfo(r, &targetAPIBaseVersion)
+
+		sanitizeProxyPaths(v.Spec, r)
+
+		handler.ServeHTTP(w, r)
+		return nil, mwStatusRespond
+	}
 	versionPaths := v.Spec.RxPaths[versionInfo.Name]
 	whiteListStatus := v.Spec.WhiteListEnabled[versionInfo.Name]
 

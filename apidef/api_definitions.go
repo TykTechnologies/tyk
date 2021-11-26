@@ -338,6 +338,7 @@ type VersionInfo struct {
 	IgnoreEndpointCase          bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
 	GlobalSizeLimit             int64             `bson:"global_size_limit" json:"global_size_limit"`
 	OverrideTarget              string            `bson:"override_target" json:"override_target"`
+	APIID                       string            `bson:"api_id" json:"api_id"`
 }
 
 type AuthProviderMeta struct {
