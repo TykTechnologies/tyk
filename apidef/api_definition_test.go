@@ -1,8 +1,9 @@
 package apidef
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	schema "github.com/xeipuuv/gojsonschema"
 )
@@ -110,4 +111,26 @@ func TestSchemaGraphqlConfig(t *testing.T) {
 			t.Error(err)
 		}
 	}
+}
+
+func TestAPIDefinition_DecodeFromDB_AuthDeprecation(t *testing.T) {
+	const authHeader = "authorization"
+
+	spec := DummyAPI()
+	spec.Auth = AuthConfig{AuthHeaderName: authHeader}
+	spec.UseStandardAuth = true
+	spec.DecodeFromDB()
+
+	assert.Equal(t, spec.AuthConfigs, map[string]AuthConfig{
+		"authToken": spec.Auth,
+	})
+
+	spec.EnableJWT = true
+	spec.DecodeFromDB()
+
+	assert.Equal(t, spec.AuthConfigs, map[string]AuthConfig{
+		"authToken": spec.Auth,
+		"jwt":       spec.Auth,
+	})
+
 }
