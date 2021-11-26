@@ -40,15 +40,6 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	if x.Middleware != nil {
 		x.Middleware.ExtractTo(api)
 	}
-
-	// This is used to make API calls work before actual versioning implementation.
-	api.VersionData.DefaultVersion = "Default"
-	api.VersionData.NotVersioned = true
-	if len(api.VersionData.Versions) == 0 {
-		api.VersionData.Versions = map[string]apidef.VersionInfo{
-			"Default": {},
-		}
-	}
 }
 
 type Info struct {
@@ -65,7 +56,8 @@ type Info struct {
 	// Old API Definition: `name`
 	Name string `bson:"name" json:"name"` // required
 	// State contains the configurations related to the state of the API.
-	State State `bson:"state" json:"state"` // required
+	State      State       `bson:"state" json:"state"` // required
+	Versioning *Versioning `bson:"versioning,omitempty" json:"versioning,omitempty"`
 }
 
 func (i *Info) Fill(api apidef.APIDefinition) {
@@ -74,6 +66,15 @@ func (i *Info) Fill(api apidef.APIDefinition) {
 	i.OrgID = api.OrgID
 	i.Name = api.Name
 	i.State.Fill(api)
+
+	if i.Versioning == nil {
+		i.Versioning = &Versioning{}
+	}
+
+	i.Versioning.Fill(api)
+	if ShouldOmit(i.Versioning) {
+		i.Versioning = nil
+	}
 }
 
 func (i *Info) ExtractTo(api *apidef.APIDefinition) {
@@ -82,6 +83,12 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	api.OrgID = i.OrgID
 	api.Name = i.Name
 	i.State.ExtractTo(api)
+
+	if i.Versioning != nil {
+		i.Versioning.ExtractTo(api)
+	} else {
+		api.VersionData.NotVersioned = true
+	}
 }
 
 type State struct {
@@ -101,4 +108,49 @@ func (s *State) Fill(api apidef.APIDefinition) {
 func (s *State) ExtractTo(api *apidef.APIDefinition) {
 	api.Active = s.Active
 	api.Internal = s.Internal
+}
+
+type Versioning struct {
+	Enabled   bool              `bson:"enabled" json:"enabled"` // required
+	Versions  map[string]string `bson:"versions,omitempty" json:"versions,omitempty"`
+	Location  string            `bson:"location,omitempty" json:"location,omitempty"`
+	Key       string            `bson:"key,omitempty" json:"key,omitempty"`
+	StripPath bool              `bson:"stripPath,omitempty" json:"stripPath,omitempty"`
+}
+
+func (v *Versioning) Fill(api apidef.APIDefinition) {
+	v.Enabled = !api.VersionData.NotVersioned
+	v.Versions = make(map[string]string)
+
+	for vName, ver := range api.VersionData.Versions {
+		if vName == "Default" {
+			continue
+		}
+		v.Versions[vName] = ver.APIID
+	}
+
+	if ShouldOmit(v.Versions) {
+		v.Versions = nil
+	}
+
+	v.Location = api.VersionDefinition.Location
+	v.Key = api.VersionDefinition.Key
+	v.StripPath = api.VersionDefinition.StripPath
+}
+
+func (v *Versioning) ExtractTo(api *apidef.APIDefinition) {
+	api.VersionData.NotVersioned = !v.Enabled
+	if api.VersionData.Versions == nil {
+		api.VersionData.Versions = make(map[string]apidef.VersionInfo)
+	}
+
+	for vName, apiID := range v.Versions {
+		api.VersionData.Versions[vName] = apidef.VersionInfo{
+			APIID: apiID,
+		}
+	}
+
+	api.VersionDefinition.Location = v.Location
+	api.VersionDefinition.Key = v.Key
+	api.VersionDefinition.StripPath = v.StripPath
 }
