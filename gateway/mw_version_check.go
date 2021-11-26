@@ -60,21 +60,14 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 			return errors.New("couldn't detect target"), http.StatusNotFound
 		}
 
-		var targetAPIBaseVersion apidef.VersionInfo
-		if targetAPI.VersionData.DefaultVersion == "" {
-			if def, ok := targetAPI.VersionData.Versions["Default"]; ok {
-				targetAPIBaseVersion = def
-			} else {
-				for _, v := range targetAPI.VersionData.Versions {
-					targetAPIBaseVersion = v
-					break
-				}
-			}
-		} else {
-			targetAPIBaseVersion = targetAPI.VersionData.Versions[targetAPI.VersionData.DefaultVersion]
-		}
+		// Remove cached version info
+		ctxSetVersionInfo(r, nil)
 
-		ctxSetVersionInfo(r, &targetAPIBaseVersion)
+		// Find and cache version info for target API
+		_, status := targetAPI.Version(r)
+		if status != StatusOk {
+			return errors.New(string(status)), http.StatusForbidden
+		}
 
 		sanitizeProxyPaths(v.Spec, r)
 

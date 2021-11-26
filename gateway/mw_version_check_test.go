@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -195,6 +197,7 @@ func TestNewVersioning(t *testing.T) {
 		a.Name = "versioned"
 		a.Proxy.ListenPath = "/new"
 		a.UseKeylessAccess = false
+		a.VersionData.DefaultVersion = ""
 		a.VersionData.Versions = map[string]apidef.VersionInfo{
 			"Default": {},
 		}
@@ -242,4 +245,36 @@ func TestNewVersioning(t *testing.T) {
 		{Path: "/new", Code: http.StatusUnauthorized},
 		{Path: "/new", Headers: headers, Code: http.StatusOK},
 	}...)
+
+	t.Run("versioned API is not versioned", func(t *testing.T) {
+		assert.True(t, versionedAPI.VersionData.NotVersioned)
+		t.Run("default is not specified", func(t *testing.T) {
+			assert.Empty(t, versionedAPI.VersionData.DefaultVersion)
+			_, _ = ts.Run(t, test.TestCase{Path: "/default?version=v2", Headers: headers, Code: http.StatusOK})
+		})
+
+		t.Run("default is invalid", func(t *testing.T) {
+			versionedAPI.VersionData.DefaultVersion = "invalid"
+			ts.Gw.LoadAPI(baseAPI, versionedAPI)
+			_, _ = ts.Run(t, test.TestCase{Path: "/default?version=v2", Headers: headers, Code: http.StatusOK})
+		})
+	})
+
+	t.Run("versioned API is versioned", func(t *testing.T) {
+		versionedAPI.VersionData.NotVersioned = false
+		t.Run("default is not specified", func(t *testing.T) {
+			versionedAPI.VersionData.DefaultVersion = ""
+			ts.Gw.LoadAPI(baseAPI, versionedAPI)
+			assert.Empty(t, versionedAPI.VersionData.DefaultVersion)
+			_, _ = ts.Run(t, test.TestCase{Path: "/default?version=v2", Headers: headers,
+				BodyMatch: string(VersionNotFound), Code: http.StatusForbidden})
+		})
+
+		t.Run("default is invalid", func(t *testing.T) {
+			versionedAPI.VersionData.DefaultVersion = "invalid"
+			ts.Gw.LoadAPI(baseAPI, versionedAPI)
+			_, _ = ts.Run(t, test.TestCase{Path: "/default?version=v2", Headers: headers,
+				BodyMatch: string(VersionDoesNotExist), Code: http.StatusForbidden})
+		})
+	})
 }
