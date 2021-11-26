@@ -1,6 +1,6 @@
-# Go version here should match https://github.com/TykTechnologies/golang-cross/blob/master/.github/workflows/release.yml#L16
+# Go version here should match https://github.com/TykTechnologies/golang-cross/blob/<branch>/.github/workflows/release.yml#L38
 
-FROM golang:1.16.10
+FROM golang:1.15.15
 LABEL description="Image for plugin development"
 
 ARG TYK_GW_TAG
