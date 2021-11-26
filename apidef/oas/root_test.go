@@ -53,6 +53,19 @@ func TestXTykAPIGateway(t *testing.T) {
 
 		assert.Equal(t, initialAPI, convertedAPI)
 	})
+
+	t.Run("filled OAS", func(t *testing.T) {
+		var xTykAPIGateway XTykAPIGateway
+		Fill(t, &xTykAPIGateway, 0)
+
+		var convertedAPI apidef.APIDefinition
+		xTykAPIGateway.ExtractTo(&convertedAPI)
+
+		var resultXTykAPIGateway XTykAPIGateway
+		resultXTykAPIGateway.Fill(convertedAPI)
+
+		assert.Equal(t, xTykAPIGateway, resultXTykAPIGateway)
+	})
 }
 
 func TestInfo(t *testing.T) {
@@ -128,17 +141,19 @@ func Fill(t *testing.T, input interface{}, index int) {
 
 			v.Set(newMap)
 		}
-
 	case reflect.Struct:
-		for i := 0; i < v.NumField(); i++ {
-			fv := v.Field(i)
-			if v.Type().Field(i).Tag.Get("json") == "-" || v.Type().Field(i).Tag.Get("json") == "" {
-				continue
+		if v.Type() == reflect.TypeOf(apidef.VersionData{}) {
+			v.Set(reflect.ValueOf(FillTestVersionData(t, index)))
+		} else {
+			for i := 0; i < v.NumField(); i++ {
+				fv := v.Field(i)
+				if v.Type().Field(i).Tag.Get("json") == "-" || v.Type().Field(i).Tag.Get("json") == "" {
+					continue
+				}
+
+				Fill(t, fv.Addr().Interface(), index+i+1)
 			}
-
-			Fill(t, fv.Addr().Interface(), index+i+1)
 		}
-
 	case reflect.Ptr:
 		newValue := reflect.New(v.Type().Elem()).Elem()
 		Fill(t, newValue.Addr().Interface(), index)
@@ -166,4 +181,48 @@ func FillTestAuthConfigs(t *testing.T, index int) map[string]apidef.AuthConfig {
 	authConfigs["oidc"] = a
 
 	return authConfigs
+}
+
+func FillTestVersionData(t *testing.T, index int) apidef.VersionData {
+	versionInfo := apidef.VersionInfo{}
+	Fill(t, &versionInfo, index)
+
+	return apidef.VersionData{
+		NotVersioned:   false,
+		DefaultVersion: "Default",
+		Versions: map[string]apidef.VersionInfo{
+			"Default": versionInfo,
+			"v1": {
+				APIID: "v1-api-id",
+			},
+			"v2": {
+				APIID: "v2-api-id",
+			},
+		},
+	}
+}
+
+func TestVersioning(t *testing.T) {
+	var emptyVersioning Versioning
+
+	var convertedAPI apidef.APIDefinition
+	emptyVersioning.ExtractTo(&convertedAPI)
+
+	var resultVersioning Versioning
+	resultVersioning.Fill(convertedAPI)
+
+	assert.Equal(t, emptyVersioning, resultVersioning)
+
+	t.Run("filled", func(t *testing.T) {
+		var filledVersioning Versioning
+		Fill(t, &filledVersioning, 0)
+
+		var convertedAPI apidef.APIDefinition
+		filledVersioning.ExtractTo(&convertedAPI)
+
+		var resultVersioning Versioning
+		resultVersioning.Fill(convertedAPI)
+
+		assert.Equal(t, filledVersioning, resultVersioning)
+	})
 }
