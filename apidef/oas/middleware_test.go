@@ -54,3 +54,30 @@ func TestCache(t *testing.T) {
 
 	assert.Equal(t, emptyCache, resultCache)
 }
+
+func TestExtendedPaths(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		paths := make(Paths)
+
+		var convertedEP apidef.ExtendedPathsSet
+		paths.ExtractTo(&convertedEP)
+
+		resultPaths := make(Paths)
+		resultPaths.Fill(convertedEP)
+
+		assert.Equal(t, paths, resultPaths)
+	})
+
+	t.Run("filled", func(t *testing.T) {
+		paths := make(Paths)
+		Fill(t, &paths, 0)
+
+		var convertedEP apidef.ExtendedPathsSet
+		paths.ExtractTo(&convertedEP)
+
+		resultPaths := make(Paths)
+		resultPaths.Fill(convertedEP)
+
+		assert.Equal(t, paths, resultPaths)
+	})
+}
