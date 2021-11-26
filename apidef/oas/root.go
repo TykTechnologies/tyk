@@ -44,8 +44,10 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	// This is used to make API calls work before actual versioning implementation.
 	api.VersionData.DefaultVersion = "Default"
 	api.VersionData.NotVersioned = true
-	api.VersionData.Versions = map[string]apidef.VersionInfo{
-		"Default": {},
+	if len(api.VersionData.Versions) == 0 {
+		api.VersionData.Versions = map[string]apidef.VersionInfo{
+			"Default": {},
+		}
 	}
 }
 
