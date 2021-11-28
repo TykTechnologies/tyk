@@ -1,8 +1,9 @@
 package apidef
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	schema "github.com/xeipuuv/gojsonschema"
 )

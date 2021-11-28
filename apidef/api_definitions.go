@@ -160,6 +160,7 @@ type EndpointMethodMeta struct {
 }
 
 type EndPointMeta struct {
+	Disabled      bool                          `bson:"disabled" json:"disabled"`
 	Path          string                        `bson:"path" json:"path"`
 	IgnoreCase    bool                          `bson:"ignore_case" json:"ignore_case"`
 	MethodActions map[string]EndpointMethodMeta `bson:"method_actions" json:"method_actions"`
@@ -338,6 +339,7 @@ type VersionInfo struct {
 	IgnoreEndpointCase          bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
 	GlobalSizeLimit             int64             `bson:"global_size_limit" json:"global_size_limit"`
 	OverrideTarget              string            `bson:"override_target" json:"override_target"`
+	APIID                       string            `bson:"api_id" json:"api_id"`
 }
 
 type AuthProviderMeta struct {
