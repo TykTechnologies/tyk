@@ -1,9 +1,9 @@
 #!/bin/bash
 set -xe
 
-export PLUGIN_BUILD_PATH=`mktemp -d -p '/go/src'`
-
 plugin_name=$1
+
+PLUGIN_BUILD_PATH="/go/src/${plugin_name%.*}"
 
 function usage() {
     cat <<EOF
@@ -18,6 +18,7 @@ if [ -z "$plugin_name" ]; then
     exit 1
 fi
 
+mkdir -p $PLUGIN_BUILD_PATH
 # Plugin's vendor folder, has precendence over the cached vendor'd dependencies from tyk
 yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
 
