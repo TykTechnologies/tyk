@@ -160,6 +160,7 @@ type EndpointMethodMeta struct {
 }
 
 type EndPointMeta struct {
+	Disabled      bool                          `bson:"disabled" json:"disabled"`
 	Path          string                        `bson:"path" json:"path"`
 	IgnoreCase    bool                          `bson:"ignore_case" json:"ignore_case"`
 	MethodActions map[string]EndpointMethodMeta `bson:"method_actions" json:"method_actions"`
