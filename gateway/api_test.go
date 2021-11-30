@@ -593,12 +593,12 @@ func TestUpdateKeyWithCert(t *testing.T) {
 
 	t.Run("Update key with valid cert", func(t *testing.T) {
 		// create cert
-		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{})
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
 		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 		defer ts.Gw.CertificateManager.Delete(certID, "")
 
 		// new valid cert
-		newClientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{})
+		newClientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
 		newCertID, _ := ts.Gw.CertificateManager.Add(newClientCertPem, "")
 		defer ts.Gw.CertificateManager.Delete(newCertID, "")
 
@@ -621,7 +621,7 @@ func TestUpdateKeyWithCert(t *testing.T) {
 	})
 
 	t.Run("Update key with empty cert", func(t *testing.T) {
-		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{})
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
 		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 
 		// create session base and set cert
@@ -644,7 +644,7 @@ func TestUpdateKeyWithCert(t *testing.T) {
 	})
 
 	t.Run("Update key with invalid cert", func(t *testing.T) {
-		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{})
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
 		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 
 		// create session base and set cert

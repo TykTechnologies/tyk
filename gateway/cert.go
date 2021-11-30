@@ -21,6 +21,8 @@ import (
 	"github.com/pmylund/go-cache"
 )
 
+const ListDetailed = "detailed"
+
 type APICertificateStatusMessage struct {
 	CertID  string `json:"id"`
 	Status  string `json:"status"`
@@ -29,6 +31,10 @@ type APICertificateStatusMessage struct {
 
 type APIAllCertificates struct {
 	CertIDs []string `json:"certs"`
+}
+
+type APIAllCertificateBasics struct {
+	Certs []*certs.CertificateBasics `json:"certs"`
 }
 
 var cipherSuites = map[string]uint16{
@@ -449,8 +455,18 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 		if certID == "" {
 			orgID := r.URL.Query().Get("org_id")
 
-			certIds := gw.CertificateManager.ListAllIds(orgID)
-			doJSONWrite(w, http.StatusOK, &APIAllCertificates{certIds})
+			certIDs := gw.CertificateManager.ListAllIds(orgID)
+			mode := r.URL.Query().Get("mode")
+			if mode == ListDetailed {
+				var certificateBasics = make([]*certs.CertificateBasics, len(certIDs))
+				certificates := gw.CertificateManager.List(certIDs, certs.CertificateAny)
+				for ci, certificate := range certificates {
+					certificateBasics[ci] = certs.ExtractCertificateBasics(certificate, certIDs[ci])
+				}
+				doJSONWrite(w, http.StatusOK, &APIAllCertificateBasics{Certs: certificateBasics})
+				return
+			}
+			doJSONWrite(w, http.StatusOK, &APIAllCertificates{certIDs})
 			return
 		}
 
