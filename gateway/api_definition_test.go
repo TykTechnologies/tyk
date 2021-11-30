@@ -200,6 +200,25 @@ func TestWhitelist(t *testing.T) {
 			{Path: "/vegetables/count", Code: http.StatusForbidden},
 		}...)
 	})
+
+	t.Run("Disabled", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.UseExtendedPaths = true
+				v.ExtendedPaths.WhiteList = []apidef.EndPointMeta{
+					{Disabled: false, Path: "/foo"},
+					{Disabled: true, Path: "/bar"},
+				}
+			})
+
+			spec.Proxy.ListenPath = "/"
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusOK},
+			{Path: "/bar", Code: http.StatusForbidden},
+		}...)
+	})
 }
 
 func TestBlacklist(t *testing.T) {
@@ -295,6 +314,25 @@ func TestBlacklist(t *testing.T) {
 
 			{Path: "/vegetables/vegetable", Code: http.StatusForbidden},
 			{Path: "/vegetables/count", Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("Disabled", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.UseExtendedPaths = true
+				v.ExtendedPaths.BlackList = []apidef.EndPointMeta{
+					{Disabled: false, Path: "/foo"},
+					{Disabled: true, Path: "/bar"},
+				}
+			})
+
+			spec.Proxy.ListenPath = "/"
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusForbidden},
+			{Path: "/bar", Code: http.StatusOK},
 		}...)
 	})
 }
@@ -490,6 +528,26 @@ func TestIgnored(t *testing.T) {
 			{Path: "/Foo", Code: http.StatusOK},
 			{Path: "/bar", Code: http.StatusOK},
 			{Path: "/Bar", Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("Disabled", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.UseExtendedPaths = true
+				v.ExtendedPaths.Ignored = []apidef.EndPointMeta{
+					{Disabled: false, Path: "/foo"},
+					{Disabled: true, Path: "/bar"},
+				}
+			})
+
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusOK},
+			{Path: "/bar", Code: http.StatusUnauthorized},
 		}...)
 	})
 }
