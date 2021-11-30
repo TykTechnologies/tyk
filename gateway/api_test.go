@@ -1865,7 +1865,6 @@ func TestOAS(t *testing.T) {
 		a.APIID = oldAPIID
 		a.Name = "old api"
 		a.Proxy.ListenPath = "/old-api/"
-		a.UseMutualTLSAuth = false
 	})[0]
 
 	tykExtension := oas.XTykAPIGateway{
