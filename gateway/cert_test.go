@@ -4,8 +4,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"fmt"
 	"github.com/TykTechnologies/tyk/headers"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -15,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TykTechnologies/tyk/user"
 
@@ -1140,14 +1143,31 @@ func TestCertificateHandlerTLS(t *testing.T) {
 	})
 
 	t.Run("List certificates, detailed mode", func(t *testing.T) {
-		certBasicDetailsTemplate := `{"id":"1%s","issuer_cn":"%s","subject_cn":"%s","not_before":"%s","not_after":"%s"}`
-		clientCertMeta := fmt.Sprintf(certBasicDetailsTemplate, clientCertID, clientCert.Leaf.Issuer.CommonName,
-			clientCert.Leaf.Subject.CommonName, clientCert.Leaf.NotBefore.UTC().Format("2006-01-02T15:04:05Z07:00"), clientCert.Leaf.NotAfter.UTC().Format("2006-01-02T15:04:05Z07:00"))
-		serverCertMeta := fmt.Sprintf(certBasicDetailsTemplate, serverCertID, serverCert.Leaf.Issuer.CommonName,
-			serverCert.Leaf.Subject.CommonName, serverCert.Leaf.NotBefore.UTC().Format("2006-01-02T15:04:05Z07:00"), serverCert.Leaf.NotAfter.UTC().Format("2006-01-02T15:04:05Z07:00"))
-		ts.Run(t, []test.TestCase{
-			{Method: "GET", Path: "/tyk/certs?org_id=1&mode=detailed", AdminAuth: true, Code: 200, BodyMatch: clientCertMeta},
-			{Method: "GET", Path: "/tyk/certs?org_id=1&mode=detailed", AdminAuth: true, Code: 200, BodyMatch: serverCertMeta},
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodGet, Path: "/tyk/certs?org_id=1&mode=detailed", AdminAuth: true, Code: http.StatusOK, BodyMatchFunc: func(data []byte) bool {
+				expectedAPICertBasics := APIAllCertificateBasics{
+					Certs: []*certs.CertificateBasics{
+						{
+							ID:        "1" + clientCertID,
+							IssuerCN:  clientCert.Leaf.Issuer.CommonName,
+							SubjectCN: clientCert.Leaf.Subject.CommonName,
+							NotAfter:  clientCert.Leaf.NotAfter.UTC().Truncate(time.Second),
+							NotBefore: clientCert.Leaf.NotBefore.UTC().Truncate(time.Second),
+						},
+						{
+							ID:        "1" + serverCertID,
+							IssuerCN:  serverCert.Leaf.Issuer.CommonName,
+							SubjectCN: serverCert.Leaf.Subject.CommonName,
+							NotAfter:  serverCert.Leaf.NotAfter.UTC().Truncate(time.Second),
+							NotBefore: serverCert.Leaf.NotBefore.UTC().Truncate(time.Second),
+						},
+					},
+				}
+				apiAllCertificateBasics := APIAllCertificateBasics{}
+				_ = json.Unmarshal(data, &apiAllCertificateBasics)
+				assert.Equal(t, expectedAPICertBasics, apiAllCertificateBasics)
+				return true
+			}},
 		}...)
 	})
 

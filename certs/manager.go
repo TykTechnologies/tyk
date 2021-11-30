@@ -247,8 +247,8 @@ type CertificateBasics struct {
 	ID        string    `json:"id"`
 	IssuerCN  string    `json:"issuer_cn"`
 	SubjectCN string    `json:"subject_cn"`
-	NotBefore time.Time `json:"not_before,omitempty"`
-	NotAfter  time.Time `json:"not_after,omitempty"`
+	NotBefore time.Time `json:"not_before"`
+	NotAfter  time.Time `json:"not_after"`
 }
 
 func ExtractCertificateBasics(cert *tls.Certificate, certID string) *CertificateBasics {

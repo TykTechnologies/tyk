@@ -454,18 +454,19 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		if certID == "" {
 			orgID := r.URL.Query().Get("org_id")
-
-			certIDs := gw.CertificateManager.ListAllIds(orgID)
 			mode := r.URL.Query().Get("mode")
+			certIDs := gw.CertificateManager.ListAllIds(orgID)
 			if mode == ListDetailed {
 				var certificateBasics = make([]*certs.CertificateBasics, len(certIDs))
 				certificates := gw.CertificateManager.List(certIDs, certs.CertificateAny)
 				for ci, certificate := range certificates {
 					certificateBasics[ci] = certs.ExtractCertificateBasics(certificate, certIDs[ci])
 				}
+
 				doJSONWrite(w, http.StatusOK, &APIAllCertificateBasics{Certs: certificateBasics})
 				return
 			}
+
 			doJSONWrite(w, http.StatusOK, &APIAllCertificates{certIDs})
 			return
 		}
