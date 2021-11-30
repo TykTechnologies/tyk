@@ -41,5 +41,4 @@ func TestClientCertificates(t *testing.T) {
 	resultsClientCertificates.Fill(convertedAPI)
 
 	assert.Equal(t, emptyClientCertificates, resultsClientCertificates)
-
 }

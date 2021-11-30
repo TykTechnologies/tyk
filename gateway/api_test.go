@@ -1885,10 +1885,6 @@ func TestOAS(t *testing.T) {
 				Value: "/oas-api/",
 				Strip: false,
 			},
-			ClientCertificates: oas.ClientCertificates{
-				Enabled: false,
-				AllowList: []string{},
-			},
 		},
 	}
 

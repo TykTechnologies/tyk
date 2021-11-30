@@ -11,8 +11,8 @@ type Server struct {
 	Slug string `bson:"slug,omitempty" json:"slug,omitempty"`
 	// Authentication contains the configurations related to authentication to the API.
 	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
-	// ClientCertificates contains configuration related to certificates are they enabled and list of enabled certificates
-	ClientCertificates ClientCertificates `bson:"client_certificates,omitempty" json:"client_certificates,omitempty"`
+	// ClientCertificates contains the configurations related to static mTLS.
+	ClientCertificates ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty"`
 }
 
 func (s *Server) Fill(api apidef.APIDefinition) {
@@ -62,18 +62,18 @@ func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 }
 
 type ClientCertificates struct {
-	// AllowList is the list of client certificates which are allowed.
-	AllowList []string `bson:"allow_list" json:"allow_list"`
 	// Enabled enables static mTLS for the API.
 	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	// AllowList is the list of client certificates which are allowed.
+	Allowlist []string `bson:"allowlist" json:"allowlist"`
 }
 
 func (cc *ClientCertificates) Fill(api apidef.APIDefinition) {
-	cc.AllowList = api.ClientCertificates
 	cc.Enabled = api.UseMutualTLSAuth
+	cc.Allowlist = api.ClientCertificates
 }
 
 func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
-	api.ClientCertificates = cc.AllowList
 	api.UseMutualTLSAuth = cc.Enabled
+	api.ClientCertificates = cc.Allowlist
 }
