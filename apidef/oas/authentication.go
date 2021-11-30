@@ -1,6 +1,8 @@
 package oas
 
 import (
+	"sort"
+
 	"github.com/lonelycode/osin"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -432,6 +434,10 @@ func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 		s.ScopeToPolicyMapping = append(s.ScopeToPolicyMapping, ScopeToPolicy{Scope: scope, PolicyID: policyID})
 	}
 
+	sort.Slice(s.ScopeToPolicyMapping, func(i, j int) bool {
+		return s.ScopeToPolicyMapping[i].Scope < s.ScopeToPolicyMapping[j].PolicyID
+	})
+
 	if len(s.ScopeToPolicyMapping) == 0 {
 		s.ScopeToPolicyMapping = nil
 	}
@@ -671,6 +677,10 @@ func (o *OIDC) Fill(api apidef.APIDefinition) {
 		if len(mapping) == 0 {
 			mapping = nil
 		}
+
+		sort.Slice(mapping, func(i, j int) bool {
+			return mapping[i].ClientID < mapping[j].ClientID
+		})
 
 		o.Providers = append(o.Providers, Provider{Issuer: v.Issuer, ClientToPolicyMapping: mapping})
 	}
