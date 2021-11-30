@@ -1865,6 +1865,8 @@ func TestOAS(t *testing.T) {
 		a.APIID = oldAPIID
 		a.Name = "old api"
 		a.Proxy.ListenPath = "/old-api/"
+		a.ClientCertificates = []string{}
+		a.UseMutualTLSAuth = false
 	})[0]
 
 	tykExtension := oas.XTykAPIGateway{
@@ -1882,6 +1884,10 @@ func TestOAS(t *testing.T) {
 			ListenPath: oas.ListenPath{
 				Value: "/oas-api/",
 				Strip: false,
+			},
+			ClientCertificates: oas.ClientCertificates{
+				Enabled: false,
+				AllowList: []string{},
 			},
 		},
 	}
