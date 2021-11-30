@@ -875,20 +875,20 @@ func (a *APIDefinition) DecodeFromDB() {
 	}
 
 	// Auth is deprecated so this code tries to maintain backward compatibility
-	makeCompatible := func(authType string) {
+	makeCompatible := func(authType string, enabled bool) {
 		if a.AuthConfigs == nil {
 			a.AuthConfigs = make(map[string]AuthConfig)
 		}
 
 		_, ok := a.AuthConfigs[authType]
 
-		if !ok {
+		if !ok && enabled {
 			a.AuthConfigs[authType] = a.Auth
 		}
 	}
 
-	makeCompatible("authToken")
-	makeCompatible("jwt")
+	makeCompatible("authToken", a.UseStandardAuth)
+	makeCompatible("jwt", a.EnableJWT)
 	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
 	if !a.UseOpenID && a.JWTScopeClaimName != "" && a.Scopes.JWT.ScopeClaimName == "" {
 		a.Scopes.JWT.ScopeToPolicy = a.JWTScopeToPolicyMapping
