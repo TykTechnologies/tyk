@@ -50,9 +50,6 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	if s.ClientCertificates != nil {
 		s.ClientCertificates.ExtractTo(api)
-	} else {
-		api.ClientCertificates = nil
-		api.UseMutualTLSAuth = false
 	}
 }
 

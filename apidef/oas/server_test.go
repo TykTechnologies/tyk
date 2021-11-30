@@ -37,8 +37,8 @@ func TestClientCertificates(t *testing.T) {
 	var convertedAPI apidef.APIDefinition
 	emptyClientCertificates.ExtractTo(&convertedAPI)
 
-	var resultsClientCertificates ClientCertificates
-	resultsClientCertificates.Fill(convertedAPI)
+	var resultClientCertificates ClientCertificates
+	resultClientCertificates.Fill(convertedAPI)
 
-	assert.Equal(t, emptyClientCertificates, resultsClientCertificates)
+	assert.Equal(t, emptyClientCertificates, resultClientCertificates)
 }
