@@ -24,6 +24,15 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(u.ServiceDiscovery) {
 		u.ServiceDiscovery = nil
 	}
+
+	if u.Test == nil {
+		u.Test = &Test{}
+	}
+
+	u.Test.Fill(api.UptimeTests)
+	if ShouldOmit(u.Test) {
+		u.Test = nil
+	}
 }
 
 func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
@@ -31,6 +40,10 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	if u.ServiceDiscovery != nil {
 		u.ServiceDiscovery.ExtractTo(&api.Proxy.ServiceDiscovery)
+	}
+
+	if u.Test != nil {
+		u.Test.ExtractTo(&api.UptimeTests)
 	}
 }
 

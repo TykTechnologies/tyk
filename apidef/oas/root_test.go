@@ -24,7 +24,20 @@ func TestXTykAPIGateway(t *testing.T) {
 		assert.Equal(t, emptyXTykAPIGateway, resultXTykAPIGateway)
 	})
 
-	t.Run("filled", func(t *testing.T) {
+	t.Run("filled OAS", func(t *testing.T) {
+		var xTykAPIGateway XTykAPIGateway
+		Fill(t, &xTykAPIGateway, 0)
+
+		var convertedAPI apidef.APIDefinition
+		xTykAPIGateway.ExtractTo(&convertedAPI)
+
+		var resultXTykAPIGateway XTykAPIGateway
+		resultXTykAPIGateway.Fill(convertedAPI)
+
+		assert.Equal(t, xTykAPIGateway, resultXTykAPIGateway)
+	})
+
+	t.Run("filled old", func(t *testing.T) {
 		t.SkipNow() // when we don't need to skip this, it means OAS and old API definition match
 		initialAPI := apidef.APIDefinition{}
 		Fill(t, &initialAPI, 0)
@@ -102,7 +115,6 @@ func Fill(t *testing.T, input interface{}, index int) {
 		if v.Type() == reflect.TypeOf(map[string]apidef.AuthConfig{}) {
 			v.Set(reflect.ValueOf(FillTestAuthConfigs(t, index)))
 		} else {
-
 			newMap := reflect.MakeMapWithSize(v.Type(), 0)
 			for i := 0; i < 3; i++ {
 				newKey := reflect.New(v.Type().Key()).Elem()

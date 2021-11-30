@@ -160,6 +160,7 @@ type EndpointMethodMeta struct {
 }
 
 type EndPointMeta struct {
+	Disabled      bool                          `bson:"disabled" json:"disabled"`
 	Path          string                        `bson:"path" json:"path"`
 	IgnoreCase    bool                          `bson:"ignore_case" json:"ignore_case"`
 	MethodActions map[string]EndpointMethodMeta `bson:"method_actions" json:"method_actions"`
@@ -338,6 +339,7 @@ type VersionInfo struct {
 	IgnoreEndpointCase          bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
 	GlobalSizeLimit             int64             `bson:"global_size_limit" json:"global_size_limit"`
 	OverrideTarget              string            `bson:"override_target" json:"override_target"`
+	APIID                       string            `bson:"api_id" json:"api_id"`
 }
 
 type AuthProviderMeta struct {
@@ -873,20 +875,20 @@ func (a *APIDefinition) DecodeFromDB() {
 	}
 
 	// Auth is deprecated so this code tries to maintain backward compatibility
-	makeCompatible := func(authType string) {
+	makeCompatible := func(authType string, enabled bool) {
 		if a.AuthConfigs == nil {
 			a.AuthConfigs = make(map[string]AuthConfig)
 		}
 
 		_, ok := a.AuthConfigs[authType]
 
-		if !ok {
+		if !ok && enabled {
 			a.AuthConfigs[authType] = a.Auth
 		}
 	}
 
-	makeCompatible("authToken")
-	makeCompatible("jwt")
+	makeCompatible("authToken", a.UseStandardAuth)
+	makeCompatible("jwt", a.EnableJWT)
 	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
 	if !a.UseOpenID && a.JWTScopeClaimName != "" && a.Scopes.JWT.ScopeClaimName == "" {
 		a.Scopes.JWT.ScopeToPolicy = a.JWTScopeToPolicyMapping

@@ -54,6 +54,26 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	}
 
 	versionInfo, _ := v.Spec.Version(r)
+	if !v.Spec.VersionData.NotVersioned && versionInfo.APIID != "" {
+		handler, targetAPI, found := v.Gw.findInternalHttpHandlerByNameOrID(versionInfo.APIID)
+		if !found {
+			return errors.New("couldn't detect target"), http.StatusNotFound
+		}
+
+		// Remove cached version info
+		ctxSetVersionInfo(r, nil)
+
+		// Find and cache version info for target API
+		_, status := targetAPI.Version(r)
+		if status != StatusOk {
+			return errors.New(string(status)), http.StatusForbidden
+		}
+
+		sanitizeProxyPaths(v.Spec, r)
+
+		handler.ServeHTTP(w, r)
+		return nil, mwStatusRespond
+	}
 	versionPaths := v.Spec.RxPaths[versionInfo.Name]
 	whiteListStatus := v.Spec.WhiteListEnabled[versionInfo.Name]
 
