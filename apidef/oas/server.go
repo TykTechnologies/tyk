@@ -12,7 +12,7 @@ type Server struct {
 	// Authentication contains the configurations related to authentication to the API.
 	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
 	// ClientCertificates contains the configurations related to static mTLS.
-	ClientCertificates ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty"`
+	ClientCertificates *ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty"`
 }
 
 func (s *Server) Fill(api apidef.APIDefinition) {
@@ -27,6 +27,15 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.Authentication) {
 		s.Authentication = nil
 	}
+
+	if s.ClientCertificates == nil {
+		s.ClientCertificates = &ClientCertificates{}
+	}
+
+	s.ClientCertificates.Fill(api)
+	if ShouldOmit(s.ClientCertificates) {
+		s.ClientCertificates = nil
+	}
 }
 
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
@@ -37,6 +46,13 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 		s.Authentication.ExtractTo(api)
 	} else {
 		api.UseKeylessAccess = true
+	}
+
+	if s.ClientCertificates != nil {
+		s.ClientCertificates.ExtractTo(api)
+	} else {
+		api.ClientCertificates = nil
+		api.UseMutualTLSAuth = false
 	}
 }
 
