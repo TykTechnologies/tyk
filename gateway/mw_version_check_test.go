@@ -224,56 +224,67 @@ func TestNewVersioning(t *testing.T) {
 
 	ts.Gw.LoadAPI(baseAPI, versionedAPI)
 
-	_, key := ts.CreateSession(func(s *user.SessionState) {
+	_, versionedAPIkey := ts.CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{versionedAPI.APIID: {
 			APIID: versionedAPI.APIID,
 		}}
 	})
 
-	headers := map[string]string{
-		"Authorization": key,
+	_, baseAPIKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{baseAPI.APIID: {
+			APIID: baseAPI.APIID, Versions: []string{"v2"},
+		}}
+	})
+
+	headersForVersionedAPI := map[string]string{
+		"Authorization": versionedAPIkey,
+	}
+
+	headersForBaseAPI := map[string]string{
+		"Authorization": baseAPIKey,
 	}
 
 	_, _ = ts.Run(t, []test.TestCase{
 		{Path: "/default", Code: http.StatusOK},
 		// default listen path with version param should route to v2
 		{Path: "/default?version=v2", Code: http.StatusUnauthorized},
-		{Path: "/default?version=v2", Headers: headers, Code: http.StatusOK},
+		{Path: "/default?version=v2", Headers: headersForVersionedAPI, Code: http.StatusForbidden},
+		{Path: "/default?version=v2", Headers: headersForBaseAPI, Code: http.StatusOK},
 		// For not found version, it should fallback to default
 		{Path: "/default?version=notFound", BodyMatch: string(VersionDoesNotExist), Code: http.StatusForbidden},
 		// v2 should be accessible by its own listen path
 		{Path: "/new", Code: http.StatusUnauthorized},
-		{Path: "/new", Headers: headers, Code: http.StatusOK},
+		{Path: "/new", Headers: headersForVersionedAPI, Code: http.StatusOK},
 	}...)
 
-	t.Run("versioned API is not versioned", func(t *testing.T) {
+	t.Run("versioned API does not have sub-version", func(t *testing.T) {
 		assert.True(t, versionedAPI.VersionData.NotVersioned)
 		t.Run("default is not specified", func(t *testing.T) {
 			assert.Empty(t, versionedAPI.VersionData.DefaultVersion)
-			_, _ = ts.Run(t, test.TestCase{Path: "/default?version=v2", Headers: headers, Code: http.StatusOK})
+			_, _ = ts.Run(t, test.TestCase{Path: "/default?version=v2", Headers: headersForBaseAPI, Code: http.StatusOK})
 		})
 
 		t.Run("default is invalid", func(t *testing.T) {
 			versionedAPI.VersionData.DefaultVersion = "invalid"
 			ts.Gw.LoadAPI(baseAPI, versionedAPI)
-			_, _ = ts.Run(t, test.TestCase{Path: "/default?version=v2", Headers: headers, Code: http.StatusOK})
+			_, _ = ts.Run(t, test.TestCase{Path: "/default?version=v2", Headers: headersForBaseAPI, Code: http.StatusOK})
 		})
 	})
 
-	t.Run("versioned API is versioned", func(t *testing.T) {
+	t.Run("versioned API has sub-version", func(t *testing.T) {
 		versionedAPI.VersionData.NotVersioned = false
 		t.Run("default is not specified", func(t *testing.T) {
 			versionedAPI.VersionData.DefaultVersion = ""
 			ts.Gw.LoadAPI(baseAPI, versionedAPI)
 			assert.Empty(t, versionedAPI.VersionData.DefaultVersion)
-			_, _ = ts.Run(t, test.TestCase{Path: "/default?version=v2", Headers: headers,
+			_, _ = ts.Run(t, test.TestCase{Path: "/default?version=v2", Headers: headersForBaseAPI,
 				BodyMatch: string(VersionNotFound), Code: http.StatusForbidden})
 		})
 
 		t.Run("default is invalid", func(t *testing.T) {
 			versionedAPI.VersionData.DefaultVersion = "invalid"
 			ts.Gw.LoadAPI(baseAPI, versionedAPI)
-			_, _ = ts.Run(t, test.TestCase{Path: "/default?version=v2", Headers: headers,
+			_, _ = ts.Run(t, test.TestCase{Path: "/default?version=v2", Headers: headersForBaseAPI,
 				BodyMatch: string(VersionDoesNotExist), Code: http.StatusForbidden})
 		})
 	})

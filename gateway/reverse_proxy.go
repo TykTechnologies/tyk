@@ -1270,11 +1270,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// We should at least copy the status code in
 	inres.StatusCode = res.StatusCode
 	inres.ContentLength = res.ContentLength
-	p.HandleResponse(rw, res, ses)
+	_ = p.HandleResponse(rw, req, res, ses)
 	return ProxyResponse{UpstreamLatency: upstreamLatency, Response: inres}
 }
 
-func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) error {
+func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, req *http.Request, res *http.Response, ses *user.SessionState) error {
 
 	// Remove hop-by-hop headers listed in the
 	// "Connection" header of the response.
@@ -1299,7 +1299,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	// Add resource headers
 	if ses != nil {
 		// We have found a session, lets report back
-		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(p.TykAPISpec.APIID)
+		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(p.TykAPISpec.BaseAPIID(req))
 		res.Header.Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
 		res.Header.Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
 		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))

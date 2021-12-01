@@ -31,7 +31,7 @@ func TestGetAccessDefinitionByAPIIDOrSession(t *testing.T) {
 			},
 		}
 
-		accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(sessionWithMissingAPI, api)
+		accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(sessionWithMissingAPI, api.BaseAPIID(nil))
 		assert.Nil(t, accessDef)
 		assert.Equal(t, "", allowanceScope)
 		assert.Error(t, err)
@@ -55,7 +55,7 @@ func TestGetAccessDefinitionByAPIIDOrSession(t *testing.T) {
 			},
 		}
 
-		accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(sessionWithoutAPILimits, api)
+		accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(sessionWithoutAPILimits, api.BaseAPIID(nil))
 		assert.Equal(t, &user.AccessDefinition{
 			Limit: user.APILimit{
 				QuotaMax:           int64(1),
@@ -108,7 +108,7 @@ func TestGetAccessDefinitionByAPIIDOrSession(t *testing.T) {
 			},
 		}
 
-		accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(sessionWithAPILimits, api)
+		accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(sessionWithAPILimits, api.BaseAPIID(nil))
 		assert.Equal(t, &user.AccessDefinition{
 			FieldAccessRights: []user.FieldAccessDefinition{
 				{

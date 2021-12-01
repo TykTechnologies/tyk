@@ -63,6 +63,8 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		// Remove cached version info
 		ctxSetVersionInfo(r, nil)
 
+		ctxSetVersionBaseAPIID(r, v.Spec.APIID)
+
 		// Find and cache version info for target API
 		_, status := targetAPI.Version(r)
 		if status != StatusOk {

@@ -33,7 +33,7 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// If there's nothing in our profile, we let them through to the next phase
 	if len(session.AccessRights) > 0 {
 		// Otherwise, run auth checks
-		versionList, apiExists := session.AccessRights[a.Spec.APIID]
+		versionList, apiExists := session.AccessRights[a.Spec.BaseAPIID(r)]
 		if !apiExists {
 			a.Logger().Info("Attempted access to unauthorised API")
 			return errors.New("Access to this API has been disallowed"), http.StatusForbidden

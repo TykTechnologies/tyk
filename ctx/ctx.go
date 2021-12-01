@@ -19,6 +19,7 @@ const (
 	HashedAuthToken
 	VersionData
 	VersionDefault
+	VersionBaseAPIID
 	OrgSessionContext
 	ContextData
 	RetainHost
