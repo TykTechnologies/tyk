@@ -4,8 +4,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/headers"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,8 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/TykTechnologies/tyk/headers"
+	"time"
 
 	"github.com/TykTechnologies/tyk/user"
 
@@ -156,7 +159,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	}()
 
 	clientWithoutCert := GetTLSClient(nil, nil)
-	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientWithCert := GetTLSClient(&clientCert, serverCertPem)
 
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
@@ -245,8 +248,8 @@ func TestAPIMutualTLS(t *testing.T) {
 	ts.ReloadGatewayProxy()
 
 	// Initialize client certificates
-	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
-	clientCertPem2, _, _, clientCert2 := certs.GenCertificate(&x509.Certificate{})
+	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
+	clientCertPem2, _, _, clientCert2 := certs.GenCertificate(&x509.Certificate{}, false)
 
 	t.Run("SNI and domain per API", func(t *testing.T) {
 		t.Run("API without mutual TLS", func(t *testing.T) {
@@ -303,7 +306,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		t.Run("Client certificate differ", func(t *testing.T) {
 			client := GetTLSClient(&clientCert, serverCertPem)
 
-			clientCertPem2, _, _, _ := certs.GenCertificate(&x509.Certificate{})
+			clientCertPem2, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
 			clientCertID2, _ := ts.Gw.CertificateManager.Add(clientCertPem2, "")
 			defer ts.Gw.CertificateManager.Delete(clientCertID2, "")
 
@@ -702,7 +705,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{})
+	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -784,7 +787,7 @@ func TestSSLForceCommonName(t *testing.T) {
 	_, _, _, cert := certs.GenCertificate(&x509.Certificate{
 		EmailAddresses: []string{"test@test.com"},
 		Subject:        pkix.Name{CommonName: "host1.local"},
-	})
+	}, false)
 
 	upstream.TLS = &tls.Config{
 		Certificates: []tls.Certificate{cert},
@@ -846,7 +849,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 	orgId := "default"
 	t.Run("Without domain", func(t *testing.T) {
-		clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+		clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
 		if err != nil {
@@ -901,7 +904,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	})
 
 	t.Run("With custom domain", func(t *testing.T) {
-		clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+		clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
 		if err != nil {
@@ -976,7 +979,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	})
 
 	t.Run("With regex custom domain", func(t *testing.T) {
-		clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+		clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
 		if err != nil {
@@ -1017,7 +1020,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 	// check that a key no longer works after the cert is removed
 	t.Run("Cert removed", func(t *testing.T) {
-		clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+		clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
 		if err != nil {
@@ -1093,12 +1096,27 @@ func TestAPICertificate(t *testing.T) {
 }
 
 func TestCertificateHandlerTLS(t *testing.T) {
-	_, _, combinedServerPEM, serverCert := certs.GenServerCertificate()
+	_, _, combinedServerPEM, serverCert := certs.GenCertificate(&x509.Certificate{
+		DNSNames:    []string{"localhost"},
+		IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::")},
+		Subject:     pkix.Name{CommonName: "localhost"},
+		Issuer:      pkix.Name{CommonName: "localhost"},
+	}, true)
 	serverCertID := certs.HexSHA256(serverCert.Certificate[0])
-
-	clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+	clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{
+		Subject: pkix.Name{CommonName: "localhost"},
+		Issuer:  pkix.Name{CommonName: "localhost"},
+	}, true)
 	clientCertID := certs.HexSHA256(clientCert.Certificate[0])
-
+	if clientCert.Leaf != nil {
+		clientCert.Leaf.Issuer = pkix.Name{CommonName: "localhost"}
+		clientCert.Leaf.Subject = pkix.Name{CommonName: "localhost"}
+	} else {
+		clientCert.Leaf = &x509.Certificate{
+			Subject: pkix.Name{CommonName: "localhost"},
+			Issuer:  pkix.Name{CommonName: "localhost"},
+		}
+	}
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -1121,6 +1139,35 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: clientCertID},
 			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: serverCertID},
+		}...)
+	})
+
+	t.Run("List certificates, detailed mode", func(t *testing.T) {
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodGet, Path: "/tyk/certs?org_id=1&mode=detailed", AdminAuth: true, Code: http.StatusOK, BodyMatchFunc: func(data []byte) bool {
+				expectedAPICertBasics := APIAllCertificateBasics{
+					Certs: []*certs.CertificateBasics{
+						{
+							ID:        "1" + clientCertID,
+							IssuerCN:  clientCert.Leaf.Issuer.CommonName,
+							SubjectCN: clientCert.Leaf.Subject.CommonName,
+							NotAfter:  clientCert.Leaf.NotAfter.UTC().Truncate(time.Second),
+							NotBefore: clientCert.Leaf.NotBefore.UTC().Truncate(time.Second),
+						},
+						{
+							ID:        "1" + serverCertID,
+							IssuerCN:  serverCert.Leaf.Issuer.CommonName,
+							SubjectCN: serverCert.Leaf.Subject.CommonName,
+							NotAfter:  serverCert.Leaf.NotAfter.UTC().Truncate(time.Second),
+							NotBefore: serverCert.Leaf.NotBefore.UTC().Truncate(time.Second),
+						},
+					},
+				}
+				apiAllCertificateBasics := APIAllCertificateBasics{}
+				_ = json.Unmarshal(data, &apiAllCertificateBasics)
+				assert.Equal(t, expectedAPICertBasics, apiAllCertificateBasics)
+				return true
+			}},
 		}...)
 	})
 
