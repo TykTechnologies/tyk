@@ -91,6 +91,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 	keyExists := false
 	var session user.SessionState
+	updateSession := false
 	if key != "" {
 		key = stripBearer(key)
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
@@ -114,7 +115,17 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	if authConfig.UseCertificate {
-		if _, err := k.Gw.CertificateManager.GetRaw(session.Certificate); err != nil {
+		certLookup := session.Certificate
+
+		if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+			certLookup = certHash
+			if session.Certificate != certHash {
+				session.Certificate = certHash
+				updateSession = true
+			}
+		}
+
+		if _, err := k.Gw.CertificateManager.GetRaw(certLookup); err != nil {
 			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
 		}
 	}
@@ -122,7 +133,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
-		ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
+		ctxSetSession(r, &session, updateSession, k.Gw.GetConfig().HashKeys)
 		k.setContextVars(r, key)
 	}
 
