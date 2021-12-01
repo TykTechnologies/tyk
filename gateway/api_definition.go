@@ -614,6 +614,10 @@ func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, pa
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		newSpec := URLSpec{IgnoreCase: stringSpec.IgnoreCase || ignoreEndpointCase}
 		a.generateRegex(stringSpec.Path, &newSpec, specType, conf)
 
