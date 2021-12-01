@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/osin"
 	cache "github.com/pmylund/go-cache"
 	jose "github.com/square/go-jose"

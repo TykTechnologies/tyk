@@ -13,7 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
@@ -81,7 +81,6 @@ func createJWTSessionWithRSAWithPolicy(policyID string) *user.SessionState {
 type JwtCreator func() *user.SessionState
 
 func (ts *Test) prepareGenericJWTSession(testName string, method string, claimName string, ApiSkipKid bool) (*APISpec, string) {
-
 	tokenKID := testKey(testName, "token")
 
 	var jwtToken string
@@ -152,14 +151,13 @@ func (ts *Test) prepareGenericJWTSession(testName string, method string, claimNa
 	}
 
 	return spec, jwtToken
-
 }
 
 func TestJWTSessionHMAC(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//If we skip the check then the Id will be taken from SUB and the call will succeed
+	// If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := ts.prepareGenericJWTSession(t.Name(), HMACSign, KID, false)
 
 	authHeaders := map[string]string{"authorization": jwtToken}
@@ -176,7 +174,7 @@ func BenchmarkJWTSessionHMAC(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//If we skip the check then the Id will be taken from SUB and the call will succeed
+	// If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := ts.prepareGenericJWTSession(b.Name(), HMACSign, KID, false)
 
 	authHeaders := map[string]string{"authorization": jwtToken}
@@ -188,11 +186,10 @@ func BenchmarkJWTSessionHMAC(b *testing.B) {
 }
 
 func TestJWTHMACIdInSubClaim(t *testing.T) {
-
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//Same as above
+	// Same as above
 	_, jwtToken := ts.prepareGenericJWTSession(t.Name(), HMACSign, SUB, true)
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT/HMAC/Id in SuB/Global-skip-kid/Api-skip-kid", func(t *testing.T) {
@@ -259,7 +256,7 @@ func TestJWTSessionRSA(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//default values, keep backward compatibility
+	// default values, keep backward compatibility
 	_, jwtToken := ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT", func(t *testing.T) {
@@ -275,7 +272,7 @@ func BenchmarkJWTSessionRSA(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//default values, keep backward compatibility
+	// default values, keep backward compatibility
 	_, jwtToken := ts.prepareGenericJWTSession(b.Name(), RSASign, KID, false)
 
 	authHeaders := map[string]string{"authorization": jwtToken}
@@ -290,7 +287,7 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//default values, same as before (keeps backward compatibility)
+	// default values, same as before (keeps backward compatibility)
 	ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
 
 	authHeaders := map[string]string{"authorization": ""}
@@ -305,7 +302,7 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//default values, same as before (keeps backward compatibility)
+	// default values, same as before (keeps backward compatibility)
 	ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
 
 	authHeaders := map[string]string{}
@@ -320,7 +317,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//default values, same as before (keeps backward compatibility)
+	// default values, same as before (keeps backward compatibility)
 	_, jwtToken := ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
 
 	authHeaders := map[string]string{"authorization": jwtToken + "ajhdkjhsdfkjashdkajshdkajhsdkajhsd"}
@@ -337,7 +334,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//default values, same as before (keeps backward compatibility)
+	// default values, same as before (keeps backward compatibility)
 	spec, jwtToken := ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
 	spec.DoNotTrack = true
 	authHeaders := map[string]string{"authorization": jwtToken + "ajhdkjhsdfkjashdkajshdkajhsdkajhsd"}
@@ -355,7 +352,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//default values, same as before (keeps backward compatibility)
+	// default values, same as before (keeps backward compatibility)
 	ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
 	authHeaders := map[string]string{"authorization": "123"}
 
@@ -372,7 +369,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//default values, same as before (keeps backward compatibility)
+	// default values, same as before (keeps backward compatibility)
 	_, jwtToken := ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
 	authHeaders := map[string]string{"authorization": "Bearer " + jwtToken}
 
@@ -388,7 +385,7 @@ func TestJWTSessionFailRSA_WrongJWT_Signature(t *testing.T) {
 	defer ts.Close()
 	invalidSignToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 
-	//default values, same as before (keeps backward compatibility)
+	// default values, same as before (keeps backward compatibility)
 	ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
 	authHeaders := map[string]string{"authorization": invalidSignToken}
 
@@ -407,7 +404,7 @@ func BenchmarkJWTSessionRSABearer(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//default values, same as before (keeps backward compatibility)
+	// default values, same as before (keeps backward compatibility)
 	_, jwtToken := ts.prepareGenericJWTSession(b.Name(), RSASign, KID, false)
 	authHeaders := map[string]string{"authorization": "Bearer " + jwtToken}
 
@@ -422,7 +419,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//default values, same as before (keeps backward compatibility)
+	// default values, same as before (keeps backward compatibility)
 	_, jwtToken := ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
 	authHeaders := map[string]string{"authorization": "Bearer: " + jwtToken} // extra ":" makes the value invalid
 
@@ -439,7 +436,7 @@ func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//default values, same as before (keeps backward compatibility)
+	// default values, same as before (keeps backward compatibility)
 	_, jwtToken := ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
 	authHeaders1 := map[string]string{"authorization": "Bearer bearer" + jwtToken}
 
@@ -461,7 +458,6 @@ func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
 // JWTSessionRSAWithRawSourceOnWithClientID
 
 func (ts *Test) prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
-
 	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.OrgID = "default"
 		spec.UseKeylessAccess = false
@@ -542,7 +538,6 @@ func BenchmarkJWTSessionRSAWithRawSourceOnWithClientID(b *testing.B) {
 // JWTSessionRSAWithRawSource
 
 func (ts *Test) prepareJWTSessionRSAWithRawSource() string {
-
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
@@ -664,7 +659,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 
 	// This test is successful by definition
 	t.Run("Expiry_After_now--Valid_jwt", func(t *testing.T) {
-		spec.JWTExpiresAtValidationSkew = 0 //Default value
+		spec.JWTExpiresAtValidationSkew = 0 // Default value
 		ts.Gw.LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
@@ -683,7 +678,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	})
 
 	t.Run("Expiry_Before_now--Invalid_jwt", func(t *testing.T) {
-		spec.JWTExpiresAtValidationSkew = 0 //Default value
+		spec.JWTExpiresAtValidationSkew = 0 // Default value
 		ts.Gw.LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
@@ -749,7 +744,7 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	})
 
 	t.Run("Expiry_after_now--Invalid_jwt", func(t *testing.T) {
-		spec.JWTExpiresAtValidationSkew = 0 //Default value
+		spec.JWTExpiresAtValidationSkew = 0 // Default value
 
 		ts.Gw.LoadAPI(spec)
 
@@ -837,7 +832,7 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 	})
 
 	t.Run("NotBefore_After_now--Invalid_jwt", func(t *testing.T) {
-		spec.JWTNotBeforeValidationSkew = 0 //Default value
+		spec.JWTNotBeforeValidationSkew = 0 // Default value
 
 		ts.Gw.LoadAPI(spec)
 
@@ -1220,7 +1215,6 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 	})
 
 	t.Run("Request with a wrong scope in JWT and then correct scope", func(t *testing.T) {
-
 		jwtTokenWrongScope := CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["user_id"] = userID
 			t.Claims.(jwt.MapClaims)["scope"] = "nonexisting"
@@ -1417,7 +1411,6 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 // JWTSessionRSAWithJWK
 
 func (ts *Test) prepareJWTSessionRSAWithJWK() string {
-
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
@@ -1477,7 +1470,6 @@ func BenchmarkJWTSessionRSAWithJWK(b *testing.B) {
 // JWTSessionRSAWithEncodedJWK
 
 func (ts *Test) prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
-
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
@@ -1590,7 +1582,7 @@ func TestJWTHMACIdNewClaim(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//If we skip the check then the Id will be taken from SUB and the call will succeed
+	// If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := ts.prepareGenericJWTSession(t.Name(), HMACSign, "user-id", true)
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT/HMAC signature/id in user-id claim", func(t *testing.T) {
@@ -1616,7 +1608,7 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 
 	pID := ts.CreatePolicy()
 
-	//First test - user id in the configured base field 'user_id'
+	// First test - user id in the configured base field 'user_id'
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
@@ -1631,7 +1623,7 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 		})
 	})
 
-	//user-id claim configured but it's empty - returning an error
+	// user-id claim configured but it's empty - returning an error
 	jwtToken = CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
@@ -1648,7 +1640,7 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 		})
 	})
 
-	//user-id claim configured but not found fallback to sub
+	// user-id claim configured but not found fallback to sub
 	jwtToken = CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
@@ -1663,7 +1655,7 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 		})
 	})
 
-	//user-id claim not found fallback to sub that is empty
+	// user-id claim not found fallback to sub that is empty
 	jwtToken = CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
@@ -1680,7 +1672,7 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 		})
 	})
 
-	//user-id and sub claims not found
+	// user-id and sub claims not found
 	jwtToken = CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
@@ -1716,7 +1708,7 @@ func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["sub"] = "user123@test.com" //is ignored
+		t.Claims.(jwt.MapClaims)["sub"] = "user123@test.com" // is ignored
 		t.Claims.(jwt.MapClaims)["policy_id"] = pID
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
@@ -1727,11 +1719,11 @@ func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
 		})
 	})
 
-	//Id is not found since there's no sub claim and user_id has't been set in the api def (spec.JWTIdentityBaseField)
+	// Id is not found since there's no sub claim and user_id has't been set in the api def (spec.JWTIdentityBaseField)
 	jwtToken = CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["user_id"] = "user123@test.com" //is ignored
+		t.Claims.(jwt.MapClaims)["user_id"] = "user123@test.com" // is ignored
 		t.Claims.(jwt.MapClaims)["policy_id"] = pID
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
@@ -1969,7 +1961,7 @@ func TestJWTECDSASign(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//If we skip the check then the Id will be taken from SUB and the call will succeed
+	// If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := ts.prepareGenericJWTSession(t.Name(), ECDSASign, KID, false)
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT/ECDSA", func(t *testing.T) {
@@ -1983,7 +1975,7 @@ func TestJWTUnknownSign(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//If we skip the check then the Id will be taken from SUB and the call will succeed
+	// If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := ts.prepareGenericJWTSession(t.Name(), "bla", KID, false)
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT/ECDSA signature needs a test. currently defaults to HMAC", func(t *testing.T) {
@@ -2011,7 +2003,7 @@ func TestJWTRSAInvalidPublickKey(t *testing.T) {
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["sub"] = "user123@test.com" //is ignored
+		t.Claims.(jwt.MapClaims)["sub"] = "user123@test.com" // is ignored
 		t.Claims.(jwt.MapClaims)["policy_id"] = pID
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
@@ -2059,7 +2051,7 @@ func TestJWTExpOverride(t *testing.T) {
 	})
 
 	t.Run("JWT expiration bigger then policy", func(t *testing.T) {
-		//create policy which sets keys to have expiry in one second
+		// create policy which sets keys to have expiry in one second
 		pID := ts.CreatePolicy(func(p *user.Policy) {
 			p.KeyExpiresIn = 1
 		})
@@ -2072,7 +2064,7 @@ func TestJWTExpOverride(t *testing.T) {
 
 		authHeaders := map[string]string{"authorization": jwtToken}
 
-		//JWT expiry overrides internal token which gets expiry from policy so second request will pass
+		// JWT expiry overrides internal token which gets expiry from policy so second request will pass
 		ts.Run(t, []test.TestCase{
 			{Headers: authHeaders, Code: http.StatusOK, Delay: 1100 * time.Millisecond},
 			{Headers: authHeaders, Code: http.StatusOK},
@@ -2127,5 +2119,4 @@ func TestJWTExpOverride(t *testing.T) {
 			{Headers: newAuthHeaders, Code: http.StatusOK},
 		}...)
 	})
-
 }

@@ -26,8 +26,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	jwt "github.com/dgrijalva/jwt-go"
 	redis "github.com/go-redis/redis/v8"
+	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
