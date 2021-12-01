@@ -394,6 +394,24 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 			},
 		},
 		{
+			TypeName:  "Query",
+			FieldName: "restWithQueryParams",
+			Arguments: []plan.ArgumentConfiguration{
+				{
+					Name:       "q",
+					SourceType: plan.FieldArgumentSource,
+				},
+				{
+					Name:       "order",
+					SourceType: plan.FieldArgumentSource,
+				},
+				{
+					Name:       "limit",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		},
+		{
 			TypeName:  "DeepGQL",
 			FieldName: "query",
 			Arguments: []plan.ArgumentConfiguration{
