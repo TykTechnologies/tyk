@@ -46,8 +46,6 @@ jQIDAQAB!!!!
 -----END PUBLIC KEY-----
 `
 
-const invalidSignToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-
 func createJWTSession() *user.SessionState {
 	session := user.NewSessionState()
 	session.Rate = 1000000.0
@@ -388,6 +386,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 func TestJWTSessionFailRSA_WrongJWT_Signature(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
+	invalidSignToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 
 	//default values, same as before (keeps backward compatibility)
 	ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
