@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func GenCertificate(template *x509.Certificate) ([]byte, []byte, []byte, tls.Certificate) {
+func GenCertificate(template *x509.Certificate, setLeaf bool) ([]byte, []byte, []byte, tls.Certificate) {
 	priv, _ := rsa.GenerateKey(rand.Reader, 1024)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
@@ -29,7 +29,9 @@ func GenCertificate(template *x509.Certificate) ([]byte, []byte, []byte, tls.Cer
 	pem.Encode(&keyPem, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
 
 	clientCert, _ := tls.X509KeyPair(certPem.Bytes(), keyPem.Bytes())
-
+	if setLeaf {
+		clientCert.Leaf = template
+	}
 	combinedPEM := bytes.Join([][]byte{certPem.Bytes(), keyPem.Bytes()}, []byte("\n"))
 
 	return certPem.Bytes(), keyPem.Bytes(), combinedPEM, clientCert
@@ -39,7 +41,7 @@ func GenServerCertificate() ([]byte, []byte, []byte, tls.Certificate) {
 	certPem, privPem, combinedPEM, cert := GenCertificate(&x509.Certificate{
 		DNSNames:    []string{"localhost"},
 		IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::")},
-	})
+	}, false)
 
 	return certPem, privPem, combinedPEM, cert
 }

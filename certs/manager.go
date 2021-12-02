@@ -243,6 +243,24 @@ func isCertCanBeListed(cert *tls.Certificate, mode CertificateType) bool {
 	return true
 }
 
+type CertificateBasics struct {
+	ID        string    `json:"id"`
+	IssuerCN  string    `json:"issuer_cn"`
+	SubjectCN string    `json:"subject_cn"`
+	NotBefore time.Time `json:"not_before"`
+	NotAfter  time.Time `json:"not_after"`
+}
+
+func ExtractCertificateBasics(cert *tls.Certificate, certID string) *CertificateBasics {
+	return &CertificateBasics{
+		ID:        certID,
+		IssuerCN:  cert.Leaf.Issuer.CommonName,
+		SubjectCN: cert.Leaf.Subject.CommonName,
+		NotAfter:  cert.Leaf.NotAfter,
+		NotBefore: cert.Leaf.NotBefore,
+	}
+}
+
 type CertificateMeta struct {
 	ID            string    `json:"id"`
 	Fingerprint   string    `json:"fingerprint"`
