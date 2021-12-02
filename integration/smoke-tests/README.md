@@ -5,6 +5,14 @@
 
 # How it works
 ## Plugin compiler
+- compiles testplugin/main.go using the appropriate plugin-compiler
+- mounts testplugin/apidef.json into apps/
+
+Run it as `./test.sh <version>`. Depends on `<version>` being available in Docker Hub. See `plugin-compiler/test.sh`.
+
+The plugin adds a header `Foo: Bar` to all requests.
+
+## Plugin aliasing
 - compiles `foobar-plugin/main.go` & `helloworld-plugin/main.go` using the appropriate plugin-compiler
 - mounts api definitions in `foobar-plugin` and `helloworld-plugin` into apps/
 
