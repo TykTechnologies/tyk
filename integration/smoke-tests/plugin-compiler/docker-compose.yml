@@ -6,9 +6,14 @@ services:
   gw:
     image: tykio/tyk-gateway:${tag}
     volumes:
-      - ./testplugin/testplugin.so:/opt/tyk-gateway/middleware/testplugin.so
-      - ./testplugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
+      - ./foobar-plugin/foobar-plugin.so:/opt/tyk-gateway/middleware/foobar-plugin.so
+      - ./helloworld-plugin/helloworld-plugin.so:/opt/tyk-gateway/middleware/helloworld-plugin.so
+      - ./helloworld-plugin/helloworld-plugin-1.json:/opt/tyk-gateway/apps/helloworld-plugin-1.json
+      - ./helloworld-plugin/helloworld-plugin-2.json:/opt/tyk-gateway/apps/helloworld-plugin-2.json
+      - ./foobar-plugin/foobar-plugin-1.json:/opt/tyk-gateway/apps/foorbar-plugin-1.json
+      - ./foobar-plugin/foobar-plugin-2.json:/opt/tyk-gateway/apps/foorbar-plugin-2.json
     ports:
       - "0.0.0.0:8080:8080"
     environment:
+      - TYK_GW_SECRET=352d20ee67be67f6340b4c0605b044b7
       - TYK_LOGLEVEL=debug

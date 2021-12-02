@@ -1,6 +1,6 @@
 {
-    "name": "Goplugin test",
-    "slug": "goplugin",
+    "name": "Goplugin test foobar 2",
+    "slug": "/goplugin-foobar-2",
     "use_go_plugin_auth": false,
     "use_keyless": true,
     "use_oauth2": false,
@@ -26,7 +26,7 @@
     },
     "proxy": {
 	"preserve_host_header": false,
-	"listen_path": "/goplugin/",
+	"listen_path": "/goplugin-foobar-2/",
 	"target_url": "http://httpbin.org/",
 	"strip_listen_path": true,
 	"enable_load_balancing": false,
@@ -58,7 +58,7 @@
 	"post": [
 	 {
 	    "name": "AddFooBarHeader",
-	    "path": "/opt/tyk-gateway/middleware/testplugin.so",
+	    "path": "/opt/tyk-gateway/middleware/foobar-plugin.so",
 	    "require_session": false
 	}
 	],

@@ -17,11 +17,26 @@ EOF
 [[ -z $1 ]] && usage $0
 export tag=$1
 
-rm -fv testplugin/*.so || true
-docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${tag} testplugin.so
+#rm -fv foobar-plugin/*.so || true
+#docker run --rm -v `pwd`/foobar-plugin:/plugin-source tykio/tyk-plugin-compiler:${tag} foobar-plugin.so
+#
+#rm -fv helloworld-plugin/*.so || true
+#docker run --rm -v `pwd`/helloworld-plugin:/plugin-source tykio/tyk-plugin-compiler:${tag} helloworld-plugin.so
+
 docker-compose up -d
 sleep 2 # Wait for init
-curl -vvv http://localhost:8080/goplugin/headers
-curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"'
+
+curl -vvv http://localhost:8080/goplugin-helloworld-1/headers
+curl http://localhost:8080/goplugin-helloworld-1/headers | jq -e '.headers.Hello == "World"'
+
+curl -vvv http://localhost:8080/goplugin-helloworld-2/headers
+curl http://localhost:8080/goplugin-helloworld-2/headers | jq -e '.headers.Hello == "World"'
+
+curl -vvv http://localhost:8080/goplugin-foobar-1/headers
+curl http://localhost:8080/goplugin-foobar-1/headers | jq -e '.headers.Foo == "Bar"'
+
+curl -vvv http://localhost:8080/goplugin-foobar-2/headers
+curl http://localhost:8080/goplugin-foobar-2/headers | jq -e '.headers.Foo == "Bar"'
+
 docker-compose logs
 docker-compose down 
