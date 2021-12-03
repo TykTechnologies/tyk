@@ -3123,7 +3123,7 @@ components:
       type: object
       x-go-package: github.com/TykTechnologies/tyk
     APIAllCertificateBasics:
-      description: APIAllCertificates represents a list of certificates
+      description: APIAllCertificates represents a list of certificate basics
       properties:
         certs:
           items:
