@@ -12,8 +12,8 @@ ENV PLUGIN_BUILD_PATH=/go/src/plugin-build
 
 RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH $PLUGIN_BUILD_PATH
 COPY images/plugin-compiler/data/build.sh /build.sh
-COPY ./ $TYK_GW_PATH/
-RUN cd $TYK_GW_PATH && go mod tidy && go mod vendor
+# COPY ./ $TYK_GW_PATH/
+# RUN cd $TYK_GW_PATH && go mod tidy && go mod vendor
 RUN chmod +x /build.sh
 
 ENTRYPOINT ["/build.sh"]

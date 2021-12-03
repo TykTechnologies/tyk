@@ -24,21 +24,6 @@ if [ ! -f go.mod ]; then
     exit 1
 fi
 
-if [ -d ./vendor ]; then
-    echo 'Found vendor directory, ignoring'
-else
-    go mod vendor
-fi
-# We can't just copy Tyk dependencies on top of plugin dependencies, since different package versions have different file structures
-# First we need to find which deps GW already has, remove this folders, and after copy fresh versions from GW
+[ -d ./vendor ] && echo 'Found vendor directory, ignoring'
 
-# github.com and rest of packages have different nesting levels, so have to handle it separately
-ls -d $TYK_GW_PATH/vendor/github.com/*/* | sed "s|$TYK_GW_PATH/vendor|$(pwd)/vendor|g" | xargs -d '\n' rm -rf
-ls -d $TYK_GW_PATH/vendor/*/* | sed "s|$TYK_GW_PATH/vendor|$(pwd)/vendor|g" | grep -v github | xargs -d '\n' rm -rf
-cp ./vendor/modules.txt modules.txt.plugin
-
-# Copy GW dependencies
-yes | cp -rf $TYK_GW_PATH/vendor/* ./vendor
-cp modules.txt.plugin ./vendor/modules.txt
-
-go build -mod=mod -buildmode=plugin -o $plugin_name
+go build -buildmode=plugin -o $plugin_name
