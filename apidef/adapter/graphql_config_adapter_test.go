@@ -595,12 +595,12 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 					Method: "POST",
 					Query: []restDataSource.QueryConfiguration{
 						{
-							Name:  "q",
-							Value: "{{.arguments.q}}",
-						},
-						{
 							Name:  "order",
 							Value: "{{.arguments.order}}",
+						},
+						{
+							Name:  "q",
+							Value: "{{.arguments.q}}",
 						},
 						{
 							Name:  "limit",

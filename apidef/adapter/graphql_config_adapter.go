@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	neturl "net/url"
+	"sort"
 	"strings"
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
@@ -364,6 +365,10 @@ func (g *GraphQLConfigAdapter) convertURLQueryParamsIntoEngineV2Queries(engineV2
 			Value: strings.Join(queryValue, ","),
 		})
 	}
+
+	sort.Slice(*engineV2Queries, func(i, j int) bool {
+		return (*engineV2Queries)[i].Name < (*engineV2Queries)[j].Name
+	})
 }
 
 func (g *GraphQLConfigAdapter) convertApiDefQueriesConfigIntoEngineV2Queries(engineV2Queries *[]restDataSource.QueryConfiguration, apiDefQueries []apidef.QueryVariable) {
