@@ -1066,6 +1066,70 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		ts.Run(t, test.TestCase{Path: "/", Code: 403, Client: client})
 	})
 
+
+	// check that key has been updated with wrong certificate
+	t.Run("Key has been updated with wrong certificate key", func(t *testing.T) {
+		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
+		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
+
+		if err != nil {
+			t.Fatal("certificate should be added to cert manager")
+		}
+
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.BaseIdentityProvidedBy = apidef.AuthToken
+			spec.AuthConfigs = map[string]apidef.AuthConfig{
+				authTokenType: {UseCertificate: true},
+			}
+			spec.Proxy.ListenPath = "/"
+			spec.OrgID = orgId
+		})
+		client := GetTLSClient(&clientCert, nil)
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.Certificate = clientCertID
+			s.AccessRights = map[string]user.AccessDefinition{"test": {
+				APIID: "test", Versions: []string{"v1"},
+			}}
+		})
+
+		if key == "" {
+			t.Fatal("Should create key based on certificate")
+		}
+
+		// check we can use the key after remove the cert
+		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
+		session.Certificate = "fooBar"
+		// update redis directly since we have protection not to allow create of a session with wrong certificate
+		err = GlobalSessionManager.UpdateSession(key, session, 0, true)
+		if err != nil {
+			t.Error("could not update session in Session Manager. " + err.Error())
+		}
+
+		// key should also work without cert
+		header := map[string]string{
+			headers.Authorization: key,
+		}
+		newClient := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+		ts.Run(t, test.TestCase{Path: "/", Headers: header, Code: http.StatusForbidden, Client: newClient})
+
+		// now we should not be allowed to use the key
+		// this call should also migrate the certificate field data
+		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
+		updatedSession, _ := GlobalSessionManager.SessionDetail(session.OrgID, session.KeyID, false)
+
+		if updatedSession.Certificate != clientCertID {
+			t.Error("Certificate should be properly updated.")
+		}
+
+		ts.Run(t, test.TestCase{Path: "/", Headers: header, Code: http.StatusOK, Client: newClient})
+
+	})
+
 }
 
 func TestAPICertificate(t *testing.T) {

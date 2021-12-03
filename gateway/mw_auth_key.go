@@ -95,7 +95,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		key = stripBearer(key)
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 		log.Debug("Trying to find key by client certificate")
-		certHash = certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+		certHash = k.Spec.OrgID + certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		key = generateToken(k.Spec.OrgID, certHash)
 
 	} else {
@@ -105,6 +105,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
 	key = session.KeyID
+	updateSession := false
 	if !keyExists {
 		// fallback to search by cert
 		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
@@ -115,7 +116,17 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	if authConfig.UseCertificate {
-		if _, err := CertificateManager.GetRaw(session.Certificate); err != nil {
+
+		certLookup := session.Certificate
+		if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+			certLookup = certHash
+			if session.Certificate != certHash {
+				session.Certificate = certHash
+				updateSession = true
+			}
+		}
+
+		if _, err := CertificateManager.GetRaw(certLookup); err != nil {
 			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
 		}
 	}
@@ -123,7 +134,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
-		ctxSetSession(r, &session, false)
+		ctxSetSession(r, &session, updateSession)
 		k.setContextVars(r, key)
 	}
 
