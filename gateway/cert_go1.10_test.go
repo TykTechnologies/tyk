@@ -163,7 +163,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		_, _, _, serverCert := certs.GenCertificate(&x509.Certificate{
 			EmailAddresses: []string{"test@test.com"},
 			Subject:        pkix.Name{CommonName: "localhost"},
-		})
+		}, false)
 		serverPubID, err := ts.Gw.uploadCertPublicKey(serverCert)
 		if err != nil {
 			t.Error(err)
@@ -182,7 +182,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		// start proxy
 		_, _, _, proxyCert := certs.GenCertificate(&x509.Certificate{
 			Subject: pkix.Name{CommonName: "local1.host"},
-		})
+		}, false)
 		proxyPubID, err := ts.Gw.uploadCertPublicKey(proxyCert)
 		if err != nil {
 			t.Error(err)

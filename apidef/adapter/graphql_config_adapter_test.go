@@ -394,6 +394,24 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 			},
 		},
 		{
+			TypeName:  "Query",
+			FieldName: "restWithQueryParams",
+			Arguments: []plan.ArgumentConfiguration{
+				{
+					Name:       "q",
+					SourceType: plan.FieldArgumentSource,
+				},
+				{
+					Name:       "order",
+					SourceType: plan.FieldArgumentSource,
+				},
+				{
+					Name:       "limit",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		},
+		{
 			TypeName:  "DeepGQL",
 			FieldName: "query",
 			Arguments: []plan.ArgumentConfiguration{
@@ -561,6 +579,37 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			}),
 		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"restWithQueryParams"},
+				},
+			},
+			Factory: &restDataSource.Factory{
+				Client: httpClient,
+			},
+			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+				Fetch: restDataSource.FetchConfiguration{
+					URL:    "https://rest-with-query-params.example.com",
+					Method: "POST",
+					Query: []restDataSource.QueryConfiguration{
+						{
+							Name:  "order",
+							Value: "{{.arguments.order}}",
+						},
+						{
+							Name:  "q",
+							Value: "{{.arguments.q}}",
+						},
+						{
+							Name:  "limit",
+							Value: "{{.arguments.limit}}",
+						},
+					},
+				},
+			}),
+		},
 	}
 
 	var gqlConfig apidef.GraphQLConfig
@@ -586,7 +635,7 @@ const graphqlEngineV1ConfigJson = `{
 	"playground": {}
 }`
 
-const v2Schema = `type Query { rest: String gql(id: ID!, name: String): String deepGQL: DeepGQL withChildren: WithChildren multiRoot1: MultiRoot1 multiRoot2: MultiRoot2 } type WithChildren { id: ID! name: String nested: Nested } type Nested { id: ID! name: String! } type MultiRoot1 { id: ID! } type MultiRoot2 { name: String! } type DeepGQL { query(code: String!): String }`
+const v2Schema = `type Query { rest: String gql(id: ID!, name: String): String deepGQL: DeepGQL withChildren: WithChildren multiRoot1: MultiRoot1 multiRoot2: MultiRoot2 restWithQueryParams(q: String, order: String, limit: Int): [String] } type WithChildren { id: ID! name: String nested: Nested } type Nested { id: ID! name: String! } type MultiRoot1 { id: ID! } type MultiRoot2 { name: String! } type DeepGQL { query(code: String!): String }`
 
 const graphqlEngineV2ConfigJson = `{
 	"enabled": true,
@@ -688,6 +737,26 @@ const graphqlEngineV2ConfigJson = `{
 					"headers": {
 						"Auth": "123"
 					}
+				}
+			},
+			{
+				"kind": "REST",
+				"name": "restWithQueryParams",
+				"internal": true,
+				"root_fields": [
+					{ "type": "Query", "fields": ["restWithQueryParams"] }
+				],
+				"config": {
+					"url": "https://rest-with-query-params.example.com?q={{.arguments.q}}&order={{.arguments.order}}",
+					"method": "POST",
+					"headers": {},
+					"query": [
+						{
+							"name": "limit",
+							"value": "{{.arguments.limit}}"
+						}
+					],
+					"body": ""
 				}
 			}
 		]
