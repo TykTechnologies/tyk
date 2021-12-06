@@ -10,6 +10,28 @@ Requires docker compose.
 EOF
     exit 1
 }
+
+function logAndStopDocker {
+  docker-compose logs
+  docker-compose down
+  exit $1
+}
+
+
+function testAPIs {
+  curl -vvv http://localhost:8080/goplugin-helloworld-1/headers
+  curl http://localhost:8080/goplugin-helloworld-1/headers | jq -e '.headers.Hello == "World"'
+
+  curl -vvv http://localhost:8080/goplugin-helloworld-2/headers
+  curl http://localhost:8080/goplugin-helloworld-2/headers | jq -e '.headers.Hello == "World"'
+
+  curl -vvv http://localhost:8080/goplugin-foobar-1/headers
+  curl http://localhost:8080/goplugin-foobar-1/headers | jq -e '.headers.Foo == "Bar"'
+
+  curl -vvv http://localhost:8080/goplugin-foobar-2/headers
+  curl http://localhost:8080/goplugin-foobar-2/headers | jq -e '.headers.Foo == "Bar"'
+}
+
 [[ -z $1 ]] && usage $0
 export tag=$1
 
@@ -22,17 +44,8 @@ docker run --rm -v `pwd`/helloworld-plugin:/plugin-source tykio/tyk-plugin-compi
 docker-compose up -d
 sleep 2 # Wait for init
 
-curl -vvv http://localhost:8080/goplugin-helloworld-1/headers
-curl http://localhost:8080/goplugin-helloworld-1/headers | jq -e '.headers.Hello == "World"'
-
-curl -vvv http://localhost:8080/goplugin-helloworld-2/headers
-curl http://localhost:8080/goplugin-helloworld-2/headers | jq -e '.headers.Hello == "World"'
-
-curl -vvv http://localhost:8080/goplugin-foobar-1/headers
-curl http://localhost:8080/goplugin-foobar-1/headers | jq -e '.headers.Foo == "Bar"'
-
-curl -vvv http://localhost:8080/goplugin-foobar-2/headers
-curl http://localhost:8080/goplugin-foobar-2/headers | jq -e '.headers.Foo == "Bar"'
-
-docker-compose logs
-docker-compose down
+if testAPIs; then
+  logAndStopDocker 0
+else
+  logAndStopDocker 1
+fi

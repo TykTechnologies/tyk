@@ -14,6 +14,12 @@ EOF
     exit 1
 }
 
+function logAndStopDocker {
+  docker-compose logs
+  docker-compose down
+  exit $1
+}
+
 [[ -z $1 ]] && usage $0
 export tag=$1
 
@@ -22,6 +28,8 @@ docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${t
 docker-compose up -d
 sleep 2 # Wait for init
 curl -vvv http://localhost:8080/goplugin/headers
-curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"'
-docker-compose logs
-docker-compose down 
+if curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"'; then
+  logAndStopDocker 0
+else
+  logAndStopDocker 1
+fi
