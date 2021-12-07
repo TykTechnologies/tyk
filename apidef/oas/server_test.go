@@ -30,3 +30,15 @@ func TestListenPath(t *testing.T) {
 
 	assert.Equal(t, emptyListenPath, resultListenPath)
 }
+
+func TestClientCertificates(t *testing.T) {
+	var emptyClientCertificates ClientCertificates
+
+	var convertedAPI apidef.APIDefinition
+	emptyClientCertificates.ExtractTo(&convertedAPI)
+
+	var resultClientCertificates ClientCertificates
+	resultClientCertificates.Fill(convertedAPI)
+
+	assert.Equal(t, emptyClientCertificates, resultClientCertificates)
+}
