@@ -507,6 +507,114 @@ paths:
               schema:
                 type: string
               example: "Hello Tiki"
+  '/tyk/certs':
+    get:
+      parameters:
+        - description: Organization ID to list the certificates
+          in: query
+          name: org_id
+          required: true
+          schema:
+            type: string
+        - description: Mode to list the certificate details
+          name: mode
+          in: query
+          required: false
+          schema:
+            type: string
+          example: 'detailed'
+        - description: Comma separated list of certificates to list
+          name: certID
+          in: query
+          required: false
+          schema:
+            type: string
+          example: 'e6ce2b49-3e31-44de-95a7-12f054724283,234a37ac-28d1-4f12-b936-ffb4211b79f1'
+      summary: List Certificates
+      description: List All Certificates in Gateway
+      tags:
+        - Certs
+      operationId: listCerts
+      responses:
+        '200':
+          description: List of all Certificates
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/APIAllCertificates'
+                  - $ref: '#/components/schemas/APIAllCertificateBasics'
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/CertificateMeta'
+    post:
+      summary: Add a certificate
+      description: Add a certificate to the gateway
+      tags:
+        - Certs
+      operationId: addCert
+      parameters:
+        - description: Organization ID to list the certificates
+          in: query
+          name: org_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: New Key added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APICertificateStatusMessage'
+              example:
+                id: 'e6ce2b49-3e31-44de-95a7-12f054724283'
+                message: 'Certificate added'
+                status: ok
+        '403':
+          description: Malformed data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: Malformed cert data
+                status: error
+    delete:
+      parameters:
+        - description: Certifiicate ID to be deleted
+          in: query
+          name: certID
+          required: true
+          schema:
+            type: string
+        - description: Organization ID to list the certificates
+          in: query
+          name: org_id
+          required: true
+          schema:
+            type: string
+      summary: Delete Certificate
+      description: Delete certificate by id
+      tags:
+        - Certs
+      operationId: deleteCerts
+      responses:
+        '200':
+          description: Deleted certificate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: removed
+                status: ok
+
   '/tyk/keys':
     get:
       summary: List Keys
@@ -3002,6 +3110,154 @@ components:
         status:
           type: string
           x-go-name: Status
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    APIAllCertificates:
+      description:  APIAllCertificates represents a list of certificates
+      properties:
+        certs:
+          items:
+            type: string
+          type: array
+          x-go-name: Certs
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    APIAllCertificateBasics:
+      description: APIAllCertificates represents a list of certificate basics
+      properties:
+        certs:
+          items:
+            $ref: '#/components/schemas/CertificateBasics'
+          type: array
+          x-go-name: Certs
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    CertificateBasics:
+      description: CertificateBasics represents basic details of a certificate
+      properties:
+        id:
+          type: string
+          x-go-name: ID
+        issuer_cn:
+          type: string
+          x-go-name: IssuerCN
+        subject_cn:
+          type: string
+          x-go-name: SubjectCN
+        not_before:
+          type: string
+          x-go-name: NotBefore
+        not_after:
+          type: string
+          x-go-name: NotAfter
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    CertificateMeta:
+      description: CertificateBasics represents basic details of a certificate
+      properties:
+        id:
+          type: string
+          x-go-name: ID
+        fingerprint:
+          type: string
+          x-go-name: Fingerprint
+        has_private:
+          type: string
+          x-go-name: HasPrivateKey
+        issuer:
+          $ref: '#/components/schemas/pkixName'
+        subject:
+          $ref: '#/components/schemas/pkixName'
+        not_before:
+          type: string
+          x-go-name: NotBefore
+        not_after:
+          type: string
+          x-go-name: NotAfter
+        dns_names:
+          type: array
+          items:
+            type: string
+          x-go-name: DNSNames
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    pkixName:
+      description: Name represents an X.509 distinguished name
+      properties:
+        Country:
+          type: array
+          items:
+            type: string
+        Organization:
+          type: array
+          items:
+            type: string
+        OrganizationalUnit:
+          type: array
+          items:
+            type: string
+        Locality:
+          type: array
+          items:
+            type: string
+        Province:
+          type: array
+          items:
+            type: string
+        StreetAddress:
+          type: array
+          items:
+            type: string
+        PostalCode:
+          type: array
+          items:
+            type: string
+        SerialNumber:
+          type: string
+        CommonName:
+          type: string
+        Names:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixAttributeTypeAndValue'
+        ExtraNames:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixAttributeTypeAndValueSET'
+    pkixAttributeTypeAndValue:
+      description: AttributeTypeAndValue mirrors the ASN.1 structure of the same name in RFC 5280, Section 4.1.2.4.
+      properties:
+        Type:
+          type: array
+          items:
+            type: integer
+        Value:
+          type: object
+    pkixAttributeTypeAndValueSET:
+      description: AttributeTypeAndValueSET represents a set of ASN.1 sequences of AttributeTypeAndValue sequences from RFC 2986 (PKCS #10).
+      properties:
+        Type:
+          type: array
+          items:
+            type: integer
+        Value:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/pkixAttributeTypeAndValue'
+    APICertificateStatusMessage:
+      description: Status message when certificate is added
+      properties:
+        id:
+          type: string
+          x-go-name: CertID
+        status:
+          type: string
+          x-go-name: Status
+        message:
+          type: string
+          x-go-name: Message
       type: object
       x-go-package: github.com/TykTechnologies/tyk
   securitySchemes:
