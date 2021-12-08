@@ -1,6 +1,6 @@
 # Go version here should match https://github.com/TykTechnologies/golang-cross/blob/<branch>/.github/workflows/release.yml#L38
 
-FROM golang:1.15.15
+FROM golang:1.15-buster
 LABEL description="Image for plugin development"
 
 ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
