@@ -216,15 +216,15 @@ func (ps Paths) ExtractTo(ep *apidef.ExtendedPathsSet) {
 }
 
 type Path struct {
-	Delete  *Plugins `bson:"delete,omitempty" json:"delete,omitempty"`
-	Get     *Plugins `bson:"get,omitempty" json:"get,omitempty"`
-	Head    *Plugins `bson:"head,omitempty" json:"head,omitempty"`
-	Options *Plugins `bson:"options,omitempty" json:"options,omitempty"`
-	Patch   *Plugins `bson:"patch,omitempty" json:"patch,omitempty"`
-	Post    *Plugins `bson:"post,omitempty" json:"post,omitempty"`
-	Put     *Plugins `bson:"put,omitempty" json:"put,omitempty"`
-	Trace   *Plugins `bson:"trace,omitempty" json:"trace,omitempty"`
-	Connect *Plugins `bson:"connect,omitempty" json:"connect,omitempty"`
+	Delete  *Plugins `bson:"DELETE,omitempty" json:"DELETE,omitempty"`
+	Get     *Plugins `bson:"GET,omitempty" json:"GET,omitempty"`
+	Head    *Plugins `bson:"HEAD,omitempty" json:"HEAD,omitempty"`
+	Options *Plugins `bson:"OPTIONS,omitempty" json:"OPTIONS,omitempty"`
+	Patch   *Plugins `bson:"PATCH,omitempty" json:"PATCH,omitempty"`
+	Post    *Plugins `bson:"POST,omitempty" json:"POST,omitempty"`
+	Put     *Plugins `bson:"PUT,omitempty" json:"PUT,omitempty"`
+	Trace   *Plugins `bson:"TRACE,omitempty" json:"TRACE,omitempty"`
+	Connect *Plugins `bson:"CONNECT,omitempty" json:"CONNECT,omitempty"`
 }
 
 func (p *Path) ExtractTo(ep *apidef.ExtendedPathsSet, path string) {
