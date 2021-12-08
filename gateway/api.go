@@ -2591,20 +2591,20 @@ func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
 	setCtxValue(r, ctx.VersionData, v)
 }
 
-func ctxSetVersionBaseAPIID(r *http.Request, baseAPIID string) {
-	setCtxValue(r, ctx.VersionBaseAPIID, baseAPIID)
+func ctxSetVersionBaseAPI(r *http.Request, spec *APISpec) {
+	setCtxValue(r, ctx.VersionBaseAPI, spec)
 }
 
-func ctxGetVersionBaseAPIID(r *http.Request) string {
+func ctxGetVersionBaseAPI(r *http.Request) *APISpec {
 	if r == nil {
-		return ""
+		return nil
 	}
 
-	if v := r.Context().Value(ctx.VersionBaseAPIID); v != nil {
-		return v.(string)
+	if v := r.Context().Value(ctx.VersionBaseAPI); v != nil {
+		return v.(*APISpec)
 	}
 
-	return ""
+	return nil
 }
 
 func ctxSetOrigRequestURL(r *http.Request, url *url.URL) {

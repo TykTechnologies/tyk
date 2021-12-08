@@ -299,7 +299,7 @@ func (m *GraphQLMiddleware) OnBeforeStart(reqCtx context.Context, operation *gql
 	session := v.(*user.SessionState)
 
 	baseAPIID := m.Spec.APIID
-	if ctxBaseAPIID := reqCtx.Value(ctx.VersionBaseAPIID); ctxBaseAPIID != nil {
+	if ctxBaseAPIID := reqCtx.Value(ctx.VersionBaseAPI); ctxBaseAPIID != nil {
 		baseAPIID = ctxBaseAPIID.(string)
 	}
 

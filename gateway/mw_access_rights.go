@@ -22,7 +22,12 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, http.StatusOK
 	}
 
-	accessingVersion := a.Spec.getVersionFromRequest(r)
+	baseAPI := ctxGetVersionBaseAPI(r)
+	if baseAPI == nil {
+		baseAPI = a.Spec
+	}
+
+	accessingVersion := baseAPI.getVersionFromRequest(r)
 	if accessingVersion == "" {
 		if a.Spec.VersionData.DefaultVersion != "" {
 			accessingVersion = a.Spec.VersionData.DefaultVersion
@@ -33,7 +38,7 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// If there's nothing in our profile, we let them through to the next phase
 	if len(session.AccessRights) > 0 {
 		// Otherwise, run auth checks
-		versionList, apiExists := session.AccessRights[a.Spec.BaseAPIID(r)]
+		versionList, apiExists := session.AccessRights[baseAPI.APIID]
 		if !apiExists {
 			a.Logger().Info("Attempted access to unauthorised API")
 			return errors.New("Access to this API has been disallowed"), http.StatusForbidden
@@ -41,7 +46,7 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 		// Find the version in their key access details
 		found := false
-		if a.Spec.VersionData.NotVersioned {
+		if baseAPI.VersionData.NotVersioned {
 			// Not versioned, no point checking version access rights
 			found = true
 		} else {

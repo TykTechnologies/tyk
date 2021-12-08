@@ -211,7 +211,8 @@ func TestNewVersioning(t *testing.T) {
 		a.VersionData.DefaultVersion = "v1"
 		a.VersionData.Versions = map[string]apidef.VersionInfo{
 			"v1": {
-				Name: "v1",
+				Name:  "v1",
+				APIID: versionedAPI.APIID,
 			},
 			"v2": {
 				Name:  "v2",
@@ -244,18 +245,36 @@ func TestNewVersioning(t *testing.T) {
 		"Authorization": baseAPIKey,
 	}
 
-	_, _ = ts.Run(t, []test.TestCase{
-		{Path: "/default", Code: http.StatusOK},
-		// default listen path with version param should route to v2
-		{Path: "/default?version=v2", Code: http.StatusUnauthorized},
-		{Path: "/default?version=v2", Headers: headersForVersionedAPI, Code: http.StatusForbidden},
-		{Path: "/default?version=v2", Headers: headersForBaseAPI, Code: http.StatusOK},
-		// For not found version, it should fallback to default
-		{Path: "/default?version=notFound", BodyMatch: string(VersionDoesNotExist), Code: http.StatusForbidden},
-		// v2 should be accessible by its own listen path
-		{Path: "/new", Code: http.StatusUnauthorized},
-		{Path: "/new", Headers: headersForVersionedAPI, Code: http.StatusOK},
-	}...)
+	t.Run("default version should be accessible without version param", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{Path: "/default", Code: http.StatusUnauthorized})
+	})
+
+	t.Run("invalid version in param should give error", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{Path: "/default?version=invalid", BodyMatch: string(VersionDoesNotExist), Code: http.StatusForbidden})
+	})
+
+	t.Run("versioned API should be accessible with param if has access rights", func(t *testing.T) {
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/default?version=v2", Code: http.StatusUnauthorized},
+			{Path: "/default?version=v1", Headers: headersForBaseAPI, Code: http.StatusForbidden},
+		}...)
+	})
+
+	t.Run("accessing to versioned API with base API listen path should require base API key", func(t *testing.T) {
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/default?version=v2", Headers: headersForVersionedAPI, Code: http.StatusForbidden},
+			{Path: "/default?version=v2", Headers: headersForBaseAPI, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("versioned API should be accessible in its own listen path", func(t *testing.T) {
+		t.Run("key checks", func(t *testing.T) {
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/new", Code: http.StatusUnauthorized},
+				{Path: "/new", Headers: headersForVersionedAPI, Code: http.StatusOK},
+			}...)
+		})
+	})
 
 	t.Run("versioned API does not have sub-version", func(t *testing.T) {
 		assert.True(t, versionedAPI.VersionData.NotVersioned)
