@@ -26,4 +26,4 @@ fi
 
 [ -d ./vendor ] && echo 'Found vendor directory, ignoring'
 
-go build -buildmode=plugin -o $plugin_name
+go build -buildmode=plugin -o $plugin_name && go mod tidy
