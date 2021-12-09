@@ -90,6 +90,8 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 			authTokenType: {CookieName: key},
 		}
 		stripFromCookieTest(t, req, key, sa, "Dummy=DUMMY;NonDefaultName=AUTHORIZATION;Dummy2=DUMMY2", "Dummy=DUMMY;Dummy2=DUMMY2")
+		// whitespace between cookies
+		stripFromCookieTest(t, req, key, sa, "Dummy=DUMMY; NonDefaultName=AUTHORIZATION; Dummy2=DUMMY2", "Dummy=DUMMY; Dummy2=DUMMY2")
 	})
 }
 
