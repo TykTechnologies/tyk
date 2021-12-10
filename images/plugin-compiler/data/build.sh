@@ -25,22 +25,27 @@ mkdir -p $PLUGIN_BUILD_PATH
 yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
 
 cd $PLUGIN_BUILD_PATH
-# Ensure that GW package versions have priorities
 
-# We can't just copy Tyk dependencies on top of plugin dependencies, since different package versions have different file structures
-# First we need to find which deps GW already has, remove this folders, and after copy fresh versions from GW
-# ls -d /tmp/vendor/*
-# Handle if plugin has own vendor folder, and ignore error if not
 if [ ! -f go.mod ]; then
     echo 'Please use gomodules.'
     exit 1
 fi
 
-[ -d ./vendor ] && echo 'Found vendor directory, ignoring'
+# if plugin has go.mod
+[ -f go.mod ] && [ ! -d vendor ] && go mod vendor
+rm go.mod
+
+# Ensure that GW package versions have priorities
+
+# We can't just copy Tyk dependencies on top of plugin dependencies, since different package versions have different file structures
+# First we need to find which deps GW already has, remove this folders, and after copy fresh versions from GW
+# ls -d /tmp/vendor/*
+## Handle if plugin has own vendor folder, and ignore error if not
+#
+#[ -d ./vendor ] && echo 'Found vendor directory, ignoring'
 
 # Copy GW dependencies
 # yes | cp -rf /tmp/vendor/* $PLUGIN_BUILD_PATH/vendor
 
 go build -buildmode=plugin -o $plugin_name \
-    && go mod tidy \
     && mv $plugin_name $PLUGIN_SOURCE_PATH
