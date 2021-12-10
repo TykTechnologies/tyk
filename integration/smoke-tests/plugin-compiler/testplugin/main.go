@@ -1,7 +1,11 @@
 package main
 
 import (
+	"html/template"
 	"net/http"
+
+	// Example of package with different version in go.mod
+	"gopkg.in/Masterminds/sprig.v2"
 
 	// Example of package which is not part of Gateway
 	"github.com/kr/pretty"
@@ -22,6 +26,12 @@ func AddFooBarHeader(rw http.ResponseWriter, r *http.Request) {
 	if api != nil {
 		logger.Info("API Definition", pretty.Sprint(api))
 	}
+
+	// Set up variables and template.
+	tpl := `Hello {{.Name | trim | lower}}`
+
+	// Get the Sprig function map.
+	template.Must(template.New("test").Funcs(sprig.FuncMap()).Parse(tpl))
 }
 
 func main() {}
