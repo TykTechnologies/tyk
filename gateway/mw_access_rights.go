@@ -22,12 +22,6 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, http.StatusOK
 	}
 
-	accessingVersion := a.Spec.getVersionFromRequest(r)
-	if accessingVersion == "" {
-		if a.Spec.VersionData.DefaultVersion != "" {
-			accessingVersion = a.Spec.VersionData.DefaultVersion
-		}
-	}
 	session := ctxGetSession(r)
 
 	// If there's nothing in our profile, we let them through to the next phase
@@ -45,8 +39,13 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			// Not versioned, no point checking version access rights
 			found = true
 		} else {
+			targetVersion := a.Spec.getVersionFromRequest(r)
+			if targetVersion == "" {
+				targetVersion = a.Spec.VersionData.DefaultVersion
+			}
+
 			for _, vInfo := range versionList.Versions {
-				if vInfo == accessingVersion {
+				if vInfo == targetVersion {
 					found = true
 					break
 				}
