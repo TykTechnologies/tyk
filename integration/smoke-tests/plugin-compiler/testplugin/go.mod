@@ -3,7 +3,7 @@ module testplugin
 go 1.15
 
 require (
-	github.com/TykTechnologies/tyk v1.9.2-0.20211203123546-58d0d160938f
+	github.com/TykTechnologies/tyk v1.9.2-0.20211117182909-d3878dedb4a3
 	github.com/kr/pretty v0.1.0
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
