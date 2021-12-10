@@ -11,29 +11,14 @@ EOF
     exit 1
 }
 
-function logAndStopDocker {
-  docker-compose logs
-  docker-compose down
-  exit $1
-}
-
-
-function testAPIs {
-  curl -vvv http://localhost:8080/goplugin-helloworld-1/headers
-  curl http://localhost:8080/goplugin-helloworld-1/headers | jq -e '.headers.Hello == "World"'
-
-  curl -vvv http://localhost:8080/goplugin-helloworld-2/headers
-  curl http://localhost:8080/goplugin-helloworld-2/headers | jq -e '.headers.Hello == "World"'
-
-  curl -vvv http://localhost:8080/goplugin-foobar-1/headers
-  curl http://localhost:8080/goplugin-foobar-1/headers | jq -e '.headers.Foo == "Bar"'
-
-  curl -vvv http://localhost:8080/goplugin-foobar-2/headers
-  curl http://localhost:8080/goplugin-foobar-2/headers | jq -e '.headers.Foo == "Bar"'
-}
+compose='docker-compose'
+# composev2 is a client plugin
+[[ $(docker version --format='{{ .Client.Version }}') == "20.10.11" ]] && compose='docker compose'
 
 [[ -z $1 ]] && usage $0
 export tag=$1
+
+trap "$compose down" EXIT
 
 rm -fv foobar-plugin/*.so || true
 docker run --rm -v `pwd`/foobar-plugin:/plugin-source tykio/tyk-plugin-compiler:${tag} foobar-plugin.so
@@ -44,8 +29,14 @@ docker run --rm -v `pwd`/helloworld-plugin:/plugin-source tykio/tyk-plugin-compi
 docker-compose up -d
 sleep 2 # Wait for init
 
-if testAPIs; then
-  logAndStopDocker 0
-else
-  logAndStopDocker 1
-fi
+curl -vvv http://localhost:8080/goplugin-helloworld-1/headers
+curl http://localhost:8080/goplugin-helloworld-1/headers | jq -e '.headers.Hello == "World"' || { $compose logs gw; exit 1; }
+
+curl -vvv http://localhost:8080/goplugin-helloworld-2/headers
+curl http://localhost:8080/goplugin-helloworld-2/headers | jq -e '.headers.Hello == "World"' || { $compose logs gw; exit 1; }
+
+curl -vvv http://localhost:8080/goplugin-foobar-1/headers
+curl http://localhost:8080/goplugin-foobar-1/headers | jq -e '.headers.Foo == "Bar"' || { $compose logs gw; exit 1; }
+
+curl -vvv http://localhost:8080/goplugin-foobar-2/headers
+curl http://localhost:8080/goplugin-foobar-2/headers | jq -e '.headers.Foo == "Bar"' || { $compose logs gw; exit 1; }
