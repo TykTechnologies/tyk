@@ -28,4 +28,4 @@ docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${t
 $compose up -d
 sleep 2 # Wait for init
 curl -vvv http://localhost:8080/goplugin/headers
-curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"' || $compose logs gw
+curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"' || { $compose logs gw; exit 1; }
