@@ -183,7 +183,7 @@ func (sfr sessionFailReason) String() string {
 // Per 10 seconds
 func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, api *APISpec, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
-	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(currentSession, api)
+	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(currentSession, api.BaseAPIID(r))
 	if err != nil {
 		log.WithField("apiID", api.APIID).Debugf("[RATE] %s", err.Error())
 		return sessionFailRateLimit
@@ -329,10 +329,10 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	return false
 }
 
-func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, api *APISpec) (accessDef *user.AccessDefinition, allowanceScope string, err error) {
+func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, baseAPIID string) (accessDef *user.AccessDefinition, allowanceScope string, err error) {
 	accessDef = &user.AccessDefinition{}
 	if len(currentSession.AccessRights) > 0 {
-		if rights, ok := currentSession.AccessRights[api.APIID]; !ok {
+		if rights, ok := currentSession.AccessRights[baseAPIID]; !ok {
 			return nil, "", errors.New("unexpected apiID")
 		} else {
 			accessDef.Limit = rights.Limit

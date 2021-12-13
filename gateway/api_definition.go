@@ -212,6 +212,16 @@ type APISpec struct {
 	} `json:"-"`
 }
 
+// BaseAPIID returns the base API of an API. If it is a sub-version, it is used to access the base API ID.
+func (s *APISpec) BaseAPIID(r *http.Request) string {
+	baseAPI := ctxGetVersionBaseAPI(r)
+	if baseAPI == nil {
+		return s.APIID
+	}
+
+	return baseAPI.APIID
+}
+
 // Release releases all resources associated with API spec
 func (s *APISpec) Release() {
 	// release circuit breaker resources

@@ -298,7 +298,12 @@ func (m *GraphQLMiddleware) OnBeforeStart(reqCtx context.Context, operation *gql
 	}
 	session := v.(*user.SessionState)
 
-	accessDef, _, err := GetAccessDefinitionByAPIIDOrSession(session, m.Spec)
+	baseAPIID := m.Spec.APIID
+	if ctxBaseAPIID := reqCtx.Value(ctx.VersionBaseAPI); ctxBaseAPIID != nil {
+		baseAPIID = ctxBaseAPIID.(string)
+	}
+
+	accessDef, _, err := GetAccessDefinitionByAPIIDOrSession(session, baseAPIID)
 	if err != nil {
 		m.Logger().Errorf("failed to get access definition in OnBeforeStart hook: '%s'", err)
 		return err

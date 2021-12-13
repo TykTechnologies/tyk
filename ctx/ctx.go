@@ -20,6 +20,7 @@ const (
 	VersionData
 	VersionName
 	VersionDefault
+	VersionBaseAPI
 	OrgSessionContext
 	ContextData
 	RetainHost
