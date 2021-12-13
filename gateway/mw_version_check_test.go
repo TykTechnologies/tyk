@@ -278,3 +278,31 @@ func TestNewVersioning(t *testing.T) {
 		})
 	})
 }
+
+func TestVersioning_StripPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const versionKey = "version"
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.VersionData.NotVersioned = false
+		spec.VersionData.DefaultVersion = "Default"
+		spec.VersionData.Versions = map[string]apidef.VersionInfo{
+			"Default": {},
+			"v1":      {},
+		}
+		spec.VersionDefinition.Location = urlLocation
+		spec.VersionDefinition.Key = versionKey
+		spec.VersionDefinition.StripPath = false
+	})[0]
+
+	ts.Gw.LoadAPI(api)
+
+	_, _ = ts.Run(t, test.TestCase{Path: "/v1/", BodyMatch: `"URI":"/v1/"`, Code: http.StatusOK})
+
+	api.VersionDefinition.StripPath = true
+	ts.Gw.LoadAPI(api)
+	_, _ = ts.Run(t, test.TestCase{Path: "/v1/", BodyMatch: `"URI":"/"`, Code: http.StatusOK})
+}
