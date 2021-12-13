@@ -247,6 +247,7 @@ type CertificateBasics struct {
 	ID        string    `json:"id"`
 	IssuerCN  string    `json:"issuer_cn"`
 	SubjectCN string    `json:"subject_cn"`
+	DNSNames  []string  `json:"dns_names"`
 	NotBefore time.Time `json:"not_before"`
 	NotAfter  time.Time `json:"not_after"`
 }
@@ -256,6 +257,7 @@ func ExtractCertificateBasics(cert *tls.Certificate, certID string) *Certificate
 		ID:        certID,
 		IssuerCN:  cert.Leaf.Issuer.CommonName,
 		SubjectCN: cert.Leaf.Subject.CommonName,
+		DNSNames:  cert.Leaf.DNSNames,
 		NotAfter:  cert.Leaf.NotAfter,
 		NotBefore: cert.Leaf.NotBefore,
 	}
