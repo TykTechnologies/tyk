@@ -1158,6 +1158,17 @@ func TestAPICertificate(t *testing.T) {
 	})
 }
 
+func isPrivateKeyEmpty(cert *tls.Certificate) bool {
+	switch priv := cert.PrivateKey.(type) {
+	default:
+		if priv == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
 func TestCertificateHandlerTLS(t *testing.T) {
 	_, _, combinedServerPEM, serverCert := certs.GenCertificate(&x509.Certificate{
 		DNSNames:    []string{"localhost", "tyk-gateway"},
@@ -1167,7 +1178,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 	}, true)
 	serverCertID := certs.HexSHA256(serverCert.Certificate[0])
 	clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{
-		DNSNames: []string{"localhost", "tyk-gateway"},
+		DNSNames: []string{"localhost"},
 		Subject:  pkix.Name{CommonName: "localhost"},
 		Issuer:   pkix.Name{CommonName: "localhost"},
 	}, true)
@@ -1200,24 +1211,25 @@ func TestCertificateHandlerTLS(t *testing.T) {
 	t.Run("List certificates, detailed mode", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: http.MethodGet, Path: "/tyk/certs?org_id=1&mode=detailed", AdminAuth: true, Code: http.StatusOK, BodyMatchFunc: func(data []byte) bool {
-				fmt.Println("returned data", string(data))
 				expectedAPICertBasics := APIAllCertificateBasics{
 					Certs: []*certs.CertificateBasics{
 						{
-							ID:        "1" + clientCertID,
-							IssuerCN:  clientCert.Leaf.Issuer.CommonName,
-							SubjectCN: clientCert.Leaf.Subject.CommonName,
-							DNSNames:  clientCert.Leaf.DNSNames,
-							NotAfter:  clientCert.Leaf.NotAfter.UTC().Truncate(time.Second),
-							NotBefore: clientCert.Leaf.NotBefore.UTC().Truncate(time.Second),
+							ID:            "1" + clientCertID,
+							IssuerCN:      clientCert.Leaf.Issuer.CommonName,
+							SubjectCN:     clientCert.Leaf.Subject.CommonName,
+							DNSNames:      clientCert.Leaf.DNSNames,
+							HasPrivateKey: false,
+							NotAfter:      clientCert.Leaf.NotAfter.UTC().Truncate(time.Second),
+							NotBefore:     clientCert.Leaf.NotBefore.UTC().Truncate(time.Second),
 						},
 						{
-							ID:        "1" + serverCertID,
-							IssuerCN:  serverCert.Leaf.Issuer.CommonName,
-							SubjectCN: serverCert.Leaf.Subject.CommonName,
-							DNSNames:  serverCert.Leaf.DNSNames,
-							NotAfter:  serverCert.Leaf.NotAfter.UTC().Truncate(time.Second),
-							NotBefore: serverCert.Leaf.NotBefore.UTC().Truncate(time.Second),
+							ID:            "1" + serverCertID,
+							IssuerCN:      serverCert.Leaf.Issuer.CommonName,
+							SubjectCN:     serverCert.Leaf.Subject.CommonName,
+							DNSNames:      serverCert.Leaf.DNSNames,
+							HasPrivateKey: true,
+							NotAfter:      serverCert.Leaf.NotAfter.UTC().Truncate(time.Second),
+							NotBefore:     serverCert.Leaf.NotBefore.UTC().Truncate(time.Second),
 						},
 					},
 				}
