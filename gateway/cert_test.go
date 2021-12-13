@@ -1158,17 +1158,6 @@ func TestAPICertificate(t *testing.T) {
 	})
 }
 
-func isPrivateKeyEmpty(cert *tls.Certificate) bool {
-	switch priv := cert.PrivateKey.(type) {
-	default:
-		if priv == nil {
-			return true
-		}
-	}
-
-	return false
-}
-
 func TestCertificateHandlerTLS(t *testing.T) {
 	_, _, combinedServerPEM, serverCert := certs.GenCertificate(&x509.Certificate{
 		DNSNames:    []string{"localhost", "tyk-gateway"},
