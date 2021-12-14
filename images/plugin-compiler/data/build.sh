@@ -1,14 +1,17 @@
 #!/bin/bash
-
 set -xe
 
 plugin_name=$1
+plugin_id=$2
 
+PLUGIN_BUILD_PATH="/go/src/${plugin_name%.*}$plugin_id"
+echo "$PLUGIN_BUILD_PATH"
 function usage() {
     cat <<EOF
 To build a plugin:
-      $0 <plugin_name>
+      $0 <plugin_name> <plugin_id>
 
+<plugin_id> is optional
 EOF
 }
 
@@ -17,6 +20,7 @@ if [ -z "$plugin_name" ]; then
     exit 1
 fi
 
+mkdir -p $PLUGIN_BUILD_PATH
 # Plugin's vendor folder, has precendence over the cached vendor'd dependencies from tyk
 yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
 
