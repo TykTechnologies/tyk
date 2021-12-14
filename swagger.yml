@@ -3144,6 +3144,14 @@ components:
         subject_cn:
           type: string
           x-go-name: SubjectCN
+        dns_names:
+          type: array
+          items:
+            type: string
+          x-go-name: DNSNames
+        has_private:
+          type: string
+          x-go-name: HasPrivateKey
         not_before:
           type: string
           x-go-name: NotBefore
