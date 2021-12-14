@@ -1,6 +1,8 @@
 package oas
 
 import (
+	"sort"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -86,8 +88,13 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 
 	if i.Versioning != nil {
 		i.Versioning.ExtractTo(api)
-	} else {
-		api.VersionData.NotVersioned = true
+	}
+
+	// everytime
+	api.VersionData.NotVersioned = true
+	api.VersionData.DefaultVersion = ""
+	api.VersionData.Versions = map[string]apidef.VersionInfo{
+		"": {},
 	}
 }
 
@@ -111,46 +118,55 @@ func (s *State) ExtractTo(api *apidef.APIDefinition) {
 }
 
 type Versioning struct {
-	Enabled   bool              `bson:"enabled" json:"enabled"` // required
-	Versions  map[string]string `bson:"versions,omitempty" json:"versions,omitempty"`
-	Location  string            `bson:"location,omitempty" json:"location,omitempty"`
-	Key       string            `bson:"key,omitempty" json:"key,omitempty"`
-	StripPath bool              `bson:"stripPath,omitempty" json:"stripPath,omitempty"`
+	Enabled             bool          `bson:"enabled" json:"enabled"` // required
+	Name                string        `bson:"name,omitempty" json:"name,omitempty"`
+	Default             string        `bson:"default" json:"default"`   // required
+	Location            string        `bson:"location" json:"location"` // required
+	Key                 string        `bson:"key" json:"key"`           // required
+	Versions            []VersionToID `bson:"versions" json:"versions"` // required
+	StripVersioningData bool          `bson:"stripVersioningData,omitempty" json:"stripVersioningData,omitempty"`
 }
 
 func (v *Versioning) Fill(api apidef.APIDefinition) {
-	v.Enabled = !api.VersionData.NotVersioned
-	v.Versions = make(map[string]string)
-
-	for vName, ver := range api.VersionData.Versions {
-		if vName == "Default" {
-			continue
-		}
-		v.Versions[vName] = ver.APIID
+	v.Enabled = api.VersionDefinition.Enabled
+	v.Name = api.VersionDefinition.Name
+	v.Default = api.VersionDefinition.Default
+	v.Location = api.VersionDefinition.Location
+	v.Key = api.VersionDefinition.Key
+	v.Versions = []VersionToID{}
+	for vName, apiID := range api.VersionDefinition.Versions {
+		v.Versions = append(v.Versions, VersionToID{vName, apiID})
 	}
+
+	sort.Slice(v.Versions, func(i, j int) bool {
+		return v.Versions[i].Name < v.Versions[j].Name
+	})
 
 	if ShouldOmit(v.Versions) {
 		v.Versions = nil
 	}
 
-	v.Location = api.VersionDefinition.Location
-	v.Key = api.VersionDefinition.Key
-	v.StripPath = api.VersionDefinition.StripPath
+	v.StripVersioningData = api.VersionDefinition.StripVersioningData
 }
 
 func (v *Versioning) ExtractTo(api *apidef.APIDefinition) {
-	api.VersionData.NotVersioned = !v.Enabled
-	if api.VersionData.Versions == nil {
-		api.VersionData.Versions = make(map[string]apidef.VersionInfo)
-	}
-
-	for vName, apiID := range v.Versions {
-		api.VersionData.Versions[vName] = apidef.VersionInfo{
-			APIID: apiID,
-		}
-	}
-
+	api.VersionDefinition.Enabled = v.Enabled
+	api.VersionDefinition.Name = v.Name
+	api.VersionDefinition.Default = v.Default
 	api.VersionDefinition.Location = v.Location
 	api.VersionDefinition.Key = v.Key
-	api.VersionDefinition.StripPath = v.StripPath
+	if api.VersionDefinition.Versions == nil {
+		api.VersionDefinition.Versions = make(map[string]string)
+	}
+
+	for _, val := range v.Versions {
+		api.VersionDefinition.Versions[val.Name] = val.ID
+	}
+
+	api.VersionDefinition.StripVersioningData = v.StripVersioningData
+}
+
+type VersionToID struct {
+	Name string `bson:"name" json:"name"`
+	ID   string `bson:"id" json:"id"`
 }

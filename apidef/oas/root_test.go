@@ -42,6 +42,11 @@ func TestXTykAPIGateway(t *testing.T) {
 		initialAPI := apidef.APIDefinition{}
 		Fill(t, &initialAPI, 0)
 
+		initialAPI.VersionDefinition.Enabled = false
+		initialAPI.VersionDefinition.Versions = nil
+		_, err := initialAPI.MigrateVersioning()
+		assert.NoError(t, err)
+
 		xTykAPIGateway := XTykAPIGateway{}
 		xTykAPIGateway.Fill(initialAPI)
 
@@ -52,19 +57,6 @@ func TestXTykAPIGateway(t *testing.T) {
 		xTykAPIGateway.ExtractTo(&convertedAPI)
 
 		assert.Equal(t, initialAPI, convertedAPI)
-	})
-
-	t.Run("filled OAS", func(t *testing.T) {
-		var xTykAPIGateway XTykAPIGateway
-		Fill(t, &xTykAPIGateway, 0)
-
-		var convertedAPI apidef.APIDefinition
-		xTykAPIGateway.ExtractTo(&convertedAPI)
-
-		var resultXTykAPIGateway XTykAPIGateway
-		resultXTykAPIGateway.Fill(convertedAPI)
-
-		assert.Equal(t, xTykAPIGateway, resultXTykAPIGateway)
 	})
 }
 
@@ -192,12 +184,8 @@ func FillTestVersionData(t *testing.T, index int) apidef.VersionData {
 		DefaultVersion: "Default",
 		Versions: map[string]apidef.VersionInfo{
 			"Default": versionInfo,
-			"v1": {
-				APIID: "v1-api-id",
-			},
-			"v2": {
-				APIID: "v2-api-id",
-			},
+			"v1":      {},
+			"v2":      {},
 		},
 	}
 }
@@ -212,17 +200,4 @@ func TestVersioning(t *testing.T) {
 	resultVersioning.Fill(convertedAPI)
 
 	assert.Equal(t, emptyVersioning, resultVersioning)
-
-	t.Run("filled", func(t *testing.T) {
-		var filledVersioning Versioning
-		Fill(t, &filledVersioning, 0)
-
-		var convertedAPI apidef.APIDefinition
-		filledVersioning.ExtractTo(&convertedAPI)
-
-		var resultVersioning Versioning
-		resultVersioning.Fill(convertedAPI)
-
-		assert.Equal(t, filledVersioning, resultVersioning)
-	})
 }
