@@ -41,7 +41,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 					FieldNames: []string{"hello"},
 				},
 			},
-			ChildNodes: nil,
+			ChildNodes: []plan.TypeField{},
 			Factory: &graphqlDataSource.Factory{
 				BatchFactory: graphqlDataSource.NewBatchFactory(),
 				HTTPClient:   httpClient,
@@ -98,7 +98,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 					FieldNames: []string{"hello"},
 				},
 			},
-			ChildNodes: nil,
+			ChildNodes: []plan.TypeField{},
 			Factory: &graphqlDataSource.Factory{
 				BatchFactory: graphqlDataSource.NewBatchFactory(),
 				HTTPClient:   httpClient,
@@ -245,12 +245,12 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 			},
 			ChildNodes: []plan.TypeField{
 				{
-					TypeName:   "User",
-					FieldNames: []string{"id", "username"},
-				},
-				{
 					TypeName:   "_Service",
 					FieldNames: []string{"sdl"},
+				},
+				{
+					TypeName:   "User",
+					FieldNames: []string{"id", "username"},
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
