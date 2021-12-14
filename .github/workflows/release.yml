@@ -35,7 +35,7 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
 
-    container: tykio/golang-cross:1.15.15
+    container: tykio/golang-cross:1.15
 
     outputs:
       tag: ${{ steps.targets.outputs.tag }}
@@ -349,7 +349,7 @@ jobs:
   packagecloud:
     if: needs.goreleaser.outputs.upload == 'true'
     needs:
-#       - smoke-tests
+      - smoke-tests
       - goreleaser
     runs-on: ubuntu-latest
 
