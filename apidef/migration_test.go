@@ -57,7 +57,9 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 	expectedBase.VersionDefinition.Enabled = true
 	expectedBase.VersionDefinition.Name = v1
 	expectedBase.VersionDefinition.Default = Self
-	expectedBase.VersionDefinition.Versions = []VersionMap{{Name: v2, Id: ""}}
+	expectedBase.VersionDefinition.Versions = map[string]string{
+		v2: "",
+	}
 
 	assert.Equal(t, expectedBase, base)
 

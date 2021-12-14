@@ -207,15 +207,9 @@ func TestNewVersioning(t *testing.T) {
 		a.VersionDefinition.Default = apidef.Self
 		a.VersionDefinition.Location = urlParamLocation
 		a.VersionDefinition.Key = "version"
-		a.VersionDefinition.Versions = []apidef.VersionMap{
-			{
-				Name: v1VersionName,
-				Id:   v1APIID,
-			},
-			{
-				Name: v2VersionName,
-				Id:   v2APIID,
-			},
+		a.VersionDefinition.Versions = map[string]string{
+			v1VersionName: v1APIID,
+			v2VersionName: v2APIID,
 		}
 	})[0]
 
