@@ -5,7 +5,7 @@ plugin_name=$1
 plugin_id=$2
 
 PLUGIN_BUILD_PATH="/go/src/${plugin_name%.*}$plugin_id"
-echo "$PLUGIN_BUILD_PATH"
+
 function usage() {
     cat <<EOF
 To build a plugin:
