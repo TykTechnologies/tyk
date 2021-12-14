@@ -77,7 +77,7 @@ var tests = []struct {
 	},
 	{
 		"MalformedDnsCacheEntry", `{"dns_cache": { "enabled": true, "tttl": 10} }`,
-		`tttl: Additional property tttl is not allowed`,
+		`dns_cache: Additional property tttl is not allowed`,
 	},
 	{
 		"BadDnsCacheTTL", `{"dns_cache": { "enabled": false, "ttl": -2 } }`,
@@ -85,7 +85,7 @@ var tests = []struct {
 	},
 	{
 		"ExtraDnsCacheCheckInterval", `{"dns_cache": { "enabled": true, "ttl": -1, "check_interval": 2500 } }`,
-		`check_interval: Additional property check_interval is not allowed`,
+		`dns_cache: Additional property check_interval is not allowed`,
 	},
 	{
 		"InvalidDnsCacheMultipleIPsHandleStrategy", `{"dns_cache": { "enabled": true, "ttl": 1, "multiple_ips_handle_strategy": "true" } }`,
