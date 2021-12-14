@@ -1300,15 +1300,36 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 }
 
 func (a *APISpec) getVersionFromRequest(r *http.Request) string {
+	if vName := ctxGetVersionName(r); vName != nil {
+		return *vName
+	}
+
 	if a.VersionData.NotVersioned && !a.VersionDefinition.Enabled {
 		return ""
 	}
 
+	var vName string
+	defer ctxSetVersionName(r, &vName)
+
 	switch a.VersionDefinition.Location {
 	case headerLocation:
-		return r.Header.Get(a.VersionDefinition.Key)
+		vName = r.Header.Get(a.VersionDefinition.Key)
+		if a.VersionDefinition.StripVersioningData {
+			log.Debug("Stripping version from header: ", vName)
+			defer r.Header.Del(a.VersionDefinition.Key)
+		}
+
+		return vName
 	case urlParamLocation:
-		return r.URL.Query().Get(a.VersionDefinition.Key)
+		vName = r.URL.Query().Get(a.VersionDefinition.Key)
+		if a.VersionDefinition.StripVersioningData {
+			log.Debug("Stripping version from query: ", vName)
+			q := r.URL.Query()
+			q.Del(a.VersionDefinition.Key)
+			r.URL.RawQuery = q.Encode()
+		}
+
+		return vName
 	case urlLocation:
 		uPath := a.StripListenPath(r, r.URL.Path)
 		uPath = strings.TrimPrefix(uPath, "/"+a.Slug)
@@ -1316,10 +1337,20 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		// First non-empty part of the path is the version ID
 		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
+				if a.VersionDefinition.StripVersioningData {
+					log.Debug("Stripping version from url: ", part)
+
+					r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
+					r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
+				}
+
+				vName = part
+
 				return part
 			}
 		}
 	}
+
 	return ""
 }
 

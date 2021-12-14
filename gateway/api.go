@@ -2591,6 +2591,18 @@ func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
 	setCtxValue(r, ctx.VersionData, v)
 }
 
+func ctxGetVersionName(r *http.Request) *string {
+	if v := r.Context().Value(ctx.VersionName); v != nil {
+		return v.(*string)
+	}
+
+	return nil
+}
+
+func ctxSetVersionName(r *http.Request, vName *string) {
+	setCtxValue(r, ctx.VersionName, vName)
+}
+
 func ctxSetOrigRequestURL(r *http.Request, url *url.URL) {
 	setCtxValue(r, ctx.OrigRequestURL, url)
 }

@@ -787,55 +787,76 @@ func TestGetVersionFromRequest(t *testing.T) {
 			ts.Close()
 		}()
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = headerLocation
 			spec.VersionDefinition.Key = "X-API-Version"
 			spec.VersionData.Versions["v1"] = versionInfo
-		})
+		})[0]
 
 		headers := map[string]string{"X-API-Version": "v1"}
 
-		ts.Run(t, []test.TestCase{
-			{Path: "/foo", Code: http.StatusOK, Headers: headers},
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusOK, Headers: headers, BodyMatch: `"X-Api-Version":"v1"`},
 			{Path: "/bar", Code: http.StatusForbidden, Headers: headers},
 		}...)
+
+		t.Run("strip versioning data", func(t *testing.T) {
+			api.VersionDefinition.StripVersioningData = true
+			ts.Gw.LoadAPI(api)
+
+			_, _ = ts.Run(t, test.TestCase{Path: "/foo", Code: http.StatusOK, Headers: headers, BodyNotMatch: `"X-Api-Version":"v1"`})
+		})
 	})
 
 	t.Run("URL param location", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = urlParamLocation
 			spec.VersionDefinition.Key = "version"
 			spec.VersionData.Versions["v2"] = versionInfo
-		})
+		})[0]
 
-		ts.Run(t, []test.TestCase{
-			{Path: "/foo?version=v2", Code: http.StatusOK},
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/foo?version=v2", BodyMatch: `"URI":"/foo\?version=v2"`, Code: http.StatusOK},
 			{Path: "/bar?version=v2", Code: http.StatusForbidden},
 		}...)
+
+		t.Run("strip versioning data", func(t *testing.T) {
+			api.VersionDefinition.StripVersioningData = true
+			ts.Gw.LoadAPI(api)
+
+			_, _ = ts.Run(t, test.TestCase{Path: "/foo?version=v2", BodyMatch: `"URI":"/foo"`, Code: http.StatusOK})
+		})
 	})
 
 	t.Run("URL location", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = urlLocation
 			spec.VersionData.Versions["v3"] = versionInfo
-		})
+		})[0]
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/v3/foo", Code: http.StatusOK},
+			{Path: "/v3/foo", BodyMatch: `"URI":"/v3/foo"`, Code: http.StatusOK},
 			{Path: "/v3/bar", Code: http.StatusForbidden},
 		}...)
+
+		t.Run("strip versioning data", func(t *testing.T) {
+			api.VersionDefinition.StripVersioningData = true
+			ts.Gw.LoadAPI(api)
+
+			_, _ = ts.Run(t, test.TestCase{Path: "/v3/foo", BodyMatch: `"URI":"/foo"`, Code: http.StatusOK})
+		})
 	})
 }
 
