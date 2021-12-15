@@ -2603,6 +2603,22 @@ func ctxSetVersionName(r *http.Request, vName *string) {
 	setCtxValue(r, ctx.VersionName, vName)
 }
 
+func ctxSetVersionBaseAPI(r *http.Request, spec *APISpec) {
+	setCtxValue(r, ctx.VersionBaseAPI, spec)
+}
+
+func ctxGetVersionBaseAPI(r *http.Request) *APISpec {
+	if r == nil {
+		return nil
+	}
+
+	if v := r.Context().Value(ctx.VersionBaseAPI); v != nil {
+		return v.(*APISpec)
+	}
+
+	return nil
+}
+
 func ctxSetOrigRequestURL(r *http.Request, url *url.URL) {
 	setCtxValue(r, ctx.OrigRequestURL, url)
 }

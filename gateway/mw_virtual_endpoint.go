@@ -293,7 +293,7 @@ func (gw *Gateway) forceResponse(w http.ResponseWriter,
 		}
 	}
 
-	gw.handleForcedResponse(w, newResponse, session, spec)
+	gw.handleForcedResponse(w, r, newResponse, session, spec)
 
 	// Record analytics
 	return newResponse
@@ -318,12 +318,12 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	return nil, mwStatusRespond
 }
 
-func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) {
+func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, req *http.Request, res *http.Response, ses *user.SessionState) {
 	// Externalising this from the MW so we can re-use it elsewhere
-	d.Gw.handleForcedResponse(rw, res, ses, d.Spec)
+	d.Gw.handleForcedResponse(rw, req, res, ses, d.Spec)
 }
 
-func (gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState, spec *APISpec) {
+func (gw *Gateway) handleForcedResponse(rw http.ResponseWriter, req *http.Request, res *http.Response, ses *user.SessionState, spec *APISpec) {
 	defer res.Body.Close()
 
 	// Close connections
@@ -334,7 +334,7 @@ func (gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Respon
 	// Add resource headers
 	if ses != nil {
 		// We have found a session, lets report back
-		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(spec.APIID)
+		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(spec.BaseAPIID(req))
 		res.Header.Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
 		res.Header.Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
 		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))

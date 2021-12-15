@@ -36,7 +36,11 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 		versions = append(versions, newAPI)
 		delete(a.VersionData.Versions, vName)
 
-		a.VersionDefinition.Versions = append(a.VersionDefinition.Versions, VersionMap{Name: vName, Id: ""})
+		if a.VersionDefinition.Versions == nil {
+			a.VersionDefinition.Versions = make(map[string]string)
+		}
+
+		a.VersionDefinition.Versions[vName] = ""
 	}
 
 	a.VersionDefinition.Enabled = !a.VersionData.NotVersioned

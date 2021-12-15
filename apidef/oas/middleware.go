@@ -28,7 +28,7 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 		m.Paths = make(Paths)
 	}
 
-	m.Paths.Fill(api.VersionData.Versions["Default"].ExtendedPaths)
+	m.Paths.Fill(api.VersionData.Versions[""].ExtendedPaths)
 	if ShouldOmit(m.Paths) {
 		m.Paths = nil
 	}
@@ -42,12 +42,12 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	if m.Paths != nil {
 		var ep apidef.ExtendedPathsSet
 		m.Paths.ExtractTo(&ep)
-		defaultVersion := apidef.VersionInfo{UseExtendedPaths: true, ExtendedPaths: ep}
-		versions := map[string]apidef.VersionInfo{
-			"Default": defaultVersion,
+		base := apidef.VersionInfo{UseExtendedPaths: true, ExtendedPaths: ep}
+		if api.VersionData.Versions == nil {
+			api.VersionData.Versions = make(map[string]apidef.VersionInfo)
 		}
 
-		api.VersionData.Versions = versions
+		api.VersionData.Versions[""] = base
 	}
 }
 

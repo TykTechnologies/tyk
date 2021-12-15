@@ -31,7 +31,7 @@ func (m *GraphQLComplexityMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *GraphQLComplexityMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	accessDef, _, err := GetAccessDefinitionByAPIIDOrSession(ctxGetSession(r), m.Spec)
+	accessDef, _, err := GetAccessDefinitionByAPIIDOrSession(ctxGetSession(r), m.Spec.BaseAPIID(r))
 	if err != nil {
 		m.Logger().Debugf("Error while calculating GraphQL complexity: '%s'", err)
 		return m.handleComplexityFailReason(ComplexityFailReasonInternalError)

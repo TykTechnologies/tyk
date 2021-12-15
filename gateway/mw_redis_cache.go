@@ -345,7 +345,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Only add ratelimit data to keyed sessions
 	if session != nil {
-		quotaMax, quotaRemaining, _, quotaRenews := session.GetQuotaLimitByAPIID(m.Spec.APIID)
+		quotaMax, quotaRemaining, _, quotaRenews := session.GetQuotaLimitByAPIID(m.Spec.BaseAPIID(r))
 		w.Header().Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
 		w.Header().Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
 		w.Header().Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))

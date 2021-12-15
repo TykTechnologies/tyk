@@ -25,7 +25,7 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	logger := m.Logger()
 	session := ctxGetSession(r)
 
-	sessionVersionData, foundAPI := session.AccessRights[m.Spec.APIID]
+	sessionVersionData, foundAPI := session.AccessRights[m.Spec.BaseAPIID(r)]
 	if !foundAPI {
 		return nil, http.StatusOK
 	}
