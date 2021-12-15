@@ -304,16 +304,6 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	log.Debug("Started proxy")
 	defer s.Base().UpdateRequestSession(r)
 
-	versionDef := s.Spec.VersionDefinition
-	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
-		part := s.Spec.getVersionFromRequest(r)
-
-		log.Debug("Stripping version from url: ", part)
-
-		r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
-		r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
-	}
-
 	// Make sure we get the correct target URL
 	if s.Spec.Proxy.StripListenPath {
 		log.Debug("Stripping: ", s.Spec.Proxy.ListenPath)
@@ -345,16 +335,6 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored Itwill also return a response object for the cache
 func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) ProxyResponse {
-
-	versionDef := s.Spec.VersionDefinition
-	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
-		part := s.Spec.getVersionFromRequest(r)
-
-		log.Debug("Stripping version from URL: ", part)
-
-		r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
-		r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
-	}
 
 	// Make sure we get the correct target URL
 	if s.Spec.Proxy.StripListenPath {

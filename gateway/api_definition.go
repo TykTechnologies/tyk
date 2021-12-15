@@ -1337,7 +1337,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		// First non-empty part of the path is the version ID
 		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
-				if a.VersionDefinition.StripVersioningData {
+				if a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath {
 					log.Debug("Stripping version from url: ", part)
 
 					r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
