@@ -49,6 +49,12 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 		a.VersionDefinition.Name = a.VersionData.DefaultVersion
 	}
 
+	if a.VersionDefinition.Location == URLLocation {
+		a.VersionDefinition.StripVersioningData = a.VersionDefinition.StripPath
+	}
+
+	a.VersionDefinition.StripPath = false
+
 	defaultVersionInfo := a.VersionData.Versions[a.VersionData.DefaultVersion]
 
 	if defaultVersionInfo.OverrideTarget != "" {
