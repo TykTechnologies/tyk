@@ -1055,7 +1055,7 @@ func TestAPIExpiration(t *testing.T) {
 
 		t.Run(fmt.Sprintf("versioning=%v", versioned), func(t *testing.T) {
 			t.Run("not expired", func(t *testing.T) {
-				api.Expiration = time.Now().Format(expiredTimeFormat)
+				api.Expiration = time.Now().AddDate(1, 0, 0).Format(apidef.ExpirationTimeFormat)
 				ts.Gw.LoadAPI(api)
 				resp, _ := ts.Run(t, test.TestCase{Code: http.StatusOK})
 
@@ -1063,7 +1063,7 @@ func TestAPIExpiration(t *testing.T) {
 			})
 
 			t.Run("expired", func(t *testing.T) {
-				api.Expiration = expiredTimeFormat
+				api.Expiration = apidef.ExpirationTimeFormat
 				ts.Gw.LoadAPI(api)
 				resp, _ := ts.Run(t, test.TestCase{Code: http.StatusForbidden})
 

@@ -263,13 +263,15 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		logger = logrus.NewEntry(log)
 	}
 
-	if t, err := time.Parse(expiredTimeFormat, def.Expiration); err != nil {
+	// new expiration feature
+	if t, err := time.Parse(apidef.ExpirationTimeFormat, def.Expiration); err != nil {
 		logger.WithError(err).WithField("name", def.Name).WithField("Expiration", def.Expiration).
 			Error("Could not parse expiration date for API")
 	} else {
 		def.ExpirationTs = t
 	}
 
+	// Deprecated
 	// parse version expiration time stamps
 	for key, ver := range def.VersionData.Versions {
 		if ver.Expires == "" || ver.Expires == "-1" {
