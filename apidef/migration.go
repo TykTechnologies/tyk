@@ -33,6 +33,8 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
 		}
 
+		newAPI.Expiration = vInfo.Expires
+
 		versions = append(versions, newAPI)
 		delete(a.VersionData.Versions, vName)
 
@@ -61,6 +63,12 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 		a.Proxy.ListenPath = defaultVersionInfo.OverrideTarget
 		defaultVersionInfo.OverrideTarget = ""
 	}
+
+	if !a.VersionData.NotVersioned {
+		a.Expiration = defaultVersionInfo.Expires
+	}
+
+	defaultVersionInfo.Expires = ""
 
 	a.VersionData.Versions[""] = defaultVersionInfo
 	delete(a.VersionData.Versions, a.VersionData.DefaultVersion)

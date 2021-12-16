@@ -15,6 +15,8 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 		v2Target   = "v2.com"
 		v1         = "v1"
 		v2         = "v2"
+		exp1       = "exp1"
+		exp2       = "exp2"
 	)
 
 	old := func() APIDefinition {
@@ -32,8 +34,12 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 				NotVersioned:   false,
 				DefaultVersion: v1,
 				Versions: map[string]VersionInfo{
-					v1: {},
-					v2: {},
+					v1: {
+						Expires: exp1,
+					},
+					v2: {
+						Expires: exp2,
+					},
 				},
 			},
 		}
@@ -44,6 +50,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 	assert.NoError(t, err)
 
 	expectedBase := base
+	expectedBase.Expiration = exp1
 	expectedBase.VersionData.NotVersioned = true
 	expectedBase.VersionData.DefaultVersion = ""
 	expectedBase.VersionData.Versions = map[string]VersionInfo{
@@ -66,6 +73,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 	expectedVersion := old()
 	expectedVersion.Id = ""
 	expectedVersion.APIID = ""
+	expectedVersion.Expiration = exp2
 	expectedVersion.Proxy.ListenPath += "-" + v2 + "/"
 	expectedVersion.VersionDefinition = VersionDefinition{}
 	expectedVersion.VersionData.NotVersioned = true
@@ -130,6 +138,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Nil(t, versions)
 
+			expectedBase.Expiration = ""
 			expectedBase.VersionDefinition.Enabled = false
 			expectedBase.VersionDefinition.Name = ""
 			expectedBase.VersionDefinition.Default = ""
