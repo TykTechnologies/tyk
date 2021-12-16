@@ -9,6 +9,8 @@ import (
 	"github.com/TykTechnologies/tyk/request"
 )
 
+const XTykAPIExpires = "x-tyk-api-expires"
+
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
 type VersionCheck struct {
 	BaseMiddleware
@@ -90,7 +92,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	}
 
 	if expTime := versionInfo.ExpiryTime(); !expTime.IsZero() {
-		w.Header().Set("x-tyk-api-expires", expTime.Format(time.RFC1123))
+		w.Header().Set(XTykAPIExpires, expTime.Format(time.RFC1123))
 	}
 
 	if stat == StatusOkAndIgnore {
