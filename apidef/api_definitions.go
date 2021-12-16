@@ -480,6 +480,8 @@ type Scopes struct {
 type APIDefinition struct {
 	Id                  ObjectId      `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
 	Name                string        `bson:"name" json:"name"`
+	Expiration          string        `bson:"expiration" json:"expiration"`
+	ExpirationTs        time.Time     `bson:"-" json:"-"`
 	Slug                string        `bson:"slug" json:"slug"`
 	ListenPort          int           `bson:"listen_port" json:"listen_port"`
 	Protocol            string        `bson:"protocol" json:"protocol"`
