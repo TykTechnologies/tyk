@@ -300,32 +300,50 @@ func TestNewVersioning(t *testing.T) {
 	})
 }
 
-func TestVersioning_StripPath(t *testing.T) {
+func TestOldVersioning_StripPath(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	const versionKey = "version"
+	api := func() *APISpec {
+		return BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionData.DefaultVersion = "Default"
+			spec.VersionData.Versions = map[string]apidef.VersionInfo{
+				"Default": {},
+				"v1":      {},
+			}
+			spec.VersionDefinition.Location = apidef.URLLocation
+			spec.VersionDefinition.StripPath = false
+		})[0]
+	}
 
-	api := BuildAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.VersionData.NotVersioned = false
-		spec.VersionData.DefaultVersion = "Default"
-		spec.VersionData.Versions = map[string]apidef.VersionInfo{
-			"Default": {},
-			"v1":      {},
-		}
-		spec.VersionDefinition.Location = apidef.URLLocation
-		spec.VersionDefinition.Key = versionKey
-		spec.VersionDefinition.StripPath = false
-	})[0]
+	check := func(t *testing.T, api *APISpec, tc test.TestCase) {
+		ts.Gw.LoadAPI(api)
+		_, _ = ts.Run(t, tc)
 
-	ts.Gw.LoadAPI(api)
+		t.Run("migration", func(t *testing.T) {
+			versions, err := api.MigrateVersioning()
+			assert.NoError(t, err)
 
-	_, _ = ts.Run(t, test.TestCase{Path: "/v1/", BodyMatch: `"URI":"/v1/"`, Code: http.StatusOK})
+			const subVersionID = "subVersionID"
+			api.VersionDefinition.Versions["v1"] = subVersionID
+			versions[0].APIID = subVersionID
+			ts.Gw.LoadAPI(api, &APISpec{APIDefinition: &versions[0]})
 
-	api.VersionDefinition.StripPath = true
-	ts.Gw.LoadAPI(api)
-	_, _ = ts.Run(t, test.TestCase{Path: "/v1/", BodyMatch: `"URI":"/"`, Code: http.StatusOK})
+			_, _ = ts.Run(t, tc)
+		})
+	}
+
+	t.Run("StripPath=false", func(t *testing.T) {
+		check(t, api(), test.TestCase{Path: "/v1/", BodyMatch: `"URI":"/v1/"`, Code: http.StatusOK})
+	})
+
+	t.Run("StripPath=true", func(t *testing.T) {
+		a := api()
+		a.VersionDefinition.StripPath = true
+		check(t, a, test.TestCase{Path: "/v1/", BodyMatch: `"URI":"/"`, Code: http.StatusOK})
+	})
 }
 
 func TestOldVersioning_Expires(t *testing.T) {
