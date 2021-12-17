@@ -32,8 +32,8 @@ if [ ! -f go.mod ]; then
 fi
 
 # if plugin has go.mod
-[ -f go.mod ] && [ ! -d vendor ] && go mod vendor
-rm go.mod
+#[ -f go.mod ] && [ ! -d vendor ] && go mod vendor
+#rm go.mod
 
 # Ensure that GW package versions have priorities
 

@@ -197,6 +197,7 @@ dockers:
     - "--label=org.opencontainers.image.title=tyk-plugin-compiler"
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
     - "--label=org.opencontainers.image.version={{.Version}}"
+    - "--build-arg=GW_VERSION={{ .Tag }}"
   goarch: amd64
   goos: linux
   dockerfile: images/plugin-compiler/Dockerfile
