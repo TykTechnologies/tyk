@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	neturl "net/url"
+	"sort"
+	"strings"
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
@@ -99,12 +102,17 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 			}
 			planDataSource.Factory = factory
 
+			urlWithoutQueryParams, queryConfigs, err := g.extractURLQueryParamsForEngineV2(restConfig.URL, restConfig.Query)
+			if err != nil {
+				return nil, err
+			}
+
 			planDataSource.Custom = restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
-					URL:    restConfig.URL,
+					URL:    urlWithoutQueryParams,
 					Method: restConfig.Method,
 					Body:   restConfig.Body,
-					Query:  g.convertURLQueriesToEngineV2Queries(restConfig.Query),
+					Query:  queryConfigs,
 					Header: g.convertHttpHeadersToEngineV2Headers(restConfig.Headers),
 				},
 			})
@@ -181,22 +189,51 @@ func (g *GraphQLConfigAdapter) SetHttpClient(httpClient *http.Client) {
 	g.httpClient = httpClient
 }
 
-func (g *GraphQLConfigAdapter) convertURLQueriesToEngineV2Queries(apiDefQueries []apidef.QueryVariable) []restDataSource.QueryConfiguration {
-	if len(apiDefQueries) == 0 {
-		return nil
+func (g *GraphQLConfigAdapter) extractURLQueryParamsForEngineV2(url string, providedApiDefQueries []apidef.QueryVariable) (urlWithoutParams string, engineV2Queries []restDataSource.QueryConfiguration, err error) {
+	parsedURL, err := neturl.Parse(url)
+	if err != nil {
+		return "", nil, err
 	}
 
-	var engineV2Queries []restDataSource.QueryConfiguration
+	engineV2Queries = make([]restDataSource.QueryConfiguration, 0)
+	g.convertURLQueryParamsIntoEngineV2Queries(&engineV2Queries, parsedURL)
+	g.convertApiDefQueriesConfigIntoEngineV2Queries(&engineV2Queries, providedApiDefQueries)
+
+	parsedURL.RawQuery = ""
+	if len(engineV2Queries) == 0 {
+		return parsedURL.String(), nil, nil
+	}
+
+	return parsedURL.String(), engineV2Queries, nil
+}
+
+func (g *GraphQLConfigAdapter) convertURLQueryParamsIntoEngineV2Queries(engineV2Queries *[]restDataSource.QueryConfiguration, parsedURL *neturl.URL) {
+	queryValues := parsedURL.Query()
+	for queryKey, queryValue := range queryValues {
+		*engineV2Queries = append(*engineV2Queries, restDataSource.QueryConfiguration{
+			Name:  queryKey,
+			Value: strings.Join(queryValue, ","),
+		})
+	}
+
+	sort.Slice(*engineV2Queries, func(i, j int) bool {
+		return (*engineV2Queries)[i].Name < (*engineV2Queries)[j].Name
+	})
+}
+
+func (g *GraphQLConfigAdapter) convertApiDefQueriesConfigIntoEngineV2Queries(engineV2Queries *[]restDataSource.QueryConfiguration, apiDefQueries []apidef.QueryVariable) {
+	if len(apiDefQueries) == 0 {
+		return
+	}
+
 	for _, apiDefQueryVar := range apiDefQueries {
 		engineV2Query := restDataSource.QueryConfiguration{
 			Name:  apiDefQueryVar.Name,
 			Value: apiDefQueryVar.Value,
 		}
 
-		engineV2Queries = append(engineV2Queries, engineV2Query)
+		*engineV2Queries = append(*engineV2Queries, engineV2Query)
 	}
-
-	return engineV2Queries
 }
 
 func (g *GraphQLConfigAdapter) convertHttpHeadersToEngineV2Headers(apiDefHeaders map[string]string) http.Header {

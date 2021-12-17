@@ -113,6 +113,14 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 								Body: "body",
 								Query: []restDataSource.QueryConfiguration{
 									{
+										Name:  "id",
+										Value: "1",
+									},
+									{
+										Name:  "order_by",
+										Value: "ASC",
+									},
+									{
 										Name:  "q",
 										Value: "val1,val2",
 									},
@@ -263,7 +271,7 @@ const graphqlEngineV2ConfigJson = `{
 					{ "type": "Query", "fields": ["rest"] }
 				],
 				"config": {
-					"url": "https://rest.example.com",
+					"url": "https://rest.example.com?id=1&order_by=ASC",
 					"method": "POST",
 					"headers": {
 						"Authorization": "123",
