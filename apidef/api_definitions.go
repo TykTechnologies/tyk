@@ -329,19 +329,14 @@ type ExtendedPathsSet struct {
 }
 
 type VersionDefinition struct {
-	Enabled             bool         `bson:"enabled" json:"enabled"`
-	Name                string       `bson:"name" json:"name"`
-	Default             string       `bson:"default" json:"default"`
-	Location            string       `bson:"location" json:"location"`
-	Key                 string       `bson:"key" json:"key"`
-	StripPath           bool         `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
-	StripVersioningData bool         `bson:"strip_versioning_data" json:"strip_versioning_data"`
-	Versions            []VersionMap `bson:"versions" json:"versions"`
-}
-
-type VersionMap struct {
-	Name string `bson:"name" json:"name"`
-	Id   string `bson:"id" json:"id"`
+	Enabled             bool              `bson:"enabled" json:"enabled"`
+	Name                string            `bson:"name" json:"name"`
+	Default             string            `bson:"default" json:"default"`
+	Location            string            `bson:"location" json:"location"`
+	Key                 string            `bson:"key" json:"key"`
+	StripPath           bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
+	StripVersioningData bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
+	Versions            map[string]string `bson:"versions" json:"versions"`
 }
 
 type VersionData struct {

@@ -1,6 +1,8 @@
 package oas
 
 import (
+	"sort"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -40,15 +42,6 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	if x.Middleware != nil {
 		x.Middleware.ExtractTo(api)
 	}
-
-	// This is used to make API calls work before actual versioning implementation.
-	api.VersionData.DefaultVersion = "Default"
-	api.VersionData.NotVersioned = true
-	if len(api.VersionData.Versions) == 0 {
-		api.VersionData.Versions = map[string]apidef.VersionInfo{
-			"Default": {},
-		}
-	}
 }
 
 type Info struct {
@@ -65,7 +58,8 @@ type Info struct {
 	// Old API Definition: `name`
 	Name string `bson:"name" json:"name"` // required
 	// State contains the configurations related to the state of the API.
-	State State `bson:"state" json:"state"` // required
+	State      State       `bson:"state" json:"state"` // required
+	Versioning *Versioning `bson:"versioning,omitempty" json:"versioning,omitempty"`
 }
 
 func (i *Info) Fill(api apidef.APIDefinition) {
@@ -74,6 +68,15 @@ func (i *Info) Fill(api apidef.APIDefinition) {
 	i.OrgID = api.OrgID
 	i.Name = api.Name
 	i.State.Fill(api)
+
+	if i.Versioning == nil {
+		i.Versioning = &Versioning{}
+	}
+
+	i.Versioning.Fill(api)
+	if ShouldOmit(i.Versioning) {
+		i.Versioning = nil
+	}
 }
 
 func (i *Info) ExtractTo(api *apidef.APIDefinition) {
@@ -82,6 +85,17 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	api.OrgID = i.OrgID
 	api.Name = i.Name
 	i.State.ExtractTo(api)
+
+	if i.Versioning != nil {
+		i.Versioning.ExtractTo(api)
+	}
+
+	// everytime
+	api.VersionData.NotVersioned = true
+	api.VersionData.DefaultVersion = ""
+	api.VersionData.Versions = map[string]apidef.VersionInfo{
+		"": {},
+	}
 }
 
 type State struct {
@@ -101,4 +115,58 @@ func (s *State) Fill(api apidef.APIDefinition) {
 func (s *State) ExtractTo(api *apidef.APIDefinition) {
 	api.Active = s.Active
 	api.Internal = s.Internal
+}
+
+type Versioning struct {
+	Enabled             bool          `bson:"enabled" json:"enabled"` // required
+	Name                string        `bson:"name,omitempty" json:"name,omitempty"`
+	Default             string        `bson:"default" json:"default"`   // required
+	Location            string        `bson:"location" json:"location"` // required
+	Key                 string        `bson:"key" json:"key"`           // required
+	Versions            []VersionToID `bson:"versions" json:"versions"` // required
+	StripVersioningData bool          `bson:"stripVersioningData,omitempty" json:"stripVersioningData,omitempty"`
+}
+
+func (v *Versioning) Fill(api apidef.APIDefinition) {
+	v.Enabled = api.VersionDefinition.Enabled
+	v.Name = api.VersionDefinition.Name
+	v.Default = api.VersionDefinition.Default
+	v.Location = api.VersionDefinition.Location
+	v.Key = api.VersionDefinition.Key
+	v.Versions = []VersionToID{}
+	for vName, apiID := range api.VersionDefinition.Versions {
+		v.Versions = append(v.Versions, VersionToID{vName, apiID})
+	}
+
+	sort.Slice(v.Versions, func(i, j int) bool {
+		return v.Versions[i].Name < v.Versions[j].Name
+	})
+
+	if ShouldOmit(v.Versions) {
+		v.Versions = nil
+	}
+
+	v.StripVersioningData = api.VersionDefinition.StripVersioningData
+}
+
+func (v *Versioning) ExtractTo(api *apidef.APIDefinition) {
+	api.VersionDefinition.Enabled = v.Enabled
+	api.VersionDefinition.Name = v.Name
+	api.VersionDefinition.Default = v.Default
+	api.VersionDefinition.Location = v.Location
+	api.VersionDefinition.Key = v.Key
+	if api.VersionDefinition.Versions == nil {
+		api.VersionDefinition.Versions = make(map[string]string)
+	}
+
+	for _, val := range v.Versions {
+		api.VersionDefinition.Versions[val.Name] = val.ID
+	}
+
+	api.VersionDefinition.StripVersioningData = v.StripVersioningData
+}
+
+type VersionToID struct {
+	Name string `bson:"name" json:"name"`
+	ID   string `bson:"id" json:"id"`
 }
