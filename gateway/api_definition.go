@@ -48,14 +48,6 @@ const (
 	RPCStorageEngine  apidef.StorageEngineCode = "rpc"
 )
 
-// Constants used by the version check middleware
-const (
-	headerLocation    = "header"
-	urlParamLocation  = "url-param"
-	urlLocation       = "url"
-	expiredTimeFormat = "2006-01-02 15:04"
-)
-
 // URLStatus is a custom enum type to avoid collisions
 type URLStatus int
 
@@ -276,7 +268,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 			continue
 		}
 		// calculate the time
-		if t, err := time.Parse(expiredTimeFormat, ver.Expires); err != nil {
+		if t, err := time.Parse(apidef.ExpirationTimeFormat, ver.Expires); err != nil {
 			logger.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
 		} else {
 			ver.ExpiresTs = t
@@ -1312,7 +1304,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	defer ctxSetVersionName(r, &vName)
 
 	switch a.VersionDefinition.Location {
-	case headerLocation:
+	case apidef.HeaderLocation:
 		vName = r.Header.Get(a.VersionDefinition.Key)
 		if a.VersionDefinition.StripVersioningData {
 			log.Debug("Stripping version from header: ", vName)
@@ -1320,7 +1312,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		}
 
 		return vName
-	case urlParamLocation:
+	case apidef.URLParamLocation:
 		vName = r.URL.Query().Get(a.VersionDefinition.Key)
 		if a.VersionDefinition.StripVersioningData {
 			log.Debug("Stripping version from query: ", vName)
@@ -1330,14 +1322,14 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		}
 
 		return vName
-	case urlLocation:
+	case apidef.URLLocation:
 		uPath := a.StripListenPath(r, r.URL.Path)
 		uPath = strings.TrimPrefix(uPath, "/"+a.Slug)
 
 		// First non-empty part of the path is the version ID
 		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
-				if a.VersionDefinition.StripVersioningData {
+				if a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath {
 					log.Debug("Stripping version from url: ", part)
 
 					r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)

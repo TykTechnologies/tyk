@@ -755,7 +755,7 @@ func (ts *Test) testPrepareDefaultVersion() string {
 		v2 := apidef.VersionInfo{Name: "v2"}
 		v2.Paths.WhiteList = []string{"/bar"}
 
-		spec.VersionDefinition.Location = urlParamLocation
+		spec.VersionDefinition.Location = apidef.URLParamLocation
 		spec.VersionDefinition.Key = "v"
 		spec.VersionData.NotVersioned = false
 
@@ -790,7 +790,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = headerLocation
+			spec.VersionDefinition.Location = apidef.HeaderLocation
 			spec.VersionDefinition.Key = "X-API-Version"
 			spec.VersionData.Versions["v1"] = versionInfo
 		})[0]
@@ -817,7 +817,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = urlParamLocation
+			spec.VersionDefinition.Location = apidef.URLParamLocation
 			spec.VersionDefinition.Key = "version"
 			spec.VersionData.Versions["v2"] = versionInfo
 		})[0]
@@ -842,7 +842,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = urlLocation
+			spec.VersionDefinition.Location = apidef.URLLocation
 			spec.VersionData.Versions["v3"] = versionInfo
 		})[0]
 
@@ -874,7 +874,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = headerLocation
+			spec.VersionDefinition.Location = apidef.HeaderLocation
 			spec.VersionDefinition.Key = "X-API-Version"
 			spec.VersionData.Versions["v1"] = versionInfo
 		})
@@ -894,7 +894,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = urlParamLocation
+			spec.VersionDefinition.Location = apidef.URLParamLocation
 			spec.VersionDefinition.Key = "version"
 			spec.VersionData.Versions["v2"] = versionInfo
 		})
@@ -912,7 +912,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = urlLocation
+			spec.VersionDefinition.Location = apidef.URLLocation
 			spec.VersionData.Versions["v3"] = versionInfo
 		})
 

@@ -3,6 +3,9 @@ package gateway
 import (
 	"net/http"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
@@ -205,7 +208,7 @@ func TestNewVersioning(t *testing.T) {
 		a.VersionDefinition.Enabled = true
 		a.VersionDefinition.Name = baseVersionName
 		a.VersionDefinition.Default = apidef.Self
-		a.VersionDefinition.Location = urlParamLocation
+		a.VersionDefinition.Location = apidef.URLParamLocation
 		a.VersionDefinition.Key = "version"
 		a.VersionDefinition.Versions = []apidef.VersionMap{
 			{
@@ -317,7 +320,7 @@ func TestVersioning_StripPath(t *testing.T) {
 			"Default": {},
 			"v1":      {},
 		}
-		spec.VersionDefinition.Location = urlLocation
+		spec.VersionDefinition.Location = apidef.URLLocation
 		spec.VersionDefinition.Key = versionKey
 		spec.VersionDefinition.StripPath = false
 	})[0]
@@ -329,4 +332,96 @@ func TestVersioning_StripPath(t *testing.T) {
 	api.VersionDefinition.StripPath = true
 	ts.Gw.LoadAPI(api)
 	_, _ = ts.Run(t, test.TestCase{Path: "/v1/", BodyMatch: `"URI":"/"`, Code: http.StatusOK})
+}
+
+func TestOldVersioning_Expires(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	nextYear := time.Now().AddDate(1, 0, 1)
+
+	vInfo := apidef.VersionInfo{
+		Expires: nextYear.Format(apidef.ExpirationTimeFormat),
+	}
+
+	api := func() *APISpec {
+		return BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = true
+			spec.VersionData.DefaultVersion = "Default"
+			spec.VersionDefinition.Location = apidef.URLParamLocation
+			spec.VersionDefinition.Key = "version"
+			spec.VersionData.Versions = map[string]apidef.VersionInfo{
+				"Default": vInfo,
+			}
+		})[0]
+	}
+
+	check := func(t *testing.T, api *APISpec, tc test.TestCase, expirationHeaderEmpty bool) {
+		ts.Gw.LoadAPI(api)
+		resp, _ := ts.Run(t, tc)
+		if expirationHeaderEmpty {
+			assert.Empty(t, resp.Header.Get(XTykAPIExpires))
+		} else {
+			assert.NotEmpty(t, resp.Header.Get(XTykAPIExpires))
+		}
+	}
+
+	t.Run("old versioning disabled", func(t *testing.T) {
+		t.Run("not expired", func(t *testing.T) {
+			check(t, api(), test.TestCase{Code: http.StatusOK}, false)
+		})
+
+		t.Run("expired", func(t *testing.T) {
+			vInfo.Expires = apidef.ExpirationTimeFormat
+			expiredAPI := api()
+			expiredAPI.VersionData.Versions["Default"] = vInfo
+
+			check(t, expiredAPI, test.TestCase{Code: http.StatusOK}, true)
+		})
+	})
+
+	t.Run("old versioning enabled", func(t *testing.T) {
+		t.Run("base", func(t *testing.T) {
+			t.Run("not expired", func(t *testing.T) {
+				versionedNotExpired := api()
+				versionedNotExpired.VersionData.NotVersioned = false
+				vInfo.Expires = nextYear.Format(apidef.ExpirationTimeFormat)
+				versionedNotExpired.VersionData.Versions["Default"] = vInfo
+
+				check(t, versionedNotExpired, test.TestCase{Code: http.StatusOK}, false)
+			})
+
+			t.Run("expired", func(t *testing.T) {
+				versionedExpired := api()
+				versionedExpired.VersionData.NotVersioned = false
+				vInfo.Expires = apidef.ExpirationTimeFormat
+				versionedExpired.VersionData.Versions["Default"] = vInfo
+
+				check(t, versionedExpired, test.TestCase{Code: http.StatusForbidden}, true)
+			})
+		})
+
+		t.Run("sub-version", func(t *testing.T) {
+			t.Run("not expired", func(t *testing.T) {
+				versionedNotExpired := api()
+				versionedNotExpired.VersionData.NotVersioned = false
+				vInfo.Expires = nextYear.Format(apidef.ExpirationTimeFormat)
+				versionedNotExpired.VersionData.Versions["v1"] = vInfo
+				versionedNotExpired.VersionData.Versions["Default"] = vInfo
+
+				check(t, versionedNotExpired, test.TestCase{Path: "/?version=v1", Code: http.StatusOK}, false)
+			})
+
+			t.Run("expired", func(t *testing.T) {
+				versionedExpired := api()
+				versionedExpired.VersionData.NotVersioned = false
+				vInfo.Expires = apidef.ExpirationTimeFormat
+				versionedExpired.VersionData.Versions["v1"] = vInfo
+				versionedExpired.VersionData.Versions["Default"] = vInfo
+
+				check(t, versionedExpired, test.TestCase{Path: "/?version=v1", Code: http.StatusForbidden}, true)
+			})
+		})
+	})
 }
