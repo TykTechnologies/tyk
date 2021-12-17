@@ -142,3 +142,56 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 		})
 	})
 }
+
+func TestAPIDefinition_MigrateVersioning_StripPath(t *testing.T) {
+	const (
+		v1 = "v1"
+		v2 = "v2"
+	)
+
+	old := func() APIDefinition {
+		return APIDefinition{
+			VersionDefinition: VersionDefinition{
+				StripPath: true,
+				Location:  URLLocation,
+			},
+			VersionData: VersionData{
+				NotVersioned:   false,
+				DefaultVersion: v1,
+				Versions: map[string]VersionInfo{
+					v1: {},
+					v2: {},
+				},
+			},
+		}
+	}
+
+	check := func(t *testing.T, base APIDefinition, stripVersioningData bool) {
+		versions, err := base.MigrateVersioning()
+		assert.NoError(t, err)
+
+		assert.False(t, base.VersionDefinition.StripPath)
+		assert.Equal(t, stripVersioningData, base.VersionDefinition.StripVersioningData)
+		assert.Len(t, versions, 1)
+		assert.False(t, versions[0].VersionDefinition.StripPath)
+		assert.False(t, versions[0].VersionDefinition.StripVersioningData)
+	}
+
+	t.Run("url", func(t *testing.T) {
+		base := old()
+		check(t, base, true)
+	})
+
+	t.Run("param", func(t *testing.T) {
+		base := old()
+		base.VersionDefinition.Location = URLParamLocation
+		check(t, base, false)
+	})
+
+	t.Run("header", func(t *testing.T) {
+		base := old()
+		base.VersionDefinition.Location = HeaderLocation
+		check(t, base, false)
+	})
+
+}
