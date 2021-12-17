@@ -31,9 +31,8 @@ if [ ! -f go.mod ]; then
     exit 1
 fi
 
-# if plugin has go.mod
-#[ -f go.mod ] && [ ! -d vendor ] && go mod vendor
-#rm go.mod
+# replace gw with local version
+echo "replace github.com/TykTechnologies/tyk => /__w/tyk/tyk" >> go.mod
 
 # Ensure that GW package versions have priorities
 
