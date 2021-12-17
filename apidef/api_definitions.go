@@ -81,6 +81,11 @@ const (
 	// TykInternalApiHeader - flags request as internal api looping request
 	TykInternalApiHeader = "x-tyk-internal"
 
+	HeaderLocation       = "header"
+	URLParamLocation     = "url-param"
+	URLLocation          = "url"
+	ExpirationTimeFormat = "2006-01-02 15:04"
+
 	Self = "self"
 )
 

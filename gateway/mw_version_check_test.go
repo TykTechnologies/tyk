@@ -208,7 +208,7 @@ func TestNewVersioning(t *testing.T) {
 		a.VersionDefinition.Enabled = true
 		a.VersionDefinition.Name = baseVersionName
 		a.VersionDefinition.Default = apidef.Self
-		a.VersionDefinition.Location = urlParamLocation
+		a.VersionDefinition.Location = apidef.URLParamLocation
 		a.VersionDefinition.Key = "version"
 		a.VersionDefinition.Versions = map[string]string{
 			v1VersionName: v1APIID,
@@ -314,7 +314,7 @@ func TestVersioning_StripPath(t *testing.T) {
 			"Default": {},
 			"v1":      {},
 		}
-		spec.VersionDefinition.Location = urlLocation
+		spec.VersionDefinition.Location = apidef.URLLocation
 		spec.VersionDefinition.Key = versionKey
 		spec.VersionDefinition.StripPath = false
 	})[0]
@@ -335,7 +335,7 @@ func TestOldVersioning_Expires(t *testing.T) {
 	nextYear := time.Now().AddDate(1, 0, 1)
 
 	vInfo := apidef.VersionInfo{
-		Expires: nextYear.Format(expiredTimeFormat),
+		Expires: nextYear.Format(apidef.ExpirationTimeFormat),
 	}
 
 	api := func() *APISpec {
@@ -343,7 +343,7 @@ func TestOldVersioning_Expires(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = true
 			spec.VersionData.DefaultVersion = "Default"
-			spec.VersionDefinition.Location = urlParamLocation
+			spec.VersionDefinition.Location = apidef.URLParamLocation
 			spec.VersionDefinition.Key = "version"
 			spec.VersionData.Versions = map[string]apidef.VersionInfo{
 				"Default": vInfo,
@@ -367,7 +367,7 @@ func TestOldVersioning_Expires(t *testing.T) {
 		})
 
 		t.Run("expired", func(t *testing.T) {
-			vInfo.Expires = expiredTimeFormat
+			vInfo.Expires = apidef.ExpirationTimeFormat
 			expiredAPI := api()
 			expiredAPI.VersionData.Versions["Default"] = vInfo
 
@@ -380,7 +380,7 @@ func TestOldVersioning_Expires(t *testing.T) {
 			t.Run("not expired", func(t *testing.T) {
 				versionedNotExpired := api()
 				versionedNotExpired.VersionData.NotVersioned = false
-				vInfo.Expires = nextYear.Format(expiredTimeFormat)
+				vInfo.Expires = nextYear.Format(apidef.ExpirationTimeFormat)
 				versionedNotExpired.VersionData.Versions["Default"] = vInfo
 
 				check(t, versionedNotExpired, test.TestCase{Code: http.StatusOK}, false)
@@ -389,7 +389,7 @@ func TestOldVersioning_Expires(t *testing.T) {
 			t.Run("expired", func(t *testing.T) {
 				versionedExpired := api()
 				versionedExpired.VersionData.NotVersioned = false
-				vInfo.Expires = expiredTimeFormat
+				vInfo.Expires = apidef.ExpirationTimeFormat
 				versionedExpired.VersionData.Versions["Default"] = vInfo
 
 				check(t, versionedExpired, test.TestCase{Code: http.StatusForbidden}, true)
@@ -400,7 +400,7 @@ func TestOldVersioning_Expires(t *testing.T) {
 			t.Run("not expired", func(t *testing.T) {
 				versionedNotExpired := api()
 				versionedNotExpired.VersionData.NotVersioned = false
-				vInfo.Expires = nextYear.Format(expiredTimeFormat)
+				vInfo.Expires = nextYear.Format(apidef.ExpirationTimeFormat)
 				versionedNotExpired.VersionData.Versions["v1"] = vInfo
 				versionedNotExpired.VersionData.Versions["Default"] = vInfo
 
@@ -410,7 +410,7 @@ func TestOldVersioning_Expires(t *testing.T) {
 			t.Run("expired", func(t *testing.T) {
 				versionedExpired := api()
 				versionedExpired.VersionData.NotVersioned = false
-				vInfo.Expires = expiredTimeFormat
+				vInfo.Expires = apidef.ExpirationTimeFormat
 				versionedExpired.VersionData.Versions["v1"] = vInfo
 				versionedExpired.VersionData.Versions["Default"] = vInfo
 
