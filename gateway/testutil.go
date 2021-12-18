@@ -1117,7 +1117,7 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 
 	go s.Gw.reloadLoop(time.Tick(time.Second))
 	go s.Gw.reloadQueueLoop()
-	go s.reloadSimulation()
+	//go s.reloadSimulation()
 }
 
 func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
