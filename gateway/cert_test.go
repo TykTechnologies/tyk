@@ -1216,7 +1216,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 							IssuerCN:      serverCert.Leaf.Issuer.CommonName,
 							SubjectCN:     serverCert.Leaf.Subject.CommonName,
 							DNSNames:      serverCert.Leaf.DNSNames,
-							HasPrivateKey: true,
+							HasPrivateKey: false,
 							NotAfter:      serverCert.Leaf.NotAfter.UTC().Truncate(time.Second),
 							NotBefore:     serverCert.Leaf.NotBefore.UTC().Truncate(time.Second),
 						},
