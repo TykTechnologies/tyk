@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -1036,4 +1037,38 @@ func TestAPIDefinitionLoader_Template(t *testing.T) {
 
 		executeAndAssert(t, temp)
 	})
+}
+
+func TestAPIExpiration(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		spec.VersionData.NotVersioned = true
+		spec.VersionDefinition.Enabled = true
+	})[0]
+
+	for _, versioned := range []bool{false, true} {
+		api.VersionDefinition.Enabled = versioned
+
+		t.Run(fmt.Sprintf("versioning=%v", versioned), func(t *testing.T) {
+			t.Run("not expired", func(t *testing.T) {
+				api.Expiration = time.Now().AddDate(1, 0, 0).Format(apidef.ExpirationTimeFormat)
+				ts.Gw.LoadAPI(api)
+				resp, _ := ts.Run(t, test.TestCase{Code: http.StatusOK})
+
+				assert.NotEmpty(t, resp.Header.Get(XTykAPIExpires))
+			})
+
+			t.Run("expired", func(t *testing.T) {
+				api.Expiration = apidef.ExpirationTimeFormat
+				ts.Gw.LoadAPI(api)
+				resp, _ := ts.Run(t, test.TestCase{Code: http.StatusForbidden})
+
+				assert.Empty(t, resp.Header.Get(XTykAPIExpires))
+			})
+		})
+	}
 }

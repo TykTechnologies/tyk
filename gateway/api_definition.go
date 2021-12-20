@@ -87,6 +87,7 @@ const (
 	VersionDoesNotExist            RequestStatus = "This API version does not seem to exist"
 	VersionWhiteListStatusNotFound RequestStatus = "WhiteListStatus for path not found"
 	VersionExpired                 RequestStatus = "Api Version has expired, please check documentation or contact administrator"
+	APIExpired                     RequestStatus = "API has expired, please check documentation or contact administrator"
 	EndPointNotAllowed             RequestStatus = "Requested endpoint is forbidden"
 	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
 	StatusOk                       RequestStatus = "Everything OK, passing"
@@ -262,6 +263,15 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		logger = logrus.NewEntry(log)
 	}
 
+	// new expiration feature
+	if t, err := time.Parse(apidef.ExpirationTimeFormat, def.Expiration); err != nil {
+		logger.WithError(err).WithField("name", def.Name).WithField("Expiration", def.Expiration).
+			Error("Could not parse expiration date for API")
+	} else {
+		def.ExpirationTs = t
+	}
+
+	// Deprecated
 	// parse version expiration time stamps
 	for key, ver := range def.VersionData.Versions {
 		if ver.Expires == "" || ver.Expires == "-1" {
@@ -1370,7 +1380,9 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
 		return false, VersionWhiteListStatusNotFound
 	}
 
-	if !a.VersionData.NotVersioned && versionInfo.Expired() {
+	if a.VersionData.NotVersioned && a.Expired() {
+		return false, APIExpired
+	} else if !a.VersionData.NotVersioned && versionInfo.Expired() { // Deprecated
 		return false, VersionExpired
 	}
 
@@ -1387,6 +1399,21 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
 	default:
 		return true, StatusOk
 	}
+}
+
+func (a *APISpec) Expired() bool {
+	// Never expires
+	if a.Expiration == "" || a.Expiration == "-1" {
+		return false
+	}
+
+	// otherwise use parsed timestamp
+	if a.ExpirationTs.IsZero() {
+		log.Error("Could not parse expiration date, disallow")
+		return true
+	}
+
+	return time.Since(a.ExpirationTs) >= 0
 }
 
 // Version attempts to extract the version data from a request, depending on where it is stored in the

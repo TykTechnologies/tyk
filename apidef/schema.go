@@ -24,6 +24,9 @@ const Schema = `{
         "api_id": {
             "type": "string"
         },
+		"expiration": {
+            "type": "string"
+        },
         "enable_ip_whitelisting": {
             "type": "boolean"
         },
