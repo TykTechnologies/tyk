@@ -84,7 +84,9 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		return nil, mwStatusRespond
 	}
 
-	if expTime := versionInfo.ExpiryTime(); !expTime.IsZero() {
+	if !v.Spec.ExpirationTs.IsZero() {
+		w.Header().Set(XTykAPIExpires, v.Spec.ExpirationTs.Format(time.RFC1123))
+	} else if expTime := versionInfo.ExpiryTime(); !expTime.IsZero() { // Deprecated
 		w.Header().Set(XTykAPIExpires, expTime.Format(time.RFC1123))
 	}
 
