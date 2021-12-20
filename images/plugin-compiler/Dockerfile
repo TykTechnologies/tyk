@@ -4,8 +4,8 @@ FROM golang:1.15-buster
 LABEL description="Image for plugin development"
 
 ARG GW_VERSION
-WORKDIR /__w/tyk/
-RUN git clone --depth 1 --branch $GW_VERSION  https://github.com/TykTechnologies/tyk
+#WORKDIR /__w/tyk/
+#RUN git clone --depth 1 --branch $GW_VERSION  https://github.com/TykTechnologies/tyk
 # This directory will contain the plugin source and will be
 # mounted from the host box by the user using docker volumes
 ENV PLUGIN_SOURCE_PATH=/plugin-source

@@ -32,7 +32,7 @@ if [ ! -f go.mod ]; then
 fi
 
 # replace gw with local version
-echo "replace github.com/TykTechnologies/tyk => /__w/tyk/tyk" >> go.mod
+#echo "replace github.com/TykTechnologies/tyk => /__w/tyk/tyk" >> go.mod
 
 # Ensure that GW package versions have priorities
 
@@ -46,5 +46,5 @@ echo "replace github.com/TykTechnologies/tyk => /__w/tyk/tyk" >> go.mod
 # Copy GW dependencies
 # yes | cp -rf /tmp/vendor/* $PLUGIN_BUILD_PATH/vendor
 
-go build -buildmode=plugin -o $plugin_name \
+go build -trimpath -buildmode=plugin -o $plugin_name \
     && mv $plugin_name $PLUGIN_SOURCE_PATH
