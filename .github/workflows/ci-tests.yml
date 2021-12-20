@@ -73,7 +73,8 @@ jobs:
         run: |
           ./bin/ci-tests.sh 2>&1 | tee test.log
           result_code=${PIPESTATUS[0]}
-          echo "::set-output name=log::$(sed -ze 's/%/%25/g;s/\n/%0A/g' test.log)"
+          grep -A 10 "FAIL:" test.log  > failed.log
+          echo "::set-output name=log::$(sed -ze 's/%/%25/g;s/\n/%0A/g' failed.log)"
           exit $result_code
 
       - name: Notify status
