@@ -73,7 +73,7 @@ jobs:
         run: |
           ./bin/ci-tests.sh 2>&1 | tee test.log
           result_code=${PIPESTATUS[0]}
-          grep -A 10 "FAIL:" test.log  > failed.log
+          grep -C 15 "FAIL:" test.log  > failed.log
           echo "::set-output name=log::$(sed -ze 's/%/%25/g;s/\n/%0A/g' failed.log)"
           exit $result_code
 
