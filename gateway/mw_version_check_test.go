@@ -370,13 +370,39 @@ func TestOldVersioning_Expires(t *testing.T) {
 	}
 
 	check := func(t *testing.T, api *APISpec, tc test.TestCase, expirationHeaderEmpty bool) {
-		ts.Gw.LoadAPI(api)
-		resp, _ := ts.Run(t, tc)
-		if expirationHeaderEmpty {
-			assert.Empty(t, resp.Header.Get(XTykAPIExpires))
-		} else {
-			assert.NotEmpty(t, resp.Header.Get(XTykAPIExpires))
+		subCheck := func(t *testing.T, apis ...*APISpec) {
+			ts.Gw.LoadAPI(apis...)
+			resp, _ := ts.Run(t, tc)
+
+			if expirationHeaderEmpty {
+				assert.Empty(t, resp.Header.Get(XTykAPIExpires))
+			} else {
+				// In migration, there is one behavior change that if old api is not versioned but `expires` is set,
+				// it was setting expiration header. However, in new expiration feature, it means empty expiration. So, it
+				// should result in empty XTykAPIExpires header.
+				if _, ok := api.VersionData.Versions[""]; !ok {
+					assert.NotEmpty(t, resp.Header.Get(XTykAPIExpires))
+				}
+			}
 		}
+
+		subCheck(t, api)
+
+		t.Run("migration", func(t *testing.T) {
+			versions, err := api.MigrateVersioning()
+			assert.NoError(t, err)
+
+			apis := []*APISpec{api}
+			if len(versions) > 0 {
+				const subVersionID = "subVersionID"
+				api.VersionDefinition.Versions["v1"] = subVersionID
+				versions[0].APIID = subVersionID
+
+				apis = append(apis, &APISpec{APIDefinition: &versions[0]})
+			}
+
+			subCheck(t, apis...)
+		})
 	}
 
 	t.Run("old versioning disabled", func(t *testing.T) {
