@@ -674,6 +674,64 @@ func TestOldMockResponse(t *testing.T) {
 	})
 }
 
+func TestNewMockResponse(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const mockResponse = "this is mock response body"
+	const mockPath = "/mock"
+	headers := map[string]string{
+		"mock-header": "mock-value",
+	}
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.ExtendedPaths.MockResponse = []apidef.MockResponseMeta{
+				{
+					Disabled:   false,
+					Path:       mockPath,
+					IgnoreCase: false,
+					Method:     "GET",
+					Code:       http.StatusTeapot,
+					Body:       mockResponse,
+					Headers:    headers,
+				},
+				{
+					Disabled:   false,
+					Path:       mockPath,
+					IgnoreCase: false,
+					Method:     "POST",
+					Code:       http.StatusInsufficientStorage,
+					Body:       mockResponse,
+					Headers:    headers,
+				},
+			}
+			v.UseExtendedPaths = true
+		})
+
+		spec.UseKeylessAccess = false
+
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	t.Run("protected", func(t *testing.T) {
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodGet, Path: mockPath, BodyMatch: mockResponse, Code: http.StatusTeapot},
+		}...)
+	})
+
+	t.Run("keyless", func(t *testing.T) {
+		api.UseKeylessAccess = true
+		ts.Gw.LoadAPI(api)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodGet, Path: mockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
+			{Method: http.MethodPost, Path: mockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusInsufficientStorage},
+			{Method: http.MethodPut, Path: mockPath, Code: http.StatusOK},
+			{Method: http.MethodGet, Path: "/something", Code: http.StatusOK},
+		}...)
+	})
+}
+
 func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
