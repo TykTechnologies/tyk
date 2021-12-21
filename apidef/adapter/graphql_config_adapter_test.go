@@ -422,6 +422,16 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 			},
 		},
 		{
+			TypeName:  "Query",
+			FieldName: "restWithFullUrlAsParam",
+			Arguments: []plan.ArgumentConfiguration{
+				{
+					Name:       "url",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		},
+		{
 			TypeName:  "DeepGQL",
 			FieldName: "query",
 			Arguments: []plan.ArgumentConfiguration{
@@ -637,6 +647,23 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			}),
 		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"restWithFullUrlAsParam"},
+				},
+			},
+			Factory: &restDataSource.Factory{
+				Client: httpClient,
+			},
+			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+				Fetch: restDataSource.FetchConfiguration{
+					URL:    "{{.arguments.url}}",
+					Method: "POST",
+				},
+			}),
+		},
 	}
 
 	var gqlConfig apidef.GraphQLConfig
@@ -671,6 +698,7 @@ var v2Schema = strconv.Quote(`type Query {
   multiRoot2: MultiRoot2
   restWithQueryParams(q: String, order: String, limit: Int): [String]
   restWithPathParams(id: String): [String]
+  restWithFullUrlAsParam(url: String): [String]
 }
 type WithChildren {
   id: ID!
@@ -822,6 +850,21 @@ var graphqlEngineV2ConfigJson = `{
 				],
 				"config": {
 					"url": "https://rest-with-path-params.example.com/{{.arguments.id}}",
+					"method": "POST",
+					"headers": {},
+					"query": [],
+					"body": ""
+				}
+			},
+			{
+				"kind": "REST",
+				"name": "restWithFullUrlAsParam",
+				"internal": true,
+				"root_fields": [
+					{ "type": "Query", "fields": ["restWithFullUrlAsParam"] }
+				],
+				"config": {
+					"url": "{{.arguments.url}}",
 					"method": "POST",
 					"headers": {},
 					"query": [],
