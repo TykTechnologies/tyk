@@ -613,10 +613,15 @@ func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
-func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string) {
+func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string, orgId string) {
 	sess := &user.SessionState{}
 	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+
+	if sess.OrgID != orgId {
+		return
+	}
+
 	var err error
 	if gw.GetConfig().HashKeys {
 		err = gw.GlobalSessionManager.UpdateSession(hashedName, sess, 0, true)
@@ -834,9 +839,6 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 	action := "modified"
 	if r.Method == http.MethodPost {
 		action = "added"
-		gw.policiesMu.Lock()
-		gw.policiesByID[polID] = *newPol
-		gw.policiesMu.Unlock()
 	}
 
 	response := apiModifyKeySuccess{
@@ -1764,15 +1766,16 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 				if apiSpec.OAuthManager == nil {
 
 					prefix := generateOAuthPrefix(apiSpec.APIID)
-					storageManager := gw.getGlobalStorageHandler(prefix, false)
+					storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 					storageManager.Connect()
 
 					apiSpec.OAuthManager = &OAuthManager{
-						OsinServer: gw.TykOsinNewServer(&osin.ServerConfig{},
+						OsinServer: gw.TykOsinNewServer(
+							&osin.ServerConfig{},
 							&RedisOsinStorageInterface{
 								storageManager,
 								gw.GlobalSessionManager,
-								&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+								&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: gw.RedisController},
 								apiSpec.OrgID,
 								gw,
 							}),
@@ -2151,14 +2154,14 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 
 	if apiSpec.OAuthManager == nil {
 		prefix := generateOAuthPrefix(apiSpec.APIID)
-		storageManager := gw.getGlobalStorageHandler(prefix, false)
+		storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 		storageManager.Connect()
 		apiSpec.OAuthManager = &OAuthManager{
 			OsinServer: gw.TykOsinNewServer(&osin.ServerConfig{},
 				&RedisOsinStorageInterface{
 					storageManager,
 					gw.GlobalSessionManager,
-					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: gw.RedisController},
 					apiSpec.OrgID,
 					gw,
 				}),
@@ -2360,7 +2363,7 @@ func (gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request
 
 	keyPrefix := "cache-" + apiID
 	matchPattern := keyPrefix + "*"
-	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true}
+	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, RedisController: gw.RedisController}
 
 	if ok := store.DeleteScanMatch(matchPattern); !ok {
 		err := errors.New("scan/delete failed")
@@ -2586,6 +2589,18 @@ func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
 
 func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
 	setCtxValue(r, ctx.VersionData, v)
+}
+
+func ctxGetVersionName(r *http.Request) *string {
+	if v := r.Context().Value(ctx.VersionName); v != nil {
+		return v.(*string)
+	}
+
+	return nil
+}
+
+func ctxSetVersionName(r *http.Request, vName *string) {
+	setCtxValue(r, ctx.VersionName, vName)
 }
 
 func ctxSetOrigRequestURL(r *http.Request, url *url.URL) {

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -204,4 +206,77 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 	quotaCounter, err = g.Gw.GlobalSessionManager.Store().GetRawKey(quotaKey)
 	assert.NoError(t, err)
 	assert.Equal(t, "1", quotaCounter)
+}
+
+// TestRPCUpdateKey check that on update key event the key still exist in worker redis
+func TestRPCUpdateKey(t *testing.T) {
+
+	cases := []struct {
+		TestName     string
+		Hashed       bool
+		EventPostfix string
+	}{
+		{
+			TestName:     "TestRPCUpdateKey unhashed",
+			Hashed:       false,
+			EventPostfix: "",
+		}, {
+			TestName:     "TestRPCUpdateKey hashed",
+			Hashed:       true,
+			EventPostfix: ":hashed",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.TestName, func(t *testing.T) {
+			g := StartTest(func(globalConf *config.Config) {
+				globalConf.HashKeys = tc.Hashed
+			})
+			defer g.Close()
+
+			rpcListener := RPCStorageHandler{
+				KeyPrefix:        "rpc.listener.",
+				SuppressRegister: true,
+				HashKeys:         tc.Hashed,
+				Gw:               g.Gw,
+			}
+
+			g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+
+			api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = false
+				spec.Proxy.ListenPath = "/api"
+			})[0]
+
+			session, key := g.CreateSession(func(s *user.SessionState) {
+				s.AccessRights = map[string]user.AccessDefinition{api.APIID: {
+					APIID: api.APIID,
+					Limit: user.APILimit{
+						QuotaMax: 30,
+					},
+				}}
+			})
+
+			auth := map[string]string{
+				headers.Authorization: key,
+			}
+
+			_, _ = g.Run(t, []test.TestCase{
+				{Path: "/api", Headers: auth, Code: http.StatusOK},
+			}...)
+
+			tags := []string{"test"}
+			session.Tags = tags
+
+			err := g.Gw.GlobalSessionManager.UpdateSession(key, session, 0, tc.Hashed)
+			assert.NoError(t, err)
+
+			rpcListener.ProcessKeySpaceChanges([]string{"apikey-" + key + tc.EventPostfix}, api.OrgID)
+			myUpdatedSession, newSessFound := g.Gw.GlobalSessionManager.SessionDetail(api.OrgID, key, tc.Hashed)
+
+			assert.True(t, newSessFound, "key should be found")
+			assert.Equal(t, tags, myUpdatedSession.Tags)
+		})
+	}
 }

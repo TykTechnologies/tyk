@@ -24,6 +24,9 @@ const Schema = `{
         "api_id": {
             "type": "string"
         },
+		"expiration": {
+            "type": "string"
+        },
         "enable_ip_whitelisting": {
             "type": "boolean"
         },
@@ -114,6 +117,33 @@ const Schema = `{
         "jwt_scope_claim_name": {
             "type": "string"
         },
+		"scopes" : {
+		"type":["object", "null"],
+		"properties": {
+			"jwt": {
+				"type":["object", "null"],
+				"properties" : {
+					"scope_claim_name": {
+						"type": "string"
+					},
+					"scope_to_policy": {
+						"type":["object", "null"]
+					}
+				}
+			},
+			"oidc": {
+				"type":["object", "null"],
+				 "properties" : {
+					 "scope_claim_name": {
+						 "type": "string"
+					 },
+					 "scope_to_policy": {
+						 "type":["object", "null"]
+					 }
+				 }
+				}
+			}
+		},  
         "use_keyless": {
             "type": "boolean"
         },
@@ -583,6 +613,9 @@ const Schema = `{
                             "type": "string",
                             "format": "date-time"
                         },
+                        "disable_query_batching": {
+                            "type": "boolean"
+                        },
                         "subgraphs": {
                             "type": ["array", "null"],
                             "properties": {
@@ -597,6 +630,9 @@ const Schema = `{
                                 },
                                 "sdl": {
                                     "type": "string"
+                                },
+                                "headers": {
+                                    "type": ["object", "null"]
                                 }
                             }
                         },

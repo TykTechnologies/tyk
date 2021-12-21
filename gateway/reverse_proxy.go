@@ -767,7 +767,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 			r.Header.Del(apidef.TykInternalApiHeader)
 		}
 
-		handler, found := rt.Gw.findInternalHttpHandlerByNameOrID(r.Host)
+		handler, _, found := rt.Gw.findInternalHttpHandlerByNameOrID(r.Host)
 		if !found {
 			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
 			return nil, errors.New("handler could")
@@ -897,7 +897,7 @@ func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoun
 		return nil, false, err
 	}
 
-	p.handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper, conn.UnderlyingConn(), r.Context())
+	p.handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper, conn.UnderlyingConn(), r)
 	return nil, true, nil
 }
 
@@ -959,7 +959,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 	return nil, false, errors.New("graphql configuration is invalid")
 }
 
-func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn, reqCtx context.Context) {
+func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn, req *http.Request) {
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
 
 	absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
@@ -981,7 +981,8 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 			log.Error("could not start graphql websocket handler: execution engine is nil")
 			return
 		}
-		executorPool = subscription.NewExecutorV2Pool(p.TykAPISpec.GraphQLExecutor.EngineV2, reqCtx)
+		initialRequestContext := subscription.NewInitialHttpRequestContext(req)
+		executorPool = subscription.NewExecutorV2Pool(p.TykAPISpec.GraphQLExecutor.EngineV2, initialRequestContext)
 	}
 
 	go gqlhttp.HandleWebsocket(done, errChan, conn, executorPool, absLogger)
@@ -1097,7 +1098,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// set up TLS certificates for upstream if needed
 	var tlsCertificates []tls.Certificate
-	if cert := p.Gw.getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
+	if cert := p.Gw.getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec); cert != nil {
 		p.logger.Debug("Found upstream mutual TLS certificate")
 		tlsCertificates = []tls.Certificate{*cert}
 	}
@@ -1649,11 +1650,6 @@ func nopCloseResponseBody(r *http.Response) {
 func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 	if !p.Gw.GetConfig().HttpServerOptions.EnableWebSockets {
 		return false, ""
-	}
-
-	EncodeAccept := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Accept)))
-	if EncodeAccept == "text/event-stream" {
-		return true, ""
 	}
 
 	connection := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Connection)))

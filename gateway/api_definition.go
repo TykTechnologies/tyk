@@ -48,14 +48,6 @@ const (
 	RPCStorageEngine  apidef.StorageEngineCode = "rpc"
 )
 
-// Constants used by the version check middleware
-const (
-	headerLocation    = "header"
-	urlParamLocation  = "url-param"
-	urlLocation       = "url"
-	expiredTimeFormat = "2006-01-02 15:04"
-)
-
 // URLStatus is a custom enum type to avoid collisions
 type URLStatus int
 
@@ -95,6 +87,7 @@ const (
 	VersionDoesNotExist            RequestStatus = "This API version does not seem to exist"
 	VersionWhiteListStatusNotFound RequestStatus = "WhiteListStatus for path not found"
 	VersionExpired                 RequestStatus = "Api Version has expired, please check documentation or contact administrator"
+	APIExpired                     RequestStatus = "API has expired, please check documentation or contact administrator"
 	EndPointNotAllowed             RequestStatus = "Requested endpoint is forbidden"
 	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
 	StatusOk                       RequestStatus = "Everything OK, passing"
@@ -270,13 +263,22 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		logger = logrus.NewEntry(log)
 	}
 
+	// new expiration feature
+	if t, err := time.Parse(apidef.ExpirationTimeFormat, def.Expiration); err != nil {
+		logger.WithError(err).WithField("name", def.Name).WithField("Expiration", def.Expiration).
+			Error("Could not parse expiration date for API")
+	} else {
+		def.ExpirationTs = t
+	}
+
+	// Deprecated
 	// parse version expiration time stamps
 	for key, ver := range def.VersionData.Versions {
 		if ver.Expires == "" || ver.Expires == "-1" {
 			continue
 		}
 		// calculate the time
-		if t, err := time.Parse(expiredTimeFormat, ver.Expires); err != nil {
+		if t, err := time.Parse(apidef.ExpirationTimeFormat, ver.Expires); err != nil {
 			logger.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
 		} else {
 			ver.ExpiresTs = t
@@ -614,6 +616,10 @@ func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, pa
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		newSpec := URLSpec{IgnoreCase: stringSpec.IgnoreCase || ignoreEndpointCase}
 		a.generateRegex(stringSpec.Path, &newSpec, specType, conf)
 
@@ -1296,26 +1302,57 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 }
 
 func (a *APISpec) getVersionFromRequest(r *http.Request) string {
-	if a.VersionData.NotVersioned {
+	if vName := ctxGetVersionName(r); vName != nil {
+		return *vName
+	}
+
+	if a.VersionData.NotVersioned && !a.VersionDefinition.Enabled {
 		return ""
 	}
 
+	var vName string
+	defer ctxSetVersionName(r, &vName)
+
 	switch a.VersionDefinition.Location {
-	case headerLocation:
-		return r.Header.Get(a.VersionDefinition.Key)
-	case urlParamLocation:
-		return r.URL.Query().Get(a.VersionDefinition.Key)
-	case urlLocation:
+	case apidef.HeaderLocation:
+		vName = r.Header.Get(a.VersionDefinition.Key)
+		if a.VersionDefinition.StripVersioningData {
+			log.Debug("Stripping version from header: ", vName)
+			defer r.Header.Del(a.VersionDefinition.Key)
+		}
+
+		return vName
+	case apidef.URLParamLocation:
+		vName = r.URL.Query().Get(a.VersionDefinition.Key)
+		if a.VersionDefinition.StripVersioningData {
+			log.Debug("Stripping version from query: ", vName)
+			q := r.URL.Query()
+			q.Del(a.VersionDefinition.Key)
+			r.URL.RawQuery = q.Encode()
+		}
+
+		return vName
+	case apidef.URLLocation:
 		uPath := a.StripListenPath(r, r.URL.Path)
 		uPath = strings.TrimPrefix(uPath, "/"+a.Slug)
 
 		// First non-empty part of the path is the version ID
 		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
+				if a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath {
+					log.Debug("Stripping version from url: ", part)
+
+					r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
+					r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
+				}
+
+				vName = part
+
 				return part
 			}
 		}
 	}
+
 	return ""
 }
 
@@ -1343,7 +1380,9 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
 		return false, VersionWhiteListStatusNotFound
 	}
 
-	if !a.VersionData.NotVersioned && versionInfo.Expired() {
+	if a.VersionData.NotVersioned && a.Expired() {
+		return false, APIExpired
+	} else if !a.VersionData.NotVersioned && versionInfo.Expired() { // Deprecated
 		return false, VersionExpired
 	}
 
@@ -1360,6 +1399,21 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
 	default:
 		return true, StatusOk
 	}
+}
+
+func (a *APISpec) Expired() bool {
+	// Never expires
+	if a.Expiration == "" || a.Expiration == "-1" {
+		return false
+	}
+
+	// otherwise use parsed timestamp
+	if a.ExpirationTs.IsZero() {
+		log.Error("Could not parse expiration date, disallow")
+		return true
+	}
+
+	return time.Since(a.ExpirationTs) >= 0
 }
 
 // Version attempts to extract the version data from a request, depending on where it is stored in the

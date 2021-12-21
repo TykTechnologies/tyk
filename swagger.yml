@@ -32,6 +32,9 @@ tags:
   - name: Keys
     description: |-
       All keys that are used to access services via Tyk correspond to a session object that informs Tyk about the context of this particular token, like access rules and rate/quota allowance.
+  - name: Policies
+    description: |-
+      A Tyk security policy incorporates several security options that can be applied to an API key. It acts as a template that can override individual sections of an API key (or identity) in Tyk.
   - name: OAuth
     description: |-
       Manage OAuth clients, and manage their tokens
@@ -56,7 +59,7 @@ tags:
       Tyk supports batch requests, so a client makes a single request to the API but gets a compound response object back.
 
       This is especially handy if clients have complex requests that have multiple synchronous dependencies and do not wish to have the entire request / response cycle running for each event.
-      
+
       To enable batch request support, set the `enable_batch_request_support` value to `true`
 
       This is especially handy if clients have complex requests that have multiple synchronous dependencies and do not wish to have the entire request / response cycle running for each event.
@@ -64,9 +67,9 @@ tags:
       Batch requests that come into Tyk are *run through the whole Tyk machinery* and *use a relative path to prevent spamming*. This means that a batch request to Tyk for three resources with the same API key will have three requests applied to their session quota and request limiting could become active if they are being throttled.
 
       Tyk reconstructs the API request based on the data in the batch request. This is to ensure that Tyk is not being used to proxy requests to other hosts outside of the upstream API being accessed.
-      
+
       Batch requests are created by POSTing to the `/{listen_path}/tyk/batch/` endpoint. These requests **do not require a valid key**, but their request list does.
-      
+
       <h3>Sample Request</h3>
 
         ```{json}
@@ -96,11 +99,11 @@ tags:
           "suppress_parallel_execution": false
         }
         ```
-      
+
       The response will will be a structured reply that encapsulates the responses for each of the outbound requests. If `suppress_parallel_execution` is set to `true`, requests will be made synchronously. If set to `false` then they will run in parallel and the response order is not guaranteed.
-      
+
       <h3>Sample Response</h3>
-      
+
       ```
       [
         {
@@ -130,21 +133,21 @@ tags:
             ]
           },
           "body": "{
-        "args": {}, 
+        "args": {},
         "headers": {
-          "Accept-Encoding": "gzip", 
-          "Authorization": "1dbc83b9c431649d7698faa9797e2900f", 
-          "Connect-Time": "2", 
-          "Connection": "close", 
-          "Host": "httpbin.org", 
-          "Total-Route-Time": "0", 
-          "User-Agent": "Go 1.1 package http", 
-          "Via": "1.1 vegur", 
-          "X-Request-Id": "6a22499a-2776-4aa1-80c0-686581a8be4d", 
-          "X-Tyk-Test": "2", 
+          "Accept-Encoding": "gzip",
+          "Authorization": "1dbc83b9c431649d7698faa9797e2900f",
+          "Connect-Time": "2",
+          "Connection": "close",
+          "Host": "httpbin.org",
+          "Total-Route-Time": "0",
+          "User-Agent": "Go 1.1 package http",
+          "Via": "1.1 vegur",
+          "X-Request-Id": "6a22499a-2776-4aa1-80c0-686581a8be4d",
+          "X-Tyk-Test": "2",
           "X-Tyk-Version": "1.2"
-        }, 
-        "origin": "127.0.0.1, 62.232.114.250", 
+        },
+        "origin": "127.0.0.1, 62.232.114.250",
         "url": "http://httpbin.org/get"
       }"
           },
@@ -175,21 +178,21 @@ tags:
               ]
             },
             "body": "{
-        "args": {}, 
+        "args": {},
         "headers": {
-          "Accept-Encoding": "gzip", 
-          "Authorization": "1dbc83b9c431649d7698faa9797e2900f", 
-          "Connect-Time": "7", 
-          "Connection": "close", 
-          "Host": "httpbin.org", 
-          "Total-Route-Time": "0", 
-          "User-Agent": "Go 1.1 package http", 
-          "Via": "1.1 vegur", 
-          "X-Request-Id": "1ab61f50-51ff-4828-a7e2-17240385a6d2", 
-          "X-Tyk-Test": "1", 
+          "Accept-Encoding": "gzip",
+          "Authorization": "1dbc83b9c431649d7698faa9797e2900f",
+          "Connect-Time": "7",
+          "Connection": "close",
+          "Host": "httpbin.org",
+          "Total-Route-Time": "0",
+          "User-Agent": "Go 1.1 package http",
+          "Via": "1.1 vegur",
+          "X-Request-Id": "1ab61f50-51ff-4828-a7e2-17240385a6d2",
+          "X-Tyk-Test": "1",
           "X-Tyk-Version": "1.2"
-        }, 
-        "origin": "127.0.0.1, 62.232.114.250", 
+        },
+        "origin": "127.0.0.1, 62.232.114.250",
         "url": "http://httpbin.org/get"
       }"
           }
@@ -198,25 +201,25 @@ tags:
       With the body for each request string encoded in the `body` field.
 
       * `expire_analytics_after`: If you are running a busy API, you may want to ensure that your MongoDB database does not overflow with old data. Set the `expire_analytics_after` value to the number of seconds you would like the data to last for. Setting this flag to anything above `0` will set an `expireAt` field for each record that is written to the database.
-          
+
       **Important:** Tyk will not create the expiry index for you. In order to implement data expiry for your analytics data, ensure that the index is created This is easily achieved using the [MongoDB command line interface](https://docs.mongodb.com/getting-started/shell/client/).
-      
+
       * `dont_set_quota_on_create`: This setting defaults to `false`, but if set to `true`, when the API is used to edit, create or add keys, the quota cache in Redis will not be re-set. By default, all updates or creates to Keys that have Quotas set will re-set the quota (This has been the default behaviour since 1.0).
-          
+
         This behaviour can be bypassed on a case-by-case basis by using the `suppress_reset` parameter when making a REST API request. This is the advised mode of operation as it allows for manual, granular control over key quotas and reset timings.
-      
+
       * `cache_options`: This section enables you to configure the caching behaviour of Tyk and to enable or disable the caching middleware for your API.
-      
+
       * `cache_options.enable_cache`: Set this value to `true` if the cache should be enabled for this endpoint, setting it to false will stop all caching behaviour.
-      
+
       * `cache_options.cache_timeout`: The amount of time, in seconds, to keep cached objects, defaults to `60` seconds.
-      
+
       * `cache_options.cache_all_safe_requests`: Set this to `true` if you want all *safe* requests (GET, HEAD, OPTIONS) to be cached. This is a blanket setting for APIs where caching is required but you don't want to set individual paths up in the definition.
       
       * `cache_options.enable_upstream_cache_control`: Set this to `true` if you want your application to control the cache options for Tyk (TTL and whether to cache or not). See [Caching](/docs/basic-config-and-security/reduce-latency/caching/) for more details.
       
       * `response_processors`: Response processors need to be specifically defined so they are loaded on API creation, otherwise the middleware will not fire. In order to have the two main response middleware components fire, the following configuration object should be supplied.
-      
+
       ```{json}
       "response_processors": [
         {
@@ -233,8 +236,8 @@ tags:
       ]
       ```
       The options for the `header_injector` are global, and will apply to all outbound requests.
-      
-      
+
+
   - name: APIs
     description: |-
       **Note: Applies only to Tyk Gateway Community Edition**
@@ -504,6 +507,114 @@ paths:
               schema:
                 type: string
               example: "Hello Tiki"
+  '/tyk/certs':
+    get:
+      parameters:
+        - description: Organization ID to list the certificates
+          in: query
+          name: org_id
+          required: true
+          schema:
+            type: string
+        - description: Mode to list the certificate details
+          name: mode
+          in: query
+          required: false
+          schema:
+            type: string
+          example: 'detailed'
+        - description: Comma separated list of certificates to list
+          name: certID
+          in: query
+          required: false
+          schema:
+            type: string
+          example: 'e6ce2b49-3e31-44de-95a7-12f054724283,234a37ac-28d1-4f12-b936-ffb4211b79f1'
+      summary: List Certificates
+      description: List All Certificates in Gateway
+      tags:
+        - Certs
+      operationId: listCerts
+      responses:
+        '200':
+          description: List of all Certificates
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/APIAllCertificates'
+                  - $ref: '#/components/schemas/APIAllCertificateBasics'
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/CertificateMeta'
+    post:
+      summary: Add a certificate
+      description: Add a certificate to the gateway
+      tags:
+        - Certs
+      operationId: addCert
+      parameters:
+        - description: Organization ID to list the certificates
+          in: query
+          name: org_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: New Key added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APICertificateStatusMessage'
+              example:
+                id: 'e6ce2b49-3e31-44de-95a7-12f054724283'
+                message: 'Certificate added'
+                status: ok
+        '403':
+          description: Malformed data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: Malformed cert data
+                status: error
+    delete:
+      parameters:
+        - description: Certifiicate ID to be deleted
+          in: query
+          name: certID
+          required: true
+          schema:
+            type: string
+        - description: Organization ID to list the certificates
+          in: query
+          name: org_id
+          required: true
+          schema:
+            type: string
+      summary: Delete Certificate
+      description: Delete certificate by id
+      tags:
+        - Certs
+      operationId: deleteCerts
+      responses:
+        '200':
+          description: Deleted certificate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: removed
+                status: ok
+
   '/tyk/keys':
     get:
       summary: List Keys
@@ -517,9 +628,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
+                $ref: "#/components/schemas/apiAllKeys"
     post:
       summary: Create a key
       description: |-
@@ -761,6 +870,171 @@ paths:
               example:
                 action: Key deleted
                 status: ok
+  '/tyk/policies':
+    get:
+      summary: List Policies
+      description: You can retrieve all the policies in your Tyk instance. Returns an array policies.
+      tags:
+        - Policies
+      operationId: listPolicies
+      responses:
+        '200':
+          description: List of all policies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Policy"
+    post:
+      summary: Create a Policy
+      description: You can create a Policy in your Tyk Instance
+      tags:
+        - Policies
+      operationId: addPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Policy"
+            example:
+              name: new policy
+              quota_max: 60
+              quota_renewal_rate: 60
+              allowance: 100
+              rate: 100
+              per: 5
+              org_id: 53ac07777cbb8c2d53000002
+      responses:
+        '200':
+          description: Policy created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiModifyKeySuccess'
+              example:
+                action: created
+                status: ok
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: Request malformed
+                status: error
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: Failed to create file!
+                status: error
+  '/tyk/policies/{polID}':
+    parameters:
+      - description: The policy ID
+        name: polID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Get a Policy
+      description: You can retrieve details of a single policy by ID in your Tyk instance. Returns an array policies.
+      tags:
+        - Policies
+      operationId: getPolicy
+      responses:
+        '200':
+          description: Get details of a single Policy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Policy"
+        '404':
+          description: Policy not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: Policy not found
+                status: error
+    put:
+      summary: Update a Policy
+      description: You can update a Policy in your Tyk Instance by ID
+      tags:
+        - Policies
+      operationId: updatePolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Policy"
+            example:
+              name: new policy
+              quota_max: 60
+              quota_renewal_rate: 60
+              allowance: 100
+              rate: 100
+              per: 5
+              org_id: 53ac07777cbb8c2d53000002
+      responses:
+        '200':
+          description: Policy updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiModifyKeySuccess'
+              example:
+                action: updated
+                status: ok
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: PUT operation on different IDs
+                status: error
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: Failed to create file!
+                status: error
+    delete:
+      summary: Delete a Policy
+      description: Delete a policy by ID in your tyk instance.
+      tags:
+        - Policies
+      operationId: deletePolicy
+      responses:
+        '200':
+          description: Delete policy by ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiModifyKeySuccess'
+              example:
+                action: deleted
+                status: ok
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: Delete failed
+                status: error
   '/tyk/oauth/clients/create':
     post:
       summary: Create new OAuth client
@@ -1970,6 +2244,9 @@ components:
           x-go-name: Rate
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
+    GraphAccessDefinition:
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/user
     HardTimeoutMeta:
       properties:
         method:
@@ -2204,6 +2481,105 @@ components:
           x-go-name: SegregateByClient
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
+    Policy:
+      properties:
+        _id:
+          $ref: '#/components/schemas/ObjectId'
+          type: object
+          x-go-name: ID
+        id:
+          type: string
+          x-go-name: ID
+        name:
+          type: string
+          x-go-name: Name
+        org_id:
+          type: string
+          x-go-name: OrgID
+        rate:
+          format: double
+          type: number
+          x-go-name: Rate
+        per:
+          format: double
+          type: number
+          x-go-name: Per
+        quota_max:
+          format: int64
+          type: integer
+          x-go-name: QuotaMax
+        quota_renewal_rate:
+          format: int64
+          type: integer
+          x-go-name: QuotaRenewalRate
+        throttle_interval:
+          format: double
+          type: number
+          x-go-name: ThrottleInterval
+        throttle_retry_limit:
+          type: number
+          x-go-name: ThrottleRetryLimit
+        max_query_depth:
+          type: number
+          x-go-name: MaxQueryDepth
+        access_rights:
+          $ref: '#/components/schemas/AccessDefinition'
+          type: object
+          x-go-name: AccessRights
+        hmac_enabled:
+          type: boolean
+          x-go-name: HMACEnabled
+        enable_http_signature_validation:
+          type: boolean
+          x-go-name: EnableHTTPSignatureValidation
+        active:
+          type: boolean
+          x-go-name: Active
+        is_inactive:
+          type: boolean
+          x-go-name: IsInactive
+        tags:
+          type: array
+          items:
+            type: string
+          x-go-name: Tags
+        key_expires_in:
+          format: int64
+          type: number
+          x-go-name: KeyExpiresIn
+        partitions:
+          $ref: '#/components/schemas/PolicyPartitions'
+          type: object
+          x-go-name: Partitions
+        last_updated:
+          type: string
+          x-go-name: LastUpdates
+        meta_data:
+          type: object
+          x-go-name: MetaData
+        graphql_access_rights:
+          $ref: '#/components/schemas/GraphAccessDefinition'
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/user
+    PolicyPartitions:
+      properties:
+        quota:
+          type: boolean
+          x-go-name: Quota
+        rate_limit:
+          type: boolean
+          x-go-name: RateLimit
+        complexity:
+          type: boolean
+          x-go-name: Complexity
+        acl:
+          type: boolean
+          x-go-name: Acl
+        per_api:
+          type: boolean
+          x-go-name: PerAPI
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/user
     Regexp:
       description: Regexp is a wrapper around regexp.Regexp but with caching
       properties:
@@ -2734,6 +3110,162 @@ components:
         status:
           type: string
           x-go-name: Status
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    APIAllCertificates:
+      description:  APIAllCertificates represents a list of certificates
+      properties:
+        certs:
+          items:
+            type: string
+          type: array
+          x-go-name: Certs
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    APIAllCertificateBasics:
+      description: APIAllCertificates represents a list of certificate basics
+      properties:
+        certs:
+          items:
+            $ref: '#/components/schemas/CertificateBasics'
+          type: array
+          x-go-name: Certs
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    CertificateBasics:
+      description: CertificateBasics represents basic details of a certificate
+      properties:
+        id:
+          type: string
+          x-go-name: ID
+        issuer_cn:
+          type: string
+          x-go-name: IssuerCN
+        subject_cn:
+          type: string
+          x-go-name: SubjectCN
+        dns_names:
+          type: array
+          items:
+            type: string
+          x-go-name: DNSNames
+        has_private:
+          type: string
+          x-go-name: HasPrivateKey
+        not_before:
+          type: string
+          x-go-name: NotBefore
+        not_after:
+          type: string
+          x-go-name: NotAfter
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    CertificateMeta:
+      description: CertificateBasics represents basic details of a certificate
+      properties:
+        id:
+          type: string
+          x-go-name: ID
+        fingerprint:
+          type: string
+          x-go-name: Fingerprint
+        has_private:
+          type: string
+          x-go-name: HasPrivateKey
+        issuer:
+          $ref: '#/components/schemas/pkixName'
+        subject:
+          $ref: '#/components/schemas/pkixName'
+        not_before:
+          type: string
+          x-go-name: NotBefore
+        not_after:
+          type: string
+          x-go-name: NotAfter
+        dns_names:
+          type: array
+          items:
+            type: string
+          x-go-name: DNSNames
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    pkixName:
+      description: Name represents an X.509 distinguished name
+      properties:
+        Country:
+          type: array
+          items:
+            type: string
+        Organization:
+          type: array
+          items:
+            type: string
+        OrganizationalUnit:
+          type: array
+          items:
+            type: string
+        Locality:
+          type: array
+          items:
+            type: string
+        Province:
+          type: array
+          items:
+            type: string
+        StreetAddress:
+          type: array
+          items:
+            type: string
+        PostalCode:
+          type: array
+          items:
+            type: string
+        SerialNumber:
+          type: string
+        CommonName:
+          type: string
+        Names:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixAttributeTypeAndValue'
+        ExtraNames:
+          type: array
+          items:
+            $ref: '#/components/schemas/pkixAttributeTypeAndValueSET'
+    pkixAttributeTypeAndValue:
+      description: AttributeTypeAndValue mirrors the ASN.1 structure of the same name in RFC 5280, Section 4.1.2.4.
+      properties:
+        Type:
+          type: array
+          items:
+            type: integer
+        Value:
+          type: object
+    pkixAttributeTypeAndValueSET:
+      description: AttributeTypeAndValueSET represents a set of ASN.1 sequences of AttributeTypeAndValue sequences from RFC 2986 (PKCS #10).
+      properties:
+        Type:
+          type: array
+          items:
+            type: integer
+        Value:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/pkixAttributeTypeAndValue'
+    APICertificateStatusMessage:
+      description: Status message when certificate is added
+      properties:
+        id:
+          type: string
+          x-go-name: CertID
+        status:
+          type: string
+          x-go-name: Status
+        message:
+          type: string
+          x-go-name: Message
       type: object
       x-go-package: github.com/TykTechnologies/tyk
   securitySchemes:

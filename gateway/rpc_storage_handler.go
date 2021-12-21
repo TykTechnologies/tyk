@@ -87,6 +87,19 @@ var (
 	}
 )
 
+const (
+	ResetQuota              string = "resetQuota"
+	CertificateRemoved      string = "CertificateRemoved"
+	CertificateAdded        string = "CertificateAdded"
+	OAuthRevokeToken        string = "oAuthRevokeToken"
+	OAuthRevokeAccessToken  string = "oAuthRevokeAccessToken"
+	OAuthRevokeRefreshToken string = "oAuthRevokeRefreshToken"
+	OAuthRevokeAllTokens    string = "revoke_all_tokens"
+	OauthClientAdded        string = "OauthClientAdded"
+	OauthClientRemoved      string = "OauthClientRemoved"
+	OauthClientUpdated      string = "OauthClientUpdated"
+)
+
 // RPCStorageHandler is a storage manager that uses the redis database.
 type RPCStorageHandler struct {
 	KeyPrefix        string
@@ -791,13 +804,95 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
-func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler) {
-	newKeyName := "apikey-" + storage.HashStr(keyName)
-	sessionString, err := r.GetRawKey(keyName)
+func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isHashed bool, orgId string) {
+
+	hashedKeyName := keyName
+	// avoid double hashing
+	if !isHashed {
+		hashedKeyName = storage.HashKey(keyName, gw.GetConfig().HashKeys)
+	}
+
+	sessionString, err := r.GetRawKey("apikey-" + hashedKeyName)
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		gw.handleAddKey(keyName, newKeyName[7:], sessionString, "-1")
+		gw.handleAddKey(keyName, hashedKeyName, sessionString, "-1", orgId)
+	}
+}
+
+func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, event string) {
+	store, _, err := gw.GetStorageForApi(apiId)
+	if err != nil {
+		log.Error("Could not get oauth storage for api")
+		return
+	}
+
+	switch event {
+	case OauthClientAdded:
+		// on add: pull from rpc and save it in local redis
+		client, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve new oauth client information")
+			return
+		}
+
+		err = store.SetClient(oauthClientId, orgID, client, false)
+		if err != nil {
+			log.WithError(err).Error("Could not save oauth client.")
+			return
+		}
+
+		log.Info("oauth client created successfully")
+	case OauthClientRemoved:
+		// on remove: remove from local redis
+		err := store.DeleteClient(oauthClientId, orgID, false)
+		if err != nil {
+			log.Errorf("Could not delete oauth client with id: %v", oauthClientId)
+			return
+		}
+		log.Infof("Oauth Client deleted successfully")
+	case OauthClientUpdated:
+		// on update: delete from local redis and pull again from rpc
+		_, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve oauth client information")
+			return
+		}
+
+		err = store.DeleteClient(oauthClientId, orgID, false)
+		if err != nil {
+			log.WithError(err).Error("Could not delete oauth client")
+			return
+		}
+
+		client, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve oauth client information")
+			return
+		}
+
+		err = store.SetClient(oauthClientId, orgID, client, false)
+		if err != nil {
+			log.WithError(err).Error("Could not save oauth client.")
+			return
+		}
+		log.Info("oauth client updated successfully")
+	default:
+		log.Warningf("Oauth client event not supported:%v", event)
+	}
+}
+
+// ProcessOauthClientsOps performs the appropiate action for the received clients
+// it can be any of the Create,Update and Delete operations
+func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
+	for clientInfo, action := range clients {
+		// clientInfo is: APIID.ClientID.OrgID
+		eventValues := strings.Split(clientInfo, ".")
+		apiId := eventValues[0]
+		oauthClientId := eventValues[1]
+		orgID := eventValues[2]
+
+		gw.ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, action)
 	}
 }
 
@@ -805,24 +900,39 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
 	ClientsToBeRevoked := map[string]string{}
-	oauthTokenKeys := map[string]bool{}
+	notRegularKeys := map[string]bool{}
+	CertificatesToRemove := map[string]string{}
+	CertificatesToAdd := map[string]string{}
+	OauthClients := map[string]string{}
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
-		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
-			keysToReset[splitKeys[0]] = true
-		} else if len(splitKeys) > 2 {
+		if len(splitKeys) > 1 {
 			action := splitKeys[len(splitKeys)-1]
-			if action == "oAuthRevokeToken" || action == "oAuthRevokeAccessToken" || action == "oAuthRevokeRefreshToken" {
+			switch action {
+			case ResetQuota:
+				keysToReset[splitKeys[0]] = true
+			case CertificateRemoved:
+				CertificatesToRemove[key] = splitKeys[0]
+				notRegularKeys[key] = true
+			case CertificateAdded:
+				CertificatesToAdd[key] = splitKeys[0]
+				notRegularKeys[key] = true
+			case OAuthRevokeToken, OAuthRevokeAccessToken, OAuthRevokeRefreshToken:
 				TokensToBeRevoked[splitKeys[0]] = key
-				oauthTokenKeys[key] = true
-			} else if action == "revoke_all_tokens" {
+				notRegularKeys[key] = true
+			case OAuthRevokeAllTokens:
 				ClientsToBeRevoked[splitKeys[1]] = key
-				oauthTokenKeys[key] = true
+				notRegularKeys[key] = true
+			case OauthClientAdded, OauthClientUpdated, OauthClientRemoved:
+				OauthClients[splitKeys[0]] = action
+				notRegularKeys[key] = true
+			default:
+				log.Debug("ignoring processing of action:", action)
 			}
 		}
 	}
-
+	r.Gw.ProcessOauthClientsOps(OauthClients)
 	for clientId, key := range ClientsToBeRevoked {
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[0]
@@ -850,9 +960,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			}
 			var tokenTypeHint string
 			switch tokenActionTypeHint {
-			case "oAuthRevokeAccessToken":
+			case OAuthRevokeAccessToken:
 				tokenTypeHint = "access_token"
-			case "oAuthRevokeRefreshToken":
+			case OAuthRevokeRefreshToken:
 				tokenTypeHint = "refresh_token"
 			}
 			RevokeToken(storage, token, tokenTypeHint)
@@ -864,16 +974,31 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
 
+	// remove certs
+	for _, certId := range CertificatesToRemove {
+		log.Debugf("Removing certificate: %v", certId)
+		r.Gw.CertificateManager.Delete(certId, orgId)
+	}
+	for _, certId := range CertificatesToAdd {
+		log.Debugf("Adding certificate: %v", certId)
+		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally
+		content, err := r.Gw.CertificateManager.GetRaw(certId)
+		if content == "" && err != nil {
+			log.Debugf("Error getting certificate content")
+		}
+	}
+
 	for _, key := range keys {
-		_, isOauthTokenKey := oauthTokenKeys[key]
+		_, isOauthTokenKey := notRegularKeys[key]
 		if !isOauthTokenKey {
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
+
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
-				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+				key = splitKeys[0]
 				r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
-				r.Gw.getSessionAndCreate(splitKeys[0], r)
+				r.Gw.getSessionAndCreate(splitKeys[0], r, true, orgId)
 			} else {
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
@@ -881,7 +1006,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 					key = r.Gw.generateToken(orgId, key)
 				}
 				r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
-				r.Gw.getSessionAndCreate(splitKeys[0], r)
+				r.Gw.getSessionAndCreate(splitKeys[0], r, false, orgId)
 			}
 			r.Gw.SessionCache.Delete(key)
 			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)

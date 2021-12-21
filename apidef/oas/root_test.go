@@ -24,10 +24,28 @@ func TestXTykAPIGateway(t *testing.T) {
 		assert.Equal(t, emptyXTykAPIGateway, resultXTykAPIGateway)
 	})
 
-	t.Run("filled", func(t *testing.T) {
+	t.Run("filled OAS", func(t *testing.T) {
+		var xTykAPIGateway XTykAPIGateway
+		Fill(t, &xTykAPIGateway, 0)
+
+		var convertedAPI apidef.APIDefinition
+		xTykAPIGateway.ExtractTo(&convertedAPI)
+
+		var resultXTykAPIGateway XTykAPIGateway
+		resultXTykAPIGateway.Fill(convertedAPI)
+
+		assert.Equal(t, xTykAPIGateway, resultXTykAPIGateway)
+	})
+
+	t.Run("filled old", func(t *testing.T) {
 		t.SkipNow() // when we don't need to skip this, it means OAS and old API definition match
 		initialAPI := apidef.APIDefinition{}
 		Fill(t, &initialAPI, 0)
+
+		initialAPI.VersionDefinition.Enabled = false
+		initialAPI.VersionDefinition.Versions = nil
+		_, err := initialAPI.MigrateVersioning()
+		assert.NoError(t, err)
 
 		xTykAPIGateway := XTykAPIGateway{}
 		xTykAPIGateway.Fill(initialAPI)
@@ -102,7 +120,6 @@ func Fill(t *testing.T, input interface{}, index int) {
 		if v.Type() == reflect.TypeOf(map[string]apidef.AuthConfig{}) {
 			v.Set(reflect.ValueOf(FillTestAuthConfigs(t, index)))
 		} else {
-
 			newMap := reflect.MakeMapWithSize(v.Type(), 0)
 			for i := 0; i < 3; i++ {
 				newKey := reflect.New(v.Type().Key()).Elem()
@@ -116,17 +133,19 @@ func Fill(t *testing.T, input interface{}, index int) {
 
 			v.Set(newMap)
 		}
-
 	case reflect.Struct:
-		for i := 0; i < v.NumField(); i++ {
-			fv := v.Field(i)
-			if v.Type().Field(i).Tag.Get("json") == "-" || v.Type().Field(i).Tag.Get("json") == "" {
-				continue
+		if v.Type() == reflect.TypeOf(apidef.VersionData{}) {
+			v.Set(reflect.ValueOf(FillTestVersionData(t, index)))
+		} else {
+			for i := 0; i < v.NumField(); i++ {
+				fv := v.Field(i)
+				if v.Type().Field(i).Tag.Get("json") == "-" || v.Type().Field(i).Tag.Get("json") == "" {
+					continue
+				}
+
+				Fill(t, fv.Addr().Interface(), index+i+1)
 			}
-
-			Fill(t, fv.Addr().Interface(), index+i+1)
 		}
-
 	case reflect.Ptr:
 		newValue := reflect.New(v.Type().Elem()).Elem()
 		Fill(t, newValue.Addr().Interface(), index)
@@ -147,6 +166,38 @@ func FillTestAuthConfigs(t *testing.T, index int) map[string]apidef.AuthConfig {
 	a.Signature = apidef.SignatureConfig{}
 	a.ValidateSignature = false
 	authConfigs["jwt"] = a
+	authConfigs["basic"] = a
+	authConfigs["oauth"] = a
+	authConfigs["hmac"] = a
+	authConfigs["coprocess"] = a
+	authConfigs["oidc"] = a
 
 	return authConfigs
+}
+
+func FillTestVersionData(t *testing.T, index int) apidef.VersionData {
+	versionInfo := apidef.VersionInfo{}
+	Fill(t, &versionInfo, index)
+
+	return apidef.VersionData{
+		NotVersioned:   false,
+		DefaultVersion: "Default",
+		Versions: map[string]apidef.VersionInfo{
+			"Default": versionInfo,
+			"v1":      {},
+			"v2":      {},
+		},
+	}
+}
+
+func TestVersioning(t *testing.T) {
+	var emptyVersioning Versioning
+
+	var convertedAPI apidef.APIDefinition
+	emptyVersioning.ExtractTo(&convertedAPI)
+
+	var resultVersioning Versioning
+	resultVersioning.Fill(convertedAPI)
+
+	assert.Equal(t, emptyVersioning, resultVersioning)
 }

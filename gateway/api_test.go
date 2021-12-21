@@ -16,6 +16,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/certs"
+
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -85,19 +87,44 @@ func TestPolicyAPI(t *testing.T) {
 	defer ts.Close()
 	ts.Gw.BuildAndLoadAPI()
 
-	_, _ = ts.Run(t, []test.TestCase{
-		// get non existent policy
-		{Path: "/tyk/policies/not-here", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`},
-		// create Policy
-		{Path: "/tyk/policies/default-test", AdminAuth: true, Method: "POST", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"added"}`},
-		//update policy with new values
-		{Path: "/tyk/policies/default-test", AdminAuth: true, Method: "PUT", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"modified"}`},
-		//get by ID
-		{Path: "/tyk/policies/default-test", AdminAuth: true, Method: "GET", Code: 200},
-		//delete to clean up
-		{Path: "/tyk/policies/default-test", AdminAuth: true, Method: "DELETE", BodyMatch: `{"key":"default-test","status":"ok","action":"deleted"}`},
-	}...)
-
+	// test non existing policy
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/not-here", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`, Code: http.StatusNotFound,
+	})
+	// create new policy
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "POST", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"added"}`,
+	})
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`, Code: http.StatusNotFound,
+	})
+	ts.Gw.DoReload()
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "GET", Code: http.StatusOK,
+	})
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "PUT", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"modified"}`,
+	})
+	// policy still should not be reverted
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/not-here", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`, Code: http.StatusNotFound,
+	})
+	ts.Gw.DoReload()
+	// after reload should revert policy
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "GET", Code: http.StatusOK,
+	})
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "DELETE", BodyMatch: `{"key":"default-test","status":"ok","action":"deleted"}`,
+	})
+	// even we delete policy should be reverted before we reload
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "GET", Code: http.StatusOK,
+	})
+	ts.Gw.DoReload()
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/not-here", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`, Code: http.StatusNotFound,
+	})
 }
 
 func TestHealthCheckEndpoint(t *testing.T) {
@@ -566,12 +593,12 @@ func TestUpdateKeyWithCert(t *testing.T) {
 
 	t.Run("Update key with valid cert", func(t *testing.T) {
 		// create cert
-		clientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
 		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 		defer ts.Gw.CertificateManager.Delete(certID, "")
 
 		// new valid cert
-		newClientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
+		newClientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
 		newCertID, _ := ts.Gw.CertificateManager.Add(newClientCertPem, "")
 		defer ts.Gw.CertificateManager.Delete(newCertID, "")
 
@@ -594,7 +621,7 @@ func TestUpdateKeyWithCert(t *testing.T) {
 	})
 
 	t.Run("Update key with empty cert", func(t *testing.T) {
-		clientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
 		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 
 		// create session base and set cert
@@ -617,7 +644,7 @@ func TestUpdateKeyWithCert(t *testing.T) {
 	})
 
 	t.Run("Update key with invalid cert", func(t *testing.T) {
-		clientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
 		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 
 		// create session base and set cert
@@ -1446,7 +1473,7 @@ func TestGroupResetHandler(t *testing.T) {
 
 	didSubscribe := make(chan bool)
 	didReload := make(chan bool)
-	cacheStore := storage.RedisCluster{}
+	cacheStore := storage.RedisCluster{RedisController: ts.Gw.RedisController}
 	cacheStore.Connect()
 
 	go func() {
@@ -1457,7 +1484,7 @@ func TestGroupResetHandler(t *testing.T) {
 			case *redis.Message:
 				notf := Notification{Gw: ts.Gw}
 				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
-					t.Fatal(err)
+					t.Error(err)
 				}
 				if notf.Command == NoticeGroupReload {
 					didReload <- true

@@ -127,7 +127,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	}
 
 	// decide if we use policy ID from provider client settings or list of policies from scope-policy mapping
-	useScope := len(k.Spec.JWTScopeToPolicyMapping) != 0
+	useScope := len(k.Spec.Scopes.OIDC.ScopeToPolicy) != 0
 
 	k.lock.RLock()
 	clientSet, foundIssuer := k.provider_client_policymap[iss.(string)]
@@ -181,14 +181,14 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	if !useScope {
 		policiesToApply = append(policiesToApply, policyID)
 	} else {
-		scopeClaimName := k.Spec.JWTScopeClaimName
+		scopeClaimName := k.Spec.Scopes.OIDC.ScopeClaimName
 		if scopeClaimName == "" {
 			scopeClaimName = "scope"
 		}
 
 		if scope := getScopeFromClaim(token.Claims.(jwt.MapClaims), scopeClaimName); scope != nil {
 			// add all policies matched from scope-policy mapping
-			policiesToApply = mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
+			policiesToApply = mapScopeToPolicies(k.Spec.Scopes.OIDC.ScopeToPolicy, scope)
 		}
 	}
 

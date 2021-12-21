@@ -5,13 +5,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
@@ -207,7 +208,7 @@ func TestJWTHMACIdInSubClaim(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:token invalid, key not found`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 
@@ -240,7 +241,7 @@ func TestJWTRSAIdInSubClaim(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:token invalid, key not found`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 
@@ -326,7 +327,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:crypto/rsa: verification error`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 }
@@ -344,7 +345,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:crypto/rsa: verification error`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 }
@@ -361,7 +362,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:token contains an invalid number of segments`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 }
@@ -410,7 +411,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "Key not authorized:illegal base64 data at input byte 6",
+			BodyMatch: "Key not authorized",
 		})
 	})
 }
@@ -975,9 +976,13 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.JWTDefaultPolicies = []string{defaultPolicyID}
 		spec.Proxy.ListenPath = "/base"
-		spec.JWTScopeToPolicyMapping = map[string]string{
-			"user:read":  p1ID,
-			"user:write": p2ID,
+		spec.Scopes = apidef.Scopes{
+			JWT: apidef.ScopeClaim{
+				ScopeToPolicy: map[string]string{
+					"user:read":  p1ID,
+					"user:write": p2ID,
+				},
+			},
 		}
 		spec.OrgID = "default"
 	})[0]
@@ -1176,8 +1181,12 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		}
 	})
 
-	base.JWTScopeToPolicyMapping = map[string]string{
-		"user:read": p3ID,
+	base.Scopes = apidef.Scopes{
+		JWT: apidef.ScopeClaim{
+			ScopeToPolicy: map[string]string{
+				"user:read": p3ID,
+			},
+		},
 	}
 
 	ts.Gw.LoadAPI(base)
@@ -1229,7 +1238,81 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 			},
 		)
 	})
+}
 
+func TestGetScopeFromClaim(t *testing.T) {
+	type tableTest struct {
+		jwt            string
+		key            string
+		expectedClaims []string
+		name           string
+	}
+
+	tests := []tableTest{
+		{
+			jwt:            `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwic2NvcGUiOiJmb28gYmFyIGJheiJ9.iS5FYY99ccB1oTGtMmNjM1lppS18FSKPytrV9oQouSM`,
+			key:            "scope",
+			expectedClaims: []string{"foo", "bar", "baz"},
+			name:           "space separated",
+		},
+		{
+			jwt:            `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwic2NvcGUiOlsiZm9vIiwiYmFyIiwiYmF6Il19.Lo_7J1FpUcsKWC4E9nMiouyVdUClA3KujHu9EwqHEwo`,
+			key:            "scope",
+			expectedClaims: []string{"foo", "bar", "baz"},
+			name:           "slice strings",
+		},
+		{
+			jwt:            `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwic2NvcGUxIjp7InNjb3BlMiI6ImZvbyBiYXIgYmF6In19.IsCBEl-GozS-sgZaTHoLwuBKmxYLOCYYVCiLLVmGu8o`,
+			key:            "scope1.scope2",
+			expectedClaims: []string{"foo", "bar", "baz"},
+			name:           "nested space separated",
+		},
+		{
+			jwt:            `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwic2NvcGUxIjp7InNjb3BlMiI6WyJmb28iLCJiYXIiLCJiYXoiXX19.VDBnH2U7KWl-fajAHGq6PzzWp4mnNCkfKAodfhHc0gY`,
+			key:            "scope1.scope2",
+			expectedClaims: []string{"foo", "bar", "baz"},
+			name:           "nested slice strings",
+		},
+	}
+
+	pubKey := []byte(`mysecret`)
+
+	for i, mytest := range tests {
+		t.Run(fmt.Sprintf("%d %s", i, mytest.name), func(t *testing.T) {
+			tok, err := jwt.Parse(mytest.jwt, func(token *jwt.Token) (interface{}, error) {
+				return pubKey, nil
+			})
+			if err != nil {
+				t.Fatal(err.Error())
+			}
+
+			scopes := getScopeFromClaim(tok.Claims.(jwt.MapClaims), mytest.key)
+			if !testEq(mytest.expectedClaims, scopes) {
+				t.Logf("expected: %v", mytest.expectedClaims)
+				t.Logf("actual: %v", scopes)
+				t.Fatal(i, "slices not equal")
+			}
+		})
+	}
+}
+
+func testEq(a, b []string) bool {
+	// If one is nil, the other must also be nil.
+	if (a == nil) != (b == nil) {
+		return false
+	}
+
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
@@ -1918,7 +2001,7 @@ func TestJWTRSAInvalidPublickKey(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "Failed to decode JWT key",
+			BodyMatch: "Key not authorized",
 		})
 	})
 }

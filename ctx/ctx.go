@@ -18,6 +18,7 @@ const (
 	AuthToken
 	HashedAuthToken
 	VersionData
+	VersionName
 	VersionDefault
 	OrgSessionContext
 	ContextData

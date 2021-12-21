@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -200,6 +201,25 @@ func TestWhitelist(t *testing.T) {
 			{Path: "/vegetables/count", Code: http.StatusForbidden},
 		}...)
 	})
+
+	t.Run("Disabled", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.UseExtendedPaths = true
+				v.ExtendedPaths.WhiteList = []apidef.EndPointMeta{
+					{Disabled: false, Path: "/foo"},
+					{Disabled: true, Path: "/bar"},
+				}
+			})
+
+			spec.Proxy.ListenPath = "/"
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusOK},
+			{Path: "/bar", Code: http.StatusForbidden},
+		}...)
+	})
 }
 
 func TestBlacklist(t *testing.T) {
@@ -295,6 +315,25 @@ func TestBlacklist(t *testing.T) {
 
 			{Path: "/vegetables/vegetable", Code: http.StatusForbidden},
 			{Path: "/vegetables/count", Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("Disabled", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.UseExtendedPaths = true
+				v.ExtendedPaths.BlackList = []apidef.EndPointMeta{
+					{Disabled: false, Path: "/foo"},
+					{Disabled: true, Path: "/bar"},
+				}
+			})
+
+			spec.Proxy.ListenPath = "/"
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusForbidden},
+			{Path: "/bar", Code: http.StatusOK},
 		}...)
 	})
 }
@@ -490,6 +529,26 @@ func TestIgnored(t *testing.T) {
 			{Path: "/Foo", Code: http.StatusOK},
 			{Path: "/bar", Code: http.StatusOK},
 			{Path: "/Bar", Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("Disabled", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.UseExtendedPaths = true
+				v.ExtendedPaths.Ignored = []apidef.EndPointMeta{
+					{Disabled: false, Path: "/foo"},
+					{Disabled: true, Path: "/bar"},
+				}
+			})
+
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusOK},
+			{Path: "/bar", Code: http.StatusUnauthorized},
 		}...)
 	})
 }
@@ -697,7 +756,7 @@ func (ts *Test) testPrepareDefaultVersion() string {
 		v2 := apidef.VersionInfo{Name: "v2"}
 		v2.Paths.WhiteList = []string{"/bar"}
 
-		spec.VersionDefinition.Location = urlParamLocation
+		spec.VersionDefinition.Location = apidef.URLParamLocation
 		spec.VersionDefinition.Key = "v"
 		spec.VersionData.NotVersioned = false
 
@@ -729,55 +788,76 @@ func TestGetVersionFromRequest(t *testing.T) {
 			ts.Close()
 		}()
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = headerLocation
+			spec.VersionDefinition.Location = apidef.HeaderLocation
 			spec.VersionDefinition.Key = "X-API-Version"
 			spec.VersionData.Versions["v1"] = versionInfo
-		})
+		})[0]
 
 		headers := map[string]string{"X-API-Version": "v1"}
 
-		ts.Run(t, []test.TestCase{
-			{Path: "/foo", Code: http.StatusOK, Headers: headers},
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusOK, Headers: headers, BodyMatch: `"X-Api-Version":"v1"`},
 			{Path: "/bar", Code: http.StatusForbidden, Headers: headers},
 		}...)
+
+		t.Run("strip versioning data", func(t *testing.T) {
+			api.VersionDefinition.StripVersioningData = true
+			ts.Gw.LoadAPI(api)
+
+			_, _ = ts.Run(t, test.TestCase{Path: "/foo", Code: http.StatusOK, Headers: headers, BodyNotMatch: `"X-Api-Version":"v1"`})
+		})
 	})
 
 	t.Run("URL param location", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = urlParamLocation
+			spec.VersionDefinition.Location = apidef.URLParamLocation
 			spec.VersionDefinition.Key = "version"
 			spec.VersionData.Versions["v2"] = versionInfo
-		})
+		})[0]
 
-		ts.Run(t, []test.TestCase{
-			{Path: "/foo?version=v2", Code: http.StatusOK},
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/foo?version=v2", BodyMatch: `"URI":"/foo\?version=v2"`, Code: http.StatusOK},
 			{Path: "/bar?version=v2", Code: http.StatusForbidden},
 		}...)
+
+		t.Run("strip versioning data", func(t *testing.T) {
+			api.VersionDefinition.StripVersioningData = true
+			ts.Gw.LoadAPI(api)
+
+			_, _ = ts.Run(t, test.TestCase{Path: "/foo?version=v2", BodyMatch: `"URI":"/foo"`, Code: http.StatusOK})
+		})
 	})
 
 	t.Run("URL location", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = urlLocation
+			spec.VersionDefinition.Location = apidef.URLLocation
 			spec.VersionData.Versions["v3"] = versionInfo
-		})
+		})[0]
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/v3/foo", Code: http.StatusOK},
+			{Path: "/v3/foo", BodyMatch: `"URI":"/v3/foo"`, Code: http.StatusOK},
 			{Path: "/v3/bar", Code: http.StatusForbidden},
 		}...)
+
+		t.Run("strip versioning data", func(t *testing.T) {
+			api.VersionDefinition.StripVersioningData = true
+			ts.Gw.LoadAPI(api)
+
+			_, _ = ts.Run(t, test.TestCase{Path: "/v3/foo", BodyMatch: `"URI":"/foo"`, Code: http.StatusOK})
+		})
 	})
 }
 
@@ -795,7 +875,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = headerLocation
+			spec.VersionDefinition.Location = apidef.HeaderLocation
 			spec.VersionDefinition.Key = "X-API-Version"
 			spec.VersionData.Versions["v1"] = versionInfo
 		})
@@ -815,7 +895,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = urlParamLocation
+			spec.VersionDefinition.Location = apidef.URLParamLocation
 			spec.VersionDefinition.Key = "version"
 			spec.VersionData.Versions["v2"] = versionInfo
 		})
@@ -833,7 +913,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = urlLocation
+			spec.VersionDefinition.Location = apidef.URLLocation
 			spec.VersionData.Versions["v3"] = versionInfo
 		})
 
@@ -957,4 +1037,38 @@ func TestAPIDefinitionLoader_Template(t *testing.T) {
 
 		executeAndAssert(t, temp)
 	})
+}
+
+func TestAPIExpiration(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		spec.VersionData.NotVersioned = true
+		spec.VersionDefinition.Enabled = true
+	})[0]
+
+	for _, versioned := range []bool{false, true} {
+		api.VersionDefinition.Enabled = versioned
+
+		t.Run(fmt.Sprintf("versioning=%v", versioned), func(t *testing.T) {
+			t.Run("not expired", func(t *testing.T) {
+				api.Expiration = time.Now().AddDate(1, 0, 0).Format(apidef.ExpirationTimeFormat)
+				ts.Gw.LoadAPI(api)
+				resp, _ := ts.Run(t, test.TestCase{Code: http.StatusOK})
+
+				assert.NotEmpty(t, resp.Header.Get(XTykAPIExpires))
+			})
+
+			t.Run("expired", func(t *testing.T) {
+				api.Expiration = apidef.ExpirationTimeFormat
+				ts.Gw.LoadAPI(api)
+				resp, _ := ts.Run(t, test.TestCase{Code: http.StatusForbidden})
+
+				assert.Empty(t, resp.Header.Get(XTykAPIExpires))
+			})
+		})
+	}
 }
