@@ -553,6 +553,127 @@ func TestIgnored(t *testing.T) {
 	})
 }
 
+func TestOldMockResponse(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const mockResponse = "this is mock response body"
+	const whiteMockPath = "/white-mock"
+	const blackMockPath = "/black-mock"
+	const ignoredMockPath = "/ignored-mock"
+
+	headers := map[string]string{
+		"mock-header": "mock-value",
+	}
+
+	whiteEndpointMeta := apidef.EndPointMeta{
+		Disabled: false,
+		Path:     whiteMockPath,
+		MethodActions: map[string]apidef.EndpointMethodMeta{
+			"GET": {
+				Action:  apidef.Reply,
+				Code:    http.StatusTeapot,
+				Data:    mockResponse,
+				Headers: headers,
+			},
+			"POST": {
+				Action:  apidef.NoAction,
+				Code:    http.StatusTeapot,
+				Data:    mockResponse,
+				Headers: headers,
+			},
+		},
+	}
+	blackEndpointMeta := whiteEndpointMeta
+	blackEndpointMeta.Path = blackMockPath
+	ignoreEndpointMeta := whiteEndpointMeta
+	ignoreEndpointMeta.Path = ignoredMockPath
+
+	buildAPI := func(keyless bool, st URLStatus) *APISpec {
+		return BuildAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				if st == WhiteList {
+					v.ExtendedPaths.WhiteList = []apidef.EndPointMeta{whiteEndpointMeta}
+				} else if st == BlackList {
+					v.ExtendedPaths.BlackList = []apidef.EndPointMeta{blackEndpointMeta}
+				} else if st == Ignored {
+					v.ExtendedPaths.Ignored = []apidef.EndPointMeta{ignoreEndpointMeta}
+				}
+
+				v.UseExtendedPaths = true
+			})
+
+			spec.Proxy.ListenPath = "/"
+			spec.UseKeylessAccess = keyless
+		})[0]
+	}
+
+	check := func(t *testing.T, api *APISpec, tc []test.TestCase) {
+		ts.Gw.LoadAPI(api)
+		_, _ = ts.Run(t, tc...)
+	}
+
+	t.Run("whitelist", func(t *testing.T) {
+		t.Run("keyless", func(t *testing.T) {
+			check(t, buildAPI(true, WhiteList), []test.TestCase{
+				{Method: http.MethodGet, Path: whiteMockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
+				{Method: http.MethodPost, Path: whiteMockPath, BodyNotMatch: mockResponse, Code: http.StatusOK},
+				{Method: http.MethodPut, Path: whiteMockPath, Code: http.StatusForbidden},
+				{Method: http.MethodGet, Path: "/something", Code: http.StatusForbidden},
+			})
+		})
+
+		t.Run("protected", func(t *testing.T) {
+			check(t, buildAPI(false, WhiteList), []test.TestCase{
+				{Method: http.MethodGet, Path: whiteMockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
+				{Method: http.MethodPost, Path: whiteMockPath, Code: http.StatusUnauthorized},
+				{Method: http.MethodPut, Path: whiteMockPath, Code: http.StatusForbidden},
+				{Method: http.MethodGet, Path: "/something", Code: http.StatusForbidden},
+			})
+		})
+	})
+
+	t.Run("blacklist", func(t *testing.T) {
+		t.Run("keyless", func(t *testing.T) {
+			check(t, buildAPI(true, BlackList), []test.TestCase{
+				{Method: http.MethodGet, Path: blackMockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
+				{Method: http.MethodPost, Path: blackMockPath, Code: http.StatusForbidden},
+				{Method: http.MethodPut, Path: blackMockPath, Code: http.StatusOK},
+				{Method: http.MethodGet, Path: "/something", Code: http.StatusOK},
+			})
+		})
+
+		t.Run("protected", func(t *testing.T) {
+			check(t, buildAPI(false, BlackList), []test.TestCase{
+				{Method: http.MethodGet, Path: blackMockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
+				{Method: http.MethodPost, Path: blackMockPath, Code: http.StatusForbidden},
+				{Method: http.MethodPut, Path: blackMockPath, Code: http.StatusUnauthorized},
+				{Method: http.MethodGet, Path: "/something", Code: http.StatusUnauthorized},
+			})
+		})
+	})
+
+	t.Run("ignored", func(t *testing.T) {
+		t.Run("keyless", func(t *testing.T) {
+			check(t, buildAPI(true, Ignored), []test.TestCase{
+				{Method: http.MethodGet, Path: ignoredMockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
+				{Method: http.MethodPost, Path: ignoredMockPath, BodyNotMatch: mockResponse, Code: http.StatusOK},
+				{Method: http.MethodPut, Path: ignoredMockPath, Code: http.StatusOK},
+				{Method: http.MethodGet, Path: "/something", Code: http.StatusOK},
+			})
+		})
+
+		t.Run("protected", func(t *testing.T) {
+			check(t, buildAPI(false, Ignored), []test.TestCase{
+				{Method: http.MethodGet, Path: ignoredMockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
+				{Method: http.MethodPost, Path: ignoredMockPath, BodyNotMatch: mockResponse, Code: http.StatusOK},
+				{Method: http.MethodPut, Path: ignoredMockPath, Code: http.StatusUnauthorized},
+				{Method: http.MethodGet, Path: "/something", Code: http.StatusUnauthorized},
+			})
+		})
+	})
+}
+
 func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
