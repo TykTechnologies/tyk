@@ -12,9 +12,9 @@
 # - macOS (only 10.15 is supported)
 # - amd64
 
-before:
-  hooks:
-  - go mod tidy
+#before:
+#  hooks:
+#  - go mod tidy
   
 builds:
   - id: std-linux
