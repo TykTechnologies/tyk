@@ -115,6 +115,7 @@ jobs:
           export GOPATH=/go
           mkdir -p /go/src || true
           whereis go
+          go mod vendor
           echo "Moving vendor"
           mv -f vendor/* $GOPATH/src
           rm -rf vendor
