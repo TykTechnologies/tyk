@@ -340,25 +340,31 @@ func (g *GraphQLConfigAdapter) createArgumentConfigurationsForArgumentNames(argu
 }
 
 func (g *GraphQLConfigAdapter) extractURLQueryParamsForEngineV2(url string, providedApiDefQueries []apidef.QueryVariable) (urlWithoutParams string, engineV2Queries []restDataSource.QueryConfiguration, err error) {
-	parsedURL, err := neturl.Parse(url)
+	urlParts := strings.Split(url, "?")
+	urlWithoutParams = urlParts[0]
+
+	queryPart := ""
+	if len(urlParts) == 2 {
+		queryPart = urlParts[1]
+	}
+	// Parse only query part as URL could contain templating {{.argument.id}} which should not be escaped
+	values, err := neturl.ParseQuery(queryPart)
 	if err != nil {
 		return "", nil, err
 	}
 
 	engineV2Queries = make([]restDataSource.QueryConfiguration, 0)
-	g.convertURLQueryParamsIntoEngineV2Queries(&engineV2Queries, parsedURL)
+	g.convertURLQueryParamsIntoEngineV2Queries(&engineV2Queries, values)
 	g.convertApiDefQueriesConfigIntoEngineV2Queries(&engineV2Queries, providedApiDefQueries)
 
-	parsedURL.RawQuery = ""
 	if len(engineV2Queries) == 0 {
-		return parsedURL.String(), nil, nil
+		return urlWithoutParams, nil, nil
 	}
 
-	return parsedURL.String(), engineV2Queries, nil
+	return urlWithoutParams, engineV2Queries, nil
 }
 
-func (g *GraphQLConfigAdapter) convertURLQueryParamsIntoEngineV2Queries(engineV2Queries *[]restDataSource.QueryConfiguration, parsedURL *neturl.URL) {
-	queryValues := parsedURL.Query()
+func (g *GraphQLConfigAdapter) convertURLQueryParamsIntoEngineV2Queries(engineV2Queries *[]restDataSource.QueryConfiguration, queryValues neturl.Values) {
 	for queryKey, queryValue := range queryValues {
 		*engineV2Queries = append(*engineV2Queries, restDataSource.QueryConfiguration{
 			Name:  queryKey,
