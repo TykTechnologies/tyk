@@ -3,6 +3,7 @@ package apidef
 import (
 	"errors"
 	"net/url"
+	"sort"
 	"strings"
 )
 
@@ -15,34 +16,36 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 		return nil, errors.New("not migratable - if not versioned, there should be 1 version info in versions map")
 	}
 
-	for vName, vInfo := range a.VersionData.Versions {
-		if a.VersionData.DefaultVersion == vName {
-			continue
+	if !a.VersionData.NotVersioned {
+		for vName, vInfo := range a.VersionData.Versions {
+			if a.VersionData.DefaultVersion == vName {
+				continue
+			}
+
+			newAPI := *a
+			newAPI.APIID = ""
+			newAPI.Id = ""
+			newAPI.VersionDefinition = VersionDefinition{}
+			newAPI.VersionData.NotVersioned = true
+			newAPI.VersionData.DefaultVersion = ""
+
+			if vInfo.OverrideTarget != "" {
+				newAPI.Proxy.TargetURL = vInfo.OverrideTarget
+			}
+
+			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
+
+			newAPI.Expiration = vInfo.Expires
+
+			versions = append(versions, newAPI)
+			delete(a.VersionData.Versions, vName)
+
+			if a.VersionDefinition.Versions == nil {
+				a.VersionDefinition.Versions = make(map[string]string)
+			}
+
+			a.VersionDefinition.Versions[vName] = ""
 		}
-
-		newAPI := *a
-		newAPI.APIID = ""
-		newAPI.Id = ""
-		newAPI.VersionDefinition = VersionDefinition{}
-		newAPI.VersionData.NotVersioned = true
-		newAPI.VersionData.DefaultVersion = ""
-
-		if vInfo.OverrideTarget != "" {
-			newAPI.Proxy.TargetURL = vInfo.OverrideTarget
-		}
-
-		newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
-
-		newAPI.Expiration = vInfo.Expires
-
-		versions = append(versions, newAPI)
-		delete(a.VersionData.Versions, vName)
-
-		if a.VersionDefinition.Versions == nil {
-			a.VersionDefinition.Versions = make(map[string]string)
-		}
-
-		a.VersionDefinition.Versions[vName] = ""
 	}
 
 	a.VersionDefinition.Enabled = !a.VersionData.NotVersioned
@@ -58,6 +61,13 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 	a.VersionDefinition.StripPath = false
 
 	defaultVersionInfo := a.VersionData.Versions[a.VersionData.DefaultVersion]
+	if a.VersionData.NotVersioned {
+		for _, v := range a.VersionData.Versions {
+			defaultVersionInfo = v
+			a.VersionData.Versions = map[string]VersionInfo{}
+			break
+		}
+	}
 
 	if defaultVersionInfo.OverrideTarget != "" {
 		a.Proxy.TargetURL = defaultVersionInfo.OverrideTarget
@@ -77,4 +87,104 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 	a.VersionData.NotVersioned = true
 
 	return
+}
+
+const (
+	typeWhitelist = 0
+	typeBlacklist = 1
+	typeIgnore    = 2
+)
+
+func (a *APIDefinition) MigrateEndpointMeta() {
+	a.migrateEndpointMetaByType(typeIgnore)
+	a.migrateEndpointMetaByType(typeBlacklist)
+	a.migrateEndpointMetaByType(typeWhitelist)
+}
+
+func (a *APIDefinition) migrateEndpointMetaByType(typ int) {
+	vInfo := a.VersionData.Versions[""]
+
+	list := vInfo.ExtendedPaths.WhiteList
+	if typ == typeBlacklist {
+		list = vInfo.ExtendedPaths.BlackList
+	} else if typ == typeIgnore {
+		list = vInfo.ExtendedPaths.Ignored
+	}
+
+	var resList []EndPointMeta
+	var resMockResponse []MockResponseMeta
+	for _, meta := range list {
+		var tempList []EndPointMeta
+		var tempMockResponse []MockResponseMeta
+		for method, action := range meta.MethodActions {
+			newMeta := meta
+			newMeta.Method = method
+
+			newMeta.MethodActions = nil
+			tempList = append(tempList, newMeta)
+
+			if action.Action == NoAction {
+				continue
+			}
+
+			mockMeta := MockResponseMeta{Path: meta.Path, IgnoreCase: meta.IgnoreCase}
+			mockMeta.Disabled = meta.Disabled || (!meta.Disabled && action.Action != Reply)
+			mockMeta.Method = method
+			mockMeta.Code = action.Code
+			mockMeta.Body = action.Data
+			mockMeta.Headers = action.Headers
+
+			tempMockResponse = append(tempMockResponse, mockMeta)
+		}
+
+		sort.Slice(tempList, func(i, j int) bool {
+			return tempList[i].Method < tempList[j].Method
+		})
+
+		resList = append(resList, tempList...)
+
+		sort.Slice(tempMockResponse, func(i, j int) bool {
+			return tempMockResponse[i].Method < tempMockResponse[j].Method
+		})
+
+		resMockResponse = append(resMockResponse, tempMockResponse...)
+	}
+
+	if typ == typeBlacklist {
+		vInfo.ExtendedPaths.BlackList = resList
+	} else if typ == typeIgnore {
+		vInfo.ExtendedPaths.Ignored = resList
+	} else {
+		vInfo.ExtendedPaths.WhiteList = resList
+	}
+
+	for _, search := range resMockResponse {
+		contains := false
+		for _, mock := range vInfo.ExtendedPaths.MockResponse {
+			if mock.Path == search.Path && mock.Method == search.Method {
+				contains = true
+				break
+			}
+		}
+
+		if !contains {
+			vInfo.ExtendedPaths.MockResponse = append(vInfo.ExtendedPaths.MockResponse, search)
+		}
+	}
+
+	a.VersionData.Versions[""] = vInfo
+}
+
+func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
+	versions, err = a.MigrateVersioning()
+	if err != nil {
+		return nil, err
+	}
+
+	a.MigrateEndpointMeta()
+	for i := 0; i < len(versions); i++ {
+		versions[i].MigrateEndpointMeta()
+	}
+
+	return versions, nil
 }
