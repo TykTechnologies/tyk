@@ -110,6 +110,19 @@ jobs:
             *.txt.sig
             *.txt
 
+      - name: Fix vendor
+        run: |
+          export GOPATH=/go
+          mkdir -p /go/src || true
+          whereis go
+          echo "Moving vendor"
+          mv -f vendor/* $GOPATH/src
+          rm -rf vendor
+
+          export GO111MODULE=off
+          mkdir -p /go/src/github.com/TykTechnologies/tyk
+          cp -r ./* /go/src/github.com/TykTechnologies/tyk
+
       - uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
@@ -117,6 +130,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
+          GO111MODULE: off
           NFPM_STD_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           NFPM_PAYG_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
