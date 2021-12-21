@@ -412,6 +412,16 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 			},
 		},
 		{
+			TypeName:  "Query",
+			FieldName: "restWithPathParams",
+			Arguments: []plan.ArgumentConfiguration{
+				{
+					Name:       "id",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		},
+		{
 			TypeName:  "DeepGQL",
 			FieldName: "query",
 			Arguments: []plan.ArgumentConfiguration{
@@ -610,6 +620,23 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			}),
 		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"restWithPathParams"},
+				},
+			},
+			Factory: &restDataSource.Factory{
+				Client: httpClient,
+			},
+			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+				Fetch: restDataSource.FetchConfiguration{
+					URL:    "https://rest-with-path-params.example.com/{{.arguments.id}}",
+					Method: "POST",
+				},
+			}),
+		},
 	}
 
 	var gqlConfig apidef.GraphQLConfig
@@ -635,13 +662,40 @@ const graphqlEngineV1ConfigJson = `{
 	"playground": {}
 }`
 
-const v2Schema = `type Query { rest: String gql(id: ID!, name: String): String deepGQL: DeepGQL withChildren: WithChildren multiRoot1: MultiRoot1 multiRoot2: MultiRoot2 restWithQueryParams(q: String, order: String, limit: Int): [String] } type WithChildren { id: ID! name: String nested: Nested } type Nested { id: ID! name: String! } type MultiRoot1 { id: ID! } type MultiRoot2 { name: String! } type DeepGQL { query(code: String!): String }`
+var v2Schema = strconv.Quote(`type Query {
+  rest: String
+  gql(id: ID!, name: String): String
+  deepGQL: DeepGQL
+  withChildren: WithChildren
+  multiRoot1: MultiRoot1
+  multiRoot2: MultiRoot2
+  restWithQueryParams(q: String, order: String, limit: Int): [String]
+  restWithPathParams(id: String): [String]
+}
+type WithChildren {
+  id: ID!
+  name: String
+  nested: Nested
+}
+type Nested {
+  id: ID!
+  name: String!
+}
+type MultiRoot1 {
+  id: ID!
+}
+type MultiRoot2 {
+  name: String!
+}
+type DeepGQL {
+  query(code: String!): String
+}`)
 
-const graphqlEngineV2ConfigJson = `{
+var graphqlEngineV2ConfigJson = `{
 	"enabled": true,
 	"execution_mode": "executionEngine",
 	"version": "2",
-	"schema": "` + v2Schema + `",
+	"schema": ` + v2Schema + `,
 	"last_schema_update": "2020-11-11T11:11:11.000+01:00",
 	"engine": {
 		"field_configs": [
@@ -756,6 +810,21 @@ const graphqlEngineV2ConfigJson = `{
 							"value": "{{.arguments.limit}}"
 						}
 					],
+					"body": ""
+				}
+			},
+			{
+				"kind": "REST",
+				"name": "restWithPathParams",
+				"internal": true,
+				"root_fields": [
+					{ "type": "Query", "fields": ["restWithPathParams"] }
+				],
+				"config": {
+					"url": "https://rest-with-path-params.example.com/{{.arguments.id}}",
+					"method": "POST",
+					"headers": {},
+					"query": [],
 					"body": ""
 				}
 			}
