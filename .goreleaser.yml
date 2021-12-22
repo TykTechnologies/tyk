@@ -21,7 +21,6 @@ builds:
 
     flags:
       - -tags=goplugin
-      - -trimpath
     ldflags:
       - -X gateway.VERSION={{.Version}} -X gateway.commit={{.FullCommit}} -X gateway.buildDate={{.Date}} -X gateway.builtBy=goreleaser
     goos:
