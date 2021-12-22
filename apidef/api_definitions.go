@@ -174,6 +174,7 @@ type EndPointMeta struct {
 }
 
 type CacheMeta struct {
+	Disabled               bool   `bson:"disabled" json:"disabled"`
 	Method                 string `bson:"method" json:"method"`
 	Path                   string `bson:"path" json:"path"`
 	CacheKeyRegex          string `bson:"cache_key_regex" json:"cache_key_regex"`

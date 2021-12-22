@@ -178,6 +178,7 @@ func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillAllowance(ep, allow)
 	ps.fillAllowance(ep, block)
 	ps.fillAllowance(ep, ignoreAuthentication)
+	ps.fillCache(ep)
 }
 
 func (ps Paths) fillAllowance(ep apidef.ExtendedPathsSet, typ AllowanceType) {
@@ -339,9 +340,10 @@ const (
 )
 
 type Plugins struct {
-	Allow                *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
-	Block                *Allowance `bson:"block,omitempty" json:"block,omitempty"`
-	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
+	Allow                *Allowance       `bson:"allow,omitempty" json:"allow,omitempty"`
+	Block                *Allowance       `bson:"block,omitempty" json:"block,omitempty"`
+	IgnoreAuthentication *Allowance       `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
+	Cache                *CacheMiddleware `bson:"cache,omitempty" json:"cache,omitempty"`
 }
 
 func (p *Plugins) fillAllowance(endpointMeta apidef.EndPointMeta, typ AllowanceType) {
@@ -378,6 +380,7 @@ func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method str
 	p.extractAllowance(ep, path, method, allow)
 	p.extractAllowance(ep, path, method, block)
 	p.extractAllowance(ep, path, method, ignoreAuthentication)
+	p.ExtractCacheTo(ep)
 }
 
 func (p *Plugins) extractAllowance(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
@@ -428,4 +431,44 @@ func (a *Allowance) Fill(endpointMeta apidef.EndPointMeta) {
 func (a *Allowance) ExtractTo(endpointMeta *apidef.EndPointMeta) {
 	endpointMeta.Disabled = !a.Enabled
 	endpointMeta.IgnoreCase = a.IgnoreCase
+}
+
+func (ps Paths) fillCache(ep apidef.ExtendedPathsSet) {
+	advanceCacheConfig := ep.AdvanceCacheConfig
+
+	for _, advCache := range advanceCacheConfig {
+		if ps[advCache.Path] != nil {
+			plugins := ps[advCache.Path].getMethod(advCache.Method)
+			var cache *CacheMiddleware
+			cache.Fill(advCache)
+			plugins.Cache = cache
+		}
+	}
+}
+
+func (p *Plugins) ExtractCacheTo(ep *apidef.ExtendedPathsSet) {
+	advanceCacheConfig := ep.AdvanceCacheConfig
+	for _, advCache := range advanceCacheConfig {
+		var cache *CacheMiddleware
+		cache.Fill(advCache)
+		p.Cache = cache
+	}
+}
+
+type CacheMiddleware struct {
+	Enabled            bool   `bson:"enabled" json:"enabled"`
+	CacheByRegex       string `bson:"cacheByRegex,omitempty" json:"cacheByRegex,omitempty"`
+	CacheResponseCodes []int  `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
+}
+
+func (a *CacheMiddleware) Fill(cm apidef.CacheMeta) {
+	a.Enabled = !cm.Disabled
+	a.CacheByRegex = cm.CacheKeyRegex
+	a.CacheResponseCodes = cm.CacheOnlyResponseCodes
+}
+
+func (a *CacheMiddleware) ExtractTo(endpointMeta *apidef.CacheMeta) {
+	endpointMeta.Disabled = !a.Enabled
+	endpointMeta.CacheKeyRegex = a.CacheByRegex
+	endpointMeta.CacheOnlyResponseCodes = a.CacheResponseCodes
 }
