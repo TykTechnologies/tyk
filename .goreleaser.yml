@@ -71,6 +71,7 @@ dockers:
     - "--label=org.opencontainers.image.title={{.ProjectName}}"
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
     - "--label=org.opencontainers.image.version={{.Version}}"
+    - "--build-arg=TYK_GW_TAG={{ .Tag }}"
   use: buildx
   goarch: amd64
   goos: linux
