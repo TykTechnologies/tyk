@@ -166,11 +166,23 @@ type EndpointMethodMeta struct {
 	Headers map[string]string    `bson:"headers" json:"headers"`
 }
 
+type MockResponseMeta struct {
+	Disabled   bool              `bson:"disabled" json:"disabled"`
+	Path       string            `bson:"path" json:"path"`
+	Method     string            `bson:"method" json:"method"`
+	IgnoreCase bool              `bson:"ignore_case" json:"ignore_case"`
+	Code       int               `bson:"code" json:"code"`
+	Body       string            `bson:"body" json:"body"`
+	Headers    map[string]string `bson:"headers" json:"headers"`
+}
+
 type EndPointMeta struct {
-	Disabled      bool                          `bson:"disabled" json:"disabled"`
-	Path          string                        `bson:"path" json:"path"`
-	IgnoreCase    bool                          `bson:"ignore_case" json:"ignore_case"`
-	MethodActions map[string]EndpointMethodMeta `bson:"method_actions" json:"method_actions"`
+	Disabled   bool   `bson:"disabled" json:"disabled"`
+	Path       string `bson:"path" json:"path"`
+	Method     string `bson:"method" json:"method"`
+	IgnoreCase bool   `bson:"ignore_case" json:"ignore_case"`
+	// Deprecated. Use Method instead.
+	MethodActions map[string]EndpointMethodMeta `bson:"method_actions,omitempty" json:"method_actions,omitempty"`
 }
 
 type CacheMeta struct {
@@ -307,6 +319,7 @@ type ExtendedPathsSet struct {
 	Ignored                 []EndPointMeta        `bson:"ignored" json:"ignored,omitempty"`
 	WhiteList               []EndPointMeta        `bson:"white_list" json:"white_list,omitempty"`
 	BlackList               []EndPointMeta        `bson:"black_list" json:"black_list,omitempty"`
+	MockResponse            []MockResponseMeta    `bson:"mock_response" json:"mock_response,omitempty"`
 	Cached                  []string              `bson:"cache" json:"cache,omitempty"`
 	AdvanceCacheConfig      []CacheMeta           `bson:"advance_cache_config" json:"advance_cache_config,omitempty"`
 	Transform               []TemplateMeta        `bson:"transform" json:"transform,omitempty"`

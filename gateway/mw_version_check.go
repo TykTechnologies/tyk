@@ -25,15 +25,13 @@ func (v *VersionCheck) Name() string {
 	return "VersionCheck"
 }
 
-func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
-	// Reply with some alternate data
-	emeta := meta.(*apidef.EndpointMethodMeta)
-	responseMessage := []byte(emeta.Data)
-	for header, value := range emeta.Headers {
+func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta apidef.MockResponseMeta) {
+	responseMessage := []byte(meta.Body)
+	for header, value := range meta.Headers {
 		w.Header().Add(header, value)
 	}
 
-	w.WriteHeader(emeta.Code)
+	w.WriteHeader(meta.Code)
 	w.Write(responseMessage)
 }
 
@@ -80,7 +78,16 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	// We handle redirects before ignores in case we aren't using a whitelist
 	if stat == StatusRedirectFlowByReply {
 		_, meta := v.Spec.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
-		v.DoMockReply(w, meta)
+		var mockMeta apidef.MockResponseMeta
+		var ok bool
+		if mockMeta, ok = meta.(apidef.MockResponseMeta); !ok {
+			endpointMethodMeta := meta.(*apidef.EndpointMethodMeta)
+			mockMeta.Body = endpointMethodMeta.Data
+			mockMeta.Headers = endpointMethodMeta.Headers
+			mockMeta.Code = endpointMethodMeta.Code
+		}
+
+		v.DoMockReply(w, mockMeta)
 		return nil, mwStatusRespond
 	}
 
