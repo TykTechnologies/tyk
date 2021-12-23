@@ -120,8 +120,6 @@ jobs:
           echo "Moving vendor"
           mv -f vendor/* $GOPATH/src
           rm -rf vendor
-
-          export GO111MODULE=off
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
 
