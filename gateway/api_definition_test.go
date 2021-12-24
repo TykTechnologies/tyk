@@ -611,6 +611,14 @@ func TestOldMockResponse(t *testing.T) {
 	check := func(t *testing.T, api *APISpec, tc []test.TestCase) {
 		ts.Gw.LoadAPI(api)
 		_, _ = ts.Run(t, tc...)
+
+		t.Run("migration", func(t *testing.T) {
+			_, err := api.Migrate()
+			assert.NoError(t, err)
+
+			ts.Gw.LoadAPI(api)
+			_, _ = ts.Run(t, tc...)
+		})
 	}
 
 	t.Run("whitelist", func(t *testing.T) {
