@@ -28,10 +28,10 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 		newAPI.VersionData.DefaultVersion = ""
 
 		if vInfo.OverrideTarget != "" {
-			newAPI.Proxy.ListenPath = vInfo.OverrideTarget
-		} else { // listen path of each version should be unique
-			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
+			newAPI.Proxy.TargetURL = vInfo.OverrideTarget
 		}
+
+		newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
 
 		newAPI.Expiration = vInfo.Expires
 
@@ -60,7 +60,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 	defaultVersionInfo := a.VersionData.Versions[a.VersionData.DefaultVersion]
 
 	if defaultVersionInfo.OverrideTarget != "" {
-		a.Proxy.ListenPath = defaultVersionInfo.OverrideTarget
+		a.Proxy.TargetURL = defaultVersionInfo.OverrideTarget
 		defaultVersionInfo.OverrideTarget = ""
 	}
 
