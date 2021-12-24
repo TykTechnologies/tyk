@@ -206,3 +206,37 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 
 	return versions, nil
 }
+
+func (a *APIDefinition) MigrateCachePlugin() (err error) {
+	if a.VersionDefinition.Enabled || len(a.VersionDefinition.Versions) != 0 {
+		return errors.New("not migratable - new versioning is enabled")
+	}
+
+	if a.VersionData.NotVersioned && len(a.VersionData.Versions) > 1 {
+		return errors.New("not migratable - if not versioned, there should be 1 version info in versions map")
+	}
+
+	for vName, vInfo := range a.VersionData.Versions {
+		var updated = false
+		if vInfo.UseExtendedPaths && len(vInfo.ExtendedPaths.Cached) > 0 {
+			var methods = []CacheMeta{}
+			for _, cache := range vInfo.ExtendedPaths.Cached {
+				newCache := CacheMeta{
+					Path:     cache,
+					Disabled: false,
+				}
+				methods = append(methods, newCache)
+			}
+			vInfo.ExtendedPaths.AdvanceCacheConfig = methods
+			updated = true
+		}
+
+		if updated {
+			delete(a.VersionData.Versions, vName)
+			a.VersionData.Versions[vName] = vInfo
+		}
+
+	}
+
+	return
+}

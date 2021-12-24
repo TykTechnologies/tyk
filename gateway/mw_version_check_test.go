@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -453,5 +454,62 @@ func TestOldVersioning_Expires(t *testing.T) {
 				check(t, versionedExpired, test.TestCase{Path: "/?version=v1", Code: http.StatusForbidden}, true)
 			})
 		})
+	})
+}
+
+func TestOld_Cache(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	var response = "default"
+
+	vInfo := apidef.VersionInfo{
+		ExtendedPaths: apidef.ExtendedPathsSet{
+			Cached: []string{
+				"/test",
+			},
+		},
+		UseExtendedPaths: true,
+	}
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(response))
+	}))
+
+	api := func() *APISpec {
+		return BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.VersionDefinition.Location = apidef.URLParamLocation
+			spec.VersionData.Versions = map[string]apidef.VersionInfo{
+				"Default": vInfo,
+			}
+			spec.CacheOptions = apidef.CacheOptions{
+				CacheTimeout: 120,
+				EnableCache:  true,
+			}
+		})[0]
+	}
+
+	check := func(t *testing.T, api *APISpec, tc []test.TestCase) {
+		ts.Gw.LoadAPI(api)
+		_, _ = ts.Run(t, tc...)
+
+		t.Run("migration", func(t *testing.T) {
+			err := api.MigrateCachePlugin()
+			assert.NoError(t, err)
+
+			ts.Gw.LoadAPI(api)
+			_, _ = ts.Run(t, tc...)
+		})
+	}
+
+	ts.Gw.LoadAPI(api())
+	_, _ = ts.Run(t, test.TestCase{Path: "/test", BodyMatch: "default", Code: http.StatusOK})
+
+	response = "updated"
+
+	check(t, api(), []test.TestCase{
+		{Path: "/test", BodyMatch: "default", Code: http.StatusOK},
+		{Path: "/anything", BodyMatch: "updated", Code: http.StatusOK},
 	})
 }

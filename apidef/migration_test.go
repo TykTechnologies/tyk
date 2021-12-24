@@ -322,3 +322,48 @@ func TestAPIDefinition_MigrateEndpointMeta(t *testing.T) {
 	assert.Equal(t, expectedWhitelist, api.VersionData.Versions[""].ExtendedPaths.Ignored)
 	assert.Equal(t, expectedMockResponse, api.VersionData.Versions[""].ExtendedPaths.MockResponse)
 }
+
+func TestAPIDefinition_MigrateCache(t *testing.T) {
+	name := "Default"
+
+	versionInfo := VersionInfo{
+		Name:             name,
+		UseExtendedPaths: true,
+		ExtendedPaths: ExtendedPathsSet{
+			Cached: []string{"test"},
+		},
+	}
+
+	old := func() APIDefinition {
+		return APIDefinition{
+			VersionDefinition: VersionDefinition{
+				Location: URLLocation,
+			},
+			VersionData: VersionData{
+				NotVersioned:   false,
+				DefaultVersion: name,
+				Versions: map[string]VersionInfo{
+					name: versionInfo,
+				},
+			},
+		}
+	}
+
+	check := func(t *testing.T, base APIDefinition) {
+		err := base.MigrateCachePlugin()
+		assert.NoError(t, err)
+
+		defaultVersionInfo := base.VersionData.Versions[base.VersionData.DefaultVersion]
+		path1 := defaultVersionInfo.ExtendedPaths.AdvanceCacheConfig[0]
+		path1Cache := defaultVersionInfo.ExtendedPaths.Cached[0]
+
+		assert.Equal(t, len(defaultVersionInfo.ExtendedPaths.AdvanceCacheConfig), len(defaultVersionInfo.ExtendedPaths.Cached))
+		assert.Equal(t, path1.Path, path1Cache)
+	}
+
+	t.Run("check migration of old data to new", func(t *testing.T) {
+		base := old()
+		check(t, base)
+	})
+
+}
