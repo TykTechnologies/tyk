@@ -11,6 +11,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 		dbID       = "apiID"
 		apiID      = "apiID"
 		listenPath = "listenPath"
+		baseTarget = "base.com"
 		v1Target   = "v1.com"
 		v2Target   = "v2.com"
 		v1         = "v1"
@@ -24,7 +25,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 			Id:     dbID,
 			APIID:  apiID,
 			Active: true,
-			Proxy:  ProxyConfig{ListenPath: listenPath},
+			Proxy:  ProxyConfig{TargetURL: baseTarget, ListenPath: listenPath},
 			VersionDefinition: VersionDefinition{
 				Location:  "url",
 				Key:       "version",
@@ -95,7 +96,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 			versions, err = overrideTargetBase.MigrateVersioning()
 			assert.NoError(t, err)
 
-			expectedBase.Proxy.ListenPath = v1Target
+			expectedBase.Proxy.TargetURL = v1Target
 
 			assert.Equal(t, expectedBase, overrideTargetBase)
 
@@ -112,11 +113,11 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 			versions, err = overrideTargetBase.MigrateVersioning()
 			assert.NoError(t, err)
 
-			expectedBase.Proxy.ListenPath = listenPath
+			expectedBase.Proxy.TargetURL = baseTarget
 
 			assert.Equal(t, expectedBase, overrideTargetBase)
 
-			expectedVersion.Proxy.ListenPath = v2Target
+			expectedVersion.Proxy.TargetURL = v2Target
 			assert.Len(t, versions, 1)
 			assert.Equal(t, expectedVersion, versions[0])
 		})
