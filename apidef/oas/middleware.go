@@ -178,6 +178,7 @@ func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillAllowance(ep.WhiteList, allow)
 	ps.fillAllowance(ep.BlackList, block)
 	ps.fillAllowance(ep.Ignored, ignoreAuthentication)
+	ps.fillMockResponse(ep.MockResponse)
 }
 
 func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
@@ -213,6 +214,24 @@ func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ Allowance
 		allowance.Fill(em)
 		if ShouldOmit(allowance) {
 			allowance = nil
+		}
+	}
+}
+
+func (ps Paths) fillMockResponse(mockMetas []apidef.MockResponseMeta) {
+	for _, mm := range mockMetas {
+		if _, ok := ps[mm.Path]; !ok {
+			ps[mm.Path] = &Path{}
+		}
+
+		plugins := ps[mm.Path].getMethod(mm.Method)
+		if plugins.MockResponse == nil {
+			plugins.MockResponse = &MockResponse{}
+		}
+
+		plugins.MockResponse.Fill(mm)
+		if ShouldOmit(plugins.MockResponse) {
+			plugins.MockResponse = nil
 		}
 	}
 }
@@ -357,15 +376,17 @@ type Plugins struct {
 	Allow                *Allowance    `bson:"allow,omitempty" json:"allow,omitempty"`
 	Block                *Allowance    `bson:"block,omitempty" json:"block,omitempty"`
 	IgnoreAuthentication *Allowance    `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
+	MockResponse         *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
 }
 
 func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method string) {
-	p.extractAllowance(ep, path, method, allow)
-	p.extractAllowance(ep, path, method, block)
-	p.extractAllowance(ep, path, method, ignoreAuthentication)
+	p.extractAllowanceTo(ep, path, method, allow)
+	p.extractAllowanceTo(ep, path, method, block)
+	p.extractAllowanceTo(ep, path, method, ignoreAuthentication)
+	p.extractMockResponseTo(ep, path, method)
 }
 
-func (p *Plugins) extractAllowance(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
+func (p *Plugins) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
 	allowance := p.Allow
 	endpointMetas := &ep.WhiteList
 
@@ -378,11 +399,23 @@ func (p *Plugins) extractAllowance(ep *apidef.ExtendedPathsSet, path string, met
 		endpointMetas = &ep.Ignored
 	}
 
-	if allowance != nil {
-		endpointMeta := apidef.EndPointMeta{Path: path, Method: method}
-		allowance.ExtractTo(&endpointMeta)
-		*endpointMetas = append(*endpointMetas, endpointMeta)
+	if allowance == nil {
+		return
 	}
+
+	endpointMeta := apidef.EndPointMeta{Path: path, Method: method}
+	allowance.ExtractTo(&endpointMeta)
+	*endpointMetas = append(*endpointMetas, endpointMeta)
+}
+
+func (p *Plugins) extractMockResponseTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.MockResponse == nil {
+		return
+	}
+
+	mockMeta := apidef.MockResponseMeta{Path: path, Method: method}
+	p.MockResponse.ExtractTo(&mockMeta)
+	ep.MockResponse = append(ep.MockResponse, mockMeta)
 }
 
 type Allowance struct {
@@ -398,4 +431,28 @@ func (a *Allowance) Fill(endpointMeta apidef.EndPointMeta) {
 func (a *Allowance) ExtractTo(endpointMeta *apidef.EndPointMeta) {
 	endpointMeta.Disabled = !a.Enabled
 	endpointMeta.IgnoreCase = a.IgnoreCase
+}
+
+type MockResponse struct {
+	Enabled    bool              `bson:"enabled" json:"enabled"`
+	IgnoreCase bool              `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
+	Code       int               `bson:"code" json:"code"`
+	Body       string            `bson:"body" json:"body"`
+	Headers    map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
+}
+
+func (mr *MockResponse) Fill(mockMeta apidef.MockResponseMeta) {
+	mr.Enabled = !mockMeta.Disabled
+	mr.IgnoreCase = mockMeta.IgnoreCase
+	mr.Code = mockMeta.Code
+	mr.Body = mockMeta.Body
+	mr.Headers = mockMeta.Headers
+}
+
+func (mr *MockResponse) ExtractTo(mockMeta *apidef.MockResponseMeta) {
+	mockMeta.Disabled = !mr.Enabled
+	mockMeta.IgnoreCase = mr.IgnoreCase
+	mockMeta.Code = mr.Code
+	mockMeta.Body = mr.Body
+	mockMeta.Headers = mr.Headers
 }
