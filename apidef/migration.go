@@ -208,35 +208,21 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 }
 
 func (a *APIDefinition) MigrateCachePlugin() (err error) {
-	if a.VersionDefinition.Enabled || len(a.VersionDefinition.Versions) != 0 {
-		return errors.New("not migratable - new versioning is enabled")
-	}
+	vInfo := a.VersionData.Versions[""]
+	list := vInfo.ExtendedPaths.Cached
 
-	if a.VersionData.NotVersioned && len(a.VersionData.Versions) > 1 {
-		return errors.New("not migratable - if not versioned, there should be 1 version info in versions map")
-	}
-
-	for vName, vInfo := range a.VersionData.Versions {
-		var updated = false
-		if vInfo.UseExtendedPaths && len(vInfo.ExtendedPaths.Cached) > 0 {
-			var methods = []CacheMeta{}
-			for _, cache := range vInfo.ExtendedPaths.Cached {
-				newCache := CacheMeta{
-					Path:     cache,
-					Disabled: false,
-				}
-				methods = append(methods, newCache)
+	if vInfo.UseExtendedPaths && len(list) > 0 {
+		var advCacheMethods = []CacheMeta{}
+		for _, cache := range list {
+			newCache := CacheMeta{
+				Path:     cache,
+				Disabled: false,
 			}
-			vInfo.ExtendedPaths.AdvanceCacheConfig = methods
-			updated = true
+			advCacheMethods = append(advCacheMethods, newCache)
 		}
-
-		if updated {
-			delete(a.VersionData.Versions, vName)
-			a.VersionData.Versions[vName] = vInfo
-		}
-
+		vInfo.ExtendedPaths.AdvanceCacheConfig = advCacheMethods
 	}
+	a.VersionData.Versions[""] = vInfo
 
-	return
+	return nil
 }

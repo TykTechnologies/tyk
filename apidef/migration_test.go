@@ -324,7 +324,7 @@ func TestAPIDefinition_MigrateEndpointMeta(t *testing.T) {
 }
 
 func TestAPIDefinition_MigrateCache(t *testing.T) {
-	name := "Default"
+	name := ""
 
 	versionInfo := VersionInfo{
 		Name:             name,
@@ -357,8 +357,22 @@ func TestAPIDefinition_MigrateCache(t *testing.T) {
 		path1 := defaultVersionInfo.ExtendedPaths.AdvanceCacheConfig[0]
 		path1Cache := defaultVersionInfo.ExtendedPaths.Cached[0]
 
+		expectedCachedDefault := []string{"test"}
+		cacheItem := CacheMeta{
+			Method:        "",
+			Disabled:      false,
+			Path:          "test",
+			CacheKeyRegex: "",
+		}
+		expectedAdvCacheMethods := []CacheMeta{
+			cacheItem,
+		}
+
 		assert.Equal(t, len(defaultVersionInfo.ExtendedPaths.AdvanceCacheConfig), len(defaultVersionInfo.ExtendedPaths.Cached))
 		assert.Equal(t, path1.Path, path1Cache)
+
+		assert.Equal(t, expectedCachedDefault, defaultVersionInfo.ExtendedPaths.Cached)
+		assert.Equal(t, expectedAdvCacheMethods, defaultVersionInfo.ExtendedPaths.AdvanceCacheConfig)
 	}
 
 	t.Run("check migration of old data to new", func(t *testing.T) {
