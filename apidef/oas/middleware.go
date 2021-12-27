@@ -175,29 +175,44 @@ func (c *Cache) ExtractTo(cache *apidef.CacheOptions) {
 type Paths map[string]*Path
 
 func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
-	ps.fillAllowance(ep, allow)
-	ps.fillAllowance(ep, block)
-	ps.fillAllowance(ep, ignoreAuthentication)
+	ps.fillAllowance(ep.WhiteList, allow)
+	ps.fillAllowance(ep.BlackList, block)
+	ps.fillAllowance(ep.Ignored, ignoreAuthentication)
 }
 
-func (ps Paths) fillAllowance(ep apidef.ExtendedPathsSet, typ AllowanceType) {
-	endpointMetas := ep.WhiteList
-
-	switch typ {
-	case block:
-		endpointMetas = ep.BlackList
-	case ignoreAuthentication:
-		endpointMetas = ep.Ignored
-	}
-
+func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
 	for _, em := range endpointMetas {
-		for method := range em.MethodActions {
-			if _, ok := ps[em.Path]; !ok {
-				ps[em.Path] = &Path{}
+		if _, ok := ps[em.Path]; !ok {
+			ps[em.Path] = &Path{}
+		}
+
+		plugins := ps[em.Path].getMethod(em.Method)
+		var allowance *Allowance
+
+		switch typ {
+		case block:
+			if plugins.Block == nil {
+				plugins.Block = &Allowance{}
 			}
 
-			plugins := ps[em.Path].getMethod(method)
-			plugins.fillAllowance(em, typ)
+			allowance = plugins.Block
+		case ignoreAuthentication:
+			if plugins.IgnoreAuthentication == nil {
+				plugins.IgnoreAuthentication = &Allowance{}
+			}
+
+			allowance = plugins.IgnoreAuthentication
+		default:
+			if plugins.Allow == nil {
+				plugins.Allow = &Allowance{}
+			}
+
+			allowance = plugins.Allow
+		}
+
+		allowance.Fill(em)
+		if ShouldOmit(allowance) {
+			allowance = nil
 		}
 	}
 }
@@ -339,39 +354,9 @@ const (
 )
 
 type Plugins struct {
-	Allow                *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
-	Block                *Allowance `bson:"block,omitempty" json:"block,omitempty"`
-	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
-}
-
-func (p *Plugins) fillAllowance(endpointMeta apidef.EndPointMeta, typ AllowanceType) {
-	var allowance *Allowance
-
-	switch typ {
-	case block:
-		if p.Block == nil {
-			p.Block = &Allowance{}
-		}
-
-		allowance = p.Block
-	case ignoreAuthentication:
-		if p.IgnoreAuthentication == nil {
-			p.IgnoreAuthentication = &Allowance{}
-		}
-
-		allowance = p.IgnoreAuthentication
-	default:
-		if p.Allow == nil {
-			p.Allow = &Allowance{}
-		}
-
-		allowance = p.Allow
-	}
-
-	allowance.Fill(endpointMeta)
-	if ShouldOmit(allowance) {
-		allowance = nil
-	}
+	Allow                *Allowance    `bson:"allow,omitempty" json:"allow,omitempty"`
+	Block                *Allowance    `bson:"block,omitempty" json:"block,omitempty"`
+	IgnoreAuthentication *Allowance    `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 }
 
 func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method string) {
@@ -394,24 +379,9 @@ func (p *Plugins) extractAllowance(ep *apidef.ExtendedPathsSet, path string, met
 	}
 
 	if allowance != nil {
-		newPath := true
-		for i, em := range *endpointMetas {
-			if path == em.Path {
-				(*endpointMetas)[i].MethodActions[method] = apidef.EndpointMethodMeta{Action: apidef.NoAction}
-				newPath = false
-				break
-			}
-		}
-
-		if newPath {
-			methodActions := map[string]apidef.EndpointMethodMeta{
-				method: {Action: apidef.NoAction},
-			}
-
-			endpointMeta := apidef.EndPointMeta{Path: path, MethodActions: methodActions}
-			allowance.ExtractTo(&endpointMeta)
-			*endpointMetas = append(*endpointMetas, endpointMeta)
-		}
+		endpointMeta := apidef.EndPointMeta{Path: path, Method: method}
+		allowance.ExtractTo(&endpointMeta)
+		*endpointMetas = append(*endpointMetas, endpointMeta)
 	}
 }
 
