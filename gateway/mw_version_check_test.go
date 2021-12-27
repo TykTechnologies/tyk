@@ -221,6 +221,12 @@ func TestNewVersioning(t *testing.T) {
 		a.Name = "v1-api-name"
 		a.Proxy.ListenPath = "/v1-listen-path"
 		a.UseKeylessAccess = false
+		UpdateAPIVersion(a, "", func(version *apidef.VersionInfo) {
+			version.UseExtendedPaths = true
+			version.ExtendedPaths.Ignored = []apidef.EndPointMeta{
+				{Method: http.MethodGet, Path: "/get"},
+			}
+		})
 	})[0]
 
 	v2 := BuildAPI(func(a *APISpec) {
@@ -297,6 +303,13 @@ func TestNewVersioning(t *testing.T) {
 				{Path: "/v1-listen-path", Headers: headersForV1, Code: http.StatusOK},
 			}...)
 		})
+	})
+
+	t.Run("sub-version allowance match", func(t *testing.T) {
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/default?version=" + v1VersionName, Code: http.StatusUnauthorized},
+			{Path: "/default/get?version=" + v1VersionName, Code: http.StatusOK},
+		}...)
 	})
 }
 

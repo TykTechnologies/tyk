@@ -1544,9 +1544,16 @@ func (r *RoundRobin) WithLen(len int) int {
 
 var listenPathVarsRE = regexp.MustCompile(`{[^:]+(:[^}]+)?}`)
 
-func stripListenPath(listenPath, path string, muxVars map[string]string) string {
+func stripListenPath(listenPath, path string, muxVars map[string]string) (res string) {
+	defer func() {
+		if !strings.HasPrefix(res, "/") {
+			res = "/" + res
+		}
+	}()
+
 	if !strings.Contains(listenPath, "{") {
-		return strings.TrimPrefix(path, listenPath)
+		res = strings.TrimPrefix(path, listenPath)
+		return
 	}
 	lp := listenPathVarsRE.ReplaceAllStringFunc(listenPath, func(match string) string {
 		match = strings.TrimLeft(match, "{")
@@ -1554,5 +1561,6 @@ func stripListenPath(listenPath, path string, muxVars map[string]string) string 
 		aliasVar := strings.Split(match, ":")[0]
 		return muxVars[aliasVar]
 	})
-	return strings.TrimPrefix(path, lp)
+	res = strings.TrimPrefix(path, lp)
+	return
 }
