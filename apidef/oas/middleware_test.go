@@ -81,3 +81,15 @@ func TestExtendedPaths(t *testing.T) {
 		assert.Equal(t, paths, resultPaths)
 	})
 }
+
+func TestMockResponse(t *testing.T) {
+	var emptyMockResponse MockResponse
+
+	var convertedMockResponse apidef.MockResponseMeta
+	emptyMockResponse.ExtractTo(&convertedMockResponse)
+
+	var resultMockResponse MockResponse
+	resultMockResponse.Fill(convertedMockResponse)
+
+	assert.Equal(t, emptyMockResponse, resultMockResponse)
+}

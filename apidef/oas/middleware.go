@@ -434,11 +434,11 @@ func (a *Allowance) ExtractTo(endpointMeta *apidef.EndPointMeta) {
 }
 
 type MockResponse struct {
-	Enabled    bool              `bson:"enabled" json:"enabled"`
-	IgnoreCase bool              `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
-	Code       int               `bson:"code" json:"code"`
-	Body       string            `bson:"body" json:"body"`
-	Headers    map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
+	Enabled    bool     `bson:"enabled" json:"enabled"`
+	IgnoreCase bool     `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
+	Code       int      `bson:"code" json:"code"`
+	Body       string   `bson:"body" json:"body"`
+	Headers    []Header `bson:"headers,omitempty" json:"headers,omitempty"`
 }
 
 func (mr *MockResponse) Fill(mockMeta apidef.MockResponseMeta) {
@@ -446,7 +446,18 @@ func (mr *MockResponse) Fill(mockMeta apidef.MockResponseMeta) {
 	mr.IgnoreCase = mockMeta.IgnoreCase
 	mr.Code = mockMeta.Code
 	mr.Body = mockMeta.Body
-	mr.Headers = mockMeta.Headers
+	mr.Headers = []Header{}
+	for name, value := range mockMeta.Headers {
+		mr.Headers = append(mr.Headers, Header{Name: name, Value: value})
+	}
+
+	sort.Slice(mr.Headers, func(i, j int) bool {
+		return mr.Headers[i].Name < mr.Headers[j].Name
+	})
+
+	if len(mr.Headers) == 0 {
+		mr.Headers = nil
+	}
 }
 
 func (mr *MockResponse) ExtractTo(mockMeta *apidef.MockResponseMeta) {
@@ -454,5 +465,13 @@ func (mr *MockResponse) ExtractTo(mockMeta *apidef.MockResponseMeta) {
 	mockMeta.IgnoreCase = mr.IgnoreCase
 	mockMeta.Code = mr.Code
 	mockMeta.Body = mr.Body
-	mockMeta.Headers = mr.Headers
+	mockMeta.Headers = make(map[string]string)
+	for _, h := range mr.Headers {
+		mockMeta.Headers[h.Name] = h.Value
+	}
+}
+
+type Header struct {
+	Name  string `bson:"name" json:"name"`
+	Value string `bson:"value" json:"value"`
 }
