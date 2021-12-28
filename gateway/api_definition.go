@@ -1534,10 +1534,14 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 		return
 	}
 
+	log.Debug("Stripping proxy listen path: ", a.Proxy.ListenPath)
+
 	r.URL.Path = a.StripListenPath(r, r.URL.Path)
 	if r.URL.RawPath != "" {
 		r.URL.RawPath = a.StripListenPath(r, r.URL.RawPath)
 	}
+
+	log.Debug("Upstream path is: ", r.URL.Path)
 }
 
 type RoundRobin struct {
