@@ -56,7 +56,7 @@ func (gw *Gateway) handleNewConfiguration(payload string) {
 	}
 
 	// Make sure payload matches nodeID and hostname
-	if configPayload.ForHostname != hostDetails.Hostname && configPayload.ForNodeID != gw.GetNodeID() {
+	if configPayload.ForHostname != gw.hostDetails.Hostname && configPayload.ForNodeID != gw.GetNodeID() {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Info("Configuration update received, no NodeID/Hostname match found")
@@ -88,7 +88,7 @@ func (gw *Gateway) handleNewConfiguration(payload string) {
 		"prefix": "pub-sub",
 	}).Info("Initiating configuration reload")
 
-	myPID := hostDetails.PID
+	myPID := gw.hostDetails.PID
 	if myPID == 0 {
 		log.Error("No PID found, cannot reload")
 		return
@@ -151,7 +151,7 @@ func (gw *Gateway) handleSendMiniConfig(payload string) {
 	}
 
 	// Make sure payload matches nodeID and hostname
-	if configPayload.FromHostname != hostDetails.Hostname && configPayload.FromNodeID != gw.GetNodeID() {
+	if configPayload.FromHostname != gw.hostDetails.Hostname && configPayload.FromNodeID != gw.GetNodeID() {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Debug("Configuration request received, no NodeID/Hostname match found, ignoring")
@@ -167,7 +167,7 @@ func (gw *Gateway) handleSendMiniConfig(payload string) {
 	}
 
 	returnPayload := ReturnConfigPayload{
-		FromHostname:  hostDetails.Hostname,
+		FromHostname:  gw.hostDetails.Hostname,
 		FromNodeID:    gw.GetNodeID(),
 		Configuration: config,
 		TimeStamp:     time.Now().Unix(),
