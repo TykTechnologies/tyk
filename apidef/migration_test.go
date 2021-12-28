@@ -358,17 +358,34 @@ func TestAPIDefinition_MigrateCache(t *testing.T) {
 		path1Cache := defaultVersionInfo.ExtendedPaths.Cached[0]
 
 		expectedCachedDefault := []string{"test"}
-		cacheItem := CacheMeta{
-			Method:        "",
+		cacheItemGet := CacheMeta{
+			Method:        http.MethodGet,
 			Disabled:      false,
 			Path:          "test",
 			CacheKeyRegex: "",
 		}
+		cacheItemHead := CacheMeta{
+
+			Disabled:      false,
+			Path:          "test",
+			CacheKeyRegex: "",
+			Method:        http.MethodHead,
+		}
+		cacheItemOptions := CacheMeta{
+			Disabled:      false,
+			Path:          "test",
+			CacheKeyRegex: "",
+			Method:        http.MethodOptions,
+		}
 		expectedAdvCacheMethods := []CacheMeta{
-			cacheItem,
+			cacheItemGet,
+			cacheItemHead,
+			cacheItemOptions,
 		}
 
-		assert.Equal(t, len(defaultVersionInfo.ExtendedPaths.AdvanceCacheConfig), len(defaultVersionInfo.ExtendedPaths.Cached))
+		// for every cache item we have to have 3 new AdvanceCacheConfig items
+		// since we do support caching only for safe methods GET, OPTIONS and HEAD
+		assert.Equal(t, len(defaultVersionInfo.ExtendedPaths.AdvanceCacheConfig), len(defaultVersionInfo.ExtendedPaths.Cached)*3)
 		assert.Equal(t, path1.Path, path1Cache)
 
 		assert.Equal(t, expectedCachedDefault, defaultVersionInfo.ExtendedPaths.Cached)
