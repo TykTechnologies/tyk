@@ -217,7 +217,7 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 	}
 }
 
-func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
+func TestMultiSession_BA_Standard_FailBA(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -258,7 +258,7 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 	}
 }
 
-func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
+func TestMultiSession_BA_Standard_FailStandard(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
