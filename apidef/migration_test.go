@@ -1,6 +1,7 @@
 package apidef
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 		dbID       = "apiID"
 		apiID      = "apiID"
 		listenPath = "listenPath"
+		baseTarget = "base.com"
 		v1Target   = "v1.com"
 		v2Target   = "v2.com"
 		v1         = "v1"
@@ -24,7 +26,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 			Id:     dbID,
 			APIID:  apiID,
 			Active: true,
-			Proxy:  ProxyConfig{ListenPath: listenPath},
+			Proxy:  ProxyConfig{TargetURL: baseTarget, ListenPath: listenPath},
 			VersionDefinition: VersionDefinition{
 				Location:  "url",
 				Key:       "version",
@@ -95,7 +97,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 			versions, err = overrideTargetBase.MigrateVersioning()
 			assert.NoError(t, err)
 
-			expectedBase.Proxy.ListenPath = v1Target
+			expectedBase.Proxy.TargetURL = v1Target
 
 			assert.Equal(t, expectedBase, overrideTargetBase)
 
@@ -112,11 +114,11 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 			versions, err = overrideTargetBase.MigrateVersioning()
 			assert.NoError(t, err)
 
-			expectedBase.Proxy.ListenPath = listenPath
+			expectedBase.Proxy.TargetURL = baseTarget
 
 			assert.Equal(t, expectedBase, overrideTargetBase)
 
-			expectedVersion.Proxy.ListenPath = v2Target
+			expectedVersion.Proxy.TargetURL = v2Target
 			assert.Len(t, versions, 1)
 			assert.Equal(t, expectedVersion, versions[0])
 		})
@@ -202,5 +204,114 @@ func TestAPIDefinition_MigrateVersioning_StripPath(t *testing.T) {
 		base.VersionDefinition.Location = HeaderLocation
 		check(t, base, false)
 	})
+}
 
+func TestAPIDefinition_MigrateEndpointMeta(t *testing.T) {
+	const mockResponse = "mock response"
+	const path = "/mock"
+	const path2 = "/mock2"
+	headers := map[string]string{
+		"mock-header": "mock-val",
+	}
+
+	methodActions := map[string]EndpointMethodMeta{
+		http.MethodGet: {
+			Action:  Reply,
+			Code:    http.StatusTeapot,
+			Data:    mockResponse,
+			Headers: headers,
+		},
+		http.MethodPost: {
+			Action:  NoAction,
+			Code:    http.StatusOK,
+			Data:    "testbody",
+			Headers: headers,
+		},
+	}
+
+	endpointMeta := []EndPointMeta{
+		{
+			Path:          path,
+			IgnoreCase:    true,
+			MethodActions: methodActions,
+		},
+		{
+			Disabled:      true,
+			Path:          path2,
+			IgnoreCase:    false,
+			MethodActions: methodActions,
+		},
+	}
+
+	api := APIDefinition{
+		VersionData: VersionData{
+			NotVersioned:   false,
+			DefaultVersion: "v1",
+			Versions: map[string]VersionInfo{
+				"v1": {
+					ExtendedPaths: ExtendedPathsSet{
+						WhiteList: endpointMeta,
+						BlackList: endpointMeta,
+						Ignored:   endpointMeta,
+					},
+				},
+			},
+		},
+	}
+
+	_, err := api.MigrateVersioning()
+	assert.NoError(t, err)
+
+	api.MigrateEndpointMeta()
+
+	expectedWhitelist := []EndPointMeta{
+		{
+			Path:       path,
+			IgnoreCase: true,
+			Method:     "GET",
+		},
+		{
+			Path:       path,
+			IgnoreCase: true,
+			Method:     "POST",
+		},
+		{
+			Disabled:   true,
+			Path:       path2,
+			IgnoreCase: false,
+			Method:     "GET",
+		},
+		{
+			Disabled:   true,
+			Path:       path2,
+			IgnoreCase: false,
+			Method:     "POST",
+		},
+	}
+
+	expectedMockResponse := []MockResponseMeta{
+		{
+			Disabled:   false,
+			Path:       path,
+			Method:     "GET",
+			IgnoreCase: true,
+			Code:       http.StatusTeapot,
+			Body:       mockResponse,
+			Headers:    headers,
+		},
+		{
+			Disabled:   true,
+			Path:       path2,
+			Method:     "GET",
+			IgnoreCase: false,
+			Code:       http.StatusTeapot,
+			Body:       mockResponse,
+			Headers:    headers,
+		},
+	}
+
+	assert.Equal(t, expectedWhitelist, api.VersionData.Versions[""].ExtendedPaths.WhiteList)
+	assert.Equal(t, expectedWhitelist, api.VersionData.Versions[""].ExtendedPaths.BlackList)
+	assert.Equal(t, expectedWhitelist, api.VersionData.Versions[""].ExtendedPaths.Ignored)
+	assert.Equal(t, expectedMockResponse, api.VersionData.Versions[""].ExtendedPaths.MockResponse)
 }

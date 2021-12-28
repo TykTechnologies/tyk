@@ -241,7 +241,7 @@ func (h *HTTPDashboardHandler) newRequest(method, endpoint string) *http.Request
 		panic(err)
 	}
 	req.Header.Set("authorization", h.Secret)
-	req.Header.Set(headers.XTykHostname, hostDetails.Hostname)
+	req.Header.Set(headers.XTykHostname, h.Gw.hostDetails.Hostname)
 	req.Header.Set(headers.XTykSessionID, h.Gw.SessionID)
 	return req
 }

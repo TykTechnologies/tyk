@@ -58,6 +58,7 @@ const (
 	Ignored
 	WhiteList
 	BlackList
+	MockResponse
 	Cached
 	Transformed
 	TransformedJQ
@@ -119,6 +120,10 @@ type URLSpec struct {
 	Spec                      *regexp.Regexp
 	Status                    URLStatus
 	MethodActions             map[string]apidef.EndpointMethodMeta
+	Whitelist                 apidef.EndPointMeta
+	Blacklist                 apidef.EndPointMeta
+	Ignored                   apidef.EndPointMeta
+	MockResponse              apidef.MockResponseMeta
 	CacheConfig               EndPointCacheMeta
 	TransformAction           TransformSpec
 	TransformResponseAction   TransformSpec
@@ -623,8 +628,36 @@ func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, pa
 		newSpec := URLSpec{IgnoreCase: stringSpec.IgnoreCase || ignoreEndpointCase}
 		a.generateRegex(stringSpec.Path, &newSpec, specType, conf)
 
+		switch specType {
+		case WhiteList:
+			newSpec.Whitelist = stringSpec
+		case BlackList:
+			newSpec.Blacklist = stringSpec
+		case Ignored:
+			newSpec.Ignored = stringSpec
+		}
+
 		// Extend with method actions
 		newSpec.MethodActions = stringSpec.MethodActions
+
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
+func (a APIDefinitionLoader) compileMockResponsePathSpec(ignoreEndpointCase bool, paths []apidef.MockResponseMeta, specType URLStatus, conf config.Config) []URLSpec {
+	var urlSpec []URLSpec
+
+	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
+		newSpec := URLSpec{IgnoreCase: stringSpec.IgnoreCase || ignoreEndpointCase}
+		a.generateRegex(stringSpec.Path, &newSpec, specType, conf)
+
+		newSpec.MockResponse = stringSpec
 		urlSpec = append(urlSpec, newSpec)
 	}
 
@@ -1005,6 +1038,7 @@ func (a APIDefinitionLoader) compileInternalPathspathSpec(paths []apidef.Interna
 func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
+	mockResponsePaths := a.compileMockResponsePathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.MockResponse, MockResponse, conf)
 	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.Ignored, Ignored, conf)
 	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.BlackList, BlackList, conf)
 	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.WhiteList, WhiteList, conf)
@@ -1028,6 +1062,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
 
 	combinedPath := []URLSpec{}
+	combinedPath = append(combinedPath, mockResponsePaths...)
 	combinedPath = append(combinedPath, ignoredPaths...)
 	combinedPath = append(combinedPath, blackListPaths...)
 	combinedPath = append(combinedPath, whiteListPaths...)
@@ -1122,7 +1157,40 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			continue
 		}
 
-		if rxPaths[i].MethodActions != nil {
+		if rxPaths[i].MethodActions == nil {
+			switch rxPaths[i].Status {
+			case WhiteList:
+				if rxPaths[i].Whitelist.Method != "" {
+					if rxPaths[i].Whitelist.Method != r.Method {
+						continue
+					}
+
+					return a.getURLStatus(rxPaths[i].Status), nil
+				}
+			case BlackList:
+				if rxPaths[i].Blacklist.Method != "" {
+					if rxPaths[i].Blacklist.Method != r.Method {
+						continue
+					}
+
+					return a.getURLStatus(rxPaths[i].Status), nil
+				}
+			case Ignored:
+				if rxPaths[i].Ignored.Method != "" {
+					if rxPaths[i].Ignored.Method != r.Method {
+						continue
+					}
+				}
+
+				return a.getURLStatus(rxPaths[i].Status), nil
+			case MockResponse:
+				if rxPaths[i].MockResponse.Method != r.Method {
+					continue
+				}
+
+				return StatusRedirectFlowByReply, rxPaths[i].MockResponse
+			}
+		} else { // Deprecated
 			// We are using an extended path set, check for the method
 			methodMeta, matchMethodOk := rxPaths[i].MethodActions[r.Method]
 			if !matchMethodOk {
