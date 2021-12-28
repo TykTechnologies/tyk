@@ -45,7 +45,7 @@ func (gw *Gateway) setupInstrumentation() {
 	log.Info("StatsD instrumentation sink started")
 	instrument.AddSink(statsdSink)
 
-	MonitorApplicationInstrumentation()
+	gw.MonitorApplicationInstrumentation()
 }
 
 // InstrumentationMW will set basic instrumentation events, variables and timers on API jobs
@@ -65,12 +65,12 @@ func InstrumentationMW(next http.Handler) http.Handler {
 	})
 }
 
-func MonitorApplicationInstrumentation() {
+func (gw *Gateway) MonitorApplicationInstrumentation() {
 	log.Info("Starting application monitoring...")
 	go func() {
 		job := instrument.NewJob("GCActivity")
 		job_rl := instrument.NewJob("Load")
-		metadata := health.Kvs{"host": hostDetails.Hostname}
+		metadata := health.Kvs{"host": gw.hostDetails.Hostname}
 		applicationGCStats.PauseQuantiles = make([]time.Duration, 5)
 
 		for {
