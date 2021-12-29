@@ -1,6 +1,8 @@
 package user
 
-import "github.com/TykTechnologies/tyk/apidef"
+import (
+	"github.com/TykTechnologies/tyk/apidef"
+)
 
 type GraphAccessDefinition struct {
 }

@@ -1405,6 +1405,21 @@ func (a *APISpec) StripListenPath(r *http.Request, path string) string {
 	return stripListenPath(a.Proxy.ListenPath, path)
 }
 
+func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
+	if !a.Proxy.StripListenPath {
+		return
+	}
+
+	log.Debug("Stripping proxy listen path: ", a.Proxy.ListenPath)
+
+	r.URL.Path = a.StripListenPath(r, r.URL.Path)
+	if r.URL.RawPath != "" {
+		r.URL.RawPath = a.StripListenPath(r, r.URL.RawPath)
+	}
+
+	log.Debug("Upstream path is: ", r.URL.Path)
+}
+
 type RoundRobin struct {
 	pos uint32
 }
@@ -1426,7 +1441,8 @@ func stripListenPath(listenPath, path string) (res string) {
 	}()
 
 	if !strings.Contains(listenPath, "{") {
-		return strings.TrimPrefix(path, listenPath)
+		res = strings.TrimPrefix(path, listenPath)
+		return
 	}
 
 	tmp := new(mux.Route).PathPrefix(listenPath)

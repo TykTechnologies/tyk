@@ -2049,6 +2049,7 @@ func TestBrokenClients(t *testing.T) {
 		}
 	})
 }
+
 func TestCache_singleErrorResponse(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
