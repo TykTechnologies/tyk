@@ -293,6 +293,7 @@ type VirtualMeta struct {
 }
 
 type MethodTransformMeta struct {
+	Disabled bool   `bson:"disabled" json:"disabled"`
 	Path     string `bson:"path" json:"path"`
 	Method   string `bson:"method" json:"method"`
 	ToMethod string `bson:"to_method" json:"to_method"`
