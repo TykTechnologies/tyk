@@ -69,7 +69,8 @@ func TestGoPluginMWs(t *testing.T) {
 				HeadersMatch: map[string]string{
 					"X-Auth-Result": "failed",
 				},
-				Code: http.StatusForbidden,
+				Code:      http.StatusForbidden,
+				BodyMatch: "auth failed",
 			},
 		}...)
 	})
