@@ -216,24 +216,25 @@ func (a *APIDefinition) MigrateCachePlugin() (err error) {
 		var advCacheMethods = []CacheMeta{}
 		for _, cache := range list {
 			newGetMethodCache := CacheMeta{
-				Path:     cache,
-				Disabled: false,
-				Method:   http.MethodGet,
+				Path:   cache,
+				Method: http.MethodGet,
 			}
 			newHeadMethodCache := CacheMeta{
-				Path:     cache,
-				Disabled: false,
-				Method:   http.MethodHead,
+				Path:   cache,
+				Method: http.MethodHead,
 			}
 			newOptionsMethodCache := CacheMeta{
-				Path:     cache,
-				Disabled: false,
-				Method:   http.MethodOptions,
+				Path:   cache,
+				Method: http.MethodOptions,
 			}
 			advCacheMethods = append(advCacheMethods, newGetMethodCache, newHeadMethodCache, newOptionsMethodCache)
 		}
+
 		vInfo.ExtendedPaths.AdvanceCacheConfig = advCacheMethods
+		// reset cache to empty
+		vInfo.ExtendedPaths.Cached = nil
 	}
+
 	a.VersionData.Versions[""] = vInfo
 
 	return nil

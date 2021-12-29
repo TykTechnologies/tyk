@@ -457,7 +457,7 @@ func TestOldVersioning_Expires(t *testing.T) {
 	})
 }
 
-func TestOld_Cache(t *testing.T) {
+func TestOldCache(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 	var response = "default"
@@ -490,26 +490,23 @@ func TestOld_Cache(t *testing.T) {
 		})[0]
 	}
 
-	check := func(t *testing.T, api *APISpec, tc []test.TestCase) {
-		ts.Gw.LoadAPI(api)
-		_, _ = ts.Run(t, tc...)
+	check := func(t *testing.T, response string) {
 
-		t.Run("migration", func(t *testing.T) {
-			err := api.MigrateCachePlugin()
-			assert.NoError(t, err)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/test", BodyMatch: "default", Code: http.StatusOK},
+			{Path: "/anything", BodyMatch: response, Code: http.StatusOK},
+		}...)
 
-			ts.Gw.LoadAPI(api)
-			_, _ = ts.Run(t, tc...)
-		})
 	}
 
 	ts.Gw.LoadAPI(api())
-	_, _ = ts.Run(t, test.TestCase{Path: "/test", BodyMatch: "default", Code: http.StatusOK})
+	check(t, response)
 
-	response = "updated"
+	t.Run("migration", func(t *testing.T) {
+		response = "updated"
+		err := api().MigrateCachePlugin()
+		assert.NoError(t, err)
 
-	check(t, api(), []test.TestCase{
-		{Path: "/test", BodyMatch: "default", Code: http.StatusOK},
-		{Path: "/anything", BodyMatch: "updated", Code: http.StatusOK},
+		check(t, response)
 	})
 }
