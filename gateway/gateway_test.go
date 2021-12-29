@@ -2035,7 +2035,7 @@ func TestStripRegex(t *testing.T) {
 		{
 			strip:  "/taihoe-test/{test:[\\w\\d]+}/id/",
 			path:   "/taihoe-test/asdas234234dad/id/v1/get",
-			expect: "v1/get",
+			expect: "/v1/get",
 			vars: map[string]string{
 				"test": "asdas234234dad",
 			},

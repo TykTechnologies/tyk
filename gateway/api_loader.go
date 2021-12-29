@@ -584,7 +584,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		sanitizeProxyPaths(d.SH.Spec, r)
+		d.SH.Spec.SanitizeProxyPaths(r)
 		handler.ServeHTTP(w, r)
 		return
 	}
@@ -604,15 +604,6 @@ func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handle
 	}
 
 	return h.(http.Handler), targetAPI, true
-}
-
-func sanitizeProxyPaths(apiSpec *APISpec, request *http.Request) {
-	if !apiSpec.Proxy.StripListenPath {
-		return
-	}
-
-	request.URL.Path = apiSpec.StripListenPath(request, request.URL.Path)
-	request.URL.RawPath = apiSpec.StripListenPath(request, request.URL.RawPath)
 }
 
 func (gw *Gateway) loadGlobalApps() {
