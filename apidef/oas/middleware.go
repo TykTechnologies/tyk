@@ -179,6 +179,7 @@ func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillAllowance(ep.BlackList, block)
 	ps.fillAllowance(ep.Ignored, ignoreAuthentication)
 	ps.fillMockResponse(ep.MockResponse)
+	ps.fillMethodTransform(ep.MethodTransforms)
 }
 
 func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
@@ -232,6 +233,24 @@ func (ps Paths) fillMockResponse(mockMetas []apidef.MockResponseMeta) {
 		plugins.MockResponse.Fill(mm)
 		if ShouldOmit(plugins.MockResponse) {
 			plugins.MockResponse = nil
+		}
+	}
+}
+
+func (ps Paths) fillMethodTransform(metas []apidef.MethodTransformMeta) {
+	for _, meta := range metas {
+		if _, ok := ps[meta.Path]; !ok {
+			ps[meta.Path] = &Path{}
+		}
+
+		plugins := ps[meta.Path].getMethod(meta.Method)
+		if plugins.MethodTransform == nil {
+			plugins.MethodTransform = &MethodTransform{}
+		}
+
+		plugins.MethodTransform.Fill(meta)
+		if ShouldOmit(plugins.MethodTransform) {
+			plugins.MethodTransform = nil
 		}
 	}
 }
@@ -373,10 +392,11 @@ const (
 )
 
 type Plugins struct {
-	Allow                *Allowance    `bson:"allow,omitempty" json:"allow,omitempty"`
-	Block                *Allowance    `bson:"block,omitempty" json:"block,omitempty"`
-	IgnoreAuthentication *Allowance    `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
-	MockResponse         *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
+	Allow                *Allowance       `bson:"allow,omitempty" json:"allow,omitempty"`
+	Block                *Allowance       `bson:"block,omitempty" json:"block,omitempty"`
+	IgnoreAuthentication *Allowance       `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
+	MockResponse         *MockResponse    `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
+	MethodTransform      *MethodTransform `bson:"methodTransform,omitempty" json:"methodTransform,omitempty"`
 }
 
 func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method string) {
@@ -384,6 +404,7 @@ func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method str
 	p.extractAllowanceTo(ep, path, method, block)
 	p.extractAllowanceTo(ep, path, method, ignoreAuthentication)
 	p.extractMockResponseTo(ep, path, method)
+	p.extractMethodTransformTo(ep, path, method)
 }
 
 func (p *Plugins) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
@@ -416,6 +437,16 @@ func (p *Plugins) extractMockResponseTo(ep *apidef.ExtendedPathsSet, path string
 	mockMeta := apidef.MockResponseMeta{Path: path, Method: method}
 	p.MockResponse.ExtractTo(&mockMeta)
 	ep.MockResponse = append(ep.MockResponse, mockMeta)
+}
+
+func (p *Plugins) extractMethodTransformTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.MethodTransform == nil {
+		return
+	}
+
+	meta := apidef.MethodTransformMeta{Path: path, Method: method}
+	p.MethodTransform.ExtractTo(&meta)
+	ep.MethodTransforms = append(ep.MethodTransforms, meta)
 }
 
 type Allowance struct {
@@ -474,4 +505,19 @@ func (mr *MockResponse) ExtractTo(mockMeta *apidef.MockResponseMeta) {
 type Header struct {
 	Name  string `bson:"name" json:"name"`
 	Value string `bson:"value" json:"value"`
+}
+
+type MethodTransform struct {
+	Enabled  bool   `bson:"enabled" json:"enabled"`
+	ToMethod string `bson:"toMethod" json:"toMethod"`
+}
+
+func (mt *MethodTransform) Fill(meta apidef.MethodTransformMeta) {
+	mt.Enabled = !meta.Disabled
+	mt.ToMethod = meta.ToMethod
+}
+
+func (mt *MethodTransform) ExtractTo(meta *apidef.MethodTransformMeta) {
+	meta.Disabled = !mt.Enabled
+	meta.ToMethod = mt.ToMethod
 }
