@@ -31,6 +31,7 @@ func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	if token != "abc" {
 		rw.Header().Add(headers.XAuthResult, "failed")
 		rw.WriteHeader(http.StatusForbidden)
+		_, _ = rw.Write([]byte("auth failed"))
 		return
 	}
 
