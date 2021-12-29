@@ -1259,3 +1259,37 @@ func TestAPIExpiration(t *testing.T) {
 		})
 	}
 }
+
+func TestStripListenPath(t *testing.T) {
+	assert.Equal(t, "/get", stripListenPath("/listen", "/listen/get", nil))
+	assert.Equal(t, "/get", stripListenPath("/listen/", "/listen/get", nil))
+	assert.Equal(t, "/get", stripListenPath("listen", "listen/get", nil))
+	assert.Equal(t, "/get", stripListenPath("listen/", "listen/get", nil))
+	assert.Equal(t, "/", stripListenPath("/listen/", "/listen/", nil))
+	assert.Equal(t, "/", stripListenPath("/listen", "/listen", nil))
+	assert.Equal(t, "/", stripListenPath("listen/", "", nil))
+}
+
+func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
+	a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+	a.Proxy.ListenPath = "/listen/"
+	r, _ := http.NewRequest(http.MethodGet, "https://proxy.com/listen/get", nil)
+
+	assert.Equal(t, "/listen/get", r.URL.Path)
+	assert.Equal(t, "", r.URL.RawPath)
+
+	t.Run("strip=false", func(t *testing.T) {
+		a.SanitizeProxyPaths(r)
+
+		assert.Equal(t, "/listen/get", r.URL.Path)
+		assert.Equal(t, "", r.URL.RawPath)
+	})
+
+	t.Run("strip=true", func(t *testing.T) {
+		a.Proxy.StripListenPath = true
+		a.SanitizeProxyPaths(r)
+
+		assert.Equal(t, "/get", r.URL.Path)
+		assert.Equal(t, "", r.URL.RawPath)
+	})
+}
