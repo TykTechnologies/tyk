@@ -1529,6 +1529,21 @@ func (a *APISpec) StripListenPath(r *http.Request, path string) string {
 	return stripListenPath(a.Proxy.ListenPath, path, mux.Vars(r))
 }
 
+func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
+	if !a.Proxy.StripListenPath {
+		return
+	}
+
+	log.Debug("Stripping proxy listen path: ", a.Proxy.ListenPath)
+
+	r.URL.Path = a.StripListenPath(r, r.URL.Path)
+	if r.URL.RawPath != "" {
+		r.URL.RawPath = a.StripListenPath(r, r.URL.RawPath)
+	}
+
+	log.Debug("Upstream path is: ", r.URL.Path)
+}
+
 type RoundRobin struct {
 	pos uint32
 }
@@ -1544,15 +1559,25 @@ func (r *RoundRobin) WithLen(len int) int {
 
 var listenPathVarsRE = regexp.MustCompile(`{[^:]+(:[^}]+)?}`)
 
-func stripListenPath(listenPath, path string, muxVars map[string]string) string {
+func stripListenPath(listenPath, path string, muxVars map[string]string) (res string) {
+	defer func() {
+		if !strings.HasPrefix(res, "/") {
+			res = "/" + res
+		}
+	}()
+
 	if !strings.Contains(listenPath, "{") {
-		return strings.TrimPrefix(path, listenPath)
+		res = strings.TrimPrefix(path, listenPath)
+		return
 	}
+
 	lp := listenPathVarsRE.ReplaceAllStringFunc(listenPath, func(match string) string {
 		match = strings.TrimLeft(match, "{")
 		match = strings.TrimRight(match, "}")
 		aliasVar := strings.Split(match, ":")[0]
 		return muxVars[aliasVar]
 	})
-	return strings.TrimPrefix(path, lp)
+
+	res = strings.TrimPrefix(path, lp)
+	return
 }
