@@ -181,7 +181,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 	// Inject definition into request context:
 	ctx.SetDefinition(r, m.Spec.APIDefinition)
-	handler(w, r)
+	handler(rw, r)
 
 	// calculate latency
 	ms := DurationToMillisecond(time.Since(t1))

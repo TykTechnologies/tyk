@@ -49,7 +49,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 			return errors.New(string(VersionDoesNotExist)), http.StatusNotFound
 		}
 
-		sanitizeProxyPaths(v.Spec, r)
+		v.Spec.SanitizeProxyPaths(r)
 
 		handler.ServeHTTP(w, r)
 		return nil, mwStatusRespond
