@@ -2,11 +2,12 @@ package gateway
 
 import (
 	"encoding/json"
-	"github.com/gorilla/websocket"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/headers"
@@ -171,7 +172,7 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	assertReviewsSubgraphResponse := func(t *testing.T) func(bytes []byte) bool {
 		return func(bytes []byte) bool {
-			expected := `{"data":{"_entities":[{"reviews":[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}]}]}}`
+			expected := `{"data":{"_entities":[{"__typename":"User","reviews":[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}]}]}}`
 			var body json.RawMessage
 			assert.NoError(t, json.Unmarshal(bytes, &body))
 

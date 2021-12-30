@@ -18,7 +18,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"github.com/hashicorp/consul/agent/cache"
 	"io"
 	"io/ioutil"
 	"net"
