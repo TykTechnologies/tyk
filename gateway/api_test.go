@@ -16,12 +16,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
-
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-redis/redis/v8"
-
 	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -29,6 +24,8 @@ import (
 
 	"fmt"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
