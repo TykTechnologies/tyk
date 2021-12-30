@@ -555,11 +555,8 @@ func (p *Plugins) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, metho
 	}
 
 	newCacheMeta := apidef.CacheMeta{
-		CacheOnlyResponseCodes: p.Cache.CacheResponseCodes,
-		Disabled:               !p.Cache.Enabled,
-		CacheKeyRegex:          p.Cache.CacheByRegex,
-		Method:                 method,
-		Path:                   path,
+		Method: method,
+		Path:   path,
 	}
 	p.Cache.ExtractTo(&newCacheMeta)
 	ep.AdvanceCacheConfig = append(ep.AdvanceCacheConfig, newCacheMeta)

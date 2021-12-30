@@ -490,8 +490,8 @@ func TestOldCache(t *testing.T) {
 		})[0]
 	}
 
-	check := func(t *testing.T, response string) {
-
+	check := func(t *testing.T, api *APISpec, response string) {
+		ts.Gw.LoadAPI(api)
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/test", BodyMatch: "default", Code: http.StatusOK},
 			{Path: "/anything", BodyMatch: response, Code: http.StatusOK},
@@ -499,14 +499,13 @@ func TestOldCache(t *testing.T) {
 
 	}
 
-	ts.Gw.LoadAPI(api())
-	check(t, response)
+	check(t, api(), response)
 
 	t.Run("migration", func(t *testing.T) {
 		response = "updated"
 		err := api().MigrateCachePlugin()
 		assert.NoError(t, err)
 
-		check(t, response)
+		check(t, api(), response)
 	})
 }
