@@ -595,15 +595,9 @@ func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`{
 			"data": {
 				"countries": [
-<<<<<<< HEAD
 					{	
 						"code": "TR",
-						"name": "Turkey"	
-=======
-					{
-						"code": "TR",
 						"name": "Turkey"
->>>>>>> f603dec
 					},
 					{
 						"code": "RU",

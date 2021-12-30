@@ -40,8 +40,6 @@ import (
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
-
-	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -52,7 +50,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-var defaultUserAgent = "Tyk/" + VERSION
+const defaultUserAgent = "Tyk/" + VERSION
 
 var corsHeaders = []string{
 	"Access-Control-Allow-Origin",
@@ -1414,13 +1412,6 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
 	}
 }
 
-func upgradeType(h http.Header) string {
-	if !httpguts.HeaderValuesContainsToken(h["Connection"], "Upgrade") {
-		return ""
-	}
-	return strings.ToLower(h.Get("Upgrade"))
-}
-
 func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.Request, res *http.Response) error {
 	copyHeader(res.Header, rw.Header(), p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 
@@ -1608,6 +1599,7 @@ func copyRequest(r *http.Request) *http.Request {
 
 func copyResponse(r *http.Response) *http.Response {
 	// for the case of streaming for which Content-Length might be unset = -1.
+
 	if r.ContentLength == -1 {
 		return r
 	}

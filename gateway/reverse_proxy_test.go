@@ -841,7 +841,6 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 		})[0]
 
 		g.Gw.LoadAPI(tykGraphQL, tykREST, composedAPI)
-
 		countries := graphql.Request{
 			Query: "query Query { countries { name } }",
 		}
