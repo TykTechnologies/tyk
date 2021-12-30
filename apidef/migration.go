@@ -25,6 +25,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 			newAPI := *a
 			newAPI.APIID = ""
 			newAPI.Id = ""
+			newAPI.Internal = true
 			newAPI.VersionDefinition = VersionDefinition{}
 			newAPI.VersionData.NotVersioned = true
 			newAPI.VersionData.DefaultVersion = ""
