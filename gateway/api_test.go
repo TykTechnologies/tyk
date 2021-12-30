@@ -25,6 +25,7 @@ import (
 	"fmt"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
