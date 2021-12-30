@@ -18,6 +18,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/consul/agent/cache"
 	"io"
 	"io/ioutil"
 	"net"
@@ -622,6 +623,7 @@ func tlsClientConfig(s *APISpec) *tls.Config {
 
 func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
 	p.logger.Debug("Creating new transport")
+
 	transport := p.defaultTransport(timeOut) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
@@ -769,6 +771,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		}
 
 		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
+
 		return handleInMemoryLoop(handler, r)
 	}
 

@@ -1,17 +1,17 @@
 package gateway
 
 import (
+	"encoding/json"
+	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"strings"
 	"testing"
 
-	"github.com/gorilla/websocket"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/stretchr/testify/assert"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
@@ -169,6 +169,18 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 }
 
 func TestGraphQLMiddleware_EngineMode(t *testing.T) {
+	assertReviewsSubgraphResponse := func(t *testing.T) func(bytes []byte) bool {
+		return func(bytes []byte) bool {
+			expected := `{"data":{"_entities":[{"reviews":[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}]}]}}`
+			var body json.RawMessage
+			assert.NoError(t, json.Unmarshal(bytes, &body))
+
+			compactBody, err := json.Marshal(body)
+			assert.NoError(t, err)
+
+			return assert.Equal(t, expected, string(compactBody))
+		}
+	}
 
 	t.Run("on invalid graphql config version", func(t *testing.T) {
 		g := StartTest(nil)
@@ -186,7 +198,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			countries1 := gql.Request{
 				Query: "query Query { countries { name } }",
 			}
-
 			_, _ = g.Run(t, []test.TestCase{
 				{Data: countries1, BodyMatch: `"There was a problem proxying the request`, Code: http.StatusInternalServerError},
 			}...)
@@ -268,9 +279,9 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				}
 
 				_, _ = g.Run(t, test.TestCase{
-					Data:      request,
-					BodyMatch: `{"data":{"\_entities":\[{"reviews":\[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}\]}\]}}`,
-					Code:      http.StatusOK,
+					Data:          request,
+					BodyMatchFunc: assertReviewsSubgraphResponse(t),
+					Code:          http.StatusOK,
 				})
 			})
 		})
@@ -308,9 +319,9 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				}
 
 				_, _ = g.Run(t, test.TestCase{
-					Data:      request,
-					BodyMatch: `{"data":{"\_entities":\[{"reviews":\[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}\]}\]}}`,
-					Code:      http.StatusOK,
+					Data:          request,
+					BodyMatchFunc: assertReviewsSubgraphResponse(t),
+					Code:          http.StatusOK,
 				})
 			})
 		})
@@ -522,6 +533,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 			})
 		})
+
 	})
 
 	t.Run("graphql engine v1", func(t *testing.T) {
@@ -634,6 +646,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 		})
 	})
+
 }
 
 func TestNeedsGraphQLExecutionEngine(t *testing.T) {
