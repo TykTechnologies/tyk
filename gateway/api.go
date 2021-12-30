@@ -790,7 +790,7 @@ func (gw *Gateway) handleGetAPIList() (interface{}, int) {
 
 func (gw *Gateway) handleGetAPI(apiID string) (interface{}, int) {
 	if spec := gw.getApiSpec(apiID); spec != nil {
-			return spec.APIDefinition, http.StatusOK
+		return spec.APIDefinition, http.StatusOK
 	}
 
 	log.WithFields(logrus.Fields{

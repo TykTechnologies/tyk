@@ -21,7 +21,6 @@ type traceHttpRequest struct {
 	Headers http.Header `json:"headers"`
 }
 
-
 func (tr *traceHttpRequest) toRequest(ignoreCanonicalMIMEHeaderKey bool) (*http.Request, error) {
 	r, err := http.NewRequest(tr.Method, tr.Path, strings.NewReader(tr.Body))
 	if err != nil {

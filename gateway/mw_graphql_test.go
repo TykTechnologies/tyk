@@ -170,7 +170,6 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 
 func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
-
 	t.Run("on invalid graphql config version", func(t *testing.T) {
 		g := StartTest(nil)
 		defer g.Close()

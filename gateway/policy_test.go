@@ -332,7 +332,6 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			ThrottleInterval:   9,
 			AccessRights:       map[string]user.AccessDefinition{"a": {}},
 		},
-
 	}
 	s.Gw.policiesMu.RUnlock()
 	bmid := &BaseMiddleware{

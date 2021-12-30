@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"

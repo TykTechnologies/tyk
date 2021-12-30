@@ -12,7 +12,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/rpc"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -442,4 +441,3 @@ func TestOrgSessionWithRPCDown(t *testing.T) {
 		t.Fatal("org  session should be null:")
 	}
 }
-

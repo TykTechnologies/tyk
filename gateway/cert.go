@@ -288,7 +288,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		certNameMap[certData.Name] = &cert
 	}
 
-
 	if len(gwConfig.HttpServerOptions.SSLCertificates) > 0 {
 		var waitingRedisLog sync.Once
 		// ensure that we are connected to redis
