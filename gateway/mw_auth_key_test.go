@@ -149,29 +149,6 @@ func TestSignatureValidation(t *testing.T) {
 		}...)
 	})
 
-	t.Run("Static signature in params", func(t *testing.T) {
-		key := CreateSession(ts.Gw)
-		hasher := signature_validator.MasheryMd5sum{}
-		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
-
-		emptySigPath := "?api_key=" + key
-		invalidSigPath := emptySigPath + "&sig=junk"
-		validSigPath := emptySigPath + "&sig=" + hex.EncodeToString(validHash)
-
-		ts.Gw.RedisController.DisableRedis(true)
-		_, _ = ts.Run(t, []test.TestCase{
-			{Path: emptySigPath, Code: http.StatusForbidden},
-			{Path: invalidSigPath, Code: http.StatusForbidden},
-			{Path: validSigPath, Code: http.StatusForbidden},
-		}...)
-		ts.Gw.RedisController.DisableRedis(false)
-		_, _ = ts.Run(t, []test.TestCase{
-			{Path: emptySigPath, Code: http.StatusUnauthorized},
-			{Path: invalidSigPath, Code: http.StatusUnauthorized},
-			{Path: validSigPath, Code: http.StatusOK},
-		}...)
-	})
-
 	t.Run("Dynamic signature", func(t *testing.T) {
 		api.Auth.Signature.Secret = "$tyk_meta.signature_secret"
 		ts.Gw.LoadAPI(api)
