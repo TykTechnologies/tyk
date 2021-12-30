@@ -16,11 +16,14 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/lonelycode/osin"
 	cache "github.com/pmylund/go-cache"
-	"github.com/square/go-jose"
+
+	jose "github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
+
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -34,6 +37,15 @@ const (
 	HMACSign  = "hmac"
 	RSASign   = "rsa"
 	ECDSASign = "ecdsa"
+)
+
+var (
+	// List of common OAuth Client ID claims used by IDPs:
+	oauthClientIDClaims = []string{
+		"clientId",  // Keycloak
+		"cid",       // OKTA
+		"client_id", // Gluu
+	}
 )
 
 func (k *JWTMiddleware) Name() string {
@@ -78,7 +90,7 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 
 	var client http.Client
 	client.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Global().JWTSSLInsecureSkipVerify},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
 	}
 
 	var jwkSet JWKs
@@ -133,7 +145,7 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{},
 	var jwkSet *jose.JSONWebKeySet
 	var client http.Client
 	client.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Global().JWTSSLInsecureSkipVerify},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
 	}
 
 	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
@@ -345,6 +357,15 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	return polIDs
 }
 
+func (k *JWTMiddleware) getOAuthClientIDFromClaim(claims jwt.MapClaims) string {
+	for _, claimName := range oauthClientIDClaims {
+		if val, ok := claims[claimName]; ok {
+			return val.(string)
+		}
+	}
+	return ""
+}
+
 // processCentralisedJWT Will check a JWT token centrally against the secret stored in the API Definition.
 func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token) (error, int) {
 	k.Logger().Debug("JWT authority is centralised")
@@ -356,10 +377,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		return err, http.StatusForbidden
 	}
 
+	// Get the OAuth client ID if available:
+	oauthClientID := k.getOAuthClientIDFromClaim(claims)
+
 	// Generate a virtual token
 	data := []byte(baseFieldData)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := generateToken(k.Spec.OrgID, keyID)
+	sessionID := k.Gw.generateToken(k.Spec.OrgID, keyID)
 	updateSession := false
 
 	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)
@@ -387,7 +411,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 
-		session, err = generateSessionFromPolicy(basePolicyID,
+		session, err = k.Gw.generateSessionFromPolicy(basePolicyID,
 			k.Spec.OrgID,
 			true)
 
@@ -436,9 +460,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 		// check if we received a valid policy ID in claim
-		policiesMu.RLock()
-		policy, ok := policiesByID[basePolicyID]
-		policiesMu.RUnlock()
+		k.Gw.policiesMu.RLock()
+		policy, ok := k.Gw.policiesByID[basePolicyID]
+		k.Gw.policiesMu.RUnlock()
 		if !ok {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("Policy ID found is invalid!")
@@ -549,7 +573,43 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				k.Logger().WithError(err).Error("Could not several policies from scope-claim mapping to JWT to session")
 				return errors.New("key not authorized: could not apply several policies"), http.StatusForbidden
 			}
+		}
+	}
 
+	session.OauthClientID = oauthClientID
+	if session.OauthClientID != "" {
+		// Initialize the OAuthManager if empty:
+		if k.Spec.OAuthManager == nil {
+			prefix := generateOAuthPrefix(k.Spec.APIID)
+			storageManager := k.Gw.getGlobalStorageHandler(prefix, false)
+			storageManager.Connect()
+			k.Spec.OAuthManager = &OAuthManager{
+				OsinServer: k.Gw.TykOsinNewServer(&osin.ServerConfig{},
+					&RedisOsinStorageInterface{
+						storageManager,
+						k.Gw.GlobalSessionManager,
+						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+						k.Spec.OrgID,
+						k.Gw,
+					}),
+			}
+		}
+
+		// Retrieve OAuth client data from storage and inject developer ID into the session object:
+		client, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(oauthClientID)
+		if err == nil {
+			userData := client.GetUserData()
+			if userData != nil {
+				data, ok := userData.(map[string]interface{})
+				if ok {
+					developerID, keyFound := data["tyk_developer_id"].(string)
+					if keyFound {
+						session.MetaData["tyk_developer_id"] = developerID
+					}
+				}
+			}
+		} else {
+			k.Logger().WithError(err).Error("Couldn't get OAuth client")
 		}
 	}
 
@@ -558,10 +618,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	k.Logger().Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
-		ctxSetSession(r, &session, updateSession)
-
+		ctxSetSession(r, &session, updateSession, k.Gw.GetConfig().HashKeys)
 		if updateSession {
-			SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
+			k.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
 		}
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
@@ -595,7 +654,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	}
 
 	k.Logger().Debug("Raw key ID found.")
-	ctxSetSession(r, &session, false)
+	ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
 }
@@ -779,16 +838,17 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 	}
 }
 
-func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
-	policiesMu.RLock()
-	policy, ok := policiesByID[policyID]
-	policiesMu.RUnlock()
+func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
+	gw.policiesMu.RLock()
+	policy, ok := gw.policiesByID[policyID]
+	gw.policiesMu.RUnlock()
 	session := user.SessionState{}
+
 	if !ok {
 		return session.Clone(), errors.New("Policy not found")
 	}
 	// Check ownership, policy org owner must be the same as API,
-	// otherwise youcould overwrite a session key with a policy from a different org!
+	// otherwise you could overwrite a session key with a policy from a different org!
 
 	if enforceOrg {
 		if policy.OrgID != orgID {

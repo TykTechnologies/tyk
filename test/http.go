@@ -16,12 +16,15 @@ import (
 )
 
 type TestCase struct {
-	Method          string            `json:",omitempty"`
-	Path            string            `json:",omitempty"`
-	BaseURL         string            `json:",omitempty"`
-	Domain          string            `json:",omitempty"`
-	Proto           string            `json:",omitempty"`
-	Code            int               `json:",omitempty"`
+	Method  string `json:",omitempty"`
+	Path    string `json:",omitempty"`
+	BaseURL string `json:",omitempty"`
+	Domain  string `json:",omitempty"`
+	Proto   string `json:",omitempty"`
+
+	// Code is the expected HTTP response status code.
+	Code int `json:",omitempty"`
+
 	Data            interface{}       `json:",omitempty"`
 	Headers         map[string]string `json:",omitempty"`
 	PathParams      map[string]string `json:",omitempty"`

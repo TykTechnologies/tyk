@@ -13,7 +13,7 @@ import (
 )
 
 func TestLooping(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	postAction := `<operation action="https://example.com/post_action">data</operation>`
@@ -22,7 +22,7 @@ func TestLooping(t *testing.T) {
 	t.Run("Using advanced URL rewrite", func(t *testing.T) {
 		// We defined internnal advanced rewrite based on body data
 		// which rewrites to internal paths (marked as blacklist so they protected from outside world)
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			version := spec.VersionData.Versions["v1"]
 			json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
@@ -89,7 +89,7 @@ func TestLooping(t *testing.T) {
 	})
 
 	t.Run("Test multiple url rewrites", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			version := spec.VersionData.Versions["v1"]
 			json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
@@ -129,7 +129,7 @@ func TestLooping(t *testing.T) {
 	})
 
 	t.Run("Loop to another API", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = "testid"
 			spec.Name = "hidden api"
 			spec.Proxy.ListenPath = "/somesecret"
@@ -180,7 +180,7 @@ func TestLooping(t *testing.T) {
 	})
 
 	t.Run("VirtualEndpoint or plugins", func(t *testing.T) {
-		testPrepareVirtualEndpoint(`
+		ts.testPrepareVirtualEndpoint(`
             function testVirtData(request, session, config) {
                 var loopLocation = "/default"
 
@@ -198,7 +198,7 @@ func TestLooping(t *testing.T) {
                 }
                 return TykJsResponse(resp, session.meta_data)
             }
-        `, "POST", "/virt", true)
+        `, "POST", "/virt", true, true)
 
 		ts.Run(t, []test.TestCase{
 			{Method: "POST", Path: "/virt", Data: postAction, BodyMatch: `"Url":"/post_action`},
@@ -212,7 +212,7 @@ func TestLooping(t *testing.T) {
 	})
 
 	t.Run("Loop limit", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			version := spec.VersionData.Versions["v1"]
 			json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
@@ -236,7 +236,7 @@ func TestLooping(t *testing.T) {
 	})
 
 	t.Run("Quota and rate limit calculation", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			version := spec.VersionData.Versions["v1"]
 			json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
@@ -255,7 +255,7 @@ func TestLooping(t *testing.T) {
 			spec.UseKeylessAccess = false
 		})
 
-		keyID := CreateSession(func(s *user.SessionState) {
+		keyID := CreateSession(ts.Gw, func(s *user.SessionState) {
 			s.QuotaMax = 2
 		})
 
@@ -270,10 +270,10 @@ func TestLooping(t *testing.T) {
 func TestConcurrencyReloads(t *testing.T) {
 	var wg sync.WaitGroup
 
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI()
+	ts.Gw.BuildAndLoadAPI()
 
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
@@ -284,7 +284,7 @@ func TestConcurrencyReloads(t *testing.T) {
 	}
 
 	for j := 0; j < 5; j++ {
-		BuildAndLoadAPI()
+		ts.Gw.BuildAndLoadAPI()
 	}
 
 	wg.Wait()

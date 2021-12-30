@@ -61,6 +61,7 @@ func NewGraphQLEngineTransport(transportType GraphQLEngineTransportType, origina
 }
 
 func (g *GraphQLEngineTransport) RoundTrip(request *http.Request) (res *http.Response, err error) {
+
 	switch g.transportType {
 	case GraphQLEngineTransportTypeProxyOnly:
 		proxyOnlyCtx, ok := request.Context().(*GraphQLProxyOnlyContext)

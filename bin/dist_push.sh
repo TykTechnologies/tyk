@@ -1,8 +1,12 @@
 #!/bin/bash
+
+# This script is only used to support the xenial builds that are triggered by Buddy
+# See https://tyktech.atlassian.net/wiki/spaces/EN/pages/1180237826/Version+management+in+releng
+
 : ${ORGDIR:="/go/src/github.com/TykTechnologies"}
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
-: ${DEBVERS:="ubuntu/trusty ubuntu/xenial ubuntu/bionic debian/jessie debian/stretch debian/buster"}
-: ${RPMVERS:="el/6 el/7 el/8"}
+: ${DEBVERS:="ubuntu/xenial"}
+: ${RPMVERS:=""}
 : ${PKGNAME:="tyk-gateway"}
 
 echo "Set version number"

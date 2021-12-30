@@ -40,10 +40,11 @@ import (
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
+
+	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -51,7 +52,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const defaultUserAgent = "Tyk/" + VERSION
+var defaultUserAgent = "Tyk/" + VERSION
 
 var corsHeaders = []string{
 	"Access-Control-Allow-Origin",
@@ -144,7 +145,7 @@ func EnsureTransport(host, protocol string) string {
 	return u.String()
 }
 
-func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
+func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a HostList
@@ -157,15 +158,14 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 			}
 
 			host := EnsureTransport(gotHost, spec.Protocol)
-
 			if !spec.Proxy.CheckHostAgainstUptimeTests {
 				return host, nil // we don't care if it's up
 			}
 			// As checked by HostCheckerManager.AmIPolling
-			if GlobalHostChecker.store == nil {
+			if gw.GlobalHostChecker.store == nil {
 				return host, nil
 			}
-			if !GlobalHostChecker.HostDown(host) {
+			if !gw.GlobalHostChecker.HostDown(host) {
 				return host, nil // we do care and it's up
 			}
 			// if the host is down, keep trying all the rest
@@ -198,7 +198,7 @@ var (
 // the target request will be for /base/dir. This version modifies the
 // stdlib version by also setting the host to the target, this allows
 // us to work with heroku and other such providers
-func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger *logrus.Entry) *ReverseProxy {
+func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger *logrus.Entry) *ReverseProxy {
 	onceStartAllHostsDown.Do(func() {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "all hosts are down", http.StatusServiceUnavailable)
@@ -245,7 +245,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger *logrus
 			}
 			fallthrough // implies load balancing, with replaced host list
 		case spec.Proxy.EnableLoadBalancing:
-			host, err := nextTarget(hostList, spec)
+			host, err := gw.nextTarget(hostList, spec)
 			if err != nil {
 				log.Error("[PROXY] [LOAD BALANCING] ", err)
 				host = allHostsDownURL
@@ -345,8 +345,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger *logrus
 				return &buffer
 			},
 		},
+		Gw: gw,
 	}
-	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy}
+	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy, Gw: gw}
 	return proxy
 }
 
@@ -383,9 +384,10 @@ type ReverseProxy struct {
 
 	logger *logrus.Entry
 	sp     sync.Pool
+	Gw     *Gateway `json:"-"`
 }
 
-func defaultTransport(dialerTimeout float64) *http.Transport {
+func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	timeout := 30.0
 	if dialerTimeout > 0 {
 		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
@@ -398,14 +400,14 @@ func defaultTransport(dialerTimeout float64) *http.Transport {
 		DualStack: true,
 	}
 	dialContextFunc := dialer.DialContext
-	if dnsCacheManager.IsCacheEnabled() {
-		dialContextFunc = dnsCacheManager.WrapDialer(dialer)
+	if p.Gw.dnsCacheManager.IsCacheEnabled() {
+		dialContextFunc = p.Gw.dnsCacheManager.WrapDialer(dialer)
 	}
 
 	return &http.Transport{
 		DialContext:           dialContextFunc,
-		MaxIdleConns:          config.Global().MaxIdleConns,
-		MaxIdleConnsPerHost:   config.Global().MaxIdleConnsPerHost, // default is 100
+		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
+		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
 		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
@@ -620,14 +622,13 @@ func tlsClientConfig(s *APISpec) *tls.Config {
 	return config
 }
 
-func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, outReq *http.Request, p *ReverseProxy) *TykRoundTripper {
+func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
 	p.logger.Debug("Creating new transport")
-
-	transport := defaultTransport(timeOut) // modifies a newly created transport
+	transport := p.defaultTransport(timeOut) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
-	if config.Global().ProxySSLInsecureSkipVerify {
+	if p.Gw.GetConfig().ProxySSLInsecureSkipVerify {
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
@@ -639,13 +640,13 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, o
 	// The reason behind two separate checks is that `DialTLS` supports specifying public keys per hostname, and `VerifyPeerCertificate` only global ones, e.g. `*`
 	if proxyURL, _ := transport.Proxy(req); proxyURL != nil {
 		p.logger.Debug("Detected proxy: " + proxyURL.String())
-		transport.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+		transport.TLSClientConfig.VerifyPeerCertificate = p.Gw.verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
 
 		if transport.TLSClientConfig.VerifyPeerCertificate != nil {
 			p.logger.Debug("Certificate pinning check is enabled")
 		}
 	} else {
-		transport.DialTLS = customDialTLSCheck(p.TykAPISpec, transport.TLSClientConfig)
+		transport.DialTLS = p.Gw.customDialTLSCheck(p.TykAPISpec, transport.TLSClientConfig)
 	}
 
 	if p.TykAPISpec.GlobalConfig.ProxySSLMinVersion > 0 {
@@ -672,13 +673,13 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, o
 		transport.TLSClientConfig.CipherSuites = getCipherAliases(p.TykAPISpec.Proxy.Transport.SSLCipherSuites)
 	}
 
-	if !config.Global().ProxySSLDisableRenegotiation {
+	if !p.Gw.GetConfig().ProxySSLDisableRenegotiation {
 		transport.TLSClientConfig.Renegotiation = tls.RenegotiateFreelyAsClient
 	}
 
 	transport.DisableKeepAlives = p.TykAPISpec.GlobalConfig.ProxyCloseConnections
 
-	if config.Global().ProxyEnableHttp2 {
+	if p.Gw.GetConfig().ProxyEnableHttp2 {
 		http2.ConfigureTransport(transport)
 	}
 
@@ -693,10 +694,10 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, o
 			},
 			AllowHTTP: true,
 		}
-		return &TykRoundTripper{transport, h2t, p.logger}
+		return &TykRoundTripper{transport, h2t, p.logger, p.Gw}
 	}
 
-	return &TykRoundTripper{transport, nil, p.logger}
+	return &TykRoundTripper{transport, nil, p.logger, p.Gw}
 }
 
 func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
@@ -723,7 +724,7 @@ func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config,
 			certs[i] = cert
 		}
 
-		if !p.TykAPISpec.Proxy.Transport.SSLInsecureSkipVerify && !config.Global().ProxySSLInsecureSkipVerify {
+		if !p.TykAPISpec.Proxy.Transport.SSLInsecureSkipVerify && !p.Gw.GetConfig().ProxySSLInsecureSkipVerify {
 			opts := x509.VerifyOptions{
 				Roots:         tlsConfig.RootCAs,
 				CurrentTime:   time.Now(),
@@ -752,6 +753,7 @@ type TykRoundTripper struct {
 	transport    *http.Transport
 	h2ctransport *http2.Transport
 	logger       *logrus.Entry
+	Gw           *Gateway `json:"-"`
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -762,14 +764,13 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 			r.Header.Del(apidef.TykInternalApiHeader)
 		}
 
-		handler, found := findInternalHttpHandlerByNameOrID(r.Host)
+		handler, found := rt.Gw.findInternalHttpHandlerByNameOrID(r.Host)
 		if !found {
 			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
 			return nil, errors.New("handler could")
 		}
 
 		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
-
 		return handleInMemoryLoop(handler, r)
 	}
 
@@ -1050,7 +1051,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.logger.Debug("Outbound request URL: ", outreq.URL.String())
 
-	outReqUpgrade, reqUpType := IsUpgrade(req)
+	outReqUpgrade, reqUpType := p.IsUpgrade(req)
 
 	// See RFC 2616, section 14.10.
 	if c := outreq.Header.Get("Connection"); c != "" {
@@ -1092,7 +1093,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// set up TLS certificates for upstream if needed
 	var tlsCertificates []tls.Certificate
-	if cert := getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
+	if cert := p.Gw.getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
 		p.logger.Debug("Found upstream mutual TLS certificate")
 		tlsCertificates = []tls.Certificate{*cert}
 	}
@@ -1103,13 +1104,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	createTransport := p.TykAPISpec.HTTPTransport == nil
 
 	// Check if timeouts are set for this endpoint
-	if !createTransport && config.Global().MaxConnTime != 0 {
-		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
+	if !createTransport && p.Gw.GetConfig().MaxConnTime != 0 {
+		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(p.Gw.GetConfig().MaxConnTime)*time.Second
 	}
 
 	if createTransport {
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, outreq, p)
+		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 	}
 
@@ -1124,7 +1125,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		outreq.URL.Scheme = "http"
 	}
 
-	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || config.Global().SSLForceCommonNameCheck {
+	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || p.Gw.GetConfig().SSLForceCommonNameCheck {
 		// if proxy is enabled, add CommonName verification in verifyPeerCertificate
 		// DialTLS is not executed if proxy is used
 		httpTransport := roundTripper.transport
@@ -1179,7 +1180,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			"prefix":      "proxy",
 			"user_ip":     addrs,
 			"server_name": outreq.Host,
-			"user_id":     obfuscateKey(token),
+			"user_id":     p.Gw.obfuscateKey(token),
 			"user_name":   alias,
 			"org_id":      p.TykAPISpec.OrgID,
 			"api_id":      p.TykAPISpec.APIID,
@@ -1214,7 +1215,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return ProxyResponse{UpstreamLatency: upstreamLatency}
 	}
 
-	upgrade, _ := IsUpgrade(req)
+	upgrade, _ := p.IsUpgrade(req)
 	// Deal with 101 Switching Protocols responses: (WebSocket, h2c, etc)
 	if upgrade {
 		if err := p.handleUpgradeResponse(rw, outreq, res); err != nil {
@@ -1286,7 +1287,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	defer res.Body.Close()
 
 	// Close connections
-	if config.Global().CloseConnections {
+	if p.Gw.GetConfig().CloseConnections {
 		res.Header.Set(headers.Connection, "close")
 	}
 
@@ -1299,7 +1300,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
-	copyHeader(rw.Header(), res.Header, config.Global().IgnoreCanonicalMIMEHeaderKey)
+	copyHeader(rw.Header(), res.Header, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 
 	announcedTrailers := len(res.Trailer)
 	if announcedTrailers > 0 {
@@ -1327,7 +1328,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	p.CopyResponse(rw, res.Body, p.flushInterval(res))
 
 	if len(res.Trailer) == announcedTrailers {
-		copyHeader(rw.Header(), res.Trailer, config.Global().IgnoreCanonicalMIMEHeaderKey)
+		copyHeader(rw.Header(), res.Trailer, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 		return nil
 	}
 
@@ -1413,8 +1414,15 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
 	}
 }
 
+func upgradeType(h http.Header) string {
+	if !httpguts.HeaderValuesContainsToken(h["Connection"], "Upgrade") {
+		return ""
+	}
+	return strings.ToLower(h.Get("Upgrade"))
+}
+
 func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.Request, res *http.Response) error {
-	copyHeader(res.Header, rw.Header(), config.Global().IgnoreCanonicalMIMEHeaderKey)
+	copyHeader(res.Header, rw.Header(), p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 
 	hj, ok := rw.(http.Hijacker)
 	if !ok {
@@ -1424,7 +1432,18 @@ func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.R
 	if !ok {
 		return fmt.Errorf("internal error: 101 switching protocols response with non-writable body")
 	}
-	defer backConn.Close()
+	backConnCloseCh := make(chan bool)
+	go func() {
+		// Ensure that the cancelation of a request closes the backend.
+		// See issue https://golang.org/issue/35559.
+		select {
+		case <-req.Context().Done():
+		case <-backConnCloseCh:
+		}
+		backConn.Close()
+	}()
+
+	defer close(backConnCloseCh)
 	conn, brw, err := hj.Hijack()
 	if err != nil {
 		return fmt.Errorf("Hijack failed on protocol switch: %v", err)
@@ -1589,7 +1608,6 @@ func copyRequest(r *http.Request) *http.Request {
 
 func copyResponse(r *http.Response) *http.Response {
 	// for the case of streaming for which Content-Length might be unset = -1.
-
 	if r.ContentLength == -1 {
 		return r
 	}
@@ -1623,8 +1641,8 @@ func nopCloseResponseBody(r *http.Response) {
 	copyResponse(r)
 }
 
-func IsUpgrade(req *http.Request) (bool, string) {
-	if !config.Global().HttpServerOptions.EnableWebSockets {
+func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
+	if !p.Gw.GetConfig().HttpServerOptions.EnableWebSockets {
 		return false, ""
 	}
 

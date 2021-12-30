@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	cache "github.com/pmylund/go-cache"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
@@ -23,17 +21,6 @@ import (
 const (
 	keyDataDeveloperID    = "tyk_developer_id"
 	keyDataDeveloperEmail = "tyk_developer_email"
-)
-
-var (
-	// key session memory cache
-	SessionCache = cache.New(10*time.Second, 5*time.Second)
-
-	// org session memory cache
-	ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
-
-	// memory cache to store arbitrary items
-	UtilCache = cache.New(time.Hour, 10*time.Minute)
 )
 
 type ProxyResponse struct {
@@ -163,6 +150,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			tags = tagHeaders(r, s.Spec.TagHeaders, tags)
 		}
 
+		if len(s.Spec.Tags) > 0 {
+			tags = append(tags, s.Spec.Tags...)
+		}
+
 		rawRequest := ""
 		rawResponse := ""
 
@@ -239,7 +230,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 		}
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip)
+			record.GetGeo(ip, s.Gw)
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
@@ -257,7 +248,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			record.NormalisePath(&s.Spec.GlobalConfig)
 		}
 
-		analytics.RecordHit(&record)
+		err := s.Gw.analytics.RecordHit(&record)
+		if err != nil {
+			log.WithError(err).Error("could not store analytic record")
+		}
 	}
 
 	// Report in health check
@@ -314,7 +308,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
 		part := s.Spec.getVersionFromRequest(r)
 
-		log.Info("Stripping version from url: ", part)
+		log.Debug("Stripping version from url: ", part)
 
 		r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
 		r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)

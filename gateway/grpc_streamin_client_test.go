@@ -146,7 +146,9 @@ func runRouteChat(t *testing.T, client pb.RouteGuideClient) {
 			}
 			t.Logf("Got message %s at point(%d, %d)", in.Message, in.Location.Latitude, in.Location.Longitude)
 		}
+
 		wg.Done()
+		t.Logf("finish to receive the notes")
 	}()
 
 	// goroutine to send data
@@ -157,19 +159,21 @@ func runRouteChat(t *testing.T, client pb.RouteGuideClient) {
 			if err := stream.Send(note); err != nil {
 				t.Fatalf("Failed to send a note: %v", err)
 			}
-			t.Log("Sending one note")
+			t.Logf("Sending note %v", note.Message)
 		}
 		wg.Done()
 		t.Logf("finish to send the notes")
 	}()
 
 	wg.Wait()
+	t.Log("finish process, will close the stream")
 	// only close the stream when we check that we're
 	// receiving and sending data in bidirectional
 	err = stream.CloseSend()
 	if err != nil {
 		t.Logf("Error closing the grpc stream: %+v", err)
 	}
+	t.Logf("grpc stream closed")
 }
 
 func randomPoint(r *rand.Rand) *pb.Point {

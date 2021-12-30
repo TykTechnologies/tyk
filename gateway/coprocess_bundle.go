@@ -5,10 +5,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/goverify"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-
 	"archive/zip"
 	"bytes"
 	"crypto/md5"
@@ -23,6 +19,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+
+	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
@@ -32,6 +31,7 @@ type Bundle struct {
 	Path     string
 	Spec     *APISpec
 	Manifest apidef.BundleManifest
+	Gw       *Gateway `json:"-"`
 }
 
 // Verify performs a signature verification on the bundle file.
@@ -44,14 +44,14 @@ func (b *Bundle) Verify() error {
 	var bundleVerifier goverify.Verifier
 
 	// Perform signature verification if a public key path is set:
-	if config.Global().PublicKeyPath != "" {
+	if b.Gw.GetConfig().PublicKeyPath != "" {
 		if b.Manifest.Signature == "" {
 			// Error: A public key is set, but the bundle isn't signed.
 			return errors.New("Bundle isn't signed")
 		}
-		if notificationVerifier == nil {
+		if b.Gw.NotificationVerifier == nil {
 			var err error
-			bundleVerifier, err = goverify.LoadPublicKeyFromFile(config.Global().PublicKeyPath)
+			bundleVerifier, err = goverify.LoadPublicKeyFromFile(b.Gw.GetConfig().PublicKeyPath)
 			if err != nil {
 				return err
 			}
@@ -103,7 +103,7 @@ func (b *Bundle) AddToSpec() {
 	// Load Python interpreter if the
 	if loadedDrivers[b.Spec.CustomMiddleware.Driver] == nil && b.Spec.CustomMiddleware.Driver == apidef.PythonDriver {
 		var err error
-		loadedDrivers[apidef.PythonDriver], err = NewPythonDispatcher()
+		loadedDrivers[apidef.PythonDriver], err = NewPythonDispatcher(b.Gw.GetConfig())
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "coprocess",
@@ -213,9 +213,11 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 }
 
 // fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
-func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
+func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
+	bundle := Bundle{Gw: gw}
+	var err error
 
-	if !config.Global().EnableBundleDownloader {
+	if !gw.GetConfig().EnableBundleDownloader {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("Bundle downloader is disabled.")
@@ -223,7 +225,7 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 		return bundle, err
 	}
 
-	u, err := url.Parse(config.Global().BundleBaseURL)
+	u, err := url.Parse(gw.GetConfig().BundleBaseURL)
 	if err != nil {
 		return bundle, err
 	}
@@ -243,12 +245,12 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 	case "https":
 		getter = &HTTPBundleGetter{
 			URL:                bundleURL,
-			InsecureSkipVerify: config.Global().BundleInsecureSkipVerify,
+			InsecureSkipVerify: gw.GetConfig().BundleInsecureSkipVerify,
 		}
 	case "mock":
 		getter = &MockBundleGetter{
 			URL:                bundleURL,
-			InsecureSkipVerify: config.Global().BundleInsecureSkipVerify,
+			InsecureSkipVerify: gw.GetConfig().BundleInsecureSkipVerify,
 		}
 	default:
 		err = errors.New("Unknown URL scheme")
@@ -313,8 +315,8 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) er
 	return nil
 }
 
-func getBundleDestPath(spec *APISpec) string {
-	tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
+func (gw *Gateway) getBundleDestPath(spec *APISpec) string {
+	tykBundlePath := filepath.Join(gw.GetConfig().MiddlewarePath, "bundles")
 	bundleNameHash := md5.New()
 	io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
 	bundlePath := fmt.Sprintf("%s_%x", spec.APIID, bundleNameHash.Sum(nil))
@@ -322,19 +324,19 @@ func getBundleDestPath(spec *APISpec) string {
 }
 
 // loadBundle wraps the load and save steps, it will return if an error occurs at any point.
-func loadBundle(spec *APISpec) error {
+func (gw *Gateway) loadBundle(spec *APISpec) error {
 	// Skip if no custom middleware bundle name is set.
 	if spec.CustomMiddlewareBundle == "" {
 		return nil
 	}
 
 	// Skip if no bundle base URL is set.
-	if config.Global().BundleBaseURL == "" {
+	if gw.GetConfig().BundleBaseURL == "" {
 		return bundleError(spec, nil, "No bundle base URL set, skipping bundle")
 	}
 
 	// get bundle destination on disk
-	destPath := getBundleDestPath(spec)
+	destPath := gw.getBundleDestPath(spec)
 
 	// Skip if the bundle destination path already exists.
 	// The bundle exists, load and return:
@@ -347,6 +349,7 @@ func loadBundle(spec *APISpec) error {
 			Name: spec.CustomMiddlewareBundle,
 			Path: destPath,
 			Spec: spec,
+			Gw:   gw,
 		}
 
 		err = loadBundleManifest(&bundle, spec, true)
@@ -369,7 +372,7 @@ func loadBundle(spec *APISpec) error {
 		"prefix": "main",
 	}).Info("----> Fetching Bundle: ", spec.CustomMiddlewareBundle)
 
-	bundle, err := fetchBundle(spec)
+	bundle, err := gw.fetchBundle(spec)
 	if err != nil {
 		return bundleError(spec, err, "Couldn't fetch bundle")
 	}

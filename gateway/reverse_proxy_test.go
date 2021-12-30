@@ -1,9 +1,12 @@
 package gateway
 
 import (
+	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -66,6 +69,9 @@ func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
 }
 
 func TestReverseProxyRetainHost(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	target, _ := url.Parse("http://target-host.com/targetpath")
 	cases := []struct {
 		name          string
@@ -105,7 +111,7 @@ func TestReverseProxyRetainHost(t *testing.T) {
 				setCtxValue(req, ctx.RetainHost, true)
 			}
 
-			proxy := TykNewSingleHostReverseProxy(target, spec, nil)
+			proxy := ts.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
 			proxy.Director(req)
 
 			if got := req.URL.String(); got != tc.wantURL {
@@ -122,22 +128,22 @@ type configTestReverseProxyDnsCache struct {
 	dnsConfig   config.DnsCacheConfig
 }
 
-func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
-	pullDomains := mockHandle.PushDomains(cfg.etcHostsMap, nil)
-	dnsCacheManager.InitDNSCaching(
+func (s *Test) SetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
+	pullDomains := s.MockHandle.PushDomains(cfg.etcHostsMap, nil)
+	s.Gw.dnsCacheManager.InitDNSCaching(
 		time.Duration(cfg.dnsConfig.TTL)*time.Second, time.Duration(cfg.dnsConfig.CheckInterval)*time.Second)
 
-	globalConf := config.Global()
+	globalConf := s.Gw.GetConfig()
 	enableWebSockets := globalConf.HttpServerOptions.EnableWebSockets
 
 	globalConf.HttpServerOptions.EnableWebSockets = true
-	config.SetGlobal(globalConf)
+	s.Gw.SetConfig(globalConf)
 
 	return func() {
 		pullDomains()
-		dnsCacheManager.DisposeCache()
+		s.Gw.dnsCacheManager.DisposeCache()
 		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
-		config.SetGlobal(globalConf)
+		s.Gw.SetConfig(globalConf)
 	}
 }
 
@@ -168,12 +174,15 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		}
 	)
 
-	tearDown := setupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	tearDown := ts.SetupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
 		config.DnsCacheConfig{
 			Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval,
 			MultipleIPsHandleStrategy: config.NoCacheStrategy}})
 
-	currentStorage := dnsCacheManager.CacheStorage()
+	currentStorage := ts.Gw.dnsCacheManager.CacheStorage()
 	fakeDeleteStorage := &dnscache.MockStorage{
 		MockFetchItem: currentStorage.FetchItem,
 		MockGet:       currentStorage.Get,
@@ -182,7 +191,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			//prevent deletion
 		},
 		MockClear: currentStorage.Clear}
-	dnsCacheManager.SetCacheStorage(fakeDeleteStorage)
+	ts.Gw.dnsCacheManager.SetCacheStorage(fakeDeleteStorage)
 
 	defer tearDown()
 
@@ -274,9 +283,9 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage := dnsCacheManager.CacheStorage()
+			storage := ts.Gw.dnsCacheManager.CacheStorage()
 			if !tc.isCacheEnabled {
-				dnsCacheManager.SetCacheStorage(nil)
+				ts.Gw.dnsCacheManager.SetCacheStorage(nil)
 			}
 
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{},
@@ -289,7 +298,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			}
 
 			Url, _ := url.Parse(tc.URL)
-			proxy := TykNewSingleHostReverseProxy(Url, spec, nil)
+			proxy := ts.Gw.TykNewSingleHostReverseProxy(Url, spec, nil)
 			recorder := httptest.NewRecorder()
 			proxy.WrappedServeHTTP(recorder, req, false)
 
@@ -307,13 +316,14 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			}
 
 			if !tc.isCacheEnabled {
-				dnsCacheManager.SetCacheStorage(storage)
+				ts.Gw.dnsCacheManager.SetCacheStorage(storage)
 			}
 		})
 	}
 }
 
-func testNewWrappedServeHTTP() *ReverseProxy {
+func (s *Test) TestNewWrappedServeHTTP() *ReverseProxy {
+
 	target, _ := url.Parse(TestHttpGet)
 	def := apidef.APIDefinition{}
 	def.VersionData.DefaultVersion = "Default"
@@ -347,22 +357,25 @@ func testNewWrappedServeHTTP() *ReverseProxy {
 		EnforcedTimeoutEnabled: true,
 		CircuitBreakerEnabled:  true,
 	}
-	return TykNewSingleHostReverseProxy(target, spec, nil)
+	return s.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
 }
 
 func TestWrappedServeHTTP(t *testing.T) {
-	proxy := testNewWrappedServeHTTP()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	proxy := ts.TestNewWrappedServeHTTP()
 	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	proxy.WrappedServeHTTP(recorder, req, false)
 }
 
 func TestCircuitBreaker5xxs(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				json.Unmarshal([]byte(`[
 					{
@@ -479,6 +492,9 @@ func TestRequestIP(t *testing.T) {
 }
 
 func TestCheckHeaderInRemoveList(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	type testSpec struct {
 		UseExtendedPaths      bool
 		GlobalHeadersRemove   []string
@@ -565,7 +581,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			spec := LoadSampleAPI(specOutput.String())
+			spec := ts.Gw.LoadSampleAPI(specOutput.String())
 			actual := rp.CheckHeaderInRemoveList(tc.header, spec, r)
 			if actual != tc.expected {
 				t.Fatalf("want %t, got %t", tc.expected, actual)
@@ -682,7 +698,7 @@ func TestNopCloseResponseBody(t *testing.T) {
 }
 
 func TestGraphQL_HeadersInjection(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	t.Cleanup(g.Close)
 
 	composedAPI := BuildAPI(func(spec *APISpec) {
@@ -701,7 +717,7 @@ func TestGraphQL_HeadersInjection(t *testing.T) {
 		spec.GraphQL.TypeFieldConfigurations = nil
 	})[0]
 
-	LoadAPI(composedAPI)
+	g.Gw.LoadAPI(composedAPI)
 
 	headers := graphql.Request{
 		Query: "query Query { headers { name value } }",
@@ -723,7 +739,8 @@ func TestGraphQL_HeadersInjection(t *testing.T) {
 }
 
 func TestGraphQL_InternalDataSource(t *testing.T) {
-	g := StartTest()
+
+	g := StartTest(nil)
 	defer g.Close()
 
 	tykGraphQL := BuildAPI(func(spec *APISpec) {
@@ -799,7 +816,7 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 			}
 		})[0]
 
-		LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
+		g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
 
 		reviews := graphql.Request{
 			Query: `query Query { me { id username reviews { body } } }`,
@@ -826,7 +843,7 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 			spec.GraphQL.TypeFieldConfigurations = nil
 		})[0]
 
-		LoadAPI(tykGraphQL, tykREST, composedAPI)
+		g.Gw.LoadAPI(tykGraphQL, tykREST, composedAPI)
 
 		countries := graphql.Request{
 			Query: "query Query { countries { name } }",
@@ -858,7 +875,7 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 			})
 		})[0]
 
-		LoadAPI(tykGraphQL, tykREST, composedAPI)
+		g.Gw.LoadAPI(tykGraphQL, tykREST, composedAPI)
 
 		countries := graphql.Request{
 			Query: "query Query { countries { name } }",
@@ -879,10 +896,10 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 }
 
 func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.GraphQL.Enabled = true
 		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 		spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
@@ -918,7 +935,7 @@ func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {
 }
 
 func TestGraphQL_OptionsPassThrough(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
 	var headers = map[string]string{
@@ -936,7 +953,7 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 	}
 
 	t.Run("ProxyOnly should pass through", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.GraphQL.Enabled = true
 			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
@@ -959,7 +976,7 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 		})
 	})
 	t.Run("UDG should not pass through", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.GraphQL.Enabled = true
 			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
@@ -977,7 +994,8 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 		})
 	})
 	t.Run("Supergraph should not pass through", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.GraphQL.Enabled = true
 			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
@@ -1005,7 +1023,11 @@ func BenchmarkRequestIPHops(b *testing.B) {
 
 func BenchmarkWrappedServeHTTP(b *testing.B) {
 	b.ReportAllocs()
-	proxy := testNewWrappedServeHTTP()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	proxy := ts.TestNewWrappedServeHTTP()
 	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	for i := 0; i < b.N; i++ {
@@ -1025,6 +1047,155 @@ func BenchmarkCopyRequestResponse(b *testing.B) {
 		for j := 0; j < 10; j++ {
 			req = copyRequest(req)
 			res = copyResponse(res)
+		}
+	}
+}
+
+func TestEnsureTransport(t *testing.T) {
+	cases := []struct {
+		host, protocol, expect string
+	}{
+		{"https://httpbin.org ", "https", "https://httpbin.org"},
+		{"httpbin.org ", "https", "https://httpbin.org"},
+		{"http://httpbin.org ", "https", "http://httpbin.org"},
+		{"httpbin.org ", "tls", "tls://httpbin.org"},
+		{"httpbin.org ", "", "http://httpbin.org"},
+	}
+	for i, v := range cases {
+		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+			g := EnsureTransport(v.host, v.protocol)
+			if g != v.expect {
+				t.Errorf("expected %q got %q", v.expect, g)
+			}
+		})
+	}
+}
+
+func TestReverseProxyWebSocketCancelation(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.EnableWebSockets = true
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	n := 5
+	triggerCancelCh := make(chan bool, n)
+	nthResponse := func(i int) string {
+		return fmt.Sprintf("backend response #%d\n", i)
+	}
+	terminalMsg := "final message"
+
+	cst := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if g, ws := upgradeType(r.Header), "websocket"; g != ws {
+			t.Errorf("Unexpected upgrade type %q, want %q", g, ws)
+			http.Error(w, "Unexpected request", 400)
+			return
+		}
+		conn, bufrw, err := w.(http.Hijacker).Hijack()
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer conn.Close()
+
+		upgradeMsg := "HTTP/1.1 101 Switching Protocols\r\nConnection: upgrade\r\nUpgrade: WebSocket\r\n\r\n"
+		if _, err := io.WriteString(conn, upgradeMsg); err != nil {
+			t.Error(err)
+			return
+		}
+		if _, _, err := bufrw.ReadLine(); err != nil {
+			t.Errorf("Failed to read line from client: %v", err)
+			return
+		}
+
+		for i := 0; i < n; i++ {
+			if _, err := bufrw.WriteString(nthResponse(i)); err != nil {
+				select {
+				case <-triggerCancelCh:
+				default:
+					t.Errorf("Writing response #%d failed: %v", i, err)
+				}
+				return
+			}
+			bufrw.Flush()
+			time.Sleep(time.Second)
+		}
+		if _, err := bufrw.WriteString(terminalMsg); err != nil {
+			select {
+			case <-triggerCancelCh:
+			default:
+				t.Errorf("Failed to write terminal message: %v", err)
+			}
+		}
+		bufrw.Flush()
+	}))
+	defer cst.Close()
+
+	backendURL, _ := url.Parse(cst.URL)
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	rproxy := ts.Gw.TykNewSingleHostReverseProxy(backendURL, spec, nil)
+
+	handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.Header().Set("X-Header", "X-Value")
+		ctx, cancel := context.WithCancel(req.Context())
+		go func() {
+			<-triggerCancelCh
+			cancel()
+		}()
+		rproxy.ServeHTTP(rw, req.WithContext(ctx))
+	})
+
+	frontendProxy := httptest.NewServer(handler)
+	defer frontendProxy.Close()
+
+	req, _ := http.NewRequest("GET", frontendProxy.URL, nil)
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+
+	res, err := frontendProxy.Client().Do(req)
+	if err != nil {
+		t.Fatalf("Dialing to frontend proxy: %v", err)
+	}
+	defer res.Body.Close()
+	if g, w := res.StatusCode, 101; g != w {
+		t.Fatalf("Switching protocols failed, got: %d, want: %d", g, w)
+	}
+
+	if g, w := res.Header.Get("X-Header"), "X-Value"; g != w {
+		t.Errorf("X-Header mismatch\n\tgot:  %q\n\twant: %q", g, w)
+	}
+
+	if g, w := upgradeType(res.Header), "websocket"; g != w {
+		t.Fatalf("Upgrade header mismatch\n\tgot:  %q\n\twant: %q", g, w)
+	}
+
+	rwc, ok := res.Body.(io.ReadWriteCloser)
+	if !ok {
+		t.Fatalf("Response body type mismatch, got %T, want io.ReadWriteCloser", res.Body)
+	}
+
+	if _, err := io.WriteString(rwc, "Hello\n"); err != nil {
+		t.Fatalf("Failed to write first message: %v", err)
+	}
+
+	// Read loop.
+
+	br := bufio.NewReader(rwc)
+	for {
+		line, err := br.ReadString('\n')
+		switch {
+		case line == terminalMsg: // this case before "err == io.EOF"
+			t.Fatalf("The websocket request was not canceled, unfortunately!")
+
+		case err == io.EOF:
+			return
+
+		case err != nil:
+			t.Fatalf("Unexpected error: %v", err)
+
+		case line == nthResponse(0): // We've gotten the first response back
+			// Let's trigger a cancel.
+			close(triggerCancelCh)
 		}
 	}
 }

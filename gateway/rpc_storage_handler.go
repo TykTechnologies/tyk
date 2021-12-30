@@ -10,7 +10,6 @@ import (
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/go-redis/redis/v8"
 
@@ -93,18 +92,18 @@ type RPCStorageHandler struct {
 	KeyPrefix        string
 	HashKeys         bool
 	SuppressRegister bool
+	DoReload         func()
+	Gw               *Gateway `json:"-"`
 }
-
-var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
 
 // Connect will establish a connection to the RPC
 func (r *RPCStorageHandler) Connect() bool {
-	slaveOptions := config.Global().SlaveOptions
+	slaveOptions := r.Gw.GetConfig().SlaveOptions
 	rpcConfig := rpc.Config{
 		UseSSL:                slaveOptions.UseSSL,
 		SSLInsecureSkipVerify: slaveOptions.SSLInsecureSkipVerify,
-		SSLMinVersion:         config.Global().HttpServerOptions.MinVersion,
-		SSLMaxVersion:         config.Global().HttpServerOptions.MaxVersion,
+		SSLMinVersion:         r.Gw.GetConfig().HttpServerOptions.MinVersion,
+		SSLMaxVersion:         r.Gw.GetConfig().HttpServerOptions.MaxVersion,
 		ConnectionString:      slaveOptions.ConnectionString,
 		RPCKey:                slaveOptions.RPCKey,
 		APIKey:                slaveOptions.APIKey,
@@ -125,9 +124,9 @@ func (r *RPCStorageHandler) Connect() bool {
 			}
 		},
 		func() {
-			reloadURLStructure(nil)
+			r.Gw.reloadURLStructure(nil)
 		},
-		DoReload,
+		r.DoReload,
 	)
 }
 
@@ -167,9 +166,9 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
-	if config.Global().SlaveOptions.EnableRPCCache {
+	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
-		cachedVal, found := RPCGlobalCache.Get(keyName)
+		cachedVal, found := r.Gw.RPCGlobalCache.Get(keyName)
 		log.Debug("--> Found? ", found)
 		if found {
 			return cachedVal.(string), nil
@@ -194,9 +193,9 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		log.Debug("Error trying to get value:", err)
 		return "", storage.ErrKeyNotFound
 	}
-	if config.Global().SlaveOptions.EnableRPCCache {
+	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
 		// Cache key
-		RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
+		r.Gw.RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
 	}
 	//return hash key without prefix so it doesnt get double prefixed in redis
 	return value.(string), nil
@@ -695,20 +694,20 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 		// Do the reload!
 		log.Warning("[RPC STORE] Received Reload instruction!")
 		go func() {
-			MainNotifier.Notify(Notification{Command: NoticeGroupReload})
+			r.Gw.MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: r.Gw})
 		}()
 	}
 }
 
 func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
-	if config.Global().SlaveOptions.DisableKeySpaceSync {
+	if r.Gw.GetConfig().SlaveOptions.DisableKeySpaceSync {
 		return
 	}
 
 	log.Info("[RPC] Starting keyspace poller")
 
 	for {
-		seconds := config.Global().SlaveOptions.KeySpaceSyncInterval
+		seconds := r.Gw.GetConfig().SlaveOptions.KeySpaceSyncInterval
 		r.CheckForKeyspaceChanges(orgId)
 		time.Sleep(time.Duration(seconds) * time.Second)
 	}
@@ -750,7 +749,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	var req interface{}
 
 	reqData := map[string]string{}
-	if groupID := config.Global().SlaveOptions.GroupID; groupID == "" {
+	if groupID := r.Gw.GetConfig().SlaveOptions.GroupID; groupID == "" {
 		funcName = "GetKeySpaceUpdate"
 		req = orgId
 		reqData["orgId"] = orgId
@@ -792,13 +791,13 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
-func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
+func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 	newKeyName := "apikey-" + storage.HashStr(keyName)
 	sessionString, err := r.GetRawKey(keyName)
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		handleAddKey(keyName, newKeyName[7:], sessionString, "-1")
+		gw.handleAddKey(keyName, newKeyName[7:], sessionString, "-1")
 	}
 }
 
@@ -828,7 +827,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[0]
 		clientSecret := splitKeys[2]
-		storage, _, err := GetStorageForApi(apiId)
+		storage, _, err := r.Gw.GetStorageForApi(apiId)
 		if err != nil {
 			continue
 		}
@@ -845,7 +844,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		tokenActionTypeHint := splitKeys[2]
 		hashedKey := strings.Contains(token, "#hashed")
 		if !hashedKey {
-			storage, _, err := GetStorageForApi(apiId)
+			storage, _, err := r.Gw.GetStorageForApi(apiId)
 			if err != nil {
 				continue
 			}
@@ -859,10 +858,10 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			RevokeToken(storage, token, tokenTypeHint)
 		} else {
 			token = strings.Split(token, "#")[0]
-			handleDeleteHashedKey(token, orgId, apiId, false)
+			r.Gw.handleDeleteHashedKey(token, orgId, apiId, false)
 		}
-		SessionCache.Delete(token)
-		RPCGlobalCache.Delete(r.KeyPrefix + token)
+		r.Gw.SessionCache.Delete(token)
+		r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
 
 	for _, key := range keys {
@@ -873,27 +872,28 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
 				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
-				handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
-				getSessionAndCreate(splitKeys[0], r)
+				r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
+				r.Gw.getSessionAndCreate(splitKeys[0], r)
 			} else {
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
 				if storage.TokenOrg(key) == "" {
-					key = generateToken(orgId, key)
+					key = r.Gw.generateToken(orgId, key)
 				}
-				handleDeleteKey(key, orgId, "-1", resetQuota)
-				getSessionAndCreate(splitKeys[0], r)
+				r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
+				r.Gw.getSessionAndCreate(splitKeys[0], r)
 			}
-			SessionCache.Delete(key)
-			RPCGlobalCache.Delete(r.KeyPrefix + key)
+			r.Gw.SessionCache.Delete(key)
+			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
 		}
 	}
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: strings.Join(keys, ","),
+		Gw:      r.Gw,
 	}
-	MainNotifier.Notify(n)
+	r.Gw.MainNotifier.Notify(n)
 }
 
 func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
@@ -907,15 +907,15 @@ func (r *RPCStorageHandler) GetKeyPrefix() string {
 }
 
 func (r *RPCStorageHandler) AddToSortedSet(keyName, value string, score float64) {
-	handleGlobalAddToSortedSet(keyName, value, score)
+	r.Gw.handleGlobalAddToSortedSet(keyName, value, score)
 }
 
 func (r *RPCStorageHandler) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
-	return handleGetSortedSetRange(keyName, scoreFrom, scoreTo)
+	return r.Gw.handleGetSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
 func (r *RPCStorageHandler) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
-	return handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo)
+	return r.Gw.handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
 func (r *RPCStorageHandler) RemoveFromList(keyName, value string) error {

@@ -1,0 +1,2 @@
+# .git directory is huge due the history of having lots of binaries in it, which affects the build context
+.git/
