@@ -1,12 +1,9 @@
 package gateway
 
 import (
-	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -1047,155 +1044,6 @@ func BenchmarkCopyRequestResponse(b *testing.B) {
 		for j := 0; j < 10; j++ {
 			req = copyRequest(req)
 			res = copyResponse(res)
-		}
-	}
-}
-
-func TestEnsureTransport(t *testing.T) {
-	cases := []struct {
-		host, protocol, expect string
-	}{
-		{"https://httpbin.org ", "https", "https://httpbin.org"},
-		{"httpbin.org ", "https", "https://httpbin.org"},
-		{"http://httpbin.org ", "https", "http://httpbin.org"},
-		{"httpbin.org ", "tls", "tls://httpbin.org"},
-		{"httpbin.org ", "", "http://httpbin.org"},
-	}
-	for i, v := range cases {
-		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
-			g := EnsureTransport(v.host, v.protocol)
-			if g != v.expect {
-				t.Errorf("expected %q got %q", v.expect, g)
-			}
-		})
-	}
-}
-
-func TestReverseProxyWebSocketCancelation(t *testing.T) {
-	conf := func(globalConf *config.Config) {
-		globalConf.HttpServerOptions.EnableWebSockets = true
-	}
-	ts := StartTest(conf)
-	defer ts.Close()
-
-	n := 5
-	triggerCancelCh := make(chan bool, n)
-	nthResponse := func(i int) string {
-		return fmt.Sprintf("backend response #%d\n", i)
-	}
-	terminalMsg := "final message"
-
-	cst := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if g, ws := upgradeType(r.Header), "websocket"; g != ws {
-			t.Errorf("Unexpected upgrade type %q, want %q", g, ws)
-			http.Error(w, "Unexpected request", 400)
-			return
-		}
-		conn, bufrw, err := w.(http.Hijacker).Hijack()
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		defer conn.Close()
-
-		upgradeMsg := "HTTP/1.1 101 Switching Protocols\r\nConnection: upgrade\r\nUpgrade: WebSocket\r\n\r\n"
-		if _, err := io.WriteString(conn, upgradeMsg); err != nil {
-			t.Error(err)
-			return
-		}
-		if _, _, err := bufrw.ReadLine(); err != nil {
-			t.Errorf("Failed to read line from client: %v", err)
-			return
-		}
-
-		for i := 0; i < n; i++ {
-			if _, err := bufrw.WriteString(nthResponse(i)); err != nil {
-				select {
-				case <-triggerCancelCh:
-				default:
-					t.Errorf("Writing response #%d failed: %v", i, err)
-				}
-				return
-			}
-			bufrw.Flush()
-			time.Sleep(time.Second)
-		}
-		if _, err := bufrw.WriteString(terminalMsg); err != nil {
-			select {
-			case <-triggerCancelCh:
-			default:
-				t.Errorf("Failed to write terminal message: %v", err)
-			}
-		}
-		bufrw.Flush()
-	}))
-	defer cst.Close()
-
-	backendURL, _ := url.Parse(cst.URL)
-	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
-	rproxy := ts.Gw.TykNewSingleHostReverseProxy(backendURL, spec, nil)
-
-	handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		rw.Header().Set("X-Header", "X-Value")
-		ctx, cancel := context.WithCancel(req.Context())
-		go func() {
-			<-triggerCancelCh
-			cancel()
-		}()
-		rproxy.ServeHTTP(rw, req.WithContext(ctx))
-	})
-
-	frontendProxy := httptest.NewServer(handler)
-	defer frontendProxy.Close()
-
-	req, _ := http.NewRequest("GET", frontendProxy.URL, nil)
-	req.Header.Set("Connection", "Upgrade")
-	req.Header.Set("Upgrade", "websocket")
-
-	res, err := frontendProxy.Client().Do(req)
-	if err != nil {
-		t.Fatalf("Dialing to frontend proxy: %v", err)
-	}
-	defer res.Body.Close()
-	if g, w := res.StatusCode, 101; g != w {
-		t.Fatalf("Switching protocols failed, got: %d, want: %d", g, w)
-	}
-
-	if g, w := res.Header.Get("X-Header"), "X-Value"; g != w {
-		t.Errorf("X-Header mismatch\n\tgot:  %q\n\twant: %q", g, w)
-	}
-
-	if g, w := upgradeType(res.Header), "websocket"; g != w {
-		t.Fatalf("Upgrade header mismatch\n\tgot:  %q\n\twant: %q", g, w)
-	}
-
-	rwc, ok := res.Body.(io.ReadWriteCloser)
-	if !ok {
-		t.Fatalf("Response body type mismatch, got %T, want io.ReadWriteCloser", res.Body)
-	}
-
-	if _, err := io.WriteString(rwc, "Hello\n"); err != nil {
-		t.Fatalf("Failed to write first message: %v", err)
-	}
-
-	// Read loop.
-
-	br := bufio.NewReader(rwc)
-	for {
-		line, err := br.ReadString('\n')
-		switch {
-		case line == terminalMsg: // this case before "err == io.EOF"
-			t.Fatalf("The websocket request was not canceled, unfortunately!")
-
-		case err == io.EOF:
-			return
-
-		case err != nil:
-			t.Fatalf("Unexpected error: %v", err)
-
-		case line == nthResponse(0): // We've gotten the first response back
-			// Let's trigger a cancel.
-			close(triggerCancelCh)
 		}
 	}
 }

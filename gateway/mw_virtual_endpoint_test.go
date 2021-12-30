@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -30,8 +28,7 @@ func (ts *Test) testPrepareVirtualEndpoint(js string, method string, path string
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "test"
 		spec.Proxy.ListenPath = "/"
-		spec.UseKeylessAccess = keyless
-		spec.Auth = apidef.AuthConfig{AuthHeaderName: "Authorization"}
+
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "testVirtData",
 			FunctionSourceType:   "blob",
@@ -39,9 +36,6 @@ func (ts *Test) testPrepareVirtualEndpoint(js string, method string, path string
 			Path:                 path,
 			Method:               method,
 			ProxyOnError:         proxyOnError,
-		}
-		if !keyless {
-			virtualMeta.UseSession = true
 		}
 		v := spec.VersionData.Versions["v1"]
 		v.UseExtendedPaths = true
@@ -91,30 +85,6 @@ func TestVirtualEndpoint500(t *testing.T) {
 	ts.Run(t, test.TestCase{
 		Path: "/abc",
 		Code: http.StatusInternalServerError,
-	})
-}
-
-func TestVirtualEndpointSessionMetadata(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	_, key := ts.CreateSession(func(s *user.SessionState) {
-		s.AccessRights = map[string]user.AccessDefinition{"test": {
-			APIID: "test", Versions: []string{"v1"},
-		}}
-		s.MetaData = map[string]interface{}{
-			"tyk_developer_id":       "5f11cc1ba4b16a176b4a6735",
-			"tyk_key_request_fields": map[string]string{"key": "value"},
-			"tyk_user_fields":        map[string]string{"key": "value"},
-		}
-	})
-
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/abc", false, false)
-
-	ts.Run(t, test.TestCase{
-		Path:    "/abc",
-		Headers: map[string]string{"Authorization": key},
-		Code:    http.StatusAccepted,
 	})
 }
 

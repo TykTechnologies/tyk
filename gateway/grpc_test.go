@@ -251,64 +251,6 @@ func TestTLSTyk_H2cUpstream(t *testing.T) {
 	ts.Run(t, test.TestCase{Client: http2Client, Path: "", Code: 200, Proto: "HTTP/2.0", BodyMatch: "Hello, I am an HTTP/2 Server"})
 }
 
-// TestTLSTyk_H2cUpstream check that we can expose an api via https
-// but consume it internally via h2c
-// user -> tyk = HTTPS | tyk -> upstream = H2C
-func TestTLSTyk_H2cUpstream(t *testing.T) {
-
-	// Certificates
-	_, _, _, clientCert := genCertificate(&x509.Certificate{})
-	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID, "")
-
-	var port = 6666
-	// run Tyk in HTTPS
-	globalConf := config.Global()
-	globalConf.ListenPort = port
-	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableHttp2 = true
-	globalConf.HttpServerOptions.EnableHttp2 = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	globalConf.HttpServerOptions.UseSSL = true
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
-	ts := StartTest()
-	defer ts.Close()
-
-	h2cServ := &http2.Server{}
-	expected := "HTTP/2.0"
-	var echo = "Hello, I am an HTTP/2 Server"
-	// Upstream server supporting HTTP/2
-	upstream := httptest.NewUnstartedServer(
-		h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			actual := r.Proto
-			if expected != actual {
-				t.Fatalf("Tyk-Upstream connection protocol is expected %s, actual %s", expected, actual)
-			}
-
-			w.Write([]byte(echo))
-		}), h2cServ),
-	)
-	upstream.Start()
-	defer upstream.Close()
-
-	// upstream protocol should be h2c
-	upstream.URL = strings.Replace(upstream.URL, "http", "h2c", 1)
-	BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = upstream.URL
-	})
-
-	// HTTP/2 client
-	http2Client := GetTLSClient(&clientCert, serverCertPem)
-	http2.ConfigureTransport(http2Client.Transport.(*http.Transport))
-
-	ts.Run(t, test.TestCase{Client: http2Client, Path: "", Code: 200, Proto: "HTTP/2.0", BodyMatch: "Hello, I am an HTTP/2 Server"})
-}
-
 func TestGRPC_TLS(t *testing.T) {
 
 	_, _, combinedPEM, _ := genServerCertificate()
