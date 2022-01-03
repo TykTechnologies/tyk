@@ -20,7 +20,7 @@ require (
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 	github.com/buger/jsonparser v1.1.1
-	github.com/cenk/backoff v2.2.1+incompatible // indirect
+	github.com/cenk/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.0.2
 	github.com/certifi/gocertifi v0.0.0-20190905060710-a5e0173ced67 // indirect
 	github.com/clbanning/mxj v1.8.4
@@ -29,6 +29,8 @@ require (
 	github.com/emanoelxavier/openid2go v0.0.0-20190718021401-6345b638bfc9 // indirect
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
+	github.com/franela/goblin v0.0.0-20211003143422-0a4f594942bf // indirect
+	github.com/franela/goreq v0.0.0-20171204163338-bcd34c9993f8
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/go-redis/redis/v8 v8.3.1
@@ -77,9 +79,7 @@ require (
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	github.com/valyala/fasthttp v1.15.1
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
-	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
-	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
-	github.com/xeipuuv/gojsonschema v0.0.0-20171025060643-212d8a0df7ac
+	github.com/xeipuuv/gojsonschema v1.2.0
 	github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca // indirect
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
@@ -98,6 +98,6 @@ require (
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20211108163221-71ca10e362db
+replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20211221124305-6c32cba2b16f
 
 //replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools
