@@ -12,7 +12,6 @@ import (
 	"sync"
 	"testing"
 
-
 	"github.com/TykTechnologies/tyk/certs"
 
 	"github.com/go-redis/redis/v8"
