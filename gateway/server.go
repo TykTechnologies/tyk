@@ -82,6 +82,7 @@ var (
 const appName = "tyk-gateway"
 
 type Gateway struct {
+
 	DefaultProxyMux *proxyMux
 	config          atomic.Value
 	configMu        sync.Mutex
@@ -179,6 +180,9 @@ type Gateway struct {
 	// RedisController keeps track of redis connection and singleton
 	RedisController *storage.RedisController
 	hostDetails     hostDetails
+
+	healthCheckInfo atomic.Value
+	healthCheckLock sync.Mutex
 }
 
 type hostDetails struct {

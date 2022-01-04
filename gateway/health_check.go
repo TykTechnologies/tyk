@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/TykTechnologies/tyk/rpc"
@@ -32,21 +31,17 @@ const (
 	System                             = "system"
 )
 
-var (
-	healthCheckInfo atomic.Value
-	healthCheckLock sync.Mutex
-)
 
-func setCurrentHealthCheckInfo(h map[string]HealthCheckItem) {
-	healthCheckLock.Lock()
-	healthCheckInfo.Store(h)
-	healthCheckLock.Unlock()
+func (gw *Gateway) setCurrentHealthCheckInfo(h map[string]HealthCheckItem) {
+	gw.healthCheckLock.Lock()
+	gw.healthCheckInfo.Store(h)
+	gw.healthCheckLock.Unlock()
 }
 
-func getHealthCheckInfo() map[string]HealthCheckItem {
-	healthCheckLock.Lock()
-	ret := healthCheckInfo.Load().(map[string]HealthCheckItem)
-	healthCheckLock.Unlock()
+func  (gw *Gateway) getHealthCheckInfo() map[string]HealthCheckItem {
+	gw.healthCheckLock.Lock()
+	ret := gw.healthCheckInfo.Load().(map[string]HealthCheckItem)
+	gw.healthCheckLock.Unlock()
 	return ret
 }
 
@@ -67,7 +62,7 @@ type HealthCheckItem struct {
 }
 
 func (gw *Gateway) initHealthCheck(ctx context.Context) {
-	setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
+	gw.setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
 
 	go func(ctx context.Context) {
 		var n = gw.GetConfig().LivenessCheck.CheckDuration
@@ -191,7 +186,7 @@ func (gw *Gateway) gatherHealthChecks() {
 	wg.Wait()
 
 	allInfos.mux.Lock()
-	setCurrentHealthCheckInfo(allInfos.info)
+	gw.setCurrentHealthCheckInfo(allInfos.info)
 	allInfos.mux.Unlock()
 }
 
@@ -201,7 +196,7 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	checks := getHealthCheckInfo()
+	checks := gw.getHealthCheckInfo()
 
 	res := HealthCheckResponse{
 		Status:      Pass,
