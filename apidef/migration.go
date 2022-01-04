@@ -201,19 +201,21 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	}
 
 	a.MigrateEndpointMeta()
+	a.MigrateCachePlugin()
 	for i := 0; i < len(versions); i++ {
 		versions[i].MigrateEndpointMeta()
+		a.MigrateCachePlugin()
 	}
 
 	return versions, nil
 }
 
-func (a *APIDefinition) MigrateCachePlugin() (err error) {
+func (a *APIDefinition) MigrateCachePlugin() {
 	vInfo := a.VersionData.Versions[""]
 	list := vInfo.ExtendedPaths.Cached
 
 	if vInfo.UseExtendedPaths && len(list) > 0 {
-		var advCacheMethods = []CacheMeta{}
+		var advCacheMethods []CacheMeta
 		for _, cache := range list {
 			newGetMethodCache := CacheMeta{
 				Path:   cache,
@@ -236,6 +238,4 @@ func (a *APIDefinition) MigrateCachePlugin() (err error) {
 	}
 
 	a.VersionData.Versions[""] = vInfo
-
-	return nil
 }

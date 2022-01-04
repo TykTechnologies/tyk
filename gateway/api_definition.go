@@ -682,6 +682,7 @@ func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths [
 		if spec.Disabled {
 			continue
 		}
+
 		newSpec := URLSpec{}
 		a.generateRegex(spec.Path, &newSpec, Cached, conf)
 		newSpec.CacheConfig.Method = spec.Method

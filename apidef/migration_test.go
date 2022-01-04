@@ -323,37 +323,23 @@ func TestAPIDefinition_MigrateEndpointMeta(t *testing.T) {
 	assert.Equal(t, expectedMockResponse, api.VersionData.Versions[""].ExtendedPaths.MockResponse)
 }
 
-func TestAPIDefinition_MigrateCache(t *testing.T) {
-
+func TestAPIDefinition_MigrateCachePlugin(t *testing.T) {
 	versionInfo := VersionInfo{
-		Name:             "",
 		UseExtendedPaths: true,
 		ExtendedPaths: ExtendedPathsSet{
 			Cached: []string{"test"},
 		},
 	}
 
-	old := func() APIDefinition {
-		return APIDefinition{
-			VersionDefinition: VersionDefinition{
-				Location: URLLocation,
+	old := APIDefinition{
+		VersionData: VersionData{
+			Versions: map[string]VersionInfo{
+				"": versionInfo,
 			},
-			VersionData: VersionData{
-				NotVersioned:   false,
-				DefaultVersion: "",
-				Versions: map[string]VersionInfo{
-					"": versionInfo,
-				},
-			},
-		}
+		},
 	}
 
-	base := old()
-
-	err := base.MigrateCachePlugin()
-	assert.NoError(t, err)
-
-	defaultVersionInfo := base.VersionData.Versions[base.VersionData.DefaultVersion]
+	old.MigrateCachePlugin()
 
 	cacheItemGet := CacheMeta{
 		Method:        http.MethodGet,
@@ -372,7 +358,6 @@ func TestAPIDefinition_MigrateCache(t *testing.T) {
 		cacheItemOptions,
 	}
 
-	assert.Empty(t, defaultVersionInfo.ExtendedPaths.Cached)
-	assert.Equal(t, expectedAdvCacheMethods, defaultVersionInfo.ExtendedPaths.AdvanceCacheConfig)
-
+	assert.Empty(t, old.VersionData.Versions[""].ExtendedPaths.Cached)
+	assert.Equal(t, expectedAdvCacheMethods, old.VersionData.Versions[""].ExtendedPaths.AdvanceCacheConfig)
 }

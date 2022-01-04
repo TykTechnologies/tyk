@@ -256,6 +256,24 @@ func (ps Paths) fillMethodTransform(metas []apidef.MethodTransformMeta) {
 	}
 }
 
+func (ps Paths) fillCache(cacheMetas []apidef.CacheMeta) {
+	for _, cm := range cacheMetas {
+		if _, ok := ps[cm.Path]; !ok {
+			ps[cm.Path] = &Path{}
+		}
+
+		plugins := ps[cm.Path].getMethod(cm.Method)
+		if plugins.Cache == nil {
+			plugins.Cache = &CachePlugin{}
+		}
+
+		plugins.Cache.Fill(cm)
+		if ShouldOmit(plugins.Cache) {
+			plugins.Cache = nil
+		}
+	}
+}
+
 func (ps Paths) ExtractTo(ep *apidef.ExtendedPathsSet) {
 	var paths []string
 	for path := range ps {
@@ -453,6 +471,19 @@ func (p *Plugins) extractMethodTransformTo(ep *apidef.ExtendedPathsSet, path str
 	ep.MethodTransforms = append(ep.MethodTransforms, meta)
 }
 
+func (p *Plugins) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.Cache == nil {
+		return
+	}
+
+	newCacheMeta := apidef.CacheMeta{
+		Method: method,
+		Path:   path,
+	}
+	p.Cache.ExtractTo(&newCacheMeta)
+	ep.AdvanceCacheConfig = append(ep.AdvanceCacheConfig, newCacheMeta)
+}
+
 type Allowance struct {
 	Enabled    bool `bson:"enabled" json:"enabled"`
 	IgnoreCase bool `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
@@ -529,37 +560,6 @@ func (mt *MethodTransform) Fill(meta apidef.MethodTransformMeta) {
 func (mt *MethodTransform) ExtractTo(meta *apidef.MethodTransformMeta) {
 	meta.Disabled = !mt.Enabled
 	meta.ToMethod = mt.ToMethod
-}
-
-func (ps Paths) fillCache(cacheMetas []apidef.CacheMeta) {
-	for _, cm := range cacheMetas {
-
-		plugins := ps[cm.Path].getMethod(cm.Method)
-		if plugins.Cache == nil {
-			plugins.Cache = &CachePlugin{}
-		}
-
-		plugins.Cache.Fill(cm)
-		if ShouldOmit(plugins.Cache) {
-			plugins.Cache = nil
-		}
-
-	}
-
-}
-
-func (p *Plugins) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {
-
-	if p.Cache == nil {
-		return
-	}
-
-	newCacheMeta := apidef.CacheMeta{
-		Method: method,
-		Path:   path,
-	}
-	p.Cache.ExtractTo(&newCacheMeta)
-	ep.AdvanceCacheConfig = append(ep.AdvanceCacheConfig, newCacheMeta)
 }
 
 type CachePlugin struct {
