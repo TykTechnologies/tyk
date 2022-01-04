@@ -33,43 +33,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const defaultListenPort = 8080
-
 func TestMain(m *testing.M) {
 	os.Exit(InitTestMain(context.Background(), m))
-}
-
-func createNonThrottledSession() *user.SessionState {
-	session := user.NewSessionState()
-	session.Rate = 100.0
-	session.Allowance = session.Rate
-	session.LastCheck = time.Now().Unix()
-	session.Per = 1.0
-	session.QuotaRenewalRate = 300 // 5 minutes
-	session.QuotaRenews = time.Now().Unix()
-	session.QuotaRemaining = 10
-	session.QuotaMax = 10
-	session.Alias = "TEST-ALIAS"
-	return session
-}
-
-func TestAA(t *testing.T) {
-	ts := StartTest(nil)
-
-	defer ts.Close()
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-	})
-
-	ts.Run(t, []test.TestCase{
-		{Code: 200},
-	}...)
-
-}
-
-type tykErrorResponse struct {
-	Error string
 }
 
 func testKey(testName string, name string) string {
@@ -1591,32 +1556,6 @@ func TestOldCachePlugin(t *testing.T) {
 		check(t)
 	})
 }
-
-// func TestWebsocketsUpstreamUpgradeRequest(t *testing.T) {
-// 	// setup spec and do test HTTP upgrade-request
-// 	globalConf := ts.Gw.GetConfig()
-// 	globalConf.HttpServerOptions.EnableWebSockets = true
-// 	ts.Gw.SetConfig(globalConf)
-// 	defer ResetTestConfig()
-
-// 	ts := StartTest(nil)
-// 	defer ts.Close()
-
-// 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-// 		spec.Proxy.ListenPath = "/"
-// 	})
-
-// 	ts.Run(t, test.TestCase{
-// 		Path: "/ws",
-// 		Headers: map[string]string{
-// 			"Connection":            "Upgrade",
-// 			"Upgrade":               "websocket",
-// 			"Sec-Websocket-Version": "13",
-// 			"Sec-Websocket-Key":     "abc",
-// 		},
-// 		Code: http.StatusSwitchingProtocols,
-// 	})
-// }
 
 func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	ts := StartTest(nil)
