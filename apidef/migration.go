@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error) {
@@ -13,29 +15,45 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 	}
 
 	if a.VersionData.NotVersioned && len(a.VersionData.Versions) > 1 {
-		return nil, errors.New("not migratable - if not versioned, there should be 1 version info in versions map")
+		return nil, errors.New("not migratable - if not versioned, there should be just one version info in versions map")
 	}
 
 	if !a.VersionData.NotVersioned {
+		if _, ok := a.VersionData.Versions[a.VersionData.DefaultVersion]; !ok {
+			return nil, errors.New("not migratable - if versioned, default version should match one of the versions")
+		}
+
 		for vName, vInfo := range a.VersionData.Versions {
 			if a.VersionData.DefaultVersion == vName {
 				continue
 			}
 
 			newAPI := *a
-			newAPI.APIID = ""
+
+			newID := uuid.NewV4()
+			apiID := strings.Replace(newID.String(), "-", "", -1)
+
+			newAPI.APIID = apiID
 			newAPI.Id = ""
+			newAPI.Name += "-" + url.QueryEscape(vName)
+			newAPI.Internal = true
 			newAPI.VersionDefinition = VersionDefinition{}
 			newAPI.VersionData.NotVersioned = true
 			newAPI.VersionData.DefaultVersion = ""
 
 			if vInfo.OverrideTarget != "" {
 				newAPI.Proxy.TargetURL = vInfo.OverrideTarget
+				vInfo.OverrideTarget = ""
 			}
 
 			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
 
 			newAPI.Expiration = vInfo.Expires
+			vInfo.Expires = ""
+
+			newAPI.VersionData.Versions = map[string]VersionInfo{
+				"": vInfo,
+			}
 
 			versions = append(versions, newAPI)
 			delete(a.VersionData.Versions, vName)
@@ -44,7 +62,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 				a.VersionDefinition.Versions = make(map[string]string)
 			}
 
-			a.VersionDefinition.Versions[vName] = ""
+			a.VersionDefinition.Versions[vName] = newAPI.APIID
 		}
 	}
 
