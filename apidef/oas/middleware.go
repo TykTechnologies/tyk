@@ -392,11 +392,12 @@ const (
 )
 
 type Plugins struct {
-	Allow                *Allowance       `bson:"allow,omitempty" json:"allow,omitempty"`
-	Block                *Allowance       `bson:"block,omitempty" json:"block,omitempty"`
-	IgnoreAuthentication *Allowance       `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
-	MockResponse         *MockResponse    `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
-	MethodTransform      *MethodTransform `bson:"methodTransform,omitempty" json:"methodTransform,omitempty"`
+	Allow                *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
+	Block                *Allowance `bson:"block,omitempty" json:"block,omitempty"`
+	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
+	// MockResponse allows you to mock responses for an API endpoint.
+	MockResponse    *MockResponse    `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
+	MethodTransform *MethodTransform `bson:"methodTransform,omitempty" json:"methodTransform,omitempty"`
 }
 
 func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method string) {
@@ -465,11 +466,16 @@ func (a *Allowance) ExtractTo(endpointMeta *apidef.EndPointMeta) {
 }
 
 type MockResponse struct {
-	Enabled    bool     `bson:"enabled" json:"enabled"`
-	IgnoreCase bool     `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
-	Code       int      `bson:"code" json:"code"`
-	Body       string   `bson:"body" json:"body"`
-	Headers    []Header `bson:"headers,omitempty" json:"headers,omitempty"`
+	// Enabled enables Mock response in the given path and method.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// IgnoreCase ignores case while matching incoming request path.
+	IgnoreCase bool `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
+	// Code is the mock response's http response code that will be returned to client.
+	Code int `bson:"code" json:"code"`
+	// Body is the mock response's body that will be returned to client.
+	Body string `bson:"body" json:"body"`
+	// Headers is the mock response's headers that will be returned to client.
+	Headers []Header `bson:"headers,omitempty" json:"headers,omitempty"`
 }
 
 func (mr *MockResponse) Fill(mockMeta apidef.MockResponseMeta) {
