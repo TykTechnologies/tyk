@@ -31,17 +31,12 @@ const (
 	System                             = "system"
 )
 
-
 func (gw *Gateway) setCurrentHealthCheckInfo(h map[string]HealthCheckItem) {
-	gw.healthCheckLock.Lock()
 	gw.healthCheckInfo.Store(h)
-	gw.healthCheckLock.Unlock()
 }
 
-func  (gw *Gateway) getHealthCheckInfo() map[string]HealthCheckItem {
-	gw.healthCheckLock.Lock()
+func (gw *Gateway) getHealthCheckInfo() map[string]HealthCheckItem {
 	ret := gw.healthCheckInfo.Load().(map[string]HealthCheckItem)
-	gw.healthCheckLock.Unlock()
 	return ret
 }
 
