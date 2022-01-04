@@ -326,11 +326,7 @@ func TestOldVersioning_StripPath(t *testing.T) {
 			versions, err := api.MigrateVersioning()
 			assert.NoError(t, err)
 
-			const subVersionID = "subVersionID"
-			api.VersionDefinition.Versions["v1"] = subVersionID
-			versions[0].APIID = subVersionID
 			ts.Gw.LoadAPI(api, &APISpec{APIDefinition: &versions[0]})
-
 			_, _ = ts.Run(t, tc)
 		})
 	}
@@ -394,10 +390,6 @@ func TestOldVersioning_Expires(t *testing.T) {
 
 			apis := []*APISpec{api}
 			if len(versions) > 0 {
-				const subVersionID = "subVersionID"
-				api.VersionDefinition.Versions["v1"] = subVersionID
-				versions[0].APIID = subVersionID
-
 				apis = append(apis, &APISpec{APIDefinition: &versions[0]})
 			}
 
