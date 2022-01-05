@@ -180,6 +180,7 @@ func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillAllowance(ep.Ignored, ignoreAuthentication)
 	ps.fillMockResponse(ep.MockResponse)
 	ps.fillMethodTransform(ep.MethodTransforms)
+	ps.fillCache(ep.AdvanceCacheConfig)
 }
 
 func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
@@ -251,6 +252,24 @@ func (ps Paths) fillMethodTransform(metas []apidef.MethodTransformMeta) {
 		plugins.MethodTransform.Fill(meta)
 		if ShouldOmit(plugins.MethodTransform) {
 			plugins.MethodTransform = nil
+		}
+	}
+}
+
+func (ps Paths) fillCache(cacheMetas []apidef.CacheMeta) {
+	for _, cm := range cacheMetas {
+		if _, ok := ps[cm.Path]; !ok {
+			ps[cm.Path] = &Path{}
+		}
+
+		plugins := ps[cm.Path].getMethod(cm.Method)
+		if plugins.Cache == nil {
+			plugins.Cache = &CachePlugin{}
+		}
+
+		plugins.Cache.Fill(cm)
+		if ShouldOmit(plugins.Cache) {
+			plugins.Cache = nil
 		}
 	}
 }
@@ -398,6 +417,7 @@ type Plugins struct {
 	// MockResponse allows you to mock responses for an API endpoint.
 	MockResponse    *MockResponse    `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
 	MethodTransform *MethodTransform `bson:"methodTransform,omitempty" json:"methodTransform,omitempty"`
+	Cache           *CachePlugin     `bson:"cache,omitempty" json:"cache,omitempty"`
 }
 
 func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method string) {
@@ -406,6 +426,7 @@ func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method str
 	p.extractAllowanceTo(ep, path, method, ignoreAuthentication)
 	p.extractMockResponseTo(ep, path, method)
 	p.extractMethodTransformTo(ep, path, method)
+	p.extractCacheTo(ep, path, method)
 }
 
 func (p *Plugins) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
@@ -448,6 +469,19 @@ func (p *Plugins) extractMethodTransformTo(ep *apidef.ExtendedPathsSet, path str
 	meta := apidef.MethodTransformMeta{Path: path, Method: method}
 	p.MethodTransform.ExtractTo(&meta)
 	ep.MethodTransforms = append(ep.MethodTransforms, meta)
+}
+
+func (p *Plugins) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.Cache == nil {
+		return
+	}
+
+	newCacheMeta := apidef.CacheMeta{
+		Method: method,
+		Path:   path,
+	}
+	p.Cache.ExtractTo(&newCacheMeta)
+	ep.AdvanceCacheConfig = append(ep.AdvanceCacheConfig, newCacheMeta)
 }
 
 type Allowance struct {
@@ -526,4 +560,22 @@ func (mt *MethodTransform) Fill(meta apidef.MethodTransformMeta) {
 func (mt *MethodTransform) ExtractTo(meta *apidef.MethodTransformMeta) {
 	meta.Disabled = !mt.Enabled
 	meta.ToMethod = mt.ToMethod
+}
+
+type CachePlugin struct {
+	Enabled            bool   `bson:"enabled" json:"enabled"`
+	CacheByRegex       string `bson:"cacheByRegex,omitempty" json:"cacheByRegex,omitempty"`
+	CacheResponseCodes []int  `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
+}
+
+func (a *CachePlugin) Fill(cm apidef.CacheMeta) {
+	a.Enabled = !cm.Disabled
+	a.CacheByRegex = cm.CacheKeyRegex
+	a.CacheResponseCodes = cm.CacheOnlyResponseCodes
+}
+
+func (a *CachePlugin) ExtractTo(cm *apidef.CacheMeta) {
+	cm.Disabled = !a.Enabled
+	cm.CacheKeyRegex = a.CacheByRegex
+	cm.CacheOnlyResponseCodes = a.CacheResponseCodes
 }
