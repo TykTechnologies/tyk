@@ -2,6 +2,7 @@ package apidef
 
 import (
 	"errors"
+	"net/http"
 	"net/url"
 	"sort"
 	"strings"
@@ -200,9 +201,41 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	}
 
 	a.MigrateEndpointMeta()
+	a.MigrateCachePlugin()
 	for i := 0; i < len(versions); i++ {
 		versions[i].MigrateEndpointMeta()
+		a.MigrateCachePlugin()
 	}
 
 	return versions, nil
+}
+
+func (a *APIDefinition) MigrateCachePlugin() {
+	vInfo := a.VersionData.Versions[""]
+	list := vInfo.ExtendedPaths.Cached
+
+	if vInfo.UseExtendedPaths && len(list) > 0 {
+		var advCacheMethods []CacheMeta
+		for _, cache := range list {
+			newGetMethodCache := CacheMeta{
+				Path:   cache,
+				Method: http.MethodGet,
+			}
+			newHeadMethodCache := CacheMeta{
+				Path:   cache,
+				Method: http.MethodHead,
+			}
+			newOptionsMethodCache := CacheMeta{
+				Path:   cache,
+				Method: http.MethodOptions,
+			}
+			advCacheMethods = append(advCacheMethods, newGetMethodCache, newHeadMethodCache, newOptionsMethodCache)
+		}
+
+		vInfo.ExtendedPaths.AdvanceCacheConfig = advCacheMethods
+		// reset cache to empty
+		vInfo.ExtendedPaths.Cached = nil
+	}
+
+	a.VersionData.Versions[""] = vInfo
 }
