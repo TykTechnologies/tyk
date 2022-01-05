@@ -14,6 +14,8 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/stretchr/testify/assert"
+
 	"strings"
 	"sync"
 	"testing"
@@ -1547,6 +1549,47 @@ func TestCacheEtag(t *testing.T) {
 		{Method: "GET", Path: "/", Headers: invalidEtag, HeadersMatch: headerCache, BodyMatch: "body"},
 		{Method: "GET", Path: "/", Headers: validEtag, HeadersMatch: headerCache, BodyNotMatch: "body"},
 	}...)
+}
+
+func TestOldCachePlugin(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		UpdateAPIVersion(spec, "v1", func(version *apidef.VersionInfo) {
+			version.UseExtendedPaths = true
+			version.ExtendedPaths.Cached = []string{"/test"}
+		})
+		spec.CacheOptions = apidef.CacheOptions{
+			EnableCache:  true,
+			CacheTimeout: 120,
+		}
+	})[0]
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+
+	check := func(t *testing.T) {
+		cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+		defer cache.DeleteScanMatch("*")
+
+		ts.Gw.LoadAPI(api)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/test", HeadersNotMatch: headerCache, Code: http.StatusOK, Delay: 10 * time.Millisecond},
+			{Path: "/test", HeadersMatch: headerCache, Code: http.StatusOK},
+			{Path: "/anything", HeadersNotMatch: headerCache, Code: http.StatusOK, Delay: 10 * time.Millisecond},
+			{Path: "/anything", HeadersNotMatch: headerCache, Code: http.StatusOK},
+		}...)
+	}
+
+	check(t)
+
+	t.Run("migration", func(t *testing.T) {
+		_, err := api.Migrate()
+		assert.NoError(t, err)
+
+		check(t)
+	})
 }
 
 // func TestWebsocketsUpstreamUpgradeRequest(t *testing.T) {
