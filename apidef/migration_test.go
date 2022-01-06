@@ -67,7 +67,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 	expectedBase.VersionDefinition.Name = v1
 	expectedBase.VersionDefinition.Default = Self
 	expectedBase.VersionDefinition.Versions = map[string]string{
-		v2: "",
+		v2: versions[0].APIID,
 	}
 
 	assert.Equal(t, expectedBase, base)
@@ -75,6 +75,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 	expectedVersion := old()
 	expectedVersion.Id = ""
 	expectedVersion.APIID = ""
+	expectedVersion.Name += "-" + v2
 	expectedVersion.Internal = true
 	expectedVersion.Expiration = exp2
 	expectedVersion.Proxy.ListenPath += "-" + v2 + "/"
@@ -86,6 +87,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 	}
 
 	assert.Len(t, versions, 1)
+	expectedVersion.APIID = versions[0].APIID
 	assert.Equal(t, expectedVersion, versions[0])
 
 	t.Run("override target", func(t *testing.T) {
@@ -100,9 +102,11 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 
 			expectedBase.Proxy.TargetURL = v1Target
 
+			expectedBase.VersionDefinition.Versions[v2] = versions[0].APIID
 			assert.Equal(t, expectedBase, overrideTargetBase)
 
 			assert.Len(t, versions, 1)
+			expectedVersion.APIID = versions[0].APIID
 			assert.Equal(t, expectedVersion, versions[0])
 		})
 
@@ -116,11 +120,13 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 			assert.NoError(t, err)
 
 			expectedBase.Proxy.TargetURL = baseTarget
+			expectedBase.VersionDefinition.Versions[v2] = versions[0].APIID
 
 			assert.Equal(t, expectedBase, overrideTargetBase)
 
 			expectedVersion.Proxy.TargetURL = v2Target
 			assert.Len(t, versions, 1)
+			expectedVersion.APIID = versions[0].APIID
 			assert.Equal(t, expectedVersion, versions[0])
 		})
 	})
@@ -131,7 +137,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 
 		t.Run("multiple versions", func(t *testing.T) {
 			versions, err = versionDisabledBase.MigrateVersioning()
-			assert.EqualError(t, err, "not migratable - if not versioned, there should be 1 version info in versions map")
+			assert.EqualError(t, err, "not migratable - if not versioned, there should be just one version info in versions map")
 		})
 
 		delete(versionDisabledBase.VersionData.Versions, v2)
@@ -315,4 +321,43 @@ func TestAPIDefinition_MigrateEndpointMeta(t *testing.T) {
 	assert.Equal(t, expectedWhitelist, api.VersionData.Versions[""].ExtendedPaths.BlackList)
 	assert.Equal(t, expectedWhitelist, api.VersionData.Versions[""].ExtendedPaths.Ignored)
 	assert.Equal(t, expectedMockResponse, api.VersionData.Versions[""].ExtendedPaths.MockResponse)
+}
+
+func TestAPIDefinition_MigrateCachePlugin(t *testing.T) {
+	versionInfo := VersionInfo{
+		UseExtendedPaths: true,
+		ExtendedPaths: ExtendedPathsSet{
+			Cached: []string{"test"},
+		},
+	}
+
+	old := APIDefinition{
+		VersionData: VersionData{
+			Versions: map[string]VersionInfo{
+				"": versionInfo,
+			},
+		},
+	}
+
+	old.MigrateCachePlugin()
+
+	cacheItemGet := CacheMeta{
+		Method:        http.MethodGet,
+		Disabled:      false,
+		Path:          "test",
+		CacheKeyRegex: "",
+	}
+	cacheItemHead := cacheItemGet
+	cacheItemHead.Method = http.MethodHead
+
+	cacheItemOptions := cacheItemGet
+	cacheItemOptions.Method = http.MethodOptions
+	expectedAdvCacheMethods := []CacheMeta{
+		cacheItemGet,
+		cacheItemHead,
+		cacheItemOptions,
+	}
+
+	assert.Empty(t, old.VersionData.Versions[""].ExtendedPaths.Cached)
+	assert.Equal(t, expectedAdvCacheMethods, old.VersionData.Versions[""].ExtendedPaths.AdvanceCacheConfig)
 }

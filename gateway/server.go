@@ -179,6 +179,8 @@ type Gateway struct {
 	// RedisController keeps track of redis connection and singleton
 	RedisController *storage.RedisController
 	hostDetails     hostDetails
+
+	healthCheckInfo atomic.Value
 }
 
 type hostDetails struct {
