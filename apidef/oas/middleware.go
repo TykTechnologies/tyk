@@ -415,7 +415,8 @@ type Plugins struct {
 	Block                *Allowance `bson:"block,omitempty" json:"block,omitempty"`
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 	// MockResponse allows you to mock responses for an API endpoint.
-	MockResponse    *MockResponse    `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
+	MockResponse *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
+	// MethodTransform allows you to transform the method of a request.
 	MethodTransform *MethodTransform `bson:"methodTransform,omitempty" json:"methodTransform,omitempty"`
 	Cache           *CachePlugin     `bson:"cache,omitempty" json:"cache,omitempty"`
 }
@@ -548,7 +549,9 @@ type Header struct {
 }
 
 type MethodTransform struct {
-	Enabled  bool   `bson:"enabled" json:"enabled"`
+	// Enabled enables Method Transform for the given path and method.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// ToMethod is the http method value to which the method of an incoming request will be transformed.
 	ToMethod string `bson:"toMethod" json:"toMethod"`
 }
 
