@@ -203,6 +203,7 @@ type TemplateData struct {
 }
 
 type TemplateMeta struct {
+	Disabled     bool         `bson:"disabled" json:"disabled"`
 	TemplateData TemplateData `bson:"template_data" json:"template_data"`
 	Path         string       `bson:"path" json:"path"`
 	Method       string       `bson:"method" json:"method"`
