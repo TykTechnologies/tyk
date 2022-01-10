@@ -223,9 +223,10 @@ type HeaderInjectionMeta struct {
 }
 
 type HardTimeoutMeta struct {
-	Path    string `bson:"path" json:"path"`
-	Method  string `bson:"method" json:"method"`
-	TimeOut int    `bson:"timeout" json:"timeout"`
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
+	TimeOut  int    `bson:"timeout" json:"timeout"`
 }
 
 type TrackEndpointMeta struct {

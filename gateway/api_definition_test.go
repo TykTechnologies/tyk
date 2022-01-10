@@ -1293,3 +1293,46 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 		assert.Equal(t, "", r.URL.RawPath)
 	})
 }
+
+func TestEnforcedTimeout(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second)
+	}))
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+		spec.UseKeylessAccess = true
+		UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+			version.UseExtendedPaths = true
+			version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+				{
+					Disabled: false,
+					Path:     "/get",
+					Method:   http.MethodGet,
+					TimeOut:  1,
+				},
+			}
+		})
+	})[0]
+
+	ts.Gw.LoadAPI(api)
+
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodGet, Path: "/get", BodyMatch: "Upstream service reached hard timeout", Code: http.StatusGatewayTimeout,
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		UpdateAPIVersion(api, "", func(version *apidef.VersionInfo) {
+			version.ExtendedPaths.HardTimeouts[0].Disabled = true
+		})
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method: http.MethodGet, Path: "/get", Code: http.StatusOK,
+		})
+	})
+}
