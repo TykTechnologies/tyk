@@ -43,6 +43,10 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	}
 
 	if v.Spec.VersionDefinition.Enabled && targetVersion != apidef.Self && targetVersion != v.Spec.VersionDefinition.Name {
+		if targetVersion == "" {
+			return errors.New(string(VersionNotFound)), http.StatusForbidden
+		}
+
 		subVersionID := v.Spec.VersionDefinition.Versions[targetVersion]
 		handler, _, found := v.Gw.findInternalHttpHandlerByNameOrID(subVersionID)
 		if !found {
