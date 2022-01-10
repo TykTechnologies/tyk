@@ -30,17 +30,19 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 	if baseVInfo, found = a.VersionData.Versions[base]; !found {
 		a.VersionDefinition.Default = ""
 
-		var sortedVersionNames []string
-		for vName := range a.VersionData.Versions {
-			sortedVersionNames = append(sortedVersionNames, vName)
-		}
+		if baseVInfo, found = a.VersionData.Versions["Default"]; !found {
+			var sortedVersionNames []string
+			for vName := range a.VersionData.Versions {
+				sortedVersionNames = append(sortedVersionNames, vName)
+			}
 
-		sort.Strings(sortedVersionNames)
-		if len(sortedVersionNames) > 0 {
-			base = sortedVersionNames[0]
-		}
+			sort.Strings(sortedVersionNames)
+			if len(sortedVersionNames) > 0 {
+				base = sortedVersionNames[0]
+			}
 
-		baseVInfo = a.VersionData.Versions[base]
+			baseVInfo = a.VersionData.Versions[base]
+		}
 	}
 
 	delete(a.VersionData.Versions, base)

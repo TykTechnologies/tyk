@@ -198,6 +198,20 @@ func TestAPIDefinition_MigrateVersioning_DefaultEmpty(t *testing.T) {
 		},
 	}
 	assert.Equal(t, expectedV2Data, versions[0].VersionData)
+
+	t.Run("Default", func(t *testing.T) {
+		base = oldTestAPI()
+		base.VersionData.DefaultVersion = ""
+		base.VersionData.Versions["Default"] = base.VersionData.Versions[v1]
+		base.VersionData.Versions["Alpha"] = base.VersionData.Versions[v2]
+		delete(base.VersionData.Versions, v1)
+		delete(base.VersionData.Versions, v2)
+
+		versions, err = base.MigrateVersioning()
+		assert.NoError(t, err)
+
+		assert.Equal(t, expectedBaseData, base.VersionData)
+	})
 }
 
 func TestAPIDefinition_MigrateVersioning_Expires(t *testing.T) {
