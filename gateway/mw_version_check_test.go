@@ -300,6 +300,60 @@ func TestNewVersioning(t *testing.T) {
 	})
 }
 
+func TestOldVersioning_DefaultVersionEmpty(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.VersionData.NotVersioned = false
+		spec.VersionData.DefaultVersion = ""
+		spec.VersionData.Versions = map[string]apidef.VersionInfo{
+			"v1": {
+				UseExtendedPaths: true,
+				ExtendedPaths: apidef.ExtendedPathsSet{
+					WhiteList: []apidef.EndPointMeta{
+						{
+							Path: "/",
+							MethodActions: map[string]apidef.EndpointMethodMeta{
+								http.MethodGet: {
+									Action: apidef.Reply,
+									Data:   "v1",
+									Code:   http.StatusOK,
+								},
+							},
+						},
+					},
+				},
+			},
+			"v2": {},
+		}
+		spec.VersionDefinition.Location = apidef.URLLocation
+	})[0]
+
+	check := func(t *testing.T, tc []test.TestCase, apis ...*APISpec) {
+		ts.Gw.LoadAPI(apis...)
+		_, _ = ts.Run(t, tc...)
+	}
+
+	cases := []test.TestCase{
+		{Path: "/", BodyMatch: string(VersionNotFound), Code: http.StatusForbidden},
+		{Path: "/v1/", BodyMatch: "v1", Code: http.StatusOK},
+	}
+
+	check(t, cases, api)
+
+	t.Run("migration", func(t *testing.T) {
+		versions, err := api.MigrateVersioning()
+		assert.NoError(t, err)
+
+		var apis []*APISpec
+		apis = append(apis, api, &APISpec{APIDefinition: &versions[0]})
+
+		check(t, cases, apis...)
+	})
+}
+
 func TestOldVersioning_StripPath(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

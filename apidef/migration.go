@@ -2,6 +2,7 @@ package apidef
 
 import (
 	"errors"
+	"net/http"
 	"net/url"
 	"sort"
 	"strings"
@@ -18,16 +19,38 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 		return nil, errors.New("not migratable - if not versioned, there should be just one version info in versions map")
 	}
 
-	if !a.VersionData.NotVersioned {
-		if _, ok := a.VersionData.Versions[a.VersionData.DefaultVersion]; !ok {
-			return nil, errors.New("not migratable - if versioned, default version should match one of the versions")
-		}
+	a.VersionDefinition.Enabled = !a.VersionData.NotVersioned
+	if a.VersionDefinition.Enabled {
+		a.VersionDefinition.Default = Self
+	}
 
-		for vName, vInfo := range a.VersionData.Versions {
-			if a.VersionData.DefaultVersion == vName {
-				continue
+	base := a.VersionData.DefaultVersion
+	var baseVInfo VersionInfo
+	var found bool
+	if baseVInfo, found = a.VersionData.Versions[base]; !found {
+		a.VersionDefinition.Default = ""
+
+		if baseVInfo, found = a.VersionData.Versions["Default"]; !found {
+			var sortedVersionNames []string
+			for vName := range a.VersionData.Versions {
+				sortedVersionNames = append(sortedVersionNames, vName)
 			}
 
+			sort.Strings(sortedVersionNames)
+			if len(sortedVersionNames) > 0 {
+				base = sortedVersionNames[0]
+			}
+
+			baseVInfo = a.VersionData.Versions[base]
+		}
+	}
+
+	delete(a.VersionData.Versions, base)
+
+	if a.VersionDefinition.Enabled {
+		a.VersionDefinition.Name = base
+
+		for vName, vInfo := range a.VersionData.Versions {
 			newAPI := *a
 
 			newID := uuid.NewV4()
@@ -37,72 +60,62 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 			newAPI.Id = ""
 			newAPI.Name += "-" + url.QueryEscape(vName)
 			newAPI.Internal = true
+			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
 			newAPI.VersionDefinition = VersionDefinition{}
-			newAPI.VersionData.NotVersioned = true
-			newAPI.VersionData.DefaultVersion = ""
 
+			// Version API Expires migration
+			newAPI.Expiration = vInfo.Expires
+			vInfo.Expires = ""
+
+			// Version API OverrideTarget migration
 			if vInfo.OverrideTarget != "" {
 				newAPI.Proxy.TargetURL = vInfo.OverrideTarget
 				vInfo.OverrideTarget = ""
 			}
 
-			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
-
-			newAPI.Expiration = vInfo.Expires
-			vInfo.Expires = ""
-
-			newAPI.VersionData.Versions = map[string]VersionInfo{
-				"": vInfo,
+			newAPI.VersionData = VersionData{
+				NotVersioned: true,
+				Versions: map[string]VersionInfo{
+					"": vInfo,
+				},
 			}
-
-			versions = append(versions, newAPI)
-			delete(a.VersionData.Versions, vName)
 
 			if a.VersionDefinition.Versions == nil {
 				a.VersionDefinition.Versions = make(map[string]string)
 			}
 
 			a.VersionDefinition.Versions[vName] = newAPI.APIID
+
+			versions = append(versions, newAPI)
 		}
 	}
 
-	a.VersionDefinition.Enabled = !a.VersionData.NotVersioned
-	if a.VersionDefinition.Enabled {
-		a.VersionDefinition.Default = Self
-		a.VersionDefinition.Name = a.VersionData.DefaultVersion
-	}
-
+	// Base API StripPath migration
 	if a.VersionDefinition.Location == URLLocation {
 		a.VersionDefinition.StripVersioningData = a.VersionDefinition.StripPath
 	}
 
 	a.VersionDefinition.StripPath = false
 
-	defaultVersionInfo := a.VersionData.Versions[a.VersionData.DefaultVersion]
-	if a.VersionData.NotVersioned {
-		for _, v := range a.VersionData.Versions {
-			defaultVersionInfo = v
-			a.VersionData.Versions = map[string]VersionInfo{}
-			break
-		}
+	// Base API Expires migration
+	if a.VersionDefinition.Enabled {
+		a.Expiration = baseVInfo.Expires
 	}
 
-	if defaultVersionInfo.OverrideTarget != "" {
-		a.Proxy.TargetURL = defaultVersionInfo.OverrideTarget
-		defaultVersionInfo.OverrideTarget = ""
+	baseVInfo.Expires = ""
+
+	// Base API OverrideTarget migration
+	if baseVInfo.OverrideTarget != "" {
+		a.Proxy.TargetURL = baseVInfo.OverrideTarget
+		baseVInfo.OverrideTarget = ""
 	}
 
-	if !a.VersionData.NotVersioned {
-		a.Expiration = defaultVersionInfo.Expires
+	a.VersionData = VersionData{
+		NotVersioned: true,
+		Versions: map[string]VersionInfo{
+			"": baseVInfo,
+		},
 	}
-
-	defaultVersionInfo.Expires = ""
-
-	a.VersionData.Versions[""] = defaultVersionInfo
-	delete(a.VersionData.Versions, a.VersionData.DefaultVersion)
-
-	a.VersionData.DefaultVersion = ""
-	a.VersionData.NotVersioned = true
 
 	return
 }
@@ -200,9 +213,41 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	}
 
 	a.MigrateEndpointMeta()
+	a.MigrateCachePlugin()
 	for i := 0; i < len(versions); i++ {
 		versions[i].MigrateEndpointMeta()
+		a.MigrateCachePlugin()
 	}
 
 	return versions, nil
+}
+
+func (a *APIDefinition) MigrateCachePlugin() {
+	vInfo := a.VersionData.Versions[""]
+	list := vInfo.ExtendedPaths.Cached
+
+	if vInfo.UseExtendedPaths && len(list) > 0 {
+		var advCacheMethods []CacheMeta
+		for _, cache := range list {
+			newGetMethodCache := CacheMeta{
+				Path:   cache,
+				Method: http.MethodGet,
+			}
+			newHeadMethodCache := CacheMeta{
+				Path:   cache,
+				Method: http.MethodHead,
+			}
+			newOptionsMethodCache := CacheMeta{
+				Path:   cache,
+				Method: http.MethodOptions,
+			}
+			advCacheMethods = append(advCacheMethods, newGetMethodCache, newHeadMethodCache, newOptionsMethodCache)
+		}
+
+		vInfo.ExtendedPaths.AdvanceCacheConfig = advCacheMethods
+		// reset cache to empty
+		vInfo.ExtendedPaths.Cached = nil
+	}
+
+	a.VersionData.Versions[""] = vInfo
 }

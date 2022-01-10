@@ -14,6 +14,8 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/stretchr/testify/assert"
+
 	"strings"
 	"sync"
 	"testing"
@@ -31,43 +33,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const defaultListenPort = 8080
-
 func TestMain(m *testing.M) {
 	os.Exit(InitTestMain(context.Background(), m))
-}
-
-func createNonThrottledSession() *user.SessionState {
-	session := user.NewSessionState()
-	session.Rate = 100.0
-	session.Allowance = session.Rate
-	session.LastCheck = time.Now().Unix()
-	session.Per = 1.0
-	session.QuotaRenewalRate = 300 // 5 minutes
-	session.QuotaRenews = time.Now().Unix()
-	session.QuotaRemaining = 10
-	session.QuotaMax = 10
-	session.Alias = "TEST-ALIAS"
-	return session
-}
-
-func TestAA(t *testing.T) {
-	ts := StartTest(nil)
-
-	defer ts.Close()
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-	})
-
-	ts.Run(t, []test.TestCase{
-		{Code: 200},
-	}...)
-
-}
-
-type tykErrorResponse struct {
-	Error string
 }
 
 func testKey(testName string, name string) string {
@@ -1549,31 +1516,46 @@ func TestCacheEtag(t *testing.T) {
 	}...)
 }
 
-// func TestWebsocketsUpstreamUpgradeRequest(t *testing.T) {
-// 	// setup spec and do test HTTP upgrade-request
-// 	globalConf := ts.Gw.GetConfig()
-// 	globalConf.HttpServerOptions.EnableWebSockets = true
-// 	ts.Gw.SetConfig(globalConf)
-// 	defer ResetTestConfig()
+func TestOldCachePlugin(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
 
-// 	ts := StartTest(nil)
-// 	defer ts.Close()
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		UpdateAPIVersion(spec, "v1", func(version *apidef.VersionInfo) {
+			version.UseExtendedPaths = true
+			version.ExtendedPaths.Cached = []string{"/test"}
+		})
+		spec.CacheOptions = apidef.CacheOptions{
+			EnableCache:  true,
+			CacheTimeout: 120,
+		}
+	})[0]
 
-// 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-// 		spec.Proxy.ListenPath = "/"
-// 	})
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 
-// 	ts.Run(t, test.TestCase{
-// 		Path: "/ws",
-// 		Headers: map[string]string{
-// 			"Connection":            "Upgrade",
-// 			"Upgrade":               "websocket",
-// 			"Sec-Websocket-Version": "13",
-// 			"Sec-Websocket-Key":     "abc",
-// 		},
-// 		Code: http.StatusSwitchingProtocols,
-// 	})
-// }
+	check := func(t *testing.T) {
+		cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+		defer cache.DeleteScanMatch("*")
+
+		ts.Gw.LoadAPI(api)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/test", HeadersNotMatch: headerCache, Code: http.StatusOK, Delay: 10 * time.Millisecond},
+			{Path: "/test", HeadersMatch: headerCache, Code: http.StatusOK},
+			{Path: "/anything", HeadersNotMatch: headerCache, Code: http.StatusOK, Delay: 10 * time.Millisecond},
+			{Path: "/anything", HeadersNotMatch: headerCache, Code: http.StatusOK},
+		}...)
+	}
+
+	check(t)
+
+	t.Run("migration", func(t *testing.T) {
+		_, err := api.Migrate()
+		assert.NoError(t, err)
+
+		check(t)
+	})
+}
 
 func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	ts := StartTest(nil)
