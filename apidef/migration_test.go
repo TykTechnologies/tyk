@@ -153,6 +153,67 @@ func TestAPIDefinition_MigrateVersioning_Disabled(t *testing.T) {
 	})
 }
 
+func TestAPIDefinition_MigrateVersioning_DefaultEmpty(t *testing.T) {
+	base := oldTestAPI()
+	base.VersionData.DefaultVersion = ""
+
+	versions, err := base.MigrateVersioning()
+	assert.NoError(t, err)
+
+	// v1 - selected as base even if default is empty, alphabetically v1>v2
+	expectedBaseDefinition := VersionDefinition{
+		Enabled:             true,
+		Name:                v1,
+		Default:             "", // should be empty
+		Location:            URLLocation,
+		Key:                 key,
+		StripVersioningData: true,
+		Versions: map[string]string{
+			v2: versions[0].APIID,
+		},
+	}
+	assert.Equal(t, expectedBaseDefinition, base.VersionDefinition)
+
+	expectedBaseData := VersionData{
+		NotVersioned: true,
+		Versions: map[string]VersionInfo{
+			"": {
+				UseExtendedPaths: true,
+				ExtendedPaths:    testV1ExtendedPaths,
+			},
+		},
+	}
+	assert.Equal(t, expectedBaseData, base.VersionData)
+
+	// v2
+	assert.Empty(t, versions[0].VersionDefinition)
+
+	expectedV2Data := VersionData{
+		NotVersioned: true,
+		Versions: map[string]VersionInfo{
+			"": {
+				UseExtendedPaths: true,
+				ExtendedPaths:    testV2ExtendedPaths,
+			},
+		},
+	}
+	assert.Equal(t, expectedV2Data, versions[0].VersionData)
+
+	t.Run("Default", func(t *testing.T) {
+		base = oldTestAPI()
+		base.VersionData.DefaultVersion = ""
+		base.VersionData.Versions["Default"] = base.VersionData.Versions[v1]
+		base.VersionData.Versions["Alpha"] = base.VersionData.Versions[v2]
+		delete(base.VersionData.Versions, v1)
+		delete(base.VersionData.Versions, v2)
+
+		versions, err = base.MigrateVersioning()
+		assert.NoError(t, err)
+
+		assert.Equal(t, expectedBaseData, base.VersionData)
+	})
+}
+
 func TestAPIDefinition_MigrateVersioning_Expires(t *testing.T) {
 	t.Run("version enabled", func(t *testing.T) {
 		base := oldTestAPI()
