@@ -41,8 +41,11 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 					FieldNames: []string{"hello"},
 				},
 			},
-			ChildNodes: nil,
-			Factory:    &graphqlDataSource.Factory{HTTPClient: httpClient},
+			ChildNodes: []plan.TypeField{},
+			Factory: &graphqlDataSource.Factory{
+				BatchFactory: graphqlDataSource.NewBatchFactory(),
+				HTTPClient:   httpClient,
+			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
 					URL: "http://localhost:8080",
@@ -95,8 +98,11 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 					FieldNames: []string{"hello"},
 				},
 			},
-			ChildNodes: nil,
-			Factory:    &graphqlDataSource.Factory{HTTPClient: httpClient},
+			ChildNodes: []plan.TypeField{},
+			Factory: &graphqlDataSource.Factory{
+				BatchFactory: graphqlDataSource.NewBatchFactory(),
+				HTTPClient:   httpClient,
+			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
 					URL: "http://api-name",
@@ -155,6 +161,63 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		_, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
 	})
+	t.Run("should create v2 config for supergraph with batching disabled", func(t *testing.T) {
+		var gqlConfig apidef.GraphQLConfig
+		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
+
+		apiDef := &apidef.APIDefinition{
+			GraphQL: gqlConfig,
+		}
+		apiDef.GraphQL.Supergraph.DisableQueryBatching = true
+
+		httpClient := &http.Client{}
+		adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
+
+		v2Config, err := adapter.EngineConfigV2()
+		assert.NoError(t, err)
+		expectedDataSource := plan.DataSourceConfiguration{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"me"},
+				},
+				{
+					TypeName:   "User",
+					FieldNames: []string{"id", "username"},
+				},
+			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "User",
+					FieldNames: []string{"id", "username"},
+				},
+			},
+			Factory: &graphqlDataSource.Factory{
+				HTTPClient: httpClient,
+			},
+			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+				Fetch: graphqlDataSource.FetchConfiguration{
+					URL:    "http://accounts.service",
+					Method: http.MethodPost,
+					Header: http.Header{
+						"Auth":           []string{"appended_header"},
+						"Header1":        []string{"override_global"},
+						"Header2":        []string{"value2"},
+						"X-Tyk-Internal": []string{"true"},
+					},
+				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{
+					URL: "http://accounts.service",
+				},
+				Federation: graphqlDataSource.FederationConfiguration{
+					Enabled:    true,
+					ServiceSDL: `extend type Query {me: User} type User @key(fields: "id"){ id: ID! username: String!}`,
+				},
+			}),
+		}
+		assert.Containsf(t, v2Config.DataSources(), expectedDataSource, "engine configuration does not contain proxy-only data source")
+
+	})
 
 	t.Run("should create v2 config for subgraph without error", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
@@ -182,15 +245,18 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 			},
 			ChildNodes: []plan.TypeField{
 				{
-					TypeName:   "User",
-					FieldNames: []string{"id", "username"},
-				},
-				{
 					TypeName:   "_Service",
 					FieldNames: []string{"sdl"},
 				},
+				{
+					TypeName:   "User",
+					FieldNames: []string{"id", "username"},
+				},
 			},
-			Factory: &graphqlDataSource.Factory{HTTPClient: httpClient},
+			Factory: &graphqlDataSource.Factory{
+				BatchFactory: graphqlDataSource.NewBatchFactory(),
+				HTTPClient:   httpClient,
+			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
 					URL: "http://localhost:8080",
@@ -242,9 +308,10 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				URL:    "http://accounts.service",
 				Method: http.MethodPost,
 				Header: http.Header{
-					"Header1":        []string{"value1"},
+					"Header1":        []string{"override_global"},
 					"Header2":        []string{"value2"},
 					"X-Tyk-Internal": []string{"true"},
+					"Auth":           []string{"appended_header"},
 				},
 			},
 			Subscription: graphqlDataSource.SubscriptionConfiguration{
@@ -277,7 +344,8 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				URL:    "http://reviews.service",
 				Method: http.MethodPost,
 				Header: http.Header{
-					"Header1": []string{"value1"},
+					"Header1": []string{"override_global"},
+					"Auth":    []string{"appended_header"},
 					"Header2": []string{"value2"},
 				},
 			},
@@ -321,6 +389,44 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 				},
 				{
 					Name:       "name",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		},
+		{
+			TypeName:  "Query",
+			FieldName: "restWithQueryParams",
+			Arguments: []plan.ArgumentConfiguration{
+				{
+					Name:       "q",
+					SourceType: plan.FieldArgumentSource,
+				},
+				{
+					Name:       "order",
+					SourceType: plan.FieldArgumentSource,
+				},
+				{
+					Name:       "limit",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		},
+		{
+			TypeName:  "Query",
+			FieldName: "restWithPathParams",
+			Arguments: []plan.ArgumentConfiguration{
+				{
+					Name:       "id",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		},
+		{
+			TypeName:  "Query",
+			FieldName: "restWithFullUrlAsParam",
+			Arguments: []plan.ArgumentConfiguration{
+				{
+					Name:       "url",
 					SourceType: plan.FieldArgumentSource,
 				},
 			},
@@ -493,6 +599,71 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			}),
 		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"restWithQueryParams"},
+				},
+			},
+			Factory: &restDataSource.Factory{
+				Client: httpClient,
+			},
+			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+				Fetch: restDataSource.FetchConfiguration{
+					URL:    "https://rest-with-query-params.example.com",
+					Method: "POST",
+					Query: []restDataSource.QueryConfiguration{
+						{
+							Name:  "q",
+							Value: "{{.arguments.q}}",
+						},
+						{
+							Name:  "order",
+							Value: "{{.arguments.order}}",
+						},
+						{
+							Name:  "limit",
+							Value: "{{.arguments.limit}}",
+						},
+					},
+				},
+			}),
+		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"restWithPathParams"},
+				},
+			},
+			Factory: &restDataSource.Factory{
+				Client: httpClient,
+			},
+			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+				Fetch: restDataSource.FetchConfiguration{
+					URL:    "https://rest-with-path-params.example.com/{{.arguments.id}}",
+					Method: "POST",
+				},
+			}),
+		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"restWithFullUrlAsParam"},
+				},
+			},
+			Factory: &restDataSource.Factory{
+				Client: httpClient,
+			},
+			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+				Fetch: restDataSource.FetchConfiguration{
+					URL:    "{{.arguments.url}}",
+					Method: "POST",
+				},
+			}),
+		},
 	}
 
 	var gqlConfig apidef.GraphQLConfig
@@ -518,13 +689,41 @@ const graphqlEngineV1ConfigJson = `{
 	"playground": {}
 }`
 
-const v2Schema = `type Query { rest: String gql(id: ID!, name: String): String deepGQL: DeepGQL withChildren: WithChildren multiRoot1: MultiRoot1 multiRoot2: MultiRoot2 } type WithChildren { id: ID! name: String nested: Nested } type Nested { id: ID! name: String! } type MultiRoot1 { id: ID! } type MultiRoot2 { name: String! } type DeepGQL { query(code: String!): String }`
+var v2Schema = strconv.Quote(`type Query {
+  rest: String
+  gql(id: ID!, name: String): String
+  deepGQL: DeepGQL
+  withChildren: WithChildren
+  multiRoot1: MultiRoot1
+  multiRoot2: MultiRoot2
+  restWithQueryParams(q: String, order: String, limit: Int): [String]
+  restWithPathParams(id: String): [String]
+  restWithFullUrlAsParam(url: String): [String]
+}
+type WithChildren {
+  id: ID!
+  name: String
+  nested: Nested
+}
+type Nested {
+  id: ID!
+  name: String!
+}
+type MultiRoot1 {
+  id: ID!
+}
+type MultiRoot2 {
+  name: String!
+}
+type DeepGQL {
+  query(code: String!): String
+}`)
 
-const graphqlEngineV2ConfigJson = `{
+var graphqlEngineV2ConfigJson = `{
 	"enabled": true,
 	"execution_mode": "executionEngine",
 	"version": "2",
-	"schema": "` + v2Schema + `",
+	"schema": ` + v2Schema + `,
 	"last_schema_update": "2020-11-11T11:11:11.000+01:00",
 	"engine": {
 		"field_configs": [
@@ -621,6 +820,56 @@ const graphqlEngineV2ConfigJson = `{
 						"Auth": "123"
 					}
 				}
+			},
+			{
+				"kind": "REST",
+				"name": "restWithQueryParams",
+				"internal": true,
+				"root_fields": [
+					{ "type": "Query", "fields": ["restWithQueryParams"] }
+				],
+				"config": {
+					"url": "https://rest-with-query-params.example.com?q={{.arguments.q}}&order={{.arguments.order}}",
+					"method": "POST",
+					"headers": {},
+					"query": [
+						{
+							"name": "limit",
+							"value": "{{.arguments.limit}}"
+						}
+					],
+					"body": ""
+				}
+			},
+			{
+				"kind": "REST",
+				"name": "restWithPathParams",
+				"internal": true,
+				"root_fields": [
+					{ "type": "Query", "fields": ["restWithPathParams"] }
+				],
+				"config": {
+					"url": "https://rest-with-path-params.example.com/{{.arguments.id}}",
+					"method": "POST",
+					"headers": {},
+					"query": [],
+					"body": ""
+				}
+			},
+			{
+				"kind": "REST",
+				"name": "restWithFullUrlAsParam",
+				"internal": true,
+				"root_fields": [
+					{ "type": "Query", "fields": ["restWithFullUrlAsParam"] }
+				],
+				"config": {
+					"url": "{{.arguments.url}}",
+					"method": "POST",
+					"headers": {},
+					"query": [],
+					"body": ""
+				}
 			}
 		]
 	},
@@ -647,7 +896,11 @@ var graphqlEngineV2SupergraphConfigJson = `{
 			{
 				"api_id": "",
 				"url": "tyk://accounts.service",
-				"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `
+				"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `,
+				"headers": {
+					"header1": "override_global",
+					"Auth": "appended_header"
+				}
 			},
 			{
 				"api_id": "",
@@ -662,7 +915,12 @@ var graphqlEngineV2SupergraphConfigJson = `{
 			{
 				"api_id": "",
 				"url": "http://reviews.service",
-				"sdl": ` + strconv.Quote(federationReviewsServiceSDL) + `
+				"sdl": ` + strconv.Quote(federationReviewsServiceSDL) + `,
+				"headers": {
+					"header1": "override_global",
+					"header2": "value2",
+					"Auth": "appended_header"
+				}
 			}
 		],
 		"global_headers": {

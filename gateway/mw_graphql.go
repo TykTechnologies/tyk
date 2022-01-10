@@ -375,7 +375,7 @@ func needsGraphQLExecutionEngine(apiSpec *APISpec) bool {
 		apidef.GraphQLExecutionModeSupergraph:
 		return true
 	case apidef.GraphQLExecutionModeSubgraph:
-		return false
+		return true
 	case apidef.GraphQLExecutionModeProxyOnly:
 		if apiSpec.GraphQL.Version == apidef.GraphQLConfigVersion2 {
 			return true
