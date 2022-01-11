@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -80,21 +79,22 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.TestName, func(t *testing.T) {
-			ts := StartTest()
+			ts := StartTest(nil)
 			defer ts.Close()
 
-			globalConf := config.Global()
+			globalConf := ts.Gw.GetConfig()
 			globalConf.HashKeys = tc.Hashed
-			config.SetGlobal(globalConf)
+			ts.Gw.SetConfig(globalConf)
 
 			rpcListener := RPCStorageHandler{
 				KeyPrefix:        "rpc.listener.",
 				SuppressRegister: true,
 				HashKeys:         tc.Hashed,
+				Gw:               ts.Gw,
 			}
 
-			myApi := loadTestOAuthSpec()
-			oauthClient := createTestOAuthClient(myApi, authClientID)
+			myApi := ts.LoadTestOAuthSpec()
+			oauthClient := ts.createTestOAuthClient(myApi, authClientID)
 			tokenData := getToken(t, ts)
 			token := tc.GetToken(tokenData)
 
@@ -125,11 +125,11 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 					return refresh, err
 				}
 			} else {
-				getKeyFromStore = GlobalSessionManager.Store().GetKey
-				GlobalSessionManager.Store().DeleteAllKeys()
-				err := GlobalSessionManager.Store().SetRawKey(token, token, 100)
+				getKeyFromStore = ts.Gw.GlobalSessionManager.Store().GetKey
+				ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+				err := ts.Gw.GlobalSessionManager.Store().SetRawKey(token, token, 100)
 				assert.NoError(t, err)
-				_, err = GlobalSessionManager.Store().GetRawKey(token)
+				_, err = ts.Gw.GlobalSessionManager.Store().GetRawKey(token)
 				assert.NoError(t, err)
 			}
 
@@ -146,19 +146,20 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 }
 
 func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
 	rpcListener := RPCStorageHandler{
 		KeyPrefix:        "rpc.listener.",
 		SuppressRegister: true,
 		HashKeys:         false,
+		Gw:               g.Gw,
 	}
 
-	GlobalSessionManager.Store().DeleteAllKeys()
-	defer GlobalSessionManager.Store().DeleteAllKeys()
+	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 
-	g := StartTest()
-	defer g.Close()
-
-	api := BuildAndLoadAPI(func(spec *APISpec) {
+	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/api"
 	})[0]
@@ -185,21 +186,21 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 
 	// AllowanceScope is api id.
 	quotaKey := QuotaKeyPrefix + api.APIID + "-" + key
-	quotaCounter, err := GlobalSessionManager.Store().GetRawKey(quotaKey)
+	quotaCounter, err := g.Gw.GlobalSessionManager.Store().GetRawKey(quotaKey)
 	assert.NoError(t, err)
 	assert.Equal(t, "3", quotaCounter)
 
 	rpcListener.ProcessKeySpaceChanges([]string{key + ":resetQuota", key}, api.OrgID)
 
 	// mock of key reload in mdcb environment
-	err = GlobalSessionManager.UpdateSession(key, session, 0, false)
+	err = g.Gw.GlobalSessionManager.UpdateSession(key, session, 0, false)
 	assert.NoError(t, err)
 
 	// Call 1 time
 	_, _ = g.Run(t, test.TestCase{Path: "/api", Headers: auth, Code: http.StatusOK})
 
 	// ProcessKeySpaceChanges should reset the quota counter, it should be 1 instead of 4.
-	quotaCounter, err = GlobalSessionManager.Store().GetRawKey(quotaKey)
+	quotaCounter, err = g.Gw.GlobalSessionManager.Store().GetRawKey(quotaKey)
 	assert.NoError(t, err)
 	assert.Equal(t, "1", quotaCounter)
 }

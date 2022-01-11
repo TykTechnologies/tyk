@@ -6,7 +6,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -18,6 +17,7 @@ type HeaderInjectorOptions struct {
 type HeaderInjector struct {
 	Spec   *APISpec
 	config HeaderInjectorOptions
+	Gw     *Gateway `json:"-"`
 }
 
 func (HeaderInjector) Name() string {
@@ -34,16 +34,17 @@ func (h *HeaderInjector) HandleError(rw http.ResponseWriter, req *http.Request) 
 func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	// TODO: This should only target specific paths
 
-	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	vInfo, versionPaths, _, _ := h.Spec.Version(req)
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjectedResponse)
+
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
 		for _, dKey := range hmeta.DeleteHeaders {
 			res.Header.Del(dKey)
 		}
 		for nKey, nVal := range hmeta.AddHeaders {
-			setCustomHeader(res.Header, nKey, replaceTykVariables(req, nVal, false), ignoreCanonical)
+			setCustomHeader(res.Header, nKey, h.Gw.replaceTykVariables(req, nVal, false), ignoreCanonical)
 		}
 	}
 
@@ -55,15 +56,16 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 
 	for key, val := range vInfo.GlobalResponseHeaders {
 		log.Debug("Adding: ", key)
-		setCustomHeader(res.Header, key, replaceTykVariables(req, val, false), ignoreCanonical)
+		setCustomHeader(res.Header, key, h.Gw.replaceTykVariables(req, val, false), ignoreCanonical)
 	}
 
 	// Manage global response header options with response_processors
 	for _, n := range h.config.RemoveHeaders {
 		res.Header.Del(n)
 	}
-	for h, v := range h.config.AddHeaders {
-		setCustomHeader(res.Header, h, replaceTykVariables(req, v, false), ignoreCanonical)
+
+	for header, v := range h.config.AddHeaders {
+		setCustomHeader(res.Header, header, h.Gw.replaceTykVariables(req, v, false), ignoreCanonical)
 	}
 
 	return nil

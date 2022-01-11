@@ -1,63 +1,25 @@
 package gateway
 
 import (
-	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
 	"io/ioutil"
-	"math/big"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
 )
-
-func genCertificate(template *x509.Certificate) ([]byte, []byte, []byte, tls.Certificate) {
-	priv, _ := rsa.GenerateKey(rand.Reader, 1024)
-
-	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, _ := rand.Int(rand.Reader, serialNumberLimit)
-	template.SerialNumber = serialNumber
-	template.BasicConstraintsValid = true
-	template.NotBefore = time.Now()
-	template.NotAfter = template.NotBefore.Add(time.Hour)
-
-	derBytes, _ := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
-
-	var certPem, keyPem bytes.Buffer
-	pem.Encode(&certPem, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	pem.Encode(&keyPem, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
-
-	clientCert, _ := tls.X509KeyPair(certPem.Bytes(), keyPem.Bytes())
-
-	combinedPEM := bytes.Join([][]byte{certPem.Bytes(), keyPem.Bytes()}, []byte("\n"))
-
-	return certPem.Bytes(), keyPem.Bytes(), combinedPEM, clientCert
-}
-
-func genServerCertificate() ([]byte, []byte, []byte, tls.Certificate) {
-	certPem, privPem, combinedPEM, cert := genCertificate(&x509.Certificate{
-		DNSNames:    []string{"localhost"},
-		IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::")},
-	})
-
-	return certPem, privPem, combinedPEM, cert
-}
 
 const (
 	internalTLSErr  = "tls: unrecognized name"
@@ -67,7 +29,7 @@ const (
 
 func TestGatewayTLS(t *testing.T) {
 	// Configure server
-	serverCertPem, serverPrivPem, combinedPEM, _ := genServerCertificate()
+	serverCertPem, serverPrivPem, combinedPEM, _ := certs.GenServerCertificate()
 
 	dir, _ := ioutil.TempDir("", "certs")
 	defer os.RemoveAll(dir)
@@ -75,15 +37,14 @@ func TestGatewayTLS(t *testing.T) {
 	client := GetTLSClient(nil, nil)
 
 	t.Run("Without certificates", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.UseSSL = true
-		config.SetGlobal(globalConf)
-		defer ResetTestConfig()
 
-		ts := StartTest()
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+		}
+		ts := StartTest(conf)
 		defer ts.Close()
 
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -91,146 +52,167 @@ func TestGatewayTLS(t *testing.T) {
 	})
 
 	t.Run("Legacy TLS certificate path", func(t *testing.T) {
+
 		certFilePath := filepath.Join(dir, "server.crt")
-		ioutil.WriteFile(certFilePath, serverCertPem, 0666)
+		err := ioutil.WriteFile(certFilePath, serverCertPem, 0666)
+		if err != nil {
+			t.Error("writing serverCertPem")
+		}
 
 		certKeyPath := filepath.Join(dir, "server.key")
-		ioutil.WriteFile(certKeyPath, serverPrivPem, 0666)
+		err = ioutil.WriteFile(certKeyPath, serverPrivPem, 0666)
+		if err != nil {
+			t.Error("writing serverPrivPem")
+		}
 
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.Certificates = []config.CertData{{
-			Name:     "localhost",
-			CertFile: certFilePath,
-			KeyFile:  certKeyPath,
-		}}
-		globalConf.HttpServerOptions.UseSSL = true
-		config.SetGlobal(globalConf)
-		defer ResetTestConfig()
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.HttpServerOptions.Certificates = []config.CertData{{
+				Name:     "localhost",
+				CertFile: certFilePath,
+				KeyFile:  certKeyPath,
+			}}
+		}
 
-		ts := StartTest()
+		ts := StartTest(conf)
 		defer ts.Close()
 
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
 
 		ts.Run(t, test.TestCase{Code: 200, Client: client})
 
-		CertificateManager.FlushCache()
+		ts.Gw.CertificateManager.FlushCache()
 		tlsConfigCache.Flush()
 	})
 
 	t.Run("File certificate path", func(t *testing.T) {
 		certPath := filepath.Join(dir, "server.pem")
-		ioutil.WriteFile(certPath, combinedPEM, 0666)
+		err := ioutil.WriteFile(certPath, combinedPEM, 0666)
+		if err != nil {
+			t.Error("could not write server.pem file")
+		}
 
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SSLCertificates = []string{certPath}
-		globalConf.HttpServerOptions.UseSSL = true
-		config.SetGlobal(globalConf)
-		defer ResetTestConfig()
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.SSLCertificates = []string{certPath}
+			globalConf.HttpServerOptions.UseSSL = true
+		}
 
-		ts := StartTest()
+		ts := StartTest(conf)
 		defer ts.Close()
 
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
 
 		ts.Run(t, test.TestCase{Code: 200, Client: client})
 
-		CertificateManager.FlushCache()
+		ts.Gw.CertificateManager.FlushCache()
 		tlsConfigCache.Flush()
 	})
 
 	t.Run("Redis certificate", func(t *testing.T) {
-		certID, err := CertificateManager.Add(combinedPEM, "")
+		s := StartTest(nil)
+		defer s.Close()
+		certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
+
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		}
+		ts := StartTest(conf)
+		defer ts.Close()
+
+		certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "")
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer CertificateManager.Delete(certID, "")
 
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		globalConf.HttpServerOptions.UseSSL = true
-		config.SetGlobal(globalConf)
-		defer ResetTestConfig()
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+		ts.ReloadGatewayProxy()
 
-		ts := StartTest()
-		defer ts.Close()
-
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
 
 		ts.Run(t, test.TestCase{Code: 200, Client: client})
 
-		CertificateManager.FlushCache()
+		ts.Gw.CertificateManager.FlushCache()
 		tlsConfigCache.Flush()
 	})
 }
 
 func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	// Configure server
-	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-
-	globalConf := config.Global()
-	globalConf.HttpServerOptions.UseSSL = true
-	globalConf.Security.ControlAPIUseMutualTLS = true
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	dir, _ := ioutil.TempDir("", "certs")
 
 	defer func() {
 		os.RemoveAll(dir)
-		CertificateManager.FlushCache()
 		tlsConfigCache.Flush()
 	}()
 
-	clientCertPem, _, _, clientCert := genCertificate(&x509.Certificate{})
+	clientWithoutCert := GetTLSClient(nil, nil)
+	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
 	clientWithCert := GetTLSClient(&clientCert, serverCertPem)
 
-	clientWithoutCert := GetTLSClient(nil, nil)
-
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 	t.Run("Separate domain", func(t *testing.T) {
-		certID, _ := CertificateManager.Add(combinedPEM, "")
-		defer CertificateManager.Delete(certID, "")
 
-		globalConf := config.Global()
-		globalConf.ControlAPIHostname = "localhost"
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		config.SetGlobal(globalConf)
-
-		ts := StartTest()
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.Security.ControlAPIUseMutualTLS = true
+			globalConf.ControlAPIHostname = "localhost"
+			globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		}
+		ts := StartTest(conf)
 		defer ts.Close()
 
+		certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+		ts.ReloadGatewayProxy()
+
 		defer func() {
-			CertificateManager.FlushCache()
+			ts.Gw.CertificateManager.FlushCache()
 			tlsConfigCache.Flush()
-			globalConf := config.Global()
+			globalConf := ts.Gw.GetConfig()
 			globalConf.HttpServerOptions.SSLCertificates = nil
 			globalConf.Security.Certificates.ControlAPI = nil
-			config.SetGlobal(globalConf)
+			ts.Gw.SetConfig(globalConf)
 		}()
 
 		unknownErr := "x509: certificate signed by unknown authority"
 
 		ts.Run(t, []test.TestCase{
-			// Should acess tyk without client certificates
+			// Should access tyk without client certificates
 			{Client: clientWithoutCert},
 			// Should raise error for ControlAPI without certificate
 			{ControlRequest: true, ErrorMatch: unknownErr},
 			// Should raise error for for unknown certificate
 			{ControlRequest: true, ErrorMatch: badcertErr, Client: clientWithCert},
 		}...)
+	})
 
-		clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-		defer CertificateManager.Delete(clientCertID, "")
+	t.Run("Separate domain/ control api with valid cert", func(t *testing.T) {
+		clientCertID, _, _ := certs.GetCertIDAndChainPEM(clientCertPem, "")
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.Security.ControlAPIUseMutualTLS = true
+			globalConf.ControlAPIHostname = "localhost"
+			globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+			globalConf.Security.Certificates.ControlAPI = []string{clientCertID}
+		}
 
-		globalConf = config.Global()
-		globalConf.Security.Certificates.ControlAPI = []string{clientCertID}
-		config.SetGlobal(globalConf)
+		ts := StartTest(conf)
+		defer ts.Close()
+
+		certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		clientCertID, _ = ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+		ts.ReloadGatewayProxy()
 
 		// Should pass request with valid client cert
 		ts.Run(t, test.TestCase{
@@ -240,31 +222,33 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 }
 
 func TestAPIMutualTLS(t *testing.T) {
-	// Configure server
-	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID, "")
 
-	globalConf := config.Global()
-	globalConf.EnableCustomDomains = true
-	globalConf.HttpServerOptions.UseSSL = true
-	globalConf.ListenPort = 0
-	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
-	ts := StartTest()
+	conf := func(globalConf *config.Config) {
+		globalConf.EnableCustomDomains = true
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	}
+	ts := StartTest(conf)
 	defer ts.Close()
 
+	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "")
+	if err != nil {
+		panic(err)
+	}
+	defer ts.Gw.CertificateManager.Delete(certID, "")
+	ts.ReloadGatewayProxy()
+
 	// Initialize client certificates
-	clientCertPem, _, _, clientCert := genCertificate(&x509.Certificate{})
-	clientCertPem2, _, _, clientCert2 := genCertificate(&x509.Certificate{})
+	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+	clientCertPem2, _, _, clientCert2 := certs.GenCertificate(&x509.Certificate{})
 
 	t.Run("SNI and domain per API", func(t *testing.T) {
 		t.Run("API without mutual TLS", func(t *testing.T) {
 			client := GetTLSClient(&clientCert, serverCertPem)
-
-			BuildAndLoadAPI(func(spec *APISpec) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
 				spec.Proxy.ListenPath = "/"
 			})
@@ -275,7 +259,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		t.Run("MutualTLSCertificate not set", func(t *testing.T) {
 			client := GetTLSClient(nil, nil)
 
-			BuildAndLoadAPI(func(spec *APISpec) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
 				spec.Proxy.ListenPath = "/"
 				spec.UseMutualTLSAuth = true
@@ -290,9 +274,9 @@ func TestAPIMutualTLS(t *testing.T) {
 
 		t.Run("Client certificate match", func(t *testing.T) {
 			client := GetTLSClient(&clientCert, serverCertPem)
-			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
+			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 
-			BuildAndLoadAPI(func(spec *APISpec) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
 				spec.Proxy.ListenPath = "/"
 				spec.UseMutualTLSAuth = true
@@ -303,8 +287,8 @@ func TestAPIMutualTLS(t *testing.T) {
 				Code: 200, Client: client, Domain: "localhost",
 			})
 
-			CertificateManager.Delete(clientCertID, "")
-			CertificateManager.FlushCache()
+			ts.Gw.CertificateManager.Delete(clientCertID, "")
+			ts.Gw.CertificateManager.FlushCache()
 			tlsConfigCache.Flush()
 
 			client = GetTLSClient(&clientCert, serverCertPem)
@@ -316,11 +300,11 @@ func TestAPIMutualTLS(t *testing.T) {
 		t.Run("Client certificate differ", func(t *testing.T) {
 			client := GetTLSClient(&clientCert, serverCertPem)
 
-			clientCertPem2, _, _, _ := genCertificate(&x509.Certificate{})
-			clientCertID2, _ := CertificateManager.Add(clientCertPem2, "")
-			defer CertificateManager.Delete(clientCertID2, "")
+			clientCertPem2, _, _, _ := certs.GenCertificate(&x509.Certificate{})
+			clientCertID2, _ := ts.Gw.CertificateManager.Add(clientCertPem2, "")
+			defer ts.Gw.CertificateManager.Delete(clientCertID2, "")
 
-			BuildAndLoadAPI(func(spec *APISpec) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
 				spec.Proxy.ListenPath = "/"
 				spec.UseMutualTLSAuth = true
@@ -335,11 +319,11 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	t.Run("Multiple APIs on same domain", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
-			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-			defer CertificateManager.Delete(clientCertID, "")
+			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+			defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
 			loadAPIS := func(certs ...string) {
-				BuildAndLoadAPI(
+				ts.Gw.BuildAndLoadAPI(
 					func(spec *APISpec) {
 						spec.Proxy.ListenPath = "/without_mutual"
 						spec.Domain = domain
@@ -415,14 +399,14 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	t.Run("Multiple APIs with Mutual TLS on the same domain", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
-			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-			defer CertificateManager.Delete(clientCertID, "")
+			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+			defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
-			clientCertID2, _ := CertificateManager.Add(clientCertPem2, "")
-			defer CertificateManager.Delete(clientCertID2, "")
+			clientCertID2, _ := ts.Gw.CertificateManager.Add(clientCertPem2, "")
+			defer ts.Gw.CertificateManager.Delete(clientCertID2, "")
 
 			loadAPIS := func(certs []string, certs2 []string) {
-				BuildAndLoadAPI(
+				ts.Gw.BuildAndLoadAPI(
 					func(spec *APISpec) {
 						spec.Proxy.ListenPath = "/with_mutual"
 						spec.UseMutualTLSAuth = true
@@ -528,11 +512,11 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	t.Run("Multiple APIs, mutual on custom", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
-			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-			defer CertificateManager.Delete(clientCertID, "")
+			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+			defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
 			loadAPIS := func(certs ...string) {
-				BuildAndLoadAPI(
+				ts.Gw.BuildAndLoadAPI(
 					func(spec *APISpec) {
 						spec.Proxy.ListenPath = "/with_mutual"
 						spec.UseMutualTLSAuth = true
@@ -622,11 +606,11 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	t.Run("Multiple APIs, mutual on empty", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
-			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-			defer CertificateManager.Delete(clientCertID, "")
+			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+			defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
 			loadAPIS := func(certs ...string) {
-				BuildAndLoadAPI(
+				ts.Gw.BuildAndLoadAPI(
 					func(spec *APISpec) {
 						spec.Proxy.ListenPath = "/with_mutual"
 						spec.UseMutualTLSAuth = true
@@ -712,7 +696,10 @@ func TestAPIMutualTLS(t *testing.T) {
 }
 
 func TestUpstreamMutualTLS(t *testing.T) {
-	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{})
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -745,20 +732,16 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	})
 
 	t.Run("Upstream API", func(t *testing.T) {
-		globalConf := config.Global()
+		globalConf := ts.Gw.GetConfig()
 		globalConf.ProxySSLInsecureSkipVerify = true
-		config.SetGlobal(globalConf)
-		defer ResetTestConfig()
+		ts.Gw.SetConfig(globalConf)
 
-		ts := StartTest()
-		defer ts.Close()
-
-		clientCertID, _ := CertificateManager.Add(combinedClientPEM, "")
-		defer CertificateManager.Delete(clientCertID, "")
+		clientCertID, _ := ts.Gw.CertificateManager.Add(combinedClientPEM, "")
+		defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
 		pool.AddCert(clientCert.Leaf)
 
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.UpstreamCertificates = map[string]string{
@@ -777,7 +760,7 @@ func TestSSLForceCommonName(t *testing.T) {
 	}))
 
 	// generate certificate Common Name as valid hostname and SAN as non-empty value
-	_, _, _, cert := genCertificate(&x509.Certificate{
+	_, _, _, cert := certs.GenCertificate(&x509.Certificate{
 		EmailAddresses: []string{"test@test.com"},
 		Subject:        pkix.Name{CommonName: "host1.local"},
 	})
@@ -792,11 +775,11 @@ func TestSSLForceCommonName(t *testing.T) {
 
 	// test case to ensure that Golang doesn't check against CommonName if SAN is non empty
 	t.Run("Force Common Name Check is Disabled", func(t *testing.T) {
-		ts := StartTest()
+		ts := StartTest(nil)
 		defer ts.Close()
 
 		targetURL := strings.Replace(upstream.URL, "127.0.0.1", "localhost", 1)
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = targetURL
 		})
@@ -804,16 +787,15 @@ func TestSSLForceCommonName(t *testing.T) {
 	})
 
 	t.Run("Force Common Name Check is Enabled", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.SSLForceCommonNameCheck = true
-		config.SetGlobal(globalConf)
-		defer ResetTestConfig()
-
-		ts := StartTest()
+		ts := StartTest(nil)
 		defer ts.Close()
 
+		globalConf := ts.Gw.GetConfig()
+		globalConf.SSLForceCommonNameCheck = true
+		ts.Gw.SetConfig(globalConf)
+
 		targetURL := strings.Replace(upstream.URL, "127.0.0.1", "host1.local", 1)
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = targetURL
 		})
@@ -823,30 +805,33 @@ func TestSSLForceCommonName(t *testing.T) {
 }
 
 func TestKeyWithCertificateTLS(t *testing.T) {
-	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(serverCertID, "")
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
+	serverCertID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
-	globalConf := config.Global()
-	globalConf.HttpServerOptions.UseSSL = true
-	globalConf.EnableCustomDomains = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
+	conf := func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.EnableCustomDomains = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
+		globalConf.HealthCheckEndpointName = "hello"
+	}
 
-	ts := StartTest()
+	ts := StartTest(conf)
 	defer ts.Close()
+
+	serverCertID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
+	ts.ReloadGatewayProxy()
 
 	orgId := "default"
 	t.Run("Without domain", func(t *testing.T) {
-		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
-		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
+		clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
 		if err != nil {
 			t.Fatal("certificate should be added to cert manager")
 		}
 
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.BaseIdentityProvidedBy = apidef.AuthToken
 			spec.AuthConfigs = map[string]apidef.AuthConfig{
@@ -894,14 +879,14 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	})
 
 	t.Run("With custom domain", func(t *testing.T) {
-		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
-		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
+		clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
 		if err != nil {
 			t.Fatal("certificate should be added to cert manager")
 		}
 
-		BuildAndLoadAPI(
+		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) {
 				spec.UseKeylessAccess = false
 				spec.BaseIdentityProvidedBy = apidef.AuthToken
@@ -958,14 +943,14 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	})
 
 	t.Run("With regex custom domain", func(t *testing.T) {
-		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
-		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
+		clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
 		if err != nil {
 			t.Fatal("certificate should be added to cert manager")
 		}
 
-		api := BuildAndLoadAPI(
+		api := ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) {
 				spec.APIID = "api-with-regex-custom-domain"
 				spec.UseKeylessAccess = false
@@ -999,14 +984,14 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 	// check that a key no longer works after the cert is removed
 	t.Run("Cert removed", func(t *testing.T) {
-		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
-		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
+		clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
 		if err != nil {
 			t.Fatal("certificate should be added to cert manager")
 		}
 
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.BaseIdentityProvidedBy = apidef.AuthToken
 			spec.AuthConfigs = map[string]apidef.AuthConfig{
@@ -1029,7 +1014,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 		// check we can use the key after remove the cert
 		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
-		CertificateManager.Delete(clientCertID, orgId)
+		ts.Gw.CertificateManager.Delete(clientCertID, orgId)
 		// now we should not be allowed to use the key
 		ts.Run(t, test.TestCase{Path: "/", Code: 403, Client: client})
 	})
@@ -1037,26 +1022,24 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 }
 
 func TestAPICertificate(t *testing.T) {
-	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(serverCertID, "")
+	conf := func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{}
+	}
 
-	globalConf := config.Global()
-	globalConf.HttpServerOptions.UseSSL = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{}
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
-	ts := StartTest()
+	ts := StartTest(conf)
 	defer ts.Close()
 
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
+	serverCertID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
 		InsecureSkipVerify: true,
 		MaxVersion:         tls.VersionTLS12,
 	}}}
 
 	t.Run("Cert set via API", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Certificates = []string{serverCertID}
 			spec.UseKeylessAccess = true
 			spec.Proxy.ListenPath = "/"
@@ -1066,7 +1049,7 @@ func TestAPICertificate(t *testing.T) {
 	})
 
 	t.Run("Cert unknown", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = true
 			spec.Proxy.ListenPath = "/"
 		})
@@ -1076,13 +1059,13 @@ func TestAPICertificate(t *testing.T) {
 }
 
 func TestCertificateHandlerTLS(t *testing.T) {
-	_, _, combinedServerPEM, serverCert := genServerCertificate()
+	_, _, combinedServerPEM, serverCert := certs.GenServerCertificate()
 	serverCertID := certs.HexSHA256(serverCert.Certificate[0])
 
-	clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
+	clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
 	clientCertID := certs.HexSHA256(clientCert.Certificate[0])
 
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	t.Run("List certificates, empty", func(t *testing.T) {
@@ -1131,22 +1114,24 @@ func TestCertificateHandlerTLS(t *testing.T) {
 }
 
 func TestCipherSuites(t *testing.T) {
+
 	//configure server so we can useSSL and utilize the logic, but skip verification in the clients
-	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(serverCertID, "")
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
+	serverCertID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
-	globalConf := config.Global()
-	globalConf.HttpServerOptions.UseSSL = true
-	globalConf.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
-	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
-	ts := StartTest()
+	conf := func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
+		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
+	}
+	ts := StartTest(conf)
 	defer ts.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	serverCertID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
+	ts.ReloadGatewayProxy()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 	})
 

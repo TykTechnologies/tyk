@@ -506,14 +506,7 @@ type APIDefinition struct {
 		DefaultVersion string                 `bson:"default_version" json:"default_version"`
 		Versions       map[string]VersionInfo `bson:"versions" json:"versions"`
 	} `bson:"version_data" json:"version_data"`
-	UptimeTests struct {
-		CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
-		Config    struct {
-			ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
-			ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-			RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
-		} `bson:"config" json:"config"`
-	} `bson:"uptime_tests" json:"uptime_tests"`
+	UptimeTests               UptimeTests            `bson:"uptime_tests" json:"uptime_tests"`
 	Proxy                     ProxyConfig            `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
 	DisableQuota              bool                   `bson:"disable_quota" json:"disable_quota"`
@@ -546,6 +539,15 @@ type APIDefinition struct {
 	StripAuthData             bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 	EnableDetailedRecording   bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 	GraphQL                   GraphQLConfig          `bson:"graphql" json:"graphql"`
+}
+
+type UptimeTests struct {
+	CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
+	Config    struct {
+		ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
+		ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
+		RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
+	} `bson:"config" json:"config"`
 }
 
 type AuthConfig struct {
@@ -864,6 +866,32 @@ func (a *APIDefinition) DecodeFromDB() {
 
 	makeCompatible("authToken")
 	makeCompatible("jwt")
+}
+
+// Expired returns true if this Version has expired
+// and false if it has not expired (or does not have any expiry)
+func (v *VersionInfo) Expired() bool {
+	// Never expires
+	if v.Expires == "" || v.Expires == "-1" {
+		return false
+	}
+
+	// otherwise use parsed timestamp
+	if v.ExpiresTs.IsZero() {
+		log.Error("Could not parse expiry date, disallow")
+		return true
+	}
+
+	return time.Since(v.ExpiresTs) >= 0
+}
+
+// ExpiryTime returns the time that this version is due to expire
+func (v *VersionInfo) ExpiryTime() (exp time.Time) {
+	if v.Expired() {
+		return exp
+	}
+	exp = v.ExpiresTs
+	return
 }
 
 func (s *StringRegexMap) Check(value string) (match string) {

@@ -13,7 +13,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/murmur3"
-	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -63,6 +62,8 @@ type AnalyticsHandler interface {
 	Connect() bool
 	AppendToSetPipelined(string, [][]byte)
 	GetAndDeleteSet(string) []interface{}
+	SetExp(string, int64) error   // Set key expiration
+	GetExp(string) (int64, error) // Returns expiry of a key
 }
 
 const defaultHashAlgorithm = "murmur64"
@@ -165,8 +166,8 @@ func HashStr(in string, withAlg ...string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func HashKey(in string) string {
-	if !config.Global().HashKeys {
+func HashKey(in string, hashKey bool) string {
+	if !hashKey {
 		// Not hashing? Return the raw key
 		return in
 	}

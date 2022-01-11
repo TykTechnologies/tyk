@@ -66,6 +66,9 @@ func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
 }
 
 func TestReverseProxyRetainHost(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	target, _ := url.Parse("http://target-host.com/targetpath")
 	cases := []struct {
 		name          string
@@ -105,7 +108,7 @@ func TestReverseProxyRetainHost(t *testing.T) {
 				setCtxValue(req, ctx.RetainHost, true)
 			}
 
-			proxy := TykNewSingleHostReverseProxy(target, spec, nil)
+			proxy := ts.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
 			proxy.Director(req)
 
 			if got := req.URL.String(); got != tc.wantURL {
@@ -122,22 +125,22 @@ type configTestReverseProxyDnsCache struct {
 	dnsConfig   config.DnsCacheConfig
 }
 
-func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
-	pullDomains := mockHandle.PushDomains(cfg.etcHostsMap, nil)
-	dnsCacheManager.InitDNSCaching(
+func (s *Test) SetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
+	pullDomains := s.MockHandle.PushDomains(cfg.etcHostsMap, nil)
+	s.Gw.dnsCacheManager.InitDNSCaching(
 		time.Duration(cfg.dnsConfig.TTL)*time.Second, time.Duration(cfg.dnsConfig.CheckInterval)*time.Second)
 
-	globalConf := config.Global()
+	globalConf := s.Gw.GetConfig()
 	enableWebSockets := globalConf.HttpServerOptions.EnableWebSockets
 
 	globalConf.HttpServerOptions.EnableWebSockets = true
-	config.SetGlobal(globalConf)
+	s.Gw.SetConfig(globalConf)
 
 	return func() {
 		pullDomains()
-		dnsCacheManager.DisposeCache()
+		s.Gw.dnsCacheManager.DisposeCache()
 		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
-		config.SetGlobal(globalConf)
+		s.Gw.SetConfig(globalConf)
 	}
 }
 
@@ -168,12 +171,15 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		}
 	)
 
-	tearDown := setupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	tearDown := ts.SetupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
 		config.DnsCacheConfig{
 			Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval,
 			MultipleIPsHandleStrategy: config.NoCacheStrategy}})
 
-	currentStorage := dnsCacheManager.CacheStorage()
+	currentStorage := ts.Gw.dnsCacheManager.CacheStorage()
 	fakeDeleteStorage := &dnscache.MockStorage{
 		MockFetchItem: currentStorage.FetchItem,
 		MockGet:       currentStorage.Get,
@@ -182,7 +188,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			//prevent deletion
 		},
 		MockClear: currentStorage.Clear}
-	dnsCacheManager.SetCacheStorage(fakeDeleteStorage)
+	ts.Gw.dnsCacheManager.SetCacheStorage(fakeDeleteStorage)
 
 	defer tearDown()
 
@@ -274,9 +280,9 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage := dnsCacheManager.CacheStorage()
+			storage := ts.Gw.dnsCacheManager.CacheStorage()
 			if !tc.isCacheEnabled {
-				dnsCacheManager.SetCacheStorage(nil)
+				ts.Gw.dnsCacheManager.SetCacheStorage(nil)
 			}
 
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{},
@@ -289,7 +295,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			}
 
 			Url, _ := url.Parse(tc.URL)
-			proxy := TykNewSingleHostReverseProxy(Url, spec, nil)
+			proxy := ts.Gw.TykNewSingleHostReverseProxy(Url, spec, nil)
 			recorder := httptest.NewRecorder()
 			proxy.WrappedServeHTTP(recorder, req, false)
 
@@ -307,13 +313,14 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			}
 
 			if !tc.isCacheEnabled {
-				dnsCacheManager.SetCacheStorage(storage)
+				ts.Gw.dnsCacheManager.SetCacheStorage(storage)
 			}
 		})
 	}
 }
 
-func testNewWrappedServeHTTP() *ReverseProxy {
+func (s *Test) TestNewWrappedServeHTTP() *ReverseProxy {
+
 	target, _ := url.Parse(TestHttpGet)
 	def := apidef.APIDefinition{}
 	def.VersionData.DefaultVersion = "Default"
@@ -347,22 +354,25 @@ func testNewWrappedServeHTTP() *ReverseProxy {
 		EnforcedTimeoutEnabled: true,
 		CircuitBreakerEnabled:  true,
 	}
-	return TykNewSingleHostReverseProxy(target, spec, nil)
+	return s.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
 }
 
 func TestWrappedServeHTTP(t *testing.T) {
-	proxy := testNewWrappedServeHTTP()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	proxy := ts.TestNewWrappedServeHTTP()
 	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	proxy.WrappedServeHTTP(recorder, req, false)
 }
 
 func TestCircuitBreaker5xxs(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				json.Unmarshal([]byte(`[
 					{
@@ -479,6 +489,9 @@ func TestRequestIP(t *testing.T) {
 }
 
 func TestCheckHeaderInRemoveList(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	type testSpec struct {
 		UseExtendedPaths      bool
 		GlobalHeadersRemove   []string
@@ -565,7 +578,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			spec := LoadSampleAPI(specOutput.String())
+			spec := ts.Gw.LoadSampleAPI(specOutput.String())
 			actual := rp.CheckHeaderInRemoveList(tc.header, spec, r)
 			if actual != tc.expected {
 				t.Fatalf("want %t, got %t", tc.expected, actual)
@@ -682,7 +695,7 @@ func TestNopCloseResponseBody(t *testing.T) {
 }
 
 func TestGraphQL_HeadersInjection(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	t.Cleanup(g.Close)
 
 	composedAPI := BuildAPI(func(spec *APISpec) {
@@ -701,7 +714,7 @@ func TestGraphQL_HeadersInjection(t *testing.T) {
 		spec.GraphQL.TypeFieldConfigurations = nil
 	})[0]
 
-	LoadAPI(composedAPI)
+	g.Gw.LoadAPI(composedAPI)
 
 	headers := graphql.Request{
 		Query: "query Query { headers { name value } }",
@@ -723,7 +736,8 @@ func TestGraphQL_HeadersInjection(t *testing.T) {
 }
 
 func TestGraphQL_InternalDataSource(t *testing.T) {
-	g := StartTest()
+
+	g := StartTest(nil)
 	defer g.Close()
 
 	tykGraphQL := BuildAPI(func(spec *APISpec) {
@@ -799,7 +813,7 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 			}
 		})[0]
 
-		LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
+		g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
 
 		reviews := graphql.Request{
 			Query: `query Query { me { id username reviews { body } } }`,
@@ -826,8 +840,7 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 			spec.GraphQL.TypeFieldConfigurations = nil
 		})[0]
 
-		LoadAPI(tykGraphQL, tykREST, composedAPI)
-
+		g.Gw.LoadAPI(tykGraphQL, tykREST, composedAPI)
 		countries := graphql.Request{
 			Query: "query Query { countries { name } }",
 		}
@@ -858,7 +871,7 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 			})
 		})[0]
 
-		LoadAPI(tykGraphQL, tykREST, composedAPI)
+		g.Gw.LoadAPI(tykGraphQL, tykREST, composedAPI)
 
 		countries := graphql.Request{
 			Query: "query Query { countries { name } }",
@@ -879,10 +892,10 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 }
 
 func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.GraphQL.Enabled = true
 		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 		spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
@@ -918,7 +931,7 @@ func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {
 }
 
 func TestGraphQL_OptionsPassThrough(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
 	var headers = map[string]string{
@@ -936,7 +949,7 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 	}
 
 	t.Run("ProxyOnly should pass through", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.GraphQL.Enabled = true
 			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
@@ -959,7 +972,7 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 		})
 	})
 	t.Run("UDG should not pass through", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.GraphQL.Enabled = true
 			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
@@ -977,7 +990,8 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 		})
 	})
 	t.Run("Supergraph should not pass through", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.GraphQL.Enabled = true
 			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
@@ -1005,7 +1019,11 @@ func BenchmarkRequestIPHops(b *testing.B) {
 
 func BenchmarkWrappedServeHTTP(b *testing.B) {
 	b.ReportAllocs()
-	proxy := testNewWrappedServeHTTP()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	proxy := ts.TestNewWrappedServeHTTP()
 	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	for i := 0; i < b.N; i++ {

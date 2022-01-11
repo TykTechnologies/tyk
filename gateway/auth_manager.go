@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 	uuid "github.com/satori/go.uuid"
@@ -30,6 +29,7 @@ type SessionHandler interface {
 type DefaultSessionManager struct {
 	store storage.Handler
 	orgID string
+	Gw    *Gateway `json:"-"`
 }
 
 func (b *DefaultSessionManager) Init(store storage.Handler) {
@@ -52,13 +52,13 @@ func (b *DefaultSessionManager) Store() storage.Handler {
 func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState, isHashed bool) {
 	origKeyName := keyName
 	if !isHashed {
-		keyName = storage.HashKey(keyName)
+		keyName = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
 	}
 
 	rawKey := QuotaKeyPrefix + keyName
 	log.WithFields(logrus.Fields{
 		"prefix":      "auth-mgr",
-		"inbound-key": obfuscateKey(origKeyName),
+		"inbound-key": b.Gw.obfuscateKey(origKeyName),
 		"key":         rawKey,
 	}).Info("Reset quota for key.")
 
@@ -78,18 +78,19 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 	cacheKey := keyName
 	if !hashed {
-		cacheKey = storage.HashKey(keyName)
+		cacheKey = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
 	}
 
-	// Delete current gateway's cache immediately
-	SessionCache.Delete(cacheKey)
+	// Delete gateway's cache immediately
+	b.Gw.SessionCache.Delete(cacheKey)
 
 	// Notify gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: cacheKey,
+		Gw:      b.Gw,
 	}
-	MainNotifier.Notify(n)
+	b.Gw.MainNotifier.Notify(n)
 }
 
 // UpdateSession updates the session state in the storage engine
@@ -123,7 +124,7 @@ func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hash
 	} else {
 		// support both old and new key hashing
 		res1 := b.store.DeleteKey(keyName)
-		res2 := b.store.DeleteKey(generateToken(orgID, keyName))
+		res2 := b.store.DeleteKey(b.Gw.generateToken(orgID, keyName))
 		return res1 || res2
 	}
 }
@@ -140,14 +141,13 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	} else {
 		if storage.TokenOrg(keyName) != orgID {
 			// try to get legacy and new format key at once
-			toSearchList := []string{generateToken(orgID, keyName), keyName}
-			for _, fallback := range config.Global().HashKeyFunctionFallback {
-				toSearchList = append(toSearchList, generateToken(orgID, keyName, fallback))
+			toSearchList := []string{b.Gw.generateToken(orgID, keyName), keyName}
+			for _, fallback := range b.Gw.GetConfig().HashKeyFunctionFallback {
+				toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName, fallback))
 			}
 
 			var jsonKeyValList []string
 			jsonKeyValList, err = b.store.GetMultiKey(toSearchList)
-
 			// pick the 1st non empty from the returned list
 			for idx, val := range jsonKeyValList {
 				if val != "" {
@@ -165,7 +165,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "auth-mgr",
-			"inbound-key": obfuscateKey(keyName),
+			"inbound-key": b.Gw.obfuscateKey(keyName),
 			"err":         err,
 		}).Debug("Could not get session detail, key not found")
 		return user.SessionState{}, false
@@ -186,11 +186,13 @@ func (b *DefaultSessionManager) Sessions(filter string) []string {
 	return b.store.GetKeys(filter)
 }
 
-type DefaultKeyGenerator struct{}
+type DefaultKeyGenerator struct {
+	Gw *Gateway `json:"-"`
+}
 
-func generateToken(orgID, keyID string, customHashKeyFunction ...string) string {
+func (gw *Gateway) generateToken(orgID, keyID string, customHashKeyFunction ...string) string {
 	keyID = strings.TrimPrefix(keyID, orgID)
-	hashKeyFunction := config.Global().HashKeyFunction
+	hashKeyFunction := gw.GetConfig().HashKeyFunction
 
 	if len(customHashKeyFunction) > 0 {
 		hashKeyFunction = customHashKeyFunction[0]
@@ -208,8 +210,8 @@ func generateToken(orgID, keyID string, customHashKeyFunction ...string) string 
 }
 
 // GenerateAuthKey is a utility function for generating new auth keys. Returns the storage key name and the actual key
-func (DefaultKeyGenerator) GenerateAuthKey(orgID string) string {
-	return generateToken(orgID, "")
+func (d DefaultKeyGenerator) GenerateAuthKey(orgID string) string {
+	return d.Gw.generateToken(orgID, "")
 }
 
 // GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key

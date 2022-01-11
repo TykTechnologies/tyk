@@ -10,22 +10,22 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts *Test, data map[string]interface{}) {
+func (ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[string]interface{}) {
+
 	// load API
 	orgID := "test-org-" + uuid.NewV4().String()
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.OrgID = orgID
 		spec.Proxy.ListenPath = "/"
 	})
 
 	data["org_id"] = orgID
-	storage.DisableRedis(true)
-	expectBody := `{"status":"error","message":"Error writing to key store storage: Redis is either down or ws not configured"}`
+	ts.Gw.RedisController.DisableRedis(true)
+	expectBody := `{"status":"error","message":"Error writing to key store storage: Redis is either down or was not configured"}`
 	// create org key with quota
 	ts.Run(tb, test.TestCase{
 		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",
@@ -35,7 +35,7 @@ func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts *Test, data map[strin
 		Code:      http.StatusInternalServerError,
 		BodyMatch: expectBody,
 	})
-	storage.DisableRedis(false)
+	ts.Gw.RedisController.DisableRedis(false)
 
 	ts.Run(tb, test.TestCase{
 		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",
@@ -47,19 +47,16 @@ func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts *Test, data map[strin
 }
 
 func TestProcessRequestLiveQuotaLimit(t *testing.T) {
-	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.ExperimentalProcessOrgOffThread = false
-	config.SetGlobal(globalConf)
 
-	// run test server
-	ts := StartTest()
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.ExperimentalProcessOrgOffThread = false
+	}
+	ts := StartTest(conf)
 	defer ts.Close()
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		t,
-		ts,
 		map[string]interface{}{
 			"quota_max":          10,
 			"quota_remaining":    10,
@@ -92,22 +89,22 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 	b.ReportAllocs()
 
-	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.ExperimentalProcessOrgOffThread = false
-	config.SetGlobal(globalConf)
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.ExperimentalProcessOrgOffThread = false
+	}
 
-	defer ResetTestConfig()
-
-	// run test server
-	ts := StartTest()
+	ts := StartTest(conf)
 	defer ts.Close()
 
+	// setup global config
+	globalConf := ts.Gw.GetConfig()
+
+	ts.Gw.SetConfig(globalConf)
+
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		b,
-		ts,
 		map[string]interface{}{
 			"quota_max":          100000000,
 			"quota_remaining":    100000000,
@@ -123,21 +120,17 @@ func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 }
 
 func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.ExperimentalProcessOrgOffThread = true
+	}
 	// run test server
-	ts := StartTest()
+	ts := StartTest(conf)
 	defer ts.Close()
 
-	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.ExperimentalProcessOrgOffThread = true
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		t,
-		ts,
 		map[string]interface{}{
 			"quota_max":          10,
 			"quota_remaining":    10,
@@ -195,21 +188,18 @@ func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 	b.ReportAllocs()
 
 	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.ExperimentalProcessOrgOffThread = true
-	config.SetGlobal(globalConf)
-
-	defer ResetTestConfig()
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.ExperimentalProcessOrgOffThread = true
+	}
 
 	// run test server
-	ts := StartTest()
+	ts := StartTest(conf)
 	defer ts.Close()
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		b,
-		ts,
 		map[string]interface{}{
 			"quota_max":          100000000,
 			"quota_remaining":    100000000,
@@ -225,22 +215,20 @@ func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 }
 
 func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	// setup global config
-	globalConf := config.Global()
+	globalConf := ts.Gw.GetConfig()
 	globalConf.EnforceOrgQuotas = true
 	globalConf.EnableRedisRollingLimiter = true
 	globalConf.ExperimentalProcessOrgOffThread = false
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
-	// run test server
-	ts := StartTest()
-	defer ts.Close()
+	ts.Gw.SetConfig(globalConf)
+	ts.Gw.DoReload()
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		t,
-		ts,
 		map[string]interface{}{
 			"quota_max": -1,
 			"rate":      10,
@@ -286,23 +274,19 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 	b.ReportAllocs()
 
-	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.EnableRedisRollingLimiter = true
-	globalConf.ExperimentalProcessOrgOffThread = false
-	config.SetGlobal(globalConf)
-
-	defer ResetTestConfig()
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.EnableRedisRollingLimiter = true
+		globalConf.ExperimentalProcessOrgOffThread = false
+	}
 
 	// run test server
-	ts := StartTest()
+	ts := StartTest(conf)
 	defer ts.Close()
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		b,
-		ts,
 		map[string]interface{}{
 			"quota_max": -1,
 			"rate":      10000,
@@ -319,21 +303,19 @@ func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 
 func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.EnableRedisRollingLimiter = true
-	globalConf.ExperimentalProcessOrgOffThread = true
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.EnableRedisRollingLimiter = true
+		globalConf.ExperimentalProcessOrgOffThread = true
+	}
 
 	// run test server
-	ts := StartTest()
+	ts := StartTest(conf)
 	defer ts.Close()
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		t,
-		ts,
 		map[string]interface{}{
 			"quota_max": -1,
 			"rate":      10,
@@ -375,20 +357,19 @@ func BenchmarkProcessRequestOffThreadRedisRollingLimiter(b *testing.B) {
 	b.ReportAllocs()
 
 	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.EnableRedisRollingLimiter = true
-	globalConf.ExperimentalProcessOrgOffThread = true
-	config.SetGlobal(globalConf)
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.EnableRedisRollingLimiter = true
+		globalConf.ExperimentalProcessOrgOffThread = true
+	}
 
 	// run test server
-	ts := StartTest()
+	ts := StartTest(conf)
 	defer ts.Close()
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		b,
-		ts,
 		map[string]interface{}{
 			"quota_max": -1,
 			"rate":      10000,

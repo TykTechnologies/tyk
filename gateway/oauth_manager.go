@@ -21,7 +21,6 @@ import (
 
 	"strconv"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -294,8 +293,9 @@ func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Req
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: strings.Join(tokens, ","),
+		Gw:      o.Manager.Gw,
 	}
-	MainNotifier.Notify(n)
+	o.Manager.Gw.MainNotifier.Notify(n)
 
 	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
@@ -336,6 +336,7 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 type OAuthManager struct {
 	API        *APISpec
 	OsinServer *TykOsinServer
+	Gw         *Gateway `json:"-"`
 }
 
 // HandleAuthorisation creates the authorisation data for the request
@@ -399,7 +400,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		if ar.Type == osin.PASSWORD {
 			username = r.Form.Get("username")
 			password := r.Form.Get("password")
-			searchKey := "apikey-" + storage.HashKey(o.API.OrgID+username)
+			searchKey := "apikey-" + storage.HashKey(o.API.OrgID+username, o.Gw.GetConfig().HashKeys)
 			log.Debug("Getting: ", searchKey)
 
 			var err error
@@ -448,7 +449,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			oldToken, foundKey := session.OauthKeys[ar.Client.GetId()]
 			if foundKey {
 				log.Info("Found old token, revoking: ", oldToken)
-				GlobalSessionManager.RemoveSession(o.API.OrgID, oldToken, false)
+				o.Gw.GlobalSessionManager.RemoveSession(o.API.OrgID, oldToken, false)
 			}
 		}
 
@@ -481,10 +482,10 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				}
 			}
 
-			keyName := generateToken(o.API.OrgID, username)
+			keyName := o.Gw.generateToken(o.API.OrgID, username)
 
 			log.Debug("Updating user:", keyName)
-			err := GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime), false)
+			err := o.Gw.GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime, o.Gw.GetConfig().ForceGlobalSessionLifetime, o.Gw.GetConfig().GlobalSessionLifetime), false)
 			if err != nil {
 				log.Error(err)
 			}
@@ -565,19 +566,19 @@ type TykOsinServer struct {
 }
 
 // TykOsinNewServer creates a new server instance, but uses an extended interface so we can SetClient() too.
-func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInterface) *TykOsinServer {
+func (gw *Gateway) TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInterface) *TykOsinServer {
 
 	overrideServer := TykOsinServer{
 		Config:            config,
 		Storage:           storage,
 		AuthorizeTokenGen: &osin.AuthorizeTokenGenDefault{},
-		AccessTokenGen:    accessTokenGen{},
+		AccessTokenGen:    accessTokenGen{gw},
 	}
 
 	overrideServer.Server.Config = config
 	overrideServer.Server.Storage = storage
 	overrideServer.Server.AuthorizeTokenGen = overrideServer.AuthorizeTokenGen
-	overrideServer.Server.AccessTokenGen = accessTokenGen{}
+	overrideServer.Server.AccessTokenGen = accessTokenGen{gw}
 
 	return &overrideServer
 }
@@ -589,6 +590,7 @@ type RedisOsinStorageInterface struct {
 	sessionManager SessionHandler
 	redisStore     storage.Handler
 	orgID          string
+	Gw             *Gateway `json:"-"`
 }
 
 func (r *RedisOsinStorageInterface) Clone() osin.Storage {
@@ -666,7 +668,7 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, orgID string, igno
 	indexKey := prefixClientIndexList + orgID
 
 	var clientJSON map[string]string
-	if !config.Global().Storage.EnableCluster {
+	if !r.Gw.GetConfig().Storage.EnableCluster {
 		exists, _ := r.store.Exists(indexKey)
 		if exists {
 			keys, err := r.store.GetListRange(indexKey, 0, -1)
@@ -729,8 +731,8 @@ func (r *RedisOsinStorageInterface) GetPaginatedClientTokens(id string, page int
 	}
 
 	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
-	if config.Global().OauthTokenExpiredRetainPeriod > 0 {
-		cleanupStartScore := strconv.FormatInt(nowTs-int64(config.Global().OauthTokenExpiredRetainPeriod), 10)
+	if r.Gw.GetConfig().OauthTokenExpiredRetainPeriod > 0 {
+		cleanupStartScore := strconv.FormatInt(nowTs-int64(r.Gw.GetConfig().OauthTokenExpiredRetainPeriod), 10)
 		go r.store.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
 	}
 
@@ -784,8 +786,8 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 	}
 
 	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
-	if config.Global().OauthTokenExpiredRetainPeriod > 0 {
-		cleanupStartScore := strconv.FormatInt(nowTs-int64(config.Global().OauthTokenExpiredRetainPeriod), 10)
+	if r.Gw.GetConfig().OauthTokenExpiredRetainPeriod > 0 {
+		cleanupStartScore := strconv.FormatInt(nowTs-int64(r.Gw.GetConfig().OauthTokenExpiredRetainPeriod), 10)
 		go r.redisStore.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
 	}
 
@@ -822,7 +824,10 @@ func (r *RedisOsinStorageInterface) SetClient(id string, orgID string, client os
 
 	log.Debug("CREATING: ", key)
 
-	r.store.SetKey(key, string(clientDataJSON), 0)
+	err = r.store.SetKey(key, string(clientDataJSON), 0)
+	if err != nil {
+		log.WithError(err).Error("could not save oauth client data")
+	}
 
 	keyForSet := prefixClientset + prefixClient // Org ID
 
@@ -874,7 +879,7 @@ func (r *RedisOsinStorageInterface) DeleteClient(id string, orgID string, ignore
 
 	// delete list of tokens for this client
 	r.store.DeleteKey(prefixClientTokens + id)
-	if config.Global().SlaveOptions.UseRPC {
+	if r.Gw.GetConfig().SlaveOptions.UseRPC {
 		r.redisStore.RemoveFromList(indexKey, key)
 		r.redisStore.DeleteKey(prefixClientTokens + id)
 		r.redisStore.RemoveFromSet(keyForSet, clientJSON)
@@ -892,7 +897,10 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 	key := prefixAuth + authData.Code
 	log.Debug("Saving auth code: ", key)
 
-	r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
+	err = r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -930,22 +938,26 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	if err != nil {
 		return err
 	}
-	key := prefixAccess + storage.HashKey(accessData.AccessToken)
+
+	key := prefixAccess + storage.HashKey(accessData.AccessToken, r.Gw.GetConfig().HashKeys)
 	log.Debug("Saving ACCESS key: ", key)
 
 	// Overide default ExpiresIn:
-	if oauthTokenExpire := config.Global().OauthTokenExpire; oauthTokenExpire != 0 {
+	if oauthTokenExpire := r.Gw.GetConfig().OauthTokenExpire; oauthTokenExpire != 0 {
 		accessData.ExpiresIn = oauthTokenExpire
 	}
 
-	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
+	err = r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
+	if err != nil {
+		log.WithError(err).Error("could not save access data")
+	}
 
 	// add code to list of tokens for this client
 	sortedListKey := prefixClientTokens + accessData.Client.GetId()
 	log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
 	r.redisStore.AddToSortedSet(
 		sortedListKey,
-		storage.HashKey(accessData.AccessToken),
+		storage.HashKey(accessData.AccessToken, r.Gw.GetConfig().HashKeys),
 		float64(accessData.CreatedAt.Unix()+int64(accessData.ExpiresIn)), // set score as token expire timestamp
 	)
 
@@ -965,7 +977,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 	if checkPolicy {
 		// defined in JWT middleware
-		sessionFromPolicy, err := generateSessionFromPolicy(accessData.Client.GetPolicyID(), "", false)
+		sessionFromPolicy, err := r.Gw.generateSessionFromPolicy(accessData.Client.GetPolicyID(), "", false)
 		if err != nil {
 			return errors.New("Couldn't use policy or key rules to create token, failing")
 		}
@@ -1006,12 +1018,15 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		}
 		key := prefixRefresh + accessData.RefreshToken
 		refreshExpire := int64(1209600) // 14 days
-		if oauthRefreshExpire := config.Global().OauthRefreshExpire; oauthRefreshExpire != 0 {
+		if oauthRefreshExpire := r.Gw.GetConfig().OauthRefreshExpire; oauthRefreshExpire != 0 {
 			refreshExpire = oauthRefreshExpire
 		}
-		r.store.SetKey(key, string(accessDataJSON), refreshExpire)
 		log.Debug("STORING ACCESS DATA: ", string(accessDataJSON))
-		return nil
+		err = r.store.SetKey(key, string(accessDataJSON), refreshExpire)
+		if err != nil {
+			log.WithError(err).Error("could not save access data")
+		}
+		return err
 	}
 
 	return nil
@@ -1019,7 +1034,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 // LoadAccess will load access data from redis
 func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error) {
-	key := prefixAccess + storage.HashKey(token)
+	key := prefixAccess + storage.HashKey(token, r.Gw.GetConfig().HashKeys)
 	log.Debug("Loading ACCESS key: ", key)
 	accessJSON, err := r.store.GetKey(key)
 
@@ -1057,7 +1072,7 @@ func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 		log.Warning("Cannot load access token:", token)
 	}
 
-	key := prefixAccess + storage.HashKey(token)
+	key := prefixAccess + storage.HashKey(token, r.Gw.GetConfig().HashKeys)
 	r.store.DeleteKey(key)
 	// remove the access token from central storage too
 	r.sessionManager.RemoveSession(r.orgID, token, false)
@@ -1095,10 +1110,12 @@ func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
 }
 
 // accessTokenGen is a modified authorization token generator that uses the same method used to generate tokens for Tyk authHandler
-type accessTokenGen struct{}
+type accessTokenGen struct {
+	Gw *Gateway `json:"-"`
+}
 
 // GenerateAccessToken generates base64-encoded UUID access and refresh tokens
-func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken, refreshtoken string, err error) {
+func (a accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken, refreshtoken string, err error) {
 	log.Info("[OAuth] Generating new token")
 
 	var newSession user.SessionState
@@ -1114,7 +1131,7 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 
 	if checkPolicy {
 		// defined in JWT middleware
-		sessionFromPolicy, err := generateSessionFromPolicy(data.Client.GetPolicyID(), "", false)
+		sessionFromPolicy, err := a.Gw.generateSessionFromPolicy(data.Client.GetPolicyID(), "", false)
 		if err != nil {
 			return "", "", errors.New("Couldn't use policy or key rules to create token, failing")
 		}
@@ -1122,7 +1139,7 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 		newSession = sessionFromPolicy.Clone()
 	}
 
-	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
+	accesstoken = a.Gw.keyGen.GenerateAuthKey(newSession.OrgID)
 	if generaterefresh {
 		u6 := uuid.NewV4()
 		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))

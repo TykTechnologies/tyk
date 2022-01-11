@@ -49,7 +49,7 @@ var (
 )
 
 // ErrRPCIsDown this is returned when we can't reach rpc server.
-var ErrRPCIsDown = errors.New("RPCStorageHandler: rpc is either down or ws not configured")
+var ErrRPCIsDown = errors.New("RPCStorageHandler: rpc is either down or was not configured")
 
 // rpc.Login is callend may places we only need one in flight at a time.
 var loginFlight singleflight.Group

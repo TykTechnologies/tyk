@@ -15,7 +15,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter"
-	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
@@ -357,7 +357,8 @@ func (m *GraphQLMiddleware) OnError(ctx resolve.HookContext, output []byte, sing
 }
 
 func (m *GraphQLMiddleware) websocketUpgradeAllowed() bool {
-	if !config.Global().HttpServerOptions.EnableWebSockets {
+
+	if !m.Gw.GetConfig().HttpServerOptions.EnableWebSockets {
 		return false
 	}
 

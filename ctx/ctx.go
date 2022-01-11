@@ -46,8 +46,8 @@ func setContext(r *http.Request, ctx context.Context) {
 	*r = *r2
 }
 
-// ctxSetSession stores in ctx the s.KeyID
-func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool) {
+func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
+
 	if s == nil {
 		panic("setting a nil context SessionData")
 	}
@@ -57,7 +57,7 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool) {
 	}
 
 	if s.KeyHashEmpty() {
-		s.SetKeyHash(storage.HashKey(s.KeyID))
+		s.SetKeyHash(storage.HashKey(s.KeyID, hashKey))
 	}
 
 	ctx := r.Context()
@@ -85,8 +85,8 @@ func GetSession(r *http.Request) *user.SessionState {
 	return nil
 }
 
-func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool) {
-	ctxSetSession(r, s, scheduleUpdate)
+func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
+	ctxSetSession(r, s, scheduleUpdate, hashKey)
 }
 
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {

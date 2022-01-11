@@ -152,6 +152,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	}
 	if handler == nil {
 		return
+
 	}
 
 	// make sure tyk recover in case Go-plugin function panics
@@ -190,7 +191,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		// check if response code was an error one
 		switch {
 		case rw.statusCodeSent == http.StatusForbidden:
-			logger.WithError(err).Error("Authentication error in Go-plugin middleware func")
+			m.logger.WithError(err).Error("Authentication error in Go-plugin middleware func")
 			m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 				Path:             r.URL.Path,
@@ -202,7 +203,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			// base middleware will report this error to analytics if needed
 			respCode = rw.statusCodeSent
 			err = fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
-			logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
+			m.logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
 		default:
 			// record 2XX to analytics
 			m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))

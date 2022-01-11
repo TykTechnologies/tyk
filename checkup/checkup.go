@@ -25,17 +25,18 @@ const (
 	minRecordsBufferSize = 1000
 )
 
-func Run(c config.Config) {
+func Run(c *config.Config) {
 	legacyRateLimiters(c)
 	allowInsecureConfigs(c)
 	healthCheck(c)
+
 	fileDescriptors()
 	cpus()
 	defaultSecrets(c)
 	defaultAnalytics(c)
 }
 
-func legacyRateLimiters(c config.Config) {
+func legacyRateLimiters(c *config.Config) {
 	if c.ManagementNode {
 		return
 	}
@@ -45,14 +46,14 @@ func legacyRateLimiters(c config.Config) {
 	}
 }
 
-func allowInsecureConfigs(c config.Config) {
+func allowInsecureConfigs(c *config.Config) {
 	if c.AllowInsecureConfigs {
 		log.WithField("config.allow_insecure_configs", true).
 			Warning("Insecure configuration allowed")
 	}
 }
 
-func healthCheck(c config.Config) {
+func healthCheck(c *config.Config) {
 	if c.HealthCheck.EnableHealthChecks {
 		log.Warn("Health Checker is deprecated and not recommended")
 	}
@@ -82,7 +83,7 @@ func cpus() {
 	}
 }
 
-func defaultSecrets(c config.Config) {
+func defaultSecrets(c *config.Config) {
 	if c.Secret == defaultConfigs.Secret {
 		log.WithField("config.secret", defaultConfigs.Secret).
 			Warning("Default secret should be changed for production.")
@@ -94,7 +95,7 @@ func defaultSecrets(c config.Config) {
 	}
 }
 
-func defaultAnalytics(c config.Config) {
+func defaultAnalytics(c *config.Config) {
 	if !c.EnableAnalytics {
 		return
 	}
@@ -113,5 +114,9 @@ func defaultAnalytics(c config.Config) {
 		c.AnalyticsConfig.RecordsBufferSize = minRecordsBufferSize
 	}
 
-	config.SetGlobal(c)
+	if c.AnalyticsConfig.StorageExpirationTime == 0 {
+		log.WithField("storageExpirationTime", c.AnalyticsConfig.StorageExpirationTime).
+			Warning("AnalyticsConfig.StorageExpirationTime is 0, defaulting to 60s")
+		c.AnalyticsConfig.StorageExpirationTime = 60
+	}
 }

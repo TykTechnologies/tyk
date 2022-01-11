@@ -13,13 +13,14 @@ import (
 )
 
 func TestRateLimit_Unlimited(t *testing.T) {
-	g := StartTest()
+
+	g := StartTest(nil)
 	defer g.Close()
 
-	DRLManager.SetCurrentTokenValue(1)
-	DRLManager.RequestTokenValue = 1
+	g.Gw.DRLManager.SetCurrentTokenValue(1)
+	g.Gw.DRLManager.RequestTokenValue = 1
 
-	api := BuildAndLoadAPI(func(spec *APISpec) {
+	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
 	})[0]
@@ -47,7 +48,7 @@ func TestRateLimit_Unlimited(t *testing.T) {
 	t.Run("-1 rate means unlimited", func(t *testing.T) {
 		session.Rate = -1
 
-		_ = GlobalSessionManager.UpdateSession(key, session, 60, false)
+		_ = g.Gw.GlobalSessionManager.UpdateSession(key, session, 60, false)
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Headers: authHeader, Code: http.StatusOK},
@@ -57,25 +58,21 @@ func TestRateLimit_Unlimited(t *testing.T) {
 
 	t.Run("0 rate means unlimited", func(t *testing.T) {
 		session.Rate = 0
-
-		_ = GlobalSessionManager.UpdateSession(key, session, 60, false)
+		_ = g.Gw.GlobalSessionManager.UpdateSession(key, session, 60, false)
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Headers: authHeader, Code: http.StatusOK},
 			{Headers: authHeader, Code: http.StatusOK},
 		}...)
 	})
-
-	DRLManager.SetCurrentTokenValue(0)
-	DRLManager.RequestTokenValue = 0
 }
 
 func TestNeverRenewQuota(t *testing.T) {
 
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
-	api := BuildAndLoadAPI(func(spec *APISpec) {
+	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "api to test quota never renews"
 		spec.APIID = "api to test quota never renews"
 		spec.Proxy.ListenPath = "/"
@@ -107,10 +104,10 @@ func TestNeverRenewQuota(t *testing.T) {
 }
 
 func TestMwRateLimiting_DepthLimit(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
-	spec := BuildAndLoadAPI(func(spec *APISpec) {
+	spec := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
 		spec.GraphQL.Enabled = true

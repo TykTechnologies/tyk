@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func TestHandleError_text_xml(t *testing.T) {
-	file := filepath.Join(config.Global().TemplatePath, "error_500.xml")
+func (s *Test) TestHandleError_text_xml(t *testing.T) {
+	file := filepath.Join(s.Gw.GetConfig().TemplatePath, "error_500.xml")
+
 	xml := `<?xml version = "1.0" encoding = "UTF-8"?>
 <error>
 	<code>500</code>
@@ -31,10 +31,11 @@ func TestHandleError_text_xml(t *testing.T) {
 	<code>500</code>
 	<message>There was a problem proxying the request</message>
 </error>`
-	ts := StartTest()
+
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.Proxy.TargetURL = "http://localhost:66666"
 	})
@@ -65,10 +66,11 @@ func TestHandleDefaultErrorXml(t *testing.T) {
 
 	expect := `<?xml version = "1.0" encoding = "UTF-8"?>
 <error>There was a problem proxying the request</error>`
-	ts := StartTest()
+
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.Proxy.TargetURL = "http://localhost:66666"
 	})
@@ -103,10 +105,10 @@ func TestHandleDefaultErrorJSON(t *testing.T) {
 }
 `
 
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.Proxy.TargetURL = "http://localhost:66666"
 	})

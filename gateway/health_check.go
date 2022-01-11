@@ -9,10 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/sirupsen/logrus"
 )
@@ -67,11 +65,11 @@ type HealthCheckItem struct {
 	Time          string            `json:"time"`
 }
 
-func initHealthCheck(ctx context.Context) {
+func (gw *Gateway) initHealthCheck(ctx context.Context) {
 	setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
 
 	go func(ctx context.Context) {
-		var n = config.Global().LivenessCheck.CheckDuration
+		var n = gw.GetConfig().LivenessCheck.CheckDuration
 
 		if n == 0 {
 			n = 10
@@ -90,7 +88,7 @@ func initHealthCheck(ctx context.Context) {
 				return
 
 			case <-ticker.C:
-				gatherHealthChecks()
+				gw.gatherHealthChecks()
 			}
 		}
 	}(ctx)
@@ -101,10 +99,10 @@ type SafeHealthCheck struct {
 	mux  sync.Mutex
 }
 
-func gatherHealthChecks() {
+func (gw *Gateway) gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
 
-	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
+	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", RedisController: gw.RedisController}
 
 	key := "tyk-liveness-probe"
 
@@ -132,7 +130,7 @@ func gatherHealthChecks() {
 		allInfos.mux.Unlock()
 	}()
 
-	if config.Global().UseDBAppConfigs {
+	if gw.GetConfig().UseDBAppConfigs {
 		wg.Add(1)
 
 		go func() {
@@ -144,12 +142,12 @@ func gatherHealthChecks() {
 				Time:          time.Now().Format(time.RFC3339),
 			}
 
-			if DashService == nil {
+			if gw.DashService == nil {
 				err := errors.New("Dashboard service not initialized")
 				mainLog.WithField("liveness-check", true).Error(err)
 				checkItem.Output = err.Error()
 				checkItem.Status = Fail
-			} else if err := DashService.Ping(); err != nil {
+			} else if err := gw.DashService.Ping(); err != nil {
 				mainLog.WithField("liveness-check", true).Error(err)
 				checkItem.Output = err.Error()
 				checkItem.Status = Fail
@@ -163,8 +161,7 @@ func gatherHealthChecks() {
 		}()
 	}
 
-	if config.Global().Policies.PolicySource == "rpc" {
-
+	if gw.GetConfig().Policies.PolicySource == "rpc" {
 		wg.Add(1)
 
 		go func() {
@@ -196,7 +193,7 @@ func gatherHealthChecks() {
 	allInfos.mux.Unlock()
 }
 
-func liveCheckHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		doJSONWrite(w, http.StatusMethodNotAllowed, apiError(http.StatusText(http.StatusMethodNotAllowed)))
 		return
@@ -233,8 +230,13 @@ func liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res.Status = status
-
 	w.Header().Set("Content-Type", headers.ApplicationJSON)
+
+	// If this option is not set, or is explicitly set to false, add the mascot headers
+	if !gw.GetConfig().HideGeneratorHeader {
+		addMascotHeaders(w)
+	}
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(res)
 }

@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/certs"
+
 	"github.com/go-redis/redis/v8"
 	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/afero"
@@ -46,15 +48,14 @@ const apiTestDef = `{
 }`
 
 func TestHealthCheckEndpoint(t *testing.T) {
-	globalConf := config.Global()
-	globalConf.HealthCheck.EnableHealthChecks = true
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI()
+	globalConf := ts.Gw.GetConfig()
+	globalConf.HealthCheck.EnableHealthChecks = true
+	ts.Gw.SetConfig(globalConf)
+
+	ts.Gw.BuildAndLoadAPI()
 
 	ts.Run(t, []test.TestCase{
 		{Path: "/tyk/health/?api_id=test", AdminAuth: true, Code: 200},
@@ -63,13 +64,16 @@ func TestHealthCheckEndpoint(t *testing.T) {
 }
 
 func TestApiHandlerPostDupPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	type testCase struct {
 		APIID, ListenPath string
 	}
 
 	assertListenPaths := func(tests []testCase) {
 		for _, tc := range tests {
-			s := getApiSpec(tc.APIID)
+			s := ts.Gw.getApiSpec(tc.APIID)
 			if want, got := tc.ListenPath, s.Proxy.ListenPath; want != got {
 				t.Errorf("API spec %s want path %s, got %s", "2", want, got)
 			}
@@ -78,11 +82,11 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 
 	t.Run("Sequentieal order", func(t *testing.T) {
 		// Load initial API
-		BuildAndLoadAPI(
+		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
 		)
 
-		BuildAndLoadAPI(
+		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
 			func(spec *APISpec) { spec.APIID = "2" },
 			func(spec *APISpec) { spec.APIID = "3" },
@@ -97,7 +101,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	})
 
 	t.Run("Should re-order", func(t *testing.T) {
-		BuildAndLoadAPI(
+		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "2" },
 			func(spec *APISpec) { spec.APIID = "3" },
 		)
@@ -109,7 +113,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	})
 
 	t.Run("Restore original order", func(t *testing.T) {
-		BuildAndLoadAPI(
+		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
 			func(spec *APISpec) { spec.APIID = "2" },
 			func(spec *APISpec) { spec.APIID = "3" },
@@ -125,12 +129,10 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 }
 
 func TestKeyHandler(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	defer ResetTestConfig()
-
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Auth.UseParam = true
 	})
@@ -138,7 +140,7 @@ func TestKeyHandler(t *testing.T) {
 	// Access right not specified
 	masterKey := CreateStandardSession()
 	masterKeyJSON, _ := json.Marshal(masterKey)
-
+	//TestTykMakeHTTPRequest
 	// with access
 	withAccess := CreateStandardSession()
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
@@ -147,8 +149,8 @@ func TestKeyHandler(t *testing.T) {
 	withAccessJSON, _ := json.Marshal(withAccess)
 
 	// with policy
-	policiesMu.Lock()
-	policiesByID["abc_policy"] = user.Policy{
+	ts.Gw.policiesMu.Lock()
+	ts.Gw.policiesByID["abc_policy"] = user.Policy{
 		Active:           true,
 		QuotaMax:         5,
 		QuotaRenewalRate: 300,
@@ -157,7 +159,7 @@ func TestKeyHandler(t *testing.T) {
 		}},
 		OrgID: "default",
 	}
-	policiesMu.Unlock()
+	ts.Gw.policiesMu.Unlock()
 	withPolicy := CreateStandardSession()
 	withoutPolicyJSON, _ := json.Marshal(withPolicy)
 
@@ -240,7 +242,7 @@ func TestKeyHandler(t *testing.T) {
 			},
 		}...)
 
-		GlobalSessionManager.Store().DeleteAllKeys()
+		ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 	})
 
 	_, knownKey := ts.CreateSession(func(s *user.SessionState) {
@@ -272,9 +274,9 @@ func TestKeyHandler(t *testing.T) {
 			{Method: "GET", Path: "/tyk/keys/?api_id=unknown", AdminAuth: true, Code: 200, BodyMatch: knownKey},
 		}...)
 
-		globalConf := config.Global()
+		globalConf := ts.Gw.GetConfig()
 		globalConf.HashKeyFunction = ""
-		config.SetGlobal(globalConf)
+		ts.Gw.SetConfig(globalConf)
 		_, keyWithoutHash := ts.CreateSession(func(s *user.SessionState) {
 			s.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
@@ -328,17 +330,17 @@ func TestKeyHandler(t *testing.T) {
 func TestKeyHandler_UpdateKey(t *testing.T) {
 	const testAPIID = "testAPIID"
 
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = testAPIID
 		spec.UseKeylessAccess = false
 		spec.Auth.UseParam = true
 		spec.OrgID = "default"
 	})
 
-	pID := CreatePolicy(func(p *user.Policy) {
+	pID := ts.CreatePolicy(func(p *user.Policy) {
 		p.Partitions.RateLimit = true
 		p.Tags = []string{"p1-tag"}
 		p.MetaData = map[string]interface{}{
@@ -346,7 +348,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}
 	})
 
-	pID2 := CreatePolicy(func(p *user.Policy) {
+	pID2 := ts.CreatePolicy(func(p *user.Policy) {
 		p.Partitions.Quota = true
 		p.Tags = []string{"p2-tag"}
 		p.MetaData = map[string]interface{}{
@@ -375,7 +377,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
+		sessionState, found := ts.Gw.GlobalSessionManager.SessionDetail("default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
@@ -390,7 +392,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
+		sessionState, found := ts.Gw.GlobalSessionManager.SessionDetail("default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
@@ -405,7 +407,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 			}...)
 
-			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
+			sessionState, found := ts.Gw.GlobalSessionManager.SessionDetail(session.OrgID, key, false)
 
 			sort.Strings(sessionState.Tags)
 			sort.Strings(expected)
@@ -446,7 +448,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 			}...)
 
-			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
+			sessionState, found := ts.Gw.GlobalSessionManager.SessionDetail(session.OrgID, key, false)
 
 			if !found || !reflect.DeepEqual(expected, sessionState.MetaData) {
 				t.Fatalf("Expected %v, returned %v", expected, sessionState.MetaData)
@@ -491,13 +493,14 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 }
 
 func TestUpdateKeyWithCert(t *testing.T) {
-	ts := StartTest()
+
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	apiId := "MTLSApi"
-	pID := CreatePolicy(func(p *user.Policy) {})
+	pID := ts.CreatePolicy(func(p *user.Policy) {})
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = apiId
 		spec.UseKeylessAccess = false
 		spec.Auth.UseCertificate = true
@@ -510,14 +513,14 @@ func TestUpdateKeyWithCert(t *testing.T) {
 
 	t.Run("Update key with valid cert", func(t *testing.T) {
 		// create cert
-		clientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
-		certID, _ := CertificateManager.Add(clientCertPem, "")
-		defer CertificateManager.Delete(certID, "")
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{})
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
 
 		// new valid cert
-		newClientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
-		newCertID, _ := CertificateManager.Add(newClientCertPem, "")
-		defer CertificateManager.Delete(newCertID, "")
+		newClientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{})
+		newCertID, _ := ts.Gw.CertificateManager.Add(newClientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(newCertID, "")
 
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {
@@ -538,8 +541,8 @@ func TestUpdateKeyWithCert(t *testing.T) {
 	})
 
 	t.Run("Update key with empty cert", func(t *testing.T) {
-		clientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
-		certID, _ := CertificateManager.Add(clientCertPem, "")
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{})
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {
@@ -561,8 +564,8 @@ func TestUpdateKeyWithCert(t *testing.T) {
 	})
 
 	t.Run("Update key with invalid cert", func(t *testing.T) {
-		clientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
-		certID, _ := CertificateManager.Add(clientCertPem, "")
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{})
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {
@@ -584,10 +587,10 @@ func TestUpdateKeyWithCert(t *testing.T) {
 }
 
 func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Auth.UseParam = true
 	})
@@ -630,34 +633,32 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 		},
 	}
 
-	globalConf := config.Global()
+	globalConf := ts.Gw.GetConfig()
 	globalConf.HashKeyFunction = ""
-	config.SetGlobal(globalConf)
-
-	defer ResetTestConfig()
+	ts.Gw.SetConfig(globalConf)
 
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
-			GlobalSessionManager.Store().DeleteAllKeys()
+			ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 			session := CreateStandardSession()
 			session.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
 			}}
 
-			globalConf := config.Global()
+			globalConf := ts.Gw.GetConfig()
 			globalConf.HashKeys = tc.HashKeys
-			config.SetGlobal(globalConf)
+			ts.Gw.SetConfig(globalConf)
 
 			keyName := tc.KeyName
-			if err := doAddOrUpdate(generateToken(session.OrgID, keyName), session, false, tc.HashKeys); err != nil {
+			if err := ts.Gw.doAddOrUpdate(ts.Gw.generateToken(session.OrgID, keyName), session, false, tc.HashKeys); err != nil {
 				t.Error("Failed to create key, ensure security settings are correct:" + err.Error())
 			}
 
 			requestByte, _ := json.Marshal(session)
 			r := httptest.NewRequest(http.MethodPut, "/tyk/keys/"+keyName, bytes.NewReader(requestByte))
-			handleAddOrUpdate(keyName, r, tc.HashKeys)
+			ts.Gw.handleAddOrUpdate(keyName, r, tc.HashKeys)
 
-			sessions := GlobalSessionManager.Sessions("")
+			sessions := ts.Gw.GlobalSessionManager.Sessions("")
 			if len(sessions) != 1 {
 				t.Errorf("Sessions stored in global manager should be 1. But got: %v", len(sessions))
 			}
@@ -666,13 +667,15 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 }
 
 func TestHashKeyHandler(t *testing.T) {
-	globalConf := config.Global()
-	// make it to use hashes for Redis keys
-	globalConf.HashKeys = true
-	// enable hashed keys listing
-	globalConf.EnableHashedKeysListing = true
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
+
+	conf := func(globalConf *config.Config) {
+		// make it to use hashes for Redis keys
+		globalConf.HashKeys = true
+		// enable hashed keys listing
+		globalConf.EnableHashedKeysListing = true
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
 
 	hashTests := []struct {
 		hashFunction     string
@@ -688,33 +691,33 @@ func TestHashKeyHandler(t *testing.T) {
 	}
 
 	for _, tc := range hashTests {
-		globalConf.HashKeyFunction = tc.hashFunction
-		config.SetGlobal(globalConf)
+		gwConf := ts.Gw.GetConfig()
+		gwConf.HashKeyFunction = tc.hashFunction
+		ts.Gw.SetConfig(gwConf)
 
 		t.Run(fmt.Sprintf("%sHash fn: %s", tc.desc, tc.hashFunction), func(t *testing.T) {
-			testHashKeyHandlerHelper(t, tc.expectedHashSize)
+			ts.testHashKeyHandlerHelper(t, tc.expectedHashSize)
 		})
 		t.Run(fmt.Sprintf("%sHash fn: %s and Basic Auth", tc.desc, tc.hashFunction), func(t *testing.T) {
-			testHashFuncAndBAHelper(t)
+			ts.testHashFuncAndBAHelper(t)
 		})
 	}
 }
 
 func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
-	globalConf := config.Global()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	globalConf := ts.Gw.GetConfig()
 
 	globalConf.HashKeys = true
 	globalConf.EnableHashedKeysListing = true
 	// settings to create BA session with legacy key format
 	globalConf.HashKeyFunction = ""
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
-	ts := StartTest()
-	defer ts.Close()
+	ts.Gw.SetConfig(globalConf)
 
 	// create session with legacy key format
-	session := testPrepareBasicAuth(false)
+	session := ts.testPrepareBasicAuth(false)
 
 	ts.Run(t, []test.TestCase{
 		{
@@ -734,7 +737,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 
 	// set custom hashing function and check if we still can get BA session with legacy key format
 	globalConf.HashKeyFunction = storage.HashMurmur64
-	config.SetGlobal(globalConf)
+	ts.Gw.SetConfig(globalConf)
 
 	ts.Run(t, []test.TestCase{
 		{
@@ -753,11 +756,9 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	}...)
 }
 
-func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
-	ts := StartTest()
-	defer ts.Close()
+func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 
-	BuildAndLoadAPI()
+	ts.Gw.BuildAndLoadAPI()
 
 	withAccess := CreateStandardSession()
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
@@ -766,7 +767,7 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	withAccessJSON, _ := json.Marshal(withAccess)
 
 	myKey := "my_key_id"
-	myKeyHash := storage.HashKey(generateToken("default", myKey))
+	myKeyHash := storage.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
 
 	if len(myKeyHash) != expectedHashSize {
 		t.Errorf("Expected hash size: %d, got %d. Hash: %s. Key: %s", expectedHashSize, len(myKeyHash), myKeyHash, myKey)
@@ -879,11 +880,9 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	})
 }
 
-func testHashFuncAndBAHelper(t *testing.T) {
-	ts := StartTest()
-	defer ts.Close()
+func (ts *Test) testHashFuncAndBAHelper(t *testing.T) {
 
-	session := testPrepareBasicAuth(false)
+	session := ts.testPrepareBasicAuth(false)
 
 	ts.Run(t, []test.TestCase{
 		{
@@ -910,19 +909,18 @@ func testHashFuncAndBAHelper(t *testing.T) {
 }
 
 func TestHashKeyListingDisabled(t *testing.T) {
-	globalConf := config.Global()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	globalConf := ts.Gw.GetConfig()
 	// make it to use hashes for Redis keys
 	globalConf.HashKeys = true
 	// disable hashed keys listing
 	globalConf.EnableHashedKeysListing = false
-	config.SetGlobal(globalConf)
+	ts.Gw.SetConfig(globalConf)
+	ts.Gw.DoReload()
 
-	defer ResetTestConfig()
-
-	ts := StartTest()
-	defer ts.Close()
-
-	BuildAndLoadAPI()
+	ts.Gw.BuildAndLoadAPI()
 
 	withAccess := CreateStandardSession()
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
@@ -931,7 +929,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	withAccessJSON, _ := json.Marshal(withAccess)
 
 	myKey := "my_key_id"
-	myKeyHash := storage.HashKey(generateToken("default", myKey))
+	myKeyHash := storage.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
@@ -1030,17 +1028,15 @@ func TestHashKeyListingDisabled(t *testing.T) {
 }
 
 func TestKeyHandler_HashingDisabled(t *testing.T) {
-	globalConf := config.Global()
-	// make it to NOT use hashes for Redis keys
-	globalConf.HashKeys = false
-	config.SetGlobal(globalConf)
-
-	defer ResetTestConfig()
-
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI()
+	globalConf := ts.Gw.GetConfig()
+	// make it to NOT use hashes for Redis keys
+	globalConf.HashKeys = false
+	ts.Gw.SetConfig(globalConf)
+
+	ts.Gw.BuildAndLoadAPI()
 
 	withAccess := CreateStandardSession()
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
@@ -1049,8 +1045,8 @@ func TestKeyHandler_HashingDisabled(t *testing.T) {
 	withAccessJSON, _ := json.Marshal(withAccess)
 
 	myKeyID := "my_key_id"
-	token := generateToken("default", myKeyID)
-	myKeyHash := storage.HashKey(token)
+	token := ts.Gw.generateToken("default", myKeyID)
+	myKeyHash := storage.HashKey(token, ts.Gw.GetConfig().HashKeys)
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
@@ -1114,10 +1110,10 @@ func TestKeyHandler_HashingDisabled(t *testing.T) {
 }
 
 func TestInvalidateCache(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI()
+	ts.Gw.BuildAndLoadAPI()
 
 	ts.Run(t, []test.TestCase{
 		{Method: "DELETE", Path: "/tyk/cache/test", AdminAuth: true, Code: 200},
@@ -1126,10 +1122,10 @@ func TestInvalidateCache(t *testing.T) {
 }
 
 func TestGetOAuthClients(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseOauth2 = true
 	})
 
@@ -1150,10 +1146,10 @@ func TestGetOAuthClients(t *testing.T) {
 }
 
 func TestCreateOAuthClient(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI(
+	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.UseOauth2 = true
 		},
@@ -1163,7 +1159,7 @@ func TestCreateOAuthClient(t *testing.T) {
 		},
 	)
 
-	CreatePolicy(func(p *user.Policy) {
+	ts.CreatePolicy(func(p *user.Policy) {
 		p.ID = "p1"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"test": {
@@ -1171,7 +1167,7 @@ func TestCreateOAuthClient(t *testing.T) {
 			},
 		}
 	})
-	CreatePolicy(func(p *user.Policy) {
+	ts.CreatePolicy(func(p *user.Policy) {
 		p.ID = "p2"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"test": {
@@ -1261,7 +1257,7 @@ func TestCreateOAuthClient(t *testing.T) {
 }
 
 func TestUpdateOauthClientHandler(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	backupSecretCreator := createOauthClientSecret
@@ -1274,7 +1270,7 @@ func TestUpdateOauthClientHandler(t *testing.T) {
 		return hardcodedSecret
 	}
 
-	BuildAndLoadAPI(
+	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.UseOauth2 = true
 		},
@@ -1284,7 +1280,7 @@ func TestUpdateOauthClientHandler(t *testing.T) {
 		},
 	)
 
-	CreatePolicy(func(p *user.Policy) {
+	ts.CreatePolicy(func(p *user.Policy) {
 		p.ID = "p1"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"test": {
@@ -1292,7 +1288,7 @@ func TestUpdateOauthClientHandler(t *testing.T) {
 			},
 		}
 	})
-	CreatePolicy(func(p *user.Policy) {
+	ts.CreatePolicy(func(p *user.Policy) {
 		p.ID = "p2"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"test": {
@@ -1392,9 +1388,12 @@ func TestUpdateOauthClientHandler(t *testing.T) {
 }
 
 func TestGroupResetHandler(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	didSubscribe := make(chan bool)
 	didReload := make(chan bool)
-	cacheStore := storage.RedisCluster{}
+	cacheStore := storage.RedisCluster{RedisController: ts.Gw.RedisController}
 	cacheStore.Connect()
 
 	go func() {
@@ -1403,9 +1402,9 @@ func TestGroupResetHandler(t *testing.T) {
 			case *redis.Subscription:
 				didSubscribe <- true
 			case *redis.Message:
-				notf := Notification{}
+				notf := Notification{Gw: ts.Gw}
 				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
-					t.Fatal(err)
+					t.Error(err)
 				}
 				if notf.Command == NoticeGroupReload {
 					didReload <- true
@@ -1421,30 +1420,30 @@ func TestGroupResetHandler(t *testing.T) {
 
 	uri := "/tyk/reload/group"
 
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisMu.Unlock()
+	ts.Gw.apisMu.Lock()
+	ts.Gw.apisByID = make(map[string]*APISpec)
+	ts.Gw.apisMu.Unlock()
 
-	LoadSampleAPI(apiTestDef)
+	ts.Gw.LoadSampleAPI(apiTestDef)
 
 	recorder := httptest.NewRecorder()
 
 	// If we don't wait for the subscription to be done, we might do
 	// the reload before pub/sub is in place to receive our message.
 	<-didSubscribe
-	req := withAuth(TestReq(t, "GET", uri, nil))
+	req := ts.withAuth(TestReq(t, "GET", uri, nil))
 
-	mainRouter().ServeHTTP(recorder, req)
+	ts.mainRouter().ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
 		t.Fatal("Hot reload (group) failed, response code was: ", recorder.Code)
 	}
 
-	apisMu.RLock()
-	if len(apisByID) == 0 {
+	ts.Gw.apisMu.RLock()
+	if len(ts.Gw.apisByID) == 0 {
 		t.Fatal("Hot reload (group) was triggered but no APIs were found.")
 	}
-	apisMu.RUnlock()
+	ts.Gw.apisMu.RUnlock()
 
 	// We wait for the right notification (NoticeGroupReload), other
 	// type of notifications may be received during tests, as this
@@ -1453,34 +1452,46 @@ func TestGroupResetHandler(t *testing.T) {
 }
 
 func TestHotReloadSingle(t *testing.T) {
-	ReloadTestCase.Enable()
-	defer ReloadTestCase.Disable()
-	oldRouter := mainRouter()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.ReloadTestCase.Enable()
+	defer ts.Gw.ReloadTestCase.Disable()
+	oldRouter := ts.mainRouter()
+
+	cfg := ts.Gw.GetConfig()
+	//Changing the UseSSL option so the main router change its protocol
+	cfg.HttpServerOptions.UseSSL = true
+	ts.Gw.SetConfig(cfg)
+
 	var wg sync.WaitGroup
 	wg.Add(1)
-	reloadURLStructure(wg.Done)
-	ReloadTestCase.TickOk(t)
+	ts.Gw.reloadURLStructure(wg.Done)
+	ts.Gw.ReloadTestCase.TickOk(t)
 	wg.Wait()
-	if mainRouter() == oldRouter {
+	if ts.mainRouter() == oldRouter {
 		t.Fatal("router wasn't swapped")
 	}
 }
 
 func BenchmarkApiReload(b *testing.B) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	b.ReportAllocs()
 
 	specs := make([]*APISpec, 100)
 
 	for i := 0; i < 100; i++ {
-		specs[i] = BuildAndLoadAPI(func(spec *APISpec) {
+		specs[i] = ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = strconv.Itoa(i + 1)
 		})[0]
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		loadControlAPIEndpoints(nil)
-		loadApps(specs)
+		ts.Gw.loadControlAPIEndpoints(nil)
+		ts.Gw.loadApps(specs)
 	}
 }
 
@@ -1502,11 +1513,19 @@ func TestContextData(t *testing.T) {
 }
 
 func TestContextSession(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	r := new(http.Request)
 	if ctxGetSession(r) != nil {
 		t.Fatal("expected ctxGetSession to return nil")
 	}
-	ctxSetSession(r, &user.SessionState{}, false)
+
+	ctxSetSession(r,
+		&user.SessionState{},
+		false,
+		false)
+
 	if ctxGetSession(r) == nil {
 		t.Fatal("expected ctxGetSession to return non-nil")
 	}
@@ -1515,19 +1534,19 @@ func TestContextSession(t *testing.T) {
 			t.Fatal("expected ctxSetSession of zero val to panic")
 		}
 	}()
-	ctxSetSession(r, nil, false)
+	ctxSetSession(r, nil, false, false)
 }
 
 func TestApiLoaderLongestPathFirst(t *testing.T) {
-	globalConf := config.Global()
-	globalConf.EnableCustomDomains = true
-	config.SetGlobal(globalConf)
-
-	defer ResetTestConfig()
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.EnableCustomDomains = true
+	})
+	defer ts.Close()
 
 	type hostAndPath struct {
 		host, path string
 	}
+
 	inputs := map[hostAndPath]bool{}
 	hosts := []string{"host1.local", "host2.local", "host3.local"}
 	paths := []string{"a", "ab", "a/b/c", "ab/c", "abc", "a/b/c"}
@@ -1550,9 +1569,7 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 		})[0])
 	}
 
-	ts := StartTest()
-	defer ts.Close()
-	LoadAPI(apis...)
+	ts.Gw.LoadAPI(apis...)
 
 	var testCases []test.TestCase
 
@@ -1570,10 +1587,10 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 
 func TestRotateClientSecretHandler(t *testing.T) {
 
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI(
+	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.UseOauth2 = true
 		},
@@ -1583,7 +1600,7 @@ func TestRotateClientSecretHandler(t *testing.T) {
 		},
 	)
 
-	CreatePolicy(func(p *user.Policy) {
+	ts.CreatePolicy(func(p *user.Policy) {
 		p.ID = "p1"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"test": {
@@ -1591,7 +1608,7 @@ func TestRotateClientSecretHandler(t *testing.T) {
 			},
 		}
 	})
-	CreatePolicy(func(p *user.Policy) {
+	ts.CreatePolicy(func(p *user.Policy) {
 		p.ID = "p2"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"test": {
@@ -1678,12 +1695,15 @@ func TestRotateClientSecretHandler(t *testing.T) {
 func TestHandleAddOrUpdateApi(t *testing.T) {
 	testFs := afero.NewMemMapFs()
 
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	t.Run("should return error when api definition json is invalid", func(t *testing.T) {
 		apiDefJson := []byte("{")
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := handleAddOrUpdateApi("", req, testFs)
+		response, statusCode := ts.Gw.handleAddOrUpdateApi("", req, testFs)
 		errorResponse, ok := response.(apiStatusMessage)
 		require.True(t, ok)
 
@@ -1700,7 +1720,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := handleAddOrUpdateApi("555", req, testFs)
+		response, statusCode := ts.Gw.handleAddOrUpdateApi("555", req, testFs)
 		errorResponse, ok := response.(apiStatusMessage)
 		require.True(t, ok)
 
@@ -1725,7 +1745,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := handleAddOrUpdateApi("", req, testFs)
+		response, statusCode := ts.Gw.handleAddOrUpdateApi("", req, testFs)
 		errorResponse, ok := response.(apiStatusMessage)
 		require.True(t, ok)
 
@@ -1742,7 +1762,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := handleAddOrUpdateApi("", req, testFs)
+		response, statusCode := ts.Gw.handleAddOrUpdateApi("", req, testFs)
 		successResponse, ok := response.(apiModifyKeySuccess)
 		require.True(t, ok)
 

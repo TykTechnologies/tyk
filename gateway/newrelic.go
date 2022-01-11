@@ -9,19 +9,17 @@ import (
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/newrelic/go-agent/_integrations/nrgorilla/v1"
 	"github.com/sirupsen/logrus"
-
-	"github.com/TykTechnologies/tyk/config"
 )
 
 // SetupNewRelic creates new newrelic.Application instance
-func SetupNewRelic() (app newrelic.Application) {
+func (gw *Gateway) SetupNewRelic() (app newrelic.Application) {
 	var err error
 	logger := log.WithFields(logrus.Fields{"prefix": "newrelic"})
 
 	logger.Info("Initializing NewRelic...")
 
-	cfg := newrelic.NewConfig(config.Global().NewRelic.AppName, config.Global().NewRelic.LicenseKey)
-	if config.Global().NewRelic.AppName != "" {
+	cfg := newrelic.NewConfig(gw.GetConfig().NewRelic.AppName, gw.GetConfig().NewRelic.LicenseKey)
+	if gw.GetConfig().NewRelic.AppName != "" {
 		cfg.Enabled = true
 	}
 	cfg.Logger = &newRelicLogger{logger}

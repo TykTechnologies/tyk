@@ -23,7 +23,6 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
@@ -74,7 +73,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
 
-func createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMiddleware) func(http.Handler) http.Handler {
+func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
 		BaseMiddleware:      baseMid,
 		MiddlewareClassName: name,
@@ -82,11 +81,11 @@ func createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMi
 		UseSession:          useSession,
 	}
 
-	return createMiddleware(dMiddleware)
+	return gw.createMiddleware(dMiddleware)
 }
 
 // Generic middleware caller to make extension easier
-func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
+func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
 	mw := &TraceMiddleware{
 		TykMiddleware: actualMW,
 	}
@@ -105,7 +104,7 @@ func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			mw.SetRequestLogger(r)
 
-			if config.Global().NewRelic.AppName != "" {
+			if gw.GetConfig().NewRelic.AppName != "" {
 				if txn, ok := w.(newrelic.Transaction); ok {
 					defer newrelic.StartSegment(txn, mw.Name()).End()
 				}
@@ -179,18 +178,18 @@ func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
 	}
 }
 
-func mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) bool {
+func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) bool {
 	if mw.EnabledForSpec() {
-		*chain = append(*chain, createMiddleware(mw))
+		*chain = append(*chain, gw.createMiddleware(mw))
 		return true
 	}
 	return false
 }
 
-func mwList(mws ...TykMiddleware) []alice.Constructor {
+func (gw *Gateway) mwList(mws ...TykMiddleware) []alice.Constructor {
 	var list []alice.Constructor
 	for _, mw := range mws {
-		mwAppendEnabled(&list, mw)
+		gw.mwAppendEnabled(&list, mw)
 	}
 	return list
 }
@@ -201,6 +200,7 @@ type BaseMiddleware struct {
 	Spec   *APISpec
 	Proxy  ReturningHttpHandler
 	logger *logrus.Entry
+	Gw     *Gateway `json:"-"`
 }
 
 func (t BaseMiddleware) Base() *BaseMiddleware { return &t }
@@ -218,7 +218,7 @@ func (t *BaseMiddleware) SetName(name string) {
 }
 
 func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
-	t.logger = getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
+	t.logger = t.Gw.getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
 }
 
 func (t BaseMiddleware) Init() {}
@@ -241,23 +241,23 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
 		t.Logger().Debug("Setting data expiry: ", session.OrgID)
-		ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
+		t.Gw.ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
-	session.SetKeyHash(storage.HashKey(orgID))
+	session.SetKeyHash(storage.HashKey(orgID, t.Gw.GetConfig().HashKeys))
 
 	return session.Clone(), found
 }
 
 func (t BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
-	ExpiryCache.Set(orgid, expiry, cache.DefaultExpiration)
+	t.Gw.ExpiryCache.Set(orgid, expiry, cache.DefaultExpiration)
 }
 
 func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
 	// Cache failed attempt
 	id, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
-		cachedVal, found := ExpiryCache.Get(orgid)
+		cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
 		if found {
 			return cachedVal, nil
 		}
@@ -286,8 +286,8 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		return false
 	}
 
-	lifetime := session.Lifetime(t.Spec.SessionLifetime)
-	if err := GlobalSessionManager.UpdateSession(token, session, lifetime, false); err != nil {
+	lifetime := session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
+	if err := t.Gw.GlobalSessionManager.UpdateSession(token, session, lifetime, false); err != nil {
 		t.Logger().WithError(err).Error("Can't update session")
 		return false
 	}
@@ -297,7 +297,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	ctxDisableSessionUpdate(r)
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
+		t.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
 	}
 
 	return true
@@ -316,16 +316,16 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	policies := session.PolicyIDs()
 
 	for _, polID := range policies {
-		policiesMu.RLock()
-		policy, ok := policiesByID[polID]
-		policiesMu.RUnlock()
+		t.Gw.policiesMu.RLock()
+		policy, ok := t.Gw.policiesByID[polID]
+		t.Gw.policiesMu.RUnlock()
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
 			return err
 		}
 		// Check ownership, policy org owner must be the same as API,
-		// otherwise youcould overwrite a session key with a policy from a different org!
+		// otherwise you could overwrite a session key with a policy from a different org!
 		if t.Spec != nil && policy.OrgID != t.Spec.OrgID {
 			err := fmt.Errorf("attempting to apply policy from different organisation to key, skipping")
 			t.Logger().Error(err)
@@ -668,7 +668,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 
 	// Check in-memory cache
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		cachedVal, found := SessionCache.Get(cacheKey)
+		cachedVal, found := t.Gw.SessionCache.Get(cacheKey)
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
 			session := cachedVal.(user.SessionState).Clone()
@@ -682,7 +682,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 
 	// Check session store
 	t.Logger().Debug("Querying keystore")
-	session, found := GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
+	session, found := t.Gw.GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
 
 	if found {
 		if t.Spec.GlobalConfig.HashKeys {
@@ -693,7 +693,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 		// If exists, assume it has been authorized and pass on
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			t.Gw.SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
@@ -719,12 +719,11 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
-
-		t.Logger().Info("Recreating session for key: ", obfuscateKey(key))
+		t.Logger().Info("Recreating session for key: ", t.Gw.obfuscateKey(key))
 
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			go t.Gw.SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
@@ -733,7 +732,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 			return session, false
 		}
 
-		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
+		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 		ctxScheduleSessionUpdate(r)
 	} else {
 		// defaulting
@@ -811,21 +810,20 @@ type TykGoPluginResponseHandler interface {
 	HandleGoPluginResponse(http.ResponseWriter, *http.Response, *http.Request) error
 }
 
-func responseProcessorByName(name string) TykResponseHandler {
+func (gw *Gateway) responseProcessorByName(name string) TykResponseHandler {
 	switch name {
 	case "header_injector":
-		return &HeaderInjector{}
+		return &HeaderInjector{Gw: gw}
 	case "response_body_transform":
 		return &ResponseTransformMiddleware{}
 	case "response_body_transform_jq":
-		return &ResponseTransformJQMiddleware{}
+		return &ResponseTransformJQMiddleware{Gw: gw}
 	case "header_transform":
-		return &HeaderTransform{}
+		return &HeaderTransform{Gw: gw}
 	case "custom_mw_res_hook":
-		return &CustomMiddlewareResponseHook{}
+		return &CustomMiddlewareResponseHook{Gw: gw}
 	case "goplugin_res_hook":
 		return &ResponseGoPluginMiddleware{}
-
 	}
 
 	return nil
