@@ -264,9 +264,9 @@ type TestCase struct {
 }
 ```
 
-`Test` provides a test runner, which generate HTTP requests based on specification and does assertions. Most of the time you going to use `tykTestServer#Run(t *testing.T, test.TestCase...) (*http.Response, error)`function. Note that it use variadic number of arguments, so if you need to pass multiple test cases, pass it  like in example above: `[]test.TestCase{<tc1>,<tc2>}...`, with 3 dots in the end.
+`Test` provides a test runner, which generate HTTP requests based on specification and does assertions. Most of the time you going to use `Test#Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error)`function. Note that it use variadic number of arguments, so if you need to pass multiple test cases, pass it  like in example above: `[]test.TestCase{<tc1>,<tc2>}...`, with 3 dots in the end.
 
-Additionally there is `RunEx` function, with exactly same definition, but internally it runs test cases multiple times (4 right now) with different combinations of `overrideDefaults` and `hotReload` options. This can be handy if you need to test functionality that tightly depends hot reload functionality, like reloading APIs, loading plugin bundles or listener itself.
+Additionally there is `RunExt` function, with exactly same definition, but internally it runs test cases multiple times (4 right now) with different combinations of `overrideDefaults` and `hotReload` options. This can be handy if you need to test functionality that tightly depends hot reload functionality, like reloading APIs, loading plugin bundles or listener itself.
 
 Both `Run` and `RunEx` also return response and error of the last test case, in case if you need it.
 ### Changing config variables
