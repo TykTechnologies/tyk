@@ -8,17 +8,18 @@ import (
 )
 
 const (
-	dbID       = "dbID"
-	apiID      = "apiID"
-	listenPath = "listenPath"
-	baseTarget = "base.com"
-	v1Target   = "v1.com"
-	v2Target   = "v2.com"
-	v1         = "v1"
-	v2         = "v2"
-	exp1       = "exp1"
-	exp2       = "exp2"
-	key        = "version"
+	dbID        = "dbID"
+	apiID       = "apiID"
+	listenPath  = "listenPath"
+	baseTarget  = "base.com"
+	baseAPIName = "base-api"
+	v1Target    = "v1.com"
+	v2Target    = "v2.com"
+	v1          = "v1"
+	v2          = "v2"
+	exp1        = "exp1"
+	exp2        = "exp2"
+	key         = "version"
 )
 
 var testV1ExtendedPaths = ExtendedPathsSet{
@@ -37,6 +38,7 @@ func oldTestAPI() APIDefinition {
 	return APIDefinition{
 		Id:     dbID,
 		APIID:  apiID,
+		Name:   baseAPIName,
 		Active: true,
 		Proxy:  ProxyConfig{TargetURL: baseTarget, ListenPath: listenPath},
 		VersionDefinition: VersionDefinition{
@@ -211,6 +213,9 @@ func TestAPIDefinition_MigrateVersioning_DefaultEmpty(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, expectedBaseData, base.VersionData)
+
+		assert.Len(t, versions, 1)
+		assert.Contains(t, versions[0].Name, baseAPIName+"-Alpha")
 	})
 }
 
