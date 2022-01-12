@@ -1,0 +1,21 @@
+version: "3"
+services:
+  redis:
+    image: redis
+
+  bundleserver:
+    image: trinitronx/python-simplehttpserver
+    ports:
+      - "0.0.0.0:9000:8080"
+    volumes:
+      - ./testplugin/bundle.zip:/var/www/bundle.zip:ro
+  gw:
+    image: tykio/tyk-gateway:${tag}
+    volumes:
+      - ./testplugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
+      - ./testplugin/apidef_2.json:/opt/tyk-gateway/apps/testplugin_2.json
+      - ./tyk.conf:/opt/tyk-gateway/tyk.conf
+    ports:
+      - "0.0.0.0:8080:8080"
+    environment:
+      - TYK_LOGLEVEL=debug

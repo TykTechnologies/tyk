@@ -1,0 +1,74 @@
+{
+	"name": "goplugin-1",
+	"slug": "goplugin-1",
+	"use_keyless": false,
+	"use_oauth2": false,
+	"use_openid": false,
+	"openid_options": {
+		"providers": [],
+		"segregate_by_client": false
+	},
+	"use_mutual_tls_auth": false,
+	"upstream_certificates": {},
+	"use_standard_auth": false,
+	"use_go_plugin_auth": true,
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"Default": {
+				"name": "Default",
+				"expires": "3000-01-02 15:04",
+				"use_extended_paths": true,
+				"extended_paths": {
+					"ignored": [],
+					"white_list": [],
+					"black_list": []
+				}
+			}
+		}
+	},
+	"proxy": {
+		"preserve_host_header": false,
+		"listen_path": "/goplugin-1/",
+		"target_url": "http://httpbin.org/",
+		"strip_listen_path": true,
+		"enable_load_balancing": false,
+		"target_list": [],
+		"check_host_against_uptime_tests": false,
+		"service_discovery": {
+			"use_discovery_service": false,
+			"query_endpoint": "",
+			"use_nested_query": false,
+			"parent_data_path": "",
+			"data_path": "",
+			"port_data_path": "",
+			"target_path": "",
+			"use_target_list": false,
+			"cache_timeout": 0,
+			"endpoint_returns_list": false
+		},
+		"transport": {
+			"ssl_insecure_skip_verify": false,
+			"ssl_ciphers": [],
+			"ssl_min_version": 0,
+			"ssl_max_version": 0,
+			"ssl_force_common_name_check": false,
+			"proxy_url": ""
+		}
+	},
+	"custom_middleware": {
+		"pre": [],
+		"post": [],
+		"post_key_auth": [],
+		"auth_check": {},
+		"response": [],
+		"driver": "",
+		"id_extractor": {
+			"extract_from": "",
+			"extract_with": "",
+			"extractor_config": {}
+		}
+	},
+	"custom_middleware_bundle": "bundle.zip",
+	"strip_auth_data": false
+}
