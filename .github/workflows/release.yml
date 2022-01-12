@@ -128,6 +128,7 @@ jobs:
           rm -rf vendor
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
+          git checkout .
 
       - uses: goreleaser/goreleaser-action@v2
         with:
