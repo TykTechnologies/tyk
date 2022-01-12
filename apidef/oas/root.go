@@ -56,8 +56,8 @@ type Info struct {
 	OrgID string `bson:"orgId" json:"orgId,omitempty"`
 	// Name is the name of the API.
 	// Old API Definition: `name`
-	Name string `bson:"name" json:"name"` // required
-	// State contains the configurations related to the state of the API.
+	Name       string      `bson:"name" json:"name"` // required
+	Expiration string      `bson:"expiration,omitempty" json:"expiration,omitempty"`
 	State      State       `bson:"state" json:"state"` // required
 	Versioning *Versioning `bson:"versioning,omitempty" json:"versioning,omitempty"`
 }
@@ -67,6 +67,7 @@ func (i *Info) Fill(api apidef.APIDefinition) {
 	i.DBID = api.Id
 	i.OrgID = api.OrgID
 	i.Name = api.Name
+	i.Expiration = api.Expiration
 	i.State.Fill(api)
 
 	if i.Versioning == nil {
@@ -84,6 +85,7 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	api.Id = i.DBID
 	api.OrgID = i.OrgID
 	api.Name = i.Name
+	api.Expiration = i.Expiration
 	i.State.ExtractTo(api)
 
 	if i.Versioning != nil {
