@@ -38,7 +38,7 @@ func Authenticate(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	// auth was successful, add session and key to request's context so other middlewares can use it
-	ctx.SetSession(r, session, true)
+	ctx.SetSession(r, session, true, true)
 	newSession := ctx.GetSession(r)
 	fmt.Println("session", newSession)
 }
