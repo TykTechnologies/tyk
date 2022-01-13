@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
 	"strings"
 
 	uuid "github.com/satori/go.uuid"
@@ -87,14 +88,15 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, err
 
 	versionInfo.UseExtendedPaths = true
 	versionInfo.Name = s.Info.Version
-	versionInfo.ExtendedPaths.TrackEndpoints = make([]apidef.TrackEndpointMeta, 0)
 
 	if len(s.Paths) == 0 {
 		return versionInfo, errors.New("no paths defined in swagger file")
 	}
 	for pathName, pathSpec := range s.Paths {
-		newEndpointMeta := apidef.TrackEndpointMeta{}
-		newEndpointMeta.Path = pathName
+		newEndpointMeta := apidef.EndPointMeta{
+			Path:          pathName,
+			MethodActions: map[string]apidef.EndpointMethodMeta{},
+		}
 
 		// We just want the paths here, no mocks
 		methods := map[string]PathMethodObject{
@@ -106,15 +108,19 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, err
 			"OPTIONS": pathSpec.Options,
 			"DELETE":  pathSpec.Delete,
 		}
+
 		for methodName, m := range methods {
 			// skip methods that are not defined
 			if len(m.Responses) == 0 && m.Description == "" && m.OperationID == "" {
 				continue
 			}
 
-			newEndpointMeta.Method = methodName
-			versionInfo.ExtendedPaths.TrackEndpoints = append(versionInfo.ExtendedPaths.TrackEndpoints, newEndpointMeta)
+			newEndpointMeta.MethodActions[methodName] = apidef.EndpointMethodMeta{
+				Action: apidef.NoAction,
+				Code:   http.StatusOK,
+			}
 		}
+		versionInfo.ExtendedPaths.WhiteList = append(versionInfo.ExtendedPaths.WhiteList, newEndpointMeta)
 	}
 
 	return versionInfo, nil
