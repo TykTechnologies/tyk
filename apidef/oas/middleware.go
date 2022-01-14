@@ -181,6 +181,7 @@ func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillMockResponse(ep.MockResponse)
 	ps.fillTransformRequestMethod(ep.MethodTransforms)
 	ps.fillCache(ep.AdvanceCacheConfig)
+	ps.fillEnforceTimeout(ep.HardTimeouts)
 }
 
 func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
@@ -270,6 +271,24 @@ func (ps Paths) fillCache(cacheMetas []apidef.CacheMeta) {
 		plugins.Cache.Fill(cm)
 		if ShouldOmit(plugins.Cache) {
 			plugins.Cache = nil
+		}
+	}
+}
+
+func (ps Paths) fillEnforceTimeout(metas []apidef.HardTimeoutMeta) {
+	for _, meta := range metas {
+		if _, ok := ps[meta.Path]; !ok {
+			ps[meta.Path] = &Path{}
+		}
+
+		plugins := ps[meta.Path].getMethod(meta.Method)
+		if plugins.EnforceTimeout == nil {
+			plugins.EnforceTimeout = &EnforceTimeout{}
+		}
+
+		plugins.EnforceTimeout.Fill(meta)
+		if ShouldOmit(plugins.EnforceTimeout) {
+			plugins.EnforceTimeout = nil
 		}
 	}
 }
@@ -419,6 +438,7 @@ type Plugins struct {
 	// TransformRequestMethod allows you to transform the method of a request.
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
 	Cache                  *CachePlugin            `bson:"cache,omitempty" json:"cache,omitempty"`
+	EnforceTimeout         *EnforceTimeout         `bson:"enforcedTimeout,omitempty" json:"enforcedTimeout,omitempty"`
 }
 
 func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method string) {
@@ -428,6 +448,7 @@ func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method str
 	p.extractMockResponseTo(ep, path, method)
 	p.extractTransformRequestMethodTo(ep, path, method)
 	p.extractCacheTo(ep, path, method)
+	p.extractEnforcedTimeoutTo(ep, path, method)
 }
 
 func (p *Plugins) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
@@ -483,6 +504,16 @@ func (p *Plugins) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, metho
 	}
 	p.Cache.ExtractTo(&newCacheMeta)
 	ep.AdvanceCacheConfig = append(ep.AdvanceCacheConfig, newCacheMeta)
+}
+
+func (p *Plugins) extractEnforcedTimeoutTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.EnforceTimeout == nil {
+		return
+	}
+
+	meta := apidef.HardTimeoutMeta{Path: path, Method: method}
+	p.EnforceTimeout.ExtractTo(&meta)
+	ep.HardTimeouts = append(ep.HardTimeouts, meta)
 }
 
 type Allowance struct {
@@ -581,4 +612,19 @@ func (a *CachePlugin) ExtractTo(cm *apidef.CacheMeta) {
 	cm.Disabled = !a.Enabled
 	cm.CacheKeyRegex = a.CacheByRegex
 	cm.CacheOnlyResponseCodes = a.CacheResponseCodes
+}
+
+type EnforceTimeout struct {
+	Enabled bool `bson:"enabled" json:"enabled"`
+	Value   int  `bson:"value" json:"value"`
+}
+
+func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
+	et.Enabled = !meta.Disabled
+	et.Value = meta.TimeOut
+}
+
+func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
+	meta.Disabled = !et.Enabled
+	meta.TimeOut = et.Value
 }
