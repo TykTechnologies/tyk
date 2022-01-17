@@ -54,7 +54,7 @@ do
 done
 
 echo "Building Tyk binaries"
-gox -tags 'goplugin' -osarch="linux/amd64 linux/386" -cgo
+gox -tags 'goplugin' -osarch="linux/amd64" -cgo
 # Build arm64 without CGO (no Python plugins), an improved cross-compilation toolkit is needed for that
 gox -tags 'goplugin' -osarch="linux/arm64"
 
