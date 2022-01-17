@@ -229,12 +229,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			r.URL.Path = e.Spec.StripListenPath(r, r.URL.Path)
 		}
 
-		// This is an odd bugfix, will need further testing
-		r.URL.Path = "/" + r.URL.Path
-		if strings.HasPrefix(r.URL.Path, "//") {
-			r.URL.Path = strings.TrimPrefix(r.URL.Path, "/")
-		}
-
 		oauthClientID := ""
 		session := ctxGetSession(r)
 		tags := make([]string, 0, estimateTagsCapacity(session, e.Spec))

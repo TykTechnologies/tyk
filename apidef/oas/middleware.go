@@ -28,7 +28,7 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 		m.Paths = make(Paths)
 	}
 
-	m.Paths.Fill(api.VersionData.Versions["Default"].ExtendedPaths)
+	m.Paths.Fill(api.VersionData.Versions[""].ExtendedPaths)
 	if ShouldOmit(m.Paths) {
 		m.Paths = nil
 	}
@@ -42,12 +42,12 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	if m.Paths != nil {
 		var ep apidef.ExtendedPathsSet
 		m.Paths.ExtractTo(&ep)
-		defaultVersion := apidef.VersionInfo{UseExtendedPaths: true, ExtendedPaths: ep}
-		versions := map[string]apidef.VersionInfo{
-			"Default": defaultVersion,
+		base := apidef.VersionInfo{UseExtendedPaths: true, ExtendedPaths: ep}
+		if api.VersionData.Versions == nil {
+			api.VersionData.Versions = make(map[string]apidef.VersionInfo)
 		}
 
-		api.VersionData.Versions = versions
+		api.VersionData.Versions[""] = base
 	}
 }
 
@@ -175,29 +175,120 @@ func (c *Cache) ExtractTo(cache *apidef.CacheOptions) {
 type Paths map[string]*Path
 
 func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
-	ps.fillAllowance(ep, allow)
-	ps.fillAllowance(ep, block)
-	ps.fillAllowance(ep, ignoreAuthentication)
+	ps.fillAllowance(ep.WhiteList, allow)
+	ps.fillAllowance(ep.BlackList, block)
+	ps.fillAllowance(ep.Ignored, ignoreAuthentication)
+	ps.fillMockResponse(ep.MockResponse)
+	ps.fillTransformRequestMethod(ep.MethodTransforms)
+	ps.fillCache(ep.AdvanceCacheConfig)
+	ps.fillEnforceTimeout(ep.HardTimeouts)
 }
 
-func (ps Paths) fillAllowance(ep apidef.ExtendedPathsSet, typ AllowanceType) {
-	endpointMetas := ep.WhiteList
-
-	switch typ {
-	case block:
-		endpointMetas = ep.BlackList
-	case ignoreAuthentication:
-		endpointMetas = ep.Ignored
-	}
-
+func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
 	for _, em := range endpointMetas {
-		for method := range em.MethodActions {
-			if _, ok := ps[em.Path]; !ok {
-				ps[em.Path] = &Path{}
+		if _, ok := ps[em.Path]; !ok {
+			ps[em.Path] = &Path{}
+		}
+
+		plugins := ps[em.Path].getMethod(em.Method)
+		var allowance *Allowance
+
+		switch typ {
+		case block:
+			if plugins.Block == nil {
+				plugins.Block = &Allowance{}
 			}
 
-			plugins := ps[em.Path].getMethod(method)
-			plugins.fillAllowance(em, typ)
+			allowance = plugins.Block
+		case ignoreAuthentication:
+			if plugins.IgnoreAuthentication == nil {
+				plugins.IgnoreAuthentication = &Allowance{}
+			}
+
+			allowance = plugins.IgnoreAuthentication
+		default:
+			if plugins.Allow == nil {
+				plugins.Allow = &Allowance{}
+			}
+
+			allowance = plugins.Allow
+		}
+
+		allowance.Fill(em)
+		if ShouldOmit(allowance) {
+			allowance = nil
+		}
+	}
+}
+
+func (ps Paths) fillMockResponse(mockMetas []apidef.MockResponseMeta) {
+	for _, mm := range mockMetas {
+		if _, ok := ps[mm.Path]; !ok {
+			ps[mm.Path] = &Path{}
+		}
+
+		plugins := ps[mm.Path].getMethod(mm.Method)
+		if plugins.MockResponse == nil {
+			plugins.MockResponse = &MockResponse{}
+		}
+
+		plugins.MockResponse.Fill(mm)
+		if ShouldOmit(plugins.MockResponse) {
+			plugins.MockResponse = nil
+		}
+	}
+}
+
+func (ps Paths) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {
+	for _, meta := range metas {
+		if _, ok := ps[meta.Path]; !ok {
+			ps[meta.Path] = &Path{}
+		}
+
+		plugins := ps[meta.Path].getMethod(meta.Method)
+		if plugins.TransformRequestMethod == nil {
+			plugins.TransformRequestMethod = &TransformRequestMethod{}
+		}
+
+		plugins.TransformRequestMethod.Fill(meta)
+		if ShouldOmit(plugins.TransformRequestMethod) {
+			plugins.TransformRequestMethod = nil
+		}
+	}
+}
+
+func (ps Paths) fillCache(cacheMetas []apidef.CacheMeta) {
+	for _, cm := range cacheMetas {
+		if _, ok := ps[cm.Path]; !ok {
+			ps[cm.Path] = &Path{}
+		}
+
+		plugins := ps[cm.Path].getMethod(cm.Method)
+		if plugins.Cache == nil {
+			plugins.Cache = &CachePlugin{}
+		}
+
+		plugins.Cache.Fill(cm)
+		if ShouldOmit(plugins.Cache) {
+			plugins.Cache = nil
+		}
+	}
+}
+
+func (ps Paths) fillEnforceTimeout(metas []apidef.HardTimeoutMeta) {
+	for _, meta := range metas {
+		if _, ok := ps[meta.Path]; !ok {
+			ps[meta.Path] = &Path{}
+		}
+
+		plugins := ps[meta.Path].getMethod(meta.Method)
+		if plugins.EnforceTimeout == nil {
+			plugins.EnforceTimeout = &EnforceTimeout{}
+		}
+
+		plugins.EnforceTimeout.Fill(meta)
+		if ShouldOmit(plugins.EnforceTimeout) {
+			plugins.EnforceTimeout = nil
 		}
 	}
 }
@@ -216,15 +307,15 @@ func (ps Paths) ExtractTo(ep *apidef.ExtendedPathsSet) {
 }
 
 type Path struct {
-	Delete  *Plugins `bson:"delete,omitempty" json:"delete,omitempty"`
-	Get     *Plugins `bson:"get,omitempty" json:"get,omitempty"`
-	Head    *Plugins `bson:"head,omitempty" json:"head,omitempty"`
-	Options *Plugins `bson:"options,omitempty" json:"options,omitempty"`
-	Patch   *Plugins `bson:"patch,omitempty" json:"patch,omitempty"`
-	Post    *Plugins `bson:"post,omitempty" json:"post,omitempty"`
-	Put     *Plugins `bson:"put,omitempty" json:"put,omitempty"`
-	Trace   *Plugins `bson:"trace,omitempty" json:"trace,omitempty"`
-	Connect *Plugins `bson:"connect,omitempty" json:"connect,omitempty"`
+	Delete  *Plugins `bson:"DELETE,omitempty" json:"DELETE,omitempty"`
+	Get     *Plugins `bson:"GET,omitempty" json:"GET,omitempty"`
+	Head    *Plugins `bson:"HEAD,omitempty" json:"HEAD,omitempty"`
+	Options *Plugins `bson:"OPTIONS,omitempty" json:"OPTIONS,omitempty"`
+	Patch   *Plugins `bson:"PATCH,omitempty" json:"PATCH,omitempty"`
+	Post    *Plugins `bson:"POST,omitempty" json:"POST,omitempty"`
+	Put     *Plugins `bson:"PUT,omitempty" json:"PUT,omitempty"`
+	Trace   *Plugins `bson:"TRACE,omitempty" json:"TRACE,omitempty"`
+	Connect *Plugins `bson:"CONNECT,omitempty" json:"CONNECT,omitempty"`
 }
 
 func (p *Path) ExtractTo(ep *apidef.ExtendedPathsSet, path string) {
@@ -342,45 +433,25 @@ type Plugins struct {
 	Allow                *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
 	Block                *Allowance `bson:"block,omitempty" json:"block,omitempty"`
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
-}
-
-func (p *Plugins) fillAllowance(endpointMeta apidef.EndPointMeta, typ AllowanceType) {
-	var allowance *Allowance
-
-	switch typ {
-	case block:
-		if p.Block == nil {
-			p.Block = &Allowance{}
-		}
-
-		allowance = p.Block
-	case ignoreAuthentication:
-		if p.IgnoreAuthentication == nil {
-			p.IgnoreAuthentication = &Allowance{}
-		}
-
-		allowance = p.IgnoreAuthentication
-	default:
-		if p.Allow == nil {
-			p.Allow = &Allowance{}
-		}
-
-		allowance = p.Allow
-	}
-
-	allowance.Fill(endpointMeta)
-	if ShouldOmit(allowance) {
-		allowance = nil
-	}
+	// MockResponse allows you to mock responses for an API endpoint.
+	MockResponse *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
+	// TransformRequestMethod allows you to transform the method of a request.
+	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
+	Cache                  *CachePlugin            `bson:"cache,omitempty" json:"cache,omitempty"`
+	EnforceTimeout         *EnforceTimeout         `bson:"enforcedTimeout,omitempty" json:"enforcedTimeout,omitempty"`
 }
 
 func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method string) {
-	p.extractAllowance(ep, path, method, allow)
-	p.extractAllowance(ep, path, method, block)
-	p.extractAllowance(ep, path, method, ignoreAuthentication)
+	p.extractAllowanceTo(ep, path, method, allow)
+	p.extractAllowanceTo(ep, path, method, block)
+	p.extractAllowanceTo(ep, path, method, ignoreAuthentication)
+	p.extractMockResponseTo(ep, path, method)
+	p.extractTransformRequestMethodTo(ep, path, method)
+	p.extractCacheTo(ep, path, method)
+	p.extractEnforcedTimeoutTo(ep, path, method)
 }
 
-func (p *Plugins) extractAllowance(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
+func (p *Plugins) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
 	allowance := p.Allow
 	endpointMetas := &ep.WhiteList
 
@@ -393,26 +464,56 @@ func (p *Plugins) extractAllowance(ep *apidef.ExtendedPathsSet, path string, met
 		endpointMetas = &ep.Ignored
 	}
 
-	if allowance != nil {
-		newPath := true
-		for i, em := range *endpointMetas {
-			if path == em.Path {
-				(*endpointMetas)[i].MethodActions[method] = apidef.EndpointMethodMeta{Action: apidef.NoAction}
-				newPath = false
-				break
-			}
-		}
-
-		if newPath {
-			methodActions := map[string]apidef.EndpointMethodMeta{
-				method: {Action: apidef.NoAction},
-			}
-
-			endpointMeta := apidef.EndPointMeta{Path: path, MethodActions: methodActions}
-			allowance.ExtractTo(&endpointMeta)
-			*endpointMetas = append(*endpointMetas, endpointMeta)
-		}
+	if allowance == nil {
+		return
 	}
+
+	endpointMeta := apidef.EndPointMeta{Path: path, Method: method}
+	allowance.ExtractTo(&endpointMeta)
+	*endpointMetas = append(*endpointMetas, endpointMeta)
+}
+
+func (p *Plugins) extractMockResponseTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.MockResponse == nil {
+		return
+	}
+
+	mockMeta := apidef.MockResponseMeta{Path: path, Method: method}
+	p.MockResponse.ExtractTo(&mockMeta)
+	ep.MockResponse = append(ep.MockResponse, mockMeta)
+}
+
+func (p *Plugins) extractTransformRequestMethodTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.TransformRequestMethod == nil {
+		return
+	}
+
+	meta := apidef.MethodTransformMeta{Path: path, Method: method}
+	p.TransformRequestMethod.ExtractTo(&meta)
+	ep.MethodTransforms = append(ep.MethodTransforms, meta)
+}
+
+func (p *Plugins) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.Cache == nil {
+		return
+	}
+
+	newCacheMeta := apidef.CacheMeta{
+		Method: method,
+		Path:   path,
+	}
+	p.Cache.ExtractTo(&newCacheMeta)
+	ep.AdvanceCacheConfig = append(ep.AdvanceCacheConfig, newCacheMeta)
+}
+
+func (p *Plugins) extractEnforcedTimeoutTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.EnforceTimeout == nil {
+		return
+	}
+
+	meta := apidef.HardTimeoutMeta{Path: path, Method: method}
+	p.EnforceTimeout.ExtractTo(&meta)
+	ep.HardTimeouts = append(ep.HardTimeouts, meta)
 }
 
 type Allowance struct {
@@ -428,4 +529,102 @@ func (a *Allowance) Fill(endpointMeta apidef.EndPointMeta) {
 func (a *Allowance) ExtractTo(endpointMeta *apidef.EndPointMeta) {
 	endpointMeta.Disabled = !a.Enabled
 	endpointMeta.IgnoreCase = a.IgnoreCase
+}
+
+type MockResponse struct {
+	// Enabled enables Mock response in the given path and method.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// IgnoreCase ignores case while matching incoming request path.
+	IgnoreCase bool `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
+	// Code is the mock response's http response code that will be returned to client.
+	Code int `bson:"code" json:"code"`
+	// Body is the mock response's body that will be returned to client.
+	Body string `bson:"body" json:"body"`
+	// Headers is the mock response's headers that will be returned to client.
+	Headers []Header `bson:"headers,omitempty" json:"headers,omitempty"`
+}
+
+func (mr *MockResponse) Fill(mockMeta apidef.MockResponseMeta) {
+	mr.Enabled = !mockMeta.Disabled
+	mr.IgnoreCase = mockMeta.IgnoreCase
+	mr.Code = mockMeta.Code
+	mr.Body = mockMeta.Body
+	mr.Headers = []Header{}
+	for name, value := range mockMeta.Headers {
+		mr.Headers = append(mr.Headers, Header{Name: name, Value: value})
+	}
+
+	sort.Slice(mr.Headers, func(i, j int) bool {
+		return mr.Headers[i].Name < mr.Headers[j].Name
+	})
+
+	if len(mr.Headers) == 0 {
+		mr.Headers = nil
+	}
+}
+
+func (mr *MockResponse) ExtractTo(mockMeta *apidef.MockResponseMeta) {
+	mockMeta.Disabled = !mr.Enabled
+	mockMeta.IgnoreCase = mr.IgnoreCase
+	mockMeta.Code = mr.Code
+	mockMeta.Body = mr.Body
+	mockMeta.Headers = make(map[string]string)
+	for _, h := range mr.Headers {
+		mockMeta.Headers[h.Name] = h.Value
+	}
+}
+
+type Header struct {
+	Name  string `bson:"name" json:"name"`
+	Value string `bson:"value" json:"value"`
+}
+
+type TransformRequestMethod struct {
+	// Enabled enables Method Transform for the given path and method.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// ToMethod is the http method value to which the method of an incoming request will be transformed.
+	ToMethod string `bson:"toMethod" json:"toMethod"`
+}
+
+func (tm *TransformRequestMethod) Fill(meta apidef.MethodTransformMeta) {
+	tm.Enabled = !meta.Disabled
+	tm.ToMethod = meta.ToMethod
+}
+
+func (tm *TransformRequestMethod) ExtractTo(meta *apidef.MethodTransformMeta) {
+	meta.Disabled = !tm.Enabled
+	meta.ToMethod = tm.ToMethod
+}
+
+type CachePlugin struct {
+	Enabled            bool   `bson:"enabled" json:"enabled"`
+	CacheByRegex       string `bson:"cacheByRegex,omitempty" json:"cacheByRegex,omitempty"`
+	CacheResponseCodes []int  `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
+}
+
+func (a *CachePlugin) Fill(cm apidef.CacheMeta) {
+	a.Enabled = !cm.Disabled
+	a.CacheByRegex = cm.CacheKeyRegex
+	a.CacheResponseCodes = cm.CacheOnlyResponseCodes
+}
+
+func (a *CachePlugin) ExtractTo(cm *apidef.CacheMeta) {
+	cm.Disabled = !a.Enabled
+	cm.CacheKeyRegex = a.CacheByRegex
+	cm.CacheOnlyResponseCodes = a.CacheResponseCodes
+}
+
+type EnforceTimeout struct {
+	Enabled bool `bson:"enabled" json:"enabled"`
+	Value   int  `bson:"value" json:"value"`
+}
+
+func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
+	et.Enabled = !meta.Disabled
+	et.Value = meta.TimeOut
+}
+
+func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
+	meta.Disabled = !et.Enabled
+	meta.TimeOut = et.Value
 }

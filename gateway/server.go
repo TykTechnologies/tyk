@@ -178,6 +178,14 @@ type Gateway struct {
 
 	// RedisController keeps track of redis connection and singleton
 	RedisController *storage.RedisController
+	hostDetails     hostDetails
+
+	healthCheckInfo atomic.Value
+}
+
+type hostDetails struct {
+	Hostname string
+	PID      int
 }
 
 func NewGateway(config config.Config, ctx context.Context, cancelFn context.CancelFunc) *Gateway {
@@ -1178,7 +1186,7 @@ func (gw *Gateway) initialiseSystem() error {
 	}
 
 	gw.SetConfig(gwConfig)
-	getHostDetails(gw.GetConfig().PIDFileLocation)
+	gw.getHostDetails(gw.GetConfig().PIDFileLocation)
 	gw.setupInstrumentation()
 
 	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
@@ -1354,17 +1362,12 @@ func (gw *Gateway) setUpConsul() error {
 	return err
 }
 
-var hostDetails struct {
-	Hostname string
-	PID      int
-}
-
-func getHostDetails(file string) {
+func (gw *Gateway) getHostDetails(file string) {
 	var err error
-	if hostDetails.PID, err = readPIDFromFile(file); err != nil {
+	if gw.hostDetails.PID, err = readPIDFromFile(file); err != nil {
 		mainLog.Error("Failed ot get host pid: ", err)
 	}
-	if hostDetails.Hostname, err = os.Hostname(); err != nil {
+	if gw.hostDetails.Hostname, err = os.Hostname(); err != nil {
 		mainLog.Error("Failed to get hostname: ", err)
 	}
 }
@@ -1680,7 +1683,7 @@ func (gw *Gateway) startServer() {
 
 	mainLog.Info("--> Listening on address: ", address)
 	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
-	mainLog.Info("--> PID: ", hostDetails.PID)
+	mainLog.Info("--> PID: ", gw.hostDetails.PID)
 	if !rpc.IsEmergencyMode() {
 		gw.DoReload()
 	}

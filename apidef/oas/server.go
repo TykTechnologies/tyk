@@ -11,6 +11,8 @@ type Server struct {
 	Slug string `bson:"slug,omitempty" json:"slug,omitempty"`
 	// Authentication contains the configurations related to authentication to the API.
 	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
+	// ClientCertificates contains the configurations related to static mTLS.
+	ClientCertificates *ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty"`
 }
 
 func (s *Server) Fill(api apidef.APIDefinition) {
@@ -25,6 +27,15 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.Authentication) {
 		s.Authentication = nil
 	}
+
+	if s.ClientCertificates == nil {
+		s.ClientCertificates = &ClientCertificates{}
+	}
+
+	s.ClientCertificates.Fill(api)
+	if ShouldOmit(s.ClientCertificates) {
+		s.ClientCertificates = nil
+	}
 }
 
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
@@ -35,6 +46,10 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 		s.Authentication.ExtractTo(api)
 	} else {
 		api.UseKeylessAccess = true
+	}
+
+	if s.ClientCertificates != nil {
+		s.ClientCertificates.ExtractTo(api)
 	}
 }
 
@@ -57,4 +72,21 @@ func (lp *ListenPath) Fill(api apidef.APIDefinition) {
 func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.ListenPath = lp.Value
 	api.Proxy.StripListenPath = lp.Strip
+}
+
+type ClientCertificates struct {
+	// Enabled enables static mTLS for the API.
+	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	// AllowList is the list of client certificates which are allowed.
+	Allowlist []string `bson:"allowlist" json:"allowlist"`
+}
+
+func (cc *ClientCertificates) Fill(api apidef.APIDefinition) {
+	cc.Enabled = api.UseMutualTLSAuth
+	cc.Allowlist = api.ClientCertificates
+}
+
+func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
+	api.UseMutualTLSAuth = cc.Enabled
+	api.ClientCertificates = cc.Allowlist
 }

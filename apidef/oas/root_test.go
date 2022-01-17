@@ -42,6 +42,11 @@ func TestXTykAPIGateway(t *testing.T) {
 		initialAPI := apidef.APIDefinition{}
 		Fill(t, &initialAPI, 0)
 
+		initialAPI.VersionDefinition.Enabled = false
+		initialAPI.VersionDefinition.Versions = nil
+		_, err := initialAPI.MigrateVersioning()
+		assert.NoError(t, err)
+
 		xTykAPIGateway := XTykAPIGateway{}
 		xTykAPIGateway.Fill(initialAPI)
 
@@ -128,17 +133,19 @@ func Fill(t *testing.T, input interface{}, index int) {
 
 			v.Set(newMap)
 		}
-
 	case reflect.Struct:
-		for i := 0; i < v.NumField(); i++ {
-			fv := v.Field(i)
-			if v.Type().Field(i).Tag.Get("json") == "-" || v.Type().Field(i).Tag.Get("json") == "" {
-				continue
+		if v.Type() == reflect.TypeOf(apidef.VersionData{}) {
+			v.Set(reflect.ValueOf(FillTestVersionData(t, index)))
+		} else {
+			for i := 0; i < v.NumField(); i++ {
+				fv := v.Field(i)
+				if v.Type().Field(i).Tag.Get("json") == "-" || v.Type().Field(i).Tag.Get("json") == "" {
+					continue
+				}
+
+				Fill(t, fv.Addr().Interface(), index+i+1)
 			}
-
-			Fill(t, fv.Addr().Interface(), index+i+1)
 		}
-
 	case reflect.Ptr:
 		newValue := reflect.New(v.Type().Elem()).Elem()
 		Fill(t, newValue.Addr().Interface(), index)
@@ -166,4 +173,31 @@ func FillTestAuthConfigs(t *testing.T, index int) map[string]apidef.AuthConfig {
 	authConfigs["oidc"] = a
 
 	return authConfigs
+}
+
+func FillTestVersionData(t *testing.T, index int) apidef.VersionData {
+	versionInfo := apidef.VersionInfo{}
+	Fill(t, &versionInfo, index)
+
+	return apidef.VersionData{
+		NotVersioned:   false,
+		DefaultVersion: "Default",
+		Versions: map[string]apidef.VersionInfo{
+			"Default": versionInfo,
+			"v1":      {},
+			"v2":      {},
+		},
+	}
+}
+
+func TestVersioning(t *testing.T) {
+	var emptyVersioning Versioning
+
+	var convertedAPI apidef.APIDefinition
+	emptyVersioning.ExtractTo(&convertedAPI)
+
+	var resultVersioning Versioning
+	resultVersioning.Fill(convertedAPI)
+
+	assert.Equal(t, emptyVersioning, resultVersioning)
 }

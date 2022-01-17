@@ -435,7 +435,7 @@ func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	}
 
 	sort.Slice(s.ScopeToPolicyMapping, func(i, j int) bool {
-		return s.ScopeToPolicyMapping[i].Scope < s.ScopeToPolicyMapping[j].PolicyID
+		return s.ScopeToPolicyMapping[i].Scope < s.ScopeToPolicyMapping[j].Scope
 	})
 
 	if len(s.ScopeToPolicyMapping) == 0 {
