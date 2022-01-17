@@ -900,6 +900,9 @@
         },
         "rpc_pool_size": {
           "type": "integer"
+        },
+        "key_space_sync_interval": {
+          "type": "number"
         }
       }
     },

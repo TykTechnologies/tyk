@@ -303,6 +303,9 @@ type SlaveOptionsConfig struct {
 
 	// The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed.
 	RPCPoolSize int `json:"rpc_pool_size"`
+
+	// You can use this to set a period for which the Gateway will check if there are changes in keys that must be synchronized. If this value is not set then it will default to 10 seconds.
+	KeySpaceSyncInterval float32 `json:"key_space_sync_interval"`
 }
 
 type LocalSessionCacheConf struct {
