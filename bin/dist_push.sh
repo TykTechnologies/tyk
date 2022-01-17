@@ -16,13 +16,17 @@ cd $RELEASE_DIR/
 for arch in amd64 arm64
 do
     debName="${PKGNAME}_${VERSION}_${arch}.deb"
-    rpmName="$PKGNAME-$VERSION-1.${arch/amd64/x86_64}.rpm"
 
     for ver in $DEBVERS
     do
         echo "Pushing $debName to PackageCloud $ver"
         package_cloud push tyk/$PC_TARGET/$ver $debName
     done
+done
+
+for arch in x86_64 aarch64
+do
+    rpmName="$PKGNAME-${VERSION}-1.${arch}.rpm"
 
     for ver in $RPMVERS
     do
