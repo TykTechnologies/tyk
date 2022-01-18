@@ -384,6 +384,24 @@ func TestJWTSessionRSABearer(t *testing.T) {
 	})
 }
 
+func TestJWTSessionFailRSA_WrongJWT_Signature(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	invalidSignToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+
+	//default values, same as before (keeps backward compatibility)
+	ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
+	authHeaders := map[string]string{"authorization": invalidSignToken}
+
+	t.Run("Request with invalid JWT signature", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Headers:   authHeaders,
+			Code:      http.StatusForbidden,
+			BodyMatch: `Key not authorized: Unexpected signing method`,
+		})
+	})
+}
+
 func BenchmarkJWTSessionRSABearer(b *testing.B) {
 	b.ReportAllocs()
 
