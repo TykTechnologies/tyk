@@ -488,12 +488,18 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		mainLog.Debug("Using Policies from RPC")
 		pols, err = gw.LoadPoliciesFromRPC(gw.GetConfig().SlaveOptions.RPCKey)
 	default:
-		// this is the only case now where we need a policy record name
-		if gw.GetConfig().Policies.PolicyRecordName == "" {
+		//if policy path defined we want to allow use of the REST API
+		if gw.GetConfig().Policies.PolicyPath != "" {
+			pols = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
+
+		} else if gw.GetConfig().Policies.PolicyRecordName == "" {
+			// old way of doing things before REST Api added
+			// this is the only case now where we need a policy record name
 			mainLog.Debug("No policy record name defined, skipping...")
 			return 0, nil
+		} else {
+			pols = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
 		}
-		pols = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
 	for id := range pols {
@@ -587,6 +593,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/apis", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/apis/{apiID}", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
+		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/policies/{polID}",gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/oauth/clients/create", gw.createOauthClient).Methods("POST")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", gw.oAuthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}/rotate", gw.rotateOauthClientHandler).Methods("PUT")
