@@ -319,7 +319,7 @@ func (gw *Gateway) getBundleDestPath(spec *APISpec) string {
 	tykBundlePath := filepath.Join(gw.GetConfig().MiddlewarePath, "bundles")
 	bundleNameHash := md5.New()
 	io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
-	bundlePath := fmt.Sprintf("%s_%x", spec.APIID, bundleNameHash.Sum(nil))
+	bundlePath := fmt.Sprintf("%x", bundleNameHash.Sum(nil))
 	return filepath.Join(tykBundlePath, bundlePath)
 }
 
