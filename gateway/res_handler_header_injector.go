@@ -33,9 +33,9 @@ func (h *HeaderInjector) HandleError(rw http.ResponseWriter, req *http.Request) 
 
 func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	// TODO: This should only target specific paths
-
 	ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
-	vInfo, versionPaths, _, _ := h.Spec.Version(req)
+	vInfo, _ := h.Spec.Version(req)
+	versionPaths := h.Spec.RxPaths[vInfo.Name]
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjectedResponse)
 
 	if found {
