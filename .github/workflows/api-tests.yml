@@ -65,7 +65,7 @@ jobs:
         ref: ${{ steps.check_test_branch.outputs.branch	 }}
 
     - name: Check if dashboard branch exists
-      id: check_test_branch
+      id: check_dashboard_branch
       env:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: |
@@ -87,7 +87,7 @@ jobs:
         token: ${{ secrets.ORG_GH_TOKEN }}
         submodules: true
         path: tyk-analytics
-        ref: ${{ steps.check_test_branch.outputs.branch	 }}
+        ref: ${{ steps.check_dashboard_branch.outputs.branch	 }}
 
     - name: start docker compose
       run: docker-compose -f ci/ci_testing_env.yml up -d
