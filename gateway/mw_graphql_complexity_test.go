@@ -213,7 +213,7 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 		{
 			name:          "should allow silent introspection query and ignore depth limit",
 			operationName: "",
-			query:         gqlCountriesTypeIntrospectionQuery,
+			query:         gqlCountriesSilentTypeIntrospectionQuery,
 			accessDef: &user.AccessDefinition{
 				Limit:             user.APILimit{MaxQueryDepth: 1},
 				FieldAccessRights: []user.FieldAccessDefinition{},
