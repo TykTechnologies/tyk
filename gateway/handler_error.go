@@ -29,6 +29,7 @@ const (
 	MsgBearerMailformed    = "Bearer token malformed"
 	MsgKeyNotAuthorized    = "Key not authorised"
 	MsgOauthClientRevoked  = "Key not authorised. OAuth client access was revoked"
+	MsgKeyNotAuthorizedUnexpectedSigningMethod = "Key not authorized: Unexpected signing method"
 )
 
 var errCustomBodyResponse = errors.New("errCustomBodyResponse")
