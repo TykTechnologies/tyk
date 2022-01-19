@@ -90,12 +90,12 @@ jobs:
         ref: ${{ steps.check_dashboard_branch.outputs.branch	 }}
 
     - name: start docker compose
-      run: docker-compose -f ci/ci_testing_env.yml up -d
+      run: docker-compose -f ci/ci_testing_env.yml up
       env:
         TYK_DB_LICENSEKEY: ${{secrets.DASH_LICENSE}}
-        DASH_REPO_PATH: /home/runner/work/tyk-analytics/tyk-analytics/tyk-analytics
-        GW_REPO_PATH: /home/runner/work/tyk-analytics/tyk-analytics/tyk
-        GOPATH: /home/runner/work/tyk-analytics/tyk-analytics
+        DASH_REPO_PATH: /home/runner/work/tyk/tyk/tyk-analytics
+        GW_REPO_PATH: /home/runner/work/tyk/tyk/tyk
+        GOPATH: /home/runner/work/tyk/tyk
         GOPRIVATE: github.com/TykTechnologies
         TOKEN: ${{ secrets.ORG_GH_TOKEN }}
       working-directory: tyk-automated-tests
