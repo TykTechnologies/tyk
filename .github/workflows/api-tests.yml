@@ -90,7 +90,7 @@ jobs:
         ref: ${{ steps.check_dashboard_branch.outputs.branch	 }}
 
     - name: start docker compose
-      run: docker-compose -f ci/ci_testing_env.yml up
+      run: docker-compose -f ci/ci_testing_env.yml up -d
       env:
         TYK_DB_LICENSEKEY: ${{secrets.DASH_LICENSE}}
         DASH_REPO_PATH: /home/runner/work/tyk/tyk/tyk-analytics
