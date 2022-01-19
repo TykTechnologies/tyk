@@ -29,8 +29,8 @@ github.com/TykTechnologies/gorpc v0.0.0-20190515174534-b9c10befc5f4 h1:hTjM5Uubg
 github.com/TykTechnologies/gorpc v0.0.0-20190515174534-b9c10befc5f4/go.mod h1:vqhQRhIHefD4jdFo55j+m0vD5NMjx2liq/ubnshQpaY=
 github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade h1:tFUV86NDnfMY4Au+EJHGJx0Rton8xdOLEh1aT+j6XBk=
 github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20220119122148-1d614c799cd9 h1:iunJ544UzUY+TaUuc6J+87N/oL5a0a0xcnGHRXzZgrQ=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20220119122148-1d614c799cd9/go.mod h1:LBH1NWaQi0EnxGuJhWzhSZPpgtLkELZu+Hr8KH/Wn1E=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20220119145137-4e314b1ec0e1 h1:MDIX1xjWv+aU7YH4hGBYYX2duUoaN0BZd8BNtfNwHmA=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20220119145137-4e314b1ec0e1/go.mod h1:Zlt/B6ixQqmyBTu6HB2uWNOgCM8vIJ5G458pQARFlAk=
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c h1:j6fd0Fz1R4oSWOmcooGjrdahqrML+btQ+PfEJw8SzbA=
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c/go.mod h1:GnHUbsQx+ysI10osPhUdTmsxcE7ef64cVp38Fdyd7e0=
 github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465 h1:A2gBjoX8aF0G3GHEpHyj2f0ixuPkCgcGqmPdKHSkW+0=
@@ -195,6 +195,8 @@ github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMyw
 github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.2 h1:X2ev0eStA3AbceY54o37/0PQ/UWqKEiiO2dKL5OPaFM=
 github.com/google/go-cmp v0.5.2/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+github.com/google/go-cmp v0.5.6 h1:BKbKCqvP6I+rmFHt06ZmyQtvB8xAkWdhFyr0ZUNZcxQ=
+github.com/google/go-cmp v0.5.6/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
 github.com/google/renameio v0.1.0/go.mod h1:KWCgfxg9yswjAJkECMjeO8J8rahYeXnNhOm40UhjYkI=
 github.com/google/uuid v1.1.1 h1:Gkbcsh/GbpXz7lPftLA3P6TYMwjCLYm83jiFQZF/3gY=
