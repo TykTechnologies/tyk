@@ -403,7 +403,7 @@ jobs:
           repo: tyk/${{ needs.goreleaser.outputs.pc }}
           dir: dist
           rpmvers: ${{ matrix.golang_cross == '1.15-el7' && 'el/7' || 'el/8' }}
-          debvers: ${{ matrix.golang_cross == '1.15-el7' && "ubuntu/xenial debian/stretch" || "ubuntu/bionic ubuntu/focal debian/jessie" }}
+          debvers: ${{ matrix.golang_cross == '1.15-el7' && 'ubuntu/xenial' || 'ubuntu/bionic ubuntu/focal debian/jessie' }}
 
       - name: Tell release channel
         if: always()
