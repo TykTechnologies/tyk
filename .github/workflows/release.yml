@@ -34,9 +34,15 @@ env:
   
 jobs:
   goreleaser:
+    name: '${{ matrix.golang_cross }}'
     runs-on: ubuntu-latest
-
-    container: tykio/golang-cross:1.15.15
+    strategy:
+      fail-fast: false
+      matrix:
+        golang_cross: [1.15,1.15-el7]
+    container: 'tykio/golang-cross:${{ matrix.golang_cross }}'
+    env:
+      GOLANG_CROSS: ${{ matrix.golang_cross }}
 
     outputs:
       tag: ${{ steps.targets.outputs.tag }}
@@ -373,6 +379,10 @@ jobs:
       - smoke-tests
       - goreleaser
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        golang_cross: [1.15, 1.15-el7]
 
     steps:
       - uses: actions/download-artifact@v2
@@ -393,6 +403,8 @@ jobs:
         with:
           repo: tyk/${{ needs.goreleaser.outputs.pc }}
           dir: dist
+          rpmvers: ${{ matrix.golang_cross == '1.15-el7' && 'el/7' || 'el/8' }}
+          debvers: ${{ matrix.golang_cross == '1.15-el7' && "ubuntu/xenial debian/stretch" || "ubuntu/bionic ubuntu/focal debian/jessie" }}
 
       - name: Tell release channel
         if: always()
