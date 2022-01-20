@@ -225,6 +225,7 @@ nfpms:
     maintainer: "Tyk <info@tyk.io>"
     description: Tyk API Gateway
     package_name: tyk-gateway
+    file_name_template: "{{ .PackageName }}-{{.Env.GOLANG_CROSS}}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
     builds:
 
       - std-linux
