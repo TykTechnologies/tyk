@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        golang_cross: [1.15,1.15-el7]
+        golang_cross: [ 1.15, 1.15-el7 ]
     container: 'tykio/golang-cross:${{ matrix.golang_cross }}'
     env:
       GOLANG_CROSS: ${{ matrix.golang_cross }}

@@ -1,6 +1,6 @@
-# Go version here should match https://github.com/TykTechnologies/golang-cross/blob/master/.github/workflows/release.yml#L16
+ARG GOLANG_CROSS=1.15
 
-FROM golang:1.15-buster
+FROM tykio/golang-cross:${GOLANG_CROSS}
 LABEL description="Image for plugin development"
 
 ARG TYK_GW_TAG
