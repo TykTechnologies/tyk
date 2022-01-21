@@ -346,6 +346,7 @@ changelog:
     - '^minor:'
 
 release:
+  disable: true
   github:
     owner: TykTechnologies
     name: tyk
