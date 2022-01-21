@@ -78,7 +78,7 @@ dockers:
     - "policies"
     - "coprocess"
     - "tyk.conf.example"
-  skip_push: {{ if .Env.SKIP_DOCKER_PUSH == 'true' }}true{{ else }}false{{ end }}
+  skip_push: "{{ .Env.SKIP_DOCKER_PUSH }}"
 
 # Build tykio/xDH_REPO, cloudsmith/xCOMPATIBILITY_NAME (arm64)
 - ids:
@@ -109,7 +109,7 @@ dockers:
     - "policies"
     - "coprocess"
     - "tyk.conf.example"
-  skip_push: {{ if .Env.SKIP_DOCKER_PUSH == 'true' }}true{{ else }}false{{ end }}
+  skip_push: "{{ .Env.SKIP_DOCKER_PUSH }}"
 
 - ids:
     - static-amd64
@@ -139,7 +139,7 @@ dockers:
     - "policies"
     - "coprocess"
     - "tyk.conf.example"
-  skip_push: {{ if .Env.SKIP_DOCKER_PUSH == 'true' }}true{{ else }}false{{ end }}
+  skip_push: "{{ .Env.SKIP_DOCKER_PUSH }}"
 
 # Build gateway hybrid container amd64
 - ids:
@@ -158,7 +158,7 @@ dockers:
   dockerfile: images/hybrid/Dockerfile
   extra_files:
     - "images/hybrid/"
-  skip_push: {{ if .Env.SKIP_DOCKER_PUSH == 'true' }}true{{ else }}false{{ end }}
+  skip_push: "{{ .Env.SKIP_DOCKER_PUSH }}"
 
 # Build gateway hybrid container arm64
 - ids:
@@ -177,7 +177,7 @@ dockers:
   dockerfile: images/hybrid/Dockerfile
   extra_files:
     - "images/hybrid/"
-  skip_push: {{ if .Env.SKIP_DOCKER_PUSH == 'true' }}true{{ else }}false{{ end }}
+  skip_push: "{{ .Env.SKIP_DOCKER_PUSH }}"
 
 # Build plugin-compiler multiarch
 - ids:
@@ -198,7 +198,7 @@ dockers:
   extra_files:
     - "images/plugin-compiler/"
     - "go.mod"
-  skip_push: {{ if .Env.SKIP_DOCKER_PUSH == 'true' }}true{{ else }}false{{ end }}
+  skip_push: "{{ .Env.SKIP_DOCKER_PUSH }}"
 
 docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}
@@ -222,7 +222,7 @@ nfpms:
     homepage: "https://tyk.io"
     maintainer: "Tyk <info@tyk.io>"
     description: Tyk API Gateway
-    package_name: tyk-gateway\
+    package_name: tyk-gateway
     builds:
 
       - std-linux
