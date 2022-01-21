@@ -183,7 +183,7 @@ dockers:
 - ids:
     - std
   image_templates:
-    - "tykio/tyk-plugin-compiler{{ if .Env.EL7 == 'true' }}-el7{{ end }}:{{ .Tag }}"
+    - tykio/tyk-plugin-compile:{{ .Tag }}{{ if eq .Env.EL7 "true" }}-el7{{ end }}
     - "tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}"
   build_flag_templates:
     - "--label=org.opencontainers.image.created={{.Date}}"
