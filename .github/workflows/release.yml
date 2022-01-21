@@ -307,8 +307,8 @@ jobs:
           COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
           RUN apt-get update && apt-get install -y curl
 
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.4
-          RUN dpkg -i /tyk-gateway.deb' > Dockerfile
+          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway-unstable/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.9~rc2
+          RUN apt-get install -y tyk-gateway' > Dockerfile
 
       - name: install on ${{ matrix.distro }}
         uses: docker/build-push-action@v2
@@ -325,8 +325,8 @@ jobs:
       fail-fast: false
       matrix:
         distro:
-          - ubi7/ubi:7.9
-          - ubi8/ubi:8.3
+          - ubi7/ubi
+          - ubi8/ubi
 
     steps:
       - uses: actions/checkout@v2
@@ -345,8 +345,8 @@ jobs:
           COPY tyk-gateway*_x86_64.rpm /tyk-gateway.rpm
           RUN yum install -y curl
 
-          RUN curl -s https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash && yum install -y tyk-gateway-3.0.4-1
-          RUN rpm -Uvh /tyk-gateway.rpm' > Dockerfile
+          RUN curl -s https://packagecloud.io/install/repositories/tyk/tyk-gateway-unstable/script.rpm.sh | bash && yum install -y tyk-gateway-3.0.9~rc1-1
+          RUN yum install -y tyk-gateway' > Dockerfile
 
       - name: install on ${{ matrix.distro }}
         uses: docker/build-push-action@v2
