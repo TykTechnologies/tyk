@@ -280,7 +280,8 @@ func buildConnStr(resource string) string {
 
 func syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{}
-
+	apisMu.Lock()
+	defer apisMu.Unlock()
 	var s []*APISpec
 	if config.Global().UseDBAppConfigs {
 		connStr := buildConnStr("/system/apis")
@@ -326,14 +327,11 @@ func syncAPISpecs() (int, error) {
 		}
 		filter = append(filter, v)
 	}
-
-	apisMu.Lock()
 	apiSpecs = filter
-	apiLen := len(apiSpecs)
-	tlsConfigCache.Flush()
-	apisMu.Unlock()
 
-	return apiLen, nil
+	tlsConfigCache.Flush()
+
+	return len(apiSpecs), nil
 }
 
 func syncPolicies() (count int, err error) {
