@@ -78,7 +78,7 @@ dockers:
     - "policies"
     - "coprocess"
     - "tyk.conf.example"
-  skip_push: "{{ .Env.SKIP_DOCKER_PUSH }}"
+  skip_push: "{{ .Env.EL7 }}"
 
 # Build tykio/xDH_REPO, cloudsmith/xCOMPATIBILITY_NAME (arm64)
 - ids:
@@ -109,7 +109,7 @@ dockers:
     - "policies"
     - "coprocess"
     - "tyk.conf.example"
-  skip_push: "{{ .Env.SKIP_DOCKER_PUSH }}"
+  skip_push: "{{ .Env.EL7 }}"
 
 - ids:
     - static-amd64
@@ -139,7 +139,7 @@ dockers:
     - "policies"
     - "coprocess"
     - "tyk.conf.example"
-  skip_push: "{{ .Env.SKIP_DOCKER_PUSH }}"
+  skip_push: "{{ .Env.EL7 }}"
 
 # Build gateway hybrid container amd64
 - ids:
@@ -158,7 +158,7 @@ dockers:
   dockerfile: images/hybrid/Dockerfile
   extra_files:
     - "images/hybrid/"
-  skip_push: "{{ .Env.SKIP_DOCKER_PUSH }}"
+  skip_push: "{{ .Env.EL7 }}"
 
 # Build gateway hybrid container arm64
 - ids:
@@ -177,13 +177,13 @@ dockers:
   dockerfile: images/hybrid/Dockerfile
   extra_files:
     - "images/hybrid/"
-  skip_push: "{{ .Env.SKIP_DOCKER_PUSH }}"
+  skip_push: "{{ .Env.EL7 }}"
 
 # Build plugin-compiler multiarch
 - ids:
     - std
   image_templates:
-    - "tykio/tyk-plugin-compiler{{ if .Env.SKIP_DOCKER_PUSH == 'true' }}-el7{{ end }}:{{ .Tag }}"
+    - "tykio/tyk-plugin-compiler{{ if .Env.EL7 == 'true' }}-el7{{ end }}:{{ .Tag }}"
     - "tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}"
   build_flag_templates:
     - "--label=org.opencontainers.image.created={{.Date}}"
@@ -198,7 +198,7 @@ dockers:
   extra_files:
     - "images/plugin-compiler/"
     - "go.mod"
-  skip_push: "{{ .Env.SKIP_DOCKER_PUSH }}"
+  skip_push: "{{ .Env.EL7 }}"
 
 docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}

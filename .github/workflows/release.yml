@@ -42,18 +42,18 @@ jobs:
         golang_cross: [ 1.15, 1.15-el7 ]
         include:
           - golang_cross: 1.15-el7
-            skip_push: true
+            el7: true
             rpmvers: 'el/7'
             debvers: 'ubuntu/xenial'
           - golang_cross: 1.15
-            skip_push: false
+            el7: false
             rpmvers: 'el/8'
             debvers: 'ubuntu/bionic ubuntu/focal debian/jessie'
 
     container: 'tykio/golang-cross:${{ matrix.golang_cross }}'
     env:
       GOLANG_CROSS: ${{ matrix.golang_cross }}
-      SKIP_DOCKER_PUSH: ${{ matrix.skip_push }}
+      EL7: ${{ matrix.el7 }}
     outputs:
       tag: ${{ steps.targets.outputs.tag }}
       upload: ${{ steps.targets.outputs.upload }}
@@ -395,11 +395,11 @@ jobs:
         golang_cross: [ 1.15, 1.15-el7 ]
         include:
           - golang_cross: 1.15-el7
-            skip_push: true
+            el7: true
             rpmvers: 'el/7'
             debvers: 'ubuntu/xenial'
           - golang_cross: 1.15
-            skip_push: false
+            el7: false
             rpmvers: 'el/8'
             debvers: 'ubuntu/bionic ubuntu/focal debian/jessie'
 
