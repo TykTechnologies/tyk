@@ -9,7 +9,6 @@
 # Check the documentation at http://goreleaser.com
 # This project needs CGO_ENABLED=1 and the cross-compiler toolchains for
 # - arm64
-# - macOS (only 10.15 is supported)
 # - amd64
 
 
@@ -179,7 +178,7 @@ dockers:
     - "images/hybrid/"
   skip_push: "{{ .Env.EL7 }}"
 
-# Build plugin-compiler multiarch
+# Build plugin-compiler
 - ids:
     - std
   image_templates:
@@ -285,8 +284,16 @@ nfpms:
         key_file: tyk.io.signing.key
         type: origin
 
-
-
+publishers:
+  - name: tyk-gateway-unstable
+    env:
+      - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
+      - REPO=tyk/tyk-gateway-unstable
+      - EL7={{ .Env.EL7 }}
+      - RPMVERS={{ .Env.RPMVERS }}
+      - DEBVERS={{ .Env.DEBVERS }}
+    cmd: /pc.sh {{ .ArtifactPath }}
+    
 archives:
 - id: std-linux
   builds:
@@ -307,43 +314,12 @@ archives:
     - "coprocess/*"
     - tyk.conf.example
 
-- id: static-amd64
-  name_template: "{{ .ProjectName }}_{{ .Version }}_static_{{ .Os }}_{{ .Arch }}"
-  builds:
-    - static-amd64
-  files:
-    - README.md
-    - "LICENSE.md"
-    - "apps/app_sample.json"
-    - "templates/*.json"
-    - "install/*"
-    - "middleware/*.js"
-    - "event_handlers/sample/*.js"
-    - "policies/*.json"
-    - "coprocess/*"
-    - tyk.conf.example
-
-
-
 checksum:
   disable: false
 
 signs:
   - id: std
     artifacts: checksum
-
-changelog:
-  sort: asc
-  filters:
-    exclude:
-    - '^utils:'
-    - (?i)typo
-    - 'Merge (pull request|branch)'
-    - '\[CI\]'
-    - '(?i)\[Buddy\]'
-    - 'cherry picked'
-    - '^rel-eng:'
-    - '^minor:'
 
 release:
   disable: true
