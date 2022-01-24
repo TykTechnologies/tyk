@@ -93,9 +93,13 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, err
 		return versionInfo, errors.New("no paths defined in swagger file")
 	}
 	for pathName, pathSpec := range s.Paths {
-		newEndpointMeta := apidef.EndPointMeta{
+		whitelistMeta := apidef.EndPointMeta{
 			Path:          pathName,
 			MethodActions: map[string]apidef.EndpointMethodMeta{},
+		}
+
+		trackMeta := apidef.TrackEndpointMeta{
+			Path: pathName,
 		}
 
 		// We just want the paths here, no mocks
@@ -115,12 +119,16 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, err
 				continue
 			}
 
-			newEndpointMeta.MethodActions[methodName] = apidef.EndpointMethodMeta{
+			whitelistMeta.MethodActions[methodName] = apidef.EndpointMethodMeta{
 				Action: apidef.NoAction,
 				Code:   http.StatusOK,
 			}
+
+			trackMeta.Method = methodName
+			versionInfo.ExtendedPaths.TrackEndpoints = append(versionInfo.ExtendedPaths.TrackEndpoints, trackMeta)
 		}
-		versionInfo.ExtendedPaths.WhiteList = append(versionInfo.ExtendedPaths.WhiteList, newEndpointMeta)
+
+		versionInfo.ExtendedPaths.WhiteList = append(versionInfo.ExtendedPaths.WhiteList, whitelistMeta)
 	}
 
 	return versionInfo, nil
