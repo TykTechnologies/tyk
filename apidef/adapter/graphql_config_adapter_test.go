@@ -664,6 +664,39 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			}),
 		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"idType"},
+				},
+			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "WithChildren",
+					FieldNames: []string{"id", "name"},
+				},
+				{
+					TypeName:   "IDType",
+					FieldNames: []string{"id"},
+				},
+			},
+			Factory: &graphqlDataSource.Factory{
+				HTTPClient: httpClient,
+			},
+			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+				Fetch: graphqlDataSource.FetchConfiguration{
+					URL:    "https://graphql.example.com",
+					Method: "POST",
+					Header: map[string][]string{
+						"Auth": {"123"},
+					},
+				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{
+					URL: "https://graphql.example.com",
+				},
+			}),
+		},
 	}
 
 	var gqlConfig apidef.GraphQLConfig
@@ -699,8 +732,12 @@ var v2Schema = strconv.Quote(`type Query {
   restWithQueryParams(q: String, order: String, limit: Int): [String]
   restWithPathParams(id: String): [String]
   restWithFullUrlAsParam(url: String): [String]
+  idType: IDType!
 }
-type WithChildren {
+interface IDType {
+	id: ID!
+}
+type WithChildren implements IDType {
   id: ID!
   name: String
   nested: Nested
@@ -869,6 +906,20 @@ var graphqlEngineV2ConfigJson = `{
 					"headers": {},
 					"query": [],
 					"body": ""
+				}
+			},
+			{
+				"kind": "GraphQL",
+				"internal": false,
+				"root_fields": [
+					{ "type": "Query", "fields": ["idType"] }
+				],
+				"config": {
+					"url": "https://graphql.example.com",
+					"method": "POST",
+					"headers": {
+						"Auth": "123"
+					}
 				}
 			}
 		]
