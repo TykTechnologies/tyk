@@ -3,6 +3,7 @@ package adapter
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"testing"
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
@@ -54,7 +55,10 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 	t.Run("should convert graphql v2 config to engine config v2",
 		runWithoutError(graphqlEngineV2ConfigJson, httpClient,
 			func(t *testing.T) *graphql.EngineV2Configuration {
-				schema, err := graphql.NewSchemaFromString(v2Schema)
+				unquotedSchema, err := strconv.Unquote(v2Schema)
+				require.NoError(t, err)
+
+				schema, err := graphql.NewSchemaFromString(unquotedSchema)
 				require.NoError(t, err)
 
 				conf := graphql.NewEngineV2Configuration(schema)
@@ -221,6 +225,36 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 							},
 						}),
 					},
+					{
+						RootNodes: []plan.TypeField{
+							{
+								TypeName:   "Query",
+								FieldNames: []string{"idType"},
+							},
+						},
+						ChildNodes: []plan.TypeField{
+							{
+								TypeName:   "WithChildren",
+								FieldNames: []string{"id", "name"},
+							},
+							{
+								TypeName:   "IDType",
+								FieldNames: []string{"id"},
+							},
+						},
+						Factory: &graphqlDataSource.Factory{
+							Client: httpclient.NewNetHttpClient(httpClient),
+						},
+						Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+							Fetch: graphqlDataSource.FetchConfiguration{
+								URL:    "https://graphql.example.com",
+								Method: "POST",
+								Header: map[string][]string{
+									"Auth": {"123"},
+								},
+							},
+						}),
+					},
 				})
 
 				return &conf
@@ -237,13 +271,42 @@ const graphqlEngineV1ConfigJson = `{
 	"playground": {}
 }`
 
-const v2Schema = `type Query { rest: String gql(id: ID!, name: String): String deepGQL: DeepGQL withChildren: WithChildren multiRoot1: MultiRoot1 multiRoot2: MultiRoot2 } type WithChildren { id: ID! name: String nested: Nested } type Nested { id: ID! name: String! } type MultiRoot1 { id: ID! } type MultiRoot2 { name: String! } type DeepGQL { query(code: String!): String }`
+var v2Schema = strconv.Quote(`type Query {
+  rest: String
+  gql(id: ID!, name: String): String
+  deepGQL: DeepGQL
+  withChildren: WithChildren
+  multiRoot1: MultiRoot1
+  multiRoot2: MultiRoot2
+  idType: IDType!
+}
+interface IDType {
+	id: ID!
+}
+type WithChildren implements IDType {
+  id: ID!
+  name: String
+  nested: Nested
+}
+type Nested {
+  id: ID!
+  name: String!
+}
+type MultiRoot1 {
+  id: ID!
+}
+type MultiRoot2 {
+  name: String!
+}
+type DeepGQL {
+  query(code: String!): String
+}`)
 
-const graphqlEngineV2ConfigJson = `{
+var graphqlEngineV2ConfigJson = `{
 	"enabled": true,
 	"execution_mode": "executionEngine",
 	"version": "2",
-	"schema": "` + v2Schema + `",
+	"schema": ` + v2Schema + `,
 	"last_schema_update": "2020-11-11T11:11:11.000+01:00",
 	"engine": {
 		"field_configs": [
@@ -332,6 +395,20 @@ const graphqlEngineV2ConfigJson = `{
 				"internal": false,
 				"root_fields": [
 					{ "type": "Query", "fields": ["multiRoot1","multiRoot2"] }
+				],
+				"config": {
+					"url": "https://graphql.example.com",
+					"method": "POST",
+					"headers": {
+						"Auth": "123"
+					}
+				}
+			},
+			{
+				"kind": "GraphQL",
+				"internal": false,
+				"root_fields": [
+					{ "type": "Query", "fields": ["idType"] }
 				],
 				"config": {
 					"url": "https://graphql.example.com",
