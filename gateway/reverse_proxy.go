@@ -30,7 +30,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
-	"github.com/patrickmn/go-cache"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	gqlhttp "github.com/jensneuse/graphql-go-tools/pkg/http"
@@ -1024,6 +1023,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// Do this before we make a shallow copy
 	session := ctxGetSession(req)
+	// mantain the body
+	req.Body = copyBody(req.Body)
 
 	outreq := new(http.Request)
 	logreq := new(http.Request)
