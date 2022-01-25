@@ -1,0 +1,61 @@
+name: CI tests
+
+on: pull_request
+
+env:
+  TYK_DB_REDISHOST: localhost
+  TYK_GW_STORAGE_HOST: localhost
+
+jobs:
+  test:
+    name: Go ${{ matrix.go }} Redis ${{ matrix.redis-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        redis-version: [5]
+        go: [1.15]
+
+    steps:
+      - name: Checkout Tyk
+        uses: actions/checkout@v2
+
+      - name: Setup Golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+            python-version: '3.5'
+
+      - name: Setup Lua
+        run:
+          sudo apt-get install libluajit-5.1-dev
+
+      - name: Install Dependencies
+        run: |
+          go get golang.org/x/tools/cmd/goimports
+
+          python -m pip install --upgrade pip
+          pip install setuptools
+          pip install google
+          pip install protobuf
+
+      - name: Start Redis
+        uses: supercharge/redis-github-action@1.1.0
+        with:
+          redis-version: ${{ matrix.redis-version }}
+
+      - name: Cache
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Run Gateway Tests
+        run: |
+          ./bin/ci-tests.sh

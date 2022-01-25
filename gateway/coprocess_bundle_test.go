@@ -148,7 +148,7 @@ from tyk.decorators import *
 from gateway import TykGateway as tyk
 
 @Hook
-def MyRequestHook(request, session, spec):
+def MyRequestHook(request, response, session, metadata, spec):
 	request.object.return_overrides.headers['X-Foo'] = 'Bar'
 	request.object.return_overrides.response_code = int(request.object.params["status"])
 
@@ -203,6 +203,7 @@ func TestResponseOverride(t *testing.T) {
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
+			PythonVersion:    "3.5",
 		}})
 	defer ts.Close()
 
