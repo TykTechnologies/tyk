@@ -1006,7 +1006,7 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 	s.MockHandle = MockHandle
 
 	var err error
-	gwConfig.Storage.Database = rand.Intn(15)
+	gwConfig.Storage.Database = 1
 	gwConfig.AppPath, err = ioutil.TempDir("", "tyk-test-")
 
 	if err != nil {
