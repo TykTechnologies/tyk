@@ -137,7 +137,7 @@ jobs:
           go mod tidy
           go mod vendor
           echo "Moving vendor"
-          mv -f vendor/* $GOPATH/src
+          cp -r -f vendor/* $GOPATH/src
           rm -rf vendor
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
