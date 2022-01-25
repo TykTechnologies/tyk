@@ -56,6 +56,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: Run go.mod tidy
+        run: |
+          go mod tidy
+          git diff-index --exit-code HEAD
+
       - name: Run Gateway Tests
         run: |
           ./bin/ci-tests.sh
