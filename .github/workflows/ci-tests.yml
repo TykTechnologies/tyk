@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         redis-version: [5]
-        go: [1.15]
+        go: [1.15.15]
 
     steps:
       - name: Checkout Tyk
@@ -56,10 +56,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-#      - name: Run go.mod tidy
-#        run: |
-#          go mod tidy
-#          git diff-index --exit-code HEAD
+      - name: Run go.mod tidy
+        run: |
+          go mod tidy
+          git diff-index --exit-code HEAD
 
       - name: Run Gateway Tests
         run: |
