@@ -1066,7 +1066,6 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		ts.Run(t, test.TestCase{Path: "/", Code: 403, Client: client})
 	})
 
-
 	// check that key has been updated with wrong certificate
 	t.Run("Key has been updated with wrong certificate key", func(t *testing.T) {
 		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
