@@ -3,7 +3,6 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"io"
 	"net/http"
 	"runtime/pprof"
@@ -158,7 +157,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 		rawResponse := ""
 
 		if recordDetail(r, s.Spec) {
-			requestBodyGraphQL(r)
 			// Get the wire format representation
 			var wireFormatReq bytes.Buffer
 			r.Write(&wireFormatReq)
@@ -171,11 +169,14 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			// mw_redis_cache instead? is there a reason not
 			// to include that in the analytics?
 			if responseCopy != nil {
+				// the body is assumed to be a nopCloser*
+				body := responseCopy.Body
 				responseCopy.Body = respBodyReader(r, responseCopy)
 
 				// Get the wire format representation
 				var wireFormatRes bytes.Buffer
 				responseCopy.Write(&wireFormatRes)
+				responseCopy.Body = body
 				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 			}
 		}
@@ -346,11 +347,4 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	return inRes
-}
-
-func requestBodyGraphQL(r *http.Request) {
-	if gqlCtx := ctxGetGraphQLRequest(r); gqlCtx != nil {
-		contents, _ := json.Marshal(gqlCtx)
-		r.Body = nopCloser{bytes.NewReader(contents)}
-	}
 }

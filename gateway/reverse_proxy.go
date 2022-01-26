@@ -1024,7 +1024,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// Do this before we make a shallow copy
 	session := ctxGetSession(req)
 	// mantain the body
-	req.Body = copyBody(req.Body)
+	copyRequest(req)
 
 	outreq := new(http.Request)
 	logreq := new(http.Request)
@@ -1264,8 +1264,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			*bodyBuffer2 = bodyBuffer
 
 			// Create new ReadClosers so we can split output
-			res.Body = ioutil.NopCloser(&bodyBuffer)
-			inres.Body = ioutil.NopCloser(bodyBuffer2)
+			res.Body = nopCloser{bytes.NewReader(bodyBuffer.Bytes())}
+			inres.Body = nopCloser{bytes.NewReader(bodyBuffer.Bytes())}
 		}
 	}
 
@@ -1603,10 +1603,6 @@ func copyBody(body io.ReadCloser) io.ReadCloser {
 }
 
 func copyRequest(r *http.Request) *http.Request {
-	if r.ContentLength == -1 {
-		return r
-	}
-
 	if r.Body != nil {
 		r.Body = copyBody(r.Body)
 	}
@@ -1614,13 +1610,7 @@ func copyRequest(r *http.Request) *http.Request {
 }
 
 func copyResponse(r *http.Response) *http.Response {
-	// for the case of streaming for which Content-Length might be unset = -1.
-
-	if r.ContentLength == -1 {
-		return r
-	}
-
-	// If the response is 101 Switching Protocols then the body will contain a
+// If the response is 101 Switching Protocols then the body will contain a
 	// `*http.readWriteCloserBody` which cannot be copied (see stdlib documentation).
 	// In this case we want to return immediately to avoid a silent crash.
 	if r.StatusCode == http.StatusSwitchingProtocols {
