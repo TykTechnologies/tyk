@@ -23,7 +23,11 @@ class TykMiddleware:
         self.imported_modules = []
         
         module_splits = filepath.split('_')
-        self.api_id, self.middleware_id = module_splits[0], module_splits[1]
+        self.api_id = ""
+        if len(module_splits) == 1:
+            self.middleware_id = module_splits[0]
+        else:
+            self.api_id, self.middleware_id = module_splits[0], module_splits[1]
 
         self.module_path = os.path.join(self.bundle_root_path, filepath)
         self.parse_manifest()
