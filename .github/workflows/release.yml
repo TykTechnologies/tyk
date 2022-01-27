@@ -45,10 +45,14 @@ jobs:
             el7: true
             rpmvers: 'el/7'
             debvers: 'ubuntu/xenial'
+            # to avoid git related error due to git version issue on
+            # stretch based image for el7 builds.
+            gorel_args: 'release --rm-dist --skip-validate'
           - golang_cross: 1.15
             el7: false
             rpmvers: 'el/8'
             debvers: 'ubuntu/bionic ubuntu/focal debian/jessie'
+            gorel_args: 'release --rm-dist'
 
     container: 'tykio/golang-cross:${{ matrix.golang_cross }}'
     outputs:
@@ -145,7 +149,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
-          args: release --rm-dist
+          args: ${{ matrix.gorel_args }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
