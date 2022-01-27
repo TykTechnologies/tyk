@@ -1264,8 +1264,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			*bodyBuffer2 = bodyBuffer
 
 			// Create new ReadClosers so we can split output
-			res.Body = nopCloser{bytes.NewReader(bodyBuffer.Bytes())}
-			inres.Body = nopCloser{bytes.NewReader(bodyBuffer.Bytes())}
+			res.Body = ioutil.NopCloser(&bodyBuffer)
+			inres.Body = ioutil.NopCloser(bodyBuffer2)
 		}
 	}
 
@@ -1603,6 +1603,12 @@ func copyBody(body io.ReadCloser) io.ReadCloser {
 }
 
 func copyRequest(r *http.Request) *http.Request {
+	if r.ContentLength == -1 &&
+		// for unknown length, if request is not gRPC we assume it's chunked transfer encoding
+		IsGrpcStreaming(r) {
+		return r
+	}
+
 	if r.Body != nil {
 		r.Body = copyBody(r.Body)
 	}
@@ -1610,7 +1616,14 @@ func copyRequest(r *http.Request) *http.Request {
 }
 
 func copyResponse(r *http.Response) *http.Response {
-// If the response is 101 Switching Protocols then the body will contain a
+	// for the case of streaming for which Content-Length might be unset = -1.
+
+	if r.ContentLength == -1 {
+		return r
+	}
+
+
+	// If the response is 101 Switching Protocols then the body will contain a
 	// `*http.readWriteCloserBody` which cannot be copied (see stdlib documentation).
 	// In this case we want to return immediately to avoid a silent crash.
 	if r.StatusCode == http.StatusSwitchingProtocols {
@@ -1659,5 +1672,7 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 
 // IsGrpcStreaming  determines wether a request represents a grpc streaming req
 func IsGrpcStreaming(r *http.Request) bool {
-	return r.ContentLength == -1 && r.Header.Get(headers.ContentType) == "application/grpc"
+	return r.ContentLength == -1 &&
+		// gRPC over HTTP/2 requests content-type should begin with "application/grpc"
+		strings.HasPrefix(r.Header.Get(headers.ContentType), "application/grpc")
 }
