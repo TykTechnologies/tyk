@@ -65,6 +65,20 @@ func TestRedisCacheMiddleware_WithCompressedResponse(t *testing.T) {
 			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},
 		}...)
 	})
+
+	t.Run("with chunked gzip response body and dynamic redis", func(t *testing.T) {
+		createAPI(true)
+		ts.Gw.RedisController.DisableRedis(true)
+		ts.Run(t, []test.TestCase{
+			{Path: "/chunked", Code: 200, BodyMatch: "Mars"},
+			{Path: "/chunked", Code: 200, BodyMatch: "Mars"},
+		}...)
+		ts.Gw.RedisController.DisableRedis(false)
+		ts.Run(t, []test.TestCase{
+			{Path: "/chunked", Code: 200, BodyMatch: "Mars"},
+			{Path: "/chunked", Code: 200, BodyMatch: "Mars"},
+		}...)
+	})
 }
 
 func Test_isSafeMethod(t *testing.T) {
