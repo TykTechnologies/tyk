@@ -53,8 +53,6 @@ jobs:
     container: 'tykio/golang-cross:${{ matrix.golang_cross }}'
     outputs:
       tag: ${{ steps.targets.outputs.tag }}
-      upload: ${{ steps.targets.outputs.upload }}
-      pc: ${{ steps.targets.outputs.pc }}
 
     steps:
       - name: Fix private module deps
@@ -66,8 +64,6 @@ jobs:
       - name: Checkout of tyk for non-el7 builds.
         if: ${{ matrix.golang_cross == '1.15' }}
         uses: actions/checkout@v2
-        with:
-          fetch-depth: ${{ ! startsWith(github.ref, 'refs/tags') }}
 
       - name: Checkout of tyk for el7 builds
         if: ${{ matrix.golang_cross == '1.15-el7' }}
@@ -92,7 +88,7 @@ jobs:
           username: ${{ secrets.CLOUDSMITH_USERNAME }}
           password: ${{ secrets.CLOUDSMITH_API_KEY }}
 
-      - name: Unlock agent and set targets
+      - name: Unlock agent and set tag
         id: targets
         shell: bash
         env:
@@ -101,24 +97,8 @@ jobs:
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
           bin/unlock-agent.sh
-          DOCKER_CFG_PATH="${DOCKER_CONFIG:-$HOME/.docker}/config.json"
-          jq '. + {"experimental": "enabled"}' "$DOCKER_CFG_PATH" > c.json && mv c.json "$DOCKER_CFG_PATH" || rm c.json
           current_tag=${GITHUB_REF##*/}
           echo "::set-output name=tag::${current_tag}"
-          if [[ $current_tag =~ .+-(qa|rc).* ]]; then
-                  echo "::set-output name=upload::true"
-                  echo "::set-output name=pc::tyk-gateway-unstable"
-                  echo "::debug file=.goreleaser.yml::Pushing to unstable repos"
-          # From https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
-          # If this is a public release, the tag is of the form vX.Y.Z where X, Y, Z ∈ ℤ
-          elif [[ $current_tag =~ v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*) ]]; then
-                  echo "::set-output name=upload::true"
-                  echo "::set-output name=pc::tyk-gateway"
-                  echo "::debug file=.goreleaser.yml::Pushing to stable repos"
-          else
-                  echo "::set-output name=upload::false"
-                  echo "::debug file=.goreleaser.yml::No uploads"
-          fi
 
       - name: Delete old release assets
         if: startsWith(github.ref, 'refs/tags')
@@ -183,12 +163,6 @@ jobs:
             dist/*.rpm
             !dist/*PAYG*.rpm
 
-      - uses: actions/upload-artifact@v2
-        with:
-          name: payg
-          retention-days: 1
-          path: dist/*PAYG*
-
   ci:
     needs:
       - goreleaser
@@ -252,8 +226,9 @@ jobs:
       - name: Tell gromit about new build
         id: gromit
         run: |
+          # Remember to remove the true when TD-626 is fixed
           curl -fsSL -H "Authorization: ${{secrets.GROMIT_TOKEN}}" 'https://domu-kun.cloud.tyk.io/gromit/newbuild' \
-                 -X POST -d '{ "repo": "${{ github.repository}}", "ref": "${{ github.ref }}", "sha": "${{ github.sha }}" }'
+                 -X POST -d '{ "repo": "${{ github.repository}}", "ref": "${{ github.ref }}", "sha": "${{ github.sha }}" }' || true
 
       - name: Tell integration channel
         if: ${{ failure() }}
@@ -298,10 +273,6 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: actions/download-artifact@v2
-        with:
-          name: deb
-
       - uses: docker/setup-qemu-action@v1
 
       - uses: docker/setup-buildx-action@v1
@@ -310,7 +281,6 @@ jobs:
         run: |
           echo 'FROM ${{ matrix.distro }}
           ARG TARGETARCH
-          COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
           RUN apt-get update && apt-get install -y curl
 
           RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway-unstable/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.9~rc2
@@ -339,16 +309,11 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: actions/download-artifact@v2
-        with:
-          name: rpm
-
       - uses: docker/setup-buildx-action@v1
 
       - name: generate dockerfile
         run: |
           echo 'FROM registry.access.redhat.com/${{ matrix.distro }}
-          COPY tyk-gateway*_x86_64.rpm /tyk-gateway.rpm
           RUN yum install -y curl
 
           RUN curl -s https://packagecloud.io/install/repositories/tyk/tyk-gateway-unstable/script.rpm.sh | bash && yum install -y tyk-gateway-3.0.9~rc1-1
@@ -390,80 +355,9 @@ jobs:
               fi
           done
 
-
-  packagecloud:
-    if: needs.goreleaser.outputs.upload == 'true'
-    needs:
-      - smoke-tests
-      - goreleaser
-    runs-on: ubuntu-latest
-    # temporary until this job is merged into jobs.goreleaser
-    strategy:
-      fail-fast: false
-      matrix:
-        golang_cross: [ 1.15, 1.15-el7 ]
-        include:
-          - golang_cross: 1.15-el7
-            el7: true
-            rpmvers: 'el/7'
-            debvers: 'ubuntu/xenial'
-          - golang_cross: 1.15
-            el7: false
-            rpmvers: 'el/8'
-            debvers: 'ubuntu/bionic ubuntu/focal debian/jessie'
-
-    steps:
-      - uses: actions/download-artifact@v2
-        with:
-          name: deb
-          path: dist
-
-      - uses: actions/download-artifact@v2
-        with:
-          name: rpm
-          path: dist
-
-      - name: Push to packagecloud
-        id: pc-push
-        uses: TykTechnologies/packagecloud-action@main
-        env:
-          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
-        with:
-          repo: tyk/${{ needs.goreleaser.outputs.pc }}
-          dir: dist
-          rpmvers: ${{ matrix.rpmvers }}
-          debvers: ${{ matrix.debvers }}
-
-      - name: Tell release channel
-        if: always()
-        run: |
-          colour=bad
-          pretext=":boom: Failed to push packages to ${{ needs.gorelease.outputs.pc }} for $${{ github.ref }}. Please review this run and correct it if needed."
-          if [[ ${{ steps.pc-push.outcome }} == "success" ]]; then
-              colour=good
-              pretext="Please review the draft release at https://github.com/${{ github.repository }}/releases and delete if not required."
-          fi
-
-          curl https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack -o /tmp/slack && chmod +x /tmp/slack
-          /tmp/slack chat send \
-          --actions '{"type": "button", "style": "primary", "text": "See log", "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' \
-          --author 'Bender' \
-          --author-icon 'https://hcoop.net/~alephnull/bender/bender-arms.jpg' \
-          --author-link 'https://github.com/TykTechnologies/tyk-ci' \
-          --channel '#release' \
-          --color $colour \
-          --fields '{"title": "Repo", "value": "${{ needs.goreleaser.outputs.pc }}", "short": false}' \
-          --footer 'github-actions' \
-          --footer-icon 'https://assets-cdn.github.com/images/modules/logos_page/Octocat.png' \
-          --image 'https://assets-cdn.github.com/images/modules/logos_page/Octocat.png' \
-          --pretext "$pretext" \
-          --text 'Commit message: ${{ github.event.head_commit.message }}' \
-          --title 'New version ${{ needs.goreleaser.outputs.tag }} for ${{ needs.goreleaser.outputs.pc }}' \
-          --title-link 'https://packagecloud.io/tyk/${{ needs.goreleaser.outputs.pc }}/'
-
   # AWS updates only for stable releases
   aws-mktplace-byol:
-    if: startsWith(github.ref, 'refs/tags/v3.0')
+    if: startsWith(github.ref, 'refs/tags/v4.0')
     runs-on: ubuntu-latest
     needs:
       - smoke-tests
