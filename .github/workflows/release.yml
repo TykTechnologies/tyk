@@ -42,11 +42,11 @@ jobs:
         golang_cross: [ 1.15, 1.15-el7 ]
         include:
           - golang_cross: 1.15-el7
-            el7: true
+            goreleaser: '.goreleaser-el7.yml'
             rpmvers: 'el/7'
             debvers: 'ubuntu/xenial'
           - golang_cross: 1.15
-            el7: false
+            goreleaser: '.goreleaser.yml'
             rpmvers: 'el/8'
             debvers: 'ubuntu/bionic ubuntu/focal debian/jessie'
 
@@ -61,15 +61,11 @@ jobs:
         run: >
           git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
 
-      - name: Checkout of tyk for non-el7 builds.
-        if: ${{ matrix.golang_cross == '1.15' }}
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
+      # v1 reqd to support older git in -el7
       - name: Checkout of tyk for el7 builds
-        if: ${{ matrix.golang_cross == '1.15-el7' }}
         uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
 
       - uses: docker/setup-qemu-action@v1
 
@@ -133,7 +129,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
-          args: release --rm-dist
+          args: release --rm-dist -f ${{ matrix.goreleaser }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
@@ -143,7 +139,6 @@ jobs:
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           GOLANG_CROSS: ${{ matrix.golang_cross }}
-          EL7: ${{ matrix.el7 }}
           DEBVERS: ${{ matrix.debvers }}
           RPMVERS: ${{ matrix.rpmvers }}
           REPO: tyk/tyk-gateway-unstable
