@@ -64,6 +64,8 @@ jobs:
       - name: Checkout of tyk for non-el7 builds.
         if: ${{ matrix.golang_cross == '1.15' }}
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: Checkout of tyk for el7 builds
         if: ${{ matrix.golang_cross == '1.15-el7' }}
