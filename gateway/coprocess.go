@@ -542,7 +542,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		Middleware: h.mw,
 	}
 
-	object, err := coProcessor.BuildObject(req, res, nil)
+	object, err := coProcessor.BuildObject(req, res, h.mw.Spec)
 	if err != nil {
 		log.WithError(err).Debug("Couldn't build request object")
 		return errors.New("Middleware error")
