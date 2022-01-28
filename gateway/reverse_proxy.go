@@ -1622,7 +1622,6 @@ func copyResponse(r *http.Response) *http.Response {
 		return r
 	}
 
-
 	// If the response is 101 Switching Protocols then the body will contain a
 	// `*http.readWriteCloserBody` which cannot be copied (see stdlib documentation).
 	// In this case we want to return immediately to avoid a silent crash.

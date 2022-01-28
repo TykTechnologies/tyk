@@ -693,7 +693,6 @@ func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
 		}`))
 }
 
-
 func chunkedEncodingHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost, http.MethodGet:
@@ -702,9 +701,9 @@ func chunkedEncodingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if f, ok := w.(http.Flusher); ok {
-		w.Write([]byte(`{"data":{"country":{`))
+		_, _ = w.Write([]byte(`{"data":{"country":{`))
 		f.Flush()
-		w.Write([]byte(`"code":"M","name":"Mars"}}}`))
+		_, _ = w.Write([]byte(`"code":"M","name":"Mars"}}}`))
 		f.Flush()
 		return
 	}

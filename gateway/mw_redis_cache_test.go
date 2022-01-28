@@ -69,14 +69,14 @@ func TestRedisCacheMiddleware_WithCompressedResponse(t *testing.T) {
 	t.Run("with chunked gzip response body and dynamic redis", func(t *testing.T) {
 		createAPI(true)
 		ts.Gw.RedisController.DisableRedis(true)
-		ts.Run(t, []test.TestCase{
-			{Path: "/chunked", Code: 200, BodyMatch: "Mars"},
-			{Path: "/chunked", Code: 200, BodyMatch: "Mars"},
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/chunked", Code: http.StatusOK, BodyMatch: "Mars"},
+			{Path: "/chunked", Code: http.StatusOK, BodyMatch: "Mars"},
 		}...)
 		ts.Gw.RedisController.DisableRedis(false)
-		ts.Run(t, []test.TestCase{
-			{Path: "/chunked", Code: 200, BodyMatch: "Mars"},
-			{Path: "/chunked", Code: 200, BodyMatch: "Mars"},
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/chunked", Code: http.StatusOK, BodyMatch: "Mars"},
+			{Path: "/chunked", Code: http.StatusOK, BodyMatch: "Mars"},
 		}...)
 	})
 }
