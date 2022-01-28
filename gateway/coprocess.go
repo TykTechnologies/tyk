@@ -15,10 +15,8 @@ import (
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/user"
 
-	"crypto/md5"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 )
@@ -133,15 +131,16 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 			}
 		}
 
-		bundleHash := md5.New()
-		io.WriteString(bundleHash, spec.CustomMiddlewareBundle)
-		bundleHashStr := fmt.Sprintf("%x", bundleHash.Sum(nil))
+		bundleHash, err := c.Middleware.Gw.getHashedBundleName(spec.CustomMiddlewareBundle)
+		if err != nil {
+			return nil, err
+		}
 
 		object.Spec = map[string]string{
 			"OrgID":       c.Middleware.Spec.OrgID,
 			"APIID":       c.Middleware.Spec.APIID,
 			"config_data": string(configDataAsJSON),
-			"bundle_hash": bundleHashStr,
+			"bundle_hash": bundleHash,
 		}
 	}
 
