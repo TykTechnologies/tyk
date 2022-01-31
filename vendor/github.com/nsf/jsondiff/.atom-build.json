@@ -1,0 +1,18 @@
+{
+    "cmd": "go",
+    "name": "go install",
+    "sh": false,
+    "args": ["install"],
+    "cwd": "{PROJECT_PATH}",
+    "errorMatch": [
+        "(?<file>[\\/0-9a-zA-Z\\._]+):(?<line>\\d+)"
+    ],
+    "targets": {
+        "go test": {
+            "cmd": "go",
+            "sh": false,
+            "args": ["test"],
+            "cwd": "{PROJECT_PATH}"
+        }
+    }
+}
