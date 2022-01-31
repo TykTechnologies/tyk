@@ -125,6 +125,7 @@ publishers:
 # This disables archives
 archives:
   - format: binary
+    allow_different_binary_count: true
 
 dockers:
 # Build plugin-compiler
