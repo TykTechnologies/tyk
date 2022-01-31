@@ -10,9 +10,9 @@
 # - arm64
 # - amd64
 
-# One build required for goreleaser, this is not used subsequently
 builds:
-  - id: std
+  - id: std-linux
+
     flags:
       - -tags=goplugin
     ldflags:
@@ -21,6 +21,106 @@ builds:
       - linux
     goarch:
       - amd64
+  - id: std-arm64
+
+    flags:
+      - -tags=goplugin
+    ldflags:
+      - -X gateway.VERSION={{.Version}} -X gateway.commit={{.FullCommit}} -X gateway.buildDate={{.Date}} -X gateway.builtBy=goreleaser
+    env:
+      - CC=aarch64-linux-gnu-gcc
+    goos:
+      - linux
+    goarch:
+      - arm64
+  # static builds strip symbols and do not allow plugins
+  - id: static-amd64
+    ldflags:
+      - -s -w -X gateway.VERSION={{.Version}} -X gateway.commit={{.FullCommit}} -X gateway.buildDate={{.Date}} -X gateway.builtBy=goreleaser
+      - -linkmode external -extldflags -static
+    goos:
+      - linux
+    goarch:
+      - amd64
+
+nfpms:
+  - id: std
+    vendor: "Tyk Technologies Ltd"
+    homepage: "https://tyk.io"
+    maintainer: "Tyk <info@tyk.io>"
+    description: Tyk API Gateway
+    package_name: tyk-gateway
+    builds:
+
+      - std-linux
+      - std-arm64
+    formats:
+      - deb
+      - rpm
+    contents:
+      - src: "README.md"
+        dst: "/opt/share/docs/tyk-gateway/README.md"
+      - src: "install/*"
+        dst: "/opt/tyk-gateway/install"
+      - src: install/inits/systemd/system/tyk-gateway.service
+        dst: /lib/systemd/system/tyk-gateway.service
+      - src: install/inits/sysv/init.d/tyk-gateway
+        dst: /etc/init.d/tyk-gateway
+
+      - src: /opt/tyk-gateway
+        dst: /opt/tyk
+        type: "symlink"
+      - src: "LICENSE.md"
+        dst: "/opt/share/docs/tyk-gateway/LICENSE.md"
+      - src: "apps/app_sample.*"
+        dst: "/opt/tyk-gateway/apps"
+      - src: "templates/*.json"
+        dst: "/opt/tyk-gateway/templates"
+      - src: "templates/playground/*"
+        dst: "/opt/tyk-gateway/templates/playground"
+      - src: "middleware/*.js"
+        dst: "/opt/tyk-gateway/middleware"
+      - src: "event_handlers/sample/*.js"
+        dst: "/opt/tyk-gateway/event_handlers/sample"
+      - src: "policies/*.json"
+        dst: "/opt/tyk-gateway/policies"
+      - src: "coprocess/*"
+        dst: "/opt/tyk-gateway/coprocess"
+      - src: tyk.conf.example
+        dst: /opt/tyk-gateway/tyk.conf
+        type: "config|noreplace"
+    scripts:
+      preinstall: "install/before_install.sh"
+      postinstall: "install/post_install.sh"
+      postremove: "install/post_remove.sh"
+    bindir: "/opt/tyk-gateway"
+    overrides:
+      rpm:
+        replacements:
+          amd64: x86_64
+          arm: aarch64
+      deb:
+        replacements:
+          arm: arm64
+    rpm:
+      scripts:
+        posttrans: install/post_trans.sh
+      signature:
+        key_file: tyk.io.signing.key
+    deb:
+      signature:
+        key_file: tyk.io.signing.key
+        type: origin
+
+publishers:
+  - name: tyk-gateway-unstable
+    env:
+      - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
+      - REPO=tyk/tyk-gateway-unstable
+      - EL7={{ .Env.EL7 }}
+      - RPMVERS={{ .Env.RPMVERS }}
+      - DEBVERS={{ .Env.DEBVERS }}
+    cmd: /pc.sh {{ .ArtifactPath }}
 
 # This disables archives
 archives:
