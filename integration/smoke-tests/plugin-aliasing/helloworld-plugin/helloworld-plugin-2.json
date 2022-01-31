@@ -1,4 +1,6 @@
 {
+	"api_id": "2",
+	"org_id": "org-1",
     "name": "Goplugin test helloworld 2",
     "slug": "/goplugin-helloworld-2",
     "use_go_plugin_auth": false,

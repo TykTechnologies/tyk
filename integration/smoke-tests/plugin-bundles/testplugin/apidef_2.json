@@ -1,5 +1,6 @@
 {
 	"api_id": "2",
+	"org_id": "org-1",
 	"name": "goplugin-2",
 	"slug": "goplugin-2",
 	"use_keyless": false,

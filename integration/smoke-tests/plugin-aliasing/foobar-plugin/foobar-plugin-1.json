@@ -1,4 +1,6 @@
 {
+	"api_id": "1",
+	"org_id": "org-1",
     "name": "Goplugin test foobar 1",
     "slug": "/goplugin-foobar-1",
     "use_go_plugin_auth": false,
