@@ -62,7 +62,7 @@ jobs:
           git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
 
       # v1 reqd to support older git in -el7
-      - name: Checkout of tyk for el7 builds
+      - name: Checkout of tyk
         uses: actions/checkout@v1
         with:
           fetch-depth: 1
@@ -262,8 +262,7 @@ jobs:
           - ubuntu:xenial
           - ubuntu:bionic
           - ubuntu:focal
-          - debian:stretch
-          - debian:buster
+          - debian:jessie
 
     steps:
       - uses: actions/checkout@v2
