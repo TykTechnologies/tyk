@@ -44,26 +44,14 @@ class TykDispatcher:
         self.update_hook_table(with_bundle=bundle)
 
     def update_hook_table(self, with_bundle=None):
-        new_hook_table = {}
-        # Disable any previous bundle associated with an API:
-        if with_bundle:
-            # First check if this API exists in the hook table:
-            hooks = {}
-            if with_bundle.middleware_id in self.hook_table:
-                hooks = self.hook_table[with_bundle.middleware_id]
-            if len(hooks) > 0:
-                # Pick the first hook and get the current bundle:
-                bundle_in_use = list(hooks.values())[0].middleware
-                # If the bundle is already in use, skip the hook table update:
-                # if bundle_in_use.bundle_id == with_bundle.bundle_id:
-                #    return
+        if with_bundle.middleware_id not in self.hook_table:
             self.hook_table[with_bundle.middleware_id] = with_bundle.build_hooks_and_event_handlers()
 
     def find_hook(self, bundle_hash, hook_name):
         hooks = self.hook_table.get(bundle_hash)
         # TODO: handle this situation and also nonexistent hooks
         if not hooks:
-            raise Exception('No hooks defined for API: {0}'.format(bundle_hash))
+            raise Exception('No hooks defined for bundle: {0}'.format(bundle_hash))
 
         hook = hooks.get(hook_name)
         if hook:
