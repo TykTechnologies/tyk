@@ -190,7 +190,7 @@ func TestGraphQLPlayground(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
 				{Path: playgroundPath, BodyMatch: `<title>API Playground</title>`, Code: http.StatusOK},
 				{Path: playgroundPath, BodyMatchFunc: func(bytes []byte) bool {
-					return assert.Contains(t, string(bytes), fmt.Sprintf(`const apiUrl = window.location.origin + "%s";`, endpoint))
+					return assert.Contains(t, string(bytes), fmt.Sprintf(`const url = window.location.origin + "%s";`, endpoint))
 				}, Code: http.StatusOK},
 			}...)
 		})
