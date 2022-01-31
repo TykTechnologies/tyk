@@ -10,6 +10,8 @@ services:
     volumes:
       - ./testplugin/bundle.zip:/var/www/bundle.zip:ro
   gw:
+    depends_on:
+      - bundleserver
     image: tykio/tyk-gateway:${tag}
     volumes:
       - ./testplugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
