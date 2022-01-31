@@ -196,7 +196,7 @@ func TestGraphQLPlayground(t *testing.T) {
 		})
 		t.Run("playground.js is loaded", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
-				{Path: path.Join(playgroundPath, "playground.js"), BodyMatch: "var TykGraphiqlExplorer", Code: http.StatusOK},
+				{Path: path.Join(playgroundPath, "playground.js"), BodyMatch: "TykGraphiQL", Code: http.StatusOK},
 			}...)
 		})
 		t.Run("should get error on post request to playground path", func(t *testing.T) {
