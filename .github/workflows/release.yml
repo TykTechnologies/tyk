@@ -116,7 +116,6 @@ jobs:
             *.txt.sig
             *.txt
 
-
       - name: Fix vendor
         run: |
           export GOPATH=/go
@@ -131,7 +130,6 @@ jobs:
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
           git checkout .
 
-
       - uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
@@ -144,13 +142,6 @@ jobs:
           NFPM_PAYG_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-        shell: bash
-        run: |
-          snapshot="--snapshot"
-          if [[ ${{steps.targets.outputs.tag}} = $(git describe --tags) ]]; then
-              snapshot=""
-          fi
-          goreleaser release --rm-dist $snapshot
 
       - uses: actions/upload-artifact@v2
         with:
@@ -374,6 +365,7 @@ jobs:
                   cd -
               fi
           done
+
 
   packagecloud:
     if: needs.goreleaser.outputs.upload == 'true'
