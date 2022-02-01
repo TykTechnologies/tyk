@@ -3,6 +3,7 @@ package oas
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -143,7 +144,13 @@ func Fill(t *testing.T, input interface{}, index int) {
 					continue
 				}
 
-				Fill(t, fv.Addr().Interface(), index+i+1)
+				if v.Type().Field(i).Name == "Method" {
+					fv.SetString(http.MethodPost)
+				} else if v.Type().Field(i).Name == "MethodActions" {
+					continue
+				} else {
+					Fill(t, fv.Addr().Interface(), index+i+1)
+				}
 			}
 		}
 	case reflect.Ptr:

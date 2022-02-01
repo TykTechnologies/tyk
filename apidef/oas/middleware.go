@@ -10,8 +10,8 @@ import (
 
 type Middleware struct {
 	// Global contains the configurations related to the global middleware.
-	Global *Global `bson:"global,omitempty" json:"global,omitempty"`
-	Paths  Paths   `bson:"paths,omitempty" json:"paths,omitempty"`
+	Global     *Global    `bson:"global,omitempty" json:"global,omitempty"`
+	Operations Operations `bson:"operations,omitempty" json:"operations,omitempty"`
 }
 
 func (m *Middleware) Fill(api apidef.APIDefinition) {
@@ -23,31 +23,11 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(m.Global) {
 		m.Global = nil
 	}
-
-	if m.Paths == nil {
-		m.Paths = make(Paths)
-	}
-
-	m.Paths.Fill(api.VersionData.Versions[""].ExtendedPaths)
-	if ShouldOmit(m.Paths) {
-		m.Paths = nil
-	}
 }
 
 func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	if m.Global != nil {
 		m.Global.ExtractTo(api)
-	}
-
-	if m.Paths != nil {
-		var ep apidef.ExtendedPathsSet
-		m.Paths.ExtractTo(&ep)
-		base := apidef.VersionInfo{UseExtendedPaths: true, ExtendedPaths: ep}
-		if api.VersionData.Versions == nil {
-			api.VersionData.Versions = make(map[string]apidef.VersionInfo)
-		}
-
-		api.VersionData.Versions[""] = base
 	}
 }
 
@@ -173,6 +153,7 @@ func (c *Cache) ExtractTo(cache *apidef.CacheOptions) {
 }
 
 type Paths map[string]*Path
+type Operations map[string]*Plugins
 
 func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillAllowance(ep.WhiteList, allow)
@@ -182,6 +163,29 @@ func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillTransformRequestMethod(ep.MethodTransforms)
 	ps.fillCache(ep.AdvanceCacheConfig)
 	ps.fillEnforceTimeout(ep.HardTimeouts)
+}
+
+func (o Operations) Fill(mockMetas []apidef.MockResponseMeta) {
+
+}
+
+func (o Operations) fillMockResponse(mockMetas []apidef.MockResponseMeta) {
+	for _, mm := range mockMetas {
+		operationId := mm.Path + mm.Method + "Operation"
+		if _, ok := o[operationId]; !ok {
+			o[operationId] = &Plugins{}
+		}
+
+		plugins := o[operationId]
+		if plugins.MockResponse == nil {
+			plugins.MockResponse = &MockResponse{}
+		}
+
+		plugins.MockResponse.Fill(mm)
+		if ShouldOmit(plugins.MockResponse) {
+			plugins.MockResponse = nil
+		}
+	}
 }
 
 func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {

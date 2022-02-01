@@ -6,8 +6,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-const ExtensionTykAPIGateway = "x-tyk-api-gateway"
-
 type XTykAPIGateway struct {
 	// Info contains the main metadata about the API definition.
 	Info Info `bson:"info" json:"info"` // required
@@ -42,6 +40,26 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	if x.Middleware != nil {
 		x.Middleware.ExtractTo(api)
 	}
+}
+
+func (x *XTykAPIGateway) getOperation(operationID string) *Plugins {
+	if x.Middleware == nil {
+		x.Middleware = &Middleware{}
+	}
+
+	middleware := x.Middleware
+
+	if middleware.Operations == nil {
+		middleware.Operations = make(Operations)
+	}
+
+	operations := middleware.Operations
+
+	if operations[operationID] == nil {
+		operations[operationID] = &Plugins{}
+	}
+
+	return operations[operationID]
 }
 
 type Info struct {
