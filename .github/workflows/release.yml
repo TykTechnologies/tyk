@@ -368,7 +368,7 @@ jobs:
           for d in integration/smoke-tests/*/
           do
               echo Attempting to test $d
-              if [ -d $d ]; then
+              if [ -d $d ] && [ -e $d/test.sh ]; then
                   cd $d
                   ./test.sh ${{ needs.goreleaser.outputs.tag }}
                   cd -
