@@ -33,7 +33,7 @@ on:
 env:
   SLACK_CLI_TOKEN: ${{ secrets.BENDER_TOKEN }}
   GOPRIVATE: github.com/TykTechnologies
-  
+
 jobs:
   goreleaser:
     name: '${{ matrix.golang_cross }}'
@@ -164,7 +164,7 @@ jobs:
           path: |
             dist/*.rpm
             !dist/*PAYG*.rpm
-            
+
   ci:
     needs:
       - goreleaser
@@ -288,9 +288,13 @@ jobs:
           ARG TARGETARCH
           COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
           RUN apt-get update && apt-get install -y curl
-
           RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway-unstable/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.9~rc1
-          RUN dpkg -i tyk-gateway.deb' > Dockerfile
+          RUN dpkg -i tyk-gateway.deb
+          RUN apt-get install -y redis jq
+          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
+          COPY integration/smoke-tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
+          COPY integration/smoke-tests/api-functionality/api_test.sh /
+          CMD [ "/api_test.sh" ]' >Dockerfile
 
       - name: install on ${{ matrix.distro }}
         uses: docker/build-push-action@v2
@@ -298,7 +302,13 @@ jobs:
           context: "."
           platforms: linux/${{ matrix.arch }}
           file: Dockerfile
+          load: true
+          tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           push: false
+
+      - name: Test the built container image with api functionality test.
+        run: |
+          docker run --rm test-${{ matrix.distro }}-${{ matrix.arch }}
 
   upgrade-rpm:
     needs: goreleaser
