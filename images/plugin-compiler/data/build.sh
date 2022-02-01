@@ -1,15 +1,17 @@
 #!/bin/bash
-
 set -xe
 
 plugin_name=$1
-plugin_path=$(date +%s)-$plugin_name
+plugin_id=$2
+
+PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}$plugin_id"
 
 function usage() {
     cat <<EOF
 To build a plugin:
-      $0 <plugin_name>
+      $0 <plugin_name> <plugin_id>
 
+<plugin_id> is optional
 EOF
 }
 
@@ -18,9 +20,9 @@ if [ -z "$plugin_name" ]; then
     exit 1
 fi
 
-
+mkdir -p $PLUGIN_BUILD_PATH
+# Plugin's vendor folder, has precedence over the cached vendor'd dependencies from tyk
 yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
-
 
 cd $PLUGIN_BUILD_PATH
 
@@ -29,7 +31,7 @@ cd $PLUGIN_BUILD_PATH
 # Ensure that go modules not used
 rm -rf go.mod
 
-# We do not needd to care whicch version of Tyk vendored in plugin, since we going to use version inside compiler
+# We do not need to care which version of Tyk vendored in plugin, since we going to use version inside compiler
 rm -rf $PLUGIN_BUILD_PATH/vendor/github.com/TykTechnologies/tyk
 
 # Copy plugin vendored pkgs to GOPATH
@@ -45,11 +47,11 @@ yes | cp -rf $PLUGIN_BUILD_PATH/vendor/* $GOPATH/src || true \
 ls -d $TYK_GW_PATH/vendor/github.com/*/* | sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | xargs -d '\n' rm -rf
 ls -d $TYK_GW_PATH/vendor/*/* | sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | grep -v github | xargs -d '\n' rm -rf
 
-
 # Copy GW dependencies
 yes | cp -rf $TYK_GW_PATH/vendor/* $GOPATH/src
 rm -rf $TYK_GW_PATH/vendor
 
+rm /go/src/modules.txt
 
-go build -buildmode=plugin -ldflags "-pluginpath=$plugin_path" -o $plugin_name \
-&& mv $plugin_name $PLUGIN_SOURCE_PATH
+GO111MODULE=off go build -buildmode=plugin -o $plugin_name \
+    && mv $plugin_name $PLUGIN_SOURCE_PATH
