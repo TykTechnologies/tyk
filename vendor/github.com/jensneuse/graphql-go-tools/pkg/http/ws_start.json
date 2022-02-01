@@ -1,0 +1,10 @@
+{
+  "id": "1",
+  "type": "start",
+  "payload": {
+    "variables": {},
+    "extensions": {},
+    "operationName": "stream",
+    "query": "subscription stream {n  stream {n    datetimen    timezonen    abbreviationn  }n}n"
+  }
+}

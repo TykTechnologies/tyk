@@ -13,6 +13,9 @@ ENV GO111MODULE=on
 # mounted from the host box by the user using docker volumes
 ENV PLUGIN_SOURCE_PATH=/plugin-source
 
+# update ca-certificates
+RUN apt update && apt install ca-certificates libgnutls30 -y
+
 RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
 COPY images/plugin-compiler/data/build.sh /build.sh

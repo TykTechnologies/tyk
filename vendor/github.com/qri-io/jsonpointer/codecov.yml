@@ -1,0 +1,9 @@
+codecov:
+  ci:
+    - "ci/circle-ci"
+  notify:
+    require_ci_to_pass: no
+    after_n_builds: 2
+coverage:
+  range: "80...100"
+comment: off
