@@ -116,6 +116,20 @@ jobs:
             *.txt.sig
             *.txt
 
+      - name: Fix vendor
+        run: |
+          export GOPATH=/go
+          mkdir -p /go/src || true
+          whereis go
+          go mod tidy
+          go mod vendor
+          echo "Moving vendor"
+          mv -f vendor/* $GOPATH/src
+          rm -rf vendor
+          mkdir -p /go/src/github.com/TykTechnologies/tyk
+          cp -r ./* /go/src/github.com/TykTechnologies/tyk
+          git checkout .
+
       - uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
@@ -372,7 +386,7 @@ jobs:
 
       - name: Push to packagecloud
         id: pc-push
-        uses: TykTechnologies/packagecloud-action@main
+        uses: TykTechnologies/packagecloud-action@v1.1
         env:
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
         with:
