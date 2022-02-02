@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"unsafe"
+	"runtime"
 )
 
 //
@@ -32,11 +33,12 @@ func bytesToString(b *[]byte) string {
 }
 
 func StringToBytes(s string) []byte {
+	b := make([]byte, 0, 0)
+	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
 	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	bh := reflect.SliceHeader{
-		Data: sh.Data,
-		Len:  sh.Len,
-		Cap:  sh.Len,
-	}
-	return *(*[]byte)(unsafe.Pointer(&bh))
+	bh.Data = sh.Data
+	bh.Cap = sh.Len
+	bh.Len = sh.Len
+	runtime.KeepAlive(s)
+	return b
 }
