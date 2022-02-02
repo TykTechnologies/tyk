@@ -117,7 +117,7 @@ jobs:
             *.txt
 
 
-      - name: Fix vendor
+      - name: Fix vendor and make src tarball.
         run: |
           export GOPATH=/go
           mkdir -p /go/src || true
@@ -129,6 +129,8 @@ jobs:
           rm -rf vendor
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
+          echo "Making a source tarball for plugin compiler build"
+          find . -name "*.go" -o -name "*.mod" -o -name "*.sum" | tar -czf src.tgz -T -
 
 
       - uses: goreleaser/goreleaser-action@v2

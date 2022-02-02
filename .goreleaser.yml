@@ -194,6 +194,7 @@ dockers:
   extra_files:
     - "images/plugin-compiler/"
     - "go.mod"
+    - "src.tgz"
 
 
 docker_manifests:
