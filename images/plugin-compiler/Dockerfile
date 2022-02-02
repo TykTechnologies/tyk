@@ -18,7 +18,7 @@ COPY images/plugin-compiler/data/build.sh /build.sh
 # RUN cd $TYK_GW_PATH && go mod tidy && go mod vendor
 RUN chmod +x /build.sh
 
-COPY ./ $TYK_GW_PATH
+COPY . $TYK_GW_PATH
 RUN cd $TYK_GW_PATH &&  go mod tidy && go mod vendor
 
 ENTRYPOINT ["/build.sh"]
