@@ -8,6 +8,20 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+const (
+	APIKey          = "apiKey"
+	HTTP            = "http"
+	Oauth2          = "oauth2"
+	OpenIDConnect   = "openIdConnect"
+	InQuery         = "query"
+	InHeader        = "header"
+	InCookie        = "cookie"
+	SchemeBasic     = "basic"
+	SchemeBearer    = "bearer"
+	BearerFormatJWT = "JWT"
+	Authorization   = "Authorization"
+)
+
 type Middleware struct {
 	// Global contains the configurations related to the global middleware.
 	Global     *Global    `bson:"global,omitempty" json:"global,omitempty"`
