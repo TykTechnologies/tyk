@@ -26,5 +26,4 @@ trap "$compose down" EXIT
 
 $compose up -d
 sleep 2 # Wait for init
-curl -s -XGET -H "Accept: application/json" "http://localhost:8080/smoke-test-api/?arg=test"
-curl -s -XGET -H "Accept: application/json" "http://localhost:8080/smoke-test-api/?arg=test"| jq -e '.args.arg == "test"' || { $compose logs gw; exit 1; }
+./api_test.sh || { $compose logs gw; exit 1; }
