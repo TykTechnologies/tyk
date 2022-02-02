@@ -42,7 +42,7 @@ github.com/andybalholm/brotli
 github.com/armon/go-metrics
 # github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 github.com/bshuster-repo/logrus-logstash-hook
-# github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23
+# github.com/buger/jsonparser v1.1.1
 github.com/buger/jsonparser
 # github.com/cenk/backoff v2.2.1+incompatible
 github.com/cenk/backoff
@@ -129,10 +129,10 @@ github.com/hashicorp/golang-lru/simplelru
 github.com/hashicorp/hcl
 github.com/hashicorp/hcl/hcl/ast
 github.com/hashicorp/hcl/hcl/parser
-github.com/hashicorp/hcl/hcl/scanner
-github.com/hashicorp/hcl/hcl/strconv
 github.com/hashicorp/hcl/hcl/token
 github.com/hashicorp/hcl/json/parser
+github.com/hashicorp/hcl/hcl/scanner
+github.com/hashicorp/hcl/hcl/strconv
 github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
 # github.com/hashicorp/serf v0.8.2
@@ -140,11 +140,11 @@ github.com/hashicorp/serf/coordinate
 # github.com/hashicorp/vault/api v1.0.4
 github.com/hashicorp/vault/api
 # github.com/hashicorp/vault/sdk v0.1.13
-github.com/hashicorp/vault/sdk/helper/compressutil
 github.com/hashicorp/vault/sdk/helper/consts
 github.com/hashicorp/vault/sdk/helper/hclutil
 github.com/hashicorp/vault/sdk/helper/jsonutil
 github.com/hashicorp/vault/sdk/helper/parseutil
+github.com/hashicorp/vault/sdk/helper/compressutil
 github.com/hashicorp/vault/sdk/helper/strutil
 # github.com/huandu/xstrings v1.3.0
 github.com/huandu/xstrings
@@ -155,36 +155,36 @@ github.com/jensneuse/abstractlogger
 # github.com/jensneuse/byte-template v0.0.0-20200214152254-4f3cf06e5c68
 github.com/jensneuse/byte-template
 # github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000 => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210310152233-6ff6aba4c612
-github.com/jensneuse/graphql-go-tools/internal/pkg/quotes
+github.com/jensneuse/graphql-go-tools/pkg/execution/datasource
+github.com/jensneuse/graphql-go-tools/pkg/graphql
+github.com/jensneuse/graphql-go-tools/pkg/playground
 github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes
 github.com/jensneuse/graphql-go-tools/pkg/ast
 github.com/jensneuse/graphql-go-tools/pkg/astimport
-github.com/jensneuse/graphql-go-tools/pkg/astnormalization
 github.com/jensneuse/graphql-go-tools/pkg/astparser
 github.com/jensneuse/graphql-go-tools/pkg/astprinter
 github.com/jensneuse/graphql-go-tools/pkg/asttransform
-github.com/jensneuse/graphql-go-tools/pkg/astvalidation
 github.com/jensneuse/graphql-go-tools/pkg/astvisitor
+github.com/jensneuse/graphql-go-tools/pkg/introspection
+github.com/jensneuse/graphql-go-tools/pkg/lexer/literal
+github.com/jensneuse/graphql-go-tools/pkg/operationreport
+github.com/jensneuse/graphql-go-tools/pkg/astnormalization
+github.com/jensneuse/graphql-go-tools/pkg/astvalidation
 github.com/jensneuse/graphql-go-tools/pkg/engine/plan
 github.com/jensneuse/graphql-go-tools/pkg/engine/resolve
-github.com/jensneuse/graphql-go-tools/pkg/engine/subscription
 github.com/jensneuse/graphql-go-tools/pkg/execution
-github.com/jensneuse/graphql-go-tools/pkg/execution/datasource
-github.com/jensneuse/graphql-go-tools/pkg/fastbuffer
-github.com/jensneuse/graphql-go-tools/pkg/graphql
-github.com/jensneuse/graphql-go-tools/pkg/introspection
+github.com/jensneuse/graphql-go-tools/pkg/middleware/operation_complexity
+github.com/jensneuse/graphql-go-tools/pkg/postprocess
+github.com/jensneuse/graphql-go-tools/internal/pkg/quotes
+github.com/jensneuse/graphql-go-tools/pkg/lexer/position
+github.com/jensneuse/graphql-go-tools/pkg/lexer/runes
 github.com/jensneuse/graphql-go-tools/pkg/lexer
 github.com/jensneuse/graphql-go-tools/pkg/lexer/identkeyword
 github.com/jensneuse/graphql-go-tools/pkg/lexer/keyword
-github.com/jensneuse/graphql-go-tools/pkg/lexer/literal
-github.com/jensneuse/graphql-go-tools/pkg/lexer/position
-github.com/jensneuse/graphql-go-tools/pkg/lexer/runes
 github.com/jensneuse/graphql-go-tools/pkg/lexer/token
-github.com/jensneuse/graphql-go-tools/pkg/middleware/operation_complexity
-github.com/jensneuse/graphql-go-tools/pkg/operationreport
-github.com/jensneuse/graphql-go-tools/pkg/playground
+github.com/jensneuse/graphql-go-tools/pkg/engine/subscription
+github.com/jensneuse/graphql-go-tools/pkg/fastbuffer
 github.com/jensneuse/graphql-go-tools/pkg/pool
-github.com/jensneuse/graphql-go-tools/pkg/postprocess
 # github.com/jensneuse/pipeline v0.0.0-20200117120358-9fb4de085cd6
 github.com/jensneuse/pipeline/pkg/pipe
 github.com/jensneuse/pipeline/pkg/step
@@ -238,23 +238,25 @@ github.com/nats-io/nuid
 github.com/newrelic/go-agent
 github.com/newrelic/go-agent/_integrations/nrgorilla/v1
 github.com/newrelic/go-agent/internal
+github.com/newrelic/go-agent/internal/logger
+github.com/newrelic/go-agent/internal/utilization
 github.com/newrelic/go-agent/internal/cat
 github.com/newrelic/go-agent/internal/jsonx
-github.com/newrelic/go-agent/internal/logger
 github.com/newrelic/go-agent/internal/sysinfo
-github.com/newrelic/go-agent/internal/utilization
+# github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e
+github.com/nsf/jsondiff
 # github.com/opentracing/opentracing-go v1.1.0
 github.com/opentracing/opentracing-go
 github.com/opentracing/opentracing-go/ext
 github.com/opentracing/opentracing-go/log
 # github.com/openzipkin/zipkin-go v0.2.2
 github.com/openzipkin/zipkin-go
-github.com/openzipkin/zipkin-go/idgenerator
 github.com/openzipkin/zipkin-go/model
-github.com/openzipkin/zipkin-go/propagation
 github.com/openzipkin/zipkin-go/propagation/b3
 github.com/openzipkin/zipkin-go/reporter
 github.com/openzipkin/zipkin-go/reporter/http
+github.com/openzipkin/zipkin-go/idgenerator
+github.com/openzipkin/zipkin-go/propagation
 # github.com/oschwald/maxminddb-golang v1.5.0
 github.com/oschwald/maxminddb-golang
 # github.com/paulbellamy/ratecounter v0.2.0
@@ -272,13 +274,13 @@ github.com/pmezard/go-difflib/difflib
 github.com/pmylund/go-cache
 # github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d
 github.com/robertkrimen/otto
+github.com/robertkrimen/otto/underscore
 github.com/robertkrimen/otto/ast
 github.com/robertkrimen/otto/dbg
 github.com/robertkrimen/otto/file
 github.com/robertkrimen/otto/parser
 github.com/robertkrimen/otto/registry
 github.com/robertkrimen/otto/token
-github.com/robertkrimen/otto/underscore
 # github.com/rogpeppe/go-internal v1.3.0
 github.com/rogpeppe/go-internal/modfile
 github.com/rogpeppe/go-internal/module
@@ -305,23 +307,23 @@ github.com/tidwall/pretty
 # github.com/tidwall/sjson v1.0.4
 github.com/tidwall/sjson
 # github.com/uber/jaeger-client-go v2.19.0+incompatible
-github.com/uber/jaeger-client-go
 github.com/uber/jaeger-client-go/config
-github.com/uber/jaeger-client-go/internal/baggage
+github.com/uber/jaeger-client-go
 github.com/uber/jaeger-client-go/internal/baggage/remote
+github.com/uber/jaeger-client-go/internal/throttler/remote
+github.com/uber/jaeger-client-go/rpcmetrics
+github.com/uber/jaeger-client-go/transport
+github.com/uber/jaeger-client-go/internal/baggage
 github.com/uber/jaeger-client-go/internal/spanlog
 github.com/uber/jaeger-client-go/internal/throttler
-github.com/uber/jaeger-client-go/internal/throttler/remote
 github.com/uber/jaeger-client-go/log
-github.com/uber/jaeger-client-go/rpcmetrics
 github.com/uber/jaeger-client-go/thrift
-github.com/uber/jaeger-client-go/thrift-gen/agent
-github.com/uber/jaeger-client-go/thrift-gen/baggage
 github.com/uber/jaeger-client-go/thrift-gen/jaeger
 github.com/uber/jaeger-client-go/thrift-gen/sampling
 github.com/uber/jaeger-client-go/thrift-gen/zipkincore
-github.com/uber/jaeger-client-go/transport
 github.com/uber/jaeger-client-go/utils
+github.com/uber/jaeger-client-go/thrift-gen/baggage
+github.com/uber/jaeger-client-go/thrift-gen/agent
 # github.com/uber/jaeger-lib v2.2.0+incompatible
 github.com/uber/jaeger-lib/metrics
 # github.com/valyala/bytebufferpool v1.0.0
@@ -341,18 +343,18 @@ github.com/xeipuuv/gojsonschema
 # github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca
 github.com/xenolf/lego/acme
 # go.opentelemetry.io/otel v0.13.0
-go.opentelemetry.io/otel
-go.opentelemetry.io/otel/api/global
-go.opentelemetry.io/otel/api/global/internal
-go.opentelemetry.io/otel/api/metric
-go.opentelemetry.io/otel/api/metric/registry
 go.opentelemetry.io/otel/api/trace
+go.opentelemetry.io/otel/label
+go.opentelemetry.io/otel/api/global
+go.opentelemetry.io/otel/api/metric
 go.opentelemetry.io/otel/codes
 go.opentelemetry.io/otel/internal
-go.opentelemetry.io/otel/internal/baggage
-go.opentelemetry.io/otel/internal/trace/noop
-go.opentelemetry.io/otel/label
+go.opentelemetry.io/otel
+go.opentelemetry.io/otel/api/global/internal
 go.opentelemetry.io/otel/unit
+go.opentelemetry.io/otel/internal/baggage
+go.opentelemetry.io/otel/api/metric/registry
+go.opentelemetry.io/otel/internal/trace/noop
 # go.uber.org/atomic v1.5.1
 go.uber.org/atomic
 # go.uber.org/multierr v1.4.0
@@ -361,86 +363,86 @@ go.uber.org/multierr
 go.uber.org/tools/update-license
 # go.uber.org/zap v1.13.0
 go.uber.org/zap
-go.uber.org/zap/buffer
 go.uber.org/zap/internal/bufferpool
+go.uber.org/zap/zapcore
+go.uber.org/zap/buffer
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
-go.uber.org/zap/zapcore
 # golang.org/x/crypto v0.0.0-20191227163750-53104e6ec876
 golang.org/x/crypto/bcrypt
-golang.org/x/crypto/blowfish
 golang.org/x/crypto/ed25519
-golang.org/x/crypto/ed25519/internal/edwards25519
-golang.org/x/crypto/ocsp
 golang.org/x/crypto/pbkdf2
+golang.org/x/crypto/blowfish
 golang.org/x/crypto/scrypt
 golang.org/x/crypto/ssh/terminal
+golang.org/x/crypto/ed25519/internal/edwards25519
+golang.org/x/crypto/ocsp
 # golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f
-golang.org/x/lint
 golang.org/x/lint/golint
+golang.org/x/lint
 # golang.org/x/net v0.0.0-20200602114024-627f9648deb9
-golang.org/x/net/bpf
 golang.org/x/net/context
-golang.org/x/net/html
-golang.org/x/net/html/atom
 golang.org/x/net/html/charset
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/h2c
-golang.org/x/net/http2/hpack
+golang.org/x/net/trace
+golang.org/x/net/html
 golang.org/x/net/idna
-golang.org/x/net/internal/iana
-golang.org/x/net/internal/socket
-golang.org/x/net/internal/socks
-golang.org/x/net/internal/timeseries
+golang.org/x/net/http2/hpack
 golang.org/x/net/ipv4
 golang.org/x/net/ipv6
 golang.org/x/net/proxy
-golang.org/x/net/publicsuffix
-golang.org/x/net/trace
 golang.org/x/net/websocket
+golang.org/x/net/internal/timeseries
+golang.org/x/net/html/atom
+golang.org/x/net/publicsuffix
+golang.org/x/net/bpf
+golang.org/x/net/internal/iana
+golang.org/x/net/internal/socket
+golang.org/x/net/internal/socks
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/singleflight
 # golang.org/x/sys v0.0.0-20201101102859-da207088b7d1
-golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+golang.org/x/sys/internal/unsafeheader
 # golang.org/x/text v0.3.2
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
-golang.org/x/text/encoding/internal
+golang.org/x/text/transform
 golang.org/x/text/encoding/internal/identifier
+golang.org/x/text/encoding/internal
 golang.org/x/text/encoding/japanese
 golang.org/x/text/encoding/korean
 golang.org/x/text/encoding/simplifiedchinese
 golang.org/x/text/encoding/traditionalchinese
 golang.org/x/text/encoding/unicode
+golang.org/x/text/language
+golang.org/x/text/secure/bidirule
+golang.org/x/text/unicode/bidi
+golang.org/x/text/unicode/norm
+golang.org/x/text/internal/utf8internal
+golang.org/x/text/runes
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
-golang.org/x/text/internal/utf8internal
-golang.org/x/text/language
-golang.org/x/text/runes
-golang.org/x/text/secure/bidirule
-golang.org/x/text/transform
-golang.org/x/text/unicode/bidi
-golang.org/x/text/unicode/norm
 # golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 golang.org/x/time/rate
 # golang.org/x/tools v0.0.0-20200414032229-332987a829c3
 golang.org/x/tools/go/analysis
-golang.org/x/tools/go/analysis/passes/inspect
 golang.org/x/tools/go/ast/astutil
-golang.org/x/tools/go/ast/inspector
-golang.org/x/tools/go/buildutil
 golang.org/x/tools/go/gcexportdata
-golang.org/x/tools/go/internal/gcimporter
-golang.org/x/tools/go/internal/packagesdriver
+golang.org/x/tools/internal/analysisinternal
 golang.org/x/tools/go/packages
 golang.org/x/tools/go/types/objectpath
+golang.org/x/tools/go/buildutil
+golang.org/x/tools/go/analysis/passes/inspect
+golang.org/x/tools/go/ast/inspector
 golang.org/x/tools/go/types/typeutil
-golang.org/x/tools/internal/analysisinternal
+golang.org/x/tools/go/internal/gcimporter
+golang.org/x/tools/go/internal/packagesdriver
 golang.org/x/tools/internal/gocommand
 golang.org/x/tools/internal/packagesinternal
 golang.org/x/tools/internal/telemetry/event
@@ -448,35 +450,31 @@ golang.org/x/tools/internal/telemetry/event
 golang.org/x/xerrors
 golang.org/x/xerrors/internal
 # google.golang.org/appengine v1.6.1
-google.golang.org/appengine
 google.golang.org/appengine/datastore
+google.golang.org/appengine
 google.golang.org/appengine/datastore/internal/cloudkey
-google.golang.org/appengine/datastore/internal/cloudpb
 google.golang.org/appengine/internal
-google.golang.org/appengine/internal/app_identity
-google.golang.org/appengine/internal/base
 google.golang.org/appengine/internal/datastore
-google.golang.org/appengine/internal/log
+google.golang.org/appengine/internal/app_identity
 google.golang.org/appengine/internal/modules
+google.golang.org/appengine/datastore/internal/cloudpb
+google.golang.org/appengine/internal/base
+google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
 # google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.29.1
 google.golang.org/grpc
-google.golang.org/grpc/attributes
+google.golang.org/grpc/codes
+google.golang.org/grpc/status
 google.golang.org/grpc/backoff
 google.golang.org/grpc/balancer
 google.golang.org/grpc/balancer/base
 google.golang.org/grpc/balancer/roundrobin
-google.golang.org/grpc/binarylog/grpc_binarylog_v1
-google.golang.org/grpc/codes
 google.golang.org/grpc/connectivity
 google.golang.org/grpc/credentials
-google.golang.org/grpc/credentials/internal
 google.golang.org/grpc/encoding
 google.golang.org/grpc/encoding/proto
-google.golang.org/grpc/examples/helloworld/helloworld
-google.golang.org/grpc/examples/route_guide/routeguide
 google.golang.org/grpc/grpclog
 google.golang.org/grpc/internal
 google.golang.org/grpc/internal/backoff
@@ -485,14 +483,11 @@ google.golang.org/grpc/internal/binarylog
 google.golang.org/grpc/internal/buffer
 google.golang.org/grpc/internal/channelz
 google.golang.org/grpc/internal/envconfig
-google.golang.org/grpc/internal/grpclog
 google.golang.org/grpc/internal/grpcrand
 google.golang.org/grpc/internal/grpcsync
 google.golang.org/grpc/internal/grpcutil
 google.golang.org/grpc/internal/resolver/dns
 google.golang.org/grpc/internal/resolver/passthrough
-google.golang.org/grpc/internal/status
-google.golang.org/grpc/internal/syscall
 google.golang.org/grpc/internal/transport
 google.golang.org/grpc/keepalive
 google.golang.org/grpc/metadata
@@ -501,36 +496,43 @@ google.golang.org/grpc/peer
 google.golang.org/grpc/resolver
 google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
-google.golang.org/grpc/status
 google.golang.org/grpc/tap
+google.golang.org/grpc/internal/status
+google.golang.org/grpc/examples/helloworld/helloworld
+google.golang.org/grpc/examples/route_guide/routeguide
+google.golang.org/grpc/credentials/internal
+google.golang.org/grpc/internal/grpclog
+google.golang.org/grpc/binarylog/grpc_binarylog_v1
+google.golang.org/grpc/internal/syscall
+google.golang.org/grpc/attributes
 # google.golang.org/protobuf v1.23.0
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
-google.golang.org/protobuf/internal/descfmt
-google.golang.org/protobuf/internal/descopts
-google.golang.org/protobuf/internal/detrand
-google.golang.org/protobuf/internal/encoding/defval
-google.golang.org/protobuf/internal/encoding/messageset
-google.golang.org/protobuf/internal/encoding/tag
-google.golang.org/protobuf/internal/encoding/text
-google.golang.org/protobuf/internal/errors
-google.golang.org/protobuf/internal/fieldnum
-google.golang.org/protobuf/internal/fieldsort
-google.golang.org/protobuf/internal/filedesc
-google.golang.org/protobuf/internal/filetype
-google.golang.org/protobuf/internal/flags
-google.golang.org/protobuf/internal/genname
-google.golang.org/protobuf/internal/impl
-google.golang.org/protobuf/internal/mapsort
-google.golang.org/protobuf/internal/pragma
-google.golang.org/protobuf/internal/set
-google.golang.org/protobuf/internal/strs
-google.golang.org/protobuf/internal/version
 google.golang.org/protobuf/proto
 google.golang.org/protobuf/reflect/protoreflect
 google.golang.org/protobuf/reflect/protoregistry
 google.golang.org/protobuf/runtime/protoiface
 google.golang.org/protobuf/runtime/protoimpl
+google.golang.org/protobuf/internal/encoding/messageset
+google.golang.org/protobuf/internal/encoding/text
+google.golang.org/protobuf/internal/errors
+google.golang.org/protobuf/internal/fieldnum
+google.golang.org/protobuf/internal/flags
+google.golang.org/protobuf/internal/mapsort
+google.golang.org/protobuf/internal/pragma
+google.golang.org/protobuf/internal/set
+google.golang.org/protobuf/internal/strs
+google.golang.org/protobuf/internal/fieldsort
+google.golang.org/protobuf/internal/filedesc
+google.golang.org/protobuf/internal/filetype
+google.golang.org/protobuf/internal/impl
+google.golang.org/protobuf/internal/version
+google.golang.org/protobuf/internal/detrand
+google.golang.org/protobuf/internal/descfmt
+google.golang.org/protobuf/internal/descopts
+google.golang.org/protobuf/internal/encoding/defval
+google.golang.org/protobuf/internal/encoding/tag
+google.golang.org/protobuf/internal/genname
 google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
@@ -549,44 +551,42 @@ gopkg.in/square/go-jose.v1
 gopkg.in/square/go-jose.v1/cipher
 gopkg.in/square/go-jose.v1/json
 # gopkg.in/square/go-jose.v2 v2.3.1
-gopkg.in/square/go-jose.v2
 gopkg.in/square/go-jose.v2/cipher
 gopkg.in/square/go-jose.v2/json
 gopkg.in/square/go-jose.v2/jwt
+gopkg.in/square/go-jose.v2
 # gopkg.in/vmihailenco/msgpack.v2 v2.9.1
 gopkg.in/vmihailenco/msgpack.v2
 gopkg.in/vmihailenco/msgpack.v2/codes
 # gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
 gopkg.in/xmlpath.v2
-# gopkg.in/yaml.v2 v2.3.0
-gopkg.in/yaml.v2
-# gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+# gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 gopkg.in/yaml.v3
 # honnef.co/go/tools v0.0.1-2019.2.3
-honnef.co/go/tools/arg
 honnef.co/go/tools/cmd/staticcheck
-honnef.co/go/tools/config
-honnef.co/go/tools/deprecated
-honnef.co/go/tools/facts
-honnef.co/go/tools/functions
-honnef.co/go/tools/go/types/typeutil
-honnef.co/go/tools/internal/cache
-honnef.co/go/tools/internal/passes/buildssa
-honnef.co/go/tools/internal/renameio
-honnef.co/go/tools/internal/sharedcheck
 honnef.co/go/tools/lint
-honnef.co/go/tools/lint/lintdsl
 honnef.co/go/tools/lint/lintutil
-honnef.co/go/tools/lint/lintutil/format
-honnef.co/go/tools/loader
-honnef.co/go/tools/printf
 honnef.co/go/tools/simple
-honnef.co/go/tools/ssa
-honnef.co/go/tools/ssautil
 honnef.co/go/tools/staticcheck
-honnef.co/go/tools/staticcheck/vrp
 honnef.co/go/tools/stylecheck
 honnef.co/go/tools/unused
+honnef.co/go/tools/config
+honnef.co/go/tools/facts
+honnef.co/go/tools/internal/cache
+honnef.co/go/tools/loader
+honnef.co/go/tools/lint/lintutil/format
 honnef.co/go/tools/version
+honnef.co/go/tools/arg
+honnef.co/go/tools/internal/passes/buildssa
+honnef.co/go/tools/internal/sharedcheck
+honnef.co/go/tools/lint/lintdsl
+honnef.co/go/tools/deprecated
+honnef.co/go/tools/functions
+honnef.co/go/tools/printf
+honnef.co/go/tools/ssa
+honnef.co/go/tools/ssautil
+honnef.co/go/tools/staticcheck/vrp
+honnef.co/go/tools/go/types/typeutil
+honnef.co/go/tools/internal/renameio
 # rsc.io/letsencrypt v0.0.2
 rsc.io/letsencrypt
