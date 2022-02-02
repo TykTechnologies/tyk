@@ -110,7 +110,24 @@ jobs:
             *.txt.sig
             *.txt
 
-      - name: goreleaser from golang-cross
+      - name: Fix vendor
+        run: |
+          export GOPATH=/go
+          mkdir -p /go/src || true
+          whereis go
+          go mod tidy
+          go mod vendor
+          echo "Moving vendor"
+          mv -f vendor/* $GOPATH/src
+          rm -rf vendor
+          mkdir -p /go/src/github.com/TykTechnologies/tyk
+          cp -r ./* /go/src/github.com/TykTechnologies/tyk
+          git checkout .
+
+      - uses: goreleaser/goreleaser-action@v2
+        with:
+          version: latest
+          args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
@@ -368,7 +385,7 @@ jobs:
 
       - name: Push to packagecloud
         id: pc-push
-        uses: TykTechnologies/packagecloud-action@main
+        uses: TykTechnologies/packagecloud-action@v1.1
         env:
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
         with:
