@@ -166,7 +166,7 @@ type ExtendedCircuitBreakerMeta struct {
 // flattened URL list is checked for matching paths and then it's status evaluated if found.
 type APISpec struct {
 	*apidef.APIDefinition
-	OAS openapi3.Swagger
+	OAS openapi3.T
 	sync.RWMutex
 
 	RxPaths                  map[string][]URLSpec
@@ -529,7 +529,7 @@ func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinit
 	return
 }
 
-func (a APIDefinitionLoader) ParseOAS(r io.Reader) (oas openapi3.Swagger) {
+func (a APIDefinitionLoader) ParseOAS(r io.Reader) (oas openapi3.T) {
 	if err := json.NewDecoder(r).Decode(&oas); err != nil {
 		log.Error("Couldn't unmarshal oas configuration: ", err)
 	}

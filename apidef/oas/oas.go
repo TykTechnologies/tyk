@@ -11,7 +11,7 @@ import (
 const ExtensionTykAPIGateway = "x-tyk-api-gateway"
 
 type OAS struct {
-	openapi3.Swagger
+	openapi3.T
 }
 
 func (s *OAS) Fill(api apidef.APIDefinition) {

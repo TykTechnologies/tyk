@@ -909,7 +909,7 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 	}
 
 	var newDef apidef.APIDefinition
-	var oasDoc openapi3.Swagger
+	var oasDoc openapi3.T
 	var xTykAPIGateway oas.XTykAPIGateway
 
 	if oasTyped {
