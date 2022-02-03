@@ -6,7 +6,11 @@ import (
 	"github.com/lonelycode/osin"
 )
 
-func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, authEnabled bool) {
+func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, enableSecurity bool) {
+	// should not extract info when authEnabled is false
+	if !enableSecurity {
+		return
+	}
 	xTykAPIGateway := s.Extensions[ExtensionTykAPIGateway].(*XTykAPIGateway)
 	if xTykAPIGateway.Server.Authentication == nil {
 		xTykAPIGateway.Server.Authentication = &Authentication{}
@@ -23,7 +27,7 @@ func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, authEnabled bool
 				}
 				if xTykAPIGateway.Server.Authentication.Token == nil {
 					xTykAPIGateway.Server.Authentication.Token = &Token{
-						Enabled: authEnabled,
+						Enabled: i == 0,
 					}
 				}
 				if i == 0 {
@@ -56,7 +60,7 @@ func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, authEnabled bool
 					}
 					if xTykAPIGateway.Server.Authentication.Basic == nil {
 						xTykAPIGateway.Server.Authentication.Basic = &Basic{
-							Enabled: authEnabled && i == 0,
+							Enabled: i == 0,
 						}
 					} else {
 						xTykAPIGateway.Server.Authentication.Basic.ExtractTo(api)
@@ -67,39 +71,48 @@ func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, authEnabled bool
 					}
 					if xTykAPIGateway.Server.Authentication.JWT == nil {
 						xTykAPIGateway.Server.Authentication.JWT = &JWT{
-							Enabled: authEnabled && i == 0,
+							Enabled: i == 0,
 						}
 					} else {
 						xTykAPIGateway.Server.Authentication.JWT.ExtractTo(api)
 					}
 				}
 			case OpenIDConnect:
-				api.UseOpenID = authEnabled && i == 0
+				api.UseOpenID = i == 0
 				if k == 0 {
 					api.BaseIdentityProvidedBy = apidef.OIDCUser
 				}
 				if xTykAPIGateway.Server.Authentication.OIDC == nil {
 					xTykAPIGateway.Server.Authentication.OIDC = &OIDC{
-						Enabled: authEnabled && i == 0,
+						Enabled: i == 0,
 					}
-					api.OpenIDOptions = apidef.OpenIDOptions{
-						Providers: []apidef.OIDProviderConfig{
+					if i == 0 {
+						api.OpenIDOptions = apidef.OpenIDOptions{
+							Providers: []apidef.OIDProviderConfig{
+								{
+									Issuer: securityScheme.OpenIdConnectUrl,
+								},
+							},
+						}
+					} else {
+						xTykAPIGateway.Server.Authentication.OIDC.Providers = []Provider{
 							{
 								Issuer: securityScheme.OpenIdConnectUrl,
 							},
-						},
+						}
 					}
+
 				} else {
 					xTykAPIGateway.Server.Authentication.OIDC.ExtractTo(api)
 				}
 			case Oauth2:
-				api.UseOauth2 = authEnabled && i == 0
+				api.UseOauth2 = i == 0
 				if k == 0 {
 					api.BaseIdentityProvidedBy = apidef.OAuthKey
 				}
 				if xTykAPIGateway.Server.Authentication.OAuth == nil {
 					oAuth := &OAuth{
-						Enabled: authEnabled && i == 0,
+						Enabled: i == 0,
 						AuthSources: AuthSources{
 							Header: HeaderAuthSource{
 								Name: Authorization,
@@ -110,23 +123,37 @@ func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, authEnabled bool
 							osin.CODE,
 						},
 					}
-					xTykAPIGateway.Server.Authentication.OAuth = oAuth
 					if api.Oauth2Meta.AllowedAuthorizeTypes == nil {
-						api.Oauth2Meta.AllowedAccessTypes = []osin.AccessRequestType{}
 						api.Oauth2Meta.AllowedAuthorizeTypes = []osin.AuthorizeRequestType{}
+					}
+					if api.Oauth2Meta.AllowedAccessTypes == nil {
+						api.Oauth2Meta.AllowedAccessTypes = []osin.AccessRequestType{}
 					}
 					if securityScheme.Flows.AuthorizationCode != nil {
 						api.Oauth2Meta.AllowedAccessTypes = append(api.Oauth2Meta.AllowedAccessTypes, osin.AUTHORIZATION_CODE)
 						api.Oauth2Meta.AuthorizeLoginRedirect = securityScheme.Flows.AuthorizationCode.AuthorizationURL
+						if i > 0 {
+							oAuth.AllowedAccessTypes = append(oAuth.AllowedAccessTypes, osin.AUTHORIZATION_CODE)
+							oAuth.AuthLoginRedirect = securityScheme.Flows.AuthorizationCode.AuthorizationURL
+						}
 					}
 					if securityScheme.Flows.Password != nil {
 						api.Oauth2Meta.AllowedAccessTypes = append(api.Oauth2Meta.AllowedAccessTypes, osin.PASSWORD)
-						api.Oauth2Meta.AuthorizeLoginRedirect = securityScheme.Flows.AuthorizationCode.AuthorizationURL
+						api.Oauth2Meta.AuthorizeLoginRedirect = securityScheme.Flows.Password.AuthorizationURL
+						if i > 0 {
+							oAuth.AllowedAccessTypes = append(oAuth.AllowedAccessTypes, osin.PASSWORD)
+							oAuth.AuthLoginRedirect = securityScheme.Flows.Password.AuthorizationURL
+						}
 					}
 					if securityScheme.Flows.ClientCredentials != nil {
 						api.Oauth2Meta.AllowedAccessTypes = append(api.Oauth2Meta.AllowedAccessTypes, osin.CLIENT_CREDENTIALS)
-						api.Oauth2Meta.AuthorizeLoginRedirect = securityScheme.Flows.AuthorizationCode.AuthorizationURL
+						api.Oauth2Meta.AuthorizeLoginRedirect = securityScheme.Flows.ClientCredentials.AuthorizationURL
+						if i > 0 {
+							oAuth.AllowedAccessTypes = append(oAuth.AllowedAccessTypes, osin.CLIENT_CREDENTIALS)
+							oAuth.AuthLoginRedirect = securityScheme.Flows.ClientCredentials.AuthorizationURL
+						}
 					}
+					xTykAPIGateway.Server.Authentication.OAuth = oAuth
 				} else {
 					xTykAPIGateway.Server.Authentication.OAuth.ExtractTo(api)
 				}
