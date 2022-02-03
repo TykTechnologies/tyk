@@ -180,19 +180,116 @@ func (s *OAS) fillSecuritySchemes(api *apidef.APIDefinition) {
 	if xTykAPIGateway.Server.Authentication == nil {
 		xTykAPIGateway.Server.Authentication = &Authentication{}
 	}
+	securitySchemes := s.Components.SecuritySchemes
+	if securitySchemes == nil {
+		securitySchemes = openapi3.SecuritySchemes{}
+	}
+	security := s.Security
+	if security == nil {
+		security = openapi3.SecurityRequirements{}
+	}
 	// APIKey
 	if authToken, ok := api.AuthConfigs["authToken"]; ok {
-		token := &Token{}
-		token.Fill(true, authToken)
-		xTykAPIGateway.Server.Authentication.Token = token
+		// use header auth as the first one
+		if authToken.AuthHeaderName != "" && xTykAPIGateway.Server.Authentication.Token.Enabled {
+			securityScheme := openapi3.SecurityScheme{
+				In:   InHeader,
+				Type: APIKey,
+				Name: authToken.AuthHeaderName,
+			}
+			securitySchemes[HeaderKey] = &openapi3.SecuritySchemeRef{
+				Value: &securityScheme,
+			}
+			security = append(security, openapi3.SecurityRequirement{
+				HeaderKey: []string{},
+			})
+		}
+		if authToken.UseCookie && xTykAPIGateway.Server.Authentication.Token.Cookie.Enabled {
+			securityScheme := openapi3.SecurityScheme{
+				In:   InCookie,
+				Type: APIKey,
+				Name: authToken.CookieName,
+			}
+			securitySchemes[CookieKey] = &openapi3.SecuritySchemeRef{
+				Value: &securityScheme,
+			}
+			security = append(security, openapi3.SecurityRequirement{
+				CookieKey: []string{},
+			})
+		}
+		if authToken.UseParam && xTykAPIGateway.Server.Authentication.Token.Param.Enabled {
+			securityScheme := openapi3.SecurityScheme{
+				In:   InQuery,
+				Type: APIKey,
+				Name: authToken.ParamName,
+			}
+			securitySchemes[QueryKey] = &openapi3.SecuritySchemeRef{
+				Value: &securityScheme,
+			}
+			security = append(security, openapi3.SecurityRequirement{
+				QueryKey: []string{},
+			})
+		}
 	}
 	// HTTP basic auth
 	if api.UseBasicAuth {
-		basic := &Basic{}
-		basic.Fill(*api)
-		xTykAPIGateway.Server.Authentication.Basic = basic
+		securityScheme := openapi3.SecurityScheme{
+			Type:   HTTP,
+			Scheme: SchemeBasic,
+		}
+		securitySchemes[BasicKey] = &openapi3.SecuritySchemeRef{
+			Value: &securityScheme,
+		}
+		security = append(security, openapi3.SecurityRequirement{})
 	}
-
+	if api.EnableJWT {
+		securityScheme := openapi3.SecurityScheme{
+			Type:   HTTP,
+			Scheme: SchemeBearer,
+		}
+		securitySchemes[JWTKey] = &openapi3.SecuritySchemeRef{
+			Value: &securityScheme,
+		}
+		security = append(security, openapi3.SecurityRequirement{})
+	}
+	if api.UseOpenID {
+		securityScheme := openapi3.SecurityScheme{
+			Type:             OpenIDConnect,
+			OpenIdConnectUrl: api.OpenIDOptions.Providers[0].Issuer,
+		}
+		securitySchemes[OpenIDConnect] = &openapi3.SecuritySchemeRef{
+			Value: &securityScheme,
+		}
+		security = append(security, openapi3.SecurityRequirement{})
+	}
+	if api.UseOauth2 {
+		securityScheme := openapi3.SecurityScheme{
+			Type:  Oauth2,
+			Flows: &openapi3.OAuthFlows{},
+		}
+		for _, allowedRequestType := range api.Oauth2Meta.AllowedAccessTypes {
+			switch allowedRequestType {
+			case osin.AUTHORIZATION_CODE:
+				securityScheme.Flows.AuthorizationCode = &openapi3.OAuthFlow{
+					AuthorizationURL: api.Oauth2Meta.AuthorizeLoginRedirect,
+				}
+			case osin.PASSWORD:
+				securityScheme.Flows.Password = &openapi3.OAuthFlow{
+					AuthorizationURL: api.Oauth2Meta.AuthorizeLoginRedirect,
+				}
+			case osin.CLIENT_CREDENTIALS:
+				securityScheme.Flows.AuthorizationCode = &openapi3.OAuthFlow{
+					AuthorizationURL: api.Oauth2Meta.AuthorizeLoginRedirect,
+				}
+			}
+		}
+		securitySchemes[Oauth2] = &openapi3.SecuritySchemeRef{
+			Value: &securityScheme,
+		}
+		security = append(security, openapi3.SecurityRequirement{})
+	}
+	s.Components.SecuritySchemes = securitySchemes
+	s.Security = security
 }
 
 func extractTokenAuth(enable bool, apiKeySecurityScheme *openapi3.SecurityScheme, api *apidef.APIDefinition) {

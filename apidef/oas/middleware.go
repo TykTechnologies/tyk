@@ -20,6 +20,11 @@ const (
 	SchemeBearer    = "bearer"
 	BearerFormatJWT = "JWT"
 	Authorization   = "Authorization"
+	HeaderKey       = "header_key"
+	CookieKey       = "cookie_key"
+	QueryKey        = "query_key"
+	BasicKey        = "basic_key"
+	JWTKey          = "jwt_key"
 )
 
 type Middleware struct {
