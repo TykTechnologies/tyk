@@ -292,7 +292,7 @@ jobs:
           COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
           RUN apt-get update && apt-get install -y curl
 
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.9
+          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.8
           RUN dpkg -i tyk-gateway.deb 
           RUN apt-get install -y jq
           RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
@@ -344,7 +344,7 @@ jobs:
           COPY tyk-gateway*_x86_64.rpm /tyk-gateway.rpm
           RUN yum install -y curl
 
-          RUN curl -s https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash && yum install -y tyk-gateway-3.0.9-1
+          RUN curl -s https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash && yum install -y tyk-gateway-3.0.8-1
           RUN rpm -Uvh tyk-gateway.rpm 
           RUN yum install -y jq
           RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
