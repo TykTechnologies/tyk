@@ -7,15 +7,16 @@ import (
 )
 
 func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, enableSecurity bool) {
+	// should not extract info when authEnabled is false
+	if !enableSecurity || s.Security == nil {
+		api.UseKeylessAccess = true
+		return
+	}
 	var xTykAPIGateway = &XTykAPIGateway{}
 	if s.Extensions == nil {
 		s.Extensions = map[string]interface{}{
 			ExtensionTykAPIGateway: xTykAPIGateway,
 		}
-	}
-	// should not extract info when authEnabled is false
-	if !enableSecurity {
-		return
 	}
 	xTykAPIGateway = s.Extensions[ExtensionTykAPIGateway].(*XTykAPIGateway)
 	if xTykAPIGateway.Server.Authentication == nil {
