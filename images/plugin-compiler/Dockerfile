@@ -21,8 +21,7 @@ RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 COPY images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
-RUN cd $TYK_GW_PATH &&  \
-    git clone --depth 1 --branch $TYK_GW_TAG  https://github.com/TykTechnologies/tyk .
+COPY . $TYK_GW_PATH
 
 ENTRYPOINT ["/build.sh"]
 
