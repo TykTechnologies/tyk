@@ -7,11 +7,17 @@ import (
 )
 
 func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, enableSecurity bool) {
+	var xTykAPIGateway = &XTykAPIGateway{}
+	if s.Extensions == nil {
+		s.Extensions = map[string]interface{}{
+			ExtensionTykAPIGateway: xTykAPIGateway,
+		}
+	}
 	// should not extract info when authEnabled is false
 	if !enableSecurity {
 		return
 	}
-	xTykAPIGateway := s.Extensions[ExtensionTykAPIGateway].(*XTykAPIGateway)
+	xTykAPIGateway = s.Extensions[ExtensionTykAPIGateway].(*XTykAPIGateway)
 	if xTykAPIGateway.Server.Authentication == nil {
 		xTykAPIGateway.Server.Authentication = &Authentication{}
 	}
@@ -55,25 +61,19 @@ func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, enableSecurity b
 				}
 			case HTTP:
 				if securityScheme.Scheme == SchemeBasic {
+					api.UseBasicAuth = i == 0
 					if k == 0 {
 						api.BaseIdentityProvidedBy = apidef.BasicAuthUser
 					}
-					if xTykAPIGateway.Server.Authentication.Basic == nil {
-						xTykAPIGateway.Server.Authentication.Basic = &Basic{
-							Enabled: i == 0,
-						}
-					} else {
+					if xTykAPIGateway.Server.Authentication.Basic != nil {
 						xTykAPIGateway.Server.Authentication.Basic.ExtractTo(api)
 					}
 				} else if securityScheme.Scheme == SchemeBearer && securityScheme.BearerFormat == BearerFormatJWT {
+					api.EnableJWT = i == 0
 					if k == 0 {
 						api.BaseIdentityProvidedBy = apidef.JWTClaim
 					}
-					if xTykAPIGateway.Server.Authentication.JWT == nil {
-						xTykAPIGateway.Server.Authentication.JWT = &JWT{
-							Enabled: i == 0,
-						}
-					} else {
+					if xTykAPIGateway.Server.Authentication.JWT != nil {
 						xTykAPIGateway.Server.Authentication.JWT.ExtractTo(api)
 					}
 				}
@@ -124,7 +124,11 @@ func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, enableSecurity b
 						},
 					}
 					if api.Oauth2Meta.AllowedAuthorizeTypes == nil {
-						api.Oauth2Meta.AllowedAuthorizeTypes = []osin.AuthorizeRequestType{}
+						api.Oauth2Meta.AllowedAuthorizeTypes = []osin.AuthorizeRequestType{
+							osin.CODE,
+						}
+					} else {
+						api.Oauth2Meta.AllowedAuthorizeTypes = append(api.Oauth2Meta.AllowedAuthorizeTypes, osin.CODE)
 					}
 					if api.Oauth2Meta.AllowedAccessTypes == nil {
 						api.Oauth2Meta.AllowedAccessTypes = []osin.AccessRequestType{}
@@ -139,18 +143,18 @@ func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, enableSecurity b
 					}
 					if securityScheme.Flows.Password != nil {
 						api.Oauth2Meta.AllowedAccessTypes = append(api.Oauth2Meta.AllowedAccessTypes, osin.PASSWORD)
-						api.Oauth2Meta.AuthorizeLoginRedirect = securityScheme.Flows.Password.AuthorizationURL
+						api.Oauth2Meta.AuthorizeLoginRedirect = securityScheme.Flows.Password.TokenURL
 						if i > 0 {
 							oAuth.AllowedAccessTypes = append(oAuth.AllowedAccessTypes, osin.PASSWORD)
-							oAuth.AuthLoginRedirect = securityScheme.Flows.Password.AuthorizationURL
+							oAuth.AuthLoginRedirect = securityScheme.Flows.Password.TokenURL
 						}
 					}
 					if securityScheme.Flows.ClientCredentials != nil {
 						api.Oauth2Meta.AllowedAccessTypes = append(api.Oauth2Meta.AllowedAccessTypes, osin.CLIENT_CREDENTIALS)
-						api.Oauth2Meta.AuthorizeLoginRedirect = securityScheme.Flows.ClientCredentials.AuthorizationURL
+						api.Oauth2Meta.AuthorizeLoginRedirect = securityScheme.Flows.ClientCredentials.TokenURL
 						if i > 0 {
 							oAuth.AllowedAccessTypes = append(oAuth.AllowedAccessTypes, osin.CLIENT_CREDENTIALS)
-							oAuth.AuthLoginRedirect = securityScheme.Flows.ClientCredentials.AuthorizationURL
+							oAuth.AuthLoginRedirect = securityScheme.Flows.ClientCredentials.TokenURL
 						}
 					}
 					xTykAPIGateway.Server.Authentication.OAuth = oAuth
@@ -176,7 +180,13 @@ func (s *OAS) getSecuritySchemeByName(schemeName string) *openapi3.SecuritySchem
 }
 
 func (s *OAS) fillSecuritySchemes(api *apidef.APIDefinition) {
-	xTykAPIGateway := s.Extensions[ExtensionTykAPIGateway].(*XTykAPIGateway)
+	var xTykAPIGateway = &XTykAPIGateway{}
+	if s.Extensions == nil {
+		s.Extensions = map[string]interface{}{
+			ExtensionTykAPIGateway: xTykAPIGateway,
+		}
+	}
+	xTykAPIGateway = s.Extensions[ExtensionTykAPIGateway].(*XTykAPIGateway)
 	if xTykAPIGateway.Server.Authentication == nil {
 		xTykAPIGateway.Server.Authentication = &Authentication{}
 	}
@@ -301,6 +311,8 @@ func extractTokenAuth(enable bool, apiKeySecurityScheme *openapi3.SecurityScheme
 		if !ok {
 			api.AuthConfigs["authToken"] = authTokenConfig
 		}
+	} else {
+		api.AuthConfigs = map[string]apidef.AuthConfig{}
 	}
 	switch apiKeySecurityScheme.In {
 	case InHeader:

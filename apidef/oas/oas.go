@@ -23,6 +23,7 @@ func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 	var ep apidef.ExtendedPathsSet
 	s.GetTykExtension().ExtractTo(api)
 	s.extractPathsAndOperations(&ep)
+	s.extractSecuritySchemes(api, true)
 	v := api.VersionData.Versions[""]
 	v.UseExtendedPaths = true
 	v.ExtendedPaths = ep
