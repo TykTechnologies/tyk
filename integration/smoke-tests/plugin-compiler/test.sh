@@ -16,7 +16,7 @@ EOF
 
 compose='docker-compose'
 # composev2 is a client plugin
-[[ $(docker version --format='{{ .Client.Version }}') == "20.10.11" ]] && compose='docker compose'
+[[ $(docker version --format='{{ .Client.Version }}') =~ "20.10" ]] && compose='docker compose'
 
 [[ -z $1 ]] && usage $0
 export tag=$1

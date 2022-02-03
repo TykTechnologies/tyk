@@ -14,12 +14,9 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
 COPY images/plugin-compiler/data/build.sh /build.sh
-# COPY ./ $TYK_GW_PATH/
-# RUN cd $TYK_GW_PATH && go mod tidy && go mod vendor
 RUN chmod +x /build.sh
 
-COPY src.tgz .
-RUN tar -xzf src.tgz -C $TYK_GW_PATH
+COPY . $TYK_GW_PATH
 RUN cd $TYK_GW_PATH && go mod vendor
 
 ENTRYPOINT ["/build.sh"]
