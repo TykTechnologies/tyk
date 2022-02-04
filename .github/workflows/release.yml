@@ -420,6 +420,7 @@ jobs:
         working-directory: ./aws
         run: |
           export VERSION=${{ needs.goreleaser.outputs.tag }}
+          packer init byol.pkr.hcl
           packer validate -var-file=${{ matrix.flavour }}.vars.json byol.pkr.hcl
           packer build -var-file=${{ matrix.flavour }}.vars.json byol.pkr.hcl
 
