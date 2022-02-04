@@ -105,6 +105,7 @@ nfpms:
         file_name_template: '{{ .PackageName }}_{{ replace .Version "-" "~" }}-1.{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}'
         replacements:
           amd64: x86_64
+          arm64: aarch64
           arm: aarch64
       deb:
         replacements:
