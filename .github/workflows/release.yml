@@ -338,7 +338,7 @@ jobs:
       - name: generate dockerfile
         run: |
           echo 'FROM registry.access.redhat.com/${{ matrix.distro }}
-          COPY tyk-gateway*_x86_64.rpm /tyk-gateway.rpm
+          COPY tyk-gateway*.x86_64.rpm /tyk-gateway.rpm
           RUN yum install -y curl
 
           RUN curl -s https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash && yum install -y tyk-gateway-3.0.8-1
