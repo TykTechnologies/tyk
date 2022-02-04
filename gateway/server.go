@@ -95,6 +95,9 @@ type Gateway struct {
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
 
+
+	configStorage 		 ConfigHandler
+
 	analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
 	MainNotifier         RedisNotifier
@@ -188,7 +191,7 @@ type hostDetails struct {
 	PID      int
 }
 
-func NewGateway(config config.Config, ctx context.Context, cancelFn context.CancelFunc) *Gateway {
+func NewGateway(configuration config.Config, ctx context.Context, cancelFn context.CancelFunc) *Gateway {
 	gw := Gateway{
 		DefaultProxyMux: &proxyMux{
 			again: again.New(),
@@ -198,7 +201,7 @@ func NewGateway(config config.Config, ctx context.Context, cancelFn context.Canc
 	}
 
 	gw.analytics = RedisAnalyticsHandler{Gw: &gw}
-	gw.SetConfig(config)
+	gw.SetConfig(configuration)
 	sessionManager := DefaultSessionManager{Gw: &gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
 	gw.DefaultQuotaStore = DefaultSessionManager{Gw: &gw}
@@ -209,6 +212,7 @@ func NewGateway(config config.Config, ctx context.Context, cancelFn context.Canc
 	gw.HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
 	}
+	gw.configStorage = &DefaultConfigHandler{}
 
 	gw.SessionCache = cache.New(10*time.Second, 5*time.Second)
 	gw.ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
@@ -401,6 +405,9 @@ func (gw *Gateway) setupGlobals() {
 		NewRelicApplication = gw.SetupNewRelic()
 	}
 
+	storeConfig := &storage.RedisCluster{KeyPrefix:"cfg-",RedisController: gw.RedisController}
+	gw.configStorage.Init(storeConfig)
+
 	gw.readGraphqlPlaygroundTemplate()
 }
 
@@ -572,11 +579,13 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	muxer.HandleFunc("/"+gw.GetConfig().HealthCheckEndpointName, gw.liveCheckHandler)
-
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
 		stripSlashes(gw.checkIsAPIOwner(gw.controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
 	))
+
+	muxer.PathPrefix("/config").Handler(gw.checkIsAPIOwner(allowMethods(gw.configsHandler, "GET")))
+
 
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
@@ -694,6 +703,7 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	oauthHandlers := OAuthHandlers{oauthManager}
 
 	muxer.Handle(apiAuthorizePath, gw.checkIsAPIOwner(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST")))
+
 	muxer.HandleFunc(clientAuthPath, allowMethods(oauthHandlers.HandleAuthorizePassthrough, "GET", "POST"))
 	muxer.HandleFunc(clientAccessPath, addSecureAndCacheHeaders(allowMethods(oauthHandlers.HandleAccessRequest, "GET", "POST")))
 	muxer.HandleFunc(revokeToken, oauthHandlers.HandleRevokeToken)
@@ -898,6 +908,7 @@ func (gw *Gateway) DoReload() {
 		}
 	}
 	gw.loadGlobalApps()
+	go gw.configStorage.Store(gw.GetNodeID(),gw.GetConfig())
 
 	mainLog.Info("API reload complete")
 }
@@ -1192,6 +1203,8 @@ func (gw *Gateway) initialiseSystem() error {
 	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
 		go gw.StartPeriodicStateBackup(&gw.LE_MANAGER)
 	}
+
+
 	return nil
 }
 
@@ -1414,7 +1427,6 @@ func Start() {
 	// ToDo:Config replace for get default conf
 	gw := NewGateway(config.Default, ctx, cancel)
 	gw.SetNodeID("solo-" + uuid.NewV4().String())
-
 	gw.SessionID = uuid.NewV4().String()
 	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
@@ -1494,7 +1506,7 @@ func Start() {
 	// TODO: replace goagain with something that support multiple listeners
 	// Example: https://gravitational.com/blog/golang-ssh-bastion-graceful-restarts/
 	gw.startServer()
-
+//
 	if again.Child() {
 		// This is a child process, we need to murder the parent now
 		if err := again.Kill(); err != nil {
@@ -1512,6 +1524,13 @@ func Start() {
 	// stop analytics workers
 	if gwConfig.EnableAnalytics && gw.analytics.Store == nil {
 		gw.analytics.Stop()
+	}
+
+	//delete cfg from redis
+	gw.configStorage.DeleteConfigs(gw.GetNodeID())
+
+	if gwConfig.SlaveOptions.UseRPC {
+		//add shutdown to mdcb
 	}
 
 	// write pprof profiles
@@ -1587,6 +1606,7 @@ func (gw *Gateway) start() {
 	// interval counts from the start of one reload to the next.
 	go gw.reloadLoop(time.Tick(time.Second))
 	go gw.reloadQueueLoop()
+
 }
 
 func dashboardServiceInit(gw *Gateway) {
