@@ -191,7 +191,11 @@ func (s *OAS) fillSecuritySchemes(api *apidef.APIDefinition) {
 			ExtensionTykAPIGateway: xTykAPIGateway,
 		}
 	}
-	xTykAPIGateway = s.Extensions[ExtensionTykAPIGateway].(*XTykAPIGateway)
+	if val, ok := s.Extensions[ExtensionTykAPIGateway]; !ok {
+		s.Extensions[ExtensionTykAPIGateway] = xTykAPIGateway
+	} else {
+		xTykAPIGateway = val.(*XTykAPIGateway)
+	}
 	if xTykAPIGateway.Server.Authentication == nil {
 		xTykAPIGateway.Server.Authentication = &Authentication{}
 	}
