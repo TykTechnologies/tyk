@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -122,9 +125,28 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 
 	// try to load plugin
 	var err error
-	if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
-		m.logger.WithError(err).Error("Could not load Go-plugin")
-		return false
+	m.logger.Infof("Path: %v ---- Symbol: %v", m.Path, m.SymbolName)
+
+	if FileExist(m.Path) {
+		if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
+			m.logger.WithError(err).Error("Could not load Go-plugin")
+			return false
+		}
+	} else {
+		// it will build a plugin path like:
+		// {plugin-dir}/{plugin-name}_{GWversion}_{OS}_{arch}.so
+		pluginDir := filepath.Dir(m.Path)
+		pluginName := strings.TrimSuffix(filepath.Base(m.Path), ".so")
+		os := runtime.GOOS
+		architecture := runtime.GOARCH
+
+		newPluginName := strings.Join([]string{pluginName, VERSION, os, architecture}, "_")
+		newPluginPath := pluginDir + "/" + newPluginName + ".os"
+
+		if m.handler, err = goplugin.GetHandler(newPluginPath, m.SymbolName); err != nil {
+			m.logger.WithError(err).Error("Could not load Go-plugin")
+			return false
+		}
 	}
 
 	// to record 2XX hits in analytics
