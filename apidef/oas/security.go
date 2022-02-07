@@ -13,9 +13,7 @@ func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, enableSecurity b
 		return
 	}
 	xTykAPIGateway := s.GetTykExtension()
-	if xTykAPIGateway.Server.Authentication == nil {
-		xTykAPIGateway.Server.Authentication = &Authentication{}
-	}
+	authentication := xTykAPIGateway.Server.GetAuthentication()
 	// when there are multiple security requirements use the first one in the array
 	for i, security := range s.Security {
 		k := 0
@@ -26,7 +24,7 @@ func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, enableSecurity b
 				if k == 0 {
 					api.BaseIdentityProvidedBy = apidef.AuthToken
 				}
-				if xTykAPIGateway.Server.Authentication.Token == nil {
+				if authentication.Token == nil {
 					xTykAPIGateway.Server.Authentication.Token = &Token{
 						Enabled: i == 0,
 					}
@@ -176,21 +174,14 @@ func (s *OAS) getSecuritySchemeByName(schemeName string) *openapi3.SecuritySchem
 
 func (s *OAS) fillSecuritySchemes(api *apidef.APIDefinition) {
 	xTykAPIGateway := s.GetTykExtension()
-	if xTykAPIGateway.Server.Authentication == nil {
-		xTykAPIGateway.Server.Authentication = &Authentication{}
-	}
-	securitySchemes := s.Components.SecuritySchemes
-	if securitySchemes == nil {
-		securitySchemes = openapi3.SecuritySchemes{}
-	}
-	security := s.Security
-	if security == nil {
-		security = openapi3.SecurityRequirements{}
-	}
+	authentication := xTykAPIGateway.Server.GetAuthentication()
+	securitySchemes := openapi3.SecuritySchemes{}
+	security := openapi3.SecurityRequirements{}
 	// APIKey
 	if authToken, ok := api.AuthConfigs["authToken"]; ok {
+		token := authentication.GetToken()
 		// use header auth as the first one
-		if authToken.AuthHeaderName != "" && xTykAPIGateway.Server.Authentication.Token.Enabled {
+		if authToken.AuthHeaderName != "" {
 			securityScheme := openapi3.SecurityScheme{
 				In:   InHeader,
 				Type: APIKey,
@@ -203,7 +194,7 @@ func (s *OAS) fillSecuritySchemes(api *apidef.APIDefinition) {
 				HeaderKey: []string{},
 			})
 		}
-		if authToken.UseCookie && xTykAPIGateway.Server.Authentication.Token.Cookie.Enabled {
+		if authToken.UseCookie {
 			securityScheme := openapi3.SecurityScheme{
 				In:   InCookie,
 				Type: APIKey,
@@ -216,7 +207,7 @@ func (s *OAS) fillSecuritySchemes(api *apidef.APIDefinition) {
 				CookieKey: []string{},
 			})
 		}
-		if authToken.UseParam && xTykAPIGateway.Server.Authentication.Token.Param.Enabled {
+		if authToken.UseParam {
 			securityScheme := openapi3.SecurityScheme{
 				In:   InQuery,
 				Type: APIKey,
@@ -229,6 +220,7 @@ func (s *OAS) fillSecuritySchemes(api *apidef.APIDefinition) {
 				QueryKey: []string{},
 			})
 		}
+		token.Fill(true, authToken)
 	}
 	// HTTP basic auth
 	if api.UseBasicAuth {

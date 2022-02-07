@@ -16,9 +16,10 @@ func TestOperations(t *testing.T) {
 	Fill(t, &extended.Ignored, 0)
 	Fill(t, &extended.MockResponse, 0)
 
-	sw := &OAS{}
+	sw := OAS{}
 	sw.fillPathsAndOperations(extended)
-
+	body, _ := json.MarshalIndent(sw, "", " ")
+	fmt.Println(string(body))
 	var converted apidef.ExtendedPathsSet
 	sw.extractPathsAndOperations(&converted)
 

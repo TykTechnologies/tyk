@@ -15,6 +15,15 @@ type Server struct {
 	ClientCertificates *ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty"`
 }
 
+func (s *Server) GetAuthentication() *Authentication {
+	if s.Authentication == nil {
+		s.Authentication = &Authentication{
+			Enabled: true,
+		}
+	}
+	return s.Authentication
+}
+
 func (s *Server) Fill(api apidef.APIDefinition) {
 	s.ListenPath.Fill(api)
 	s.Slug = api.Slug

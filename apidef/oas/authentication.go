@@ -47,6 +47,15 @@ type Authentication struct {
 	CustomPlugin *CustomPlugin `bson:"customPlugin,omitempty" json:"customPlugin,omitempty"`
 }
 
+func (a *Authentication) GetToken() *Token {
+	if a.Token == nil {
+		a.Token = &Token{
+			Enabled: true,
+		}
+	}
+	return a.Token
+}
+
 func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.Enabled = !api.UseKeylessAccess
 	a.StripAuthorizationData = api.StripAuthData
@@ -254,7 +263,7 @@ type AuthSources struct {
 
 func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
 	// Header
-	as.Header = HeaderAuthSource{authConfig.AuthHeaderName}
+	//as.Header = HeaderAuthSource{authConfig.AuthHeaderName}
 
 	// Param
 	if as.Param == nil {
