@@ -125,28 +125,15 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 
 	// try to load plugin
 	var err error
-	m.logger.Infof("Path: %v ---- Symbol: %v", m.Path, m.SymbolName)
 
-	if FileExist(m.Path) {
-		if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
-			m.logger.WithError(err).Error("Could not load Go-plugin")
-			return false
-		}
-	} else {
-		// it will build a plugin path like:
-		// {plugin-dir}/{plugin-name}_{GWversion}_{OS}_{arch}.so
-		pluginDir := filepath.Dir(m.Path)
-		pluginName := strings.TrimSuffix(filepath.Base(m.Path), ".so")
-		os := runtime.GOOS
-		architecture := runtime.GOARCH
+	if !FileExist(m.Path) {
+		// if the exact name doesn't exist then try to load it using tyk version
+		m.Path = m.goPluginFromTykVersion()
+	}
 
-		newPluginName := strings.Join([]string{pluginName, VERSION, os, architecture}, "_")
-		newPluginPath := pluginDir + "/" + newPluginName + ".os"
-
-		if m.handler, err = goplugin.GetHandler(newPluginPath, m.SymbolName); err != nil {
-			m.logger.WithError(err).Error("Could not load Go-plugin")
-			return false
-		}
+	if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
+		m.logger.WithError(err).Error("Could not load Go-plugin")
+		return false
 	}
 
 	// to record 2XX hits in analytics
@@ -239,4 +226,24 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	return
+}
+
+// goPluginFromTykVersion builds a name of plugin based on tyk version
+// os and architecture. The structure of the plugin name looks like:
+// {plugin-dir}/{plugin-name}_{GW-version}_{OS}_{arch}.so
+func (m *GoPluginMiddleware) goPluginFromTykVersion() string {
+	if m.Path == "" {
+		return ""
+	}
+
+	pluginDir := filepath.Dir(m.Path)
+	// remove plugin extension to have the plugin's clean name
+	pluginName := strings.TrimSuffix(filepath.Base(m.Path), ".so")
+	os := runtime.GOOS
+	architecture := runtime.GOARCH
+
+	newPluginName := strings.Join([]string{pluginName, VERSION, os, architecture}, "_")
+	newPluginPath := pluginDir + "/" + newPluginName + ".so"
+
+	return newPluginPath
 }

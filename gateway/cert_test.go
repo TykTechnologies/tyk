@@ -6,9 +6,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -19,6 +16,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/user"
 
