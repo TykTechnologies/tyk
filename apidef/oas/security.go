@@ -12,17 +12,7 @@ func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, enableSecurity b
 		api.UseKeylessAccess = true
 		return
 	}
-	var xTykAPIGateway = &XTykAPIGateway{}
-	if s.Extensions == nil {
-		s.Extensions = map[string]interface{}{
-			ExtensionTykAPIGateway: xTykAPIGateway,
-		}
-	}
-	if val, ok := s.Extensions[ExtensionTykAPIGateway]; !ok {
-		s.Extensions[ExtensionTykAPIGateway] = xTykAPIGateway
-	} else {
-		xTykAPIGateway = val.(*XTykAPIGateway)
-	}
+	xTykAPIGateway := s.GetTykExtension()
 	if xTykAPIGateway.Server.Authentication == nil {
 		xTykAPIGateway.Server.Authentication = &Authentication{}
 	}
@@ -185,17 +175,7 @@ func (s *OAS) getSecuritySchemeByName(schemeName string) *openapi3.SecuritySchem
 }
 
 func (s *OAS) fillSecuritySchemes(api *apidef.APIDefinition) {
-	var xTykAPIGateway = &XTykAPIGateway{}
-	if s.Extensions == nil {
-		s.Extensions = map[string]interface{}{
-			ExtensionTykAPIGateway: xTykAPIGateway,
-		}
-	}
-	if val, ok := s.Extensions[ExtensionTykAPIGateway]; !ok {
-		s.Extensions[ExtensionTykAPIGateway] = xTykAPIGateway
-	} else {
-		xTykAPIGateway = val.(*XTykAPIGateway)
-	}
+	xTykAPIGateway := s.GetTykExtension()
 	if xTykAPIGateway.Server.Authentication == nil {
 		xTykAPIGateway.Server.Authentication = &Authentication{}
 	}
