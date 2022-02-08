@@ -231,7 +231,9 @@ func (s *OAS) fillSecuritySchemes(api *apidef.APIDefinition) {
 		securitySchemes[BasicKey] = &openapi3.SecuritySchemeRef{
 			Value: &securityScheme,
 		}
-		security = append(security, openapi3.SecurityRequirement{})
+		security = append(security, openapi3.SecurityRequirement{
+			BasicKey: []string{},
+		})
 	}
 	if api.EnableJWT {
 		securityScheme := openapi3.SecurityScheme{
@@ -241,7 +243,9 @@ func (s *OAS) fillSecuritySchemes(api *apidef.APIDefinition) {
 		securitySchemes[JWTKey] = &openapi3.SecuritySchemeRef{
 			Value: &securityScheme,
 		}
-		security = append(security, openapi3.SecurityRequirement{})
+		security = append(security, openapi3.SecurityRequirement{
+			JWTKey: []string{},
+		})
 	}
 	if api.UseOpenID {
 		securityScheme := openapi3.SecurityScheme{
@@ -277,7 +281,9 @@ func (s *OAS) fillSecuritySchemes(api *apidef.APIDefinition) {
 		securitySchemes[Oauth2] = &openapi3.SecuritySchemeRef{
 			Value: &securityScheme,
 		}
-		security = append(security, openapi3.SecurityRequirement{})
+		security = append(security, openapi3.SecurityRequirement{
+			Oauth2: []string{},
+		})
 	}
 	s.Components.SecuritySchemes = securitySchemes
 	s.Security = security
