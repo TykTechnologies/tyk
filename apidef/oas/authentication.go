@@ -233,7 +233,7 @@ func (t *Token) Fill(enabled bool, authToken apidef.AuthConfig) {
 func (t *Token) ExtractTo(api *apidef.APIDefinition) {
 	api.UseStandardAuth = t.Enabled
 
-	authConfig := apidef.AuthConfig{}
+	authConfig := api.AuthConfigs["authToken"]
 	authConfig.UseCertificate = t.EnableClientCertificate
 
 	t.AuthSources.ExtractTo(&authConfig)
@@ -288,15 +288,17 @@ func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
 
 func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
 	// Header
-	authConfig.AuthHeaderName = as.Header.Name
+	if authConfig.AuthHeaderName == "" {
+		authConfig.AuthHeaderName = as.Header.Name
+	}
 
 	// Param
-	if as.Param != nil {
+	if as.Param != nil && as.Param.Enabled {
 		as.Param.ExtractTo(&authConfig.UseParam, &authConfig.ParamName)
 	}
 
 	// Cookie
-	if as.Cookie != nil {
+	if as.Cookie != nil && as.Cookie.Enabled {
 		as.Cookie.ExtractTo(&authConfig.UseCookie, &authConfig.CookieName)
 	}
 }

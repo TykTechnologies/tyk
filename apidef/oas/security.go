@@ -33,25 +33,9 @@ func (s *OAS) extractSecuritySchemes(api *apidef.APIDefinition, enableSecurity b
 					extractTokenAuth(true, securityScheme, api)
 				} else {
 					extractTokenAuth(false, securityScheme, api)
-					// update x-tyk-gateway when there are more than one auth specified
-					tokenAuthConfig := xTykAPIGateway.Server.Authentication.Token
-					switch securityScheme.In {
-					case InHeader:
-						tokenAuthConfig.Header = HeaderAuthSource{
-							Name: securityScheme.Name,
-						}
-					case InCookie:
-						tokenAuthConfig.Cookie = &AuthSource{
-							Name:    securityScheme.Name,
-							Enabled: true,
-						}
-					case InQuery:
-						tokenAuthConfig.Cookie = &AuthSource{
-							Name:    securityScheme.Name,
-							Enabled: true,
-						}
-					}
 				}
+				tokenAuthConfig := xTykAPIGateway.Server.Authentication.Token
+				tokenAuthConfig.ExtractTo(api)
 			case HTTP:
 				if securityScheme.Scheme == SchemeBasic {
 					api.UseBasicAuth = i == 0
@@ -292,13 +276,7 @@ func (s *OAS) fillSecuritySchemes(api *apidef.APIDefinition) {
 func extractTokenAuth(enable bool, apiKeySecurityScheme *openapi3.SecurityScheme, api *apidef.APIDefinition) {
 	api.UseStandardAuth = true
 	var authTokenConfig apidef.AuthConfig
-	if api.AuthConfigs != nil {
-		ok := false
-		authTokenConfig, ok = api.AuthConfigs["authToken"]
-		if !ok {
-			api.AuthConfigs["authToken"] = authTokenConfig
-		}
-	} else {
+	if api.AuthConfigs == nil {
 		api.AuthConfigs = map[string]apidef.AuthConfig{}
 	}
 	switch apiKeySecurityScheme.In {
