@@ -188,7 +188,8 @@ func PythonInit(pythonVersion string) error {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
-		}).Fatal("Couldn't initialize Python")
+		}).Fatalf("Couldn't initialize Python - %s", err.Error())
+		return err
 	}
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
