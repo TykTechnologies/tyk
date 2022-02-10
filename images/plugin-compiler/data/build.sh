@@ -1,6 +1,7 @@
 #!/bin/bash
 set -xe
 
+CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' ./../../../gateway/version.go)
 plugin_name=$1
 plugin_id=$2
 
@@ -14,6 +15,15 @@ To build a plugin:
 <plugin_id> is optional
 EOF
 }
+
+# read from params: os and arch
+GOOS=$(go env GOOS)
+GOARCH=$(go env GOARCH)
+
+if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
+      PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}${CURRENTVERS}_${GOOS}_${GOARCH}.so"
+fi
+echo $PLUGIN_BUILD_PATH
 
 if [ -z "$plugin_name" ]; then
     usage
