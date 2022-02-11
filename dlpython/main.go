@@ -128,8 +128,18 @@ func FindPythonConfig(customVersion string) (selectedVersion string, err error) 
 	return selectedVersion, nil
 }
 
+func execPythonConfig() ([]byte, error) {
+	// Try to include the "embed" flag first
+	// introduced in Python 3.8: https://docs.python.org/3.8/whatsnew/3.8.html#debug-build-uses-the-same-abi-as-release-build
+	out, err := exec.Command(pythonConfigPath, "--ldflags", "--embed").Output()
+	if err != nil {
+		return exec.Command(pythonConfigPath, "--ldflags").Output()
+	}
+	return out, err
+}
+
 func getLibraryPathFromCfg() error {
-	out, err := exec.Command(pythonConfigPath, "--ldflags").Output()
+	out, err := execPythonConfig()
 	if err != nil {
 		logger.Errorf("Error while executing command for python config path: %s", pythonConfigPath)
 		return err
