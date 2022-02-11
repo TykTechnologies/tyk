@@ -1,9 +1,12 @@
 #!/bin/bash
 set -xe
 
-CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' ./../../../gateway/version.go)
+CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' $TYK_GW_PATH/gateway/version.go)
 plugin_name=$1
 plugin_id=$2
+# GOOS and GOARCH can be send to override the name of the plugin
+GOOS=$3
+GOARCH=$4
 
   PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}$plugin_id"
 
@@ -16,14 +19,16 @@ To build a plugin:
 EOF
 }
 
-# read from params: os and arch
-GOOS=$(go env GOOS)
-GOARCH=$(go env GOARCH)
-
-if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
-      PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}${CURRENTVERS}_${GOOS}_${GOARCH}.so"
+# if params were not send, then attempt to get them from env vars
+if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
+  GOOS=$(go env GOOS)
+  GOARCH=$(go env GOARCH)
 fi
-echo $PLUGIN_BUILD_PATH
+
+# if arch and os present then update the name of file with those params
+if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
+  PLUGIN_BUILD_PATH="/go/src/${plugin_name%.*}${CURRENTVERS}_${GOOS}_${GOARCH}.so"
+fi
 
 if [ -z "$plugin_name" ]; then
     usage
