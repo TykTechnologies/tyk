@@ -52,7 +52,7 @@ type ValidationRuleSet []ValidationRule
 
 var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleUniqueDataSourceNames{},
-	&RuleAtLeastEnableOneAuthConfig{},
+	&RuleAtLeastEnableOneAuthSource{},
 }
 
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
@@ -94,13 +94,13 @@ func (r *RuleUniqueDataSourceNames) Validate(apiDef *APIDefinition, validationRe
 	}
 }
 
-var ErrAllAuthSourcesDisabled = "all auth sources are disabled for %s, at least one of header/cookie/param must be enabled"
+var ErrAllAuthSourcesDisabled = "all auth sources are disabled for %s, at least one of header/cookie/query must be enabled"
 
-type RuleAtLeastEnableOneAuthConfig struct{}
+type RuleAtLeastEnableOneAuthSource struct{}
 
-func (r *RuleAtLeastEnableOneAuthConfig) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+func (r *RuleAtLeastEnableOneAuthSource) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
 	for k, authConfig := range apiDef.AuthConfigs {
-		if shouldValidateAuthConfig(k, apiDef) && !(authConfig.UseParam || authConfig.UseCookie || !authConfig.DisableHeader) {
+		if shouldValidateAuthSource(k, apiDef) && !(authConfig.UseParam || authConfig.UseCookie || !authConfig.DisableHeader) {
 			validationResult.IsValid = false
 			validationResult.AppendError(fmt.Errorf(ErrAllAuthSourcesDisabled, k))
 		}
@@ -108,7 +108,7 @@ func (r *RuleAtLeastEnableOneAuthConfig) Validate(apiDef *APIDefinition, validat
 
 }
 
-func shouldValidateAuthConfig(authType string, apiDef *APIDefinition) bool {
+func shouldValidateAuthSource(authType string, apiDef *APIDefinition) bool {
 	switch authType {
 	case "authToken":
 		return apiDef.UseStandardAuth

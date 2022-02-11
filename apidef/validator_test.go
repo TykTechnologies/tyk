@@ -123,7 +123,7 @@ func TestRuleUniqueDataSourceNames_Validate(t *testing.T) {
 
 func TestRuleAtLeastEnableOneAuthConfig_Validate(t *testing.T) {
 	ruleSet := ValidationRuleSet{
-		&RuleAtLeastEnableOneAuthConfig{},
+		&RuleAtLeastEnableOneAuthSource{},
 	}
 	t.Run("should return invalid when all sources are disabled for enabled auth mechanisms", runValidationTest(
 		&APIDefinition{
