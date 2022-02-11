@@ -32,7 +32,7 @@ fi
 
 # if arch and os present then update the name of file with those params
 if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
-  plugin_name="${plugin_name%.*}${CURRENTVERS}_${GOOS}_${GOARCH}.so"
+  plugin_name="${plugin_name%.*}_${CURRENTVERS}_${GOOS}_${GOARCH}.so"
 fi
 
 mkdir -p $PLUGIN_BUILD_PATH
