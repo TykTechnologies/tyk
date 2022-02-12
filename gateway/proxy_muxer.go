@@ -22,6 +22,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttpadaptor"
+
 	"golang.org/x/net/http2"
 )
 
@@ -59,6 +62,8 @@ type proxy struct {
 	useProxyProtocol bool
 	router           *mux.Router
 	httpServer       *http.Server
+	fasthttpServer   *fasthttp.Server
+	httpHandler      http.Handler
 	tcpProxy         *tcp.Proxy
 	started          bool
 }
@@ -332,6 +337,8 @@ func (m *proxyMux) swap(new *proxyMux, gw *Gateway) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 				curP.httpServer.Shutdown(ctx)
 				cancel()
+			} else if curP.fasthttpServer != nil {
+				curP.fasthttpServer.Shutdown()
 			} else if curP.listener != nil {
 				curP.listener.Close()
 			}
@@ -361,6 +368,13 @@ func (m *proxyMux) swap(new *proxyMux, gw *Gateway) {
 					e.w.router = newP.router
 				}
 			}
+
+			if match.fasthttpServer != nil {
+				switch e := match.httpHandler.(type) {
+				case *handleWrapper:
+					e.router = newP.router
+				}
+			}
 		}
 	}
 
@@ -386,24 +400,33 @@ func (m *proxyMux) serve(gw *Gateway) {
 		if p.started {
 			continue
 		}
+
+		mainLog.Warning("Starting HTTP server on:", p.listener.Addr().String())
+		readTimeout := 120 * time.Second
+		writeTimeout := 120 * time.Second
+
+		if conf.HttpServerOptions.ReadTimeout > 0 {
+			readTimeout = time.Duration(conf.HttpServerOptions.ReadTimeout) * time.Second
+		}
+
+		if conf.HttpServerOptions.WriteTimeout > 0 {
+			writeTimeout = time.Duration(conf.HttpServerOptions.WriteTimeout) * time.Second
+		}
+
+		addr := conf.ListenAddress + ":" + strconv.Itoa(p.port)
+
+		var h http.Handler
+		h = &handleWrapper{p.router}
+
+		if p.protocol == "http" {
+			p.protocol = "fasthttp"
+		}
+
 		switch p.protocol {
 		case "tcp", "tls":
 			mainLog.Warning("Starting TCP server on:", p.listener.Addr().String())
 			go p.tcpProxy.Serve(p.getListener())
 		case "http", "https", "h2c":
-			mainLog.Warning("Starting HTTP server on:", p.listener.Addr().String())
-			readTimeout := 120 * time.Second
-			writeTimeout := 120 * time.Second
-
-			if conf.HttpServerOptions.ReadTimeout > 0 {
-				readTimeout = time.Duration(conf.HttpServerOptions.ReadTimeout) * time.Second
-			}
-
-			if conf.HttpServerOptions.WriteTimeout > 0 {
-				writeTimeout = time.Duration(conf.HttpServerOptions.WriteTimeout) * time.Second
-			}
-			var h http.Handler
-			h = &handleWrapper{p.router}
 			// by default enabling h2c by wrapping handler in h2c. This ensures all features including tracing work
 			// in h2c services.
 			h2s := &http2.Server{}
@@ -412,7 +435,6 @@ func (m *proxyMux) serve(gw *Gateway) {
 				h: h2c.NewHandler(h, h2s),
 			}
 
-			addr := conf.ListenAddress + ":" + strconv.Itoa(p.port)
 			p.httpServer = &http.Server{
 				Addr:         addr,
 				ReadTimeout:  readTimeout,
@@ -424,6 +446,20 @@ func (m *proxyMux) serve(gw *Gateway) {
 				p.httpServer.SetKeepAlivesEnabled(false)
 			}
 			go p.httpServer.Serve(p.listener)
+		case "fasthttp":
+			p.fasthttpServer = &fasthttp.Server{
+				ReadTimeout:  readTimeout,
+				WriteTimeout: writeTimeout,
+				Handler:      fasthttpadaptor.NewFastHTTPHandler(h),
+			}
+			p.httpHandler = h
+
+			go func() {
+				err := p.fasthttpServer.Serve(p.listener)
+				if err != nil {
+					panic(err)
+				}
+			}()
 		}
 		p.started = true
 	}
