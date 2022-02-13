@@ -68,5 +68,5 @@ rm -rf $TYK_GW_PATH/vendor
 
 rm /go/src/modules.txt
 
-GO111MODULE=off CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH  go build -buildmode=plugin -o $plugin_name \
+GO111MODULE=off CGO_ENABLE=1 GOOS=$GOOS GOARCH=$GOARCH  go build -buildmode=plugin -o $plugin_name \
     && mv $plugin_name $PLUGIN_SOURCE_PATH
