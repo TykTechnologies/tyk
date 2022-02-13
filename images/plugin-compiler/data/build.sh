@@ -7,6 +7,7 @@ plugin_id=$2
 # GOOS and GOARCH can be send to override the name of the plugin
 GOOS=$3
 GOARCH=$4
+CGOENABLED=0
 
   PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}$plugin_id"
 
@@ -33,6 +34,10 @@ fi
 # if arch and os present then update the name of file with those params
 if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
   plugin_name="${plugin_name%.*}_${CURRENTVERS}_${GOOS}_${GOARCH}.so"
+fi
+
+if [[ $GOOS != "linux" ]];then
+    CGOENABLED=1
 fi
 
 mkdir -p $PLUGIN_BUILD_PATH
@@ -68,5 +73,5 @@ rm -rf $TYK_GW_PATH/vendor
 
 rm /go/src/modules.txt
 
-GO111MODULE=off CGO_ENABLE=1 GOOS=$GOOS GOARCH=$GOARCH  go build -buildmode=plugin -o $plugin_name \
+GO111MODULE=off CGO_ENABLE=$CGO_ENABLE GOOS=$GOOS GOARCH=$GOARCH  go build -buildmode=plugin -o $plugin_name \
     && mv $plugin_name $PLUGIN_SOURCE_PATH
