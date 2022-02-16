@@ -65,9 +65,9 @@ dockers:
   use: buildx
   goarch: amd64
   goos: linux
-  dockerfile: Dockerfile.std
+  dockerfile: ci/Dockerfile.std
   extra_files:
-    - "install/"
+    - "ci/install/"
     - "README.md"
 
     - "LICENSE.md"
@@ -95,9 +95,9 @@ dockers:
   use: buildx
   goarch: arm64
   goos: linux
-  dockerfile: Dockerfile.std
+  dockerfile: ci/Dockerfile.std
   extra_files:
-    - "install/"
+    - "ci/install/"
     - "README.md"
 
     - "LICENSE.md"
@@ -124,9 +124,9 @@ dockers:
     - "--label=org.opencontainers.image.version={{.Version}}"
   goarch: amd64
   goos: linux
-  dockerfile: Dockerfile.slim
+  dockerfile: ci/Dockerfile.slim
   extra_files:
-    - "install/"
+    - "ci/install/"
     - "README.md"
 
     - "LICENSE.md"
@@ -152,9 +152,9 @@ dockers:
   use: buildx
   goarch: amd64
   goos: linux
-  dockerfile: images/hybrid/Dockerfile
+  dockerfile: ci/images/hybrid/Dockerfile
   extra_files:
-    - "images/hybrid/"
+    - "ci/images/hybrid/"
 
 # Build gateway hybrid container arm64
 - ids:
@@ -170,9 +170,9 @@ dockers:
   use: buildx
   goarch: arm64
   goos: linux
-  dockerfile: images/hybrid/Dockerfile
+  dockerfile: ci/images/hybrid/Dockerfile
   extra_files:
-    - "images/hybrid/"
+    - "ci/images/hybrid/"
 
 
 # Build plugin-compiler
@@ -190,9 +190,9 @@ dockers:
     - "--build-arg=GOLANG_CROSS={{ .Env.GOLANG_CROSS }}"
   goarch: amd64
   goos: linux
-  dockerfile: images/plugin-compiler/Dockerfile
+  dockerfile: ci/images/plugin-compiler/Dockerfile
   extra_files:
-    - images/plugin-compiler
+    - ci/images/plugin-compiler
     - go.mod
     - apidef
     - certs
@@ -254,11 +254,11 @@ nfpms:
     contents:
       - src: "README.md"
         dst: "/opt/share/docs/tyk-gateway/README.md"
-      - src: "install/*"
-        dst: "/opt/tyk-gateway/install"
-      - src: install/inits/systemd/system/tyk-gateway.service
+      - src: "ci/install/*"
+        dst: "/opt/tyk-gateway/ci/install"
+      - src: ci/install/inits/systemd/system/tyk-gateway.service
         dst: /lib/systemd/system/tyk-gateway.service
-      - src: install/inits/sysv/init.d/tyk-gateway
+      - src: ci/install/inits/sysv/init.d/tyk-gateway
         dst: /etc/init.d/tyk-gateway
 
       - src: /opt/tyk-gateway
@@ -284,9 +284,9 @@ nfpms:
         dst: /opt/tyk-gateway/tyk.conf
         type: "config|noreplace"
     scripts:
-      preinstall: "install/before_install.sh"
-      postinstall: "install/post_install.sh"
-      postremove: "install/post_remove.sh"
+      preinstall: "ci/install/before_install.sh"
+      postinstall: "ci/install/post_install.sh"
+      postremove: "ci/install/post_remove.sh"
     bindir: "/opt/tyk-gateway"
     overrides:
       rpm:
@@ -301,7 +301,7 @@ nfpms:
           arm: arm64
     rpm:
       scripts:
-        posttrans: install/post_trans.sh
+        posttrans: ci/install/post_trans.sh
       signature:
         key_file: tyk.io.signing.key
     deb:
@@ -328,7 +328,7 @@ archives:
     - std-arm64
   files:
     - README.md
-    - "install/*"
+    - "ci/install/*"
     - "LICENSE.md"
     - "apps/app_sample.json"
     - "templates/*.json"
