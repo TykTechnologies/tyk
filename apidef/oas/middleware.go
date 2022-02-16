@@ -182,6 +182,7 @@ func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillTransformRequestMethod(ep.MethodTransforms)
 	ps.fillCache(ep.AdvanceCacheConfig)
 	ps.fillEnforceTimeout(ep.HardTimeouts)
+	ps.fillTransformRequestHeaders(ep.TransformHeader)
 }
 
 func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
@@ -289,6 +290,24 @@ func (ps Paths) fillEnforceTimeout(metas []apidef.HardTimeoutMeta) {
 		plugins.EnforceTimeout.Fill(meta)
 		if ShouldOmit(plugins.EnforceTimeout) {
 			plugins.EnforceTimeout = nil
+		}
+	}
+}
+
+func (ps Paths) fillTransformRequestHeaders(metas []apidef.HeaderInjectionMeta) {
+	for _, meta := range metas {
+		if _, ok := ps[meta.Path]; !ok {
+			ps[meta.Path] = &Path{}
+		}
+
+		plugins := ps[meta.Path].getMethod(meta.Method)
+		if plugins.TransformRequestHeaders == nil {
+			plugins.TransformRequestHeaders = &TransformRequestHeaders{}
+		}
+
+		plugins.TransformRequestHeaders.Fill(meta)
+		if ShouldOmit(plugins.TransformRequestHeaders) {
+			plugins.TransformRequestHeaders = nil
 		}
 	}
 }
@@ -439,6 +458,8 @@ type Plugins struct {
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
 	Cache                  *CachePlugin            `bson:"cache,omitempty" json:"cache,omitempty"`
 	EnforceTimeout         *EnforceTimeout         `bson:"enforcedTimeout,omitempty" json:"enforcedTimeout,omitempty"`
+	// TransformRequestHeaders allows you to transform headers of a request
+	TransformRequestHeaders *TransformRequestHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
 }
 
 func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method string) {
@@ -449,6 +470,7 @@ func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method str
 	p.extractTransformRequestMethodTo(ep, path, method)
 	p.extractCacheTo(ep, path, method)
 	p.extractEnforcedTimeoutTo(ep, path, method)
+	p.extractTransformRequestHeadersTo(ep, path, method)
 }
 
 func (p *Plugins) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
@@ -514,6 +536,16 @@ func (p *Plugins) extractEnforcedTimeoutTo(ep *apidef.ExtendedPathsSet, path str
 	meta := apidef.HardTimeoutMeta{Path: path, Method: method}
 	p.EnforceTimeout.ExtractTo(&meta)
 	ep.HardTimeouts = append(ep.HardTimeouts, meta)
+}
+
+func (p *Plugins) extractTransformRequestHeadersTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.TransformRequestHeaders == nil {
+		return
+	}
+
+	meta := apidef.HeaderInjectionMeta{Path: path, Method: method}
+	p.TransformRequestHeaders.ExtractTo(&meta)
+	ep.TransformHeader = append(ep.TransformHeader, meta)
 }
 
 type Allowance struct {
@@ -627,4 +659,41 @@ func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	meta.Disabled = !et.Enabled
 	meta.TimeOut = et.Value
+}
+
+type TransformRequestHeaders struct {
+	Enabled bool     `bson:"enabled" json:"enabled"`
+	Remove  []string `bson:"remove" json:"remove"`
+	Add     []Header `bson:"add" json:"add"`
+}
+
+func (tr *TransformRequestHeaders) Fill(meta apidef.HeaderInjectionMeta) {
+	if ShouldOmit(meta) {
+		return
+	}
+	tr.Enabled = true
+	tr.Remove = meta.DeleteHeaders
+	headerNames := []string{}
+	for k := range meta.AddHeaders {
+		headerNames = append(headerNames, k)
+	}
+	sort.Strings(headerNames)
+	var headers []Header
+	for _, headerName := range headerNames {
+		headers = append(headers, Header{
+			Name:  headerName,
+			Value: meta.AddHeaders[headerName],
+		})
+	}
+
+	tr.Add = headers
+}
+
+func (tr *TransformRequestHeaders) ExtractTo(meta *apidef.HeaderInjectionMeta) {
+	meta.DeleteHeaders = tr.Remove
+	var addHeaders = make(map[string]string)
+	for _, addHeader := range tr.Add {
+		addHeaders[addHeader.Name] = addHeader.Value
+	}
+	meta.AddHeaders = addHeaders
 }
