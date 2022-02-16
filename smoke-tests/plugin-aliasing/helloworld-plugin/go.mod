@@ -1,4 +1,4 @@
-module github.com/TykTechnologies/tyk/integration/smoke-tests/plugin-compiler/helloworld-plugin
+module github.com/TykTechnologies/tyk/smoke-tests/plugin-compiler/helloworld-plugin
 
 go 1.15
 
