@@ -597,6 +597,7 @@ type UptimeTests struct {
 }
 
 type AuthConfig struct {
+	Name              string          `mapstructure:"name" bson:"name" json:"name"`
 	UseParam          bool            `mapstructure:"use_param" bson:"use_param" json:"use_param"`
 	ParamName         string          `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 	UseCookie         bool            `mapstructure:"use_cookie" bson:"use_cookie" json:"use_cookie"`
