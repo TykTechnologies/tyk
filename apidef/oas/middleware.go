@@ -183,6 +183,7 @@ func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillCache(ep.AdvanceCacheConfig)
 	ps.fillEnforceTimeout(ep.HardTimeouts)
 	ps.fillTransformRequestHeaders(ep.TransformHeader)
+	ps.fillTransformResponseHeaders(ep.TransformResponseHeader)
 }
 
 func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
@@ -302,12 +303,30 @@ func (ps Paths) fillTransformRequestHeaders(metas []apidef.HeaderInjectionMeta) 
 
 		plugins := ps[meta.Path].getMethod(meta.Method)
 		if plugins.TransformRequestHeaders == nil {
-			plugins.TransformRequestHeaders = &TransformRequestHeaders{}
+			plugins.TransformRequestHeaders = &TransformHeaders{}
 		}
 
 		plugins.TransformRequestHeaders.Fill(meta)
 		if ShouldOmit(plugins.TransformRequestHeaders) {
 			plugins.TransformRequestHeaders = nil
+		}
+	}
+}
+
+func (ps Paths) fillTransformResponseHeaders(metas []apidef.HeaderInjectionMeta) {
+	for _, meta := range metas {
+		if _, ok := ps[meta.Path]; !ok {
+			ps[meta.Path] = &Path{}
+		}
+
+		plugins := ps[meta.Path].getMethod(meta.Method)
+		if plugins.TransformResponseHeaders == nil {
+			plugins.TransformResponseHeaders = &TransformHeaders{}
+		}
+
+		plugins.TransformResponseHeaders.Fill(meta)
+		if ShouldOmit(plugins.TransformResponseHeaders) {
+			plugins.TransformResponseHeaders = nil
 		}
 	}
 }
@@ -459,7 +478,9 @@ type Plugins struct {
 	Cache                  *CachePlugin            `bson:"cache,omitempty" json:"cache,omitempty"`
 	EnforceTimeout         *EnforceTimeout         `bson:"enforcedTimeout,omitempty" json:"enforcedTimeout,omitempty"`
 	// TransformRequestHeaders allows you to transform headers of a request
-	TransformRequestHeaders *TransformRequestHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
+	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
+	// TransformResponseHeaders allows you to transform headers of a response
+	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
 }
 
 func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method string) {
@@ -471,6 +492,7 @@ func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method str
 	p.extractCacheTo(ep, path, method)
 	p.extractEnforcedTimeoutTo(ep, path, method)
 	p.extractTransformRequestHeadersTo(ep, path, method)
+	p.extractTransformResponseHeadersTo(ep, path, method)
 }
 
 func (p *Plugins) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
@@ -546,6 +568,16 @@ func (p *Plugins) extractTransformRequestHeadersTo(ep *apidef.ExtendedPathsSet, 
 	meta := apidef.HeaderInjectionMeta{Path: path, Method: method}
 	p.TransformRequestHeaders.ExtractTo(&meta)
 	ep.TransformHeader = append(ep.TransformHeader, meta)
+}
+
+func (p *Plugins) extractTransformResponseHeadersTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.TransformResponseHeaders == nil {
+		return
+	}
+
+	meta := apidef.HeaderInjectionMeta{Path: path, Method: method}
+	p.TransformResponseHeaders.ExtractTo(&meta)
+	ep.TransformResponseHeader = append(ep.TransformResponseHeader, meta)
 }
 
 type Allowance struct {
@@ -661,13 +693,13 @@ func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	meta.TimeOut = et.Value
 }
 
-type TransformRequestHeaders struct {
+type TransformHeaders struct {
 	Enabled bool     `bson:"enabled" json:"enabled"`
 	Remove  []string `bson:"remove" json:"remove"`
 	Add     []Header `bson:"add" json:"add"`
 }
 
-func (tr *TransformRequestHeaders) Fill(meta apidef.HeaderInjectionMeta) {
+func (tr *TransformHeaders) Fill(meta apidef.HeaderInjectionMeta) {
 	if ShouldOmit(meta) {
 		return
 	}
@@ -689,7 +721,7 @@ func (tr *TransformRequestHeaders) Fill(meta apidef.HeaderInjectionMeta) {
 	tr.Add = headers
 }
 
-func (tr *TransformRequestHeaders) ExtractTo(meta *apidef.HeaderInjectionMeta) {
+func (tr *TransformHeaders) ExtractTo(meta *apidef.HeaderInjectionMeta) {
 	meta.DeleteHeaders = tr.Remove
 	var addHeaders = make(map[string]string)
 	for _, addHeader := range tr.Add {
