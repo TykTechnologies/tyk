@@ -2,10 +2,11 @@ package ctx
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef"
-
+	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -81,7 +82,17 @@ func GetAuthToken(r *http.Request) string {
 
 func GetSession(r *http.Request) *user.SessionState {
 	if v := r.Context().Value(SessionData); v != nil {
-		return v.(*user.SessionState)
+		if val, ok := v.(*user.SessionState); ok {
+			return val
+		}else {
+			logger.Get().Warning("SessionState struct differ from the gateway version, trying to unmarshal.")
+			sess := user.SessionState{}
+			b, _ := json.Marshal(v)
+			e := json.Unmarshal(b, &sess)
+			if e == nil {
+				return &sess
+			}
+		}
 	}
 	return nil
 }
@@ -98,7 +109,17 @@ func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
 
 func GetDefinition(r *http.Request) *apidef.APIDefinition {
 	if v := r.Context().Value(Definition); v != nil {
-		return v.(*apidef.APIDefinition)
+		if val, ok := v.(*apidef.APIDefinition); ok {
+			return val
+		}else {
+			logger.Get().Warning("APIDefinition struct differ from the gateway version, trying to unmarshal.")
+			def := apidef.APIDefinition{}
+			b, _ := json.Marshal(v)
+			e := json.Unmarshal(b, &def)
+			if e == nil {
+				return &def
+			}
+		}
 	}
 	return nil
 }
