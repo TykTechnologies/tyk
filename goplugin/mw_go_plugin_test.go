@@ -1,6 +1,8 @@
 // +build goplugin
 
-package goplugin_test
+//go:generate go build -buildmode=plugin -o ../test/goplugins/goplugins.so ../test/goplugins/test_goplugin.go
+
+package goplugin
 
 import (
 	"net/http"
@@ -55,6 +57,11 @@ func TestGoPluginMWs(t *testing.T) {
 				},
 			},
 		}
+
+		configData := map[string]interface{}{
+			"my-context-data": "my-plugin-config",
+		}
+		spec.ConfigData = configData
 	})
 
 	time.Sleep(1 * time.Second)
@@ -83,6 +90,7 @@ func TestGoPluginMWs(t *testing.T) {
 					"X-Initial-URI":   "/goplugin/plugin_hit",
 					"X-Auth-Result":   "OK",
 					"X-Session-Alias": "abc-session",
+					"X-Plugin-Data":   "my-plugin-config",
 				},
 				BodyMatch: `"message":"post message"`,
 			},
