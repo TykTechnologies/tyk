@@ -46,11 +46,11 @@ jobs:
         golang_cross: [ 1.15, 1.15-el7 ]
         include:
           - golang_cross: 1.15-el7
-            goreleaser: '.goreleaser-el7.yml'
+            goreleaser: 'ci/goreleaser/goreleaser-el7.yml'
             rpmvers: 'el/7'
             debvers: 'ubuntu/xenial ubuntu/bionic debian/jessie'
           - golang_cross: 1.15
-            goreleaser: '.goreleaser.yml'
+            goreleaser: 'ci/goreleaser/goreleaser.yml'
             rpmvers: 'el/8'
             debvers: 'ubuntu/focal debian/buster debian/bullseye'
 
@@ -97,7 +97,7 @@ jobs:
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
-          bin/unlock-agent.sh
+          ci/bin/unlock-agent.sh
           current_tag=${GITHUB_REF##*/}
           echo "::set-output name=tag::${current_tag}"
 
@@ -186,7 +186,7 @@ jobs:
       - name: Get AWS creds from Terraform remote state
         id: aws-creds
         run: |
-          cd integration/terraform
+          cd ci/terraform
           terraform init -input=false
           terraform refresh 2>&1 >/dev/null
           eval $(terraform output -json tyk | jq -r 'to_entries[] | [.key,.value] | join("=")')
@@ -220,7 +220,7 @@ jobs:
         with:
           push: true
           context: "."
-          file: Dockerfile.std
+          file: ci/Dockerfile.std
           platforms: linux/amd64,linux/arm64
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/tyk:${{ needs.goreleaser.outputs.tag }}
@@ -294,9 +294,9 @@ jobs:
           RUN dpkg -i tyk-gateway.deb 
           RUN apt-get install -y jq
           RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
-          COPY integration/smoke-tests/api-functionality/api_test.sh /
-          COPY integration/smoke-tests/api-functionality/pkg_test.sh /
-          COPY integration/smoke-tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
+          COPY ci/tests/api-functionality/api_test.sh /
+          COPY ci/tests/api-functionality/pkg_test.sh /
+          COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
           CMD [ "/pkg_test.sh" ]
           ' > Dockerfile
 
@@ -345,9 +345,9 @@ jobs:
           RUN rpm -Uvh --force tyk-gateway.rpm 
           RUN curl -fSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 --output /usr/local/bin/jq && chmod a+x /usr/local/bin/jq
           RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
-          COPY integration/smoke-tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          COPY integration/smoke-tests/api-functionality/api_test.sh /
-          COPY integration/smoke-tests/api-functionality/pkg_test.sh /
+          COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
+          COPY ci/tests/api-functionality/api_test.sh /
+          COPY ci/tests/api-functionality/pkg_test.sh /
           CMD [ "/pkg_test.sh" ]
           ' > Dockerfile
 
@@ -380,10 +380,22 @@ jobs:
         run: |
           set -eaxo pipefail
           if [ ! -d integration/smoke-tests ]; then
-             echo "::warning No smoke tests defined"
+             echo "::warning No squad specific smoke tests defined"
+          fi
+          if [ ! -d ci/tests ]; then
+             echo "::warning No ci  tests defined"
              exit 0
           fi
           for d in integration/smoke-tests/*/
+          do
+              echo Attempting to test $d
+              if [ -d $d ] && [ -e $d/test.sh ]; then
+                  cd $d
+                  ./test.sh ${{ needs.goreleaser.outputs.tag }}
+                  cd -
+              fi
+          done
+          for d in ci/tests/*/
           do
               echo Attempting to test $d
               if [ -d $d ] && [ -e $d/test.sh ]; then
@@ -418,7 +430,7 @@ jobs:
           path: aws
 
       - name: Packer build
-        working-directory: ./aws
+        working-directory: ./ci/aws
         run: |
           export VERSION=${{ needs.goreleaser.outputs.tag }}
           packer validate -var-file=${{ matrix.flavour }}.vars.json byol.pkr.hcl

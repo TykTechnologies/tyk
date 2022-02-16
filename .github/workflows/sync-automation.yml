@@ -12,18 +12,9 @@ on:
     branches:
       - master
     paths:
-      - bin/unlock-agent.sh
-      - .goreleaser.yml
-      - Dockerfileg.std
-      - Dockerfile.slim
-      - aws/byol.pkr.hcl
       - .github/workflows/release.yml
       - .github/workflows/del-env.yml
-      - integration/terraform/outputs.tf
-      - install/before_install.sh
-      - install/post_install.sh
-      - install/post_remove.sh
-      - images/*
+      - ci/*
 
 jobs:
 
