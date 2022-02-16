@@ -170,7 +170,6 @@ dockers:
     - gateway
     - goplugin
     - headers
-    - integration
     - log
     - regexp
     - request
