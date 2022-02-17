@@ -183,7 +183,9 @@ func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillCache(ep.AdvanceCacheConfig)
 	ps.fillEnforceTimeout(ep.HardTimeouts)
 	ps.fillTransformRequestHeaders(ep.TransformHeader)
+	ps.fillTransformRequestBody(ep.Transform)
 	ps.fillTransformResponseHeaders(ep.TransformResponseHeader)
+	ps.fillTransformResponseBody(ep.TransformResponse)
 	ps.fillValidateRequestJSON(ep.ValidateJSON)
 }
 
@@ -314,6 +316,24 @@ func (ps Paths) fillTransformRequestHeaders(metas []apidef.HeaderInjectionMeta) 
 	}
 }
 
+func (ps Paths) fillTransformRequestBody(metas []apidef.TemplateMeta) {
+	for _, meta := range metas {
+		if _, ok := ps[meta.Path]; !ok {
+			ps[meta.Path] = &Path{}
+		}
+
+		plugins := ps[meta.Path].getMethod(meta.Method)
+		if plugins.TransformRequestBody == nil {
+			plugins.TransformRequestBody = &TransformBody{}
+		}
+
+		plugins.TransformRequestBody.Fill(meta)
+		if ShouldOmit(plugins.TransformRequestBody) {
+			plugins.TransformRequestBody = nil
+		}
+	}
+}
+
 func (ps Paths) fillTransformResponseHeaders(metas []apidef.HeaderInjectionMeta) {
 	for _, meta := range metas {
 		if _, ok := ps[meta.Path]; !ok {
@@ -328,6 +348,24 @@ func (ps Paths) fillTransformResponseHeaders(metas []apidef.HeaderInjectionMeta)
 		plugins.TransformResponseHeaders.Fill(meta)
 		if ShouldOmit(plugins.TransformResponseHeaders) {
 			plugins.TransformResponseHeaders = nil
+		}
+	}
+}
+
+func (ps Paths) fillTransformResponseBody(metas []apidef.TemplateMeta) {
+	for _, meta := range metas {
+		if _, ok := ps[meta.Path]; !ok {
+			ps[meta.Path] = &Path{}
+		}
+
+		plugins := ps[meta.Path].getMethod(meta.Method)
+		if plugins.TransformResponseBody == nil {
+			plugins.TransformResponseBody = &TransformBody{}
+		}
+
+		plugins.TransformResponseBody.Fill(meta)
+		if ShouldOmit(plugins.TransformResponseBody) {
+			plugins.TransformResponseBody = nil
 		}
 	}
 }
@@ -498,6 +536,10 @@ type Plugins struct {
 	EnforceTimeout         *EnforceTimeout         `bson:"enforcedTimeout,omitempty" json:"enforcedTimeout,omitempty"`
 	// TransformRequestHeaders allows you to transform headers of a request
 	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
+	// TransformRequestBody allows you to transform request body
+	TransformRequestBody *TransformBody `bson:"transformRequestBody,omitempty" json:"transformRequestBody,omitempty"`
+	// TransformResponseBody allows you to transform request body
+	TransformResponseBody *TransformBody `bson:"transformResponseBody,omitempty" json:"transformResponseBody,omitempty"`
 	// TransformResponseHeaders allows you to transform headers of a response
 	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
 	// ValidateRequestJSON allows you to validate request body JSON
@@ -513,7 +555,9 @@ func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method str
 	p.extractCacheTo(ep, path, method)
 	p.extractEnforcedTimeoutTo(ep, path, method)
 	p.extractTransformRequestHeadersTo(ep, path, method)
+	p.extractTransformRequestBodyTo(ep, path, method)
 	p.extractTransformResponseHeadersTo(ep, path, method)
+	p.extractTransformResponseBodyTo(ep, path, method)
 	p.extractValidateRequestJSONTo(ep, path, method)
 }
 
@@ -592,6 +636,16 @@ func (p *Plugins) extractTransformRequestHeadersTo(ep *apidef.ExtendedPathsSet, 
 	ep.TransformHeader = append(ep.TransformHeader, meta)
 }
 
+func (p *Plugins) extractTransformRequestBodyTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.TransformRequestBody == nil {
+		return
+	}
+
+	meta := apidef.TemplateMeta{Path: path, Method: method}
+	p.TransformRequestBody.ExtractTo(&meta)
+	ep.Transform = append(ep.Transform, meta)
+}
+
 func (p *Plugins) extractTransformResponseHeadersTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if p.TransformResponseHeaders == nil {
 		return
@@ -600,6 +654,16 @@ func (p *Plugins) extractTransformResponseHeadersTo(ep *apidef.ExtendedPathsSet,
 	meta := apidef.HeaderInjectionMeta{Path: path, Method: method}
 	p.TransformResponseHeaders.ExtractTo(&meta)
 	ep.TransformResponseHeader = append(ep.TransformResponseHeader, meta)
+}
+
+func (p *Plugins) extractTransformResponseBodyTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.TransformResponseBody == nil {
+		return
+	}
+
+	meta := apidef.TemplateMeta{Path: path, Method: method}
+	p.TransformResponseBody.ExtractTo(&meta)
+	ep.TransformResponse = append(ep.TransformResponse, meta)
 }
 
 func (p *Plugins) extractValidateRequestJSONTo(ep *apidef.ExtendedPathsSet, path string, method string) {
@@ -780,4 +844,36 @@ func (tr *ValidateRequestJSON) Fill(meta apidef.ValidatePathMeta) {
 func (tr *ValidateRequestJSON) ExtractTo(meta *apidef.ValidatePathMeta) {
 	meta.Schema = tr.Schema
 	meta.ErrorResponseCode = tr.ErrorResponseCode
+}
+
+type TransformBody struct {
+	Enabled bool                    `bson:"enabled" json:"enabled"`
+	Format  apidef.RequestInputType `bson:"format" json:"format"`
+	Path    string                  `bson:"path" json:"path"`
+	Body    string                  `bson:"body" json:"body"`
+}
+
+func (tr *TransformBody) Fill(meta apidef.TemplateMeta) {
+	if ShouldOmit(meta) {
+		return
+	}
+	tr.Enabled = true
+	tr.Format = meta.TemplateData.Input
+	if meta.TemplateData.Mode == apidef.UseBlob {
+		tr.Body = meta.TemplateData.TemplateSource
+	} else {
+		tr.Path = meta.TemplateData.TemplateSource
+	}
+}
+
+func (tr *TransformBody) ExtractTo(meta *apidef.TemplateMeta) {
+	meta.TemplateData.Input = tr.Format
+	meta.TemplateData.EnableSession = true
+	if tr.Body != "" {
+		meta.TemplateData.Mode = apidef.UseBlob
+		meta.TemplateData.TemplateSource = tr.Body
+	} else {
+		meta.TemplateData.Mode = apidef.UseFile
+		meta.TemplateData.TemplateSource = tr.Path
+	}
 }

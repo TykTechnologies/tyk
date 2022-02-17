@@ -136,6 +136,8 @@ func Fill(t *testing.T, input interface{}, index int) {
 	case reflect.Struct:
 		if v.Type() == reflect.TypeOf(apidef.VersionData{}) {
 			v.Set(reflect.ValueOf(FillTestVersionData(t, index)))
+		} else if v.Type() == reflect.TypeOf(TransformBody{}) {
+			v.Set(reflect.ValueOf(FillTransformBody(t)))
 		} else {
 			for i := 0; i < v.NumField(); i++ {
 				fv := v.Field(i)
@@ -187,6 +189,14 @@ func FillTestVersionData(t *testing.T, index int) apidef.VersionData {
 			"v1":      {},
 			"v2":      {},
 		},
+	}
+}
+
+func FillTransformBody(t *testing.T) TransformBody {
+	return TransformBody{
+		Body:    "body",
+		Enabled: true,
+		Format:  "json",
 	}
 }
 
