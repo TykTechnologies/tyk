@@ -1,9 +1,9 @@
 #!/bin/bash
 set -xe
-
 plugin_name=$1
 plugin_id=$2
 
+PLUGIN_SOURCE_PATH=${PLUGIN_SOURCE_PATH:-/plugin-source}
 PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}$plugin_id"
 
 function usage() {
@@ -21,7 +21,6 @@ if [ -z "$plugin_name" ]; then
 fi
 
 mkdir -p $PLUGIN_BUILD_PATH
-# Plugin's vendor folder, has precendence over the cached vendor'd dependencies from tyk
 yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
 
 cd $PLUGIN_BUILD_PATH
@@ -37,7 +36,6 @@ rm -rf $PLUGIN_BUILD_PATH/vendor/github.com/TykTechnologies/tyk
 # Copy plugin vendored pkgs to GOPATH
 yes | cp -rf $PLUGIN_BUILD_PATH/vendor/* $GOPATH/src || true \
         && rm -rf $PLUGIN_BUILD_PATH/vendor
-
 
 # Ensure that GW package versions have priorities
 
