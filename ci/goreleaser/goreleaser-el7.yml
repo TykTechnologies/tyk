@@ -66,7 +66,7 @@ nfpms:
       - src: "README.md"
         dst: "/opt/share/docs/tyk-gateway/README.md"
       - src: "ci/install/*"
-        dst: "/opt/tyk-gateway/ci/install"
+        dst: "/opt/tyk-gateway/install"
       - src: ci/install/inits/systemd/system/tyk-gateway.service
         dst: /lib/systemd/system/tyk-gateway.service
       - src: ci/install/inits/sysv/init.d/tyk-gateway
