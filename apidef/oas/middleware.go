@@ -184,6 +184,7 @@ func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillEnforceTimeout(ep.HardTimeouts)
 	ps.fillTransformRequestHeaders(ep.TransformHeader)
 	ps.fillTransformResponseHeaders(ep.TransformResponseHeader)
+	ps.fillValidateRequestJSON(ep.ValidateJSON)
 }
 
 func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
@@ -327,6 +328,24 @@ func (ps Paths) fillTransformResponseHeaders(metas []apidef.HeaderInjectionMeta)
 		plugins.TransformResponseHeaders.Fill(meta)
 		if ShouldOmit(plugins.TransformResponseHeaders) {
 			plugins.TransformResponseHeaders = nil
+		}
+	}
+}
+
+func (ps Paths) fillValidateRequestJSON(metas []apidef.ValidatePathMeta) {
+	for _, meta := range metas {
+		if _, ok := ps[meta.Path]; !ok {
+			ps[meta.Path] = &Path{}
+		}
+
+		plugins := ps[meta.Path].getMethod(meta.Method)
+		if plugins.ValidateRequestJSON == nil {
+			plugins.ValidateRequestJSON = &ValidateRequestJSON{}
+		}
+
+		plugins.ValidateRequestJSON.Fill(meta)
+		if ShouldOmit(plugins.ValidateRequestJSON) {
+			plugins.ValidateRequestJSON = nil
 		}
 	}
 }
@@ -481,6 +500,8 @@ type Plugins struct {
 	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
 	// TransformResponseHeaders allows you to transform headers of a response
 	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
+	// ValidateRequestJSON allows you to validate request body JSON
+	ValidateRequestJSON *ValidateRequestJSON `bson:"validateRequestJSON,omitempty" json:"validateRequestJSON,omitempty"`
 }
 
 func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method string) {
@@ -493,6 +514,7 @@ func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method str
 	p.extractEnforcedTimeoutTo(ep, path, method)
 	p.extractTransformRequestHeadersTo(ep, path, method)
 	p.extractTransformResponseHeadersTo(ep, path, method)
+	p.extractValidateRequestJSONTo(ep, path, method)
 }
 
 func (p *Plugins) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
@@ -578,6 +600,16 @@ func (p *Plugins) extractTransformResponseHeadersTo(ep *apidef.ExtendedPathsSet,
 	meta := apidef.HeaderInjectionMeta{Path: path, Method: method}
 	p.TransformResponseHeaders.ExtractTo(&meta)
 	ep.TransformResponseHeader = append(ep.TransformResponseHeader, meta)
+}
+
+func (p *Plugins) extractValidateRequestJSONTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if p.ValidateRequestJSON == nil {
+		return
+	}
+
+	meta := apidef.ValidatePathMeta{Path: path, Method: method}
+	p.ValidateRequestJSON.ExtractTo(&meta)
+	ep.ValidateJSON = append(ep.ValidateJSON, meta)
 }
 
 type Allowance struct {
@@ -728,4 +760,24 @@ func (tr *TransformHeaders) ExtractTo(meta *apidef.HeaderInjectionMeta) {
 		addHeaders[addHeader.Name] = addHeader.Value
 	}
 	meta.AddHeaders = addHeaders
+}
+
+type ValidateRequestJSON struct {
+	Enabled           bool                   `bson:"enabled" json:"enabled"`
+	ErrorResponseCode int                    `bson:"errorResponseCode" json:"errorResponseCode"`
+	Schema            map[string]interface{} `bson:"schema" json:"schema"`
+}
+
+func (tr *ValidateRequestJSON) Fill(meta apidef.ValidatePathMeta) {
+	if ShouldOmit(meta) {
+		return
+	}
+	tr.Enabled = true
+	tr.ErrorResponseCode = meta.ErrorResponseCode
+	tr.Schema = meta.Schema
+}
+
+func (tr *ValidateRequestJSON) ExtractTo(meta *apidef.ValidatePathMeta) {
+	meta.Schema = tr.Schema
+	meta.ErrorResponseCode = tr.ErrorResponseCode
 }
