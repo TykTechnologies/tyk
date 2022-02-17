@@ -62,6 +62,36 @@ func oldTestAPI() APIDefinition {
 				},
 			},
 		},
+		AuthConfigs: map[string]AuthConfig{
+			"authToken": {
+				AuthHeaderName: "Authorization",
+				UseParam:       true,
+				ParamName:      "Authorization",
+				UseCookie:      true,
+				CookieName:     "Authorization",
+			},
+			"jwt": {
+				AuthHeaderName: "Authorization",
+				UseParam:       true,
+				ParamName:      "Authorization",
+				UseCookie:      true,
+				CookieName:     "Authorization",
+			},
+			"oidc": {
+				AuthHeaderName: "Authorization",
+				UseParam:       true,
+				ParamName:      "Authorization",
+				UseCookie:      true,
+				CookieName:     "Authorization",
+			},
+			"hmac": {
+				AuthHeaderName: "Authorization",
+				UseParam:       true,
+				ParamName:      "Authorization",
+				UseCookie:      true,
+				CookieName:     "Authorization",
+			},
+		},
 	}
 }
 
@@ -464,4 +494,13 @@ func TestAPIDefinition_MigrateCachePlugin(t *testing.T) {
 
 	assert.Empty(t, old.VersionData.Versions[""].ExtendedPaths.Cached)
 	assert.Equal(t, expectedAdvCacheMethods, old.VersionData.Versions[""].ExtendedPaths.AdvanceCacheConfig)
+}
+
+func TestAPIDefinition_MigrateAuthConfigNames(t *testing.T) {
+	base := oldTestAPI()
+	_, err := base.Migrate()
+	assert.NoError(t, err)
+	for k, v := range base.AuthConfigs {
+		assert.Equal(t, k, v.Name)
+	}
 }
