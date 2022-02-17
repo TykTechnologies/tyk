@@ -379,14 +379,14 @@ jobs:
         shell: bash
         run: |
           set -eaxo pipefail
-          if [ ! -d integration/smoke-tests ]; then
-             echo "::warning No squad specific smoke tests defined"
+          if [ ! -d smoke-tests ]; then
+             echo "::warning No repo specific smoke tests defined"
           fi
           if [ ! -d ci/tests ]; then
-             echo "::warning No ci  tests defined"
+             echo "::warning No ci tests defined"
              exit 0
           fi
-          for d in integration/smoke-tests/*/
+          for d in ci/tests/*/
           do
               echo Attempting to test $d
               if [ -d $d ] && [ -e $d/test.sh ]; then
@@ -395,7 +395,7 @@ jobs:
                   cd -
               fi
           done
-          for d in ci/tests/*/
+          for d in smoke-tests/*/
           do
               echo Attempting to test $d
               if [ -d $d ] && [ -e $d/test.sh ]; then
