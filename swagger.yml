@@ -679,6 +679,12 @@ paths:
         required: true
         schema:
           type: string
+      - description: Use the hash of the key as input instead of the full key
+        name: hashed
+        in: query
+        required: false
+        schema:
+          type: boolean
     get:
       summary: Get a Key
       description: Get session info about the specified key. Should return up to date rate limit and quota usage numbers.
