@@ -214,6 +214,12 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 
 	a.MigrateEndpointMeta()
 	a.MigrateCachePlugin()
+
+	for k, v := range a.AuthConfigs {
+		v.Name = k
+		a.AuthConfigs[k] = v
+	}
+
 	for i := 0; i < len(versions); i++ {
 		versions[i].MigrateEndpointMeta()
 		a.MigrateCachePlugin()
