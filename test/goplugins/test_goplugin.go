@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/TykTechnologies/tyk/analytics"
+	"github.com/TykTechnologies/tyk/log"
 	"io/ioutil"
 	"net/http"
 
@@ -144,9 +147,24 @@ func MyPluginPerPathResp(rw http.ResponseWriter, r *http.Request) {
 	rw.Write(jsonData)
 }
 
-func MyAnalyticsMaskPlugin(record *analytics.Record) {
+var logger = log.Get()
 
-	fmt.Println(record)
+func MyAnalyticsMaskPlugin(record *analytics.Record) {
+	str, _ := base64.StdEncoding.DecodeString(record.RawResponse)
+
+	fmt.Println(string(str))
+	var b = &bytes.Buffer{}
+	b.Write(str)
+
+	r := bufio.NewReader(b)
+	var resp *http.Response
+	resp, _ = http.ReadResponse(r, nil)
+
+	resp.Header.Del("Server")
+	var bNew bytes.Buffer
+	resp.Write(&bNew)
+	record.RawResponse = base64.StdEncoding.EncodeToString(bNew.Bytes())
+
 }
 
 func main() {}

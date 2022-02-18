@@ -486,18 +486,18 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		chainDef.ThisHandler = chain
 	}
 
-	if spec.APIDefinition.AnalyticsPlugin.Enabled {
+	//if spec.APIDefinition.AnalyticsPlugin.Enabled {
 
-		ap := &GoAnalyticsPlugin{
-			Path:     spec.AnalyticsPlugin.PluginPath,
-			FuncName: spec.AnalyticsPlugin.FuncName,
-		}
+	ap := &GoAnalyticsPlugin{
+		Path:     "/Users/home/go/src/github.com/TykTechnologies/tyk/test/goplugins/goplugins.so", //spec.AnalyticsPlugin.PluginPath,
+		FuncName: "MyAnalyticsMaskPlugin",                                                         //spec.AnalyticsPlugin.FuncName,
+	}
 
-		ap.loadAnalyticsPlugin()
+	if ap.loadAnalyticsPlugin() {
 		spec.AnalyticsPluginConfig = ap
 		logger.Debug("Loaded analytics plugin")
-
 	}
+	//}
 
 	logger.WithFields(logrus.Fields{
 		"prefix":      "gateway",
