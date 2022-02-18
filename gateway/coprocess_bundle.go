@@ -315,10 +315,17 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) er
 
 func getBundleDestPath(spec *APISpec) string {
 	tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
-	bundleNameHash := md5.New()
-	io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
-	bundlePath := fmt.Sprintf("%s_%x", spec.APIID, bundleNameHash.Sum(nil))
+	bundlePath, _ := getHashedBundleName(spec.CustomMiddlewareBundle)
 	return filepath.Join(tykBundlePath, bundlePath)
+}
+
+func getHashedBundleName(bundleName string) (string, error) {
+	bundleNameHash := md5.New()
+	_, err := io.WriteString(bundleNameHash, bundleName)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", bundleNameHash.Sum(nil)), nil
 }
 
 // loadBundle wraps the load and save steps, it will return if an error occurs at any point.

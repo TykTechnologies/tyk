@@ -64,7 +64,7 @@ func TestBundleLoader(t *testing.T) {
 
 		bundleNameHash := md5.New()
 		io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
-		bundleDir := fmt.Sprintf("%s_%x", spec.APIID, bundleNameHash.Sum(nil))
+		bundleDir := fmt.Sprintf("%x", bundleNameHash.Sum(nil))
 		savedBundlePath := filepath.Join(testBundlesPath, bundleDir)
 		if _, err = os.Stat(savedBundlePath); os.IsNotExist(err) {
 			t.Fatalf("Bundle wasn't saved to disk: %s", err.Error())
