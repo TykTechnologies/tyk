@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"fmt"
+	"github.com/TykTechnologies/tyk/analytics"
 	"math/rand"
 	"net"
 	"strings"
@@ -9,88 +10,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	maxminddb "github.com/oschwald/maxminddb-golang"
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/oschwald/maxminddb-golang"
+	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 )
-
-type NetworkStats struct {
-	OpenConnections  int64
-	ClosedConnection int64
-	BytesIn          int64
-	BytesOut         int64
-}
-
-func (n *NetworkStats) Flush() NetworkStats {
-	s := NetworkStats{
-		OpenConnections:  atomic.LoadInt64(&n.OpenConnections),
-		ClosedConnection: atomic.LoadInt64(&n.ClosedConnection),
-		BytesIn:          atomic.LoadInt64(&n.BytesIn),
-		BytesOut:         atomic.LoadInt64(&n.BytesOut),
-	}
-	atomic.StoreInt64(&n.OpenConnections, 0)
-	atomic.StoreInt64(&n.ClosedConnection, 0)
-	atomic.StoreInt64(&n.BytesIn, 0)
-	atomic.StoreInt64(&n.BytesOut, 0)
-	return s
-}
-
-type Latency struct {
-	Total    int64
-	Upstream int64
-}
-
-// AnalyticsRecord encodes the details of a request
-type AnalyticsRecord struct {
-	Method        string
-	Host          string
-	Path          string // HTTP path, can be overriden by "track path" plugin
-	RawPath       string // Original HTTP path
-	ContentLength int64
-	UserAgent     string
-	Day           int
-	Month         time.Month
-	Year          int
-	Hour          int
-	ResponseCode  int
-	APIKey        string
-	TimeStamp     time.Time
-	APIVersion    string
-	APIName       string
-	APIID         string
-	OrgID         string
-	OauthID       string
-	RequestTime   int64
-	Latency       Latency
-	RawRequest    string // Base64 encoded request data (if detailed recording turned on)
-	RawResponse   string // ^ same but for response
-	IPAddress     string
-	Geo           GeoData
-	Network       NetworkStats
-	Tags          []string
-	Alias         string
-	TrackPath     bool
-	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
-}
-
-type GeoData struct {
-	Country struct {
-		ISOCode string `maxminddb:"iso_code"`
-	} `maxminddb:"country"`
-
-	City struct {
-		Names map[string]string `maxminddb:"names"`
-	} `maxminddb:"city"`
-
-	Location struct {
-		Latitude  float64 `maxminddb:"latitude"`
-		Longitude float64 `maxminddb:"longitude"`
-		TimeZone  string  `maxminddb:"time_zone"`
-	} `maxminddb:"location"`
-}
 
 const analyticsKeyName = "tyk-system-analytics"
 
@@ -98,45 +24,6 @@ const (
 	recordsBufferFlushInterval       = 200 * time.Millisecond
 	recordsBufferForcedFlushInterval = 1 * time.Second
 )
-
-func (a *AnalyticsRecord) GetGeo(ipStr string, gw *Gateway) {
-	// Not great, tightly coupled
-	if gw.analytics.GeoIPDB == nil {
-		return
-	}
-
-	record, err := geoIPLookup(ipStr, gw)
-	if err != nil {
-		log.Error("GeoIP Failure (not recorded): ", err)
-		return
-	}
-	if record == nil {
-		return
-	}
-
-	log.Debug("ISO Code: ", record.Country.ISOCode)
-	log.Debug("City: ", record.City.Names["en"])
-	log.Debug("Lat: ", record.Location.Latitude)
-	log.Debug("Lon: ", record.Location.Longitude)
-	log.Debug("TZ: ", record.Location.TimeZone)
-
-	a.Geo = *record
-}
-
-func geoIPLookup(ipStr string, gw *Gateway) (*GeoData, error) {
-	if ipStr == "" {
-		return nil, nil
-	}
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid IP address %q", ipStr)
-	}
-	record := new(GeoData)
-	if err := gw.analytics.GeoIPDB.Lookup(ip, record); err != nil {
-		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %v", ipStr, err)
-	}
-	return record, nil
-}
 
 func (gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
@@ -152,37 +39,13 @@ func (gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns
 	return
 }
 
-func (a *AnalyticsRecord) NormalisePath(globalConfig *config.Config) {
-	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
-		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
-	}
-	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
-		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
-	}
-	for _, r := range globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
-		a.Path = r.ReplaceAllString(a.Path, "{var}")
-	}
-}
-
-func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
-	expiry := time.Duration(expiresInSeconds) * time.Second
-	if expiresInSeconds == 0 {
-		// Expiry is set to 100 years
-		expiry = (24 * time.Hour) * (365 * 100)
-	}
-
-	t := time.Now()
-	t2 := t.Add(expiry)
-	a.ExpireAt = t2
-}
-
 // RedisAnalyticsHandler will record analytics data to a redis back end
 // as defined in the Config object
 type RedisAnalyticsHandler struct {
 	Store                       storage.AnalyticsHandler
 	GeoIPDB                     *maxminddb.Reader
 	globalConf                  config.Config
-	recordsChan                 chan *AnalyticsRecord
+	recordsChan                 chan *analytics.Record
 	workerBufferSize            uint64
 	shouldStop                  uint32
 	poolWg                      sync.WaitGroup
@@ -209,7 +72,7 @@ func (r *RedisAnalyticsHandler) Init() {
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
 	r.enableMultipleAnalyticsKeys = r.Gw.GetConfig().AnalyticsConfig.EnableMultipleAnalyticsKeys
-	r.recordsChan = make(chan *AnalyticsRecord, recordsBufferSize)
+	r.recordsChan = make(chan *analytics.Record, recordsBufferSize)
 
 	// start worker pool
 	atomic.SwapUint32(&r.shouldStop, 0)
@@ -232,8 +95,8 @@ func (r *RedisAnalyticsHandler) Stop() {
 	r.poolWg.Wait()
 }
 
-// RecordHit will store an AnalyticsRecord in Redis
-func (r *RedisAnalyticsHandler) RecordHit(record *AnalyticsRecord) error {
+// RecordHit will store an analytics.Record in Redis
+func (r *RedisAnalyticsHandler) RecordHit(record *analytics.Record) error {
 	// check if we should stop sending records 1st
 	if atomic.LoadUint32(&r.shouldStop) > 0 {
 		return nil
@@ -335,4 +198,43 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 func DurationToMillisecond(d time.Duration) float64 {
 	return float64(d) / 1e6
+}
+
+func GetGeo(a *analytics.Record, ipStr string, gw *Gateway) {
+	// Not great, tightly coupled
+	if gw.Analytics.GeoIPDB == nil {
+		return
+	}
+
+	record, err := geoIPLookup(ipStr, gw)
+	if err != nil {
+		log.Error("GeoIP Failure (not recorded): ", err)
+		return
+	}
+	if record == nil {
+		return
+	}
+
+	log.Debug("ISO Code: ", record.Country.ISOCode)
+	log.Debug("City: ", record.City.Names["en"])
+	log.Debug("Lat: ", record.Location.Latitude)
+	log.Debug("Lon: ", record.Location.Longitude)
+	log.Debug("TZ: ", record.Location.TimeZone)
+
+	a.Geo = *record
+}
+
+func geoIPLookup(ipStr string, gw *Gateway) (*analytics.GeoData, error) {
+	if ipStr == "" {
+		return nil, nil
+	}
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid IP address %q", ipStr)
+	}
+	record := new(analytics.GeoData)
+	if err := gw.Analytics.GeoIPDB.Lookup(ip, record); err != nil {
+		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %v", ipStr, err)
+	}
+	return record, nil
 }

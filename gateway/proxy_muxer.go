@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/TykTechnologies/tyk/analytics"
 	"net"
 	"net/http"
 	"net/url"
@@ -229,7 +230,7 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 				if spec.DoNotTrack {
 					continue
 				}
-				record := AnalyticsRecord{
+				record := analytics.Record{
 					Network:      spec.network.Flush(),
 					Day:          t.Day(),
 					Month:        t.Month(),
@@ -242,7 +243,7 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 					OrgID:        spec.OrgID,
 				}
 				record.SetExpiry(spec.ExpireAnalyticsAfter)
-				gw.analytics.RecordHit(&record)
+				gw.Analytics.RecordHit(&record)
 			}
 			gw.apisMu.RUnlock()
 		}

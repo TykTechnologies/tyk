@@ -95,7 +95,7 @@ type Gateway struct {
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
 
-	analytics            RedisAnalyticsHandler
+	Analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
 	MainNotifier         RedisNotifier
 	DefaultOrgStore      DefaultSessionManager
@@ -200,7 +200,7 @@ func NewGateway(config config.Config, ctx context.Context, cancelFn context.Canc
 		cancelFn: cancelFn,
 	}
 
-	gw.analytics = RedisAnalyticsHandler{Gw: &gw}
+	gw.Analytics = RedisAnalyticsHandler{Gw: &gw}
 	gw.SetConfig(config)
 	sessionManager := DefaultSessionManager{Gw: &gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
@@ -334,15 +334,15 @@ func (gw *Gateway) setupGlobals() {
 		mainLog.WithError(err).Error("Could not set version in versionStore")
 	}
 
-	if gwConfig.EnableAnalytics && gw.analytics.Store == nil {
+	if gwConfig.EnableAnalytics && gw.Analytics.Store == nil {
 		Conf := gwConfig
 		Conf.LoadIgnoredIPs()
 		gw.SetConfig(Conf)
 		mainLog.Debug("Setting up analytics DB connection")
 
 		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
-		gw.analytics.Store = &analyticsStore
-		gw.analytics.Init()
+		gw.Analytics.Store = &analyticsStore
+		gw.Analytics.Init()
 
 		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
 		redisPurger := RedisPurger{Store: &store, Gw: gw}
@@ -1537,8 +1537,8 @@ func Start() {
 		mainLog.Error("Closing listeners: ", err)
 	}
 	// stop analytics workers
-	if gwConfig.EnableAnalytics && gw.analytics.Store == nil {
-		gw.analytics.Stop()
+	if gwConfig.EnableAnalytics && gw.Analytics.Store == nil {
+		gw.Analytics.Stop()
 	}
 
 	// write pprof profiles

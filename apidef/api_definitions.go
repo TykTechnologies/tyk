@@ -593,6 +593,13 @@ type APIDefinition struct {
 	StripAuthData              bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 	EnableDetailedRecording    bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 	GraphQL                    GraphQLConfig          `bson:"graphql" json:"graphql"`
+	AnalyticsPlugin            AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin"`
+}
+
+type AnalyticsPluginConfig struct {
+	Enabled    bool   `bson:"enable" json:"enable"`
+	PluginPath string `bson:"plugin_path" json:"plugin_path"`
+	FuncName   string `bson:"func_name" json:"func_name"`
 }
 
 type UptimeTests struct {

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/analytics"
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/headers"
@@ -274,7 +275,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			host = e.Spec.target.Host
 		}
 
-		record := AnalyticsRecord{
+		record := analytics.Record{
 			r.Method,
 			host,
 			trackedPath,
@@ -294,12 +295,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			e.Spec.OrgID,
 			oauthClientID,
 			0,
-			Latency{},
+			analytics.Latency{},
 			rawRequest,
 			rawResponse,
 			ip,
-			GeoData{},
-			NetworkStats{},
+			analytics.GeoData{},
+			analytics.NetworkStats{},
 			tags,
 			alias,
 			trackEP,
@@ -307,7 +308,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip, e.Gw)
+			GetGeo(&record, ip, e.Gw)
 		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
@@ -324,7 +325,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath(&e.Spec.GlobalConfig)
 		}
-		err := e.Gw.analytics.RecordHit(&record)
+
+		if e.Spec.AnalyticsPlugin.Enabled {
+			e.Spec.AnalyticsPluginConfig.processRecord(&record)
+		}
+
+		err := e.Gw.Analytics.RecordHit(&record)
 		if err != nil {
 			log.WithError(err).Error("could not store analytic record")
 		}

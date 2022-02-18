@@ -486,6 +486,19 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		chainDef.ThisHandler = chain
 	}
 
+	if spec.APIDefinition.AnalyticsPlugin.Enabled {
+
+		ap := &GoAnalyticsPlugin{
+			Path:     spec.AnalyticsPlugin.PluginPath,
+			FuncName: spec.AnalyticsPlugin.FuncName,
+		}
+
+		ap.loadAnalyticsPlugin()
+		spec.AnalyticsPluginConfig = ap
+		logger.Debug("Loaded analytics plugin")
+
+	}
+
 	logger.WithFields(logrus.Fields{
 		"prefix":      "gateway",
 		"user_ip":     "--",
