@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/analytics"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
@@ -114,7 +115,7 @@ func getSessionTags(session *user.SessionState) []string {
 	return tags
 }
 
-func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, responseCopy *http.Response) {
+func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response) {
 
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
@@ -193,7 +194,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			host = s.Spec.target.Host
 		}
 
-		record := AnalyticsRecord{
+		record := analytics.Record{
 			r.Method,
 			host,
 			trackedPath,
@@ -217,8 +218,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			rawRequest,
 			rawResponse,
 			ip,
-			GeoData{},
-			NetworkStats{},
+			analytics.GeoData{},
+			analytics.NetworkStats{},
 			tags,
 			alias,
 			trackEP,
@@ -226,7 +227,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 		}
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip, s.Gw)
+			GetGeo(&record, ip, s.Gw)
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
@@ -244,7 +245,14 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			record.NormalisePath(&s.Spec.GlobalConfig)
 		}
 
-		err := s.Gw.analytics.RecordHit(&record)
+		if s.Spec.AnalyticsPlugin.Enabled {
+
+			//send to plugin
+			s.Spec.AnalyticsPluginConfig.processRecord(&record)
+
+		}
+
+		err := s.Gw.Analytics.RecordHit(&record)
 		if err != nil {
 			log.WithError(err).Error("could not store analytic record")
 		}
@@ -312,7 +320,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
-		latency := Latency{
+		latency := analytics.Latency{
 			Total:    int64(millisec),
 			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
 		}
@@ -339,7 +347,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {
-		latency := Latency{
+		latency := analytics.Latency{
 			Total:    int64(millisec),
 			Upstream: int64(DurationToMillisecond(inRes.UpstreamLatency)),
 		}

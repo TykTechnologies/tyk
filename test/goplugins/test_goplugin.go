@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"github.com/TykTechnologies/tyk/analytics"
 	"io/ioutil"
 	"net/http"
 
@@ -140,6 +142,11 @@ func MyPluginPerPathResp(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
 	rw.Write(jsonData)
+}
+
+func MyAnalyticsMaskPlugin(record *analytics.Record) {
+
+	fmt.Println(record)
 }
 
 func main() {}
