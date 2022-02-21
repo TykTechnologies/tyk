@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	// Example of package with different version in go.mod
-	"gopkg.in/Masterminds/sprig.v2"
+	"github.com/Masterminds/sprig/v3"
 
 	// Example of package which is not part of Gateway
 	"github.com/kr/pretty"

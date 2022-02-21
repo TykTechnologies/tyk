@@ -23,7 +23,7 @@ import (
 	"github.com/cenk/backoff"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 
-	"gopkg.in/Masterminds/sprig.v2"
+	"github.com/Masterminds/sprig/v3"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/gorilla/mux"
