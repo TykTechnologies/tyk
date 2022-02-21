@@ -4,19 +4,24 @@ FROM golang:1.12-stretch
 LABEL description="Image for plugin development"
 
 ARG TYK_GW_TAG
+
 ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
+
+ENV GO111MODULE=on
+
 # This directory will contain the plugin source and will be
 # mounted from the host box by the user using docker volumes
 ENV PLUGIN_SOURCE_PATH=/plugin-source
-# This is the temporary path where the plugin will be built
-ENV PLUGIN_BUILD_PATH=/go/src/plugin-build
 
-RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH $PLUGIN_BUILD_PATH
+# Upgrade certificates
+RUN apt-get update && apt-get install ca-certificates libgnutls30 -y
+
+RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH
+
 COPY images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
-RUN curl -sL "https://api.github.com/repos/TykTechnologies/tyk/tarball/${TYK_GW_TAG}" | \
-    tar -C $TYK_GW_PATH --strip-components=1 -xzf - 
+COPY . $TYK_GW_PATH
 
 ENTRYPOINT ["/build.sh"]
 
