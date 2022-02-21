@@ -132,7 +132,7 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 			}
 		}
 
-		bundleHash, err := c.Middleware.Gw.getHashedBundleName(spec.CustomMiddlewareBundle)
+		bundleHash, err := getHashedBundleName(spec.CustomMiddlewareBundle)
 		if err != nil {
 			return nil, err
 		}
