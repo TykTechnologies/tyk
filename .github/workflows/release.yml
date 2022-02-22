@@ -289,7 +289,7 @@ jobs:
           COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
           RUN apt-get update && apt-get install -y curl
 
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.4
+          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.9
           RUN dpkg -i /tyk-gateway.deb' > Dockerfile
 
       - name: install on ${{ matrix.distro }}

@@ -278,8 +278,6 @@ nfpms:
         dst: "/opt/tyk-gateway/apps"
       - src: "templates/*.json"
         dst: "/opt/tyk-gateway/templates"
-      - src: "templates/playground/*"
-        dst: "/opt/tyk-gateway/templates/playground"
       - src: "middleware/*.js"
         dst: "/opt/tyk-gateway/middleware"
       - src: "event_handlers/sample/*.js"
@@ -305,8 +303,6 @@ nfpms:
         replacements:
           arm: arm64
     rpm:
-      scripts:
-        posttrans: install/post_trans.sh
       signature:
         key_file: tyk.io.signing.key
     deb:
@@ -329,8 +325,6 @@ archives:
     - "LICENSE.md"
     - "apps/app_sample.json"
     - "templates/*.json"
-    - "templates/playground/index.html"
-    - "templates/playground/playground.js"
     - "middleware/*.js"
     - "event_handlers/sample/*.js"
     - "policies/*.json"
