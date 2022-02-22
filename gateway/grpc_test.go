@@ -797,7 +797,6 @@ func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 	//globalConf.HttpServerOptions.UseSSL = true
 
-
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
 
