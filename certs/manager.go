@@ -335,7 +335,6 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
-	var err error
 
 	for _, id := range certIDs {
 		if cert, found := c.cache.Get(id); found {
@@ -345,8 +344,8 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 			continue
 		}
 
-		var val string
-		val, err = c.storage.GetKey("raw-" + id)
+		val, err := c.storage.GetKey("raw-" + id)
+		// fallback to file
 		if err != nil {
 			// Try read from file
 			rawCert, err = ioutil.ReadFile(id)
@@ -390,7 +389,7 @@ func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 
 		if isSHA256(id) {
 			var val string
-			val, err = c.storage.GetKey("raw-" + id)
+			val, err := c.storage.GetKey("raw-" + id)
 			if err != nil {
 				c.logger.Warn("Can't retrieve public key from Redis:", id, err)
 				out = append(out, "")
