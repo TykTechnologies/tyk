@@ -790,11 +790,13 @@ func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 
 	// Tyk
 	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
 	globalConf.ProxySSLInsecureSkipVerify = true
 	globalConf.ProxyEnableHttp2 = true
 	globalConf.HttpServerOptions.EnableHttp2 = true
 	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	globalConf.HttpServerOptions.UseSSL = true
+	//globalConf.HttpServerOptions.UseSSL = true
+
 
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
