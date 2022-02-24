@@ -6,8 +6,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-const ExtensionTykAPIGateway = "x-tyk-api-gateway"
-
 type XTykAPIGateway struct {
 	// Info contains the main metadata about the API definition.
 	Info Info `bson:"info" json:"info"` // required
