@@ -87,6 +87,8 @@ const (
 	ExpirationTimeFormat = "2006-01-02 15:04"
 
 	Self = "self"
+
+	AuthTokenType = "authToken"
 )
 
 type ObjectId bson.ObjectId
