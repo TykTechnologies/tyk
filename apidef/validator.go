@@ -2,6 +2,7 @@ package apidef
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -51,6 +52,7 @@ type ValidationRuleSet []ValidationRule
 
 var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleUniqueDataSourceNames{},
+	&RuleAtLeastEnableOneAuthSource{},
 }
 
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
@@ -90,4 +92,37 @@ func (r *RuleUniqueDataSourceNames) Validate(apiDef *APIDefinition, validationRe
 
 		usedNames[trimmedName] = true
 	}
+}
+
+var ErrAllAuthSourcesDisabled = "all auth sources are disabled for %s, at least one of header/cookie/query must be enabled"
+
+type RuleAtLeastEnableOneAuthSource struct{}
+
+func (r *RuleAtLeastEnableOneAuthSource) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	for k, authConfig := range apiDef.AuthConfigs {
+		if shouldValidateAuthSource(k, apiDef) && !(authConfig.UseParam || authConfig.UseCookie || !authConfig.DisableHeader) {
+			validationResult.IsValid = false
+			validationResult.AppendError(fmt.Errorf(ErrAllAuthSourcesDisabled, k))
+		}
+	}
+
+}
+
+func shouldValidateAuthSource(authType string, apiDef *APIDefinition) bool {
+	switch authType {
+	case "authToken":
+		return apiDef.UseStandardAuth
+	case "jwt":
+		return apiDef.EnableJWT
+	case "hmac":
+		return apiDef.EnableSignatureChecking
+	case "oauth":
+		return apiDef.UseOauth2
+	case "oidc":
+		return apiDef.UseOpenID
+	case "coprocess":
+		return apiDef.EnableCoProcessAuth
+	}
+
+	return false
 }
