@@ -789,33 +789,69 @@ const (
 	inMemNetworkType = "memu"
 )
 
-func handleInMemoryLoop(handler http.Handler, r *http.Request) (resp *http.Response, err error) {
-	// use separate provider for each request
-	provider := memconn.Provider{}
+var (
+	memconnProvidersMtx sync.Mutex
+	// TODO: Find a proper way to clean that cache
+	memconnProvidersCache = make(map[string]*memconn.Provider)
+)
 
+func createMemconnProviderIfNeeded(handler http.Handler, r *http.Request) error {
+	memconnProvidersMtx.Lock()
+	defer memconnProvidersMtx.Unlock()
+	_, ok := memconnProvidersCache[r.Host]
+	if ok {
+		return nil
+	}
+	// use separate provider for each request
+	provider := &memconn.Provider{}
 	// start in mem listener
 	lis, err := provider.Listen(inMemNetworkType, inMemNetworkName)
+	if err != nil {
+		memconnProvidersMtx.Unlock()
+		return err
+	}
 	// on lis.Close http.Serve will return with error and stop goroutine
-	defer func() { _ = lis.Close() }()
+	//defer func() { _ = lis.Close() }()
 
 	// start http server with in mem listener
 	// Note: do not try to use http.Server it is working only with mux
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
+
+	// TODO: We have to stop that goroutine when the provider is removed from the cache.
 	go func() { _ = http.Serve(lis, mux) }()
 
-	r.URL.Scheme = "http"
+	memconnProvidersCache[r.Host] = provider
 
-	// create http client with in mem transport
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				return provider.DialContext(ctx, inMemNetworkType, inMemNetworkName)
-			},
+	return nil
+}
+
+var globalInMemClient = &http.Client{
+	Transport: &http.Transport{
+		DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			memconnProvidersMtx.Lock()
+			provider, ok := memconnProvidersCache[host]
+			memconnProvidersMtx.Unlock()
+			if !ok {
+				return nil, fmt.Errorf("no provider found for: %s", addr)
+			}
+			return provider.DialContext(ctx, inMemNetworkType, inMemNetworkName)
 		},
+	},
+}
+
+func handleInMemoryLoop(handler http.Handler, r *http.Request) (resp *http.Response, err error) {
+	err = createMemconnProviderIfNeeded(handler, r)
+	if err != nil {
+		return nil, err
 	}
 
-	return client.Do(r)
+	r.URL.Scheme = "http"
+	return globalInMemClient.Do(r)
 }
 
 func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, latency time.Duration, err error) {
