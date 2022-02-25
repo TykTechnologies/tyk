@@ -44,7 +44,8 @@ type Authentication struct {
 	GoPlugin *GoPlugin `bson:"goPlugin,omitempty" json:"goPlugin,omitempty"`
 	// CustomPlugin contains the configurations related to CustomPlugin authentication mode.
 	// Old API Definition: `auth_configs["coprocess"]`
-	CustomPlugin *CustomPlugin `bson:"customPlugin,omitempty" json:"customPlugin,omitempty"`
+	CustomPlugin    *CustomPlugin          `bson:"customPlugin,omitempty" json:"customPlugin,omitempty"`
+	SecuritySchemes map[string]interface{} `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
 }
 
 func (a *Authentication) Fill(api apidef.APIDefinition) {
@@ -243,27 +244,34 @@ func (t *Token) ExtractTo(api *apidef.APIDefinition) {
 type AuthSources struct {
 	// Header contains configurations of the header auth source, it is enabled by default.
 	// Old API Definition:
-	Header HeaderAuthSource `bson:"header" json:"header"` // required
+	Header *AuthSource `bson:"header,omitempty" json:"header,omitempty"`
 	// Cookie contains configurations of the cookie auth source.
 	// Old API Definition: `api_id`
 	Cookie *AuthSource `bson:"cookie,omitempty" json:"cookie,omitempty"`
 	// Param contains configurations of the param auth source.
 	// Old API Definition: `api_id`
-	Param *AuthSource `bson:"param,omitempty" json:"param,omitempty"`
+	Query *AuthSource `bson:"query,omitempty" json:"query,omitempty"`
 }
 
 func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
 	// Header
-	as.Header = HeaderAuthSource{authConfig.AuthHeaderName}
-
-	// Param
-	if as.Param == nil {
-		as.Param = &AuthSource{}
+	if as.Header == nil {
+		as.Header = &AuthSource{}
 	}
 
-	as.Param.Fill(authConfig.UseParam, authConfig.ParamName)
-	if ShouldOmit(as.Param) {
-		as.Param = nil
+	as.Header.Fill(!authConfig.DisableHeader, authConfig.AuthHeaderName)
+	if ShouldOmit(as.Header) {
+		as.Header = nil
+	}
+
+	// Query
+	if as.Query == nil {
+		as.Query = &AuthSource{}
+	}
+
+	as.Query.Fill(authConfig.UseParam, authConfig.ParamName)
+	if ShouldOmit(as.Query) {
+		as.Query = nil
 	}
 
 	// Cookie
@@ -279,11 +287,17 @@ func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
 
 func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
 	// Header
-	authConfig.AuthHeaderName = as.Header.Name
+	if as.Header != nil {
+		var enabled bool
+		as.Header.ExtractTo(&enabled, &authConfig.AuthHeaderName)
+		authConfig.DisableHeader = !enabled
+	} else {
+		authConfig.DisableHeader = true
+	}
 
-	// Param
-	if as.Param != nil {
-		as.Param.ExtractTo(&authConfig.UseParam, &authConfig.ParamName)
+	// Query
+	if as.Query != nil {
+		as.Query.ExtractTo(&authConfig.UseParam, &authConfig.ParamName)
 	}
 
 	// Cookie
@@ -318,13 +332,14 @@ func (as *AuthSource) ExtractTo(enabled *bool, name *string) {
 }
 
 type Signature struct {
-	Enabled          bool   `bson:"enabled" json:"enabled"` // required
-	Algorithm        string `bson:"algorithm,omitempty" json:"algorithm,omitempty"`
-	Header           string `bson:"header,omitempty" json:"header,omitempty"`
-	Secret           string `bson:"secret,omitempty" json:"secret,omitempty"`
-	AllowedClockSkew int64  `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
-	ErrorCode        int    `bson:"errorCode,omitempty" json:"errorCode,omitempty"`
-	ErrorMessage     string `bson:"errorMessage,omitempty" json:"errorMessage,omitempty"`
+	Enabled          bool       `bson:"enabled" json:"enabled"` // required
+	Algorithm        string     `bson:"algorithm,omitempty" json:"algorithm,omitempty"`
+	Header           string     `bson:"header,omitempty" json:"header,omitempty"`
+	Query            AuthSource `bson:"query,omitempty" json:"query,omitempty"`
+	Secret           string     `bson:"secret,omitempty" json:"secret,omitempty"`
+	AllowedClockSkew int64      `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
+	ErrorCode        int        `bson:"errorCode,omitempty" json:"errorCode,omitempty"`
+	ErrorMessage     string     `bson:"errorMessage,omitempty" json:"errorMessage,omitempty"`
 }
 
 func (s *Signature) Fill(authConfig apidef.AuthConfig) {
@@ -333,6 +348,7 @@ func (s *Signature) Fill(authConfig apidef.AuthConfig) {
 	s.Enabled = authConfig.ValidateSignature
 	s.Algorithm = signature.Algorithm
 	s.Header = signature.Header
+	s.Query.Fill(signature.UseParam, signature.ParamName)
 	s.Secret = signature.Secret
 	s.AllowedClockSkew = signature.AllowedClockSkew
 	s.ErrorCode = signature.ErrorCode
@@ -344,6 +360,7 @@ func (s *Signature) ExtractTo(authConfig *apidef.AuthConfig) {
 
 	authConfig.Signature.Algorithm = s.Algorithm
 	authConfig.Signature.Header = s.Header
+	s.Query.ExtractTo(&authConfig.Signature.UseParam, &authConfig.Signature.ParamName)
 	authConfig.Signature.Secret = s.Secret
 	authConfig.Signature.AllowedClockSkew = s.AllowedClockSkew
 	authConfig.Signature.ErrorCode = s.ErrorCode

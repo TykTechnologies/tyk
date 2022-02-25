@@ -87,6 +87,8 @@ const (
 	ExpirationTimeFormat = "2006-01-02 15:04"
 
 	Self = "self"
+
+	AuthTokenType = "authToken"
 )
 
 type ObjectId bson.ObjectId
@@ -602,6 +604,7 @@ type AuthConfig struct {
 	ParamName         string          `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 	UseCookie         bool            `mapstructure:"use_cookie" bson:"use_cookie" json:"use_cookie"`
 	CookieName        string          `mapstructure:"cookie_name" bson:"cookie_name" json:"cookie_name"`
+	DisableHeader     bool            `mapstructure:"disable_header" bson:"disable_header" json:"disable_header"`
 	AuthHeaderName    string          `mapstructure:"auth_header_name" bson:"auth_header_name" json:"auth_header_name"`
 	UseCertificate    bool            `mapstructure:"use_certificate" bson:"use_certificate" json:"use_certificate"`
 	ValidateSignature bool            `mapstructure:"validate_signature" bson:"validate_signature" json:"validate_signature"`

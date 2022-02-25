@@ -530,7 +530,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			ChildNodes: []plan.TypeField{
 				{
 					TypeName:   "WithChildren",
-					FieldNames: []string{"id", "name"},
+					FieldNames: []string{"id", "name", "__typename"},
 				},
 			},
 			Factory: &restDataSource.Factory{
@@ -553,7 +553,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			ChildNodes: []plan.TypeField{
 				{
 					TypeName:   "Nested",
-					FieldNames: []string{"id", "name"},
+					FieldNames: []string{"id", "name", "__typename"},
 				},
 			},
 			Factory: &restDataSource.Factory{
@@ -576,11 +576,11 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			ChildNodes: []plan.TypeField{
 				{
 					TypeName:   "MultiRoot1",
-					FieldNames: []string{"id"},
+					FieldNames: []string{"id", "__typename"},
 				},
 				{
 					TypeName:   "MultiRoot2",
-					FieldNames: []string{"name"},
+					FieldNames: []string{"name", "__typename"},
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
@@ -674,11 +674,11 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			ChildNodes: []plan.TypeField{
 				{
 					TypeName:   "WithChildren",
-					FieldNames: []string{"id", "name"},
+					FieldNames: []string{"id", "name", "__typename"},
 				},
 				{
 					TypeName:   "IDType",
-					FieldNames: []string{"id"},
+					FieldNames: []string{"id", "__typename"},
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
@@ -711,7 +711,8 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 
 	actualDataSources, err := adapter.engineConfigV2DataSources()
 	assert.NoError(t, err)
-	assert.ElementsMatch(t, expectedDataSources, actualDataSources)
+	require.Equal(t, expectedDataSources, actualDataSources)
+	//assert.ElementsMatch(t, expectedDataSources, actualDataSources)
 }
 
 const graphqlEngineV1ConfigJson = `{

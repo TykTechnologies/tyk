@@ -1886,7 +1886,7 @@ func TestOAS(t *testing.T) {
 		},
 	}
 
-	oasAPI := openapi3.Swagger{
+	oasAPI := openapi3.T{
 		Info: &openapi3.Info{
 			Title: "oas doc",
 		},
@@ -2063,7 +2063,7 @@ func testUpdateAPI(t *testing.T, g *Test, api interface{}, apiID string, oasType
 	g.Gw.DoReload()
 }
 
-func testGetOASAPI(t *testing.T, d *Test, id, name, title string) (oasDoc openapi3.Swagger) {
+func testGetOASAPI(t *testing.T, d *Test, id, name, title string) (oasDoc openapi3.T) {
 
 	getPathWithOASParam := "/tyk/apis/" + id + "?type=oas"
 	bodyMatch := fmt.Sprintf(`{.*"info":{"title":"%s".*"x-tyk-api-gateway":{"info":{.*"name":"%s"`, title, name)
