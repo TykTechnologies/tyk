@@ -20,10 +20,9 @@ import (
 )
 
 const (
-	defaultTemplateName   = "error"
-	defaultTemplateFormat = "json"
-	defaultContentType    = headers.ApplicationJSON
-
+	defaultTemplateName    = "error"
+	defaultTemplateFormat  = "json"
+	defaultContentType     = headers.ApplicationJSON
 	MsgAuthFieldMissing    = "Authorization field missing"
 	MsgApiAccessDisallowed = "Access to this API has been disallowed"
 	MsgBearerMailformed    = "Bearer token malformed"

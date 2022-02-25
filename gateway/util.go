@@ -1,5 +1,10 @@
 package gateway
 
+import (
+	"errors"
+	"os"
+)
+
 // appendIfMissing appends the given new item to the given slice.
 func appendIfMissing(slice []string, newSlice ...string) []string {
 	for _, new := range newSlice {
@@ -86,4 +91,11 @@ func greaterThanInt(first, second int) bool {
 	}
 
 	return first > second
+}
+
+func FileExist(filepath string) bool {
+	if _, err := os.Stat(filepath); errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	return true
 }
