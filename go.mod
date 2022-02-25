@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/Jeffail/gabs v1.4.0
 	github.com/Jeffail/tunny v0.0.0-20171107125207-452a8e97d6a3
+	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed
 	github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible
 	github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1
@@ -48,8 +49,6 @@ require (
 	github.com/hashicorp/memberlist v0.1.6 // indirect
 	github.com/hashicorp/serf v0.8.6 // indirect
 	github.com/hashicorp/vault/api v1.0.5-0.20200717191844-f687267c8086
-	github.com/huandu/xstrings v1.3.0 // indirect
-	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jensneuse/abstractlogger v0.0.4
 	github.com/jensneuse/graphql-go-tools v1.20.2
 	github.com/jensneuse/graphql-go-tools/examples/federation v0.0.0-20210804084050-3c2e37945919 // indirect
@@ -98,7 +97,7 @@ require (
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/grpc v1.29.1
-	gopkg.in/Masterminds/sprig.v2 v2.21.0
+	gopkg.in/Masterminds/sprig.v2 v2.22.0 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect; indi    rect

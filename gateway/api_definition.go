@@ -18,22 +18,20 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/cenk/backoff"
-
+	"github.com/Masterminds/sprig/v3"
 	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/TykTechnologies/gojsonschema"
-	"github.com/gorilla/mux"
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
-	"github.com/sirupsen/logrus"
-	"gopkg.in/Masterminds/sprig.v2"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/cenk/backoff"
+	"github.com/gorilla/mux"
+	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/sirupsen/logrus"
 )
 
 //const used by cache middleware
