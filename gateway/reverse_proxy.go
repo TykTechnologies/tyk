@@ -346,6 +346,11 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		},
 		Gw: gw,
 	}
+
+	// We cache memconn.Provider instances and the listeners to prevent a memory leak.
+	// This goroutine deletes unused instances and closes underlying net.Listener.
+	go cleanIdleMemConnProviders()
+
 	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy, Gw: gw}
 	return proxy
 }
@@ -785,59 +790,112 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 const (
-	inMemNetworkName = "in-mem-network"
-	inMemNetworkType = "memu"
+	checkIdleMemConnInterval = 5 * time.Minute
+	maxIdleMemConnDuration   = -time.Minute
+	inMemNetworkName         = "in-mem-network"
+	inMemNetworkType         = "memu"
 )
 
-var (
-	memconnProvidersMtx sync.Mutex
-	// TODO: Find a proper way to clean that cache
-	memconnProvidersCache = make(map[string]*memconn.Provider)
-)
+type memConnProvider struct {
+	listener net.Listener
+	provider *memconn.Provider
+	lastUsed int64
+}
 
-func createMemconnProviderIfNeeded(handler http.Handler, r *http.Request) error {
-	memconnProvidersMtx.Lock()
-	defer memconnProvidersMtx.Unlock()
-	_, ok := memconnProvidersCache[r.Host]
+var memConnProviders = &struct {
+	mtx sync.Mutex
+	m   map[string]*memConnProvider
+}{
+	m: make(map[string]*memConnProvider),
+}
+
+// cleanIdleMemConnProvidersEagerly deletes unused memconn.Provider instances and closes
+// its listener.
+func cleanIdleMemConnProvidersEagerly(maxIdleDuration time.Duration) {
+	memConnProviders.mtx.Lock()
+	defer memConnProviders.mtx.Unlock()
+
+	for host, mp := range memConnProviders.m {
+		if time.Now().Add(maxIdleDuration).Unix() > mp.lastUsed {
+			delete(memConnProviders.m, host)
+			// on listener.Close http.Serve will return with error and stop goroutine
+			_ = mp.listener.Close()
+		}
+	}
+}
+
+func cleanIdleMemConnProviders() {
+	timer := time.NewTimer(checkIdleMemConnInterval)
+	defer timer.Stop()
+
+	for {
+		timer.Reset(checkIdleMemConnInterval)
+		select {
+		case <-timer.C:
+			cleanIdleMemConnProvidersEagerly(maxIdleMemConnDuration)
+		}
+	}
+}
+
+// getMemConnProvider return the cached memconn.Provider, if it's available in the cache.
+func getMemConnProvider(addr string) (*memconn.Provider, error) {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	memConnProviders.mtx.Lock()
+	defer memConnProviders.mtx.Unlock()
+
+	p, ok := memConnProviders.m[host]
+	if !ok {
+		return nil, fmt.Errorf("no provider found for: %s", addr)
+	}
+	return p.provider, nil
+}
+
+// createMemConnProviderIfNeeded creates a new memconn.Provider and net.Listener
+// for the given host.
+func createMemConnProviderIfNeeded(handler http.Handler, r *http.Request) error {
+	memConnProviders.mtx.Lock()
+	defer memConnProviders.mtx.Unlock()
+
+	p, ok := memConnProviders.m[r.Host]
 	if ok {
+		// we will clean the providers and close its listener, if it is idle for
+		// some time.
+		p.lastUsed = time.Now().Unix()
 		return nil
 	}
-	// use separate provider for each request
+
 	provider := &memconn.Provider{}
 	// start in mem listener
 	lis, err := provider.Listen(inMemNetworkType, inMemNetworkName)
 	if err != nil {
-		memconnProvidersMtx.Unlock()
 		return err
 	}
-	// on lis.Close http.Serve will return with error and stop goroutine
-	//defer func() { _ = lis.Close() }()
 
 	// start http server with in mem listener
 	// Note: do not try to use http.Server it is working only with mux
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
 
-	// TODO: We have to stop that goroutine when the provider is removed from the cache.
 	go func() { _ = http.Serve(lis, mux) }()
 
-	memconnProvidersCache[r.Host] = provider
-
+	memConnProviders.m[r.Host] = &memConnProvider{
+		listener: lis,
+		provider: provider,
+		lastUsed: time.Now().Unix(),
+	}
 	return nil
 }
 
-var globalInMemClient = &http.Client{
+var memConnClient = &http.Client{
 	Transport: &http.Transport{
 		DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
-			host, _, err := net.SplitHostPort(addr)
+			provider, err := getMemConnProvider(addr)
 			if err != nil {
 				return nil, err
-			}
-			memconnProvidersMtx.Lock()
-			provider, ok := memconnProvidersCache[host]
-			memconnProvidersMtx.Unlock()
-			if !ok {
-				return nil, fmt.Errorf("no provider found for: %s", addr)
 			}
 			return provider.DialContext(ctx, inMemNetworkType, inMemNetworkName)
 		},
@@ -845,13 +903,13 @@ var globalInMemClient = &http.Client{
 }
 
 func handleInMemoryLoop(handler http.Handler, r *http.Request) (resp *http.Response, err error) {
-	err = createMemconnProviderIfNeeded(handler, r)
+	err = createMemConnProviderIfNeeded(handler, r)
 	if err != nil {
 		return nil, err
 	}
 
 	r.URL.Scheme = "http"
-	return globalInMemClient.Do(r)
+	return memConnClient.Do(r)
 }
 
 func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, latency time.Duration, err error) {
