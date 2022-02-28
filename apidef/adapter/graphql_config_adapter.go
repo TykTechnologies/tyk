@@ -10,6 +10,7 @@ import (
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
+	kafkaDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -243,6 +244,22 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				graphqlConfig.Method,
 				graphqlConfig.Headers,
 			))
+		case apidef.GraphQLEngineDataSourceKindKafka:
+			var kafkaConfig apidef.GraphQLEngineDataSourceConfigKafka
+			err = json.Unmarshal(ds.Config, &kafkaConfig)
+			if err != nil {
+				return nil, err
+			}
+
+			planDataSource.Factory = &kafkaDataSource.Factory{}
+			planDataSource.Custom = kafkaDataSource.ConfigJson(kafkaDataSource.Configuration{
+				Subscription: kafkaDataSource.SubscriptionConfiguration{
+					BrokerAddr: kafkaConfig.BrokerAddr,
+					Topic:      kafkaConfig.Topic,
+					GroupID:    kafkaConfig.GroupID,
+					ClientID:   kafkaConfig.ClientID,
+				},
+			})
 		}
 
 		planDataSources = append(planDataSources, planDataSource)
