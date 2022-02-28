@@ -980,7 +980,7 @@ func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
 	<-time.After(2 * time.Second)
 	// Remove memconn.Provider structs from the cache, if they are idle for
 	// 1 second.
-	cleanIdleMemConnProvidersEagerly(-time.Second)
+	cleanIdleMemConnProviders(time.Second, time.Second)
 
 	memConnProviders.mtx.Lock()
 	require.NotContains(t, memConnProviders.m, tykSubgraphAccounts.Name)

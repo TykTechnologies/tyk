@@ -346,11 +346,6 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		},
 		Gw: gw,
 	}
-
-	// We cache memconn.Provider instances and the listeners to prevent a memory leak.
-	// This goroutine deletes unused instances and closes underlying net.Listener.
-	go cleanIdleMemConnProviders()
-
 	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy, Gw: gw}
 	return proxy
 }
@@ -791,7 +786,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 const (
 	checkIdleMemConnInterval = 5 * time.Minute
-	maxIdleMemConnDuration   = -time.Minute
+	maxIdleMemConnDuration   = time.Minute
 	inMemNetworkName         = "in-mem-network"
 	inMemNetworkType         = "memu"
 )
@@ -803,38 +798,27 @@ type memConnProvider struct {
 }
 
 var memConnProviders = &struct {
-	mtx sync.Mutex
-	m   map[string]*memConnProvider
+	mtx           sync.Mutex
+	m             map[string]*memConnProvider
+	lastIdleCheck int64
 }{
 	m: make(map[string]*memConnProvider),
 }
 
-// cleanIdleMemConnProvidersEagerly deletes unused memconn.Provider instances and closes
+// cleanIdleMemConnProviders deletes unused memconn.Provider instances and closes
 // its listener.
-func cleanIdleMemConnProvidersEagerly(maxIdleDuration time.Duration) {
-	memConnProviders.mtx.Lock()
-	defer memConnProviders.mtx.Unlock()
-
+func cleanIdleMemConnProviders(maxIdleDuration, idleCheckInterval time.Duration) {
+	if memConnProviders.lastIdleCheck > time.Now().Add(-idleCheckInterval).Unix() {
+		return
+	}
 	for host, mp := range memConnProviders.m {
-		if time.Now().Add(maxIdleDuration).Unix() > mp.lastUsed {
+		if time.Now().Add(-maxIdleDuration).Unix() > mp.lastUsed {
 			delete(memConnProviders.m, host)
 			// on listener.Close http.Serve will return with error and stop goroutine
 			_ = mp.listener.Close()
 		}
 	}
-}
-
-func cleanIdleMemConnProviders() {
-	timer := time.NewTimer(checkIdleMemConnInterval)
-	defer timer.Stop()
-
-	for {
-		timer.Reset(checkIdleMemConnInterval)
-		select {
-		case <-timer.C:
-			cleanIdleMemConnProvidersEagerly(maxIdleMemConnDuration)
-		}
-	}
+	memConnProviders.lastIdleCheck = time.Now().Unix()
 }
 
 // getMemConnProvider return the cached memconn.Provider, if it's available in the cache.
@@ -851,6 +835,8 @@ func getMemConnProvider(addr string) (*memconn.Provider, error) {
 	if !ok {
 		return nil, fmt.Errorf("no provider found for: %s", addr)
 	}
+
+	cleanIdleMemConnProviders(maxIdleMemConnDuration, checkIdleMemConnInterval)
 	return p.provider, nil
 }
 
