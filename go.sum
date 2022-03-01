@@ -44,6 +44,8 @@ github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465 h1:A2gBjoX
 github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465/go.mod h1:sqH/SPFr11m9cahie7ulBuBX9TOhfBX1sp+qf9jh3Vg=
 github.com/TykTechnologies/openid2go v0.0.0-20200312160651-00c254a52b19 h1:mgi8xtMR6Pxj/5Rncalb67ArL8TCJbHSQmMfJg9lE4s=
 github.com/TykTechnologies/openid2go v0.0.0-20200312160651-00c254a52b19/go.mod h1:rGlqNE4CvxZIeiHp0mgrw+/jdGSjJzkZ0n78hhHMdfM=
+github.com/TykTechnologies/tyk/certs v0.0.0-20220301163050-705385d3d65d h1:TmbCK5kbiLxKFeu3pnNdjPytiAo8JuQ3Qsa1zagJD5I=
+github.com/TykTechnologies/tyk/certs v0.0.0-20220301163050-705385d3d65d/go.mod h1:Xq3wD9z699ZujmiGvndoOPi3ElE46pmiiHrHSUjpqb0=
 github.com/agnivade/levenshtein v1.0.1/go.mod h1:CURSv5d9Uaml+FovSIICkLbAUZ9S4RqaHDIsdSBg7lM=
 github.com/agnivade/levenshtein v1.0.3/go.mod h1:4SFRZbbXWLF4MU1T9Qg0pGgH3Pjs+t6ie5efyrwRJXs=
 github.com/agnivade/levenshtein v1.1.0/go.mod h1:veldBMzWxcCG2ZvUTKD2kJNRdCk5hVbJomOvKkmgYbo=
