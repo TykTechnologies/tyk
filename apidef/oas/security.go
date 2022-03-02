@@ -38,15 +38,15 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 		token.Signature = nil
 	}
 
-	if ShouldOmit(token) {
-		token = nil
-	}
-
 	s.getTykSecuritySchemes()[authConfig.Name] = token
+
+	if ShouldOmit(token) {
+		delete(s.getTykSecuritySchemes(), authConfig.Name)
+	}
 }
 
 func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
-	var authConfig apidef.AuthConfig
+	authConfig := apidef.AuthConfig{DisableHeader: true}
 
 	if token := s.getTykTokenAuth(name); token != nil {
 		api.UseStandardAuth = token.Enabled
@@ -122,15 +122,15 @@ func (s *OAS) fillSecurityScheme(ac *apidef.AuthConfig) {
 	var loc, name string
 
 	switch {
-	case ref.Value.In == header || (ref.Value.In == "" && !ac.DisableHeader):
+	case ref.Value.In == header || (ref.Value.In == "" && ac.AuthHeaderName != ""):
 		loc = header
 		name = ac.AuthHeaderName
 		ac.AuthHeaderName = ""
-	case ref.Value.In == query || (ref.Value.In == "" && ac.UseParam):
+	case ref.Value.In == query || (ref.Value.In == "" && ac.ParamName != ""):
 		loc = query
 		name = ac.ParamName
 		ac.ParamName = ""
-	case ref.Value.In == cookie || (ref.Value.In == "" && ac.UseCookie):
+	case ref.Value.In == cookie || (ref.Value.In == "" && ac.CookieName != ""):
 		loc = cookie
 		name = ac.CookieName
 		ac.CookieName = ""
