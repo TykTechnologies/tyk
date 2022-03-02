@@ -888,14 +888,93 @@ var memConnClient = &http.Client{
 	},
 }
 
+var (
+	memConnClientPool *sync.Pool
+	memConnClientInit sync.Once
+)
+
+type memConnBridge struct {
+	client *http.Client
+	server *http.Server
+}
+
+// getMemConnBridge creates a http server, a http client, and a memconn transport
+func newMemConnBridge(handler http.Handler) (*memConnBridge, error) {
+	// TODO: This could have been a package init()
+	memConnClientInit.Do(func() {
+		memConnClientPool = &sync.Pool{
+			New: func() interface{} {
+				return &memConnBridge{
+					client: &http.Client{
+						Transport: &http.Transport{},
+					},
+				}
+			},
+		}
+	})
+
+	bridge, ok := memConnClientPool.Get().(*memConnBridge)
+	if !ok {
+		return nil, fmt.Errorf("invalid pool return, expected *memConnBridge")
+	}
+	return bridge, nil
+}
+
+// Start does some things
+func (b *memConnBridge) Listen(handler http.Handler) error {
+	// listener
+	provider := &memconn.Provider{}
+	listener, err := provider.Listen(inMemNetworkType, inMemNetworkName)
+	if err != nil {
+		return err
+	}
+	// server
+	b.server = &http.Server{
+		Handler: handler,
+	}
+	// update just the client transport
+	b.client.Transport.(*http.Transport).DialContext = func(ctx context.Context, _, addr string) (net.Conn, error) {
+		return provider.DialContext(ctx, inMemNetworkType, inMemNetworkName)
+	}
+	go func() {
+		err = b.server.Serve(listener)
+		if err == http.ErrServerClosed {
+			err = nil
+		}
+		if err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	return nil
+}
+
+// Close shuts down the listener and the server
+func (b *memConnBridge) Close(ctx context.Context) {
+	if b.server != nil {
+		// also closes listener
+		err := b.server.Shutdown(ctx)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+}
+
 func handleInMemoryLoop(handler http.Handler, r *http.Request) (resp *http.Response, err error) {
-	err = createMemConnProviderIfNeeded(handler, r)
+	bridge, err := newMemConnBridge(handler)
 	if err != nil {
 		return nil, err
 	}
+	if err := bridge.Listen(handler); err != nil {
+		return nil, err
+	}
+	defer func() {
+		bridge.Close(r.Context())
+		memConnClientPool.Put(bridge)
+	}()
 
 	r.URL.Scheme = "http"
-	return memConnClient.Do(r)
+	return bridge.client.Do(r)
 }
 
 func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, latency time.Duration, err error) {
