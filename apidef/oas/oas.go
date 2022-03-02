@@ -151,7 +151,7 @@ func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 	return
 }
 
-func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
+func (s *OAS) getTykOAuthAuth(name string) (oAuth *OAuth) {
 	if securitySchemes := s.getTykSecuritySchemes(); securitySchemes != nil {
 		securityScheme := securitySchemes[name]
 		if securityScheme == nil {
@@ -160,14 +160,14 @@ func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 
 		mapSecurityScheme, ok := securityScheme.(map[string]interface{})
 		if ok {
-			basic = &Basic{}
+			oAuth = &OAuth{}
 			inBytes, _ := json.Marshal(mapSecurityScheme)
-			_ = json.Unmarshal(inBytes, basic)
-			s.getTykSecuritySchemes()[name] = basic
+			_ = json.Unmarshal(inBytes, oAuth)
+			s.getTykSecuritySchemes()[name] = oAuth
 			return
 		}
 
-		basic = s.getTykSecuritySchemes()[name].(*Basic)
+		oAuth = s.getTykSecuritySchemes()[name].(*OAuth)
 	}
 
 	return
