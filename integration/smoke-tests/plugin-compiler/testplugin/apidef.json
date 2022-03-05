@@ -1,4 +1,6 @@
 {
+	"api_id": "1",
+	"org_id": "org-1",
     "name": "Goplugin test",
     "slug": "goplugin",
     "use_go_plugin_auth": false,

@@ -1,0 +1,42 @@
+{
+  "file_list": [
+    "testplugin.so"
+  ],
+  "custom_middleware": {
+    "post": [
+      {
+        "name": "AddHelloWorldHeader",
+        "path": "testplugin.so",
+        "require_session": false,
+        "raw_body_only": false
+      }
+    ],
+    "post_key_auth": null,
+    "auth_check": {
+      "name": "Authenticate",
+      "path": "testplugin.so",
+      "require_session": false,
+      "raw_body_only": false
+    },
+    "pre": [
+      {
+        "name": "PreRequestLogger",
+        "path": "testplugin.so"
+      }
+    ],
+    "response": [
+      {
+        "name": "AddResponseHeader",
+        "path": "testplugin.so"
+      }
+    ],
+    "driver": "goplugin",
+    "id_extractor": {
+      "extract_from": "",
+      "extract_with": "",
+      "extractor_config": null
+    }
+  },
+  "checksum": "f5c4abdc4a0ede029c9d2c08eec41cd7",
+  "signature": ""
+}
