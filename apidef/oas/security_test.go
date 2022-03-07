@@ -28,7 +28,7 @@ func TestOAS_Security(t *testing.T) {
 	assert.Equal(t, api, convertedAPI)
 }
 
-func TestOAS_SecurityScheme(t *testing.T) {
+func TestOAS_ApiKeyScheme(t *testing.T) {
 	const (
 		authName   = "my-auth"
 		headerName = "header-auth"
@@ -47,7 +47,7 @@ func TestOAS_SecurityScheme(t *testing.T) {
 	}
 
 	check := func(in, name string, ac apidef.AuthConfig, s OAS) {
-		s.fillSecurityScheme(&ac)
+		s.fillApiKeyScheme(&ac)
 
 		expectedAC := ac
 		expExtractedAC := apidef.AuthConfig{Name: authName}
@@ -181,7 +181,7 @@ func TestOAS_Token(t *testing.T) {
 	var convertedOAS OAS
 	convertedOAS.Components.SecuritySchemes = oas.Components.SecuritySchemes
 
-	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: map[string]interface{}{}}}})
 	convertedOAS.fillToken(api)
 
 	assert.Equal(t, oas, convertedOAS)
@@ -214,4 +214,46 @@ func TestOAS_Token_EmptyTykAuthentication(t *testing.T) {
 	convertedOAS.Fill(api)
 
 	assert.Equal(t, oas, convertedOAS)
+}
+
+func TestOAS_AppendSecurity(t *testing.T) {
+	oas := OAS{}
+	oas.Security = openapi3.SecurityRequirements{
+		openapi3.SecurityRequirement{
+			"one": []string{},
+			"two": []string{},
+		},
+		openapi3.SecurityRequirement{
+			"three": []string{},
+			"four":  []string{},
+		},
+	}
+
+	t.Run("append new", func(t *testing.T) {
+		oas.appendSecurity("new")
+
+		assert.Len(t, oas.Security[0], 3)
+		assert.Contains(t, oas.Security[0], "one")
+		assert.Contains(t, oas.Security[0], "two")
+		assert.Contains(t, oas.Security[0], "new")
+
+		assert.Len(t, oas.Security[1], 2)
+		assert.Contains(t, oas.Security[1], "three")
+		assert.Contains(t, oas.Security[1], "four")
+
+		delete(oas.Security[0], "new")
+	})
+
+	t.Run("append same", func(t *testing.T) {
+		oas.appendSecurity("one")
+
+		assert.Len(t, oas.Security[0], 2)
+		assert.Contains(t, oas.Security[0], "one")
+		assert.Contains(t, oas.Security[0], "two")
+
+		assert.Len(t, oas.Security[1], 2)
+		assert.Contains(t, oas.Security[1], "three")
+		assert.Contains(t, oas.Security[1], "four")
+	})
+
 }

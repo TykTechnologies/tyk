@@ -14,16 +14,12 @@ const (
 )
 
 func (s *OAS) fillToken(api apidef.APIDefinition) {
-	if s.getTykSecuritySchemes() == nil {
-		s.GetTykExtension().Server.Authentication.SecuritySchemes = make(map[string]interface{})
-	}
-
 	authConfig, ok := api.AuthConfigs[apidef.AuthTokenType]
 	if !ok || authConfig.Name == "" {
 		return
 	}
 
-	s.fillSecurityScheme(&authConfig)
+	s.fillApiKeyScheme(&authConfig)
 
 	token := &Token{}
 	token.Enabled = api.UseStandardAuth
@@ -80,7 +76,8 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	}
 
 	for name := range s.Security[0] {
-		if s.Components.SecuritySchemes[name].Value.Type == apiKey {
+		switch s.Components.SecuritySchemes[name].Value.Type {
+		case apiKey:
 			s.extractTokenTo(api, name)
 		}
 	}
@@ -91,6 +88,10 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	if a == nil {
 		a = &Authentication{}
 		s.GetTykExtension().Server.Authentication = a
+	}
+
+	if a.SecuritySchemes == nil {
+		s.GetTykExtension().Server.Authentication.SecuritySchemes = make(map[string]interface{})
 	}
 
 	a.Enabled = !api.UseKeylessAccess
@@ -104,7 +105,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	}
 }
 
-func (s *OAS) fillSecurityScheme(ac *apidef.AuthConfig) {
+func (s *OAS) fillApiKeyScheme(ac *apidef.AuthConfig) {
 	ss := s.Components.SecuritySchemes
 	if ss == nil {
 		ss = make(map[string]*openapi3.SecuritySchemeRef)
@@ -119,39 +120,26 @@ func (s *OAS) fillSecurityScheme(ac *apidef.AuthConfig) {
 		ss[ac.Name] = ref
 	}
 
-	var loc, name string
+	var loc, key string
 
 	switch {
 	case ref.Value.In == header || (ref.Value.In == "" && ac.AuthHeaderName != ""):
 		loc = header
-		name = ac.AuthHeaderName
+		key = ac.AuthHeaderName
 		ac.AuthHeaderName = ""
 	case ref.Value.In == query || (ref.Value.In == "" && ac.ParamName != ""):
 		loc = query
-		name = ac.ParamName
+		key = ac.ParamName
 		ac.ParamName = ""
 	case ref.Value.In == cookie || (ref.Value.In == "" && ac.CookieName != ""):
 		loc = cookie
-		name = ac.CookieName
+		key = ac.CookieName
 		ac.CookieName = ""
 	}
 
-	sec := openapi3.NewSecurityRequirement()
-	sec[ac.Name] = []string{}
+	ref.Value.WithName(key).WithIn(loc).WithType(apiKey)
 
-	found := false
-	for _, security := range s.Security {
-		if _, ok := security[ac.Name]; ok {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		s.Security.With(sec)
-	}
-
-	ref.Value.WithName(name).WithIn(loc).WithType(apiKey)
+	s.appendSecurity(ac.Name)
 }
 
 func (s *OAS) extractApiKeySchemeTo(ac *apidef.AuthConfig, name string) {
@@ -165,5 +153,15 @@ func (s *OAS) extractApiKeySchemeTo(ac *apidef.AuthConfig, name string) {
 		ac.ParamName = ref.Value.Name
 	case cookie:
 		ac.CookieName = ref.Value.Name
+	}
+}
+
+func (s *OAS) appendSecurity(name string) {
+	if len(s.Security) == 0 {
+		s.Security.With(openapi3.NewSecurityRequirement())
+	}
+
+	if _, found := s.Security[0][name]; !found {
+		s.Security[0][name] = []string{}
 	}
 }
