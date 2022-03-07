@@ -95,14 +95,21 @@ func TestOAS_SecurityScheme(t *testing.T) {
 	})
 
 	t.Run("should not set query name in tyk extension", func(t *testing.T) {
-		ac.DisableHeader = true
+		ac.AuthHeaderName = ""
 		check(query, queryName, ac, OAS{})
+
+		// reset
+		ac.AuthHeaderName = headerName
 	})
 
 	t.Run("should not set cookie name in tyk extension", func(t *testing.T) {
-		ac.DisableHeader = true
-		ac.UseParam = false
+		ac.AuthHeaderName = ""
+		ac.ParamName = ""
 		check(cookie, cookieName, ac, OAS{})
+
+		// reset
+		ac.AuthHeaderName = headerName
+		ac.ParamName = queryName
 	})
 
 	testOAS := func(in, name string) (oas OAS) {
@@ -120,20 +127,14 @@ func TestOAS_SecurityScheme(t *testing.T) {
 	}
 
 	t.Run("already filled scheme in=header value should be respected", func(t *testing.T) {
-		ac.DisableHeader = true
 		check(header, headerName, ac, testOAS(header, headerName))
 	})
 
 	t.Run("already filled scheme in=query value should be respected", func(t *testing.T) {
-		ac.DisableHeader = false
-		ac.UseParam = false
 		check(query, queryName, ac, testOAS(query, queryName))
 	})
 
 	t.Run("already filled scheme in=cookie value should be respected", func(t *testing.T) {
-		ac.DisableHeader = false
-		ac.UseParam = true
-		ac.UseCookie = false
 		check(cookie, cookieName, ac, testOAS(cookie, cookieName))
 	})
 }
@@ -182,6 +183,35 @@ func TestOAS_Token(t *testing.T) {
 
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
 	convertedOAS.fillToken(api)
+
+	assert.Equal(t, oas, convertedOAS)
+}
+
+func TestOAS_Token_EmptyTykAuthentication(t *testing.T) {
+	const securityName = "custom"
+
+	var oas OAS
+	oas.Security = openapi3.SecurityRequirements{
+		{
+			securityName: []string{},
+		},
+	}
+
+	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+		securityName: {
+			Value: &openapi3.SecurityScheme{
+				Type: apiKey,
+				Name: "x-query",
+				In:   query,
+			},
+		},
+	}
+
+	var api apidef.APIDefinition
+	oas.ExtractTo(&api)
+
+	var convertedOAS OAS
+	convertedOAS.Fill(api)
 
 	assert.Equal(t, oas, convertedOAS)
 }
