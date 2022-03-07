@@ -7,6 +7,7 @@ typedef struct _pygilstate {} PyGILState_STATE;
 PyGILState_STATE gilState;
 */
 import "C"
+
 import (
 	"errors"
 	"strings"
