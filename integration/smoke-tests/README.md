@@ -10,13 +10,4 @@
 
 Run it as `./test.sh <version>`. Depends on `<version>` being available in Docker Hub. See `plugin-compiler/test.sh`.
 
-The plugin adds a header `Foo: Bar` to all requests. 
-
-## Python plugins
-The `bundler` service serves two purposes:
-- compiles src/middleware.py using src/manifest.json using `tyk bundle`. This is done during the build phase.
-- serves `bundle.zip` from `tyk bundle` for the `gw` service
-
-The plugin adds a header `Foo: Bar` to all requests. 
-
-Run it as `./test.sh <version>`. Depends on `<version>` being available in Docker Hub. See `python-plugins/test.sh`.
+The plugin adds a header `Foo: Bar` to all requests.
