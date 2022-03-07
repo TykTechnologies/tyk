@@ -1,4 +1,4 @@
-module github.com/TykTechnologies/tyk/integration/smoke-tests/plugin-compiler/testplugin
+module github.com/TykTechnologies/tyk/ci/tests/plugin-compiler/testplugin
 
 go 1.15
 
