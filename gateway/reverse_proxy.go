@@ -794,31 +794,46 @@ const (
 type memConnProvider struct {
 	listener net.Listener
 	provider *memconn.Provider
-	lastUsed int64
+	expireAt time.Time
 }
 
 var memConnProviders = &struct {
-	mtx           sync.Mutex
-	m             map[string]*memConnProvider
-	lastIdleCheck int64
+	mtx sync.RWMutex
+	m   map[string]*memConnProvider
 }{
 	m: make(map[string]*memConnProvider),
 }
 
-// cleanIdleMemConnProviders deletes unused memconn.Provider instances and closes
-// its listener.
-func cleanIdleMemConnProviders(maxIdleDuration, idleCheckInterval time.Duration) {
-	if memConnProviders.lastIdleCheck > time.Now().Add(-idleCheckInterval).Unix() {
-		return
-	}
+// cleanIdleMemConnProvidersEagerly deletes idle memconn.Provider instances and
+// closes the underlying listener to free resources.
+func cleanIdleMemConnProvidersEagerly(pointInTime time.Time) {
+	memConnProviders.mtx.Lock()
+	defer memConnProviders.mtx.Unlock()
+
 	for host, mp := range memConnProviders.m {
-		if time.Now().Add(-maxIdleDuration).Unix() > mp.lastUsed {
+		if mp.expireAt.Before(pointInTime) {
 			delete(memConnProviders.m, host)
 			// on listener.Close http.Serve will return with error and stop goroutine
 			_ = mp.listener.Close()
 		}
 	}
-	memConnProviders.lastIdleCheck = time.Now().Unix()
+}
+
+// cleanIdleMemConnProviders checks memconn.Provider instances periodically and
+// deletes idle ones.
+func cleanIdleMemConnProviders(ctx context.Context) {
+	timer := time.NewTimer(checkIdleMemConnInterval)
+	defer timer.Stop()
+
+	for {
+		timer.Reset(checkIdleMemConnInterval)
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+			cleanIdleMemConnProvidersEagerly(time.Now())
+		}
+	}
 }
 
 // getMemConnProvider return the cached memconn.Provider, if it's available in the cache.
@@ -828,15 +843,14 @@ func getMemConnProvider(addr string) (*memconn.Provider, error) {
 		return nil, err
 	}
 
-	memConnProviders.mtx.Lock()
-	defer memConnProviders.mtx.Unlock()
+	memConnProviders.mtx.RLock()
+	defer memConnProviders.mtx.RUnlock()
 
 	p, ok := memConnProviders.m[host]
 	if !ok {
 		return nil, fmt.Errorf("no provider found for: %s", addr)
 	}
 
-	cleanIdleMemConnProviders(maxIdleMemConnDuration, checkIdleMemConnInterval)
 	return p.provider, nil
 }
 
@@ -848,9 +862,8 @@ func createMemConnProviderIfNeeded(handler http.Handler, r *http.Request) error 
 
 	p, ok := memConnProviders.m[r.Host]
 	if ok {
-		// we will clean the providers and close its listener, if it is idle for
-		// some time.
-		p.lastUsed = time.Now().Unix()
+		// Clean the providers and close its listener, if it is idle for a while.
+		p.expireAt = time.Now().Add(maxIdleMemConnDuration)
 		return nil
 	}
 
@@ -871,11 +884,12 @@ func createMemConnProviderIfNeeded(handler http.Handler, r *http.Request) error 
 	memConnProviders.m[r.Host] = &memConnProvider{
 		listener: lis,
 		provider: provider,
-		lastUsed: time.Now().Unix(),
+		expireAt: time.Now().Add(maxIdleMemConnDuration),
 	}
 	return nil
 }
 
+// memConnClient is used to make request to internal APIs.
 var memConnClient = &http.Client{
 	Transport: &http.Transport{
 		DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
