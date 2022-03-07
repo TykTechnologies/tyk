@@ -822,15 +822,14 @@ func cleanIdleMemConnProvidersEagerly(pointInTime time.Time) {
 // cleanIdleMemConnProviders checks memconn.Provider instances periodically and
 // deletes idle ones.
 func cleanIdleMemConnProviders(ctx context.Context) {
-	timer := time.NewTimer(checkIdleMemConnInterval)
-	defer timer.Stop()
+	ticker := time.NewTicker(checkIdleMemConnInterval)
+	defer ticker.Stop()
 
 	for {
-		timer.Reset(checkIdleMemConnInterval)
 		select {
 		case <-ctx.Done():
 			return
-		case <-timer.C:
+		case <-ticker.C:
 			cleanIdleMemConnProvidersEagerly(time.Now())
 		}
 	}
