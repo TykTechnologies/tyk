@@ -17,10 +17,10 @@ RUN apt-get update \
 COPY *${TARGETARCH}.deb /
 RUN dpkg -i /*${TARGETARCH}.deb
 
-COPY images/hybrid/nginx/1_upstream.conf /etc/nginx/conf.d/
-COPY images/hybrid/nginx/sample.tconf /etc/nginx/sites-enabled/
-COPY images/hybrid/EULA.md /opt/tyk-gateway/EULA.md
-COPY images/hybrid/entrypoint.sh /opt/tyk-gateway/entrypoint.sh
+COPY ci/images/hybrid/nginx/1_upstream.conf /etc/nginx/conf.d/
+COPY ci/images/hybrid/nginx/sample.tconf /etc/nginx/sites-enabled/
+COPY ci/images/hybrid/EULA.md /opt/tyk-gateway/EULA.md
+COPY ci/images/hybrid/entrypoint.sh /opt/tyk-gateway/entrypoint.sh
 
 VOLUME ["/etc/nginx/sites-enabled/"]
 
