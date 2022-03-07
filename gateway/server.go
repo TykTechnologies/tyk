@@ -1179,6 +1179,11 @@ func (gw *Gateway) initialiseSystem() error {
 	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
 		go gw.StartPeriodicStateBackup(&gw.LE_MANAGER)
 	}
+
+	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
+	// instances periodically and deletes idle items, closes net.Listener instances to
+	// free resources.
+	go cleanIdleMemConnProviders(gw.ctx)
 	return nil
 }
 
