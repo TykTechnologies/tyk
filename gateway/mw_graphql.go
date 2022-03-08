@@ -55,17 +55,17 @@ func (m *GraphQLMiddleware) EnabledForSpec() bool {
 func (m *GraphQLMiddleware) Init() {
 	schema, err := gql.NewSchemaFromString(m.Spec.GraphQL.Schema)
 	if err != nil {
-		log.Errorf("Error while creating schema from API definition: %v", err)
+		log.WithError(err).Error("Error while creating schema from API definition")
 		return
 	}
 
 	normalizationResult, err := schema.Normalize()
 	if err != nil {
-		log.Errorf("Error while normalizing schema from API definition: %v", err)
+		log.WithError(err).Error("Error while normalizing schema from API definition")
 	}
 
-	if !normalizationResult.Successful {
-		log.Errorf("Schema normalization was not successful. Reason: %v", normalizationResult.Errors)
+	if err := normalizationResult.Errors; !normalizationResult.Successful {
+		log.WithError(err).Error("Schema normalization was not successful")
 	}
 
 	m.Spec.GraphQLExecutor.Schema = schema
@@ -108,7 +108,7 @@ func (m *GraphQLMiddleware) initGraphQLEngineV1(logger *abstractlogger.LogrusLog
 
 	engine, err := gql.NewExecutionEngine(logger, m.Spec.GraphQLExecutor.Schema, plannerConfig)
 	if err != nil {
-		log.Errorf("GraphQL execution engine couldn't created: %v", err)
+		log.WithError(err).Error("GraphQL execution engine couldn't created")
 		return
 	}
 

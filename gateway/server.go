@@ -463,7 +463,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	var filter []*APISpec
 	for _, v := range s {
 		if err := v.Validate(); err != nil {
-			mainLog.Infof("Skipping loading spec:%q because it failed validation with error:%v", v.Name, err)
+			mainLog.WithError(err).Infof("Skipping loading spec: %q because it failed validation", v.Name)
 			continue
 		}
 		filter = append(filter, v)
@@ -832,7 +832,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		}
 
 		if err := processor.Init(mw, spec); err != nil {
-			mainLog.Debug("Failed to init processor: ", err)
+			mainLog.WithError(err).Debug("Failed to init processor")
 		}
 		responseChain = append(responseChain, processor)
 	}
@@ -881,13 +881,13 @@ func (gw *Gateway) DoReload() {
 
 	// Load the API Policies
 	if _, err := gw.syncPolicies(); err != nil {
-		mainLog.Error("Error during syncing policies:", err.Error())
+		mainLog.WithError(err).Error("Error during syncing policies")
 		return
 	}
 
 	// load the specs
 	if count, err := gw.syncAPISpecs(); err != nil {
-		mainLog.Error("Error during syncing apis:", err.Error())
+		mainLog.WithError(err).Error("Error during syncing apis")
 		return
 	} else {
 		// skip re-loading only if dashboard service reported 0 APIs
@@ -1055,7 +1055,7 @@ func (gw *Gateway) setupLogger() {
 		}
 
 		if err != nil {
-			log.Errorf("Error making connection for logstash: %v", err)
+			log.WithError(err).Error("Error making connection for logstash")
 		} else {
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
@@ -1138,7 +1138,7 @@ func (gw *Gateway) initialiseSystem() error {
 	if *cli.Port != "" {
 		portNum, err := strconv.Atoi(*cli.Port)
 		if err != nil {
-			mainLog.Error("Port specified in flags must be a number: ", err)
+			mainLog.WithError(err).Error("Port specified in flags must be a number")
 		} else {
 			gwConfig.ListenPort = portNum
 			gw.SetConfig(gwConfig)
@@ -1150,7 +1150,7 @@ func (gw *Gateway) initialiseSystem() error {
 	mainLog.Info("PIDFile location set to: ", gwConfig.PIDFileLocation)
 
 	if err := writePIDFile(gw.GetConfig().PIDFileLocation); err != nil {
-		mainLog.Error("Failed to write PIDFile: ", err)
+		mainLog.WithError(err).Error("Failed to write PIDFile")
 	}
 
 	if gw.GetConfig().UseDBAppConfigs && gw.GetConfig().Policies.PolicySource != config.DefaultDashPolicySource {
@@ -1250,40 +1250,40 @@ func (gw *Gateway) afterConfSetup() {
 
 	conf.Secret, err = gw.kvStore(conf.Secret)
 	if err != nil {
-		log.Fatalf("could not retrieve the secret key.. %v", err)
+		log.WithError(err).Fatal("could not retrieve the secret key")
 	}
 
 	conf.NodeSecret, err = gw.kvStore(conf.NodeSecret)
 	if err != nil {
-		log.Fatalf("could not retrieve the NodeSecret key.. %v", err)
+		log.WithError(err).Fatal("could not retrieve the NodeSecret key")
 	}
 
 	conf.Storage.Password, err = gw.kvStore(conf.Storage.Password)
 	if err != nil {
-		log.Fatalf("Could not retrieve redis password... %v", err)
+		log.WithError(err).Fatal("Could not retrieve redis password")
 	}
 
 	conf.CacheStorage.Password, err = gw.kvStore(conf.CacheStorage.Password)
 	if err != nil {
-		log.Fatalf("Could not retrieve cache storage password... %v", err)
+		log.WithError(err).Fatal("Could not retrieve cache storage password")
 	}
 
 	conf.Security.PrivateCertificateEncodingSecret, err = gw.kvStore(conf.Security.PrivateCertificateEncodingSecret)
 	if err != nil {
-		log.Fatalf("Could not retrieve the private certificate encoding secret... %v", err)
+		log.WithError(err).Fatal("Could not retrieve the private certificate encoding secret")
 	}
 
 	if conf.UseDBAppConfigs {
 		conf.DBAppConfOptions.ConnectionString, err = gw.kvStore(conf.DBAppConfOptions.ConnectionString)
 		if err != nil {
-			log.Fatalf("Could not fetch dashboard connection string.. %v", err)
+			log.WithError(err).Fatal("Could not fetch dashboard connection string")
 		}
 	}
 
 	if conf.Policies.PolicySource == "service" {
 		conf.Policies.PolicyConnectionString, err = gw.kvStore(conf.Policies.PolicyConnectionString)
 		if err != nil {
-			log.Fatalf("Could not fetch policy connection string... %v", err)
+			log.WithError(err).Fatal("Could not fetch policy connection string")
 		}
 	}
 
@@ -1313,7 +1313,7 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 		key := strings.TrimPrefix(value, "consul://")
 		log.Debugf("Retrieving %s from consul", key)
 		if err := gw.setUpConsul(); err != nil {
-			log.Error("Failed to setup consul: ", err)
+			log.WithError(err).Error("Failed to setup consul")
 
 			// Return value as is. If consul cannot be set up
 			return value, nil
@@ -1326,7 +1326,7 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 		key := strings.TrimPrefix(value, "vault://")
 		log.Debugf("Retrieving %s from vault", key)
 		if err := gw.setUpVault(); err != nil {
-			log.Error("Failed to setup vault: ", err)
+			log.WithError(err).Error("Failed to setup vault")
 			// Return value as is If vault cannot be set up
 			return value, nil
 		}
@@ -1346,7 +1346,7 @@ func (gw *Gateway) setUpVault() error {
 
 	gw.vaultKVStore, err = kv.NewVault(gw.GetConfig().KV.Vault)
 	if err != nil {
-		log.Debugf("an error occurred while setting up vault... %v", err)
+		log.WithError(err).Debug("an error occurred while setting up vault")
 	}
 
 	return err
@@ -1361,7 +1361,7 @@ func (gw *Gateway) setUpConsul() error {
 
 	gw.consulKVStore, err = kv.NewConsul(gw.GetConfig().KV.Consul)
 	if err != nil {
-		log.Debugf("an error occurred while setting up consul.. %v", err)
+		log.WithError(err).Debug("an error occurred while setting up consul")
 	}
 
 	return err
@@ -1370,10 +1370,10 @@ func (gw *Gateway) setUpConsul() error {
 func (gw *Gateway) getHostDetails(file string) {
 	var err error
 	if gw.hostDetails.PID, err = readPIDFromFile(file); err != nil {
-		mainLog.Error("Failed ot get host pid: ", err)
+		mainLog.WithError(err).Error("Failed to get host pid")
 	}
 	if gw.hostDetails.Hostname, err = os.Hostname(); err != nil {
-		mainLog.Error("Failed to get hostname: ", err)
+		mainLog.WithError(err).Error("Failed to get hostname")
 	}
 }
 
@@ -1422,7 +1422,7 @@ func Start() {
 
 	gw.SessionID = uuid.NewV4().String()
 	if err := gw.initialiseSystem(); err != nil {
-		mainLog.Fatalf("Error initialising system: %v", err)
+		mainLog.WithError(err).Fatal("Error initialising system")
 	}
 
 	gwConfig := gw.GetConfig()
