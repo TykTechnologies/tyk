@@ -126,18 +126,21 @@ func (s *OAS) fillApiKeyScheme(ac *apidef.AuthConfig) {
 	var loc, key string
 
 	switch {
-	case ref.Value.In == header || (ref.Value.In == "" && ac.AuthHeaderName != ""):
+	case ref.Value.In == header || (ref.Value.In == "" && !ac.DisableHeader):
 		loc = header
 		key = ac.AuthHeaderName
 		ac.AuthHeaderName = ""
-	case ref.Value.In == query || (ref.Value.In == "" && ac.ParamName != ""):
+		ac.DisableHeader = true
+	case ref.Value.In == query || (ref.Value.In == "" && ac.UseParam):
 		loc = query
 		key = ac.ParamName
 		ac.ParamName = ""
-	case ref.Value.In == cookie || (ref.Value.In == "" && ac.CookieName != ""):
+		ac.UseParam = false
+	case ref.Value.In == cookie || (ref.Value.In == "" && ac.UseCookie):
 		loc = cookie
 		key = ac.CookieName
 		ac.CookieName = ""
+		ac.UseCookie = false
 	}
 
 	ref.Value.WithName(key).WithIn(loc).WithType(apiKey)
@@ -152,10 +155,13 @@ func (s *OAS) extractApiKeySchemeTo(ac *apidef.AuthConfig, name string) {
 	switch ref.Value.In {
 	case header:
 		ac.AuthHeaderName = ref.Value.Name
+		ac.DisableHeader = false
 	case query:
 		ac.ParamName = ref.Value.Name
+		ac.UseParam = true
 	case cookie:
 		ac.CookieName = ref.Value.Name
+		ac.UseCookie = true
 	}
 }
 
