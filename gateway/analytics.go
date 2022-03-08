@@ -47,7 +47,7 @@ type Latency struct {
 type AnalyticsRecord struct {
 	Method        string
 	Host          string
-	Path          string // HTTP path, can be overriden by "track path" plugin
+	Path          string // HTTP path, can be overridden by "track path" plugin
 	RawPath       string // Original HTTP path
 	ContentLength int64
 	UserAgent     string
