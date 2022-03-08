@@ -187,13 +187,15 @@ func TestOAS_Token(t *testing.T) {
 	assert.Equal(t, oas, convertedOAS)
 }
 
-func TestOAS_Token_EmptyTykAuthentication(t *testing.T) {
+func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
 	const securityName = "custom"
+	const securityName2 = "custom2"
 
 	var oas OAS
 	oas.Security = openapi3.SecurityRequirements{
 		{
-			securityName: []string{},
+			securityName:  []string{},
+			securityName2: []string{},
 		},
 	}
 
@@ -205,7 +207,29 @@ func TestOAS_Token_EmptyTykAuthentication(t *testing.T) {
 				In:   query,
 			},
 		},
+		securityName2: {
+			Value: &openapi3.SecurityScheme{
+				Type: apiKey,
+				Name: "x-header",
+				In:   header,
+			},
+		},
 	}
+
+	xTykAPIGateway := &XTykAPIGateway{
+		Server: Server{
+			Authentication: &Authentication{
+				Enabled: true,
+				SecuritySchemes: map[string]interface{}{
+					securityName: &Token{
+						Enabled: true,
+					},
+				},
+			},
+		},
+	}
+
+	oas.SetTykExtension(xTykAPIGateway)
 
 	var api apidef.APIDefinition
 	oas.ExtractTo(&api)
@@ -213,7 +237,8 @@ func TestOAS_Token_EmptyTykAuthentication(t *testing.T) {
 	var convertedOAS OAS
 	convertedOAS.Fill(api)
 
-	assert.Equal(t, oas, convertedOAS)
+	assert.Len(t, convertedOAS.getTykSecuritySchemes(), 1)
+	assert.Contains(t, convertedOAS.getTykSecuritySchemes(), securityName)
 }
 
 func TestOAS_AppendSecurity(t *testing.T) {
