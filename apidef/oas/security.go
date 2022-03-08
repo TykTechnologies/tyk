@@ -44,13 +44,12 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	authConfig := apidef.AuthConfig{DisableHeader: true}
 
-	if token := s.getTykTokenAuth(name); token != nil {
-		api.UseStandardAuth = token.Enabled
-		authConfig.UseCertificate = token.EnableClientCertificate
-		token.AuthSources.ExtractTo(&authConfig)
-		if token.Signature != nil {
-			token.Signature.ExtractTo(&authConfig)
-		}
+	token := s.getTykTokenAuth(name)
+	api.UseStandardAuth = token.Enabled
+	authConfig.UseCertificate = token.EnableClientCertificate
+	token.AuthSources.ExtractTo(&authConfig)
+	if token.Signature != nil {
+		token.Signature.ExtractTo(&authConfig)
 	}
 
 	s.extractApiKeySchemeTo(&authConfig, name)
@@ -71,14 +70,18 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	if len(s.Security) == 0 {
+	if len(s.Security) == 0 || len(s.Components.SecuritySchemes) == 0 {
 		return
 	}
 
-	for name := range s.Security[0] {
-		switch s.Components.SecuritySchemes[name].Value.Type {
-		case apiKey:
-			s.extractTokenTo(api, name)
+	for schemeName := range s.getTykSecuritySchemes() {
+		if _, ok := s.Security[0][schemeName]; ok {
+			switch s.Components.SecuritySchemes[schemeName].Value.Type {
+			case apiKey:
+				if s.getTykTokenAuth(schemeName) != nil {
+					s.extractTokenTo(api, schemeName)
+				}
+			}
 		}
 	}
 }
