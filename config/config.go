@@ -86,10 +86,10 @@ type PoliciesConfig struct {
 	// If you set this value to `true`, then the id parameter in a stored policy (or imported policy using the Dashboard API), will be used instead of the internal ID.
 	//
 	// This option should only be used when moving an installation to a new database.
-	AllowExplicitPolicyID bool   `json:"allow_explicit_policy_id"`
+	AllowExplicitPolicyID bool `json:"allow_explicit_policy_id"`
 	// This option is used for storing a policies  if `policies.policy_source` is set to `file`.
 	// it should be some existing file path on hard drive
-	PolicyPath            string `json:"policy_path"`
+	PolicyPath string `json:"policy_path"`
 }
 
 type DBAppConfOptionsConfig struct {
