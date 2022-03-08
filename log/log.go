@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
 var (
@@ -20,15 +19,16 @@ var (
 // example:   `{"foo": {"bar": "baz"}}`
 // flattened: `foo.bar: baz`
 func LoadTranslations(thing map[string]interface{}) {
-	formatter := new(prefixed.TextFormatter)
+	formatter := new(logrus.TextFormatter)
 	formatter.TimestampFormat = `Jan 02 15:04:05`
 	formatter.FullTimestamp = true
+
 	log.Formatter = &TranslationFormatter{formatter}
 	translations, _ = Flatten(thing)
 }
 
 type TranslationFormatter struct {
-	*prefixed.TextFormatter
+	*logrus.TextFormatter
 }
 
 func (t *TranslationFormatter) Format(entry *logrus.Entry) ([]byte, error) {
@@ -47,7 +47,7 @@ func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 func init() {
-	formatter := new(prefixed.TextFormatter)
+	formatter := new(logrus.TextFormatter)
 	formatter.TimestampFormat = `Jan 02 15:04:05`
 	formatter.FullTimestamp = true
 
