@@ -1680,15 +1680,18 @@ func (gw *Gateway) startServer() {
 	// at this point NodeID is ready to use by DRL
 	gw.drlOnce.Do(gw.startDRL)
 
-	mainLog.Infof("Tyk Gateway started (%s)", VERSION)
 	address := gw.GetConfig().ListenAddress
 	if gw.GetConfig().ListenAddress == "" {
 		address = "(open interface)"
 	}
 
-	mainLog.Info("--> Listening on address: ", address)
-	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
-	mainLog.Info("--> PID: ", gw.hostDetails.PID)
+	mainLog.WithFields(logrus.Fields{
+		"address": address,
+		"port":    gw.GetConfig().ListenPort,
+		"pid":     gw.hostDetails.PID,
+		"version": VERSION,
+	}).Info("Tyk Gateway Started")
+
 	if !rpc.IsEmergencyMode() {
 		gw.DoReload()
 	}
