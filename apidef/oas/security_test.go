@@ -56,12 +56,15 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 		case header:
 			expectedAC.AuthHeaderName = ""
 			expExtractedAC.AuthHeaderName = name
+			expExtractedAC.DisableHeader = false
 		case query:
 			expectedAC.ParamName = ""
 			expExtractedAC.ParamName = name
+			expExtractedAC.UseParam = true
 		case cookie:
 			expectedAC.CookieName = ""
 			expExtractedAC.CookieName = name
+			expExtractedAC.UseCookie = true
 		}
 
 		expSecurity := openapi3.SecurityRequirements{
@@ -95,21 +98,14 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 	})
 
 	t.Run("should not set query name in tyk extension", func(t *testing.T) {
-		ac.AuthHeaderName = ""
+		ac.DisableHeader = true
 		check(query, queryName, ac, OAS{})
-
-		// reset
-		ac.AuthHeaderName = headerName
 	})
 
 	t.Run("should not set cookie name in tyk extension", func(t *testing.T) {
-		ac.AuthHeaderName = ""
-		ac.ParamName = ""
+		ac.DisableHeader = true
+		ac.UseParam = false
 		check(cookie, cookieName, ac, OAS{})
-
-		// reset
-		ac.AuthHeaderName = headerName
-		ac.ParamName = queryName
 	})
 
 	testOAS := func(in, name string) (oas OAS) {
@@ -127,14 +123,20 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 	}
 
 	t.Run("already filled scheme in=header value should be respected", func(t *testing.T) {
+		ac.DisableHeader = true
 		check(header, headerName, ac, testOAS(header, headerName))
 	})
 
 	t.Run("already filled scheme in=query value should be respected", func(t *testing.T) {
+		ac.DisableHeader = false
+		ac.UseParam = false
 		check(query, queryName, ac, testOAS(query, queryName))
 	})
 
 	t.Run("already filled scheme in=cookie value should be respected", func(t *testing.T) {
+		ac.DisableHeader = false
+		ac.UseParam = true
+		ac.UseCookie = false
 		check(cookie, cookieName, ac, testOAS(cookie, cookieName))
 	})
 }
@@ -161,7 +163,7 @@ func TestOAS_Token(t *testing.T) {
 
 	var token Token
 	Fill(t, &token, 0)
-	token.Query.Name = ""
+	token.Query = nil
 	oas.Extensions = map[string]interface{}{
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{
