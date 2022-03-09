@@ -694,7 +694,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 
 // getAuthType overrides BaseMiddleware.getAuthType.
 func (k *JWTMiddleware) getAuthType() string {
-	return jwtType
+	return apidef.JWTType
 }
 
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {

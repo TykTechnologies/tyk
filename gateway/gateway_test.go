@@ -1931,7 +1931,7 @@ func TestTracing(t *testing.T) {
 
 	t.Run("Custom auth header", func(t *testing.T) {
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			authTokenType: {
+			apidef.AuthTokenType: {
 				AuthHeaderName: "Custom-Auth-Header",
 			},
 		}
