@@ -64,7 +64,7 @@ yes | cp -rf $PLUGIN_BUILD_PATH/vendor/* $GOPATH/src || true \
 # First we need to find which deps GW already has, remove this folders, and after copy fresh versions from GW
 
 # github.com and rest of packages have different nesting levels, so have to handle it separately
-ls -d $TYK_GW_PATH/vendor/github.com/*/* | sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | xargs -d '\n' rm -rf
+ls -d $TYK_GW_PATH/vendor/github.com/*/* | sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | grep -v "TykTechnologies/tyk" | xargs -d '\n' rm -rf
 ls -d $TYK_GW_PATH/vendor/*/* | sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | grep -v github | xargs -d '\n' rm -rf
 
 # Copy GW dependencies
@@ -73,5 +73,5 @@ rm -rf $TYK_GW_PATH/vendor
 
 rm /go/src/modules.txt
 
-GO111MODULE=off CGO_ENABLE=$CGO_ENABLE GOOS=$GOOS GOARCH=$GOARCH  go build -buildmode=plugin -o $plugin_name \
+GO111MODULE=off CGO_ENABLED=$CGOENABLED GOOS=$GOOS GOARCH=$GOARCH  go build -buildmode=plugin -o $plugin_name \
     && mv $plugin_name $PLUGIN_SOURCE_PATH
