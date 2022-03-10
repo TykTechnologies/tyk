@@ -76,7 +76,7 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 		expSecuritySchemes := openapi3.SecuritySchemes{
 			authName: &openapi3.SecuritySchemeRef{
 				Value: &openapi3.SecurityScheme{
-					Type: apiKey,
+					Type: typeApiKey,
 					In:   in,
 					Name: name,
 				},
@@ -112,7 +112,7 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 		oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
 			authName: &openapi3.SecuritySchemeRef{
 				Value: &openapi3.SecurityScheme{
-					Type: apiKey,
+					Type: typeApiKey,
 					In:   in,
 					Name: name,
 				},
@@ -154,7 +154,7 @@ func TestOAS_Token(t *testing.T) {
 	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
 		securityName: {
 			Value: &openapi3.SecurityScheme{
-				Type: apiKey,
+				Type: typeApiKey,
 				Name: "x-query",
 				In:   query,
 			},
@@ -204,14 +204,14 @@ func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
 	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
 		securityName: {
 			Value: &openapi3.SecurityScheme{
-				Type: apiKey,
+				Type: typeApiKey,
 				Name: "x-query",
 				In:   query,
 			},
 		},
 		securityName2: {
 			Value: &openapi3.SecurityScheme{
-				Type: apiKey,
+				Type: typeApiKey,
 				Name: "x-header",
 				In:   header,
 			},
@@ -283,4 +283,49 @@ func TestOAS_AppendSecurity(t *testing.T) {
 		assert.Contains(t, oas.Security[1], "four")
 	})
 
+}
+
+func TestOAS_JWT(t *testing.T) {
+	const securityName = "custom"
+
+	var oas OAS
+	oas.Security = openapi3.SecurityRequirements{
+		{
+			securityName: []string{},
+		},
+	}
+
+	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+		securityName: {
+			Value: &openapi3.SecurityScheme{
+				Type:         typeHttp,
+				Scheme:       schemeBearer,
+				BearerFormat: bearerFormatJWT,
+			},
+		},
+	}
+
+	var jwt JWT
+	Fill(t, &jwt, 0)
+	oas.Extensions = map[string]interface{}{
+		ExtensionTykAPIGateway: &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecuritySchemes: map[string]interface{}{
+						securityName: &jwt,
+					},
+				},
+			},
+		},
+	}
+
+	var api apidef.APIDefinition
+	api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	oas.extractJWTTo(&api, securityName)
+
+	var convertedOAS OAS
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: map[string]interface{}{}}}})
+	convertedOAS.fillJWT(api)
+
+	assert.Equal(t, oas, convertedOAS)
 }
