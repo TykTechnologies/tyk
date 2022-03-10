@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 
@@ -377,7 +379,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 						}
 					}
 				}
-			case spec.AuthConfigs[authTokenType].UseCertificate:
+			case spec.AuthConfigs[apidef.AuthTokenType].UseCertificate:
 				// Dynamic certificate check required, falling back to HTTP level check
 				// TODO: Change to VerifyPeerCertificate hook instead, when possible
 				if domainRequireCert[spec.Domain] < tls.RequestClientCert {

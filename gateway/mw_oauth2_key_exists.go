@@ -59,7 +59,7 @@ func (k *Oauth2KeyExists) EnabledForSpec() bool {
 
 // getAuthType overrides BaseMiddleware.getAuthType.
 func (k *Oauth2KeyExists) getAuthType() string {
-	return oauthType
+	return apidef.OAuthType
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
