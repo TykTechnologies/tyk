@@ -200,8 +200,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 					URL:    "http://accounts.service",
 					Method: http.MethodPost,
 					Header: http.Header{
-						"Auth":           []string{"appended_header"},
-						"Header1":        []string{"override_global"},
+						"Header1":        []string{"value1"},
 						"Header2":        []string{"value2"},
 						"X-Tyk-Internal": []string{"true"},
 					},
