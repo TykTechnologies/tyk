@@ -31,14 +31,6 @@ import (
 
 const mwStatusRespond = 666
 
-const authTokenType = "authToken"
-const jwtType = "jwt"
-const hmacType = "hmac"
-const basicType = "basic"
-const coprocessType = "coprocess"
-const oauthType = "oauth"
-const oidcType = "oidc"
-
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
 	orgSessionExpiryCache singleflight.Group
@@ -754,7 +746,7 @@ func (b BaseMiddleware) getAuthType() string {
 func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, apidef.AuthConfig) {
 	config, ok := b.Base().Spec.AuthConfigs[authType]
 	// Auth is deprecated. To maintain backward compatibility authToken and jwt cases are added.
-	if !ok && (authType == authTokenType || authType == jwtType) {
+	if !ok && (authType == apidef.AuthTokenType || authType == apidef.JWTType) {
 		config = b.Base().Spec.Auth
 	}
 
