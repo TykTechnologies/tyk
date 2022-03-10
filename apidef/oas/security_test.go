@@ -434,3 +434,28 @@ func TestOAS_OAuth(t *testing.T) {
 
 	assert.Equal(t, oas, convertedOAS)
 }
+
+func TestOAS_CustomPlugin(t *testing.T) {
+	var oas OAS
+	var customPlugin CustomPlugin
+	Fill(t, &customPlugin, 0)
+	oas.Extensions = map[string]interface{}{
+		ExtensionTykAPIGateway: &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					CustomPlugin: &customPlugin,
+				},
+			},
+		},
+	}
+
+	var api apidef.APIDefinition
+	api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	oas.extractCustomPluginTo(&api)
+
+	var convertedOAS OAS
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
+	convertedOAS.fillCustomPlugin(api)
+
+	assert.Equal(t, oas, convertedOAS)
+}
