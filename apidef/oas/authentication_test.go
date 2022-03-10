@@ -38,7 +38,7 @@ func TestToken(t *testing.T) {
 	emptyToken.ExtractTo(&convertedAPI)
 
 	var resultToken Token
-	resultToken.Fill(convertedAPI.UseStandardAuth, convertedAPI.AuthConfigs["authToken"])
+	resultToken.Fill(convertedAPI.UseStandardAuth, convertedAPI.AuthConfigs[apidef.AuthTokenType])
 
 	assert.Equal(t, emptyToken, resultToken)
 }

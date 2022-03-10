@@ -110,17 +110,17 @@ func (r *RuleAtLeastEnableOneAuthSource) Validate(apiDef *APIDefinition, validat
 
 func shouldValidateAuthSource(authType string, apiDef *APIDefinition) bool {
 	switch authType {
-	case "authToken":
+	case AuthTokenType:
 		return apiDef.UseStandardAuth
-	case "jwt":
+	case JWTType:
 		return apiDef.EnableJWT
-	case "hmac":
+	case HMACType:
 		return apiDef.EnableSignatureChecking
-	case "oauth":
+	case OAuthType:
 		return apiDef.UseOauth2
-	case "oidc":
+	case OIDCType:
 		return apiDef.UseOpenID
-	case "coprocess":
+	case CoprocessType:
 		return apiDef.EnableCoProcessAuth
 	}
 

@@ -68,7 +68,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		return
 	}
 
-	if authToken, ok := api.AuthConfigs["authToken"]; ok {
+	if authToken, ok := api.AuthConfigs[apidef.AuthTokenType]; ok {
 		if a.Token == nil {
 			a.Token = &Token{}
 		}
@@ -80,7 +80,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.Token = nil
 	}
 
-	if _, ok := api.AuthConfigs["jwt"]; ok {
+	if _, ok := api.AuthConfigs[apidef.JWTType]; ok {
 		if a.JWT == nil {
 			a.JWT = &JWT{}
 		}
@@ -92,7 +92,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.JWT = nil
 	}
 
-	if _, ok := api.AuthConfigs["basic"]; ok {
+	if _, ok := api.AuthConfigs[apidef.BasicType]; ok {
 		if a.Basic == nil {
 			a.Basic = &Basic{}
 		}
@@ -104,7 +104,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.Basic = nil
 	}
 
-	if _, ok := api.AuthConfigs["oauth"]; ok {
+	if _, ok := api.AuthConfigs[apidef.OAuthType]; ok {
 		if a.OAuth == nil {
 			a.OAuth = &OAuth{}
 		}
@@ -116,7 +116,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.OAuth = nil
 	}
 
-	if _, ok := api.AuthConfigs["hmac"]; ok {
+	if _, ok := api.AuthConfigs[apidef.HMACType]; ok {
 		if a.HMAC == nil {
 			a.HMAC = &HMAC{}
 		}
@@ -128,7 +128,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.HMAC = nil
 	}
 
-	if _, ok := api.AuthConfigs["coprocess"]; ok {
+	if _, ok := api.AuthConfigs[apidef.CoprocessType]; ok {
 		if a.CustomPlugin == nil {
 			a.CustomPlugin = &CustomPlugin{}
 		}
@@ -140,7 +140,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.CustomPlugin = nil
 	}
 
-	if _, ok := api.AuthConfigs["oidc"]; ok {
+	if _, ok := api.AuthConfigs[apidef.OIDCType]; ok {
 		if a.OIDC == nil {
 			a.OIDC = &OIDC{}
 		}
@@ -238,7 +238,7 @@ func (t *Token) ExtractTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	api.AuthConfigs["authToken"] = authConfig
+	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
 type AuthSources struct {
@@ -384,7 +384,7 @@ type JWT struct {
 }
 
 func (j *JWT) Fill(api apidef.APIDefinition) {
-	j.AuthSources.Fill(api.AuthConfigs["jwt"])
+	j.AuthSources.Fill(api.AuthConfigs[apidef.JWTType])
 
 	j.Enabled = api.EnableJWT
 	j.Source = api.JWTSource
@@ -417,7 +417,7 @@ func (j *JWT) ExtractTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	api.AuthConfigs["jwt"] = authConfig
+	api.AuthConfigs[apidef.JWTType] = authConfig
 
 	api.EnableJWT = j.Enabled
 	api.JWTSource = j.Source
@@ -496,7 +496,7 @@ type Basic struct {
 func (b *Basic) Fill(api apidef.APIDefinition) {
 	b.Enabled = api.UseBasicAuth
 
-	b.AuthSources.Fill(api.AuthConfigs["basic"])
+	b.AuthSources.Fill(api.AuthConfigs[apidef.BasicType])
 
 	b.DisableCaching = api.BasicAuth.DisableCaching
 	b.CacheTTL = api.BasicAuth.CacheTTL
@@ -522,7 +522,7 @@ func (b *Basic) ExtractTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	api.AuthConfigs["basic"] = authConfig
+	api.AuthConfigs[apidef.BasicType] = authConfig
 
 	api.BasicAuth.DisableCaching = b.DisableCaching
 	api.BasicAuth.CacheTTL = b.CacheTTL
@@ -568,7 +568,7 @@ type OAuth struct {
 func (o *OAuth) Fill(api apidef.APIDefinition) {
 	o.Enabled = api.UseOauth2
 
-	o.AuthSources.Fill(api.AuthConfigs["oauth"])
+	o.AuthSources.Fill(api.AuthConfigs[apidef.OAuthType])
 
 	o.AllowedAccessTypes = api.Oauth2Meta.AllowedAccessTypes
 	o.AllowedAuthorizeTypes = api.Oauth2Meta.AllowedAuthorizeTypes
@@ -595,7 +595,7 @@ func (o *OAuth) ExtractTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	api.AuthConfigs["oauth"] = authConfig
+	api.AuthConfigs[apidef.OAuthType] = authConfig
 
 	api.Oauth2Meta.AllowedAccessTypes = o.AllowedAccessTypes
 	api.Oauth2Meta.AllowedAuthorizeTypes = o.AllowedAuthorizeTypes
@@ -644,7 +644,7 @@ type HMAC struct {
 func (h *HMAC) Fill(api apidef.APIDefinition) {
 	h.Enabled = api.EnableSignatureChecking
 
-	h.AuthSources.Fill(api.AuthConfigs["hmac"])
+	h.AuthSources.Fill(api.AuthConfigs[apidef.HMACType])
 
 	h.AllowedAlgorithms = api.HmacAllowedAlgorithms
 	h.AllowedClockSkew = api.HmacAllowedClockSkew
@@ -660,7 +660,7 @@ func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	api.AuthConfigs["hmac"] = authConfig
+	api.AuthConfigs[apidef.HMACType] = authConfig
 
 	api.HmacAllowedAlgorithms = h.AllowedAlgorithms
 	api.HmacAllowedClockSkew = h.AllowedClockSkew
@@ -680,7 +680,7 @@ type OIDC struct {
 func (o *OIDC) Fill(api apidef.APIDefinition) {
 	o.Enabled = api.UseOpenID
 
-	o.AuthSources.Fill(api.AuthConfigs["oidc"])
+	o.AuthSources.Fill(api.AuthConfigs[apidef.OIDCType])
 
 	o.SegregateByClientId = api.OpenIDOptions.SegregateByClient
 
@@ -726,7 +726,7 @@ func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	api.AuthConfigs["oidc"] = authConfig
+	api.AuthConfigs[apidef.OIDCType] = authConfig
 
 	api.OpenIDOptions.SegregateByClient = o.SegregateByClientId
 
@@ -778,7 +778,7 @@ type CustomPlugin struct {
 func (c *CustomPlugin) Fill(api apidef.APIDefinition) {
 	c.Enabled = api.EnableCoProcessAuth
 
-	c.AuthSources.Fill(api.AuthConfigs["coprocess"])
+	c.AuthSources.Fill(api.AuthConfigs[apidef.CoprocessType])
 }
 
 func (c *CustomPlugin) ExtractTo(api *apidef.APIDefinition) {
@@ -791,5 +791,5 @@ func (c *CustomPlugin) ExtractTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	api.AuthConfigs["coprocess"] = authConfig
+	api.AuthConfigs[apidef.CoprocessType] = authConfig
 }

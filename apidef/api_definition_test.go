@@ -122,15 +122,15 @@ func TestAPIDefinition_DecodeFromDB_AuthDeprecation(t *testing.T) {
 	spec.DecodeFromDB()
 
 	assert.Equal(t, spec.AuthConfigs, map[string]AuthConfig{
-		"authToken": spec.Auth,
+		AuthTokenType: spec.Auth,
 	})
 
 	spec.EnableJWT = true
 	spec.DecodeFromDB()
 
 	assert.Equal(t, spec.AuthConfigs, map[string]AuthConfig{
-		"authToken": spec.Auth,
-		"jwt":       spec.Auth,
+		AuthTokenType: spec.Auth,
+		JWTType:       spec.Auth,
 	})
 
 }

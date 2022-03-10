@@ -130,32 +130,32 @@ func TestRuleAtLeastEnableOneAuthConfig_Validate(t *testing.T) {
 			UseStandardAuth: true,
 			UseOauth2:       true,
 			AuthConfigs: map[string]AuthConfig{
-				"authToken": {
+				AuthTokenType: {
 					UseParam:      false,
 					DisableHeader: true,
 					UseCookie:     false,
 				},
-				"oauth": {
+				OAuthType: {
 					UseParam:      false,
 					DisableHeader: true,
 					UseCookie:     false,
 				},
-				"jwt": {
+				JWTType: {
 					UseParam:      false,
 					DisableHeader: true,
 					UseCookie:     false,
 				},
-				"oidc": {
+				OIDCType: {
 					UseParam:      false,
 					DisableHeader: true,
 					UseCookie:     false,
 				},
-				"hmac": {
+				HMACType: {
 					UseParam:      false,
 					DisableHeader: true,
 					UseCookie:     false,
 				},
-				"coprocess": {
+				CoprocessType: {
 					UseParam:      false,
 					DisableHeader: true,
 					UseCookie:     false,
@@ -166,8 +166,8 @@ func TestRuleAtLeastEnableOneAuthConfig_Validate(t *testing.T) {
 		ValidationResult{
 			IsValid: false,
 			Errors: []error{
-				fmt.Errorf(ErrAllAuthSourcesDisabled, "authToken"),
-				fmt.Errorf(ErrAllAuthSourcesDisabled, "oauth"),
+				fmt.Errorf(ErrAllAuthSourcesDisabled, AuthTokenType),
+				fmt.Errorf(ErrAllAuthSourcesDisabled, OAuthType),
 			},
 		},
 	))
@@ -177,32 +177,32 @@ func TestRuleAtLeastEnableOneAuthConfig_Validate(t *testing.T) {
 			UseStandardAuth: true,
 			UseOauth2:       true,
 			AuthConfigs: map[string]AuthConfig{
-				"authToken": {
+				AuthTokenType: {
 					UseParam:      true,
 					DisableHeader: true,
 					UseCookie:     false,
 				},
-				"oauth": {
+				OAuthType: {
 					UseParam:      false,
 					DisableHeader: false,
 					UseCookie:     false,
 				},
-				"jwt": {
+				JWTType: {
 					UseParam:      false,
 					DisableHeader: true,
 					UseCookie:     false,
 				},
-				"oidc": {
+				OIDCType: {
 					UseParam:      false,
 					DisableHeader: true,
 					UseCookie:     false,
 				},
-				"hmac": {
+				HMACType: {
 					UseParam:      false,
 					DisableHeader: true,
 					UseCookie:     false,
 				},
-				"coprocess": {
+				CoprocessType: {
 					UseParam:      false,
 					DisableHeader: true,
 					UseCookie:     false,

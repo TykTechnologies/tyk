@@ -856,7 +856,7 @@ func (a *APIDefinition) EncodeForDB() {
 
 	// Auth is deprecated so this code tries to maintain backward compatibility
 	if a.Auth.AuthHeaderName == "" {
-		a.Auth = a.AuthConfigs["authToken"]
+		a.Auth = a.AuthConfigs[AuthTokenType]
 	}
 	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
 	if !a.UseOpenID && a.Scopes.JWT.ScopeClaimName != "" {
@@ -930,8 +930,8 @@ func (a *APIDefinition) DecodeFromDB() {
 		}
 	}
 
-	makeCompatible("authToken", a.UseStandardAuth)
-	makeCompatible("jwt", a.EnableJWT)
+	makeCompatible(AuthTokenType, a.UseStandardAuth)
+	makeCompatible(JWTType, a.EnableJWT)
 	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
 	if !a.UseOpenID && a.JWTScopeClaimName != "" && a.Scopes.JWT.ScopeClaimName == "" {
 		a.Scopes.JWT.ScopeToPolicy = a.JWTScopeToPolicyMapping

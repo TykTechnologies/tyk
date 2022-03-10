@@ -237,7 +237,7 @@ func TestHMACRequestSigning(t *testing.T) {
 		api := specs[0]
 
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
-		api.AuthConfigs["hmac"] = apidef.AuthConfig{
+		api.AuthConfigs[apidef.HMACType] = apidef.AuthConfig{
 			AuthHeaderName: "something",
 		}
 
@@ -396,7 +396,7 @@ func TestRSARequestSigning(t *testing.T) {
 
 		api := specs[0]
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
-		api.AuthConfigs["hmac"] = apidef.AuthConfig{
+		api.AuthConfigs[apidef.HMACType] = apidef.AuthConfig{
 			AuthHeaderName: "something",
 		}
 

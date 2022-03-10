@@ -587,7 +587,7 @@ func TestUpdateKeyWithCert(t *testing.T) {
 		spec.OrgID = "default"
 		spec.UseStandardAuth = true
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			"authToken": {UseCertificate: true},
+			apidef.AuthTokenType: {UseCertificate: true},
 		}
 	})
 

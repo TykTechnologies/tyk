@@ -61,13 +61,13 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 func TestBaseMiddleware_getAuthType(t *testing.T) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	spec.AuthConfigs = map[string]apidef.AuthConfig{
-		"authToken": {AuthHeaderName: "h1"},
-		"basic":     {AuthHeaderName: "h2"},
-		"coprocess": {AuthHeaderName: "h3"},
-		"hmac":      {AuthHeaderName: "h4"},
-		"jwt":       {AuthHeaderName: "h5"},
-		"oauth":     {AuthHeaderName: "h6"},
-		"oidc":      {AuthHeaderName: "h7"},
+		apidef.AuthTokenType: {AuthHeaderName: "h1"},
+		apidef.BasicType:     {AuthHeaderName: "h2"},
+		apidef.CoprocessType: {AuthHeaderName: "h3"},
+		apidef.HMACType:      {AuthHeaderName: "h4"},
+		apidef.JWTType:       {AuthHeaderName: "h5"},
+		apidef.OAuthType:     {AuthHeaderName: "h6"},
+		apidef.OIDCType:      {AuthHeaderName: "h7"},
 	}
 
 	ts := StartTest(nil)

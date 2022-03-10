@@ -311,17 +311,17 @@ func TestJWTAuthKeyMultiAuth(t *testing.T) {
 		spec.AuthConfigs = make(map[string]apidef.AuthConfig)
 
 		spec.UseStandardAuth = true
-		authConfig := spec.AuthConfigs["authToken"]
+		authConfig := spec.AuthConfigs[apidef.AuthTokenType]
 		authConfig.AuthHeaderName = "Auth-Token"
-		spec.AuthConfigs["authToken"] = authConfig
+		spec.AuthConfigs[apidef.AuthTokenType] = authConfig
 		spec.BaseIdentityProvidedBy = apidef.AuthToken
 
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
-		jwtConfig := spec.AuthConfigs["jwt"]
+		jwtConfig := spec.AuthConfigs[apidef.JWTType]
 		jwtConfig.AuthHeaderName = "Auth-JWT"
-		spec.AuthConfigs["jwt"] = jwtConfig
+		spec.AuthConfigs[apidef.JWTType] = jwtConfig
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.JWTDefaultPolicies = []string{pID}

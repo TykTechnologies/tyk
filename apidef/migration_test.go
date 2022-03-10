@@ -63,28 +63,28 @@ func oldTestAPI() APIDefinition {
 			},
 		},
 		AuthConfigs: map[string]AuthConfig{
-			"authToken": {
+			AuthTokenType: {
 				AuthHeaderName: "Authorization",
 				UseParam:       true,
 				ParamName:      "Authorization",
 				UseCookie:      true,
 				CookieName:     "Authorization",
 			},
-			"jwt": {
+			JWTType: {
 				AuthHeaderName: "Authorization",
 				UseParam:       true,
 				ParamName:      "Authorization",
 				UseCookie:      true,
 				CookieName:     "Authorization",
 			},
-			"oidc": {
+			OIDCType: {
 				AuthHeaderName: "Authorization",
 				UseParam:       true,
 				ParamName:      "Authorization",
 				UseCookie:      true,
 				CookieName:     "Authorization",
 			},
-			"hmac": {
+			HMACType: {
 				AuthHeaderName: "Authorization",
 				UseParam:       true,
 				ParamName:      "Authorization",
