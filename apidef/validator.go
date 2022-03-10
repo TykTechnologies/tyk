@@ -100,9 +100,11 @@ var ErrAllAuthSourcesDisabled = "all auth sources are disabled for %s, at least 
 type RuleAtLeastEnableOneAuthSource struct{}
 
 func (r *RuleAtLeastEnableOneAuthSource) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
-	var authConfigs []string
+	authConfigs := make([]string, len(apiDef.AuthConfigs))
+	i := 0
 	for name := range apiDef.AuthConfigs {
-		authConfigs = append(authConfigs, name)
+		authConfigs[i] = name
+		i++
 	}
 
 	sort.Strings(authConfigs)
