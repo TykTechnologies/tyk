@@ -310,7 +310,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	logger := m.Logger()
 	logger.Debug("CoProcess Request, HookType: ", m.HookType)
 	originalURL := r.URL
-	authToken, _ := m.getAuthToken(coprocessType, r)
+	authToken, _ := m.getAuthToken(apidef.CoprocessType, r)
 
 	var extractor IdExtractor
 	if m.Spec.EnableCoProcessAuth && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
@@ -521,7 +521,7 @@ func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) er
 
 // getAuthType overrides BaseMiddleware.getAuthType.
 func (m *CoProcessMiddleware) getAuthType() string {
-	return coprocessType
+	return apidef.CoprocessType
 }
 
 func (h *CustomMiddlewareResponseHook) Name() string {

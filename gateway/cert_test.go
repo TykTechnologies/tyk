@@ -862,7 +862,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 			spec.UseKeylessAccess = false
 			spec.BaseIdentityProvidedBy = apidef.AuthToken
 			spec.AuthConfigs = map[string]apidef.AuthConfig{
-				authTokenType: {UseCertificate: true},
+				apidef.AuthTokenType: {UseCertificate: true},
 			}
 			spec.Proxy.ListenPath = "/"
 			spec.OrgID = orgId
@@ -918,7 +918,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 				spec.UseKeylessAccess = false
 				spec.BaseIdentityProvidedBy = apidef.AuthToken
 				spec.AuthConfigs = map[string]apidef.AuthConfig{
-					authTokenType: {UseCertificate: true},
+					apidef.AuthTokenType: {UseCertificate: true},
 				}
 				spec.Proxy.ListenPath = "/test1"
 				spec.OrgID = orgId
@@ -994,7 +994,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 				spec.UseKeylessAccess = false
 				spec.BaseIdentityProvidedBy = apidef.AuthToken
 				spec.AuthConfigs = map[string]apidef.AuthConfig{
-					authTokenType: {UseCertificate: true},
+					apidef.AuthTokenType: {UseCertificate: true},
 				}
 				spec.Proxy.ListenPath = "/test1"
 				spec.OrgID = orgId
@@ -1033,7 +1033,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 			spec.UseKeylessAccess = false
 			spec.BaseIdentityProvidedBy = apidef.AuthToken
 			spec.AuthConfigs = map[string]apidef.AuthConfig{
-				authTokenType: {UseCertificate: true},
+				apidef.AuthTokenType: {UseCertificate: true},
 			}
 			spec.Proxy.ListenPath = "/"
 			spec.OrgID = orgId
@@ -1070,7 +1070,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 			spec.UseKeylessAccess = false
 			spec.BaseIdentityProvidedBy = apidef.AuthToken
 			spec.AuthConfigs = map[string]apidef.AuthConfig{
-				authTokenType: {UseCertificate: true},
+				apidef.AuthTokenType: {UseCertificate: true},
 			}
 			spec.Proxy.ListenPath = "/"
 			spec.OrgID = orgId

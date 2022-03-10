@@ -92,7 +92,7 @@ func (k *OpenIDMW) dummyErrorHandler(e error, w http.ResponseWriter, r *http.Req
 }
 
 func (k *OpenIDMW) getAuthType() string {
-	return oidcType
+	return apidef.OIDCType
 }
 
 func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {

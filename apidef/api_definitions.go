@@ -89,6 +89,12 @@ const (
 	Self = "self"
 
 	AuthTokenType = "authToken"
+	JWTType       = "jwt"
+	HMACType      = "hmac"
+	BasicType     = "basic"
+	CoprocessType = "coprocess"
+	OAuthType     = "oauth"
+	OIDCType      = "oidc"
 )
 
 type ObjectId bson.ObjectId
