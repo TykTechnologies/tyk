@@ -39,7 +39,7 @@ func TestXTykAPIGateway(t *testing.T) {
 		oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
 			"custom": {
 				Value: &openapi3.SecurityScheme{
-					Type: apiKey,
+					Type: typeApiKey,
 					Name: "x-query",
 					In:   "query",
 				},
