@@ -329,3 +329,47 @@ func TestOAS_JWT(t *testing.T) {
 
 	assert.Equal(t, oas, convertedOAS)
 }
+
+func TestOAS_Basic(t *testing.T) {
+	const securityName = "custom"
+
+	var oas OAS
+	oas.Security = openapi3.SecurityRequirements{
+		{
+			securityName: []string{},
+		},
+	}
+
+	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+		securityName: {
+			Value: &openapi3.SecurityScheme{
+				Type:   typeHttp,
+				Scheme: schemeBasic,
+			},
+		},
+	}
+
+	var basic Basic
+	Fill(t, &basic, 0)
+	oas.Extensions = map[string]interface{}{
+		ExtensionTykAPIGateway: &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecuritySchemes: map[string]interface{}{
+						securityName: &basic,
+					},
+				},
+			},
+		},
+	}
+
+	var api apidef.APIDefinition
+	api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	oas.extractBasicTo(&api, securityName)
+
+	var convertedOAS OAS
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: map[string]interface{}{}}}})
+	convertedOAS.fillBasic(api)
+
+	assert.Equal(t, oas, convertedOAS)
+}
