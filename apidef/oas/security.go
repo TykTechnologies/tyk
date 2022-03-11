@@ -9,6 +9,7 @@ const (
 	typeApiKey      = "apiKey"
 	typeHttp        = "http"
 	schemeBearer    = "bearer"
+	schemeBasic     = "basic"
 	bearerFormatJWT = "JWT"
 
 	header = "header"
@@ -140,6 +141,69 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.JWTType] = ac
 }
 
+func (s *OAS) fillBasic(api apidef.APIDefinition) {
+	ac, ok := api.AuthConfigs[apidef.BasicType]
+	if !ok || ac.Name == "" {
+		return
+	}
+
+	ss := s.Components.SecuritySchemes
+	if ss == nil {
+		ss = make(map[string]*openapi3.SecuritySchemeRef)
+		s.Components.SecuritySchemes = ss
+	}
+
+	ref, ok := ss[ac.Name]
+	if !ok {
+		ref = &openapi3.SecuritySchemeRef{
+			Value: openapi3.NewSecurityScheme(),
+		}
+		ss[ac.Name] = ref
+	}
+
+	ref.Value.WithType(typeHttp).WithScheme(schemeBasic)
+
+	s.appendSecurity(ac.Name)
+
+	basic := &Basic{}
+	basic.Enabled = api.UseBasicAuth
+	basic.AuthSources.Fill(ac)
+	basic.DisableCaching = api.BasicAuth.DisableCaching
+	basic.CacheTTL = api.BasicAuth.CacheTTL
+
+	if basic.ExtractCredentialsFromBody == nil {
+		basic.ExtractCredentialsFromBody = &ExtractCredentialsFromBody{}
+	}
+
+	basic.ExtractCredentialsFromBody.Fill(api)
+
+	if ShouldOmit(basic.ExtractCredentialsFromBody) {
+		basic.ExtractCredentialsFromBody = nil
+	}
+
+	s.getTykSecuritySchemes()[ac.Name] = basic
+
+	if ShouldOmit(basic) {
+		delete(s.getTykSecuritySchemes(), ac.Name)
+	}
+}
+
+func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
+	ac := apidef.AuthConfig{Name: name, DisableHeader: true}
+
+	basic := s.getTykBasicAuth(name)
+	api.UseBasicAuth = basic.Enabled
+	basic.AuthSources.ExtractTo(&ac)
+	api.BasicAuth.DisableCaching = basic.DisableCaching
+	api.BasicAuth.CacheTTL = basic.CacheTTL
+
+	if basic.ExtractCredentialsFromBody != nil {
+		basic.ExtractCredentialsFromBody.ExtractTo(api)
+	}
+
+	api.AuthConfigs[apidef.BasicType] = ac
+}
+
 func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	if a := s.getTykAuthentication(); a != nil {
 		api.UseKeylessAccess = !a.Enabled
@@ -165,6 +229,8 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 				s.extractTokenTo(api, schemeName)
 			case v.Type == typeHttp && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT:
 				s.extractJWTTo(api, schemeName)
+			case v.Type == typeHttp && v.Scheme == schemeBasic:
+				s.extractBasicTo(api, schemeName)
 			}
 		}
 	}
@@ -187,6 +253,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 	s.fillToken(api)
 	s.fillJWT(api)
+	s.fillBasic(api)
 
 	if ShouldOmit(a) {
 		s.GetTykExtension().Server.Authentication = nil
