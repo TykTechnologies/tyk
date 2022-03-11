@@ -15,6 +15,7 @@ type Operation struct {
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 	// TransformRequestMethod allows you to transform the method of a request.
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
+	Cache                  *CachePlugin            `bson:"cache,omitempty" json:"cache,omitempty"`
 }
 
 const (
@@ -34,6 +35,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillAllowance(ep.BlackList, block)
 	s.fillAllowance(ep.Ignored, ignoreAuthentication)
 	s.fillTransformRequestMethod(ep.MethodTransforms)
+	s.fillCache(ep.AdvanceCacheConfig)
 
 	if len(s.Paths) == 0 {
 		s.Paths = nil
@@ -55,6 +57,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractAllowanceTo(ep, path, method, block)
 					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
 					tykOp.extractTransformRequestMethodTo(ep, path, method)
+					tykOp.extractCacheTo(ep, path, method)
 					break found
 				}
 			}
@@ -108,6 +111,21 @@ func (s *OAS) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {
 	}
 }
 
+func (s *OAS) fillCache(metas []apidef.CacheMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.Cache == nil {
+			operation.Cache = &CachePlugin{}
+		}
+
+		operation.Cache.Fill(meta)
+		if ShouldOmit(operation.Cache) {
+			operation.Cache = nil
+		}
+	}
+}
+
 func (o *Operation) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
 	allowance := o.Allow
 	endpointMetas := &ep.WhiteList
@@ -138,6 +156,19 @@ func (o *Operation) extractTransformRequestMethodTo(ep *apidef.ExtendedPathsSet,
 	meta := apidef.MethodTransformMeta{Path: path, Method: method}
 	o.TransformRequestMethod.ExtractTo(&meta)
 	ep.MethodTransforms = append(ep.MethodTransforms, meta)
+}
+
+func (o *Operation) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.Cache == nil {
+		return
+	}
+
+	newCacheMeta := apidef.CacheMeta{
+		Method: method,
+		Path:   path,
+	}
+	o.Cache.ExtractTo(&newCacheMeta)
+	ep.AdvanceCacheConfig = append(ep.AdvanceCacheConfig, newCacheMeta)
 }
 
 func (s *OAS) getOperationID(path, method string) (operationID string) {
