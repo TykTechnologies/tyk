@@ -6,7 +6,10 @@ import (
 )
 
 const (
-	apiKey = "apiKey"
+	typeApiKey      = "apiKey"
+	typeHttp        = "http"
+	schemeBearer    = "bearer"
+	bearerFormatJWT = "JWT"
 
 	header = "header"
 	query  = "query"
@@ -57,6 +60,86 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
+func (s *OAS) fillJWT(api apidef.APIDefinition) {
+	ac, ok := api.AuthConfigs[apidef.JWTType]
+	if !ok || ac.Name == "" {
+		return
+	}
+
+	ss := s.Components.SecuritySchemes
+	if ss == nil {
+		ss = make(map[string]*openapi3.SecuritySchemeRef)
+		s.Components.SecuritySchemes = ss
+	}
+
+	ref, ok := ss[ac.Name]
+	if !ok {
+		ref = &openapi3.SecuritySchemeRef{
+			Value: openapi3.NewSecurityScheme(),
+		}
+		ss[ac.Name] = ref
+	}
+
+	ref.Value.WithType(typeHttp).WithScheme(schemeBearer).WithBearerFormat(bearerFormatJWT)
+
+	s.appendSecurity(ac.Name)
+
+	jwt := &JWT{}
+	jwt.Enabled = api.EnableJWT
+	jwt.AuthSources.Fill(ac)
+	jwt.Source = api.JWTSource
+	jwt.SigningMethod = api.JWTSigningMethod
+	jwt.IdentityBaseField = api.JWTIdentityBaseField
+	jwt.SkipKid = api.JWTSkipKid
+	jwt.PolicyFieldName = api.JWTPolicyFieldName
+	jwt.ClientBaseField = api.JWTClientIDBaseField
+
+	if jwt.Scopes == nil {
+		jwt.Scopes = &Scopes{}
+	}
+
+	jwt.Scopes.Fill(&api.Scopes.JWT)
+	if ShouldOmit(jwt.Scopes) {
+		jwt.Scopes = nil
+	}
+
+	jwt.DefaultPolicies = api.JWTDefaultPolicies
+	jwt.IssuedAtValidationSkew = api.JWTIssuedAtValidationSkew
+	jwt.NotBeforeValidationSkew = api.JWTNotBeforeValidationSkew
+	jwt.ExpiresAtValidationSkew = api.JWTExpiresAtValidationSkew
+
+	s.getTykSecuritySchemes()[ac.Name] = jwt
+
+	if ShouldOmit(jwt) {
+		delete(s.getTykSecuritySchemes(), ac.Name)
+	}
+}
+
+func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
+	ac := apidef.AuthConfig{Name: name, DisableHeader: true}
+
+	jwt := s.getTykJWTAuth(name)
+	api.EnableJWT = jwt.Enabled
+	jwt.AuthSources.ExtractTo(&ac)
+	api.JWTSource = jwt.Source
+	api.JWTSigningMethod = jwt.SigningMethod
+	api.JWTIdentityBaseField = jwt.IdentityBaseField
+	api.JWTSkipKid = jwt.SkipKid
+	api.JWTPolicyFieldName = jwt.PolicyFieldName
+	api.JWTClientIDBaseField = jwt.ClientBaseField
+
+	if jwt.Scopes != nil {
+		jwt.Scopes.ExtractTo(&api.Scopes.JWT)
+	}
+
+	api.JWTDefaultPolicies = jwt.DefaultPolicies
+	api.JWTIssuedAtValidationSkew = jwt.IssuedAtValidationSkew
+	api.JWTNotBeforeValidationSkew = jwt.NotBeforeValidationSkew
+	api.JWTExpiresAtValidationSkew = jwt.ExpiresAtValidationSkew
+
+	api.AuthConfigs[apidef.JWTType] = ac
+}
+
 func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	if a := s.getTykAuthentication(); a != nil {
 		api.UseKeylessAccess = !a.Enabled
@@ -76,11 +159,12 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 
 	for schemeName := range s.getTykSecuritySchemes() {
 		if _, ok := s.Security[0][schemeName]; ok {
-			switch s.Components.SecuritySchemes[schemeName].Value.Type {
-			case apiKey:
-				if s.getTykTokenAuth(schemeName) != nil {
-					s.extractTokenTo(api, schemeName)
-				}
+			v := s.Components.SecuritySchemes[schemeName].Value
+			switch {
+			case v.Type == typeApiKey:
+				s.extractTokenTo(api, schemeName)
+			case v.Type == typeHttp && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT:
+				s.extractJWTTo(api, schemeName)
 			}
 		}
 	}
@@ -102,6 +186,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	a.BaseIdentityProvider = api.BaseIdentityProvidedBy
 
 	s.fillToken(api)
+	s.fillJWT(api)
 
 	if ShouldOmit(a) {
 		s.GetTykExtension().Server.Authentication = nil
@@ -143,7 +228,7 @@ func (s *OAS) fillApiKeyScheme(ac *apidef.AuthConfig) {
 		ac.UseCookie = false
 	}
 
-	ref.Value.WithName(key).WithIn(loc).WithType(apiKey)
+	ref.Value.WithName(key).WithIn(loc).WithType(typeApiKey)
 
 	s.appendSecurity(ac.Name)
 }
