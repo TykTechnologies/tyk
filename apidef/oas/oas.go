@@ -21,6 +21,7 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	}
 
 	xTykAPIGateway.Fill(api)
+	s.fillPathsAndOperations(api.VersionData.Versions[""].ExtendedPaths)
 	s.fillSecurity(api)
 
 	if ShouldOmit(xTykAPIGateway) {
@@ -41,6 +42,16 @@ func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 
 	if s.GetTykExtension() != nil {
 		s.GetTykExtension().ExtractTo(api)
+	}
+
+	var ep apidef.ExtendedPathsSet
+	s.extractPathsAndOperations(&ep)
+
+	api.VersionData.Versions = map[string]apidef.VersionInfo{
+		"": {
+			UseExtendedPaths: true,
+			ExtendedPaths:    ep,
+		},
 	}
 }
 
@@ -188,4 +199,20 @@ func (s *OAS) getTykSecurityScheme(name string) interface{} {
 	}
 
 	return securitySchemes[name]
+}
+
+func (s *OAS) getTykMiddleware() (middleware *Middleware) {
+	if s.GetTykExtension() != nil {
+		middleware = s.GetTykExtension().Middleware
+	}
+
+	return
+}
+
+func (s *OAS) getTykOperations() (operations Operations) {
+	if s.getTykMiddleware() != nil {
+		operations = s.getTykMiddleware().Operations
+	}
+
+	return
 }
