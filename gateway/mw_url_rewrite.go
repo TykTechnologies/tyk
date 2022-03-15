@@ -463,8 +463,8 @@ func LoopingUrl(host string) string {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	vInfo, _ := m.Spec.Version(r)
-	found, meta := m.Spec.CheckSpecMatchesStatus(r, m.Spec.RxPaths[vInfo.Name], URLRewrite)
+	_, versionPaths, _, _ := m.Spec.Version(r)
+	found, meta := m.Spec.CheckSpecMatchesStatus(r, versionPaths, URLRewrite)
 
 	if !found {
 		return nil, http.StatusOK

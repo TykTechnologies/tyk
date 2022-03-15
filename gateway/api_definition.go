@@ -1287,52 +1287,69 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	return ""
 }
 
+// VersionExpired checks if an API version (during a proxied
+// request) is expired. If it isn't and the configured time was valid,
+// it also returns the expiration time.
+func (a *APISpec) VersionExpired(versionDef *apidef.VersionInfo) (bool, *time.Time) {
+	if a.VersionData.NotVersioned {
+		return false, nil
+	}
+
+	// Never expires
+	if versionDef.Expires == "" || versionDef.Expires == "-1" {
+		return false, nil
+	}
+
+	// otherwise use parsed timestamp
+	if versionDef.ExpiresTs.IsZero() {
+		log.Error("Could not parse expiry date for API, disallow")
+		return true, nil
+	}
+
+	// It's in the past, expire
+	// It's in the future, keep going
+	return time.Since(versionDef.ExpiresTs) >= 0, &versionDef.ExpiresTs
+}
+
 // RequestValid will check if an incoming request has valid version
 // data and return a RequestStatus that describes the status of the
 // request
-func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
-	versionInfo, status := a.Version(r)
+func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus, interface{}) {
+	versionMetaData, versionPaths, whiteListStatus, vstat := a.Version(r)
 
 	// Screwed up version info - fail and pass through
-	if status != StatusOk {
-		return false, status
+	if vstat != StatusOk {
+		return false, vstat, nil
 	}
 
-	// Load path data and whitelist data for version
-	versionPaths, ok := a.RxPaths[versionInfo.Name]
-	if !ok {
-		log.Error("no RX Paths found for version ", versionInfo.Name)
-		return false, VersionDoesNotExist
-	}
-
-	whiteListStatus, ok := a.WhiteListEnabled[versionInfo.Name]
-	if !ok {
-		log.Error("no whitelist data found")
-		return false, VersionWhiteListStatusNotFound
-	}
-
-	if !a.VersionData.NotVersioned && versionInfo.Expired() {
-		return false, VersionExpired
+	// Is the API version expired?
+	// TODO: Don't abuse the interface{} return value for both
+	// *apidef.EndpointMethodMeta and *time.Time. Probably need to
+	// redesign or entirely remove RequestValid. See discussion on
+	// https://github.com/TykTechnologies/tyk/pull/776
+	expired, expTime := a.VersionExpired(versionMetaData)
+	if expired {
+		return false, VersionExpired, nil
 	}
 
 	// not expired, let's check path info
-	status, _ = a.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
+	status, meta := a.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
 	switch status {
 	case EndPointNotAllowed:
-		return false, status
+		return false, status, expTime
 	case StatusRedirectFlowByReply:
-		return true, status
+		return true, status, meta
 	case StatusOkAndIgnore, StatusCached, StatusTransform,
 		StatusHeaderInjected, StatusMethodTransformed:
-		return true, status
+		return true, status, expTime
 	default:
-		return true, StatusOk
+		return true, StatusOk, expTime
 	}
 }
 
 // Version attempts to extract the version data from a request, depending on where it is stored in the
 // request (currently only "header" is supported)
-func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) {
+func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool, RequestStatus) {
 	var version apidef.VersionInfo
 
 	// try the context first
@@ -1352,7 +1369,7 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 			vName := a.getVersionFromRequest(r)
 			if vName == "" {
 				if a.VersionData.DefaultVersion == "" {
-					return &version, VersionNotFound
+					return &version, nil, false, VersionNotFound
 				}
 				vName = a.VersionData.DefaultVersion
 				ctxSetDefaultVersion(r)
@@ -1360,7 +1377,7 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 			// Load Version Data - General
 			var ok bool
 			if version, ok = a.VersionData.Versions[vName]; !ok {
-				return &version, VersionDoesNotExist
+				return &version, nil, false, VersionDoesNotExist
 			}
 		}
 
@@ -1368,7 +1385,20 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 		ctxSetVersionInfo(r, &version)
 	}
 
-	return &version, StatusOk
+	// Load path data and whitelist data for version
+	rxPaths, rxOk := a.RxPaths[version.Name]
+	if !rxOk {
+		log.Error("no RX Paths found for version ", version.Name)
+		return &version, nil, false, VersionDoesNotExist
+	}
+
+	whiteListStatus, wlOk := a.WhiteListEnabled[version.Name]
+	if !wlOk {
+		log.Error("No whitelist data found")
+		return &version, nil, false, VersionWhiteListStatusNotFound
+	}
+
+	return &version, rxPaths, whiteListStatus, StatusOk
 }
 
 func (a *APISpec) StripListenPath(r *http.Request, path string) string {

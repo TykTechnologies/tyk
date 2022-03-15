@@ -174,8 +174,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	var cacheKeyRegex string
 	var cacheMeta *EndPointCacheMeta
 
-	version, _ := m.Spec.Version(r)
-	versionPaths := m.Spec.RxPaths[version.Name]
+	_, versionPaths, _, _ := m.Spec.Version(r)
 	isVirtual, _ := m.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 
 	// Lets see if we can throw a sledgehammer at this

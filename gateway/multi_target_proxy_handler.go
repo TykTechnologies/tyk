@@ -16,7 +16,7 @@ type MultiTargetProxy struct {
 }
 
 func (m *MultiTargetProxy) proxyForRequest(r *http.Request) *ReverseProxy {
-	version, _ := m.specReference.Version(r)
+	version, _, _, _ := m.specReference.Version(r)
 	if proxy := m.versionProxies[version.Name]; proxy != nil {
 		return proxy
 	}

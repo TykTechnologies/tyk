@@ -38,7 +38,7 @@ func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Check versioning, blacklist, whitelist and ignored status
-	requestValid, stat := v.Spec.RequestValid(r)
+	requestValid, stat, meta := v.Spec.RequestValid(r)
 	if !requestValid {
 		// Fire a versioning failure event
 		v.FireEvent(EventVersionFailure, EventVersionFailureMeta{
@@ -53,18 +53,13 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		return errors.New(string(stat)), http.StatusForbidden
 	}
 
-	versionInfo, _ := v.Spec.Version(r)
-	versionPaths := v.Spec.RxPaths[versionInfo.Name]
-	whiteListStatus := v.Spec.WhiteListEnabled[versionInfo.Name]
-
 	// We handle redirects before ignores in case we aren't using a whitelist
 	if stat == StatusRedirectFlowByReply {
-		_, meta := v.Spec.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
 		v.DoMockReply(w, meta)
 		return nil, mwStatusRespond
 	}
 
-	if expTime := versionInfo.ExpiryTime(); !expTime.IsZero() {
+	if expTime, _ := meta.(*time.Time); expTime != nil {
 		w.Header().Set("x-tyk-api-expires", expTime.Format(time.RFC1123))
 	}
 
