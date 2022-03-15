@@ -111,10 +111,59 @@ func (s *OAS) getTykTokenAuth(name string) (token *Token) {
 	return
 }
 
+func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
+	securityScheme := s.getTykSecurityScheme(name)
+	if securityScheme == nil {
+		return
+	}
+
+	mapSecurityScheme, ok := securityScheme.(map[string]interface{})
+	if ok {
+		jwt = &JWT{}
+		inBytes, _ := json.Marshal(mapSecurityScheme)
+		_ = json.Unmarshal(inBytes, jwt)
+		s.getTykSecuritySchemes()[name] = jwt
+		return
+	}
+
+	jwt = securityScheme.(*JWT)
+
+	return
+}
+
+func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
+	securityScheme := s.getTykSecurityScheme(name)
+	if securityScheme == nil {
+		return
+	}
+
+	mapSecurityScheme, ok := securityScheme.(map[string]interface{})
+	if ok {
+		basic = &Basic{}
+		inBytes, _ := json.Marshal(mapSecurityScheme)
+		_ = json.Unmarshal(inBytes, basic)
+		s.getTykSecuritySchemes()[name] = basic
+		return
+	}
+
+	basic = securityScheme.(*Basic)
+
+	return
+}
+
 func (s *OAS) getTykSecuritySchemes() (securitySchemes map[string]interface{}) {
 	if s.getTykAuthentication() != nil {
 		securitySchemes = s.getTykAuthentication().SecuritySchemes
 	}
 
 	return
+}
+
+func (s *OAS) getTykSecurityScheme(name string) interface{} {
+	securitySchemes := s.getTykSecuritySchemes()
+	if securitySchemes == nil {
+		return nil
+	}
+
+	return securitySchemes[name]
 }
