@@ -559,8 +559,8 @@ func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
 type OAuth struct {
 	Enabled               bool `bson:"enabled" json:"enabled"` // required
 	AuthSources           `bson:",inline" json:",inline"`
-	AllowedAccessTypes    []osin.AccessRequestType    `bson:"allowedAccessTypes,omitempty" json:"allowedAccessTypes,omitempty"`
 	AllowedAuthorizeTypes []osin.AuthorizeRequestType `bson:"allowedAuthorizeTypes,omitempty" json:"allowedAuthorizeTypes,omitempty"`
+	RefreshToken          bool                        `bson:"refreshToken,omitempty" json:"refreshToken,omitempty"`
 	AuthLoginRedirect     string                      `bson:"authLoginRedirect,omitempty" json:"authLoginRedirect,omitempty"`
 	Notifications         *Notifications              `bson:"notifications,omitempty" json:"notifications,omitempty"`
 }
@@ -570,7 +570,6 @@ func (o *OAuth) Fill(api apidef.APIDefinition) {
 
 	o.AuthSources.Fill(api.AuthConfigs["oauth"])
 
-	o.AllowedAccessTypes = api.Oauth2Meta.AllowedAccessTypes
 	o.AllowedAuthorizeTypes = api.Oauth2Meta.AllowedAuthorizeTypes
 	o.AuthLoginRedirect = api.Oauth2Meta.AuthorizeLoginRedirect
 
@@ -597,7 +596,6 @@ func (o *OAuth) ExtractTo(api *apidef.APIDefinition) {
 
 	api.AuthConfigs["oauth"] = authConfig
 
-	api.Oauth2Meta.AllowedAccessTypes = o.AllowedAccessTypes
 	api.Oauth2Meta.AllowedAuthorizeTypes = o.AllowedAuthorizeTypes
 	api.Oauth2Meta.AuthorizeLoginRedirect = o.AuthLoginRedirect
 
