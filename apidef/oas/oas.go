@@ -8,6 +8,7 @@ import (
 )
 
 const ExtensionTykAPIGateway = "x-tyk-api-gateway"
+const Main = ""
 
 type OAS struct {
 	openapi3.T
@@ -21,7 +22,7 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	}
 
 	xTykAPIGateway.Fill(api)
-	s.fillPathsAndOperations(api.VersionData.Versions[""].ExtendedPaths)
+	s.fillPathsAndOperations(api.VersionData.Versions[Main].ExtendedPaths)
 	s.fillSecurity(api)
 
 	if ShouldOmit(xTykAPIGateway) {
@@ -48,7 +49,7 @@ func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 	s.extractPathsAndOperations(&ep)
 
 	api.VersionData.Versions = map[string]apidef.VersionInfo{
-		"": {
+		Main: {
 			UseExtendedPaths: true,
 			ExtendedPaths:    ep,
 		},

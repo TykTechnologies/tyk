@@ -44,12 +44,14 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 	}
 
 	for id, tykOp := range tykOperations {
+	found:
 		for path, pathItem := range s.Paths {
 			for method, operation := range pathItem.Operations() {
 				if id == operation.OperationID {
 					tykOp.extractAllowanceTo(ep, path, method, allow)
 					tykOp.extractAllowanceTo(ep, path, method, block)
 					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
+					break found
 				}
 			}
 		}
