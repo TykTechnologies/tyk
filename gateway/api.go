@@ -43,7 +43,6 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
-	"github.com/getkin/kin-openapi/openapi3"
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/gorilla/mux"
@@ -909,44 +908,27 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 	}
 
 	var newDef apidef.APIDefinition
-	var oasDoc openapi3.Swagger
-	var xTykAPIGateway oas.XTykAPIGateway
+	var oas oas.OAS
 
 	if oasTyped {
-		if err := json.NewDecoder(r.Body).Decode(&oasDoc); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&oas); err != nil {
 			log.Error("Couldn't decode new OAS object: ", err)
 			return apiError("Request malformed"), http.StatusBadRequest
 		}
 
-		if intTykAPIGateway, ok := oasDoc.Extensions[oas.ExtensionTykAPIGateway]; ok {
-			rawTykAPIGateway := intTykAPIGateway.(json.RawMessage)
-			err := json.Unmarshal(rawTykAPIGateway, &xTykAPIGateway)
-			if err != nil {
-				return apiError("Couldn't unmarshal " + oas.ExtensionTykAPIGateway + " extension in the document"), http.StatusBadRequest
-			}
-		} else {
-			return apiError("Couldn't find " + oas.ExtensionTykAPIGateway + " extension in the document"), http.StatusBadRequest
-		}
-
-		xTykAPIGateway.ExtractTo(&newDef)
+		oas.ExtractTo(&newDef)
 	} else {
 		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
 			log.Error("Couldn't decode new API Definition object: ", err)
 			return apiError("Request malformed"), http.StatusBadRequest
 		}
 
-		xTykAPIGateway.Fill(newDef)
-
 		spec := gw.getApiSpec(newDef.APIID)
 		if spec != nil {
-			oasDoc = spec.OAS
+			oas = spec.OAS
 		}
 
-		if oasDoc.Extensions == nil {
-			oasDoc.Extensions = make(map[string]interface{})
-		}
-
-		oasDoc.Extensions[oas.ExtensionTykAPIGateway] = xTykAPIGateway
+		oas.Fill(newDef)
 	}
 
 	if apiID != "" && newDef.APIID != apiID {
@@ -972,7 +954,7 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 	}
 
 	// oas
-	err, errCode = gw.writeToFile(fs, &oasDoc, newDef.APIID+"-oas")
+	err, errCode = gw.writeToFile(fs, &oas, newDef.APIID+"-oas")
 	if err != nil {
 		return apiError(err.Error()), errCode
 	}

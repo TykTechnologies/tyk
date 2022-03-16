@@ -92,7 +92,7 @@ func (k *OpenIDMW) dummyErrorHandler(e error, w http.ResponseWriter, r *http.Req
 }
 
 func (k *OpenIDMW) getAuthType() string {
-	return oidcType
+	return apidef.OIDCType
 }
 
 func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -217,6 +217,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		session.OrgID = k.Spec.OrgID
 		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID, "ClientID": clientID}
 		session.Alias = clientID + ":" + ouser.ID
+		session.KeyID = sessionID
 
 		// Update the session in the session manager in case it gets called again
 		logger.Debug("Policy applied to key")

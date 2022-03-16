@@ -6,9 +6,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -19,6 +16,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/user"
 
@@ -861,7 +862,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 			spec.UseKeylessAccess = false
 			spec.BaseIdentityProvidedBy = apidef.AuthToken
 			spec.AuthConfigs = map[string]apidef.AuthConfig{
-				authTokenType: {UseCertificate: true},
+				apidef.AuthTokenType: {UseCertificate: true},
 			}
 			spec.Proxy.ListenPath = "/"
 			spec.OrgID = orgId
@@ -917,7 +918,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 				spec.UseKeylessAccess = false
 				spec.BaseIdentityProvidedBy = apidef.AuthToken
 				spec.AuthConfigs = map[string]apidef.AuthConfig{
-					authTokenType: {UseCertificate: true},
+					apidef.AuthTokenType: {UseCertificate: true},
 				}
 				spec.Proxy.ListenPath = "/test1"
 				spec.OrgID = orgId
@@ -993,7 +994,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 				spec.UseKeylessAccess = false
 				spec.BaseIdentityProvidedBy = apidef.AuthToken
 				spec.AuthConfigs = map[string]apidef.AuthConfig{
-					authTokenType: {UseCertificate: true},
+					apidef.AuthTokenType: {UseCertificate: true},
 				}
 				spec.Proxy.ListenPath = "/test1"
 				spec.OrgID = orgId
@@ -1032,7 +1033,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 			spec.UseKeylessAccess = false
 			spec.BaseIdentityProvidedBy = apidef.AuthToken
 			spec.AuthConfigs = map[string]apidef.AuthConfig{
-				authTokenType: {UseCertificate: true},
+				apidef.AuthTokenType: {UseCertificate: true},
 			}
 			spec.Proxy.ListenPath = "/"
 			spec.OrgID = orgId
@@ -1069,7 +1070,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 			spec.UseKeylessAccess = false
 			spec.BaseIdentityProvidedBy = apidef.AuthToken
 			spec.AuthConfigs = map[string]apidef.AuthConfig{
-				authTokenType: {UseCertificate: true},
+				apidef.AuthTokenType: {UseCertificate: true},
 			}
 			spec.Proxy.ListenPath = "/"
 			spec.OrgID = orgId

@@ -19,15 +19,6 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	s.ListenPath.Fill(api)
 	s.Slug = api.Slug
 
-	if s.Authentication == nil {
-		s.Authentication = &Authentication{}
-	}
-
-	s.Authentication.Fill(api)
-	if ShouldOmit(s.Authentication) {
-		s.Authentication = nil
-	}
-
 	if s.ClientCertificates == nil {
 		s.ClientCertificates = &ClientCertificates{}
 	}
@@ -41,12 +32,6 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	s.ListenPath.ExtractTo(api)
 	api.Slug = s.Slug
-
-	if s.Authentication != nil {
-		s.Authentication.ExtractTo(api)
-	} else {
-		api.UseKeylessAccess = true
-	}
 
 	if s.ClientCertificates != nil {
 		s.ClientCertificates.ExtractTo(api)

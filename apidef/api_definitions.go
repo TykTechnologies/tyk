@@ -87,6 +87,14 @@ const (
 	ExpirationTimeFormat = "2006-01-02 15:04"
 
 	Self = "self"
+
+	AuthTokenType = "authToken"
+	JWTType       = "jwt"
+	HMACType      = "hmac"
+	BasicType     = "basic"
+	CoprocessType = "coprocess"
+	OAuthType     = "oauth"
+	OIDCType      = "oidc"
 )
 
 type ObjectId bson.ObjectId
@@ -224,9 +232,10 @@ type HeaderInjectionMeta struct {
 }
 
 type HardTimeoutMeta struct {
-	Path    string `bson:"path" json:"path"`
-	Method  string `bson:"method" json:"method"`
-	TimeOut int    `bson:"timeout" json:"timeout"`
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
+	TimeOut  int    `bson:"timeout" json:"timeout"`
 }
 
 type TrackEndpointMeta struct {
@@ -597,10 +606,12 @@ type UptimeTests struct {
 }
 
 type AuthConfig struct {
+	Name              string          `mapstructure:"name" bson:"name" json:"name"`
 	UseParam          bool            `mapstructure:"use_param" bson:"use_param" json:"use_param"`
 	ParamName         string          `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 	UseCookie         bool            `mapstructure:"use_cookie" bson:"use_cookie" json:"use_cookie"`
 	CookieName        string          `mapstructure:"cookie_name" bson:"cookie_name" json:"cookie_name"`
+	DisableHeader     bool            `mapstructure:"disable_header" bson:"disable_header" json:"disable_header"`
 	AuthHeaderName    string          `mapstructure:"auth_header_name" bson:"auth_header_name" json:"auth_header_name"`
 	UseCertificate    bool            `mapstructure:"use_certificate" bson:"use_certificate" json:"use_certificate"`
 	ValidateSignature bool            `mapstructure:"validate_signature" bson:"validate_signature" json:"validate_signature"`

@@ -110,7 +110,7 @@ func TestSignatureValidation(t *testing.T) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			authTokenType: {
+			apidef.AuthTokenType: {
 				ValidateSignature: true,
 				UseParam:          true,
 				ParamName:         "api_key",
@@ -184,9 +184,9 @@ func TestSignatureValidation(t *testing.T) {
 	})
 
 	t.Run("Dynamic signature", func(t *testing.T) {
-		authConfig := api.AuthConfigs[authTokenType]
+		authConfig := api.AuthConfigs[apidef.AuthTokenType]
 		authConfig.Signature.Secret = "$tyk_meta.signature_secret"
-		api.AuthConfigs[authTokenType] = authConfig
+		api.AuthConfigs[apidef.AuthTokenType] = authConfig
 		ts.Gw.LoadAPI(api)
 
 		key := CreateSession(ts.Gw, func(s *user.SessionState) {
@@ -220,9 +220,9 @@ func TestSignatureValidation(t *testing.T) {
 	})
 
 	t.Run("Dynamic signature with custom key", func(t *testing.T) {
-		authConfig := api.AuthConfigs[authTokenType]
+		authConfig := api.AuthConfigs[apidef.AuthTokenType]
 		authConfig.Signature.Secret = "$tyk_meta.signature_secret"
-		api.AuthConfigs[authTokenType] = authConfig
+		api.AuthConfigs[apidef.AuthTokenType] = authConfig
 		ts.Gw.LoadAPI(api)
 
 		customKey := "c8zj99aze7hdvtaqh4qvcck7"
