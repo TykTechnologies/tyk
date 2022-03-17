@@ -67,23 +67,11 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 
 		switch typ {
 		case block:
-			if operation.Block == nil {
-				operation.Block = &Allowance{}
-			}
-
-			allowance = operation.Block
+			allowance = newAllowance(&operation.Block)
 		case ignoreAuthentication:
-			if operation.IgnoreAuthentication == nil {
-				operation.IgnoreAuthentication = &Allowance{}
-			}
-
-			allowance = operation.IgnoreAuthentication
+			allowance = newAllowance(&operation.IgnoreAuthentication)
 		default:
-			if operation.Allow == nil {
-				operation.Allow = &Allowance{}
-			}
-
-			allowance = operation.Allow
+			allowance = newAllowance(&operation.Allow)
 		}
 
 		allowance.Fill(em)
@@ -91,6 +79,14 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 			allowance = nil
 		}
 	}
+}
+
+func newAllowance(prev **Allowance) *Allowance {
+	if *prev == nil {
+		*prev = &Allowance{}
+	}
+
+	return *prev
 }
 
 func (o *Operation) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
