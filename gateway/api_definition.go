@@ -1397,7 +1397,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	case apidef.HeaderLocation:
 		vName = r.Header.Get(a.VersionDefinition.Key)
 		if a.VersionDefinition.StripVersioningData {
-			log.Debug("Stripping version from header: ", vName)
+			log.Debugf("Stripping version from header: %q", vName)
 			defer r.Header.Del(a.VersionDefinition.Key)
 		}
 
@@ -1405,7 +1405,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	case apidef.URLParamLocation:
 		vName = r.URL.Query().Get(a.VersionDefinition.Key)
 		if a.VersionDefinition.StripVersioningData {
-			log.Debug("Stripping version from query: ", vName)
+			log.Debugf("Stripping version from query: %q", vName)
 			q := r.URL.Query()
 			q.Del(a.VersionDefinition.Key)
 			r.URL.RawQuery = q.Encode()
@@ -1420,7 +1420,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
 				if a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath {
-					log.Debug("Stripping version from url: ", part)
+					log.Debugf("Stripping version from url: %q", part)
 
 					r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
 					r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
@@ -1553,7 +1553,7 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 		r.URL.RawPath = a.StripListenPath(r, r.URL.RawPath)
 	}
 
-	log.Debug("Upstream path is: ", r.URL.Path)
+	log.Debugf("Upstream path is: %q", r.URL.Path)
 }
 
 type RoundRobin struct {

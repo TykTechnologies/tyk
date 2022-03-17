@@ -256,7 +256,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 				log.Debugf("%s: sending %s", host, cmd.Message)
 				_, err = ls.Write([]byte(cmd.Message))
 				if err != nil {
-					log.Errorf("Failed to send %s :%v", cmd.Message, err)
+					log.WithError(err).Errorf("Failed to send %s", cmd.Message)
 					report.IsTCPError = true
 					break
 				}
@@ -264,13 +264,13 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 				buf := make([]byte, len(cmd.Message))
 				_, err = ls.Read(buf)
 				if err != nil {
-					log.Errorf("Failed to read %s :%v", cmd.Message, err)
+					log.WithError(err).Errorf("Failed to read %s", cmd.Message)
 					report.IsTCPError = true
 					break
 				}
 				g := string(buf)
 				if g != cmd.Message {
-					log.Errorf("Failed expectation  expected %s got %s", cmd.Message, g)
+					log.Errorf("Failed expectation  expected %q got %q", cmd.Message, g)
 					report.IsTCPError = true
 					break
 				}

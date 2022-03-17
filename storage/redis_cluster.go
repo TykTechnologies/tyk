@@ -156,8 +156,8 @@ func (r *RedisCluster) cleanKey(keyName string) string {
 }
 
 func (r *RedisCluster) up() error {
-
 	if !r.RedisController.Connected() {
+		log.WithError(ErrRedisIsDown).Debug()
 		return ErrRedisIsDown
 	}
 	return nil
@@ -172,7 +172,7 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 
 	value, err := cluster.Get(r.RedisController.ctx, r.fixKey(keyName)).Result()
 	if err != nil {
-		log.Debug("Error trying to get value:", err)
+		log.WithError(err).Debug("Error trying to get value")
 		return "", ErrKeyNotFound
 	}
 
@@ -250,7 +250,7 @@ func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 	}
 	value, err := r.singleton().Get(r.RedisController.ctx, keyName).Result()
 	if err != nil {
-		log.Debug("Error trying to get value:", err)
+		log.WithError(err).Debug("Error trying to get value")
 		return "", ErrKeyNotFound
 	}
 
@@ -320,12 +320,11 @@ func (r *RedisCluster) Decrement(keyName string) {
 	keyName = r.fixKey(keyName)
 	// log.Debug("Decrementing key: ", keyName)
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return
 	}
 	err := r.singleton().Decr(r.RedisController.ctx, keyName).Err()
 	if err != nil {
-		log.Error("Error trying to decrement value:", err)
+		log.WithError(err).Error("Error trying to decrement value")
 	}
 }
 
@@ -333,7 +332,6 @@ func (r *RedisCluster) Decrement(keyName string) {
 func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
 	// log.Debug("Incrementing raw key: ", keyName)
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return 0
 	}
 	// This function uses a raw key, so we shouldn't call fixKey
@@ -341,9 +339,9 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 	val, err := r.singleton().Incr(r.RedisController.ctx, fixedKey).Result()
 
 	if err != nil {
-		log.Error("Error trying to increment value:", err)
+		log.WithError(err).Error("Error trying to increment value")
 	} else {
-		log.Debug("Incremented key: ", fixedKey, ", val is: ", val)
+		log.Debug("Incremented key: %q, val is: %q", fixedKey, val)
 	}
 
 	if val == 1 && expire > 0 {
@@ -357,7 +355,6 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
 func (r *RedisCluster) GetKeys(filter string) []string {
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return nil
 	}
 	client := r.singleton()
@@ -367,7 +364,7 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 		filterHash = r.hashKey(filter)
 	}
 	searchStr := r.KeyPrefix + filterHash + "*"
-	log.Debug("[STORE] Getting list by: ", searchStr)
+	log.Debugf("[STORE] Getting list by: %q", searchStr)
 
 	fnFetchKeys := func(client *redis.Client) ([]string, error) {
 		values := make([]string, 0)
@@ -412,7 +409,7 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 	}
 
 	if err != nil {
-		log.Error("Error while fetching keys:", err)
+		log.WithError(err).Error("Error while fetching keys")
 		return nil
 	}
 
@@ -426,7 +423,6 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
 func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]string {
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return nil
 	}
 	keys := r.GetKeys(filter)
@@ -499,7 +495,6 @@ func (r *RedisCluster) GetKeysAndValues() map[string]string {
 // DeleteKey will remove a key from the database
 func (r *RedisCluster) DeleteKey(keyName string) bool {
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return false
 	}
 	log.Debug("DEL Key was: ", keyName)
@@ -515,7 +510,6 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 // DeleteAllKeys will remove all keys from the database.
 func (r *RedisCluster) DeleteAllKeys() bool {
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return false
 	}
 	n, err := r.singleton().FlushAll(r.RedisController.ctx).Result()
@@ -533,7 +527,6 @@ func (r *RedisCluster) DeleteAllKeys() bool {
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
 func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return false
 	}
 	n, err := r.singleton().Del(r.RedisController.ctx, keyName).Result()
@@ -547,7 +540,6 @@ func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 // DeleteKeys will remove a group of keys in bulk
 func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return false
 	}
 	client := r.singleton()
@@ -618,7 +610,6 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 // DeleteKeys will remove a group of keys in bulk
 func (r *RedisCluster) DeleteKeys(keys []string) bool {
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return false
 	}
 	if len(keys) > 0 {
@@ -704,7 +695,6 @@ func (r *RedisCluster) Publish(channel, message string) error {
 func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 	log.Debug("Getting raw key set: ", keyName)
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return nil
 	}
 	log.Debug("keyName is: ", keyName)
@@ -744,7 +734,6 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 	log.WithField("keyName", keyName).Debug("Pushing to raw key list")
 	log.WithField("fixedKey", fixedKey).Debug("Appending to fixed key list")
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return
 	}
 	if err := r.singleton().RPush(r.RedisController.ctx, fixedKey, value).Err(); err != nil {
@@ -813,7 +802,6 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 
 	fixedKey := r.fixKey(key)
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return
 	}
 	client := r.singleton()
@@ -852,7 +840,6 @@ func (r *RedisCluster) AddToSet(keyName, value string) {
 	log.Debug("Pushing to raw key set: ", keyName)
 	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return
 	}
 	err := r.singleton().SAdd(r.RedisController.ctx, r.fixKey(keyName), value).Err()
@@ -865,7 +852,6 @@ func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 	log.Debug("Removing from raw key set: ", keyName)
 	log.Debug("Removing from fixed key set: ", r.fixKey(keyName))
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return
 	}
 	err := r.singleton().SRem(r.RedisController.ctx, r.fixKey(keyName), value).Err()
@@ -876,33 +862,40 @@ func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 
 func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return false
 	}
 	val, err := r.singleton().SIsMember(r.RedisController.ctx, r.fixKey(keyName), value).Result()
 
+	logEntry := logrus.Fields{
+		"keyName":  keyName,
+		"value":    value,
+		"response": val,
+	}
+
 	if err != nil {
-		log.Error("Error trying to check set memeber: ", err)
+		log.WithFields(logEntry).WithError(err).Error("SISMEMBER command failed")
 		return false
 	}
 
-	log.Debug("SISMEMBER", keyName, value, val, err)
-
-	return val == true
+	return val
 }
 
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values
 func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_override string, pipeline bool) (int, []interface{}) {
-	log.Debug("Incrementing raw key: ", keyName)
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return 0, nil
 	}
-	log.Debug("keyName is: ", keyName)
+
 	now := time.Now()
-	log.Debug("Now is:", now)
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
-	log.Debug("Then is: ", onePeriodAgo)
+
+	logEntry := logrus.Fields{
+		"keyName": keyName,
+		"now":     now,
+		"then":    onePeriodAgo,
+	}
+
+	log.WithFields(logEntry).Debug("SetRollingWindow")
 
 	client := r.singleton()
 	var zrange *redis.StringSliceCmd
@@ -935,7 +928,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 	}
 
 	if err != nil {
-		log.Error("Multi command failed: ", err)
+		log.WithFields(logEntry).WithError(err).Error("SetRollingWindow: multi command failed")
 		return 0, nil
 	}
 
@@ -960,7 +953,6 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 
 func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return 0, nil
 	}
 	now := time.Now()
@@ -1020,7 +1012,6 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 	log.WithFields(logEntry).Debug("Pushing raw key to sorted set")
 
 	if err := r.up(); err != nil {
-		log.Debug(err)
 		return
 	}
 	member := redis.Z{Score: score, Member: value}

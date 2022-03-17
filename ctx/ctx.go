@@ -84,7 +84,7 @@ func GetSession(r *http.Request) *user.SessionState {
 	if v := r.Context().Value(SessionData); v != nil {
 		if val, ok := v.(*user.SessionState); ok {
 			return val
-		}else {
+		} else {
 			logger.Get().Warning("SessionState struct differ from the gateway version, trying to unmarshal.")
 			sess := user.SessionState{}
 			b, _ := json.Marshal(v)
@@ -111,7 +111,7 @@ func GetDefinition(r *http.Request) *apidef.APIDefinition {
 	if v := r.Context().Value(Definition); v != nil {
 		if val, ok := v.(*apidef.APIDefinition); ok {
 			return val
-		}else {
+		} else {
 			logger.Get().Warning("APIDefinition struct differ from the gateway version, trying to unmarshal.")
 			def := apidef.APIDefinition{}
 			b, _ := json.Marshal(v)
