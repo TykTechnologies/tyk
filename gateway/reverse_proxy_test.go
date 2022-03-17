@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -894,6 +895,94 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 			{Data: people, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
 		}...)
 	})
+}
+
+func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	// tests run in parallel and memConnProviders is a global struct.
+	// For consistency, we use unique names for the subgraphs.
+	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
+		spec.Name = fmt.Sprintf("subgraph-accounts-%d", rand.Intn(1000))
+		spec.APIID = "subgraph1"
+		spec.Proxy.TargetURL = testSubgraphAccounts
+		spec.Proxy.ListenPath = "/tyk-subgraph-accounts"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaAccounts,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLAccounts,
+			},
+		}
+	})[0]
+
+	tykSubgraphReviews := BuildAPI(func(spec *APISpec) {
+		spec.Name = fmt.Sprintf("subgraph-reviews-%d", rand.Intn(1000))
+		spec.APIID = "subgraph2"
+		spec.Proxy.TargetURL = testSubgraphReviews
+		spec.Proxy.ListenPath = "/tyk-subgraph-reviews"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaReviews,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLReviews,
+			},
+		}
+	})[0]
+
+	supergraph := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.APIID = "supergraph"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			Version:       apidef.GraphQLConfigVersion2,
+			ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
+			Supergraph: apidef.GraphQLSupergraphConfig{
+				Subgraphs: []apidef.GraphQLSubgraphEntity{
+					{
+						APIID: "subgraph1",
+						URL:   "tyk://" + tykSubgraphAccounts.Name,
+						SDL:   gqlSubgraphSDLAccounts,
+					},
+					{
+						APIID: "subgraph2",
+						URL:   "tyk://" + tykSubgraphReviews.Name,
+						SDL:   gqlSubgraphSDLReviews,
+					},
+				},
+				MergedSDL: gqlMergedSupergraphSDL,
+			},
+			Schema: gqlMergedSupergraphSDL,
+		}
+	})[0]
+
+	g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
+
+	reviews := graphql.Request{
+		Query: `query Query { me { id username reviews { body } } }`,
+	}
+
+	_, _ = g.Run(t, []test.TestCase{
+		{Data: reviews, BodyMatch: `{"data":{"me":{"id":"1","username":"tyk","reviews":\[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}\]}}}`, Code: http.StatusOK},
+	}...)
+
+	memConnProviders.mtx.Lock()
+	require.Contains(t, memConnProviders.m, tykSubgraphAccounts.Name)
+	require.Contains(t, memConnProviders.m, tykSubgraphReviews.Name)
+	memConnProviders.mtx.Unlock()
+
+	// Remove memconn.Provider structs from the cache, if they are idle for a while.
+	cleanIdleMemConnProvidersEagerly(time.Now().Add(2 * time.Minute))
+
+	memConnProviders.mtx.Lock()
+	require.NotContains(t, memConnProviders.m, tykSubgraphAccounts.Name)
+	require.NotContains(t, memConnProviders.m, tykSubgraphReviews.Name)
+	memConnProviders.mtx.Unlock()
 }
 
 func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {

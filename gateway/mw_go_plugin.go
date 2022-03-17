@@ -133,8 +133,7 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 }
 
 func (m *GoPluginMiddleware) goPluginFromRequest(r *http.Request) (*GoPluginMiddleware, bool) {
-	version, _ := m.Spec.Version(r)
-	versionPaths := m.Spec.RxPaths[version.Name]
+	_, versionPaths, _, _ := m.Spec.Version(r)
 	found, perPathPerMethodGoPlugin := m.Spec.CheckSpecMatchesStatus(r, versionPaths, GoPlugin)
 	if !found {
 		return nil, false

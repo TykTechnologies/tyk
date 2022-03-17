@@ -106,8 +106,7 @@ func (d *VirtualEndpoint) EnabledForSpec() bool {
 }
 
 func (d *VirtualEndpoint) getMetaFromRequest(r *http.Request) *apidef.VirtualMeta {
-	version, _ := d.Spec.Version(r)
-	versionPaths := d.Spec.RxPaths[version.Name]
+	_, versionPaths, _, _ := d.Spec.Version(r)
 	found, meta := d.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 	if !found {
 		return nil

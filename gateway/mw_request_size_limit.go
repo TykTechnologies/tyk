@@ -59,7 +59,7 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	logger := t.Logger()
 	logger.Debug("Request size limiter active")
 
-	vInfo, _ := t.Spec.Version(r)
+	vInfo, versionPaths, _, _ := t.Spec.Version(r)
 
 	logger.Debug("Global limit is: ", vInfo.GlobalSizeLimit)
 	// Manage global headers first
@@ -77,8 +77,6 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 		return nil, http.StatusOK
 	}
 
-	versionPaths := t.Spec.RxPaths[vInfo.Name]
-	
 	// If there's a potential match, try to match
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, RequestSizeLimit)
 	if found {

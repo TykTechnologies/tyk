@@ -5,8 +5,6 @@ import "gopkg.in/mgo.v2/bson"
 type GraphAccessDefinition struct {
 }
 
-// Policy represents a user policy
-// swagger:model
 type Policy struct {
 	MID                           bson.ObjectId                    `bson:"_id,omitempty" json:"_id"`
 	ID                            string                           `bson:"id,omitempty" json:"id"`
