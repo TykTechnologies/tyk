@@ -16,4 +16,12 @@ func TestLogQuoting(t *testing.T) {
 	log.WithFields(logrus.Fields{
 		"text": "\rhello\n",
 	}).Info("hey")
+
+	rawLog := logger.GetRaw()
+	rawLog.Info("\rhello\n")
+
+	logger.LoadTranslations(map[string]interface{}{
+		"foo": "bar",
+	})
+	log.WithField("code", "foo").Info("foo")
 }
