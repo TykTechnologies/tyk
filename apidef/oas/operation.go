@@ -13,6 +13,10 @@ type Operation struct {
 	Allow                *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
 	Block                *Allowance `bson:"block,omitempty" json:"block,omitempty"`
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
+	// TransformRequestMethod allows you to transform the method of a request.
+	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
+	Cache                  *CachePlugin            `bson:"cache,omitempty" json:"cache,omitempty"`
+	EnforceTimeout         *EnforceTimeout         `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
 }
 
 const (
@@ -31,6 +35,9 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillAllowance(ep.WhiteList, allow)
 	s.fillAllowance(ep.BlackList, block)
 	s.fillAllowance(ep.Ignored, ignoreAuthentication)
+	s.fillTransformRequestMethod(ep.MethodTransforms)
+	s.fillCache(ep.AdvanceCacheConfig)
+	s.fillEnforceTimeout(ep.HardTimeouts)
 
 	if len(s.Paths) == 0 {
 		s.Paths = nil
@@ -51,6 +58,9 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractAllowanceTo(ep, path, method, allow)
 					tykOp.extractAllowanceTo(ep, path, method, block)
 					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
+					tykOp.extractTransformRequestMethodTo(ep, path, method)
+					tykOp.extractCacheTo(ep, path, method)
+					tykOp.extractEnforceTimeoutTo(ep, path, method)
 					break found
 				}
 			}
@@ -89,6 +99,51 @@ func newAllowance(prev **Allowance) *Allowance {
 	return *prev
 }
 
+func (s *OAS) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.TransformRequestMethod == nil {
+			operation.TransformRequestMethod = &TransformRequestMethod{}
+		}
+
+		operation.TransformRequestMethod.Fill(meta)
+		if ShouldOmit(operation.TransformRequestMethod) {
+			operation.TransformRequestMethod = nil
+		}
+	}
+}
+
+func (s *OAS) fillCache(metas []apidef.CacheMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.Cache == nil {
+			operation.Cache = &CachePlugin{}
+		}
+
+		operation.Cache.Fill(meta)
+		if ShouldOmit(operation.Cache) {
+			operation.Cache = nil
+		}
+	}
+}
+
+func (s *OAS) fillEnforceTimeout(metas []apidef.HardTimeoutMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.EnforceTimeout == nil {
+			operation.EnforceTimeout = &EnforceTimeout{}
+		}
+
+		operation.EnforceTimeout.Fill(meta)
+		if ShouldOmit(operation.EnforceTimeout) {
+			operation.EnforceTimeout = nil
+		}
+	}
+}
+
 func (o *Operation) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
 	allowance := o.Allow
 	endpointMetas := &ep.WhiteList
@@ -109,6 +164,39 @@ func (o *Operation) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string,
 	endpointMeta := apidef.EndPointMeta{Path: path, Method: method}
 	allowance.ExtractTo(&endpointMeta)
 	*endpointMetas = append(*endpointMetas, endpointMeta)
+}
+
+func (o *Operation) extractTransformRequestMethodTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.TransformRequestMethod == nil {
+		return
+	}
+
+	meta := apidef.MethodTransformMeta{Path: path, Method: method}
+	o.TransformRequestMethod.ExtractTo(&meta)
+	ep.MethodTransforms = append(ep.MethodTransforms, meta)
+}
+
+func (o *Operation) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.Cache == nil {
+		return
+	}
+
+	newCacheMeta := apidef.CacheMeta{
+		Method: method,
+		Path:   path,
+	}
+	o.Cache.ExtractTo(&newCacheMeta)
+	ep.AdvanceCacheConfig = append(ep.AdvanceCacheConfig, newCacheMeta)
+}
+
+func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.EnforceTimeout == nil {
+		return
+	}
+
+	meta := apidef.HardTimeoutMeta{Path: path, Method: method}
+	o.EnforceTimeout.ExtractTo(&meta)
+	ep.HardTimeouts = append(ep.HardTimeouts, meta)
 }
 
 func (s *OAS) getOperationID(path, method string) (operationID string) {
