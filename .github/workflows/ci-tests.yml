@@ -40,13 +40,13 @@ jobs:
         run: |
           sudo apt-get install libluajit-5.1-dev
           GO111MODULE=off go get golang.org/x/tools/cmd/goimports
-          gofmt -l . 2>&1 | tee fmt.log
-          fmt_code=${PIPESTATUS[0]}
+          gofmt -l . >> fmt.log
+          fmt_lines=$(wc -l < fmt.log)
           echo "::set-output name=fmt::$(sed -ze 's/%/%25/g;s/\n/%0A/g' fmt.log)"
           goimports -l . 2>&1 | tee imports.log
           imports_code=${PIPESTATUS[0]}
           echo "::set-output name=imports::$(sed -ze 's/%/%25/g;s/\n/%0A/g' imports.log)"
-          [[ $fmt_code -ne 0 || $imports_code -ne 0 ]] && exit 1
+          [[ $fmt_lines -ne 0 || $imports_code -ne 0 ]] && exit 1
           
           python -m pip install --upgrade pip
           pip install setuptools
