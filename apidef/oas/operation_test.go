@@ -21,14 +21,13 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 		},
 	}
 
+	var operation Operation
+	Fill(t, &operation, 0)
+
 	xTykAPIGateway := &XTykAPIGateway{
 		Middleware: &Middleware{
 			Operations: Operations{
-				operationId: {
-					Allow: &Allowance{
-						Enabled: true,
-					},
-				},
+				operationId: &operation,
 			},
 		},
 	}
