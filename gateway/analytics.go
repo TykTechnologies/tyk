@@ -9,12 +9,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	maxminddb "github.com/oschwald/maxminddb-golang"
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
+	maxminddb "github.com/oschwald/maxminddb-golang"
 )
 
 type NetworkStats struct {
@@ -190,6 +188,7 @@ type RedisAnalyticsHandler struct {
 	Clean                       Purger
 	Gw                          *Gateway `json:"-"`
 	mu                          sync.Mutex
+	analyticsSerializer         AnalyticsSerializer
 }
 
 func (r *RedisAnalyticsHandler) Init() {
@@ -208,9 +207,10 @@ func (r *RedisAnalyticsHandler) Init() {
 
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
-	r.enableMultipleAnalyticsKeys = r.Gw.GetConfig().AnalyticsConfig.EnableMultipleAnalyticsKeys
+	r.enableMultipleAnalyticsKeys = r.globalConf.AnalyticsConfig.EnableMultipleAnalyticsKeys
 	r.recordsChan = make(chan *AnalyticsRecord, recordsBufferSize)
 
+	r.analyticsSerializer = NewAnalyticsSerializer(r.globalConf.AnalyticsConfig.SerializerType)
 	// start worker pool
 	atomic.SwapUint32(&r.shouldStop, 0)
 	for i := 0; i < ps; i++ {
@@ -264,6 +264,8 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			suffix := rand.Intn(10)
 			analyticKey = fmt.Sprintf("%v_%v", analyticKey, suffix)
 		}
+		serliazerSuffix := r.analyticsSerializer.GetSuffix()
+		analyticKey += serliazerSuffix
 		readyToSend := false
 		select {
 
@@ -309,7 +311,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 				record.RawPath = "/" + record.RawPath
 			}
 
-			if encoded, err := msgpack.Marshal(record); err != nil {
+			if encoded, err := r.analyticsSerializer.Encode(record); err != nil {
 				log.WithError(err).Error("Error encoding analytics data")
 			} else {
 				recordsBuffer = append(recordsBuffer, encoded)
