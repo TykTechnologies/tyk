@@ -267,6 +267,33 @@ func (s *OAS) extractOAuthTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.OAuthType] = authConfig
 }
 
+func (s *OAS) fillCustomPlugin(api apidef.APIDefinition) {
+	authConfig, ok := api.AuthConfigs[apidef.CoprocessType]
+	if !ok {
+		return
+	}
+
+	customPlugin := &CustomPlugin{}
+	customPlugin.Enabled = api.EnableCoProcessAuth
+	customPlugin.AuthSources.Fill(authConfig)
+
+	if ShouldOmit(customPlugin) {
+		customPlugin = nil
+	}
+
+	s.getTykAuthentication().CustomPlugin = customPlugin
+}
+
+func (s *OAS) extractCustomPluginTo(api *apidef.APIDefinition) {
+	authConfig := apidef.AuthConfig{DisableHeader: true}
+
+	customPlugin := s.getTykAuthentication().CustomPlugin
+	api.EnableCoProcessAuth = customPlugin.Enabled
+	customPlugin.AuthSources.ExtractTo(&authConfig)
+
+	api.AuthConfigs[apidef.CoprocessType] = authConfig
+}
+
 func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	if a := s.getTykAuthentication(); a != nil {
 		api.UseKeylessAccess = !a.Enabled
@@ -278,6 +305,10 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 
 	if api.AuthConfigs == nil {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	}
+
+	if s.getTykAuthentication().CustomPlugin != nil {
+		s.extractCustomPluginTo(api)
 	}
 
 	if len(s.Security) == 0 || len(s.Components.SecuritySchemes) == 0 {
@@ -320,6 +351,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillJWT(api)
 	s.fillBasic(api)
 	s.fillOAuth(api)
+	s.fillCustomPlugin(api)
 
 	if ShouldOmit(a) {
 		s.GetTykExtension().Server.Authentication = nil
