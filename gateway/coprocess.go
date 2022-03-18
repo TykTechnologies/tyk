@@ -69,7 +69,7 @@ type CoProcessor struct {
 }
 
 // BuildObject constructs a CoProcessObject from a given http.Request.
-func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*coprocess.Object, error) {
+func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *APISpec) (*coprocess.Object, error) {
 	headers := ProtoMap(req.Header)
 
 	host := req.Host
@@ -131,10 +131,16 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*copro
 			}
 		}
 
+		bundleHash, err := c.Middleware.Gw.getHashedBundleName(spec.CustomMiddlewareBundle)
+		if err != nil {
+			return nil, err
+		}
+
 		object.Spec = map[string]string{
 			"OrgID":       c.Middleware.Spec.OrgID,
 			"APIID":       c.Middleware.Spec.APIID,
 			"config_data": string(configDataAsJSON),
+			"bundle_hash": bundleHash,
 		}
 	}
 
@@ -304,7 +310,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	logger := m.Logger()
 	logger.Debug("CoProcess Request, HookType: ", m.HookType)
 	originalURL := r.URL
-	authToken, _ := m.getAuthToken(coprocessType, r)
+	authToken, _ := m.getAuthToken(apidef.CoprocessType, r)
 
 	var extractor IdExtractor
 	if m.Spec.EnableCoProcessAuth && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
@@ -329,7 +335,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		Middleware: m,
 	}
 
-	object, err := coProcessor.BuildObject(r, nil)
+	object, err := coProcessor.BuildObject(r, nil, m.Spec)
 	if err != nil {
 		logger.WithError(err).Error("Failed to build request object")
 		return errors.New("Middleware error"), 500
@@ -515,7 +521,7 @@ func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) er
 
 // getAuthType overrides BaseMiddleware.getAuthType.
 func (m *CoProcessMiddleware) getAuthType() string {
-	return coprocessType
+	return apidef.CoprocessType
 }
 
 func (h *CustomMiddlewareResponseHook) Name() string {
@@ -535,7 +541,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		Middleware: h.mw,
 	}
 
-	object, err := coProcessor.BuildObject(req, res)
+	object, err := coProcessor.BuildObject(req, res, h.mw.Spec)
 	if err != nil {
 		log.WithError(err).Debug("Couldn't build request object")
 		return errors.New("Middleware error")

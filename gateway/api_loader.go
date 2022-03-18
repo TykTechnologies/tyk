@@ -304,6 +304,8 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		logger.Info("Checking security policy: Open")
 	}
 
+	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
+
 	for _, obj := range mwPreFuncs {
 		if mwDriver == apidef.GoPluginDriver {
 			gw.mwAppendEnabled(
@@ -323,7 +325,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 	}
 
-	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
@@ -576,14 +577,14 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.SH.Spec.target.Scheme == "tyk" {
-		handler, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+		handler, _, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
 		if !found {
 			handler := ErrorHandler{*d.SH.Base()}
 			handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
 			return
 		}
 
-		sanitizeProxyPaths(d.SH.Spec, r)
+		d.SH.Spec.SanitizeProxyPaths(r)
 		handler.ServeHTTP(w, r)
 		return
 	}
@@ -591,27 +592,18 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.SH.ServeHTTP(w, r)
 }
 
-func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, ok bool) {
-	targetAPI := gw.fuzzyFindAPI(apiNameOrID)
+func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, targetAPI *APISpec, ok bool) {
+	targetAPI = gw.fuzzyFindAPI(apiNameOrID)
 	if targetAPI == nil {
-		return nil, false
+		return
 	}
 
 	h, found := gw.apisHandlesByID.Load(targetAPI.APIID)
 	if !found {
-		return nil, false
+		return nil, nil, false
 	}
 
-	return h.(http.Handler), true
-}
-
-func sanitizeProxyPaths(apiSpec *APISpec, request *http.Request) {
-	if !apiSpec.Proxy.StripListenPath {
-		return
-	}
-
-	request.URL.Path = apiSpec.StripListenPath(request, request.URL.Path)
-	request.URL.RawPath = apiSpec.StripListenPath(request, request.URL.RawPath)
+	return h.(http.Handler), targetAPI, true
 }
 
 func (gw *Gateway) loadGlobalApps() {

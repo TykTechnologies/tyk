@@ -18,35 +18,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/storage"
+
 	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 )
 
-// StorageHandler is a standard interface to a storage backend,
-// used by AuthorisationManager to read and write key values to the backend
-type StorageHandler interface {
-	GetKey(string) (string, error)
-	SetKey(string, string, int64) error
-	GetKeys(string) []string
-	DeleteKey(string) bool
-	DeleteScanMatch(string) bool
-	GetListRange(string, int64, int64) ([]string, error)
-	RemoveFromList(string, string) error
-	AppendToSet(string, string)
-	Exists(string) (bool, error)
-}
-
 var CertManagerLogPrefix = "cert_storage"
 
 type CertificateManager struct {
-	storage         StorageHandler
+	storage         storage.Handler
 	logger          *logrus.Entry
 	cache           *cache.Cache
 	secret          string
 	migrateCertList bool
 }
 
-func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
+func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
@@ -60,7 +48,13 @@ func NewCertificateManager(storage StorageHandler, secret string, logger *logrus
 	}
 }
 
-func NewSlaveCertManager(storage, rpcStorage StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
+func getOrgFromKeyID(key, certID string) string {
+	orgId := strings.ReplaceAll(key, "raw-", "")
+	orgId = strings.ReplaceAll(orgId, certID, "")
+	return orgId
+}
+
+func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
@@ -73,7 +67,18 @@ func NewSlaveCertManager(storage, rpcStorage StorageHandler, secret string, logg
 		migrateCertList: migrateCertList,
 	}
 
-	mdcbStorage := newMdcbCertStorage(storage, rpcStorage, log, cm.Add)
+	callbackOnPullCertFromRPC := func(key, val string) error {
+		// calculate the orgId from the keyId
+		certID, _, _ := GetCertIDAndChainPEM([]byte(val), "")
+		orgID := getOrgFromKeyID(key, certID)
+		// save the cert in local redis
+		_, err := cm.Add([]byte(val), orgID)
+		return err
+	}
+
+	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log)
+	mdcbStorage.CallbackonPullfromRPC = &callbackOnPullCertFromRPC
+
 	cm.storage = mdcbStorage
 	return cm
 }
@@ -236,6 +241,28 @@ func isCertCanBeListed(cert *tls.Certificate, mode CertificateType) bool {
 	}
 
 	return true
+}
+
+type CertificateBasics struct {
+	ID            string    `json:"id"`
+	IssuerCN      string    `json:"issuer_cn"`
+	SubjectCN     string    `json:"subject_cn"`
+	DNSNames      []string  `json:"dns_names"`
+	HasPrivateKey bool      `json:"has_private"`
+	NotBefore     time.Time `json:"not_before"`
+	NotAfter      time.Time `json:"not_after"`
+}
+
+func ExtractCertificateBasics(cert *tls.Certificate, certID string) *CertificateBasics {
+	return &CertificateBasics{
+		ID:            certID,
+		IssuerCN:      cert.Leaf.Issuer.CommonName,
+		SubjectCN:     cert.Leaf.Subject.CommonName,
+		DNSNames:      cert.Leaf.DNSNames,
+		HasPrivateKey: !isPrivateKeyEmpty(cert),
+		NotAfter:      cert.Leaf.NotAfter,
+		NotBefore:     cert.Leaf.NotBefore,
+	}
 }
 
 type CertificateMeta struct {

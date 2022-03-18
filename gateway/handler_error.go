@@ -24,11 +24,12 @@ const (
 	defaultTemplateFormat = "json"
 	defaultContentType    = headers.ApplicationJSON
 
-	MsgAuthFieldMissing    = "Authorization field missing"
-	MsgApiAccessDisallowed = "Access to this API has been disallowed"
-	MsgBearerMailformed    = "Bearer token malformed"
-	MsgKeyNotAuthorized    = "Key not authorised"
-	MsgOauthClientRevoked  = "Key not authorised. OAuth client access was revoked"
+	MsgAuthFieldMissing                        = "Authorization field missing"
+	MsgApiAccessDisallowed                     = "Access to this API has been disallowed"
+	MsgBearerMailformed                        = "Bearer token malformed"
+	MsgKeyNotAuthorized                        = "Key not authorised"
+	MsgOauthClientRevoked                      = "Key not authorised. OAuth client access was revoked"
+	MsgKeyNotAuthorizedUnexpectedSigningMethod = "Key not authorized: Unexpected signing method"
 )
 
 var errCustomBodyResponse = errors.New("errCustomBodyResponse")
@@ -226,12 +227,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		if e.Spec.Proxy.StripListenPath {
 			r.URL.Path = e.Spec.StripListenPath(r, r.URL.Path)
-		}
-
-		// This is an odd bugfix, will need further testing
-		r.URL.Path = "/" + r.URL.Path
-		if strings.HasPrefix(r.URL.Path, "//") {
-			r.URL.Path = strings.TrimPrefix(r.URL.Path, "/")
 		}
 
 		oauthClientID := ""

@@ -31,6 +31,7 @@ func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	if token != "abc" {
 		rw.Header().Add(headers.XAuthResult, "failed")
 		rw.WriteHeader(http.StatusForbidden)
+		_, _ = rw.Write([]byte("auth failed"))
 		return
 	}
 
@@ -71,6 +72,18 @@ func MyPluginPost(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	apiDefinition := ctx.GetDefinition(r)
+	if apiDefinition == nil {
+		rw.Header().Add("X-Plugin-Data", "null")
+	} else {
+		pluginConfig, ok := apiDefinition.ConfigData["my-context-data"].(string)
+		if !ok || pluginConfig == "" {
+			rw.Header().Add("X-Plugin-Data", "null")
+		} else {
+			rw.Header().Add("X-Plugin-Data", pluginConfig)
+		}
+
+	}
 	rw.Header().Set(headers.ContentType, headers.ApplicationJSON)
 	rw.WriteHeader(http.StatusOK)
 	rw.Write(jsonData)

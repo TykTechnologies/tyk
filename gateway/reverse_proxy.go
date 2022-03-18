@@ -767,7 +767,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 			r.Header.Del(apidef.TykInternalApiHeader)
 		}
 
-		handler, found := rt.Gw.findInternalHttpHandlerByNameOrID(r.Host)
+		handler, _, found := rt.Gw.findInternalHttpHandlerByNameOrID(r.Host)
 		if !found {
 			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
 			return nil, errors.New("handler could")
@@ -785,37 +785,130 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 const (
-	inMemNetworkName = "in-mem-network"
-	inMemNetworkType = "memu"
+	checkIdleMemConnInterval = 5 * time.Minute
+	maxIdleMemConnDuration   = time.Minute
+	inMemNetworkName         = "in-mem-network"
+	inMemNetworkType         = "memu"
 )
 
-func handleInMemoryLoop(handler http.Handler, r *http.Request) (resp *http.Response, err error) {
-	// use separate provider for each request
-	provider := memconn.Provider{}
+type memConnProvider struct {
+	listener net.Listener
+	provider *memconn.Provider
+	expireAt time.Time
+}
 
+var memConnProviders = &struct {
+	mtx sync.RWMutex
+	m   map[string]*memConnProvider
+}{
+	m: make(map[string]*memConnProvider),
+}
+
+// cleanIdleMemConnProvidersEagerly deletes idle memconn.Provider instances and
+// closes the underlying listener to free resources.
+func cleanIdleMemConnProvidersEagerly(pointInTime time.Time) {
+	memConnProviders.mtx.Lock()
+	defer memConnProviders.mtx.Unlock()
+
+	for host, mp := range memConnProviders.m {
+		if mp.expireAt.Before(pointInTime) {
+			delete(memConnProviders.m, host)
+			// on listener.Close http.Serve will return with error and stop goroutine
+			_ = mp.listener.Close()
+		}
+	}
+}
+
+// cleanIdleMemConnProviders checks memconn.Provider instances periodically and
+// deletes idle ones.
+func cleanIdleMemConnProviders(ctx context.Context) {
+	ticker := time.NewTicker(checkIdleMemConnInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cleanIdleMemConnProvidersEagerly(time.Now())
+		}
+	}
+}
+
+// getMemConnProvider return the cached memconn.Provider, if it's available in the cache.
+func getMemConnProvider(addr string) (*memconn.Provider, error) {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	memConnProviders.mtx.RLock()
+	defer memConnProviders.mtx.RUnlock()
+
+	p, ok := memConnProviders.m[host]
+	if !ok {
+		return nil, fmt.Errorf("no provider found for: %s", addr)
+	}
+
+	return p.provider, nil
+}
+
+// createMemConnProviderIfNeeded creates a new memconn.Provider and net.Listener
+// for the given host.
+func createMemConnProviderIfNeeded(handler http.Handler, r *http.Request) error {
+	memConnProviders.mtx.Lock()
+	defer memConnProviders.mtx.Unlock()
+
+	p, ok := memConnProviders.m[r.Host]
+	if ok {
+		// Clean the providers and close its listener, if it is idle for a while.
+		p.expireAt = time.Now().Add(maxIdleMemConnDuration)
+		return nil
+	}
+
+	provider := &memconn.Provider{}
 	// start in mem listener
 	lis, err := provider.Listen(inMemNetworkType, inMemNetworkName)
-	// on lis.Close http.Serve will return with error and stop goroutine
-	defer func() { _ = lis.Close() }()
+	if err != nil {
+		return err
+	}
 
 	// start http server with in mem listener
 	// Note: do not try to use http.Server it is working only with mux
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
+
 	go func() { _ = http.Serve(lis, mux) }()
 
-	r.URL.Scheme = "http"
+	memConnProviders.m[r.Host] = &memConnProvider{
+		listener: lis,
+		provider: provider,
+		expireAt: time.Now().Add(maxIdleMemConnDuration),
+	}
+	return nil
+}
 
-	// create http client with in mem transport
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				return provider.DialContext(ctx, inMemNetworkType, inMemNetworkName)
-			},
+// memConnClient is used to make request to internal APIs.
+var memConnClient = &http.Client{
+	Transport: &http.Transport{
+		DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
+			provider, err := getMemConnProvider(addr)
+			if err != nil {
+				return nil, err
+			}
+			return provider.DialContext(ctx, inMemNetworkType, inMemNetworkName)
 		},
+	},
+}
+
+func handleInMemoryLoop(handler http.Handler, r *http.Request) (resp *http.Response, err error) {
+	err = createMemConnProviderIfNeeded(handler, r)
+	if err != nil {
+		return nil, err
 	}
 
-	return client.Do(r)
+	r.URL.Scheme = "http"
+	return memConnClient.Do(r)
 }
 
 func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, latency time.Duration, err error) {
@@ -1023,6 +1116,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// Do this before we make a shallow copy
 	session := ctxGetSession(req)
+	// mantain the body
+	copyRequest(req)
 
 	outreq := new(http.Request)
 	logreq := new(http.Request)
@@ -1098,7 +1193,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// set up TLS certificates for upstream if needed
 	var tlsCertificates []tls.Certificate
-	if cert := p.Gw.getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
+	if cert := p.Gw.getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec); cert != nil {
 		p.logger.Debug("Found upstream mutual TLS certificate")
 		tlsCertificates = []tls.Certificate{*cert}
 	}
@@ -1601,7 +1696,9 @@ func copyBody(body io.ReadCloser) io.ReadCloser {
 }
 
 func copyRequest(r *http.Request) *http.Request {
-	if r.ContentLength == -1 {
+	if r.ContentLength == -1 &&
+		// for unknown length, if request is not gRPC we assume it's chunked transfer encoding
+		IsGrpcStreaming(r) {
 		return r
 	}
 
@@ -1652,11 +1749,6 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 		return false, ""
 	}
 
-	EncodeAccept := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Accept)))
-	if EncodeAccept == "text/event-stream" {
-		return true, ""
-	}
-
 	connection := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Connection)))
 	if connection != "upgrade" {
 		return false, ""
@@ -1672,5 +1764,7 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 
 // IsGrpcStreaming  determines wether a request represents a grpc streaming req
 func IsGrpcStreaming(r *http.Request) bool {
-	return r.ContentLength == -1 && r.Header.Get(headers.ContentType) == "application/grpc"
+	return r.ContentLength == -1 &&
+		// gRPC over HTTP/2 requests content-type should begin with "application/grpc"
+		strings.HasPrefix(r.Header.Get(headers.ContentType), "application/grpc")
 }

@@ -8,13 +8,17 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"text/template"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -894,6 +898,94 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 	})
 }
 
+func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	// tests run in parallel and memConnProviders is a global struct.
+	// For consistency, we use unique names for the subgraphs.
+	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
+		spec.Name = fmt.Sprintf("subgraph-accounts-%d", rand.Intn(1000))
+		spec.APIID = "subgraph1"
+		spec.Proxy.TargetURL = testSubgraphAccounts
+		spec.Proxy.ListenPath = "/tyk-subgraph-accounts"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaAccounts,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLAccounts,
+			},
+		}
+	})[0]
+
+	tykSubgraphReviews := BuildAPI(func(spec *APISpec) {
+		spec.Name = fmt.Sprintf("subgraph-reviews-%d", rand.Intn(1000))
+		spec.APIID = "subgraph2"
+		spec.Proxy.TargetURL = testSubgraphReviews
+		spec.Proxy.ListenPath = "/tyk-subgraph-reviews"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaReviews,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLReviews,
+			},
+		}
+	})[0]
+
+	supergraph := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.APIID = "supergraph"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			Version:       apidef.GraphQLConfigVersion2,
+			ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
+			Supergraph: apidef.GraphQLSupergraphConfig{
+				Subgraphs: []apidef.GraphQLSubgraphEntity{
+					{
+						APIID: "subgraph1",
+						URL:   "tyk://" + tykSubgraphAccounts.Name,
+						SDL:   gqlSubgraphSDLAccounts,
+					},
+					{
+						APIID: "subgraph2",
+						URL:   "tyk://" + tykSubgraphReviews.Name,
+						SDL:   gqlSubgraphSDLReviews,
+					},
+				},
+				MergedSDL: gqlMergedSupergraphSDL,
+			},
+			Schema: gqlMergedSupergraphSDL,
+		}
+	})[0]
+
+	g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
+
+	reviews := graphql.Request{
+		Query: `query Query { me { id username reviews { body } } }`,
+	}
+
+	_, _ = g.Run(t, []test.TestCase{
+		{Data: reviews, BodyMatch: `{"data":{"me":{"id":"1","username":"tyk","reviews":\[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}\]}}}`, Code: http.StatusOK},
+	}...)
+
+	memConnProviders.mtx.Lock()
+	require.Contains(t, memConnProviders.m, tykSubgraphAccounts.Name)
+	require.Contains(t, memConnProviders.m, tykSubgraphReviews.Name)
+	memConnProviders.mtx.Unlock()
+
+	// Remove memconn.Provider structs from the cache, if they are idle for a while.
+	cleanIdleMemConnProvidersEagerly(time.Now().Add(2 * time.Minute))
+
+	memConnProviders.mtx.Lock()
+	require.NotContains(t, memConnProviders.m, tykSubgraphAccounts.Name)
+	require.NotContains(t, memConnProviders.m, tykSubgraphReviews.Name)
+	memConnProviders.mtx.Unlock()
+}
+
 func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
@@ -1196,4 +1288,74 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 			close(triggerCancelCh)
 		}
 	}
+}
+
+func TestSSE(t *testing.T) {
+	// send and receive should be in order
+	var wg sync.WaitGroup
+
+	sseServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Connection", "keep-alive")
+
+		flusher, _ := w.(http.Flusher)
+		for i := 0; i < 5; i++ {
+			wg.Wait()
+			fmt.Fprintf(w, "data: %d\n", i)
+			flusher.Flush()
+			wg.Add(1)
+		}
+	}))
+
+	conf := func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.EnableWebSockets = false
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.TargetURL = sseServer.URL
+		spec.Proxy.ListenPath = "/"
+	})
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL, nil)
+	req.Header.Set("Accept", "text/event-stream")
+
+	client := http.Client{}
+
+	stream := func(enableWebSockets bool) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
+		ts.Gw.SetConfig(globalConf)
+
+		res, err := client.Do(req)
+		assert.NoError(t, err)
+
+		reader := bufio.NewReader(res.Body)
+		defer res.Body.Close()
+
+		i := 0
+		for {
+			line, err := reader.ReadBytes('\n')
+			if err != nil && err != io.EOF {
+				t.Fatal(err)
+			}
+
+			if len(line) == 0 {
+				break
+			}
+
+			assert.Equal(t, fmt.Sprintf("data: %v\n", i), string(line))
+			i++
+			wg.Done()
+		}
+	}
+
+	t.Run("websockets disabled", func(t *testing.T) {
+		stream(false)
+	})
+
+	t.Run("websockets enabled", func(t *testing.T) {
+		stream(true)
+	})
 }

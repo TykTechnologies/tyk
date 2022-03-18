@@ -144,7 +144,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	//We reload the gw proxy so it uses the added server certificate
 	ts.ReloadGatewayProxy()
 
-	clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+	clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 	if err != nil {
 		t.Fatal("certificate should be added to cert manager")
@@ -154,7 +154,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			authTokenType: {UseCertificate: false},
+			apidef.AuthTokenType: {UseCertificate: false},
 		}
 	})[0]
 
@@ -196,7 +196,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	t.Run("basic auth key", func(t *testing.T) {
 		api.UseBasicAuth = true
 		api.AuthConfigs = map[string]apidef.AuthConfig{
-			authTokenType: {UseCertificate: true},
+			apidef.AuthTokenType: {UseCertificate: true},
 		}
 		ts.Gw.LoadAPI(api)
 		globalConf = ts.Gw.GetConfig()
@@ -222,7 +222,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	t.Run("client certificate", func(t *testing.T) {
 		api.UseBasicAuth = false
 		api.AuthConfigs = map[string]apidef.AuthConfig{
-			authTokenType: {UseCertificate: true},
+			apidef.AuthTokenType: {UseCertificate: true},
 		}
 		ts.Gw.LoadAPI(api)
 		session := CreateStandardSession()

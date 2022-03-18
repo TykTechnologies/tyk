@@ -31,14 +31,6 @@ import (
 
 const mwStatusRespond = 666
 
-const authTokenType = "authToken"
-const jwtType = "jwt"
-const hmacType = "hmac"
-const basicType = "basic"
-const coprocessType = "coprocess"
-const oauthType = "oauth"
-const oidcType = "oidc"
-
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
 	orgSessionExpiryCache singleflight.Group
@@ -754,20 +746,30 @@ func (b BaseMiddleware) getAuthType() string {
 func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, apidef.AuthConfig) {
 	config, ok := b.Base().Spec.AuthConfigs[authType]
 	// Auth is deprecated. To maintain backward compatibility authToken and jwt cases are added.
-	if !ok && (authType == authTokenType || authType == jwtType) {
+	if !ok && (authType == apidef.AuthTokenType || authType == apidef.JWTType) {
 		config = b.Base().Spec.Auth
 	}
 
-	if config.AuthHeaderName == "" {
-		config.AuthHeaderName = headers.Authorization
-	}
+	var (
+		key         string
+		defaultName = headers.Authorization
+	)
 
-	key := r.Header.Get(config.AuthHeaderName)
+	headerName := config.AuthHeaderName
+	if !config.DisableHeader {
+		if headerName == "" {
+			headerName = defaultName
+		} else {
+			defaultName = headerName
+		}
+
+		key = r.Header.Get(headerName)
+	}
 
 	paramName := config.ParamName
 	if config.UseParam || paramName != "" {
 		if paramName == "" {
-			paramName = config.AuthHeaderName
+			paramName = defaultName
 		}
 
 		paramValue := r.URL.Query().Get(paramName)
@@ -781,7 +783,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	cookieName := config.CookieName
 	if config.UseCookie || cookieName != "" {
 		if cookieName == "" {
-			cookieName = config.AuthHeaderName
+			cookieName = defaultName
 		}
 
 		authCookie, err := r.Cookie(cookieName)

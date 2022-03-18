@@ -60,14 +60,16 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 	}`
 
 	cases := []struct {
-		name      string
-		query     string
-		accessDef *user.AccessDefinition
-		result    ComplexityFailReason
+		name          string
+		operationName string
+		query         string
+		accessDef     *user.AccessDefinition
+		result        ComplexityFailReason
 	}{
 		{
-			name:  "should use global limit and exceed when no per field rights",
-			query: countriesQuery,
+			name:          "should use global limit and exceed when no per field rights",
+			operationName: "TestQuery",
+			query:         countriesQuery,
 			accessDef: &user.AccessDefinition{
 				Limit:             user.APILimit{MaxQueryDepth: 3},
 				FieldAccessRights: []user.FieldAccessDefinition{},
@@ -75,8 +77,9 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			result: ComplexityFailReasonDepthLimitExceeded,
 		},
 		{
-			name:  "should respect unlimited specific field depth limit and not exceed",
-			query: countriesQuery,
+			name:          "should respect unlimited specific field depth limit and not exceed",
+			operationName: "TestQuery",
+			query:         countriesQuery,
 			accessDef: &user.AccessDefinition{
 				Limit: user.APILimit{MaxQueryDepth: 3},
 				FieldAccessRights: []user.FieldAccessDefinition{
@@ -89,8 +92,9 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			result: ComplexityFailReasonNone,
 		},
 		{
-			name:  "should respect higher specific field depth limit and not exceed",
-			query: countriesQuery,
+			name:          "should respect higher specific field depth limit and not exceed",
+			operationName: "TestQuery",
+			query:         countriesQuery,
 			accessDef: &user.AccessDefinition{
 				Limit: user.APILimit{MaxQueryDepth: 3},
 				FieldAccessRights: []user.FieldAccessDefinition{
@@ -103,8 +107,9 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			result: ComplexityFailReasonNone,
 		},
 		{
-			name:  "should respect lower specific field depth limit and exceed",
-			query: countriesQuery,
+			name:          "should respect lower specific field depth limit and exceed",
+			operationName: "TestQuery",
+			query:         countriesQuery,
 			accessDef: &user.AccessDefinition{
 				Limit: user.APILimit{MaxQueryDepth: 100},
 				FieldAccessRights: []user.FieldAccessDefinition{
@@ -117,8 +122,9 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			result: ComplexityFailReasonDepthLimitExceeded,
 		},
 		{
-			name:  "should respect specific field depth limits and not exceed",
-			query: countriesContinentsQuery,
+			name:          "should respect specific field depth limits and not exceed",
+			operationName: "TestQuery",
+			query:         countriesContinentsQuery,
 			accessDef: &user.AccessDefinition{
 				Limit: user.APILimit{MaxQueryDepth: 1},
 				FieldAccessRights: []user.FieldAccessDefinition{
@@ -135,8 +141,9 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			result: ComplexityFailReasonNone,
 		},
 		{
-			name:  "should fallback to global limit when continents limits is not specified",
-			query: countriesContinentsQuery,
+			name:          "should fallback to global limit when continents limits is not specified",
+			operationName: "TestQuery",
+			query:         countriesContinentsQuery,
 			accessDef: &user.AccessDefinition{
 				Limit: user.APILimit{MaxQueryDepth: 1},
 				FieldAccessRights: []user.FieldAccessDefinition{
@@ -149,8 +156,9 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			result: ComplexityFailReasonDepthLimitExceeded,
 		},
 		{
-			name:  "should fallback to global limit when countries limits is not specified",
-			query: countriesContinentsQuery,
+			name:          "should fallback to global limit when countries limits is not specified",
+			operationName: "TestQuery",
+			query:         countriesContinentsQuery,
 			accessDef: &user.AccessDefinition{
 				Limit: user.APILimit{MaxQueryDepth: 1},
 				FieldAccessRights: []user.FieldAccessDefinition{
@@ -162,12 +170,72 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			},
 			result: ComplexityFailReasonDepthLimitExceeded,
 		},
+		{
+			name:          "should allow schema introspection query and ignore depth limit",
+			operationName: "IntrospectionQuery",
+			query:         gqlIntrospectionQuery,
+			accessDef: &user.AccessDefinition{
+				Limit:             user.APILimit{MaxQueryDepth: 1},
+				FieldAccessRights: []user.FieldAccessDefinition{},
+			},
+			result: ComplexityFailReasonNone,
+		},
+		{
+			name:          "should disallow schema introspection query and apply depth-limit with other non-introspection fields",
+			operationName: "IntrospectionQuery",
+			query:         gqlSchemaIntrospectionQueryWithMultipleFields,
+			accessDef: &user.AccessDefinition{
+				Limit:             user.APILimit{MaxQueryDepth: 1},
+				FieldAccessRights: []user.FieldAccessDefinition{},
+			},
+			result: ComplexityFailReasonDepthLimitExceeded,
+		},
+		{
+			name:          "should allow type introspection query and ignore depth limit",
+			operationName: "IntrospectionQuery",
+			query:         gqlCountriesTypeIntrospectionQuery,
+			accessDef: &user.AccessDefinition{
+				Limit:             user.APILimit{MaxQueryDepth: 1},
+				FieldAccessRights: []user.FieldAccessDefinition{},
+			},
+			result: ComplexityFailReasonNone,
+		},
+		{
+			name:          "should disallow type introspection query and apply depth-limit with other non-introspection fields",
+			operationName: "IntrospectionQuery",
+			query:         gqlCountriesTypeIntrospectionQueryWithMultipleFields,
+			accessDef: &user.AccessDefinition{
+				Limit:             user.APILimit{MaxQueryDepth: 1},
+				FieldAccessRights: []user.FieldAccessDefinition{},
+			},
+			result: ComplexityFailReasonDepthLimitExceeded,
+		},
+		{
+			name:          "should allow silent introspection query and ignore depth limit",
+			operationName: "",
+			query:         gqlCountriesSilentTypeIntrospectionQuery,
+			accessDef: &user.AccessDefinition{
+				Limit:             user.APILimit{MaxQueryDepth: 1},
+				FieldAccessRights: []user.FieldAccessDefinition{},
+			},
+			result: ComplexityFailReasonNone,
+		},
+		{
+			name:          "should return error when complexity fails because of internal reasons",
+			operationName: "TestQuery",
+			query:         gqlInvalidCountriesQuery,
+			accessDef: &user.AccessDefinition{
+				Limit:             user.APILimit{MaxQueryDepth: 1},
+				FieldAccessRights: []user.FieldAccessDefinition{},
+			},
+			result: ComplexityFailReasonInternalError,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			req := &graphql.Request{
-				OperationName: "TestQuery",
+				OperationName: tc.operationName,
 				Variables:     nil,
 				Query:         tc.query,
 			}
@@ -262,3 +330,73 @@ func TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits(t *testing.T) 
 		})
 	}
 }
+
+const gqlSchemaIntrospectionQueryWithMultipleFields = `query IntrospectionQuery {
+  countries {
+    name
+    continent {
+      code
+      name
+      countries {
+        code
+      }
+    }
+  }
+  __schema {
+    queryType {
+      name
+    }
+  }
+}`
+
+const gqlCountriesTypeIntrospectionQuery = `query IntrospectionQuery {
+  __type(name:"Country") {
+    name
+    fields {
+      name
+      type {
+        kind
+      }
+    }
+  }
+}`
+
+const gqlCountriesSilentTypeIntrospectionQuery = `{
+  __type(name:"Country") {
+    name
+    fields {
+      name
+      type {
+        kind
+      }
+    }
+  }
+}`
+
+const gqlCountriesTypeIntrospectionQueryWithMultipleFields = `query IntrospectionQuery {
+  countries {
+    name
+    continent {
+      code
+      name
+      countries {
+        code
+      }
+    }
+  }
+  __type(name:"Country") {
+    name
+  }
+}`
+
+const gqlInvalidCountriesQuery = `{
+  countries {
+    name
+    continent {
+      code
+      name
+      countries {
+        code
+      }
+    }
+}`

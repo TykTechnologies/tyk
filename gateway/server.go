@@ -178,6 +178,14 @@ type Gateway struct {
 
 	// RedisController keeps track of redis connection and singleton
 	RedisController *storage.RedisController
+	hostDetails     hostDetails
+
+	healthCheckInfo atomic.Value
+}
+
+type hostDetails struct {
+	Hostname string
+	PID      int
 }
 
 func NewGateway(config config.Config, ctx context.Context, cancelFn context.CancelFunc) *Gateway {
@@ -670,7 +678,7 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	serverConfig.RedirectUriSeparator = gwConfig.OauthRedirectUriSeparator
 
 	prefix := generateOAuthPrefix(spec.APIID)
-	storageManager := gw.getGlobalStorageHandler(prefix, false)
+	storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 	storageManager.Connect()
 	osinStorage := &RedisOsinStorageInterface{
 		storageManager,
@@ -1178,12 +1186,17 @@ func (gw *Gateway) initialiseSystem() error {
 	}
 
 	gw.SetConfig(gwConfig)
-	getHostDetails(gw.GetConfig().PIDFileLocation)
+	gw.getHostDetails(gw.GetConfig().PIDFileLocation)
 	gw.setupInstrumentation()
 
 	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
 		go gw.StartPeriodicStateBackup(&gw.LE_MANAGER)
 	}
+
+	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
+	// instances periodically and deletes idle items, closes net.Listener instances to
+	// free resources.
+	go cleanIdleMemConnProviders(gw.ctx)
 	return nil
 }
 
@@ -1354,19 +1367,32 @@ func (gw *Gateway) setUpConsul() error {
 	return err
 }
 
-var hostDetails struct {
-	Hostname string
-	PID      int
-}
-
-func getHostDetails(file string) {
+func (gw *Gateway) getHostDetails(file string) {
 	var err error
-	if hostDetails.PID, err = readPIDFromFile(file); err != nil {
+	if gw.hostDetails.PID, err = readPIDFromFile(file); err != nil {
 		mainLog.Error("Failed ot get host pid: ", err)
 	}
-	if hostDetails.Hostname, err = os.Hostname(); err != nil {
+	if gw.hostDetails.Hostname, err = os.Hostname(); err != nil {
 		mainLog.Error("Failed to get hostname: ", err)
 	}
+}
+
+func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
+	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, RedisController: gw.RedisController}
+	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
+
+	if gw.GetConfig().SlaveOptions.UseRPC {
+		return storage.NewMdcbStorage(
+			localStorage,
+			&RPCStorageHandler{
+				KeyPrefix: keyPrefix,
+				HashKeys:  hashKeys,
+				Gw:        gw,
+			},
+			logger,
+		)
+	}
+	return localStorage
 }
 
 func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
@@ -1662,7 +1688,7 @@ func (gw *Gateway) startServer() {
 
 	mainLog.Info("--> Listening on address: ", address)
 	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
-	mainLog.Info("--> PID: ", hostDetails.PID)
+	mainLog.Info("--> PID: ", gw.hostDetails.PID)
 	if !rpc.IsEmergencyMode() {
 		gw.DoReload()
 	}

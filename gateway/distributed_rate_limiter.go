@@ -12,7 +12,7 @@ import (
 func (gw *Gateway) setupDRL() {
 	drlManager := &drl.DRL{}
 	drlManager.Init()
-	drlManager.ThisServerID = gw.GetNodeID() + "|" + hostDetails.Hostname
+	drlManager.ThisServerID = gw.GetNodeID() + "|" + gw.hostDetails.Hostname
 	log.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
 	gw.DRLManager = drlManager
 }
@@ -62,7 +62,7 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 	}
 
 	server := drl.Server{
-		HostName:   hostDetails.Hostname,
+		HostName:   gw.hostDetails.Hostname,
 		ID:         gw.GetNodeID(),
 		LoadPerSec: rate,
 		TagHash:    gw.getTagHash(),
