@@ -53,11 +53,13 @@ func TestAnalytics_Write(t *testing.T) {
 			ts.Gw.analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 
 			t.Run("Log errors", func(t *testing.T) {
-				ts.Run(t, []test.TestCase{
+				_, err := ts.Run(t, []test.TestCase{
 					{Path: "/", Code: 401},
 					{Path: "/", Code: 401},
 				}...)
-
+				if err != nil {
+					t.Error("Error executing test case")
+				}
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
 
@@ -67,7 +69,7 @@ func TestAnalytics_Write(t *testing.T) {
 				}
 
 				var record analytics.AnalyticsRecord
-				err := ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
 				if err != nil {
 					t.Error("Error decoding analytics")
 				}
