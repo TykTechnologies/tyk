@@ -9,86 +9,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk-pump/serializer"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 	maxminddb "github.com/oschwald/maxminddb-golang"
 )
 
-type NetworkStats struct {
-	OpenConnections  int64
-	ClosedConnection int64
-	BytesIn          int64
-	BytesOut         int64
-}
-
-func (n *NetworkStats) Flush() NetworkStats {
-	s := NetworkStats{
-		OpenConnections:  atomic.LoadInt64(&n.OpenConnections),
-		ClosedConnection: atomic.LoadInt64(&n.ClosedConnection),
-		BytesIn:          atomic.LoadInt64(&n.BytesIn),
-		BytesOut:         atomic.LoadInt64(&n.BytesOut),
-	}
-	atomic.StoreInt64(&n.OpenConnections, 0)
-	atomic.StoreInt64(&n.ClosedConnection, 0)
-	atomic.StoreInt64(&n.BytesIn, 0)
-	atomic.StoreInt64(&n.BytesOut, 0)
-	return s
-}
-
-type Latency struct {
-	Total    int64
-	Upstream int64
-}
-
 // AnalyticsRecord encodes the details of a request
-type AnalyticsRecord struct {
-	Method        string
-	Host          string
-	Path          string // HTTP path, can be overriden by "track path" plugin
-	RawPath       string // Original HTTP path
-	ContentLength int64
-	UserAgent     string
-	Day           int
-	Month         time.Month
-	Year          int
-	Hour          int
-	ResponseCode  int
-	APIKey        string
-	TimeStamp     time.Time
-	APIVersion    string
-	APIName       string
-	APIID         string
-	OrgID         string
-	OauthID       string
-	RequestTime   int64
-	Latency       Latency
-	RawRequest    string // Base64 encoded request data (if detailed recording turned on)
-	RawResponse   string // ^ same but for response
-	IPAddress     string
-	Geo           GeoData
-	Network       NetworkStats
-	Tags          []string
-	Alias         string
-	TrackPath     bool
-	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
-}
-
-type GeoData struct {
-	Country struct {
-		ISOCode string `maxminddb:"iso_code"`
-	} `maxminddb:"country"`
-
-	City struct {
-		Names map[string]string `maxminddb:"names"`
-	} `maxminddb:"city"`
-
-	Location struct {
-		Latitude  float64 `maxminddb:"latitude"`
-		Longitude float64 `maxminddb:"longitude"`
-		TimeZone  string  `maxminddb:"time_zone"`
-	} `maxminddb:"location"`
-}
+type AnalyticsRecord analytics.AnalyticsRecord
 
 const analyticsKeyName = "tyk-system-analytics"
 
@@ -103,25 +33,28 @@ func (a *AnalyticsRecord) GetGeo(ipStr string, gw *Gateway) {
 		return
 	}
 
-	record, err := geoIPLookup(ipStr, gw)
+	geo, err := geoIPLookup(ipStr, gw)
 	if err != nil {
 		log.Error("GeoIP Failure (not recorded): ", err)
 		return
 	}
-	if record == nil {
+	if geo == nil {
 		return
 	}
 
-	log.Debug("ISO Code: ", record.Country.ISOCode)
-	log.Debug("City: ", record.City.Names["en"])
-	log.Debug("Lat: ", record.Location.Latitude)
-	log.Debug("Lon: ", record.Location.Longitude)
-	log.Debug("TZ: ", record.Location.TimeZone)
+	log.Debug("ISO Code: ", geo.Country.ISOCode)
+	log.Debug("City: ", geo.City.Names["en"])
+	log.Debug("Lat: ", geo.Location.Latitude)
+	log.Debug("Lon: ", geo.Location.Longitude)
+	log.Debug("TZ: ", geo.Location.TimeZone)
 
-	a.Geo = *record
+	a.Geo.Location = geo.Location
+	a.Geo.Country = geo.Country
+	a.Geo.City = geo.City
+
 }
 
-func geoIPLookup(ipStr string, gw *Gateway) (*GeoData, error) {
+func geoIPLookup(ipStr string, gw *Gateway) (*analytics.GeoData, error) {
 	if ipStr == "" {
 		return nil, nil
 	}
@@ -129,7 +62,7 @@ func geoIPLookup(ipStr string, gw *Gateway) (*GeoData, error) {
 	if ip == nil {
 		return nil, fmt.Errorf("invalid IP address %q", ipStr)
 	}
-	record := new(GeoData)
+	record := new(analytics.GeoData)
 	if err := gw.analytics.GeoIPDB.Lookup(ip, record); err != nil {
 		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %v", ipStr, err)
 	}
@@ -188,7 +121,7 @@ type RedisAnalyticsHandler struct {
 	Clean                       Purger
 	Gw                          *Gateway `json:"-"`
 	mu                          sync.Mutex
-	analyticsSerializer         AnalyticsSerializer
+	analyticsSerializer         serializer.AnalyticsSerializer
 }
 
 func (r *RedisAnalyticsHandler) Init() {
@@ -210,7 +143,7 @@ func (r *RedisAnalyticsHandler) Init() {
 	r.enableMultipleAnalyticsKeys = r.globalConf.AnalyticsConfig.EnableMultipleAnalyticsKeys
 	r.recordsChan = make(chan *AnalyticsRecord, recordsBufferSize)
 
-	r.analyticsSerializer = NewAnalyticsSerializer(r.globalConf.AnalyticsConfig.SerializerType)
+	r.analyticsSerializer = serializer.NewAnalyticsSerializer(r.globalConf.AnalyticsConfig.SerializerType)
 	// start worker pool
 	atomic.SwapUint32(&r.shouldStop, 0)
 	for i := 0; i < ps; i++ {
@@ -311,7 +244,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 				record.RawPath = "/" + record.RawPath
 			}
 
-			if encoded, err := r.analyticsSerializer.Encode(record); err != nil {
+			if encoded, err := r.analyticsSerializer.Encode((*analytics.AnalyticsRecord)(record)); err != nil {
 				log.WithError(err).Error("Error encoding analytics data")
 			} else {
 				recordsBuffer = append(recordsBuffer, encoded)

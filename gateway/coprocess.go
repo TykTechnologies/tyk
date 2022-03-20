@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -435,7 +436,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			ReadSeeker: strings.NewReader(returnObject.Request.ReturnOverrides.ResponseBody),
 		}
 		res.ContentLength = int64(len(returnObject.Request.ReturnOverrides.ResponseBody))
-		m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, int(returnObject.Request.ReturnOverrides.ResponseCode), res)
+		m.successHandler.RecordHit(r, analytics.Latency{Total: int64(ms)}, int(returnObject.Request.ReturnOverrides.ResponseCode), res)
 		return nil, mwStatusRespond
 	}
 

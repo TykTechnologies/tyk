@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/headers"
@@ -275,35 +276,35 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		record := AnalyticsRecord{
-			r.Method,
-			host,
-			trackedPath,
-			r.URL.Path,
-			r.ContentLength,
-			r.Header.Get(headers.UserAgent),
-			t.Day(),
-			t.Month(),
-			t.Year(),
-			t.Hour(),
-			errCode,
-			token,
-			t,
-			version,
-			e.Spec.Name,
-			e.Spec.APIID,
-			e.Spec.OrgID,
-			oauthClientID,
-			0,
-			Latency{},
-			rawRequest,
-			rawResponse,
-			ip,
-			GeoData{},
-			NetworkStats{},
-			tags,
-			alias,
-			trackEP,
-			t,
+			Method:        r.Method,
+			Host:          host,
+			Path:          trackedPath,
+			RawPath:       r.URL.Path,
+			ContentLength: r.ContentLength,
+			UserAgent:     r.Header.Get(headers.UserAgent),
+			Day:           t.Day(),
+			Month:         t.Month(),
+			Year:          t.Year(),
+			Hour:          t.Hour(),
+			ResponseCode:  errCode,
+			APIKey:        token,
+			TimeStamp:     t,
+			APIVersion:    version,
+			APIName:       e.Spec.Name,
+			APIID:         e.Spec.APIID,
+			OrgID:         e.Spec.OrgID,
+			OauthID:       oauthClientID,
+			RequestTime:   0,
+			Latency:       analytics.Latency{},
+			RawRequest:    rawRequest,
+			RawResponse:   rawResponse,
+			IPAddress:     ip,
+			Geo:           analytics.GeoData{},
+			Network:       analytics.NetworkStats{},
+			Tags:          tags,
+			Alias:         alias,
+			TrackPath:     trackEP,
+			ExpireAt:      t,
 		}
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {

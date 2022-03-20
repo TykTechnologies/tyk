@@ -18,6 +18,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/cenk/backoff"
@@ -195,7 +196,7 @@ type APISpec struct {
 
 	middlewareChain *ChainObject
 
-	network NetworkStats
+	network analytics.NetworkStats
 
 	GraphQLExecutor struct {
 		Engine   *graphql.ExecutionEngine

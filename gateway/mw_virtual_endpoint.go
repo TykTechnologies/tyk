@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
@@ -238,7 +239,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	d.Logger().Debug("JSVM Virtual Endpoint execution took: (ms) ", ms)
 
 	if copiedResponse != nil {
-		d.sh.RecordHit(r, Latency{Total: int64(ms)}, copiedResponse.StatusCode, copiedResponse)
+		d.sh.RecordHit(r, analytics.Latency{Total: int64(ms)}, copiedResponse.StatusCode, copiedResponse)
 	}
 
 	return copiedResponse
