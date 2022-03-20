@@ -172,6 +172,9 @@
         },
         "type": {
           "type": "string"
+        },
+        "serializer_type": {
+          "type": "string"
         }
       }
     },
