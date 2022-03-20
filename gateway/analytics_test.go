@@ -67,7 +67,10 @@ func TestAnalytics_Write(t *testing.T) {
 				}
 
 				var record analytics.AnalyticsRecord
-				ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err := ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
 				if record.ResponseCode != 401 {
 					t.Error("Analytics record do not match: ", record)
 				}
@@ -80,10 +83,12 @@ func TestAnalytics_Write(t *testing.T) {
 					"authorization": key,
 				}
 
-				ts.Run(t, test.TestCase{
+				_, err := ts.Run(t, test.TestCase{
 					Path: "/", Headers: authHeaders, Code: 200,
 				})
-
+				if err != nil {
+					t.Error("Error executing test case")
+				}
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
 
@@ -93,7 +98,10 @@ func TestAnalytics_Write(t *testing.T) {
 				}
 
 				var record analytics.AnalyticsRecord
-				ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
 				if record.ResponseCode != 200 {
 					t.Error("Analytics record do not match", record)
 				}
@@ -119,9 +127,12 @@ func TestAnalytics_Write(t *testing.T) {
 					"authorization": key,
 				}
 
-				ts.Run(t, test.TestCase{
+				_, err := ts.Run(t, test.TestCase{
 					Path: "/", Headers: authHeaders, Code: 200,
 				})
+				if err != nil {
+					t.Error("Error executing test case")
+				}
 
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
@@ -132,7 +143,10 @@ func TestAnalytics_Write(t *testing.T) {
 				}
 
 				var record analytics.AnalyticsRecord
-				ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
 				if record.ResponseCode != 200 {
 					t.Error("Analytics record do not match", record)
 				}
@@ -161,16 +175,19 @@ func TestAnalytics_Write(t *testing.T) {
 				})
 
 				key := CreateSession(ts.Gw, func(sess *user.SessionState) {
-					sess.EnableDetailRecording = true
+					sess.EnableDetailedRecording = true
 				})
 
 				authHeaders := map[string]string{
 					"authorization": key,
 				}
 
-				ts.Run(t, test.TestCase{
+				_, err := ts.Run(t, test.TestCase{
 					Path: "/", Headers: authHeaders, Code: 200,
 				})
+				if err != nil {
+					t.Error("Error executing test case")
+				}
 
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
@@ -181,7 +198,10 @@ func TestAnalytics_Write(t *testing.T) {
 				}
 
 				var record analytics.AnalyticsRecord
-				ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
 				if record.ResponseCode != 200 {
 					t.Error("Analytics record do not match", record)
 				}
@@ -213,10 +233,12 @@ func TestAnalytics_Write(t *testing.T) {
 					"authorization": key,
 				}
 
-				ts.Run(t, test.TestCase{
+				_, err := ts.Run(t, test.TestCase{
 					Path: "/", Headers: authHeaders, Code: 200,
 				})
-
+				if err != nil {
+					t.Error("Error executing test case")
+				}
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
 
@@ -226,7 +248,10 @@ func TestAnalytics_Write(t *testing.T) {
 				}
 
 				var record analytics.AnalyticsRecord
-				ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
 				if record.ResponseCode != 200 {
 					t.Error("Analytics record do not match", record)
 				}
@@ -266,9 +291,12 @@ func TestAnalytics_Write(t *testing.T) {
 					"authorization": key,
 				}
 
-				ts.Run(t, test.TestCase{
+				_, err := ts.Run(t, test.TestCase{
 					Path: "/", Headers: authHeaders, Code: 200,
 				})
+				if err != nil {
+					t.Error("Error executing test case")
+				}
 
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
@@ -279,7 +307,10 @@ func TestAnalytics_Write(t *testing.T) {
 				}
 
 				var record analytics.AnalyticsRecord
-				ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
 				if record.ResponseCode != 200 {
 					t.Error("Analytics record do not match", record)
 				}
@@ -326,10 +357,13 @@ func TestAnalytics_Write(t *testing.T) {
 					"authorization": key,
 				}
 
-				ts.Run(t, []test.TestCase{
+				_, err := ts.Run(t, []test.TestCase{
 					{Path: "/", Headers: authHeaders, Code: 200},
 					{Path: "/", Headers: authHeaders, Code: 200},
 				}...)
+				if err != nil {
+					t.Error("Error executing test case")
+				}
 
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
@@ -341,7 +375,10 @@ func TestAnalytics_Write(t *testing.T) {
 
 				// Take second cached request
 				var record analytics.AnalyticsRecord
-				ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[1].(string)), &record)
+				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[1].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
 				if record.ResponseCode != 200 {
 					t.Error("Analytics record do not match", record)
 				}
