@@ -57,7 +57,7 @@ do
 done
 
 echo "Building Tyk binaries"
-gox -tags 'goplugin' -osarch="linux/amd64 linux/386" -cgo
+gox -tags 'goplugin' -osarch="linux/amd64" -cgo
 
 TEMPLATEDIR=${ARCHTGZDIRS[amd64]}
 echo "Prepping TGZ Dirs"
@@ -89,7 +89,7 @@ for arch in ${!ARCHTGZDIRS[@]}
 do
     archDir=${ARCHTGZDIRS[$arch]}
     [ $archDir != $TEMPLATEDIR ] && cp -R $TEMPLATEDIR/* $archDir
-    mv tyk_linux_${arch/i386/386} $archDir/$SOURCEBIN
+    mv tyk_linux_${arch} $archDir/$SOURCEBIN
 done
 
 echo "Compressing"
