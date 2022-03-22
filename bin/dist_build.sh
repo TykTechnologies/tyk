@@ -39,7 +39,6 @@ export SOURCEBIN=tyk
 
 declare -A ARCHTGZDIRS
 ARCHTGZDIRS=(
-    [i386]=$BUILDDIR/i386/tgz/tyk.linux.i386-$VERSION
     [amd64]=$BUILDDIR/amd64/tgz/tyk.linux.amd64-$VERSION
 )
 
@@ -60,7 +59,7 @@ done
 echo "Building Tyk binaries"
 gox -tags 'goplugin' -osarch="linux/amd64 linux/386" -cgo
 
-TEMPLATEDIR=${ARCHTGZDIRS[i386]}
+TEMPLATEDIR=${ARCHTGZDIRS[amd64]}
 echo "Prepping TGZ Dirs"
 mkdir -p $TEMPLATEDIR/apps
 mkdir -p $TEMPLATEDIR/js
