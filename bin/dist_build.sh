@@ -40,7 +40,6 @@ declare -A ARCHTGZDIRS
 ARCHTGZDIRS=(
     [i386]=$BUILDDIR/i386/tgz/tyk.linux.i386-$VERSION
     [amd64]=$BUILDDIR/amd64/tgz/tyk.linux.amd64-$VERSION
-    [arm64]=$BUILDDIR/arm/tgz/tyk.linux.arm64-$VERSION
 )
 
 DESCRIPTION="Tyk Open Source API Gateway written in Go"
@@ -59,8 +58,6 @@ done
 
 echo "Building Tyk binaries"
 gox -tags 'goplugin' -osarch="linux/amd64 linux/386" -cgo
-# Build arm64 without CGO (no Python plugins), an improved cross-compilation toolkit is needed for that
-gox -tags 'goplugin' -osarch="linux/arm64"
 
 TEMPLATEDIR=${ARCHTGZDIRS[i386]}
 echo "Prepping TGZ Dirs"
@@ -79,7 +76,7 @@ mkdir -p $TEMPLATEDIR/install
 cp $SOURCEBINPATH/apps/app_sample.json $TEMPLATEDIR/apps
 cp $SOURCEBINPATH/templates/*.json $TEMPLATEDIR/templates
 cp -R $SOURCEBINPATH/templates/playground/* $TEMPLATEDIR/templates/playground
-cp -R $SOURCEBINPATH/install/* $TEMPLATEDIR/install
+cp -R $SOURCEBINPATH/ci/install/* $TEMPLATEDIR/install
 cp $SOURCEBINPATH/middleware/*.js $TEMPLATEDIR/middleware
 cp $SOURCEBINPATH/event_handlers/sample/*.js $TEMPLATEDIR/event_handlers/sample
 cp $SOURCEBINPATH/policies/*.json $TEMPLATEDIR/policies
