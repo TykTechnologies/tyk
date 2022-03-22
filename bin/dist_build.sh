@@ -13,6 +13,7 @@ set -ex
 : ${PKGNAME:="tyk-gateway"}
 BUILDTOOLSDIR=$SOURCEBINPATH/build_tools
 BUILDDIR=$SOURCEBINPATH/build
+CIDIR=$SOURCEBINPATH/ci
 
 echo "Set version number"
 : ${VERSION:=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3"' version.go)}
@@ -29,7 +30,7 @@ EOF
 
     echo "Importing signing key"
     gpg --list-keys | grep -w $SIGNKEY && echo "Key exists" || gpg --batch --import $BUILDTOOLSDIR/tyk.io.signing.key
-    bash $BUILDTOOLSDIR/unlock-agent.sh $SIGNKEY
+    bash $CIDIR/bin/unlock-agent.sh $SIGNKEY
 fi
 
 echo "Prepare the release directories"
