@@ -294,6 +294,22 @@ func (s *OAS) extractCustomPluginTo(api *apidef.APIDefinition) {
 	api.AuthConfigs[apidef.CoprocessType] = authConfig
 }
 
+func (s *OAS) fillGoPlugin(api apidef.APIDefinition) {
+	goPlugin := &GoPlugin{}
+	goPlugin.Enabled = api.UseGoPluginAuth
+
+	if ShouldOmit(goPlugin) {
+		goPlugin = nil
+	}
+
+	s.getTykAuthentication().GoPlugin = goPlugin
+}
+
+func (s *OAS) extractGoPluginTo(api *apidef.APIDefinition) {
+	goPlugin := s.getTykAuthentication().GoPlugin
+	api.UseGoPluginAuth = goPlugin.Enabled
+}
+
 func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	if a := s.getTykAuthentication(); a != nil {
 		api.UseKeylessAccess = !a.Enabled
@@ -309,6 +325,10 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 
 	if s.getTykAuthentication().CustomPlugin != nil {
 		s.extractCustomPluginTo(api)
+	}
+
+	if s.getTykAuthentication().GoPlugin != nil {
+		s.extractGoPluginTo(api)
 	}
 
 	if len(s.Security) == 0 || len(s.Components.SecuritySchemes) == 0 {
@@ -352,6 +372,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillBasic(api)
 	s.fillOAuth(api)
 	s.fillCustomPlugin(api)
+	s.fillGoPlugin(api)
 
 	if ShouldOmit(a) {
 		s.GetTykExtension().Server.Authentication = nil

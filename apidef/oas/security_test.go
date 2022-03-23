@@ -459,3 +459,28 @@ func TestOAS_CustomPlugin(t *testing.T) {
 
 	assert.Equal(t, oas, convertedOAS)
 }
+
+func TestOAS_GoPlugin(t *testing.T) {
+	var goPlugin GoPlugin
+	Fill(t, &goPlugin, 0)
+
+	var oas OAS
+	oas.Extensions = map[string]interface{}{
+		ExtensionTykAPIGateway: &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					GoPlugin: &goPlugin,
+				},
+			},
+		},
+	}
+
+	var api apidef.APIDefinition
+	oas.extractGoPluginTo(&api)
+
+	var convertedOAS OAS
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
+	convertedOAS.fillGoPlugin(api)
+
+	assert.Equal(t, oas, convertedOAS)
+}
