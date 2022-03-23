@@ -75,3 +75,24 @@ func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 	api.UseMutualTLSAuth = cc.Enabled
 	api.ClientCertificates = cc.Allowlist
 }
+
+type Certificate struct {
+	Domain string `bson:"domain" json:"domain"`
+	Cert   string `bson:"certificate" json:"certificate"`
+}
+
+type Certificates []Certificate
+
+func (c Certificates) Fill(upstreamCerts map[string]string) {
+	i := 0
+	for domain, cert := range upstreamCerts {
+		c[i] = Certificate{Domain: domain, Cert: cert}
+		i++
+	}
+}
+
+func (c Certificates) ExtractTo(upstreamCerts map[string]string) {
+	for _, cert := range c {
+		upstreamCerts[cert.Domain] = cert.Cert
+	}
+}
