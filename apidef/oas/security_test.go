@@ -436,6 +436,31 @@ func TestOAS_OAuth(t *testing.T) {
 	assert.Equal(t, oas, convertedOAS)
 }
 
+func TestOAS_HMAC(t *testing.T) {
+	var oas OAS
+	var hmac HMAC
+	Fill(t, &hmac, 0)
+	oas.Extensions = map[string]interface{}{
+		ExtensionTykAPIGateway: &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					HMAC: &hmac,
+				},
+			},
+		},
+	}
+
+	var api apidef.APIDefinition
+	api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	oas.extractHMACTo(&api)
+
+	var convertedOAS OAS
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
+	convertedOAS.fillHMAC(api)
+
+	assert.Equal(t, oas, convertedOAS)
+}
+
 func TestOAS_OIDC(t *testing.T) {
 	var oas OAS
 	var oidc OIDC

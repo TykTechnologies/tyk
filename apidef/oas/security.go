@@ -208,6 +208,37 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.BasicType] = ac
 }
 
+func (s *OAS) fillHMAC(api apidef.APIDefinition) {
+	authConfig, ok := api.AuthConfigs[apidef.HMACType]
+	if !ok {
+		return
+	}
+
+	hmac := &HMAC{}
+	hmac.Enabled = api.EnableSignatureChecking
+	hmac.AuthSources.Fill(authConfig)
+	hmac.AllowedAlgorithms = api.HmacAllowedAlgorithms
+	hmac.AllowedClockSkew = api.HmacAllowedClockSkew
+
+	if ShouldOmit(hmac) {
+		hmac = nil
+	}
+
+	s.getTykAuthentication().HMAC = hmac
+}
+
+func (s *OAS) extractHMACTo(api *apidef.APIDefinition) {
+	authConfig := apidef.AuthConfig{DisableHeader: true}
+
+	hmac := s.getTykAuthentication().HMAC
+	api.EnableSignatureChecking = hmac.Enabled
+	hmac.AuthSources.ExtractTo(&authConfig)
+	api.HmacAllowedAlgorithms = hmac.AllowedAlgorithms
+	api.HmacAllowedClockSkew = hmac.AllowedClockSkew
+
+	api.AuthConfigs[apidef.HMACType] = authConfig
+}
+
 func (s *OAS) fillOAuth(api apidef.APIDefinition) {
 	authConfig, ok := api.AuthConfigs[apidef.OAuthType]
 	if !ok || authConfig.Name == "" {
@@ -399,6 +430,10 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
+	if s.getTykAuthentication().HMAC != nil {
+		s.extractHMACTo(api)
+	}
+
 	if s.getTykAuthentication().OIDC != nil {
 		s.extractOIDCTo(api)
 	}
@@ -451,6 +486,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillJWT(api)
 	s.fillBasic(api)
 	s.fillOAuth(api)
+	s.fillHMAC(api)
 	s.fillOIDC(api)
 	s.fillCustomPlugin(api)
 	s.fillGoPlugin(api)
