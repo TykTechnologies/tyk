@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -431,6 +432,41 @@ func TestOAS_OAuth(t *testing.T) {
 	assert.Equal(t, flows.AuthorizationCode.AuthorizationURL, "{api-url}/oauth/authorize")
 	assert.Equal(t, flows.AuthorizationCode.TokenURL, "{api-url}/oauth/token")
 	assert.Equal(t, flows.ClientCredentials.TokenURL, "/oauth/token")
+
+	assert.Equal(t, oas, convertedOAS)
+}
+
+func TestOAS_OIDC(t *testing.T) {
+	var oas OAS
+	var oidc OIDC
+	Fill(t, &oidc, 0)
+	sort.Slice(oidc.Scopes.ScopeToPolicyMapping, func(i, j int) bool {
+		return oidc.Scopes.ScopeToPolicyMapping[i].Scope < oidc.Scopes.ScopeToPolicyMapping[j].Scope
+	})
+
+	for _, provider := range oidc.Providers {
+		sort.Slice(provider.ClientToPolicyMapping, func(i, j int) bool {
+			return provider.ClientToPolicyMapping[i].ClientID < provider.ClientToPolicyMapping[j].ClientID
+		})
+	}
+
+	oas.Extensions = map[string]interface{}{
+		ExtensionTykAPIGateway: &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					OIDC: &oidc,
+				},
+			},
+		},
+	}
+
+	var api apidef.APIDefinition
+	api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	oas.extractOIDCTo(&api)
+
+	var convertedOAS OAS
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
+	convertedOAS.fillOIDC(api)
 
 	assert.Equal(t, oas, convertedOAS)
 }
