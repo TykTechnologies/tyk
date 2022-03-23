@@ -13,6 +13,7 @@ set -ex
 : ${PKGNAME:="tyk-gateway"}
 BUILDTOOLSDIR=$SOURCEBINPATH/build_tools
 BUILDDIR=$SOURCEBINPATH/build
+CIDIR=$SOURCEBINPATH/ci
 
 echo "Set version number"
 : ${VERSION:=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3"' version.go)}
@@ -29,7 +30,7 @@ EOF
 
     echo "Importing signing key"
     gpg --list-keys | grep -w $SIGNKEY && echo "Key exists" || gpg --batch --import $BUILDTOOLSDIR/tyk.io.signing.key
-    bash $BUILDTOOLSDIR/unlock-agent.sh $SIGNKEY
+    bash $CIDIR/bin/unlock-agent.sh $SIGNKEY
 fi
 
 echo "Prepare the release directories"
@@ -38,9 +39,7 @@ export SOURCEBIN=tyk
 
 declare -A ARCHTGZDIRS
 ARCHTGZDIRS=(
-    [i386]=$BUILDDIR/i386/tgz/tyk.linux.i386-$VERSION
     [amd64]=$BUILDDIR/amd64/tgz/tyk.linux.amd64-$VERSION
-    [arm64]=$BUILDDIR/arm/tgz/tyk.linux.arm64-$VERSION
 )
 
 DESCRIPTION="Tyk Open Source API Gateway written in Go"
@@ -58,11 +57,9 @@ do
 done
 
 echo "Building Tyk binaries"
-gox -tags 'goplugin' -osarch="linux/amd64 linux/386" -cgo
-# Build arm64 without CGO (no Python plugins), an improved cross-compilation toolkit is needed for that
-gox -tags 'goplugin' -osarch="linux/arm64"
+gox -tags 'goplugin' -osarch="linux/amd64" -cgo
 
-TEMPLATEDIR=${ARCHTGZDIRS[i386]}
+TEMPLATEDIR=${ARCHTGZDIRS[amd64]}
 echo "Prepping TGZ Dirs"
 mkdir -p $TEMPLATEDIR/apps
 mkdir -p $TEMPLATEDIR/js
@@ -79,7 +76,7 @@ mkdir -p $TEMPLATEDIR/install
 cp $SOURCEBINPATH/apps/app_sample.json $TEMPLATEDIR/apps
 cp $SOURCEBINPATH/templates/*.json $TEMPLATEDIR/templates
 cp -R $SOURCEBINPATH/templates/playground/* $TEMPLATEDIR/templates/playground
-cp -R $SOURCEBINPATH/install/* $TEMPLATEDIR/install
+cp -R $SOURCEBINPATH/ci/install/* $TEMPLATEDIR/install
 cp $SOURCEBINPATH/middleware/*.js $TEMPLATEDIR/middleware
 cp $SOURCEBINPATH/event_handlers/sample/*.js $TEMPLATEDIR/event_handlers/sample
 cp $SOURCEBINPATH/policies/*.json $TEMPLATEDIR/policies
@@ -92,7 +89,7 @@ for arch in ${!ARCHTGZDIRS[@]}
 do
     archDir=${ARCHTGZDIRS[$arch]}
     [ $archDir != $TEMPLATEDIR ] && cp -R $TEMPLATEDIR/* $archDir
-    mv tyk_linux_${arch/i386/386} $archDir/$SOURCEBIN
+    mv tyk_linux_${arch} $archDir/$SOURCEBIN
 done
 
 echo "Compressing"
