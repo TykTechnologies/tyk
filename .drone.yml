@@ -1,0 +1,39 @@
+workspace:
+  base: /app
+
+kind: pipeline
+name: default
+
+steps:
+- name: test
+  image: golang:1.18
+  pull: always
+  environment:
+    TEST_TYK_STORAGE_HOST: redis
+  volumes:
+  - name: cache
+    path: /go
+  commands:
+    - apt install python3.9
+    - make test
+
+- name: build
+  image: golang:1.15
+  pull: always
+  volumes:
+  - name: cache
+    path: /go
+  commands:
+    - make build
+
+volumes:
+- name: cache
+  host:
+    path: /data/drone-ci
+
+services:
+- name: redis
+  pull: always
+  image: redis:4.0
+  ports:
+    - 6379
