@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,22 +22,39 @@ import (
 
 type IPsHandleStrategy string
 
-var (
-	log      = logger.Get()
-	global   atomic.Value
-	globalMu sync.Mutex
+func getenv(name, defaultValue string) string {
+	if val := os.Getenv(name); val != "" {
+		return val
+	}
+	return defaultValue
+}
 
-	Default = Config{
+func newDefaultConfig() Config {
+	var (
+		storagePortDefault int64 = 6379
+
+		// Enable overriding defaults for running custom unit tests
+		storageType = getenv("TEST_TYK_STORAGE_TYPE", "redis")
+		storageHost = getenv("TEST_TYK_STORAGE_HOST", "localhost")
+		storagePort = getenv("TEST_TYK_STORAGE_PORT", fmt.Sprint(storagePortDefault))
+	)
+
+	storagePortInt, err := strconv.ParseInt(storagePort, 10, 64)
+	if err != nil {
+		storagePortInt = storagePortDefault
+	}
+
+	return Config{
 		ListenPort:     8080,
 		Secret:         "352d20ee67be67f6340b4c0605b044b7",
 		TemplatePath:   "templates",
 		MiddlewarePath: "middleware",
 		AppPath:        "apps/",
 		Storage: StorageOptionsConf{
-			Type:    "redis",
-			Host:    "localhost",
+			Type:    storageType,
+			Host:    storageHost,
+			Port:    int(storagePortInt),
 			MaxIdle: 100,
-			Port:    6379,
 		},
 		AnalyticsConfig: AnalyticsConfigConfig{
 			IgnoredIPs: make([]string, 0),
@@ -52,6 +70,14 @@ var (
 			EnableCoProcess: false,
 		},
 	}
+}
+
+var (
+	log      = logger.Get()
+	global   atomic.Value
+	globalMu sync.Mutex
+
+	Default = newDefaultConfig()
 )
 
 const (
