@@ -10,8 +10,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -73,10 +71,7 @@ func newDefaultConfig() Config {
 }
 
 var (
-	log      = logger.Get()
-	global   atomic.Value
-	globalMu sync.Mutex
-
+	log     = logger.Get()
 	Default = newDefaultConfig()
 )
 
@@ -1166,7 +1161,7 @@ func Load(paths []string, conf *Config) error {
 		return Load([]string{path}, conf)
 	}
 	if err := json.NewDecoder(r).Decode(&conf); err != nil {
-		return fmt.Errorf("couldn't unmarshal config: %v", err)
+		return fmt.Errorf("couldn't unmarshal config: %w", err)
 	}
 
 	shouldOmit, omitEnvExist := os.LookupEnv(envPrefix + "_OMITCONFIGFILE")
@@ -1175,10 +1170,10 @@ func Load(paths []string, conf *Config) error {
 	}
 
 	if err := envconfig.Process(envPrefix, conf); err != nil {
-		return fmt.Errorf("failed to process config env vars: %v", err)
+		return fmt.Errorf("failed to process config env vars: %w", err)
 	}
 	if err := processCustom(envPrefix, conf, loadZipkin, loadJaeger); err != nil {
-		return fmt.Errorf("failed to process config custom loader: %v", err)
+		return fmt.Errorf("failed to process config custom loader: %w", err)
 	}
 	return nil
 }
