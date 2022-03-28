@@ -24,8 +24,8 @@ func TestAnalytics_Write(t *testing.T) {
 			analyticsSerializer: "",
 		},
 		{
-			TestName:            "Testing analytics flows with gotiny",
-			analyticsSerializer: "gotiny",
+			TestName:            "Testing analytics flows with protobuf",
+			analyticsSerializer: "protobuf",
 		},
 	}
 
