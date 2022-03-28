@@ -84,6 +84,8 @@ github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220320113312-05e2f75606ff h1:
 github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220320113312-05e2f75606ff/go.mod h1:9fA5PZcc9w92l4feF6tQ7VsMrI5Y8D/xO0puuUdNxu8=
 github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220320115637-799c972fbc92 h1:aStWRx2Uggjym8klNHCaZDHH+EfDC2Bt9m5c2KcMdeE=
 github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220320115637-799c972fbc92/go.mod h1:9fA5PZcc9w92l4feF6tQ7VsMrI5Y8D/xO0puuUdNxu8=
+github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220325163454-326577ab7002 h1:2EaDJtIEjZGH0Quclh0Z3gCeAtJk2v+9bFaJ22Ss1aU=
+github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220325163454-326577ab7002/go.mod h1:EgLZPakwjeYqfb34QjO+vGvLo+qippEoX0nnyhqF0L0=
 github.com/TykTechnologies/tyk-pump v1.4.0/go.mod h1:3AXhYgEzLeaxkWCNziNb8qe0L1fwiRhah76oo2Zc5Pw=
 github.com/TykTechnologies/tyk-pump v1.5.1/go.mod h1:RMK3aSqW72/TbbhAgAL2qDv3RJxR+QKuNMaUB0lyvlc=
 github.com/agnivade/levenshtein v1.0.1/go.mod h1:CURSv5d9Uaml+FovSIICkLbAUZ9S4RqaHDIsdSBg7lM=
@@ -504,6 +506,8 @@ github.com/jensneuse/graphql-go-tools/examples/federation v0.0.0-20210804084050-
 github.com/jensneuse/pipeline v0.0.0-20200117120358-9fb4de085cd6 h1:y8hvuqbuVGFNpEos+vB5I5X+QxWm0uyTk+5oeOinMjY=
 github.com/jensneuse/pipeline v0.0.0-20200117120358-9fb4de085cd6/go.mod h1:UsfzaMt+keVOxa007GcCJMFeTHr6voRfBGMQEW7DkdM=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
+github.com/jinzhu/copier v0.3.5 h1:GlvfUwHk62RokgqVNvYsku0TATCF7bAHVwEXoBh3iJg=
+github.com/jinzhu/copier v0.3.5/go.mod h1:DfbEm0FYsaqBcKcFuvmOZb218JkPGtvSHsKg8S8hyyg=
 github.com/jinzhu/inflection v1.0.0 h1:K317FqzuhWc8YvSVlFMCCUb36O/S9MCKRDI7QkRKD/E=
 github.com/jinzhu/inflection v1.0.0/go.mod h1:h+uFLlag+Qp1Va5pdKtLDYj+kHp5pxUVkryuEj+Srlc=
 github.com/jinzhu/now v1.1.1 h1:g39TucaRWyV3dwDO++eEc6qf8TVIQ/Da48WmqjZ3i7E=
