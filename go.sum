@@ -86,6 +86,8 @@ github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220320115637-799c972fbc92 h1:
 github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220320115637-799c972fbc92/go.mod h1:9fA5PZcc9w92l4feF6tQ7VsMrI5Y8D/xO0puuUdNxu8=
 github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220325163454-326577ab7002 h1:2EaDJtIEjZGH0Quclh0Z3gCeAtJk2v+9bFaJ22Ss1aU=
 github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220325163454-326577ab7002/go.mod h1:EgLZPakwjeYqfb34QjO+vGvLo+qippEoX0nnyhqF0L0=
+github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220328105344-818df00f2742 h1:XGJI9FudJeQGmnElf7aQWKlLiM96XbrgGSK1un5mf9U=
+github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220328105344-818df00f2742/go.mod h1:EgLZPakwjeYqfb34QjO+vGvLo+qippEoX0nnyhqF0L0=
 github.com/TykTechnologies/tyk-pump v1.4.0/go.mod h1:3AXhYgEzLeaxkWCNziNb8qe0L1fwiRhah76oo2Zc5Pw=
 github.com/TykTechnologies/tyk-pump v1.5.1/go.mod h1:RMK3aSqW72/TbbhAgAL2qDv3RJxR+QKuNMaUB0lyvlc=
 github.com/agnivade/levenshtein v1.0.1/go.mod h1:CURSv5d9Uaml+FovSIICkLbAUZ9S4RqaHDIsdSBg7lM=
