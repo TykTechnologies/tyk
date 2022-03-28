@@ -1,6 +1,8 @@
 package oas
 
 import (
+	"sort"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/lonelycode/osin"
@@ -267,6 +269,123 @@ func (s *OAS) extractOAuthTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.OAuthType] = authConfig
 }
 
+func (s *OAS) fillOIDC(api apidef.APIDefinition) {
+	authConfig, ok := api.AuthConfigs[apidef.OIDCType]
+	if !ok {
+		return
+	}
+
+	oidc := &OIDC{}
+	oidc.Enabled = api.UseOpenID
+	oidc.AuthSources.Fill(authConfig)
+	oidc.SegregateByClientId = api.OpenIDOptions.SegregateByClient
+
+	oidc.Providers = []Provider{}
+	for _, v := range api.OpenIDOptions.Providers {
+		var mapping []ClientToPolicy
+		for clientID, polID := range v.ClientIDs {
+			mapping = append(mapping, ClientToPolicy{ClientID: clientID, PolicyID: polID})
+		}
+
+		if len(mapping) == 0 {
+			mapping = nil
+		}
+
+		sort.Slice(mapping, func(i, j int) bool {
+			return mapping[i].ClientID < mapping[j].ClientID
+		})
+
+		oidc.Providers = append(oidc.Providers, Provider{Issuer: v.Issuer, ClientToPolicyMapping: mapping})
+	}
+
+	if len(oidc.Providers) == 0 {
+		oidc.Providers = nil
+	}
+
+	if oidc.Scopes == nil {
+		oidc.Scopes = &Scopes{}
+	}
+
+	oidc.Scopes.Fill(&api.Scopes.OIDC)
+	if ShouldOmit(oidc.Scopes) {
+		oidc.Scopes = nil
+	}
+
+	if ShouldOmit(oidc) {
+		oidc = nil
+	}
+
+	s.getTykAuthentication().OIDC = oidc
+}
+
+func (s *OAS) extractOIDCTo(api *apidef.APIDefinition) {
+	authConfig := apidef.AuthConfig{DisableHeader: true}
+
+	oidc := s.getTykAuthentication().OIDC
+	api.UseOpenID = oidc.Enabled
+	oidc.AuthSources.ExtractTo(&authConfig)
+
+	api.OpenIDOptions.SegregateByClient = oidc.SegregateByClientId
+
+	for _, p := range oidc.Providers {
+		clientIDs := make(map[string]string)
+		for _, mapping := range p.ClientToPolicyMapping {
+			clientIDs[mapping.ClientID] = mapping.PolicyID
+		}
+
+		api.OpenIDOptions.Providers = append(api.OpenIDOptions.Providers, apidef.OIDProviderConfig{Issuer: p.Issuer, ClientIDs: clientIDs})
+	}
+
+	if oidc.Scopes != nil {
+		oidc.Scopes.ExtractTo(&api.Scopes.OIDC)
+	}
+
+	api.AuthConfigs[apidef.OIDCType] = authConfig
+}
+
+func (s *OAS) fillCustomPlugin(api apidef.APIDefinition) {
+	authConfig, ok := api.AuthConfigs[apidef.CoprocessType]
+	if !ok {
+		return
+	}
+
+	customPlugin := &CustomPlugin{}
+	customPlugin.Enabled = api.EnableCoProcessAuth
+	customPlugin.AuthSources.Fill(authConfig)
+
+	if ShouldOmit(customPlugin) {
+		customPlugin = nil
+	}
+
+	s.getTykAuthentication().CustomPlugin = customPlugin
+}
+
+func (s *OAS) extractCustomPluginTo(api *apidef.APIDefinition) {
+	authConfig := apidef.AuthConfig{DisableHeader: true}
+
+	customPlugin := s.getTykAuthentication().CustomPlugin
+	api.EnableCoProcessAuth = customPlugin.Enabled
+	customPlugin.AuthSources.ExtractTo(&authConfig)
+
+	api.AuthConfigs[apidef.CoprocessType] = authConfig
+}
+
+func (s *OAS) fillGoPlugin(api apidef.APIDefinition) {
+	goPlugin := &GoPlugin{}
+	goPlugin.Enabled = api.UseGoPluginAuth
+
+	if ShouldOmit(goPlugin) {
+		goPlugin = nil
+	}
+
+	s.getTykAuthentication().GoPlugin = goPlugin
+}
+
+func (s *OAS) extractGoPluginTo(api *apidef.APIDefinition) {
+	goPlugin := s.getTykAuthentication().GoPlugin
+	api.UseGoPluginAuth = goPlugin.Enabled
+}
+
 func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	if a := s.getTykAuthentication(); a != nil {
 		api.UseKeylessAccess = !a.Enabled
@@ -278,6 +397,18 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 
 	if api.AuthConfigs == nil {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	}
+
+	if s.getTykAuthentication().OIDC != nil {
+		s.extractOIDCTo(api)
+	}
+
+	if s.getTykAuthentication().CustomPlugin != nil {
+		s.extractCustomPluginTo(api)
+	}
+
+	if s.getTykAuthentication().GoPlugin != nil {
+		s.extractGoPluginTo(api)
 	}
 
 	if len(s.Security) == 0 || len(s.Components.SecuritySchemes) == 0 {
@@ -320,6 +451,9 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillJWT(api)
 	s.fillBasic(api)
 	s.fillOAuth(api)
+	s.fillOIDC(api)
+	s.fillCustomPlugin(api)
+	s.fillGoPlugin(api)
 
 	if ShouldOmit(a) {
 		s.GetTykExtension().Server.Authentication = nil
