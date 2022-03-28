@@ -14,7 +14,7 @@ func getStrPointer(str string) *string {
 func TestValidateOASObject(t *testing.T) {
 	validOASObject := OAS{
 		openapi3.T{
-			OpenAPI: "3.0.0",
+			OpenAPI: "3.0.3",
 			Info: &openapi3.Info{
 				Version: "1.0.0",
 				Title:   "Swagger Petstore",
@@ -146,7 +146,7 @@ func TestValidateOASObject(t *testing.T) {
 	validOAS3Definition, _ := validOASObject.MarshalJSON()
 
 	t.Run("valid OAS object", func(t *testing.T) {
-		isValid, errs := ValidateOASObject(validOAS3Definition, "3.0")
+		isValid, errs := ValidateOASObject(validOAS3Definition, "3.0.3")
 		assert.True(t, isValid)
 		assert.Nil(t, errs)
 	})
@@ -156,7 +156,7 @@ func TestValidateOASObject(t *testing.T) {
 	invalidOAS3Definition, _ := invalidOASObject.MarshalJSON()
 
 	t.Run("invalid OAS object", func(t *testing.T) {
-		isValid, errs := ValidateOASObject(invalidOAS3Definition, "3.0")
+		isValid, errs := ValidateOASObject(invalidOAS3Definition, "3.0.3")
 		expectedErrs := []string{
 			"paths./pets.get.responses.200: description is required",
 			"paths./pets.get.responses.200: Must validate one and only one schema (oneOf)",
@@ -248,7 +248,7 @@ func TestValidateOASObject(t *testing.T) {
 	}`)
 
 	t.Run("wrong typed OAS object", func(t *testing.T) {
-		isValid, errs := ValidateOASObject(wrongTypedOASDefinition, "3.0")
+		isValid, errs := ValidateOASObject(wrongTypedOASDefinition, "3.0.3")
 		expectedErrs := []string{
 			"paths./pets.get: responses is required",
 			"paths./pets.get.tags: Invalid type. Expected: array, given: string",
