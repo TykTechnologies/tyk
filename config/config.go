@@ -1080,6 +1080,9 @@ type TykEventHandler interface {
 	HandleEvent(EventMessage)
 }
 
+// Global function that will return the config of the gw running
+var Global func() Config
+
 func WriteConf(path string, conf *Config) error {
 	bs, err := json.MarshalIndent(conf, "", "    ")
 	if err != nil {
