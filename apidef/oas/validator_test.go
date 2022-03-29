@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -12,6 +13,7 @@ func getStrPointer(str string) *string {
 }
 
 func TestValidateOASObject(t *testing.T) {
+	t.Parallel()
 	validOASObject := OAS{
 		openapi3.T{
 			OpenAPI: "3.0.3",
@@ -146,9 +148,8 @@ func TestValidateOASObject(t *testing.T) {
 	validOAS3Definition, _ := validOASObject.MarshalJSON()
 
 	t.Run("valid OAS object", func(t *testing.T) {
-		isValid, errs := ValidateOASObject(validOAS3Definition, "3.0.3")
-		assert.True(t, isValid)
-		assert.Nil(t, errs)
+		err := ValidateOASObject(validOAS3Definition, "3.0.3")
+		assert.Nil(t, err)
 	})
 
 	invalidOASObject := validOASObject
@@ -156,13 +157,12 @@ func TestValidateOASObject(t *testing.T) {
 	invalidOAS3Definition, _ := invalidOASObject.MarshalJSON()
 
 	t.Run("invalid OAS object", func(t *testing.T) {
-		isValid, errs := ValidateOASObject(invalidOAS3Definition, "3.0.3")
-		expectedErrs := []string{
-			"paths./pets.get.responses.200: description is required",
+		err := ValidateOASObject(invalidOAS3Definition, "3.0.3")
+		expectedErr := fmt.Sprintf("%s\n%s",
 			"paths./pets.get.responses.200: Must validate one and only one schema (oneOf)",
-		}
-		assert.False(t, isValid)
-		assert.ElementsMatch(t, expectedErrs, errs)
+			"paths./pets.get.responses.200: description is required",
+		)
+		assert.Equal(t, expectedErr, err.Error())
 	})
 
 	var wrongTypedOASDefinition = []byte(`{
@@ -248,19 +248,18 @@ func TestValidateOASObject(t *testing.T) {
 	}`)
 
 	t.Run("wrong typed OAS object", func(t *testing.T) {
-		isValid, errs := ValidateOASObject(wrongTypedOASDefinition, "3.0.3")
-		expectedErrs := []string{
+		err := ValidateOASObject(wrongTypedOASDefinition, "3.0.3")
+		expectedErr := fmt.Sprintf("%s\n%s",
 			"paths./pets.get: responses is required",
-			"paths./pets.get.tags: Invalid type. Expected: array, given: string",
-		}
-		assert.False(t, isValid)
-		assert.Equal(t, expectedErrs, errs)
+			"paths./pets.get.tags: Invalid type. Expected: array, given: string")
+		assert.Equal(t, expectedErr, err.Error())
 	})
 }
 
 func Test_loadOASSchema(t *testing.T) {
 	t.Run("load OAS", func(t *testing.T) {
-		loadOASSchema()
+		err := loadOASSchema()
+		assert.Nil(t, err)
 		assert.NotNil(t, oasJSONSchemas["3.0.3"])
 	})
 }
