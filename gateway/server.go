@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -348,6 +349,8 @@ func (gw *Gateway) setupGlobals() {
 				Store: &store,
 			}
 			purger.Connect()
+			// register with gob so we can transmit [][]byte
+			gob.Register([][]byte{})
 			go purger.PurgeLoop(gw.ctx, time.Duration(gw.GetConfig().AnalyticsConfig.PurgeInterval))
 		}
 		go gw.flushNetworkAnalytics(gw.ctx)
