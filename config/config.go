@@ -1082,19 +1082,8 @@ type TykEventHandler interface {
 	HandleEvent(EventMessage)
 }
 
-func init() {
-	SetGlobal(Config{})
-}
-
-func Global() Config {
-	return global.Load().(Config)
-}
-
-func SetGlobal(conf Config) {
-	globalMu.Lock()
-	defer globalMu.Unlock()
-	global.Store(conf)
-}
+// Global function that will return the config of the gw running
+var Global func() Config
 
 func WriteConf(path string, conf *Config) error {
 	bs, err := json.MarshalIndent(conf, "", "    ")

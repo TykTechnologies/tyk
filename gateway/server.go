@@ -1187,7 +1187,7 @@ func (gw *Gateway) initialiseSystem() error {
 	}
 
 	gw.SetConfig(gwConfig)
-	config.SetGlobal(gwConfig)
+	config.Global = gw.GetConfig
 	gw.getHostDetails(gw.GetConfig().PIDFileLocation)
 	gw.setupInstrumentation()
 
