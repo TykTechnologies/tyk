@@ -462,11 +462,11 @@ func TestOAS_OIDC(t *testing.T) {
 
 	var api apidef.APIDefinition
 	api.AuthConfigs = make(map[string]apidef.AuthConfig)
-	oas.extractOIDCTo(&api)
+	oas.getTykAuthentication().ExtractTo(&api)
 
 	var convertedOAS OAS
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
-	convertedOAS.fillOIDC(api)
+	convertedOAS.getTykAuthentication().Fill(api)
 
 	assert.Equal(t, oas, convertedOAS)
 }
@@ -487,11 +487,11 @@ func TestOAS_CustomPlugin(t *testing.T) {
 
 	var api apidef.APIDefinition
 	api.AuthConfigs = make(map[string]apidef.AuthConfig)
-	oas.extractCustomPluginTo(&api)
+	oas.getTykAuthentication().ExtractTo(&api)
 
 	var convertedOAS OAS
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
-	convertedOAS.fillCustomPlugin(api)
+	convertedOAS.getTykAuthentication().Fill(api)
 
 	assert.Equal(t, oas, convertedOAS)
 }
@@ -512,11 +512,11 @@ func TestOAS_GoPlugin(t *testing.T) {
 	}
 
 	var api apidef.APIDefinition
-	oas.extractGoPluginTo(&api)
+	oas.getTykAuthentication().ExtractTo(&api)
 
 	var convertedOAS OAS
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
-	convertedOAS.fillGoPlugin(api)
+	convertedOAS.getTykAuthentication().Fill(api)
 
 	assert.Equal(t, oas, convertedOAS)
 }
