@@ -11,7 +11,9 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 )
 
-// TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
+// RequestSizeLimitMiddleware is a middleware that will enforce a limit on the request body size. The request has
+// already been copied to memory when this middleware is called. Therefore, this middleware can't protect the gateway
+// itself from large requests.
 type RequestSizeLimitMiddleware struct {
 	BaseMiddleware
 }
@@ -22,7 +24,8 @@ func (t *RequestSizeLimitMiddleware) Name() string {
 
 func (t *RequestSizeLimitMiddleware) EnabledForSpec() bool {
 	for _, version := range t.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.SizeLimit) > 0 {
+		if len(version.ExtendedPaths.SizeLimit) > 0 ||
+			version.GlobalSizeLimit > 0 {
 			return true
 		}
 	}
