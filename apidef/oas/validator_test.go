@@ -257,3 +257,10 @@ func TestValidateOASObject(t *testing.T) {
 		assert.Equal(t, expectedErrs, errs)
 	})
 }
+
+func Test_loadOASSchema(t *testing.T) {
+	t.Run("load OAS", func(t *testing.T) {
+		loadOASSchema()
+		assert.NotNil(t, oasJSONSchemas["3.0.3"])
+	})
+}

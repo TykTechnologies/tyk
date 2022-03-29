@@ -13,6 +13,10 @@ var log = logger.Get()
 var oasJSONSchemas map[string][]byte
 
 func init() {
+	loadOASSchema()
+}
+
+func loadOASSchema() {
 	oasJSONSchemas = make(map[string][]byte)
 	baseDir := "./schema/"
 	files, err := os.ReadDir(baseDir)
@@ -42,7 +46,6 @@ func init() {
 
 		oasJSONSchemas[oasVersion] = oasJSONSchema
 	}
-
 }
 
 func ValidateOASObject(documentBody []byte, oasVersion string) (bool, []string) {
