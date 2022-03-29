@@ -1079,6 +1079,7 @@ func (gw *Gateway) initialiseSystem() error {
 		if err := config.Load(confPaths, &gwConfig); err != nil {
 			return err
 		}
+
 		if gwConfig.PIDFileLocation == "" {
 			gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
 		}
@@ -1165,6 +1166,7 @@ func (gw *Gateway) initialiseSystem() error {
 	}
 
 	gw.SetConfig(gwConfig)
+	config.Global = gw.GetConfig
 	gw.getHostDetails(gw.GetConfig().PIDFileLocation)
 	gw.setupInstrumentation()
 
