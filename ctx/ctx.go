@@ -3,8 +3,9 @@ package ctx
 import (
 	"context"
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/config"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
