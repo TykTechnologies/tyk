@@ -9,6 +9,7 @@ GOOS=$3
 GOARCH=$4
 CGOENABLED=0
 
+
 PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}$plugin_id"
 
 function usage() {
@@ -19,6 +20,11 @@ To build a plugin:
 <plugin_id> is optional
 EOF
 }
+
+if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
+   GOOS=$(go env GOOS)
+   GOARCH=$(go env GOARCH)
+ fi
 
 if [ -z "$plugin_name" ]; then
     usage
