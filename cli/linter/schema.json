@@ -607,6 +607,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "max_request_body_size": {
+          "type": "integer"
         }
       }
     },
