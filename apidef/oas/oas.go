@@ -2,7 +2,6 @@ package oas
 
 import (
 	"encoding/json"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/getkin/kin-openapi/openapi3"
 )
