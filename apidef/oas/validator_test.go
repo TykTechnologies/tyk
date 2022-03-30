@@ -148,6 +148,7 @@ func TestValidateOASObject(t *testing.T) {
 	validOAS3Definition, _ := validOASObject.MarshalJSON()
 
 	t.Run("valid OAS object", func(t *testing.T) {
+		t.Parallel()
 		err := ValidateOASObject(validOAS3Definition, "3.0.3")
 		assert.Nil(t, err)
 	})
@@ -157,6 +158,7 @@ func TestValidateOASObject(t *testing.T) {
 	invalidOAS3Definition, _ := invalidOASObject.MarshalJSON()
 
 	t.Run("invalid OAS object", func(t *testing.T) {
+		t.Parallel()
 		err := ValidateOASObject(invalidOAS3Definition, "3.0.3")
 		expectedErr := fmt.Sprintf("%s\n%s",
 			"paths./pets.get.responses.200: Must validate one and only one schema (oneOf)",
@@ -248,6 +250,7 @@ func TestValidateOASObject(t *testing.T) {
 	}`)
 
 	t.Run("wrong typed OAS object", func(t *testing.T) {
+		t.Parallel()
 		err := ValidateOASObject(wrongTypedOASDefinition, "3.0.3")
 		expectedErr := fmt.Sprintf("%s\n%s",
 			"paths./pets.get: responses is required",
@@ -257,7 +260,9 @@ func TestValidateOASObject(t *testing.T) {
 }
 
 func Test_loadOASSchema(t *testing.T) {
+	t.Parallel()
 	t.Run("load OAS", func(t *testing.T) {
+		t.Parallel()
 		err := loadOASSchema()
 		assert.Nil(t, err)
 		assert.NotNil(t, oasJSONSchemas["3.0.3"])

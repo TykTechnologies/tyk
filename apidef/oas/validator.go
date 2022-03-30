@@ -1,15 +1,14 @@
 package oas
 
 import (
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
 
-	"github.com/hashicorp/go-multierror"
-
-	"github.com/pkg/errors"
-
 	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/hashicorp/go-multierror"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -39,7 +38,7 @@ func loadOASSchema() error {
 	files, err := os.ReadDir(baseDir)
 
 	if err != nil {
-		return errors.Wrap(err, "error while listing schema files")
+		return fmt.Errorf("error while listing schema files: %w", err)
 	}
 	combinedErr := &multierror.Error{}
 	combinedErr.ErrorFormat = errorFormatter
@@ -53,13 +52,13 @@ func loadOASSchema() error {
 		oasVersion := strings.TrimSuffix(fileInfo.Name(), ".json")
 		file, err := os.Open(baseDir + fileInfo.Name())
 		if err != nil {
-			combinedErr = multierror.Append(combinedErr, errors.Wrapf(err, "error while loading oas json schema %s", fileInfo.Name()))
+			combinedErr = multierror.Append(combinedErr, fmt.Errorf("error while loading oas json schema %s: %w", fileInfo.Name(), err))
 			continue
 		}
 
 		oasJSONSchema, err := ioutil.ReadAll(file)
 		if err != nil {
-			combinedErr = multierror.Append(combinedErr, errors.Wrapf(err, "error while reading file %s", fileInfo.Name()))
+			combinedErr = multierror.Append(combinedErr, fmt.Errorf("error while reading file %s: %w ", fileInfo.Name(), err))
 			continue
 		}
 
