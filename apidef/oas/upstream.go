@@ -10,7 +10,8 @@ type Upstream struct {
 	// Old API Definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 	// Test contains the configuration related to uptime tests.
-	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
+	Test         *Test        `bson:"test,omitempty" json:"test,omitempty"`
+	Certificates Certificates `bson:"certificates,omitempty" json:"certificates,omitempty"`
 }
 
 func (u *Upstream) Fill(api apidef.APIDefinition) {
@@ -33,6 +34,13 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(u.Test) {
 		u.Test = nil
 	}
+
+	u.Certificates = make([]Certificate, len(api.UpstreamCertificates))
+	u.Certificates.Fill(api.UpstreamCertificates)
+
+	if len(u.Certificates) == 0 {
+		u.Certificates = nil
+	}
 }
 
 func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
@@ -44,6 +52,10 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	if u.Test != nil {
 		u.Test.ExtractTo(&api.UptimeTests)
+	}
+
+	if len(api.UpstreamCertificates) > 0 {
+		u.Certificates.ExtractTo(api.UpstreamCertificates)
 	}
 }
 
