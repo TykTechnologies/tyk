@@ -35,15 +35,11 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 }
 
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
-	if s.Security != nil {
-		s.extractSecurityTo(api)
-	} else {
-		api.UseKeylessAccess = true
-	}
-
 	if s.GetTykExtension() != nil {
 		s.GetTykExtension().ExtractTo(api)
 	}
+
+	s.extractSecurityTo(api)
 
 	var ep apidef.ExtendedPathsSet
 	s.extractPathsAndOperations(&ep)
