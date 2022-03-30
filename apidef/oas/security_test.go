@@ -520,3 +520,27 @@ func TestOAS_GoPlugin(t *testing.T) {
 
 	assert.Equal(t, oas, convertedOAS)
 }
+
+func TestOAS_TykAuthentication_NoOASSecurity(t *testing.T) {
+	var hmac HMAC
+	Fill(t, &hmac, 0)
+
+	var oas OAS
+	oas.Extensions = map[string]interface{}{
+		ExtensionTykAPIGateway: &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					HMAC: &hmac,
+				},
+			},
+		},
+	}
+
+	var api apidef.APIDefinition
+	oas.ExtractTo(&api)
+
+	var convertedOAS OAS
+	convertedOAS.Fill(api)
+
+	assert.Equal(t, oas, convertedOAS)
+}
