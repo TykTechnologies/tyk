@@ -42,3 +42,16 @@ func TestClientCertificates(t *testing.T) {
 
 	assert.Equal(t, emptyClientCertificates, resultClientCertificates)
 }
+
+func TestPinnedPublicKeys(t *testing.T) {
+	var pinnedPublicKeys PinnedPublicKeys
+	Fill(t, &pinnedPublicKeys, 0)
+
+	convertedPinnedPublicKeys := make(map[string]string)
+	pinnedPublicKeys.ExtractTo(convertedPinnedPublicKeys)
+
+	resultPinnedPublicKeys := make(PinnedPublicKeys, len(pinnedPublicKeys))
+	resultPinnedPublicKeys.Fill(convertedPinnedPublicKeys)
+
+	assert.Equal(t, pinnedPublicKeys, resultPinnedPublicKeys)
+}
