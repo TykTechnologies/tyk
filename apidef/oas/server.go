@@ -1,6 +1,11 @@
 package oas
 
-import "github.com/TykTechnologies/tyk/apidef"
+import (
+	"sort"
+	"strings"
+
+	"github.com/TykTechnologies/tyk/apidef"
+)
 
 type Server struct {
 	// ListenPath represents the path to listen on. Any requests coming into the host, on the port that Tyk is configured to run on,
@@ -94,5 +99,38 @@ func (c Certificates) Fill(upstreamCerts map[string]string) {
 func (c Certificates) ExtractTo(upstreamCerts map[string]string) {
 	for _, cert := range c {
 		upstreamCerts[cert.Domain] = cert.Cert
+	}
+}
+
+type PinnedPublicKey struct {
+	Domain string   `bson:"domain" json:"domain"`
+	List   []string `bson:"list" json:"list"`
+}
+
+type PinnedPublicKeys []PinnedPublicKey
+
+func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
+	domains := make([]string, len(publicKeys))
+
+	i := 0
+	for domain := range publicKeys {
+		domains[i] = domain
+		i++
+	}
+
+	sort.Slice(domains, func(i, j int) bool {
+		return domains[i] < domains[j]
+	})
+
+	i = 0
+	for _, domain := range domains {
+		ppk[i] = PinnedPublicKey{Domain: domain, List: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
+		i++
+	}
+}
+
+func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
+	for _, publicKey := range ppk {
+		publicKeys[publicKey.Domain] = strings.Join(publicKey.List, ",")
 	}
 }
