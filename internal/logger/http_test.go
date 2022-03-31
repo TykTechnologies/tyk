@@ -27,4 +27,10 @@ func TestRequestLogger(t *testing.T) {
 
 	assert.Equal(t, id, RequestID(r.Context()))
 	assert.Equal(t, cid, CorrelationID(r.Context()))
+	assert.Equal(t, l1, l2)
+
+	l3 := FromContext(r.Context())
+	l3.Info("Third log with data")
+
+	assert.Equal(t, l2, l3)
 }

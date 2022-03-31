@@ -32,9 +32,9 @@ type (
 func FromRequest(r *http.Request) *zap.Logger {
 	// Return existing logger bound in context
 	ctx := r.Context()
-	value, ok := ctx.Value(requestLogger{}).(*zap.Logger)
-	if ok {
-		return value
+	logger := FromContext(ctx)
+	if logger != nil {
+		return logger
 	}
 
 	var (
@@ -47,7 +47,7 @@ func FromRequest(r *http.Request) *zap.Logger {
 	ctx = context.WithValue(ctx, correlationID{}, cid)
 
 	// Create logger with context information
-	logger := zap.L().With(
+	logger = zap.L().With(
 		zap.String("request-id", id),
 		zap.String("correlation-id", cid),
 	)
@@ -59,6 +59,14 @@ func FromRequest(r *http.Request) *zap.Logger {
 	*r = *(r.WithContext(ctx))
 
 	return logger
+}
+
+// FromContext returns a logger bound to the context or nil
+func FromContext(ctx context.Context) *zap.Logger {
+	if value, ok := ctx.Value(requestLogger{}).(*zap.Logger); ok {
+		return value
+	}
+	return nil
 }
 
 func RequestID(ctx context.Context) (value string) {
