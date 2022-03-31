@@ -29,6 +29,7 @@ import (
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/goverify"
+	zap "github.com/TykTechnologies/tyk/internal/logger"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
@@ -1411,6 +1412,10 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Flush logger output buffers
+	defer zap.Sync()
+
 	cli.Init(VERSION, confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
