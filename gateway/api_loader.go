@@ -493,10 +493,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			FuncName: spec.AnalyticsPlugin.FuncName,
 		}
 
-		ap.loadAnalyticsPlugin()
-		spec.AnalyticsPluginConfig = ap
-		logger.Debug("Loaded analytics plugin")
-
+		if ap.loadAnalyticsPlugin() {
+			spec.AnalyticsPluginConfig = ap
+			logger.Debug("Loaded analytics plugin")
+		}
 	}
 
 	logger.WithFields(logrus.Fields{

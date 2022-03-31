@@ -5,6 +5,7 @@ import (
 	"github.com/TykTechnologies/tyk/analytics"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/sirupsen/logrus"
+	"time"
 )
 
 type GoAnalyticsPlugin struct {
@@ -43,8 +44,13 @@ func (m *GoAnalyticsPlugin) processRecord(record *analytics.Record) (err error) 
 			m.logger.WithError(err).Error("Recovered from panic while running Go-plugin middleware func")
 		}
 	}()
-
+	// call Go-plugin function
+	t1 := time.Now()
 	m.handler(record)
+
+	// calculate latency
+	ms := DurationToMillisecond(time.Since(t1))
+	m.logger.WithField("ms", ms).Debug("Go-plugin analytics record processing took")
 
 	return nil
 }

@@ -9,7 +9,7 @@ import (
 
 var log = logger.Get()
 
-// AnalyticsRecord encodes the details of a request
+// Record encodes the details of a request/response cycle
 type Record struct {
 	Method        string
 	Host          string
@@ -42,48 +42,6 @@ type Record struct {
 	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
 }
 
-type Latency struct {
-	Total    int64
-	Upstream int64
-}
-
-type NetworkStats struct {
-	OpenConnections  int64
-	ClosedConnection int64
-	BytesIn          int64
-	BytesOut         int64
-}
-
-type GeoData struct {
-	Country struct {
-		ISOCode string `maxminddb:"iso_code"`
-	} `maxminddb:"country"`
-
-	City struct {
-		Names map[string]string `maxminddb:"names"`
-	} `maxminddb:"city"`
-
-	Location struct {
-		Latitude  float64 `maxminddb:"latitude"`
-		Longitude float64 `maxminddb:"longitude"`
-		TimeZone  string  `maxminddb:"time_zone"`
-	} `maxminddb:"location"`
-}
-
-func (n *NetworkStats) Flush() NetworkStats {
-	s := NetworkStats{
-		OpenConnections:  atomic.LoadInt64(&n.OpenConnections),
-		ClosedConnection: atomic.LoadInt64(&n.ClosedConnection),
-		BytesIn:          atomic.LoadInt64(&n.BytesIn),
-		BytesOut:         atomic.LoadInt64(&n.BytesOut),
-	}
-	atomic.StoreInt64(&n.OpenConnections, 0)
-	atomic.StoreInt64(&n.ClosedConnection, 0)
-	atomic.StoreInt64(&n.BytesIn, 0)
-	atomic.StoreInt64(&n.BytesOut, 0)
-	return s
-}
-
 func (a *Record) NormalisePath(globalConfig *config.Config) {
 	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
 		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
@@ -106,4 +64,46 @@ func (a *Record) SetExpiry(expiresInSeconds int64) {
 	t := time.Now()
 	t2 := t.Add(expiry)
 	a.ExpireAt = t2
+}
+
+type NetworkStats struct {
+	OpenConnections  int64
+	ClosedConnection int64
+	BytesIn          int64
+	BytesOut         int64
+}
+
+func (n *NetworkStats) Flush() NetworkStats {
+	s := NetworkStats{
+		OpenConnections:  atomic.LoadInt64(&n.OpenConnections),
+		ClosedConnection: atomic.LoadInt64(&n.ClosedConnection),
+		BytesIn:          atomic.LoadInt64(&n.BytesIn),
+		BytesOut:         atomic.LoadInt64(&n.BytesOut),
+	}
+	atomic.StoreInt64(&n.OpenConnections, 0)
+	atomic.StoreInt64(&n.ClosedConnection, 0)
+	atomic.StoreInt64(&n.BytesIn, 0)
+	atomic.StoreInt64(&n.BytesOut, 0)
+	return s
+}
+
+type Latency struct {
+	Total    int64
+	Upstream int64
+}
+
+type GeoData struct {
+	Country struct {
+		ISOCode string `maxminddb:"iso_code"`
+	} `maxminddb:"country"`
+
+	City struct {
+		Names map[string]string `maxminddb:"names"`
+	} `maxminddb:"city"`
+
+	Location struct {
+		Latitude  float64 `maxminddb:"latitude"`
+		Longitude float64 `maxminddb:"longitude"`
+		TimeZone  string  `maxminddb:"time_zone"`
+	} `maxminddb:"location"`
 }

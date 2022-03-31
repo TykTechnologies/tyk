@@ -1,16 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"github.com/TykTechnologies/tyk/analytics"
-	"io/ioutil"
-	"net/http"
-
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/buger/jsonparser"
+	"io/ioutil"
+	"net/http"
 )
 
 // MyPluginPre checks if session is NOT present, adds custom header
@@ -144,9 +145,41 @@ func MyPluginPerPathResp(rw http.ResponseWriter, r *http.Request) {
 	rw.Write(jsonData)
 }
 
-func MyAnalyticsMaskPlugin(record *analytics.Record) {
+func MyAnalyticsPluginDeleteHeader(record *analytics.Record) {
+	str, err := base64.StdEncoding.DecodeString(record.RawResponse)
+	if err != nil {
+		return
+	}
 
-	fmt.Println(record)
+	var b = &bytes.Buffer{}
+	b.Write(str)
+
+	r := bufio.NewReader(b)
+	var resp *http.Response
+	resp, err = http.ReadResponse(r, nil)
+
+	resp.Header.Del("Server")
+	var bNew bytes.Buffer
+	resp.Write(&bNew)
+	record.RawResponse = base64.StdEncoding.EncodeToString(bNew.Bytes())
 }
 
-func main() {}
+func MyAnalyticsPluginMaskJSONLoginBody(record *analytics.Record) {
+	if record.ContentLength < 1 {
+		return
+	}
+	d, err := base64.StdEncoding.DecodeString(record.RawRequest)
+	if err != nil {
+		return
+	}
+	const CRLF = "\r\n\r\n"
+	if i := bytes.Index(d, []byte(CRLF)); i > 0 || (i+4) < len(d) {
+		body, err := jsonparser.Set(d[i+4:],
+			[]byte("******"),
+			"email", "password", "data.email", "data.password", "body.email", "body.password",
+		)
+		if err == nil {
+			record.RawRequest = string(append(d[i:], body...))
+		}
+	}
+}

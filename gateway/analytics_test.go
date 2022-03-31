@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"github.com/TykTechnologies/tyk/analytics"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -40,12 +41,12 @@ func TestURLReplacer(t *testing.T) {
 	defer ts.Close()
 	globalConf := ts.Gw.GetConfig()
 
-	recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
-	recordUUID2 := AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
-	recordUUID3 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-	recordUUID4 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-	recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
-	recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
+	recordUUID1 := analytics.Record{Path: "/15873a748894492162c402d67e92283b/search"}
+	recordUUID2 := analytics.Record{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
+	recordUUID3 := analytics.Record{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+	recordUUID4 := analytics.Record{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+	recordID1 := analytics.Record{Path: "/widgets/123456/getParams"}
+	recordCust := analytics.Record{Path: "/widgets/123456/getParams/ihatethisstring"}
 
 	globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = ts.Gw.initNormalisationPatterns()
 	ts.Gw.SetConfig(globalConf)
@@ -104,12 +105,12 @@ func BenchmarkURLReplacer(b *testing.B) {
 	ts.Gw.SetConfig(globalConf)
 
 	for i := 0; i < b.N; i++ {
-		recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
-		recordUUID2 := AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
-		recordUUID3 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-		recordUUID4 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-		recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
-		recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
+		recordUUID1 := analytics.Record{Path: "/15873a748894492162c402d67e92283b/search"}
+		recordUUID2 := analytics.Record{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
+		recordUUID3 := analytics.Record{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+		recordUUID4 := analytics.Record{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+		recordID1 := analytics.Record{Path: "/widgets/123456/getParams"}
+		recordCust := analytics.Record{Path: "/widgets/123456/getParams/ihatethisstring"}
 
 		recordUUID1.NormalisePath(&globalConf)
 		recordUUID2.NormalisePath(&globalConf)
