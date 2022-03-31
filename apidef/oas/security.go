@@ -378,6 +378,10 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillBasic(api)
 	s.fillOAuth(api)
 
+	if len(tykAuthentication.SecuritySchemes) == 0 {
+		tykAuthentication.SecuritySchemes = nil
+	}
+
 	if ShouldOmit(tykAuthentication) {
 		s.GetTykExtension().Server.Authentication = nil
 	}
@@ -388,6 +392,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		tykAuthentication.ExtractTo(api)
 	} else {
 		api.UseKeylessAccess = true
+		return
 	}
 
 	if api.AuthConfigs == nil {
