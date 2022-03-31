@@ -265,6 +265,6 @@ func Test_loadOASSchema(t *testing.T) {
 		t.Parallel()
 		err := loadOASSchema()
 		assert.Nil(t, err)
-		assert.NotNil(t, JSONSchemas["3.0.3"])
+		assert.NotNil(t, oasJsonSchemas["3.0.3"])
 	})
 }

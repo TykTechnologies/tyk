@@ -6,6 +6,7 @@ package oas
 import (
 	"errors"
 	"strings"
+	"sync"
 
 	"github.com/TykTechnologies/tyk/apidef/oas/schema"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -14,9 +15,9 @@ import (
 )
 
 var (
-	log         = logger.Get()
-	JSONSchemas map[string][]byte
-
+	log            = logger.Get()
+	oasJsonSchemas map[string][]byte
+	mu             sync.Mutex
 	errorFormatter = func(errs []error) string {
 		var result strings.Builder
 		for i, err := range errs {
@@ -34,11 +35,10 @@ func init() {
 	if err := loadOASSchema(); err != nil {
 		log.WithError(err).Error("loadOASSchema failed!")
 	}
-
 }
 
 func loadOASSchema() error {
-	JSONSchemas = make(map[string][]byte)
+	oasJsonSchemas = make(map[string][]byte)
 	fileNames := schema.AssetNames()
 	for _, fileName := range fileNames {
 		if !strings.HasSuffix(fileName, ".json") {
@@ -51,14 +51,14 @@ func loadOASSchema() error {
 		}
 
 		oasVersion := strings.TrimSuffix(fileName, ".json")
-		JSONSchemas[oasVersion] = data
+		oasJsonSchemas[oasVersion] = data
 	}
 
 	return nil
 }
 
 func ValidateOASObject(documentBody []byte, oasVersion string) error {
-	schemaLoader := gojsonschema.NewBytesLoader(JSONSchemas[oasVersion])
+	schemaLoader := gojsonschema.NewBytesLoader(GetOASSchema(oasVersion))
 	documentLoader := gojsonschema.NewBytesLoader(documentBody)
 	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
 
@@ -78,4 +78,10 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	}
 
 	return nil
+}
+
+func GetOASSchema(version string) []byte {
+	mu.Lock()
+	defer mu.Unlock()
+	return oasJsonSchemas[version]
 }
