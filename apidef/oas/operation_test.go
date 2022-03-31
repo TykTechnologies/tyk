@@ -67,6 +67,56 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	assert.Equal(t, expCombinedPaths, convertedOAS.Paths)
 }
 
+func TestOAS_PathsAndOperationsRegex(t *testing.T) {
+	t.Parallel()
+
+	expectedOperationID := "users/[a-z]+/[0-9]+$GET"
+	expectedPath := "/users/{customRegex1}/{customRegex2}"
+
+	var oas OAS
+	oas.Paths = openapi3.Paths{}
+
+	_ = oas.getOperationID("/users/[a-z]+/[0-9]+$", "GET")
+
+	expectedPathItems := openapi3.Paths{
+		expectedPath: &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: expectedOperationID,
+			},
+			Parameters: []*openapi3.ParameterRef{
+				{
+					Value: &openapi3.Parameter{
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{
+								Type:    "string",
+								Pattern: "[a-z]+",
+							},
+						},
+						Name:     "customRegex1",
+						In:       "path",
+						Required: true,
+					},
+				},
+				{
+					Value: &openapi3.Parameter{
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{
+								Type:    "string",
+								Pattern: "[0-9]+$",
+							},
+						},
+						Name:     "customRegex2",
+						In:       "path",
+						Required: true,
+					},
+				},
+			},
+		},
+	}
+
+	assert.Equal(t, expectedPathItems, oas.Paths, "expected path item differs")
+}
+
 func TestOAS_RegexOperationIDs(t *testing.T) {
 	t.Parallel()
 
@@ -132,14 +182,15 @@ func TestOAS_RegexPaths(t *testing.T) {
 
 		p, ok := oas.Paths[tc.want]
 		assert.Truef(t, ok, "test %d: path doesn't exist in OAS: %v", i, tc.want)
-		assert.Equalf(t, tc.params, len(p.Parameters), "test %d: expected %d parameters, got %d", i, tc.params, len(p.Parameters))
+		assert.Lenf(t, p.Parameters, tc.params, "test %d: expected %d parameters, got %d", i, tc.params, len(p.Parameters))
 
 		// rebuild original link
 		got := tc.want
 		for _, param := range p.Parameters {
-			assert.Truef(t, param.Value != nil, "test %d: missing value", i)
-			assert.Truef(t, param.Value.Schema != nil, "test %d: missing schema", i)
-			assert.Truef(t, param.Value.Schema.Value != nil, "test %d: missing schema value", i)
+			assert.NotNilf(t, param.Value, "test %d: missing value", i)
+			assert.NotNilf(t, param.Value.Schema, "test %d: missing schema", i)
+			assert.NotNilf(t, param.Value.Schema.Value, "test %d: missing schema value", i)
+
 			assert.Truef(t, strings.HasPrefix(param.Value.Name, "customRegex"), "test %d: invalid name %v", i, param.Value.Name)
 
 			got = strings.ReplaceAll(got, "{"+param.Value.Name+"}", param.Value.Schema.Value.Pattern)
