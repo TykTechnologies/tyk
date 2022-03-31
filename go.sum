@@ -88,6 +88,10 @@ github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220325163454-326577ab7002 h1:
 github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220325163454-326577ab7002/go.mod h1:EgLZPakwjeYqfb34QjO+vGvLo+qippEoX0nnyhqF0L0=
 github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220328105344-818df00f2742 h1:XGJI9FudJeQGmnElf7aQWKlLiM96XbrgGSK1un5mf9U=
 github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220328105344-818df00f2742/go.mod h1:EgLZPakwjeYqfb34QjO+vGvLo+qippEoX0nnyhqF0L0=
+github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220331091229-8931a32abb1f h1:FEqpPWkEMIyJMEcx/XNywkEYzo6QqVeOEFdun6jnibc=
+github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220331091229-8931a32abb1f/go.mod h1:EgLZPakwjeYqfb34QjO+vGvLo+qippEoX0nnyhqF0L0=
+github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220331100921-f15208fa876e h1:DF9ibeaOGyDpWeaoXAVp358fCJzdrTzjUqwzGQJWX58=
+github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220331100921-f15208fa876e/go.mod h1:EgLZPakwjeYqfb34QjO+vGvLo+qippEoX0nnyhqF0L0=
 github.com/TykTechnologies/tyk-pump v1.4.0/go.mod h1:3AXhYgEzLeaxkWCNziNb8qe0L1fwiRhah76oo2Zc5Pw=
 github.com/TykTechnologies/tyk-pump v1.5.1/go.mod h1:RMK3aSqW72/TbbhAgAL2qDv3RJxR+QKuNMaUB0lyvlc=
 github.com/agnivade/levenshtein v1.0.1/go.mod h1:CURSv5d9Uaml+FovSIICkLbAUZ9S4RqaHDIsdSBg7lM=

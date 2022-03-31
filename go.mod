@@ -21,7 +21,7 @@ require (
 	github.com/TykTechnologies/logrus-prefixed-formatter v0.0.0-20161201171121-85209afb73a6 // indirect
 	github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
 	github.com/TykTechnologies/openid2go v0.0.0-20200312160651-00c254a52b19
-	github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220328105344-818df00f2742
+	github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220331100921-f15208fa876e
 	github.com/akutz/memconn v0.1.0
 	github.com/aws/aws-sdk-go v1.40.32 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.9.0 // indirect
