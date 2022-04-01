@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
@@ -97,8 +99,12 @@ func GetSession(r *http.Request) *user.SessionState {
 	return nil
 }
 
-func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
-	ctxSetSession(r, s, scheduleUpdate, hashKey)
+func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey ...bool) {
+	if len(hashKey) > 1 {
+		ctxSetSession(r, s, scheduleUpdate, hashKey[0])
+	} else {
+		ctxSetSession(r, s, scheduleUpdate, config.Global().HashKeys)
+	}
 }
 
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
