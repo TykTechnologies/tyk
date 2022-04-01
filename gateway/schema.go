@@ -29,7 +29,6 @@ func (gw *Gateway) schemaHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		log.Debug("Requesting OAS schema definition for", oasVersion)
 
 		data := oas.GetOASSchema(oasVersion)
 		if data == nil {
