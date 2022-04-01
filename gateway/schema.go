@@ -17,11 +17,6 @@ type OASSchemaResponse struct {
 func (gw *Gateway) schemaHandler(w http.ResponseWriter, r *http.Request) {
 	oasVersion := r.URL.Query().Get("oasVersion")
 
-	if oasVersion == "" {
-		doJSONWrite(w, http.StatusBadRequest, OASSchemaResponse{Message: "Should provide a value for parameter oasVersion", Status: "Failed"})
-		return
-	}
-
 	var resp OASSchemaResponse
 	var code = http.StatusOK
 
