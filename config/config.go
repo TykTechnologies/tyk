@@ -322,7 +322,7 @@ type SlaveOptionsConfig struct {
 	RPCCertCacheExpiration float32 `json:"rpc_cert_cache_expiration"`
 
 	// RPCKeysCacheExpiration defines the expiration time of the rpc cache that stores the keys, defined in seconds
-	RPCGlobalCacheExpiration float32 `json:"rpc_global_cache_expiration""`
+	RPCGlobalCacheExpiration float32 `json:"rpc_global_cache_expiration"`
 }
 
 type LocalSessionCacheConf struct {
