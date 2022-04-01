@@ -45,6 +45,8 @@ func init() {
 }
 
 func loadOASSchema() error {
+	mu.Lock()
+	defer mu.Unlock()
 	oasJsonSchemas = make(map[string][]byte)
 	fileNames := schema.AssetNames()
 	for _, fileName := range fileNames {
