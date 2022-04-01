@@ -1497,7 +1497,6 @@ paths:
         - description: The OAS version
           name: oasVersion
           in: query
-          required: true
           schema:
             type: string
       responses:
