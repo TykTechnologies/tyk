@@ -62,11 +62,13 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 		u.Test.ExtractTo(&api.UptimeTests)
 	}
 
-	if len(api.UpstreamCertificates) > 0 {
+	if len(u.Certificates) > 0 {
+		api.UpstreamCertificates = make(map[string]string, len(u.Certificates))
 		u.Certificates.ExtractTo(api.UpstreamCertificates)
 	}
 
-	if len(api.PinnedPublicKeys) > 0 {
+	if len(u.PinnedPublicKeys) > 0 {
+		api.PinnedPublicKeys = make(map[string]string, len(u.PinnedPublicKeys))
 		u.PinnedPublicKeys.ExtractTo(api.PinnedPublicKeys)
 	}
 }
