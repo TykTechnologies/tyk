@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 )
 
 func TestSchemaApi(t *testing.T) {
+	t.Parallel()
 	g := StartTest(nil)
 	defer g.Close()
 
@@ -18,7 +20,18 @@ func TestSchemaApi(t *testing.T) {
 
 	t.Run("status not found when non existing version is queried", func(t *testing.T) {
 		_, _ = g.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: "/tyk/schema?oasVersion=2.0.3",
-			BodyMatch: `"message":"Schema not found for version 2.0.3"`, Code: http.StatusNotFound})
+			BodyMatchFunc: func(bytes []byte) bool {
+				var resp OASSchemaResponse
+				err := json.Unmarshal(bytes, &resp)
+				if err != nil {
+					t.Logf("error while unmarshalling body in test: %s", err.Error())
+					return false
+				}
+				if resp.Message == `Schema not found for version "2.0.3"` && resp.Status == "Failed" {
+					return true
+				}
+				return false
+			}, Code: http.StatusNotFound})
 	})
 
 	t.Run("bad request when oasVersion is not supplied", func(t *testing.T) {

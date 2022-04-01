@@ -5,15 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/getkin/kin-openapi/openapi3"
-
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
 type OASSchemaResponse struct {
-	Status  string      `json:"status"`
-	Message string      `json:"message"`
-	Schema  *openapi3.T `json:"schema,omitempty"`
+	Status  string          `json:"status"`
+	Message string          `json:"message"`
+	Schema  json.RawMessage `json:"schema,omitempty"`
 }
 
 func (gw *Gateway) schemaHandler(w http.ResponseWriter, r *http.Request) {
@@ -32,18 +30,15 @@ func (gw *Gateway) schemaHandler(w http.ResponseWriter, r *http.Request) {
 
 		data := oas.GetOASSchema(oasVersion)
 		if data == nil {
-			resp.Message = fmt.Sprintf("Schema not found for version %s", oasVersion)
+			resp.Message = fmt.Sprintf("Schema not found for version %q", oasVersion)
 			resp.Status = "Failed"
 			code = http.StatusNotFound
 			break
 		}
 
-		schema := openapi3.T{}
-		_ = json.Unmarshal(data, &schema)
-
 		resp = OASSchemaResponse{
 			Status: "Success",
-			Schema: &schema,
+			Schema: data,
 		}
 
 	}
