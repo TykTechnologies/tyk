@@ -24,7 +24,7 @@ func TestSchemaApi(t *testing.T) {
 				var resp OASSchemaResponse
 				err := json.Unmarshal(bytes, &resp)
 				if err != nil {
-					t.Logf("error while unmarshalling body in test: %s", err.Error())
+					t.Logf("error while unmarshalling body in test: %v", err)
 					return false
 				}
 				if resp.Message == `Schema not found for version "2.0.3"` && resp.Status == "Failed" {
