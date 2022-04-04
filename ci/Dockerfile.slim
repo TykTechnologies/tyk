@@ -7,7 +7,7 @@
 # ./pr.zsh -repos tyk -base td-883-test -branch td-883-test -title Sync from latest releng templates
 # m4 -E -DxREPO=tyk
 
-FROM gcr.io/distroless/static-debian10
+FROM gcr.io/distroless/static-debian11
 WORKDIR /opt/tyk
 COPY tyk .
 COPY apps/app_sample.json apps/app_sample.json
