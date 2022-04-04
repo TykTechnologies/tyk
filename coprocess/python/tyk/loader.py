@@ -19,7 +19,7 @@ class MiddlewareLoader():
 
     def find_module(self, module_name, package_path):
       module_filename = "{0}.py".format(module_name)
-      self.base_path = "{0}_{1}".format(self.mw.api_id, self.mw.middleware_id)
+      self.base_path = self.mw.middleware_id
       self.module_path = os.path.join(self.bundle_root_path, self.base_path, module_filename)
 
       s = inspect.stack()
