@@ -114,7 +114,7 @@ jobs:
             -Dsonar.organization=tyktechnologies
             -Dsonar.projectKey=TykTechnologies_tyk
             -Dsonar.sources=.
-            -Dsonar.exclusions=coprocess/**/*,ci/**,smoke-tests/**
+            -Dsonar.exclusions=coprocess/**/*,ci/**,smoke-tests/**,apidef/oas/schema/schema.go
             -Dsonar.coverage.exclusions=**/*_test.go
             -Dsonar.test.inclusions=**/*_test.go
             -Dsonar.tests=.

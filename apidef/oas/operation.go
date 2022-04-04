@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -199,27 +200,128 @@ func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path st
 	ep.HardTimeouts = append(ep.HardTimeouts, meta)
 }
 
-func (s *OAS) getOperationID(path, method string) (operationID string) {
-	operationID = strings.TrimPrefix(path, "/") + method
+// detect possible regex pattern:
+// - character match ([a-z])
+// - greedy match (*)
+// - ungreedy match (+)
+// - any char (.)
+// - end of string ($)
+const regexPatterns = "[].+*$"
 
-	if s.Paths[path] == nil {
-		s.Paths[path] = &openapi3.PathItem{}
+type pathPart struct {
+	name    string
+	value   string
+	isRegex bool
+}
+
+func (p pathPart) String() string {
+	if p.isRegex {
+		return "{" + p.name + "}"
 	}
 
-	p := s.Paths[path]
-	operation := p.GetOperation(method)
-	if operation == nil {
-		p.SetOperation(method, &openapi3.Operation{OperationID: operationID})
-		return operationID
+	return p.value
+}
+
+// splitPath splits url into folder parts, detecting regex patterns
+func splitPath(inPath string) ([]pathPart, bool) {
+	// Each url fragment can contain a regex, but the whole
+	// url isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
+	parts := strings.Split(strings.Trim(inPath, "/"), "/")
+	result := make([]pathPart, len(parts))
+	found := 0
+
+	for k, value := range parts {
+		name := value
+		isRegex := strings.ContainsAny(value, regexPatterns)
+		if isRegex {
+			found++
+			name = fmt.Sprintf("customRegex%d", found)
+		}
+		result[k] = pathPart{
+			name:    name,
+			value:   value,
+			isRegex: isRegex,
+		}
 	}
 
-	if operation.OperationID == "" {
-		operation.OperationID = operationID
+	return result, found > 0
+}
+
+// buildPath converts the url paths with regex to named parameters
+// e.g. ["a", ".*"] becomes /a/{customRegex1}
+func buildPath(parts []pathPart, appendSlash bool) string {
+	newPath := ""
+
+	for _, part := range parts {
+		newPath += "/" + part.String()
+	}
+
+	if appendSlash {
+		return newPath + "/"
+	}
+
+	return newPath
+}
+
+func (s *OAS) getOperationID(inPath, method string) string {
+	operationID := strings.TrimPrefix(inPath, "/") + method
+
+	createOrGetPathItem := func(item string) *openapi3.PathItem {
+		if s.Paths[item] == nil {
+			s.Paths[item] = &openapi3.PathItem{}
+		}
+
+		return s.Paths[item]
+	}
+
+	createOrUpdateOperation := func(p *openapi3.PathItem) *openapi3.Operation {
+		operation := p.GetOperation(method)
+
+		if operation == nil {
+			operation = &openapi3.Operation{}
+			p.SetOperation(method, operation)
+		}
+
+		if operation.OperationID == "" {
+			operation.OperationID = operationID
+		}
+
+		return operation
+	}
+
+	var p *openapi3.PathItem
+	parts, hasRegex := splitPath(inPath)
+
+	if hasRegex {
+		newPath := buildPath(parts, strings.HasSuffix(inPath, "/"))
+		p = createOrGetPathItem(newPath)
+		p.Parameters = []*openapi3.ParameterRef{}
+
+		for _, part := range parts {
+			if part.isRegex {
+				schema := &openapi3.SchemaRef{
+					Value: &openapi3.Schema{
+						Type:    "string",
+						Pattern: part.value,
+					},
+				}
+				param := &openapi3.ParameterRef{
+					Value: &openapi3.Parameter{
+						Name:     part.name,
+						In:       "path",
+						Required: true,
+						Schema:   schema,
+					},
+				}
+				p.Parameters = append(p.Parameters, param)
+			}
+		}
 	} else {
-		operationID = operation.OperationID
+		p = createOrGetPathItem(inPath)
 	}
 
-	return
+	operation := createOrUpdateOperation(p)
+	return operation.OperationID
 }
 
 func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
