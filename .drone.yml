@@ -5,6 +5,33 @@ kind: pipeline
 name: default
 
 steps:
+- name: build-cross
+  image: tykio/golang-cross:1.15.15
+  privileged: true
+  environment:
+    GOPRIVATE: github.com/TykTechnologies/*
+    GPG_FINGERPRINT: "12B5D62C28F57592D1575BD51ED14C59E37DAC20"
+    GOLANG_CROSS: "1.15.15"
+    EL7: false
+    RPMVERS: "el/8"
+    DEBVERS: "ubuntu/bionic ubuntu/focal debian/jessie"
+    REPO: tyk/tyk-gateway-unstable
+    TYK_PKG_SIGNING_KEY:
+      from_secret: TYK_PKG_SIGNING_KEY
+    TYK_PKG_SIGNING_PASSPHRASE:
+      from_secret: TYK_PKG_SIGNING_PASSPHRASE
+  volumes:
+    - name: dockersock
+      path: /var/run/docker.sock
+  commands:
+    - export PACKAGECLOUD_TOKEN="${PC_TOKEN}"
+    - export GITHUB_TOKEN="$TYK_GITHUB_TOKEN"
+    - export PKG_SIGNING_KEY="$TYK_PKG_SIGNING_KEY"
+    - export NFPM_STD_PASSPHRASE="$TYK_PKG_SIGNING_PASSPHRASE"
+    - export NFPM_PAYG_PASSPHRASE="$TYK_PKG_SIGNING_PASSPHRASE"
+    - ci/bin/unlock-agent.sh
+    - goreleaser --snapshot --rm-dist
+
 - name: test
   image: golang:1.18
   pull: always
@@ -26,10 +53,14 @@ steps:
   commands:
     - make build
 
+
 volumes:
 - name: cache
   host:
     path: /data/drone-ci
+- name: dockersock
+  host:
+    path: /var/run/docker.sock
 
 services:
 - name: redis
