@@ -6,12 +6,12 @@ name: default
 
 steps:
 - name: build-cross
-  image: tykio/golang-cross:1.15.15
+  image: tykio/golang-cross:1.15
   privileged: true
   environment:
     GOPRIVATE: github.com/TykTechnologies/*
     GPG_FINGERPRINT: "12B5D62C28F57592D1575BD51ED14C59E37DAC20"
-    GOLANG_CROSS: "1.15.15"
+    GOLANG_CROSS: "1.15"
     EL7: false
     RPMVERS: "el/8"
     DEBVERS: "ubuntu/bionic ubuntu/focal debian/jessie"
