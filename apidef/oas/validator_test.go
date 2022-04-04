@@ -268,3 +268,26 @@ func Test_loadOASSchema(t *testing.T) {
 		assert.NotNil(t, oasJsonSchemas["3.0.3"])
 	})
 }
+
+func Test_findDefaultVersion(t *testing.T) {
+	t.Parallel()
+	t.Run("single version", func(t *testing.T) {
+		rawVersions := []string{"3.0.3"}
+
+		assert.Equal(t, "3.0.3", findDefaultVersion(rawVersions))
+	})
+
+	t.Run("multiple versions", func(t *testing.T) {
+		rawVersions := []string{"3.0.3", "3.0.4", "3.1.0"}
+
+		assert.Equal(t, "3.1.0", findDefaultVersion(rawVersions))
+	})
+}
+
+func Test_setDefaultVersion(t *testing.T) {
+	err := loadOASSchema()
+	assert.NoError(t, err)
+
+	setDefaultVersion()
+	assert.Equal(t, "3.0.3", defaultVersion)
+}

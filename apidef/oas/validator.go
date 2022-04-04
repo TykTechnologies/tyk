@@ -5,12 +5,14 @@ package oas
 
 import (
 	"errors"
+	"sort"
 	"strings"
 	"sync"
 
 	"github.com/TykTechnologies/tyk/apidef/oas/schema"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/go-version"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -29,12 +31,17 @@ var (
 
 		return result.String()
 	}
+
+	defaultVersion string
 )
 
 func init() {
 	if err := loadOASSchema(); err != nil {
 		log.WithError(err).Error("loadOASSchema failed!")
+		return
 	}
+
+	setDefaultVersion()
 }
 
 func loadOASSchema() error {
@@ -83,5 +90,31 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 func GetOASSchema(version string) []byte {
 	mu.Lock()
 	defer mu.Unlock()
+	if version == "" {
+		return oasJsonSchemas[defaultVersion]
+	}
+
 	return oasJsonSchemas[version]
+}
+
+func findDefaultVersion(rawVersions []string) string {
+	versions := make([]*version.Version, len(rawVersions))
+	for i, raw := range rawVersions {
+		v, _ := version.NewVersion(raw)
+		versions[i] = v
+	}
+
+	sort.Sort(version.Collection(versions))
+	return versions[len(rawVersions)-1].String()
+}
+
+func setDefaultVersion() {
+	mu.Lock()
+	defer mu.Unlock()
+	var versions []string
+	for k := range oasJsonSchemas {
+		versions = append(versions, k)
+	}
+
+	defaultVersion = findDefaultVersion(versions)
 }
