@@ -177,6 +177,16 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, gw *Gate
 		hostname = ""
 	}
 
+	if spec.ListenPort == spec.GlobalConfig.ListenPort {
+		mainLog.WithFields(logrus.Fields{
+			"prefix":   "gateway",
+			"org_id":   spec.OrgID,
+			"api_id":   spec.APIID,
+			"api_name": spec.Name,
+		}).Error("TCP service can't have the same port as main gateway listen port")
+		return
+	}
+
 	if p := m.getProxy(spec.ListenPort, conf); p != nil {
 		p.tcpProxy.AddDomainHandler(hostname, spec.Proxy.TargetURL, modifier)
 	} else {
