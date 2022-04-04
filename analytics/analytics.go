@@ -2,12 +2,9 @@ package analytics
 
 import (
 	"github.com/TykTechnologies/tyk/config"
-	logger "github.com/TykTechnologies/tyk/log"
 	"sync/atomic"
 	"time"
 )
-
-var log = logger.Get()
 
 // Record encodes the details of a request/response cycle
 type Record struct {
