@@ -78,3 +78,7 @@ mongo-stop:
 .PHONY: mongo-shell
 mongo-shell:
 	docker exec -it mongo mongo
+
+.PHONY: drone
+drone:
+	drone exec --secret-file .env --trusted
