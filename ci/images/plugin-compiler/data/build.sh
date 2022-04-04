@@ -9,8 +9,7 @@ GOOS=$3
 GOARCH=$4
 CGOENABLED=0
 
-
-PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}$plugin_id"
+  PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}$plugin_id"
 
 function usage() {
     cat <<EOF
@@ -21,14 +20,20 @@ To build a plugin:
 EOF
 }
 
+# if params were not send, then attempt to get them from env vars
 if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
-   GOOS=$(go env GOOS)
-   GOARCH=$(go env GOARCH)
- fi
+  GOOS=$(go env GOOS)
+  GOARCH=$(go env GOARCH)
+fi
 
 if [ -z "$plugin_name" ]; then
     usage
     exit 1
+fi
+
+# if arch and os present then update the name of file with those params
+if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
+  plugin_name="${plugin_name%.*}_${CURRENTVERS}_${GOOS}_${GOARCH}.so"
 fi
 
 if [[ $GOOS != "linux" ]];then
