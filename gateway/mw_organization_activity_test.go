@@ -46,6 +46,33 @@ func (ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[stri
 	})
 }
 
+func TestOrganizationMonitorEnabled(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.ExperimentalProcessOrgOffThread = false
+		globalConf.Monitor.EnableTriggerMonitors = true
+		globalConf.Monitor.MonitorOrgKeys = true
+
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	// load API
+	ts.testPrepareProcessRequestQuotaLimit(
+		t,
+		map[string]interface{}{
+			"quota_max":          10,
+			"quota_remaining":    10,
+			"quota_renewal_rate": 1,
+		},
+	)
+
+	//check that the gateway is still up on request
+	ts.Run(t, test.TestCase{
+		Code: http.StatusOK,
+	})
+}
+
 func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 
 	conf := func(globalConf *config.Config) {
