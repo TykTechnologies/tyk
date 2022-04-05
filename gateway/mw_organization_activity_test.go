@@ -68,9 +68,12 @@ func TestOrganizationMonitorEnabled(t *testing.T) {
 	)
 
 	//check that the gateway is still up on request
-	ts.Run(t, test.TestCase{
+	_, err := ts.Run(t, test.TestCase{
 		Code: http.StatusOK,
 	})
+	if err != nil {
+		t.Error("error running a gateway request when org is enabled")
+	}
 }
 
 func TestProcessRequestLiveQuotaLimit(t *testing.T) {
