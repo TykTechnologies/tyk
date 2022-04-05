@@ -329,7 +329,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid, mon: Monitor{Gw: gw}})
 	gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
@@ -465,7 +465,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		var simpleArray []alice.Constructor
 		gw.mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
 		gw.mwAppendEnabled(&simpleArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
-		gw.mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+		gw.mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid, mon: Monitor{Gw: gw}})
 		gw.mwAppendEnabled(&simpleArray, &VersionCheck{BaseMiddleware: baseMid})
 		simpleArray = append(simpleArray, authArray...)
 
