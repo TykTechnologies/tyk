@@ -41,7 +41,7 @@ func (sa *StripAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 
 	// For backward compatibility
 	if len(sa.Spec.AuthConfigs) == 0 {
-		strip(authTokenType, &sa.Spec.Auth)
+		strip(apidef.AuthTokenType, &sa.Spec.Auth)
 	}
 
 	return nil, http.StatusOK

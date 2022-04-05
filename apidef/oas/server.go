@@ -1,6 +1,11 @@
 package oas
 
-import "github.com/TykTechnologies/tyk/apidef"
+import (
+	"sort"
+	"strings"
+
+	"github.com/TykTechnologies/tyk/apidef"
+)
 
 type Server struct {
 	// ListenPath represents the path to listen on. Any requests coming into the host, on the port that Tyk is configured to run on,
@@ -19,15 +24,6 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	s.ListenPath.Fill(api)
 	s.Slug = api.Slug
 
-	if s.Authentication == nil {
-		s.Authentication = &Authentication{}
-	}
-
-	s.Authentication.Fill(api)
-	if ShouldOmit(s.Authentication) {
-		s.Authentication = nil
-	}
-
 	if s.ClientCertificates == nil {
 		s.ClientCertificates = &ClientCertificates{}
 	}
@@ -41,12 +37,6 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	s.ListenPath.ExtractTo(api)
 	api.Slug = s.Slug
-
-	if s.Authentication != nil {
-		s.Authentication.ExtractTo(api)
-	} else {
-		api.UseKeylessAccess = true
-	}
 
 	if s.ClientCertificates != nil {
 		s.ClientCertificates.ExtractTo(api)
@@ -89,4 +79,58 @@ func (cc *ClientCertificates) Fill(api apidef.APIDefinition) {
 func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 	api.UseMutualTLSAuth = cc.Enabled
 	api.ClientCertificates = cc.Allowlist
+}
+
+type Certificate struct {
+	Domain string `bson:"domain" json:"domain"`
+	Cert   string `bson:"certificate" json:"certificate"`
+}
+
+type Certificates []Certificate
+
+func (c Certificates) Fill(upstreamCerts map[string]string) {
+	i := 0
+	for domain, cert := range upstreamCerts {
+		c[i] = Certificate{Domain: domain, Cert: cert}
+		i++
+	}
+}
+
+func (c Certificates) ExtractTo(upstreamCerts map[string]string) {
+	for _, cert := range c {
+		upstreamCerts[cert.Domain] = cert.Cert
+	}
+}
+
+type PinnedPublicKey struct {
+	Domain string   `bson:"domain" json:"domain"`
+	List   []string `bson:"list" json:"list"`
+}
+
+type PinnedPublicKeys []PinnedPublicKey
+
+func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
+	domains := make([]string, len(publicKeys))
+
+	i := 0
+	for domain := range publicKeys {
+		domains[i] = domain
+		i++
+	}
+
+	sort.Slice(domains, func(i, j int) bool {
+		return domains[i] < domains[j]
+	})
+
+	i = 0
+	for _, domain := range domains {
+		ppk[i] = PinnedPublicKey{Domain: domain, List: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
+		i++
+	}
+}
+
+func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
+	for _, publicKey := range ppk {
+		publicKeys[publicKey.Domain] = strings.Join(publicKey.List, ",")
+	}
 }

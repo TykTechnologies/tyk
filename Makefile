@@ -78,3 +78,11 @@ mongo-stop:
 .PHONY: mongo-shell
 mongo-shell:
 	docker exec -it mongo mongo
+
+.PHONY: docker-std docker-slim
+
+docker-slim: build
+	docker build --no-cache -t internal/tyk-gateway:slim -f ci/Dockerfile.slim .
+
+docker-std: build
+	docker build --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .

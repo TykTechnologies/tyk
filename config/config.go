@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1081,6 +1082,9 @@ type TykEventHandler interface {
 	HandleEvent(EventMessage)
 }
 
+// Global function that will return the config of the gw running
+var Global func() Config
+
 func WriteConf(path string, conf *Config) error {
 	bs, err := json.MarshalIndent(conf, "", "    ")
 	if err != nil {
@@ -1141,6 +1145,12 @@ func Load(paths []string, conf *Config) error {
 	if err := json.NewDecoder(r).Decode(&conf); err != nil {
 		return fmt.Errorf("couldn't unmarshal config: %v", err)
 	}
+
+	shouldOmit, omitEnvExist := os.LookupEnv(envPrefix + "_OMITCONFIGFILE")
+	if omitEnvExist && strings.ToLower(shouldOmit) == "true" {
+		*conf = Config{}
+	}
+
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return fmt.Errorf("failed to process config env vars: %v", err)
 	}

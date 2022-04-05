@@ -694,7 +694,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 
 // getAuthType overrides BaseMiddleware.getAuthType.
 func (k *JWTMiddleware) getAuthType() string {
-	return jwtType
+	return apidef.JWTType
 }
 
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -731,7 +731,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		switch k.Spec.JWTSigningMethod {
 		case HMACSign:
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf( "%v: %v and not HMAC signature", UnexpectedSigningMethod, token.Header["alg"])
+				return nil, fmt.Errorf("%v: %v and not HMAC signature", UnexpectedSigningMethod, token.Header["alg"])
 			}
 		case RSASign:
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
