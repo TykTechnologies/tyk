@@ -1,0 +1,23 @@
+services:
+  tyk:
+    image: internal/tyk-gateway
+    networks: [ proxy ]
+    build: .
+    ports:
+    - 9000:8080
+    volumes:
+    - ./tyk.conf.example:/opt/tyk-gateway/tyk.conf
+
+  redis:
+    image: redis:4.0-alpine
+    networks: [ proxy ]
+    command: redis-server --appendonly yes
+
+  mongodb:
+    networks: [ proxy ]
+    image: mongo:3.4-jessie
+
+networks:
+  proxy:
+    name: proxy
+    driver: bridge
