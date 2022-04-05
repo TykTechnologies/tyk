@@ -1,11 +1,13 @@
 package gateway
 
 import (
+	"errors"
 	"fmt"
+	"time"
+
 	"github.com/TykTechnologies/tyk/analytics"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/sirupsen/logrus"
-	"time"
 )
 
 type GoAnalyticsPlugin struct {
@@ -40,7 +42,7 @@ func (m *GoAnalyticsPlugin) processRecord(record *analytics.Record) (err error) 
 	// make sure tyk recover in case Go-plugin function panics
 	defer func() {
 		if e := recover(); e != nil {
-			err = fmt.Errorf("%v", e)
+			err = fmt.Errorf("%v", errors.New(fmt.Sprint(err)))
 			m.logger.WithError(err).Error("Recovered from panic while running Go-plugin middleware func")
 		}
 	}()

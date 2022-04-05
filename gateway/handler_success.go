@@ -195,35 +195,35 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		}
 
 		record := analytics.Record{
-			r.Method,
-			host,
-			trackedPath,
-			r.URL.Path,
-			r.ContentLength,
-			r.Header.Get(headers.UserAgent),
-			t.Day(),
-			t.Month(),
-			t.Year(),
-			t.Hour(),
-			code,
-			token,
-			t,
-			version,
-			s.Spec.Name,
-			s.Spec.APIID,
-			s.Spec.OrgID,
-			oauthClientID,
-			timing.Total,
-			timing,
-			rawRequest,
-			rawResponse,
-			ip,
-			analytics.GeoData{},
-			analytics.NetworkStats{},
-			tags,
-			alias,
-			trackEP,
-			t,
+			Method:        r.Method,
+			Host:          host,
+			RawPath:       trackedPath,
+			Path:          r.URL.Path,
+			ContentLength: r.ContentLength,
+			UserAgent:     r.Header.Get(headers.UserAgent),
+			Day:           t.Day(),
+			Month:         t.Month(),
+			Year:          t.Year(),
+			Hour:          t.Hour(),
+			ResponseCode:  code,
+			APIKey:        token,
+			TimeStamp:     t,
+			APIVersion:    version,
+			APIName:       s.Spec.Name,
+			APIID:         s.Spec.APIID,
+			OrgID:         s.Spec.OrgID,
+			OauthID:       oauthClientID,
+			RequestTime:   timing.Total,
+			Latency:       timing,
+			RawRequest:    rawRequest,
+			RawResponse:   rawResponse,
+			IPAddress:     ip,
+			Geo:           analytics.GeoData{},
+			Network:       analytics.NetworkStats{},
+			Tags:          tags,
+			Alias:         alias,
+			TrackPath:     trackEP,
+			ExpireAt:      t,
 		}
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
@@ -248,7 +248,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		if s.Spec.AnalyticsPlugin.Enabled {
 
 			//send to plugin
-			s.Spec.AnalyticsPluginConfig.processRecord(&record)
+			_ = s.Spec.AnalyticsPluginConfig.processRecord(&record)
 
 		}
 
