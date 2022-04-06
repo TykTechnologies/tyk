@@ -2,6 +2,8 @@ package oas
 
 import (
 	"fmt"
+	"github.com/buger/jsonparser"
+	"strings"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -33,6 +35,26 @@ func TestValidateOASObject(t *testing.T) {
 			},
 		},
 	}
+
+	validXTykAPIGateway := XTykAPIGateway{
+		Info: Info{
+			Name: "oas-api",
+			State: State{
+				Active: true,
+			},
+		},
+		Server: Server{
+			ListenPath: ListenPath{
+				Value: "/oas-api",
+			},
+		},
+		Upstream: Upstream{
+			URL: "http://upstream.url",
+		},
+	}
+
+	validOASObject.SetTykExtension(&validXTykAPIGateway)
+
 	validOAS3Definition, _ := validOASObject.MarshalJSON()
 
 	t.Run("valid OAS object", func(t *testing.T) {
@@ -42,17 +64,22 @@ func TestValidateOASObject(t *testing.T) {
 	})
 
 	invalidOASObject := validOASObject
+	invalidXTykAPIGateway := validXTykAPIGateway
+	invalidXTykAPIGateway.Info = Info{}
+	invalidOASObject.SetTykExtension(&invalidXTykAPIGateway)
 	invalidOASObject.Paths["/pets"].Get.Responses["200"].Value.Description = nil
 	invalidOAS3Definition, _ := invalidOASObject.MarshalJSON()
 
 	t.Run("invalid OAS object", func(t *testing.T) {
 		t.Parallel()
 		err := ValidateOASObject(invalidOAS3Definition, "3.0.3")
-		expectedErr := fmt.Sprintf("%s\n%s",
+		expectedErrs := []string{
+			`x-tyk-api-gateway.info.name: Does not match pattern '\S+'`,
 			"paths./pets.get.responses.200: Must validate one and only one schema (oneOf)",
 			"paths./pets.get.responses.200: description is required",
-		)
-		assert.Equal(t, expectedErr, err.Error())
+		}
+		actualErrs := strings.Split(err.Error(), "\n")
+		assert.ElementsMatch(t, expectedErrs, actualErrs)
 	})
 
 	var wrongTypedOASDefinition = []byte(`{
@@ -153,7 +180,17 @@ func Test_loadOASSchema(t *testing.T) {
 		t.Parallel()
 		err := loadOASSchema()
 		assert.Nil(t, err)
-		assert.NotNil(t, oasJsonSchemas["3.0.3"])
+		assert.NotNil(t, oasJsonSchemas)
+		for oasVersion := range oasJsonSchemas {
+			var xTykAPIGateway, xTykServer []byte
+			xTykAPIGateway, _, _, err = jsonparser.Get(oasJsonSchemas[oasVersion], keyProperties, ExtensionTykAPIGateway)
+			assert.NoError(t, err)
+			assert.NotNil(t, xTykAPIGateway)
+
+			xTykServer, _, _, err = jsonparser.Get(oasJsonSchemas[oasVersion], keyDefinitions, "X-Tyk-Server")
+			assert.NoError(t, err)
+			assert.NotNil(t, xTykServer)
+		}
 	})
 }
 
