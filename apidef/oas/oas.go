@@ -32,6 +32,11 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.Extensions) {
 		s.Extensions = nil
 	}
+
+	// set external docs to nil if populated with default values
+	if ShouldOmit(s.ExternalDocs) {
+		s.ExternalDocs = nil
+	}
 }
 
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
