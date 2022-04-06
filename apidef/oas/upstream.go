@@ -12,7 +12,7 @@ type Upstream struct {
 	// Test contains the configuration related to uptime tests.
 	Test             *Test            `bson:"test,omitempty" json:"test,omitempty"`
 	Certificates     Certificates     `bson:"certificates,omitempty" json:"certificates,omitempty"`
-	PinnedPublicKeys PinnedPublicKeys `bson:"pinnedPublicKeys,omitempty" json:"PinnedPublicKeys,omitempty"`
+	PinnedPublicKeys PinnedPublicKeys `bson:"pinnedPublicKeys,omitempty" json:"pinnedPublicKeys,omitempty"`
 }
 
 func (u *Upstream) Fill(api apidef.APIDefinition) {
