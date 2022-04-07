@@ -1,0 +1,38 @@
+# This workflow will run on push to release-* branches, and runs a
+# go mod tidy on checked out source tree. If it causes go.mod or
+# go.sum to change - it would commit those changes.
+# This should take care of cherry-picked commits causing goreleaser
+# to fail with dirty git state errors.
+
+name: Tidy up go dependencies.
+
+on:
+  push:
+    branches:
+      - release-**
+
+jobs:
+  tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.ORG_GH_TOKEN }}
+
+      - name: Update go.mod and go.sum if required.
+        run: |
+          git config --local user.email "wf-gen@tyk-ci"
+          git config --local user.name "Bender"
+          go mod tidy
+          if git status --porcelain -uno | grep  -E "go.mod|go.sum"
+          then
+            git add go.mod go.sum
+            git commit -a -m "[CI] Updating go deps.(go mod tidy)"
+            git push origin
+            echo "::debug::Successfully updated go deps. ${GITHUB_REF##*/}"
+            echo "Successfully updated go deps. ${GITHUB_REF##*/}"
+            exit 0
+          fi
+          echo "::debug::${GITHUB_REF##*/} already has updated go.mod and go.sum"
+          echo "${GITHUB_REF##*/} already has updated go.mod and go.sum"
+          exit 0
