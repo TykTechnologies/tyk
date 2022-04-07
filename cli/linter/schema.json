@@ -906,6 +906,12 @@
         },
         "key_space_sync_interval": {
           "type": "number"
+        },
+        "rpc_cert_cache_expiration": {
+          "type": "number"
+        },
+        "rpc_global_cache_expiration": {
+          "type": "number"
         }
       }
     },

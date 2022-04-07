@@ -166,9 +166,16 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
+
 	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
-		cachedVal, found := r.Gw.RPCGlobalCache.Get(keyName)
+
+		cacheStore := r.Gw.RPCGlobalCache
+		if strings.Contains(keyName, "cert-") {
+			cacheStore = r.Gw.RPCCertCache
+		}
+
+		cachedVal, found := cacheStore.Get(keyName)
 		log.Debug("--> Found? ", found)
 		if found {
 			return cachedVal.(string), nil
@@ -195,7 +202,11 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	}
 	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
 		// Cache key
-		r.Gw.RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
+		cacheStore := r.Gw.RPCGlobalCache
+		if strings.Contains(keyName, "cert-") {
+			cacheStore = r.Gw.RPCCertCache
+		}
+		cacheStore.Set(keyName, value, cache.DefaultExpiration)
 	}
 	//return hash key without prefix so it doesnt get double prefixed in redis
 	return value.(string), nil
