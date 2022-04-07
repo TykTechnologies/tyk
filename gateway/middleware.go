@@ -729,9 +729,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 		return session, found
 	}
 
-	// defaulting
+	// session not found
 	session.KeyID = key
-	return session, found
+	return session, false
 }
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
