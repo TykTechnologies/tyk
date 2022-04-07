@@ -992,6 +992,7 @@ func initialiseSystem(ctx context.Context) error {
 	}
 
 	getHostDetails()
+	initializeRPCCache()
 	setupInstrumentation()
 
 	if config.Global().HttpServerOptions.UseLE_SSL {
@@ -1030,6 +1031,15 @@ func afterConfSetup(conf *config.Config) {
 
 	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
 		conf.SlaveOptions.KeySpaceSyncInterval = 10
+	}
+
+	if conf.SlaveOptions.RPCCertCacheExpiration == 0 {
+		// defaults to 1 hr
+		conf.SlaveOptions.RPCCertCacheExpiration = 3600
+	}
+
+	if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
+		conf.SlaveOptions.RPCGlobalCacheExpiration = 30
 	}
 
 	if conf.AnalyticsConfig.PurgeInterval == 0 {

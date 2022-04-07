@@ -95,7 +95,14 @@ type RPCStorageHandler struct {
 	SuppressRegister bool
 }
 
-var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
+var RPCGlobalCache *cache.Cache
+var RPCCertCache *cache.Cache
+
+func initializeRPCCache() {
+	conf := config.Global()
+	RPCGlobalCache = cache.New(time.Duration(conf.SlaveOptions.RPCGlobalCacheExpiration)*time.Second, 15*time.Second)
+	RPCCertCache = cache.New(time.Duration(conf.SlaveOptions.RPCCertCacheExpiration)*time.Second, 15*time.Second)
+}
 
 // Connect will establish a connection to the RPC
 func (r *RPCStorageHandler) Connect() bool {
@@ -167,7 +174,13 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
 	if config.Global().SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
-		cachedVal, found := RPCGlobalCache.Get(keyName)
+
+		cacheStore := RPCGlobalCache
+		if strings.Contains(keyName, "cert-") {
+			cacheStore = RPCCertCache
+		}
+
+		cachedVal, found := cacheStore.Get(keyName)
 		log.Debug("--> Found? ", found)
 		if found {
 			return cachedVal.(string), nil
@@ -193,8 +206,11 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		return "", storage.ErrKeyNotFound
 	}
 	if config.Global().SlaveOptions.EnableRPCCache {
-		// Cache key
-		RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
+		cacheStore := RPCGlobalCache
+		if strings.Contains(keyName, "cert-") {
+			cacheStore = RPCCertCache
+		}
+		cacheStore.Set(keyName, value, cache.DefaultExpiration)
 	}
 	//return hash key without prefix so it doesnt get double prefixed in redis
 	return value.(string), nil
