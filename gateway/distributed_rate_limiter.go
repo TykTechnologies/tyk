@@ -52,7 +52,7 @@ func (gw *Gateway) getTagHash() string {
 }
 
 func (gw *Gateway) NotifyCurrentServerStatus() {
-	if !gw.DRLManager.Ready {
+	if gw.DRLManager == nil || !gw.DRLManager.Ready {
 		return
 	}
 
@@ -84,6 +84,12 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 }
 
 func (gw *Gateway) onServerStatusReceivedHandler(payload string) {
+	if gw.DRLManager == nil || !gw.DRLManager.Ready {
+		log.Warning("DRL not ready, skipping this notification")
+
+		return
+	}
+
 	serverData := drl.Server{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{
@@ -93,17 +99,10 @@ func (gw *Gateway) onServerStatusReceivedHandler(payload string) {
 		return
 	}
 
-	// log.Debug("Received DRL data: ", serverData)
-
-	if gw.DRLManager.Ready {
-		if err := gw.DRLManager.AddOrUpdateServer(serverData); err != nil {
-			log.WithError(err).
-				WithField("serverData", serverData).
-				Debug("AddOrUpdateServer error. Seems like you running multiple segmented Tyk groups in same Redis.")
-			return
-		}
-		// log.Debug(DRLManager.Report())
-	} else {
-		log.Warning("DRL not ready, skipping this notification")
+	if err := gw.DRLManager.AddOrUpdateServer(serverData); err != nil {
+		log.WithError(err).
+			WithField("serverData", serverData).
+			Debug("AddOrUpdateServer error. Seems like you running multiple segmented Tyk groups in same Redis.")
+		return
 	}
 }
