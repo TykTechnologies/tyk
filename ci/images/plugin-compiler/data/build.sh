@@ -63,9 +63,10 @@ yes | cp -rf $PLUGIN_BUILD_PATH/vendor/* $GOPATH/src || true \
 # We can't just copy Tyk dependencies on top of plugin dependencies, since different package versions have different file structures
 # First we need to find which deps GW already has, remove this folders, and after copy fresh versions from GW
 
-# github.com and rest of packages have different nesting levels, so have to handle it separately
-ls -d $TYK_GW_PATH/vendor/github.com/*/* | sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | xargs -d '\n' rm -rf
-ls -d $TYK_GW_PATH/vendor/*/* | sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | grep -v github | xargs -d '\n' rm -rf
+# github.com and rest of packages have different nesting levels, so have to handle it separately - also exlude the tyk repo so that
+# it doesn't get deleted if we have any deps internal to the tyk module
+find "$TYK_GW_PATH/vendor/github.com" -mindepth 2 -maxdepth 2  -type d -not -path "$TYK_GW_PATH/vendor/github.com/TykTechnologies/tyk" | sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | xargs rm -rf
+find "$TYK_GW_PATH/vendor" -mindepth 2 -maxdepth 2  -type d -not -path "$TYK_GW_PATH/vendor/github.com/*"| sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | xargs rm -rf
 
 # Copy GW dependencies
 yes | cp -rf $TYK_GW_PATH/vendor/* $GOPATH/src
