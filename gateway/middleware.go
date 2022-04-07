@@ -734,12 +734,12 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 		ctxScheduleSessionUpdate(r)
-	} else {
-		// defaulting
-		session.KeyID = key
+		return session, found
 	}
 
-	return session, found
+	// session not found
+	session.KeyID = key
+	return session, false
 }
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
