@@ -25,6 +25,7 @@ trap "$compose down" EXIT
 
 rm -fv testplugin/*.so || true
 docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${tag} testplugin.so
+mv testplugin/testplugin*.so testplugin/testplugin.so
 $compose up -d
 sleep 2 # Wait for init
 curl -vvv http://localhost:8080/goplugin/headers
