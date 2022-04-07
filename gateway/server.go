@@ -228,6 +228,7 @@ func NewGateway(config config.Config, ctx context.Context, cancelFn context.Canc
 	gw.TestBundles = map[string]map[string]string{}
 
 	gw.RedisController = storage.NewRedisController()
+	gw.RedisController.SetContext(ctx)
 
 	return &gw
 }
