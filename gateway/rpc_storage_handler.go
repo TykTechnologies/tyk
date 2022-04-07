@@ -95,7 +95,7 @@ type RPCStorageHandler struct {
 	SuppressRegister bool
 }
 
-var RPCGlobalCache  *cache.Cache
+var RPCGlobalCache *cache.Cache
 var RPCCertCache *cache.Cache
 
 func initializeRPCCache() {

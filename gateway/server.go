@@ -1047,7 +1047,6 @@ func afterConfSetup(conf *config.Config) {
 		conf.AnalyticsConfig.PurgeInterval = 10
 	}
 
-
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	initGenericEventHandlers(conf)
