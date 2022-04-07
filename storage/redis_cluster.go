@@ -669,6 +669,8 @@ func (r *RedisCluster) StartPubSubHandler(channel string, callback func(interfac
 	pubsub := client.Subscribe(r.RedisController.ctx, channel)
 	defer pubsub.Close()
 
+	log.Debug("Starting pubsub with ctx", r.RedisController.ctx)
+
 	for {
 		msg, err := pubsub.Receive(r.RedisController.ctx)
 		if err != nil {

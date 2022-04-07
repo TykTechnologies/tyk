@@ -26,6 +26,11 @@ func NewRedisController() *RedisController {
 	}
 }
 
+// SetContext to ensure cancellation on pubsub
+func (rc *RedisController) SetContext(ctx context.Context) {
+	rc.ctx = ctx
+}
+
 // DisableRedis very handy when testsing it allows to dynamically enable/disable talking with
 // redisW
 func (rc *RedisController) DisableRedis(setRedisDown bool) {
