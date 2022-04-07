@@ -17,126 +17,14 @@ func TestValidateOASObject(t *testing.T) {
 	validOASObject := OAS{
 		openapi3.T{
 			OpenAPI: "3.0.3",
-			Info: &openapi3.Info{
-				Version: "1.0.0",
-				Title:   "Swagger Petstore",
-				License: &openapi3.License{
-					Name: "MIT",
-				},
-			},
-			Servers: []*openapi3.Server{
-				{
-					URL: "http://petstore.swagger.io/v1",
-				},
-			},
+			Info:    &openapi3.Info{},
 			Paths: map[string]*openapi3.PathItem{
 				"/pets": {
 					Get: &openapi3.Operation{
-						Summary:     "List all pets",
-						OperationID: "listPets",
-						Tags: []string{
-							"pets",
-						},
-						Parameters: []*openapi3.ParameterRef{
-							{
-								Value: &openapi3.Parameter{
-									Name:        "limit",
-									In:          "query",
-									Description: "How many items to return at one time (max 100)",
-									Required:    false,
-									Schema: &openapi3.SchemaRef{
-										Value: &openapi3.Schema{
-											Type:   "integer",
-											Format: "int32",
-										},
-									},
-								},
-							},
-						},
 						Responses: openapi3.Responses{
 							"200": &openapi3.ResponseRef{
 								Value: &openapi3.Response{
 									Description: getStrPointer("A paged array of pets"),
-									Content: openapi3.Content{
-										"application/json": {
-											Schema: &openapi3.SchemaRef{
-												Ref: "#/components/schemas/Pets",
-											},
-										},
-									},
-								},
-							},
-							"default": &openapi3.ResponseRef{
-								Value: &openapi3.Response{
-									Description: getStrPointer("unexpected error"),
-									Content: openapi3.Content{
-										"application/json": {
-											Schema: &openapi3.SchemaRef{
-												Ref: "#/components/schemas/Error",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			Components: openapi3.Components{
-				Schemas: map[string]*openapi3.SchemaRef{
-					"Pet": {
-						Value: &openapi3.Schema{
-							Type: "object",
-							Required: []string{
-								"id",
-								"name",
-							},
-							Properties: map[string]*openapi3.SchemaRef{
-								"id": {
-									Value: &openapi3.Schema{
-										Type:   "integer",
-										Format: "int64",
-									},
-								},
-								"name": {
-									Value: &openapi3.Schema{
-										Type: "string",
-									},
-								},
-								"tag": {
-									Value: &openapi3.Schema{
-										Type: "string",
-									},
-								},
-							},
-						},
-					},
-					"Pets": {
-						Value: &openapi3.Schema{
-							Type: "array",
-							Items: &openapi3.SchemaRef{
-								Ref: "#/components/schemas/Pet",
-							},
-						},
-					},
-					"Error": {
-						Value: &openapi3.Schema{
-							Type: "object",
-							Required: []string{
-								"code",
-								"message",
-							},
-							Properties: map[string]*openapi3.SchemaRef{
-								"code": {
-									Value: &openapi3.Schema{
-										Type:   "integer",
-										Format: "int32",
-									},
-								},
-								"message": {
-									Value: &openapi3.Schema{
-										Type: "string",
-									},
 								},
 							},
 						},
