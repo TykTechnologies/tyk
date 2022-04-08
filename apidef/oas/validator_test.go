@@ -2,9 +2,10 @@ package oas
 
 import (
 	"fmt"
-	"github.com/buger/jsonparser"
 	"strings"
 	"testing"
+
+	"github.com/buger/jsonparser"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
