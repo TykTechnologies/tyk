@@ -52,6 +52,16 @@ jobs:
           pip install setuptools
           pip install google
           pip install protobuf
+          
+          GO111MODULE=off go get -u github.com/jteeuwen/go-bindata/...
+          
+          go generate ./...
+          git add --all
+          git diff-index HEAD > gogenerate.log
+          echo "::set-output name=gogenerate::$(sed -ze 's/%/%25/g;s/\n/%0A/g' gogenerate.log)"
+          git_state=$(wc -l < gogenerate.log)
+          [[ $git_state -ne 0 ]] && exit 1
+
       - name: Fetch base branch
         if: ${{ github.event_name == 'pull_request' }}
         run: git fetch origin ${{ github.base_ref }}
@@ -59,6 +69,7 @@ jobs:
         uses: supercharge/redis-github-action@1.2.0
         with:
           redis-version: ${{ matrix.redis-version }}
+
 
       - name: Cache
         uses: actions/cache@v2
@@ -91,7 +102,10 @@ jobs:
             ${{ steps.hygiene.outputs.fmt || 'all ok' }}
             ## goimports
             ${{ steps.hygiene.outputs.imports || 'all ok' }}
-
+            
+            ## gogenerate 
+            ${{ steps.hygiene.outputs.gogenerate || 'all ok' }}
+            
             If the above are ok, please look at [the run](https://github.com/TykTechnologies/tyk/pull/${{ github.event.pull_request.number }}/checks?check_run_id=${{ github.run_id }}) or in the _Checks_ tab.
 
       - name: Download golangci-lint
