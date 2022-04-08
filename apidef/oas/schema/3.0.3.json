@@ -43,6 +43,9 @@
     },
     "components": {
       "$ref": "#/definitions/Components"
+    },
+    "x-tyk-api-gateway": {
+      "type": "object"
     }
   },
   "patternProperties": {
