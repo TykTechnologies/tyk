@@ -55,12 +55,12 @@ func init() {
 func loadOASSchema() error {
 	mu.Lock()
 	defer mu.Unlock()
-	xTykAPIGatewaySchema, err := schema.Asset(fmt.Sprintf("%s.json", ExtensionTykAPIGateway))
+	xTykAPIGwSchema, err := schema.Asset(fmt.Sprintf("%s.json", ExtensionTykAPIGateway))
 	if err != nil {
 		return fmt.Errorf("%s loading failed: %w", ExtensionTykAPIGateway, err)
 	}
 
-	xTykAPIGatewaySchemaWithoutDefinitions := jsonparser.Delete(xTykAPIGatewaySchema, keyDefinitions)
+	xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
 	oasJsonSchemas = make(map[string][]byte)
 	fileNames := schema.AssetNames()
 	for _, fileName := range fileNames {
@@ -78,12 +78,12 @@ func loadOASSchema() error {
 			return err
 		}
 
-		data, err = jsonparser.Set(data, xTykAPIGatewaySchemaWithoutDefinitions, keyProperties, ExtensionTykAPIGateway)
+		data, err = jsonparser.Set(data, xTykAPIGwSchemaWithoutDefs, keyProperties, ExtensionTykAPIGateway)
 		if err != nil {
 			return err
 		}
 
-		err = jsonparser.ObjectEach(xTykAPIGatewaySchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+		err = jsonparser.ObjectEach(xTykAPIGwSchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
 			data, err = jsonparser.Set(data, value, keyDefinitions, string(key))
 			return err
 		}, keyDefinitions)
