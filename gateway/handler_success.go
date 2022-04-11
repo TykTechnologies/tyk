@@ -231,6 +231,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
+
 		if s.Spec.GlobalConfig.EnforceOrgDataAge {
 			orgExpireDataTime := s.OrgSessionExpiry(s.Spec.OrgID)
 
@@ -253,6 +254,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		}
 
 		err := s.Gw.Analytics.RecordHit(&record)
+
 		if err != nil {
 			log.WithError(err).Error("could not store analytic record")
 		}
@@ -278,6 +280,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 	}
 
 	session := ctxGetSession(r)
+
 	if session != nil {
 		if session.EnableDetailedRecording || session.EnableDetailRecording {
 			return true
@@ -291,6 +294,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 
 	// We are, so get session data
 	ses := r.Context().Value(ctx.OrgSessionContext)
+
 	if ses == nil {
 		// no session found, use global config
 		return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording

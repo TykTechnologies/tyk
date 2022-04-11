@@ -1,9 +1,10 @@
 package analytics
 
 import (
-	"github.com/TykTechnologies/tyk/config"
 	"sync/atomic"
 	"time"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // Record encodes the details of a request/response cycle
@@ -40,12 +41,15 @@ type Record struct {
 }
 
 func (a *Record) NormalisePath(globalConfig *config.Config) {
+
 	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
 		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
 	}
+
 	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
 		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
 	}
+
 	for _, r := range globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
 		a.Path = r.ReplaceAllString(a.Path, "{var}")
 	}
@@ -53,6 +57,7 @@ func (a *Record) NormalisePath(globalConfig *config.Config) {
 
 func (a *Record) SetExpiry(expiresInSeconds int64) {
 	expiry := time.Duration(expiresInSeconds) * time.Second
+
 	if expiresInSeconds == 0 {
 		// Expiry is set to 100 years
 		expiry = (24 * time.Hour) * (365 * 100)

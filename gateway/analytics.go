@@ -2,13 +2,14 @@ package gateway
 
 import (
 	"fmt"
-	"github.com/TykTechnologies/tyk/analytics"
 	"math/rand"
 	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/TykTechnologies/tyk/analytics"
 
 	"github.com/oschwald/maxminddb-golang"
 	"gopkg.in/vmihailenco/msgpack.v2"
@@ -207,10 +208,12 @@ func GetGeo(a *analytics.Record, ipStr string, gw *Gateway) {
 	}
 
 	record, err := geoIPLookup(ipStr, gw)
+
 	if err != nil {
 		log.Error("GeoIP Failure (not recorded): ", err)
 		return
 	}
+
 	if record == nil {
 		return
 	}
@@ -228,13 +231,18 @@ func geoIPLookup(ipStr string, gw *Gateway) (*analytics.GeoData, error) {
 	if ipStr == "" {
 		return nil, nil
 	}
+
 	ip := net.ParseIP(ipStr)
+
 	if ip == nil {
 		return nil, fmt.Errorf("invalid IP address %q", ipStr)
 	}
+
 	record := new(analytics.GeoData)
+
 	if err := gw.Analytics.GeoIPDB.Lookup(ip, record); err != nil {
 		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %v", ipStr, err)
 	}
+
 	return record, nil
 }

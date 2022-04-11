@@ -5,6 +5,7 @@ package goplugin
 
 import (
 	"fmt"
+
 	"github.com/TykTechnologies/tyk/analytics"
 )
 

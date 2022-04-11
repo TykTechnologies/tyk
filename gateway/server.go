@@ -302,6 +302,7 @@ func (gw *Gateway) setupGlobals() {
 
 	gw.SetConfig(gwConfig)
 	gw.dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
+
 	if gwConfig.DnsCache.Enabled {
 		gw.dnsCacheManager.InitDNSCaching(
 			time.Duration(gwConfig.DnsCache.TTL)*time.Second,
@@ -330,6 +331,7 @@ func (gw *Gateway) setupGlobals() {
 	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", RedisController: gw.RedisController}
 	versionStore.Connect()
 	err := versionStore.SetKey("gateway", VERSION, 0)
+
 	if err != nil {
 		mainLog.WithError(err).Error("Could not set version in versionStore")
 	}

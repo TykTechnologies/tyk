@@ -3,13 +3,14 @@ package gateway
 import (
 	"bytes"
 	"fmt"
-	"github.com/TykTechnologies/tyk/analytics"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/analytics"
 
 	"github.com/TykTechnologies/tyk/apidef"
 

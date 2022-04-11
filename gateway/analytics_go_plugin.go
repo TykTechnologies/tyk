@@ -30,6 +30,7 @@ func (m *GoAnalyticsPlugin) loadAnalyticsPlugin() bool {
 
 	// try to load plugin
 	var err error
+
 	if m.handler, err = goplugin.GetAnalyticsHandler(m.Path, m.FuncName); err != nil {
 		m.logger.WithError(err).Error("Could not load Go-plugin for analytics")
 		return false
@@ -41,10 +42,12 @@ func (m *GoAnalyticsPlugin) loadAnalyticsPlugin() bool {
 func (m *GoAnalyticsPlugin) processRecord(record *analytics.Record) (err error) {
 	// make sure tyk recover in case Go-plugin function panics
 	defer func() {
+
 		if e := recover(); e != nil {
 			err = fmt.Errorf("%v", errors.New(fmt.Sprint(err)))
 			m.logger.WithError(err).Error("Recovered from panic while running Go-plugin middleware func")
 		}
+
 	}()
 	// call Go-plugin function
 	t1 := time.Now()

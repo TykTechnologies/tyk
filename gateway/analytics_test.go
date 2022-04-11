@@ -1,8 +1,9 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/analytics"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/analytics"
 
 	"github.com/TykTechnologies/tyk/config"
 )

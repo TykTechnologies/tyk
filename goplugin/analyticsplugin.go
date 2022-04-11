@@ -5,8 +5,9 @@ package goplugin
 
 import (
 	"errors"
-	"github.com/TykTechnologies/tyk/analytics"
 	"plugin"
+
+	"github.com/TykTechnologies/tyk/analytics"
 )
 
 func GetAnalyticsHandler(path string, symbol string) (func(record *analytics.Record), error) {
