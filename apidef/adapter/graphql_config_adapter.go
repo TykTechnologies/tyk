@@ -244,6 +244,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				graphqlConfig.Method,
 				graphqlConfig.Headers,
 			))
+
 		case apidef.GraphQLEngineDataSourceKindKafka:
 			var kafkaConfig apidef.GraphQLEngineDataSourceConfigKafka
 			err = json.Unmarshal(ds.Config, &kafkaConfig)
@@ -252,12 +253,13 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 			}
 
 			planDataSource.Factory = &kafkaDataSource.Factory{}
-			planDataSource.Custom = kafkaDataSource.ConfigJson(kafkaDataSource.Configuration{
+			planDataSource.Custom = kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
 				Subscription: kafkaDataSource.SubscriptionConfiguration{
-					BrokerAddr: kafkaConfig.BrokerAddr,
-					Topic:      kafkaConfig.Topic,
-					GroupID:    kafkaConfig.GroupID,
-					ClientID:   kafkaConfig.ClientID,
+					BrokerAddr:   kafkaConfig.BrokerAddr,
+					Topic:        kafkaConfig.Topic,
+					GroupID:      kafkaConfig.GroupID,
+					ClientID:     kafkaConfig.ClientID,
+					KafkaVersion: kafkaConfig.KafkaVersion,
 				},
 			})
 		}
