@@ -390,7 +390,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							for ai, au := range r.AllowedURLs {
 								if u.URL == au.URL {
 									found = true
-									r.AllowedURLs[ai].Methods = append(au.Methods, u.Methods...)
+									r.AllowedURLs[ai].Methods = appendIfMissing(au.Methods, u.Methods...)
 								}
 							}
 
@@ -556,7 +556,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	// set tags
 	session.Tags = []string{}
 	for tag := range tags {
-		session.Tags = append(session.Tags, tag)
+		session.Tags = appendIfMissing(session.Tags, tag)
 	}
 
 	if len(policies) == 0 {
