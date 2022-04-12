@@ -527,7 +527,7 @@
         "securitySchemes": {
           "type": "object",
           "^\\/": {
-            "anyOf": [
+            "oneOf": [
               {
                 "$ref": "#/definitions/X-Tyk-Token"
               },
