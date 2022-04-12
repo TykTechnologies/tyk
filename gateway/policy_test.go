@@ -618,7 +618,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				want := map[string]user.AccessDefinition{
 					"a": {
 						AllowedURLs: []user.AccessSpec{
-							{URL: "/user", Methods: []string{"GET", "POST", "GET"}},
+							{URL: "/user", Methods: []string{"GET", "POST"}},
 							{URL: "/companies", Methods: []string{"GET", "POST"}},
 						},
 						Limit: user.APILimit{},
