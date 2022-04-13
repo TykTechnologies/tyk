@@ -5,23 +5,51 @@ import (
 	"os"
 )
 
-// appendIfMissing appends the given new item to the given slice.
-func appendIfMissing(slice []string, newSlice ...string) []string {
-	for _, new := range newSlice {
-		found := false
-		for _, item := range slice {
-			if item == new {
-				continue
-			}
-			found = true
-		}
+// appendIfMissing ensures dest slice is unique with new items.
+func appendIfMissing(src []string, in ...string) []string {
+	// Use map for uniqueness
+	srcMap := map[string]bool{}
+	for _, v := range src {
+		srcMap[v] = true
+	}
+	for _, v := range in {
+		srcMap[v] = true
+	}
 
-		if !found {
-			slice = append(slice, new)
+	// no new items from `in`
+	if len(srcMap) == len(src) {
+		return src
+	}
+
+	src = uniqueOrdered(src, srcMap)
+	in = uniqueOrdered(in, srcMap)
+
+	return append(src, in...)
+}
+
+// uniqueOrdered keeps src slice order while ensuring uniqueness with a src map
+// keys can be nil to auto-generate. Keys are deleted from map during run.
+func uniqueOrdered(src []string, keys map[string]bool) []string {
+	if len(src) == 0 {
+		return src
+	}
+
+	if len(keys) == 0 {
+		keys = make(map[string]bool)
+		for _, v := range src {
+			keys[v] = true
 		}
 	}
 
-	return slice
+	result := make([]string, 0, len(keys))
+	for _, v := range src {
+		// append missing value
+		if val := keys[v]; val {
+			result = append(result, v)
+			delete(keys, v)
+		}
+	}
+	return result
 }
 
 // intersection gets intersection of the given two slices.
