@@ -114,7 +114,10 @@ type Gateway struct {
 	SessionLimiter SessionLimiter
 	SessionMonitor Monitor
 
+	// RPCGlobalCache stores keys
 	RPCGlobalCache *cache.Cache
+	// RPCCertCache stores certificates
+	RPCCertCache *cache.Cache
 	// key session memory cache
 	SessionCache *cache.Cache
 	// org session memory cache
@@ -204,7 +207,6 @@ func NewGateway(config config.Config, ctx context.Context, cancelFn context.Canc
 	gw.DefaultQuotaStore = DefaultSessionManager{Gw: &gw}
 	gw.SessionLimiter = SessionLimiter{Gw: &gw}
 	gw.SessionMonitor = Monitor{Gw: &gw}
-	gw.RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
 	gw.HostCheckTicker = make(chan struct{})
 	gw.HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
@@ -235,6 +237,12 @@ func (gw *Gateway) UnmarshalJSON(data []byte) error {
 }
 func (gw *Gateway) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct{}{})
+}
+
+func (gw *Gateway) InitializeRPCCache() {
+	conf := gw.GetConfig()
+	gw.RPCGlobalCache = cache.New(time.Duration(conf.SlaveOptions.RPCGlobalCacheExpiration)*time.Second, 15*time.Second)
+	gw.RPCCertCache = cache.New(time.Duration(conf.SlaveOptions.RPCCertCacheExpiration)*time.Second, 15*time.Second)
 }
 
 // SetNodeID writes NodeID safely.
@@ -1191,6 +1199,7 @@ func (gw *Gateway) initialiseSystem() error {
 	gw.SetConfig(gwConfig)
 	config.Global = gw.GetConfig
 	gw.getHostDetails(gw.GetConfig().PIDFileLocation)
+	gw.InitializeRPCCache()
 	gw.setupInstrumentation()
 
 	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
@@ -1234,6 +1243,15 @@ func (gw *Gateway) afterConfSetup() {
 
 	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
 		conf.SlaveOptions.KeySpaceSyncInterval = 10
+	}
+
+	if conf.SlaveOptions.RPCCertCacheExpiration == 0 {
+		// defaults to 1 hr
+		conf.SlaveOptions.RPCCertCacheExpiration = 3600
+	}
+
+	if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
+		conf.SlaveOptions.RPCGlobalCacheExpiration = 30
 	}
 
 	if conf.AnalyticsConfig.PurgeInterval == 0 {
