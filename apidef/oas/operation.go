@@ -379,8 +379,17 @@ func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {
 		}
 
 		var schema openapi3.Schema
-		schemaInBytes, _ := json.Marshal(meta.Schema)
-		_ = schema.UnmarshalJSON(schemaInBytes)
+		schemaInBytes, err := json.Marshal(meta.Schema)
+		if err != nil {
+			log.WithError(err).Error("Path meta schema couldn't be marshalled")
+			return
+		}
+
+		err = schema.UnmarshalJSON(schemaInBytes)
+		if err != nil {
+			log.WithError(err).Error("Schema couldn't be unmarshalled")
+			return
+		}
 
 		operation := s.Paths[meta.Path].GetOperation(meta.Method)
 
@@ -455,18 +464,27 @@ func (o *Operation) extractValidateRequestTo(ep *apidef.ExtendedPathsSet, path s
 		return
 	}
 
+	var schemaVal *openapi3.Schema
+
 	ref := strings.TrimPrefix(schema.Ref, "#/components/schemas/")
 	if schemaRef, ok := components.Schemas[ref]; ok {
-		schemaInBytes, _ := schemaRef.Value.MarshalJSON()
-		_ = json.Unmarshal(schemaInBytes, &meta.Schema)
-		return
+		schemaVal = schemaRef.Value
+	} else {
+		schemaVal = schema.Value
 	}
 
-	schemaVal := schema.Value
 	if schemaVal == nil {
 		return
 	}
 
-	schemaInBytes, _ := json.Marshal(schemaVal)
-	_ = json.Unmarshal(schemaInBytes, &meta.Schema)
+	schemaInBytes, err := json.Marshal(schemaVal)
+	if err != nil {
+		log.WithError(err).Error("Schema value couldn't be marshalled")
+		return
+	}
+
+	err = json.Unmarshal(schemaInBytes, &meta.Schema)
+	if err != nil {
+		log.WithError(err).Error("Path meta schema couldn't be unmarshalled")
+	}
 }
