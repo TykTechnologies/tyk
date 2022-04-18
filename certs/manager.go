@@ -71,6 +71,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 		// calculate the orgId from the keyId
 		certID, _, _ := GetCertIDAndChainPEM([]byte(val), "")
 		orgID := getOrgFromKeyID(key, certID)
+
 		// save the cert in local redis
 		_, err := cm.Add([]byte(val), orgID)
 		return err
@@ -545,7 +546,8 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 	}
 	certID = orgID + certID
 
-	if cert, err := c.storage.GetKey("raw-" + certID); err == nil && cert != "" {
+	// use `Exist` rather than `Get` to avoiding infinite looping in mdcb storage
+	if found, err := c.storage.Exists("raw-" + certID); err == nil && found {
 		return "", errors.New("Certificate with " + certID + " id already exists")
 	}
 
