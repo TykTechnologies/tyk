@@ -98,6 +98,8 @@ func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) 
 
 	certs := CertificateManager.List([]string{certID}, certs.CertificatePrivate)
 
+	certLog.Infof("For API %v found upstream mTLS certificate %v for the the domain %v. Found in database: %v", spec.APIID, certID, host, len(certs) != 0)
+
 	if len(certs) == 0 {
 		return nil
 	}

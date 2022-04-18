@@ -99,7 +99,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		key = generateToken(k.Spec.OrgID, certHash)
 
 	} else {
-		k.Logger().Info("Attempted access with malformed header, no auth header found.")
+		k.Logger().Infof("Attempted access with malformed header, no auth header found. API: %v, TLS: %+v, R: %+v", k.Spec.APIID, r.TLS, r)
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	}
 
