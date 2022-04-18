@@ -65,7 +65,7 @@ jobs:
           echo "::set-output name=gogenerate::$(sed -ze 's/%/%25/g;s/\n/%0A/g' gogenerate.log)"
           git_state=$(wc -l < gogenerate.log)
           echo "git state ${git_state}"
-          [[ $git_state -ne 0 ]] && exit 1
+          exit $git_state
 
       - name: Fetch base branch
         if: ${{ github.event_name == 'pull_request' }}
