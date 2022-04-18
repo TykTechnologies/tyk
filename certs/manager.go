@@ -56,6 +56,25 @@ func NewCertificateManager(storage StorageHandler, secret string, logger *logrus
 		secret:          secret,
 		migrateCertList: migrateCertList,
 	}
+<<<<<<< HEAD
+=======
+
+	callbackOnPullCertFromRPC := func(key, val string) error {
+		// calculate the orgId from the keyId
+		certID, _, _ := GetCertIDAndChainPEM([]byte(val), "")
+		orgID := getOrgFromKeyID(key, certID)
+
+		// save the cert in local redis
+		_, err := cm.Add([]byte(val), orgID)
+		return err
+	}
+
+	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log)
+	mdcbStorage.CallbackonPullfromRPC = &callbackOnPullCertFromRPC
+
+	cm.storage = mdcbStorage
+	return cm
+>>>>>>> c78468d3... when adding a new certificate check if exists by using the Exist method and not Get (#4003)
 }
 
 // Extracted from: https://golang.org/src/crypto/tls/tls.go
@@ -498,7 +517,8 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 	}
 	certID = orgID + certID
 
-	if cert, err := c.storage.GetKey("raw-" + certID); err == nil && cert != "" {
+	// use `Exist` rather than `Get` to avoiding infinite looping in mdcb storage
+	if found, err := c.storage.Exists("raw-" + certID); err == nil && found {
 		return "", errors.New("Certificate with " + certID + " id already exists")
 	}
 
