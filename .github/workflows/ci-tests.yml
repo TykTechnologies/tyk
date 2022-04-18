@@ -61,6 +61,7 @@ jobs:
           go generate ./...
           git add --all
           git diff-index HEAD > gogenerate.log
+          git diff --staged
           echo "::set-output name=gogenerate::$(sed -ze 's/%/%25/g;s/\n/%0A/g' gogenerate.log)"
           git_state=$(wc -l < gogenerate.log)
           [[ $git_state -ne 0 ]] && exit 1
