@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -18,12 +19,14 @@ type Operation struct {
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
 	Cache                  *CachePlugin            `bson:"cache,omitempty" json:"cache,omitempty"`
 	EnforceTimeout         *EnforceTimeout         `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
+	ValidateRequest        *ValidateRequest        `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
 }
 
 const (
 	allow                AllowanceType = 0
 	block                AllowanceType = 1
 	ignoreAuthentication AllowanceType = 2
+	contentTypeJSON                    = "application/json"
 )
 
 type AllowanceType int
@@ -39,6 +42,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTransformRequestMethod(ep.MethodTransforms)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
+	s.fillValidateRequest(ep.ValidateJSON)
 
 	if len(s.Paths) == 0 {
 		s.Paths = nil
@@ -62,6 +66,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTransformRequestMethodTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
+					tykOp.extractValidateRequestTo(ep, path, method, operation, &s.Components)
 					break found
 				}
 			}
@@ -342,4 +347,145 @@ func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
 	}
 
 	return operations[operationID]
+}
+
+type ValidateRequest struct {
+	Enabled           bool `bson:"enabled" json:"enabled"`
+	ErrorResponseCode int  `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
+}
+
+func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
+	v.Enabled = !meta.Disabled
+	v.ErrorResponseCode = meta.ErrorResponseCode
+}
+
+func (v *ValidateRequest) ExtractTo(meta *apidef.ValidatePathMeta) {
+	meta.Disabled = !v.Enabled
+	meta.ErrorResponseCode = v.ErrorResponseCode
+}
+
+func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		tykOp := s.GetTykExtension().getOperation(operationID)
+
+		if tykOp.ValidateRequest == nil {
+			tykOp.ValidateRequest = &ValidateRequest{}
+		}
+
+		tykOp.ValidateRequest.Fill(meta)
+
+		if ShouldOmit(tykOp.ValidateRequest) {
+			tykOp.ValidateRequest = nil
+		}
+
+		var schema openapi3.Schema
+		schemaInBytes, err := json.Marshal(meta.Schema)
+		if err != nil {
+			log.WithError(err).Error("Path meta schema couldn't be marshalled")
+			return
+		}
+
+		err = schema.UnmarshalJSON(schemaInBytes)
+		if err != nil {
+			log.WithError(err).Error("Schema couldn't be unmarshalled")
+			return
+		}
+
+		operation := s.Paths[meta.Path].GetOperation(meta.Method)
+
+		requestBody := operation.RequestBody
+		if requestBody == nil {
+			requestBody = &openapi3.RequestBodyRef{
+				Value: openapi3.NewRequestBody(),
+			}
+
+			operation.RequestBody = requestBody
+		}
+
+		bodyContent := requestBody.Value.Content
+		if bodyContent == nil {
+			bodyContent = openapi3.NewContent()
+			requestBody.Value.Content = bodyContent
+		}
+
+		mediaType := bodyContent.Get(contentTypeJSON)
+		if mediaType == nil {
+			mediaType = openapi3.NewMediaType()
+			bodyContent[contentTypeJSON] = mediaType
+		}
+
+		schemaRef := mediaType.Schema
+
+		if schemaRef == nil {
+			schemaRef = openapi3.NewSchemaRef("", &schema)
+		}
+
+		rawRef := schemaRef.Ref
+		ref := strings.TrimPrefix(rawRef, "#/components/schemas/")
+		if ref != "" {
+			if s.Components.Schemas == nil {
+				s.Components.Schemas = make(openapi3.Schemas)
+			}
+
+			s.Components.Schemas[ref] = openapi3.NewSchemaRef("", &schema)
+		} else {
+			operation.RequestBody.Value.WithJSONSchema(&schema)
+		}
+	}
+}
+
+func (o *Operation) extractValidateRequestTo(ep *apidef.ExtendedPathsSet, path string, method string, operation *openapi3.Operation, components *openapi3.Components) {
+	meta := apidef.ValidatePathMeta{Path: path, Method: method}
+	if o.ValidateRequest != nil {
+		o.ValidateRequest.ExtractTo(&meta)
+
+		defer func() {
+			ep.ValidateJSON = append(ep.ValidateJSON, meta)
+		}()
+	}
+
+	reqBody := operation.RequestBody
+	if reqBody == nil {
+		return
+	}
+
+	reqBodyVal := reqBody.Value
+	if reqBodyVal == nil {
+		return
+	}
+
+	media := reqBodyVal.Content.Get("application/json")
+	if media == nil {
+		return
+	}
+
+	schema := media.Schema
+	if schema == nil {
+		return
+	}
+
+	var schemaVal *openapi3.Schema
+
+	ref := strings.TrimPrefix(schema.Ref, "#/components/schemas/")
+	if schemaRef, ok := components.Schemas[ref]; ok {
+		schemaVal = schemaRef.Value
+	} else {
+		schemaVal = schema.Value
+	}
+
+	if schemaVal == nil {
+		return
+	}
+
+	schemaInBytes, err := json.Marshal(schemaVal)
+	if err != nil {
+		log.WithError(err).Error("Schema value couldn't be marshalled")
+		return
+	}
+
+	err = json.Unmarshal(schemaInBytes, &meta.Schema)
+	if err != nil {
+		log.WithError(err).Error("Path meta schema couldn't be unmarshalled")
+	}
 }

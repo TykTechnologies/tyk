@@ -1,6 +1,8 @@
 package oas
 
 import (
+	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -26,6 +28,7 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 
 	var operation Operation
 	Fill(t, &operation, 0)
+	operation.ValidateRequest = nil // This one also fills native part, let's skip it for this test.
 
 	xTykAPIGateway := &XTykAPIGateway{
 		Middleware: &Middleware{
@@ -198,4 +201,94 @@ func TestOAS_RegexPaths(t *testing.T) {
 
 		assert.Equalf(t, tc.input, got, "test %d: rebuilt link, expected %v, got %v", i, tc.input, got)
 	}
+}
+
+func TestValidateRequest(t *testing.T) {
+	const (
+		contentType = "application/json"
+		operationID = "getGET"
+	)
+
+	schema := map[string]interface{}{
+		"properties": map[string]interface{}{
+			"name": map[string]interface{}{
+				"type": "string",
+			},
+		},
+	}
+
+	schemaInBytes, _ := json.Marshal(schema)
+
+	metas := []apidef.ValidatePathMeta{
+		{
+			Disabled: false,
+			Path:     "/get",
+			Method:   http.MethodGet,
+			Schema:   schema,
+		},
+	}
+
+	t.Run("ref", func(t *testing.T) {
+
+		schemas := make(openapi3.Schemas)
+		oasSchema := openapi3.NewSchema()
+		_ = oasSchema.UnmarshalJSON(schemaInBytes)
+		schemas[contentType] = openapi3.NewSchemaRef("", oasSchema)
+
+		reqBodyString := `{
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "$/components/schemas/Person"
+              }
+            }
+          }
+        }`
+
+		reqBody := openapi3.NewRequestBody()
+		_ = reqBody.UnmarshalJSON([]byte(reqBodyString))
+
+		getOperation := openapi3.NewOperation()
+		getOperation.OperationID = operationID
+		getOperation.RequestBody = &openapi3.RequestBodyRef{
+			Value: reqBody,
+		}
+
+		paths := make(openapi3.Paths)
+		paths["/get"] = &openapi3.PathItem{
+			Get: getOperation,
+		}
+
+		var s OAS
+		s.Components.Schemas = schemas
+		s.Paths = paths
+
+		s.SetTykExtension(&XTykAPIGateway{Middleware: &Middleware{}})
+
+		s.fillValidateRequest(metas)
+
+		resSchema := s.Paths["/get"].Get.RequestBody.Value.Content[contentType].Schema
+		assert.Equal(t, resSchema.Ref, "$/components/schemas/Person")
+		assert.Nil(t, resSchema.Value)
+
+		var ep apidef.ExtendedPathsSet
+		s.getTykOperations()[operationID].extractValidateRequestTo(&ep, "/get", http.MethodGet,
+			s.Paths["/get"].GetOperation(http.MethodGet), &s.Components)
+
+		assert.Equal(t, metas, ep.ValidateJSON)
+	})
+
+	t.Run("value", func(t *testing.T) {
+		var s OAS
+		s.Paths = make(map[string]*openapi3.PathItem)
+		s.SetTykExtension(&XTykAPIGateway{Middleware: &Middleware{}})
+
+		s.fillValidateRequest(metas)
+
+		var ep apidef.ExtendedPathsSet
+		s.getTykOperations()[operationID].extractValidateRequestTo(&ep, "/get", http.MethodGet,
+			s.Paths["/get"].GetOperation(http.MethodGet), &s.Components)
+
+		assert.Equal(t, metas, ep.ValidateJSON)
+	})
 }
