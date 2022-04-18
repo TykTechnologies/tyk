@@ -1070,7 +1070,7 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 		panic(err)
 	}
 
-	if s.Gw.GetConfig().EnableAnalytics && s.Gw.analytics.GeoIPDB == nil {
+	if s.Gw.GetConfig().EnableAnalytics && s.Gw.Analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
 
@@ -1169,7 +1169,7 @@ func (s *Test) Close() {
 	}
 
 	s.gwMu.Lock()
-	s.Gw.analytics.Stop()
+	s.Gw.Analytics.Stop()
 	s.Gw.GlobalHostChecker.StopPoller()
 	s.gwMu.Unlock()
 	os.RemoveAll(s.Gw.GetConfig().AppPath)

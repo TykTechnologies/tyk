@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/analytics"
+
 	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk/ctx"
@@ -216,7 +218,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
 		default:
 			// record 2XX to analytics
-			m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
+			m.successHandler.RecordHit(r, analytics.Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
 
 			// no need to continue passing this request down to reverse proxy
 			respCode = mwStatusRespond
