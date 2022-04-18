@@ -55,6 +55,9 @@ jobs:
           
           GO111MODULE=off go get -u github.com/jteeuwen/go-bindata/...
           
+          bindata_version=$(go-bindata --version)
+          echo "go-bindata version ${bindata_version}"
+          
           go generate ./...
           git add --all
           git diff-index HEAD > gogenerate.log
