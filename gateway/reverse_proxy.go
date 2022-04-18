@@ -152,9 +152,9 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 			}
 
 			host := EnsureTransport(gotHost, spec.Protocol)
-			if !spec.Proxy.CheckHostAgainstUptimeTests {
-				return host, nil // we don't care if it's up
-			}
+			// if !spec.Proxy.CheckHostAgainstUptimeTests {
+			return host, nil // we don't care if it's up
+			// }
 			// As checked by HostCheckerManager.AmIPolling
 			if GlobalHostChecker.store == nil {
 				return host, nil
@@ -869,9 +869,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	roundTripper = p.TykAPISpec.HTTPTransport
 
-	if roundTripper.transport != nil {
-		roundTripper.transport.TLSClientConfig.Certificates = tlsCertificates
-	}
+	// if roundTripper.transport != nil {
+	roundTripper.transport.TLSClientConfig.Certificates = tlsCertificates
+	// }
 	p.TykAPISpec.Unlock()
 
 	if outreq.URL.Scheme == "h2c" {
