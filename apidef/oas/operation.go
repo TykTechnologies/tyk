@@ -26,6 +26,7 @@ const (
 	allow                AllowanceType = 0
 	block                AllowanceType = 1
 	ignoreAuthentication AllowanceType = 2
+	contentTypeJSON                    = "application/json"
 )
 
 type AllowanceType int
@@ -408,10 +409,10 @@ func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {
 			requestBody.Value.Content = bodyContent
 		}
 
-		mediaType := bodyContent.Get("application/json")
+		mediaType := bodyContent.Get(contentTypeJSON)
 		if mediaType == nil {
 			mediaType = openapi3.NewMediaType()
-			bodyContent["application/json"] = mediaType
+			bodyContent[contentTypeJSON] = mediaType
 		}
 
 		schemaRef := mediaType.Schema
