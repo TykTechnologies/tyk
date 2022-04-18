@@ -82,7 +82,11 @@
         "certificate": {
           "type": "string"
         }
-      }
+      },
+      "required": [
+        "domain",
+        "certificate"
+      ]
     },
     "X-Tyk-PinnedPublicKeys": {
       "type": "object",
