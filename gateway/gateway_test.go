@@ -14,6 +14,8 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/TykTechnologies/tyk/analytics"
+
 	"github.com/stretchr/testify/assert"
 
 	"strings"
@@ -418,7 +420,7 @@ func TestAnalytics(t *testing.T) {
 	// Cleanup before test
 	// let records to to be sent
 	time.Sleep(recordsBufferFlushInterval + 50)
-	ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+	ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
 	t.Run("Log errors", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
@@ -429,12 +431,12 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 2 {
 			t.Error("Should return 2 record", len(results))
 		}
 
-		var record AnalyticsRecord
+		var record analytics.Record
 		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 401 {
 			t.Error("Analytics record do not match: ", record)
@@ -455,12 +457,12 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
 
-		var record AnalyticsRecord
+		var record analytics.Record
 		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
@@ -494,12 +496,12 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
 
-		var record AnalyticsRecord
+		var record analytics.Record
 		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
@@ -543,12 +545,12 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
 
-		var record AnalyticsRecord
+		var record analytics.Record
 		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
@@ -588,12 +590,12 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
 
-		var record AnalyticsRecord
+		var record analytics.Record
 		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
@@ -641,12 +643,12 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
 
-		var record AnalyticsRecord
+		var record analytics.Record
 		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
@@ -702,13 +704,13 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 2 {
 			t.Fatal("Should return 1 record: ", len(results))
 		}
 
 		// Take second cached request
-		var record AnalyticsRecord
+		var record analytics.Record
 		msgpack.Unmarshal([]byte(results[1].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
@@ -1975,7 +1977,7 @@ func TestBrokenClients(t *testing.T) {
 
 	t.Run("Invalid client: close without read", func(t *testing.T) {
 		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
-		ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
 		conn, _ := net.DialTimeout("tcp", ts.mainProxy().listener.Addr().String(), 0)
 		conn.Write([]byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"))
@@ -1983,9 +1985,9 @@ func TestBrokenClients(t *testing.T) {
 		//conn.Read(buf)
 
 		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
-		var record AnalyticsRecord
+		var record analytics.Record
 		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 499 {
 			t.Fatal("Analytics record do not match:", record)

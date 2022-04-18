@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/murmur3"
+	"github.com/TykTechnologies/tyk/analytics"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -367,7 +368,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Record analytics
 	if !m.Spec.DoNotTrack {
-		m.sh.RecordHit(r, Latency{}, newRes.StatusCode, newRes)
+		m.sh.RecordHit(r, analytics.Latency{}, newRes.StatusCode, newRes)
 	}
 
 	// Stop any further execution
