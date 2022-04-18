@@ -5,12 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/lonelycode/go-uuid/uuid"
