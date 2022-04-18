@@ -1,6 +1,6 @@
 package oas
 
-//go:generate go-bindata -pkg schema -nomemcopy -ignore=(schema\/schema.gen.go|schema\/README.md) -prefix "./schema" -o schema/schema.gen.go schema/...
+//go:generate go-bindata -pkg schema -nomemcopy -nometadata -ignore=(schema\/schema.gen.go|schema\/README.md) -prefix "./schema" -o schema/schema.gen.go schema/...
 //go:generate gofmt -w -s schema/schema.gen.go
 
 import (
@@ -14,8 +14,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas/schema"
 	logger "github.com/TykTechnologies/tyk/log"
-	"github.com/hashicorp/go-multierror"
-	"github.com/hashicorp/go-version"
 	"github.com/xeipuuv/gojsonschema"
 )
 

@@ -84,7 +84,7 @@ func _303Json() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "3.0.3.json", size: 35809, mode: os.FileMode(420), modTime: time.Unix(1650286266, 0)}
+	info := bindataFileInfo{name: "3.0.3.json", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -104,7 +104,7 @@ func xTykApiGatewayJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "x-tyk-api-gateway.json", size: 19341, mode: os.FileMode(420), modTime: time.Unix(1650286142, 0)}
+	info := bindataFileInfo{name: "x-tyk-api-gateway.json", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
