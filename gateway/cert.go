@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"tyk/certs"
 
 	"github.com/TykTechnologies/tyk/apidef"
 
@@ -373,7 +374,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 				if spec.Domain == "" || spec.Domain == hello.ServerName {
 					certIDs := append(spec.ClientCertificates, gwConfig.Security.Certificates.API...)
 
-					for _, cert := range gw.CertificateManager.List(certIDs, certs.CertificatePublic) {
+					for _, cert := range gw.CertificateManager.List(certIDs, certs.CertificateAny) {
 						if cert != nil {
 							newConfig.ClientCAs.AddCert(cert.Leaf)
 						}

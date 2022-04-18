@@ -326,7 +326,7 @@ func TestCertificateStorage(t *testing.T) {
 	publicKeyID, _ := m.Add(pubPem, "")
 
 	t.Run("File certificates", func(t *testing.T) {
-		certs := m.List([]string{certPath, "wrong"}, CertificatePublic)
+		certs := m.List([]string{certPath, "wrong"}, CertificateAny)
 		if len(certs) != 2 {
 			t.Fatal("Should contain 2 cert", len(certs))
 		}
@@ -341,7 +341,7 @@ func TestCertificateStorage(t *testing.T) {
 	})
 
 	t.Run("Remote storage certificates", func(t *testing.T) {
-		certs := m.List([]string{certPath, storageCertID, privateCertID}, CertificatePublic)
+		certs := m.List([]string{certPath, storageCertID, privateCertID}, CertificateAny)
 
 		if len(certs) != 3 {
 			t.Fatal("Should contain 3 certs but", len(certs))
@@ -365,7 +365,7 @@ func TestCertificateStorage(t *testing.T) {
 	})
 
 	t.Run("Public keys", func(t *testing.T) {
-		certs := m.List([]string{publicKeyID}, CertificatePublic)
+		certs := m.List([]string{publicKeyID}, CertificateAny)
 
 		if len(certs) != 1 {
 			t.Error("Should return only private certificate")
