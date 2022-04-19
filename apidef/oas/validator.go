@@ -14,6 +14,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas/schema"
 	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/go-version"
 	"github.com/xeipuuv/gojsonschema"
 )
 
