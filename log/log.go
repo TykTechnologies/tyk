@@ -22,6 +22,7 @@ func LoadTranslations(thing map[string]interface{}) {
 	formatter := new(logrus.TextFormatter)
 	formatter.TimestampFormat = `Jan 02 15:04:05`
 	formatter.FullTimestamp = true
+	formatter.DisableColors = true
 
 	log.Formatter = &TranslationFormatter{formatter}
 	translations, _ = Flatten(thing)
@@ -50,6 +51,7 @@ func init() {
 	formatter := new(logrus.TextFormatter)
 	formatter.TimestampFormat = `Jan 02 15:04:05`
 	formatter.FullTimestamp = true
+	formatter.DisableColors = true
 
 	log.Formatter = formatter
 	rawLog.Formatter = new(RawFormatter)
