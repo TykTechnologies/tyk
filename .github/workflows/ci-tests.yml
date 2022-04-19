@@ -63,6 +63,7 @@ jobs:
           
           if [[ $git_state_count -ne 0 ]]
           then 
+            echo "go generate ./... made git state dirty, please run go generate ./... and update PR"
             exit 1
           fi
 
