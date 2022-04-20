@@ -389,7 +389,8 @@
         "^\\/": {
           "$ref": "#/definitions/X-Tyk-Operation"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-Middleware": {
       "type": "object",
