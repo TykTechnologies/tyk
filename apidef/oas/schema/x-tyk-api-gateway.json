@@ -343,6 +343,20 @@
         "value"
       ]
     },
+    "X-Tyk-ValidateRequest": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "errorResponseCode": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-Operation": {
       "type": "object",
       "properties": {
@@ -363,6 +377,9 @@
         },
         "enforceTimeout": {
           "$ref": "#/definitions/X-Tyk-EnforceTimeout"
+        },
+        "validateRequest": {
+          "$ref": "#/definitions/X-Tyk-ValidateRequest"
         }
       }
     },
