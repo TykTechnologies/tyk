@@ -17,12 +17,14 @@ type DnsCacheItem struct {
 
 // DnsCacheStorage is an in-memory cache of auto-purged dns query ip responses
 type DnsCacheStorage struct {
-	cache *cache.Cache
+	cache      *cache.Cache
+	LookupHost func(string) ([]string, error)
 }
 
 func NewDnsCacheStorage(expiration, checkInterval time.Duration) *DnsCacheStorage {
-	storage := DnsCacheStorage{cache.New(expiration, checkInterval)}
-	return &storage
+	return &DnsCacheStorage{
+		cache: cache.New(expiration, checkInterval),
+	}
 }
 
 // Items returns map of non expired dns cache items
@@ -89,5 +91,8 @@ func (dc *DnsCacheStorage) Clear() {
 }
 
 func (dc *DnsCacheStorage) resolveDNSRecord(host string) ([]string, error) {
+	if dc.LookupHost != nil {
+		return dc.LookupHost(host)
+	}
 	return net.LookupHost(host)
 }

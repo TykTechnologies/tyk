@@ -41,31 +41,13 @@ var (
 	}
 )
 
-type configTestStorageFetchItem struct {
-	*testing.T
-	etcHostsMap       map[string][]string
-	etcHostsErrorsMap map[string]int
-}
-
-func setupTestStorageFetchItem(cfg *configTestStorageFetchItem) func() {
-	handle, err := test.InitDNSMock(cfg.etcHostsMap, cfg.etcHostsErrorsMap)
-	if err != nil {
-		cfg.T.Error(err.Error())
-	}
-
-	return func() {
-		if err := handle.ShutdownDnsMock(); err != nil {
-			cfg.T.Error(err.Error())
-		}
-	}
-}
-
 func TestStorageFetchItem(t *testing.T) {
-	dnsCache := NewDnsCacheStorage(time.Duration(expiration)*time.Second, time.Duration(checkInterval)*time.Second)
+	t.Parallel()
 
-	tearDownTestStorageFetchItem := setupTestStorageFetchItem(&configTestStorageFetchItem{t, etcHostsMap, etcHostsErrorMap})
+	dnsCache := NewDnsCacheStorage(time.Duration(expiration)*time.Second, time.Duration(checkInterval)*time.Second)
+	dnsCache.LookupHost = dnsMock.LookupHost
+
 	defer func() {
-		tearDownTestStorageFetchItem()
 		dnsCache.Clear()
 		dnsCache = nil
 	}()
@@ -151,9 +133,11 @@ func TestStorageFetchItem(t *testing.T) {
 }
 
 func TestStorageRecordExpiration(t *testing.T) {
+	t.Parallel()
+
 	var (
-		expiration    = 2000
-		checkInterval = 1500
+		expiration    = 100
+		checkInterval = 50
 	)
 
 	type testRecord struct {
@@ -220,10 +204,10 @@ func TestStorageRecordExpiration(t *testing.T) {
 			"Should remove only expired record after expiration",
 			[]testRecord{
 				{dns: host, addrs: etcHostsMap[host]},
-				{dns: host2, addrs: etcHostsMap[host2], addDelay: 500 * time.Millisecond},
+				{dns: host2, addrs: etcHostsMap[host2], addDelay: time.Duration(expiration) * time.Millisecond},
 				{dns: wsHost, addrs: etcHostsMap[wsHost]},
 			},
-			time.Duration(expiration-400) * time.Millisecond,
+			time.Duration(checkInterval+10) * time.Millisecond,
 			[]testRecord{
 				{dns: host2, addrs: etcHostsMap[host2]},
 				{dns: wsHost, addrs: etcHostsMap[wsHost]},
@@ -234,12 +218,12 @@ func TestStorageRecordExpiration(t *testing.T) {
 			"Should remove only expired records after expiration",
 			[]testRecord{
 				{dns: host, addrs: etcHostsMap[host]},
-				{dns: host2, addrs: etcHostsMap[host2], addDelay: 250 * time.Millisecond},
-				{dns: host3, addrs: etcHostsMap[host3], addDelay: 500 * time.Millisecond},
-				{dns: host4, addrs: etcHostsMap[host4], addDelay: 100 * time.Millisecond},
+				{dns: host2, addrs: etcHostsMap[host2]},
+				{dns: host3, addrs: etcHostsMap[host3], addDelay: time.Duration(expiration) * time.Millisecond},
+				{dns: host4, addrs: etcHostsMap[host4]},
 				{dns: wsHost, addrs: etcHostsMap[wsHost]},
 			},
-			time.Duration(expiration-350) * time.Millisecond,
+			time.Duration(checkInterval+10) * time.Millisecond,
 			[]testRecord{
 				{dns: host3, addrs: etcHostsMap[host3]},
 				{dns: host4, addrs: etcHostsMap[host4]},

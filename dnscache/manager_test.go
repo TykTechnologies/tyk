@@ -11,14 +11,14 @@ import (
 )
 
 func TestWrapDialerDialContextFunc(t *testing.T) {
-	tearDownTestStorageFetchItem := setupTestStorageFetchItem(&configTestStorageFetchItem{t, etcHostsMap, etcHostsErrorMap})
-	defer tearDownTestStorageFetchItem()
+	t.Parallel()
 
 	expectedHost := "orig-host.com"
 	expectedSingleIpHost := "single.orig-host.com"
 	hostWithPort := expectedHost + ":8078"
 	singleIpHostWithPort := expectedSingleIpHost + ":8078"
-	dialerContext, cancel := context.WithCancel(context.TODO())
+
+	dialerContext, cancel := context.WithCancel(context.Background())
 	cancel() //Manually disable connection establishment
 
 	cases := []struct {

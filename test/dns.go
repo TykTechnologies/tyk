@@ -7,11 +7,8 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-
-	"time"
-
 	"sync"
-	"sync/atomic"
+	"time"
 
 	"github.com/miekg/dns"
 )
@@ -30,6 +27,8 @@ var (
 	}
 )
 
+type dnsMessageWriter func(*dns.Msg) error
+
 type dnsMockHandler struct {
 	domainsToAddresses map[string][]string
 	domainsToErrors    map[string]int
@@ -37,7 +36,52 @@ type dnsMockHandler struct {
 	muDomainsToAddresses sync.RWMutex
 }
 
+func (d *dnsMockHandler) LookupHost(host string) (addrs []string, err error) {
+	query := &dns.Msg{
+		Question: []dns.Question{
+			{
+				Qtype: dns.TypeA,
+				Name:  host,
+			},
+		},
+	}
+
+	var response *dns.Msg
+	writeMsg := func(reply *dns.Msg) error {
+		response = reply
+		return nil
+	}
+
+	d.serveDNS(writeMsg, query)
+
+	if response.Rcode != 0 {
+		return nil, &net.DNSError{
+			Err:    dns.RcodeToString[response.Rcode],
+			Name:   host,
+			Server: "mock",
+		}
+	}
+
+	retval := make([]string, 0, len(response.Answer))
+	for _, item := range response.Answer {
+		answer, ok := item.(*dns.A)
+		if !ok {
+			return nil, &net.DNSError{
+				Err:    fmt.Sprintf("unknown mock dns answer: %T", item),
+				Name:   host,
+				Server: "mock",
+			}
+		}
+		retval = append(retval, answer.A.String())
+	}
+	return retval, nil
+}
+
 func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
+	d.serveDNS(w.WriteMsg, r)
+}
+
+func (d *dnsMockHandler) serveDNS(writeMsg dnsMessageWriter, r *dns.Msg) {
 	msg := dns.Msg{}
 	msg.SetReply(r)
 	switch r.Question[0].Qtype {
@@ -51,7 +95,7 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		if rcode, ok := d.domainsToErrors[domain]; ok {
 			m := new(dns.Msg)
 			m.SetRcode(r, rcode)
-			w.WriteMsg(m)
+			writeMsg(m)
 			return
 		}
 
@@ -62,14 +106,14 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 				if err != nil {
 					m := new(dns.Msg)
 					m.SetRcode(r, dns.RcodeServerFailure)
-					w.WriteMsg(m)
+					writeMsg(m)
 					return
 				}
 				msg.Answer = append(msg.Answer, &dns.A{
 					Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
 					A:   ipAddrs[0].IP,
 				})
-				w.WriteMsg(&msg)
+				writeMsg(&msg)
 				return
 			}
 		}
@@ -102,13 +146,16 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			})
 		}
 	}
-	w.WriteMsg(&msg)
+	writeMsg(&msg)
 }
 
 type DnsMockHandle struct {
-	id              string
-	mockServer      *dns.Server
-	ShutdownDnsMock func() error
+	id         string
+	mockServer *dns.Server
+
+	Resolver   *net.Resolver
+	Shutdown   func() error
+	LookupHost func(string) ([]string, error)
 }
 
 func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsErrorMap map[string]int) func() {
@@ -159,9 +206,6 @@ func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsError
 // to route all dns queries within tests to this server.
 // InitDNSMock returns handle, which can be used to add/remove dns query mock responses or initialization error.
 func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int) (*DnsMockHandle, error) {
-	// should we use the mock (atomic flag)
-	var mockEnabled int32 = 1
-
 	addr, _ := net.ResolveUDPAddr("udp", ":0")
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
@@ -200,24 +244,19 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 		return handle, err
 	}
 
-	mockResolver := &net.Resolver{
+	handle.Resolver = &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			dialer := net.Dialer{}
-			if enabled := atomic.LoadInt32(&mockEnabled); enabled > 0 {
-				return dialer.DialContext(ctx, network, mockServer.PacketConn.LocalAddr().String())
-			}
-			return dialer.DialContext(ctx, network, address)
+			return dialer.DialContext(ctx, network, mockServer.PacketConn.LocalAddr().String())
 		},
 	}
 
-	net.DefaultResolver = mockResolver
-
-	handle.ShutdownDnsMock = func() error {
-		// disable mocking in our dialer, don't replace net.DefaultResolver (race)
-		atomic.CompareAndSwapInt32(&mockEnabled, 1, 0)
+	handle.Shutdown = func() error {
 		return mockServer.Shutdown()
 	}
+
+	handle.LookupHost = dnsMux.LookupHost
 
 	return handle, nil
 }

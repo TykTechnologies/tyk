@@ -219,7 +219,7 @@ func InitTestMain(ctx context.Context, m *testing.M) int {
 			panic(errMock)
 		}
 
-		defer MockHandle.ShutdownDnsMock()
+		defer MockHandle.Shutdown()
 	}
 
 	exitCode := m.Run()
