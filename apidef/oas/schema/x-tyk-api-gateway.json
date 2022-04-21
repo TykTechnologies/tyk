@@ -385,9 +385,12 @@
     },
     "X-Tyk-Operations": {
       "type": "object",
-      "additionalProperties": {
-        "$ref": "#/definitions/X-Tyk-Operation"
-      }
+      "patternProperties": {
+        "^\\/": {
+          "$ref": "#/definitions/X-Tyk-Operation"
+        }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-Middleware": {
       "type": "object",
