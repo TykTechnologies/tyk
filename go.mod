@@ -101,6 +101,6 @@ require (
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20220420070619-0971b34f37f3
+replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20220420134850-c03778a74bc7
 
 //replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools
