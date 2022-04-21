@@ -538,7 +538,6 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 	//ts.Gw.setTestMode(false)
 
 	var (
-		limit  = 4
 		ping   atomic.Value
 		failed atomic.Value
 	)
@@ -546,13 +545,18 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 	ping.Store(0)
 
 	hs := &HostUptimeChecker{Gw: ts.Gw}
-	hs.Init(1, limit, 0, map[string]HostData{
-		l.Addr().String(): {CheckURL: "http://" + l.Addr().String()},
-	},
-		HostCheckCallBacks{
+
+	var (
+		workers      = 1
+		triggerLimit = 4
+		timeout      = 1
+		hostMap      = map[string]HostData{
+			l.Addr().String(): {CheckURL: "http://" + l.Addr().String()},
+		}
+		callbacks = HostCheckCallBacks{
 			Ping: func(_ context.Context, _ HostHealthReport) {
 				ping.Store(ping.Load().(int) + 1)
-				if ping.Load().(int) >= limit {
+				if ping.Load().(int) >= triggerLimit {
 					cancel()
 				}
 				wg.Done()
@@ -561,12 +565,15 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 				failed.Store(failed.Load().(int) + 1)
 				wg.Done()
 			},
-		},
+		}
 	)
+
+	hs.Init(workers, triggerLimit, timeout, hostMap, callbacks)
+
 	go hs.Start(ctx)
 
 	wg.Wait()
-	assert.Equal(t, limit, ping.Load().(int), "ping count is wrong")
+	assert.Equal(t, triggerLimit, ping.Load().(int), "ping count is wrong")
 	assert.Equal(t, 1, failed.Load().(int), "expected host down to be fired once")
 }
 
