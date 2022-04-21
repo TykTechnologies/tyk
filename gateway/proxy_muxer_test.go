@@ -310,3 +310,30 @@ func TestHandle404(t *testing.T) {
 		{Path: "/nonexisting", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
 	}...)
 }
+
+func TestHandleSubroutes(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	g.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/apple"
+			spec.UseKeylessAccess = true
+		},
+		func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/apple/bottom"
+			spec.UseKeylessAccess = false
+		},
+	)
+	_, _ = g.Run(t, []test.TestCase{
+		{Path: "/apple", Code: http.StatusOK},
+		{Path: "/apple/", Code: http.StatusOK},
+		{Path: "/apple/bot", Code: http.StatusOK},
+		{Path: "/apple/bottom", Code: http.StatusUnauthorized},
+		{Path: "/apple/bottom/", Code: http.StatusUnauthorized},
+		{Path: "/apple/bottom/jeans", Code: http.StatusUnauthorized},
+		{Path: "/applebottomjeans", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
+		{Path: "/apple-bottom-jeans", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
+		{Path: "/apple/bottom-jeans", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
+	}...)
+}

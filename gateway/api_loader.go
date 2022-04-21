@@ -663,6 +663,37 @@ func (gw *Gateway) fuzzyFindAPI(search string) *APISpec {
 	return nil
 }
 
+type explicitRouteHandler struct {
+	prefix  string
+	handler http.Handler
+	muxer   *proxyMux
+}
+
+func (h *explicitRouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == h.prefix || strings.HasPrefix(r.URL.Path, h.prefix+"/") {
+		h.handler.ServeHTTP(w, r)
+		return
+	}
+	h.muxer.handle404(w, r)
+}
+
+func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux) http.Handler {
+	// keep trailing slash paths as-is
+	if strings.HasSuffix(prefix, "/") {
+		return handler
+	}
+	// keep paths with params as-is
+	if strings.Contains(prefix, "{") && strings.Contains(prefix, "}") {
+		return handler
+	}
+
+	return &explicitRouteHandler{
+		prefix:  prefix,
+		handler: handler,
+		muxer:   muxer,
+	}
+}
+
 func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) http.Handler {
 	gwConfig := gw.GetConfig()
 	port := gwConfig.ListenPort
@@ -687,6 +718,9 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 	subrouter := router.PathPrefix(spec.Proxy.ListenPath).Subrouter()
 	chainObj := gw.processSpec(spec, apisByListen, gs, subrouter, logrus.NewEntry(log))
+
+	chainObj.ThisHandler = explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer)
+
 	if chainObj.Skip {
 		return chainObj.ThisHandler
 	}
