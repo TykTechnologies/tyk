@@ -394,7 +394,7 @@ func (gw *Gateway) setupGlobals() {
 	gw.readGraphqlPlaygroundTemplate()
 }
 
-func (gw *Gateway) buildConnStr(resource string) string {
+func (gw *Gateway) buildDashboardConnStr(resource string) string {
 
 	if gw.GetConfig().DBAppConfOptions.ConnectionString == "" && gw.GetConfig().DisableDashboardZeroConf {
 		mainLog.Fatal("Connection string is empty, failing.")
@@ -415,7 +415,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 
 	var s []*APISpec
 	if gw.GetConfig().UseDBAppConfigs {
-		connStr := gw.buildConnStr("/system/apis")
+		connStr := gw.buildDashboardConnStr("/system/apis")
 		tmpSpecs, err := loader.FromDashboardService(connStr)
 		if err != nil {
 			log.Error("failed to load API specs: ", err)
@@ -1576,7 +1576,7 @@ func handleDashboardRegistration(gw *Gateway) {
 
 	dashboardServiceInit(gw)
 
-	// connStr := buildConnStr("/register/node")
+	// connStr := buildDashboardConnStr("/register/node")
 	if err := gw.DashService.Register(); err != nil {
 		dashLog.Fatal("Registration failed: ", err)
 	}

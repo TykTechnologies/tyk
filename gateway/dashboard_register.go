@@ -94,10 +94,10 @@ func (gw *Gateway) reLogin() {
 }
 
 func (h *HTTPDashboardHandler) Init() error {
-	h.RegistrationEndpoint = h.Gw.buildConnStr("/register/node")
-	h.DeRegistrationEndpoint = h.Gw.buildConnStr("/system/node")
-	h.HeartBeatEndpoint = h.Gw.buildConnStr("/register/ping")
-	h.KeyQuotaTriggerEndpoint = h.Gw.buildConnStr("/system/key/quota_trigger")
+	h.RegistrationEndpoint = h.Gw.buildDashboardConnStr("/register/node")
+	h.DeRegistrationEndpoint = h.Gw.buildDashboardConnStr("/system/node")
+	h.HeartBeatEndpoint = h.Gw.buildDashboardConnStr("/register/ping")
+	h.KeyQuotaTriggerEndpoint = h.Gw.buildDashboardConnStr("/system/key/quota_trigger")
 
 	if h.Secret = h.Gw.GetConfig().NodeSecret; h.Secret == "" {
 		dashLog.Fatal("Node secret is not set, required for dashboard connection")
