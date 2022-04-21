@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"sync"
+	"sync/atomic"
 
 	"github.com/miekg/dns"
 )
 
 var (
-	muDefaultResolver  sync.RWMutex
 	DomainsToAddresses = map[string][]string{
 		"host1.": {"127.0.0.1"},
 		"host2.": {"127.0.0.1"},
@@ -159,6 +159,9 @@ func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsError
 // to route all dns queries within tests to this server.
 // InitDNSMock returns handle, which can be used to add/remove dns query mock responses or initialization error.
 func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int) (*DnsMockHandle, error) {
+	// should we use the mock (atomic flag)
+	var mockEnabled int32 = 1
+
 	addr, _ := net.ResolveUDPAddr("udp", ":0")
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
@@ -173,7 +176,7 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	mockServer := &dns.Server{PacketConn: conn, NotifyStartedFunc: started}
 	handle := &DnsMockHandle{id: time.Now().String(), mockServer: mockServer}
 
-	dnsMux := &dnsMockHandler{muDomainsToAddresses: sync.RWMutex{}}
+	dnsMux := &dnsMockHandler{}
 
 	if domainsMap != nil {
 		dnsMux.domainsToAddresses = domainsMap
@@ -197,30 +200,22 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 		return handle, err
 	}
 
-	muDefaultResolver.RLock()
-	defaultResolver := net.DefaultResolver
-	muDefaultResolver.RUnlock()
 	mockResolver := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{}
-
-			//Use write lock to prevent unsafe d.DialContext update of net.DefaultResolver
-			muDefaultResolver.Lock()
-			defer muDefaultResolver.Unlock()
-			return d.DialContext(ctx, network, mockServer.PacketConn.LocalAddr().String())
+			dialer := net.Dialer{}
+			if enabled := atomic.LoadInt32(&mockEnabled); enabled > 0 {
+				return dialer.DialContext(ctx, network, mockServer.PacketConn.LocalAddr().String())
+			}
+			return dialer.DialContext(ctx, network, address)
 		},
 	}
 
-	muDefaultResolver.Lock()
 	net.DefaultResolver = mockResolver
-	muDefaultResolver.Unlock()
 
 	handle.ShutdownDnsMock = func() error {
-		muDefaultResolver.Lock()
-		net.DefaultResolver = defaultResolver
-		muDefaultResolver.Unlock()
-
+		// disable mocking in our dialer, don't replace net.DefaultResolver (race)
+		atomic.CompareAndSwapInt32(&mockEnabled, 1, 0)
 		return mockServer.Shutdown()
 	}
 
