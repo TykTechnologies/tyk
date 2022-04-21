@@ -767,6 +767,7 @@ type GraphQLEngineDataSourceKind string
 const (
 	GraphQLEngineDataSourceKindREST    = "REST"
 	GraphQLEngineDataSourceKindGraphQL = "GraphQL"
+	GraphQLEngineDataSourceKindKafka   = "Kafka"
 )
 
 type GraphQLEngineDataSource struct {
@@ -794,6 +795,14 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 	URL     string            `bson:"url" json:"url"`
 	Method  string            `bson:"method" json:"method"`
 	Headers map[string]string `bson:"headers" json:"headers"`
+}
+
+type GraphQLEngineDataSourceConfigKafka struct {
+	BrokerAddr   string `bson:"broker_addr" json:"broker_addr"`
+	Topic        string `bson:"topic" json:"topic"`
+	GroupID      string `bson:"group_id" json:"group_id"`
+	ClientID     string `bson:"client_id" json:"client_id"`
+	KafkaVersion string `bson:"kafka_version" json:"kafka_version"`
 }
 
 type QueryVariable struct {
