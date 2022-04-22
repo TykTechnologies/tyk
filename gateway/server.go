@@ -366,7 +366,7 @@ func (gw *Gateway) setupGlobals() {
 
 	// Load all the files that have the "error" prefix.
 	//	gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
-	templatesDir := filepath.Join(gwConfig.TemplatePath, "error*")
+	templatesDir := filepath.Join(gwConfig.TemplatePath, "error.*")
 	gw.templates = template.Must(template.ParseGlob(templatesDir))
 	gw.templatesRaw = textTemplate.Must(textTemplate.ParseGlob(templatesDir))
 	gw.CoProcessInit()
