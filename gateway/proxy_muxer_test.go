@@ -328,6 +328,14 @@ func TestHandleSubroutes(t *testing.T) {
 			spec.Proxy.ListenPath = "/apple/bottom"
 			spec.UseKeylessAccess = false
 		},
+		func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/bob/{name:.*}"
+			spec.UseKeylessAccess = true
+		},
+		func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/charlie/{name:.*}/suffix"
+			spec.UseKeylessAccess = true
+		},
 	)
 	_, _ = g.Run(t, []test.TestCase{
 		{Path: "/", Code: http.StatusUnauthorized},
@@ -341,5 +349,23 @@ func TestHandleSubroutes(t *testing.T) {
 		{Path: "/applebottomjeans", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
 		{Path: "/apple-bottom-jeans", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
 		{Path: "/apple/bottom-jeans", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
+		{Path: "/bob", Code: http.StatusUnauthorized},
+		{Path: "/bob/", Code: http.StatusOK},
+		{Path: "/bob/name", Code: http.StatusOK},
+		{Path: "/bob/name/surname", Code: http.StatusOK},
+		{Path: "/bob/name/patronym/surname", Code: http.StatusOK},
+
+		// This one is a particular re2/gorilla implementation detail,
+		// the .* regex should match "", and .+ should match length >= 1.
+		// The reality doesn't reflect the route definition.
+		{Path: "/charlie//suffix/", Code: http.StatusUnauthorized},
+
+		// Regex paths will behave as they did before
+		{Path: "/charlie/name/suffix", Code: http.StatusOK},
+		{Path: "/charlie/name/suffix/", Code: http.StatusOK},
+		{Path: "/charlie/name/suffix/foo", Code: http.StatusOK},
+		{Path: "/charlie/name/suffixfoo", Code: http.StatusOK},
+		{Path: "/charlie/name/name/suffix/foo", Code: http.StatusOK},
+		{Path: "/charlie/name/name/name/suffix/foo", Code: http.StatusOK},
 	}...)
 }
