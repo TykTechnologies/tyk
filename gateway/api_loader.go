@@ -694,6 +694,10 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux)
 	}
 }
 
+// loadHTTPService has two responsibilities:
+//
+// - register gorilla/mux routing handless with proxyMux directly (wrapped),
+// - return a raw http.Handler for tyk://ID urls.
 func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) http.Handler {
 	gwConfig := gw.GetConfig()
 	port := gwConfig.ListenPort
@@ -717,10 +721,8 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	}
 
 	subrouter := router.PathPrefix(spec.Proxy.ListenPath).Subrouter()
+
 	chainObj := gw.processSpec(spec, apisByListen, gs, subrouter, logrus.NewEntry(log))
-
-	chainObj.ThisHandler = explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer)
-
 	if chainObj.Skip {
 		return chainObj.ThisHandler
 	}
@@ -729,7 +731,9 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 	}
 
-	subrouter.NewRoute().Handler(chainObj.ThisHandler)
+	httpHandler := explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer)
+	subrouter.NewRoute().Handler(httpHandler)
+
 	return chainObj.ThisHandler
 }
 
