@@ -434,7 +434,7 @@ func TestListener(t *testing.T) {
 		{Method: "GET", Path: "/tyk/apis/test", AdminAuth: true, Code: 200, BodyMatch: `^{.*"api_id":"test".*}`},
 		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: `^\[.*"api_id":"test".*\]`},
 		{Method: "GET", Path: "/sample", Code: 200},
-		{Method: "GET", Path: "/samplefoo", Code: 200},
+		{Method: "GET", Path: "/samplefoo", Code: 404},
 		{Method: "GET", Path: "/sample/", Code: 200},
 		{Method: "GET", Path: "/sample/foo", Code: 200},
 	}
