@@ -317,6 +317,10 @@ func TestHandleSubroutes(t *testing.T) {
 
 	g.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.UseKeylessAccess = false
+		},
+		func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/apple"
 			spec.UseKeylessAccess = true
 		},
@@ -326,6 +330,8 @@ func TestHandleSubroutes(t *testing.T) {
 		},
 	)
 	_, _ = g.Run(t, []test.TestCase{
+		{Path: "/", Code: http.StatusUnauthorized},
+		{Path: "/app", Code: http.StatusUnauthorized},
 		{Path: "/apple", Code: http.StatusOK},
 		{Path: "/apple/", Code: http.StatusOK},
 		{Path: "/apple/bot", Code: http.StatusOK},
