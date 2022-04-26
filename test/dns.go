@@ -153,7 +153,9 @@ type DnsMockHandle struct {
 	id         string
 	mockServer *dns.Server
 
-	Resolver   *net.Resolver
+	Resolver *net.Resolver
+	Dialer   *net.Dialer
+
 	Shutdown   func() error
 	LookupHost func(string) ([]string, error)
 }
@@ -250,6 +252,10 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 			dialer := net.Dialer{}
 			return dialer.DialContext(ctx, network, mockServer.PacketConn.LocalAddr().String())
 		},
+	}
+
+	handle.Dialer = &net.Dialer{
+		Resolver: handle.Resolver,
 	}
 
 	handle.Shutdown = func() error {
