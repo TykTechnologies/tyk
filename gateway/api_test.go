@@ -1653,17 +1653,11 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 
 	var testCases []test.TestCase
 
-	client := test.NewClient(
-		test.WithTransport(
-			test.NewTransport(test.WithLocalDialer()),
-		),
-	)
-
 	for hp := range inputs {
 		testCases = append(testCases, test.TestCase{
 			Path:      "/" + hp.path,
 			Domain:    hp.host,
-			Client:    client,
+			Client:    test.NewClientLocal(),
 			Code:      200,
 			BodyMatch: `"Url":"/` + hp.path + `"`,
 		})
