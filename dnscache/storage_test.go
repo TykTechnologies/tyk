@@ -235,6 +235,8 @@ func TestStorageRecordExpiration(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			dnsCache := NewDnsCacheStorage(time.Duration(expiration)*time.Millisecond, time.Duration(tc.checkInterval)*time.Millisecond)
 
 			for _, r := range tc.records {
