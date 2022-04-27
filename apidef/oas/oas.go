@@ -37,10 +37,6 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.ExternalDocs) {
 		s.ExternalDocs = nil
 	}
-
-	if s.Servers == nil {
-
-	}
 }
 
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
