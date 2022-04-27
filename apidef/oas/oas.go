@@ -237,7 +237,7 @@ func (s *OAS) AddServers(apiURL string) {
 }
 
 func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
-	if s.Servers != nil && s.Servers[0].URL == oldAPIURL {
+	if len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL {
 		s.Servers[0].URL = apiURL
 	}
 }
