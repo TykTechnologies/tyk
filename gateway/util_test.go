@@ -142,24 +142,6 @@ func Test_getAPIURL(t *testing.T) {
 			},
 			want: "http://example-host.org/api",
 		},
-
-		{
-			name: "https disabled with gw hostname and api slug",
-			args: args{
-				apiDef: apidef.APIDefinition{
-					Proxy: apidef.ProxyConfig{
-						ListenPath: "/api",
-					},
-					Slug: "/api-slug",
-				},
-				gwConfig: config.Config{
-					ListenAddress: "127.0.0.1",
-					ListenPort:    8080,
-					HostName:      "example-host.org",
-				},
-			},
-			want: "http://example-host.org/api-slug/",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

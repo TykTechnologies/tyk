@@ -1943,9 +1943,6 @@ func TestOAS(t *testing.T) {
 
 				oldAPIInOAS.Extensions[oas.ExtensionTykAPIGateway] = oas.XTykAPIGateway{
 					Info: oas.Info{Name: "oas-updated old api", ID: apiID},
-					Server: oas.Server{
-						Slug: "oas-api-slug",
-					},
 				}
 
 				oldAPIInOAS.Info.Title = "oas-updated old doc"
@@ -1953,8 +1950,7 @@ func TestOAS(t *testing.T) {
 
 				t.Run("get", func(t *testing.T) {
 					t.Run("in oas", func(t *testing.T) {
-						updateOASAPI := testGetOASAPI(t, g, apiID, "oas-updated old api", "oas-updated old doc")
-						assert.Equal(t, fmt.Sprintf("%s%s", g.URL, "/oas-api-slug/"), updateOASAPI.Servers[0].URL)
+						testGetOASAPI(t, g, apiID, "oas-updated old api", "oas-updated old doc")
 					})
 
 					t.Run("in old", func(t *testing.T) {
