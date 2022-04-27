@@ -74,7 +74,7 @@ func (r *Purger) Connect() {
 		})
 		addedFuncs["Ping"] = true
 	}
-	if !addedFuncs["PurgeAnalyticsDataPurgeAnalyticsData"] {
+	if !addedFuncs["PurgeAnalyticsData"] {
 		dispatcher.AddFunc("PurgeAnalyticsData", func(data string) error {
 			return nil
 		})

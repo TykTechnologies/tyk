@@ -209,7 +209,7 @@ type AnalyticsConfigConfig struct {
 
 	ignoredIPsCompiled map[string]bool
 
-	// Determines the serialization engine for analytics. Available options: msgpack, and gotiny. By default, msgpack.
+	// Determines the serialization engine for analytics. Available options: msgpack, and protobuf. By default, msgpack.
 	SerializerType string `json:"serializer_type"`
 }
 
