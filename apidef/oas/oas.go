@@ -37,6 +37,10 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.ExternalDocs) {
 		s.ExternalDocs = nil
 	}
+
+	if s.Servers == nil {
+
+	}
 }
 
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
@@ -217,4 +221,27 @@ func (s *OAS) getTykOperations() (operations Operations) {
 	}
 
 	return
+}
+
+func (s *OAS) AddServers(apiURL string) {
+	if s.Servers == nil {
+		s.Servers = openapi3.Servers{
+			{
+				URL: apiURL,
+			},
+		}
+		return
+	}
+	newServers := openapi3.Servers{
+		{
+			URL: apiURL,
+		},
+	}
+	s.Servers = append(newServers, s.Servers...)
+}
+
+func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
+	if s.Servers != nil && s.Servers[0].URL == oldAPIURL {
+		s.Servers[0].URL = apiURL
+	}
 }
