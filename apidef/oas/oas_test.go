@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"github.com/getkin/kin-openapi/openapi3"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -34,4 +35,45 @@ func TestOAS(t *testing.T) {
 	sw.ExtractTo(&converted)
 
 	assert.Equal(t, api.AuthConfigs, converted.AuthConfigs)
+}
+
+func TestOAS_AddServers(t *testing.T) {
+	t.Parallel()
+	type fields struct {
+		T openapi3.T
+	}
+	type args struct {
+		apiURL string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+	}{
+		{
+			name:   "empty servers",
+			fields: fields{T: openapi3.T{}},
+			args:   args{apiURL: "http://127.0.0.1:8080/api"},
+		},
+		{
+			name: "non-empty servers",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			}},
+			args: args{apiURL: "http://127.0.0.1:8080/api"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &OAS{
+				T: tt.fields.T,
+			}
+			s.AddServers(tt.args.apiURL)
+			assert.Equal(t, tt.args.apiURL, s.Servers[0].URL)
+		})
+	}
 }
