@@ -129,16 +129,13 @@ func (r *Purger) PurgeCache() {
 				continue
 			}
 
-			keys := make([][]byte, len(analyticsValues))
-			for i, v := range analyticsValues {
-				keys[i] = []byte(v.(string))
+			for _, v := range analyticsValues {
+				if _, err := FuncClientSingleton("PurgeAnalyticsData", v); err != nil {
+					EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
+					Log.Warn("Failed to call purge, retrying: ", err)
+				}
 			}
 
-			// Send keys as [][]bytes to RPC
-			if _, err := FuncClientSingleton("PurgeAnalyticsData", keys); err != nil {
-				EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
-				Log.Warn("Failed to call purge, retrying: ", err)
-			}
 		}
 
 	}
