@@ -220,7 +220,7 @@ func (s *OAS) getTykOperations() (operations Operations) {
 }
 
 func (s *OAS) AddServers(apiURL string) {
-	if s.Servers == nil {
+	if len(s.Servers) == 0 {
 		s.Servers = openapi3.Servers{
 			{
 				URL: apiURL,
@@ -237,6 +237,15 @@ func (s *OAS) AddServers(apiURL string) {
 }
 
 func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
+	if len(s.Servers) == 0 {
+		s.Servers = openapi3.Servers{
+			{
+				URL: apiURL,
+			},
+		}
+		return
+	}
+
 	if len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL {
 		s.Servers[0].URL = apiURL
 	}
