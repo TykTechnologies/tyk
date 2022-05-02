@@ -194,7 +194,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			host = s.Spec.target.Host
 		}
 
-		record := AnalyticsRecord{
+		record := analytics.AnalyticsRecord{
 			Method:        r.Method,
 			Host:          host,
 			Path:          trackedPath,
@@ -227,10 +227,11 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		}
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip, s.Gw)
+			record.GetGeo(ip, s.Gw.Analytics.GeoIPDB)
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
+
 		if s.Spec.GlobalConfig.EnforceOrgDataAge {
 			orgExpireDataTime := s.OrgSessionExpiry(s.Spec.OrgID)
 
@@ -242,10 +243,18 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		record.SetExpiry(expiresAfter)
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-			record.NormalisePath(&s.Spec.GlobalConfig)
+			NormalisePath(&record, &s.Spec.GlobalConfig)
 		}
 
-		err := s.Gw.analytics.RecordHit(&record)
+		if s.Spec.AnalyticsPlugin.Enabled {
+
+			//send to plugin
+			_ = s.Spec.AnalyticsPluginConfig.processRecord(&record)
+
+		}
+
+		err := s.Gw.Analytics.RecordHit(&record)
+
 		if err != nil {
 			log.WithError(err).Error("could not store analytic record")
 		}
@@ -271,6 +280,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 	}
 
 	session := ctxGetSession(r)
+
 	if session != nil {
 		if session.EnableDetailedRecording || session.EnableDetailRecording {
 			return true
@@ -284,6 +294,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 
 	// We are, so get session data
 	ses := r.Context().Value(ctx.OrgSessionContext)
+
 	if ses == nil {
 		// no session found, use global config
 		return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording

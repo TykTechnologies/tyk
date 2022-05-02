@@ -194,7 +194,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
-		"AuthFailure": {&testAuthFailEventHandler{cb}},
+		EventAuthFailure: {&testAuthFailEventHandler{cb}},
 	}
 
 	sessionKey := ""
@@ -769,17 +769,9 @@ func TestRSAAuthSessionKeyMissing(t *testing.T) {
 	pubID, _ := ts.Gw.CertificateManager.Add(pubPem, "")
 	defer ts.Gw.CertificateManager.Delete(pubID, "")
 
-	spec := ts.Gw.LoadSampleAPI(hmacAuthDef)
-
-	// Should receive an AuthFailure event
+	// Should receive an AuthFailure events
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-	cb := func(em config.EventMessage) {
-		eventWG.Done()
-	}
-	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
-		"AuthFailure": {&testAuthFailEventHandler{cb}},
-	}
 
 	recorder := httptest.NewRecorder()
 	encodedString, spec, req, _ := testPrepareRSAAuthSessionPass(t, &eventWG, privateKey, pubID, false, false, ts)

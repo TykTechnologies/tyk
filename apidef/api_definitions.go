@@ -310,6 +310,7 @@ type MethodTransformMeta struct {
 }
 
 type ValidatePathMeta struct {
+	Disabled    bool                    `bson:"disabled" json:"disabled"`
 	Path        string                  `bson:"path" json:"path"`
 	Method      string                  `bson:"method" json:"method"`
 	Schema      map[string]interface{}  `bson:"schema" json:"schema"`
@@ -593,6 +594,13 @@ type APIDefinition struct {
 	StripAuthData              bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 	EnableDetailedRecording    bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 	GraphQL                    GraphQLConfig          `bson:"graphql" json:"graphql"`
+	AnalyticsPlugin            AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin"`
+}
+
+type AnalyticsPluginConfig struct {
+	Enabled    bool   `bson:"enable" json:"enable"`
+	PluginPath string `bson:"plugin_path" json:"plugin_path"`
+	FuncName   string `bson:"func_name" json:"func_name"`
 }
 
 type UptimeTests struct {
@@ -759,6 +767,7 @@ type GraphQLEngineDataSourceKind string
 const (
 	GraphQLEngineDataSourceKindREST    = "REST"
 	GraphQLEngineDataSourceKindGraphQL = "GraphQL"
+	GraphQLEngineDataSourceKindKafka   = "Kafka"
 )
 
 type GraphQLEngineDataSource struct {
@@ -786,6 +795,14 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 	URL     string            `bson:"url" json:"url"`
 	Method  string            `bson:"method" json:"method"`
 	Headers map[string]string `bson:"headers" json:"headers"`
+}
+
+type GraphQLEngineDataSourceConfigKafka struct {
+	BrokerAddr   string `bson:"broker_addr" json:"broker_addr"`
+	Topic        string `bson:"topic" json:"topic"`
+	GroupID      string `bson:"group_id" json:"group_id"`
+	ClientID     string `bson:"client_id" json:"client_id"`
+	KafkaVersion string `bson:"kafka_version" json:"kafka_version"`
 }
 
 type QueryVariable struct {

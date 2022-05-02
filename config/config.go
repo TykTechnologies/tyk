@@ -320,6 +320,12 @@ type SlaveOptionsConfig struct {
 
 	// You can use this to set a period for which the Gateway will check if there are changes in keys that must be synchronized. If this value is not set then it will default to 10 seconds.
 	KeySpaceSyncInterval float32 `json:"key_space_sync_interval"`
+
+	// RPCCertCacheExpiration defines the expiration time of the rpc cache that stores the certificates, defined in seconds
+	RPCCertCacheExpiration float32 `json:"rpc_cert_cache_expiration"`
+
+	// RPCKeysCacheExpiration defines the expiration time of the rpc cache that stores the keys, defined in seconds
+	RPCGlobalCacheExpiration float32 `json:"rpc_global_cache_expiration"`
 }
 
 type LocalSessionCacheConf struct {
@@ -1084,6 +1090,9 @@ type TykEventHandler interface {
 	Init(interface{}) error
 	HandleEvent(EventMessage)
 }
+
+// Global function that will return the config of the gw running
+var Global func() Config
 
 func WriteConf(path string, conf *Config) error {
 	bs, err := json.MarshalIndent(conf, "", "    ")

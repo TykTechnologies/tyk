@@ -14,6 +14,8 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"github.com/stretchr/testify/assert"
 
 	"strings"
@@ -1654,7 +1656,7 @@ func TestBrokenClients(t *testing.T) {
 
 	t.Run("Invalid client: close without read", func(t *testing.T) {
 		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
-		ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
 		conn, _ := net.DialTimeout("tcp", ts.mainProxy().listener.Addr().String(), 0)
 		conn.Write([]byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"))
@@ -1662,9 +1664,9 @@ func TestBrokenClients(t *testing.T) {
 		//conn.Read(buf)
 
 		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
-		var record AnalyticsRecord
+		var record analytics.AnalyticsRecord
 		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 499 {
 			t.Fatal("Analytics record do not match:", record)

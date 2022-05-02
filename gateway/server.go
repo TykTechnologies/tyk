@@ -95,7 +95,7 @@ type Gateway struct {
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
 
-	analytics            RedisAnalyticsHandler
+	Analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
 	MainNotifier         RedisNotifier
 	DefaultOrgStore      DefaultSessionManager
@@ -114,7 +114,10 @@ type Gateway struct {
 	SessionLimiter SessionLimiter
 	SessionMonitor Monitor
 
+	// RPCGlobalCache stores keys
 	RPCGlobalCache *cache.Cache
+	// RPCCertCache stores certificates
+	RPCCertCache *cache.Cache
 	// key session memory cache
 	SessionCache *cache.Cache
 	// org session memory cache
@@ -197,14 +200,13 @@ func NewGateway(config config.Config, ctx context.Context, cancelFn context.Canc
 		cancelFn: cancelFn,
 	}
 
-	gw.analytics = RedisAnalyticsHandler{Gw: &gw}
+	gw.Analytics = RedisAnalyticsHandler{Gw: &gw}
 	gw.SetConfig(config)
 	sessionManager := DefaultSessionManager{Gw: &gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
 	gw.DefaultQuotaStore = DefaultSessionManager{Gw: &gw}
 	gw.SessionLimiter = SessionLimiter{Gw: &gw}
 	gw.SessionMonitor = Monitor{Gw: &gw}
-	gw.RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
 	gw.HostCheckTicker = make(chan struct{})
 	gw.HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
@@ -235,6 +237,12 @@ func (gw *Gateway) UnmarshalJSON(data []byte) error {
 }
 func (gw *Gateway) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct{}{})
+}
+
+func (gw *Gateway) InitializeRPCCache() {
+	conf := gw.GetConfig()
+	gw.RPCGlobalCache = cache.New(time.Duration(conf.SlaveOptions.RPCGlobalCacheExpiration)*time.Second, 15*time.Second)
+	gw.RPCCertCache = cache.New(time.Duration(conf.SlaveOptions.RPCCertCacheExpiration)*time.Second, 15*time.Second)
 }
 
 // SetNodeID writes NodeID safely.
@@ -294,6 +302,7 @@ func (gw *Gateway) setupGlobals() {
 
 	gw.SetConfig(gwConfig)
 	gw.dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
+
 	if gwConfig.DnsCache.Enabled {
 		gw.dnsCacheManager.InitDNSCaching(
 			time.Duration(gwConfig.DnsCache.TTL)*time.Second,
@@ -322,19 +331,20 @@ func (gw *Gateway) setupGlobals() {
 	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", RedisController: gw.RedisController}
 	versionStore.Connect()
 	err := versionStore.SetKey("gateway", VERSION, 0)
+
 	if err != nil {
 		mainLog.WithError(err).Error("Could not set version in versionStore")
 	}
 
-	if gwConfig.EnableAnalytics && gw.analytics.Store == nil {
+	if gwConfig.EnableAnalytics && gw.Analytics.Store == nil {
 		Conf := gwConfig
 		Conf.LoadIgnoredIPs()
 		gw.SetConfig(Conf)
 		mainLog.Debug("Setting up analytics DB connection")
 
 		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
-		gw.analytics.Store = &analyticsStore
-		gw.analytics.Init()
+		gw.Analytics.Store = &analyticsStore
+		gw.Analytics.Init()
 
 		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
 		redisPurger := RedisPurger{Store: &store, Gw: gw}
@@ -404,20 +414,19 @@ func (gw *Gateway) setupGlobals() {
 	gw.readGraphqlPlaygroundTemplate()
 }
 
-func buildConnStr(resource string, conf config.Config) string {
-
-	if conf.DBAppConfOptions.ConnectionString == "" && conf.DisableDashboardZeroConf {
+func (gw *Gateway) buildDashboardConnStr(resource string) string {
+	if gw.GetConfig().DBAppConfOptions.ConnectionString == "" && gw.GetConfig().DisableDashboardZeroConf {
 		mainLog.Fatal("Connection string is empty, failing.")
 	}
 
-	if !conf.DisableDashboardZeroConf && conf.DBAppConfOptions.ConnectionString == "" {
+	if !gw.GetConfig().DisableDashboardZeroConf && gw.GetConfig().DBAppConfOptions.ConnectionString == "" {
 		mainLog.Info("Waiting for zeroconf signal...")
-		for conf.DBAppConfOptions.ConnectionString == "" {
+		for gw.GetConfig().DBAppConfOptions.ConnectionString == "" {
 			time.Sleep(1 * time.Second)
 		}
 	}
 
-	return conf.DBAppConfOptions.ConnectionString + resource
+	return gw.GetConfig().DBAppConfOptions.ConnectionString + resource
 }
 
 func (gw *Gateway) syncAPISpecs() (int, error) {
@@ -425,7 +434,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 
 	var s []*APISpec
 	if gw.GetConfig().UseDBAppConfigs {
-		connStr := buildConnStr("/system/apis", gw.GetConfig())
+		connStr := gw.buildDashboardConnStr("/system/apis")
 		tmpSpecs, err := loader.FromDashboardService(connStr)
 		if err != nil {
 			log.Error("failed to load API specs: ", err)
@@ -628,6 +637,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/oauth/clients/{apiID}", gw.oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", gw.oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", gw.oAuthClientTokensHandler).Methods("GET")
+
+	r.HandleFunc("/schema", gw.schemaHandler).Methods(http.MethodGet)
 
 	mainLog.Debug("Loaded API Endpoints")
 }
@@ -1099,6 +1110,7 @@ func (gw *Gateway) initialiseSystem() error {
 		if err := config.Load(confPaths, &gwConfig); err != nil {
 			return err
 		}
+
 		if gwConfig.PIDFileLocation == "" {
 			gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
 		}
@@ -1186,7 +1198,9 @@ func (gw *Gateway) initialiseSystem() error {
 	}
 
 	gw.SetConfig(gwConfig)
+	config.Global = gw.GetConfig
 	gw.getHostDetails(gw.GetConfig().PIDFileLocation)
+	gw.InitializeRPCCache()
 	gw.setupInstrumentation()
 
 	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
@@ -1230,6 +1244,15 @@ func (gw *Gateway) afterConfSetup() {
 
 	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
 		conf.SlaveOptions.KeySpaceSyncInterval = 10
+	}
+
+	if conf.SlaveOptions.RPCCertCacheExpiration == 0 {
+		// defaults to 1 hr
+		conf.SlaveOptions.RPCCertCacheExpiration = 3600
+	}
+
+	if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
+		conf.SlaveOptions.RPCGlobalCacheExpiration = 30
 	}
 
 	if conf.AnalyticsConfig.PurgeInterval == 0 {
@@ -1515,8 +1538,8 @@ func Start() {
 		mainLog.Error("Closing listeners: ", err)
 	}
 	// stop analytics workers
-	if gwConfig.EnableAnalytics && gw.analytics.Store == nil {
-		gw.analytics.Stop()
+	if gwConfig.EnableAnalytics && gw.Analytics.Store == nil {
+		gw.Analytics.Stop()
 	}
 
 	// write pprof profiles
@@ -1611,7 +1634,7 @@ func handleDashboardRegistration(gw *Gateway) {
 
 	dashboardServiceInit(gw)
 
-	// connStr := buildConnStr("/register/node")
+	// connStr := buildDashboardConnStr("/register/node")
 	if err := gw.DashService.Register(); err != nil {
 		dashLog.Fatal("Registration failed: ", err)
 	}

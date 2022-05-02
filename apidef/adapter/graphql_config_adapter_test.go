@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"encoding/json"
+	kafkaDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"net/http"
 	"strconv"
 	"testing"
@@ -441,6 +442,16 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 				},
 			},
 		},
+		{
+			TypeName:  "Subscription",
+			FieldName: "foobarTopicWithVariable",
+			Arguments: []plan.ArgumentConfiguration{
+				{
+					Name:       "name",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		},
 	}
 
 	var gqlConfig apidef.GraphQLConfig
@@ -697,6 +708,42 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			}),
 		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Subscription",
+					FieldNames: []string{"foobar"},
+				},
+			},
+			Factory: &kafkaDataSource.Factory{},
+			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
+				Subscription: kafkaDataSource.SubscriptionConfiguration{
+					BrokerAddr:   "localhost:9092",
+					Topic:        "test.topic",
+					GroupID:      "test.consumer.group",
+					ClientID:     "test.client.id",
+					KafkaVersion: "V2_8_0_0",
+				},
+			}),
+		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Subscription",
+					FieldNames: []string{"foobarTopicWithVariable"},
+				},
+			},
+			Factory: &kafkaDataSource.Factory{},
+			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
+				Subscription: kafkaDataSource.SubscriptionConfiguration{
+					BrokerAddr:   "localhost:9092",
+					Topic:        "test.topic.{{.arguments.name}}",
+					GroupID:      "test.consumer.group",
+					ClientID:     "test.client.id",
+					KafkaVersion: "V2_8_0_0",
+				},
+			}),
+		},
 	}
 
 	var gqlConfig apidef.GraphQLConfig
@@ -755,6 +802,10 @@ type MultiRoot2 {
 }
 type DeepGQL {
   query(code: String!): String
+}
+type Subscription {
+  foobar: Int
+  foobarTopicWithVariable(name: String): Int
 }`)
 
 var graphqlEngineV2ConfigJson = `{
@@ -921,6 +972,42 @@ var graphqlEngineV2ConfigJson = `{
 					"headers": {
 						"Auth": "123"
 					}
+				}
+			},
+			{
+				"kind": "Kafka",
+				"name": "kafka-consumer-group",
+				"internal": false,
+				"root_fields": [{
+					"type": "Subscription",
+					"fields": [
+						"foobar"
+					]
+				}],
+				"config": {
+					"broker_addr": "localhost:9092",
+					"topic": "test.topic",
+					"group_id": "test.consumer.group",
+					"client_id": "test.client.id",
+					"kafka_version": "V2_8_0_0"
+				}
+			},
+			{
+				"kind": "Kafka",
+				"name": "kafka-consumer-group-with-variable",
+				"internal": false,
+				"root_fields": [{
+					"type": "Subscription",
+					"fields": [
+						"foobarTopicWithVariable"
+					]
+				}],
+				"config": {
+					"broker_addr": "localhost:9092",
+					"topic": "test.topic.{{.arguments.name}}",
+					"group_id": "test.consumer.group",
+					"client_id": "test.client.id",
+					"kafka_version": "V2_8_0_0"
 				}
 			}
 		]

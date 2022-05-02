@@ -32,18 +32,19 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.Extensions) {
 		s.Extensions = nil
 	}
+
+	// set external docs to nil if populated with default values
+	if ShouldOmit(s.ExternalDocs) {
+		s.ExternalDocs = nil
+	}
 }
 
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
-	if s.Security != nil {
-		s.extractSecurityTo(api)
-	} else {
-		api.UseKeylessAccess = true
-	}
-
 	if s.GetTykExtension() != nil {
 		s.GetTykExtension().ExtractTo(api)
 	}
+
+	s.extractSecurityTo(api)
 
 	var ep apidef.ExtendedPathsSet
 	s.extractPathsAndOperations(&ep)

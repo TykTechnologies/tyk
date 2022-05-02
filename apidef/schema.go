@@ -662,6 +662,20 @@ const Schema = `{
             "required": [
                 "enabled"
             ]
+        },
+        "analytics_plugin": {
+            "type": ["object", "null"],
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "plugin_path": {
+                    "type": "string"
+                },
+                "func_name": {
+                    "type": "string"
+                }
+            }
         }
     },
     "required": [

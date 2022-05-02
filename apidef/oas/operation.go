@@ -1,6 +1,8 @@
 package oas
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -17,12 +19,14 @@ type Operation struct {
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
 	Cache                  *CachePlugin            `bson:"cache,omitempty" json:"cache,omitempty"`
 	EnforceTimeout         *EnforceTimeout         `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
+	ValidateRequest        *ValidateRequest        `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
 }
 
 const (
 	allow                AllowanceType = 0
 	block                AllowanceType = 1
 	ignoreAuthentication AllowanceType = 2
+	contentTypeJSON                    = "application/json"
 )
 
 type AllowanceType int
@@ -38,6 +42,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTransformRequestMethod(ep.MethodTransforms)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
+	s.fillValidateRequest(ep.ValidateJSON)
 
 	if len(s.Paths) == 0 {
 		s.Paths = nil
@@ -61,6 +66,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTransformRequestMethodTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
+					tykOp.extractValidateRequestTo(ep, path, method, operation, &s.Components)
 					break found
 				}
 			}
@@ -199,27 +205,128 @@ func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path st
 	ep.HardTimeouts = append(ep.HardTimeouts, meta)
 }
 
-func (s *OAS) getOperationID(path, method string) (operationID string) {
-	operationID = strings.TrimPrefix(path, "/") + method
+// detect possible regex pattern:
+// - character match ([a-z])
+// - greedy match (*)
+// - ungreedy match (+)
+// - any char (.)
+// - end of string ($)
+const regexPatterns = "[].+*$"
 
-	if s.Paths[path] == nil {
-		s.Paths[path] = &openapi3.PathItem{}
+type pathPart struct {
+	name    string
+	value   string
+	isRegex bool
+}
+
+func (p pathPart) String() string {
+	if p.isRegex {
+		return "{" + p.name + "}"
 	}
 
-	p := s.Paths[path]
-	operation := p.GetOperation(method)
-	if operation == nil {
-		p.SetOperation(method, &openapi3.Operation{OperationID: operationID})
-		return operationID
+	return p.value
+}
+
+// splitPath splits url into folder parts, detecting regex patterns
+func splitPath(inPath string) ([]pathPart, bool) {
+	// Each url fragment can contain a regex, but the whole
+	// url isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
+	parts := strings.Split(strings.Trim(inPath, "/"), "/")
+	result := make([]pathPart, len(parts))
+	found := 0
+
+	for k, value := range parts {
+		name := value
+		isRegex := strings.ContainsAny(value, regexPatterns)
+		if isRegex {
+			found++
+			name = fmt.Sprintf("customRegex%d", found)
+		}
+		result[k] = pathPart{
+			name:    name,
+			value:   value,
+			isRegex: isRegex,
+		}
 	}
 
-	if operation.OperationID == "" {
-		operation.OperationID = operationID
+	return result, found > 0
+}
+
+// buildPath converts the url paths with regex to named parameters
+// e.g. ["a", ".*"] becomes /a/{customRegex1}
+func buildPath(parts []pathPart, appendSlash bool) string {
+	newPath := ""
+
+	for _, part := range parts {
+		newPath += "/" + part.String()
+	}
+
+	if appendSlash {
+		return newPath + "/"
+	}
+
+	return newPath
+}
+
+func (s *OAS) getOperationID(inPath, method string) string {
+	operationID := strings.TrimPrefix(inPath, "/") + method
+
+	createOrGetPathItem := func(item string) *openapi3.PathItem {
+		if s.Paths[item] == nil {
+			s.Paths[item] = &openapi3.PathItem{}
+		}
+
+		return s.Paths[item]
+	}
+
+	createOrUpdateOperation := func(p *openapi3.PathItem) *openapi3.Operation {
+		operation := p.GetOperation(method)
+
+		if operation == nil {
+			operation = &openapi3.Operation{}
+			p.SetOperation(method, operation)
+		}
+
+		if operation.OperationID == "" {
+			operation.OperationID = operationID
+		}
+
+		return operation
+	}
+
+	var p *openapi3.PathItem
+	parts, hasRegex := splitPath(inPath)
+
+	if hasRegex {
+		newPath := buildPath(parts, strings.HasSuffix(inPath, "/"))
+		p = createOrGetPathItem(newPath)
+		p.Parameters = []*openapi3.ParameterRef{}
+
+		for _, part := range parts {
+			if part.isRegex {
+				schema := &openapi3.SchemaRef{
+					Value: &openapi3.Schema{
+						Type:    "string",
+						Pattern: part.value,
+					},
+				}
+				param := &openapi3.ParameterRef{
+					Value: &openapi3.Parameter{
+						Name:     part.name,
+						In:       "path",
+						Required: true,
+						Schema:   schema,
+					},
+				}
+				p.Parameters = append(p.Parameters, param)
+			}
+		}
 	} else {
-		operationID = operation.OperationID
+		p = createOrGetPathItem(inPath)
 	}
 
-	return
+	operation := createOrUpdateOperation(p)
+	return operation.OperationID
 }
 
 func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
@@ -240,4 +347,145 @@ func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
 	}
 
 	return operations[operationID]
+}
+
+type ValidateRequest struct {
+	Enabled           bool `bson:"enabled" json:"enabled"`
+	ErrorResponseCode int  `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
+}
+
+func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
+	v.Enabled = !meta.Disabled
+	v.ErrorResponseCode = meta.ErrorResponseCode
+}
+
+func (v *ValidateRequest) ExtractTo(meta *apidef.ValidatePathMeta) {
+	meta.Disabled = !v.Enabled
+	meta.ErrorResponseCode = v.ErrorResponseCode
+}
+
+func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		tykOp := s.GetTykExtension().getOperation(operationID)
+
+		if tykOp.ValidateRequest == nil {
+			tykOp.ValidateRequest = &ValidateRequest{}
+		}
+
+		tykOp.ValidateRequest.Fill(meta)
+
+		if ShouldOmit(tykOp.ValidateRequest) {
+			tykOp.ValidateRequest = nil
+		}
+
+		var schema openapi3.Schema
+		schemaInBytes, err := json.Marshal(meta.Schema)
+		if err != nil {
+			log.WithError(err).Error("Path meta schema couldn't be marshalled")
+			return
+		}
+
+		err = schema.UnmarshalJSON(schemaInBytes)
+		if err != nil {
+			log.WithError(err).Error("Schema couldn't be unmarshalled")
+			return
+		}
+
+		operation := s.Paths[meta.Path].GetOperation(meta.Method)
+
+		requestBody := operation.RequestBody
+		if requestBody == nil {
+			requestBody = &openapi3.RequestBodyRef{
+				Value: openapi3.NewRequestBody(),
+			}
+
+			operation.RequestBody = requestBody
+		}
+
+		bodyContent := requestBody.Value.Content
+		if bodyContent == nil {
+			bodyContent = openapi3.NewContent()
+			requestBody.Value.Content = bodyContent
+		}
+
+		mediaType := bodyContent.Get(contentTypeJSON)
+		if mediaType == nil {
+			mediaType = openapi3.NewMediaType()
+			bodyContent[contentTypeJSON] = mediaType
+		}
+
+		schemaRef := mediaType.Schema
+
+		if schemaRef == nil {
+			schemaRef = openapi3.NewSchemaRef("", &schema)
+		}
+
+		rawRef := schemaRef.Ref
+		ref := strings.TrimPrefix(rawRef, "#/components/schemas/")
+		if ref != "" {
+			if s.Components.Schemas == nil {
+				s.Components.Schemas = make(openapi3.Schemas)
+			}
+
+			s.Components.Schemas[ref] = openapi3.NewSchemaRef("", &schema)
+		} else {
+			operation.RequestBody.Value.WithJSONSchema(&schema)
+		}
+	}
+}
+
+func (o *Operation) extractValidateRequestTo(ep *apidef.ExtendedPathsSet, path string, method string, operation *openapi3.Operation, components *openapi3.Components) {
+	meta := apidef.ValidatePathMeta{Path: path, Method: method}
+	if o.ValidateRequest != nil {
+		o.ValidateRequest.ExtractTo(&meta)
+
+		defer func() {
+			ep.ValidateJSON = append(ep.ValidateJSON, meta)
+		}()
+	}
+
+	reqBody := operation.RequestBody
+	if reqBody == nil {
+		return
+	}
+
+	reqBodyVal := reqBody.Value
+	if reqBodyVal == nil {
+		return
+	}
+
+	media := reqBodyVal.Content.Get("application/json")
+	if media == nil {
+		return
+	}
+
+	schema := media.Schema
+	if schema == nil {
+		return
+	}
+
+	var schemaVal *openapi3.Schema
+
+	ref := strings.TrimPrefix(schema.Ref, "#/components/schemas/")
+	if schemaRef, ok := components.Schemas[ref]; ok {
+		schemaVal = schemaRef.Value
+	} else {
+		schemaVal = schema.Value
+	}
+
+	if schemaVal == nil {
+		return
+	}
+
+	schemaInBytes, err := json.Marshal(schemaVal)
+	if err != nil {
+		log.WithError(err).Error("Schema value couldn't be marshalled")
+		return
+	}
+
+	err = json.Unmarshal(schemaInBytes, &meta.Schema)
+	if err != nil {
+		log.WithError(err).Error("Path meta schema couldn't be unmarshalled")
+	}
 }

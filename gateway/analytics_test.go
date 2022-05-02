@@ -45,12 +45,12 @@ func TestAnalytics_Write(t *testing.T) {
 				spec.Proxy.ListenPath = "/"
 			})
 
-			redisAnalyticsKeyName := analyticsKeyName + ts.Gw.analytics.analyticsSerializer.GetSuffix()
+			redisAnalyticsKeyName := analyticsKeyName + ts.Gw.Analytics.analyticsSerializer.GetSuffix()
 
 			// Cleanup before test
 			// let records to to be sent
 			time.Sleep(recordsBufferFlushInterval + 50)
-			ts.Gw.analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+			ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 
 			t.Run("Log errors", func(t *testing.T) {
 				_, err := ts.Run(t, []test.TestCase{
@@ -63,13 +63,13 @@ func TestAnalytics_Write(t *testing.T) {
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
 
-				results := ts.Gw.analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 2 {
 					t.Error("Should return 2 record", len(results))
 				}
 
 				var record analytics.AnalyticsRecord
-				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
 				if err != nil {
 					t.Error("Error decoding analytics")
 				}
@@ -94,13 +94,13 @@ func TestAnalytics_Write(t *testing.T) {
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
 
-				results := ts.Gw.analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 1 {
 					t.Error("Should return 1 record: ", len(results))
 				}
 
 				var record analytics.AnalyticsRecord
-				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
 				if err != nil {
 					t.Error("Error decoding analytics")
 				}
@@ -139,13 +139,13 @@ func TestAnalytics_Write(t *testing.T) {
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
 
-				results := ts.Gw.analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 1 {
 					t.Error("Should return 1 record: ", len(results))
 				}
 
 				var record analytics.AnalyticsRecord
-				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
 				if err != nil {
 					t.Error("Error decoding analytics")
 				}
@@ -194,13 +194,13 @@ func TestAnalytics_Write(t *testing.T) {
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
 
-				results := ts.Gw.analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 1 {
 					t.Error("Should return 1 record: ", len(results))
 				}
 
 				var record analytics.AnalyticsRecord
-				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
 				if err != nil {
 					t.Error("Error decoding analytics")
 				}
@@ -244,13 +244,13 @@ func TestAnalytics_Write(t *testing.T) {
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
 
-				results := ts.Gw.analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 1 {
 					t.Error("Should return 1 record: ", len(results))
 				}
 
 				var record analytics.AnalyticsRecord
-				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
 				if err != nil {
 					t.Error("Error decoding analytics")
 				}
@@ -303,13 +303,13 @@ func TestAnalytics_Write(t *testing.T) {
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
 
-				results := ts.Gw.analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 1 {
 					t.Error("Should return 1 record: ", len(results))
 				}
 
 				var record analytics.AnalyticsRecord
-				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
 				if err != nil {
 					t.Error("Error decoding analytics")
 				}
@@ -370,14 +370,14 @@ func TestAnalytics_Write(t *testing.T) {
 				// let records to to be sent
 				time.Sleep(recordsBufferFlushInterval + 50)
 
-				results := ts.Gw.analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 2 {
 					t.Fatal("Should return 1 record: ", len(results))
 				}
 
 				// Take second cached request
 				var record analytics.AnalyticsRecord
-				err = ts.Gw.analytics.analyticsSerializer.Decode([]byte(results[1].(string)), &record)
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[1].(string)), &record)
 				if err != nil {
 					t.Error("Error decoding analytics")
 				}
@@ -412,7 +412,7 @@ func TestGeoIPLookup(t *testing.T) {
 		{"1.2.3.4", false},
 	}
 	for _, tc := range testCases {
-		_, err := geoIPLookup(tc.in, ts.Gw)
+		_, err := analytics.GeoIPLookup(tc.in, ts.Gw.Analytics.GeoIPDB)
 		switch {
 		case tc.wantErr && err == nil:
 			t.Errorf("geoIPLookup(%q) did not error", tc.in)
@@ -433,22 +433,22 @@ func TestURLReplacer(t *testing.T) {
 	defer ts.Close()
 	globalConf := ts.Gw.GetConfig()
 
-	recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
-	recordUUID2 := AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
-	recordUUID3 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-	recordUUID4 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-	recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
-	recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
+	recordUUID1 := analytics.AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
+	recordUUID2 := analytics.AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
+	recordUUID3 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+	recordUUID4 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+	recordID1 := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams"}
+	recordCust := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
 	globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = ts.Gw.initNormalisationPatterns()
 	ts.Gw.SetConfig(globalConf)
 
-	recordUUID1.NormalisePath(&globalConf)
-	recordUUID2.NormalisePath(&globalConf)
-	recordUUID3.NormalisePath(&globalConf)
-	recordUUID4.NormalisePath(&globalConf)
-	recordID1.NormalisePath(&globalConf)
-	recordCust.NormalisePath(&globalConf)
+	NormalisePath(&recordUUID1, &globalConf)
+	NormalisePath(&recordUUID2, &globalConf)
+	NormalisePath(&recordUUID3, &globalConf)
+	NormalisePath(&recordUUID4, &globalConf)
+	NormalisePath(&recordID1, &globalConf)
+	NormalisePath(&recordCust, &globalConf)
 
 	if recordUUID1.Path != "/{uuid}/search" {
 		t.Error("Path not altered, is:")
@@ -497,19 +497,19 @@ func BenchmarkURLReplacer(b *testing.B) {
 	ts.Gw.SetConfig(globalConf)
 
 	for i := 0; i < b.N; i++ {
-		recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
-		recordUUID2 := AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
-		recordUUID3 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-		recordUUID4 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-		recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
-		recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
+		recordUUID1 := analytics.AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
+		recordUUID2 := analytics.AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
+		recordUUID3 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+		recordUUID4 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+		recordID1 := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams"}
+		recordCust := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
-		recordUUID1.NormalisePath(&globalConf)
-		recordUUID2.NormalisePath(&globalConf)
-		recordUUID3.NormalisePath(&globalConf)
-		recordUUID4.NormalisePath(&globalConf)
-		recordID1.NormalisePath(&globalConf)
-		recordCust.NormalisePath(&globalConf)
+		NormalisePath(&recordUUID1, &globalConf)
+		NormalisePath(&recordUUID2, &globalConf)
+		NormalisePath(&recordUUID3, &globalConf)
+		NormalisePath(&recordUUID4, &globalConf)
+		NormalisePath(&recordID1, &globalConf)
+		NormalisePath(&recordCust, &globalConf)
 	}
 }
 
