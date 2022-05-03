@@ -947,6 +947,19 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 		return apiError(fmt.Sprintf("Validation of API Definition failed. Reason: %s.", reason)), http.StatusBadRequest
 	}
 
+	newAPIURL := getAPIURL(newDef, gw.GetConfig())
+
+	if r.Method == http.MethodPost {
+		oas.AddServers(newAPIURL)
+	} else {
+		var oldAPIURL string
+		spec := gw.getApiSpec(newDef.APIID)
+		if spec != nil && spec.OAS.Servers != nil {
+			oldAPIURL = spec.OAS.Servers[0].URL
+		}
+		oas.UpdateServers(newAPIURL, oldAPIURL)
+	}
+
 	// api
 	err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
 	if err != nil {
