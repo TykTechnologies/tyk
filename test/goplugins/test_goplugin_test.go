@@ -10,7 +10,7 @@ import (
 )
 
 func ExampleMyAnalyticsPluginDeleteHeader() {
-	record := analytics.Record{
+	record := analytics.AnalyticsRecord{
 		ContentLength: 5,
 		RawResponse:   base64.StdEncoding.EncodeToString([]byte("HTTP/1.1 200 OK\r\nServer: golang\r\nContent-Length: 5\r\n\r\nHello")),
 	}
@@ -21,7 +21,7 @@ func ExampleMyAnalyticsPluginDeleteHeader() {
 }
 
 func ExampleMyAnalyticsPluginMaskJSONLoginBody() {
-	record := analytics.Record{
+	record := analytics.AnalyticsRecord{
 		ContentLength: 72,
 		RawRequest:    base64.StdEncoding.EncodeToString([]byte("POST / HTTP/1.1\r\nHost: server.com\r\nContent-Length: 72\r\n\r\n{\"email\": \"m\", \"password\": \"p\", \"data\": {\"email\": \"m\", \"password\": \"p\"}}")),
 	}
