@@ -18,6 +18,8 @@ type Server struct {
 	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
 	// ClientCertificates contains the configurations related to static mTLS.
 	ClientCertificates *ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty"`
+	// GatewayTags contains segment tags to configure which GWs your APIs connect to
+	GatewayTags *GatewayTags `bson:"gatewayTags,omitempty" json:"gatewayTags,omitempty"`
 }
 
 func (s *Server) Fill(api apidef.APIDefinition) {
@@ -32,6 +34,14 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.ClientCertificates) {
 		s.ClientCertificates = nil
 	}
+
+	if s.GatewayTags == nil {
+		s.GatewayTags = &GatewayTags{}
+	}
+	s.GatewayTags.Fill(api)
+	if ShouldOmit(s.GatewayTags) {
+		s.GatewayTags = nil
+	}
 }
 
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
@@ -40,6 +50,9 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	if s.ClientCertificates != nil {
 		s.ClientCertificates.ExtractTo(api)
+	}
+	if s.GatewayTags != nil {
+		s.GatewayTags.ExtractTo(api)
 	}
 }
 
@@ -79,6 +92,23 @@ func (cc *ClientCertificates) Fill(api apidef.APIDefinition) {
 func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 	api.UseMutualTLSAuth = cc.Enabled
 	api.ClientCertificates = cc.Allowlist
+}
+
+type GatewayTags struct {
+	// Enabled enables use of segment tags.
+	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	// Tags is a list of segment tags
+	Tags []string `bson:"tags" json:"tags"`
+}
+
+func (gt *GatewayTags) Fill(api apidef.APIDefinition) {
+	gt.Enabled = api.EnableSegmentTags
+	gt.Tags = api.SegmentTags
+}
+
+func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
+	api.EnableSegmentTags = gt.Enabled
+	api.SegmentTags = gt.Tags
 }
 
 type Certificate struct {
