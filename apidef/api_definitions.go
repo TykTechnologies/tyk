@@ -595,7 +595,7 @@ type APIDefinition struct {
 	EnableDetailedRecording    bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 	GraphQL                    GraphQLConfig          `bson:"graphql" json:"graphql"`
 	AnalyticsPlugin            AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin"`
-	EnableSegmentTags          bool                   `bson:"use_segment_tags" json:"use_segment_tags"`
+	EnableSegmentTags          bool                   `bson:"enable_segment_tags" json:"enable_segment_tags"`
 	SegmentTags                []string               `bson:"segment_tags" json:"segment_tags"`
 }
 
