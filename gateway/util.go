@@ -2,7 +2,11 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"os"
+	"strings"
 )
 
 // appendIfMissing ensures dest slice is unique with new items.
@@ -114,4 +118,34 @@ func FileExist(filepath string) bool {
 		return false
 	}
 	return true
+}
+
+func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
+	apiURL := "http://"
+	if gwConfig.HttpServerOptions.UseSSL {
+		apiURL = "https://"
+	}
+
+	// Custom API conquers more
+	if apiDef.Domain != "" {
+		apiURL += mergeURLAndBasePath(apiDef.Domain, apiDef.Proxy.ListenPath)
+		return apiURL
+	}
+
+	// Do we have a gateway host name?
+	if gwConfig.HostName != "" {
+		apiURL += mergeURLAndBasePath(gwConfig.HostName, apiDef.Proxy.ListenPath)
+		return apiURL
+	}
+
+	// We don't, so use IP
+	apiURL += mergeURLAndBasePath(fmt.Sprintf("%s:%d", gwConfig.ListenAddress, gwConfig.ListenPort), apiDef.Proxy.ListenPath)
+
+	return apiURL
+}
+
+func mergeURLAndBasePath(url, basePath string) string {
+	trimmedUrl := strings.TrimRight(url, "/")
+	trimmedBasePath := strings.TrimLeft(basePath, "/")
+	return fmt.Sprintf("%s/%s", trimmedUrl, trimmedBasePath)
 }
