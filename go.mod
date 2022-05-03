@@ -16,7 +16,7 @@ require (
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
 	github.com/TykTechnologies/openid2go v0.0.0-20200312160651-00c254a52b19
-	github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220502170500-09eb01ce7cb7
+	github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220503202414-da623b44f763
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 	github.com/buger/jsonparser v1.1.1
@@ -42,7 +42,6 @@ require (
 	github.com/jensneuse/abstractlogger v0.0.4
 	github.com/jensneuse/graphql-go-tools v1.20.2
 	github.com/jensneuse/graphql-go-tools/examples/federation v0.0.0-20210804084050-3c2e37945919 // indirect
-	github.com/jinzhu/copier v0.3.5 // indirect
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93
@@ -53,7 +52,6 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/nats-io/nats-server/v2 v2.3.4 // indirect
 	github.com/newrelic/go-agent v2.13.0+incompatible
-	github.com/niubaoshu/gotiny v0.0.3 // indirect
 	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/openzipkin/zipkin-go v0.2.2
