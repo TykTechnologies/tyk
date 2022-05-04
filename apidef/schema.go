@@ -30,9 +30,6 @@ const Schema = `{
         "enable_segment_tags": {
             "type": "boolean"
         },
-        "segment_tags": {
-            "type": ["array", "null"]
-        },
         "enable_ip_whitelisting": {
             "type": "boolean"
         },

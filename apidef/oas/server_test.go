@@ -96,7 +96,7 @@ func TestSegmentTagsImport(t *testing.T) {
 			tc.input.ExtractTo(&apidef)
 
 			assert.Equal(t, tc.expectEnabled, apidef.EnableSegmentTags)
-			assert.Equal(t, tc.expectValues, apidef.SegmentTags)
+			assert.Equal(t, tc.expectValues, apidef.Tags)
 		})
 	}
 }
@@ -113,7 +113,7 @@ func TestSegmentTagsExportServer(t *testing.T) {
 			"export segment tags if enabled",
 			apidef.APIDefinition{
 				EnableSegmentTags: true,
-				SegmentTags:       []string{"a", "b", "c"},
+				Tags:       []string{"a", "b", "c"},
 			},
 			&GatewayTags{
 				Enabled: true,
@@ -124,7 +124,7 @@ func TestSegmentTagsExportServer(t *testing.T) {
 			"export segment tags if disabled",
 			apidef.APIDefinition{
 				EnableSegmentTags: true,
-				SegmentTags:       []string{"a", "b", "c"},
+				Tags:       []string{"a", "b", "c"},
 			},
 			&GatewayTags{
 				Enabled: false,
