@@ -178,7 +178,7 @@
       "type": "object",
       "properties": {
         "enabled": {
-          "type": "string"
+          "type": "boolean"
         },
         "maxAge": {
           "type": "integer"
@@ -550,21 +550,23 @@
         },
         "securitySchemes": {
           "type": "object",
-          "^\\/": {
-            "oneOf": [
-              {
-                "$ref": "#/definitions/X-Tyk-Token"
-              },
-              {
-                "$ref": "#/definitions/X-Tyk-JWT"
-              },
-              {
-                "$ref": "#/definitions/X-Tyk-Basic"
-              },
-              {
-                "$ref": "#/definitions/X-Tyk-OAuth"
-              }
-            ]
+          "patternProperties": {
+            "^[a-zA-Z0-9\\.\\-_]+$": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/X-Tyk-Token"
+                },
+                {
+                  "$ref": "#/definitions/X-Tyk-JWT"
+                },
+                {
+                  "$ref": "#/definitions/X-Tyk-Basic"
+                },
+                {
+                  "$ref": "#/definitions/X-Tyk-OAuth"
+                }
+              ]
+            }
           }
         }
       },
@@ -586,11 +588,30 @@
         },
         "clientCertificates": {
           "$ref": "#/definitions/X-Tyk-ClientCertificates"
+        },
+        "gatewayTags": {
+          "$ref": "#/definitions/X-Tyk-GatewayTags"
         }
       },
       "required": [
         "listenPath"
       ]
+    },
+    "X-Tyk-GatewayTags": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "tags": {
+          "type": "array",
+          "items": [
+            {
+              "type": "string"
+            }
+          ]
+        }
+      }
     },
     "X-Tyk-Upstream": {
       "type": "object",

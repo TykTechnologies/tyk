@@ -38,8 +38,11 @@ jobs:
       - name: Install Dependencies and basic hygiene test
         id: hygiene
         run: |
+          go install golang.org/x/tools/cmd/goimports@latest
+          go install github.com/jteeuwen/go-bindata/...@master
+
           sudo apt-get install libluajit-5.1-dev
-          GO111MODULE=off go get golang.org/x/tools/cmd/goimports
+
           gofmt -l . >> fmt.log
           fmt_lines=$(wc -l < fmt.log)
           echo "::set-output name=fmt::$(sed -ze 's/%/%25/g;s/\n/%0A/g' fmt.log)"
@@ -52,8 +55,6 @@ jobs:
           pip install setuptools
           pip install google
           pip install protobuf
-          
-          GO111MODULE=off go get -u github.com/jteeuwen/go-bindata/...
           
           go generate ./...
           git add --all
