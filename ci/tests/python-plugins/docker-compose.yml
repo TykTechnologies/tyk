@@ -27,7 +27,7 @@ services:
     environment:
       - TYK_LOGLEVEL=debug
     healthcheck:
-      test: curl --fail http://localhost:8080/hello || exit 1
+      test: curl -s --fail http://localhost:8080/hello | grep -o '.*"status":"pass".*"status":"pass"'
       interval: 5s
       retries: 10
       start_period: 2s
