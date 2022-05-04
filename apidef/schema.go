@@ -27,6 +27,9 @@ const Schema = `{
 		"expiration": {
             "type": "string"
         },
+        "enable_tags": {
+            "type": "boolean"
+        },
         "enable_ip_whitelisting": {
             "type": "boolean"
         },
