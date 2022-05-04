@@ -64,7 +64,7 @@ func TestPinnedPublicKeys(t *testing.T) {
 	assert.Equal(t, pinnedPublicKeys, resultPinnedPublicKeys)
 }
 
-func TestSegmentTagsImport(t *testing.T) {
+func TestTagsImport(t *testing.T) {
 	t.Parallel()
 
 	testcases := []struct {
@@ -95,13 +95,13 @@ func TestSegmentTagsImport(t *testing.T) {
 
 			tc.input.ExtractTo(&apidef)
 
-			assert.Equal(t, tc.expectEnabled, apidef.EnableSegmentTags)
+			assert.Equal(t, tc.expectEnabled, apidef.EnableTags)
 			assert.Equal(t, tc.expectValues, apidef.Tags)
 		})
 	}
 }
 
-func TestSegmentTagsExportServer(t *testing.T) {
+func TestTagsExportServer(t *testing.T) {
 	t.Parallel()
 
 	testcases := []struct {
@@ -112,7 +112,7 @@ func TestSegmentTagsExportServer(t *testing.T) {
 		{
 			"export segment tags if enabled",
 			apidef.APIDefinition{
-				EnableSegmentTags: true,
+				EnableTags: true,
 				Tags:       []string{"a", "b", "c"},
 			},
 			&GatewayTags{
@@ -123,7 +123,7 @@ func TestSegmentTagsExportServer(t *testing.T) {
 		{
 			"export segment tags if disabled",
 			apidef.APIDefinition{
-				EnableSegmentTags: true,
+				EnableTags: true,
 				Tags:       []string{"a", "b", "c"},
 			},
 			&GatewayTags{

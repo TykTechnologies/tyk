@@ -102,12 +102,12 @@ type GatewayTags struct {
 }
 
 func (gt *GatewayTags) Fill(api apidef.APIDefinition) {
-	gt.Enabled = api.EnableSegmentTags
+	gt.Enabled = api.EnableTags
 	gt.Tags = api.Tags
 }
 
 func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
-	api.EnableSegmentTags = gt.Enabled
+	api.EnableTags = gt.Enabled
 	api.Tags = gt.Tags
 }
 

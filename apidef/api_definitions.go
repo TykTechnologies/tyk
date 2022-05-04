@@ -595,9 +595,9 @@ type APIDefinition struct {
 	GraphQL                    GraphQLConfig          `bson:"graphql" json:"graphql"`
 	AnalyticsPlugin            AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin"`
 
-	// Segment tags
-	EnableSegmentTags          bool                   `bson:"enable_segment_tags" json:"enable_segment_tags"`
-	Tags                       []string               `bson:"tags" json:"tags"`
+	// Gateway segment tags
+	EnableTags bool     `bson:"enable_tags" json:"enable_tags"`
+	Tags       []string `bson:"tags" json:"tags"`
 }
 
 type AnalyticsPluginConfig struct {
