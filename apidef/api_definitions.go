@@ -586,7 +586,6 @@ type APIDefinition struct {
 	Domain                     string                 `bson:"domain" json:"domain"`
 	Certificates               []string               `bson:"certificates" json:"certificates"`
 	DoNotTrack                 bool                   `bson:"do_not_track" json:"do_not_track"`
-	Tags                       []string               `bson:"tags" json:"tags"`
 	EnableContextVars          bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
 	ConfigData                 map[string]interface{} `bson:"config_data" json:"config_data"`
 	TagHeaders                 []string               `bson:"tag_headers" json:"tag_headers"`
@@ -595,6 +594,10 @@ type APIDefinition struct {
 	EnableDetailedRecording    bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 	GraphQL                    GraphQLConfig          `bson:"graphql" json:"graphql"`
 	AnalyticsPlugin            AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin"`
+
+	// Gateway segment tags
+	EnableTags bool     `bson:"enable_tags" json:"enable_tags"`
+	Tags       []string `bson:"tags" json:"tags"`
 }
 
 type AnalyticsPluginConfig struct {

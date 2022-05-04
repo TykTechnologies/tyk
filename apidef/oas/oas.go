@@ -218,3 +218,35 @@ func (s *OAS) getTykOperations() (operations Operations) {
 
 	return
 }
+
+func (s *OAS) AddServers(apiURL string) {
+	if len(s.Servers) == 0 {
+		s.Servers = openapi3.Servers{
+			{
+				URL: apiURL,
+			},
+		}
+		return
+	}
+	newServers := openapi3.Servers{
+		{
+			URL: apiURL,
+		},
+	}
+	s.Servers = append(newServers, s.Servers...)
+}
+
+func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
+	if len(s.Servers) == 0 {
+		s.Servers = openapi3.Servers{
+			{
+				URL: apiURL,
+			},
+		}
+		return
+	}
+
+	if len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL {
+		s.Servers[0].URL = apiURL
+	}
+}
