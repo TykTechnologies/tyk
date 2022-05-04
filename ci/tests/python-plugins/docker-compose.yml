@@ -18,7 +18,7 @@ services:
         - tag=${tag}
       
   gw:
-    image: tykio/tyk-gateway:v4.0.0
+    image: tykio/tyk-gateway:${tag}
     volumes:
       - ./src/apidef.json:/opt/tyk-gateway/apps/python.json
       - ./src/tyk.conf:/opt/tyk-gateway/tyk.conf
