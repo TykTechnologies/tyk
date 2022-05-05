@@ -69,15 +69,20 @@ func WithDialer(dialer DialContext) TransportOption {
 // which only connects to 127.0.0.1.
 func WithLocalDialer() TransportOption {
 	return TransportOption(func(transport *http.Transport) {
-		transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, err
-			}
-			host = "127.0.0.1"
-
-			dialer := net.Dialer{}
-			return dialer.DialContext(ctx, network, net.JoinHostPort(host, port))
-		}
+		transport.DialContext = LocalDialer()
 	})
+}
+
+// LocalDialer provides a function to use to dial to localhost
+func LocalDialer() func(context.Context, string, string) (net.Conn, error) {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		_, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		host := "127.0.0.1"
+
+		dialer := net.Dialer{}
+		return dialer.DialContext(ctx, network, net.JoinHostPort(host, port))
+	}
 }
