@@ -203,11 +203,16 @@ pre.NewProcessRequest(function(request, session) {
 }
 
 func TestResponseOverride(t *testing.T) {
+	pythonVersion := os.Getenv("PYTHON_VERSION")
+	if pythonVersion == "" {
+		pythonVersion = "3.5"
+	}
+
 	ts := StartTest(nil, TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
-			PythonVersion:    "3.5",
+			PythonVersion:    pythonVersion,
 		}})
 	defer ts.Close()
 
