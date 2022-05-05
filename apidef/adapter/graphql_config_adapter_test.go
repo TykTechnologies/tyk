@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"testing"
 
+	kafkaDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 

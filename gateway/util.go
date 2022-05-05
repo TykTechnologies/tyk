@@ -2,11 +2,13 @@ package gateway
 
 import (
 	"errors"
-	"fmt"
+	"net"
+	"net/url"
+	"os"
+	"strconv"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"os"
-	"strings"
 )
 
 // appendIfMissing ensures dest slice is unique with new items.
@@ -121,31 +123,37 @@ func FileExist(filepath string) bool {
 }
 
 func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
-	apiURL := "http://"
+	var result = url.URL{
+		Scheme: "http",
+		Host:   apiDef.Domain,
+		Path:   apiDef.Proxy.ListenPath,
+	}
+
 	if gwConfig.HttpServerOptions.UseSSL {
-		apiURL = "https://"
+		result.Scheme = "https"
 	}
 
-	// Custom API conquers more
-	if apiDef.Domain != "" {
-		apiURL += mergeURLAndBasePath(apiDef.Domain, apiDef.Proxy.ListenPath)
-		return apiURL
+	// apiDef has priority
+	if result.Host != "" {
+		return result.String()
 	}
 
-	// Do we have a gateway host name?
+	result.Host = gwConfig.ListenAddress
 	if gwConfig.HostName != "" {
-		apiURL += mergeURLAndBasePath(gwConfig.HostName, apiDef.Proxy.ListenPath)
-		return apiURL
+		result.Host = gwConfig.HostName
 	}
 
-	// We don't, so use IP
-	apiURL += mergeURLAndBasePath(fmt.Sprintf("%s:%d", gwConfig.ListenAddress, gwConfig.ListenPort), apiDef.Proxy.ListenPath)
+	if result.Host == "" {
+		result.Host = "127.0.0.1"
+	}
 
-	return apiURL
-}
+	// Skip adding ListenPort for http/80, https/443
+	if result.Scheme == "http" && gwConfig.ListenPort == 80 ||
+		result.Scheme == "https" && gwConfig.ListenPort == 443 {
+		return result.String()
+	}
 
-func mergeURLAndBasePath(url, basePath string) string {
-	trimmedUrl := strings.TrimRight(url, "/")
-	trimmedBasePath := strings.TrimLeft(basePath, "/")
-	return fmt.Sprintf("%s/%s", trimmedUrl, trimmedBasePath)
+	result.Host = net.JoinHostPort(result.Host, strconv.Itoa(gwConfig.ListenPort))
+
+	return result.String()
 }

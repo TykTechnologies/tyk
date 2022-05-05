@@ -228,12 +228,22 @@ func (s *OAS) AddServers(apiURL string) {
 		}
 		return
 	}
+
 	newServers := openapi3.Servers{
 		{
 			URL: apiURL,
 		},
 	}
-	s.Servers = append(newServers, s.Servers...)
+
+	// check if apiURL already exists in servers object
+	for i := 0; i < len(s.Servers); i++ {
+		if s.Servers[i].URL == apiURL {
+			continue
+		}
+		newServers = append(newServers, s.Servers[i])
+	}
+
+	s.Servers = newServers
 }
 
 func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {

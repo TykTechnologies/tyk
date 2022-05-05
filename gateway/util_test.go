@@ -1,10 +1,11 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"strings"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -88,7 +89,7 @@ func Test_getAPIURL(t *testing.T) {
 		},
 
 		{
-			name: "https enabled without api domain",
+			name: "https enabled and configured listen address and port 443",
 			args: args{
 				apiDef: apidef.APIDefinition{
 					Proxy: apidef.ProxyConfig{
@@ -96,8 +97,61 @@ func Test_getAPIURL(t *testing.T) {
 					},
 				},
 				gwConfig: config.Config{
-					ListenAddress: "127.0.0.1",
+					ListenAddress: "10.0.0.1",
+					ListenPort:    443,
+					HttpServerOptions: config.HttpServerOptionsConfig{
+						UseSSL: true,
+					},
+				},
+			},
+			want: "https://10.0.0.1/api",
+		},
+
+		{
+			name: "without api domain and configured listen address",
+			args: args{
+				apiDef: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						ListenPath: "/api",
+					},
+				},
+				gwConfig: config.Config{
+					ListenAddress: "10.0.0.1",
 					ListenPort:    8080,
+					HttpServerOptions: config.HttpServerOptionsConfig{
+						UseSSL: true,
+					},
+				},
+			},
+			want: "https://10.0.0.1:8080/api",
+		},
+
+		{
+			name: "configured listen address with 80 port",
+			args: args{
+				apiDef: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						ListenPath: "/api",
+					},
+				},
+				gwConfig: config.Config{
+					ListenAddress: "10.0.0.1",
+					ListenPort:    80,
+				},
+			},
+			want: "http://10.0.0.1/api",
+		},
+
+		{
+			name: "without api domain and no configured listen address",
+			args: args{
+				apiDef: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						ListenPath: "/api",
+					},
+				},
+				gwConfig: config.Config{
+					ListenPort: 8080,
 					HttpServerOptions: config.HttpServerOptionsConfig{
 						UseSSL: true,
 					},
@@ -107,7 +161,22 @@ func Test_getAPIURL(t *testing.T) {
 		},
 
 		{
-			name: "https enabled with gw hostname",
+			name: "no configured listen address with 80 port",
+			args: args{
+				apiDef: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						ListenPath: "/api",
+					},
+				},
+				gwConfig: config.Config{
+					ListenPort: 80,
+				},
+			},
+			want: "http://127.0.0.1/api",
+		},
+
+		{
+			name: "gw hostname non 80 port",
 			args: args{
 				apiDef: apidef.APIDefinition{
 					Proxy: apidef.ProxyConfig{
@@ -117,30 +186,48 @@ func Test_getAPIURL(t *testing.T) {
 				gwConfig: config.Config{
 					ListenAddress: "127.0.0.1",
 					ListenPort:    8080,
+					HostName:      "example-host.org",
+				},
+			},
+			want: "http://example-host.org:8080/api",
+		},
+
+		{
+			name: "gw hostname with port 80",
+			args: args{
+				apiDef: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						ListenPath: "/api",
+					},
+				},
+				gwConfig: config.Config{
+					ListenAddress: "127.0.0.1",
+					ListenPort:    80,
+					HostName:      "example-host.org",
+				},
+			},
+			want: "http://example-host.org/api",
+		},
+
+		{
+			name: "https enabled gw hostname with port 443",
+			args: args{
+				apiDef: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						ListenPath: "/api",
+					},
+				},
+				gwConfig: config.Config{
+					ListenAddress: "127.0.0.1",
+					ListenPort:    443,
 					HostName:      "example-host.org",
 					HttpServerOptions: config.HttpServerOptionsConfig{
 						UseSSL: true,
 					},
 				},
 			},
-			want: "https://example-host.org/api",
-		},
 
-		{
-			name: "https disabled with gw hostname",
-			args: args{
-				apiDef: apidef.APIDefinition{
-					Proxy: apidef.ProxyConfig{
-						ListenPath: "/api",
-					},
-				},
-				gwConfig: config.Config{
-					ListenAddress: "127.0.0.1",
-					ListenPort:    8080,
-					HostName:      "example-host.org",
-				},
-			},
-			want: "http://example-host.org/api",
+			want: "https://example-host.org/api",
 		},
 	}
 	for _, tt := range tests {
