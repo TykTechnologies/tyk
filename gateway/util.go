@@ -2,12 +2,13 @@ package gateway
 
 import (
 	"errors"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"net"
 	"net/url"
 	"os"
 	"strconv"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // appendIfMissing ensures dest slice is unique with new items.
@@ -171,6 +172,6 @@ func mergeURLAndBasePath(useSSL bool, host, basePath string) string {
 		Host:   host,
 		Path:   basePath,
 	}
-	
+
 	return apiURL.String()
 }

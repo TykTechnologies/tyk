@@ -2,10 +2,11 @@ package adapter
 
 import (
 	"encoding/json"
-	kafkaDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"net/http"
 	"strconv"
 	"testing"
+
+	kafkaDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
