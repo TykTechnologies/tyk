@@ -591,6 +591,9 @@
         },
         "gatewayTags": {
           "$ref": "#/definitions/X-Tyk-GatewayTags"
+        },
+        "customDomain": {
+          "type": "string"
         }
       },
       "required": [
