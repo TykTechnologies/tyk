@@ -554,6 +554,8 @@ func TestIgnored(t *testing.T) {
 }
 
 func TestOldMockResponse(t *testing.T) {
+	test.Racy(t) // TODO: TT-5225
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
