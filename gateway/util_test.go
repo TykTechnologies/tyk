@@ -88,7 +88,7 @@ func Test_getAPIURL(t *testing.T) {
 		},
 
 		{
-			name: "https enabled without api domain",
+			name: "without api domain and configured listen address",
 			args: args{
 				apiDef: apidef.APIDefinition{
 					Proxy: apidef.ProxyConfig{
@@ -96,8 +96,45 @@ func Test_getAPIURL(t *testing.T) {
 					},
 				},
 				gwConfig: config.Config{
-					ListenAddress: "127.0.0.1",
+					ListenAddress: "10.0.0.1",
 					ListenPort:    8080,
+					HttpServerOptions: config.HttpServerOptionsConfig{
+						UseSSL: true,
+					},
+				},
+			},
+			want: "https://10.0.0.1:8080/api",
+		},
+
+		{
+			name: "configured listen address with 80 port",
+			args: args{
+				apiDef: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						ListenPath: "/api",
+					},
+				},
+				gwConfig: config.Config{
+					ListenAddress: "10.0.0.1",
+					ListenPort:    80,
+					HttpServerOptions: config.HttpServerOptionsConfig{
+						UseSSL: true,
+					},
+				},
+			},
+			want: "https://10.0.0.1/api",
+		},
+
+		{
+			name: "without api domain and no configured listen address",
+			args: args{
+				apiDef: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						ListenPath: "/api",
+					},
+				},
+				gwConfig: config.Config{
+					ListenPort: 8080,
 					HttpServerOptions: config.HttpServerOptionsConfig{
 						UseSSL: true,
 					},
@@ -107,7 +144,25 @@ func Test_getAPIURL(t *testing.T) {
 		},
 
 		{
-			name: "https enabled with gw hostname",
+			name: "no configured listen address with 80 port",
+			args: args{
+				apiDef: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						ListenPath: "/api",
+					},
+				},
+				gwConfig: config.Config{
+					ListenPort: 80,
+					HttpServerOptions: config.HttpServerOptionsConfig{
+						UseSSL: true,
+					},
+				},
+			},
+			want: "https://127.0.0.1/api",
+		},
+
+		{
+			name: "gw hostname non 80 port",
 			args: args{
 				apiDef: apidef.APIDefinition{
 					Proxy: apidef.ProxyConfig{
@@ -118,16 +173,13 @@ func Test_getAPIURL(t *testing.T) {
 					ListenAddress: "127.0.0.1",
 					ListenPort:    8080,
 					HostName:      "example-host.org",
-					HttpServerOptions: config.HttpServerOptionsConfig{
-						UseSSL: true,
-					},
 				},
 			},
-			want: "https://example-host.org/api",
+			want: "http://example-host.org:8080/api",
 		},
 
 		{
-			name: "https disabled with gw hostname",
+			name: "gw hostname with port 80",
 			args: args{
 				apiDef: apidef.APIDefinition{
 					Proxy: apidef.ProxyConfig{
@@ -136,7 +188,7 @@ func Test_getAPIURL(t *testing.T) {
 				},
 				gwConfig: config.Config{
 					ListenAddress: "127.0.0.1",
-					ListenPort:    8080,
+					ListenPort:    80,
 					HostName:      "example-host.org",
 				},
 			},

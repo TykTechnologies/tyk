@@ -134,14 +134,33 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 
 	// Do we have a gateway host name?
 	if gwConfig.HostName != "" {
-		apiURL += mergeURLAndBasePath(gwConfig.HostName, apiDef.Proxy.ListenPath)
+		gwHostName := gwConfig.HostName
+		if gwConfig.ListenPort != 80 {
+			gwHostName = getHostURLWithPort(gwHostName, gwConfig.ListenPort)
+		}
+
+		apiURL += mergeURLAndBasePath(gwHostName, apiDef.Proxy.ListenPath)
 		return apiURL
 	}
 
 	// We don't, so use IP
-	apiURL += mergeURLAndBasePath(fmt.Sprintf("%s:%d", gwConfig.ListenAddress, gwConfig.ListenPort), apiDef.Proxy.ListenPath)
+	listenAddress := gwConfig.ListenAddress
+	if listenAddress == "" {
+		listenAddress = "127.0.0.1"
+	}
+
+	host := listenAddress
+	if gwConfig.ListenPort != 80 {
+		host = getHostURLWithPort(listenAddress, gwConfig.ListenPort)
+	}
+
+	apiURL += mergeURLAndBasePath(host, apiDef.Proxy.ListenPath)
 
 	return apiURL
+}
+
+func getHostURLWithPort(host string, port int) string {
+	return fmt.Sprintf("%s:%d", host, port)
 }
 
 func mergeURLAndBasePath(url, basePath string) string {
