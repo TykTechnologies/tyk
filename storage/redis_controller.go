@@ -20,9 +20,9 @@ type RedisController struct {
 	ctx context.Context
 }
 
-func NewRedisController() *RedisController {
+func NewRedisController(ctx context.Context) *RedisController {
 	return &RedisController{
-		ctx: context.Background(),
+		ctx: ctx,
 	}
 }
 
