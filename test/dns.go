@@ -16,7 +16,6 @@ import (
 )
 
 var (
-	muDefaultResolver  sync.RWMutex
 	DomainsToAddresses = map[string][]string{
 		"host1.": {"127.0.0.1"},
 		"host2.": {"127.0.0.1"},
@@ -197,30 +196,18 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 		return handle, err
 	}
 
-	muDefaultResolver.RLock()
-	defaultResolver := net.DefaultResolver
-	muDefaultResolver.RUnlock()
 	mockResolver := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{}
-
-			//Use write lock to prevent unsafe d.DialContext update of net.DefaultResolver
-			muDefaultResolver.Lock()
-			defer muDefaultResolver.Unlock()
 			return d.DialContext(ctx, network, mockServer.PacketConn.LocalAddr().String())
 		},
 	}
 
-	muDefaultResolver.Lock()
+	// TODO: this is destructive, TT-5112
 	net.DefaultResolver = mockResolver
-	muDefaultResolver.Unlock()
 
 	handle.ShutdownDnsMock = func() error {
-		muDefaultResolver.Lock()
-		net.DefaultResolver = defaultResolver
-		muDefaultResolver.Unlock()
-
 		return mockServer.Shutdown()
 	}
 
