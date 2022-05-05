@@ -136,12 +136,9 @@ func Test_getAPIURL(t *testing.T) {
 				gwConfig: config.Config{
 					ListenAddress: "10.0.0.1",
 					ListenPort:    80,
-					HttpServerOptions: config.HttpServerOptionsConfig{
-						UseSSL: true,
-					},
 				},
 			},
-			want: "https://10.0.0.1/api",
+			want: "http://10.0.0.1/api",
 		},
 
 		{
@@ -172,12 +169,9 @@ func Test_getAPIURL(t *testing.T) {
 				},
 				gwConfig: config.Config{
 					ListenPort: 80,
-					HttpServerOptions: config.HttpServerOptionsConfig{
-						UseSSL: true,
-					},
 				},
 			},
-			want: "https://127.0.0.1/api",
+			want: "http://127.0.0.1/api",
 		},
 
 		{
