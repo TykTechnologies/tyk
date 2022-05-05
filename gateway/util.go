@@ -123,55 +123,37 @@ func FileExist(filepath string) bool {
 }
 
 func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
-
-	skipPort := (gwConfig.HttpServerOptions.UseSSL && gwConfig.ListenPort == 443) || (!gwConfig.HttpServerOptions.UseSSL && gwConfig.ListenPort == 80)
-
-	var apiURL string
-
-	// Custom API conquers more
-	if apiDef.Domain != "" {
-		apiURL = mergeURLAndBasePath(gwConfig.HttpServerOptions.UseSSL, apiDef.Domain, apiDef.Proxy.ListenPath)
-		return apiURL
+	var result = url.URL{
+		Scheme: "http",
+		Host:   apiDef.Domain,
+		Path:   apiDef.Proxy.ListenPath,
 	}
 
-	// Do we have a gateway host name?
+	if gwConfig.HttpServerOptions.UseSSL {
+		result.Scheme = "https"
+	}
+
+	// apiDef has priority
+	if result.Host != "" {
+		return result.String()
+	}
+
+	result.Host = gwConfig.ListenAddress
 	if gwConfig.HostName != "" {
-		gwHostName := gwConfig.HostName
-		if !skipPort {
-			gwHostName = net.JoinHostPort(gwHostName, strconv.Itoa(gwConfig.ListenPort))
-		}
-
-		apiURL = mergeURLAndBasePath(gwConfig.HttpServerOptions.UseSSL, gwHostName, apiDef.Proxy.ListenPath)
-		return apiURL
+		result.Host = gwConfig.HostName
+	}
+	
+	if result.Host == "" {
+		result.Host = "127.0.0.1"
 	}
 
-	// We don't, so use IP
-	listenAddress := gwConfig.ListenAddress
-	if listenAddress == "" {
-		listenAddress = "127.0.0.1"
+	// Skip adding ListenPort for http/80, https/443
+	if result.Scheme == "http" && gwConfig.ListenPort == 80 ||
+		result.Scheme == "https" && gwConfig.ListenPort == 443 {
+		return result.String()
 	}
 
-	host := listenAddress
-	if !skipPort {
-		host = net.JoinHostPort(listenAddress, strconv.Itoa(gwConfig.ListenPort))
-	}
+	result.Host = net.JoinHostPort(result.Host, strconv.Itoa(gwConfig.ListenPort))
 
-	apiURL = mergeURLAndBasePath(gwConfig.HttpServerOptions.UseSSL, host, apiDef.Proxy.ListenPath)
-
-	return apiURL
-}
-
-func mergeURLAndBasePath(useSSL bool, host, basePath string) string {
-	scheme := "http"
-	if useSSL {
-		scheme = "https"
-	}
-
-	apiURL := url.URL{
-		Scheme: scheme,
-		Host:   host,
-		Path:   basePath,
-	}
-
-	return apiURL.String()
+	return result.String()
 }
