@@ -29,6 +29,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -546,6 +547,8 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 }
 
 func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5228
+
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
