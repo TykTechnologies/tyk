@@ -2,13 +2,12 @@ package gateway
 
 import (
 	"errors"
-	"fmt"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
-	"strings"
 )
 
 // appendIfMissing ensures dest slice is unique with new items.
@@ -126,14 +125,11 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 
 	skipPort := (gwConfig.HttpServerOptions.UseSSL && gwConfig.ListenPort == 443) || (!gwConfig.HttpServerOptions.UseSSL && gwConfig.ListenPort == 80)
 
-	apiURL := "http://"
-	if gwConfig.HttpServerOptions.UseSSL {
-		apiURL = "https://"
-	}
+	var apiURL string
 
 	// Custom API conquers more
 	if apiDef.Domain != "" {
-		apiURL += mergeURLAndBasePath(apiDef.Domain, apiDef.Proxy.ListenPath)
+		apiURL = mergeURLAndBasePath(gwConfig.HttpServerOptions.UseSSL, apiDef.Domain, apiDef.Proxy.ListenPath)
 		return apiURL
 	}
 
@@ -144,7 +140,7 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 			gwHostName = net.JoinHostPort(gwHostName, strconv.Itoa(gwConfig.ListenPort))
 		}
 
-		apiURL += mergeURLAndBasePath(gwHostName, apiDef.Proxy.ListenPath)
+		apiURL = mergeURLAndBasePath(gwConfig.HttpServerOptions.UseSSL, gwHostName, apiDef.Proxy.ListenPath)
 		return apiURL
 	}
 
@@ -159,13 +155,22 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 		host = net.JoinHostPort(listenAddress, strconv.Itoa(gwConfig.ListenPort))
 	}
 
-	apiURL += mergeURLAndBasePath(host, apiDef.Proxy.ListenPath)
+	apiURL = mergeURLAndBasePath(gwConfig.HttpServerOptions.UseSSL, host, apiDef.Proxy.ListenPath)
 
 	return apiURL
 }
 
-func mergeURLAndBasePath(url, basePath string) string {
-	trimmedUrl := strings.TrimRight(url, "/")
-	trimmedBasePath := strings.TrimLeft(basePath, "/")
-	return fmt.Sprintf("%s/%s", trimmedUrl, trimmedBasePath)
+func mergeURLAndBasePath(useSSL bool, host, basePath string) string {
+	scheme := "http"
+	if useSSL {
+		scheme = "https"
+	}
+
+	apiURL := url.URL{
+		Scheme: scheme,
+		Host:   host,
+		Path:   basePath,
+	}
+	
+	return apiURL.String()
 }
