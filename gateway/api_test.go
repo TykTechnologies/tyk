@@ -1657,6 +1657,7 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 
 	for hp := range inputs {
 		testCases = append(testCases, test.TestCase{
+			Client:    test.NewClientLocal(),
 			Path:      "/" + hp.path,
 			Domain:    hp.host,
 			Code:      200,
