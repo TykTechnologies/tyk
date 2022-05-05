@@ -132,7 +132,7 @@ type SessionState struct {
 
 	// Used to store token hash
 	keyHash string
-	KeyID   string `json:"key_id,omitempty"`
+	KeyID   string `json:"-"`
 }
 
 func NewSessionState() *SessionState {
