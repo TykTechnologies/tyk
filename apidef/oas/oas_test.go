@@ -66,6 +66,37 @@ func TestOAS_AddServers(t *testing.T) {
 			}},
 			args: args{apiURL: "http://127.0.0.1:8080/api"},
 		},
+		{
+			name: "non-empty servers having same URL that of apiURL",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+					{
+						URL: "http://legacy-upstream.org/api",
+					},
+					{
+						URL: "http://127.0.0.1:8080/api",
+					},
+				},
+			}},
+			args: args{apiURL: "http://127.0.0.1:8080/api"},
+		},
+		{
+			name: "non-empty servers having same URL that of apiURL",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://127.0.0.1:8080/api",
+					},
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			}},
+			args: args{apiURL: "http://127.0.0.1:8080/api"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
