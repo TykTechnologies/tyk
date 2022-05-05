@@ -110,6 +110,8 @@ type DnsMockHandle struct {
 	ShutdownDnsMock func() error
 }
 
+var once sync.Once
+
 func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsErrorMap map[string]int) func() {
 	handler := h.mockServer.Handler.(*dnsMockHandler)
 	handler.muDomainsToAddresses.Lock()
@@ -205,10 +207,15 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	}
 
 	// TODO: this is destructive, TT-5112
-	net.DefaultResolver = mockResolver
+	once.Do(func() {
+		net.DefaultResolver = mockResolver
+	})
 
 	handle.ShutdownDnsMock = func() error {
-		return mockServer.Shutdown()
+		// We run tests against O(1) packages, we can
+		// afford a dirty shutdown, if it means less
+		// flaky tests.
+		return nil // mockServer.Shutdown()
 	}
 
 	return handle, nil
