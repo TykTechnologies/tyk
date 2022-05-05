@@ -1108,6 +1108,8 @@ func TestHashKeyListingDisabled(t *testing.T) {
 }
 
 func TestKeyHandler_HashingDisabled(t *testing.T) {
+	test.Racy(t) // TODO: TT-5524
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
