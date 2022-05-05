@@ -88,6 +88,25 @@ func Test_getAPIURL(t *testing.T) {
 		},
 
 		{
+			name: "https enabled and configured listen address and port 443",
+			args: args{
+				apiDef: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						ListenPath: "/api",
+					},
+				},
+				gwConfig: config.Config{
+					ListenAddress: "10.0.0.1",
+					ListenPort:    443,
+					HttpServerOptions: config.HttpServerOptionsConfig{
+						UseSSL: true,
+					},
+				},
+			},
+			want: "https://10.0.0.1/api",
+		},
+
+		{
 			name: "without api domain and configured listen address",
 			args: args{
 				apiDef: apidef.APIDefinition{
@@ -193,6 +212,27 @@ func Test_getAPIURL(t *testing.T) {
 				},
 			},
 			want: "http://example-host.org/api",
+		},
+
+		{
+			name: "https enabled gw hostname with port 443",
+			args: args{
+				apiDef: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						ListenPath: "/api",
+					},
+				},
+				gwConfig: config.Config{
+					ListenAddress: "127.0.0.1",
+					ListenPort:    443,
+					HostName:      "example-host.org",
+					HttpServerOptions: config.HttpServerOptionsConfig{
+						UseSSL: true,
+					},
+				},
+			},
+
+			want: "https://example-host.org/api",
 		},
 	}
 	for _, tt := range tests {

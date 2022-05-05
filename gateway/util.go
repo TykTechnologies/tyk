@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -121,6 +123,9 @@ func FileExist(filepath string) bool {
 }
 
 func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
+
+	skipPort := (gwConfig.HttpServerOptions.UseSSL && gwConfig.ListenPort == 443) || (!gwConfig.HttpServerOptions.UseSSL && gwConfig.ListenPort == 80)
+
 	apiURL := "http://"
 	if gwConfig.HttpServerOptions.UseSSL {
 		apiURL = "https://"
@@ -135,8 +140,8 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 	// Do we have a gateway host name?
 	if gwConfig.HostName != "" {
 		gwHostName := gwConfig.HostName
-		if gwConfig.ListenPort != 80 {
-			gwHostName = getHostURLWithPort(gwHostName, gwConfig.ListenPort)
+		if !skipPort {
+			gwHostName = net.JoinHostPort(gwHostName, strconv.Itoa(gwConfig.ListenPort))
 		}
 
 		apiURL += mergeURLAndBasePath(gwHostName, apiDef.Proxy.ListenPath)
@@ -150,17 +155,13 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 	}
 
 	host := listenAddress
-	if gwConfig.ListenPort != 80 {
-		host = getHostURLWithPort(listenAddress, gwConfig.ListenPort)
+	if !skipPort {
+		host = net.JoinHostPort(listenAddress, strconv.Itoa(gwConfig.ListenPort))
 	}
 
 	apiURL += mergeURLAndBasePath(host, apiDef.Proxy.ListenPath)
 
 	return apiURL
-}
-
-func getHostURLWithPort(host string, port int) string {
-	return fmt.Sprintf("%s:%d", host, port)
 }
 
 func mergeURLAndBasePath(url, basePath string) string {
