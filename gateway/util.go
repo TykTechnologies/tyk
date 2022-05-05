@@ -142,7 +142,7 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 	if gwConfig.HostName != "" {
 		result.Host = gwConfig.HostName
 	}
-	
+
 	if result.Host == "" {
 		result.Host = "127.0.0.1"
 	}
