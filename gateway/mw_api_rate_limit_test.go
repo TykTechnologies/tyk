@@ -200,6 +200,8 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 }
 
 func TestRequestThrottling(t *testing.T) {
+	test.Flaky(t) // TODO TT-5236
+
 	t.Run("PolicyLevel", func(t *testing.T) {
 		t.Run("InMemoryRateLimiter", requestThrottlingTest("InMemoryRateLimiter", "PolicyLevel"))
 		t.Run("SentinelRateLimiter", requestThrottlingTest("SentinelRateLimiter", "PolicyLevel"))
