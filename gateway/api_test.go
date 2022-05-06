@@ -747,7 +747,7 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 }
 
 func TestHashKeyHandler(t *testing.T) {
-
+	test.Racy(t) // TODO: TT-5233
 	conf := func(globalConf *config.Config) {
 		// make it to use hashes for Redis keys
 		globalConf.HashKeys = true
@@ -785,6 +785,7 @@ func TestHashKeyHandler(t *testing.T) {
 }
 
 func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
+	test.Racy(t) // TODO: TT-5233
 	ts := StartTest(nil)
 	defer ts.Close()
 
