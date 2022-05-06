@@ -4,6 +4,12 @@ TEST_TIMEOUT=15m
 
 PKGS="$(go list ./...)"
 
+# Support passing custom flags (-json, etc.)
+OPTS="$@"
+if [[ -z "$OPTS" ]]; then
+	OPTS="-race -count=1 -failfast -v"
+fi
+
 export PKG_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
 
 # exit on non-zero exit from go test/vet
@@ -25,8 +31,8 @@ for pkg in ${PKGS}; do
 
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
 
-    echo go test -race -count=1 -timeout ${TEST_TIMEOUT} -failfast -v -coverprofile=${coveragefile}.cov ${pkg} ${tags}
-    go test -race -count=1 -timeout ${TEST_TIMEOUT} -failfast -v -coverprofile=${coveragefile}.cov ${pkg} ${tags}
+    echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
+    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
 done
 
 # run rpc tests separately
