@@ -30,5 +30,7 @@ func skipCI(t *testing.T, message string, fake ...func() (bool, func(...interfac
 	}
 	if ci {
 		skip(message)
+	} else {
+		t.Log("# Skip this flaky/racy test by setting env CI=true")
 	}
 }
