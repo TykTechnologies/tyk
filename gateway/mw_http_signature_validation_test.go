@@ -763,6 +763,7 @@ func BenchmarkRSAAuthSessionPass(b *testing.B) {
 }
 
 func TestRSAAuthSessionKeyMissing(t *testing.T) {
+	test.Racy(t) // TODO: TT-4069
 	ts := StartTest(nil)
 	defer ts.Close()
 
