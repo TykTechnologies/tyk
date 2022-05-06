@@ -243,6 +243,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 }
 
 func TestHMACAuthSessionPass(t *testing.T) {
+	test.Racy(t) // TODO: TT-3973
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
@@ -431,6 +432,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 }
 
 func TestHMACAuthSessionKeyMissing(t *testing.T) {
+	test.Racy(t) // TODO: TT-3973
 	ts := StartTest(nil)
 	defer ts.Close()
 
