@@ -598,6 +598,23 @@ func TestListenPathTykPrefix(t *testing.T) {
 	})
 }
 
+func TestReloadGoroutineLeakWithTest(t *testing.T) {
+	test.Flaky(t)
+
+	before := runtime.NumGoroutine()
+
+	ts := StartTest(nil)
+	ts.Close()
+
+	time.Sleep(time.Second)
+
+	after := runtime.NumGoroutine()
+
+	if before < after {
+		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
+	}
+}
+
 func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
