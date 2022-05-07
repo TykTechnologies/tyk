@@ -692,7 +692,13 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 }
 
 // CheckForReload will start a long poll
-func (r *RPCStorageHandler) CheckForReload(orgId string) {
+func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
+	select {
+	case <-r.Gw.ctx.Done():
+		return false
+	default:
+	}
+
 	log.Debug("[RPC STORE] Check Reload called...")
 	reload, err := rpc.FuncClientSingleton("CheckReload", orgId)
 	if err != nil {
@@ -721,6 +727,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 			r.Gw.MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: r.Gw})
 		}()
 	}
+	return true
 }
 
 func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
@@ -742,6 +749,12 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 		"prefix": "RPC Conn Mgr",
 	}).Info("[RPC Conn Mgr] Starting keepalive watcher...")
 	for {
+
+		select {
+		case <-r.Gw.ctx.Done():
+			return
+		default:
+		}
 
 		if err := r.SetKey("0000", "0000", 10); err != nil {
 			log.WithError(err).WithFields(logrus.Fields{
