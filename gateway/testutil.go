@@ -162,13 +162,12 @@ func (r *ReloadMachinery) Queued() bool {
 // EnsureQueued this will block until any queue happens. It will timeout after
 // 100ms
 func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
-	deadline := time.NewTimer(100 * time.Millisecond)
-	defer deadline.Stop()
+	timeout := time.After(100 * time.Millisecond)
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 	for {
 		select {
-		case <-deadline.C:
+		case <-timeout:
 			t.Fatal("Timedout waiting for reload to be queue")
 		case <-tick.C:
 			if r.Queued() {
@@ -181,13 +180,12 @@ func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
 // EnsureReloaded this will block until any reload happens. It will timeout after
 // 200ms
 func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
-	deadline := time.NewTimer(200 * time.Millisecond)
-	defer deadline.Stop()
+	timeout := time.After(200 * time.Millisecond)
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 	for {
 		select {
-		case <-deadline.C:
+		case <-timeout:
 			t.Fatal("Timedout waiting for reload to be queue")
 		case <-tick.C:
 			if r.Reloaded() {
@@ -1094,13 +1092,29 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 
 	configs := s.Gw.GetConfig()
 
+	connected := make(chan bool, 1)
+
+	// TODO: this is flaky since ConnectToRedis should
+	// have onConnect callback, but it's rather an
+	// onReconnect. No initial connect called.
+
 	go s.Gw.RedisController.ConnectToRedis(ctx, func() {
+		connected <- true
 		if s.Gw.OnConnect != nil {
 			s.Gw.OnConnect()
 		}
 	}, &configs)
 
+	timeout := time.After(time.Second)
 	for {
+		select {
+		case <-connected:
+			break
+		case <-timeout:
+			panic("can't connect to redis, timeout")
+		default:
+		}
+
 		if s.Gw.RedisController.Connected() {
 			break
 		}
@@ -1188,6 +1202,7 @@ func (s *Test) Close() {
 
 	s.gwMu.Lock()
 	s.Gw.Analytics.Stop()
+	s.Gw.ReloadTestCase.StopTicker()
 	s.Gw.GlobalHostChecker.StopPoller()
 	s.gwMu.Unlock()
 	os.RemoveAll(s.Gw.GetConfig().AppPath)
