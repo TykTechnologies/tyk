@@ -1,9 +1,13 @@
 package test
 
 import (
+	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"sync"
+
+	_ "net/http/pprof"
 )
 
 var initOnce sync.Once
@@ -18,4 +22,16 @@ func init() {
 			go NewMonitor(val)
 		})
 	}
+
+	if pprof := os.Getenv("TEST_PPROF_ENABLE"); pprof == "1" {
+		var listen string
+		if listen = os.Getenv("TEST_PPROF_ADDR"); listen == "" {
+			listen = ":12345"
+		}
+		go func() {
+			log.Printf("Starting pprof on addr=%q", listen)
+			http.ListenAndServe(listen, nil)
+		}()
+	}
+
 }
