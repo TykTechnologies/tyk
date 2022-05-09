@@ -1732,12 +1732,13 @@ func TestStripRegex(t *testing.T) {
 }
 
 func TestCache_singleErrorResponse(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("{}"))
 	}))
-	defer srv.Close()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
@@ -1746,11 +1747,19 @@ func TestCache_singleErrorResponse(t *testing.T) {
 		spec.CacheOptions.EnableCache = true
 		spec.CacheOptions.CacheAllSafeRequests = true
 	})
+
 	ts.Run(t,
 		test.TestCase{Method: http.MethodGet, Path: "/", Code: http.StatusOK},
 	)
-	time.Sleep(time.Second)
+
 	srv.Close()
+
+	ts.Run(t,
+		test.TestCase{Method: http.MethodGet, Path: "/", Code: http.StatusOK},
+	)
+
+	time.Sleep(time.Second)
+
 	wantBody := `{
     "error": "There was a problem proxying the request"
 }`
