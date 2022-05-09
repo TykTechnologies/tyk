@@ -885,9 +885,30 @@ func (gw *Gateway) handleGetAPIList() (interface{}, int) {
 	return apiIDList, http.StatusOK
 }
 
+func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	apisList := make([]oas.OAS, len(gw.apisByID))
+	c := 0
+
+	for _, apiSpec := range gw.apisByID {
+		apiSpec.OAS.Fill(*apiSpec.APIDefinition)
+
+		if modePublic {
+			apiSpec.OAS.RemoveTykExtension()
+		}
+		apisList[c] = apiSpec.OAS
+		c++
+	}
+
+	return apisList, http.StatusOK
+}
+
 func (gw *Gateway) handleGetAPI(apiID string, oasTyped bool) (interface{}, int) {
 	if spec := gw.getApiSpec(apiID); spec != nil {
 		if oasTyped {
+			spec.OAS.Fill(*spec.APIDefinition)
 			return &spec.OAS, http.StatusOK
 		} else {
 			return spec.APIDefinition, http.StatusOK
@@ -899,6 +920,18 @@ func (gw *Gateway) handleGetAPI(apiID string, oasTyped bool) (interface{}, int) 
 		"apiID":  apiID,
 	}).Error("API doesn't exist.")
 	return apiError("API not found"), http.StatusNotFound
+}
+
+func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, int) {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	obj, code := gw.handleGetAPI(apiID, true)
+	if apiOAS, ok := obj.(*oas.OAS); ok && modePublic {
+		apiOAS.RemoveTykExtension()
+	}
+	return obj, code
+
 }
 
 func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasTyped bool) (interface{}, int) {
@@ -1075,7 +1108,6 @@ func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 
 func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
-	oasTyped := r.FormValue("type") == "oas"
 
 	var obj interface{}
 	var code int
@@ -1084,18 +1116,18 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		if apiID != "" {
 			log.Debug("Requesting API definition for", apiID)
-			obj, code = gw.handleGetAPI(apiID, oasTyped)
+			obj, code = gw.handleGetAPI(apiID, false)
 		} else {
 			log.Debug("Requesting API list")
 			obj, code = gw.handleGetAPIList()
 		}
 	case "POST":
 		log.Debug("Creating new definition file")
-		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), oasTyped)
+		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), false)
 	case "PUT":
 		if apiID != "" {
 			log.Debug("Updating existing API: ", apiID)
-			obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), oasTyped)
+			obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), false)
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
@@ -1106,6 +1138,53 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			obj, code = apiError("Must specify an apiID to delete"), http.StatusBadRequest
 		}
+	}
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASHandler(w http.ResponseWriter, r *http.Request) {
+	apiID := mux.Vars(r)["apiID"]
+
+	var obj interface{}
+	var code int
+
+	switch r.Method {
+	case "GET":
+		if apiID != "" {
+			log.Debug("Requesting API definition for", apiID)
+			obj, code = gw.handleGetAPIOAS(apiID, false)
+		} else {
+			log.Debug("Requesting API list")
+			obj, code = gw.handleGetAPIListOAS(false)
+		}
+	case "POST":
+		log.Debug("Creating new definition file")
+		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
+	case "PUT":
+		if apiID != "" {
+			log.Debug("Updating existing API: ", apiID)
+			obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
+		} else {
+			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
+		}
+	}
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASHandlerPublic(w http.ResponseWriter, r *http.Request) {
+	apiID := mux.Vars(r)["apiID"]
+
+	var obj interface{}
+	var code int
+
+	if apiID != "" {
+		log.Debug("Requesting API definition for", apiID)
+		obj, code = gw.handleGetAPIOAS(apiID, true)
+	} else {
+		log.Debug("Requesting API list")
+		obj, code = gw.handleGetAPIListOAS(true)
 	}
 
 	doJSONWrite(w, code, obj)

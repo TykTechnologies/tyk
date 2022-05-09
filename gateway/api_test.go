@@ -1857,8 +1857,9 @@ func TestOAS(t *testing.T) {
 	defer g.Close()
 
 	const (
-		oldAPIID = "old-api-id"
-		oasAPIID = "oas-api-id"
+		oldAPIID    = "old-api-id"
+		oasAPIID    = "oas-api-id"
+		oasBasePath = "/tyk/apis/oas"
 	)
 
 	oldAPI := BuildAPI(func(a *APISpec) {
@@ -1901,7 +1902,7 @@ func TestOAS(t *testing.T) {
 		BodyMatch: `"action":"added"`, Code: http.StatusOK})
 
 	// Create OAS API
-	_, _ = g.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis?type=oas", Data: &oasAPI,
+	_, _ = g.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: oasBasePath, Data: &oasAPI,
 		BodyMatch: `"action":"added"`, Code: http.StatusOK})
 
 	g.Gw.DoReload()
@@ -1924,13 +1925,13 @@ func TestOAS(t *testing.T) {
 
 				t.Run("get", func(t *testing.T) {
 
+					t.Run("in old", func(t *testing.T) {
+						testGetOldAPI(t, g, apiID, "old-updated old api")
+					})
+
 					t.Run("in oas", func(t *testing.T) {
 						updatedOldAPIInOAS := testGetOASAPI(t, g, apiID, "old-updated old api", "")
 						assert.Equal(t, fmt.Sprintf("%s%s", g.URL, "/updated-old-api/"), updatedOldAPIInOAS.Servers[0].URL)
-					})
-
-					t.Run("in old", func(t *testing.T) {
-						testGetOldAPI(t, g, apiID, "old-updated old api")
 					})
 				})
 
@@ -2011,6 +2012,48 @@ func TestOAS(t *testing.T) {
 				testUpdateAPI(t, g, &oasAPI, apiID, true)
 			})
 		})
+		t.Run("oas api/public", func(t *testing.T) {
+			apiID := oasAPIID
+			oasPubliPath := "/tyk/apis/oas/public"
+
+			t.Run("with old", func(t *testing.T) {
+
+				t.Run("get", func(t *testing.T) {
+					_, _ = g.Run(t, []test.TestCase{
+						{AdminAuth: true, Method: http.MethodGet, Path: oasPubliPath, BodyMatch: `\[\{.*components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasPubliPath + "/" + oldAPIID, BodyMatch: `components`, Code: http.StatusOK},
+					}...)
+				})
+
+				// Reset
+				testUpdateAPI(t, g, &oasAPI, apiID, true)
+			})
+
+			t.Run("with oas", func(t *testing.T) {
+				const oasPubliPath = "/tyk/apis/oas/public"
+
+				t.Run("get", func(t *testing.T) {
+					_, _ = g.Run(t, []test.TestCase{
+						{AdminAuth: true, Method: http.MethodGet, Path: oasPubliPath, BodyMatch: `\[\{.*components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasPubliPath + "/" + oasAPIID, BodyMatch: `components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK},
+					}...)
+				})
+			})
+
+			t.Run("not found", func(t *testing.T) {
+				const oasPubliPath = "/tyk/apis/oas/public"
+
+				t.Run("get", func(t *testing.T) {
+					_, _ = g.Run(t, []test.TestCase{
+						{AdminAuth: true, Method: http.MethodGet, Path: oasPubliPath, BodyMatch: `\[\{.*components`, BodyNotMatch: ".*\"components\":", Code: http.StatusOK},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasPubliPath + "/" + "invalidID", BodyNotMatch: ".*\"components\":", Code: http.StatusNotFound},
+					}...)
+				})
+
+				// Reset
+				testUpdateAPI(t, g, &oasAPI, apiID, true)
+			})
+		})
 	})
 
 	t.Run("delete", func(t *testing.T) {
@@ -2027,20 +2070,21 @@ func TestOAS(t *testing.T) {
 			assert.NoError(t, err)
 
 			path := basePath + apiID
+			oasPath := oasBasePath + "/" + apiID
 
 			_, _ = g.Run(t, []test.TestCase{
 				{Method: http.MethodGet, Path: listenPath, Code: http.StatusOK},
 				{AdminAuth: true, Method: http.MethodGet, Path: path, BodyNotMatch: "components", Code: http.StatusOK},
-				{AdminAuth: true, Method: http.MethodGet, Path: path + "?type=oas", BodyMatch: `components`, Code: http.StatusOK},
+				{AdminAuth: true, Method: http.MethodGet, Path: oasPath, BodyMatch: `components`, Code: http.StatusOK},
 				{AdminAuth: true, Method: http.MethodDelete, Path: path, BodyMatch: `"action":"deleted"`, Code: http.StatusOK},
 			}...)
 
 			g.Gw.DoReload()
 
 			_, _ = g.Run(t, []test.TestCase{
-				{AdminAuth: true, Method: http.MethodGet, Path: path,
+				{AdminAuth: true, Method: http.MethodGet, Path: oasPath,
 					BodyMatch: `"message":"API not found"`, Code: http.StatusNotFound},
-				{AdminAuth: true, Method: http.MethodGet, Path: path + "?type=oas",
+				{AdminAuth: true, Method: http.MethodGet, Path: path,
 					BodyMatch: `"message":"API not found"`, Code: http.StatusNotFound},
 				{Method: http.MethodGet, Path: listenPath, Code: http.StatusNotFound},
 			}...)
@@ -2055,10 +2099,11 @@ func TestOAS(t *testing.T) {
 }
 
 func testUpdateAPI(t *testing.T, g *Test, api interface{}, apiID string, oasTyped bool) {
-	updatePath := "/tyk/apis/" + apiID
+	updatePath := "/tyk/apis/"
 	if oasTyped {
-		updatePath += "?type=oas"
+		updatePath += "oas/"
 	}
+	updatePath += apiID
 
 	_, _ = g.Run(t, []test.TestCase{
 		{AdminAuth: true, Method: http.MethodPut, Path: updatePath, Data: &api,
@@ -2070,7 +2115,7 @@ func testUpdateAPI(t *testing.T, g *Test, api interface{}, apiID string, oasType
 
 func testGetOASAPI(t *testing.T, d *Test, id, name, title string) (oasDoc openapi3.T) {
 
-	getPathWithOASParam := "/tyk/apis/" + id + "?type=oas"
+	getPathWithOASParam := "/tyk/apis/oas/" + id
 	bodyMatch := fmt.Sprintf(`{.*"info":{"title":"%s".*"x-tyk-api-gateway":{"info":{.*"name":"%s"`, title, name)
 
 	resp, _ := d.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: getPathWithOASParam,
