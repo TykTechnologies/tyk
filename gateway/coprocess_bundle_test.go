@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
@@ -223,8 +222,6 @@ func TestResponseOverride(t *testing.T) {
 			spec.UseKeylessAccess = true
 			spec.CustomMiddlewareBundle = bundle
 		})
-
-		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/test/?status=200", Code: 200, BodyMatch: customError, HeadersMatch: customHeader},
