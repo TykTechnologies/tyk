@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"encoding/json"
 	"io/ioutil"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
 
@@ -1471,16 +1473,16 @@ func TestGroupResetHandler(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	didSubscribe := make(chan bool)
 	didReload := make(chan bool)
 	cacheStore := storage.RedisCluster{RedisController: ts.Gw.RedisController}
 	cacheStore.Connect()
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
 	go func() {
-		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
+		err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
 			switch x := v.(type) {
-			case *redis.Subscription:
-				didSubscribe <- true
 			case *redis.Message:
 				notf := Notification{Gw: ts.Gw}
 				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
@@ -1494,8 +1496,8 @@ func TestGroupResetHandler(t *testing.T) {
 		if err != nil {
 			t.Log(err)
 			t.Fail()
-			close(didReload)
 		}
+		close(didReload)
 	}()
 
 	uri := "/tyk/reload/group"
@@ -1510,7 +1512,6 @@ func TestGroupResetHandler(t *testing.T) {
 
 	// If we don't wait for the subscription to be done, we might do
 	// the reload before pub/sub is in place to receive our message.
-	<-didSubscribe
 	req := ts.withAuth(TestReq(t, "GET", uri, nil))
 
 	ts.mainRouter().ServeHTTP(recorder, req)
@@ -1528,7 +1529,14 @@ func TestGroupResetHandler(t *testing.T) {
 	// We wait for the right notification (NoticeGroupReload), other
 	// type of notifications may be received during tests, as this
 	// is the cluster channel:
-	<-didReload
+	select {
+	case <-time.After(time.Second):
+		t.Fatal("Timeout waiting for reload signal")
+	case ok := <-didReload:
+		if !ok {
+			t.Fatal("Reload failed (closed pubsub)")
+		}
+	}
 }
 
 func TestHotReloadSingle(t *testing.T) {
