@@ -20,6 +20,9 @@ type Server struct {
 	ClientCertificates *ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty"`
 	// GatewayTags contains segment tags to configure which GWs your APIs connect to
 	GatewayTags *GatewayTags `bson:"gatewayTags,omitempty" json:"gatewayTags,omitempty"`
+	// CustomDomain is the domain to bind this API to.
+	// Old API Definition: `domain`
+	CustomDomain string `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
 }
 
 func (s *Server) Fill(api apidef.APIDefinition) {
@@ -42,6 +45,8 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.GatewayTags) {
 		s.GatewayTags = nil
 	}
+
+	s.CustomDomain = api.Domain
 }
 
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
@@ -54,6 +59,8 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	if s.GatewayTags != nil {
 		s.GatewayTags.ExtractTo(api)
 	}
+
+	api.Domain = s.CustomDomain
 }
 
 type ListenPath struct {
