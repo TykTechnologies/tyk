@@ -30,7 +30,7 @@ func init() {
 		}
 		go func() {
 			log.Printf("Starting pprof on addr=%q", listen)
-			http.ListenAndServe(listen, nil)
+			_ = http.ListenAndServe(listen, nil)
 		}()
 	}
 

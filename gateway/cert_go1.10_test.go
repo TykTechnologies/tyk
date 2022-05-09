@@ -41,7 +41,7 @@ var (
 	handlerEmpty http.HandlerFunc = func(http.ResponseWriter, *http.Request) {}
 	handlerEcho                   = func(message string) http.HandlerFunc {
 		return func(w http.ResponseWriter, _ *http.Request) {
-			w.Write([]byte(message))
+			_, _ = w.Write([]byte(message))
 		}
 	}
 )

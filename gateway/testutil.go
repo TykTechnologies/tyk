@@ -1125,7 +1125,13 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 		go gw.RPCListener.StartRPCKeepaliveWatcher()
 		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 
-		go gw.reloadLoop(time.Tick(time.Second))
+		ticker := time.NewTicker(time.Second)
+		go func() {
+			<-s.ctx.Done()
+			ticker.Stop()
+		}()
+
+		go gw.reloadLoop(ticker.C)
 		go gw.reloadQueueLoop()
 	} else {
 		go gw.reloadLoop(gw.ReloadTestCase.ReloadTicker(), gw.ReloadTestCase.OnReload)
