@@ -3,11 +3,12 @@ package gateway
 import (
 	"net/http"
 	"testing"
-	"time"
+
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
-	uuid "github.com/satori/go.uuid"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestHostCheckerManagerInit(t *testing.T) {
@@ -106,6 +107,8 @@ func TestGenerateCheckerId(t *testing.T) {
 }
 
 func TestCheckActivePollerLoop(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5259
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -115,14 +118,10 @@ func TestCheckActivePollerLoop(t *testing.T) {
 
 	go hc.CheckActivePollerLoop(ts.Gw.ctx)
 
-	//We give some warmup time to CheckActivePollerLoop to avoid random tests fail. The sleep time is the same of CheckActivePollerLoop ticker.
-	time.Sleep(11 * time.Second)
-
 	activeInstance, err := redisStorage.GetKey(PollerCacheKey)
 	if activeInstance != hc.Id || err != nil {
 		t.Errorf("activeInstance should be %q when the CheckActivePollerLoop is running", hc.Id)
 	}
-
 }
 
 func TestStartPoller(t *testing.T) {
