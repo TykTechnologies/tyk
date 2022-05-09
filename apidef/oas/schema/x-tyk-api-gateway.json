@@ -588,11 +588,33 @@
         },
         "clientCertificates": {
           "$ref": "#/definitions/X-Tyk-ClientCertificates"
+        },
+        "gatewayTags": {
+          "$ref": "#/definitions/X-Tyk-GatewayTags"
+        },
+        "customDomain": {
+          "type": "string"
         }
       },
       "required": [
         "listenPath"
       ]
+    },
+    "X-Tyk-GatewayTags": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "tags": {
+          "type": "array",
+          "items": [
+            {
+              "type": "string"
+            }
+          ]
+        }
+      }
     },
     "X-Tyk-Upstream": {
       "type": "object",
