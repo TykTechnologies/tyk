@@ -15,10 +15,6 @@ export PKG_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
 # exit on non-zero exit from go test/vet
 set -e
 
-# run go vet overall to fail early on violations
-echo "Running go vet"
-go vet ./...
-
 # build Go-plugin used in tests
 echo "Building go plugin"
 go build -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
