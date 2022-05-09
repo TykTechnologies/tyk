@@ -704,6 +704,8 @@ func TestAPIMutualTLS(t *testing.T) {
 }
 
 func TestUpstreamMutualTLS(t *testing.T) {
+	test.Flaky(t) // TODO: 5262
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -782,6 +784,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 }
 
 func TestSSLForceCommonName(t *testing.T) {
+	test.Flaky(t) // TODO TT-5112
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
 
@@ -809,7 +812,7 @@ func TestSSLForceCommonName(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = targetURL
 		})
-		ts.Run(t, test.TestCase{Code: 500, BodyMatch: "There was a problem proxying the request"})
+		ts.Run(t, test.TestCase{Code: 500, BodyMatch: "There was a problem proxying the request", Client: test.NewClientLocal()})
 	})
 
 	t.Run("Force Common Name Check is Enabled", func(t *testing.T) {
@@ -826,11 +829,13 @@ func TestSSLForceCommonName(t *testing.T) {
 			spec.Proxy.TargetURL = targetURL
 		})
 
-		ts.Run(t, test.TestCase{Code: 200})
+		ts.Run(t, test.TestCase{Code: 200, Client: test.NewClientLocal()})
 	})
 }
 
 func TestKeyWithCertificateTLS(t *testing.T) {
+	test.Flaky(t) // TODO TT-5112
+
 	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	serverCertID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
@@ -1003,6 +1008,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		)[0]
 
 		client := GetTLSClient(&clientCert, nil)
+		client.Transport = test.NewTransport(test.WithLocalDialer())
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Code: http.StatusNotFound, Path: "/test1", Client: client},
@@ -1160,6 +1166,8 @@ func TestAPICertificate(t *testing.T) {
 }
 
 func TestCertificateHandlerTLS(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5261
+
 	_, _, combinedServerPEM, serverCert := certs.GenCertificate(&x509.Certificate{
 		DNSNames:    []string{"localhost", "tyk-gateway"},
 		IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::")},
