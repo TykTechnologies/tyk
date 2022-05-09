@@ -78,6 +78,7 @@ func TestOrganizationMonitorEnabled(t *testing.T) {
 }
 
 func TestProcessRequestLiveQuotaLimit(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5254
 
 	conf := func(globalConf *config.Config) {
 		globalConf.EnforceOrgQuotas = true
@@ -152,6 +153,8 @@ func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 }
 
 func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5254
+
 	conf := func(globalConf *config.Config) {
 		globalConf.EnforceOrgQuotas = true
 		globalConf.ExperimentalProcessOrgOffThread = true
@@ -247,6 +250,8 @@ func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 }
 
 func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5254
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -334,6 +339,8 @@ func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 }
 
 func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5254
+
 	// setup global config
 	conf := func(globalConf *config.Config) {
 		globalConf.EnforceOrgQuotas = true
