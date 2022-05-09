@@ -973,7 +973,6 @@ func TestGetVersionFromRequest(t *testing.T) {
 	t.Run("Header location", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer func() {
-			time.Sleep(1 * time.Second)
 			ts.Close()
 		}()
 
