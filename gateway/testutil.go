@@ -168,11 +168,17 @@ func (r *ReloadMachinery) Queued() bool {
 func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
+
 	for {
+		timeout := time.NewTimer(100 * time.Millisecond)
+
 		select {
-		case <-time.After(100 * time.Millisecond):
+		case <-timeout.C:
 			t.Fatal("Timedout waiting for reload to be queued")
 		case <-tick.C:
+			if !timeout.Stop() {
+				<-timeout.C
+			}
 			if r.Queued() {
 				return
 			}
@@ -186,10 +192,15 @@ func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 	for {
+		timeout := time.NewTimer(200 * time.Millisecond)
+
 		select {
-		case <-time.After(200 * time.Millisecond):
+		case <-timeout.C:
 			t.Fatal("Timedout waiting for reload to be queued")
 		case <-tick.C:
+			if !timeout.Stop() {
+				<-timeout.C
+			}
 			if r.Reloaded() {
 				return
 			}
