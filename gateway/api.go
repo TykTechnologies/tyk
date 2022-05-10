@@ -1115,7 +1115,7 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		if apiID != "" {
-			log.Debug("Requesting API definition for", apiID)
+			log.Debugf("Requesting API definition for %q", apiID)
 			obj, code = gw.handleGetAPI(apiID, false)
 		} else {
 			log.Debug("Requesting API list")
@@ -1126,7 +1126,7 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), false)
 	case "PUT":
 		if apiID != "" {
-			log.Debug("Updating existing API: ", apiID)
+			log.Debugf("Updating existing API: %q", apiID)
 			obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), false)
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
@@ -1152,7 +1152,7 @@ func (gw *Gateway) apiOASHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		if apiID != "" {
-			log.Debug("Requesting API definition for", apiID)
+			log.Debugf("Requesting API definition for %q", apiID)
 			obj, code = gw.handleGetAPIOAS(apiID, false)
 		} else {
 			log.Debug("Requesting API list")
@@ -1163,7 +1163,7 @@ func (gw *Gateway) apiOASHandler(w http.ResponseWriter, r *http.Request) {
 		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
 	case "PUT":
 		if apiID != "" {
-			log.Debug("Updating existing API: ", apiID)
+			log.Debugf("Updating existing API: %q", apiID)
 			obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
@@ -1180,7 +1180,7 @@ func (gw *Gateway) apiOASHandlerPublic(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	if apiID != "" {
-		log.Debug("Requesting API definition for", apiID)
+		log.Debugf("Requesting API definition for %q", apiID)
 		obj, code = gw.handleGetAPIOAS(apiID, true)
 	} else {
 		log.Debug("Requesting API list")
