@@ -146,7 +146,6 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 		flushTimer := time.NewTimer(recordsBufferFlushInterval)
 
-
 		select {
 		case record, ok := <-r.recordsChan:
 			if !flushTimer.Stop() {
@@ -208,8 +207,6 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			// anyways send whatever we have, don't hold data too long in buffer
 			readyToSend = true
 		}
-
-
 
 		// send data to Redis and reset buffer
 		if len(recordsBuffer) > 0 && (readyToSend || time.Since(lastSentTs) >= recordsBufferForcedFlushInterval) {
