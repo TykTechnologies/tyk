@@ -533,7 +533,7 @@ paths:
                 status: "error"
                 message: "Malformed API data"
 
-  '/tyk/apis/oas/public/{apiID}':
+  '/tyk/apis/oas/{apiID}/public':
     parameters:
       - description: The API ID
         name: apiID
