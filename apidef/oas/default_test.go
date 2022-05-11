@@ -9,7 +9,7 @@ import (
 func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 	t.Parallel()
 
-	t.Run("fill tyk extension with no supplied params", func(t *testing.T) {
+	t.Run("build tyk extension with no supplied params", func(t *testing.T) {
 		oasDef := OAS{
 			T: openapi3.T{
 				Info: &openapi3.Info{
@@ -46,7 +46,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
 	})
 
-	t.Run("fill tyk extension with supplied params", func(t *testing.T) {
+	t.Run("build tyk extension with supplied params", func(t *testing.T) {
 		oasDef := OAS{
 			T: openapi3.T{
 				Info: &openapi3.Info{
@@ -87,7 +87,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
 	})
 
-	t.Run("do not over ride existing tyk extension by default", func(t *testing.T) {
+	t.Run("do not override existing tyk extension by default", func(t *testing.T) {
 		oasDef := OAS{
 			T: openapi3.T{
 				Info: &openapi3.Info{
@@ -137,7 +137,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
 	})
 
-	t.Run("over ride existing tyk extension with supplied params", func(t *testing.T) {
+	t.Run("override existing tyk extension with supplied params", func(t *testing.T) {
 		oasDef := OAS{
 			T: openapi3.T{
 				Info: &openapi3.Info{
