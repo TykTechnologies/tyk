@@ -143,16 +143,19 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 		serliazerSuffix := r.analyticsSerializer.GetSuffix()
 		analyticKey += serliazerSuffix
 		readyToSend := false
+
 		flushTimer := time.NewTimer(recordsBufferFlushInterval)
+
 
 		select {
 		case record, ok := <-r.recordsChan:
+			if !flushTimer.Stop() {
+				// if the timer has been stopped then read from the channel to avoid leak
+				<-flushTimer.C
+			}
+
 			// check if channel was closed and it is time to exit from worker
 			if !ok {
-				if !flushTimer.Stop() {
-					// if the timer has been stopped then read from the channel to avoid leak
-					<-flushTimer.C
-				}
 				// send what is left in buffer
 				r.Store.AppendToSetPipelined(analyticKey, recordsBuffer)
 				return
@@ -206,10 +209,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			readyToSend = true
 		}
 
-		if !flushTimer.Stop() {
-			// if the timer has been stopped then read from the channel to avoid leak
-			<-flushTimer.C
-		}
+
 
 		// send data to Redis and reset buffer
 		if len(recordsBuffer) > 0 && (readyToSend || time.Since(lastSentTs) >= recordsBufferForcedFlushInterval) {
