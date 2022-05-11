@@ -49,7 +49,6 @@ func TestAnalytics_Write(t *testing.T) {
 
 			// Cleanup before test
 			// let records to to be sent
-			time.Sleep(recordsBufferFlushInterval + 50)
 			ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 
 			t.Run("Log errors", func(t *testing.T) {
@@ -60,8 +59,9 @@ func TestAnalytics_Write(t *testing.T) {
 				if err != nil {
 					t.Error("Error executing test case")
 				}
-				// let records to to be sent
-				time.Sleep(recordsBufferFlushInterval + 50)
+
+				//Restart will empty the analytics buffer into redis, stop the analytics processing and start it again
+				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 2 {
@@ -92,7 +92,8 @@ func TestAnalytics_Write(t *testing.T) {
 					t.Error("Error executing test case")
 				}
 				// let records to to be sent
-				time.Sleep(recordsBufferFlushInterval + 50)
+
+				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 1 {
@@ -136,8 +137,8 @@ func TestAnalytics_Write(t *testing.T) {
 					t.Error("Error executing test case")
 				}
 
-				// let records to to be sent
-				time.Sleep(recordsBufferFlushInterval + 50)
+				// let records to  be sent
+				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 1 {
@@ -192,7 +193,7 @@ func TestAnalytics_Write(t *testing.T) {
 				}
 
 				// let records to to be sent
-				time.Sleep(recordsBufferFlushInterval + 50)
+				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 1 {
@@ -242,7 +243,7 @@ func TestAnalytics_Write(t *testing.T) {
 					t.Error("Error executing test case")
 				}
 				// let records to to be sent
-				time.Sleep(recordsBufferFlushInterval + 50)
+				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 1 {
@@ -301,7 +302,7 @@ func TestAnalytics_Write(t *testing.T) {
 				}
 
 				// let records to to be sent
-				time.Sleep(recordsBufferFlushInterval + 50)
+				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 1 {
@@ -368,7 +369,7 @@ func TestAnalytics_Write(t *testing.T) {
 				}
 
 				// let records to to be sent
-				time.Sleep(recordsBufferFlushInterval + 50)
+				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 2 {

@@ -72,17 +72,22 @@ func (r *RedisAnalyticsHandler) Init() {
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
 	r.enableMultipleAnalyticsKeys = r.globalConf.AnalyticsConfig.EnableMultipleAnalyticsKeys
-	r.recordsChan = make(chan *analytics.AnalyticsRecord, recordsBufferSize)
-
 	r.analyticsSerializer = serializer.NewAnalyticsSerializer(r.globalConf.AnalyticsConfig.SerializerType)
-	// start worker pool
+
+	r.Start()
+}
+
+//Start initialize the records channel and spawn the record workers
+func (r *RedisAnalyticsHandler) Start() {
+	r.recordsChan = make(chan *analytics.AnalyticsRecord, r.globalConf.AnalyticsConfig.RecordsBufferSize)
 	atomic.SwapUint32(&r.shouldStop, 0)
-	for i := 0; i < ps; i++ {
+	for i := 0; i < r.Gw.GetConfig().AnalyticsConfig.PoolSize; i++ {
 		r.poolWg.Add(1)
 		go r.recordWorker()
 	}
 }
 
+//Stop stops the analytics processing
 func (r *RedisAnalyticsHandler) Stop() {
 	// flag to stop sending records into channel
 	atomic.SwapUint32(&r.shouldStop, 1)
@@ -94,6 +99,13 @@ func (r *RedisAnalyticsHandler) Stop() {
 
 	// wait for all workers to be done
 	r.poolWg.Wait()
+}
+
+//Flush will stop the analytics processing and empty the analytics buffer and then re-init the workers again
+func (r *RedisAnalyticsHandler) Flush() {
+	r.Stop()
+
+	r.Start()
 }
 
 // RecordHit will store an analytics.Record in Redis
@@ -131,11 +143,16 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 		serliazerSuffix := r.analyticsSerializer.GetSuffix()
 		analyticKey += serliazerSuffix
 		readyToSend := false
-		select {
+		flushTimer := time.NewTimer(recordsBufferFlushInterval)
 
+		select {
 		case record, ok := <-r.recordsChan:
 			// check if channel was closed and it is time to exit from worker
 			if !ok {
+				if !flushTimer.Stop() {
+					// if the timer has been stopped then read from the channel to avoid leak
+					<-flushTimer.C
+				}
 				// send what is left in buffer
 				r.Store.AppendToSetPipelined(analyticKey, recordsBuffer)
 				return
@@ -183,11 +200,15 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 			// identify that buffer is ready to be sent
 			readyToSend = uint64(len(recordsBuffer)) == r.workerBufferSize
-
-		case <-time.After(recordsBufferFlushInterval):
+		case <-flushTimer.C:
 			// nothing was received for that period of time
 			// anyways send whatever we have, don't hold data too long in buffer
 			readyToSend = true
+		}
+
+		if !flushTimer.Stop() {
+			// if the timer has been stopped then read from the channel to avoid leak
+			<-flushTimer.C
 		}
 
 		// send data to Redis and reset buffer
