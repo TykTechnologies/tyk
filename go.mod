@@ -16,7 +16,7 @@ require (
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
 	github.com/TykTechnologies/openid2go v0.0.0-20200312160651-00c254a52b19
-	github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220503202414-da623b44f763
+	github.com/TykTechnologies/tyk-pump v1.2.1-rc2.0.20220511142453-c0bc0e2ab6a6
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 	github.com/buger/jsonparser v1.1.1
