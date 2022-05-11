@@ -95,9 +95,11 @@ func (s *OAS) GetTykExtension() *XTykAPIGateway {
 }
 
 func (s *OAS) RemoveTykExtension() {
+
 	if s.Extensions == nil {
 		return
 	}
+
 	delete(s.Extensions, ExtensionTykAPIGateway)
 }
 
