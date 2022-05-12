@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/TykTechnologies/tyk/analytics"
+	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"golang.org/x/net/http2/h2c"
 
@@ -231,7 +231,7 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 				if spec.DoNotTrack {
 					continue
 				}
-				record := analytics.Record{
+				record := analytics.AnalyticsRecord{
 					Network:      spec.network.Flush(),
 					Day:          t.Day(),
 					Month:        t.Month(),

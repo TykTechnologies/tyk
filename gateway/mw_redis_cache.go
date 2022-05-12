@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/murmur3"
-	"github.com/TykTechnologies/tyk/analytics"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
