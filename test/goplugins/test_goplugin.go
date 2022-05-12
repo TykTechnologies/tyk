@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -147,7 +146,7 @@ func MyPluginPerPathResp(rw http.ResponseWriter, r *http.Request) {
 	rw.Write(jsonData)
 }
 
-func MyAnalyticsPluginDeleteHeader(record *analytics.Record, test bool) {
+func MyAnalyticsPluginDeleteHeader(record *analytics.Record, t bool) {
 	str, err := base64.StdEncoding.DecodeString(record.RawResponse)
 	if err != nil {
 		return
@@ -155,8 +154,6 @@ func MyAnalyticsPluginDeleteHeader(record *analytics.Record, test bool) {
 
 	var b = &bytes.Buffer{}
 	b.Write(str)
-
-	fmt.Println("test")
 
 	r := bufio.NewReader(b)
 	var resp *http.Response
