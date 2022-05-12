@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/analytics"
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
@@ -198,11 +198,11 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			host = s.Spec.target.Host
 		}
 
-		record := analytics.Record{
+		record := analytics.AnalyticsRecord{
 			Method:        r.Method,
 			Host:          host,
-			RawPath:       trackedPath,
-			Path:          r.URL.Path,
+			Path:          trackedPath,
+			RawPath:       r.URL.Path,
 			ContentLength: r.ContentLength,
 			UserAgent:     r.Header.Get(headers.UserAgent),
 			Day:           t.Day(),
@@ -218,12 +218,12 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			OrgID:         s.Spec.OrgID,
 			OauthID:       oauthClientID,
 			RequestTime:   timing.Total,
-			Latency:       timing,
 			RawRequest:    rawRequest,
 			RawResponse:   rawResponse,
 			IPAddress:     ip,
 			Geo:           analytics.GeoData{},
 			Network:       analytics.NetworkStats{},
+			Latency:       timing,
 			Tags:          tags,
 			Alias:         alias,
 			TrackPath:     trackEP,
@@ -231,7 +231,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		}
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			GetGeo(&record, ip, s.Gw)
+			record.GetGeo(ip, s.Gw.Analytics.GeoIPDB)
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
@@ -247,7 +247,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		record.SetExpiry(expiresAfter)
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-			record.NormalisePath(&s.Spec.GlobalConfig)
+			NormalisePath(&record, &s.Spec.GlobalConfig)
 		}
 
 		if s.Spec.AnalyticsPlugin.Enabled {

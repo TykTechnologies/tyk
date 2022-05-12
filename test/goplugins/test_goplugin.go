@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/analytics"
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
@@ -146,7 +146,7 @@ func MyPluginPerPathResp(rw http.ResponseWriter, r *http.Request) {
 	rw.Write(jsonData)
 }
 
-func MyAnalyticsPluginDeleteHeader(record *analytics.Record) {
+func MyAnalyticsPluginDeleteHeader(record *analytics.AnalyticsRecord) {
 	str, err := base64.StdEncoding.DecodeString(record.RawResponse)
 	if err != nil {
 		return
@@ -167,7 +167,7 @@ func MyAnalyticsPluginDeleteHeader(record *analytics.Record) {
 	record.RawResponse = base64.StdEncoding.EncodeToString(bNew.Bytes())
 }
 
-func MyAnalyticsPluginMaskJSONLoginBody(record *analytics.Record) {
+func MyAnalyticsPluginMaskJSONLoginBody(record *analytics.AnalyticsRecord) {
 	if record.ContentLength < 1 {
 		return
 	}

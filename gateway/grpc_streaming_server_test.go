@@ -41,7 +41,7 @@ import (
 
 type routeGuideServer struct {
 	savedFeatures []*pb.Feature // read-only after initialized
-
+	pb.UnimplementedRouteGuideServer
 	mu         sync.Mutex // protects routeNotes
 	routeNotes map[string][]*pb.RouteNote
 }

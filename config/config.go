@@ -208,6 +208,9 @@ type AnalyticsConfigConfig struct {
 	PurgeInterval float32 `json:"purge_interval"`
 
 	ignoredIPsCompiled map[string]bool
+
+	// Determines the serialization engine for analytics. Available options: msgpack, and protobuf. By default, msgpack.
+	SerializerType string `json:"serializer_type"`
 }
 
 type HealthCheckConfig struct {
