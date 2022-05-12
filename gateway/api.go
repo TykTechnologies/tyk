@@ -1150,7 +1150,7 @@ func (gw *Gateway) apiOASHandler(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	switch r.Method {
-	case "GET":
+	case http.MethodGet:
 		if apiID != "" {
 			log.Debugf("Requesting API definition for %q", apiID)
 			obj, code = gw.handleGetAPIOAS(apiID, false)
@@ -1158,10 +1158,10 @@ func (gw *Gateway) apiOASHandler(w http.ResponseWriter, r *http.Request) {
 			log.Debug("Requesting API list")
 			obj, code = gw.handleGetAPIListOAS(false)
 		}
-	case "POST":
+	case http.MethodPost:
 		log.Debug("Creating new definition file")
 		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
-	case "PUT":
+	case http.MethodPut:
 		if apiID != "" {
 			log.Debugf("Updating existing API: %q", apiID)
 			obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
