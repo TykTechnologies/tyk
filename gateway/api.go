@@ -113,6 +113,32 @@ func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	}
 }
 
+func doJSONExport(w http.ResponseWriter, code int, obj interface{}, fileName string) {
+
+	if code != http.StatusOK {
+		doJSONWrite(w, code, obj)
+		return
+	}
+
+	stream, err := json.MarshalIndent(obj, "", "  ")
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=%q", fileName))
+	w.WriteHeader(code)
+	_, err = w.Write(stream)
+
+	if err != nil {
+		job := instrument.NewJob("SystemAPIError")
+		job.Event(err.Error())
+	}
+
+}
+
 type MethodNotAllowedHandler struct{}
 
 func (m MethodNotAllowedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -1144,19 +1170,21 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gw *Gateway) apiOASHandler(w http.ResponseWriter, r *http.Request) {
-	apiID := mux.Vars(r)["apiID"]
-
-	var obj interface{}
-	var code int
+	var (
+		apiID       = mux.Vars(r)["apiID"]
+		scopePublic = r.URL.Query().Get("mode") == "public"
+		obj         interface{}
+		code        int
+	)
 
 	switch r.Method {
 	case http.MethodGet:
 		if apiID != "" {
 			log.Debugf("Requesting API definition for %q", apiID)
-			obj, code = gw.handleGetAPIOAS(apiID, false)
+			obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
 		} else {
 			log.Debug("Requesting API list")
-			obj, code = gw.handleGetAPIListOAS(false)
+			obj, code = gw.handleGetAPIListOAS(scopePublic)
 		}
 	case http.MethodPost:
 		log.Debug("Creating new definition file")
@@ -1173,21 +1201,34 @@ func (gw *Gateway) apiOASHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
-func (gw *Gateway) apiOASHandlerPublic(w http.ResponseWriter, r *http.Request) {
-	apiID := mux.Vars(r)["apiID"]
+func (gw *Gateway) apiOASExportHandler(w http.ResponseWriter, r *http.Request) {
+	const (
+		baseFileName       = "TykOasApiDef"
+		baseFileNamePublic = "oas"
+		fileTypeJSON       = "json"
+	)
+	var (
+		apiID       = mux.Vars(r)["apiID"]
+		fileName    = baseFileName
+		scopePublic = r.URL.Query().Get("mode") == "public"
+		obj         interface{}
+		code        int
+	)
 
-	var obj interface{}
-	var code int
+	if scopePublic {
+		fileName = baseFileNamePublic
+	}
 
 	if apiID != "" {
 		log.Debugf("Requesting API definition for %q", apiID)
-		obj, code = gw.handleGetAPIOAS(apiID, true)
+		obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
+		fileName += "-" + apiID
 	} else {
 		log.Debug("Requesting API list")
-		obj, code = gw.handleGetAPIListOAS(true)
+		obj, code = gw.handleGetAPIListOAS(scopePublic)
 	}
 
-	doJSONWrite(w, code, obj)
+	doJSONExport(w, code, obj, fmt.Sprintf("%s.%s", fileName, fileTypeJSON))
 }
 
 func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {

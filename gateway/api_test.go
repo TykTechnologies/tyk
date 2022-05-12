@@ -2012,16 +2012,25 @@ func TestOAS(t *testing.T) {
 				testUpdateAPI(t, ts, &oasAPI, apiID, true)
 			})
 		})
-		t.Run("oas api/public", func(t *testing.T) {
+		t.Run("oas api/export", func(t *testing.T) {
 			apiID := oasAPIID
-			oasPublicPath := "/tyk/apis/oas/public"
+			oasExportPath := "/tyk/apis/oas/export"
+			matchHeaders := map[string]string{
+				"Content-Type": "application/octet-stream",
+			}
 
 			t.Run("with old", func(t *testing.T) {
 
 				t.Run("get", func(t *testing.T) {
 					_, _ = ts.Run(t, []test.TestCase{
-						{AdminAuth: true, Method: http.MethodGet, Path: oasPublicPath, BodyMatch: `\[\{.*components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK},
-						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID + "/public", BodyMatch: `components`, Code: http.StatusOK},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath, BodyMatch: `\"x-tyk-api-gateway\":`, Code: http.StatusOK, HeadersMatch: matchHeaders},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID + "/export", BodyMatch: `\"x-tyk-api-gateway\":`, Code: http.StatusOK, HeadersMatch: matchHeaders},
+					}...)
+				})
+				t.Run("get scope public", func(t *testing.T) {
+					_, _ = ts.Run(t, []test.TestCase{
+						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath + "?mode=public", BodyMatch: `.*components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID + "/export?mode=public", BodyMatch: `components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
 					}...)
 				})
 
@@ -2030,23 +2039,26 @@ func TestOAS(t *testing.T) {
 			})
 
 			t.Run("with oas", func(t *testing.T) {
-				const oasPublicPath = "/tyk/apis/oas/public"
+				const oasExportPath = "/tyk/apis/oas/export"
 
 				t.Run("get", func(t *testing.T) {
 					_, _ = ts.Run(t, []test.TestCase{
-						{AdminAuth: true, Method: http.MethodGet, Path: oasPublicPath, BodyMatch: `\[\{.*components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK},
-						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oasAPIID + "/public", BodyMatch: `components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath, BodyMatch: `\"x-tyk-api-gateway\":`, Code: http.StatusOK, HeadersMatch: matchHeaders},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oasAPIID + "/export", BodyMatch: `\"x-tyk-api-gateway\":`, Code: http.StatusOK, HeadersMatch: matchHeaders},
+					}...)
+				})
+				t.Run("get scope public", func(t *testing.T) {
+					_, _ = ts.Run(t, []test.TestCase{
+						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oasAPIID + "/export?mode=public", BodyMatch: `components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
 					}...)
 				})
 			})
 
 			t.Run("not found", func(t *testing.T) {
-				const oasPublicPath = "/tyk/apis/oas/public"
 
 				t.Run("get", func(t *testing.T) {
 					_, _ = ts.Run(t, []test.TestCase{
-						{AdminAuth: true, Method: http.MethodGet, Path: oasPublicPath, BodyMatch: `\[\{.*components`, BodyNotMatch: ".*\"components\":", Code: http.StatusOK},
-						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + "invalidID" + "/public", BodyNotMatch: ".*\"components\":", Code: http.StatusNotFound},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath + "/invalidID/export", BodyNotMatch: ".*\"components\":", Code: http.StatusNotFound, HeadersNotMatch: matchHeaders},
 					}...)
 				})
 

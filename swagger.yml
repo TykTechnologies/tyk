@@ -317,6 +317,12 @@ paths:
       tags:
         - APIs
       operationId: listApisOAS
+      parameters:
+      - description: mode of export(e.g public)
+        name: mode
+        in: query
+        schema:
+          type: string
       responses:
         '200':
           description: List of API definitions in OAS format
@@ -478,6 +484,12 @@ paths:
         Only if used without the Tyk Dashboard
       tags:
         - APIs
+      parameters:
+      - description: mode of export(e.g public)
+        name: mode
+        in: query
+        schema:
+          type: string
       operationId: listApiOAS
       responses:
         '200':
@@ -533,7 +545,7 @@ paths:
                 status: "error"
                 message: "Malformed API data"
 
-  '/tyk/apis/oas/{apiID}/public':
+  '/tyk/apis/oas/{apiID}/export':
     parameters:
       - description: The API ID
         name: apiID
@@ -543,11 +555,17 @@ paths:
           type: string
     get:
       description: |-
-        Get API definition in OAS format with tyk gateway info stripped,
+        download API definition in OAS format,
         Only if used without the Tyk Dashboard
       tags:
         - APIs
-      operationId: listApiOASPublic
+      operationId: downloadApiOASPublic
+      parameters:
+      - description: mode of export(e.g public)
+        name: mode
+        in: query
+        schema:
+          type: string
       responses:
         '200':
           description: API definition
@@ -561,14 +579,20 @@ paths:
                 active: true
                 proxy:
                   listen_path: "/test"  
-  '/tyk/apis/oas/public':
+  '/tyk/apis/oas/export':
     get:
       description: |-
-        Get list of API definition in OAS format with tyk gateway info stripped,
+        Download list of API definition in OAS format,
         Only if used without the Tyk Dashboard
       tags:
         - APIs
-      operationId: listApisOASPublic
+      operationId: downloadApisOASPublic
+      parameters:
+      - description: mode of export(e.g public)
+        name: mode
+        in: query
+        schema:
+          type: string
       responses:
         '200':
           description: API definition
