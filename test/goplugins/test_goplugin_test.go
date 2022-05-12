@@ -14,7 +14,7 @@ func ExampleMyAnalyticsPluginDeleteHeader() {
 		ContentLength: 5,
 		RawResponse:   base64.StdEncoding.EncodeToString([]byte("HTTP/1.1 200 OK\r\nServer: golang\r\nContent-Length: 5\r\n\r\nHello")),
 	}
-	MyAnalyticsPluginDeleteHeader(&record)
+	MyAnalyticsPluginDeleteHeader(&record, false)
 	data, _ := base64.StdEncoding.DecodeString(record.RawResponse)
 	fmt.Printf("%q", string(data))
 	// Output: "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello"
