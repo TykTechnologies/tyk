@@ -7,10 +7,10 @@ import (
 	"errors"
 	"plugin"
 
-	"github.com/TykTechnologies/tyk/analytics"
+	"github.com/TykTechnologies/tyk-pump/analytics"
 )
 
-func GetAnalyticsHandler(path string, symbol string) (func(record *analytics.Record), error) {
+func GetAnalyticsHandler(path string, symbol string) (func(record *analytics.AnalyticsRecord), error) {
 	// try to load plugin
 	loadedPlugin, err := plugin.Open(path)
 	if err != nil {
@@ -24,7 +24,7 @@ func GetAnalyticsHandler(path string, symbol string) (func(record *analytics.Rec
 	}
 
 	// try to cast symbol to real func
-	pluginHandler, ok := funcSymbol.(func(record *analytics.Record))
+	pluginHandler, ok := funcSymbol.(func(record *analytics.AnalyticsRecord))
 	if !ok {
 		return nil, errors.New("could not cast function symbol to AnalyticsPlugin function")
 	}

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/TykTechnologies/tyk/analytics"
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/sirupsen/logrus"
 )
@@ -13,7 +13,7 @@ import (
 type GoAnalyticsPlugin struct {
 	Path     string // path to .so file
 	FuncName string // function symbol to look up
-	handler  func(record *analytics.Record)
+	handler  func(record *analytics.AnalyticsRecord)
 	logger   *logrus.Entry
 }
 
@@ -39,7 +39,7 @@ func (m *GoAnalyticsPlugin) loadAnalyticsPlugin() bool {
 	return true
 }
 
-func (m *GoAnalyticsPlugin) processRecord(record *analytics.Record) (err error) {
+func (m *GoAnalyticsPlugin) processRecord(record *analytics.AnalyticsRecord) (err error) {
 	// make sure tyk recover in case Go-plugin function panics
 	defer func() {
 

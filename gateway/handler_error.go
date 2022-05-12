@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/analytics"
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/headers"
@@ -283,11 +283,11 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			host = e.Spec.target.Host
 		}
 
-		record := analytics.Record{
+		record := analytics.AnalyticsRecord{
 			Method:        r.Method,
 			Host:          host,
-			RawPath:       trackedPath,
-			Path:          r.URL.Path,
+			Path:          trackedPath,
+			RawPath:       r.URL.Path,
 			ContentLength: r.ContentLength,
 			UserAgent:     r.Header.Get(headers.UserAgent),
 			Day:           t.Day(),
@@ -316,7 +316,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			GetGeo(&record, ip, e.Gw)
+			record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)
 		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
@@ -329,11 +329,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			}
 
 		}
-
 		record.SetExpiry(expiresAfter)
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-			record.NormalisePath(&e.Spec.GlobalConfig)
+			NormalisePath(&record, &e.Spec.GlobalConfig)
 		}
 
 		if e.Spec.AnalyticsPlugin.Enabled {

@@ -2,11 +2,8 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
-
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -104,6 +101,7 @@ func (r Purger) PurgeLoop(ctx context.Context, interval time.Duration) {
 
 // PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
 func (r *Purger) PurgeCache() {
+
 	if !values.ClientIsConnected() {
 		Log.Error("RPC client is not connected, use Connect method 1st")
 	}
@@ -119,35 +117,26 @@ func (r *Purger) PurgeCache() {
 			//if it's the first iteration, we look for tyk-system-analytics to maintain backwards compatibility or if analytics_config.enable_multiple_analytics_keys is disabled in the gateway
 			analyticsKeyName = ANALYTICS_KEYNAME
 		} else {
+			// keyname + serializationmethod
 			analyticsKeyName = fmt.Sprintf("%v_%v", ANALYTICS_KEYNAME, i)
 		}
 
-		analyticsValues := r.Store.GetAndDeleteSet(analyticsKeyName)
-		if len(analyticsValues) == 0 {
-			continue
-		}
-		keys := make([]interface{}, len(analyticsValues))
+		for _, serializerMethod := range AnalyticsSerializers {
 
-		for i, v := range analyticsValues {
-			decoded := AnalyticsRecord{}
-			if err := msgpack.Unmarshal([]byte(v.(string)), &decoded); err != nil {
-				Log.WithError(err).Error("Couldn't unmarshal analytics data")
-			} else {
-				Log.WithField("decoded", decoded).Debug("Decoded Record")
-				keys[i] = decoded
+			analyticsKeyName += serializerMethod.GetSuffix()
+			analyticsValues := r.Store.GetAndDeleteSet(analyticsKeyName)
+			if len(analyticsValues) == 0 {
+				continue
 			}
+
+			for _, v := range analyticsValues {
+				if _, err := FuncClientSingleton("PurgeAnalyticsData", v); err != nil {
+					EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
+					Log.Warn("Failed to call purge, retrying: ", err)
+				}
+			}
+
 		}
 
-		data, err := json.Marshal(keys)
-		if err != nil {
-			Log.WithError(err).Error("Failed to marshal analytics data")
-			return
-		}
-
-		// Send keys to RPC
-		if _, err := FuncClientSingleton("PurgeAnalyticsData", string(data)); err != nil {
-			EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
-			Log.Warn("Failed to call purge, retrying: ", err)
-		}
 	}
 }
