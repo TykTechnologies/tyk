@@ -7,12 +7,13 @@ import (
 )
 
 const (
-	invalidServerURLFmt = "Error validating servers entry in OAS: Please update %q to be a valid url or pass a valid url with upstreamURL query param"
+	invalidServerURLFmt = "Please update %q to be a valid url or pass a valid url with upstreamURL query param"
 )
 
 var (
 	errEmptyServersObject = errors.New("servers object is empty in OAS")
 	errInvalidUpstreamURL = errors.New("invalid upstream URL")
+	errInvalidServerURL   = errors.New("Error validating servers entry in OAS")
 )
 
 type TykExtensionConfigParams struct {
@@ -68,7 +69,7 @@ func getURLFormatErr(fromParam bool, upstreamURL string) error {
 		if fromParam {
 			return errInvalidUpstreamURL
 		}
-		return fmt.Errorf(invalidServerURLFmt, upstreamURL)
+		return fmt.Errorf("%w: %s", errInvalidServerURL, fmt.Sprintf(invalidServerURLFmt, url))
 	}
 
 	return nil

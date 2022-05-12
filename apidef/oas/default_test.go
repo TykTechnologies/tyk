@@ -1,7 +1,6 @@
 package oas
 
 import (
-	"fmt"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -254,8 +253,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		oasDef.SetTykExtension(&existingTykExtension)
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{})
-		expectedErrStr := fmt.Sprintf(invalidServerURLFmt, oasDef.Servers[0].URL)
-		assert.EqualError(t, err, expectedErrStr)
+		assert.ErrorIs(t, err, errInvalidServerURL)
 	})
 
 	t.Run("error when no supplied params and no servers", func(t *testing.T) {
