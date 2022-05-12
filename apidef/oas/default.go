@@ -3,7 +3,7 @@ package oas
 import (
 	"errors"
 	"fmt"
-	neturl "net/url"
+	"net/url"
 )
 
 const (
@@ -64,12 +64,12 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 }
 
 func getURLFormatErr(fromParam bool, upstreamURL string) error {
-	url, err := neturl.Parse(upstreamURL)
-	if err != nil || !url.IsAbs() {
+	parsedURL, err := url.Parse(upstreamURL)
+	if err != nil || !parsedURL.IsAbs() {
 		if fromParam {
 			return errInvalidUpstreamURL
 		}
-		return fmt.Errorf("%w: %s", errInvalidServerURL, fmt.Sprintf(invalidServerURLFmt, url))
+		return fmt.Errorf("%w: %s", errInvalidServerURL, fmt.Sprintf(invalidServerURLFmt, parsedURL))
 	}
 
 	return nil
