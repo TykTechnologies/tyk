@@ -155,6 +155,11 @@ type ExtendedCircuitBreakerMeta struct {
 	CB *circuit.Breaker `json:"-"`
 }
 
+type apiTransport struct {
+	HTTPTransport        *TykRoundTripper
+	HTTPTransportCreated time.Time
+}
+
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
 // flattened URL list is checked for matching paths and then it's status evaluated if found.
 type APISpec struct {
@@ -178,7 +183,7 @@ type APISpec struct {
 	LastGoodHostList         *apidef.HostList
 	HasRun                   bool
 	ServiceRefreshInProgress bool
-	HTTPTransport            *TykRoundTripper
+	Transport                map[string]apiTransport
 	HTTPTransportCreated     time.Time
 	WSTransport              http.RoundTripper
 	WSTransportCreated       time.Time
@@ -265,6 +270,8 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	}
 
 	spec.APIDefinition = def
+
+	spec.Transport = make(map[string]apiTransport)
 
 	// We'll push the default HealthChecker:
 	spec.Health = &DefaultHealthChecker{

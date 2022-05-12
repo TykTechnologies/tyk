@@ -598,7 +598,7 @@ func (j *JSVM) LoadTykJSApi() {
 	})
 
 	// Batch request method
-	unsafeBatchHandler := BatchRequestHandler{}
+	unsafeBatchHandler := BatchRequestHandler{API: j.Spec}
 	j.VM.Set("TykBatchRequest", func(call otto.FunctionCall) otto.Value {
 		requestSet := call.Argument(0).String()
 		j.Log.Debug("Batch input is: ", requestSet)

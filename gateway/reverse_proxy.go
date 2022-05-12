@@ -844,35 +844,37 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// Circuit breaker
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
 
-	// set up TLS certificates for upstream if needed
-	var tlsCertificates []tls.Certificate
-	if cert := getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec); cert != nil {
-		p.logger.Debug("Found upstream mutual TLS certificate")
-		tlsCertificates = []tls.Certificate{*cert}
-	}
-
 	p.TykAPISpec.Lock()
 
 	// create HTTP transport
-	createTransport := p.TykAPISpec.HTTPTransport == nil
+	transport, transportFound := p.TykAPISpec.Transport[outreq.URL.Host]
 
 	// Check if timeouts are set for this endpoint
-	if !createTransport && config.Global().MaxConnTime != 0 {
-		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
+	if transportFound && config.Global().MaxConnTime != 0 {
+		transportFound = !(time.Since(transport.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second)
 	}
 
-	if createTransport {
+	if !transportFound {
+		// set up TLS certificates for upstream if needed
+		var tlsCertificates []tls.Certificate
+		if cert := getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec); cert != nil {
+			p.logger.Debug("Found upstream mutual TLS certificate")
+			tlsCertificates = []tls.Certificate{*cert}
+		}
+
+		transport = apiTransport{}
+
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, outreq, p)
-		p.TykAPISpec.HTTPTransportCreated = time.Now()
+		transport.HTTPTransport = httpTransport(timeout, rw, req, outreq, p)
+		transport.HTTPTransportCreated = time.Now()
+		transport.HTTPTransport.transport.TLSClientConfig.Certificates = tlsCertificates
+
+		p.TykAPISpec.Transport[outreq.URL.Host] = transport
 	}
 
-	roundTripper = p.TykAPISpec.HTTPTransport
-
-	// if roundTripper.transport != nil {
-	roundTripper.transport.TLSClientConfig.Certificates = tlsCertificates
-	// }
 	p.TykAPISpec.Unlock()
+
+	roundTripper = transport.HTTPTransport
 
 	if outreq.URL.Scheme == "h2c" {
 		outreq.URL.Scheme = "http"
