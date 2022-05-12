@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"fmt"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -24,7 +25,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		}
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		expectedTykExtension := XTykAPIGateway{
 			Server: Server{
@@ -222,7 +223,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			ListenPath:  "/new-listen-api",
 			UpstreamURL: "invalid-url",
 		})
-		assert.EqualError(t, err, "invalid upstream URL")
+		assert.ErrorIs(t, err, errInvalidUpstreamURL)
 	})
 
 	t.Run("error when no supplied params and invalid URL in servers", func(t *testing.T) {
@@ -253,7 +254,8 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		oasDef.SetTykExtension(&existingTykExtension)
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{})
-		assert.EqualError(t, err, `Error validating servers entry in OAS: Please update "/listen-api" to be a valid url or pass a valid url with upstreamURL query param`)
+		expectedErrStr := fmt.Sprintf(invalidServerURLFmt, oasDef.Servers[0].URL)
+		assert.EqualError(t, err, expectedErrStr)
 	})
 
 	t.Run("error when no supplied params and no servers", func(t *testing.T) {
@@ -279,6 +281,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		oasDef.SetTykExtension(&existingTykExtension)
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{})
-		assert.EqualError(t, err, "servers object is empty in OAS")
+		assert.ErrorIs(t, err, errEmptyServersObject)
 	})
 }

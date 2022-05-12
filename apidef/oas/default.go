@@ -1,8 +1,18 @@
 package oas
 
 import (
+	"errors"
 	"fmt"
 	neturl "net/url"
+)
+
+const (
+	invalidServerURLFmt = "Error validating servers entry in OAS: Please update %q to be a valid url or pass a valid url with upstreamURL query param"
+)
+
+var (
+	errEmptyServersObject = errors.New("servers object is empty in OAS")
+	errInvalidUpstreamURL = errors.New("invalid upstream URL")
 )
 
 type TykExtensionConfigParams struct {
@@ -31,31 +41,35 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 		xTykAPIGateway.Server.ListenPath.Value = "/"
 	}
 
-	var (
-		url *neturl.URL
-		err error
-	)
+	var upstreamURL string
 
 	if overRideValues.UpstreamURL != "" {
-		url, err = neturl.Parse(overRideValues.UpstreamURL)
-		if err != nil || !url.IsAbs() {
-			return fmt.Errorf("invalid upstream URL")
-		}
-
+		upstreamURL = overRideValues.UpstreamURL
 	} else {
 		if len(s.Servers) == 0 {
-			return fmt.Errorf("servers object is empty in OAS")
+			return errEmptyServersObject
 		}
 
-		serverURL := s.Servers[0].URL
-		url, err = neturl.Parse(serverURL)
-		if err != nil || !url.IsAbs() {
-			return fmt.Errorf("Error validating servers entry in OAS: Please update %q to be a valid url or pass a valid url with upstreamURL query param", serverURL)
-		}
-
+		upstreamURL = s.Servers[0].URL
 	}
 
-	xTykAPIGateway.Upstream.URL = url.String()
+	if err := getURLFormatErr(overRideValues.UpstreamURL != "", upstreamURL); err != nil {
+		return err
+	}
+
+	xTykAPIGateway.Upstream.URL = upstreamURL
+
+	return nil
+}
+
+func getURLFormatErr(fromParam bool, upstreamURL string) error {
+	url, err := neturl.Parse(upstreamURL)
+	if err != nil || !url.IsAbs() {
+		if fromParam {
+			return errInvalidUpstreamURL
+		}
+		return fmt.Errorf(invalidServerURLFmt, upstreamURL)
+	}
 
 	return nil
 }
