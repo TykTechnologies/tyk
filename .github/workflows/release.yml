@@ -36,7 +36,7 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
 
-    container: tykio/golang-cross:1.12
+    container: tykio/golang-cross:1.15
 
     outputs:
       tag: ${{ steps.targets.outputs.tag }}
