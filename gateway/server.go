@@ -506,7 +506,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		pols = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
-		pols, err = gw.LoadPoliciesFromRPC(gw.GetConfig().SlaveOptions.RPCKey)
+		pols, err = gw.LoadPoliciesFromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	default:
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
