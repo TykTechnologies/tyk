@@ -67,7 +67,7 @@ require (
 	github.com/spf13/afero v1.6.0
 	github.com/square/go-jose v2.4.1+incompatible
 	github.com/stretchr/testify v1.7.0
-	github.com/uber/jaeger-client-go v2.19.0+incompatible
+	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/valyala/fasthttp v1.15.1
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/xeipuuv/gojsonschema v1.2.0
