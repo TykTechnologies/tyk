@@ -6,14 +6,12 @@ import (
 	"strconv"
 	"testing"
 
-	kafkaDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	kafkaDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -719,11 +717,12 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			Factory: &kafkaDataSource.Factory{},
 			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
 				Subscription: kafkaDataSource.SubscriptionConfiguration{
-					BrokerAddr:   "localhost:9092",
-					Topic:        "test.topic",
-					GroupID:      "test.consumer.group",
-					ClientID:     "test.client.id",
-					KafkaVersion: "V2_8_0_0",
+					BrokerAddr:           "localhost:9092",
+					Topic:                "test.topic",
+					GroupID:              "test.consumer.group",
+					ClientID:             "test.client.id",
+					KafkaVersion:         "V2_8_0_0",
+					StartConsumingLatest: true,
 				},
 			}),
 		},
@@ -737,11 +736,12 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			Factory: &kafkaDataSource.Factory{},
 			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
 				Subscription: kafkaDataSource.SubscriptionConfiguration{
-					BrokerAddr:   "localhost:9092",
-					Topic:        "test.topic.{{.arguments.name}}",
-					GroupID:      "test.consumer.group",
-					ClientID:     "test.client.id",
-					KafkaVersion: "V2_8_0_0",
+					BrokerAddr:           "localhost:9092",
+					Topic:                "test.topic.{{.arguments.name}}",
+					GroupID:              "test.consumer.group",
+					ClientID:             "test.client.id",
+					KafkaVersion:         "V2_8_0_0",
+					StartConsumingLatest: true,
 				},
 			}),
 		},
@@ -990,7 +990,8 @@ var graphqlEngineV2ConfigJson = `{
 					"topic": "test.topic",
 					"group_id": "test.consumer.group",
 					"client_id": "test.client.id",
-					"kafka_version": "V2_8_0_0"
+					"kafka_version": "V2_8_0_0",
+					"start_consuming_latest": true
 				}
 			},
 			{
@@ -1008,7 +1009,8 @@ var graphqlEngineV2ConfigJson = `{
 					"topic": "test.topic.{{.arguments.name}}",
 					"group_id": "test.consumer.group",
 					"client_id": "test.client.id",
-					"kafka_version": "V2_8_0_0"
+					"kafka_version": "V2_8_0_0",
+					"start_consuming_latest": true
 				}
 			}
 		]
