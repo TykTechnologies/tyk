@@ -27,6 +27,8 @@
             "rpc_metrics": false,
             "sampler": {
                 "maxOperations": 0,
+                "options": [
+                ],
                 "param": 1,
                 "samplingRefreshInterval": "0s",
                 "samplingServerURL": "",
