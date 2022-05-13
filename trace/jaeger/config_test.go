@@ -19,8 +19,9 @@ func TestLoad(t *testing.T) {
 	cfg := config.Configuration{
 		ServiceName: "tyk-gateway",
 		Sampler: &config.SamplerConfig{
-			Type:  jaeger.SamplerTypeConst,
-			Param: 1,
+			Type:    jaeger.SamplerTypeConst,
+			Param:   1,
+			Options: []jaeger.SamplerOption{},
 		},
 		Reporter: &config.ReporterConfig{
 			LogSpans:           true,
