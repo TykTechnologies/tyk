@@ -203,6 +203,7 @@ func NewGateway(config config.Config, ctx context.Context, cancelFn context.Canc
 	gw.SetConfig(config)
 	sessionManager := DefaultSessionManager{Gw: &gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
+	gw.DefaultOrgStore = DefaultSessionManager{Gw: &gw}
 	gw.DefaultQuotaStore = DefaultSessionManager{Gw: &gw}
 	gw.SessionLimiter = SessionLimiter{Gw: &gw}
 	gw.SessionMonitor = Monitor{Gw: &gw}
