@@ -26,7 +26,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
