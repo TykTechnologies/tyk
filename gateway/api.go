@@ -1169,33 +1169,47 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
-func (gw *Gateway) apiOASHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	var (
 		apiID       = mux.Vars(r)["apiID"]
 		scopePublic = r.URL.Query().Get("mode") == "public"
 		obj         interface{}
 		code        int
 	)
+	if apiID != "" {
+		log.Debugf("Requesting API definition for %q", apiID)
+		obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
+	} else {
+		log.Debug("Requesting API list")
+		obj, code = gw.handleGetAPIListOAS(scopePublic)
+	}
 
-	switch r.Method {
-	case http.MethodGet:
-		if apiID != "" {
-			log.Debugf("Requesting API definition for %q", apiID)
-			obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
-		} else {
-			log.Debug("Requesting API list")
-			obj, code = gw.handleGetAPIListOAS(scopePublic)
-		}
-	case http.MethodPost:
-		log.Debug("Creating new definition file")
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		obj  interface{}
+		code int
+	)
+
+	log.Debug("Creating new definition file")
+	obj, code = gw.handleAddOrUpdateApi("", r, afero.NewOsFs(), true)
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		apiID = mux.Vars(r)["apiID"]
+		obj   interface{}
+		code  int
+	)
+	if apiID != "" {
+		log.Debugf("Updating existing API: %q", apiID)
 		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
-	case http.MethodPut:
-		if apiID != "" {
-			log.Debugf("Updating existing API: %q", apiID)
-			obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
-		} else {
-			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
-		}
+	} else {
+		obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 	}
 
 	doJSONWrite(w, code, obj)

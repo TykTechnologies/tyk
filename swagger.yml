@@ -318,11 +318,12 @@ paths:
         - APIs
       operationId: listApisOAS
       parameters:
-      - description: mode of export(e.g public)
+      - description: mode of export
         name: mode
         in: query
         schema:
           type: string
+        example: public
       responses:
         '200':
           description: List of API definitions in OAS format
@@ -485,11 +486,12 @@ paths:
       tags:
         - APIs
       parameters:
-      - description: mode of export(e.g public)
+      - description: mode of export
         name: mode
         in: query
         schema:
           type: string
+        example: public
       operationId: listApiOAS
       responses:
         '200':
@@ -561,11 +563,12 @@ paths:
         - APIs
       operationId: downloadApiOASPublic
       parameters:
-      - description: mode of export(e.g public)
+      - description: mode of export
         name: mode
         in: query
         schema:
           type: string
+        example: public
       responses:
         '200':
           description: API definition
@@ -588,11 +591,12 @@ paths:
         - APIs
       operationId: downloadApisOASPublic
       parameters:
-      - description: mode of export(e.g public)
+      - description: mode of export
         name: mode
         in: query
         schema:
           type: string
+        example: public
       responses:
         '200':
           description: API definition

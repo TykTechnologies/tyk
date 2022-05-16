@@ -2127,10 +2127,10 @@ func testUpdateAPI(t *testing.T, ts *Test, api interface{}, apiID string, oasTyp
 
 func testGetOASAPI(t *testing.T, d *Test, id, name, title string) (oasDoc openapi3.T) {
 
-	getPathWithOASParam := "/tyk/apis/oas/" + id
+	getPath := "/tyk/apis/oas/" + id
 	bodyMatch := fmt.Sprintf(`{.*"info":{"title":"%s".*"x-tyk-api-gateway":{"info":{.*"name":"%s"`, title, name)
 
-	resp, _ := d.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: getPathWithOASParam,
+	resp, _ := d.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: getPath,
 		BodyMatch: bodyMatch, Code: http.StatusOK})
 
 	respInBytes, _ := ioutil.ReadAll(resp.Body)
