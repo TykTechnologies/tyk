@@ -38,6 +38,8 @@ func (ts *Test) testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
 }
 
 func TestBasicAuth(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5223
+
 	ts := StartTest(nil)
 	defer ts.Close()
 

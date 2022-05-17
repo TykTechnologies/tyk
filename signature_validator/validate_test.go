@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestValidateSignature_Init(t *testing.T) {
@@ -40,6 +42,8 @@ func TestValidateSignature_Init(t *testing.T) {
 }
 
 func TestValidateSignature_Validate(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5264
+
 	type tt struct {
 		SignatureAttempt string
 		Error            error

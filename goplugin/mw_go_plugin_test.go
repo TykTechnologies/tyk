@@ -6,7 +6,6 @@ package goplugin_test
 import (
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/gateway"
@@ -22,6 +21,8 @@ import (
 
 // run go build -buildmode=plugin -o goplugins.so in ./test/goplugins directory prior to running tests
 func TestGoPluginMWs(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5263
+
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
 
@@ -62,8 +63,6 @@ func TestGoPluginMWs(t *testing.T) {
 		spec.ConfigData = configData
 	})
 
-	time.Sleep(1 * time.Second)
-
 	t.Run("Run Go-plugin auth failed", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{
@@ -103,6 +102,8 @@ func TestGoPluginMWs(t *testing.T) {
 }
 
 func TestGoPluginResponseHook(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5263
+
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
 
@@ -127,8 +128,6 @@ func TestGoPluginResponseHook(t *testing.T) {
 		spec.ConfigData = configData
 	})
 
-	time.Sleep(1 * time.Second)
-
 	t.Run("Run Go-plugin all middle-wares", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{
@@ -146,6 +145,8 @@ func TestGoPluginResponseHook(t *testing.T) {
 }
 
 func TestGoPluginPerPathSingleFile(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5263
+
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
 
@@ -190,8 +191,6 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 
 	})
 
-	time.Sleep(1 * time.Second)
-
 	t.Run("Run Go-plugins on each path", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{
@@ -223,6 +222,8 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 }
 
 func TestGoPluginAPIandPerPath(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5263
+
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
 
@@ -257,8 +258,6 @@ func TestGoPluginAPIandPerPath(t *testing.T) {
 		spec.VersionData.Versions["v1"] = v
 
 	})
-
-	time.Sleep(1 * time.Second)
 
 	t.Run("Run on per API and per path on same def", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{

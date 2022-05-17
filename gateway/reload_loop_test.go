@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestReloadLoop_basic(t *testing.T) {
@@ -90,6 +92,8 @@ func TestReloadLoop_handlerWithBlock(t *testing.T) {
 }
 
 func TestReloadLoop_group(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5252
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -101,7 +105,7 @@ func TestReloadLoop_group(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("expected %d got %d", http.StatusOK, res.StatusCode)
 	}
-	time.Sleep(time.Second)
+
 	ts.Gw.requeueLock.Lock()
 	n := len(ts.Gw.requeue)
 	ts.Gw.requeue = []func(){}
