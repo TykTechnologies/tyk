@@ -1436,12 +1436,12 @@ func TestParsePoliciesFromRPC(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.testName, func(t *testing.T) {
-			policyList, _ := json.Marshal([]user.Policy{tc.policy})
-			polMap, err := parsePoliciesFromRPC(string(policyList), tc.allowExplicit)
-			if err != nil {
-				t.Error("error parsing policies from RPC:", err)
-				return
-			}
+
+			policyList, err := json.Marshal([]user.Policy{tc.policy})
+			assert.NoError(t, err, "error unmarshalling policies")
+
+			polMap, errParsing := parsePoliciesFromRPC(string(policyList), tc.allowExplicit)
+			assert.NoError(t, errParsing, "error parsing policies from RPC")
 
 			if _, ok := polMap[tc.expectedID]; !ok {
 				t.Error("expected policiy id", tc.expectedID, " not found after parsing policies")
