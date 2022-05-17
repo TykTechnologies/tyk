@@ -142,6 +142,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 		}
 		serliazerSuffix := r.analyticsSerializer.GetSuffix()
 		analyticKey += serliazerSuffix
+
 		readyToSend := false
 
 		flushTimer := time.NewTimer(recordsBufferFlushInterval)

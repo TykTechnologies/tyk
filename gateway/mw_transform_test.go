@@ -26,6 +26,8 @@ func testPrepareTransformNonAscii() (*TransformSpec, string) {
 }
 
 func TestTransformNonAscii(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5223
+
 	tmeta, in := testPrepareTransformNonAscii()
 	want := `["Jyväskylä", "Hyvinkää"]`
 

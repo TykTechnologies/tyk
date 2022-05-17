@@ -554,6 +554,8 @@ func TestIgnored(t *testing.T) {
 }
 
 func TestOldMockResponse(t *testing.T) {
+	test.Racy(t) // TODO: TT-5225
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -971,7 +973,6 @@ func TestGetVersionFromRequest(t *testing.T) {
 	t.Run("Header location", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer func() {
-			time.Sleep(1 * time.Second)
 			ts.Close()
 		}()
 
@@ -1295,6 +1296,8 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 }
 
 func TestEnforcedTimeout(t *testing.T) {
+	test.Flaky(t) // TODO TT-5222
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
