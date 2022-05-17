@@ -413,7 +413,47 @@ paths:
         Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
       tags:
         - APIs
-      operationId: updateApi
+      operationId: putApi
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/APIDefinition"
+            example:
+              name: "TestAPI"
+              use_keyless: true
+              active: true
+              proxy:
+                listen_path: "/test"
+      responses:
+        '200':
+          description: API updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiModifyKeySuccess"
+              example:
+                status: "ok"
+                action: "updated"
+                key: "{...API JSON definition...}"
+        '400':
+          description: Malformed data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiStatusMessage"
+              example:
+                status: "error"
+                message: "Malformed API data"
+    patch:
+      description: |
+        By using a `PATCH` request, you can update an existing API definition with an OAS document without OAS extensions as the body of the request. The existing configuration for the APIs remains unmodified, only API endpoints and such are updated with what's defined in the OAS document.
+
+
+        Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
+      tags:
+        - APIs
+      operationId: patchApi
       requestBody:
         content:
           application/json:
@@ -492,7 +532,7 @@ paths:
         schema:
           type: string
         example: public
-      operationId: listApiOAS
+      operationId: getApiOAS
       responses:
         '200':
           description: API definition
@@ -514,7 +554,7 @@ paths:
         Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
       tags:
         - APIs
-      operationId: updateApiOAS
+      operationId: putApiOAS
       requestBody:
         content:
           application/json:
@@ -561,7 +601,7 @@ paths:
         Only if used without the Tyk Dashboard
       tags:
         - APIs
-      operationId: downloadApiOASPublic
+      operationId: getApiOASExport
       parameters:
       - description: mode of export
         name: mode
@@ -589,7 +629,7 @@ paths:
         Only if used without the Tyk Dashboard
       tags:
         - APIs
-      operationId: downloadApisOASPublic
+      operationId: listApisOASExport
       parameters:
       - description: mode of export
         name: mode
