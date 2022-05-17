@@ -1129,12 +1129,13 @@ func WriteDefault(path string, conf *Config) error {
 // An error will be returned only if any of the paths existed but was
 // not a valid config file.
 func Load(paths []string, conf *Config) error {
-	var r io.Reader
-	for _, path := range paths {
-		f, err := os.Open(path)
+	var r io.ReadCloser
+	for _, filename := range paths {
+		f, err := os.Open(filename)
 		if err == nil {
 			r = f
-			conf.OriginalPath = path
+			defer r.Close()
+			conf.OriginalPath = filename
 			break
 		}
 		if os.IsNotExist(err) {
@@ -1142,6 +1143,7 @@ func Load(paths []string, conf *Config) error {
 		}
 		return err
 	}
+
 	if r == nil {
 		path := paths[0]
 		log.Warnf("No config file found, writing default to %s", path)
@@ -1151,6 +1153,7 @@ func Load(paths []string, conf *Config) error {
 		log.Info("Loading default configuration...")
 		return Load([]string{path}, conf)
 	}
+
 	if err := json.NewDecoder(r).Decode(&conf); err != nil {
 		return fmt.Errorf("couldn't unmarshal config: %v", err)
 	}
