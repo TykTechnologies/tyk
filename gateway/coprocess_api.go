@@ -4,10 +4,12 @@ import "C"
 
 import (
 	"context"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -21,8 +23,18 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	key := C.GoString(CKey)
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
-	rc := storage.NewConnectionHandler(context.TODO())
+
+	// Timeout storing data after 1 second
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	rc := storage.NewConnectionHandler(ctx)
+
+	go rc.ConnectToRedis(ctx, nil, &config.Config{})
+	rc.WaitConnect(ctx)
+
 	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
+
 	err := store.SetKey(key, value, ttl)
 	if err != nil {
 		log.WithError(err).Error("could not set key")
@@ -35,9 +47,20 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 func TykGetData(CKey *C.char) *C.char {
 	key := C.GoString(CKey)
 
-	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix}
-	// TODO: return error
-	val, _ := store.GetKey(key)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	rc := storage.NewRedisController(ctx)
+	go rc.ConnectToRedis(ctx, nil, &config.Config{})
+	rc.WaitConnect(ctx)
+
+	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, RedisController: rc}
+
+	val, err := store.GetKey(key)
+	if err != nil {
+		log.WithError(err).Error("could not get key")
+	}
+
 	return C.CString(val)
 }
 
@@ -80,4 +103,16 @@ func CoProcessLog(CMessage, CLogLevel *C.char) {
 			"prefix": "python",
 		}).Info(message)
 	}
+}
+
+func cgoCString(in string) *C.char {
+	return C.CString(in)
+}
+
+func cgoGoString(in *C.char) string {
+	return C.GoString(in)
+}
+
+func cgoCint(in int) C.int {
+	return C.int(in)
 }
