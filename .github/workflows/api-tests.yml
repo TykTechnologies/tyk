@@ -90,7 +90,9 @@ jobs:
         ref: ${{ steps.check_dashboard_branch.outputs.branch	 }}
 
     - name: start docker compose
-      run: docker-compose -f ci/ci_testing_env.yml up -d
+      run: |
+        docker-compose -f ci/ci_testing_env.yml build
+        docker-compose -f ci/ci_testing_env.yml up -d
       env:
         TYK_DB_LICENSEKEY: ${{secrets.DASH_LICENSE}}
         DASH_REPO_PATH: /home/runner/work/tyk/tyk/tyk-analytics
@@ -117,8 +119,8 @@ jobs:
 
     - name: Waiting for dashboard
       run: |
-        while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:3000/hello/)" != "200" ]]; do sleep 60 && echo "waiting for dashboard '$(date +"%T")'"; done
-      timeout-minutes: 15    
+        while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:3000/hello/)" != "200" ]]; do sleep 5 && echo "waiting for dashboard '$(date +"%T")'"; done
+      timeout-minutes: 1
     
     - name: Test with pytest
       id: test_execution
