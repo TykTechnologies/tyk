@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/go-redis/redis/v8"
 
@@ -54,23 +53,12 @@ func (n *Notification) Sign() {
 func (gw *Gateway) startPubSubLoop() {
 	cacheStore := storage.RedisCluster{RedisController: gw.RedisController}
 	cacheStore.Connect()
-	// On message, synchronise
-	for {
-		select {
-		case <-gw.ctx.Done():
-			return
-		default:
-			err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
-				gw.handleRedisEvent(v, nil, nil)
-			})
-			if err != nil {
-				if err != storage.ErrRedisIsDown {
-					pubSubLog.WithField("err", err).Error("Connection to Redis failed, reconnect in 10s")
-				}
-				time.Sleep(10 * time.Second)
-				pubSubLog.Warning("Reconnecting ", err)
-			}
-		}
+
+	err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
+		gw.handleRedisEvent(v, nil, nil)
+	})
+	if err != nil {
+		log.WithError(err).Error("Exiting pubsub")
 	}
 }
 

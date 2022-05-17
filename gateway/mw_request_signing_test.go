@@ -415,14 +415,14 @@ func TestRSARequestSigning(t *testing.T) {
 }
 
 func TestAPISpec_StripListenPath(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	algo := "hmac-sha256"
 	secret := "12345"
-	sessionKey := ts.generateSession(algo, secret)
 
 	t.Run("Off", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		sessionKey := ts.generateSession(algo, secret)
 		specs := ts.generateSpec(algo, secret, sessionKey, nil)
 		req := TestReq(t, "get", "/test/get", nil)
 
@@ -436,31 +436,41 @@ func TestAPISpec_StripListenPath(t *testing.T) {
 	})
 
 	t.Run("On", func(t *testing.T) {
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.APIID = "protected"
-			spec.Proxy.ListenPath = "/protected"
-			spec.EnableSignatureChecking = true
-			spec.UseKeylessAccess = false
-			spec.Proxy.StripListenPath = true
-		}, func(spec *APISpec) {
-			spec.APIID = "trailingSlash"
-			spec.Proxy.ListenPath = "/trailingSlash/"
-			spec.Proxy.StripListenPath = true
-			spec.RequestSigning.IsEnabled = true
-			spec.RequestSigning.Secret = secret
-			spec.RequestSigning.KeyId = sessionKey
-			spec.RequestSigning.Algorithm = algo
-			spec.Proxy.TargetURL = ts.URL
-		}, func(spec *APISpec) {
-			spec.APIID = "withoutTrailingSlash"
-			spec.Proxy.ListenPath = "/withoutTrailingSlash"
-			spec.Proxy.StripListenPath = true
-			spec.RequestSigning.IsEnabled = true
-			spec.RequestSigning.Secret = secret
-			spec.RequestSigning.KeyId = sessionKey
-			spec.RequestSigning.Algorithm = algo
-			spec.Proxy.TargetURL = ts.URL
-		})
+		test.Flaky(t) // TODO: TT-5255
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		sessionKey := ts.generateSession(algo, secret)
+		ts.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = "protected"
+				spec.Proxy.ListenPath = "/protected"
+				spec.EnableSignatureChecking = true
+				spec.UseKeylessAccess = false
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "trailingSlash"
+				spec.Proxy.ListenPath = "/trailingSlash/"
+				spec.Proxy.StripListenPath = true
+				spec.RequestSigning.IsEnabled = true
+				spec.RequestSigning.Secret = secret
+				spec.RequestSigning.KeyId = sessionKey
+				spec.RequestSigning.Algorithm = algo
+				spec.Proxy.TargetURL = ts.URL
+			},
+			func(spec *APISpec) {
+				spec.APIID = "withoutTrailingSlash"
+				spec.Proxy.ListenPath = "/withoutTrailingSlash"
+				spec.Proxy.StripListenPath = true
+				spec.RequestSigning.IsEnabled = true
+				spec.RequestSigning.Secret = secret
+				spec.RequestSigning.KeyId = sessionKey
+				spec.RequestSigning.Algorithm = algo
+				spec.Proxy.TargetURL = ts.URL
+			},
+		)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/trailingSlash/protected/get", Method: http.MethodGet, Code: http.StatusOK},

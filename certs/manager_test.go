@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/test"
 )
 
 type dummyStorage struct {
@@ -246,6 +248,8 @@ func leafSubjectName(cert *tls.Certificate) string {
 }
 
 func TestAddCertificate(t *testing.T) {
+	test.Flaky(t) // TT-5249
+
 	m := newManager()
 
 	expiredCertPem, _ := genCertificateFromCommonName("expired", true)
