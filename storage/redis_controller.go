@@ -128,7 +128,9 @@ func (rc *RedisController) disconnect() {
 // onConnect will be called when we have established a successful redis connection
 func (rc *RedisController) ConnectToRedis(ctx context.Context, onConnect func(), conf *config.Config) {
 	if onConnect == nil {
-		onConnect = func() {}
+		onConnect = func() {
+			// an empty function to avoid repeated nil checks below
+		}
 	}
 	c := []RedisCluster{
 		{
