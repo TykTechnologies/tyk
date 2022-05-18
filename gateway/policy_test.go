@@ -1441,12 +1441,10 @@ func TestParsePoliciesFromRPC(t *testing.T) {
 			assert.NoError(t, err, "error unmarshalling policies")
 
 			polMap, errParsing := parsePoliciesFromRPC(string(policyList), tc.allowExplicit)
-			assert.NoError(t, errParsing, "error parsing policies from RPC")
+			assert.NoError(t, errParsing, "error parsing policies from RPC:", errParsing)
 
-			if _, ok := polMap[tc.expectedID]; !ok {
-				t.Error("expected policiy id", tc.expectedID, " not found after parsing policies")
-			}
-
+			_, ok := polMap[tc.expectedID]
+			assert.True(t, ok, "expected policy id", tc.expectedID, " not found after parsing policies")
 		})
 	}
 
