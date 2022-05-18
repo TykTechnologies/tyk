@@ -2,10 +2,9 @@ package signature_validator
 
 import (
 	"encoding/hex"
+	"errors"
 	"testing"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/TykTechnologies/tyk/test"
 )
