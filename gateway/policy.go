@@ -176,7 +176,7 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	return policies
 }
 
-func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
+func parsePoliciesFromRPC(list string, allowExplicit bool) (map[string]user.Policy, error) {
 	var dbPolicyList []user.Policy
 
 	if err := json.Unmarshal([]byte(list), &dbPolicyList); err != nil {
@@ -186,14 +186,18 @@ func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
 	policies := make(map[string]user.Policy, len(dbPolicyList))
 
 	for _, p := range dbPolicyList {
-		p.ID = p.MID.Hex()
-		policies[p.MID.Hex()] = p
+		id := p.MID.Hex()
+		if allowExplicit && p.ID != "" {
+			id = p.ID
+		}
+		p.ID = id
+		policies[id] = p
 	}
 
 	return policies, nil
 }
 
-func (gw *Gateway) LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromRPC(orgId string, allowExplicit bool) (map[string]user.Policy, error) {
 	if rpc.IsEmergencyMode() {
 		return gw.LoadPoliciesFromRPCBackup()
 	}
@@ -205,7 +209,7 @@ func (gw *Gateway) LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, er
 
 	rpcPolicies := store.GetPolicies(orgId)
 
-	policies, err := parsePoliciesFromRPC(rpcPolicies)
+	policies, err := parsePoliciesFromRPC(rpcPolicies, allowExplicit)
 
 	if err != nil {
 		log.WithFields(logrus.Fields{

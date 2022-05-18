@@ -14,12 +14,14 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
 	proxyproto "github.com/pires/go-proxyproto"
 	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 const sampleUptimeTestAPI = `{
@@ -520,6 +522,8 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 }
 
 func TestChecker_triggerSampleLimit(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5258
+
 	ts := StartTest(nil)
 	defer ts.Close()
 	ts.Gw.setTestMode(false)

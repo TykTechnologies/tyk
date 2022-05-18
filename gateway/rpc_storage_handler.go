@@ -179,9 +179,16 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
+
 	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
-		cachedVal, found := r.Gw.RPCGlobalCache.Get(keyName)
+
+		cacheStore := r.Gw.RPCGlobalCache
+		if strings.Contains(keyName, "cert-") {
+			cacheStore = r.Gw.RPCCertCache
+		}
+
+		cachedVal, found := cacheStore.Get(keyName)
 		log.Debug("--> Found? ", found)
 		if found {
 			return cachedVal.(string), nil
@@ -208,7 +215,11 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	}
 	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
 		// Cache key
-		r.Gw.RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
+		cacheStore := r.Gw.RPCGlobalCache
+		if strings.Contains(keyName, "cert-") {
+			cacheStore = r.Gw.RPCCertCache
+		}
+		cacheStore.Set(keyName, value, cache.DefaultExpiration)
 	}
 	//return hash key without prefix so it doesnt get double prefixed in redis
 	return value.(string), nil
@@ -681,7 +692,13 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 }
 
 // CheckForReload will start a long poll
-func (r *RPCStorageHandler) CheckForReload(orgId string) {
+func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
+	select {
+	case <-r.Gw.ctx.Done():
+		return false
+	default:
+	}
+
 	log.Debug("[RPC STORE] Check Reload called...")
 	reload, err := rpc.FuncClientSingleton("CheckReload", orgId)
 	if err != nil {
@@ -710,6 +727,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 			r.Gw.MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: r.Gw})
 		}()
 	}
+	return true
 }
 
 func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
@@ -731,6 +749,12 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 		"prefix": "RPC Conn Mgr",
 	}).Info("[RPC Conn Mgr] Starting keepalive watcher...")
 	for {
+
+		select {
+		case <-r.Gw.ctx.Done():
+			return
+		default:
+		}
 
 		if err := r.SetKey("0000", "0000", 10); err != nil {
 			log.WithError(err).WithFields(logrus.Fields{
@@ -978,7 +1002,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	for _, certId := range CertificatesToRemove {
 		log.Debugf("Removing certificate: %v", certId)
 		r.Gw.CertificateManager.Delete(certId, orgId)
+		r.Gw.RPCCertCache.Delete("cert-raw-" + certId)
 	}
+
 	for _, certId := range CertificatesToAdd {
 		log.Debugf("Adding certificate: %v", certId)
 		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally

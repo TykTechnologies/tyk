@@ -3,6 +3,7 @@ package rpc
 import (
 	"crypto/tls"
 	"errors"
+	"github.com/TykTechnologies/tyk-pump/serializer"
 	"net"
 	"strconv"
 	"sync"
@@ -46,7 +47,13 @@ var (
 
 	// UseSyncLoginRPC for tests where we dont need to execute as a goroutine
 	UseSyncLoginRPC bool
+
+	AnalyticsSerializers []serializer.AnalyticsSerializer
 )
+
+func init() {
+	AnalyticsSerializers = []serializer.AnalyticsSerializer{serializer.NewAnalyticsSerializer(serializer.MSGP_SERIALIZER), serializer.NewAnalyticsSerializer(serializer.PROTOBUF_SERIALIZER)}
+}
 
 // ErrRPCIsDown this is returned when we can't reach rpc server.
 var ErrRPCIsDown = errors.New("RPCStorageHandler: rpc is either down or was not configured")

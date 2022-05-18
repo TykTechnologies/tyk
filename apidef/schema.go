@@ -27,6 +27,9 @@ const Schema = `{
 		"expiration": {
             "type": "string"
         },
+        "enable_tags": {
+            "type": "boolean"
+        },
         "enable_ip_whitelisting": {
             "type": "boolean"
         },
@@ -662,6 +665,20 @@ const Schema = `{
             "required": [
                 "enabled"
             ]
+        },
+        "analytics_plugin": {
+            "type": ["object", "null"],
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "plugin_path": {
+                    "type": "string"
+                },
+                "func_name": {
+                    "type": "string"
+                }
+            }
         }
     },
     "required": [

@@ -7,22 +7,34 @@
 # ./pr.zsh -repos tyk -base td-883-test -branch td-883-test -title Sync from latest releng templates
 # m4 -E -DxREPO=tyk
 
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 ARG TARGETARCH
 
-RUN apt-get update \
-    && apt-get dist-upgrade -y ca-certificates
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get install -y python3-setuptools libpython3.7 python3.7-dev curl \
+# Install curl and python3
+RUN apt update \
+    && apt dist-upgrade -y ca-certificates curl \
+    && apt install -y python3-setuptools libpython3.9 python3.9-dev \
     && curl https://bootstrap.pypa.io/get-pip.py | python3 \
-    && rm -rf /usr/include/* && rm /usr/lib/*-linux-gnu/*.a && rm /usr/lib/*-linux-gnu/*.o \
-    && rm /usr/lib/python3.7/config-3.7m-*-linux-gnu/*.a \
-    && pip3 install --only-binary ":all:" grpcio protobuf \
-    && apt-get autoremove -y \
-    && rm -rf /root/.cache \
-    && rm -rf /var/lib/apt/lists/*
+    && pip3 install --only-binary ":all:" grpcio protobuf
 
+# Remove some things to decrease CVE surface
+RUN  apt remove -y --allow-remove-essential libtiff5 ncurses-base \
+	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
+# Clean up caches, unwanted .a and .o files
+RUN rm -rf /root/.cache \
+    && apt -y autoremove \
+    && apt clean \
+    && rm -rf /usr/include/* \
+    && find /usr/lib -type f -name '*.a' -delete \
+    && find /usr/lib -type f -name '*.o' -delete
+
+# Print included pip/python versions
+RUN pip3 --version && python3 --version
+
+# Comment this to test in dev
 COPY *${TARGETARCH}.deb /
 RUN dpkg -i /tyk-gateway*${TARGETARCH}.deb && rm /*.deb
 
@@ -31,6 +43,9 @@ ARG PORTS
 EXPOSE $PORTS
 
 WORKDIR /opt/tyk-gateway/
+
+# Uncomment this to test in dev
+# COPY tyk .
 
 ENTRYPOINT ["/opt/tyk-gateway/tyk" ]
 CMD [ "--conf=/opt/tyk-gateway/tyk.conf" ]

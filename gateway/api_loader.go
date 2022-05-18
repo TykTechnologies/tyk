@@ -329,7 +329,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid, mon: Monitor{Gw: gw}})
 	gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
@@ -465,7 +465,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		var simpleArray []alice.Constructor
 		gw.mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
 		gw.mwAppendEnabled(&simpleArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
-		gw.mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+		gw.mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid, mon: Monitor{Gw: gw}})
 		gw.mwAppendEnabled(&simpleArray, &VersionCheck{BaseMiddleware: baseMid})
 		simpleArray = append(simpleArray, authArray...)
 		gw.mwAppendEnabled(&simpleArray, &KeyExpired{baseMid})
@@ -484,6 +484,19 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		chainDef.ThisHandler = trace.Handle(spec.Name, chain)
 	} else {
 		chainDef.ThisHandler = chain
+	}
+
+	if spec.APIDefinition.AnalyticsPlugin.Enabled {
+
+		ap := &GoAnalyticsPlugin{
+			Path:     spec.AnalyticsPlugin.PluginPath,
+			FuncName: spec.AnalyticsPlugin.FuncName,
+		}
+
+		if ap.loadAnalyticsPlugin() {
+			spec.AnalyticsPluginConfig = ap
+			logger.Debug("Loaded analytics plugin")
+		}
 	}
 
 	logger.WithFields(logrus.Fields{

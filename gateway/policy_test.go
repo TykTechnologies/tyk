@@ -642,7 +642,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				want := map[string]user.AccessDefinition{
 					"a": {
 						AllowedURLs: []user.AccessSpec{
-							{URL: "/user", Methods: []string{"GET", "POST", "GET"}},
+							{URL: "/user", Methods: []string{"GET", "POST"}},
 							{URL: "/companies", Methods: []string{"GET", "POST"}},
 						},
 						Limit: user.APILimit{},
@@ -1396,4 +1396,56 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			},
 		},
 	}...)
+}
+
+func TestParsePoliciesFromRPC(t *testing.T) {
+
+	objectID := apidef.NewObjectId()
+	explicitID := "explicit_pol_id"
+	tcs := []struct {
+		testName      string
+		allowExplicit bool
+		policy        user.Policy
+		expectedID    string
+	}{
+		{
+			testName:      "policy with explicit ID - allow_explicit_id false",
+			allowExplicit: false,
+			policy:        user.Policy{MID: objectID, ID: explicitID},
+			expectedID:    objectID.Hex(),
+		},
+		{
+			testName:      "policy with explicit ID - allow_explicit_id true",
+			allowExplicit: true,
+			policy:        user.Policy{MID: objectID, ID: explicitID},
+			expectedID:    explicitID,
+		},
+		{
+			testName:      "policy without explicit ID - allow_explicit_id false",
+			allowExplicit: false,
+			policy:        user.Policy{MID: objectID, ID: ""},
+			expectedID:    objectID.Hex(),
+		},
+		{
+			testName:      "policy without explicit ID - allow_explicit_id true",
+			allowExplicit: true,
+			policy:        user.Policy{MID: objectID, ID: ""},
+			expectedID:    objectID.Hex(),
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.testName, func(t *testing.T) {
+
+			policyList, err := json.Marshal([]user.Policy{tc.policy})
+			assert.NoError(t, err, "error unmarshalling policies")
+
+			polMap, errParsing := parsePoliciesFromRPC(string(policyList), tc.allowExplicit)
+			assert.NoError(t, errParsing, "error parsing policies from RPC:", errParsing)
+
+			_, ok := polMap[tc.expectedID]
+			assert.True(t, ok, "expected policy id", tc.expectedID, " not found after parsing policies")
+		})
+	}
+
 }

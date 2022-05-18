@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -431,6 +432,115 @@ func TestOAS_OAuth(t *testing.T) {
 	assert.Equal(t, flows.AuthorizationCode.AuthorizationURL, "{api-url}/oauth/authorize")
 	assert.Equal(t, flows.AuthorizationCode.TokenURL, "{api-url}/oauth/token")
 	assert.Equal(t, flows.ClientCredentials.TokenURL, "/oauth/token")
+
+	assert.Equal(t, oas, convertedOAS)
+}
+
+func TestOAS_OIDC(t *testing.T) {
+	var oas OAS
+	var oidc OIDC
+	Fill(t, &oidc, 0)
+	sort.Slice(oidc.Scopes.ScopeToPolicyMapping, func(i, j int) bool {
+		return oidc.Scopes.ScopeToPolicyMapping[i].Scope < oidc.Scopes.ScopeToPolicyMapping[j].Scope
+	})
+
+	for _, provider := range oidc.Providers {
+		sort.Slice(provider.ClientToPolicyMapping, func(i, j int) bool {
+			return provider.ClientToPolicyMapping[i].ClientID < provider.ClientToPolicyMapping[j].ClientID
+		})
+	}
+
+	oas.Extensions = map[string]interface{}{
+		ExtensionTykAPIGateway: &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					OIDC: &oidc,
+				},
+			},
+		},
+	}
+
+	var api apidef.APIDefinition
+	api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	oas.getTykAuthentication().ExtractTo(&api)
+
+	var convertedOAS OAS
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
+	convertedOAS.getTykAuthentication().Fill(api)
+
+	assert.Equal(t, oas, convertedOAS)
+}
+
+func TestOAS_CustomPlugin(t *testing.T) {
+	var oas OAS
+	var customPlugin CustomPlugin
+	Fill(t, &customPlugin, 0)
+	oas.Extensions = map[string]interface{}{
+		ExtensionTykAPIGateway: &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					CustomPlugin: &customPlugin,
+				},
+			},
+		},
+	}
+
+	var api apidef.APIDefinition
+	api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	oas.getTykAuthentication().ExtractTo(&api)
+
+	var convertedOAS OAS
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
+	convertedOAS.getTykAuthentication().Fill(api)
+
+	assert.Equal(t, oas, convertedOAS)
+}
+
+func TestOAS_GoPlugin(t *testing.T) {
+	var goPlugin GoPlugin
+	Fill(t, &goPlugin, 0)
+
+	var oas OAS
+	oas.Extensions = map[string]interface{}{
+		ExtensionTykAPIGateway: &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					GoPlugin: &goPlugin,
+				},
+			},
+		},
+	}
+
+	var api apidef.APIDefinition
+	oas.getTykAuthentication().ExtractTo(&api)
+
+	var convertedOAS OAS
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
+	convertedOAS.getTykAuthentication().Fill(api)
+
+	assert.Equal(t, oas, convertedOAS)
+}
+
+func TestOAS_TykAuthentication_NoOASSecurity(t *testing.T) {
+	var hmac HMAC
+	Fill(t, &hmac, 0)
+
+	var oas OAS
+	oas.Extensions = map[string]interface{}{
+		ExtensionTykAPIGateway: &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					HMAC: &hmac,
+				},
+			},
+		},
+	}
+
+	var api apidef.APIDefinition
+	oas.ExtractTo(&api)
+
+	var convertedOAS OAS
+	convertedOAS.Fill(api)
 
 	assert.Equal(t, oas, convertedOAS)
 }

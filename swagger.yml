@@ -309,6 +309,74 @@ paths:
               example:
                 status: "error"
                 message: "Malformed API data"
+  '/tyk/apis/oas':
+    get:
+      description: |-
+        List APIs, in OAS fromat
+         Only if used without the Tyk Dashboard
+      tags:
+        - APIs
+      operationId: listApisOAS
+      parameters:
+      - description: mode of export
+        name: mode
+        in: query
+        schema:
+          type: string
+        example: public
+      responses:
+        '200':
+          description: List of API definitions in OAS format
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OASSchemaResponse'
+              example:
+                - name: "TestAPI"
+                  use_keyless: true
+                  active: true
+                  proxy:
+                    listen_path: "/test"
+    post:
+      description: |-
+        Create API with OAS format
+         A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.
+      tags:
+        - APIs
+      operationId: createApiOAS
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OASSchemaResponse"
+            example:
+              name: "TestAPI"
+              use_keyless: true
+              active: true
+              proxy:
+                listen_path: "/test"
+      responses:
+        '200':
+          description: API created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiModifyKeySuccess"
+              example:
+                status: "ok"
+                action: "created"
+                key: "{...API JSON definition...}"
+        '400':
+          description: Malformed data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiStatusMessage"
+              example:
+                status: "error"
+                message: "Malformed API data"              
   '/tyk/apis/{apiID}':
     parameters:
       - description: The API ID
@@ -403,6 +471,147 @@ paths:
               example:
                 message: API ID not specified
                 status: error
+  '/tyk/apis/oas/{apiID}':
+    parameters:
+      - description: The API ID
+        name: apiID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      description: |-
+        Get API definition in OAS format
+        Only if used without the Tyk Dashboard
+      tags:
+        - APIs
+      parameters:
+      - description: mode of export
+        name: mode
+        in: query
+        schema:
+          type: string
+        example: public
+      operationId: listApiOAS
+      responses:
+        '200':
+          description: API definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OASSchemaResponse"
+              example:
+                name: "TestAPI"
+                use_keyless: true
+                active: true
+                proxy:
+                  listen_path: "/test"
+    put:
+      description: |
+        Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
+
+
+        Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
+      tags:
+        - APIs
+      operationId: updateApiOAS
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OASSchemaResponse"
+            example:
+              name: "TestAPI"
+              use_keyless: true
+              active: true
+              proxy:
+                listen_path: "/test"
+      responses:
+        '200':
+          description: API updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiModifyKeySuccess"
+              example:
+                status: "ok"
+                action: "updated"
+                key: "{...API JSON definition...}"
+        '400':
+          description: Malformed data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiStatusMessage"
+              example:
+                status: "error"
+                message: "Malformed API data"
+
+  '/tyk/apis/oas/{apiID}/export':
+    parameters:
+      - description: The API ID
+        name: apiID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      description: |-
+        download API definition in OAS format,
+        Only if used without the Tyk Dashboard
+      tags:
+        - APIs
+      operationId: downloadApiOASPublic
+      parameters:
+      - description: mode of export
+        name: mode
+        in: query
+        schema:
+          type: string
+        example: public
+      responses:
+        '200':
+          description: API definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OASSchemaResponse"
+              example:
+                name: "TestAPI"
+                use_keyless: true
+                active: true
+                proxy:
+                  listen_path: "/test"  
+  '/tyk/apis/oas/export':
+    get:
+      description: |-
+        Download list of API definition in OAS format,
+        Only if used without the Tyk Dashboard
+      tags:
+        - APIs
+      operationId: downloadApisOASPublic
+      parameters:
+      - description: mode of export
+        name: mode
+        in: query
+        schema:
+          type: string
+        example: public
+      responses:
+        '200':
+          description: API definition
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OASSchemaResponse'
+              example:
+                - name: "TestAPI"
+                  use_keyless: true
+                  active: true
+                  proxy:
+                    listen_path: "/test" 
   '/tyk/cache/{apiID}':
     parameters:
       - description: The API ID
@@ -1486,6 +1695,48 @@ paths:
       responses:
         '200':
           $ref: '#/components/schemas/apiStatusMessage'
+  '/tyk/schema':
+    get:
+      description: |-
+        Get OAS schema
+      tags:
+        - Schema
+      operationId: getSchema
+      parameters:
+        - description: The OAS version
+          name: oasVersion
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OAS schema response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OASSchemaResponse'
+              example:
+                status: Success
+                schema: <open api 3.0.3 schema>
+        '400':
+          description: response when parameter oasVersion is missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OASSchemaResponse'
+              example:
+                message: 'Should provide a value for parameter oasVersion'
+                status: 'Failed'
+        '404':
+          description: response when requested OAS schema is not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OASSchemaResponse'
+              example:
+                message: 'Schema not found for version 5.0.0'
+                status: 'Failed'
+
 components:
   responses:
     parameterBodies:
@@ -3267,6 +3518,20 @@ components:
           type: string
           x-go-name: Message
       type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    OASSchemaResponse:
+      description: OAS schema endpoint response
+      type: object
+      properties:
+        status:
+          type: string
+          x-go-name: Status
+        message:
+          type: string
+          x-go-name: Message
+        schema:
+          type: string
+          description: <OAS schema definition>
       x-go-package: github.com/TykTechnologies/tyk
   securitySchemes:
     api_key:

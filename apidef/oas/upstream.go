@@ -10,7 +10,9 @@ type Upstream struct {
 	// Old API Definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 	// Test contains the configuration related to uptime tests.
-	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
+	Test             *Test            `bson:"test,omitempty" json:"test,omitempty"`
+	Certificates     Certificates     `bson:"certificates,omitempty" json:"certificates,omitempty"`
+	PinnedPublicKeys PinnedPublicKeys `bson:"pinnedPublicKeys,omitempty" json:"pinnedPublicKeys,omitempty"`
 }
 
 func (u *Upstream) Fill(api apidef.APIDefinition) {
@@ -33,6 +35,20 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(u.Test) {
 		u.Test = nil
 	}
+
+	u.Certificates = make(Certificates, len(api.UpstreamCertificates))
+	u.Certificates.Fill(api.UpstreamCertificates)
+
+	if len(u.Certificates) == 0 {
+		u.Certificates = nil
+	}
+
+	u.PinnedPublicKeys = make(PinnedPublicKeys, len(api.PinnedPublicKeys))
+	u.PinnedPublicKeys.Fill(api.PinnedPublicKeys)
+
+	if len(u.PinnedPublicKeys) == 0 {
+		u.PinnedPublicKeys = nil
+	}
 }
 
 func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
@@ -44,6 +60,16 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	if u.Test != nil {
 		u.Test.ExtractTo(&api.UptimeTests)
+	}
+
+	if len(u.Certificates) > 0 {
+		api.UpstreamCertificates = make(map[string]string, len(u.Certificates))
+		u.Certificates.ExtractTo(api.UpstreamCertificates)
+	}
+
+	if len(u.PinnedPublicKeys) > 0 {
+		api.PinnedPublicKeys = make(map[string]string, len(u.PinnedPublicKeys))
+		u.PinnedPublicKeys.ExtractTo(api.PinnedPublicKeys)
 	}
 }
 

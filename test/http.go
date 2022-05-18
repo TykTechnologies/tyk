@@ -29,6 +29,7 @@ type TestCase struct {
 	Headers         map[string]string `json:",omitempty"`
 	PathParams      map[string]string `json:",omitempty"`
 	FormParams      map[string]string `json:",omitempty"`
+	QueryParams     map[string]string `json:",omitempty"`
 	Cookies         []*http.Cookie    `json:",omitempty"`
 	Delay           time.Duration     `json:",omitempty"`
 	BodyMatch       string            `json:",omitempty"` // regex

@@ -1,3 +1,4 @@
+//go:build !race
 // +build !race
 
 package gateway
@@ -231,7 +232,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 
 		GetKeyCounter = 0
 		// RPC layer is down,
-		ts := StartTest(conf, TestConfig{SkipEmptyRedis: true})
+		ts := StartTest(conf, TestConfig{})
 		defer ts.Close()
 
 		// Wait for backup to load

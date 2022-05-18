@@ -3,44 +3,55 @@ package storage
 import (
 	"context"
 	"sync/atomic"
+	"time"
 
-	"github.com/TykTechnologies/tyk/config"
 	redis "github.com/go-redis/redis/v8"
 
-	"time"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type RedisController struct {
-	singlePool          atomic.Value
-	singleCachePool     atomic.Value
-	singleAnalyticsPool atomic.Value
-	redisUp             atomic.Value
-	disableRedis        atomic.Value
+	singlePool          redis.UniversalClient
+	singleCachePool     redis.UniversalClient
+	singleAnalyticsPool redis.UniversalClient
 
-	ctx context.Context
+	redisUp      atomic.Value
+	disableRedis atomic.Value
+
+	ctx       context.Context
+	reconnect chan struct{}
 }
 
-func NewRedisController() *RedisController {
+func NewRedisController(ctx context.Context) *RedisController {
 	return &RedisController{
-		ctx: context.Background(),
+		ctx:       ctx,
+		reconnect: make(chan struct{}, 1),
 	}
 }
 
-// DisableRedis very handy when testsing it allows to dynamically enable/disable talking with
-// redisW
+// DisableRedis allows to dynamically enable/disable talking with redisW
 func (rc *RedisController) DisableRedis(setRedisDown bool) {
 	if setRedisDown {
 		// we make sure x set that redis is down
-		rc.redisUp.Store(false)
 		rc.disableRedis.Store(true)
+		rc.redisUp.Store(false)
 		return
 	}
 
 	rc.disableRedis.Store(false)
-	rc.WaitConnect(context.Background())
+	rc.redisUp.Store(false)
+
+	rc.reconnect <- struct{}{}
+
+	ctx, cancel := context.WithTimeout(rc.ctx, 5*time.Second)
+	defer cancel()
+
+	if !rc.WaitConnect(ctx) {
+		panic("Can't reconnect to redis after disable")
+	}
 }
 
-func (rc *RedisController) shouldConnect() bool {
+func (rc *RedisController) enabled() bool {
 	ok := true
 	if v := rc.disableRedis.Load(); v != nil {
 		ok = !v.(bool)
@@ -74,41 +85,41 @@ func (rc *RedisController) WaitConnect(ctx context.Context) bool {
 
 func (rc *RedisController) singleton(cache, analytics bool) redis.UniversalClient {
 	if cache {
-		v := rc.singleCachePool.Load()
-		if v != nil {
-			return v.(redis.UniversalClient)
-		}
-		return nil
+		return rc.singleCachePool
 	}
 	if analytics {
-		v := rc.singleAnalyticsPool.Load()
-		if v != nil {
-			return v.(redis.UniversalClient)
-		}
-		return nil
+		return rc.singleAnalyticsPool
 	}
-	v := rc.singlePool.Load()
-	if v != nil {
-		return v.(redis.UniversalClient)
-	}
-	return nil
+	return rc.singlePool
 }
 
 func (rc *RedisController) connectSingleton(cache, analytics bool, conf config.Config) bool {
-	d := rc.singleton(cache, analytics) == nil
-	if d {
-		log.Debug("Connecting to redis cluster")
-		if cache {
-			rc.singleCachePool.Store(NewRedisClusterPool(cache, analytics, conf))
-			return true
-		} else if analytics {
-			rc.singleAnalyticsPool.Store(NewRedisClusterPool(cache, analytics, conf))
-			return true
-		}
-		rc.singlePool.Store(NewRedisClusterPool(cache, analytics, conf))
+	if conn := rc.singleton(cache, analytics); conn != nil {
 		return true
 	}
+
+	if cache {
+		rc.singleCachePool = NewRedisClusterPool(cache, analytics, conf)
+		return true
+	}
+
+	if analytics {
+		rc.singleAnalyticsPool = NewRedisClusterPool(cache, analytics, conf)
+		return true
+	}
+	rc.singlePool = NewRedisClusterPool(cache, analytics, conf)
 	return true
+}
+
+// disconnect all redis clients created
+func (rc *RedisController) disconnect() {
+	for _, v := range []redis.UniversalClient{
+		rc.singleCachePool,
+		rc.singleAnalyticsPool,
+		rc.singlePool,
+	} {
+		defer v.Close()
+	}
 }
 
 // ConnectToRedis starts a go routine that periodically tries to connect to
@@ -116,45 +127,66 @@ func (rc *RedisController) connectSingleton(cache, analytics bool, conf config.C
 //
 // onConnect will be called when we have established a successful redis connection
 func (rc *RedisController) ConnectToRedis(ctx context.Context, onConnect func(), conf *config.Config) {
-
-	tick := time.NewTicker(time.Second)
-	defer tick.Stop()
-	c := []RedisCluster{
-		{RedisController: rc},
-		{IsCache: true, RedisController: rc},
-		{IsAnalytics: true, RedisController: rc},
+	if onConnect == nil {
+		onConnect = func() {
+			// an empty function to avoid repeated nil checks below
+		}
 	}
-	var ok bool
+	c := []RedisCluster{
+		{
+			RedisController: rc,
+		},
+		{
+			IsCache:         true,
+			RedisController: rc,
+		},
+		{
+			IsAnalytics:     true,
+			RedisController: rc,
+		},
+	}
+
+	up := true
 	for _, v := range c {
 		if !rc.connectSingleton(v.IsCache, v.IsAnalytics, *conf) {
+			up = false
 			break
 		}
 
 		if !clusterConnectionIsOpen(&v) {
-			rc.redisUp.Store(false)
+			up = false
 			break
 		}
-		ok = true
 	}
-	rc.redisUp.Store(ok)
+
+	rc.redisUp.Store(up)
+	if up {
+		onConnect()
+	}
+
+	defer func() {
+		close(rc.reconnect)
+		rc.disconnect()
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-tick.C:
-			if !rc.shouldConnect() {
-				continue
-			}
-			conn := rc.Connected()
-			ok := rc.connectCluster(*conf, c...)
+		case <-rc.reconnect:
+			break
+		}
 
-			rc.redisUp.Store(ok)
-			if !conn && ok {
-				// Here we are transitioning from DISCONNECTED to CONNECTED state
-				if onConnect != nil {
-					onConnect()
-				}
-			}
+		if !rc.enabled() {
+			continue
+		}
+
+		ok := rc.connectCluster(*conf, c...)
+
+		rc.redisUp.Store(ok)
+
+		if ok {
+			onConnect()
 		}
 	}
 }

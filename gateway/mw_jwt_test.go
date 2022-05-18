@@ -802,6 +802,8 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 }
 
 func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5257 (failed on run 37/100)
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -2046,6 +2048,8 @@ func createExpiringPolicy(pGen ...func(p *user.Policy)) string {
 }
 
 func TestJWTExpOverride(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5257
+
 	ts := StartTest(nil)
 	defer ts.Close()
 

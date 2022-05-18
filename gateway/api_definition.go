@@ -32,6 +32,7 @@ import (
 
 	"github.com/TykTechnologies/gojsonschema"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
@@ -192,10 +193,11 @@ type APISpec struct {
 	WSTransportCreated       time.Time
 	GlobalConfig             config.Config
 	OrgHasNoSession          bool
+	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
 	middlewareChain *ChainObject
 
-	network NetworkStats
+	network analytics.NetworkStats
 
 	GraphQLExecutor struct {
 		Engine   *graphql.ExecutionEngine
@@ -1004,16 +1006,20 @@ func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.
 }
 
 func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.ValidatePathMeta, stat URLStatus, conf config.Config) []URLSpec {
-	urlSpec := make([]URLSpec, len(paths))
+	var urlSpec []URLSpec
 
-	for i, stringSpec := range paths {
+	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 
 		stringSpec.SchemaCache = gojsonschema.NewGoLoader(stringSpec.Schema)
 		newSpec.ValidatePathMeta = stringSpec
-		urlSpec[i] = newSpec
+		urlSpec = append(urlSpec, newSpec)
 	}
 
 	return urlSpec

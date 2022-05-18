@@ -32,18 +32,19 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.Extensions) {
 		s.Extensions = nil
 	}
+
+	// set external docs to nil if populated with default values
+	if ShouldOmit(s.ExternalDocs) {
+		s.ExternalDocs = nil
+	}
 }
 
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
-	if s.Security != nil {
-		s.extractSecurityTo(api)
-	} else {
-		api.UseKeylessAccess = true
-	}
-
 	if s.GetTykExtension() != nil {
 		s.GetTykExtension().ExtractTo(api)
 	}
+
+	s.extractSecurityTo(api)
 
 	var ep apidef.ExtendedPathsSet
 	s.extractPathsAndOperations(&ep)
@@ -91,6 +92,15 @@ func (s *OAS) GetTykExtension() *XTykAPIGateway {
 	}
 
 	return nil
+}
+
+func (s *OAS) RemoveTykExtension() {
+
+	if s.Extensions == nil {
+		return
+	}
+
+	delete(s.Extensions, ExtensionTykAPIGateway)
 }
 
 func (s *OAS) getTykAuthentication() (authentication *Authentication) {
@@ -216,4 +226,46 @@ func (s *OAS) getTykOperations() (operations Operations) {
 	}
 
 	return
+}
+
+func (s *OAS) AddServers(apiURL string) {
+	if len(s.Servers) == 0 {
+		s.Servers = openapi3.Servers{
+			{
+				URL: apiURL,
+			},
+		}
+		return
+	}
+
+	newServers := openapi3.Servers{
+		{
+			URL: apiURL,
+		},
+	}
+
+	// check if apiURL already exists in servers object
+	for i := 0; i < len(s.Servers); i++ {
+		if s.Servers[i].URL == apiURL {
+			continue
+		}
+		newServers = append(newServers, s.Servers[i])
+	}
+
+	s.Servers = newServers
+}
+
+func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
+	if len(s.Servers) == 0 {
+		s.Servers = openapi3.Servers{
+			{
+				URL: apiURL,
+			},
+		}
+		return
+	}
+
+	if len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL {
+		s.Servers[0].URL = apiURL
+	}
 }

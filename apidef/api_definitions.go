@@ -310,6 +310,7 @@ type MethodTransformMeta struct {
 }
 
 type ValidatePathMeta struct {
+	Disabled    bool                    `bson:"disabled" json:"disabled"`
 	Path        string                  `bson:"path" json:"path"`
 	Method      string                  `bson:"method" json:"method"`
 	Schema      map[string]interface{}  `bson:"schema" json:"schema"`
@@ -585,7 +586,6 @@ type APIDefinition struct {
 	Domain                     string                 `bson:"domain" json:"domain"`
 	Certificates               []string               `bson:"certificates" json:"certificates"`
 	DoNotTrack                 bool                   `bson:"do_not_track" json:"do_not_track"`
-	Tags                       []string               `bson:"tags" json:"tags"`
 	EnableContextVars          bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
 	ConfigData                 map[string]interface{} `bson:"config_data" json:"config_data"`
 	TagHeaders                 []string               `bson:"tag_headers" json:"tag_headers"`
@@ -593,6 +593,17 @@ type APIDefinition struct {
 	StripAuthData              bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 	EnableDetailedRecording    bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 	GraphQL                    GraphQLConfig          `bson:"graphql" json:"graphql"`
+	AnalyticsPlugin            AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin"`
+
+	// Gateway segment tags
+	EnableTags bool     `bson:"enable_tags" json:"enable_tags"`
+	Tags       []string `bson:"tags" json:"tags"`
+}
+
+type AnalyticsPluginConfig struct {
+	Enabled    bool   `bson:"enable" json:"enable"`
+	PluginPath string `bson:"plugin_path" json:"plugin_path"`
+	FuncName   string `bson:"func_name" json:"func_name"`
 }
 
 type UptimeTests struct {
@@ -759,6 +770,7 @@ type GraphQLEngineDataSourceKind string
 const (
 	GraphQLEngineDataSourceKindREST    = "REST"
 	GraphQLEngineDataSourceKindGraphQL = "GraphQL"
+	GraphQLEngineDataSourceKindKafka   = "Kafka"
 )
 
 type GraphQLEngineDataSource struct {
@@ -786,6 +798,15 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 	URL     string            `bson:"url" json:"url"`
 	Method  string            `bson:"method" json:"method"`
 	Headers map[string]string `bson:"headers" json:"headers"`
+}
+
+type GraphQLEngineDataSourceConfigKafka struct {
+	BrokerAddr           string `bson:"broker_addr" json:"broker_addr"`
+	Topic                string `bson:"topic" json:"topic"`
+	GroupID              string `bson:"group_id" json:"group_id"`
+	ClientID             string `bson:"client_id" json:"client_id"`
+	KafkaVersion         string `bson:"kafka_version" json:"kafka_version"`
+	StartConsumingLatest bool   `json:"start_consuming_latest"`
 }
 
 type QueryVariable struct {

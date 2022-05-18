@@ -113,6 +113,32 @@ func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	}
 }
 
+func doJSONExport(w http.ResponseWriter, code int, obj interface{}, fileName string) {
+
+	if code != http.StatusOK {
+		doJSONWrite(w, code, obj)
+		return
+	}
+
+	stream, err := json.MarshalIndent(obj, "", "  ")
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=%q", fileName))
+	w.WriteHeader(code)
+	_, err = w.Write(stream)
+
+	if err != nil {
+		job := instrument.NewJob("SystemAPIError")
+		job.Event(err.Error())
+	}
+
+}
+
 type MethodNotAllowedHandler struct{}
 
 func (m MethodNotAllowedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -885,9 +911,30 @@ func (gw *Gateway) handleGetAPIList() (interface{}, int) {
 	return apiIDList, http.StatusOK
 }
 
+func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	apisList := make([]oas.OAS, len(gw.apisByID))
+	c := 0
+
+	for _, apiSpec := range gw.apisByID {
+		apiSpec.OAS.Fill(*apiSpec.APIDefinition)
+
+		if modePublic {
+			apiSpec.OAS.RemoveTykExtension()
+		}
+		apisList[c] = apiSpec.OAS
+		c++
+	}
+
+	return apisList, http.StatusOK
+}
+
 func (gw *Gateway) handleGetAPI(apiID string, oasTyped bool) (interface{}, int) {
 	if spec := gw.getApiSpec(apiID); spec != nil {
 		if oasTyped {
+			spec.OAS.Fill(*spec.APIDefinition)
 			return &spec.OAS, http.StatusOK
 		} else {
 			return spec.APIDefinition, http.StatusOK
@@ -899,6 +946,18 @@ func (gw *Gateway) handleGetAPI(apiID string, oasTyped bool) (interface{}, int) 
 		"apiID":  apiID,
 	}).Error("API doesn't exist.")
 	return apiError("API not found"), http.StatusNotFound
+}
+
+func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, int) {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	obj, code := gw.handleGetAPI(apiID, true)
+	if apiOAS, ok := obj.(*oas.OAS); ok && modePublic {
+		apiOAS.RemoveTykExtension()
+	}
+	return obj, code
+
 }
 
 func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasTyped bool) (interface{}, int) {
@@ -945,6 +1004,19 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 
 		log.Debugf("Semantic validation for API Definition failed. Reason: %s.", reason)
 		return apiError(fmt.Sprintf("Validation of API Definition failed. Reason: %s.", reason)), http.StatusBadRequest
+	}
+
+	newAPIURL := getAPIURL(newDef, gw.GetConfig())
+
+	if r.Method == http.MethodPost {
+		oas.AddServers(newAPIURL)
+	} else {
+		var oldAPIURL string
+		spec := gw.getApiSpec(newDef.APIID)
+		if spec != nil && spec.OAS.Servers != nil {
+			oldAPIURL = spec.OAS.Servers[0].URL
+		}
+		oas.UpdateServers(newAPIURL, oldAPIURL)
 	}
 
 	// api
@@ -1062,7 +1134,6 @@ func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 
 func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
-	oasTyped := r.FormValue("type") == "oas"
 
 	var obj interface{}
 	var code int
@@ -1070,19 +1141,19 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		if apiID != "" {
-			log.Debug("Requesting API definition for", apiID)
-			obj, code = gw.handleGetAPI(apiID, oasTyped)
+			log.Debugf("Requesting API definition for %q", apiID)
+			obj, code = gw.handleGetAPI(apiID, false)
 		} else {
 			log.Debug("Requesting API list")
 			obj, code = gw.handleGetAPIList()
 		}
 	case "POST":
 		log.Debug("Creating new definition file")
-		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), oasTyped)
+		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), false)
 	case "PUT":
 		if apiID != "" {
-			log.Debug("Updating existing API: ", apiID)
-			obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), oasTyped)
+			log.Debugf("Updating existing API: %q", apiID)
+			obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), false)
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
@@ -1096,6 +1167,82 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		apiID       = mux.Vars(r)["apiID"]
+		scopePublic = r.URL.Query().Get("mode") == "public"
+		obj         interface{}
+		code        int
+	)
+	if apiID != "" {
+		log.Debugf("Requesting API definition for %q", apiID)
+		obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
+	} else {
+		log.Debug("Requesting API list")
+		obj, code = gw.handleGetAPIListOAS(scopePublic)
+	}
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		obj  interface{}
+		code int
+	)
+
+	log.Debug("Creating new definition file")
+	obj, code = gw.handleAddOrUpdateApi("", r, afero.NewOsFs(), true)
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		apiID = mux.Vars(r)["apiID"]
+		obj   interface{}
+		code  int
+	)
+	if apiID != "" {
+		log.Debugf("Updating existing API: %q", apiID)
+		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
+	} else {
+		obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
+	}
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASExportHandler(w http.ResponseWriter, r *http.Request) {
+	const (
+		baseFileName       = "TykOasApiDef"
+		baseFileNamePublic = "oas"
+		fileTypeJSON       = "json"
+	)
+	var (
+		apiID       = mux.Vars(r)["apiID"]
+		fileName    = baseFileName
+		scopePublic = r.URL.Query().Get("mode") == "public"
+		obj         interface{}
+		code        int
+	)
+
+	if scopePublic {
+		fileName = baseFileNamePublic
+	}
+
+	if apiID != "" {
+		log.Debugf("Requesting API definition for %q", apiID)
+		obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
+		fileName += "-" + apiID
+	} else {
+		log.Debug("Requesting API list")
+		obj, code = gw.handleGetAPIListOAS(scopePublic)
+	}
+
+	doJSONExport(w, code, obj, fmt.Sprintf("%s.%s", fileName, fileTypeJSON))
 }
 
 func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
