@@ -3,6 +3,8 @@ package gateway
 import "C"
 
 import (
+	"context"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -12,16 +14,14 @@ import (
 // CoProcessDefaultKeyPrefix is used as a key prefix for this CP.
 const CoProcessDefaultKeyPrefix = "coprocess-data:"
 
-// TODO: implement INCR, DECR?
-
 // TykStoreData is a CoProcess API function for storing data.
 //export TykStoreData
 func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	key := C.GoString(CKey)
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
-
-	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix}
+	rc := storage.NewRedisController(context.TODO())
+	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, RedisController: rc}
 	err := store.SetKey(key, value, ttl)
 	if err != nil {
 		log.WithError(err).Error("could not set key")

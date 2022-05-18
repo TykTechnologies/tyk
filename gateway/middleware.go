@@ -31,14 +31,6 @@ import (
 
 const mwStatusRespond = 666
 
-const authTokenType = "authToken"
-const jwtType = "jwt"
-const hmacType = "hmac"
-const basicType = "basic"
-const coprocessType = "coprocess"
-const oauthType = "oauth"
-const oidcType = "oidc"
-
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
 	orgSessionExpiryCache singleflight.Group
@@ -398,7 +390,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							for ai, au := range r.AllowedURLs {
 								if u.URL == au.URL {
 									found = true
-									r.AllowedURLs[ai].Methods = append(au.Methods, u.Methods...)
+									r.AllowedURLs[ai].Methods = appendIfMissing(au.Methods, u.Methods...)
 								}
 							}
 
@@ -564,7 +556,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	// set tags
 	session.Tags = []string{}
 	for tag := range tags {
-		session.Tags = append(session.Tags, tag)
+		session.Tags = appendIfMissing(session.Tags, tag)
 	}
 
 	if len(policies) == 0 {
@@ -734,12 +726,12 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 		ctxScheduleSessionUpdate(r)
-	} else {
-		// defaulting
-		session.KeyID = key
+		return session, found
 	}
 
-	return session, found
+	// session not found
+	session.KeyID = key
+	return session, false
 }
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
@@ -754,20 +746,30 @@ func (b BaseMiddleware) getAuthType() string {
 func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, apidef.AuthConfig) {
 	config, ok := b.Base().Spec.AuthConfigs[authType]
 	// Auth is deprecated. To maintain backward compatibility authToken and jwt cases are added.
-	if !ok && (authType == authTokenType || authType == jwtType) {
+	if !ok && (authType == apidef.AuthTokenType || authType == apidef.JWTType) {
 		config = b.Base().Spec.Auth
 	}
 
-	if config.AuthHeaderName == "" {
-		config.AuthHeaderName = headers.Authorization
-	}
+	var (
+		key         string
+		defaultName = headers.Authorization
+	)
 
-	key := r.Header.Get(config.AuthHeaderName)
+	headerName := config.AuthHeaderName
+	if !config.DisableHeader {
+		if headerName == "" {
+			headerName = defaultName
+		} else {
+			defaultName = headerName
+		}
+
+		key = r.Header.Get(headerName)
+	}
 
 	paramName := config.ParamName
 	if config.UseParam || paramName != "" {
 		if paramName == "" {
-			paramName = config.AuthHeaderName
+			paramName = defaultName
 		}
 
 		paramValue := r.URL.Query().Get(paramName)
@@ -781,7 +783,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	cookieName := config.CookieName
 	if config.UseCookie || cookieName != "" {
 		if cookieName == "" {
-			cookieName = config.AuthHeaderName
+			cookieName = defaultName
 		}
 
 		authCookie, err := r.Cookie(cookieName)

@@ -38,6 +38,8 @@ const (
 	ECDSASign = "ecdsa"
 )
 
+const UnexpectedSigningMethod = "Unexpected signing method"
+
 var (
 	// List of common OAuth Client ID claims used by IDPs:
 	oauthClientIDClaims = []string{
@@ -326,14 +328,45 @@ func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error)
 	return "", errors.New(message)
 }
 
-func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
-	// get claim with scopes and turn it into slice of strings
-	if scope, found := claims[scopeClaimName].(string); found {
-		return strings.Split(scope, " ") // by standard is space separated list of values
+func toStrings(v interface{}) []string {
+	switch e := v.(type) {
+	case string:
+		return strings.Split(e, " ")
+	case []interface{}:
+		var r []string
+		for _, x := range e {
+			r = append(r, toStrings(x)...)
+		}
+		return r
 	}
-
-	// claim with scopes is optional so return nothing if it is not present
 	return nil
+}
+
+func nestedMapLookup(m map[string]interface{}, ks ...string) interface{} {
+	var c interface{} = m
+	for _, k := range ks {
+		if _, ok := c.(map[string]interface{}); !ok {
+			//fmt.Errorf("key not found; remaining keys: %v", ks)
+			return nil
+		}
+		c = getMapContext(c, k)
+	}
+	return c
+}
+
+func getMapContext(m interface{}, k string) (rval interface{}) {
+	switch e := m.(type) {
+	case map[string]interface{}:
+		return e[k]
+	default:
+		return e
+	}
+}
+
+func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
+	lookedUp := nestedMapLookup(claims, strings.Split(scopeClaimName, ".")...)
+
+	return toStrings(lookedUp)
 }
 
 func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
@@ -528,8 +561,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	}
 
 	// apply policies from scope if scope-to-policy mapping is specified for this API
-	if len(k.Spec.JWTScopeToPolicyMapping) != 0 {
-		scopeClaimName := k.Spec.JWTScopeClaimName
+	if len(k.Spec.Scopes.JWT.ScopeToPolicy) != 0 {
+		scopeClaimName := k.Spec.Scopes.JWT.ScopeClaimName
 		if scopeClaimName == "" {
 			scopeClaimName = "scope"
 		}
@@ -545,7 +578,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 
 			// add all policies matched from scope-policy mapping
-			mappedPolIDs := mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
+			mappedPolIDs := mapScopeToPolicies(k.Spec.Scopes.JWT.ScopeToPolicy, scope)
 			if len(mappedPolIDs) > 0 {
 				k.Logger().Debugf("Identified policy(s) to apply to this token from scope claim: %s", scopeClaimName)
 			} else {
@@ -581,14 +614,14 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// Initialize the OAuthManager if empty:
 		if k.Spec.OAuthManager == nil {
 			prefix := generateOAuthPrefix(k.Spec.APIID)
-			storageManager := k.Gw.getGlobalStorageHandler(prefix, false)
+			storageManager := k.Gw.getGlobalMDCBStorageHandler(prefix, false)
 			storageManager.Connect()
 			k.Spec.OAuthManager = &OAuthManager{
 				OsinServer: k.Gw.TykOsinNewServer(&osin.ServerConfig{},
 					&RedisOsinStorageInterface{
 						storageManager,
 						k.Gw.GlobalSessionManager,
-						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: k.Gw.RedisController},
 						k.Spec.OrgID,
 						k.Gw,
 					}),
@@ -661,7 +694,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 
 // getAuthType overrides BaseMiddleware.getAuthType.
 func (k *JWTMiddleware) getAuthType() string {
-	return jwtType
+	return apidef.JWTType
 }
 
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -698,20 +731,20 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		switch k.Spec.JWTSigningMethod {
 		case HMACSign:
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v and not HMAC signature", token.Header["alg"])
+				return nil, fmt.Errorf("%v: %v and not HMAC signature", UnexpectedSigningMethod, token.Header["alg"])
 			}
 		case RSASign:
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v and not RSA signature", token.Header["alg"])
+				return nil, fmt.Errorf("%v: %v and not RSA signature", UnexpectedSigningMethod, token.Header["alg"])
 			}
 		case ECDSASign:
 			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v and not ECDSA signature", token.Header["alg"])
+				return nil, fmt.Errorf("%v: %v and not ECDSA signature", UnexpectedSigningMethod, token.Header["alg"])
 			}
 		default:
 			logger.Warning("No signing method found in API Definition, defaulting to HMAC signature")
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+				return nil, fmt.Errorf("%v: %v", UnexpectedSigningMethod, token.Header["alg"])
 			}
 		}
 
@@ -761,7 +794,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	k.reportLoginFailure(tykId, r)
 	if err != nil {
 		logger.WithError(err).Error("JWT validation error")
-		return errors.New("Key not authorized:" + err.Error()), http.StatusForbidden
+		errorDetails := strings.Split(err.Error(), ":")
+		if errorDetails[0] == UnexpectedSigningMethod {
+			return errors.New(MsgKeyNotAuthorizedUnexpectedSigningMethod), http.StatusForbidden
+		}
 	}
 	return errors.New("Key not authorized"), http.StatusForbidden
 }

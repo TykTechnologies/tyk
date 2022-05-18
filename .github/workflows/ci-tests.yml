@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout Tyk
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
 
       - name: Setup Golang
         uses: actions/setup-go@v2
@@ -36,25 +38,44 @@ jobs:
       - name: Install Dependencies and basic hygiene test
         id: hygiene
         run: |
+          go install golang.org/x/tools/cmd/goimports@latest
+          go install github.com/jteeuwen/go-bindata/...@master
+
           sudo apt-get install libluajit-5.1-dev
-          GO111MODULE=off go get golang.org/x/tools/cmd/goimports
-          gofmt -l . 2>&1 | tee fmt.log
-          fmt_code=${PIPESTATUS[0]}
+
+          gofmt -l . >> fmt.log
+          fmt_lines=$(wc -l < fmt.log)
           echo "::set-output name=fmt::$(sed -ze 's/%/%25/g;s/\n/%0A/g' fmt.log)"
           goimports -l . 2>&1 | tee imports.log
           imports_code=${PIPESTATUS[0]}
           echo "::set-output name=imports::$(sed -ze 's/%/%25/g;s/\n/%0A/g' imports.log)"
-          [[ $fmt_code -ne 0 || $imports_code -ne 0 ]] && exit 1
+          [[ $fmt_lines -ne 0 || $imports_code -ne 0 ]] && exit 1
           
           python -m pip install --upgrade pip
           pip install setuptools
           pip install google
           pip install protobuf
+          
+          go generate ./...
+          git add --all
+          git diff-index HEAD > gogenerate.log
+          echo "::set-output name=gogenerate::$(sed -ze 's/%/%25/g;s/\n/%0A/g' gogenerate.log)"
+          git_state_count=$(wc -l < gogenerate.log)
+          
+          if [[ $git_state_count -ne 0 ]]
+          then 
+            echo "go generate ./... made git state dirty, please run go generate ./... and update PR"
+            exit 1
+          fi
 
+      - name: Fetch base branch
+        if: ${{ github.event_name == 'pull_request' }}
+        run: git fetch origin ${{ github.base_ref }}
       - name: Start Redis
         uses: supercharge/redis-github-action@1.2.0
         with:
           redis-version: ${{ matrix.redis-version }}
+
 
       - name: Cache
         uses: actions/cache@v2
@@ -87,5 +108,38 @@ jobs:
             ${{ steps.hygiene.outputs.fmt || 'all ok' }}
             ## goimports
             ${{ steps.hygiene.outputs.imports || 'all ok' }}
-
+            
+            ## gogenerate 
+            ${{ steps.hygiene.outputs.gogenerate || 'all ok' }}
+            
             If the above are ok, please look at [the run](https://github.com/TykTechnologies/tyk/pull/${{ github.event.pull_request.number }}/checks?check_run_id=${{ github.run_id }}) or in the _Checks_ tab.
+
+      - name: Download golangci-lint
+        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+
+      - name: golangci-lint
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --timeout=300s --max-issues-per-linter=0 --max-same-issues=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
+
+      - name: golangci-lint
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --timeout=300s --max-issues-per-linter=0 --max-same-issues=0 --issues-exit-code=0 ./... > golanglint.xml
+
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.organization=tyktechnologies
+            -Dsonar.projectKey=TykTechnologies_tyk
+            -Dsonar.sources=.
+            -Dsonar.exclusions=coprocess/**/*,ci/**,smoke-tests/**,apidef/oas/schema/schema.gen.go
+            -Dsonar.coverage.exclusions=**/*_test.go
+            -Dsonar.test.inclusions=**/*_test.go
+            -Dsonar.tests=.
+            -Dsonar.go.coverage.reportPaths=*.cov
+            -Dsonar.go.golangci-lint.reportPaths=golanglint.xml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

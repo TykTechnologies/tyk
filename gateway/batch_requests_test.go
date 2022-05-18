@@ -12,7 +12,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
+
+	"github.com/TykTechnologies/tyk/certs"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
@@ -124,7 +125,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
+	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
@@ -237,9 +238,6 @@ func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 			}
 		})
 	})
-
-	// Let the server start
-	time.Sleep(500 * time.Millisecond)
 
 	ts.Run(t, test.TestCase{Path: "/virt", Code: 202})
 	got := header.Load().(string)

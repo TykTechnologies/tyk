@@ -1,0 +1,168 @@
+package oas
+
+import (
+	"testing"
+
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestOAS(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyOAS OAS
+
+		var convertedAPI apidef.APIDefinition
+		emptyOAS.ExtractTo(&convertedAPI)
+
+		var resultOAS OAS
+		resultOAS.Fill(convertedAPI)
+
+		assert.Equal(t, emptyOAS, resultOAS)
+	})
+
+	var api apidef.APIDefinition
+	api.AuthConfigs = make(map[string]apidef.AuthConfig)
+
+	a := apidef.AuthConfig{}
+	Fill(t, &a, 0)
+	api.AuthConfigs[apidef.AuthTokenType] = a
+
+	sw := &OAS{}
+	sw.Fill(api)
+
+	var converted apidef.APIDefinition
+	sw.ExtractTo(&converted)
+
+	assert.Equal(t, api.AuthConfigs, converted.AuthConfigs)
+}
+
+func TestOAS_AddServers(t *testing.T) {
+	t.Parallel()
+	type fields struct {
+		T openapi3.T
+	}
+	type args struct {
+		apiURL string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+	}{
+		{
+			name:   "empty servers",
+			fields: fields{T: openapi3.T{}},
+			args:   args{apiURL: "http://127.0.0.1:8080/api"},
+		},
+		{
+			name: "non-empty servers",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			}},
+			args: args{apiURL: "http://127.0.0.1:8080/api"},
+		},
+		{
+			name: "non-empty servers having same URL that of apiURL",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+					{
+						URL: "http://legacy-upstream.org/api",
+					},
+					{
+						URL: "http://127.0.0.1:8080/api",
+					},
+				},
+			}},
+			args: args{apiURL: "http://127.0.0.1:8080/api"},
+		},
+		{
+			name: "non-empty servers having same URL that of apiURL",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://127.0.0.1:8080/api",
+					},
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			}},
+			args: args{apiURL: "http://127.0.0.1:8080/api"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &OAS{
+				T: tt.fields.T,
+			}
+			s.AddServers(tt.args.apiURL)
+			assert.Equal(t, tt.args.apiURL, s.Servers[0].URL)
+		})
+	}
+}
+
+func TestOAS_UpdateServers(t *testing.T) {
+	t.Parallel()
+	type fields struct {
+		T openapi3.T
+	}
+	type args struct {
+		apiURL    string
+		oldAPIURL string
+	}
+	tests := []struct {
+		name        string
+		fields      fields
+		args        args
+		expectedURL string
+	}{
+		{
+			name:        "empty servers",
+			fields:      fields{T: openapi3.T{}},
+			args:        args{apiURL: "http://127.0.0.1:8080/api", oldAPIURL: ""},
+			expectedURL: "http://127.0.0.1:8080/api",
+		},
+		{
+			name: "non-empty servers replace with new",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			}},
+			args:        args{apiURL: "http://127.0.0.1:8080/api", oldAPIURL: "http://example-upstream.org/api"},
+			expectedURL: "http://127.0.0.1:8080/api",
+		},
+		{
+			name: "non-empty servers not replace",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			}},
+			args:        args{apiURL: "http://127.0.0.1:8080/api", oldAPIURL: "http://localhost/api"},
+			expectedURL: "http://example-upstream.org/api",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &OAS{
+				T: tt.fields.T,
+			}
+			s.UpdateServers(tt.args.apiURL, tt.args.oldAPIURL)
+			assert.Equal(t, tt.expectedURL, s.Servers[0].URL)
+		})
+	}
+}

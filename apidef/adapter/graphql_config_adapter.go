@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	neturl "net/url"
+	"sort"
 	"strings"
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
+	kafkaDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -87,13 +90,29 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 		}
 	}
 
-	v2Config, err := graphql.NewProxyEngineConfigFactory(g.schema, upstreamConfig, graphql.WithProxyHttpClient(g.httpClient)).EngineV2Configuration()
+	v2Config, err := graphql.NewProxyEngineConfigFactory(
+		g.schema,
+		upstreamConfig,
+		graphqlDataSource.NewBatchFactory(),
+		graphql.WithProxyHttpClient(g.httpClient),
+	).EngineV2Configuration()
+
 	return &v2Config, err
 }
 
 func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*graphql.EngineV2Configuration, error) {
 	dataSourceConfs := g.subgraphDataSourceConfigs()
-	federationConfigV2Factory := graphql.NewFederationEngineConfigFactory(dataSourceConfs, graphql.WithFederationHttpClient(g.getHttpClient()))
+	var federationConfigV2Factory *graphql.FederationEngineConfigFactory
+	if g.apiDefinition.GraphQL.Supergraph.DisableQueryBatching {
+		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(dataSourceConfs, nil, graphql.WithFederationHttpClient(g.getHttpClient()))
+	} else {
+		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(
+			dataSourceConfs,
+			graphqlDataSource.NewBatchFactory(),
+			graphql.WithFederationHttpClient(g.getHttpClient()),
+		)
+	}
+
 	err := federationConfigV2Factory.SetMergedSchemaFromString(g.apiDefinition.GraphQL.Supergraph.MergedSDL)
 	if err != nil {
 		return nil, err
@@ -194,12 +213,17 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				Client: g.getHttpClient(),
 			}
 
+			urlWithoutQueryParams, queryConfigs, err := g.extractURLQueryParamsForEngineV2(restConfig.URL, restConfig.Query)
+			if err != nil {
+				return nil, err
+			}
+
 			planDataSource.Custom = restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
-					URL:    restConfig.URL,
+					URL:    urlWithoutQueryParams,
 					Method: restConfig.Method,
 					Body:   restConfig.Body,
-					Query:  g.convertURLQueriesToEngineV2Queries(restConfig.Query),
+					Query:  queryConfigs,
 					Header: g.convertHeadersToHttpHeaders(restConfig.Headers),
 				},
 			})
@@ -220,6 +244,25 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				graphqlConfig.Method,
 				graphqlConfig.Headers,
 			))
+
+		case apidef.GraphQLEngineDataSourceKindKafka:
+			var kafkaConfig apidef.GraphQLEngineDataSourceConfigKafka
+			err = json.Unmarshal(ds.Config, &kafkaConfig)
+			if err != nil {
+				return nil, err
+			}
+
+			planDataSource.Factory = &kafkaDataSource.Factory{}
+			planDataSource.Custom = kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
+				Subscription: kafkaDataSource.SubscriptionConfiguration{
+					BrokerAddr:           kafkaConfig.BrokerAddr,
+					Topic:                kafkaConfig.Topic,
+					GroupID:              kafkaConfig.GroupID,
+					ClientID:             kafkaConfig.ClientID,
+					KafkaVersion:         kafkaConfig.KafkaVersion,
+					StartConsumingLatest: kafkaConfig.StartConsumingLatest,
+				},
+			})
 		}
 
 		planDataSources = append(planDataSources, planDataSource)
@@ -239,8 +282,8 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 		if len(apiDefSubgraphConf.SDL) == 0 {
 			continue
 		}
-
-		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
+		hdr := g.removeDuplicateHeaders(apiDefSubgraphConf.Headers, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
+		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, hdr)
 		conf.Federation = graphqlDataSource.FederationConfiguration{
 			Enabled:    true,
 			ServiceSDL: apiDefSubgraphConf.SDL,
@@ -316,22 +359,57 @@ func (g *GraphQLConfigAdapter) createArgumentConfigurationsForArgumentNames(argu
 	return argConfs
 }
 
-func (g *GraphQLConfigAdapter) convertURLQueriesToEngineV2Queries(apiDefQueries []apidef.QueryVariable) []restDataSource.QueryConfiguration {
-	if len(apiDefQueries) == 0 {
-		return nil
+func (g *GraphQLConfigAdapter) extractURLQueryParamsForEngineV2(url string, providedApiDefQueries []apidef.QueryVariable) (urlWithoutParams string, engineV2Queries []restDataSource.QueryConfiguration, err error) {
+	urlParts := strings.Split(url, "?")
+	urlWithoutParams = urlParts[0]
+
+	queryPart := ""
+	if len(urlParts) == 2 {
+		queryPart = urlParts[1]
+	}
+	// Parse only query part as URL could contain templating {{.argument.id}} which should not be escaped
+	values, err := neturl.ParseQuery(queryPart)
+	if err != nil {
+		return "", nil, err
 	}
 
-	var engineV2Queries []restDataSource.QueryConfiguration
+	engineV2Queries = make([]restDataSource.QueryConfiguration, 0)
+	g.convertURLQueryParamsIntoEngineV2Queries(&engineV2Queries, values)
+	g.convertApiDefQueriesConfigIntoEngineV2Queries(&engineV2Queries, providedApiDefQueries)
+
+	if len(engineV2Queries) == 0 {
+		return urlWithoutParams, nil, nil
+	}
+
+	return urlWithoutParams, engineV2Queries, nil
+}
+
+func (g *GraphQLConfigAdapter) convertURLQueryParamsIntoEngineV2Queries(engineV2Queries *[]restDataSource.QueryConfiguration, queryValues neturl.Values) {
+	for queryKey, queryValue := range queryValues {
+		*engineV2Queries = append(*engineV2Queries, restDataSource.QueryConfiguration{
+			Name:  queryKey,
+			Value: strings.Join(queryValue, ","),
+		})
+	}
+
+	sort.Slice(*engineV2Queries, func(i, j int) bool {
+		return (*engineV2Queries)[i].Name < (*engineV2Queries)[j].Name
+	})
+}
+
+func (g *GraphQLConfigAdapter) convertApiDefQueriesConfigIntoEngineV2Queries(engineV2Queries *[]restDataSource.QueryConfiguration, apiDefQueries []apidef.QueryVariable) {
+	if len(apiDefQueries) == 0 {
+		return
+	}
+
 	for _, apiDefQueryVar := range apiDefQueries {
 		engineV2Query := restDataSource.QueryConfiguration{
 			Name:  apiDefQueryVar.Name,
 			Value: apiDefQueryVar.Value,
 		}
 
-		engineV2Queries = append(engineV2Queries, engineV2Query)
+		*engineV2Queries = append(*engineV2Queries, engineV2Query)
 	}
-
-	return engineV2Queries
 }
 
 func (g *GraphQLConfigAdapter) convertHeadersToHttpHeaders(apiDefHeaders map[string]string) http.Header {
@@ -345,6 +423,22 @@ func (g *GraphQLConfigAdapter) convertHeadersToHttpHeaders(apiDefHeaders map[str
 	}
 
 	return engineV2Headers
+}
+
+func (g *GraphQLConfigAdapter) removeDuplicateHeaders(headers ...map[string]string) map[string]string {
+	hdr := make(map[string]string)
+	// headers priority depends on the order of arguments
+	for _, header := range headers {
+		for k, v := range header {
+			keyCanonical := http.CanonicalHeaderKey(k)
+			if _, ok := hdr[keyCanonical]; ok {
+				// skip because header is present
+				continue
+			}
+			hdr[keyCanonical] = v
+		}
+	}
+	return hdr
 }
 
 func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {

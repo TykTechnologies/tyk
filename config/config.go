@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -207,6 +208,9 @@ type AnalyticsConfigConfig struct {
 	PurgeInterval float32 `json:"purge_interval"`
 
 	ignoredIPsCompiled map[string]bool
+
+	// Determines the serialization engine for analytics. Available options: msgpack, and protobuf. By default, msgpack.
+	SerializerType string `json:"serializer_type"`
 }
 
 type HealthCheckConfig struct {
@@ -316,6 +320,12 @@ type SlaveOptionsConfig struct {
 
 	// You can use this to set a period for which the Gateway will check if there are changes in keys that must be synchronized. If this value is not set then it will default to 10 seconds.
 	KeySpaceSyncInterval float32 `json:"key_space_sync_interval"`
+
+	// RPCCertCacheExpiration defines the expiration time of the rpc cache that stores the certificates, defined in seconds
+	RPCCertCacheExpiration float32 `json:"rpc_cert_cache_expiration"`
+
+	// RPCKeysCacheExpiration defines the expiration time of the rpc cache that stores the keys, defined in seconds
+	RPCGlobalCacheExpiration float32 `json:"rpc_global_cache_expiration"`
 }
 
 type LocalSessionCacheConf struct {
@@ -1081,6 +1091,9 @@ type TykEventHandler interface {
 	HandleEvent(EventMessage)
 }
 
+// Global function that will return the config of the gw running
+var Global func() Config
+
 func WriteConf(path string, conf *Config) error {
 	bs, err := json.MarshalIndent(conf, "", "    ")
 	if err != nil {
@@ -1116,12 +1129,13 @@ func WriteDefault(path string, conf *Config) error {
 // An error will be returned only if any of the paths existed but was
 // not a valid config file.
 func Load(paths []string, conf *Config) error {
-	var r io.Reader
-	for _, path := range paths {
-		f, err := os.Open(path)
+	var r io.ReadCloser
+	for _, filename := range paths {
+		f, err := os.Open(filename)
 		if err == nil {
 			r = f
-			conf.OriginalPath = path
+			defer r.Close()
+			conf.OriginalPath = filename
 			break
 		}
 		if os.IsNotExist(err) {
@@ -1129,6 +1143,7 @@ func Load(paths []string, conf *Config) error {
 		}
 		return err
 	}
+
 	if r == nil {
 		path := paths[0]
 		log.Warnf("No config file found, writing default to %s", path)
@@ -1138,9 +1153,16 @@ func Load(paths []string, conf *Config) error {
 		log.Info("Loading default configuration...")
 		return Load([]string{path}, conf)
 	}
+
 	if err := json.NewDecoder(r).Decode(&conf); err != nil {
 		return fmt.Errorf("couldn't unmarshal config: %v", err)
 	}
+
+	shouldOmit, omitEnvExist := os.LookupEnv(envPrefix + "_OMITCONFIGFILE")
+	if omitEnvExist && strings.ToLower(shouldOmit) == "true" {
+		*conf = Config{}
+	}
+
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return fmt.Errorf("failed to process config env vars: %v", err)
 	}

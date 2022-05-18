@@ -41,14 +41,15 @@ petstore.json
 *.mutexprof
 *.pdf
 *.mmdb
-*.cov
 *.so
+*.log
 !testdata/*.mmdb
 *.pid
 coprocess_gen_test.go
 session_state_gen_test.go
 __pycache__/
 tyk.test
+tyk-gateway.pid
 
 tyk_linux_*
 /dist/

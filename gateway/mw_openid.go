@@ -92,7 +92,7 @@ func (k *OpenIDMW) dummyErrorHandler(e error, w http.ResponseWriter, r *http.Req
 }
 
 func (k *OpenIDMW) getAuthType() string {
-	return oidcType
+	return apidef.OIDCType
 }
 
 func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -127,7 +127,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	}
 
 	// decide if we use policy ID from provider client settings or list of policies from scope-policy mapping
-	useScope := len(k.Spec.JWTScopeToPolicyMapping) != 0
+	useScope := len(k.Spec.Scopes.OIDC.ScopeToPolicy) != 0
 
 	k.lock.RLock()
 	clientSet, foundIssuer := k.provider_client_policymap[iss.(string)]
@@ -181,14 +181,14 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	if !useScope {
 		policiesToApply = append(policiesToApply, policyID)
 	} else {
-		scopeClaimName := k.Spec.JWTScopeClaimName
+		scopeClaimName := k.Spec.Scopes.OIDC.ScopeClaimName
 		if scopeClaimName == "" {
 			scopeClaimName = "scope"
 		}
 
 		if scope := getScopeFromClaim(token.Claims.(jwt.MapClaims), scopeClaimName); scope != nil {
 			// add all policies matched from scope-policy mapping
-			policiesToApply = mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
+			policiesToApply = mapScopeToPolicies(k.Spec.Scopes.OIDC.ScopeToPolicy, scope)
 		}
 	}
 
@@ -217,6 +217,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		session.OrgID = k.Spec.OrgID
 		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID, "ClientID": clientID}
 		session.Alias = clientID + ":" + ouser.ID
+		session.KeyID = sessionID
 
 		// Update the session in the session manager in case it gets called again
 		logger.Debug("Policy applied to key")

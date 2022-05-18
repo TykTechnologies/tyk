@@ -86,8 +86,7 @@ type Gateway struct {
 	config          atomic.Value
 	configMu        sync.Mutex
 
-	ctx      context.Context
-	cancelFn context.CancelFunc
+	ctx context.Context
 
 	muNodeID   sync.Mutex // guards NodeID
 	NodeID     string
@@ -95,7 +94,7 @@ type Gateway struct {
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
 
-	analytics            RedisAnalyticsHandler
+	Analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
 	MainNotifier         RedisNotifier
 	DefaultOrgStore      DefaultSessionManager
@@ -114,7 +113,10 @@ type Gateway struct {
 	SessionLimiter SessionLimiter
 	SessionMonitor Monitor
 
+	// RPCGlobalCache stores keys
 	RPCGlobalCache *cache.Cache
+	// RPCCertCache stores certificates
+	RPCCertCache *cache.Cache
 	// key session memory cache
 	SessionCache *cache.Cache
 	// org session memory cache
@@ -175,25 +177,35 @@ type Gateway struct {
 
 	templates    *template.Template
 	templatesRaw *textTemplate.Template
+
+	// RedisController keeps track of redis connection and singleton
+	RedisController *storage.RedisController
+	hostDetails     hostDetails
+
+	healthCheckInfo atomic.Value
 }
 
-func NewGateway(config config.Config, ctx context.Context, cancelFn context.CancelFunc) *Gateway {
+type hostDetails struct {
+	Hostname string
+	PID      int
+}
+
+func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw := Gateway{
 		DefaultProxyMux: &proxyMux{
 			again: again.New(),
 		},
-		ctx:      ctx,
-		cancelFn: cancelFn,
+		ctx: ctx,
 	}
 
-	gw.analytics = RedisAnalyticsHandler{Gw: &gw}
+	gw.Analytics = RedisAnalyticsHandler{Gw: &gw}
 	gw.SetConfig(config)
 	sessionManager := DefaultSessionManager{Gw: &gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
+	gw.DefaultOrgStore = DefaultSessionManager{Gw: &gw}
 	gw.DefaultQuotaStore = DefaultSessionManager{Gw: &gw}
 	gw.SessionLimiter = SessionLimiter{Gw: &gw}
 	gw.SessionMonitor = Monitor{Gw: &gw}
-	gw.RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
 	gw.HostCheckTicker = make(chan struct{})
 	gw.HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
@@ -214,6 +226,8 @@ func NewGateway(config config.Config, ctx context.Context, cancelFn context.Canc
 	gw.ReloadTestCase = NewReloadMachinery()
 	gw.TestBundles = map[string]map[string]string{}
 
+	gw.RedisController = storage.NewRedisController(ctx)
+
 	return &gw
 }
 
@@ -222,6 +236,12 @@ func (gw *Gateway) UnmarshalJSON(data []byte) error {
 }
 func (gw *Gateway) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct{}{})
+}
+
+func (gw *Gateway) InitializeRPCCache() {
+	conf := gw.GetConfig()
+	gw.RPCGlobalCache = cache.New(time.Duration(conf.SlaveOptions.RPCGlobalCacheExpiration)*time.Second, 15*time.Second)
+	gw.RPCCertCache = cache.New(time.Duration(conf.SlaveOptions.RPCCertCacheExpiration)*time.Second, 15*time.Second)
 }
 
 // SetNodeID writes NodeID safely.
@@ -281,6 +301,7 @@ func (gw *Gateway) setupGlobals() {
 
 	gw.SetConfig(gwConfig)
 	gw.dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
+
 	if gwConfig.DnsCache.Enabled {
 		gw.dnsCacheManager.InitDNSCaching(
 			time.Duration(gwConfig.DnsCache.TTL)*time.Second,
@@ -297,40 +318,41 @@ func (gw *Gateway) setupGlobals() {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
 
-		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true}
+		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true, RedisController: gw.RedisController}
 		gw.InitHostCheckManager(gw.ctx, &healthCheckStore)
 	}
 
 	gw.initHealthCheck(gw.ctx)
 
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys}
+	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys, RedisController: gw.RedisController}
 	gw.GlobalSessionManager.Init(&redisStore)
 
-	versionStore := storage.RedisCluster{KeyPrefix: "version-check-"}
+	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", RedisController: gw.RedisController}
 	versionStore.Connect()
 	err := versionStore.SetKey("gateway", VERSION, 0)
+
 	if err != nil {
 		mainLog.WithError(err).Error("Could not set version in versionStore")
 	}
 
-	if gwConfig.EnableAnalytics && gw.analytics.Store == nil {
+	if gwConfig.EnableAnalytics && gw.Analytics.Store == nil {
 		Conf := gwConfig
 		Conf.LoadIgnoredIPs()
 		gw.SetConfig(Conf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
-		gw.analytics.Store = &analyticsStore
-		gw.analytics.Init()
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
+		gw.Analytics.Store = &analyticsStore
+		gw.Analytics.Init()
 
-		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
+		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
 		redisPurger := RedisPurger{Store: &store, Gw: gw}
 		go redisPurger.PurgeLoop(gw.ctx)
 
 		if gw.GetConfig().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
 
-			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
+			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
 			purger := rpc.Purger{
 				Store: &store,
 			}
@@ -349,7 +371,7 @@ func (gw *Gateway) setupGlobals() {
 
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")
-	mainNotifierStore := &storage.RedisCluster{}
+	mainNotifierStore := &storage.RedisCluster{RedisController: gw.RedisController}
 	mainNotifierStore.Connect()
 	gw.MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
 
@@ -373,7 +395,16 @@ func (gw *Gateway) setupGlobals() {
 		certificateSecret = gw.GetConfig().Security.PrivateCertificateEncodingSecret
 	}
 
-	gw.CertificateManager = certs.NewCertificateManager(gw.getGlobalStorageHandler("cert-", false), certificateSecret, log, !gw.GetConfig().Cloud)
+	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, RedisController: gw.RedisController}
+	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
+	if gw.GetConfig().SlaveOptions.UseRPC {
+		rpcStore := &RPCStorageHandler{
+			KeyPrefix: "cert-",
+			HashKeys:  false,
+			Gw:        gw,
+		}
+		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
+	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
 		NewRelicApplication = gw.SetupNewRelic()
@@ -382,20 +413,19 @@ func (gw *Gateway) setupGlobals() {
 	gw.readGraphqlPlaygroundTemplate()
 }
 
-func buildConnStr(resource string, conf config.Config) string {
-
-	if conf.DBAppConfOptions.ConnectionString == "" && conf.DisableDashboardZeroConf {
+func (gw *Gateway) buildDashboardConnStr(resource string) string {
+	if gw.GetConfig().DBAppConfOptions.ConnectionString == "" && gw.GetConfig().DisableDashboardZeroConf {
 		mainLog.Fatal("Connection string is empty, failing.")
 	}
 
-	if !conf.DisableDashboardZeroConf && conf.DBAppConfOptions.ConnectionString == "" {
+	if !gw.GetConfig().DisableDashboardZeroConf && gw.GetConfig().DBAppConfOptions.ConnectionString == "" {
 		mainLog.Info("Waiting for zeroconf signal...")
-		for conf.DBAppConfOptions.ConnectionString == "" {
+		for gw.GetConfig().DBAppConfOptions.ConnectionString == "" {
 			time.Sleep(1 * time.Second)
 		}
 	}
 
-	return conf.DBAppConfOptions.ConnectionString + resource
+	return gw.GetConfig().DBAppConfOptions.ConnectionString + resource
 }
 
 func (gw *Gateway) syncAPISpecs() (int, error) {
@@ -403,7 +433,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 
 	var s []*APISpec
 	if gw.GetConfig().UseDBAppConfigs {
-		connStr := buildConnStr("/system/apis", gw.GetConfig())
+		connStr := gw.buildDashboardConnStr("/system/apis")
 		tmpSpecs, err := loader.FromDashboardService(connStr)
 		if err != nil {
 			log.Error("failed to load API specs: ", err)
@@ -580,7 +610,13 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/keys/policy/{keyName}", gw.policyUpdateHandler).Methods("POST")
 		r.HandleFunc("/keys/create", gw.createKeyHandler).Methods("POST")
 		r.HandleFunc("/apis", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/apis/oas", gw.apiOASGetHandler).Methods(http.MethodGet)
+		r.HandleFunc("/apis/oas", gw.apiOASPostHandler).Methods(http.MethodPost)
 		r.HandleFunc("/apis/{apiID}", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/apis/oas/export", gw.apiOASExportHandler).Methods("GET")
+		r.HandleFunc("/apis/oas/{apiID}", gw.apiOASGetHandler).Methods(http.MethodGet)
+		r.HandleFunc("/apis/oas/{apiID}", gw.apiOASPutHandler).Methods(http.MethodPut)
+		r.HandleFunc("/apis/oas/{apiID}/export", gw.apiOASExportHandler).Methods("GET")
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/policies/{polID}", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
@@ -606,6 +642,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/oauth/clients/{apiID}", gw.oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", gw.oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", gw.oAuthClientTokensHandler).Methods("GET")
+
+	r.HandleFunc("/schema", gw.schemaHandler).Methods(http.MethodGet)
 
 	mainLog.Debug("Loaded API Endpoints")
 }
@@ -656,12 +694,12 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	serverConfig.RedirectUriSeparator = gwConfig.OauthRedirectUriSeparator
 
 	prefix := generateOAuthPrefix(spec.APIID)
-	storageManager := gw.getGlobalStorageHandler(prefix, false)
+	storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 	storageManager.Connect()
 	osinStorage := &RedisOsinStorageInterface{
 		storageManager,
 		gw.GlobalSessionManager,
-		&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+		&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: gw.RedisController},
 		spec.OrgID,
 		gw,
 	}
@@ -844,7 +882,9 @@ func (gw *Gateway) isRPCMode() bool {
 
 func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 	for {
-		gw.RPCListener.CheckForReload(rpcKey)
+		if ok := gw.RPCListener.CheckForReload(rpcKey); !ok {
+			return
+		}
 	}
 }
 
@@ -932,6 +972,7 @@ func (gw *Gateway) reloadQueueLoop(cb ...func()) {
 	for {
 		select {
 		case <-gw.ctx.Done():
+			log.Warn("Canceled ctx in reloadQueueLoop")
 			return
 		case fn := <-gw.reloadQueue:
 			gw.requeueLock.Lock()
@@ -1042,7 +1083,7 @@ func (gw *Gateway) setupLogger() {
 	}
 
 	if gwConfig.UseRedisLog {
-		hook := newRedisHook()
+		hook := gw.newRedisHook()
 		log.Hooks.Add(hook)
 		rawLog.Hooks.Add(hook)
 
@@ -1077,6 +1118,7 @@ func (gw *Gateway) initialiseSystem() error {
 		if err := config.Load(confPaths, &gwConfig); err != nil {
 			return err
 		}
+
 		if gwConfig.PIDFileLocation == "" {
 			gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
 		}
@@ -1164,12 +1206,19 @@ func (gw *Gateway) initialiseSystem() error {
 	}
 
 	gw.SetConfig(gwConfig)
-	getHostDetails(gw.GetConfig().PIDFileLocation)
+	config.Global = gw.GetConfig
+	gw.getHostDetails(gw.GetConfig().PIDFileLocation)
+	gw.InitializeRPCCache()
 	gw.setupInstrumentation()
 
 	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
 		go gw.StartPeriodicStateBackup(&gw.LE_MANAGER)
 	}
+
+	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
+	// instances periodically and deletes idle items, closes net.Listener instances to
+	// free resources.
+	go cleanIdleMemConnProviders(gw.ctx)
 	return nil
 }
 
@@ -1203,6 +1252,15 @@ func (gw *Gateway) afterConfSetup() {
 
 	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
 		conf.SlaveOptions.KeySpaceSyncInterval = 10
+	}
+
+	if conf.SlaveOptions.RPCCertCacheExpiration == 0 {
+		// defaults to 1 hr
+		conf.SlaveOptions.RPCCertCacheExpiration = 3600
+	}
+
+	if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
+		conf.SlaveOptions.RPCGlobalCacheExpiration = 30
 	}
 
 	if conf.AnalyticsConfig.PurgeInterval == 0 {
@@ -1340,19 +1398,32 @@ func (gw *Gateway) setUpConsul() error {
 	return err
 }
 
-var hostDetails struct {
-	Hostname string
-	PID      int
-}
-
-func getHostDetails(file string) {
+func (gw *Gateway) getHostDetails(file string) {
 	var err error
-	if hostDetails.PID, err = readPIDFromFile(file); err != nil {
+	if gw.hostDetails.PID, err = readPIDFromFile(file); err != nil {
 		mainLog.Error("Failed ot get host pid: ", err)
 	}
-	if hostDetails.Hostname, err = os.Hostname(); err != nil {
+	if gw.hostDetails.Hostname, err = os.Hostname(); err != nil {
 		mainLog.Error("Failed to get hostname: ", err)
 	}
+}
+
+func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
+	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, RedisController: gw.RedisController}
+	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
+
+	if gw.GetConfig().SlaveOptions.UseRPC {
+		return storage.NewMdcbStorage(
+			localStorage,
+			&RPCStorageHandler{
+				KeyPrefix: keyPrefix,
+				HashKeys:  hashKeys,
+				Gw:        gw,
+			},
+			logger,
+		)
+	}
+	return localStorage
 }
 
 func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
@@ -1363,12 +1434,13 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 			Gw:        gw,
 		}
 	}
-	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
+	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, RedisController: gw.RedisController}
 }
 
 func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	cli.Init(VERSION, confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
@@ -1377,7 +1449,7 @@ func Start() {
 	}
 
 	// ToDo:Config replace for get default conf
-	gw := NewGateway(config.Default, ctx, cancel)
+	gw := NewGateway(config.Default, ctx)
 	gw.SetNodeID("solo-" + uuid.NewV4().String())
 
 	gw.SessionID = uuid.NewV4().String()
@@ -1424,7 +1496,7 @@ func Start() {
 	}
 	gw.start()
 	configs := gw.GetConfig()
-	go storage.ConnectToRedis(gw.ctx, func() {
+	go gw.RedisController.ConnectToRedis(gw.ctx, func() {
 		gw.reloadURLStructure(func() {})
 	}, &configs)
 
@@ -1475,8 +1547,8 @@ func Start() {
 		mainLog.Error("Closing listeners: ", err)
 	}
 	// stop analytics workers
-	if gwConfig.EnableAnalytics && gw.analytics.Store == nil {
-		gw.analytics.Stop()
+	if gwConfig.EnableAnalytics && gw.Analytics.Store == nil {
+		gw.Analytics.Stop()
 	}
 
 	// write pprof profiles
@@ -1571,7 +1643,7 @@ func handleDashboardRegistration(gw *Gateway) {
 
 	dashboardServiceInit(gw)
 
-	// connStr := buildConnStr("/register/node")
+	// connStr := buildDashboardConnStr("/register/node")
 	if err := gw.DashService.Register(); err != nil {
 		dashLog.Fatal("Registration failed: ", err)
 	}
@@ -1648,7 +1720,7 @@ func (gw *Gateway) startServer() {
 
 	mainLog.Info("--> Listening on address: ", address)
 	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
-	mainLog.Info("--> PID: ", hostDetails.PID)
+	mainLog.Info("--> PID: ", gw.hostDetails.PID)
 	if !rpc.IsEmergencyMode() {
 		gw.DoReload()
 	}

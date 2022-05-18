@@ -1,3 +1,4 @@
+//go:build !race
 // +build !race
 
 package gateway
@@ -7,8 +8,6 @@ import (
 	_ "net/http"
 	"testing"
 	"time"
-
-	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -233,7 +232,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 
 		GetKeyCounter = 0
 		// RPC layer is down,
-		ts := StartTest(conf, TestConfig{SkipEmptyRedis: true})
+		ts := StartTest(conf, TestConfig{})
 		defer ts.Close()
 
 		// Wait for backup to load
@@ -370,8 +369,8 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 
 	t.Run("Should load apis when redis is down", func(t *testing.T) {
 
-		storage.DisableRedis(true)
-		//defer storage.DisableRedis(false)
+		ts.Gw.RedisController.DisableRedis(true)
+		//defer ts.Gw.RedisController.DisableRedis((false)
 
 		authHeaders := map[string]string{"Authorization": "test"}
 		ts.Run(t, []test.TestCase{
@@ -381,7 +380,7 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 
 	t.Run("Should reload when redis is back up", func(t *testing.T) {
 
-		storage.DisableRedis(true)
+		ts.Gw.RedisController.DisableRedis(true)
 		event := make(chan struct{}, 1)
 		ts.Gw.OnConnect = func() {
 			event <- struct{}{}
@@ -393,7 +392,7 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 			t.Fatal("OnConnect should only run after reconnection")
 		case <-time.After(1 * time.Second):
 		}
-		storage.DisableRedis(false)
+		ts.Gw.RedisController.DisableRedis(false)
 
 		select {
 		case <-event:

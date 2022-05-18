@@ -1,12 +1,16 @@
 package user
 
-import "gopkg.in/mgo.v2/bson"
+import (
+	"github.com/TykTechnologies/tyk/apidef"
+)
 
 type GraphAccessDefinition struct {
 }
 
+// Policy represents a user policy
+// swagger:model
 type Policy struct {
-	MID                           bson.ObjectId                    `bson:"_id,omitempty" json:"_id"`
+	MID                           apidef.ObjectId                  `bson:"_id,omitempty" json:"_id" gorm:"primaryKey;column:_id"`
 	ID                            string                           `bson:"id,omitempty" json:"id"`
 	Name                          string                           `bson:"name" json:"name"`
 	OrgID                         string                           `bson:"org_id" json:"org_id"`

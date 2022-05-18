@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"github.com/TykTechnologies/tyk/storage"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -15,12 +14,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/gorilla/mux"
 	"github.com/pmylund/go-cache"
 )
+
+const ListDetailed = "detailed"
 
 type APICertificateStatusMessage struct {
 	CertID  string `json:"id"`
@@ -30,6 +33,10 @@ type APICertificateStatusMessage struct {
 
 type APIAllCertificates struct {
 	CertIDs []string `json:"certs"`
+}
+
+type APIAllCertificateBasics struct {
+	Certs []*certs.CertificateBasics `json:"certs"`
 }
 
 var cipherSuites = map[string]uint16{
@@ -293,7 +300,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		var waitingRedisLog sync.Once
 		// ensure that we are connected to redis
 		for {
-			if storage.Connected() {
+			if gw.RedisController.Connected() {
 				break
 			}
 
@@ -372,7 +379,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 						}
 					}
 				}
-			case spec.AuthConfigs[authTokenType].UseCertificate:
+			case spec.AuthConfigs[apidef.AuthTokenType].UseCertificate:
 				// Dynamic certificate check required, falling back to HTTP level check
 				// TODO: Change to VerifyPeerCertificate hook instead, when possible
 				if domainRequireCert[spec.Domain] < tls.RequestClientCert {
@@ -449,9 +456,20 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		if certID == "" {
 			orgID := r.URL.Query().Get("org_id")
+			mode := r.URL.Query().Get("mode")
+			certIDs := gw.CertificateManager.ListAllIds(orgID)
+			if mode == ListDetailed {
+				var certificateBasics = make([]*certs.CertificateBasics, len(certIDs))
+				certificates := gw.CertificateManager.List(certIDs, certs.CertificateAny)
+				for ci, certificate := range certificates {
+					certificateBasics[ci] = certs.ExtractCertificateBasics(certificate, certIDs[ci])
+				}
 
-			certIds := gw.CertificateManager.ListAllIds(orgID)
-			doJSONWrite(w, http.StatusOK, &APIAllCertificates{certIds})
+				doJSONWrite(w, http.StatusOK, &APIAllCertificateBasics{Certs: certificateBasics})
+				return
+			}
+
+			doJSONWrite(w, http.StatusOK, &APIAllCertificates{certIDs})
 			return
 		}
 

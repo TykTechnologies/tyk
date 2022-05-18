@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
@@ -67,7 +66,7 @@ func TestBundleLoader(t *testing.T) {
 
 		bundleNameHash := md5.New()
 		io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
-		bundleDir := fmt.Sprintf("%s_%x", spec.APIID, bundleNameHash.Sum(nil))
+		bundleDir := fmt.Sprintf("%x", bundleNameHash.Sum(nil))
 		savedBundlePath := filepath.Join(testBundlesPath, bundleDir)
 		if _, err = os.Stat(savedBundlePath); os.IsNotExist(err) {
 			t.Fatalf("Bundle wasn't saved to disk: %s", err.Error())
@@ -203,11 +202,13 @@ pre.NewProcessRequest(function(request, session) {
 }
 
 func TestResponseOverride(t *testing.T) {
+	pythonVersion := test.GetPythonVersion()
+
 	ts := StartTest(nil, TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
-			PythonVersion:    "3.5",
+			PythonVersion:    pythonVersion,
 		}})
 	defer ts.Close()
 
@@ -221,8 +222,6 @@ func TestResponseOverride(t *testing.T) {
 			spec.UseKeylessAccess = true
 			spec.CustomMiddlewareBundle = bundle
 		})
-
-		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/test/?status=200", Code: 200, BodyMatch: customError, HeadersMatch: customHeader},

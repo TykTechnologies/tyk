@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/headers"
@@ -24,11 +25,12 @@ const (
 	defaultTemplateFormat = "json"
 	defaultContentType    = headers.ApplicationJSON
 
-	MsgAuthFieldMissing    = "Authorization field missing"
-	MsgApiAccessDisallowed = "Access to this API has been disallowed"
-	MsgBearerMailformed    = "Bearer token malformed"
-	MsgKeyNotAuthorized    = "Key not authorised"
-	MsgOauthClientRevoked  = "Key not authorised. OAuth client access was revoked"
+	MsgAuthFieldMissing                        = "Authorization field missing"
+	MsgApiAccessDisallowed                     = "Access to this API has been disallowed"
+	MsgBearerMailformed                        = "Bearer token malformed"
+	MsgKeyNotAuthorized                        = "Key not authorised"
+	MsgOauthClientRevoked                      = "Key not authorised. OAuth client access was revoked"
+	MsgKeyNotAuthorizedUnexpectedSigningMethod = "Key not authorized: Unexpected signing method"
 )
 
 var errCustomBodyResponse = errors.New("errCustomBodyResponse")
@@ -85,6 +87,7 @@ func defaultTykErrors() {
 
 func overrideTykErrors(gw *Gateway) {
 	gwConfig := gw.GetConfig()
+
 	for id, err := range gwConfig.OverrideMessages {
 
 		overridenErr := TykErrors[id]
@@ -184,6 +187,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			tmplExecutor = tmpl
 
 			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+
 			if contentType == headers.ApplicationXML || contentType == headers.TextXML {
 				apiError.Message = template.HTML(errMsg)
 
@@ -213,6 +217,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	var alias string
 
 	ip := request.RealIP(r)
+
 	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
 
 		t := time.Now()
@@ -220,6 +225,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		addVersionHeader(w, r, e.Spec.GlobalConfig)
 
 		version := e.Spec.getVersionFromRequest(r)
+
 		if version == "" {
 			version = "Non Versioned"
 		}
@@ -228,15 +234,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			r.URL.Path = e.Spec.StripListenPath(r, r.URL.Path)
 		}
 
-		// This is an odd bugfix, will need further testing
-		r.URL.Path = "/" + r.URL.Path
-		if strings.HasPrefix(r.URL.Path, "//") {
-			r.URL.Path = strings.TrimPrefix(r.URL.Path, "/")
-		}
-
 		oauthClientID := ""
 		session := ctxGetSession(r)
 		tags := make([]string, 0, estimateTagsCapacity(session, e.Spec))
+
 		if session != nil {
 			oauthClientID = session.OauthClientID
 			alias = session.Alias
@@ -253,6 +254,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		rawRequest := ""
 		rawResponse := ""
+
 		if recordDetail(r, e.Spec) {
 
 			// Get the wire format representation
@@ -269,53 +271,56 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		trackEP := false
 		trackedPath := r.URL.Path
+
 		if p := ctxGetTrackedPath(r); p != "" {
 			trackEP = true
 			trackedPath = p
 		}
 
 		host := r.URL.Host
+
 		if host == "" && e.Spec.target != nil {
 			host = e.Spec.target.Host
 		}
 
-		record := AnalyticsRecord{
-			r.Method,
-			host,
-			trackedPath,
-			r.URL.Path,
-			r.ContentLength,
-			r.Header.Get(headers.UserAgent),
-			t.Day(),
-			t.Month(),
-			t.Year(),
-			t.Hour(),
-			errCode,
-			token,
-			t,
-			version,
-			e.Spec.Name,
-			e.Spec.APIID,
-			e.Spec.OrgID,
-			oauthClientID,
-			0,
-			Latency{},
-			rawRequest,
-			rawResponse,
-			ip,
-			GeoData{},
-			NetworkStats{},
-			tags,
-			alias,
-			trackEP,
-			t,
+		record := analytics.AnalyticsRecord{
+			Method:        r.Method,
+			Host:          host,
+			Path:          trackedPath,
+			RawPath:       r.URL.Path,
+			ContentLength: r.ContentLength,
+			UserAgent:     r.Header.Get(headers.UserAgent),
+			Day:           t.Day(),
+			Month:         t.Month(),
+			Year:          t.Year(),
+			Hour:          t.Hour(),
+			ResponseCode:  errCode,
+			APIKey:        token,
+			TimeStamp:     t,
+			APIVersion:    version,
+			APIName:       e.Spec.Name,
+			APIID:         e.Spec.APIID,
+			OrgID:         e.Spec.OrgID,
+			OauthID:       oauthClientID,
+			RequestTime:   0,
+			Latency:       analytics.Latency{},
+			RawRequest:    rawRequest,
+			RawResponse:   rawResponse,
+			IPAddress:     ip,
+			Geo:           analytics.GeoData{},
+			Network:       analytics.NetworkStats{},
+			Tags:          tags,
+			Alias:         alias,
+			TrackPath:     trackEP,
+			ExpireAt:      t,
 		}
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip, e.Gw)
+			record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)
 		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
+
 		if e.Spec.GlobalConfig.EnforceOrgDataAge {
 			orgExpireDataTime := e.OrgSessionExpiry(e.Spec.OrgID)
 
@@ -324,12 +329,18 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			}
 
 		}
-
 		record.SetExpiry(expiresAfter)
+
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-			record.NormalisePath(&e.Spec.GlobalConfig)
+			NormalisePath(&record, &e.Spec.GlobalConfig)
 		}
-		err := e.Gw.analytics.RecordHit(&record)
+
+		if e.Spec.AnalyticsPlugin.Enabled {
+			_ = e.Spec.AnalyticsPluginConfig.processRecord(&record)
+		}
+
+		err := e.Gw.Analytics.RecordHit(&record)
+
 		if err != nil {
 			log.WithError(err).Error("could not store analytic record")
 		}

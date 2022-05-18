@@ -2,6 +2,7 @@ package apidef
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,7 +43,8 @@ func TestValidationResult_ErrorStrings(t *testing.T) {
 func runValidationTest(apiDef *APIDefinition, ruleSet ValidationRuleSet, expectedValidationResult ValidationResult) func(t *testing.T) {
 	return func(t *testing.T) {
 		result := Validate(apiDef, ruleSet)
-		assert.Equal(t, expectedValidationResult, result)
+		assert.Equal(t, expectedValidationResult.IsValid, result.IsValid)
+		assert.ElementsMatch(t, expectedValidationResult.Errors, result.Errors)
 	}
 }
 
@@ -118,4 +120,100 @@ func TestRuleUniqueDataSourceNames_Validate(t *testing.T) {
 		},
 	))
 
+}
+
+func TestRuleAtLeastEnableOneAuthConfig_Validate(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleAtLeastEnableOneAuthSource{},
+	}
+	t.Run("should return invalid when all sources are disabled for enabled auth mechanisms", runValidationTest(
+		&APIDefinition{
+			UseStandardAuth: true,
+			UseOauth2:       true,
+			AuthConfigs: map[string]AuthConfig{
+				"authToken": {
+					UseParam:      false,
+					DisableHeader: true,
+					UseCookie:     false,
+				},
+				"oauth": {
+					UseParam:      false,
+					DisableHeader: true,
+					UseCookie:     false,
+				},
+				"jwt": {
+					UseParam:      false,
+					DisableHeader: true,
+					UseCookie:     false,
+				},
+				"oidc": {
+					UseParam:      false,
+					DisableHeader: true,
+					UseCookie:     false,
+				},
+				"hmac": {
+					UseParam:      false,
+					DisableHeader: true,
+					UseCookie:     false,
+				},
+				"coprocess": {
+					UseParam:      false,
+					DisableHeader: true,
+					UseCookie:     false,
+				},
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: false,
+			Errors: []error{
+				fmt.Errorf(ErrAllAuthSourcesDisabled, "authToken"),
+				fmt.Errorf(ErrAllAuthSourcesDisabled, "oauth"),
+			},
+		},
+	))
+
+	t.Run("should return valid when at least one source is enabled for enabled auth mechanisms", runValidationTest(
+		&APIDefinition{
+			UseStandardAuth: true,
+			UseOauth2:       true,
+			AuthConfigs: map[string]AuthConfig{
+				"authToken": {
+					UseParam:      true,
+					DisableHeader: true,
+					UseCookie:     false,
+				},
+				"oauth": {
+					UseParam:      false,
+					DisableHeader: false,
+					UseCookie:     false,
+				},
+				"jwt": {
+					UseParam:      false,
+					DisableHeader: true,
+					UseCookie:     false,
+				},
+				"oidc": {
+					UseParam:      false,
+					DisableHeader: true,
+					UseCookie:     false,
+				},
+				"hmac": {
+					UseParam:      false,
+					DisableHeader: true,
+					UseCookie:     false,
+				},
+				"coprocess": {
+					UseParam:      false,
+					DisableHeader: true,
+					UseCookie:     false,
+				},
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: true,
+			Errors:  nil,
+		},
+	))
 }

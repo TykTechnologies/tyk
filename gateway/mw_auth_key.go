@@ -78,7 +78,7 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 
 // getAuthType overrides BaseMiddleware.getAuthType.
 func (k *AuthKey) getAuthType() string {
-	return authTokenType
+	return apidef.AuthTokenType
 }
 
 func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -91,13 +91,13 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 	keyExists := false
 	var session user.SessionState
+	updateSession := false
 	if key != "" {
 		key = stripBearer(key)
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 		log.Debug("Trying to find key by client certificate")
-		certHash = certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+		certHash = k.Spec.OrgID + certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
-
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
@@ -108,14 +108,23 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	if !keyExists {
 		// fallback to search by cert
 		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
-		certHash = session.KeyID
 		if !keyExists {
 			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
 		}
 	}
 
 	if authConfig.UseCertificate {
-		if _, err := k.Gw.CertificateManager.GetRaw(session.Certificate); err != nil {
+		certLookup := session.Certificate
+
+		if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+			certLookup = certHash
+			if session.Certificate != certHash {
+				session.Certificate = certHash
+				updateSession = true
+			}
+		}
+
+		if _, err := k.Gw.CertificateManager.GetRaw(certLookup); err != nil {
 			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
 		}
 	}
@@ -123,7 +132,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
-		ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
+		ctxSetSession(r, &session, updateSession, k.Gw.GetConfig().HashKeys)
 		k.setContextVars(r, key)
 	}
 

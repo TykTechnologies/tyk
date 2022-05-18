@@ -18,12 +18,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/cenk/backoff"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 
-	"gopkg.in/Masterminds/sprig.v2"
+	"github.com/Masterminds/sprig/v3"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/gorilla/mux"
@@ -32,6 +32,7 @@ import (
 
 	"github.com/TykTechnologies/gojsonschema"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
@@ -48,14 +49,6 @@ const (
 	RPCStorageEngine  apidef.StorageEngineCode = "rpc"
 )
 
-// Constants used by the version check middleware
-const (
-	headerLocation    = "header"
-	urlParamLocation  = "url-param"
-	urlLocation       = "url"
-	expiredTimeFormat = "2006-01-02 15:04"
-)
-
 // URLStatus is a custom enum type to avoid collisions
 type URLStatus int
 
@@ -66,6 +59,7 @@ const (
 	Ignored
 	WhiteList
 	BlackList
+	MockResponse
 	Cached
 	Transformed
 	TransformedJQ
@@ -95,6 +89,7 @@ const (
 	VersionDoesNotExist            RequestStatus = "This API version does not seem to exist"
 	VersionWhiteListStatusNotFound RequestStatus = "WhiteListStatus for path not found"
 	VersionExpired                 RequestStatus = "Api Version has expired, please check documentation or contact administrator"
+	APIExpired                     RequestStatus = "API has expired, please check documentation or contact administrator"
 	EndPointNotAllowed             RequestStatus = "Requested endpoint is forbidden"
 	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
 	StatusOk                       RequestStatus = "Everything OK, passing"
@@ -126,6 +121,10 @@ type URLSpec struct {
 	Spec                      *regexp.Regexp
 	Status                    URLStatus
 	MethodActions             map[string]apidef.EndpointMethodMeta
+	Whitelist                 apidef.EndPointMeta
+	Blacklist                 apidef.EndPointMeta
+	Ignored                   apidef.EndPointMeta
+	MockResponse              apidef.MockResponseMeta
 	CacheConfig               EndPointCacheMeta
 	TransformAction           TransformSpec
 	TransformResponseAction   TransformSpec
@@ -168,7 +167,7 @@ type ExtendedCircuitBreakerMeta struct {
 // flattened URL list is checked for matching paths and then it's status evaluated if found.
 type APISpec struct {
 	*apidef.APIDefinition
-	OAS openapi3.Swagger
+	OAS oas.OAS
 	sync.RWMutex
 
 	RxPaths                  map[string][]URLSpec
@@ -194,10 +193,11 @@ type APISpec struct {
 	WSTransportCreated       time.Time
 	GlobalConfig             config.Config
 	OrgHasNoSession          bool
+	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
 	middlewareChain *ChainObject
 
-	network NetworkStats
+	network analytics.NetworkStats
 
 	GraphQLExecutor struct {
 		Engine   *graphql.ExecutionEngine
@@ -270,13 +270,22 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		logger = logrus.NewEntry(log)
 	}
 
+	// new expiration feature
+	if t, err := time.Parse(apidef.ExpirationTimeFormat, def.Expiration); err != nil {
+		logger.WithError(err).WithField("name", def.Name).WithField("Expiration", def.Expiration).
+			Error("Could not parse expiration date for API")
+	} else {
+		def.ExpirationTs = t
+	}
+
+	// Deprecated
 	// parse version expiration time stamps
 	for key, ver := range def.VersionData.Versions {
 		if ver.Expires == "" || ver.Expires == "-1" {
 			continue
 		}
 		// calculate the time
-		if t, err := time.Parse(expiredTimeFormat, ver.Expires); err != nil {
+		if t, err := time.Parse(apidef.ExpirationTimeFormat, ver.Expires); err != nil {
 			logger.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
 		} else {
 			ver.ExpiresTs = t
@@ -522,7 +531,7 @@ func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinit
 	return
 }
 
-func (a APIDefinitionLoader) ParseOAS(r io.Reader) (oas openapi3.Swagger) {
+func (a APIDefinitionLoader) ParseOAS(r io.Reader) (oas oas.OAS) {
 	if err := json.NewDecoder(r).Decode(&oas); err != nil {
 		log.Error("Couldn't unmarshal oas configuration: ", err)
 	}
@@ -614,11 +623,43 @@ func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, pa
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		newSpec := URLSpec{IgnoreCase: stringSpec.IgnoreCase || ignoreEndpointCase}
 		a.generateRegex(stringSpec.Path, &newSpec, specType, conf)
 
+		switch specType {
+		case WhiteList:
+			newSpec.Whitelist = stringSpec
+		case BlackList:
+			newSpec.Blacklist = stringSpec
+		case Ignored:
+			newSpec.Ignored = stringSpec
+		}
+
 		// Extend with method actions
 		newSpec.MethodActions = stringSpec.MethodActions
+
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
+func (a APIDefinitionLoader) compileMockResponsePathSpec(ignoreEndpointCase bool, paths []apidef.MockResponseMeta, specType URLStatus, conf config.Config) []URLSpec {
+	var urlSpec []URLSpec
+
+	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
+		newSpec := URLSpec{IgnoreCase: stringSpec.IgnoreCase || ignoreEndpointCase}
+		a.generateRegex(stringSpec.Path, &newSpec, specType, conf)
+
+		newSpec.MockResponse = stringSpec
 		urlSpec = append(urlSpec, newSpec)
 	}
 
@@ -640,6 +681,10 @@ func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths [
 	}
 
 	for _, spec := range newpaths {
+		if spec.Disabled {
+			continue
+		}
+
 		newSpec := URLSpec{}
 		a.generateRegex(spec.Path, &newSpec, Cached, conf)
 		newSpec.CacheConfig.Method = spec.Method
@@ -749,6 +794,10 @@ func (a APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTra
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		newSpec.MethodTransform = stringSpec
@@ -765,6 +814,10 @@ func (a APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutMe
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
@@ -953,16 +1006,20 @@ func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.
 }
 
 func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.ValidatePathMeta, stat URLStatus, conf config.Config) []URLSpec {
-	urlSpec := make([]URLSpec, len(paths))
+	var urlSpec []URLSpec
 
-	for i, stringSpec := range paths {
+	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 
 		stringSpec.SchemaCache = gojsonschema.NewGoLoader(stringSpec.Schema)
 		newSpec.ValidatePathMeta = stringSpec
-		urlSpec[i] = newSpec
+		urlSpec = append(urlSpec, newSpec)
 	}
 
 	return urlSpec
@@ -999,6 +1056,7 @@ func (a APIDefinitionLoader) compileInternalPathspathSpec(paths []apidef.Interna
 func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
+	mockResponsePaths := a.compileMockResponsePathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.MockResponse, MockResponse, conf)
 	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.Ignored, Ignored, conf)
 	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.BlackList, BlackList, conf)
 	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.WhiteList, WhiteList, conf)
@@ -1022,6 +1080,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
 
 	combinedPath := []URLSpec{}
+	combinedPath = append(combinedPath, mockResponsePaths...)
 	combinedPath = append(combinedPath, ignoredPaths...)
 	combinedPath = append(combinedPath, blackListPaths...)
 	combinedPath = append(combinedPath, whiteListPaths...)
@@ -1116,7 +1175,40 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			continue
 		}
 
-		if rxPaths[i].MethodActions != nil {
+		if rxPaths[i].MethodActions == nil {
+			switch rxPaths[i].Status {
+			case WhiteList:
+				if rxPaths[i].Whitelist.Method != "" {
+					if rxPaths[i].Whitelist.Method != r.Method {
+						continue
+					}
+
+					return a.getURLStatus(rxPaths[i].Status), nil
+				}
+			case BlackList:
+				if rxPaths[i].Blacklist.Method != "" {
+					if rxPaths[i].Blacklist.Method != r.Method {
+						continue
+					}
+
+					return a.getURLStatus(rxPaths[i].Status), nil
+				}
+			case Ignored:
+				if rxPaths[i].Ignored.Method != "" {
+					if rxPaths[i].Ignored.Method != r.Method {
+						continue
+					}
+				}
+
+				return a.getURLStatus(rxPaths[i].Status), nil
+			case MockResponse:
+				if rxPaths[i].MockResponse.Method != r.Method {
+					continue
+				}
+
+				return StatusRedirectFlowByReply, rxPaths[i].MockResponse
+			}
+		} else { // Deprecated
 			// We are using an extended path set, check for the method
 			methodMeta, matchMethodOk := rxPaths[i].MethodActions[r.Method]
 			if !matchMethodOk {
@@ -1296,26 +1388,57 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 }
 
 func (a *APISpec) getVersionFromRequest(r *http.Request) string {
-	if a.VersionData.NotVersioned {
+	if vName := ctxGetVersionName(r); vName != nil {
+		return *vName
+	}
+
+	if a.VersionData.NotVersioned && !a.VersionDefinition.Enabled {
 		return ""
 	}
 
+	var vName string
+	defer ctxSetVersionName(r, &vName)
+
 	switch a.VersionDefinition.Location {
-	case headerLocation:
-		return r.Header.Get(a.VersionDefinition.Key)
-	case urlParamLocation:
-		return r.URL.Query().Get(a.VersionDefinition.Key)
-	case urlLocation:
+	case apidef.HeaderLocation:
+		vName = r.Header.Get(a.VersionDefinition.Key)
+		if a.VersionDefinition.StripVersioningData {
+			log.Debug("Stripping version from header: ", vName)
+			defer r.Header.Del(a.VersionDefinition.Key)
+		}
+
+		return vName
+	case apidef.URLParamLocation:
+		vName = r.URL.Query().Get(a.VersionDefinition.Key)
+		if a.VersionDefinition.StripVersioningData {
+			log.Debug("Stripping version from query: ", vName)
+			q := r.URL.Query()
+			q.Del(a.VersionDefinition.Key)
+			r.URL.RawQuery = q.Encode()
+		}
+
+		return vName
+	case apidef.URLLocation:
 		uPath := a.StripListenPath(r, r.URL.Path)
 		uPath = strings.TrimPrefix(uPath, "/"+a.Slug)
 
 		// First non-empty part of the path is the version ID
 		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
+				if a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath {
+					log.Debug("Stripping version from url: ", part)
+
+					r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
+					r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
+				}
+
+				vName = part
+
 				return part
 			}
 		}
 	}
+
 	return ""
 }
 
@@ -1343,7 +1466,9 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
 		return false, VersionWhiteListStatusNotFound
 	}
 
-	if !a.VersionData.NotVersioned && versionInfo.Expired() {
+	if a.VersionData.NotVersioned && a.Expired() {
+		return false, APIExpired
+	} else if !a.VersionData.NotVersioned && versionInfo.Expired() { // Deprecated
 		return false, VersionExpired
 	}
 
@@ -1360,6 +1485,21 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
 	default:
 		return true, StatusOk
 	}
+}
+
+func (a *APISpec) Expired() bool {
+	// Never expires
+	if a.Expiration == "" || a.Expiration == "-1" {
+		return false
+	}
+
+	// otherwise use parsed timestamp
+	if a.ExpirationTs.IsZero() {
+		log.Error("Could not parse expiration date, disallow")
+		return true
+	}
+
+	return time.Since(a.ExpirationTs) >= 0
 }
 
 // Version attempts to extract the version data from a request, depending on where it is stored in the
@@ -1407,6 +1547,21 @@ func (a *APISpec) StripListenPath(r *http.Request, path string) string {
 	return stripListenPath(a.Proxy.ListenPath, path, mux.Vars(r))
 }
 
+func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
+	if !a.Proxy.StripListenPath {
+		return
+	}
+
+	log.Debug("Stripping proxy listen path: ", a.Proxy.ListenPath)
+
+	r.URL.Path = a.StripListenPath(r, r.URL.Path)
+	if r.URL.RawPath != "" {
+		r.URL.RawPath = a.StripListenPath(r, r.URL.RawPath)
+	}
+
+	log.Debug("Upstream path is: ", r.URL.Path)
+}
+
 type RoundRobin struct {
 	pos uint32
 }
@@ -1422,15 +1577,25 @@ func (r *RoundRobin) WithLen(len int) int {
 
 var listenPathVarsRE = regexp.MustCompile(`{[^:]+(:[^}]+)?}`)
 
-func stripListenPath(listenPath, path string, muxVars map[string]string) string {
+func stripListenPath(listenPath, path string, muxVars map[string]string) (res string) {
+	defer func() {
+		if !strings.HasPrefix(res, "/") {
+			res = "/" + res
+		}
+	}()
+
 	if !strings.Contains(listenPath, "{") {
-		return strings.TrimPrefix(path, listenPath)
+		res = strings.TrimPrefix(path, listenPath)
+		return
 	}
+
 	lp := listenPathVarsRE.ReplaceAllStringFunc(listenPath, func(match string) string {
 		match = strings.TrimLeft(match, "{")
 		match = strings.TrimRight(match, "}")
 		aliasVar := strings.Split(match, ":")[0]
 		return muxVars[aliasVar]
 	})
-	return strings.TrimPrefix(path, lp)
+
+	res = strings.TrimPrefix(path, lp)
+	return
 }

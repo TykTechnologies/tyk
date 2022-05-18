@@ -1,3 +1,4 @@
+//go:build !race
 // +build !race
 
 package gateway
@@ -10,7 +11,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -25,7 +25,7 @@ func (ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[stri
 	})
 
 	data["org_id"] = orgID
-	storage.DisableRedis(true)
+	ts.Gw.RedisController.DisableRedis(true)
 	expectBody := `{"status":"error","message":"Error writing to key store storage: Redis is either down or was not configured"}`
 	// create org key with quota
 	ts.Run(tb, test.TestCase{
@@ -36,7 +36,7 @@ func (ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[stri
 		Code:      http.StatusInternalServerError,
 		BodyMatch: expectBody,
 	})
-	storage.DisableRedis(false)
+	ts.Gw.RedisController.DisableRedis(false)
 
 	ts.Run(tb, test.TestCase{
 		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",
@@ -47,7 +47,38 @@ func (ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[stri
 	})
 }
 
+func TestOrganizationMonitorEnabled(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.ExperimentalProcessOrgOffThread = false
+		globalConf.Monitor.EnableTriggerMonitors = true
+		globalConf.Monitor.MonitorOrgKeys = true
+
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	// load API
+	ts.testPrepareProcessRequestQuotaLimit(
+		t,
+		map[string]interface{}{
+			"quota_max":          10,
+			"quota_remaining":    10,
+			"quota_renewal_rate": 1,
+		},
+	)
+
+	//check that the gateway is still up on request
+	_, err := ts.Run(t, test.TestCase{
+		Code: http.StatusOK,
+	})
+	if err != nil {
+		t.Error("error running a gateway request when org is enabled")
+	}
+}
+
 func TestProcessRequestLiveQuotaLimit(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5254
 
 	conf := func(globalConf *config.Config) {
 		globalConf.EnforceOrgQuotas = true
@@ -122,6 +153,8 @@ func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 }
 
 func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5254
+
 	conf := func(globalConf *config.Config) {
 		globalConf.EnforceOrgQuotas = true
 		globalConf.ExperimentalProcessOrgOffThread = true
@@ -217,6 +250,8 @@ func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 }
 
 func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5254
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -304,6 +339,8 @@ func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 }
 
 func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5254
+
 	// setup global config
 	conf := func(globalConf *config.Config) {
 		globalConf.EnforceOrgQuotas = true

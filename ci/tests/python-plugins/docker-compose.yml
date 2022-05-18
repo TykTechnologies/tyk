@@ -1,0 +1,42 @@
+version: "3"
+services:
+  redis:
+    image: redis
+    ports:
+      - "0.0.0.0:6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 5s
+      retries: 10
+      start_period: 2s
+      timeout: 10s
+
+  bundler:
+    build:
+      context: ./src
+      args:
+        - tag=${tag}
+      
+  gw:
+    image: tykio/tyk-gateway:${tag}
+    volumes:
+      - ./src/apidef.json:/opt/tyk-gateway/apps/python.json
+      - ./src/tyk.conf:/opt/tyk-gateway/tyk.conf
+    ports:
+      - "0.0.0.0:8080:8080"
+    environment:
+      - TYK_LOGLEVEL=debug
+    healthcheck:
+      test: curl -s --fail http://localhost:8080/hello | grep -o '.*"status":"pass".*"status":"pass"'
+      interval: 5s
+      retries: 10
+      start_period: 2s
+      timeout: 10s
+  wait:
+    image: hello-world:linux
+    depends_on:
+        gw:
+            condition: service_healthy
+        redis:
+            condition: service_healthy
+      

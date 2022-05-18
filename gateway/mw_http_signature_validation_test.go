@@ -22,11 +22,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/certs"
+
 	"github.com/justinas/alice"
 	"github.com/lonelycode/go-uuid/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -192,7 +195,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
-		"AuthFailure": {&testAuthFailEventHandler{cb}},
+		EventAuthFailure: {&testAuthFailEventHandler{cb}},
 	}
 
 	sessionKey := ""
@@ -240,6 +243,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 }
 
 func TestHMACAuthSessionPass(t *testing.T) {
+	test.Racy(t) // TODO: TT-3973
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
@@ -264,6 +268,7 @@ func TestHMACAuthSessionPass(t *testing.T) {
 }
 
 func TestHMACAuthSessionSHA512Pass(t *testing.T) {
+	test.Flaky(t) // TODO: TT-3973
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
@@ -428,6 +433,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 }
 
 func TestHMACAuthSessionKeyMissing(t *testing.T) {
+	test.Racy(t) // TODO: TT-3973
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -544,6 +550,8 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 }
 
 func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5228
+
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
@@ -695,7 +703,7 @@ func TestRSAAuthSessionPass(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, _, serverCert := genServerCertificate()
+	_, _, _, serverCert := certs.GenServerCertificate()
 	privateKey := serverCert.PrivateKey.(*rsa.PrivateKey)
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
@@ -730,7 +738,7 @@ func BenchmarkRSAAuthSessionPass(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, _, serverCert := genServerCertificate()
+	_, _, _, serverCert := certs.GenServerCertificate()
 	privateKey := serverCert.PrivateKey.(*rsa.PrivateKey)
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
@@ -756,10 +764,11 @@ func BenchmarkRSAAuthSessionPass(b *testing.B) {
 }
 
 func TestRSAAuthSessionKeyMissing(t *testing.T) {
+	test.Racy(t) // TODO: TT-4069
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, _, serverCert := genServerCertificate()
+	_, _, _, serverCert := certs.GenServerCertificate()
 	privateKey := serverCert.PrivateKey.(*rsa.PrivateKey)
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
@@ -767,17 +776,9 @@ func TestRSAAuthSessionKeyMissing(t *testing.T) {
 	pubID, _ := ts.Gw.CertificateManager.Add(pubPem, "")
 	defer ts.Gw.CertificateManager.Delete(pubID, "")
 
-	spec := ts.Gw.LoadSampleAPI(hmacAuthDef)
-
-	// Should receive an AuthFailure event
+	// Should receive an AuthFailure events
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-	cb := func(em config.EventMessage) {
-		eventWG.Done()
-	}
-	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
-		"AuthFailure": {&testAuthFailEventHandler{cb}},
-	}
 
 	recorder := httptest.NewRecorder()
 	encodedString, spec, req, _ := testPrepareRSAAuthSessionPass(t, &eventWG, privateKey, pubID, false, false, ts)

@@ -110,7 +110,7 @@ func TestSignatureValidation(t *testing.T) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			authTokenType: {
+			apidef.AuthTokenType: {
 				ValidateSignature: true,
 				UseParam:          true,
 				ParamName:         "api_key",
@@ -146,13 +146,13 @@ func TestSignatureValidation(t *testing.T) {
 		emptySigHeader := map[string]string{
 			"authorization": key,
 		}
-		storage.DisableRedis(true)
+		ts.Gw.RedisController.DisableRedis(true)
 		ts.Run(t, []test.TestCase{
 			{Headers: emptySigHeader, Code: http.StatusForbidden},
 			{Headers: invalidSigHeader, Code: http.StatusForbidden},
 			{Headers: validSigHeader, Code: http.StatusForbidden},
 		}...)
-		storage.DisableRedis(false)
+		ts.Gw.RedisController.DisableRedis(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: emptySigHeader, Code: http.StatusUnauthorized},
 			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
@@ -169,13 +169,13 @@ func TestSignatureValidation(t *testing.T) {
 		invalidSigPath := emptySigPath + "&sig=junk"
 		validSigPath := emptySigPath + "&sig=" + hex.EncodeToString(validHash)
 
-		storage.DisableRedis(true)
+		ts.Gw.RedisController.DisableRedis(true)
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: emptySigPath, Code: http.StatusForbidden},
 			{Path: invalidSigPath, Code: http.StatusForbidden},
 			{Path: validSigPath, Code: http.StatusForbidden},
 		}...)
-		storage.DisableRedis(false)
+		ts.Gw.RedisController.DisableRedis(false)
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: emptySigPath, Code: http.StatusUnauthorized},
 			{Path: invalidSigPath, Code: http.StatusUnauthorized},
@@ -184,9 +184,9 @@ func TestSignatureValidation(t *testing.T) {
 	})
 
 	t.Run("Dynamic signature", func(t *testing.T) {
-		authConfig := api.AuthConfigs[authTokenType]
+		authConfig := api.AuthConfigs[apidef.AuthTokenType]
 		authConfig.Signature.Secret = "$tyk_meta.signature_secret"
-		api.AuthConfigs[authTokenType] = authConfig
+		api.AuthConfigs[apidef.AuthTokenType] = authConfig
 		ts.Gw.LoadAPI(api)
 
 		key := CreateSession(ts.Gw, func(s *user.SessionState) {
@@ -207,12 +207,12 @@ func TestSignatureValidation(t *testing.T) {
 			"authorization": key,
 			"signature":     "junk",
 		}
-		storage.DisableRedis(true)
+		ts.Gw.RedisController.DisableRedis(true)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusForbidden},
 			{Headers: validSigHeader, Code: http.StatusForbidden},
 		}...)
-		storage.DisableRedis(false)
+		ts.Gw.RedisController.DisableRedis(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
 			{Headers: validSigHeader, Code: http.StatusOK},
@@ -220,9 +220,9 @@ func TestSignatureValidation(t *testing.T) {
 	})
 
 	t.Run("Dynamic signature with custom key", func(t *testing.T) {
-		authConfig := api.AuthConfigs[authTokenType]
+		authConfig := api.AuthConfigs[apidef.AuthTokenType]
 		authConfig.Signature.Secret = "$tyk_meta.signature_secret"
-		api.AuthConfigs[authTokenType] = authConfig
+		api.AuthConfigs[apidef.AuthTokenType] = authConfig
 		ts.Gw.LoadAPI(api)
 
 		customKey := "c8zj99aze7hdvtaqh4qvcck7"
@@ -276,7 +276,7 @@ func TestSignatureValidation(t *testing.T) {
 			"authorization": customKey,
 			"signature":     "junk",
 		}
-		storage.DisableRedis(true)
+		ts.Gw.RedisController.DisableRedis(true)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusForbidden},
 			{Headers: validSigHeader, Code: http.StatusForbidden},
@@ -284,7 +284,7 @@ func TestSignatureValidation(t *testing.T) {
 			{Headers: validSigHeader3, Code: http.StatusForbidden},
 			{Headers: validSigHeader4, Code: http.StatusForbidden},
 		}...)
-		storage.DisableRedis(false)
+		ts.Gw.RedisController.DisableRedis(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
 			{Headers: validSigHeader, Code: http.StatusOK},
