@@ -1087,7 +1087,6 @@ type CertData struct {
 	KeyFile string `json:"key_file"`
 }
 
-
 // EventMessage is a standard form to send event data to handlers
 type EventMessage struct {
 	Type      apidef.TykEvent
