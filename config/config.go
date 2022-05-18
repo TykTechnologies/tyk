@@ -340,7 +340,7 @@ type CertsData []CertData
 func (certs *CertsData) Decode(value string) error {
 	err := json.Unmarshal([]byte(value), certs)
 	if err != nil {
-		log.Info("Error unmarshaling TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES")
+		log.Error("Error unmarshaling TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES")
 	}
 	return nil
 }
