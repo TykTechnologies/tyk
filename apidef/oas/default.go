@@ -17,8 +17,9 @@ var (
 )
 
 type TykExtensionConfigParams struct {
-	UpstreamURL string
-	ListenPath  string
+	UpstreamURL  string
+	ListenPath   string
+	CustomDomain string
 }
 
 func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) error {
@@ -40,6 +41,10 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 		xTykAPIGateway.Server.ListenPath.Value = overRideValues.ListenPath
 	} else if xTykAPIGateway.Server.ListenPath.Value == "" {
 		xTykAPIGateway.Server.ListenPath.Value = "/"
+	}
+
+	if overRideValues.CustomDomain != "" {
+		xTykAPIGateway.Server.CustomDomain = overRideValues.CustomDomain
 	}
 
 	var upstreamURL string
