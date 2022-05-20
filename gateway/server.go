@@ -29,6 +29,7 @@ import (
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk/config_helper"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
@@ -181,6 +182,8 @@ type Gateway struct {
 	// RedisController keeps track of redis connection and singleton
 	RedisController *storage.RedisController
 	hostDetails     hostDetails
+
+	configHelper *config_helper.ConfigHelper
 
 	healthCheckInfo atomic.Value
 }
@@ -585,6 +588,10 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
 		stripSlashes(gw.checkIsAPIOwner(gw.controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
 	))
+
+	//Config endpoints
+	muxer.PathPrefix("/config").Handler(gw.checkIsAPIOwner(allowMethods(gw.configHelper.JsonHandler, "GET")))
+	muxer.PathPrefix("/envs").Handler(gw.checkIsAPIOwner(allowMethods(gw.configHelper.EnvsHandler, "GET")))
 
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
@@ -1124,6 +1131,8 @@ func (gw *Gateway) initialiseSystem() error {
 		}
 		gw.SetConfig(gwConfig)
 		gw.afterConfSetup()
+
+		gw.configHelper = config_helper.New(gw.GetConfig(), config.EnvPrefix+"_")
 	}
 
 	overrideTykErrors(gw)

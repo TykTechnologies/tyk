@@ -55,7 +55,7 @@ var (
 )
 
 const (
-	envPrefix = "TYK_GW"
+	EnvPrefix = "TYK_GW"
 
 	dnsCacheDefaultTtl           = 3600
 	dnsCacheDefaultCheckInterval = 60
@@ -1111,7 +1111,7 @@ func WriteDefault(path string, conf *Config) error {
 	Default.TemplatePath = filepath.Join(rootPath, "templates")
 
 	*conf = Default
-	if err := envconfig.Process(envPrefix, conf); err != nil {
+	if err := envconfig.Process(EnvPrefix, conf); err != nil {
 		return err
 	}
 	if path == "" {
@@ -1158,15 +1158,15 @@ func Load(paths []string, conf *Config) error {
 		return fmt.Errorf("couldn't unmarshal config: %v", err)
 	}
 
-	shouldOmit, omitEnvExist := os.LookupEnv(envPrefix + "_OMITCONFIGFILE")
+	shouldOmit, omitEnvExist := os.LookupEnv(EnvPrefix + "_OMITCONFIGFILE")
 	if omitEnvExist && strings.ToLower(shouldOmit) == "true" {
 		*conf = Config{}
 	}
 
-	if err := envconfig.Process(envPrefix, conf); err != nil {
+	if err := envconfig.Process(EnvPrefix, conf); err != nil {
 		return fmt.Errorf("failed to process config env vars: %v", err)
 	}
-	if err := processCustom(envPrefix, conf, loadZipkin, loadJaeger); err != nil {
+	if err := processCustom(EnvPrefix, conf, loadZipkin, loadJaeger); err != nil {
 		return fmt.Errorf("failed to process config custom loader: %v", err)
 	}
 	return nil
