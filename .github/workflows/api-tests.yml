@@ -164,3 +164,15 @@ jobs:
         allow-repeats: true
       env:
         STATUS: "${{ steps.test_execution.outcome == 'success' && ':white_check_mark:' || ':no_entry_sign:' }}"
+       
+    - name: Xray update
+      if: ${{ always() }} && github.event_name != 'pull_request'
+      run: |
+        ./update_xray.sh
+      working-directory: tyk-automated-tests
+      env:
+        TEST: "QA-901"
+        STATUS: "${{ steps.test_execution.outcome }}"
+        CLIENT_ID: ${{secrets.XRAY_CLIENT_ID}}
+        CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
+        BRANCH: ${{ github.ref }}
