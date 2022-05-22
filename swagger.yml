@@ -376,7 +376,88 @@ paths:
                 $ref: "#/components/schemas/apiStatusMessage"
               example:
                 status: "error"
-                message: "Malformed API data"              
+                message: "Malformed API data"
+    patch:
+      description: |-
+        Update API with OAS format. You can use this endpoint to update OAS part of the tyk API definition.
+        This endpoint allows you to configure tyk OAS extension based on query params provided(similar to import)
+      tags:
+        - APIs
+      operationId: patchApiOAS
+      parameters:
+        - name: listenPath
+          in: query
+          description: listenPath for the API
+          required: false
+          schema:
+            type: string
+        - name: upstreamURL
+          in: query
+          description: upstreamURL for the API
+          required: false
+          schema:
+            type: string
+        - name: customDomain
+          in: query
+          description: custom domain for the API
+          required: false
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
+      responses:
+        '200':
+          description: API patched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiModifyKeySuccess"
+              example:
+                status: "ok"
+                action: "modified"
+                key: "{updated APIID}"
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiStatusMessage"
+              examples:
+                malformedBody:
+                  summary: When the request body is malformed
+                  value:
+                    message: "Request malformed"
+                    status: "error"
+                missingAPIID:
+                  summary: When the request is missing APIID in query Param
+                  value:
+                    message: "Must specify an apiID to patch"
+                    status: "error"
+                nonExistingAPIID:
+                  summary: When the client sends and APIID which doesn't exists in tyk gw
+                  value:
+                    message: "No API found for APIID {APIID}"
+                    status: "error"
+                invalidUpstreamURL:
+                  summary: When the client sends query param upstreamURL which isn't valid
+                  value:
+                    message: "invalid upstream URL"
+                    status: "error"
+        500:
+          description: When patch request is send while using dashboard app configs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiStatusMessage"
+              example:
+                summary: dashboard app configs is used for tyk api definitions
+                value:
+                  message: "Due to enabled use_db_app_configs, please use the Dashboard API"
+                  status: "error"
+
   '/tyk/apis/{apiID}':
     parameters:
       - description: The API ID
