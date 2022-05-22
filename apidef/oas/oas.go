@@ -118,16 +118,16 @@ func (s *OAS) getTykTokenAuth(name string) (token *Token) {
 			return
 		}
 
-		mapSecurityScheme, ok := securityScheme.(map[string]interface{})
+		var ok bool
+		token, ok = securityScheme.(*Token)
 		if ok {
-			token = &Token{}
-			inBytes, _ := json.Marshal(mapSecurityScheme)
-			_ = json.Unmarshal(inBytes, token)
-			s.getTykSecuritySchemes()[name] = token
 			return
 		}
 
-		token = s.getTykSecuritySchemes()[name].(*Token)
+		token = &Token{}
+		inBytes, _ := json.Marshal(securityScheme)
+		_ = json.Unmarshal(inBytes, token)
+		s.getTykSecuritySchemes()[name] = token
 	}
 
 	return
@@ -180,16 +180,16 @@ func (s *OAS) getTykOAuthAuth(name string) (oAuth *OAuth) {
 			return
 		}
 
-		mapSecurityScheme, ok := securityScheme.(map[string]interface{})
+		var ok bool
+		oAuth, ok = securityScheme.(*OAuth)
 		if ok {
-			oAuth = &OAuth{}
-			inBytes, _ := json.Marshal(mapSecurityScheme)
-			_ = json.Unmarshal(inBytes, oAuth)
-			s.getTykSecuritySchemes()[name] = oAuth
 			return
 		}
 
-		oAuth = s.getTykSecuritySchemes()[name].(*OAuth)
+		oAuth = &OAuth{}
+		inBytes, _ := json.Marshal(securityScheme)
+		_ = json.Unmarshal(inBytes, oAuth)
+		s.getTykSecuritySchemes()[name] = oAuth
 	}
 
 	return
