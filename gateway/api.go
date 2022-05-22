@@ -1235,6 +1235,12 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = r.Body.Close()
+	if err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError(""))
+		return
+	}
+
 	err = oasObj.UnmarshalJSON(reqBody)
 	if err != nil {
 		doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
@@ -2702,6 +2708,36 @@ func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request
 	gw.MainNotifier.Notify(n)
 
 	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
+}
+
+func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reqBody, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
+			return
+		}
+
+		err = r.Body.Close()
+		if err != nil {
+			doJSONWrite(w, http.StatusInternalServerError, apiError(""))
+		}
+
+		var oasObj oas.OAS
+		err = oasObj.UnmarshalJSON(reqBody)
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
+			return
+		}
+
+		if err = oas.ValidateOASObject(reqBody, oasObj.OpenAPI); err != nil {
+			doJSONWrite(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		r.Body = ioutil.NopCloser(bytes.NewReader(reqBody))
+		next.ServeHTTP(w, r)
+	}
 }
 
 // TODO: Don't modify http.Request values in-place. We must right now

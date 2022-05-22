@@ -41,6 +41,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+func getStrPointer(str string) *string {
+	return &str
+}
+
 const apiTestDef = `{
 	"api_id": "1",
 	"definition": {
@@ -1900,6 +1904,7 @@ func TestOAS(t *testing.T) {
 	}
 
 	oasAPI := openapi3.T{
+		OpenAPI: "3.0.3",
 		Info: &openapi3.Info{
 			Title: "oas doc",
 		},
@@ -2136,9 +2141,27 @@ func TestOAS(t *testing.T) {
 			return apiInOAS
 		}
 
+		fillPaths := func(oasAPI *oas.OAS) {
+			oasAPI.Paths = openapi3.Paths{
+				"/pet": {
+					Get: &openapi3.Operation{
+						Summary: "get pets",
+						Responses: openapi3.Responses{
+							"200": {
+								Value: &openapi3.Response{
+									Description: getStrPointer("200 response"),
+									Content:     openapi3.Content{},
+								},
+							},
+						},
+					},
+				},
+			}
+		}
+
 		t.Run("when tyk extension is provided - act like PUT", func(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
-
+			fillPaths(&apiInOAS)
 			tykExt := apiInOAS.GetTykExtension()
 			tykExt.Info.Name = "patched-oas-api"
 
@@ -2154,6 +2177,7 @@ func TestOAS(t *testing.T) {
 
 		t.Run("when tyk extension and parameters are not provided - update OAS part only", func(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
+			fillPaths(&apiInOAS)
 
 			tykExt := apiInOAS.GetTykExtension()
 			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
@@ -2170,6 +2194,7 @@ func TestOAS(t *testing.T) {
 
 		t.Run("when parameters are provided - override values", func(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
+			fillPaths(&apiInOAS)
 
 			expectedTykExt := apiInOAS.GetTykExtension()
 			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
@@ -2198,6 +2223,7 @@ func TestOAS(t *testing.T) {
 
 		t.Run("error on invalid upstreamURL", func(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
+			fillPaths(&apiInOAS)
 			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
 
 			upstreamURL := "new-upstream.org"
@@ -2214,9 +2240,10 @@ func TestOAS(t *testing.T) {
 			}...)
 		})
 
-		t.Run("validation", func(t *testing.T) {
+		t.Run("request validation", func(t *testing.T) {
 			t.Run("empty apiID", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
+				fillPaths(&apiInOAS)
 				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
 
 				pathPath := fmt.Sprintf("/tyk/apis/oas/%s", " ")
@@ -2229,6 +2256,7 @@ func TestOAS(t *testing.T) {
 
 			t.Run("malformed body", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
+				fillPaths(&apiInOAS)
 				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
 
 				pathPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
@@ -2241,6 +2269,8 @@ func TestOAS(t *testing.T) {
 
 			t.Run("error when APIID doesn't exist in gw", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
+				fillPaths(&apiInOAS)
+
 				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
 
 				upstreamURL := "new-upstream.org"
@@ -2255,17 +2285,32 @@ func TestOAS(t *testing.T) {
 				_, _ = ts.Run(t, []test.TestCase{
 					{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &apiInOAS,
 						QueryParams: params, BodyMatchFunc: func(body []byte) bool {
-						resp := apiStatusMessage{}
-						err := json.Unmarshal(body, &resp)
-						if err != nil {
-							return false
-						}
-						return fmt.Sprintf("No API found for APIID %q", nonExistingAPIID) == resp.Message
-					},
+							resp := apiStatusMessage{}
+							err := json.Unmarshal(body, &resp)
+							if err != nil {
+								return false
+							}
+							return fmt.Sprintf("No API found for APIID %q", nonExistingAPIID) == resp.Message
+						},
 						Code: http.StatusNotFound},
 				}...)
 			})
 
+		})
+
+		t.Run("OAS validation", func(t *testing.T) {
+			apiInOAS := copyOAS(oasAPI)
+			fillPaths(&apiInOAS)
+
+			delete(apiInOAS.T.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			apiInOAS.Paths = nil
+
+			pathPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &apiInOAS,
+					BodyMatch: `"paths: Invalid type. Expected: object, given: null"`, Code: http.StatusBadRequest},
+			}...)
 		})
 
 	})

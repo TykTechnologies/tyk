@@ -3,13 +3,14 @@ package rpc
 import (
 	"crypto/tls"
 	"errors"
-	"github.com/TykTechnologies/tyk-pump/serializer"
 	"net"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk-pump/serializer"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/gocraft/health"
