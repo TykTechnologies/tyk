@@ -2120,6 +2120,101 @@ func TestOAS(t *testing.T) {
 			assert.Error(t, err)
 		}
 	})
+
+	t.Run("patch", func(t *testing.T) {
+		apiID := oasAPIID
+
+		// copy OAS API, we need to manipulate tyk extension here
+		copyOAS := func(oasAPI openapi3.T) oas.OAS {
+			apiInOAS := oas.OAS{T: oasAPI}
+			oasExt := oasAPI.ExtensionProps.Extensions
+			copyExt := make(map[string]interface{})
+			for k, v := range oasExt {
+				copyExt[k] = v
+			}
+			apiInOAS.T.ExtensionProps.Extensions = copyExt
+			return apiInOAS
+		}
+
+		t.Run("when tyk extension is provided - act like PUT", func(t *testing.T) {
+			apiInOAS := copyOAS(oasAPI)
+
+			tykExt := apiInOAS.GetTykExtension()
+			tykExt.Info.Name = "patched-oas-api"
+
+			apiInOAS.T.Info.Title = "patched-oas-doc"
+			testPatchOAS(t, ts, apiInOAS, nil, apiID)
+			patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
+			o := oas.OAS{T: patchedOASObj}
+			assert.Equal(t, tykExt, o.GetTykExtension())
+
+			// Reset
+			testUpdateAPI(t, ts, &oasAPI, apiID, true)
+		})
+
+		t.Run("when tyk extension and parameters are not provided - update OAS part only", func(t *testing.T) {
+			apiInOAS := copyOAS(oasAPI)
+
+			tykExt := apiInOAS.GetTykExtension()
+			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+
+			apiInOAS.T.Info.Title = "patched-oas-doc"
+			testPatchOAS(t, ts, apiInOAS, nil, apiID)
+			patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
+			o := oas.OAS{T: patchedOASObj}
+			assert.Equal(t, tykExt, o.GetTykExtension())
+
+			// Reset
+			testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
+		})
+
+		t.Run("when parameters are provided - override values", func(t *testing.T) {
+			apiInOAS := copyOAS(oasAPI)
+
+			expectedTykExt := apiInOAS.GetTykExtension()
+			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+
+			listenPath, upstreamURL, customDomain := "/listen-api/", "https://new-upstream.org", "custom-upstream.com"
+
+			params := map[string]string{
+				"listenPath":   listenPath,
+				"upstreamURL":  upstreamURL,
+				"customDomain": customDomain,
+			}
+
+			expectedTykExt.Server.ListenPath.Value = listenPath
+			expectedTykExt.Upstream.URL = upstreamURL
+			expectedTykExt.Server.CustomDomain = customDomain
+			expectedTykExt.Info.State.Active = true
+
+			testPatchOAS(t, ts, apiInOAS, params, apiID)
+			patchedOASObj := testGetOASAPI(t, ts, apiID, expectedTykExt.Info.Name, apiInOAS.T.Info.Title)
+			o := oas.OAS{T: patchedOASObj}
+			assert.Equal(t, expectedTykExt, o.GetTykExtension())
+
+			// Reset
+			testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
+		})
+
+		t.Run("error on invalid upstreamURL", func(t *testing.T) {
+			apiInOAS := copyOAS(oasAPI)
+			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+
+			upstreamURL := "new-upstream.org"
+
+			params := map[string]string{
+				"upstreamURL": upstreamURL,
+			}
+
+			pathPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &apiInOAS,
+					QueryParams: params, BodyMatch: `"message":"invalid upstream URL"`, Code: http.StatusBadRequest},
+			}...)
+		})
+
+	})
 }
 
 func testUpdateAPI(t *testing.T, ts *Test, api interface{}, apiID string, oasTyped bool) {
@@ -2163,4 +2258,15 @@ func testGetOldAPI(t *testing.T, d *Test, id, name string) (oldAPI apidef.APIDef
 	_ = json.Unmarshal(respInBytes, &oldAPI)
 
 	return oldAPI
+}
+
+func testPatchOAS(t *testing.T, ts *Test, api oas.OAS, params map[string]string, apiID string) {
+	pathPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &api,
+			QueryParams: params, BodyMatch: `"action":"modified"`, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
 }

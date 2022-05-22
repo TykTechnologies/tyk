@@ -1215,6 +1215,78 @@ func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
+	if gw.GetConfig().UseDBAppConfigs {
+		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
+		doJSONWrite(w, http.StatusInternalServerError, apiError("Due to enabled use_db_app_configs, please use the Dashboard API"))
+		return
+	}
+
+	apiID := mux.Vars(r)["apiID"]
+	if apiID == "" {
+		doJSONWrite(w, http.StatusBadRequest, apiError("Must specify an apiID to patch"))
+		return
+	}
+
+	var oasObj oas.OAS
+	err := json.NewDecoder(r.Body).Decode(&oasObj)
+	if err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
+		return
+	}
+
+	if oasObj.GetTykExtension() != nil {
+		oasAPIInBytes, err := json.Marshal(&oasObj)
+		if err != nil {
+			doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
+			return
+		}
+
+		r.Body = ioutil.NopCloser(bytes.NewReader(oasAPIInBytes))
+		obj, code := gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
+		doJSONWrite(w, code, obj)
+		return
+	}
+
+	var oasObjToPatch oas.OAS
+
+	if spec := gw.getApiSpec(apiID); spec != nil {
+		oasObjToPatch.Fill(*spec.APIDefinition)
+	} else {
+		doJSONWrite(w, http.StatusBadRequest, apiError(fmt.Sprintf("No API found for APIID %q", apiID)))
+		return
+	}
+
+	existingTykExtension := oasObjToPatch.GetTykExtension()
+
+	oasObjToPatch.T = oasObj.T
+
+	oasObjToPatch.SetTykExtension(existingTykExtension)
+
+	tykExtensionConfigParams := getTykExtensionConfigParams(r)
+	if tykExtensionConfigParams != nil {
+		err = oasObjToPatch.BuildDefaultTykExtension(*tykExtensionConfigParams)
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
+	}
+
+	oasAPIInBytes, err := json.Marshal(&oasObj)
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
+		return
+	}
+
+	r.Body = ioutil.NopCloser(bytes.NewReader(oasAPIInBytes))
+
+	log.Debugf("PATCHing API: %q", apiID)
+	obj, code := gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
+
+	doJSONWrite(w, code, obj)
+}
+
 func (gw *Gateway) apiOASExportHandler(w http.ResponseWriter, r *http.Request) {
 	const (
 		baseFileName       = "TykOasApiDef"
@@ -2966,5 +3038,21 @@ func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAut
 				log.WithError(err).Warning("Could not remove token for updated OAuth client policy")
 			}
 		}
+	}
+}
+
+func getTykExtensionConfigParams(r *http.Request) *oas.TykExtensionConfigParams {
+	upstreamURL := r.URL.Query().Get("upstreamURL")
+	listenPath := r.URL.Query().Get("listenPath")
+	customDomain := r.URL.Query().Get("customDomain")
+
+	if upstreamURL == "" && listenPath == "" && customDomain == "" {
+		return nil
+	}
+
+	return &oas.TykExtensionConfigParams{
+		UpstreamURL:  upstreamURL,
+		ListenPath:   listenPath,
+		CustomDomain: customDomain,
 	}
 }
