@@ -2214,6 +2214,60 @@ func TestOAS(t *testing.T) {
 			}...)
 		})
 
+		t.Run("validation", func(t *testing.T) {
+			t.Run("empty apiID", func(t *testing.T) {
+				apiInOAS := copyOAS(oasAPI)
+				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+
+				pathPath := fmt.Sprintf("/tyk/apis/oas/%s", " ")
+
+				_, _ = ts.Run(t, []test.TestCase{
+					{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &apiInOAS,
+						BodyMatch: `"message":"Must specify an apiID to patch"`, Code: http.StatusBadRequest},
+				}...)
+			})
+
+			t.Run("malformed body", func(t *testing.T) {
+				apiInOAS := copyOAS(oasAPI)
+				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+
+				pathPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
+
+				_, _ = ts.Run(t, []test.TestCase{
+					{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: `oas-body`,
+						BodyMatch: `"message":"Request malformed"`, Code: http.StatusBadRequest},
+				}...)
+			})
+
+			t.Run("error when APIID doesn't exist in gw", func(t *testing.T) {
+				apiInOAS := copyOAS(oasAPI)
+				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+
+				upstreamURL := "new-upstream.org"
+
+				params := map[string]string{
+					"upstreamURL": upstreamURL,
+				}
+
+				nonExistingAPIID := "non-existing-api-id"
+				pathPath := fmt.Sprintf("/tyk/apis/oas/%s", nonExistingAPIID)
+
+				_, _ = ts.Run(t, []test.TestCase{
+					{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &apiInOAS,
+						QueryParams: params, BodyMatchFunc: func(body []byte) bool {
+						resp := apiStatusMessage{}
+						err := json.Unmarshal(body, &resp)
+						if err != nil {
+							return false
+						}
+						return fmt.Sprintf("No API found for APIID %q", nonExistingAPIID) == resp.Message
+					},
+						Code: http.StatusNotFound},
+				}...)
+			})
+
+		})
+
 	})
 }
 

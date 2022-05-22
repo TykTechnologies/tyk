@@ -1222,27 +1222,27 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiID := mux.Vars(r)["apiID"]
+	apiID := strings.TrimSpace(mux.Vars(r)["apiID"])
 	if apiID == "" {
 		doJSONWrite(w, http.StatusBadRequest, apiError("Must specify an apiID to patch"))
 		return
 	}
 
 	var oasObj oas.OAS
-	err := json.NewDecoder(r.Body).Decode(&oasObj)
+	reqBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
+		return
+	}
+
+	err = oasObj.UnmarshalJSON(reqBody)
 	if err != nil {
 		doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
 		return
 	}
 
 	if oasObj.GetTykExtension() != nil {
-		oasAPIInBytes, err := json.Marshal(&oasObj)
-		if err != nil {
-			doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
-			return
-		}
-
-		r.Body = ioutil.NopCloser(bytes.NewReader(oasAPIInBytes))
+		r.Body = ioutil.NopCloser(bytes.NewReader(reqBody))
 		obj, code := gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
 		doJSONWrite(w, code, obj)
 		return
@@ -1253,7 +1253,7 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 	if spec := gw.getApiSpec(apiID); spec != nil {
 		oasObjToPatch.Fill(*spec.APIDefinition)
 	} else {
-		doJSONWrite(w, http.StatusBadRequest, apiError(fmt.Sprintf("No API found for APIID %q", apiID)))
+		doJSONWrite(w, http.StatusNotFound, apiError(fmt.Sprintf("No API found for APIID %q", apiID)))
 		return
 	}
 
@@ -1273,7 +1273,7 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	oasAPIInBytes, err := json.Marshal(&oasObj)
+	oasAPIInBytes, err := oasObj.MarshalJSON()
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
 		return
