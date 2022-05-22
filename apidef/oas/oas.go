@@ -195,7 +195,7 @@ func (s *OAS) getTykOAuthAuth(name string) (oAuth *OAuth) {
 	return
 }
 
-func (s *OAS) getTykSecuritySchemes() (securitySchemes map[string]interface{}) {
+func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
 	if s.getTykAuthentication() != nil {
 		securitySchemes = s.getTykAuthentication().SecuritySchemes
 	}

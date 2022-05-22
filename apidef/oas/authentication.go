@@ -1,7 +1,10 @@
 package oas
 
 import (
+	"fmt"
 	"sort"
+
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -34,8 +37,8 @@ type Authentication struct {
 	GoPlugin *GoPlugin `bson:"goPlugin,omitempty" json:"goPlugin,omitempty"`
 	// CustomPlugin contains the configurations related to CustomPlugin authentication mode.
 	// Old API Definition: `auth_configs["coprocess"]`
-	CustomPlugin    *CustomPlugin          `bson:"customPlugin,omitempty" json:"customPlugin,omitempty"`
-	SecuritySchemes map[string]interface{} `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
+	CustomPlugin    *CustomPlugin   `bson:"customPlugin,omitempty" json:"customPlugin,omitempty"`
+	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
 }
 
 func (a *Authentication) Fill(api apidef.APIDefinition) {
@@ -115,6 +118,25 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	if a.CustomPlugin != nil {
 		a.CustomPlugin.ExtractTo(api)
 	}
+}
+
+type SecuritySchemes map[string]interface{}
+
+func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme) error {
+	switch {
+	case nativeSS.Type == typeApiKey:
+		if ss[name] == nil {
+			ss[name] = &Token{}
+		}
+
+		token := ss[name].(*Token)
+		token.Enabled = true
+		token.AuthSources.Import(nativeSS.In)
+	default:
+		return fmt.Errorf(unsupportedSecuritySchemeFmt, name)
+	}
+
+	return nil
 }
 
 type AuthSources struct {

@@ -8,19 +8,23 @@ import (
 )
 
 const (
-	invalidServerURLFmt = "Please update %q to be a valid url or pass a valid url with upstreamURL query param"
+	invalidServerURLFmt          = "Please update %q to be a valid url or pass a valid url with upstreamURL query param"
+	unsupportedSecuritySchemeFmt = "unsupported security scheme: %s"
 )
 
 var (
 	errEmptyServersObject = errors.New("servers object is empty in OAS")
 	errInvalidUpstreamURL = errors.New("invalid upstream URL")
 	errInvalidServerURL   = errors.New("Error validating servers entry in OAS")
+
+	errEmptySecurityObject = errors.New("security object is empty in OAS")
 )
 
 type TykExtensionConfigParams struct {
-	UpstreamURL  string
-	ListenPath   string
-	CustomDomain string
+	UpstreamURL    string
+	ListenPath     string
+	Authentication bool
+	CustomDomain   string
 }
 
 func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) error {
@@ -66,7 +70,60 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 
 	xTykAPIGateway.Upstream.URL = upstreamURL
 
+	if overRideValues.Authentication {
+		err := s.importAuthentication()
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func (s *OAS) importAuthentication() error {
+	if len(s.Security) == 0 {
+		return errEmptySecurityObject
+	}
+
+	securityReq := s.Security[0]
+
+	xTykAPIGateway := s.GetTykExtension()
+	authentication := xTykAPIGateway.Server.Authentication
+	if authentication == nil {
+		authentication = &Authentication{}
+		xTykAPIGateway.Server.Authentication = authentication
+	}
+
+	authentication.Enabled = true
+
+	tykSecuritySchemes := authentication.SecuritySchemes
+	if tykSecuritySchemes == nil {
+		tykSecuritySchemes = make(SecuritySchemes)
+		authentication.SecuritySchemes = tykSecuritySchemes
+	}
+
+	for name := range securityReq {
+		securityScheme := s.Components.SecuritySchemes[name]
+		err := tykSecuritySchemes.Import(name, securityScheme.Value)
+		if err != nil {
+			log.WithError(err).Errorf("Error while importing security scheme: %s", name)
+		}
+	}
+
+	return nil
+}
+
+func (as *AuthSources) Import(in string) {
+	source := &AuthSource{Enabled: true}
+
+	switch in {
+	case header:
+		as.Header = source
+	case cookie:
+		as.Cookie = source
+	case query:
+		as.Query = source
+	}
 }
 
 func getURLFormatErr(fromParam bool, upstreamURL string) error {
