@@ -3,6 +3,7 @@ package oas
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 )
 
@@ -78,4 +79,20 @@ func getURLFormatErr(fromParam bool, upstreamURL string) error {
 	}
 
 	return nil
+}
+
+func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
+	upstreamURL := r.URL.Query().Get("upstreamURL")
+	listenPath := r.URL.Query().Get("listenPath")
+	customDomain := r.URL.Query().Get("customDomain")
+
+	if upstreamURL == "" && listenPath == "" && customDomain == "" {
+		return nil
+	}
+
+	return &TykExtensionConfigParams{
+		UpstreamURL:  upstreamURL,
+		ListenPath:   listenPath,
+		CustomDomain: customDomain,
+	}
 }

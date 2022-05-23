@@ -1,9 +1,12 @@
 package oas
 
 import (
+	"net/http"
+	"net/url"
+	"testing"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestOAS_BuildDefaultTykExtension(t *testing.T) {
@@ -288,5 +291,35 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{})
 		assert.ErrorIs(t, err, errEmptyServersObject)
+	})
+}
+
+func TestGetTykExtensionConfigParams(t *testing.T) {
+	t.Run("extract all params", func(t *testing.T) {
+		endpoint, err := url.Parse("/")
+		assert.NoError(t, err)
+
+		listenPath := "/listen-api"
+		upstreamURL := "https://upstream.org"
+		customDomain := "custom-domain.org"
+
+		queryParams := endpoint.Query()
+		queryParams.Set("listenPath", listenPath)
+		queryParams.Set("upstreamURL", upstreamURL)
+		queryParams.Set("customDomain", customDomain)
+
+		endpoint.RawQuery = queryParams.Encode()
+		r, err := http.NewRequest(http.MethodPatch, endpoint.String(), nil)
+		assert.NoError(t, err)
+
+		tykExtConfigParams := GetTykExtensionConfigParams(r)
+
+		expectedConfigParams := TykExtensionConfigParams{
+			ListenPath:   listenPath,
+			UpstreamURL:  upstreamURL,
+			CustomDomain: customDomain,
+		}
+
+		assert.Equal(t, &expectedConfigParams, tykExtConfigParams)
 	})
 }

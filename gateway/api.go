@@ -32,6 +32,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -59,6 +60,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
+)
+
+var (
+	ErrRequestMalformed = errors.New("request malformed")
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful
@@ -1211,6 +1216,80 @@ func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 	}
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
+	// refer https://tyktech.atlassian.net/wiki/spaces/EN/pages/1660485648/OAS+import+API+Creation+RFC+WIP#Tyk-OAS-gw-endpoint
+	if gw.GetConfig().UseDBAppConfigs {
+		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
+		doJSONWrite(w, http.StatusInternalServerError, apiError("Due to enabled use_db_app_configs, please use the Dashboard API"))
+		return
+	}
+
+	apiID := strings.TrimSpace(mux.Vars(r)["apiID"])
+	if apiID == "" {
+		doJSONWrite(w, http.StatusBadRequest, apiError("Must specify an apiID to patch"))
+		return
+	}
+
+	reqBodyInBytes, oasObj, err := extractOASObjFromReq(r.Body)
+
+	if err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+		return
+	}
+
+	tykExtensionConfigParams := oas.GetTykExtensionConfigParams(r)
+
+	if oasObj.GetTykExtension() != nil && tykExtensionConfigParams == nil {
+		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
+		obj, code := gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
+		doJSONWrite(w, code, obj)
+		return
+	}
+
+	var oasObjToPatch oas.OAS
+
+	if spec := gw.getApiSpec(apiID); spec != nil {
+		oasObjToPatch.Fill(*spec.APIDefinition)
+	} else {
+		doJSONWrite(w, http.StatusNotFound, apiError(fmt.Sprintf("No API found for APIID %q", apiID)))
+		return
+	}
+
+	var tykExtToPatch *oas.XTykAPIGateway
+
+	if oasObj.GetTykExtension() != nil {
+		tykExtToPatch = oasObj.GetTykExtension()
+	} else {
+		tykExtToPatch = oasObjToPatch.GetTykExtension()
+	}
+
+	oasObjToPatch.T = oasObj.T
+
+	oasObjToPatch.SetTykExtension(tykExtToPatch)
+
+	if tykExtensionConfigParams != nil {
+		err = oasObjToPatch.BuildDefaultTykExtension(*tykExtensionConfigParams)
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
+	}
+
+	oasAPIInBytes, err := oasObj.MarshalJSON()
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
+		return
+	}
+
+	r.Body = ioutil.NopCloser(bytes.NewReader(oasAPIInBytes))
+
+	log.Debugf("PATCHing API: %q", apiID)
+	obj, code := gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
 
 	doJSONWrite(w, code, obj)
 }
@@ -2632,6 +2711,25 @@ func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request
 	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
 
+func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reqBodyInBytes, oasObj, err := extractOASObjFromReq(r.Body)
+
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
+		if err = oas.ValidateOASObject(reqBodyInBytes, oasObj.OpenAPI); err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
+		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
+		next.ServeHTTP(w, r)
+	}
+}
+
 // TODO: Don't modify http.Request values in-place. We must right now
 // because our middleware design doesn't pass around http.Request
 // pointers, so we have no way to modify the pointer in a middleware.
@@ -2967,4 +3065,24 @@ func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAut
 			}
 		}
 	}
+}
+
+func extractOASObjFromReq(reqBody io.ReadCloser) ([]byte, *oas.OAS, error) {
+	var oasObj oas.OAS
+	reqBodyInBytes, err := ioutil.ReadAll(reqBody)
+	if err != nil {
+		return nil, nil, ErrRequestMalformed
+	}
+
+	err = reqBody.Close()
+	if err != nil {
+		return nil, nil, errors.New("")
+	}
+
+	err = oasObj.UnmarshalJSON(reqBodyInBytes)
+	if err != nil {
+		return nil, nil, ErrRequestMalformed
+	}
+
+	return reqBodyInBytes, &oasObj, nil
 }
