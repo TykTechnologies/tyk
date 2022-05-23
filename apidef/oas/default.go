@@ -8,19 +8,34 @@ import (
 )
 
 const (
-	invalidServerURLFmt = "Please update %q to be a valid url or pass a valid url with upstreamURL query param"
+	invalidServerURLFmt       = "Please update %q to be a valid url or pass a valid url with upstreamURL query param"
+	MiddlewareValidateRequest = "validateRequest"
+	MiddlewareAllowList       = "allowList"
 )
 
 var (
 	errEmptyServersObject = errors.New("servers object is empty in OAS")
 	errInvalidUpstreamURL = errors.New("invalid upstream URL")
 	errInvalidServerURL   = errors.New("Error validating servers entry in OAS")
+	allowedMethods        = []string{
+		http.MethodConnect,
+		http.MethodDelete,
+		http.MethodGet,
+		http.MethodHead,
+		http.MethodOptions,
+		http.MethodPatch,
+		http.MethodPost,
+		http.MethodPut,
+		http.MethodTrace,
+	}
 )
 
 type TykExtensionConfigParams struct {
-	UpstreamURL  string
-	ListenPath   string
-	CustomDomain string
+	UpstreamURL     string
+	ListenPath      string
+	CustomDomain    string
+	AllowList       *bool
+	ValidateRequest *bool
 }
 
 func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) error {
@@ -66,7 +81,50 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 
 	xTykAPIGateway.Upstream.URL = upstreamURL
 
+	if overRideValues.AllowList != nil {
+		s.configureMiddlewareOnAllPaths(*overRideValues.AllowList, MiddlewareAllowList)
+	}
+
+	if overRideValues.ValidateRequest != nil {
+		s.configureMiddlewareOnAllPaths(*overRideValues.ValidateRequest, MiddlewareValidateRequest)
+	}
+
 	return nil
+}
+
+func (s *OAS) configureMiddlewareOnAllPaths(enabled bool, middleware string) {
+	for path, pathItem := range s.Paths {
+		for _, method := range allowedMethods {
+			if pathItem.GetOperation(method) != nil {
+				s.configureMiddlewareOnOperation(enabled, method, path, middleware)
+			}
+		}
+
+	}
+
+}
+
+func (s *OAS) configureMiddlewareOnOperation(enabled bool, method, path, middleware string) {
+	xTykAPIGateway := s.GetTykExtension()
+	operationID := s.getOperationID(path, method)
+	operation := xTykAPIGateway.getOperation(operationID)
+
+	switch middleware {
+	case MiddlewareAllowList:
+		operation.Allow = &Allowance{
+			Enabled: enabled,
+		}
+
+		if block := operation.Block; block != nil {
+			block.Enabled = !enabled
+		}
+
+	case MiddlewareValidateRequest:
+		operation.ValidateRequest = &ValidateRequest{
+			Enabled: enabled,
+		}
+	}
+
 }
 
 func getURLFormatErr(fromParam bool, upstreamURL string) error {
@@ -86,13 +144,33 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 	listenPath := r.URL.Query().Get("listenPath")
 	customDomain := r.URL.Query().Get("customDomain")
 
+	validateRequest := getQueryValPtr(r.URL.Query().Get("validateRequest"))
+
+	allowList := getQueryValPtr(r.URL.Query().Get("allowList"))
+
 	if upstreamURL == "" && listenPath == "" && customDomain == "" {
 		return nil
 	}
 
 	return &TykExtensionConfigParams{
-		UpstreamURL:  upstreamURL,
-		ListenPath:   listenPath,
-		CustomDomain: customDomain,
+		UpstreamURL:     upstreamURL,
+		ListenPath:      listenPath,
+		CustomDomain:    customDomain,
+		ValidateRequest: validateRequest,
+		AllowList:       allowList,
 	}
+}
+
+func getQueryValPtr(val string) *bool {
+	if val == "true" {
+		return getBoolPtr(true)
+	} else if val == "false" {
+		return getBoolPtr(false)
+	}
+
+	return nil
+}
+
+func getBoolPtr(val bool) *bool {
+	return &val
 }
