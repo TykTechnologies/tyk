@@ -2291,7 +2291,7 @@ func TestOAS(t *testing.T) {
 
 				_, _ = ts.Run(t, []test.TestCase{
 					{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: `oas-body`,
-						BodyMatch: `"message":"Request malformed"`, Code: http.StatusBadRequest},
+						BodyMatch: `"message":"request malformed"`, Code: http.StatusBadRequest},
 				}...)
 			})
 
