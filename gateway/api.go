@@ -1248,7 +1248,7 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tykExtensionConfigParams := getTykExtensionConfigParams(r)
+	tykExtensionConfigParams := oas.GetTykExtensionConfigParams(r)
 
 	if oasObj.GetTykExtension() != nil && tykExtensionConfigParams == nil {
 		r.Body = ioutil.NopCloser(bytes.NewReader(reqBody))
@@ -3082,21 +3082,5 @@ func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAut
 				log.WithError(err).Warning("Could not remove token for updated OAuth client policy")
 			}
 		}
-	}
-}
-
-func getTykExtensionConfigParams(r *http.Request) *oas.TykExtensionConfigParams {
-	upstreamURL := r.URL.Query().Get("upstreamURL")
-	listenPath := r.URL.Query().Get("listenPath")
-	customDomain := r.URL.Query().Get("customDomain")
-
-	if upstreamURL == "" && listenPath == "" && customDomain == "" {
-		return nil
-	}
-
-	return &oas.TykExtensionConfigParams{
-		UpstreamURL:  upstreamURL,
-		ListenPath:   listenPath,
-		CustomDomain: customDomain,
 	}
 }
