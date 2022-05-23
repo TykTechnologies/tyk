@@ -32,6 +32,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -59,6 +60,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
+)
+
+var (
+	ErrRequestMalformed = errors.New("Request malformed")
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful
@@ -1229,29 +1234,17 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var oasObj oas.OAS
-	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
-		return
-	}
+	reqBodyInBytes, oasObj, err := extractOASObjFromReq(r.Body)
 
-	err = r.Body.Close()
 	if err != nil {
-		doJSONWrite(w, http.StatusBadRequest, apiError(""))
-		return
-	}
-
-	err = oasObj.UnmarshalJSON(reqBody)
-	if err != nil {
-		doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
+		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 		return
 	}
 
 	tykExtensionConfigParams := oas.GetTykExtensionConfigParams(r)
 
 	if oasObj.GetTykExtension() != nil && tykExtensionConfigParams == nil {
-		r.Body = ioutil.NopCloser(bytes.NewReader(reqBody))
+		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
 		obj, code := gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
 		doJSONWrite(w, code, obj)
 		return
@@ -2720,30 +2713,19 @@ func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request
 
 func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		reqBody, err := ioutil.ReadAll(r.Body)
+		reqBodyInBytes, oasObj, err := extractOASObjFromReq(r.Body)
+
 		if err != nil {
-			doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 			return
 		}
 
-		err = r.Body.Close()
-		if err != nil {
-			doJSONWrite(w, http.StatusInternalServerError, apiError(""))
-		}
-
-		var oasObj oas.OAS
-		err = oasObj.UnmarshalJSON(reqBody)
-		if err != nil {
-			doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
+		if err = oas.ValidateOASObject(reqBodyInBytes, oasObj.OpenAPI); err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 			return
 		}
 
-		if err = oas.ValidateOASObject(reqBody, oasObj.OpenAPI); err != nil {
-			doJSONWrite(w, http.StatusBadRequest, err.Error())
-			return
-		}
-
-		r.Body = ioutil.NopCloser(bytes.NewReader(reqBody))
+		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
 		next.ServeHTTP(w, r)
 	}
 }
@@ -3083,4 +3065,24 @@ func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAut
 			}
 		}
 	}
+}
+
+func extractOASObjFromReq(reqBody io.ReadCloser) ([]byte, *oas.OAS, error) {
+	var oasObj oas.OAS
+	reqBodyInBytes, err := ioutil.ReadAll(reqBody)
+	if err != nil {
+		return nil, nil, ErrRequestMalformed
+	}
+
+	err = reqBody.Close()
+	if err != nil {
+		return nil, nil, errors.New("")
+	}
+
+	err = oasObj.UnmarshalJSON(reqBodyInBytes)
+	if err != nil {
+		return nil, nil, ErrRequestMalformed
+	}
+
+	return reqBodyInBytes, &oasObj, nil
 }
