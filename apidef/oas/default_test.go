@@ -897,6 +897,26 @@ func TestGetTykExtensionConfigParams(t *testing.T) {
 
 		assert.Equal(t, &expectedConfigParams, tykExtConfigParams)
 	})
+
+	t.Run("not nil when at least one parameter is provided", func(t *testing.T) {
+		endpoint, err := url.Parse("/")
+		assert.NoError(t, err)
+
+		queryParams := endpoint.Query()
+		queryParams.Set("allowList", "true")
+
+		endpoint.RawQuery = queryParams.Encode()
+		r, err := http.NewRequest(http.MethodPatch, endpoint.String(), nil)
+		assert.NoError(t, err)
+
+		tykExtConfigParams := GetTykExtensionConfigParams(r)
+
+		expectedConfigParams := TykExtensionConfigParams{
+			AllowList: getBoolPtr(true),
+		}
+
+		assert.Equal(t, &expectedConfigParams, tykExtConfigParams)
+	})
 }
 
 func Test_getBoolPtr(t *testing.T) {

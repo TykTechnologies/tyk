@@ -148,7 +148,8 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 
 	allowList := getQueryValPtr(r.URL.Query().Get("allowList"))
 
-	if upstreamURL == "" && listenPath == "" && customDomain == "" {
+	if upstreamURL == "" && listenPath == "" && customDomain == "" &&
+		validateRequest == nil && allowList == nil {
 		return nil
 	}
 
