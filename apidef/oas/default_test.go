@@ -60,9 +60,11 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			},
 		}
 
+		customDomain := "custom-domain.org"
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
-			ListenPath:  "/listen-api",
-			UpstreamURL: "https://example.org/api",
+			ListenPath:   "/listen-api",
+			UpstreamURL:  "https://example.org/api",
+			CustomDomain: customDomain,
 		})
 
 		assert.Nil(t, err)
@@ -72,6 +74,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				ListenPath: ListenPath{
 					Value: "/listen-api",
 				},
+				CustomDomain: customDomain,
 			},
 			Upstream: Upstream{
 				URL: "https://example.org/api",
@@ -159,14 +162,18 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				ListenPath: ListenPath{
 					Value: "/listen-api",
 				},
+				CustomDomain: "custom-domain.org",
 			},
 		}
 
 		oasDef.SetTykExtension(&existingTykExtension)
 
+		newCustomDomain := "new-custom-domain.org"
+
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
-			ListenPath:  "/new-listen-api",
-			UpstreamURL: "https://example.org/api",
+			ListenPath:   "/new-listen-api",
+			UpstreamURL:  "https://example.org/api",
+			CustomDomain: newCustomDomain,
 		})
 
 		assert.Nil(t, err)
@@ -176,6 +183,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				ListenPath: ListenPath{
 					Value: "/new-listen-api",
 				},
+				CustomDomain: newCustomDomain,
 			},
 			Upstream: Upstream{
 				URL: "https://example.org/api",
