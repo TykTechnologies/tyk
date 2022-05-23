@@ -63,7 +63,7 @@ import (
 )
 
 var (
-	ErrRequestMalformed = errors.New("Request malformed")
+	ErrRequestMalformed = errors.New("request malformed")
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful
