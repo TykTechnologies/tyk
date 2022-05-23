@@ -115,8 +115,8 @@ func (s *OAS) configureMiddlewareOnOperation(enabled bool, method, path, middlew
 			Enabled: enabled,
 		}
 
-		if block := operation.Block; block != nil {
-			block.Enabled = !enabled
+		if block := operation.Block; block != nil && block.Enabled && enabled {
+			block.Enabled = false
 		}
 
 	case MiddlewareValidateRequest:

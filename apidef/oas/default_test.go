@@ -464,7 +464,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
 			})
 
-			t.Run("override allowList configured in tyk extension - toggle block list if any", func(t *testing.T) {
+			t.Run("override allowList (disable) configured in tyk extension - do not toggle block list if any", func(t *testing.T) {
 				oasDef := getOASDef(true)
 
 				tykExt := XTykAPIGateway{
@@ -510,7 +510,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 							Enabled: false,
 						},
 						Block: &Allowance{
-							Enabled: true,
+							Enabled: false,
 						},
 					},
 					oasPostOperationID: {
@@ -518,7 +518,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 							Enabled: false,
 						},
 						Block: &Allowance{
-							Enabled: true,
+							Enabled: false,
 						},
 					},
 				}
@@ -527,6 +527,72 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 				tykExtensionConfigParams := TykExtensionConfigParams{
 					AllowList: &falseVal,
+				}
+
+				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+
+				assert.NoError(t, err)
+
+				assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+			})
+
+			t.Run("override allowList (enable) configured in tyk extension - toggle enabled block list if any", func(t *testing.T) {
+				oasDef := getOASDef(true)
+
+				tykExt := XTykAPIGateway{
+					Server: Server{
+						ListenPath: ListenPath{
+							Value: "/",
+						},
+					},
+					Upstream: Upstream{
+						URL: "https://example-org.com/api",
+					},
+					Info: Info{
+						Name: "OAS API",
+						State: State{
+							Active: true,
+						},
+					},
+					Middleware: &Middleware{
+						Operations: Operations{
+							oasGetOperationID: {
+								Allow: &Allowance{
+									Enabled: false,
+								},
+								Block: &Allowance{
+									Enabled: true,
+								},
+							},
+							oasPostOperationID: {
+								Allow: &Allowance{
+									Enabled: false,
+								},
+							},
+						},
+					},
+				}
+
+				expectedOperations := Operations{
+					oasGetOperationID: {
+						Allow: &Allowance{
+							Enabled: true,
+						},
+						Block: &Allowance{
+							Enabled: false,
+						},
+					},
+					oasPostOperationID: {
+						Allow: &Allowance{
+							Enabled: true,
+						},
+					},
+				}
+
+				oasDef.SetTykExtension(&tykExt)
+
+				tykExtensionConfigParams := TykExtensionConfigParams{
+					AllowList: &trueVal,
 				}
 
 				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
