@@ -2273,18 +2273,12 @@ func TestOAS(t *testing.T) {
 
 				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
 
-				upstreamURL := "new-upstream.org"
-
-				params := map[string]string{
-					"upstreamURL": upstreamURL,
-				}
-
 				nonExistingAPIID := "non-existing-api-id"
 				pathPath := fmt.Sprintf("/tyk/apis/oas/%s", nonExistingAPIID)
 
 				_, _ = ts.Run(t, []test.TestCase{
 					{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &apiInOAS,
-						QueryParams: params, BodyMatchFunc: func(body []byte) bool {
+						BodyMatchFunc: func(body []byte) bool {
 							resp := apiStatusMessage{}
 							err := json.Unmarshal(body, &resp)
 							if err != nil {
@@ -2293,6 +2287,30 @@ func TestOAS(t *testing.T) {
 							return fmt.Sprintf("No API found for APIID %q", nonExistingAPIID) == resp.Message
 						},
 						Code: http.StatusNotFound},
+				}...)
+			})
+
+			t.Run("when dashboard app config set to true", func(t *testing.T) {
+				apiInOAS := copyOAS(oasAPI)
+				fillPaths(&apiInOAS)
+
+				conf := ts.Gw.GetConfig()
+				conf.UseDBAppConfigs = true
+				ts.Gw.SetConfig(conf)
+
+				defer func() {
+					conf.UseDBAppConfigs = false
+					ts.Gw.SetConfig(conf)
+				}()
+
+				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+
+				pathPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
+
+				_, _ = ts.Run(t, []test.TestCase{
+					{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &apiInOAS,
+						BodyMatch: "Due to enabled use_db_app_configs, please use the Dashboard API",
+						Code:      http.StatusInternalServerError},
 				}...)
 			})
 
@@ -2314,6 +2332,7 @@ func TestOAS(t *testing.T) {
 		})
 
 	})
+
 }
 
 func testUpdateAPI(t *testing.T, ts *Test, api interface{}, apiID string, oasTyped bool) {
