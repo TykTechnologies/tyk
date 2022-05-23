@@ -1216,6 +1216,7 @@ func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
+	// refer https://tyktech.atlassian.net/wiki/spaces/EN/pages/1660485648/OAS+import+API+Creation+RFC+WIP#Tyk-OAS-gw-endpoint
 	if gw.GetConfig().UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Due to enabled use_db_app_configs, please use the Dashboard API"))
@@ -1247,7 +1248,9 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if oasObj.GetTykExtension() != nil {
+	tykExtensionConfigParams := getTykExtensionConfigParams(r)
+
+	if oasObj.GetTykExtension() != nil && tykExtensionConfigParams == nil {
 		r.Body = ioutil.NopCloser(bytes.NewReader(reqBody))
 		obj, code := gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), true)
 		doJSONWrite(w, code, obj)
@@ -1263,13 +1266,18 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existingTykExtension := oasObjToPatch.GetTykExtension()
+	var tykExtToPatch *oas.XTykAPIGateway
+
+	if oasObj.GetTykExtension() != nil {
+		tykExtToPatch = oasObj.GetTykExtension()
+	} else {
+		tykExtToPatch = oasObjToPatch.GetTykExtension()
+	}
 
 	oasObjToPatch.T = oasObj.T
 
-	oasObjToPatch.SetTykExtension(existingTykExtension)
+	oasObjToPatch.SetTykExtension(tykExtToPatch)
 
-	tykExtensionConfigParams := getTykExtensionConfigParams(r)
 	if tykExtensionConfigParams != nil {
 		err = oasObjToPatch.BuildDefaultTykExtension(*tykExtensionConfigParams)
 		if err != nil {

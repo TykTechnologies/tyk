@@ -2159,7 +2159,7 @@ func TestOAS(t *testing.T) {
 			}
 		}
 
-		t.Run("when tyk extension is provided - act like PUT", func(t *testing.T) {
+		t.Run("when tyk extension is provided and no params are provided - act like PUT", func(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
 			fillPaths(&apiInOAS)
 			tykExt := apiInOAS.GetTykExtension()
@@ -2192,7 +2192,7 @@ func TestOAS(t *testing.T) {
 			testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 		})
 
-		t.Run("when parameters are provided - override values", func(t *testing.T) {
+		t.Run("when params are provided and no tyk extension in request - override values in existing API", func(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
 			fillPaths(&apiInOAS)
 
@@ -2216,6 +2216,34 @@ func TestOAS(t *testing.T) {
 			patchedOASObj := testGetOASAPI(t, ts, apiID, expectedTykExt.Info.Name, apiInOAS.T.Info.Title)
 			o := oas.OAS{T: patchedOASObj}
 			assert.Equal(t, expectedTykExt, o.GetTykExtension())
+
+			// Reset
+			testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
+		})
+
+		t.Run("when param are provided and tyk extension in request - override values in request", func(t *testing.T) {
+			apiInOAS := copyOAS(oasAPI)
+			fillPaths(&apiInOAS)
+
+			listenPath, upstreamURL, customDomain := "/listen-api/", "https://new-upstream.org", "custom-upstream.com"
+
+			params := map[string]string{
+				"listenPath":   listenPath,
+				"upstreamURL":  upstreamURL,
+				"customDomain": customDomain,
+			}
+
+			expectedTykExt := *apiInOAS.GetTykExtension()
+
+			expectedTykExt.Server.ListenPath.Value = listenPath
+			expectedTykExt.Upstream.URL = upstreamURL
+			expectedTykExt.Server.CustomDomain = customDomain
+			expectedTykExt.Info.State.Active = true
+
+			testPatchOAS(t, ts, apiInOAS, params, apiID)
+			patchedOASObj := testGetOASAPI(t, ts, apiID, expectedTykExt.Info.Name, apiInOAS.T.Info.Title)
+			o := oas.OAS{T: patchedOASObj}
+			assert.Equal(t, expectedTykExt, *o.GetTykExtension())
 
 			// Reset
 			testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
