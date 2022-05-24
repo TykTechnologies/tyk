@@ -935,12 +935,12 @@ func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
 	return apisList, http.StatusOK
 }
 
-func (gw *Gateway) handleGetAPI(apiID string, oasAPI bool) (interface{}, int) {
+func (gw *Gateway) handleGetAPI(apiID string, oasEndpoint bool) (interface{}, int) {
 	if spec := gw.getApiSpec(apiID); spec != nil {
-		if oasAPI && spec.IsOAS {
+		if oasEndpoint && spec.IsOAS {
 			spec.OAS.Fill(*spec.APIDefinition)
 			return &spec.OAS, http.StatusOK
-		} else if oasAPI && !spec.IsOAS {
+		} else if oasEndpoint && !spec.IsOAS {
 			return apiError("API not migrated to OAS, please migrate API definition to get OAS spec"), http.StatusBadRequest
 		}
 
@@ -966,7 +966,7 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 
 }
 
-func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasAPI bool) (interface{}, int) {
+func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
 	if gw.GetConfig().UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
@@ -983,7 +983,7 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 		return apiError("API not found"), http.StatusNotFound
 	}
 
-	if oasAPI {
+	if oasEndpoint {
 		if !isCreate && !spec.IsOAS {
 			return apiError("API not migrated to OAS, please migrate API definition to update using OAS spec"), http.StatusBadRequest
 		}
@@ -1024,7 +1024,7 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 
 	newAPIURL := getAPIURL(newDef, gw.GetConfig())
 
-	if oasAPI {
+	if oasEndpoint {
 		if isCreate {
 			oasObj.AddServers(newAPIURL)
 		} else if !isCreate && spec.IsOAS {
@@ -1036,7 +1036,7 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 		}
 	}
 
-	if (oasAPI && isCreate) || (!isCreate && spec.IsOAS) {
+	if (oasEndpoint && isCreate) || (!isCreate && spec.IsOAS) {
 		newDef.IsOAS = true
 
 		err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
@@ -1049,7 +1049,7 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 			return apiError(err.Error()), errCode
 		}
 
-	} else if !oasAPI {
+	} else if !oasEndpoint {
 		newDef.IsOAS = false
 
 		err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
@@ -1255,7 +1255,6 @@ func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
-	// refer https://tyktech.atlassian.net/wiki/spaces/EN/pages/1660485648/OAS+import+API+Creation+RFC+WIP#Tyk-OAS-gw-endpoint
 	if gw.GetConfig().UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Due to enabled use_db_app_configs, please use the Dashboard API"))

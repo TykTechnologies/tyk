@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"net/http"
 	"text/template"
@@ -95,6 +96,13 @@ const (
 	CoprocessType = "coprocess"
 	OAuthType     = "oauth"
 	OIDCType      = "oidc"
+)
+
+var (
+	ErrAPIMigrated     = errors.New("the supplied API definition is in Tyk native format, please use OAS format for this API")
+	ErrAPINotMigrated  = errors.New("the supplied API definition is in OAS format, please use the Tyk native format for this API")
+	ErrOASGetForOldAPI = errors.New("the requested API definition is in Tyk native format, please use old api endpoint")
+	ErrAPINotFound     = errors.New("API not found")
 )
 
 type ObjectId bson.ObjectId
