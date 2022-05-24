@@ -312,18 +312,20 @@ paths:
   '/tyk/apis/oas':
     get:
       description: |-
-        List APIs, in OAS fromat
+         List APIs, in OAS format
          Only if used without the Tyk Dashboard
       tags:
-        - APIs
+        - OASAPIs
       operationId: listApisOAS
       parameters:
-      - description: mode of export
-        name: mode
-        in: query
-        schema:
-          type: string
-        example: public
+        - description: |- 
+            Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. 
+            When mode=public, OAS spec excluding Tyk extension will be returned in the response
+          name: mode
+          in: query
+          schema:
+            type: string
+          example: public
       responses:
         '200':
           description: List of API definitions in OAS format
@@ -344,7 +346,7 @@ paths:
         Create API with OAS format
          A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.
       tags:
-        - APIs
+        - OASAPIs
       operationId: createApiOAS
       requestBody:
         content:
@@ -377,86 +379,6 @@ paths:
               example:
                 status: "error"
                 message: "Malformed API data"
-    patch:
-      description: |-
-        Update API with OAS format. You can use this endpoint to update OAS part of the tyk API definition.
-        This endpoint allows you to configure tyk OAS extension based on query params provided(similar to import)
-      tags:
-        - APIs
-      operationId: patchApiOAS
-      parameters:
-        - name: listenPath
-          in: query
-          description: listenPath for the API
-          required: false
-          schema:
-            type: string
-        - name: upstreamURL
-          in: query
-          description: upstreamURL for the API
-          required: false
-          schema:
-            type: string
-        - name: customDomain
-          in: query
-          description: custom domain for the API
-          required: false
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
-      responses:
-        '200':
-          description: API patched
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/apiModifyKeySuccess"
-              example:
-                status: "ok"
-                action: "modified"
-                key: "{updated APIID}"
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/apiStatusMessage"
-              examples:
-                malformedBody:
-                  summary: When the request body is malformed
-                  value:
-                    message: "Request malformed"
-                    status: "error"
-                missingAPIID:
-                  summary: When the request is missing APIID in query Param
-                  value:
-                    message: "Must specify an apiID to patch"
-                    status: "error"
-                nonExistingAPIID:
-                  summary: When the client sends and APIID which doesn't exists in tyk gw
-                  value:
-                    message: "No API found for APIID {APIID}"
-                    status: "error"
-                invalidUpstreamURL:
-                  summary: When the client sends query param upstreamURL which isn't valid
-                  value:
-                    message: "invalid upstream URL"
-                    status: "error"
-        500:
-          description: When patch request is send while using dashboard app configs
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/apiStatusMessage"
-              example:
-                summary: dashboard app configs is used for tyk api definitions
-                value:
-                  message: "Due to enabled use_db_app_configs, please use the Dashboard API"
-                  status: "error"
 
   '/tyk/apis/{apiID}':
     parameters:
@@ -552,6 +474,7 @@ paths:
               example:
                 message: API ID not specified
                 status: error
+
   '/tyk/apis/oas/{apiID}':
     parameters:
       - description: The API ID
@@ -565,14 +488,16 @@ paths:
         Get API definition in OAS format
         Only if used without the Tyk Dashboard
       tags:
-        - APIs
+        - OASAPIs
       parameters:
-      - description: mode of export
-        name: mode
-        in: query
-        schema:
-          type: string
-        example: public
+        - description: |-
+            Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. 
+            When mode=public, OAS spec excluding Tyk extension will be returned in the response
+          name: mode
+          in: query
+          schema:
+            type: string
+          example: public
       operationId: listApiOAS
       responses:
         '200':
@@ -594,7 +519,7 @@ paths:
 
         Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
       tags:
-        - APIs
+        - OASAPIs
       operationId: updateApiOAS
       requestBody:
         content:
@@ -627,12 +552,92 @@ paths:
               example:
                 status: "error"
                 message: "Malformed API data"
+    patch:
+      description: |-
+        Update API with OAS format. You can use this endpoint to update OAS part of the tyk API definition.
+        This endpoint allows you to configure tyk OAS extension based on query params provided(similar to import)
+      tags:
+        - OASAPIs
+      operationId: patchApiOAS
+      parameters:
+        - name: listenPath
+          in: query
+          description: listenPath for the API
+          required: false
+          schema:
+            type: string
+        - name: upstreamURL
+          in: query
+          description: upstreamURL for the API
+          required: false
+          schema:
+            type: string
+        - name: customDomain
+          in: query
+          description: custom domain for the API
+          required: false
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
+      responses:
+        '200':
+          description: API patched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiModifyKeySuccess"
+              example:
+                status: "ok"
+                action: "modified"
+                key: "{updated APIID}"
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiStatusMessage"
+              examples:
+                malformedBody:
+                  summary: When the request body is malformed
+                  value:
+                    message: "Request malformed"
+                    status: "error"
+                missingAPIID:
+                  summary: When the request is missing APIID in query Param
+                  value:
+                    message: "Must specify an apiID to patch"
+                    status: "error"
+                nonExistingAPIID:
+                  summary: When the client sends and APIID which doesn't exists in tyk gw
+                  value:
+                    message: "No API found for APIID {APIID}"
+                    status: "error"
+                invalidUpstreamURL:
+                  summary: When the client sends query param upstreamURL which isn't valid
+                  value:
+                    message: "invalid upstream URL"
+                    status: "error"
+        500:
+          description: When patch request is send while using dashboard app configs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiStatusMessage"
+              example:
+                summary: dashboard app configs is used for tyk api definitions
+                value:
+                  message: "Due to enabled use_db_app_configs, please use the Dashboard API"
+                  status: "error"
     delete:
       description: |-
         Deleting an API definition will remove the file from the file store, the API definition will NOT be unloaded, a separate reload request will need to be made to disable the API endpoint.
       tags:
-        - APIs
-      operationId: deleteApi
+        - OASAPIs
+      operationId: deleteOASApi
       responses:
         '200':
           description: API deleted
@@ -666,15 +671,17 @@ paths:
         download API definition in OAS format,
         Only if used without the Tyk Dashboard
       tags:
-        - APIs
+        - OASAPIs
       operationId: downloadApiOASPublic
       parameters:
-      - description: mode of export
-        name: mode
-        in: query
-        schema:
-          type: string
-        example: public
+        - description: |-
+            Mode of OAS export, by default mode could be empty which means to export OAS spec including OAS Tyk extension. 
+            When mode=public, OAS spec excluding Tyk extension is exported
+          name: mode
+          in: query
+          schema:
+            type: string
+          example: public
       responses:
         '200':
           description: API definition
@@ -687,22 +694,24 @@ paths:
                 use_keyless: true
                 active: true
                 proxy:
-                  listen_path: "/test"  
+                  listen_path: "/test"
   '/tyk/apis/oas/export':
     get:
       description: |-
         Download list of API definition in OAS format,
         Only if used without the Tyk Dashboard
       tags:
-        - APIs
+        - OASAPIs
       operationId: downloadApisOASPublic
       parameters:
-      - description: mode of export
-        name: mode
-        in: query
-        schema:
-          type: string
-        example: public
+        - description: |-
+            Mode of OAS export, by default mode could be empty which means to export OAS spec including OAS Tyk extension. 
+            When mode=public, OAS spec excluding Tyk extension is exported
+          name: mode
+          in: query
+          schema:
+            type: string
+          example: public
       responses:
         '200':
           description: API definition
@@ -717,7 +726,7 @@ paths:
                   use_keyless: true
                   active: true
                   proxy:
-                    listen_path: "/test" 
+                    listen_path: "/test"
   '/tyk/cache/{apiID}':
     parameters:
       - description: The API ID
@@ -747,13 +756,13 @@ paths:
       summary: Hot-reload a single node
       description: Tyk is capable of reloading configurations without having to stop serving requests, this means that API configurations can be added at runtime, or even modified at runtime and those rules applied immediately without any downtime.
       parameters:
-      - description: Block a response, until the reload is performed. This can be useful in scripting environments like CI/CD workflows.
-        name: block
-        in: query
-        required: false
-        schema:
-          type: boolean
-          enum: [true]
+        - description: Block a response, until the reload is performed. This can be useful in scripting environments like CI/CD workflows.
+          name: block
+          in: query
+          required: false
+          schema:
+            type: boolean
+            enum: [true]
       tags:
         - Hot Reload
       operationId: hotReload
@@ -786,9 +795,9 @@ paths:
     get:
       summary: Check the Health of the Gateway
       description: |
-          From v2.7.5 you can now rename the `/hello`  endpoint by using the `health_check_endpoint_name` option
-
-          Returns 200 response in case of success
+        From v2.7.5 you can now rename the `/hello`  endpoint by using the `health_check_endpoint_name` option
+        
+        Returns 200 response in case of success
       tags:
         - Health Checking
       operationId: hello
@@ -1062,7 +1071,7 @@ paths:
                 $ref: '#/components/schemas/apiStatusMessage'
               example:
                 message: Key ID not specified
-                status: error         
+                status: error
     post:
       summary: Create Custom Key / Import Key
       description: |-
@@ -1404,7 +1413,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/NewClientRequest'  
+                  $ref: '#/components/schemas/NewClientRequest'
     get:
       summary: List oAuth clients
       description: OAuth Clients are organised by API ID, and therefore are queried as such.
@@ -1535,13 +1544,13 @@ paths:
             schema:
               type: object
               properties:
-                token: 
+                token:
                   description: token to be revoked
                   type: string
-                client_id: 
+                client_id:
                   description: id of oauth client
                   type: string
-                token_type_hint: 
+                token_type_hint:
                   description: type of token to be revoked, if sent then the accepted values are access_token and refresh_token. String value and optional, of not provided then it will attempt to remove access and refresh tokens that matchs
                   type: string
             example:
@@ -1564,10 +1573,10 @@ paths:
             schema:
               type: object
               properties:
-                client_id: 
+                client_id:
                   description: id of oauth client
                   type: string
-                client_secret: 
+                client_secret:
                   description: oauth client secret to ensure that its a valid operation
                   type: string
             example:
@@ -1583,7 +1592,7 @@ paths:
           description: Bad request, form malformed or client secret and client id doesn't match
         '404':
           description: oauth client doesn't have any api related
-                
+
   '/tyk/oauth/refresh/{keyName}':
     delete:
       summary: Invalidate OAuth refresh token
