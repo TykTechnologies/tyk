@@ -969,13 +969,10 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 }
 
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
-	if gw.GetConfig().UseDBAppConfigs {
-		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
-		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
-	}
-
-	var newDef apidef.APIDefinition
-	var oasObj oas.OAS
+	var (
+		newDef apidef.APIDefinition
+		oasObj oas.OAS
+	)
 
 	if oasEndpoint {
 		if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
@@ -1025,11 +1022,6 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 }
 
 func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
-	if gw.GetConfig().UseDBAppConfigs {
-		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
-		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
-	}
-
 	spec := gw.getApiSpec(apiID)
 	if spec == nil {
 		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
@@ -1296,12 +1288,6 @@ func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
-	if gw.GetConfig().UseDBAppConfigs {
-		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
-		doJSONWrite(w, http.StatusInternalServerError, apiError("Due to enabled use_db_app_configs, please use the Dashboard API"))
-		return
-	}
-
 	apiID := strings.TrimSpace(mux.Vars(r)["apiID"])
 	if apiID == "" {
 		doJSONWrite(w, http.StatusBadRequest, apiError("Must specify an apiID to patch"))
@@ -2800,6 +2786,16 @@ func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
+		next.ServeHTTP(w, r)
+	}
+}
+
+func (gw *Gateway) blockInDashboardMode(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if gw.GetConfig().UseDBAppConfigs {
+			doJSONWrite(w, http.StatusInternalServerError, apiError("Due to enabled use_db_app_configs, please use the Dashboard API"))
+		}
+
 		next.ServeHTTP(w, r)
 	}
 }
