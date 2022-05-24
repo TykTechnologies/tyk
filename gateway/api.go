@@ -1061,10 +1061,6 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 			return apiError("Request malformed"), http.StatusBadRequest
 		}
 
-		if spec != nil && spec.IsOAS {
-			oasObj = spec.OAS
-			oasObj.Fill(newDef)
-		}
 	}
 
 	if apiID != "" && newDef.APIID != apiID {
