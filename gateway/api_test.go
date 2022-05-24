@@ -1799,7 +1799,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := ts.Gw.handleAddOrUpdateApi("", req, testFs, false)
+		response, statusCode := ts.Gw.handleAddApi(req, testFs, false)
 		errorResponse, ok := response.(apiStatusMessage)
 		require.True(t, ok)
 
@@ -1816,7 +1816,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := ts.Gw.handleAddOrUpdateApi("555", req, testFs, false)
+		response, statusCode := ts.Gw.handleUpdateApi("555", req, testFs, false)
 		errorResponse, ok := response.(apiStatusMessage)
 		require.True(t, ok)
 
@@ -1841,7 +1841,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := ts.Gw.handleAddOrUpdateApi("", req, testFs, false)
+		response, statusCode := ts.Gw.handleAddApi(req, testFs, false)
 		errorResponse, ok := response.(apiStatusMessage)
 		require.True(t, ok)
 
@@ -1858,7 +1858,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := ts.Gw.handleAddOrUpdateApi("", req, testFs, false)
+		response, statusCode := ts.Gw.handleAddApi(req, testFs, false)
 		successResponse, ok := response.(apiModifyKeySuccess)
 		require.True(t, ok)
 
@@ -1948,7 +1948,7 @@ func TestOAS(t *testing.T) {
 
 	t.Run("get old api in OAS format - should fail", func(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID,
-			BodyMatch: "API not migrated to OAS, please migrate API definition to get OAS spec", Code: http.StatusBadRequest})
+			BodyMatch: apidef.ErrOASGetForOldAPI.Error(), Code: http.StatusBadRequest})
 	})
 
 	t.Run("toggle isOAS - should override", func(t *testing.T) {
@@ -1988,9 +1988,9 @@ func TestOAS(t *testing.T) {
 						testGetOldAPI(t, ts, apiID, "old-updated old api")
 					})
 
-					t.Run("in oas", func(t *testing.T) {
+					t.Run("in oas - should fail", func(t *testing.T) {
 						_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID,
-							BodyMatch: "API not migrated to OAS, please migrate API definition to get OAS spec", Code: http.StatusBadRequest})
+							BodyMatch: apidef.ErrOASGetForOldAPI.Error(), Code: http.StatusBadRequest})
 					})
 				})
 
@@ -1998,7 +1998,7 @@ func TestOAS(t *testing.T) {
 				testUpdateAPI(t, ts, &oldAPI, apiID, false)
 			})
 
-			t.Run("with oas", func(t *testing.T) {
+			t.Run("with oas - should fail", func(t *testing.T) {
 
 				var oldAPIInOAS oas.OAS
 				oldAPIInOAS.Fill(*oldAPI.APIDefinition)
@@ -2007,7 +2007,7 @@ func TestOAS(t *testing.T) {
 
 				_, _ = ts.Run(t, []test.TestCase{
 					{AdminAuth: true, Method: http.MethodPut, Path: updatePath, Data: &oldAPIInOAS,
-						BodyMatch: `"API not migrated to OAS, please migrate API definition to update using OAS spec"`, Code: http.StatusBadRequest},
+						BodyMatch: apidef.ErrAPINotMigrated.Error(), Code: http.StatusBadRequest},
 				}...)
 			})
 
@@ -2023,20 +2023,14 @@ func TestOAS(t *testing.T) {
 
 				oasAPIInOld.Name = "old-updated oas api"
 
-				testUpdateAPI(t, ts, &oasAPIInOld, apiID, false)
+				t.Run("update oas API with old format - should fail", func(t *testing.T) {
+					updatePath := "/tyk/apis/" + apiID
 
-				t.Run("get", func(t *testing.T) {
-					t.Run("in oas", func(t *testing.T) {
-						testGetOASAPI(t, ts, apiID, "old-updated oas api", "oas doc")
-					})
-
-					t.Run("in old", func(t *testing.T) {
-						testGetOldAPI(t, ts, apiID, "old-updated oas api")
-					})
+					_, _ = ts.Run(t, []test.TestCase{
+						{AdminAuth: true, Method: http.MethodPut, Path: updatePath, Data: &oasAPIInOld,
+							BodyMatch: apidef.ErrAPIMigrated.Error(), Code: http.StatusBadRequest},
+					}...)
 				})
-
-				// Reset
-				testUpdateAPI(t, ts, &oasAPI, apiID, true)
 			})
 
 			t.Run("with oas", func(t *testing.T) {
@@ -2078,7 +2072,7 @@ func TestOAS(t *testing.T) {
 						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath, BodyMatch: `\"x-tyk-api-gateway\":`,
 							Code: http.StatusOK, HeadersMatch: matchHeaders},
 						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID + "/export",
-							BodyMatch: `"API not migrated to OAS, please migrate API definition to get OAS spec"`,
+							BodyMatch: apidef.ErrOASGetForOldAPI.Error(),
 							Code:      http.StatusBadRequest},
 					}...)
 				})
@@ -2087,7 +2081,7 @@ func TestOAS(t *testing.T) {
 						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath + "?mode=public", BodyMatch: `.*components`,
 							BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
 						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID + "/export?mode=public",
-							BodyMatch: `"API not migrated to OAS, please migrate API definition to get OAS spec"`, Code: http.StatusBadRequest},
+							BodyMatch: apidef.ErrOASGetForOldAPI.Error(), Code: http.StatusBadRequest},
 					}...)
 				})
 
@@ -2419,7 +2413,7 @@ func TestOAS(t *testing.T) {
 				{Method: http.MethodGet, Path: listenPath, Code: http.StatusOK},
 				{AdminAuth: true, Method: http.MethodGet, Path: path, BodyNotMatch: "components", Code: http.StatusOK},
 				{AdminAuth: true, Method: http.MethodGet, Path: oasPath,
-					BodyMatch: `"API not migrated to OAS, please migrate API definition to get OAS spec"`, Code: http.StatusBadRequest},
+					BodyMatch: apidef.ErrOASGetForOldAPI.Error(), Code: http.StatusBadRequest},
 				{AdminAuth: true, Method: http.MethodDelete, Path: path, BodyMatch: `"action":"deleted"`, Code: http.StatusOK},
 			}...)
 
@@ -2441,6 +2435,7 @@ func TestOAS(t *testing.T) {
 }
 
 func testUpdateAPI(t *testing.T, ts *Test, api interface{}, apiID string, oasTyped bool) {
+	t.Helper()
 	updatePath := "/tyk/apis/"
 	if oasTyped {
 		updatePath += "oas/"
@@ -2456,7 +2451,7 @@ func testUpdateAPI(t *testing.T, ts *Test, api interface{}, apiID string, oasTyp
 }
 
 func testGetOASAPI(t *testing.T, d *Test, id, name, title string) (oasDoc openapi3.T) {
-
+	t.Helper()
 	getPath := "/tyk/apis/oas/" + id
 	bodyMatch := fmt.Sprintf(`{.*"info":{"title":"%s".*"x-tyk-api-gateway":{"info":{.*"name":"%s"`, title, name)
 
