@@ -913,13 +913,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 			if p.TykAPISpec.GraphQLExecutor.Engine == nil {
 				err = errors.New("execution engine is nil")
-				return nil, time.Since(begin), err
+				return res, time.Since(begin), err
 			}
 
 			gqlRequest := ctxGetGraphQLRequest(outreq)
 			if gqlRequest == nil {
 				err = errors.New("graphql request is nil")
-				return nil, time.Since(begin), err
+				return res, time.Since(begin), err
 			}
 
 			p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
