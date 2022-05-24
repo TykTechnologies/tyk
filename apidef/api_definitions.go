@@ -598,6 +598,8 @@ type APIDefinition struct {
 	// Gateway segment tags
 	EnableTags bool     `bson:"enable_tags" json:"enable_tags"`
 	Tags       []string `bson:"tags" json:"tags"`
+	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
+	IsOAS bool `json:"is_oas" bson:"is_oas"`
 }
 
 type AnalyticsPluginConfig struct {

@@ -679,7 +679,10 @@ const Schema = `{
                     "type": "string"
                 }
             }
-        }
+        },
+		"is_oas": {
+			"type": "boolean"
+		}
     },
     "required": [
         "name",
