@@ -210,6 +210,9 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			logger.Warn("Attempted access with existing user, failed password check.")
 			return k.handleAuthFail(w, r, token)
 		}
+	default:
+		// Todo: Implement the other hash algos here.
+		return k.handleAuthFail(w, r, token)
 	}
 
 	// Set session state on context, we will need it later

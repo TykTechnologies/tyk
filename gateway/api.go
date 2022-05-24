@@ -348,16 +348,39 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 // remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
 // need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
 
-func setSessionPassword(session *user.SessionState) {
-	session.BasicAuthData.Hash = user.HashBCrypt
-	newPass, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
-	if err != nil {
-		log.Error("Could not hash password, setting to plaintext, error was: ", err)
-		session.BasicAuthData.Hash = user.HashPlainText
-		return
+//
+func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
+
+	log.Info("hello world!")
+
+	// Set default basic auth hash to bcrypt
+	// If specified, set it to config.
+	basicAuthHashAlgo := "bcrypt"
+	if gw.GetConfig().BasicAuthHashKeyFunction != "" {
+		basicAuthHashAlgo = gw.GetConfig().BasicAuthHashKeyFunction
 	}
 
-	session.BasicAuthData.Password = string(newPass)
+	var hashedPass string
+
+	// Bcrypt Hashing
+	if basicAuthHashAlgo == string(user.HashBCrypt) {
+
+		session.BasicAuthData.Hash = user.HashBCrypt
+		hashedPassBytes, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
+		if err != nil {
+			log.Error("Could not hash password, setting to plaintext, error was: ", err)
+			session.BasicAuthData.Hash = user.HashPlainText
+			return
+		}
+
+		hashedPass = string(hashedPassBytes)
+
+	} else { // Standard Hashing Algos
+		hashedPass = storage.HashStr(session.BasicAuthData.Password, basicAuthHashAlgo)
+		session.BasicAuthData.Hash = user.HashType(basicAuthHashAlgo)
+	}
+
+	session.BasicAuthData.Password = hashedPass
 }
 
 func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
@@ -447,14 +470,14 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		switch r.Method {
 		case http.MethodPost:
 			// It's a create, so lets hash the password
-			setSessionPassword(newSession)
+			gw.setBasicAuthSessionPassword(newSession)
 		case http.MethodPut:
 			if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
 				// passwords dont match assume it's new, lets hash it
 				log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
 				log.Debug("New: newSession.BasicAuthData.Password")
 				log.Debug("Changing password")
-				setSessionPassword(newSession)
+				gw.setBasicAuthSessionPassword(newSession)
 			}
 		}
 	} else if originalKey.BasicAuthData.Password != "" {
