@@ -627,6 +627,31 @@ paths:
               example:
                 status: "error"
                 message: "Malformed API data"
+    delete:
+      description: |-
+        Deleting an API definition will remove the file from the file store, the API definition will NOT be unloaded, a separate reload request will need to be made to disable the API endpoint.
+      tags:
+        - APIs
+      operationId: deleteApi
+      responses:
+        '200':
+          description: API deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: API deleted
+                status: ok
+        '400':
+          description: No API ID specified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: API ID not specified
+                status: error
 
   '/tyk/apis/oas/{apiID}/export':
     parameters:
