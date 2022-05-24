@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 )
 
 const (
@@ -163,15 +164,10 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 }
 
 func getQueryValPtr(val string) *bool {
-	if val == "true" {
-		return getBoolPtr(true)
-	} else if val == "false" {
-		return getBoolPtr(false)
+	boolVal, err := strconv.ParseBool(val)
+	if err != nil {
+		return nil
 	}
 
-	return nil
-}
-
-func getBoolPtr(val bool) *bool {
-	return &val
+	return &boolVal
 }

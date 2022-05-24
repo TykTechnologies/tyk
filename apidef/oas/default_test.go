@@ -828,6 +828,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 }
 
 func TestGetTykExtensionConfigParams(t *testing.T) {
+	trueVal, falseVal := true, false
 	t.Run("extract all params when provided", func(t *testing.T) {
 		endpoint, err := url.Parse("/")
 		assert.NoError(t, err)
@@ -853,8 +854,8 @@ func TestGetTykExtensionConfigParams(t *testing.T) {
 			ListenPath:      listenPath,
 			UpstreamURL:     upstreamURL,
 			CustomDomain:    customDomain,
-			AllowList:       getBoolPtr(false),
-			ValidateRequest: getBoolPtr(true),
+			AllowList:       &falseVal,
+			ValidateRequest: &trueVal,
 		}
 
 		assert.Equal(t, &expectedConfigParams, tykExtConfigParams)
@@ -912,19 +913,9 @@ func TestGetTykExtensionConfigParams(t *testing.T) {
 		tykExtConfigParams := GetTykExtensionConfigParams(r)
 
 		expectedConfigParams := TykExtensionConfigParams{
-			AllowList: getBoolPtr(true),
+			AllowList: &trueVal,
 		}
 
 		assert.Equal(t, &expectedConfigParams, tykExtConfigParams)
-	})
-}
-
-func Test_getBoolPtr(t *testing.T) {
-	t.Run("false val", func(t *testing.T) {
-		assert.False(t, *getBoolPtr(false))
-	})
-
-	t.Run("true val", func(t *testing.T) {
-		assert.True(t, *getBoolPtr(true))
 	})
 }
