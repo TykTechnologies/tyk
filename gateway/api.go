@@ -1067,6 +1067,11 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		}
 	}
 
+	if apiID != "" && newDef.APIID != apiID {
+		log.Error("PUT operation on different APIIDs")
+		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
+	}
+
 	if validationErr := validateAPIDef(&newDef); validationErr != nil {
 		return *validationErr, http.StatusBadRequest
 	}

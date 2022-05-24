@@ -1788,7 +1788,7 @@ func TestRotateClientSecretHandler(t *testing.T) {
 	}
 }
 
-func TestHandleAddOrUpdateApi(t *testing.T) {
+func TestHandleAddApi(t *testing.T) {
 	testFs := afero.NewMemMapFs()
 
 	ts := StartTest(nil)
@@ -1804,23 +1804,6 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		require.True(t, ok)
 
 		assert.Equal(t, "Request malformed", errorResponse.Message)
-		assert.Equal(t, http.StatusBadRequest, statusCode)
-	})
-
-	t.Run("should return error when api ids are different", func(t *testing.T) {
-		apiDef := apidef.DummyAPI()
-		apiDef.APIID = "123"
-		apiDefJson, err := json.Marshal(apiDef)
-		require.NoError(t, err)
-
-		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
-		require.NoError(t, err)
-
-		response, statusCode := ts.Gw.handleUpdateApi("555", req, testFs, false)
-		errorResponse, ok := response.(apiStatusMessage)
-		require.True(t, ok)
-
-		assert.Equal(t, "Request APIID does not match that in Definition! For Update operations these must match.", errorResponse.Message)
 		assert.Equal(t, http.StatusBadRequest, statusCode)
 	})
 
@@ -1864,6 +1847,100 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 
 		assert.Equal(t, "123", successResponse.Key)
 		assert.Equal(t, "added", successResponse.Action)
+		assert.Equal(t, http.StatusOK, statusCode)
+	})
+
+}
+
+func TestHandleUpdateApi(t *testing.T) {
+	testFs := afero.NewMemMapFs()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oldAPIID := "old-api-id"
+
+	oldAPI := BuildAPI(func(a *APISpec) {
+		a.APIID = oldAPIID
+		a.Name = "old api"
+		a.Proxy.ListenPath = "/old-api/"
+	})[0]
+	// Create Old API
+	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis", Data: &oldAPI,
+		BodyMatch: `"action":"added"`, Code: http.StatusOK})
+
+	ts.Gw.DoReload()
+
+	t.Run("should return error when api definition json is invalid", func(t *testing.T) {
+		apiDefJson := []byte("{")
+		req, err := http.NewRequest(http.MethodPut, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := ts.Gw.handleUpdateApi(oldAPIID, req, testFs, false)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Request malformed", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return error when api ids are different", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "XXX"
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPut, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := ts.Gw.handleUpdateApi(oldAPIID, req, testFs, false)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Request APIID does not match that in Definition! For Update operations these must match.", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return error when semantic validation fails", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = oldAPIID
+		apiDef.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Name: "duplicate",
+			},
+			{
+				Name: "duplicate",
+			},
+		}
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPut, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := ts.Gw.handleUpdateApi(oldAPIID, req, testFs, false)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Validation of API Definition failed. Reason: duplicate data source names are not allowed.", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return success when no error occurs", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = oldAPIID
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPut, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := ts.Gw.handleUpdateApi(oldAPIID, req, testFs, false)
+		successResponse, ok := response.(apiModifyKeySuccess)
+		require.True(t, ok)
+
+		assert.Equal(t, oldAPIID, successResponse.Key)
+		assert.Equal(t, "modified", successResponse.Action)
 		assert.Equal(t, http.StatusOK, statusCode)
 	})
 
