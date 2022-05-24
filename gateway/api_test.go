@@ -1945,7 +1945,7 @@ func TestHandleUpdateApi(t *testing.T) {
 	})
 
 	t.Run("API not found for non existing API", func(t *testing.T) {
-		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPut, Path: "/tyk/apis/" + "/non-existing-api-id",
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPut, Path: "/tyk/apis/non-existing-api-id",
 			BodyMatch: `"API not found"`, Code: http.StatusNotFound})
 	})
 
@@ -1956,7 +1956,7 @@ func TestDeleteAPI(t *testing.T) {
 	defer ts.Close()
 
 	t.Run("API not found for non existing API", func(t *testing.T) {
-		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodDelete, Path: "/tyk/apis/" + "/non-existing-api-id",
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodDelete, Path: "/tyk/apis/non-existing-api-id",
 			BodyMatch: `"API not found"`, Code: http.StatusNotFound})
 	})
 }
