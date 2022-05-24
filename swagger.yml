@@ -312,13 +312,15 @@ paths:
   '/tyk/apis/oas':
     get:
       description: |-
-        List APIs, in OAS fromat
+         List APIs, in OAS format
          Only if used without the Tyk Dashboard
       tags:
         - OASAPIs
       operationId: listApisOAS
       parameters:
-        - description: mode of export
+        - description: |- 
+            Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. 
+            When mode=public, OAS spec excluding Tyk extension will be returned in the response
           name: mode
           in: query
           schema:
@@ -488,7 +490,9 @@ paths:
       tags:
         - OASAPIs
       parameters:
-        - description: mode of export
+        - description: |-
+            Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. 
+            When mode=public, OAS spec excluding Tyk extension will be returned in the response
           name: mode
           in: query
           schema:
@@ -670,7 +674,9 @@ paths:
         - OASAPIs
       operationId: downloadApiOASPublic
       parameters:
-        - description: mode of export
+        - description: |-
+            Mode of OAS export, by default mode could be empty which means to export OAS spec including OAS Tyk extension. 
+            When mode=public, OAS spec excluding Tyk extension is exported
           name: mode
           in: query
           schema:
@@ -698,7 +704,9 @@ paths:
         - OASAPIs
       operationId: downloadApisOASPublic
       parameters:
-        - description: mode of export
+        - description: |-
+            Mode of OAS export, by default mode could be empty which means to export OAS spec including OAS Tyk extension. 
+            When mode=public, OAS spec excluding Tyk extension is exported
           name: mode
           in: query
           schema:
