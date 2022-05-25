@@ -3,6 +3,7 @@ package oas
 import (
 	"errors"
 	"fmt"
+	"github.com/getkin/kin-openapi/openapi3"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -92,13 +93,7 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 		}
 	}
 
-	if overRideValues.AllowList != nil {
-		s.configureMiddlewareOnAllPaths(*overRideValues.AllowList, MiddlewareAllowList)
-	}
-
-	if overRideValues.ValidateRequest != nil {
-		s.configureMiddlewareOnAllPaths(*overRideValues.ValidateRequest, MiddlewareValidateRequest)
-	}
+	s.importMiddlewares(overRideValues.AllowList, overRideValues.ValidateRequest)
 
 	return nil
 }
@@ -149,29 +144,30 @@ func (as *AuthSources) Import(in string) {
 	}
 }
 
-func (s *OAS) configureMiddlewareOnAllPaths(enabled bool, middleware string) {
+func (s *OAS) importMiddlewares(allowList, validateRequest *bool) {
+	if allowList != nil {
+		s.importMiddleware(*allowList, MiddlewareAllowList)
+	}
+
+	if validateRequest != nil {
+		s.importMiddleware(*validateRequest, MiddlewareValidateRequest)
+	}
+
+}
+
+func (s *OAS) importMiddleware(enabled bool, middleware string) {
 	for path, pathItem := range s.Paths {
 		for _, method := range allowedMethods {
 			if operation := pathItem.GetOperation(method); operation != nil {
-				if middleware == MiddlewareAllowList {
-					s.configureAllowList(enabled, method, path)
-				} else if middleware == MiddlewareValidateRequest {
-					reqBody := operation.RequestBody
-					if reqBody == nil {
+				switch middleware {
+				case MiddlewareAllowList:
+					s.importAllowList(enabled, method, path)
+				case MiddlewareValidateRequest:
+					if shouldImport := shouldImportValidateRequest(operation); !shouldImport {
 						continue
 					}
 
-					reqBodyVal := reqBody.Value
-					if reqBodyVal == nil {
-						continue
-					}
-
-					media := reqBodyVal.Content.Get("application/json")
-					if media == nil {
-						continue
-					}
-
-					s.configureValidateRequest(enabled, method, path)
+					s.importValidateRequest(enabled, method, path)
 				}
 			}
 		}
@@ -180,7 +176,26 @@ func (s *OAS) configureMiddlewareOnAllPaths(enabled bool, middleware string) {
 
 }
 
-func (s *OAS) configureAllowList(enabled bool, method, path string) {
+func shouldImportValidateRequest(operation *openapi3.Operation) bool {
+	reqBody := operation.RequestBody
+	if reqBody == nil {
+		return false
+	}
+
+	reqBodyVal := reqBody.Value
+	if reqBodyVal == nil {
+		return false
+	}
+
+	media := reqBodyVal.Content.Get("application/json")
+	if media == nil {
+		return false
+	}
+
+	return true
+}
+
+func (s *OAS) importAllowList(enabled bool, method, path string) {
 	operation := s.getTykOperation(method, path)
 	operation.Allow = &Allowance{
 		Enabled: enabled,
@@ -192,7 +207,7 @@ func (s *OAS) configureAllowList(enabled bool, method, path string) {
 
 }
 
-func (s *OAS) configureValidateRequest(enabled bool, method, path string) {
+func (s *OAS) importValidateRequest(enabled bool, method, path string) {
 	operation := s.getTykOperation(method, path)
 
 	operation.ValidateRequest = &ValidateRequest{
