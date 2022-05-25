@@ -771,7 +771,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// Do this before we make a shallow copy
 	session := ctxGetSession(req)
-
 	outreq := new(http.Request)
 	logreq := new(http.Request)
 
@@ -870,6 +869,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		transport.HTTPTransport.transport.TLSClientConfig.Certificates = tlsCertificates
 
 		p.TykAPISpec.Transport[outreq.URL.Host] = transport
+
+		p.logger.Debugf("Setting transport layer. API: %+v TykRoundtriper:%+v , TykAPISpec.Transport:%+v ", p.TykAPISpec.APIID, transport, p.TykAPISpec.Transport)
+	} else {
+		p.logger.Debugf("Transport already found for %+v in TykAPISpec.Transport: %+v, TLS:%+v", outreq.URL.Host, transport, transport.HTTPTransport)
 	}
 
 	p.TykAPISpec.Unlock()
@@ -901,19 +904,22 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	var err error
 	var upstreamLatency time.Duration
 
-	sendRequestToUpstream := func() {
+	sendRequestToUpstream := func(outreq *http.Request) (*http.Response, time.Duration, error) {
+		var res *http.Response
+		var err error
+		var upstreamLatency time.Duration
 		begin := time.Now()
 		if p.TykAPISpec.GraphQL.Enabled && p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
 
 			if p.TykAPISpec.GraphQLExecutor.Engine == nil {
 				err = errors.New("execution engine is nil")
-				return
+				return res, time.Since(begin), err
 			}
 
 			gqlRequest := ctxGetGraphQLRequest(outreq)
 			if gqlRequest == nil {
 				err = errors.New("graphql request is nil")
-				return
+				return res, time.Since(begin), err
 			}
 
 			p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
@@ -926,6 +932,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 
 		upstreamLatency = time.Since(begin)
+
+		return res, upstreamLatency, err
 	}
 
 	if breakerEnforced {
@@ -935,14 +943,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			return ProxyResponse{}
 		}
 		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
-		sendRequestToUpstream()
+		res, upstreamLatency, err = sendRequestToUpstream(outreq)
 		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		sendRequestToUpstream()
+		p.logger.Debugf("Making upstream req: %+v, TLS: %+v", outreq, outreq.TLS)
+		res, upstreamLatency, err = sendRequestToUpstream(outreq)
 	}
 
 	if err != nil {
@@ -986,7 +995,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", http.StatusInternalServerError, true)
 		return ProxyResponse{UpstreamLatency: upstreamLatency}
-
 	}
 
 	upgrade, _ := IsUpgrade(req)
