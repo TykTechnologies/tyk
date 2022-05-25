@@ -96,8 +96,27 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 func (s *OAS) configureMiddlewareOnAllPaths(enabled bool, middleware string) {
 	for path, pathItem := range s.Paths {
 		for _, method := range allowedMethods {
-			if pathItem.GetOperation(method) != nil {
-				s.configureMiddlewareOnOperation(enabled, method, path, middleware)
+			if operation := pathItem.GetOperation(method); operation != nil {
+				if middleware == MiddlewareAllowList {
+					s.configureAllowList(enabled, method, path)
+				} else if middleware == MiddlewareValidateRequest {
+					reqBody := operation.RequestBody
+					if reqBody == nil {
+						continue
+					}
+
+					reqBodyVal := reqBody.Value
+					if reqBodyVal == nil {
+						continue
+					}
+
+					media := reqBodyVal.Content.Get("application/json")
+					if media == nil {
+						continue
+					}
+
+					s.configureValidateRequest(enabled, method, path)
+				}
 			}
 		}
 
@@ -105,27 +124,31 @@ func (s *OAS) configureMiddlewareOnAllPaths(enabled bool, middleware string) {
 
 }
 
-func (s *OAS) configureMiddlewareOnOperation(enabled bool, method, path, middleware string) {
-	xTykAPIGateway := s.GetTykExtension()
-	operationID := s.getOperationID(path, method)
-	operation := xTykAPIGateway.getOperation(operationID)
-
-	switch middleware {
-	case MiddlewareAllowList:
-		operation.Allow = &Allowance{
-			Enabled: enabled,
-		}
-
-		if block := operation.Block; block != nil && block.Enabled && enabled {
-			block.Enabled = false
-		}
-
-	case MiddlewareValidateRequest:
-		operation.ValidateRequest = &ValidateRequest{
-			Enabled: enabled,
-		}
+func (s *OAS) configureAllowList(enabled bool, method, path string) {
+	operation := s.getTykOperation(method, path)
+	operation.Allow = &Allowance{
+		Enabled: enabled,
 	}
 
+	if block := operation.Block; block != nil && block.Enabled && enabled {
+		block.Enabled = false
+	}
+
+}
+
+func (s *OAS) configureValidateRequest(enabled bool, method, path string) {
+	operation := s.getTykOperation(method, path)
+
+	operation.ValidateRequest = &ValidateRequest{
+		Enabled: enabled,
+	}
+
+}
+
+func (s *OAS) getTykOperation(method, path string) *Operation {
+	xTykAPIGateway := s.GetTykExtension()
+	operationID := s.getOperationID(path, method)
+	return xTykAPIGateway.getOperation(operationID)
 }
 
 func getURLFormatErr(fromParam bool, upstreamURL string) error {

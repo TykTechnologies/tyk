@@ -344,6 +344,24 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			return oasDef
 		}
 
+		fillReqBody := func(oasDef *OAS, path, method string) {
+			pathItem := oasDef.Paths.Find(path)
+			oasOperation := pathItem.GetOperation(method)
+			reqBody := openapi3.NewRequestBody()
+			reqBody.Description = "JSON req body"
+			valueSchema := openapi3.NewSchema()
+			valueSchema.Properties = openapi3.Schemas{
+				"value": {
+					Value: &openapi3.Schema{
+						Type: openapi3.TypeBoolean,
+					},
+				},
+			}
+			content := openapi3.NewContentWithSchema(valueSchema, []string{contentTypeJSON})
+			reqBody.Content = content
+			oasOperation.RequestBody = &openapi3.RequestBodyRef{Value: reqBody}
+		}
+
 		getExpectedOperations := func(enabled bool, middleware string, oasOperationID bool) Operations {
 			if middleware == MiddlewareAllowList && oasOperationID {
 				return Operations{
@@ -375,11 +393,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 			if middleware == MiddlewareValidateRequest && oasOperationID {
 				return Operations{
-					oasGetOperationID: {
-						ValidateRequest: &ValidateRequest{
-							Enabled: enabled,
-						},
-					},
 					oasPostOperationID: {
 						ValidateRequest: &ValidateRequest{
 							Enabled: enabled,
@@ -388,11 +401,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				}
 			} else if middleware == MiddlewareValidateRequest && !oasOperationID {
 				return Operations{
-					tykGetOperationID: {
-						ValidateRequest: &ValidateRequest{
-							Enabled: enabled,
-						},
-					},
 					tykPostOperationID: {
 						ValidateRequest: &ValidateRequest{
 							Enabled: enabled,
@@ -655,68 +663,94 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		})
 
 		t.Run("validateRequest", func(t *testing.T) {
-			t.Run("enable validateRequest for all paths when no configured operationID in OAS", func(t *testing.T) {
-				oasDef := getOASDef(false)
 
-				expectedOperations := getExpectedOperations(true, MiddlewareValidateRequest, false)
+			t.Run("do not configure validateRequest for paths where request body is not specified for application/json",
+				func(t *testing.T) {
+					oasDef := getOASDef(false)
+					fillReqBody(&oasDef, "/pets", http.MethodPost)
 
-				tykExtensionConfigParams := TykExtensionConfigParams{
-					ValidateRequest: &trueVal,
-				}
+					expectedOperations := getExpectedOperations(true, MiddlewareValidateRequest, false)
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						ValidateRequest: &trueVal,
+					}
 
-				assert.NoError(t, err)
-				assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
-			})
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
 
-			t.Run("enable validateRequest for all paths when operationID is configured in OAS", func(t *testing.T) {
-				oasDef := getOASDef(true)
+					assert.NoError(t, err)
+					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+				})
 
-				expectedOperations := getExpectedOperations(true, MiddlewareValidateRequest, true)
+			t.Run("enable validateRequest for all paths with application/json req body when no configured operationID in OAS",
+				func(t *testing.T) {
+					oasDef := getOASDef(false)
+					fillReqBody(&oasDef, "/pets", http.MethodPost)
 
-				tykExtensionConfigParams := TykExtensionConfigParams{
-					ValidateRequest: &trueVal,
-				}
+					expectedOperations := getExpectedOperations(true, MiddlewareValidateRequest, false)
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						ValidateRequest: &trueVal,
+					}
 
-				assert.NoError(t, err)
-				assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
-			})
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
 
-			t.Run("disable validateRequest for all paths when no configured operationID in OAS", func(t *testing.T) {
-				oasDef := getOASDef(false)
+					assert.NoError(t, err)
+					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+				})
 
-				expectedOperations := getExpectedOperations(false, MiddlewareValidateRequest, false)
+			t.Run("enable validateRequest for all paths with application/json req body when operationID is configured in OAS",
+				func(t *testing.T) {
+					oasDef := getOASDef(true)
+					fillReqBody(&oasDef, "/pets", http.MethodPost)
 
-				tykExtensionConfigParams := TykExtensionConfigParams{
-					ValidateRequest: &falseVal,
-				}
+					expectedOperations := getExpectedOperations(true, MiddlewareValidateRequest, true)
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						ValidateRequest: &trueVal,
+					}
 
-				assert.NoError(t, err)
-				assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
-			})
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
 
-			t.Run("disable validateRequest for all paths when operationID is configured in OAS", func(t *testing.T) {
-				oasDef := getOASDef(true)
+					assert.NoError(t, err)
+					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+				})
 
-				expectedOperations := getExpectedOperations(false, MiddlewareValidateRequest, true)
+			t.Run("disable validateRequest for all paths with application/json req body when no configured operationID in OAS",
+				func(t *testing.T) {
+					oasDef := getOASDef(false)
+					fillReqBody(&oasDef, "/pets", http.MethodPost)
+					expectedOperations := getExpectedOperations(false, MiddlewareValidateRequest, false)
 
-				tykExtensionConfigParams := TykExtensionConfigParams{
-					ValidateRequest: &falseVal,
-				}
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						ValidateRequest: &falseVal,
+					}
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
 
-				assert.NoError(t, err)
-				assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
-			})
+					assert.NoError(t, err)
+					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+				})
+
+			t.Run("disable validateRequest for all paths with application/json req body when operationID is configured in OAS",
+				func(t *testing.T) {
+					oasDef := getOASDef(true)
+					fillReqBody(&oasDef, "/pets", http.MethodPost)
+
+					expectedOperations := getExpectedOperations(false, MiddlewareValidateRequest, true)
+
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						ValidateRequest: &falseVal,
+					}
+
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+
+					assert.NoError(t, err)
+					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+				})
 
 			t.Run("override validateRequest configured in tyk extension", func(t *testing.T) {
 				oasDef := getOASDef(true)
+				fillReqBody(&oasDef, "/pets", http.MethodPost)
 
 				tykExt := XTykAPIGateway{
 					Server: Server{
@@ -735,14 +769,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					},
 					Middleware: &Middleware{
 						Operations: Operations{
-							oasGetOperationID: {
-								ValidateRequest: &ValidateRequest{
-									Enabled: false,
-								},
-							},
 							oasPostOperationID: {
 								ValidateRequest: &ValidateRequest{
-									Enabled: true,
+									Enabled: false,
 								},
 							},
 						},
@@ -821,6 +850,20 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				actualTykExtension := oasDef.GetTykExtension()
 				assert.EqualValues(t, expectedOperations, actualTykExtension.Middleware.Operations)
 			})
+
+			t.Run("do not configure validateRequest when no paths have application/json req body",
+				func(t *testing.T) {
+					oasDef := getOASDef(true)
+
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						ValidateRequest: &falseVal,
+					}
+
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+
+					assert.NoError(t, err)
+					assert.Nil(t, oasDef.GetTykExtension().Middleware)
+				})
 		})
 
 	})
