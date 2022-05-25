@@ -144,10 +144,24 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 	})
 
 	t.Run("override existing tyk extension with supplied params", func(t *testing.T) {
+		const (
+			testSSMyAuth = "my_auth"
+			testHeader   = "my-header"
+		)
 		oasDef := OAS{
 			T: openapi3.T{
 				Info: &openapi3.Info{
 					Title: "OAS API",
+				},
+				Security: openapi3.SecurityRequirements{
+					{testSSMyAuth: []string{}},
+				},
+				Components: openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						testSSMyAuth: &openapi3.SecuritySchemeRef{
+							Value: openapi3.NewSecurityScheme().WithType(typeApiKey).WithIn(header).WithName(testHeader),
+						},
+					},
 				},
 				Servers: openapi3.Servers{
 					{
@@ -174,9 +188,10 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		newCustomDomain := "new-custom-domain.org"
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
-			ListenPath:   "/new-listen-api",
-			UpstreamURL:  "https://example.org/api",
-			CustomDomain: newCustomDomain,
+			ListenPath:     "/new-listen-api",
+			UpstreamURL:    "https://example.org/api",
+			Authentication: getBoolPointer(true),
+			CustomDomain:   newCustomDomain,
 		})
 
 		assert.Nil(t, err)
@@ -187,6 +202,19 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					Value: "/new-listen-api",
 				},
 				CustomDomain: newCustomDomain,
+				Authentication: &Authentication{
+					Enabled: true,
+					SecuritySchemes: SecuritySchemes{
+						testSSMyAuth: &Token{
+							Enabled: true,
+							AuthSources: AuthSources{
+								Header: &AuthSource{
+									Enabled: true,
+								},
+							},
+						},
+					},
+				},
 			},
 			Upstream: Upstream{
 				URL: "https://example.org/api",
@@ -962,5 +990,246 @@ func TestGetTykExtensionConfigParams(t *testing.T) {
 		}
 
 		assert.Equal(t, &expectedConfigParams, tykExtConfigParams)
+	})
+}
+
+func TestOAS_importAuthentication(t *testing.T) {
+	const (
+		testSecurityNameToken = "my_auth_token"
+		testHeaderName        = "my-auth-token-header"
+		testCookieName        = "my-auth-token-cookie"
+	)
+
+	t.Run("security is empty", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{})
+
+		err := oas.importAuthentication(true)
+		assert.ErrorIs(t, errEmptySecurityObject, err)
+
+		authentication := oas.getTykAuthentication()
+		assert.Nil(t, authentication)
+	})
+
+	t.Run("add authentication", func(t *testing.T) {
+		check := func(t *testing.T, enable bool) {
+			oas := OAS{}
+			oas.Security = openapi3.SecurityRequirements{
+				{testSecurityNameToken: []string{}},
+			}
+
+			tokenScheme := openapi3.NewSecurityScheme()
+			tokenScheme.Type = typeApiKey
+			tokenScheme.In = cookie
+			tokenScheme.Name = testCookieName
+
+			jwtScheme := openapi3.NewSecurityScheme()
+			jwtScheme.Type = typeHttp
+			jwtScheme.Scheme = schemeBearer
+			jwtScheme.BearerFormat = bearerFormatJWT
+
+			oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+				testSecurityNameToken: &openapi3.SecuritySchemeRef{
+					Value: tokenScheme,
+				},
+			}
+
+			oas.SetTykExtension(&XTykAPIGateway{})
+
+			err := oas.importAuthentication(enable)
+			assert.NoError(t, err)
+
+			authentication := oas.getTykAuthentication()
+
+			assert.Equal(t, authentication.Enabled, enable)
+
+			expectedSecuritySchemes := SecuritySchemes{
+				testSecurityNameToken: &Token{
+					Enabled: enable,
+					AuthSources: AuthSources{
+						Cookie: &AuthSource{
+							Enabled: true,
+						},
+					},
+				},
+			}
+
+			assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
+		}
+
+		t.Run("enable=true", func(t *testing.T) {
+			check(t, true)
+		})
+
+		t.Run("enable=false", func(t *testing.T) {
+			check(t, false)
+		})
+
+	})
+
+	t.Run("update existing one", func(t *testing.T) {
+		oas := OAS{}
+		oas.Security = openapi3.SecurityRequirements{
+			{testSecurityNameToken: []string{}},
+		}
+
+		securityScheme := openapi3.NewSecurityScheme()
+		securityScheme.Type = typeApiKey
+		securityScheme.In = cookie
+		securityScheme.Name = testCookieName
+
+		oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+			testSecurityNameToken: &openapi3.SecuritySchemeRef{
+				Value: securityScheme,
+			},
+		}
+
+		xTykAPIGateway := &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecuritySchemes: SecuritySchemes{
+						testSecurityNameToken: &Token{
+							Enabled: false,
+							AuthSources: AuthSources{
+								Header: &AuthSource{
+									Enabled: true,
+									Name:    testHeaderName,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		oas.SetTykExtension(xTykAPIGateway)
+
+		err := oas.importAuthentication(true)
+		assert.NoError(t, err)
+
+		authentication := oas.getTykAuthentication()
+
+		assert.True(t, authentication.Enabled)
+
+		expectedSecuritySchemes := SecuritySchemes{
+			testSecurityNameToken: &Token{
+				Enabled: true,
+				AuthSources: AuthSources{
+					Header: &AuthSource{
+						Enabled: true,
+						Name:    testHeaderName,
+					},
+					Cookie: &AuthSource{
+						Enabled: true,
+					},
+				},
+			},
+		}
+
+		assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
+	})
+}
+
+func TestSecuritySchemes_Import(t *testing.T) {
+	const (
+		testSecurityNameToken = "my_auth_token"
+		testHeaderName        = "my-auth-token-header"
+		testCookieName        = "my-auth-token-cookie"
+	)
+
+	t.Run("token", func(t *testing.T) {
+		check := func(t *testing.T, enable bool) {
+			securitySchemes := SecuritySchemes{}
+			nativeSecurityScheme := &openapi3.SecurityScheme{
+				Type: typeApiKey,
+				In:   header,
+				Name: testHeaderName,
+			}
+
+			err := securitySchemes.Import(testSecurityNameToken, nativeSecurityScheme, enable)
+			assert.NoError(t, err)
+
+			expectedToken := &Token{
+				Enabled: enable,
+				AuthSources: AuthSources{
+					Header: &AuthSource{
+						Enabled: true,
+					},
+				},
+			}
+
+			assert.Equal(t, expectedToken, securitySchemes[testSecurityNameToken])
+		}
+
+		t.Run("enable=true", func(t *testing.T) {
+			check(t, true)
+		})
+
+		t.Run("enable=false", func(t *testing.T) {
+			check(t, false)
+		})
+	})
+
+	t.Run("update existing one", func(t *testing.T) {
+		existingToken := &Token{
+			AuthSources: AuthSources{
+				Cookie: &AuthSource{
+					Enabled: true,
+					Name:    testCookieName,
+				},
+			},
+		}
+		securitySchemes := SecuritySchemes{
+			testSecurityNameToken: existingToken,
+		}
+
+		nativeSecurityScheme := &openapi3.SecurityScheme{
+			Type: typeApiKey,
+			In:   header,
+			Name: testHeaderName,
+		}
+
+		err := securitySchemes.Import(testSecurityNameToken, nativeSecurityScheme, true)
+		assert.NoError(t, err)
+
+		expectedToken := &Token{
+			Enabled: true,
+			AuthSources: AuthSources{
+				Header: &AuthSource{
+					Enabled: true,
+				},
+				Cookie: &AuthSource{
+					Enabled: true,
+					Name:    testCookieName,
+				},
+			},
+		}
+
+		assert.Equal(t, expectedToken, securitySchemes[testSecurityNameToken])
+	})
+}
+
+func TestAuthSources_Import(t *testing.T) {
+	expectedAuthSource := &AuthSource{Enabled: true}
+
+	t.Run(header, func(t *testing.T) {
+		as := AuthSources{}
+		as.Import(header)
+
+		assert.Equal(t, expectedAuthSource, as.Header)
+	})
+
+	t.Run(query, func(t *testing.T) {
+		as := AuthSources{}
+		as.Import(query)
+
+		assert.Equal(t, expectedAuthSource, as.Query)
+	})
+
+	t.Run(cookie, func(t *testing.T) {
+		as := AuthSources{}
+		as.Import(cookie)
+
+		assert.Equal(t, expectedAuthSource, as.Cookie)
 	})
 }
