@@ -69,30 +69,35 @@ func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) 
 		certMaps = append(certMaps, spec.UpstreamCertificates)
 	}
 
-	for _, m := range certMaps {
-		if len(m) == 0 {
-			continue
-		}
+	if cid, found := spec.UpstreamCertificates["*"]; found {
+		certID = cid
+	} else {
+		for _, m := range certMaps {
+			if len(m) == 0 {
+				continue
+			}
 
-		if id, ok := m["*"]; ok {
-			certID = id
-		}
-
-		hostParts := strings.SplitN(host, ".", 2)
-		if len(hostParts) > 1 {
-			hostPattern := "*." + hostParts[1]
-
-			if id, ok := m[hostPattern]; ok {
+			if id, ok := m["*"]; ok {
 				certID = id
 			}
-		}
 
-		if id, ok := m[host]; ok {
-			certID = id
+			hostParts := strings.SplitN(host, ".", 2)
+			if len(hostParts) > 1 {
+				hostPattern := "*." + hostParts[1]
+
+				if id, ok := m[hostPattern]; ok {
+					certID = id
+				}
+			}
+
+			if id, ok := m[host]; ok {
+				certID = id
+			}
 		}
 	}
 
 	if certID == "" {
+		certLog.Infof("For API %v certificate NOT FOUND %v, for domain %v", spec.APIID, host, spec.UpstreamCertificates)
 		return nil
 	}
 
