@@ -15,6 +15,10 @@ func getStrPointer(str string) *string {
 	return &str
 }
 
+func getBoolPointer(b bool) *bool {
+	return &b
+}
+
 func TestValidateOASObject(t *testing.T) {
 	t.Parallel()
 	validOASObject := OAS{
