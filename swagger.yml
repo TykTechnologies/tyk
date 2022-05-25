@@ -312,7 +312,7 @@ paths:
   '/tyk/apis/oas':
     get:
       description: |-
-         List APIs, in OAS format (only APIs saved in OAS format)
+         List APIs, in OAS format
          Only if used without the Tyk Dashboard
       tags:
         - OASAPIs
@@ -560,24 +560,9 @@ paths:
         - OASAPIs
       operationId: patchApiOAS
       parameters:
-        - name: listenPath
-          in: query
-          description: listenPath for the API
-          required: false
-          schema:
-            type: string
-        - name: upstreamURL
-          in: query
-          description: upstreamURL for the API
-          required: false
-          schema:
-            type: string
-        - name: customDomain
-          in: query
-          description: custom domain for the API
-          required: false
-          schema:
-            type: string
+        - $ref: '#/components/parameters/UpstreamURL'
+        - $ref: '#/components/parameters/ListenPath'
+        - $ref: '#/components/parameters/CustomDomain'
       requestBody:
         content:
           application/json:
@@ -668,7 +653,7 @@ paths:
           type: string
     get:
       description: |-
-        download API definition in OAS format (only APIs saved in OAS format),
+        download API definition in OAS format,
         Only if used without the Tyk Dashboard
       tags:
         - OASAPIs
@@ -727,6 +712,62 @@ paths:
                   active: true
                   proxy:
                     listen_path: "/test"
+  '/tyk/import/oas':
+    post:
+      description: |-
+        Create new API definitions with OAS without x-tyk-gateway.
+        The developer is starting with their own OAS definition that they would like to expose via Tyk (New)
+      tags:
+        - OASAPIs
+      operationId: importOAS
+      parameters:
+        - $ref: '#/components/parameters/UpstreamURL'
+        - $ref: '#/components/parameters/ListenPath'
+        - $ref: '#/components/parameters/CustomDomain'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
+      responses:
+        '200':
+          description: API definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiModifyKeySuccess"
+              example:
+                status: "ok"
+                action: "added"
+                key: "{created APIID}"
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiStatusMessage"
+              examples:
+                malformedBody:
+                  summary: When the request body is malformed
+                  value:
+                    message: "Request malformed"
+                    status: "error"
+                invalidUpstreamURL:
+                  summary: When the client sends query param upstreamURL which isn't valid
+                  value:
+                    message: "invalid upstream URL"
+                    status: "error"
+        500:
+         description: When import request is send while using dashboard app configs
+         content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiStatusMessage"
+              example:
+                summary: dashboard app configs is used for tyk api definitions
+                value:
+                  message: "Due to enabled use_db_app_configs, please use the Dashboard API"
+                  status: "error"
   '/tyk/cache/{apiID}':
     parameters:
       - description: The API ID
@@ -3647,7 +3688,28 @@ components:
         schema:
           type: string
           description: <OAS schema definition>
-      x-go-package: github.com/TykTechnologies/tyk
+  parameters:
+    UpstreamURL:
+      name: upstreamURL
+      in: query
+      description: upstream URL for the API
+      required: false
+      schema:
+        type: string
+    ListenPath:
+      name: listenPath
+      in: query
+      description: listen path for the API
+      schema:
+        type: string
+      required: false
+    CustomDomain:
+      name: customDomain
+      schema:
+        type: string
+      description: custom domain for the API
+      in: query
+      required: false
   securitySchemes:
     api_key:
       in: header
