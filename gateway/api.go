@@ -2730,6 +2730,36 @@ func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, oasObj, err := extractOASObjFromReq(r.Body)
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError("Couldn't decode OAS object"))
+			return
+		}
+
+		tykExtensionConfigParams := oas.GetTykExtensionConfigParams(r)
+		if tykExtensionConfigParams == nil {
+			tykExtensionConfigParams = &oas.TykExtensionConfigParams{}
+		}
+
+		err = oasObj.BuildDefaultTykExtension(*tykExtensionConfigParams)
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
+		apiInBytes, err := oasObj.MarshalJSON()
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
+		r.Body = ioutil.NopCloser(bytes.NewReader(apiInBytes))
+		next.ServeHTTP(w, r)
+	}
+}
+
 // TODO: Don't modify http.Request values in-place. We must right now
 // because our middleware design doesn't pass around http.Request
 // pointers, so we have no way to modify the pointer in a middleware.
