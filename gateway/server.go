@@ -619,6 +619,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/apis/oas/{apiID}", gw.apiHandler).Methods(http.MethodDelete)
 		r.HandleFunc("/apis/oas/{apiID}", gw.validateOAS(gw.apiOASPatchHandler)).Methods(http.MethodPatch)
 		r.HandleFunc("/apis/oas/{apiID}/export", gw.apiOASExportHandler).Methods("GET")
+		r.HandleFunc("/import/oas", gw.validateOAS(gw.makeImportedOASTykAPI(gw.apiOASPostHandler))).Methods(http.MethodPost)
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/policies/{polID}", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
