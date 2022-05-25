@@ -764,7 +764,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/apiStatusMessage"
               example:
-                summary: dashboard app configs is used for tyk api definitions
+                summary: Dashboard app configs is used for tyk api definitions
                 value:
                   message: "Due to enabled use_db_app_configs, please use the Dashboard API"
                   status: "error"
@@ -3692,14 +3692,14 @@ components:
     UpstreamURL:
       name: upstreamURL
       in: query
-      description: upstream URL for the API
+      description: Upstream URL for the API
       required: false
       schema:
         type: string
     ListenPath:
       name: listenPath
       in: query
-      description: listen path for the API
+      description: Listen path for the API
       schema:
         type: string
       required: false
@@ -3707,7 +3707,7 @@ components:
       name: customDomain
       schema:
         type: string
-      description: custom domain for the API
+      description: Custom domain for the API
       in: query
       required: false
   securitySchemes:
