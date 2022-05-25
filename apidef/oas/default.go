@@ -188,11 +188,8 @@ func shouldImportValidateRequest(operation *openapi3.Operation) bool {
 	}
 
 	media := reqBodyVal.Content.Get("application/json")
-	if media == nil {
-		return false
-	}
 
-	return true
+	return media != nil
 }
 
 func (s *OAS) importAllowList(enabled bool, method, path string) {
