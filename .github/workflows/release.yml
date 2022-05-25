@@ -338,7 +338,7 @@ jobs:
           push: false
 
   smoke-tests:
-    if: needs.goreleaser.outputs.upload == 'true'
+    if: false
     needs:
       - goreleaser
     runs-on: ubuntu-latest
