@@ -169,7 +169,7 @@ func TestOAS_Token(t *testing.T) {
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: map[string]interface{}{
+					SecuritySchemes: SecuritySchemes{
 						securityName: &token,
 					},
 				},
@@ -184,7 +184,7 @@ func TestOAS_Token(t *testing.T) {
 	var convertedOAS OAS
 	convertedOAS.Components.SecuritySchemes = oas.Components.SecuritySchemes
 
-	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: map[string]interface{}{}}}})
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
 	convertedOAS.fillToken(api)
 
 	assert.Equal(t, oas, convertedOAS)
@@ -223,7 +223,7 @@ func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
 		Server: Server{
 			Authentication: &Authentication{
 				Enabled: true,
-				SecuritySchemes: map[string]interface{}{
+				SecuritySchemes: SecuritySchemes{
 					securityName: &Token{
 						Enabled: true,
 					},
@@ -312,7 +312,7 @@ func TestOAS_JWT(t *testing.T) {
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: map[string]interface{}{
+					SecuritySchemes: SecuritySchemes{
 						securityName: &jwt,
 					},
 				},
@@ -325,7 +325,7 @@ func TestOAS_JWT(t *testing.T) {
 	oas.extractJWTTo(&api, securityName)
 
 	var convertedOAS OAS
-	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: map[string]interface{}{}}}})
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
 	convertedOAS.fillJWT(api)
 
 	assert.Equal(t, oas, convertedOAS)
@@ -356,7 +356,7 @@ func TestOAS_Basic(t *testing.T) {
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: map[string]interface{}{
+					SecuritySchemes: SecuritySchemes{
 						securityName: &basic,
 					},
 				},
@@ -369,7 +369,7 @@ func TestOAS_Basic(t *testing.T) {
 	oas.extractBasicTo(&api, securityName)
 
 	var convertedOAS OAS
-	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: map[string]interface{}{}}}})
+	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
 	convertedOAS.fillBasic(api)
 
 	assert.Equal(t, oas, convertedOAS)
@@ -413,7 +413,7 @@ func TestOAS_OAuth(t *testing.T) {
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: map[string]interface{}{
+					SecuritySchemes: SecuritySchemes{
 						securityName: &oauth,
 					},
 				},
