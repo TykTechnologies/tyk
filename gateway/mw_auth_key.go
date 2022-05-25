@@ -92,12 +92,12 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	keyExists := false
 	var session user.SessionState
 	if key != "" {
+		log.Debug("AuthKey: Using key from the request")
 		key = stripBearer(key)
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		log.Debug("Trying to find key by client certificate")
+		log.Debug("AuthKey: Trying to find")
 		certHash = k.Spec.OrgID + certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		key = generateToken(k.Spec.OrgID, certHash)
-
 	} else {
 		k.Logger().Infof("Attempted access with malformed header, no auth header found. API: %v, TLS: %+v, R: %+v", k.Spec.APIID, r.TLS, r)
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)

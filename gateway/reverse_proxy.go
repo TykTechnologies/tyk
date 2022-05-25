@@ -870,7 +870,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 		p.TykAPISpec.Transport[outreq.URL.Host] = transport
 
-		p.logger.Debugf("Setting transport layer. API: %+v TykRoundtriper:%+v , TykAPISpec.Transport:%+v ", p.TykAPISpec.APIID, transport, p.TykAPISpec.Transport)
+		p.logger.Debugf("Setting transport layer. API: %+v TykRoundtriper:%+v , TykAPISpec.Transport:%+v, Certificates: %v", p.TykAPISpec.APIID, transport, p.TykAPISpec.Transport, tlsCertificates)
 	} else {
 		p.logger.Debugf("Transport already found for %+v in TykAPISpec.Transport: %+v, TLS:%+v", outreq.URL.Host, transport, transport.HTTPTransport)
 	}
@@ -1161,7 +1161,6 @@ func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval 
 }
 
 func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
-
 	buf := p.sp.Get().(*[]byte)
 	defer p.sp.Put(buf)
 

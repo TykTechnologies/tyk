@@ -371,6 +371,8 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 				// If current domain match or empty, whitelist client certificates
 				if spec.Domain == "" || spec.Domain == hello.ServerName {
+					log.Debugf("TLS Handshake: Matched mTLS api %v via domain %v", spec.APIID, hello.ServerName)
+
 					certIDs := append(spec.ClientCertificates, config.Global().Security.Certificates.API...)
 
 					for _, cert := range CertificateManager.List(certIDs, certs.CertificatePublic) {
@@ -379,7 +381,8 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 						}
 					}
 				}
-			case spec.AuthConfigs[authTokenType].UseCertificate:
+			case spec.Auth.UseCertificate, spec.AuthConfigs[authTokenType].UseCertificate:
+				log.Debugf("TLS Handshake: found UseCertificate API %v, is legacy %v", spec.APIID, spec.Auth.UseCertificate && !spec.AuthConfigs[authTokenType].UseCertificate)
 				// Dynamic certificate check required, falling back to HTTP level check
 				// TODO: Change to VerifyPeerCertificate hook instead, when possible
 				if domainRequireCert[spec.Domain] < tls.RequestClientCert {
@@ -414,19 +417,40 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 			}
 		}
 
-		newConfig.ClientAuth = tls.NoClientCert
+		if clientAuth, found := domainRequireCert[hello.ServerName]; found {
+			log.Debugf("TLS Handshake: domain %v matched, with client auth: %v", hello.ServerName, clientAuth)
+			newConfig.ClientAuth = clientAuth
+		} else {
+			newConfig.ClientAuth = tls.NoClientCert
 
-		for key, clientAuth := range domainRequireCert {
-			req := http.Request{Host: hello.ServerName, URL: &url.URL{}}
-			if mux.NewRouter().Host(key).Match(&req, &mux.RouteMatch{}) {
-				newConfig.ClientAuth = clientAuth
-				break
+			for domain, clientAuth := range domainRequireCert {
+				isRegex := false
+				for _, c := range domain {
+					if c == '{' {
+						isRegex = true
+						break
+					}
+				}
+
+				req := http.Request{Host: hello.ServerName, URL: &url.URL{}}
+				if isRegex && mux.NewRouter().Host(domain).Match(&req, &mux.RouteMatch{}) {
+					log.Debugf("TLS Handshake: regexp domain %v matched, with client auth: %v", hello.ServerName, clientAuth)
+					if clientAuth > newConfig.ClientAuth {
+						newConfig.ClientAuth = clientAuth
+					}
+
+					if newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+						break
+					}
+				}
 			}
 		}
 
 		if newConfig.ClientAuth == tls.NoClientCert {
 			newConfig.ClientAuth = domainRequireCert[""]
 		}
+
+		log.Debugf("TLS Handshake: Successs. ServerName: %v. Require client certificate: %v", hello.ServerName, newConfig.ClientAuth)
 
 		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
