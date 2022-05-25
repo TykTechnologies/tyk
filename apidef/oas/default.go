@@ -23,7 +23,7 @@ var (
 type TykExtensionConfigParams struct {
 	UpstreamURL    string
 	ListenPath     string
-	Authentication bool
+	Authentication *bool
 	CustomDomain   string
 }
 
@@ -70,8 +70,8 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 
 	xTykAPIGateway.Upstream.URL = upstreamURL
 
-	if overRideValues.Authentication {
-		err := s.importAuthentication()
+	if overRideValues.Authentication != nil {
+		err := s.importAuthentication(*overRideValues.Authentication)
 		if err != nil {
 			return err
 		}
@@ -80,7 +80,7 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 	return nil
 }
 
-func (s *OAS) importAuthentication() error {
+func (s *OAS) importAuthentication(enable bool) error {
 	if len(s.Security) == 0 {
 		return errEmptySecurityObject
 	}
@@ -94,7 +94,7 @@ func (s *OAS) importAuthentication() error {
 		xTykAPIGateway.Server.Authentication = authentication
 	}
 
-	authentication.Enabled = true
+	authentication.Enabled = enable
 
 	tykSecuritySchemes := authentication.SecuritySchemes
 	if tykSecuritySchemes == nil {
@@ -104,7 +104,7 @@ func (s *OAS) importAuthentication() error {
 
 	for name := range securityReq {
 		securityScheme := s.Components.SecuritySchemes[name]
-		err := tykSecuritySchemes.Import(name, securityScheme.Value)
+		err := tykSecuritySchemes.Import(name, securityScheme.Value, enable)
 		if err != nil {
 			log.WithError(err).Errorf("Error while importing security scheme: %s", name)
 		}

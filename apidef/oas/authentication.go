@@ -122,7 +122,7 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 type SecuritySchemes map[string]interface{}
 
-func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme) error {
+func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme, enable bool) error {
 	switch {
 	case nativeSS.Type == typeApiKey:
 		if ss[name] == nil {
@@ -130,7 +130,7 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme)
 		}
 
 		token := ss[name].(*Token)
-		token.Enabled = true
+		token.Enabled = enable
 		token.AuthSources.Import(nativeSS.In)
 	default:
 		return fmt.Errorf(unsupportedSecuritySchemeFmt, name)
