@@ -140,7 +140,8 @@ func (s *OAS) configureValidateRequest(enabled bool, method, path string) {
 	operation := s.getTykOperation(method, path)
 
 	operation.ValidateRequest = &ValidateRequest{
-		Enabled: enabled,
+		Enabled:           enabled,
+		ErrorResponseCode: http.StatusBadRequest,
 	}
 
 }

@@ -395,7 +395,8 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				return Operations{
 					oasPostOperationID: {
 						ValidateRequest: &ValidateRequest{
-							Enabled: enabled,
+							Enabled:           enabled,
+							ErrorResponseCode: http.StatusBadRequest,
 						},
 					},
 				}
@@ -403,7 +404,8 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				return Operations{
 					tykPostOperationID: {
 						ValidateRequest: &ValidateRequest{
-							Enabled: enabled,
+							Enabled:           enabled,
+							ErrorResponseCode: http.StatusBadRequest,
 						},
 					},
 				}
@@ -678,7 +680,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
 
 					assert.NoError(t, err)
-					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+					assert.EqualValues(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
 				})
 
 			t.Run("enable validateRequest for all paths with application/json req body when no configured operationID in OAS",

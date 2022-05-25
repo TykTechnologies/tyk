@@ -2212,10 +2212,21 @@ func TestOAS(t *testing.T) {
 			return apiInOAS
 		}
 
+		jsonSchema := openapi3.NewSchema()
+		jsonSchema.WithProperty("value", &openapi3.Schema{
+			Type: "string",
+		})
+
 		fillPaths := func(oasAPI *oas.OAS) {
 			oasAPI.Paths = openapi3.Paths{
 				"/pet": {
 					Get: &openapi3.Operation{
+						RequestBody: &openapi3.RequestBodyRef{
+							Value: &openapi3.RequestBody{
+								Description: "json body",
+								Content:     openapi3.NewContentWithJSONSchema(jsonSchema),
+							},
+						},
 						Summary: "get pets",
 						Responses: openapi3.Responses{
 							"200": {
@@ -2273,9 +2284,11 @@ func TestOAS(t *testing.T) {
 			listenPath, upstreamURL, customDomain := "/listen-api/", "https://new-upstream.org", "custom-upstream.com"
 
 			params := map[string]string{
-				"listenPath":   listenPath,
-				"upstreamURL":  upstreamURL,
-				"customDomain": customDomain,
+				"listenPath":      listenPath,
+				"upstreamURL":     upstreamURL,
+				"customDomain":    customDomain,
+				"allowList":       "true",
+				"validateRequest": "false",
 			}
 
 			expectedTykExt.Server.ListenPath.Value = listenPath
@@ -2283,10 +2296,23 @@ func TestOAS(t *testing.T) {
 			expectedTykExt.Server.CustomDomain = customDomain
 			expectedTykExt.Info.State.Active = true
 
+			expectedTykExt.Middleware = &oas.Middleware{
+				Operations: oas.Operations{
+					"petGET": {
+						Allow: &oas.Allowance{
+							Enabled: true,
+						},
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled: false,
+						},
+					},
+				},
+			}
+
 			testPatchOAS(t, ts, apiInOAS, params, apiID)
 			patchedOASObj := testGetOASAPI(t, ts, apiID, expectedTykExt.Info.Name, apiInOAS.T.Info.Title)
 			o := oas.OAS{T: patchedOASObj}
-			assert.Equal(t, expectedTykExt, o.GetTykExtension())
+			assert.Equal(t, expectedTykExt.Middleware.Operations, o.GetTykExtension().Middleware.Operations)
 
 			// Reset
 			testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
@@ -2621,7 +2647,8 @@ func testGetOASAPI(t *testing.T, d *Test, id, name, title string) (oasDoc openap
 		BodyMatch: bodyMatch, Code: http.StatusOK})
 
 	respInBytes, _ := ioutil.ReadAll(resp.Body)
-	_ = json.Unmarshal(respInBytes, &oasDoc)
+	err := oasDoc.UnmarshalJSON(respInBytes)
+	assert.NoError(t, err)
 
 	return oasDoc
 }
