@@ -1777,7 +1777,7 @@ func TestRotateClientSecretHandler(t *testing.T) {
 	}
 }
 
-func TestHandleAddOrUpdateApi(t *testing.T) {
+func TestHandleAddApi(t *testing.T) {
 	testFs := afero.NewMemMapFs()
 
 	ts := StartTest(nil)
@@ -1788,28 +1788,11 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := ts.Gw.handleAddOrUpdateApi("", req, testFs, false)
+		response, statusCode := ts.Gw.handleAddApi(req, testFs, false)
 		errorResponse, ok := response.(apiStatusMessage)
 		require.True(t, ok)
 
 		assert.Equal(t, "Request malformed", errorResponse.Message)
-		assert.Equal(t, http.StatusBadRequest, statusCode)
-	})
-
-	t.Run("should return error when api ids are different", func(t *testing.T) {
-		apiDef := apidef.DummyAPI()
-		apiDef.APIID = "123"
-		apiDefJson, err := json.Marshal(apiDef)
-		require.NoError(t, err)
-
-		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
-		require.NoError(t, err)
-
-		response, statusCode := ts.Gw.handleAddOrUpdateApi("555", req, testFs, false)
-		errorResponse, ok := response.(apiStatusMessage)
-		require.True(t, ok)
-
-		assert.Equal(t, "Request APIID does not match that in Definition! For Update operations these must match.", errorResponse.Message)
 		assert.Equal(t, http.StatusBadRequest, statusCode)
 	})
 
@@ -1830,7 +1813,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := ts.Gw.handleAddOrUpdateApi("", req, testFs, false)
+		response, statusCode := ts.Gw.handleAddApi(req, testFs, false)
 		errorResponse, ok := response.(apiStatusMessage)
 		require.True(t, ok)
 
@@ -1847,13 +1830,123 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := ts.Gw.handleAddOrUpdateApi("", req, testFs, false)
+		response, statusCode := ts.Gw.handleAddApi(req, testFs, false)
 		successResponse, ok := response.(apiModifyKeySuccess)
 		require.True(t, ok)
 
 		assert.Equal(t, "123", successResponse.Key)
 		assert.Equal(t, "added", successResponse.Action)
 		assert.Equal(t, http.StatusOK, statusCode)
+	})
+
+}
+
+func TestHandleUpdateApi(t *testing.T) {
+	testFs := afero.NewMemMapFs()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oldAPIID := "old-api-id"
+
+	oldAPI := BuildAPI(func(a *APISpec) {
+		a.APIID = oldAPIID
+		a.Name = "old api"
+		a.Proxy.ListenPath = "/old-api/"
+	})[0]
+	// Create Old API
+	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis", Data: &oldAPI,
+		BodyMatch: `"action":"added"`, Code: http.StatusOK})
+
+	ts.Gw.DoReload()
+
+	t.Run("should return error when api definition json is invalid", func(t *testing.T) {
+		apiDefJson := []byte("{")
+		req, err := http.NewRequest(http.MethodPut, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := ts.Gw.handleUpdateApi(oldAPIID, req, testFs, false)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Request malformed", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return error when api ids are different", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "XXX"
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPut, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := ts.Gw.handleUpdateApi(oldAPIID, req, testFs, false)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Request APIID does not match that in Definition! For Update operations these must match.", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return error when semantic validation fails", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = oldAPIID
+		apiDef.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Name: "duplicate",
+			},
+			{
+				Name: "duplicate",
+			},
+		}
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPut, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := ts.Gw.handleUpdateApi(oldAPIID, req, testFs, false)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Validation of API Definition failed. Reason: duplicate data source names are not allowed.", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return success when no error occurs", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = oldAPIID
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPut, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := ts.Gw.handleUpdateApi(oldAPIID, req, testFs, false)
+		successResponse, ok := response.(apiModifyKeySuccess)
+		require.True(t, ok)
+
+		assert.Equal(t, oldAPIID, successResponse.Key)
+		assert.Equal(t, "modified", successResponse.Action)
+		assert.Equal(t, http.StatusOK, statusCode)
+	})
+
+	t.Run("API not found for non existing API", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPut, Path: "/tyk/apis/non-existing-api-id",
+			BodyMatch: `"API not found"`, Code: http.StatusNotFound})
+	})
+
+}
+
+func TestDeleteAPI(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("API not found for non existing API", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodDelete, Path: "/tyk/apis/non-existing-api-id",
+			BodyMatch: `"API not found"`, Code: http.StatusNotFound})
 	})
 }
 
@@ -1916,6 +2009,32 @@ func TestOAS(t *testing.T) {
 	oasAPI = testGetOASAPI(t, ts, oasAPIID, "oas api", "oas doc")
 	assert.NotNil(t, oasAPI.Servers)
 
+	createdOldAPI := testGetOldAPI(t, ts, oldAPIID, "old api")
+	assert.NotNil(t, createdOldAPI)
+
+	t.Run("get old api in OAS format - should fail", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID,
+			BodyMatch: apidef.ErrOASGetForOldAPI.Error(), Code: http.StatusBadRequest})
+	})
+
+	t.Run("toggle isOAS - should override", func(t *testing.T) {
+		oldAPIID2 := "old-api-id-2"
+		oldAPI2 := BuildAPI(func(a *APISpec) {
+			a.APIID = oldAPIID2
+			a.Name = "old api 2"
+			a.Proxy.ListenPath = "/old-api-2/"
+			a.IsOAS = true
+		})[0]
+
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis", Data: &oldAPI2,
+			BodyMatch: `"action":"added"`, Code: http.StatusOK})
+
+		ts.Gw.DoReload()
+
+		createdOldAPI2 := testGetOldAPI(t, ts, oldAPIID2, oldAPI2.Name)
+		assert.False(t, createdOldAPI2.IsOAS)
+	})
+
 	t.Run("update", func(t *testing.T) {
 		t.Run("old api", func(t *testing.T) {
 
@@ -1935,9 +2054,9 @@ func TestOAS(t *testing.T) {
 						testGetOldAPI(t, ts, apiID, "old-updated old api")
 					})
 
-					t.Run("in oas", func(t *testing.T) {
-						updatedOldAPIInOAS := testGetOASAPI(t, ts, apiID, "old-updated old api", "")
-						assert.Equal(t, fmt.Sprintf("%s%s", ts.URL, "/updated-old-api/"), updatedOldAPIInOAS.Servers[0].URL)
+					t.Run("in oas - should fail", func(t *testing.T) {
+						_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID,
+							BodyMatch: apidef.ErrOASGetForOldAPI.Error(), Code: http.StatusBadRequest})
 					})
 				})
 
@@ -1945,25 +2064,17 @@ func TestOAS(t *testing.T) {
 				testUpdateAPI(t, ts, &oldAPI, apiID, false)
 			})
 
-			t.Run("with oas", func(t *testing.T) {
-				oldAPIInOAS := testGetOASAPI(t, ts, apiID, "old api", "")
+			t.Run("with oas - should fail", func(t *testing.T) {
 
-				oldAPIInOAS.Extensions[oas.ExtensionTykAPIGateway] = oas.XTykAPIGateway{
-					Info: oas.Info{Name: "oas-updated old api", ID: apiID},
-				}
+				var oldAPIInOAS oas.OAS
+				oldAPIInOAS.Fill(*oldAPI.APIDefinition)
 
-				oldAPIInOAS.Info.Title = "oas-updated old doc"
-				testUpdateAPI(t, ts, &oldAPIInOAS, apiID, true)
+				updatePath := "/tyk/apis/oas/" + apiID
 
-				t.Run("get", func(t *testing.T) {
-					t.Run("in oas", func(t *testing.T) {
-						testGetOASAPI(t, ts, apiID, "oas-updated old api", "oas-updated old doc")
-					})
-
-					t.Run("in old", func(t *testing.T) {
-						testGetOldAPI(t, ts, apiID, "oas-updated old api")
-					})
-				})
+				_, _ = ts.Run(t, []test.TestCase{
+					{AdminAuth: true, Method: http.MethodPut, Path: updatePath, Data: &oldAPIInOAS,
+						BodyMatch: apidef.ErrAPINotMigrated.Error(), Code: http.StatusBadRequest},
+				}...)
 			})
 
 			// Reset
@@ -1978,20 +2089,14 @@ func TestOAS(t *testing.T) {
 
 				oasAPIInOld.Name = "old-updated oas api"
 
-				testUpdateAPI(t, ts, &oasAPIInOld, apiID, false)
+				t.Run("update oas API with old format - should fail", func(t *testing.T) {
+					updatePath := "/tyk/apis/" + apiID
 
-				t.Run("get", func(t *testing.T) {
-					t.Run("in oas", func(t *testing.T) {
-						testGetOASAPI(t, ts, apiID, "old-updated oas api", "oas doc")
-					})
-
-					t.Run("in old", func(t *testing.T) {
-						testGetOldAPI(t, ts, apiID, "old-updated oas api")
-					})
+					_, _ = ts.Run(t, []test.TestCase{
+						{AdminAuth: true, Method: http.MethodPut, Path: updatePath, Data: &oasAPIInOld,
+							BodyMatch: apidef.ErrAPIMigrated.Error(), Code: http.StatusBadRequest},
+					}...)
 				})
-
-				// Reset
-				testUpdateAPI(t, ts, &oasAPI, apiID, true)
 			})
 
 			t.Run("with oas", func(t *testing.T) {
@@ -2018,6 +2123,7 @@ func TestOAS(t *testing.T) {
 				testUpdateAPI(t, ts, &oasAPI, apiID, true)
 			})
 		})
+
 		t.Run("oas api/export", func(t *testing.T) {
 			apiID := oasAPIID
 			oasExportPath := "/tyk/apis/oas/export"
@@ -2029,14 +2135,19 @@ func TestOAS(t *testing.T) {
 
 				t.Run("get", func(t *testing.T) {
 					_, _ = ts.Run(t, []test.TestCase{
-						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath, BodyMatch: `\"x-tyk-api-gateway\":`, Code: http.StatusOK, HeadersMatch: matchHeaders},
-						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID + "/export", BodyMatch: `\"x-tyk-api-gateway\":`, Code: http.StatusOK, HeadersMatch: matchHeaders},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath, BodyMatch: `\"x-tyk-api-gateway\":`,
+							Code: http.StatusOK, HeadersMatch: matchHeaders},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID + "/export",
+							BodyMatch: apidef.ErrOASGetForOldAPI.Error(),
+							Code:      http.StatusBadRequest},
 					}...)
 				})
 				t.Run("get scope public", func(t *testing.T) {
 					_, _ = ts.Run(t, []test.TestCase{
-						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath + "?mode=public", BodyMatch: `.*components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
-						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID + "/export?mode=public", BodyMatch: `components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath + "?mode=public", BodyMatch: `.*components`,
+							BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID + "/export?mode=public",
+							BodyMatch: apidef.ErrOASGetForOldAPI.Error(), Code: http.StatusBadRequest},
 					}...)
 				})
 
@@ -2072,47 +2183,6 @@ func TestOAS(t *testing.T) {
 				testUpdateAPI(t, ts, &oasAPI, apiID, true)
 			})
 		})
-	})
-
-	t.Run("delete", func(t *testing.T) {
-		basePath := "/tyk/apis/"
-		for _, apiID := range []string{oldAPIID, oasAPIID} {
-			listenPath := "/" + strings.TrimSuffix(apiID, "-id") + "/"
-			defFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, apiID+"-oas.json")
-			defOASFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, apiID+".json")
-
-			_, err := os.Stat(defFilePath)
-			assert.NoError(t, err)
-
-			_, err = os.Stat(defOASFilePath)
-			assert.NoError(t, err)
-
-			path := basePath + apiID
-			oasPath := oasBasePath + "/" + apiID
-
-			_, _ = ts.Run(t, []test.TestCase{
-				{Method: http.MethodGet, Path: listenPath, Code: http.StatusOK},
-				{AdminAuth: true, Method: http.MethodGet, Path: path, BodyNotMatch: "components", Code: http.StatusOK},
-				{AdminAuth: true, Method: http.MethodGet, Path: oasPath, BodyMatch: `components`, Code: http.StatusOK},
-				{AdminAuth: true, Method: http.MethodDelete, Path: path, BodyMatch: `"action":"deleted"`, Code: http.StatusOK},
-			}...)
-
-			ts.Gw.DoReload()
-
-			_, _ = ts.Run(t, []test.TestCase{
-				{AdminAuth: true, Method: http.MethodGet, Path: oasPath,
-					BodyMatch: `"message":"API not found"`, Code: http.StatusNotFound},
-				{AdminAuth: true, Method: http.MethodGet, Path: path,
-					BodyMatch: `"message":"API not found"`, Code: http.StatusNotFound},
-				{Method: http.MethodGet, Path: listenPath, Code: http.StatusNotFound},
-			}...)
-
-			_, err = os.Stat(defFilePath)
-			assert.Error(t, err)
-
-			_, err = os.Stat(defOASFilePath)
-			assert.Error(t, err)
-		}
 	})
 
 	t.Run("patch", func(t *testing.T) {
@@ -2350,6 +2420,84 @@ func TestOAS(t *testing.T) {
 
 	})
 
+	t.Run("delete", func(t *testing.T) {
+		basePath := "/tyk/apis/"
+		t.Run("oas", func(t *testing.T) {
+			listenPath := "/" + strings.TrimSuffix(oasAPIID, "-id") + "/"
+			defOASFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, oasAPIID+"-oas.json")
+			defFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, oasAPIID+".json")
+
+			_, err := os.Stat(defFilePath)
+			assert.NoError(t, err)
+
+			_, err = os.Stat(defOASFilePath)
+			assert.NoError(t, err)
+
+			path := basePath + oasAPIID
+			oasPath := oasBasePath + "/" + oasAPIID
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Method: http.MethodGet, Path: listenPath, Code: http.StatusOK},
+				{AdminAuth: true, Method: http.MethodGet, Path: path, BodyNotMatch: "components", Code: http.StatusOK},
+				{AdminAuth: true, Method: http.MethodGet, Path: oasPath, BodyMatch: `components`, Code: http.StatusOK},
+				{AdminAuth: true, Method: http.MethodDelete, Path: path, BodyMatch: `"action":"deleted"`, Code: http.StatusOK},
+			}...)
+
+			ts.Gw.DoReload()
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{AdminAuth: true, Method: http.MethodGet, Path: oasPath,
+					BodyMatch: `"message":"API not found"`, Code: http.StatusNotFound},
+				{AdminAuth: true, Method: http.MethodGet, Path: path,
+					BodyMatch: `"message":"API not found"`, Code: http.StatusNotFound},
+				{Method: http.MethodGet, Path: listenPath, Code: http.StatusNotFound},
+			}...)
+
+			_, err = os.Stat(defFilePath)
+			assert.Error(t, err)
+
+			_, err = os.Stat(defOASFilePath)
+			assert.Error(t, err)
+		})
+
+		t.Run("old api", func(t *testing.T) {
+			listenPath := "/" + strings.TrimSuffix(oldAPIID, "-id") + "/"
+			defOASFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, oldAPIID+"-oas.json")
+			defFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, oldAPIID+".json")
+
+			_, err := os.Stat(defFilePath)
+			assert.NoError(t, err)
+
+			// assert no OAS spec file saved when not in OAS mode
+			_, err = os.Stat(defOASFilePath)
+			assert.Error(t, err)
+
+			path := basePath + oldAPIID
+			oasPath := oasBasePath + "/" + oldAPIID
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Method: http.MethodGet, Path: listenPath, Code: http.StatusOK},
+				{AdminAuth: true, Method: http.MethodGet, Path: path, BodyNotMatch: "components", Code: http.StatusOK},
+				{AdminAuth: true, Method: http.MethodGet, Path: oasPath,
+					BodyMatch: apidef.ErrOASGetForOldAPI.Error(), Code: http.StatusBadRequest},
+				{AdminAuth: true, Method: http.MethodDelete, Path: path, BodyMatch: `"action":"deleted"`, Code: http.StatusOK},
+			}...)
+
+			ts.Gw.DoReload()
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{AdminAuth: true, Method: http.MethodGet, Path: oasPath,
+					BodyMatch: `"message":"API not found"`, Code: http.StatusNotFound},
+				{AdminAuth: true, Method: http.MethodGet, Path: path,
+					BodyMatch: `"message":"API not found"`, Code: http.StatusNotFound},
+				{Method: http.MethodGet, Path: listenPath, Code: http.StatusNotFound},
+			}...)
+
+			_, err = os.Stat(defFilePath)
+			assert.Error(t, err)
+		})
+	})
+
 	t.Run("import/OAS", func(t *testing.T) {
 		tykExtensionConfigParamsToURLQuery := func(ext oas.TykExtensionConfigParams) string {
 			params := url.Values{}
@@ -2437,6 +2585,7 @@ func TestOAS(t *testing.T) {
 }
 
 func testUpdateAPI(t *testing.T, ts *Test, api interface{}, apiID string, oasTyped bool) {
+	t.Helper()
 	updatePath := "/tyk/apis/"
 	if oasTyped {
 		updatePath += "oas/"
@@ -2452,7 +2601,7 @@ func testUpdateAPI(t *testing.T, ts *Test, api interface{}, apiID string, oasTyp
 }
 
 func testGetOASAPI(t *testing.T, d *Test, id, name, title string) (oasDoc openapi3.T) {
-
+	t.Helper()
 	getPath := "/tyk/apis/oas/" + id
 	bodyMatch := fmt.Sprintf(`{.*"info":{"title":"%s".*"x-tyk-api-gateway":{"info":{.*"name":"%s"`, title, name)
 
@@ -2466,6 +2615,7 @@ func testGetOASAPI(t *testing.T, d *Test, id, name, title string) (oasDoc openap
 }
 
 func testGetOldAPI(t *testing.T, d *Test, id, name string) (oldAPI apidef.APIDefinition) {
+	t.Helper()
 
 	getPath := "/tyk/apis/" + id
 	bodyMatch := fmt.Sprintf(`"name":"%s".*`, name)
