@@ -950,7 +950,7 @@ func (gw *Gateway) handleGetAPI(apiID string, oasEndpoint bool) (interface{}, in
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"apiID":  apiID,
+		"apiID":  fmt.Sprintf("%q", apiID),
 	}).Error("API doesn't exist.")
 
 	return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
@@ -1140,7 +1140,9 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 
 	// Generate a filename
 	defFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+".json")
+	defFilePath = filepath.Clean(defFilePath)
 	defOASFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+"-oas.json")
+	defOASFilePath = filepath.Clean(defOASFilePath)
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {
