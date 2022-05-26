@@ -431,6 +431,8 @@ func TestSingleJoiningSlash(t *testing.T) {
 		a, b, want string
 	}{
 		{"foo/", "", "foo/"},
+		{"foo/", "/name", "foo/name"},
+		{"foo/", "/", "foo/"},
 		{"foo", "", "foo"},
 	}
 	for _, tc := range testsTrue {
