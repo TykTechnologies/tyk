@@ -724,6 +724,7 @@ paths:
         - $ref: '#/components/parameters/UpstreamURL'
         - $ref: '#/components/parameters/ListenPath'
         - $ref: '#/components/parameters/CustomDomain'
+        - $ref: '#/components/parameters/ApiId'
       requestBody:
         content:
           application/json:
@@ -3708,6 +3709,13 @@ components:
       schema:
         type: string
       description: Custom domain for the API
+      in: query
+      required: false
+    ApiID:
+      name: apiID
+      schema:
+        type: string
+      description: ID of the API
       in: query
       required: false
   securitySchemes:
