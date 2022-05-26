@@ -3,9 +3,9 @@ package oas
 import (
 	"errors"
 	"fmt"
-	"github.com/getkin/kin-openapi/openapi3"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strconv"
 )
 
@@ -145,79 +145,41 @@ func (as *AuthSources) Import(in string) {
 }
 
 func (s *OAS) importMiddlewares(allowList, validateRequest *bool) {
-	if allowList != nil {
-		s.importMiddleware(*allowList, MiddlewareAllowList)
+	xTykAPIGateway := s.GetTykExtension()
+	middleware := xTykAPIGateway.Middleware
+
+	if middleware == nil {
+		middleware = &Middleware{}
+		xTykAPIGateway.Middleware = &Middleware{}
 	}
 
-	if validateRequest != nil {
-		s.importMiddleware(*validateRequest, MiddlewareValidateRequest)
-	}
-
-}
-
-func (s *OAS) importMiddleware(enabled bool, middleware string) {
 	for path, pathItem := range s.Paths {
 		for _, method := range allowedMethods {
 			if operation := pathItem.GetOperation(method); operation != nil {
-				switch middleware {
-				case MiddlewareAllowList:
-					s.importAllowList(enabled, method, path)
-				case MiddlewareValidateRequest:
-					if shouldImport := shouldImportValidateRequest(operation); !shouldImport {
-						continue
-					}
-
-					s.importValidateRequest(enabled, method, path)
-				}
+				tykOperation := s.getTykOperation(method, path)
+				tykOperation.Import(operation, allowList, validateRequest)
+				s.deleteTykOperationIfEmpty(tykOperation, method, path)
 			}
 		}
-
 	}
 
-}
-
-func shouldImportValidateRequest(operation *openapi3.Operation) bool {
-	reqBody := operation.RequestBody
-	if reqBody == nil {
-		return false
+	if ShouldOmit(xTykAPIGateway.Middleware) {
+		xTykAPIGateway.Middleware = nil
 	}
-
-	reqBodyVal := reqBody.Value
-	if reqBodyVal == nil {
-		return false
-	}
-
-	media := reqBodyVal.Content.Get("application/json")
-
-	return media != nil
-}
-
-func (s *OAS) importAllowList(enabled bool, method, path string) {
-	operation := s.getTykOperation(method, path)
-	operation.Allow = &Allowance{
-		Enabled: enabled,
-	}
-
-	if block := operation.Block; block != nil && block.Enabled && enabled {
-		block.Enabled = false
-	}
-
-}
-
-func (s *OAS) importValidateRequest(enabled bool, method, path string) {
-	operation := s.getTykOperation(method, path)
-
-	operation.ValidateRequest = &ValidateRequest{
-		Enabled:           enabled,
-		ErrorResponseCode: http.StatusBadRequest,
-	}
-
 }
 
 func (s *OAS) getTykOperation(method, path string) *Operation {
 	xTykAPIGateway := s.GetTykExtension()
 	operationID := s.getOperationID(path, method)
 	return xTykAPIGateway.getOperation(operationID)
+}
+
+func (s *OAS) deleteTykOperationIfEmpty(tykOperation *Operation, method, path string) {
+	if reflect.DeepEqual(Operation{}, *tykOperation) {
+		operations := s.getTykOperations()
+		operationID := s.getOperationID(path, method)
+		delete(operations, operationID)
+	}
 }
 
 func getURLFormatErr(fromParam bool, upstreamURL string) error {

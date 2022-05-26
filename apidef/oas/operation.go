@@ -3,6 +3,7 @@ package oas
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -28,6 +29,37 @@ const (
 	ignoreAuthentication AllowanceType = 2
 	contentTypeJSON                    = "application/json"
 )
+
+func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validateRequest *bool) {
+	if allowList != nil {
+		allow := o.Allow
+		if allow == nil {
+			allow = &Allowance{}
+		}
+
+		allow.Import(*allowList)
+
+		if block := o.Block; block != nil && block.Enabled && *allowList {
+			block.Enabled = false
+		}
+
+		o.Allow = allow
+	}
+
+	if validateRequest != nil {
+		validate := o.ValidateRequest
+		if validate == nil {
+			validate = &ValidateRequest{}
+		}
+
+		if shouldImport := validate.shouldImportValidateRequest(oasOperation); !shouldImport {
+			return
+		}
+
+		validate.Import(*validateRequest)
+		o.ValidateRequest = validate
+	}
+}
 
 type AllowanceType int
 
@@ -362,6 +394,27 @@ func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
 func (v *ValidateRequest) ExtractTo(meta *apidef.ValidatePathMeta) {
 	meta.Disabled = !v.Enabled
 	meta.ErrorResponseCode = v.ErrorResponseCode
+}
+
+func (v *ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operation) bool {
+	reqBody := operation.RequestBody
+	if reqBody == nil {
+		return false
+	}
+
+	reqBodyVal := reqBody.Value
+	if reqBodyVal == nil {
+		return false
+	}
+
+	media := reqBodyVal.Content.Get("application/json")
+
+	return media != nil
+}
+
+func (v *ValidateRequest) Import(enabled bool) {
+	v.Enabled = enabled
+	v.ErrorResponseCode = http.StatusBadRequest
 }
 
 func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {
