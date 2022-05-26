@@ -412,7 +412,7 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 }
 
 func singleJoiningSlash(a, b string, disableStripSlash bool) string {
-	if disableStripSlash && len(b) == 0 {
+	if disableStripSlash && (len(b) == 0 || b == "/") {
 		return a
 	}
 	a = strings.TrimRight(a, "/")
