@@ -386,7 +386,7 @@
     "X-Tyk-Operations": {
       "type": "object",
       "patternProperties": {
-        "^\\/": {
+        "\\S+": {
           "$ref": "#/definitions/X-Tyk-Operation"
         }
       },
