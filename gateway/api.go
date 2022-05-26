@@ -32,7 +32,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/config"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -43,6 +42,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	uuid "github.com/satori/go.uuid"
