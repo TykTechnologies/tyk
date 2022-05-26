@@ -146,10 +146,8 @@ func (as *AuthSources) Import(in string) {
 
 func (s *OAS) importMiddlewares(allowList, validateRequest *bool) {
 	xTykAPIGateway := s.GetTykExtension()
-	middleware := xTykAPIGateway.Middleware
 
-	if middleware == nil {
-		middleware = &Middleware{}
+	if xTykAPIGateway.Middleware == nil {
 		xTykAPIGateway.Middleware = &Middleware{}
 	}
 
