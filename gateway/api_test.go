@@ -2684,7 +2684,7 @@ func TestOAS(t *testing.T) {
 	})
 
 	t.Run("import/OAS", func(t *testing.T) {
-		tykExtensionConfigParamsToURLQuery := func(ext oas.TykExtensionConfigParams) string {
+		configParamsToQuery := func(ext oas.TykExtensionConfigParams) string {
 			params := url.Values{}
 			if ext.UpstreamURL != "" {
 				params.Add("upstreamURL", ext.UpstreamURL)
@@ -2712,66 +2712,93 @@ func TestOAS(t *testing.T) {
 			ApiId:        oasAPIID,
 		}
 
-		oasCopy := func(withTykExt bool, f func(t *openapi3.T)) []byte {
+		oasCopy := func(withTykExt bool, setter func(t *openapi3.T)) []byte {
 			toOas := oas.OAS{T: openapi3.T{
 				OpenAPI: "3.0.3",
 				Info: &openapi3.Info{
 					Title: "example oas doc",
 				},
 				Paths: openapi3.Paths{},
+				Servers: openapi3.Servers{
+					&openapi3.Server{
+						URL:         "http://upstream.example.com",
+						Description: "main server upstream",
+					},
+				},
 			}}
 			if withTykExt {
-				toOas.SetTykExtension(&tykExtension)
+				toOas.SetTykExtension(&oas.XTykAPIGateway{
+					Info: oas.Info{
+						Name: "oas api",
+						ID:   oasAPIID,
+						State: oas.State{
+							Active: false,
+						},
+					},
+					Upstream: oas.Upstream{
+						URL: TestHttpAny,
+					},
+					Server: oas.Server{
+						ListenPath: oas.ListenPath{
+							Value: "/oas-api/",
+							Strip: false,
+						},
+					},
+				})
 			}
-			if f != nil {
-				f(&toOas.T)
+			if setter != nil {
+				setter(&toOas.T)
 			}
 			data, _ := toOas.MarshalJSON()
 			return data
 		}
 
 		t.Run("success without tyk extension", func(t *testing.T) {
-			params := tykExtensionConfigParamsToURLQuery(ext)
-			testImportOAS(t, ts, params, test.TestCase{Code: http.StatusOK, BodyMatch: "added", Data: oasCopy(false, nil), AdminAuth: true})
+			testImportOAS(t, ts, configParamsToQuery(ext), test.TestCase{
+				Code: http.StatusOK, BodyMatch: "added", Data: oasCopy(false, nil), AdminAuth: true,
+			})
 		})
 
-		t.Run("fail with malformed OAS", func(t *testing.T) {
-			params := tykExtensionConfigParamsToURLQuery(ext)
+		t.Run("missing paths from OAS", func(t *testing.T) {
 			data := oasCopy(false, func(t *openapi3.T) {
 				t.Paths = nil
 			})
-			testImportOAS(t, ts, params, test.TestCase{Code: http.StatusBadRequest, Data: data, AdminAuth: true})
+			testImportOAS(t, ts, configParamsToQuery(ext), test.TestCase{Code: http.StatusBadRequest, Data: data, AdminAuth: true})
 		})
 
-		t.Run("fail with malformed upstream URL", func(t *testing.T) {
+		t.Run("malformed upstream URL", func(t *testing.T) {
 			newParam := ext
 			newParam.UpstreamURL = "upstream.example.com"
-			params := tykExtensionConfigParamsToURLQuery(newParam)
-			testImportOAS(t, ts, params, test.TestCase{Code: http.StatusBadRequest, Data: oasCopy(false, nil), AdminAuth: true, BodyMatch: "invalid upstream URL"})
+			testImportOAS(t, ts, configParamsToQuery(newParam), test.TestCase{
+				Code: http.StatusBadRequest, Data: oasCopy(false, nil), AdminAuth: true, BodyMatch: "invalid upstream URL",
+			})
 		})
 
-		t.Run("fail with missing upstreamURL", func(t *testing.T) {
+		t.Run("missing upstream URL", func(t *testing.T) {
 			oasAPI := oasCopy(false, func(t *openapi3.T) {
 				t.Servers = openapi3.Servers{}
 			})
-			testImportOAS(t, ts, "", test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: "missing api ID"})
+			testImportOAS(t, ts, "", test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: "servers object is empty in OAS"})
 		})
 
-		t.Run("success without config params", func(t *testing.T) {
-			data := oasCopy(true, func(t *openapi3.T) {
-				t.Servers = openapi3.Servers{
-					&openapi3.Server{
-						URL:         "http://upstream.example.com",
-						Description: "main server upstream",
-					},
+		t.Run("missing api ID", func(t *testing.T) {
+			oasAPI := oasCopy(true, func(oasApi *openapi3.T) {
+				if ext, ok := oasApi.Extensions[oas.ExtensionTykAPIGateway].(*oas.XTykAPIGateway); ok {
+					ext.Info.ID = ""
+				} else {
+					t.Fatal("expected *oas.XTykAPIGateway")
 				}
 			})
-			testImportOAS(t, ts, "", test.TestCase{Code: http.StatusOK, Data: data, AdminAuth: true})
+			testImportOAS(t, ts, "", test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: apidef.ErrMissingAPIID.Error()})
 		})
 
-		t.Run("should override the ID from api Def", func(t *testing.T) {
+		t.Run("success without config query params", func(t *testing.T) {
+			testImportOAS(t, ts, "", test.TestCase{Code: http.StatusOK, Data: oasCopy(true, nil), AdminAuth: true})
+		})
+
+		t.Run("override ID from x-tyk-gateway", func(t *testing.T) {
 			var (
-				params            = tykExtensionConfigParamsToURLQuery(ext)
+				params            = configParamsToQuery(ext)
 				apiTitle, apiName string
 			)
 			data := oasCopy(true, func(oasApi *openapi3.T) {
@@ -2780,7 +2807,7 @@ func TestOAS(t *testing.T) {
 					ext.Info.ID = "unwanted-id"
 					apiName = ext.Info.Name
 				} else {
-					t.Fatal("expected extensions props to be *oas.XTykAPIGateway")
+					t.Fatal("expected *oas.XTykAPIGateway")
 				}
 			})
 
