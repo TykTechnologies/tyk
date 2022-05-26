@@ -62,7 +62,9 @@ func preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	var src interface{}
 	switch meta.FunctionSourceType {
 	case "file":
-		j.Log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
+		if log.Level == DebugLevel {
+			j.Log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
+		}
 		f, err := os.Open(meta.FunctionSourceURI)
 		if err != nil {
 			j.Log.WithError(err).Error("Failed to open Endpoint JS")
@@ -74,7 +76,9 @@ func preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 			j.Log.Error("[JSVM] Blobs not allowed on this node")
 			return
 		}
-		j.Log.Debug("Loading JS blob")
+		if log.Level == DebugLevel {
+			j.Log.Debug("Loading JS blob")
+		}
 		js, err := base64.StdEncoding.DecodeString(meta.FunctionSourceURI)
 		if err != nil {
 			j.Log.WithError(err).Error("Failed to load blob JS")

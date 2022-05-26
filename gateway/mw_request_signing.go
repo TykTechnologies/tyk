@@ -173,10 +173,14 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 
 	if s.Spec.RequestSigning.SignatureHeader != "" {
 		r.Header.Set(s.Spec.RequestSigning.SignatureHeader, authHeader)
-		log.Debugf("Setting %s headers as =%s", s.Spec.RequestSigning.SignatureHeader, authHeader)
+		if log.Level == DebugLevel {
+			log.Debugf("Setting %s headers as =%s", s.Spec.RequestSigning.SignatureHeader, authHeader)
+		}
 	} else {
 		r.Header.Set("Authorization", authHeader)
-		log.Debug("Setting Authorization headers as =", authHeader)
+		if log.Level == DebugLevel {
+			log.Debug("Setting Authorization headers as =", authHeader)
+		}
 	}
 
 	return nil, http.StatusOK

@@ -57,14 +57,20 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 // RequestSizeLimit will check a request for maximum request size, this can be a global limit or a matched limit.
 func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	logger := t.Logger()
-	logger.Debug("Request size limiter active")
+	if log.Level == DebugLevel {
+		logger.Debug("Request size limiter active")
+	}
 
 	vInfo, versionPaths, _, _ := t.Spec.Version(r)
 
-	logger.Debug("Global limit is: ", vInfo.GlobalSizeLimit)
+	if log.Level == DebugLevel {
+		logger.Debug("Global limit is: ", vInfo.GlobalSizeLimit)
+	}
 	// Manage global headers first
 	if vInfo.GlobalSizeLimit > 0 {
-		logger.Debug("Checking global limit")
+		if log.Level == DebugLevel {
+			logger.Debug("Checking global limit")
+		}
 		err, code := t.checkRequestLimit(r, vInfo.GlobalSizeLimit)
 		// If not OK, block
 		if code != http.StatusOK {
@@ -80,7 +86,9 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	// If there's a potential match, try to match
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, RequestSizeLimit)
 	if found {
-		logger.Debug("Request size limit matched for this URL, checking...")
+		if log.Level == DebugLevel {
+			logger.Debug("Request size limit matched for this URL, checking...")
+		}
 		rmeta := meta.(*apidef.RequestSizeMeta)
 		return t.checkRequestLimit(r, rmeta.SizeLimit)
 	}

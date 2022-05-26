@@ -322,7 +322,9 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	for _, scopeItem := range scope {
 		if policyID, ok := mapping[scopeItem]; ok {
 			policiesToApply[policyID] = true
-			log.Debugf("Found a matching policy for scope item: %s", scopeItem)
+			if log.Level == DebugLevel {
+				log.Debugf("Found a matching policy for scope item: %s", scopeItem)
+			}
 		} else {
 			log.Errorf("Couldn't find a matching policy for scope item: %s", scopeItem)
 		}
@@ -608,9 +610,15 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		// No header value, fail
 		logger.Info("Attempted access with malformed header, no JWT auth header found.")
 
-		log.Debug("Looked in: ", config.AuthHeaderName)
-		log.Debug("Raw data was: ", rawJWT)
-		log.Debug("Headers are: ", r.Header)
+		if log.Level == DebugLevel {
+			log.Debug("Looked in: ", config.AuthHeaderName)
+		}
+		if log.Level == DebugLevel {
+			log.Debug("Raw data was: ", rawJWT)
+		}
+		if log.Level == DebugLevel {
+			log.Debug("Headers are: ", r.Header)
+		}
 
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Authorization field missing"), http.StatusBadRequest

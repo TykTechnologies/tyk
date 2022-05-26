@@ -179,7 +179,9 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	middlewareClassname := d.MiddlewareClassName
 	vm := d.Spec.JSVM.VM.Copy()
 	vm.Interrupt = make(chan func(), 1)
-	logger.Debug("Running: ", middlewareClassname)
+	if log.Level == DebugLevel {
+		logger.Debug("Running: ", middlewareClassname)
+	}
 	// buffered, leaving no chance of a goroutine leak since the
 	// spawned goroutine will send 0 or 1 values.
 	ret := make(chan otto.Value, 1)
@@ -265,7 +267,9 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	logger.Debug("JSVM middleware execution took: (ns) ", time.Now().UnixNano()-t1)
+	if log.Level == DebugLevel {
+		logger.Debug("JSVM middleware execution took: (ns) ", time.Now().UnixNano()-t1)
+	}
 
 	if newRequestData.Request.ReturnOverrides.ResponseError != "" {
 		newRequestData.Request.ReturnOverrides.ResponseBody = newRequestData.Request.ReturnOverrides.ResponseError
@@ -356,10 +360,14 @@ func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry) {
 
 	if jsvmTimeout := config.Global().JSVMTimeout; jsvmTimeout <= 0 {
 		j.Timeout = time.Duration(defaultJSVMTimeout) * time.Second
-		logger.Debugf("Default JSVM timeout used: %v", j.Timeout)
+		if log.Level == DebugLevel {
+			logger.Debugf("Default JSVM timeout used: %v", j.Timeout)
+		}
 	} else {
 		j.Timeout = time.Duration(jsvmTimeout) * time.Second
-		logger.Debugf("Custom JSVM timeout: %v", j.Timeout)
+		if log.Level == DebugLevel {
+			logger.Debugf("Custom JSVM timeout: %v", j.Timeout)
+		}
 	}
 
 	j.Log = logger // use the global logger by default
@@ -601,7 +609,9 @@ func (j *JSVM) LoadTykJSApi() {
 	unsafeBatchHandler := BatchRequestHandler{API: j.Spec}
 	j.VM.Set("TykBatchRequest", func(call otto.FunctionCall) otto.Value {
 		requestSet := call.Argument(0).String()
-		j.Log.Debug("Batch input is: ", requestSet)
+		if log.Level == DebugLevel {
+			j.Log.Debug("Batch input is: ", requestSet)
+		}
 		bs, err := unsafeBatchHandler.ManualBatchRequest([]byte(requestSet))
 		if err != nil {
 			j.Log.WithError(err).Error("Batch request error")

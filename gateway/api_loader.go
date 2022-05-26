@@ -225,7 +225,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		prefix = getBundleDestPath(spec)
 	}
 
-	logger.Debug("Initializing API")
+	if log.Level == DebugLevel {
+		logger.Debug("Initializing API")
+	}
 	var mwPaths []string
 
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = loadCustomMiddleware(spec)
@@ -251,12 +253,18 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	if spec.UseOauth2 {
-		logger.Debug("Loading OAuth Manager")
+		if log.Level == DebugLevel {
+			logger.Debug("Loading OAuth Manager")
+		}
 		oauthManager := addOAuthHandlers(spec, subrouter)
-		logger.Debug("-- Added OAuth Handlers")
+		if log.Level == DebugLevel {
+			logger.Debug("-- Added OAuth Handlers")
+		}
 
 		spec.OAuthManager = oauthManager
-		logger.Debug("Done loading OAuth Manager")
+		if log.Level == DebugLevel {
+			logger.Debug("Done loading OAuth Manager")
+		}
 	}
 
 	enableVersionOverrides := false
@@ -316,7 +324,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
-			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
+			if log.Level == DebugLevel {
+				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
+			}
 			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
@@ -360,7 +370,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver && spec.UseGoPluginAuth
 		if coprocessAuth {
 			// TODO: check if mwAuthCheckFunc is available/valid
-			coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
+			if log.Level == DebugLevel {
+				coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
+			}
 
 			newExtractor(spec, baseMid)
 			mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
@@ -405,7 +417,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					},
 				)
 			} else {
-				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
+				if log.Level == DebugLevel {
+					coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
+				}
 				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 			}
 		}
@@ -444,7 +458,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
-			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
+			if log.Level == DebugLevel {
+				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
+			}
 			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
@@ -467,13 +483,17 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&simpleArray, &AccessRightsCheck{baseMid})
 
 		rateLimitPath := path.Join(spec.Proxy.ListenPath, rateLimitEndpoint)
-		logger.Debug("Rate limit endpoint is: ", rateLimitPath)
+		if log.Level == DebugLevel {
+			logger.Debug("Rate limit endpoint is: ", rateLimitPath)
+		}
 
 		chainDef.RateLimitChain = alice.New(simpleArray...).
 			Then(http.HandlerFunc(userRatesCheck))
 	}
 
-	logger.Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
+	if log.Level == DebugLevel {
+		logger.Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
+	}
 
 	if trace.IsEnabled() {
 		chainDef.ThisHandler = trace.Handle(spec.Name, chain)
@@ -828,14 +848,18 @@ func loadApps(specs []*APISpec) {
 
 	apisMu.Unlock()
 
-	mainLog.Debug("Checker host list")
+	if log.Level == DebugLevel {
+		mainLog.Debug("Checker host list")
+	}
 
 	// Kick off our host checkers
 	if !config.Global().UptimeTests.Disable {
 		SetCheckerHostList()
 	}
 
-	mainLog.Debug("Checker host Done")
+	if log.Level == DebugLevel {
+		mainLog.Debug("Checker host Done")
+	}
 
 	mainLog.Info("Initialised API Definitions")
 }

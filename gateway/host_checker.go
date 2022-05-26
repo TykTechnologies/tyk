@@ -135,7 +135,9 @@ func (h *HostUptimeChecker) execCheck() {
 		h.HostList = h.newList
 		h.newList = nil
 		h.doResetList = false
-		log.Debug("[HOST CHECKER] Host list reset")
+		if log.Level == DebugLevel {
+			log.Debug("[HOST CHECKER] Host list reset")
+		}
 	}
 	h.resetListMu.Unlock()
 	for _, host := range h.HostList {
@@ -152,7 +154,9 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 		case <-ctx.Done():
 			if !h.getStopLoop() {
 				h.Stop()
-				log.Debug("[HOST CHECKER] Received cancel signal")
+				if log.Level == DebugLevel {
+					log.Debug("[HOST CHECKER] Received cancel signal")
+				}
 			}
 			return
 		case okHost := <-h.okChan:
@@ -220,7 +224,9 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 }
 
 func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
-	log.Debug("[HOST CHECKER] Checking: ", toCheck.CheckURL)
+	if log.Level == DebugLevel {
+		log.Debug("[HOST CHECKER] Checking: ", toCheck.CheckURL)
+	}
 
 	t1 := time.Now()
 	report := HostHealthReport{
@@ -252,14 +258,18 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			break
 		}
 		if toCheck.EnableProxyProtocol {
-			log.Debug("using proxy protocol")
+			if log.Level == DebugLevel {
+				log.Debug("using proxy protocol")
+			}
 			ls = proxyproto.NewConn(ls, 0)
 		}
 		defer ls.Close()
 		for _, cmd := range toCheck.Commands {
 			switch cmd.Name {
 			case "send":
-				log.Debugf("%s: sending %s", host, cmd.Message)
+				if log.Level == DebugLevel {
+					log.Debugf("%s: sending %s", host, cmd.Message)
+				}
 				_, err = ls.Write([]byte(cmd.Message))
 				if err != nil {
 					log.Errorf("Failed to send %s :%v", cmd.Message, err)
@@ -280,7 +290,9 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 					report.IsTCPError = true
 					break
 				}
-				log.Debugf("%s: received %s", host, cmd.Message)
+				if log.Level == DebugLevel {
+					log.Debugf("%s: received %s", host, cmd.Message)
+				}
 			}
 		}
 		report.ResponseCode = http.StatusOK
@@ -369,9 +381,15 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 		h.checkTimeout = defaultTimeout
 	}
 
-	log.Debug("[HOST CHECKER] Config:TriggerLimit: ", h.sampleTriggerLimit)
-	log.Debug("[HOST CHECKER] Config:Timeout: ~", h.checkTimeout)
-	log.Debug("[HOST CHECKER] Config:WorkerPool: ", h.workerPoolSize)
+	if log.Level == DebugLevel {
+		log.Debug("[HOST CHECKER] Config:TriggerLimit: ", h.sampleTriggerLimit)
+	}
+	if log.Level == DebugLevel {
+		log.Debug("[HOST CHECKER] Config:Timeout: ~", h.checkTimeout)
+	}
+	if log.Level == DebugLevel {
+		log.Debug("[HOST CHECKER] Config:WorkerPool: ", h.workerPoolSize)
+	}
 
 	var err error
 	h.pool, err = tunny.CreatePool(h.workerPoolSize, func(hostData interface{}) interface{} {
@@ -380,7 +398,9 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 		return nil
 	}).Open()
 
-	log.Debug("[HOST CHECKER] Init complete")
+	if log.Level == DebugLevel {
+		log.Debug("[HOST CHECKER] Init complete")
+	}
 
 	if err != nil {
 		log.Errorf("[HOST CHECKER POOL] Error: %v\n", err)
@@ -390,11 +410,17 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 func (h *HostUptimeChecker) Start(ctx context.Context) {
 	// Start the loop that checks for bum hosts
 	h.setStopLoop(false)
-	log.Debug("[HOST CHECKER] Starting...")
+	if log.Level == DebugLevel {
+		log.Debug("[HOST CHECKER] Starting...")
+	}
 	go h.HostCheckLoop(ctx)
-	log.Debug("[HOST CHECKER] Check loop started...")
+	if log.Level == DebugLevel {
+		log.Debug("[HOST CHECKER] Check loop started...")
+	}
 	go h.HostReporter(ctx)
-	log.Debug("[HOST CHECKER] Host reporter started...")
+	if log.Level == DebugLevel {
+		log.Debug("[HOST CHECKER] Host reporter started...")
+	}
 }
 
 func (h *HostUptimeChecker) Stop() {
@@ -413,5 +439,7 @@ func (h *HostUptimeChecker) ResetList(hostList map[string]HostData) {
 	h.doResetList = true
 	h.newList = hostList
 	h.resetListMu.Unlock()
-	log.Debug("[HOST CHECKER] Checker reset queued!")
+	if log.Level == DebugLevel {
+		log.Debug("[HOST CHECKER] Checker reset queued!")
+	}
 }

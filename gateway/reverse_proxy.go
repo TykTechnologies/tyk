@@ -62,7 +62,9 @@ var sdMu sync.RWMutex
 func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 
 	doCacheRefresh := func() (*apidef.HostList, error) {
-		log.Debug("--> Refreshing")
+		if log.Level == DebugLevel {
+			log.Debug("--> Refreshing")
+		}
 		spec.ServiceRefreshInProgress = true
 		defer func() { spec.ServiceRefreshInProgress = false }()
 		sd := ServiceDiscovery{}
@@ -96,7 +98,9 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 	sdMu.RUnlock()
 	// First time? Refresh the cache and return that
 	if !hasRun {
-		log.Debug("First run! Setting cache")
+		if log.Level == DebugLevel {
+			log.Debug("First run! Setting cache")
+		}
 		return doCacheRefresh()
 	}
 
@@ -105,15 +109,21 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 	if !found {
 		if spec.ServiceRefreshInProgress {
 			// Are we already refreshing the cache? skip and return last good conf
-			log.Debug("Cache expired! But service refresh in progress")
+			if log.Level == DebugLevel {
+				log.Debug("Cache expired! But service refresh in progress")
+			}
 			return spec.LastGoodHostList, nil
 		}
 		// Refresh the spec
-		log.Debug("Cache expired! Refreshing...")
+		if log.Level == DebugLevel {
+			log.Debug("Cache expired! Refreshing...")
+		}
 		return doCacheRefresh()
 	}
 
-	log.Debug("Returning from cache.")
+	if log.Level == DebugLevel {
+		log.Debug("Returning from cache.")
+	}
 	return cachedServiceData.(*apidef.HostList), nil
 }
 
@@ -141,7 +151,9 @@ func EnsureTransport(host, protocol string) string {
 
 func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 	if spec.Proxy.EnableLoadBalancing {
-		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
+		if log.Level == DebugLevel {
+			log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
+		}
 		// Use a HostList
 		startPos := spec.RoundRobin.WithLen(targetData.Len())
 		pos := startPos
@@ -171,7 +183,9 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 
 	}
 	// Use standard target - might still be service data
-	log.Debug("TARGET DATA:", targetData)
+	if log.Level == DebugLevel {
+		log.Debug("TARGET DATA:", targetData)
+	}
 
 	gotHost, err := targetData.GetIndex(0)
 	if err != nil {
@@ -213,9 +227,13 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger *logrus
 		}()
 	})
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-		log.Debug("[PROXY] Service discovery enabled")
+		if log.Level == DebugLevel {
+			log.Debug("[PROXY] Service discovery enabled")
+		}
 		if ServiceCache == nil {
-			log.Debug("[PROXY] Service cache initialising")
+			if log.Level == DebugLevel {
+				log.Debug("[PROXY] Service cache initialising")
+			}
 			expiry := 120
 			if spec.Proxy.ServiceDiscovery.CacheTimeout > 0 {
 				expiry = int(spec.Proxy.ServiceDiscovery.CacheTimeout)
@@ -257,7 +275,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger *logrus
 		targetToUse := target
 
 		if spec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
-			log.Debug("Detected host rewrite, overriding target")
+			if log.Level == DebugLevel {
+				log.Debug("Detected host rewrite, overriding target")
+			}
 			tmpTarget, err := url.Parse(req.URL.String())
 			if err != nil {
 				log.Error("Failed to parse URL! Err: ", err)
@@ -371,7 +391,9 @@ type ReverseProxy struct {
 func defaultTransport(dialerTimeout float64) *http.Transport {
 	timeout := 30.0
 	if dialerTimeout > 0 {
-		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
+		if log.Level == DebugLevel {
+			log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
+		}
 		timeout = dialerTimeout
 	}
 
@@ -508,7 +530,9 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
 		intMeta := meta.(*int)
-		p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
+		if log.Level == DebugLevel {
+			p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
+		}
 		return true, float64(*intMeta)
 	}
 
@@ -545,7 +569,9 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, CircuitBreaker)
 	if found {
 		exMeta := meta.(*ExtendedCircuitBreakerMeta)
-		p.logger.Debug("CB Enforced for path: ", *exMeta)
+		if log.Level == DebugLevel {
+			p.logger.Debug("CB Enforced for path: ", *exMeta)
+		}
 		return true, exMeta
 	}
 
@@ -596,7 +622,9 @@ func tlsClientConfig(s *APISpec) *tls.Config {
 }
 
 func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, outReq *http.Request, p *ReverseProxy) *TykRoundTripper {
-	p.logger.Debug("Creating new transport")
+	if log.Level == DebugLevel {
+		p.logger.Debug("Creating new transport")
+	}
 
 	transport := defaultTransport(timeOut) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
@@ -613,11 +641,15 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, o
 	// When request routed through the proxy `DialTLS` is not used, and only VerifyPeerCertificate is supported
 	// The reason behind two separate checks is that `DialTLS` supports specifying public keys per hostname, and `VerifyPeerCertificate` only global ones, e.g. `*`
 	if proxyURL, _ := transport.Proxy(req); proxyURL != nil {
-		p.logger.Debug("Detected proxy: " + proxyURL.String())
+		if log.Level == DebugLevel {
+			p.logger.Debug("Detected proxy: " + proxyURL.String())
+		}
 		transport.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
 
 		if transport.TLSClientConfig.VerifyPeerCertificate != nil {
-			p.logger.Debug("Certificate pinning check is enabled")
+			if log.Level == DebugLevel {
+				p.logger.Debug("Certificate pinning check is enabled")
+			}
 		}
 	} else {
 		transport.DialTLS = customDialTLSCheck(p.TykAPISpec, transport.TLSClientConfig)
@@ -649,7 +681,9 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, o
 		http2.ConfigureTransport(transport)
 	}
 
-	p.logger.Debug("Out request url: ", outReq.URL.String())
+	if log.Level == DebugLevel {
+		p.logger.Debug("Out request url: ", outReq.URL.String())
+	}
 
 	if outReq.URL.Scheme == "h2c" {
 		p.logger.Info("Enabling h2c mode")
@@ -780,11 +814,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	setContext(outreq, context.Background())
 	setContext(logreq, context.Background())
 
-	p.logger.Debug("Upstream request URL: ", req.URL)
+	if log.Level == DebugLevel {
+		p.logger.Debug("Upstream request URL: ", req.URL)
+	}
 
 	// We need to double set the context for the outbound request to reprocess the target
 	if p.TykAPISpec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
-		p.logger.Debug("Detected host rewrite, notifying director")
+		if log.Level == DebugLevel {
+			p.logger.Debug("Detected host rewrite, notifying director")
+		}
 		setCtxValue(outreq, ctx.RetainHost, true)
 	}
 
@@ -801,7 +839,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	p.Director(outreq)
 	outreq.Close = false
 
-	p.logger.Debug("Outbound request URL: ", outreq.URL.String())
+	if log.Level == DebugLevel {
+		p.logger.Debug("Outbound request URL: ", outreq.URL.String())
+	}
 
 	outReqUpgrade, reqUpType := IsUpgrade(req)
 
@@ -857,7 +897,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		// set up TLS certificates for upstream if needed
 		var tlsCertificates []tls.Certificate
 		if cert := getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec); cert != nil {
-			p.logger.Debug("Found upstream mutual TLS certificate")
+			if log.Level == DebugLevel {
+				p.logger.Debug("Found upstream mutual TLS certificate")
+			}
 			tlsCertificates = []tls.Certificate{*cert}
 		}
 
@@ -870,9 +912,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 		p.TykAPISpec.Transport[outreq.URL.Host] = transport
 
-		p.logger.Debugf("Setting transport layer. API: %+v TykRoundtriper:%+v , TykAPISpec.Transport:%+v, Certificates: %v", p.TykAPISpec.APIID, transport, p.TykAPISpec.Transport, tlsCertificates)
+		if log.Level == DebugLevel {
+			p.logger.Debugf("Setting transport layer. API: %+v TykRoundtriper:%+v , TykAPISpec.Transport:%+v, Certificates: %v", p.TykAPISpec.APIID, transport, p.TykAPISpec.Transport, tlsCertificates)
+		}
 	} else {
-		p.logger.Debugf("Transport already found for %+v in TykAPISpec.Transport: %+v, TLS:%+v", outreq.URL.Host, transport, transport.HTTPTransport)
+		if log.Level == DebugLevel {
+			p.logger.Debugf("Transport already found for %+v in TykAPISpec.Transport: %+v, TLS:%+v", outreq.URL.Host, transport, transport.HTTPTransport)
+		}
 	}
 
 	p.TykAPISpec.Unlock()
@@ -888,10 +934,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		// DialTLS is not executed if proxy is used
 		httpTransport := roundTripper.transport
 
-		p.logger.Debug("Using forced SSL CN check")
+		if log.Level == DebugLevel {
+			p.logger.Debug("Using forced SSL CN check")
+		}
 
 		if proxyURL, _ := httpTransport.Proxy(req); proxyURL != nil {
-			p.logger.Debug("Detected proxy: " + proxyURL.String())
+			if log.Level == DebugLevel {
+				p.logger.Debug("Detected proxy: " + proxyURL.String())
+			}
 			tlsConfig := httpTransport.TLSClientConfig
 			host, _, _ := net.SplitHostPort(outreq.Host)
 			p.setCommonNameVerifyPeerCertificate(tlsConfig, host)
@@ -938,11 +988,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
-			p.logger.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
+			if log.Level == DebugLevel {
+				p.logger.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
+			}
 			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503, true)
 			return ProxyResponse{}
 		}
-		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
+		if log.Level == DebugLevel {
+			p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
+		}
 		res, upstreamLatency, err = sendRequestToUpstream(outreq)
 		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
@@ -950,7 +1004,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			breakerConf.CB.Success()
 		}
 	} else {
-		p.logger.Debugf("Making upstream req: %+v, TLS: %+v", outreq, outreq.TLS)
+		if log.Level == DebugLevel {
+			p.logger.Debugf("Making upstream req: %+v, TLS: %+v", outreq, outreq.TLS)
+		}
 		res, upstreamLatency, err = sendRequestToUpstream(outreq)
 	}
 
@@ -977,7 +1033,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 			if p.TykAPISpec.Proxy.ServiceDiscovery.UseDiscoveryService {
 				if ServiceCache != nil {
-					p.logger.Debug("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
+					if log.Level == DebugLevel {
+						p.logger.Debug("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
+					}
 					ServiceCache.Delete(p.TykAPISpec.APIID)
 				}
 			}

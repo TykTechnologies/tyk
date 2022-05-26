@@ -301,7 +301,9 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	logger := m.Logger()
-	logger.Debug("CoProcess Request, HookType: ", m.HookType)
+	if log.Level == DebugLevel {
+		logger.Debug("CoProcess Request, HookType: ", m.HookType)
+	}
 	originalURL := r.URL
 	authToken, _ := m.getAuthToken(coprocessType, r)
 

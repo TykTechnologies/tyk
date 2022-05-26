@@ -92,10 +92,14 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	keyExists := false
 	var session user.SessionState
 	if key != "" {
-		log.Debug("AuthKey: Using key from the request")
+		if log.Level == DebugLevel {
+			log.Debug("AuthKey: Using key from the request")
+		}
 		key = stripBearer(key)
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		log.Debug("AuthKey: Trying to find")
+		if log.Level == DebugLevel {
+			log.Debug("AuthKey: Trying to find")
+		}
 		certHash = k.Spec.OrgID + certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		key = generateToken(k.Spec.OrgID, certHash)
 	} else {

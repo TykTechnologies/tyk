@@ -15,14 +15,20 @@ import (
 const LEKeyPrefix = "le_ssl:"
 
 func StoreLEState(m *letsencrypt.Manager) {
-	log.Debug("Storing SSL backup")
+	if log.Level == DebugLevel {
+		log.Debug("Storing SSL backup")
+	}
 
-	log.Debug("[SSL] --> Connecting to DB")
+	if log.Level == DebugLevel {
+		log.Debug("[SSL] --> Connecting to DB")
+	}
 
 	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix}
 	connected := store.Connect()
 
-	log.Debug("--> Connected to DB")
+	if log.Level == DebugLevel {
+		log.Debug("--> Connected to DB")
+	}
 
 	if !connected {
 		log.Error("[SSL] --> SSL Backup save failed: redis connection failed")
@@ -45,7 +51,9 @@ func GetLEState(m *letsencrypt.Manager) {
 	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix}
 
 	connected := store.Connect()
-	log.Debug("[SSL] --> Connected to DB")
+	if log.Level == DebugLevel {
+		log.Debug("[SSL] --> Connected to DB")
+	}
 
 	if !connected {
 		log.Error("[SSL] --> SSL Backup recovery failed: redis connection failed")
@@ -78,7 +86,9 @@ func onLESSLStatusReceivedHandler(payload string) {
 		return
 	}
 
-	log.Debug("Received LE data: ", serverData)
+	if log.Level == DebugLevel {
+		log.Debug("Received LE data: ", serverData)
+	}
 
 	// not great
 	if serverData.ID != GetNodeID() {

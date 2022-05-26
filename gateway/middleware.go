@@ -744,7 +744,9 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	key := r.Header.Get(config.AuthHeaderName)
-	log.Debugf("GetAuthToken: API: %v, Headers: %+v, config header: %v", b.Spec.APIID, r, config.AuthHeaderName)
+	if log.Level == DebugLevel {
+		log.Debugf("GetAuthToken: API: %v, Headers: %+v, config header: %v", b.Spec.APIID, r, config.AuthHeaderName)
+	}
 
 	paramName := config.ParamName
 	if config.UseParam || paramName != "" {

@@ -45,7 +45,9 @@ func (s *ServiceDiscovery) Init(spec *apidef.ServiceDiscoveryConfiguration) {
 }
 
 func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
-	log.Debug("Getting ", name)
+	if log.Level == DebugLevel {
+		log.Debug("Getting ", name)
+	}
 	resp, err := http.Get(name)
 	if err != nil {
 		return "", err
@@ -61,16 +63,24 @@ func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
 }
 
 func (s *ServiceDiscovery) decodeToNameSpace(namespace string, jsonParsed *gabs.Container) interface{} {
-	log.Debug("Namespace: ", namespace)
+	if log.Level == DebugLevel {
+		log.Debug("Namespace: ", namespace)
+	}
 	value := jsonParsed.Path(namespace).Data()
 	return value
 }
 
 func (s *ServiceDiscovery) decodeToNameSpaceAsArray(namespace string, jsonParsed *gabs.Container) []*gabs.Container {
-	log.Debug("Array Namespace: ", namespace)
-	log.Debug("Container: ", jsonParsed)
+	if log.Level == DebugLevel {
+		log.Debug("Array Namespace: ", namespace)
+	}
+	if log.Level == DebugLevel {
+		log.Debug("Container: ", jsonParsed)
+	}
 	value, _ := jsonParsed.Path(namespace).Children()
-	log.Debug("Array value:", value)
+	if log.Level == DebugLevel {
+		log.Debug("Array value:", value)
+	}
 	return value
 }
 
@@ -105,7 +115,9 @@ func (s *ServiceDiscovery) NestedObject(item *gabs.Container) string {
 	case string:
 		s.ParseObject(x, &subContainer)
 	default:
-		log.Debug("Get Nested Object: parentData is not a string")
+		if log.Level == DebugLevel {
+			log.Debug("Get Nested Object: parentData is not a string")
+		}
 		return ""
 	}
 	return s.Object(&subContainer)
@@ -144,7 +156,9 @@ func (s *ServiceDiscovery) SubObjectFromList(objList *gabs.Container) []string {
 	if s.endpointReturnsList {
 		// pre-process the object since we've nested it
 		set = s.decodeToNameSpaceAsArray(arrayName, objList)
-		log.Debug("set: ", set)
+		if log.Level == DebugLevel {
+			log.Debug("set: ", set)
+		}
 	} else if s.isNested { // It's an object, but the value may be nested
 		// Get the actual raw string object
 		parentData := s.decodeToNameSpace(s.parentPath, objList)
@@ -154,34 +168,46 @@ func (s *ServiceDiscovery) SubObjectFromList(objList *gabs.Container) []string {
 		// Now check if this string is a list
 		nestedString, ok := parentData.(string)
 		if !ok {
-			log.Debug("parentData is not a string")
+			if log.Level == DebugLevel {
+				log.Debug("parentData is not a string")
+			}
 			return hostList
 		}
 		if s.isList(nestedString) {
-			log.Debug("Yup, it's a list")
+			if log.Level == DebugLevel {
+				log.Debug("Yup, it's a list")
+			}
 			jsonData := s.rawListToObj(nestedString)
 			s.ParseObject(jsonData, &subContainer)
 			set = s.decodeToNameSpaceAsArray(arrayName, &subContainer)
 
 			// Hijack this here because we need to use a non-nested get
 			for _, item := range set {
-				log.Debug("Child in list: ", item)
+				if log.Level == DebugLevel {
+					log.Debug("Child in list: ", item)
+				}
 				hostname = s.Object(item) + s.targetPath
 				// Add to list
 				hostList = append(hostList, hostname)
 			}
 			return hostList
 		}
-		log.Debug("Not a list")
+		if log.Level == DebugLevel {
+			log.Debug("Not a list")
+		}
 		s.ParseObject(nestedString, &subContainer)
 		set = s.decodeToNameSpaceAsArray(s.dataPath, objList)
-		log.Debug("set (object list): ", objList)
+		if log.Level == DebugLevel {
+			log.Debug("set (object list): ", objList)
+		}
 	} else if s.parentPath != "" {
 		set = s.decodeToNameSpaceAsArray(s.parentPath, objList)
 	}
 
 	for _, item := range set {
-		log.Debug("Child in list: ", item)
+		if log.Level == DebugLevel {
+			log.Debug("Child in list: ", item)
+		}
 		hostname = s.Hostname(item) + s.targetPath
 		// Add to list
 		hostList = append(hostList, hostname)
@@ -199,14 +225,18 @@ func (s *ServiceDiscovery) rawListToObj(rawData string) string {
 }
 
 func (s *ServiceDiscovery) ParseObject(contents string, jsonParsed *gabs.Container) error {
-	log.Debug("Parsing raw data: ", contents)
+	if log.Level == DebugLevel {
+		log.Debug("Parsing raw data: ", contents)
+	}
 	jp, err := gabs.ParseJSON([]byte(contents))
 	if err != nil {
 		log.Error(err)
 		return err
 	}
 	*jsonParsed = *jp
-	log.Debug("Got:", jsonParsed)
+	if log.Level == DebugLevel {
+		log.Debug("Got:", jsonParsed)
+	}
 	return nil
 }
 
@@ -223,12 +253,16 @@ func (s *ServiceDiscovery) ProcessRawData(rawData string) (*apidef.HostList, err
 			return nil, err
 		}
 
-		log.Debug("Parsed object list: ", jsonParsed)
+		if log.Level == DebugLevel {
+			log.Debug("Parsed object list: ", jsonParsed)
+		}
 		// Treat JSON as a list and then apply the data path
 		if s.isTargetList {
 			// Get all values
 			asList := s.SubObjectFromList(&jsonParsed)
-			log.Debug("Host list:", asList)
+			if log.Level == DebugLevel {
+				log.Debug("Host list:", asList)
+			}
 			hostlist.Set(asList)
 			return hostlist, nil
 		}
@@ -249,12 +283,18 @@ func (s *ServiceDiscovery) ProcessRawData(rawData string) (*apidef.HostList, err
 	s.ParseObject(rawData, &jsonParsed)
 	if s.isTargetList {
 		// It's a list object
-		log.Debug("It's a target list - getting sub object from list")
-		log.Debug("Passing in: ", jsonParsed)
+		if log.Level == DebugLevel {
+			log.Debug("It's a target list - getting sub object from list")
+		}
+		if log.Level == DebugLevel {
+			log.Debug("Passing in: ", jsonParsed)
+		}
 
 		asList := s.SubObjectFromList(&jsonParsed)
 		hostlist.Set(asList)
-		log.Debug("Got from object: ", hostlist)
+		if log.Level == DebugLevel {
+			log.Debug("Got from object: ", hostlist)
+		}
 		return hostlist, nil
 	}
 

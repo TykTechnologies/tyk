@@ -147,7 +147,9 @@ func (r *RPCStorageHandler) hashKey(in string) string {
 func (r *RPCStorageHandler) fixKey(keyName string) string {
 	setKeyName := r.KeyPrefix + r.hashKey(keyName)
 
-	log.Debug("Input key was: ", setKeyName)
+	if log.Level == DebugLevel {
+		log.Debug("Input key was: ", setKeyName)
+	}
 
 	return setKeyName
 }
@@ -160,12 +162,14 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 // GetKey will retrieve a key from the database
 func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	start := time.Now() // get current time
-	//	log.Debug("[STORE] Getting WAS: ", keyName)
-	//  log.Debug("[STORE] Getting: ", r.fixKey(keyName))
+	//	if log.Level == DebugLevel {log.Debug("[STORE] Getting WAS: ", keyName)}
+	//  if log.Level == DebugLevel {log.Debug("[STORE] Getting: ", r.fixKey(keyName))}
 	value, err := r.GetRawKey(r.fixKey(keyName))
 
 	elapsed := time.Since(start)
-	log.Debug("GetKey took ", elapsed)
+	if log.Level == DebugLevel {
+		log.Debug("GetKey took ", elapsed)
+	}
 
 	return value, err
 }
@@ -173,7 +177,9 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
 	if config.Global().SlaveOptions.EnableRPCCache {
-		log.Debug("Using cache for: ", keyName)
+		if log.Level == DebugLevel {
+			log.Debug("Using cache for: ", keyName)
+		}
 
 		cacheStore := RPCGlobalCache
 		if strings.Contains(keyName, "cert-") {
@@ -181,7 +187,9 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		}
 
 		cachedVal, found := cacheStore.Get(keyName)
-		log.Debug("--> Found? ", found)
+		if log.Level == DebugLevel {
+			log.Debug("--> Found? ", found)
+		}
 		if found {
 			return cachedVal.(string), nil
 		}
@@ -202,7 +210,9 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 				return r.GetRawKey(keyName)
 			}
 		}
-		log.Debug("Error trying to get value:", err)
+		if log.Level == DebugLevel {
+			log.Debug("Error trying to get value:", err)
+		}
 		return "", storage.ErrKeyNotFound
 	}
 	if config.Global().SlaveOptions.EnableRPCCache {
@@ -231,7 +241,9 @@ func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
 }
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
-	log.Debug("GetExp called")
+	if log.Level == DebugLevel {
+		log.Debug("GetExp called")
+	}
 	value, err := rpc.FuncClientSingleton("GetExp", r.fixKey(keyName))
 	if err != nil {
 		rpc.EmitErrorEventKv(
@@ -286,12 +298,16 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 			}
 		}
 
-		log.Debug("Error trying to set value:", err)
+		if log.Level == DebugLevel {
+			log.Debug("Error trying to set value:", err)
+		}
 		return err
 	}
 
 	elapsed := time.Since(start)
-	log.Debug("SetKey took ", elapsed)
+	if log.Level == DebugLevel {
+		log.Debug("SetKey took ", elapsed)
+	}
 	return nil
 
 }
@@ -366,7 +382,9 @@ func (r *RPCStorageHandler) GetKeys(filter string) []string {
 func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string]string {
 
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
-	log.Debug("[STORE] Getting list by: ", searchStr)
+	if log.Level == DebugLevel {
+		log.Debug("[STORE] Getting list by: ", searchStr)
+	}
 
 	kvPair, err := rpc.FuncClientSingleton("GetKeysAndValuesWithFilter", searchStr)
 	if err != nil {
@@ -427,8 +445,12 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 // DeleteKey will remove a key from the database
 func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
-	log.Debug("DEL Key was: ", keyName)
-	log.Debug("DEL Key became: ", r.fixKey(keyName))
+	if log.Level == DebugLevel {
+		log.Debug("DEL Key was: ", keyName)
+	}
+	if log.Level == DebugLevel {
+		log.Debug("DEL Key became: ", r.fixKey(keyName))
+	}
 	ok, err := rpc.FuncClientSingleton("DeleteKey", r.fixKey(keyName))
 	if err != nil {
 		rpc.EmitErrorEventKv(
@@ -487,7 +509,9 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 			asInterface[i] = r.fixKey(v)
 		}
 
-		log.Debug("Deleting: ", asInterface)
+		if log.Level == DebugLevel {
+			log.Debug("Deleting: ", asInterface)
+		}
 		ok, err := rpc.FuncClientSingleton("DeleteKeys", asInterface)
 		if err != nil {
 			rpc.EmitErrorEventKv(
@@ -509,7 +533,9 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 
 		return ok == true
 	}
-	log.Debug("RPCStorageHandler called DEL - Nothing to delete")
+	if log.Level == DebugLevel {
+		log.Debug("RPCStorageHandler called DEL - Nothing to delete")
+	}
 	return true
 }
 
@@ -582,7 +608,9 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 	}
 
 	elapsed := time.Since(start)
-	log.Debug("SetRollingWindow took ", elapsed)
+	if log.Level == DebugLevel {
+		log.Debug("SetRollingWindow took ", elapsed)
+	}
 
 	if intVal == nil {
 		log.Warning("RPC Handler: SetRollingWindow() returned nil, returning 0")
@@ -645,7 +673,9 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 
 		return ""
 	}
-	log.Debug("API Definitions retrieved")
+	if log.Level == DebugLevel {
+		log.Debug("API Definitions retrieved")
+	}
 
 	if defString == nil {
 		log.Warning("RPC Handler: GetApiDefinitions() returned nil, returning empty string")
@@ -684,7 +714,9 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 
 // CheckForReload will start a long poll
 func (r *RPCStorageHandler) CheckForReload(orgId string) {
-	log.Debug("[RPC STORE] Check Reload called...")
+	if log.Level == DebugLevel {
+		log.Debug("[RPC STORE] Check Reload called...")
+	}
 	reload, err := rpc.FuncClientSingleton("CheckReload", orgId)
 	if err != nil {
 		rpc.EmitErrorEventKv(
@@ -756,7 +788,9 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 
 // CheckForKeyspaceChanges will poll for keysace changes
 func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
-	log.Debug("Checking for keyspace changes...")
+	if log.Level == DebugLevel {
+		log.Debug("Checking for keyspace changes...")
+	}
 
 	var keys interface{}
 	var err error

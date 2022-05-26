@@ -64,24 +64,34 @@ func reportHealthValue(spec *APISpec, counter HealthPrefix, value string) {
 
 func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value string) {
 	searchStr := h.CreateKeyName(counterType)
-	log.Debug("Adding Healthcheck to: ", searchStr)
-	log.Debug("Val is: ", value)
+	if log.Level == DebugLevel {
+		log.Debug("Adding Healthcheck to: ", searchStr)
+	}
+	if log.Level == DebugLevel {
+		log.Debug("Val is: ", value)
+	}
 	//go h.storage.SetKey(searchStr, value, config.Global.HealthCheck.HealthCheckValueTimeout)
 	if value != "-1" {
 		// need to ensure uniqueness
 		now_string := strconv.Itoa(int(time.Now().UnixNano()))
 		value = now_string + "." + value
-		log.Debug("Set value to: ", value)
+		if log.Level == DebugLevel {
+			log.Debug("Set value to: ", value)
+		}
 	}
 	go h.storage.SetRollingWindow(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, value, false)
 }
 
 func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
 	searchStr := h.CreateKeyName(prefix)
-	log.Debug("Searching for: ", searchStr)
+	if log.Level == DebugLevel {
+		log.Debug("Searching for: ", searchStr)
+	}
 
 	count, _ := h.storage.SetRollingWindow(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, "-1", false)
-	log.Debug("Count is: ", count)
+	if log.Level == DebugLevel {
+		log.Debug("Count is: ", count)
+	}
 	divisor := float64(config.Global().HealthCheck.HealthCheckValueTimeout)
 	if divisor == 0 {
 		log.Warning("The Health Check sample timeout is set to 0, samples will never be deleted!!!")
@@ -109,16 +119,22 @@ func (h *DefaultHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
 
 	// Get the micro latency graph, an average upstream latency
 	searchStr := h.APIID + "." + string(RequestLog)
-	log.Debug("Searching KV for: ", searchStr)
+	if log.Level == DebugLevel {
+		log.Debug("Searching KV for: ", searchStr)
+	}
 	_, vals := h.storage.SetRollingWindow(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, "-1", false)
-	log.Debug("Found: ", vals)
+	if log.Level == DebugLevel {
+		log.Debug("Found: ", vals)
+	}
 	if len(vals) == 0 {
 		return values, nil
 	}
 	var runningTotal int
 	for _, v := range vals {
 		s := v.(string)
-		log.Debug("V is: ", s)
+		if log.Level == DebugLevel {
+			log.Debug("V is: ", s)
+		}
 		splitValues := strings.Split(s, ".")
 		if len(splitValues) > 1 {
 			vInt, err := strconv.Atoi(splitValues[1])

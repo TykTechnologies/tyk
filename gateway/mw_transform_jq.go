@@ -1,3 +1,4 @@
+//go:build jq
 // +build jq
 
 package gateway
@@ -157,7 +158,9 @@ type TransformJQSpec struct {
 func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.TransformJQMeta, stat URLStatus) []URLSpec {
 	urlSpec := []URLSpec{}
 
-	log.Debug("Checking for JQ tranform paths ...")
+	if log.Level == DebugLevel {
+		log.Debug("Checking for JQ tranform paths ...")
+	}
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)

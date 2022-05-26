@@ -41,7 +41,9 @@ var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
 func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	path := r.URL.String()
-	log.Debug("Inbound path: ", path)
+	if log.Level == DebugLevel {
+		log.Debug("Inbound path: ", path)
+	}
 	newpath := path
 
 	if meta.MatchRegexp == nil {
@@ -169,7 +171,9 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	matchGroups := meta.MatchRegexp.FindAllStringSubmatch(path, -1)
 
 	// Make sure it matches the string
-	log.Debug("Rewriter checking matches, len is: ", len(matchGroups))
+	if log.Level == DebugLevel {
+		log.Debug("Rewriter checking matches, len is: ", len(matchGroups))
+	}
 	if len(matchGroups) > 0 {
 		newpath = rewriteToPath
 		// get the indices for the replacements:
@@ -188,8 +192,12 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 			newpath = strings.Replace(newpath, v[0], groupReplace[v[0]], -1)
 		}
 
-		log.Debug("URL Re-written from: ", path)
-		log.Debug("URL Re-written to: ", newpath)
+		if log.Level == DebugLevel {
+			log.Debug("URL Re-written from: ", path)
+		}
+		if log.Level == DebugLevel {
+			log.Debug("URL Re-written to: ", newpath)
+		}
 
 		// put url_rewrite path to context to be used in ResponseTransformMiddleware
 		ctxSetUrlRewritePath(r, meta.Path)
@@ -446,7 +454,9 @@ func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *ht
 	}
 
 	if newAsURL.Scheme != LoopScheme && oldAsURL.Host != newAsURL.Host {
-		log.Debug("Detected a host rewrite in pattern!")
+		if log.Level == DebugLevel {
+			log.Debug("Detected a host rewrite in pattern!")
+		}
 		setCtxValue(r, ctx.RetainHost, true)
 	}
 }
@@ -473,7 +483,9 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	//To get host and query parameters
 	ctxSetOrigRequestURL(r, r.URL)
 
-	log.Debug("Rewriter active")
+	if log.Level == DebugLevel {
+		log.Debug("Rewriter active")
+	}
 	umeta := meta.(*apidef.URLRewriteMeta)
 	log.Debug(r.URL)
 	oldPath := r.URL.String()

@@ -57,15 +57,23 @@ func (m Monitor) checkLimit(sessionData *user.SessionState, key string, quotaMax
 	remainder := quotaMax - quotaRemaining
 	usagePerc := (float64(remainder) / float64(quotaMax)) * 100.0
 
-	log.Debug("Perc is: ", usagePerc)
+	if log.Level == DebugLevel {
+		log.Debug("Perc is: ", usagePerc)
+	}
 	renewalDate := time.Unix(quotaRenews, 0)
 
-	log.Debug("Now is: ", time.Now())
-	log.Debug("Renewal is: ", renewalDate)
+	if log.Level == DebugLevel {
+		log.Debug("Now is: ", time.Now())
+	}
+	if log.Level == DebugLevel {
+		log.Debug("Renewal is: ", renewalDate)
+	}
 	if time.Now().After(renewalDate) {
 		// Make sure that renewal is still in the future, If renewal is in the past,
 		// then the quota can expire and will auto-renew
-		log.Debug("Renewal date is in the past, skipping")
+		if log.Level == DebugLevel {
+			log.Debug("Renewal date is in the past, skipping")
+		}
 		return false
 	}
 

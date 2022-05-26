@@ -53,8 +53,12 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		rate = currentSession.Rate
 	}
 
-	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
-	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
+	if log.Level == DebugLevel {
+		log.Debug("[RATELIMIT] Inbound raw key is: ", key)
+	}
+	if log.Level == DebugLevel {
+		log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
+	}
 	pipeline := globalConf.EnableNonTransactionalRateLimiter
 
 	var ratePerPeriodNow int
@@ -265,17 +269,29 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	quotaRenews := limit.QuotaRenews
 	quotaMax := limit.QuotaMax
 
-	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
-	log.Debug("Renewing with TTL: ", quotaRenewalRate)
+	if log.Level == DebugLevel {
+		log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
+	}
+	if log.Level == DebugLevel {
+		log.Debug("Renewing with TTL: ", quotaRenewalRate)
+	}
 	// INCR the key (If it equals 1 - set EXPIRE)
 	qInt := store.IncrememntWithExpire(rawKey, quotaRenewalRate)
 	// if the returned val is >= quota: block
 	if qInt-1 >= quotaMax {
 		renewalDate := time.Unix(quotaRenews, 0)
-		log.Debug("Renewal Date is: ", renewalDate)
-		log.Debug("As epoch: ", quotaRenews)
-		log.Debug("Session: ", currentSession)
-		log.Debug("Now:", time.Now())
+		if log.Level == DebugLevel {
+			log.Debug("Renewal Date is: ", renewalDate)
+		}
+		if log.Level == DebugLevel {
+			log.Debug("As epoch: ", quotaRenews)
+		}
+		if log.Level == DebugLevel {
+			log.Debug("Session: ", currentSession)
+		}
+		if log.Level == DebugLevel {
+			log.Debug("Now:", time.Now())
+		}
 		if time.Now().After(renewalDate) {
 			//for renew quota = never, once we get the quota max we must not allow using it again
 
@@ -284,7 +300,9 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 			}
 			// The renewal date is in the past, we should update the quota!
 			// Also, this fixes legacy issues where there is no TTL on quota buckets
-			log.Debug("Incorrect key expiry setting detected, correcting")
+			if log.Level == DebugLevel {
+				log.Debug("Incorrect key expiry setting detected, correcting")
+			}
 			go store.DeleteRawKey(rawKey)
 			qInt = 1
 		} else {

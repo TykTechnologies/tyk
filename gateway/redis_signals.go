@@ -214,7 +214,7 @@ func (r *RedisNotifier) Notify(notif interface{}) bool {
 		return false
 	}
 
-	// pubSubLog.Debug("Sending notification", notif)
+	// if log.Level == DebugLevel {pubSubLog.Debug("Sending notification", notif)}
 
 	if err := r.store.Publish(r.channel, string(toSend)); err != nil {
 		if err != storage.ErrRedisIsDown {

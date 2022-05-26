@@ -249,7 +249,9 @@ func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password strin
 	hashBytes := []byte(hash)
 
 	if k.Spec.BasicAuth.DisableCaching {
-		logEntry.Debug("cache disabled")
+		if log.Level == DebugLevel {
+			logEntry.Debug("cache disabled")
+		}
 		return bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
 	}
 
@@ -260,7 +262,9 @@ func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password strin
 
 	cachedPass, inCache := basicAuthCache.Get(hash)
 	if !inCache {
-		logEntry.Debug("cache enabled: miss: bcrypt")
+		if log.Level == DebugLevel {
+			logEntry.Debug("cache enabled: miss: bcrypt")
+		}
 		_, err, _ := cacheGroup.Do(hash+"."+password, func() (interface{}, error) {
 			return nil, k.doBcryptWithCache(cacheTTL, hashBytes, passwordBytes)
 		})
@@ -276,6 +280,8 @@ func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password strin
 		return bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
 	}
 
-	logEntry.Debug("cache enabled: hit: success")
+	if log.Level == DebugLevel {
+		logEntry.Debug("cache enabled: hit: success")
+	}
 	return nil
 }

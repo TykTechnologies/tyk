@@ -160,7 +160,9 @@ func (h *HTTPDashboardHandler) Register() error {
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	} else if resp.StatusCode == http.StatusConflict {
-		dashLog.Debug("Node is already registered")
+		if log.Level == DebugLevel {
+			dashLog.Debug("Node is already registered")
+		}
 		return nil
 	} else if resp != nil && resp.StatusCode != 200 {
 		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
@@ -188,7 +190,9 @@ func (h *HTTPDashboardHandler) Register() error {
 
 	// Set the nonce
 	ServiceNonce = val.Nonce
-	dashLog.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
+	if log.Level == DebugLevel {
+		dashLog.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
+	}
 
 	return nil
 }
@@ -257,7 +261,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 
 	// Set the nonce
 	ServiceNonce = val.Nonce
-	//log.Debug("Heartbeat Finished: Nonce Set: ", ServiceNonce)
+	//if log.Level == DebugLevel {log.Debug("Heartbeat Finished: Nonce Set: ", ServiceNonce)}
 
 	return nil
 }

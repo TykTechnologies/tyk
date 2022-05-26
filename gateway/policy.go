@@ -120,7 +120,9 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}
 
 	ServiceNonce = list.Nonce
-	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
+	if log.Level == DebugLevel {
+		log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
+	}
 
 	policies := make(map[string]user.Policy, len(list.Message))
 

@@ -51,6 +51,7 @@ import (
 
 var (
 	log                  = logger.Get()
+	DebugLevel           = logrus.DebugLevel
 	mainLog              = log.WithField("prefix", "main")
 	pubSubLog            = log.WithField("prefix", "pub-sub")
 	rawLog               = logger.GetRaw()
@@ -196,7 +197,9 @@ func setupGlobals(ctx context.Context) {
 		globalConf := config.Global()
 		globalConf.LoadIgnoredIPs()
 		config.SetGlobal(globalConf)
-		mainLog.Debug("Setting up analytics DB connection")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Setting up analytics DB connection")
+		}
 
 		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 		analytics.Store = &analyticsStore
@@ -209,7 +212,9 @@ func setupGlobals(ctx context.Context) {
 		})
 
 		if config.Global().AnalyticsConfig.Type == "rpc" {
-			mainLog.Debug("Using RPC cache purge")
+			if log.Level == DebugLevel {
+				mainLog.Debug("Using RPC cache purge")
+			}
 
 			rpcPurgeOnce.Do(func() {
 				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
@@ -230,7 +235,9 @@ func setupGlobals(ctx context.Context) {
 	CoProcessInit()
 
 	// Get the notifier ready
-	mainLog.Debug("Notifier will not work in hybrid mode")
+	if log.Level == DebugLevel {
+		mainLog.Debug("Notifier will not work in hybrid mode")
+	}
 	mainNotifierStore := &storage.RedisCluster{}
 	mainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel}
@@ -292,9 +299,13 @@ func syncAPISpecs() (int, error) {
 
 		s = tmpSpecs
 
-		mainLog.Debug("Downloading API Configurations from Dashboard Service")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Downloading API Configurations from Dashboard Service")
+		}
 	} else if config.Global().SlaveOptions.UseRPC {
-		mainLog.Debug("Using RPC Configuration")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Using RPC Configuration")
+		}
 
 		var err error
 		s, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey)
@@ -353,12 +364,16 @@ func syncPolicies() (count int, err error) {
 
 		pols = LoadPoliciesFromDashboard(connStr, config.Global().NodeSecret, config.Global().Policies.AllowExplicitPolicyID)
 	case "rpc":
-		mainLog.Debug("Using Policies from RPC")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Using Policies from RPC")
+		}
 		pols, err = LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
 	default:
 		// this is the only case now where we need a policy record name
 		if config.Global().Policies.PolicyRecordName == "" {
-			mainLog.Debug("No policy record name defined, skipping...")
+			if log.Level == DebugLevel {
+				mainLog.Debug("No policy record name defined, skipping...")
+			}
 			return 0, nil
 		}
 		pols = LoadPoliciesFromFile(config.Global().Policies.PolicyRecordName)
@@ -479,7 +494,9 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", oAuthClientTokensHandler).Methods("GET")
 
-	mainLog.Debug("Loaded API Endpoints")
+	if log.Level == DebugLevel {
+		mainLog.Debug("Loaded API Endpoints")
+	}
 }
 
 // checkIsAPIOwner will ensure that the accessor of the tyk API has the
@@ -545,7 +562,9 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 }
 
 func addBatchEndpoint(spec *APISpec, subrouter *mux.Router) {
-	mainLog.Debug("Batch requests enabled for API")
+	if log.Level == DebugLevel {
+		mainLog.Debug("Batch requests enabled for API")
+	}
 	batchHandler := BatchRequestHandler{API: spec}
 	subrouter.HandleFunc("/tyk/batch/", batchHandler.HandleBatchRequest)
 }
@@ -572,12 +591,16 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 	for _, mwObj := range spec.CustomMiddleware.Pre {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPreFuncs = append(mwPreFuncs, mwObj)
-		mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
+		if log.Level == DebugLevel {
+			mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
+		}
 	}
 	for _, mwObj := range spec.CustomMiddleware.Post {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPostFuncs = append(mwPostFuncs, mwObj)
-		mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
+		if log.Level == DebugLevel {
+			mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
+		}
 	}
 
 	// Load from folders
@@ -594,18 +617,24 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 		globPath := filepath.Join(config.Global().MiddlewarePath, spec.APIID, folder.name, "*.js")
 		paths, _ := filepath.Glob(globPath)
 		for _, path := range paths {
-			mainLog.Debug("Loading file middleware from ", path)
+			if log.Level == DebugLevel {
+				mainLog.Debug("Loading file middleware from ", path)
+			}
 
 			mwDef := apidef.MiddlewareDefinition{
 				Name: strings.Split(filepath.Base(path), ".")[0],
 				Path: path,
 			}
-			mainLog.Debug("-- Middleware name ", mwDef.Name)
+			if log.Level == DebugLevel {
+				mainLog.Debug("-- Middleware name ", mwDef.Name)
+			}
 			mwDef.RequireSession = strings.HasSuffix(mwDef.Name, "_with_session")
 			if mwDef.RequireSession {
 				switch folder.name {
 				case "post_auth", "post":
-					mainLog.Debug("-- Middleware requires session")
+					if log.Level == DebugLevel {
+						mainLog.Debug("-- Middleware requires session")
+					}
 				default:
 					mainLog.Warning("Middleware requires session, but isn't post-auth: ", mwDef.Name)
 				}
@@ -653,9 +682,13 @@ func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.Middlew
 			return
 		}
 		if err := processor.Init(processorDetail.Options, spec); err != nil {
-			mainLog.Debug("Failed to init processor: ", err)
+			if log.Level == DebugLevel {
+				mainLog.Debug("Failed to init processor: ", err)
+			}
 		}
-		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
+		if log.Level == DebugLevel {
+			mainLog.Debug("Loading Response processor: ", processorDetail.Name)
+		}
 		responseChain[i] = processor
 	}
 
@@ -667,7 +700,9 @@ func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.Middlew
 			return
 		}
 		if err := processor.Init(mw, spec); err != nil {
-			mainLog.Debug("Failed to init processor: ", err)
+			if log.Level == DebugLevel {
+				mainLog.Debug("Failed to init processor: ", err)
+			}
 		}
 		responseChain = append(responseChain, processor)
 	}
@@ -678,7 +713,9 @@ func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.Middlew
 func handleCORS(router *mux.Router, spec *APISpec) {
 
 	if spec.CORS.Enable {
-		mainLog.Debug("CORS ENABLED")
+		if log.Level == DebugLevel {
+			mainLog.Debug("CORS ENABLED")
+		}
 		c := cors.New(cors.Options{
 			AllowedOrigins:     spec.CORS.AllowedOrigins,
 			AllowedMethods:     spec.CORS.AllowedMethods,
@@ -808,7 +845,9 @@ func reloadURLStructure(done func()) {
 
 func setupLogger() {
 	if config.Global().UseSentry {
-		mainLog.Debug("Enabling Sentry support")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Enabling Sentry support")
+		}
 
 		logLevel := []logrus.Level{}
 
@@ -833,11 +872,15 @@ func setupLogger() {
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
 		}
-		mainLog.Debug("Sentry hook active")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Sentry hook active")
+		}
 	}
 
 	if config.Global().UseSyslog {
-		mainLog.Debug("Enabling Syslog support")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Enabling Syslog support")
+		}
 		hook, err := logrus_syslog.NewSyslogHook(config.Global().SyslogTransport,
 			config.Global().SyslogNetworkAddr,
 			syslog.LOG_INFO, "")
@@ -846,33 +889,45 @@ func setupLogger() {
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
 		}
-		mainLog.Debug("Syslog hook active")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Syslog hook active")
+		}
 	}
 
 	if config.Global().UseGraylog {
-		mainLog.Debug("Enabling Graylog support")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Enabling Graylog support")
+		}
 		hook := graylogHook.NewGraylogHook(config.Global().GraylogNetworkAddr,
 			map[string]interface{}{"tyk-module": "gateway"})
 
 		log.Hooks.Add(hook)
 		rawLog.Hooks.Add(hook)
 
-		mainLog.Debug("Graylog hook active")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Graylog hook active")
+		}
 	}
 
 	if config.Global().UseLogstash {
-		mainLog.Debug("Enabling Logstash support")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Enabling Logstash support")
+		}
 
 		var hook *logstashHook.Hook
 		var err error
 		var conn net.Conn
 		if config.Global().LogstashTransport == "udp" {
-			mainLog.Debug("Connecting to Logstash with udp")
+			if log.Level == DebugLevel {
+				mainLog.Debug("Connecting to Logstash with udp")
+			}
 			hook, err = logstashHook.NewHook(config.Global().LogstashTransport,
 				config.Global().LogstashNetworkAddr,
 				appName)
 		} else {
-			mainLog.Debugf("Connecting to Logstash with %s", config.Global().LogstashTransport)
+			if log.Level == DebugLevel {
+				mainLog.Debugf("Connecting to Logstash with %s", config.Global().LogstashTransport)
+			}
 			conn, err = gas.Dial(config.Global().LogstashTransport, config.Global().LogstashNetworkAddr)
 			if err == nil {
 				hook, err = logstashHook.NewHookWithConn(conn, appName)
@@ -884,7 +939,9 @@ func setupLogger() {
 		} else {
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
-			mainLog.Debug("Logstash hook active")
+			if log.Level == DebugLevel {
+				mainLog.Debug("Logstash hook active")
+			}
 		}
 	}
 
@@ -893,7 +950,9 @@ func setupLogger() {
 		log.Hooks.Add(hook)
 		rawLog.Hooks.Add(hook)
 
-		mainLog.Debug("Redis log hook active")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Redis log hook active")
+		}
 	}
 }
 
@@ -907,14 +966,20 @@ func initialiseSystem(ctx context.Context) error {
 		stdlog.SetOutput(ioutil.Discard)
 	} else if *cli.DebugMode {
 		log.Level = logrus.DebugLevel
-		mainLog.Debug("Enabling debug-level output")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Enabling debug-level output")
+		}
 	}
 
 	if *cli.Conf != "" {
-		mainLog.Debugf("Using %s for configuration", *cli.Conf)
+		if log.Level == DebugLevel {
+			mainLog.Debugf("Using %s for configuration", *cli.Conf)
+		}
 		confPaths = []string{*cli.Conf}
 	} else {
-		mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
+		if log.Level == DebugLevel {
+			mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
+		}
 	}
 
 	mainLog.Infof("Tyk API Gateway %s", VERSION)
@@ -1102,7 +1167,9 @@ func kvStore(value string) (string, error) {
 
 	if strings.HasPrefix(value, "secrets://") {
 		key := strings.TrimPrefix(value, "secrets://")
-		log.Debugf("Retrieving %s from secret store in config", key)
+		if log.Level == DebugLevel {
+			log.Debugf("Retrieving %s from secret store in config", key)
+		}
 		val, ok := config.Global().Secrets[key]
 		if !ok {
 			return "", fmt.Errorf("secrets does not exist in config.. %s not found", key)
@@ -1113,13 +1180,17 @@ func kvStore(value string) (string, error) {
 
 	if strings.HasPrefix(value, "env://") {
 		key := strings.TrimPrefix(value, "env://")
-		log.Debugf("Retrieving %s from environment", key)
+		if log.Level == DebugLevel {
+			log.Debugf("Retrieving %s from environment", key)
+		}
 		return os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key))), nil
 	}
 
 	if strings.HasPrefix(value, "consul://") {
 		key := strings.TrimPrefix(value, "consul://")
-		log.Debugf("Retrieving %s from consul", key)
+		if log.Level == DebugLevel {
+			log.Debugf("Retrieving %s from consul", key)
+		}
 		if err := setUpConsul(); err != nil {
 			log.Error("Failed to setup consul: ", err)
 			// Return value as is. If consul cannot be set up
@@ -1131,7 +1202,9 @@ func kvStore(value string) (string, error) {
 
 	if strings.HasPrefix(value, "vault://") {
 		key := strings.TrimPrefix(value, "vault://")
-		log.Debugf("Retrieving %s from vault", key)
+		if log.Level == DebugLevel {
+			log.Debugf("Retrieving %s from vault", key)
+		}
 		if err := setUpVault(); err != nil {
 			log.Error("Failed to setup vault: ", err)
 			// Return value as is If vault cannot be set up
@@ -1153,7 +1226,9 @@ func setUpVault() error {
 
 	vaultKVStore, err = kv.NewVault(config.Global().KV.Vault)
 	if err != nil {
-		log.Debugf("an error occurred while setting up vault... %v", err)
+		if log.Level == DebugLevel {
+			log.Debugf("an error occurred while setting up vault... %v", err)
+		}
 	}
 
 	return err
@@ -1168,7 +1243,9 @@ func setUpConsul() error {
 
 	consulKVStore, err = kv.NewConsul(config.Global().KV.Consul)
 	if err != nil {
-		log.Debugf("an error occurred while setting up consul.. %v", err)
+		if log.Level == DebugLevel {
+			log.Debugf("an error occurred while setting up consul.. %v", err)
+		}
 	}
 
 	return err
@@ -1258,7 +1335,9 @@ func Start() {
 	})
 
 	if *cli.MemProfile {
-		mainLog.Debug("Memory profiling active")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Memory profiling active")
+		}
 		var err error
 		if memProfFile, err = os.Create("tyk.mprof"); err != nil {
 			panic(err)
@@ -1344,7 +1423,9 @@ func writeProfiles() {
 func start(ctx context.Context) {
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
-		mainLog.Debug("Initialising default org store")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Initialising default org store")
+		}
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
@@ -1356,7 +1437,9 @@ func start(ctx context.Context) {
 	}
 
 	if slaveOptions := config.Global().SlaveOptions; slaveOptions.UseRPC {
-		mainLog.Debug("Starting RPC reload listener")
+		if log.Level == DebugLevel {
+			mainLog.Debug("Starting RPC reload listener")
+		}
 		RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
 			SuppressRegister: true,

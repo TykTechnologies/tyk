@@ -125,7 +125,9 @@ func verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func
 	}
 
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-		certLog.Debug("Checking certificate public key")
+		if log.Level == DebugLevel {
+			certLog.Debug("Checking certificate public key")
+		}
 
 		for _, rawCert := range rawCerts {
 			cert, _ := x509.ParseCertificate(rawCert)
@@ -148,7 +150,9 @@ func verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func
 }
 
 func validatePublicKeys(host string, conn *tls.Conn, spec *APISpec) bool {
-	certLog.Debug("Checking certificate public key for host:", host)
+	if log.Level == DebugLevel {
+		certLog.Debug("Checking certificate public key for host:", host)
+	}
 
 	whitelist := getPinnedPublicKeys(host, spec)
 	if len(whitelist) == 0 {
@@ -177,7 +181,9 @@ func validatePublicKeys(host string, conn *tls.Conn, spec *APISpec) bool {
 }
 
 func validateCommonName(host string, cert *x509.Certificate) error {
-	certLog.Debug("Checking certificate CommonName for host :", host)
+	if log.Level == DebugLevel {
+		certLog.Debug("Checking certificate CommonName for host :", host)
+	}
 
 	if cert.Subject.CommonName != host {
 		return errors.New("certificate had CN " + cert.Subject.CommonName + "expected " + host)
@@ -371,7 +377,9 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 				// If current domain match or empty, whitelist client certificates
 				if spec.Domain == "" || spec.Domain == hello.ServerName {
-					log.Debugf("TLS Handshake: Matched mTLS api %v via domain %v", spec.APIID, hello.ServerName)
+					if log.Level == DebugLevel {
+						log.Debugf("TLS Handshake: Matched mTLS api %v via domain %v", spec.APIID, hello.ServerName)
+					}
 
 					certIDs := append(spec.ClientCertificates, config.Global().Security.Certificates.API...)
 
@@ -382,7 +390,9 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 					}
 				}
 			case spec.Auth.UseCertificate, spec.AuthConfigs[authTokenType].UseCertificate:
-				log.Debugf("TLS Handshake: found UseCertificate API %v, is legacy %v", spec.APIID, spec.Auth.UseCertificate && !spec.AuthConfigs[authTokenType].UseCertificate)
+				if log.Level == DebugLevel {
+					log.Debugf("TLS Handshake: found UseCertificate API %v, is legacy %v", spec.APIID, spec.Auth.UseCertificate && !spec.AuthConfigs[authTokenType].UseCertificate)
+				}
 				// Dynamic certificate check required, falling back to HTTP level check
 				// TODO: Change to VerifyPeerCertificate hook instead, when possible
 				if domainRequireCert[spec.Domain] < tls.RequestClientCert {
@@ -418,7 +428,9 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		}
 
 		if clientAuth, found := domainRequireCert[hello.ServerName]; found {
-			log.Debugf("TLS Handshake: domain %v matched, with client auth: %v", hello.ServerName, clientAuth)
+			if log.Level == DebugLevel {
+				log.Debugf("TLS Handshake: domain %v matched, with client auth: %v", hello.ServerName, clientAuth)
+			}
 			newConfig.ClientAuth = clientAuth
 		} else {
 			newConfig.ClientAuth = tls.NoClientCert
@@ -434,7 +446,9 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 				req := http.Request{Host: hello.ServerName, URL: &url.URL{}}
 				if isRegex && mux.NewRouter().Host(domain).Match(&req, &mux.RouteMatch{}) {
-					log.Debugf("TLS Handshake: regexp domain %v matched, with client auth: %v", hello.ServerName, clientAuth)
+					if log.Level == DebugLevel {
+						log.Debugf("TLS Handshake: regexp domain %v matched, with client auth: %v", hello.ServerName, clientAuth)
+					}
 					if clientAuth > newConfig.ClientAuth {
 						newConfig.ClientAuth = clientAuth
 					}
@@ -450,7 +464,9 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 			newConfig.ClientAuth = domainRequireCert[""]
 		}
 
-		log.Debugf("TLS Handshake: Successs. ServerName: %v. Require client certificate: %v", hello.ServerName, newConfig.ClientAuth)
+		if log.Level == DebugLevel {
+			log.Debugf("TLS Handshake: Successs. ServerName: %v. Require client certificate: %v", hello.ServerName, newConfig.ClientAuth)
+		}
 
 		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)

@@ -16,7 +16,9 @@ func setupDRL() {
 	drlManager := &drl.DRL{}
 	drlManager.Init()
 	drlManager.ThisServerID = GetNodeID() + "|" + hostDetails.Hostname
-	log.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
+	if log.Level == DebugLevel {
+		log.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
+	}
 	DRLManager = drlManager
 }
 
@@ -89,7 +91,7 @@ func onServerStatusReceivedHandler(payload string) {
 		return
 	}
 
-	// log.Debug("Received DRL data: ", serverData)
+	// if log.Level == DebugLevel {log.Debug("Received DRL data: ", serverData)}
 
 	if DRLManager.Ready {
 		if err := DRLManager.AddOrUpdateServer(serverData); err != nil {

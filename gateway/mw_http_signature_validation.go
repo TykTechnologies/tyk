@@ -141,7 +141,9 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 		if !matchPass {
 			isLower, lowerList := hm.hasLowerCaseEscaped(fieldValues.Signature)
 			if isLower {
-				logger.Debug("--- Detected lower case encoding! ---")
+				if log.Level == DebugLevel {
+					logger.Debug("--- Detected lower case encoding! ---")
+				}
 				upperedSignature := hm.replaceWithUpperCase(fieldValues.Signature, lowerList)
 				matchPass, err = validateRSAEncodedSignature(signatureString, rsaKey, fieldValues.Algorthm, upperedSignature)
 				if err != nil {
@@ -173,7 +175,9 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 		if !matchPass {
 			isLower, lowerList := hm.hasLowerCaseEscaped(fieldValues.Signature)
 			if isLower {
-				logger.Debug("--- Detected lower case encoding! ---")
+				if log.Level == DebugLevel {
+					logger.Debug("--- Detected lower case encoding! ---")
+				}
 				upperedSignature := hm.replaceWithUpperCase(fieldValues.Signature, lowerList)
 				if encodedSignature == upperedSignature {
 					matchPass = true
@@ -442,7 +446,9 @@ func generateHMACSignatureStringFromRequest(r *http.Request, headers []string, p
 			signatureString += "\n"
 		}
 	}
-	log.Debug("Generated sig string: ", signatureString)
+	if log.Level == DebugLevel {
+		log.Debug("Generated sig string: ", signatureString)
+	}
 	return signatureString, nil
 }
 

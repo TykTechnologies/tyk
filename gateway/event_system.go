@@ -137,16 +137,22 @@ func EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APIS
 }
 
 func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
-	log.Debug("EVENT FIRED: ", name)
+	if log.Level == DebugLevel {
+		log.Debug("EVENT FIRED: ", name)
+	}
 	if handlers, e := handlers[name]; e {
-		log.Debugf("FOUND %d EVENT HANDLERS", len(handlers))
+		if log.Level == DebugLevel {
+			log.Debugf("FOUND %d EVENT HANDLERS", len(handlers))
+		}
 		eventMessage := config.EventMessage{
 			Meta:      meta,
 			Type:      name,
 			TimeStamp: time.Now().Local().String(),
 		}
 		for _, handler := range handlers {
-			log.Debug("FIRING HANDLER: ", handler)
+			if log.Level == DebugLevel {
+				log.Debug("FIRING HANDLER: ", handler)
+			}
 			go handler.HandleEvent(eventMessage)
 		}
 	}
@@ -201,15 +207,21 @@ func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 func initGenericEventHandlers(conf *config.Config) {
 	handlers := make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range conf.EventHandlers.Events {
-		log.Debug("FOUND EVENTS TO INIT")
+		if log.Level == DebugLevel {
+			log.Debug("FOUND EVENTS TO INIT")
+		}
 		for _, handlerConf := range eventHandlerConfs {
-			log.Debug("CREATING EVENT HANDLERS")
+			if log.Level == DebugLevel {
+				log.Debug("CREATING EVENT HANDLERS")
+			}
 			eventHandlerInstance, err := EventHandlerByName(handlerConf, nil)
 
 			if err != nil {
 				log.Error("Failed to init event handler: ", err)
 			} else {
-				log.Debug("Init Event Handler: ", eventName)
+				if log.Level == DebugLevel {
+					log.Debug("Init Event Handler: ", eventName)
+				}
 				handlers[eventName] = append(handlers[eventName], eventHandlerInstance)
 			}
 

@@ -138,10 +138,16 @@ func (m *RedisCacheMiddleware) isTimeStampExpired(timestamp string) bool {
 	}
 	tm := time.Unix(i, 0)
 
-	log.Debug("Time Now: ", now)
-	log.Debug("Expires: ", tm)
+	if log.Level == DebugLevel {
+		log.Debug("Time Now: ", now)
+	}
+	if log.Level == DebugLevel {
+		log.Debug("Expires: ", tm)
+	}
 	if tm.Before(now) {
-		log.Debug("Expriy caught in TS!")
+		if log.Level == DebugLevel {
+			log.Debug("Expriy caught in TS!")
+		}
 		return true
 	}
 
@@ -207,7 +213,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	var retBlob string
 	key, err := m.CreateCheckSum(r, token, cacheKeyRegex, m.getCacheKeyFromHeaders(r))
 	if err != nil {
-		log.Debug("Error creating checksum. Skipping cache check")
+		if log.Level == DebugLevel {
+			log.Debug("Error creating checksum. Skipping cache check")
+		}
 		errCreatingChecksum = true
 	} else {
 		v, sfErr, _ := m.singleFlight.Do(key, func() (interface{}, error) {
@@ -219,19 +227,25 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	if err != nil {
 		if !errCreatingChecksum {
-			log.Debug("Cache enabled, but record not found")
+			if log.Level == DebugLevel {
+				log.Debug("Cache enabled, but record not found")
+			}
 		}
 		// Pass through to proxy AND CACHE RESULT
 
 		var resVal *http.Response
 		if isVirtual {
-			log.Debug("This is a virtual function")
+			if log.Level == DebugLevel {
+				log.Debug("This is a virtual function")
+			}
 			vp := VirtualEndpoint{BaseMiddleware: m.BaseMiddleware}
 			vp.Init()
 			resVal = vp.ServeHTTPForCache(w, r, nil)
 		} else {
 			// This passes through and will write the value to the writer, but spit out a copy for the cache
-			log.Debug("Not virtual, passing")
+			if log.Level == DebugLevel {
+				log.Debug("Not virtual, passing")
+			}
 			if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
 				r.URL = newURL
 				ctxSetURLRewriteTarget(r, nil)
@@ -272,7 +286,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 		// Are we using upstream cache control?
 		if m.Spec.CacheOptions.EnableUpstreamCacheControl {
-			log.Debug("Upstream control enabled")
+			if log.Level == DebugLevel {
+				log.Debug("Upstream control enabled")
+			}
 			// Do we cache?
 			if resVal.Header.Get(upstreamCacheHeader) == "" {
 				log.Warning("Upstream cache action not found, not caching")
@@ -286,7 +302,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 			ttl := resVal.Header.Get(cacheTTLHeader)
 			if ttl != "" {
-				log.Debug("TTL Set upstream")
+				if log.Level == DebugLevel {
+					log.Debug("TTL Set upstream")
+				}
 				cacheAsInt, err := strconv.Atoi(ttl)
 				if err != nil {
 					log.Error("Failed to decode TTL cache value: ", err)
@@ -298,10 +316,14 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		}
 
 		if cacheThisRequest && !errCreatingChecksum {
-			log.Debug("Caching request to redis")
+			if log.Level == DebugLevel {
+				log.Debug("Caching request to redis")
+			}
 			var wireFormatReq bytes.Buffer
 			resVal.Write(&wireFormatReq)
-			log.Debug("Cache TTL is:", cacheTTL)
+			if log.Level == DebugLevel {
+				log.Debug("Cache TTL is:", cacheTTL)
+			}
 			ts := m.getTimeTTL(cacheTTL)
 			toStore := m.encodePayload(wireFormatReq.String(), ts)
 			go m.CacheStore.SetKey(key, toStore, cacheTTL)
@@ -322,7 +344,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, http.StatusOK
 	}
 
-	log.Debug("Cache got: ", cachedData)
+	if log.Level == DebugLevel {
+		log.Debug("Cache got: ", cachedData)
+	}
 	bufData := bufio.NewReader(strings.NewReader(cachedData))
 	newRes, err := http.ReadResponse(bufData, r)
 	if err != nil {

@@ -202,7 +202,9 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
 }
 
 func flushNetworkAnalytics(ctx context.Context) {
-	mainLog.Debug("Starting routine for flushing network analytics")
+	if log.Level == DebugLevel {
+		mainLog.Debug("Starting routine for flushing network analytics")
+	}
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	for {
@@ -271,9 +273,13 @@ func dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 		return nil
 	}
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-		log.Debug("[PROXY] Service discovery enabled")
+		if log.Level == DebugLevel {
+			log.Debug("[PROXY] Service discovery enabled")
+		}
 		if ServiceCache == nil {
-			log.Debug("[PROXY] Service cache initialising")
+			if log.Level == DebugLevel {
+				log.Debug("[PROXY] Service cache initialising")
+			}
 			expiry := 120
 			if spec.Proxy.ServiceDiscovery.CacheTimeout > 0 {
 				expiry = int(spec.Proxy.ServiceDiscovery.CacheTimeout)
@@ -294,7 +300,9 @@ func dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 				break
 			}
-			log.Debug("[PROXY] [SERVICE DISCOVERY] received host list ", hostList.All())
+			if log.Level == DebugLevel {
+				log.Debug("[PROXY] [SERVICE DISCOVERY] received host list ", hostList.All())
+			}
 			fallthrough // implies load balancing, with replaced host list
 		case spec.Proxy.EnableLoadBalancing:
 			host, err := nextTarget(hostList, spec)

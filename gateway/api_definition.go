@@ -307,19 +307,27 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 
 	// Set up Event Handlers
 	if len(def.EventHandlers.Events) > 0 {
-		logger.Debug("Initializing event handlers")
+		if log.Level == DebugLevel {
+			logger.Debug("Initializing event handlers")
+		}
 	}
 	spec.EventPaths = make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range def.EventHandlers.Events {
-		logger.Debug("FOUND EVENTS TO INIT")
+		if log.Level == DebugLevel {
+			logger.Debug("FOUND EVENTS TO INIT")
+		}
 		for _, handlerConf := range eventHandlerConfs {
-			logger.Debug("CREATING EVENT HANDLERS")
+			if log.Level == DebugLevel {
+				logger.Debug("CREATING EVENT HANDLERS")
+			}
 			eventHandlerInstance, err := EventHandlerByName(handlerConf, spec)
 
 			if err != nil {
 				logger.Error("Failed to init event handler: ", err)
 			} else {
-				logger.Debug("Init Event Handler: ", eventName)
+				if log.Level == DebugLevel {
+					logger.Debug("Init Event Handler: ", eventName)
+				}
 				spec.EventPaths[eventName] = append(spec.EventPaths[eventName], eventHandlerInstance)
 			}
 
@@ -349,14 +357,18 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
 func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*APISpec, error) {
 	// Get the definitions
-	log.Debug("Calling: ", endpoint)
+	if log.Level == DebugLevel {
+		log.Debug("Calling: ", endpoint)
+	}
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
 		log.Error("Failed to create request: ", err)
 	}
 
 	newRequest.Header.Set("authorization", secret)
-	log.Debug("Using: NodeID: ", GetNodeID())
+	if log.Level == DebugLevel {
+		log.Debug("Using: NodeID: ", GetNodeID())
+	}
 	newRequest.Header.Set(headers.XTykNodeID, GetNodeID())
 
 	newRequest.Header.Set(headers.XTykNonce, ServiceNonce)
@@ -429,7 +441,9 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 
 	// Set the nonce
 	ServiceNonce = list.Nonce
-	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
+	if log.Level == DebugLevel {
+		log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
+	}
 
 	return specs, nil
 }
@@ -613,13 +627,17 @@ func (a APIDefinitionLoader) filterSprigFuncs() template.FuncMap {
 }
 
 func (a APIDefinitionLoader) loadFileTemplate(path string) (*template.Template, error) {
-	log.Debug("-- Loading template: ", path)
+	if log.Level == DebugLevel {
+		log.Debug("-- Loading template: ", path)
+	}
 	tmpName := filepath.Base(path)
 	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(path)
 }
 
 func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, error) {
-	log.Debug("-- Loading blob")
+	if log.Level == DebugLevel {
+		log.Debug("-- Loading blob")
+	}
 	uDec, err := base64.StdEncoding.DecodeString(blob)
 	if err != nil {
 		return nil, err
@@ -632,9 +650,13 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
 
-	log.Debug("Checking for transform paths...")
+	if log.Level == DebugLevel {
+		log.Debug("Checking for transform paths...")
+	}
 	for _, stringSpec := range paths {
-		log.Debug("-- Generating path")
+		if log.Level == DebugLevel {
+			log.Debug("-- Generating path")
+		}
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with template actions
@@ -646,10 +668,14 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 
 		switch stringSpec.TemplateData.Mode {
 		case apidef.UseFile:
-			log.Debug("-- Using File mode")
+			if log.Level == DebugLevel {
+				log.Debug("-- Using File mode")
+			}
 			newTransformSpec.Template, err = a.loadFileTemplate(stringSpec.TemplateData.TemplateSource)
 		case apidef.UseBlob:
-			log.Debug("-- Blob mode")
+			if log.Level == DebugLevel {
+				log.Debug("-- Blob mode")
+			}
 			newTransformSpec.Template, err = a.loadBlobTemplate(stringSpec.TemplateData.TemplateSource)
 		default:
 			log.Warning("[Transform Templates] No template mode defined! Found: ", stringSpec.TemplateData.Mode)
@@ -664,7 +690,9 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 
 		if err == nil {
 			urlSpec = append(urlSpec, newSpec)
-			log.Debug("-- Loaded")
+			if log.Level == DebugLevel {
+				log.Debug("-- Loaded")
+			}
 		} else {
 			log.Error("Template load failure! Skipping transformation: ", err)
 		}
@@ -755,7 +783,9 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
 		newSpec.CircuitBreaker = ExtendedCircuitBreakerMeta{CircuitBreakerMeta: stringSpec}
-		log.Debug("Initialising circuit breaker for: ", stringSpec.Path)
+		if log.Level == DebugLevel {
+			log.Debug("Initialising circuit breaker for: ", stringSpec.Path)
+		}
 		newSpec.CircuitBreaker.CB = circuit.NewRateBreaker(stringSpec.ThresholdPercent, stringSpec.Samples)
 
 		// override backoff algorithm when is not desired to recheck the upstream before the ReturnToServiceAfter happens
@@ -770,14 +800,20 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 				switch e {
 				case circuit.BreakerTripped:
 					log.Warning("[PROXY] [CIRCUIT BREAKER] Breaker tripped for path: ", path)
-					log.Debug("Breaker tripped: ", e)
+					if log.Level == DebugLevel {
+						log.Debug("Breaker tripped: ", e)
+					}
 					// Start a timer function
 
 					if !timerActive {
 						go func(timeout int, breaker *circuit.Breaker) {
-							log.Debug("-- Sleeping for (s): ", timeout)
+							if log.Level == DebugLevel {
+								log.Debug("-- Sleeping for (s): ", timeout)
+							}
 							time.Sleep(time.Duration(timeout) * time.Second)
-							log.Debug("-- Resetting breaker")
+							if log.Level == DebugLevel {
+								log.Debug("-- Resetting breaker")
+							}
 							breaker.Reset()
 							timerActive = false
 						}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)

@@ -171,11 +171,15 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 	if k.Spec.OpenIDOptions.SegregateByClient {
 		// We are segregating by client, so use it as part of the internal token
-		logger.Debug("Client ID:", clientID)
+		if log.Level == DebugLevel {
+			logger.Debug("Client ID:", clientID)
+		}
 		sessionID = generateToken(k.Spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(clientID)))+keyID)
 	}
 
-	logger.Debug("Generated Session ID: ", sessionID)
+	if log.Level == DebugLevel {
+		logger.Debug("Generated Session ID: ", sessionID)
+	}
 
 	var policiesToApply []string
 	if !useScope {
@@ -196,7 +200,9 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	sessionID = session.KeyID
 	if !exists {
 		// Create it
-		logger.Debug("Key does not exist, creating")
+		if log.Level == DebugLevel {
+			logger.Debug("Key does not exist, creating")
+		}
 		session = user.SessionState{}
 
 		if !useScope {
@@ -219,7 +225,9 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		session.Alias = clientID + ":" + ouser.ID
 
 		// Update the session in the session manager in case it gets called again
-		logger.Debug("Policy applied to key")
+		if log.Level == DebugLevel {
+			logger.Debug("Policy applied to key")
+		}
 	}
 	// apply new policy to session if any and update session
 	session.SetPolicies(policiesToApply...)

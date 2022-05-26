@@ -310,7 +310,9 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored
 func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
-	log.Debug("Started proxy")
+	if log.Level == DebugLevel {
+		log.Debug("Started proxy")
+	}
 
 	defer s.Base().UpdateRequestSession(r)
 
@@ -318,7 +320,9 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
 		part := s.Spec.getVersionFromRequest(r)
 
-		log.Debug("Stripping version from url: ", part)
+		if log.Level == DebugLevel {
+			log.Debug("Stripping version from url: ", part)
+		}
 
 		r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
 		r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
@@ -326,10 +330,14 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 	// Make sure we get the correct target URL
 	if s.Spec.Proxy.StripListenPath {
-		log.Debug("Stripping: ", s.Spec.Proxy.ListenPath)
+		if log.Level == DebugLevel {
+			log.Debug("Stripping: ", s.Spec.Proxy.ListenPath)
+		}
 		r.URL.Path = s.Spec.StripListenPath(r, r.URL.Path)
 		r.URL.RawPath = s.Spec.StripListenPath(r, r.URL.RawPath)
-		log.Debug("Upstream Path is: ", r.URL.Path)
+		if log.Level == DebugLevel {
+			log.Debug("Upstream Path is: ", r.URL.Path)
+		}
 	}
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
@@ -338,7 +346,9 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	resp := s.Proxy.ServeHTTP(w, r)
 
 	millisec := DurationToMillisecond(time.Since(t1))
-	log.Debug("Upstream request took (ms): ", millisec)
+	if log.Level == DebugLevel {
+		log.Debug("Upstream request took (ms): ", millisec)
+	}
 
 	if resp.Response != nil {
 		latency := Latency{
@@ -347,7 +357,9 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response)
 	}
-	log.Debug("Done proxy")
+	if log.Level == DebugLevel {
+		log.Debug("Done proxy")
+	}
 	return nil
 }
 
@@ -360,7 +372,9 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
 		part := s.Spec.getVersionFromRequest(r)
 
-		log.Debug("Stripping version from URL: ", part)
+		if log.Level == DebugLevel {
+			log.Debug("Stripping version from URL: ", part)
+		}
 
 		r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
 		r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
@@ -378,7 +392,9 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
-	log.Debug("Upstream request took (ms): ", millisec)
+	if log.Level == DebugLevel {
+		log.Debug("Upstream request took (ms): ", millisec)
+	}
 
 	if inRes.Response != nil {
 		latency := Latency{

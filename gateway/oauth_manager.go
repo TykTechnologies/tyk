@@ -106,7 +106,9 @@ func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.R
 
 	// TODO: Might need to clear this out
 	if osinResponse.Output["state"] == "" {
-		log.Debug("Removing state")
+		if log.Level == DebugLevel {
+			log.Debug("Removing state")
+		}
 		delete(osinResponse.Output, "state")
 	}
 
@@ -191,18 +193,26 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 	// Ping endpoint with o_auth key and auth_key
 	authCode := r.FormValue("code")
 	oldRefreshToken := r.FormValue("refresh_token")
-	log.Debug("AUTH CODE: ", authCode)
+	if log.Level == DebugLevel {
+		log.Debug("AUTH CODE: ", authCode)
+	}
 	newOauthToken := ""
 	if resp.Output["access_token"] != nil {
 		newOauthToken = resp.Output["access_token"].(string)
 	}
-	log.Debug("TOKEN: ", newOauthToken)
+	if log.Level == DebugLevel {
+		log.Debug("TOKEN: ", newOauthToken)
+	}
 	refreshToken := ""
 	if resp.Output["refresh_token"] != nil {
 		refreshToken = resp.Output["refresh_token"].(string)
 	}
-	log.Debug("REFRESH: ", refreshToken)
-	log.Debug("Old REFRESH: ", oldRefreshToken)
+	if log.Level == DebugLevel {
+		log.Debug("REFRESH: ", refreshToken)
+	}
+	if log.Level == DebugLevel {
+		log.Debug("Old REFRESH: ", oldRefreshToken)
+	}
 
 	notificationType := newAccessToken
 	if oldRefreshToken != "" {
@@ -299,7 +309,9 @@ func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Req
 func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecret string) (int, []string, error) {
 	resp := []string{}
 	client, err := storage.GetClient(clientId)
-	log.Debug("Revoke all tokens")
+	if log.Level == DebugLevel {
+		log.Debug("Revoke all tokens")
+	}
 	if err != nil {
 		return http.StatusNotFound, resp, errors.New("error getting oauth client")
 	}
@@ -313,7 +325,9 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 		return http.StatusBadRequest, resp, errors.New("cannot retrieve client tokens")
 	}
 
-	log.Debug("Tokens found to be revoked:", len(clientTokens))
+	if log.Level == DebugLevel {
+		log.Debug("Tokens found to be revoked:", len(clientTokens))
+	}
 	for _, token := range clientTokens {
 		access, err := storage.LoadAccess(token.Token)
 		if err == nil {
@@ -321,7 +335,9 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 			storage.RemoveAccess(access.AccessToken)
 			storage.RemoveRefresh(access.RefreshToken)
 		} else {
-			log.Debug("error loading access:", err.Error())
+			if log.Level == DebugLevel {
+				log.Debug("error loading access:", err.Error())
+			}
 		}
 	}
 
@@ -396,7 +412,9 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			username = r.Form.Get("username")
 			password := r.Form.Get("password")
 			searchKey := "apikey-" + storage.HashKey(o.API.OrgID+username)
-			log.Debug("Getting: ", searchKey)
+			if log.Level == DebugLevel {
+				log.Debug("Getting: ", searchKey)
+			}
 
 			var err error
 			session, err = o.OsinServer.Storage.GetUser(searchKey)
@@ -440,7 +458,9 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 
 		// Does the user have an old OAuth token for this client?
 		if session != nil && session.OauthKeys != nil {
-			log.Debug("There's keys here bill...")
+			if log.Level == DebugLevel {
+				log.Debug("There's keys here bill...")
+			}
 			oldToken, foundKey := session.OauthKeys[ar.Client.GetId()]
 			if foundKey {
 				log.Info("Found old token, revoking: ", oldToken)
@@ -448,17 +468,25 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			}
 		}
 
-		log.Debug("[OAuth] Finishing access request ")
+		if log.Level == DebugLevel {
+			log.Debug("[OAuth] Finishing access request ")
+		}
 		o.OsinServer.FinishAccessRequest(resp, r, ar)
 		new_token, foundNewToken := resp.Output["access_token"]
 		if username != "" && foundNewToken {
-			log.Debug("Updating token data in key")
+			if log.Level == DebugLevel {
+				log.Debug("Updating token data in key")
+			}
 			if session.OauthKeys == nil {
 				session.OauthKeys = make(map[string]string)
 			}
 			session.OauthKeys[ar.Client.GetId()] = new_token.(string)
-			log.Debug("New token: ", new_token.(string))
-			log.Debug("Keys: ", session.OauthKeys)
+			if log.Level == DebugLevel {
+				log.Debug("New token: ", new_token.(string))
+			}
+			if log.Level == DebugLevel {
+				log.Debug("Keys: ", session.OauthKeys)
+			}
 
 			// add oauth-client user_fields to session's meta
 			if userData := ar.Client.GetUserData(); userData != nil {
@@ -479,7 +507,9 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 
 			keyName := generateToken(o.API.OrgID, username)
 
-			log.Debug("Updating user:", keyName)
+			if log.Level == DebugLevel {
+				log.Debug("Updating user:", keyName)
+			}
 			err := GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime), false)
 			if err != nil {
 				log.Error(err)
@@ -810,7 +840,9 @@ func (r *RedisOsinStorageInterface) SetClient(id string, orgID string, client os
 		key = id
 	}
 
-	log.Debug("CREATING: ", key)
+	if log.Level == DebugLevel {
+		log.Debug("CREATING: ", key)
+	}
 
 	r.store.SetKey(key, string(clientDataJSON), 0)
 
@@ -852,7 +884,9 @@ func (r *RedisOsinStorageInterface) DeleteClient(id string, orgID string, ignore
 	clientJSON, err := r.store.GetKey(key)
 	keyForSet := prefixClientset + prefixClient // Org ID
 	if err == nil {
-		log.Debug("Removing from set")
+		if log.Level == DebugLevel {
+			log.Debug("Removing from set")
+		}
 		r.store.RemoveFromSet(keyForSet, clientJSON)
 	}
 
@@ -880,7 +914,9 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 		return err
 	}
 	key := prefixAuth + authData.Code
-	log.Debug("Saving auth code: ", key)
+	if log.Level == DebugLevel {
+		log.Debug("Saving auth code: ", key)
+	}
 
 	r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
 
@@ -890,7 +926,9 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 // LoadAuthorize loads auth data from redis
 func (r *RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 	key := prefixAuth + code
-	log.Debug("Loading auth code: ", key)
+	if log.Level == DebugLevel {
+		log.Debug("Loading auth code: ", key)
+	}
 	authJSON, err := r.store.GetKey(key)
 
 	if err != nil {
@@ -921,7 +959,9 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		return err
 	}
 	key := prefixAccess + storage.HashKey(accessData.AccessToken)
-	log.Debug("Saving ACCESS key: ", key)
+	if log.Level == DebugLevel {
+		log.Debug("Saving ACCESS key: ", key)
+	}
 
 	// Overide default ExpiresIn:
 	if oauthTokenExpire := config.Global().OauthTokenExpire; oauthTokenExpire != 0 {
@@ -932,7 +972,9 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 	// add code to list of tokens for this client
 	sortedListKey := prefixClientTokens + accessData.Client.GetId()
-	log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
+	if log.Level == DebugLevel {
+		log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
+	}
 	r.redisStore.AddToSortedSet(
 		sortedListKey,
 		storage.HashKey(accessData.AccessToken),
@@ -1000,7 +1042,9 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 			refreshExpire = oauthRefreshExpire
 		}
 		r.store.SetKey(key, string(accessDataJSON), refreshExpire)
-		log.Debug("STORING ACCESS DATA: ", string(accessDataJSON))
+		if log.Level == DebugLevel {
+			log.Debug("STORING ACCESS DATA: ", string(accessDataJSON))
+		}
 		return nil
 	}
 
@@ -1010,7 +1054,9 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 // LoadAccess will load access data from redis
 func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error) {
 	key := prefixAccess + storage.HashKey(token)
-	log.Debug("Loading ACCESS key: ", key)
+	if log.Level == DebugLevel {
+		log.Debug("Loading ACCESS key: ", key)
+	}
 	accessJSON, err := r.store.GetKey(key)
 
 	if err != nil {
@@ -1057,7 +1103,9 @@ func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 // LoadRefresh will load access data from Redis
 func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, error) {
 	key := prefixRefresh + token
-	log.Debug("Loading REFRESH key: ", key)
+	if log.Level == DebugLevel {
+		log.Debug("Loading REFRESH key: ", key)
+	}
 	accessJSON, err := r.store.GetKey(key)
 
 	if err != nil {
@@ -1078,7 +1126,9 @@ func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData,
 
 // RemoveRefresh will remove a refresh token from redis
 func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
-	log.Debug("is going to revoke refresh token: ", token)
+	if log.Level == DebugLevel {
+		log.Debug("is going to revoke refresh token: ", token)
+	}
 	key := prefixRefresh + token
 	r.store.DeleteKey(key)
 	return nil
@@ -1123,7 +1173,9 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 // LoadRefresh will load access data from Redis
 func (r *RedisOsinStorageInterface) GetUser(username string) (*user.SessionState, error) {
 	key := username
-	log.Debug("Loading User key: ", key)
+	if log.Level == DebugLevel {
+		log.Debug("Loading User key: ", key)
+	}
 	accessJSON, err := r.store.GetRawKey(key)
 
 	if err != nil {

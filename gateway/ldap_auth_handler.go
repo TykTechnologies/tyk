@@ -48,7 +48,9 @@ func (l *LDAPStorageHandler) Connect() bool {
 }
 
 func (l *LDAPStorageHandler) GetKey(filter string) (string, error) {
-	log.Debug("Searching for filter: ", filter)
+	if log.Level == DebugLevel {
+		log.Debug("Searching for filter: ", filter)
+	}
 
 	useFilter := strings.Replace(l.SearchString, "TYKKEYID", filter, 1)
 	log.Warning("Search filter is: ", useFilter)
@@ -62,7 +64,9 @@ func (l *LDAPStorageHandler) GetKey(filter string) (string, error) {
 
 	sr, err := l.store.Search(search_request)
 	if err != nil {
-		log.Debug("LDAP Key search failed: ", err)
+		if log.Level == DebugLevel {
+			log.Debug("LDAP Key search failed: ", err)
+		}
 		return "", err
 	}
 
@@ -70,7 +74,9 @@ func (l *LDAPStorageHandler) GetKey(filter string) (string, error) {
 		return "", nil
 	}
 
-	log.Debug("Found Key: ", sr.Entries[0])
+	if log.Level == DebugLevel {
+		log.Debug("Found Key: ", sr.Entries[0])
+	}
 
 	entry := sr.Entries[0]
 
@@ -81,7 +87,9 @@ func (l *LDAPStorageHandler) GetKey(filter string) (string, error) {
 
 	for _, attr := range entry.Attributes {
 		if attr.Name == l.SessionAttributeName {
-			log.Debug("Found session data: ", attr.Values[0])
+			if log.Level == DebugLevel {
+				log.Debug("Found session data: ", attr.Values[0])
+			}
 			return attr.Values[0], nil
 		}
 	}

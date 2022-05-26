@@ -410,9 +410,15 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		case http.MethodPut:
 			if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
 				// passwords dont match assume it's new, lets hash it
-				log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
-				log.Debug("New: newSession.BasicAuthData.Password")
-				log.Debug("Changing password")
+				if log.Level == DebugLevel {
+					log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
+				}
+				if log.Level == DebugLevel {
+					log.Debug("New: newSession.BasicAuthData.Password")
+				}
+				if log.Level == DebugLevel {
+					log.Debug("Changing password")
+				}
 				setSessionPassword(newSession)
 			}
 		}
@@ -880,25 +886,35 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		if apiID != "" {
-			log.Debug("Requesting API definition for", apiID)
+			if log.Level == DebugLevel {
+				log.Debug("Requesting API definition for", apiID)
+			}
 			obj, code = handleGetAPI(apiID)
 		} else {
-			log.Debug("Requesting API list")
+			if log.Level == DebugLevel {
+				log.Debug("Requesting API list")
+			}
 			obj, code = handleGetAPIList()
 		}
 	case "POST":
-		log.Debug("Creating new definition file")
+		if log.Level == DebugLevel {
+			log.Debug("Creating new definition file")
+		}
 		obj, code = handleAddOrUpdateApi(apiID, r)
 	case "PUT":
 		if apiID != "" {
-			log.Debug("Updating existing API: ", apiID)
+			if log.Level == DebugLevel {
+				log.Debug("Updating existing API: ", apiID)
+			}
 			obj, code = handleAddOrUpdateApi(apiID, r)
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
 	case "DELETE":
 		if apiID != "" {
-			log.Debug("Deleting API definition for: ", apiID)
+			if log.Level == DebugLevel {
+				log.Debug("Deleting API definition for: ", apiID)
+			}
 			obj, code = handleDeleteAPI(apiID)
 		} else {
 			obj, code = apiError("Must specify an apiID to delete"), http.StatusBadRequest

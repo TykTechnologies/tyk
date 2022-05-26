@@ -35,7 +35,9 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	}
 
 	for _, accessSpec := range sessionVersionData.AllowedURLs {
-		logger.Debug("Checking: ", r.URL.Path, " Against:", accessSpec.URL)
+		if log.Level == DebugLevel {
+			logger.Debug("Checking: ", r.URL.Path, " Against:", accessSpec.URL)
+		}
 		asRegex, err := regexp.Compile(accessSpec.URL)
 		if err != nil {
 			logger.WithError(err).Error("Regex error")
@@ -44,7 +46,9 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 
 		match := asRegex.MatchString(r.URL.Path)
 		if match {
-			logger.Debug("Match!")
+			if log.Level == DebugLevel {
+				logger.Debug("Match!")
+			}
 			for _, method := range accessSpec.Methods {
 				if method == r.Method {
 					return nil, http.StatusOK

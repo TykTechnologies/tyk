@@ -114,11 +114,21 @@ func (a *AnalyticsRecord) GetGeo(ipStr string) {
 		return
 	}
 
-	log.Debug("ISO Code: ", record.Country.ISOCode)
-	log.Debug("City: ", record.City.Names["en"])
-	log.Debug("Lat: ", record.Location.Latitude)
-	log.Debug("Lon: ", record.Location.Longitude)
-	log.Debug("TZ: ", record.Location.TimeZone)
+	if log.Level == DebugLevel {
+		log.Debug("ISO Code: ", record.Country.ISOCode)
+	}
+	if log.Level == DebugLevel {
+		log.Debug("City: ", record.City.Names["en"])
+	}
+	if log.Level == DebugLevel {
+		log.Debug("Lat: ", record.Location.Latitude)
+	}
+	if log.Level == DebugLevel {
+		log.Debug("Lon: ", record.Location.Longitude)
+	}
+	if log.Level == DebugLevel {
+		log.Debug("TZ: ", record.Location.TimeZone)
+	}
 
 	a.Geo = *record
 }
