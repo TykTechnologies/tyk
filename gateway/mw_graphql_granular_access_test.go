@@ -83,6 +83,8 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 	})
 
 	t.Run("Policy applied key", func(t *testing.T) {
+		test.Flaky(t) // TODO: TT-5220
+
 		authHeaderWithPolicyAppliedKey := map[string]string{
 			headers.Authorization: policyAppliedKey,
 		}

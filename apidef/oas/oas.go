@@ -94,6 +94,15 @@ func (s *OAS) GetTykExtension() *XTykAPIGateway {
 	return nil
 }
 
+func (s *OAS) RemoveTykExtension() {
+
+	if s.Extensions == nil {
+		return
+	}
+
+	delete(s.Extensions, ExtensionTykAPIGateway)
+}
+
 func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 	if s.GetTykExtension() != nil {
 		authentication = s.GetTykExtension().Server.Authentication
@@ -186,7 +195,7 @@ func (s *OAS) getTykOAuthAuth(name string) (oAuth *OAuth) {
 	return
 }
 
-func (s *OAS) getTykSecuritySchemes() (securitySchemes map[string]interface{}) {
+func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
 	if s.getTykAuthentication() != nil {
 		securitySchemes = s.getTykAuthentication().SecuritySchemes
 	}

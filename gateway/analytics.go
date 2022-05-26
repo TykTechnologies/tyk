@@ -3,20 +3,18 @@ package gateway
 import (
 	"fmt"
 	"math/rand"
-	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/TykTechnologies/tyk/analytics"
-
-	"github.com/oschwald/maxminddb-golang"
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk-pump/serializer"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
+	maxminddb "github.com/oschwald/maxminddb-golang"
 )
 
 const analyticsKeyName = "tyk-system-analytics"
@@ -46,7 +44,7 @@ type RedisAnalyticsHandler struct {
 	Store                       storage.AnalyticsHandler
 	GeoIPDB                     *maxminddb.Reader
 	globalConf                  config.Config
-	recordsChan                 chan *analytics.Record
+	recordsChan                 chan *analytics.AnalyticsRecord
 	workerBufferSize            uint64
 	shouldStop                  uint32
 	poolWg                      sync.WaitGroup
@@ -54,6 +52,7 @@ type RedisAnalyticsHandler struct {
 	Clean                       Purger
 	Gw                          *Gateway `json:"-"`
 	mu                          sync.Mutex
+	analyticsSerializer         serializer.AnalyticsSerializer
 }
 
 func (r *RedisAnalyticsHandler) Init() {
@@ -72,17 +71,23 @@ func (r *RedisAnalyticsHandler) Init() {
 
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
-	r.enableMultipleAnalyticsKeys = r.Gw.GetConfig().AnalyticsConfig.EnableMultipleAnalyticsKeys
-	r.recordsChan = make(chan *analytics.Record, recordsBufferSize)
+	r.enableMultipleAnalyticsKeys = r.globalConf.AnalyticsConfig.EnableMultipleAnalyticsKeys
+	r.analyticsSerializer = serializer.NewAnalyticsSerializer(r.globalConf.AnalyticsConfig.SerializerType)
 
-	// start worker pool
+	r.Start()
+}
+
+//Start initialize the records channel and spawn the record workers
+func (r *RedisAnalyticsHandler) Start() {
+	r.recordsChan = make(chan *analytics.AnalyticsRecord, r.globalConf.AnalyticsConfig.RecordsBufferSize)
 	atomic.SwapUint32(&r.shouldStop, 0)
-	for i := 0; i < ps; i++ {
+	for i := 0; i < r.Gw.GetConfig().AnalyticsConfig.PoolSize; i++ {
 		r.poolWg.Add(1)
 		go r.recordWorker()
 	}
 }
 
+//Stop stops the analytics processing
 func (r *RedisAnalyticsHandler) Stop() {
 	// flag to stop sending records into channel
 	atomic.SwapUint32(&r.shouldStop, 1)
@@ -96,8 +101,15 @@ func (r *RedisAnalyticsHandler) Stop() {
 	r.poolWg.Wait()
 }
 
+//Flush will stop the analytics processing and empty the analytics buffer and then re-init the workers again
+func (r *RedisAnalyticsHandler) Flush() {
+	r.Stop()
+
+	r.Start()
+}
+
 // RecordHit will store an analytics.Record in Redis
-func (r *RedisAnalyticsHandler) RecordHit(record *analytics.Record) error {
+func (r *RedisAnalyticsHandler) RecordHit(record *analytics.AnalyticsRecord) error {
 	// check if we should stop sending records 1st
 	if atomic.LoadUint32(&r.shouldStop) > 0 {
 		return nil
@@ -128,10 +140,20 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			suffix := rand.Intn(10)
 			analyticKey = fmt.Sprintf("%v_%v", analyticKey, suffix)
 		}
-		readyToSend := false
-		select {
+		serliazerSuffix := r.analyticsSerializer.GetSuffix()
+		analyticKey += serliazerSuffix
 
+		readyToSend := false
+
+		flushTimer := time.NewTimer(recordsBufferFlushInterval)
+
+		select {
 		case record, ok := <-r.recordsChan:
+			if !flushTimer.Stop() {
+				// if the timer has been stopped then read from the channel to avoid leak
+				<-flushTimer.C
+			}
+
 			// check if channel was closed and it is time to exit from worker
 			if !ok {
 				// send what is left in buffer
@@ -173,7 +195,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 				record.RawPath = "/" + record.RawPath
 			}
 
-			if encoded, err := msgpack.Marshal(record); err != nil {
+			if encoded, err := r.analyticsSerializer.Encode(record); err != nil {
 				log.WithError(err).Error("Error encoding analytics data")
 			} else {
 				recordsBuffer = append(recordsBuffer, encoded)
@@ -181,8 +203,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 			// identify that buffer is ready to be sent
 			readyToSend = uint64(len(recordsBuffer)) == r.workerBufferSize
-
-		case <-time.After(recordsBufferFlushInterval):
+		case <-flushTimer.C:
 			// nothing was received for that period of time
 			// anyways send whatever we have, don't hold data too long in buffer
 			readyToSend = true
@@ -201,48 +222,17 @@ func DurationToMillisecond(d time.Duration) float64 {
 	return float64(d) / 1e6
 }
 
-func GetGeo(a *analytics.Record, ipStr string, gw *Gateway) {
-	// Not great, tightly coupled
-	if gw.Analytics.GeoIPDB == nil {
-		return
+func NormalisePath(a *analytics.AnalyticsRecord, globalConfig *config.Config) {
+
+	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
+		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
 	}
 
-	record, err := geoIPLookup(ipStr, gw)
-
-	if err != nil {
-		log.Error("GeoIP Failure (not recorded): ", err)
-		return
+	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
+		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
 	}
 
-	if record == nil {
-		return
+	for _, r := range globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
+		a.Path = r.ReplaceAllString(a.Path, "{var}")
 	}
-
-	log.Debug("ISO Code: ", record.Country.ISOCode)
-	log.Debug("City: ", record.City.Names["en"])
-	log.Debug("Lat: ", record.Location.Latitude)
-	log.Debug("Lon: ", record.Location.Longitude)
-	log.Debug("TZ: ", record.Location.TimeZone)
-
-	a.Geo = *record
-}
-
-func geoIPLookup(ipStr string, gw *Gateway) (*analytics.GeoData, error) {
-	if ipStr == "" {
-		return nil, nil
-	}
-
-	ip := net.ParseIP(ipStr)
-
-	if ip == nil {
-		return nil, fmt.Errorf("invalid IP address %q", ipStr)
-	}
-
-	record := new(analytics.GeoData)
-
-	if err := gw.Analytics.GeoIPDB.Lookup(ip, record); err != nil {
-		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %v", ipStr, err)
-	}
-
-	return record, nil
 }

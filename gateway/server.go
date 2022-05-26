@@ -86,8 +86,7 @@ type Gateway struct {
 	config          atomic.Value
 	configMu        sync.Mutex
 
-	ctx      context.Context
-	cancelFn context.CancelFunc
+	ctx context.Context
 
 	muNodeID   sync.Mutex // guards NodeID
 	NodeID     string
@@ -191,19 +190,19 @@ type hostDetails struct {
 	PID      int
 }
 
-func NewGateway(config config.Config, ctx context.Context, cancelFn context.CancelFunc) *Gateway {
+func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw := Gateway{
 		DefaultProxyMux: &proxyMux{
 			again: again.New(),
 		},
-		ctx:      ctx,
-		cancelFn: cancelFn,
+		ctx: ctx,
 	}
 
 	gw.Analytics = RedisAnalyticsHandler{Gw: &gw}
 	gw.SetConfig(config)
 	sessionManager := DefaultSessionManager{Gw: &gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
+	gw.DefaultOrgStore = DefaultSessionManager{Gw: &gw}
 	gw.DefaultQuotaStore = DefaultSessionManager{Gw: &gw}
 	gw.SessionLimiter = SessionLimiter{Gw: &gw}
 	gw.SessionMonitor = Monitor{Gw: &gw}
@@ -227,7 +226,7 @@ func NewGateway(config config.Config, ctx context.Context, cancelFn context.Canc
 	gw.ReloadTestCase = NewReloadMachinery()
 	gw.TestBundles = map[string]map[string]string{}
 
-	gw.RedisController = storage.NewRedisController()
+	gw.RedisController = storage.NewRedisController(ctx)
 
 	return &gw
 }
@@ -505,7 +504,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		pols = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
-		pols, err = gw.LoadPoliciesFromRPC(gw.GetConfig().SlaveOptions.RPCKey)
+		pols, err = gw.LoadPoliciesFromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	default:
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
@@ -610,8 +609,21 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/org/keys/{keyName:[^/]*}", gw.orgHandler).Methods("POST", "PUT", "GET", "DELETE")
 		r.HandleFunc("/keys/policy/{keyName}", gw.policyUpdateHandler).Methods("POST")
 		r.HandleFunc("/keys/create", gw.createKeyHandler).Methods("POST")
-		r.HandleFunc("/apis", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
-		r.HandleFunc("/apis/{apiID}", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/apis", gw.apiHandler).Methods(http.MethodGet)
+		r.HandleFunc("/apis", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodPost)
+		r.HandleFunc("/apis/oas", gw.apiOASGetHandler).Methods(http.MethodGet)
+		r.HandleFunc("/apis/oas", gw.blockInDashboardMode(gw.apiOASPostHandler)).Methods(http.MethodPost)
+		r.HandleFunc("/apis/{apiID}", gw.apiHandler).Methods(http.MethodGet)
+		r.HandleFunc("/apis/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodPost)
+		r.HandleFunc("/apis/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodPut)
+		r.HandleFunc("/apis/{apiID}", gw.apiHandler).Methods(http.MethodDelete)
+		r.HandleFunc("/apis/oas/export", gw.apiOASExportHandler).Methods("GET")
+		r.HandleFunc("/apis/oas/{apiID}", gw.apiOASGetHandler).Methods(http.MethodGet)
+		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.apiOASPutHandler)).Methods(http.MethodPut)
+		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.validateOAS(gw.apiOASPatchHandler))).Methods(http.MethodPatch)
+		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodDelete)
+		r.HandleFunc("/apis/oas/{apiID}/export", gw.apiOASExportHandler).Methods("GET")
+		r.HandleFunc("/import/oas", gw.validateOAS(gw.makeImportedOASTykAPI(gw.apiOASPostHandler))).Methods(http.MethodPost)
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/policies/{polID}", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
@@ -877,7 +889,9 @@ func (gw *Gateway) isRPCMode() bool {
 
 func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 	for {
-		gw.RPCListener.CheckForReload(rpcKey)
+		if ok := gw.RPCListener.CheckForReload(rpcKey); !ok {
+			return
+		}
 	}
 }
 
@@ -965,6 +979,7 @@ func (gw *Gateway) reloadQueueLoop(cb ...func()) {
 	for {
 		select {
 		case <-gw.ctx.Done():
+			log.Warn("Canceled ctx in reloadQueueLoop")
 			return
 		case fn := <-gw.reloadQueue:
 			gw.requeueLock.Lock()
@@ -1432,6 +1447,7 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	cli.Init(VERSION, confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
@@ -1440,7 +1456,7 @@ func Start() {
 	}
 
 	// ToDo:Config replace for get default conf
-	gw := NewGateway(config.Default, ctx, cancel)
+	gw := NewGateway(config.Default, ctx)
 	gw.SetNodeID("solo-" + uuid.NewV4().String())
 
 	gw.SessionID = uuid.NewV4().String()

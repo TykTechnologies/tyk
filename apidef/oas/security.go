@@ -368,7 +368,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	}
 
 	if tykAuthentication.SecuritySchemes == nil {
-		s.GetTykExtension().Server.Authentication.SecuritySchemes = make(map[string]interface{})
+		s.GetTykExtension().Server.Authentication.SecuritySchemes = make(SecuritySchemes)
 	}
 
 	tykAuthentication.Fill(api)

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"net/http"
 	"text/template"
@@ -95,6 +96,13 @@ const (
 	CoprocessType = "coprocess"
 	OAuthType     = "oauth"
 	OIDCType      = "oidc"
+)
+
+var (
+	ErrAPIMigrated     = errors.New("the supplied API definition is in Tyk native format, please use OAS format for this API")
+	ErrAPINotMigrated  = errors.New("the supplied API definition is in OAS format, please use the Tyk native format for this API")
+	ErrOASGetForOldAPI = errors.New("the requested API definition is in Tyk native format, please use old api endpoint")
+	ErrAPINotFound     = errors.New("API not found")
 )
 
 type ObjectId bson.ObjectId
@@ -598,6 +606,8 @@ type APIDefinition struct {
 	// Gateway segment tags
 	EnableTags bool     `bson:"enable_tags" json:"enable_tags"`
 	Tags       []string `bson:"tags" json:"tags"`
+	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
+	IsOAS bool `json:"is_oas" bson:"is_oas"`
 }
 
 type AnalyticsPluginConfig struct {
@@ -801,11 +811,12 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
-	BrokerAddr   string `bson:"broker_addr" json:"broker_addr"`
-	Topic        string `bson:"topic" json:"topic"`
-	GroupID      string `bson:"group_id" json:"group_id"`
-	ClientID     string `bson:"client_id" json:"client_id"`
-	KafkaVersion string `bson:"kafka_version" json:"kafka_version"`
+	BrokerAddr           string `bson:"broker_addr" json:"broker_addr"`
+	Topic                string `bson:"topic" json:"topic"`
+	GroupID              string `bson:"group_id" json:"group_id"`
+	ClientID             string `bson:"client_id" json:"client_id"`
+	KafkaVersion         string `bson:"kafka_version" json:"kafka_version"`
+	StartConsumingLatest bool   `json:"start_consuming_latest"`
 }
 
 type QueryVariable struct {

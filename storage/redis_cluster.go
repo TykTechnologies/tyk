@@ -156,7 +156,6 @@ func (r *RedisCluster) cleanKey(keyName string) string {
 }
 
 func (r *RedisCluster) up() error {
-
 	if !r.RedisController.Connected() {
 		return ErrRedisIsDown
 	}
@@ -630,22 +629,18 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 		client := r.singleton()
 		switch v := client.(type) {
 		case *redis.ClusterClient:
-			{
-				pipe := v.Pipeline()
-				for _, k := range keys {
-					pipe.Del(r.RedisController.ctx, k)
-				}
+			pipe := v.Pipeline()
+			for _, k := range keys {
+				pipe.Del(r.RedisController.ctx, k)
+			}
 
-				if _, err := pipe.Exec(r.RedisController.ctx); err != nil {
-					log.Error("Error trying to delete keys:", err)
-				}
+			if _, err := pipe.Exec(r.RedisController.ctx); err != nil {
+				log.Error("Error trying to delete keys:", err)
 			}
 		case *redis.Client:
-			{
-				_, err := v.Del(r.RedisController.ctx, keys...).Result()
-				if err != nil {
-					log.Error("Error trying to delete keys: ", err)
-				}
+			_, err := v.Del(r.RedisController.ctx, keys...).Result()
+			if err != nil {
+				log.Error("Error trying to delete keys: ", err)
 			}
 		}
 	} else {
@@ -657,7 +652,7 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 
 // StartPubSubHandler will listen for a signal and run the callback for
 // every subscription and message event.
-func (r *RedisCluster) StartPubSubHandler(channel string, callback func(interface{})) error {
+func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channel string, callback func(interface{})) error {
 	if err := r.up(); err != nil {
 		return err
 	}
@@ -666,25 +661,16 @@ func (r *RedisCluster) StartPubSubHandler(channel string, callback func(interfac
 		return errors.New("Redis connection failed")
 	}
 
-	pubsub := client.Subscribe(r.RedisController.ctx, channel)
+	pubsub := client.Subscribe(ctx, channel)
 	defer pubsub.Close()
 
 	for {
-		msg, err := pubsub.Receive(r.RedisController.ctx)
-		if err != nil {
-			log.Error("Error while receiving pubsub message:", err)
-			return err
-		}
-		switch v := msg.(type) {
-		case *redis.Message:
-			callback(v)
-
-		case *redis.Subscription:
-			callback(v)
-
-		case error:
-			log.Error("Redis disconnected or error received, attempting to reconnect: ", v)
-			return v
+		// quit pubsub loop on context cancellation
+		select {
+		case <-ctx.Done():
+			return nil
+		case msg := <-pubsub.Channel():
+			callback(msg)
 		}
 	}
 }
