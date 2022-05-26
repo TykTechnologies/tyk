@@ -2214,20 +2214,72 @@ func TestOAS(t *testing.T) {
 
 		fillPaths := func(oasAPI *oas.OAS) {
 			oasAPI.Paths = openapi3.Paths{
-				"/pet": {
+				"/pets": {
 					Get: &openapi3.Operation{
 						Summary: "get pets",
 						Responses: openapi3.Responses{
 							"200": {
 								Value: &openapi3.Response{
 									Description: getStrPointer("200 response"),
-									Content:     openapi3.Content{},
+									Content: openapi3.Content{
+										"application/json": {
+											Schema: &openapi3.SchemaRef{
+												Value: &openapi3.Schema{
+													Properties: openapi3.Schemas{
+														"value": &openapi3.SchemaRef{
+															Value: &openapi3.Schema{Type: openapi3.TypeBoolean},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Post: &openapi3.Operation{
+						Responses: openapi3.Responses{
+							"200": {
+								Value: &openapi3.Response{
+									Description: getStrPointer("200 response"),
+									Content: openapi3.Content{
+										"application/json": {
+											Schema: &openapi3.SchemaRef{
+												Value: &openapi3.Schema{
+													Properties: openapi3.Schemas{
+														"added": &openapi3.SchemaRef{
+															Value: &openapi3.Schema{Type: openapi3.TypeBoolean},
+														},
+													},
+												},
+											},
+										},
+									},
 								},
 							},
 						},
 					},
 				},
 			}
+		}
+
+		fillReqBody := func(oasDef *oas.OAS, path, method string) {
+			pathItem := oasDef.Paths.Find(path)
+			oasOperation := pathItem.GetOperation(method)
+			reqBody := openapi3.NewRequestBody()
+			reqBody.Description = "JSON req body"
+			valueSchema := openapi3.NewSchema()
+			valueSchema.Properties = openapi3.Schemas{
+				"value": {
+					Value: &openapi3.Schema{
+						Type: openapi3.TypeBoolean,
+					},
+				},
+			}
+			content := openapi3.NewContentWithSchema(valueSchema, []string{"application/json"})
+			reqBody.Content = content
+			oasOperation.RequestBody = &openapi3.RequestBodyRef{Value: reqBody}
 		}
 
 		t.Run("when tyk extension is provided and no params are provided - act like PUT", func(t *testing.T) {
@@ -2266,6 +2318,7 @@ func TestOAS(t *testing.T) {
 		t.Run("when params are provided and no tyk extension in request - override values in existing API", func(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
 			fillPaths(&apiInOAS)
+			fillReqBody(&apiInOAS, "/pets", http.MethodPost)
 
 			expectedTykExt := apiInOAS.GetTykExtension()
 			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
@@ -2273,9 +2326,11 @@ func TestOAS(t *testing.T) {
 			listenPath, upstreamURL, customDomain := "/listen-api/", "https://new-upstream.org", "custom-upstream.com"
 
 			params := map[string]string{
-				"listenPath":   listenPath,
-				"upstreamURL":  upstreamURL,
-				"customDomain": customDomain,
+				"listenPath":      listenPath,
+				"upstreamURL":     upstreamURL,
+				"customDomain":    customDomain,
+				"allowList":       "true",
+				"validateRequest": "true",
 			}
 
 			expectedTykExt.Server.ListenPath.Value = listenPath
@@ -2283,38 +2338,76 @@ func TestOAS(t *testing.T) {
 			expectedTykExt.Server.CustomDomain = customDomain
 			expectedTykExt.Info.State.Active = true
 
+			expectedTykExt.Middleware = &oas.Middleware{
+				Operations: oas.Operations{
+					"petsGET": {
+						Allow: &oas.Allowance{
+							Enabled: true,
+						},
+					},
+					"petsPOST": {
+						Allow: &oas.Allowance{
+							Enabled: true,
+						},
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: http.StatusBadRequest,
+						},
+					},
+				},
+			}
+
 			testPatchOAS(t, ts, apiInOAS, params, apiID)
 			patchedOASObj := testGetOASAPI(t, ts, apiID, expectedTykExt.Info.Name, apiInOAS.T.Info.Title)
 			o := oas.OAS{T: patchedOASObj}
-			assert.Equal(t, expectedTykExt, o.GetTykExtension())
+			assert.EqualValues(t, expectedTykExt, o.GetTykExtension())
 
 			// Reset
 			testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 		})
 
-		t.Run("when param are provided and tyk extension in request - override values in request", func(t *testing.T) {
+		t.Run("when param are provided and tyk extension in request - override values (if any) in request", func(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
 			fillPaths(&apiInOAS)
+			fillReqBody(&apiInOAS, "/pets", http.MethodPost)
 
-			listenPath, upstreamURL, customDomain := "/listen-api/", "https://new-upstream.org", "custom-upstream.com"
+			upstreamURL, customDomain := "https://new-upstream.org", "custom-upstream.com"
 
 			params := map[string]string{
-				"listenPath":   listenPath,
-				"upstreamURL":  upstreamURL,
-				"customDomain": customDomain,
+				"upstreamURL":     upstreamURL,
+				"customDomain":    customDomain,
+				"allowList":       "false",
+				"validateRequest": "false",
 			}
 
 			expectedTykExt := *apiInOAS.GetTykExtension()
 
-			expectedTykExt.Server.ListenPath.Value = listenPath
 			expectedTykExt.Upstream.URL = upstreamURL
 			expectedTykExt.Server.CustomDomain = customDomain
 			expectedTykExt.Info.State.Active = true
+			expectedTykExt.Middleware = &oas.Middleware{
+				Operations: oas.Operations{
+					"petsGET": {
+						Allow: &oas.Allowance{
+							Enabled: false,
+						},
+					},
+					"petsPOST": {
+						Allow: &oas.Allowance{
+							Enabled: false,
+						},
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           false,
+							ErrorResponseCode: http.StatusBadRequest,
+						},
+					},
+				},
+			}
 
 			testPatchOAS(t, ts, apiInOAS, params, apiID)
 			patchedOASObj := testGetOASAPI(t, ts, apiID, expectedTykExt.Info.Name, apiInOAS.T.Info.Title)
 			o := oas.OAS{T: patchedOASObj}
-			assert.Equal(t, expectedTykExt, *o.GetTykExtension())
+			assert.EqualValues(t, expectedTykExt, *o.GetTykExtension())
 
 			// Reset
 			testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
@@ -2642,10 +2735,10 @@ func testGetOldAPI(t *testing.T, d *Test, id, name string) (oldAPI apidef.APIDef
 }
 
 func testPatchOAS(t *testing.T, ts *Test, api oas.OAS, params map[string]string, apiID string) {
-	pathPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
+	patchPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
 
 	_, _ = ts.Run(t, []test.TestCase{
-		{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &api,
+		{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &api,
 			QueryParams: params, BodyMatch: `"action":"modified"`, Code: http.StatusOK},
 	}...)
 
