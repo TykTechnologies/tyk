@@ -560,6 +560,12 @@ paths:
         - OASAPIs
       operationId: patchApiOAS
       parameters:
+        - name: id
+          in: path
+          description: ID of API to patch
+          required: true
+          schema:
+            type: string
         - name: listenPath
           in: query
           description: listenPath for the API
@@ -578,6 +584,18 @@ paths:
           required: false
           schema:
             type: string
+        - name: validateRequest
+          in: query
+          description: enable validateRequest middleware for all endpoints having a request body with media type application/json
+          required: false
+          schema:
+            $ref: '#/components/schemas/BooleanQueryParam'
+        - name: allowList
+          in: query
+          description: enable allowList middleware for all endpoints
+          required: false
+          schema:
+            $ref: '#/components/schemas/BooleanQueryParam'
       requestBody:
         content:
           application/json:
@@ -3648,6 +3666,11 @@ components:
           type: string
           description: <OAS schema definition>
       x-go-package: github.com/TykTechnologies/tyk
+    BooleanQueryParam:
+      type: string
+      example:
+        - true
+        - false
   securitySchemes:
     api_key:
       in: header
