@@ -425,7 +425,7 @@ const (
 	NonCanonicalHeaderKey = "X-CertificateOuid"
 )
 
-func (s *Test) testHttpHandler() *mux.Router {
+func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -513,7 +513,7 @@ func (s *Test) testHttpHandler() *mux.Router {
 		gz.Close()
 	})
 	r.HandleFunc("/chunked", chunkedEncodingHandler)
-	r.HandleFunc("/groupReload", s.Gw.groupResetHandler)
+	r.HandleFunc("/groupReload", gw.groupResetHandler)
 	r.HandleFunc("/bundles/{rest:.*}", s.BundleHandleFunc)
 	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
 		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
@@ -984,7 +984,6 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
 			tc.BaseURL = s.URL
 			if tc.ControlRequest {
-
 				if s.config.SeparateControlAPI {
 					tc.BaseURL = scheme + s.controlProxy().listener.Addr().String()
 				} else if s.GlobalConfig.ControlAPIHostname != "" {
@@ -1066,7 +1065,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 		genConf(&gwConfig)
 	}
 
-	s.TestServerRouter = s.testHttpHandler()
+	s.TestServerRouter = s.testHttpHandler(gw)
 
 	skip := gwConfig.HttpServerOptions.SkipURLCleaning
 	s.TestServerRouter.SkipClean(skip)
