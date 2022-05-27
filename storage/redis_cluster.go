@@ -665,11 +665,15 @@ func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channel string, c
 	defer pubsub.Close()
 
 	for {
-		// quit pubsub loop on context cancellation
-		select {
-		case <-ctx.Done():
-			return nil
-		case msg := <-pubsub.Channel():
+		msg, err := pubsub.Receive(ctx)
+
+		switch {
+		case err != nil && strings.Contains(err.Error(), "use of closed network connection"):
+			log.Error("Error while receiving pubsub message:", err)
+			return redis.ErrClosed
+		case err != nil:
+			return err
+		default:
 			callback(msg)
 		}
 	}
