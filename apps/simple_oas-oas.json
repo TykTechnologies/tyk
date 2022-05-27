@@ -1,0 +1,47 @@
+{
+  "components": {
+    "securitySchemes": {
+      "auth_token": {
+        "in": "header",
+        "name": "Authorization",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "title": "simple-oas",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {},
+  "security": [
+    {
+      "auth_token": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8080/new-listen-path2/"
+    },
+    {
+      "url": "https://tyk-gateway-import.com:8183/simple_oas-1/"
+    }
+  ],
+  "x-tyk-api-gateway": {
+    "info": {
+      "id": "simple_oas",
+      "name": "simple-oas",
+      "state": {
+        "active": true
+      }
+    },
+    "upstream": {
+      "url": "http://127.0.0.1:8080/new-listen-path/"
+    },
+    "server": {
+      "listenPath": {
+        "value": "/new-listen-path2/"
+      }
+    }
+  }
+}
