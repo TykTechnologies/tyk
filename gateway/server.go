@@ -1610,7 +1610,7 @@ func (gw *Gateway) start() {
 
 	// Start listening for reload messages
 	if !gw.GetConfig().SuppressRedisSignalReload {
-		go gw.startPubSubLoop()
+		go gw.startPubSubLoop(true)
 	}
 
 	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
