@@ -41,7 +41,7 @@ type TykExtensionConfigParams struct {
 	UpstreamURL     string
 	ListenPath      string
 	CustomDomain    string
-	ApiId           string
+	ApiID           string
 	Authentication  *bool
 	AllowList       *bool
 	ValidateRequest *bool
@@ -59,8 +59,8 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 		xTykAPIGateway.Info.Name = s.Info.Title
 	}
 
-	if overRideValues.ApiId != "" {
-		xTykAPIGateway.Info.ID = overRideValues.ApiId
+	if overRideValues.ApiID != "" {
+		xTykAPIGateway.Info.ID = overRideValues.ApiID
 	}
 
 	xTykAPIGateway.Info.State.Active = true
@@ -205,11 +205,11 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 	upstreamURL := strings.TrimSpace(queries.Get("upstreamURL"))
 	listenPath := strings.TrimSpace(queries.Get("listenPath"))
 	customDomain := strings.TrimSpace(queries.Get("customDomain"))
-	apiId := strings.TrimSpace(queries.Get("apiId"))
+	apiID := strings.TrimSpace(queries.Get("apiID"))
 	validateRequest := getQueryValPtr(strings.TrimSpace(queries.Get("validateRequest")))
 	allowList := getQueryValPtr(strings.TrimSpace(queries.Get("allowList")))
 
-	if upstreamURL == "" && listenPath == "" && customDomain == "" && apiId == "" &&
+	if upstreamURL == "" && listenPath == "" && customDomain == "" && apiID == "" &&
 		validateRequest == nil && allowList == nil {
 		return nil
 	}
@@ -219,7 +219,7 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 		ListenPath:      listenPath,
 		CustomDomain:    customDomain,
 		ValidateRequest: validateRequest,
-		ApiId:           apiId,
+		ApiID:           apiID,
 		AllowList:       allowList,
 	}
 }

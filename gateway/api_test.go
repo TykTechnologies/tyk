@@ -2698,8 +2698,8 @@ func TestOAS(t *testing.T) {
 				params.Add("customDomain", ext.CustomDomain)
 			}
 
-			if ext.ApiId != "" {
-				params.Add("apiId", ext.ApiId)
+			if ext.ApiID != "" {
+				params.Add("apiID", ext.ApiID)
 			}
 
 			return params.Encode()
@@ -2709,7 +2709,7 @@ func TestOAS(t *testing.T) {
 			CustomDomain: "example.com",
 			UpstreamURL:  TestHttpAny,
 			ListenPath:   "/listen-path",
-			ApiId:        oasAPIID,
+			ApiID:        oasAPIID,
 		}
 
 		oasCopy := func(withTykExt bool, setter func(t *openapi3.T)) []byte {
