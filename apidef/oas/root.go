@@ -123,7 +123,7 @@ type Versioning struct {
 	Default             string        `bson:"default" json:"default"`   // required
 	Location            string        `bson:"location" json:"location"` // required
 	Key                 string        `bson:"key" json:"key"`           // required
-	Versions            []VersionToID `bson:"versions" json:"versions"` // required
+	Versions            []VersionToID `bson:"versions" json:"versions"`
 	StripVersioningData bool          `bson:"stripVersioningData,omitempty" json:"stripVersioningData,omitempty"`
 }
 
