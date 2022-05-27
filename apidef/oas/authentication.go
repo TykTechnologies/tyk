@@ -136,6 +136,10 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 		if ss[name] == nil {
 			ss[name] = &JWT{}
 		}
+	case nativeSS.Type == typeOAuth2:
+		if ss[name] == nil {
+			ss[name] = &OAuth{}
+		}
 	default:
 		return fmt.Errorf(unsupportedSecuritySchemeFmt, name)
 	}

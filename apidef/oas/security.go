@@ -303,6 +303,11 @@ type OAuth struct {
 }
 
 func (o *OAuth) Import(_ *openapi3.SecurityScheme, enable bool) {
+	o.Enabled = enable
+	o.Header = &AuthSource{
+		Enabled: true,
+		Name:    defaultAuthSourceName,
+	}
 }
 
 func (s *OAS) fillOAuth(api apidef.APIDefinition) {
