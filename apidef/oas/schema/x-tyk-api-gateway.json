@@ -706,8 +706,7 @@
         "enabled",
         "default",
         "location",
-        "key",
-        "versions"
+        "key"
       ]
     },
     "X-Tyk-VersionToID": {
