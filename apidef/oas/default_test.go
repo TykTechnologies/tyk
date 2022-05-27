@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
@@ -145,8 +146,10 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 	t.Run("override existing tyk extension with supplied params", func(t *testing.T) {
 		const (
-			testSSMyAuth = "my_auth"
-			testHeader   = "my-header"
+			testSSMyAuth        = "my_auth"
+			testSSMyAuthWithAnd = "my_auth_with_and"
+			testSSMyAuthWithOR  = "my_auth_with_or"
+			testHeader          = "my-header"
 		)
 		oasDef := OAS{
 			T: openapi3.T{
@@ -996,6 +999,7 @@ func TestGetTykExtensionConfigParams(t *testing.T) {
 func TestOAS_importAuthentication(t *testing.T) {
 	const (
 		testSecurityNameToken = "my_auth_token"
+		testSecurityNameJWT   = "my_auth_jwt"
 		testHeaderName        = "my-auth-token-header"
 		testCookieName        = "my-auth-token-cookie"
 	)
@@ -1011,11 +1015,12 @@ func TestOAS_importAuthentication(t *testing.T) {
 		assert.Nil(t, authentication)
 	})
 
-	t.Run("add authentication", func(t *testing.T) {
+	t.Run("add first authentication in case of OR condition", func(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
 			oas := OAS{}
 			oas.Security = openapi3.SecurityRequirements{
 				{testSecurityNameToken: []string{}},
+				{testSecurityNameJWT: []string{}},
 			}
 
 			tokenScheme := openapi3.NewSecurityScheme()
@@ -1032,6 +1037,9 @@ func TestOAS_importAuthentication(t *testing.T) {
 				testSecurityNameToken: &openapi3.SecuritySchemeRef{
 					Value: tokenScheme,
 				},
+				testSecurityNameJWT: &openapi3.SecuritySchemeRef{
+					Value: jwtScheme,
+				},
 			}
 
 			oas.SetTykExtension(&XTykAPIGateway{})
@@ -1041,7 +1049,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 
 			authentication := oas.getTykAuthentication()
 
-			assert.Equal(t, authentication.Enabled, enable)
+			assert.Equal(t, enable, authentication.Enabled)
 
 			expectedSecuritySchemes := SecuritySchemes{
 				testSecurityNameToken: &Token{
@@ -1128,13 +1136,83 @@ func TestOAS_importAuthentication(t *testing.T) {
 
 		assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
 	})
+
+	t.Run("add multiple authentication with and condition", func(t *testing.T) {
+		check := func(t *testing.T, enable bool) {
+			oas := OAS{}
+			oas.Security = openapi3.SecurityRequirements{
+				{testSecurityNameToken: []string{}, testSecurityNameJWT: []string{}},
+			}
+
+			tokenScheme := openapi3.NewSecurityScheme()
+			tokenScheme.Type = typeApiKey
+			tokenScheme.In = cookie
+			tokenScheme.Name = testCookieName
+
+			jwtScheme := openapi3.NewSecurityScheme()
+			jwtScheme.Type = typeHttp
+			jwtScheme.Scheme = schemeBearer
+			jwtScheme.BearerFormat = bearerFormatJWT
+
+			oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+				testSecurityNameToken: &openapi3.SecuritySchemeRef{
+					Value: tokenScheme,
+				},
+				testSecurityNameJWT: &openapi3.SecuritySchemeRef{
+					Value: jwtScheme,
+				},
+			}
+
+			oas.SetTykExtension(&XTykAPIGateway{})
+
+			err := oas.importAuthentication(enable)
+			assert.NoError(t, err)
+
+			authentication := oas.getTykAuthentication()
+
+			assert.Equal(t, enable, authentication.Enabled)
+
+			expectedSecuritySchemes := SecuritySchemes{
+				testSecurityNameToken: &Token{
+					Enabled: enable,
+					AuthSources: AuthSources{
+						Cookie: &AuthSource{
+							Enabled: true,
+						},
+					},
+				},
+				testSecurityNameJWT: &JWT{
+					Enabled: enable,
+					AuthSources: AuthSources{
+						Header: &AuthSource{
+							Enabled: true,
+							Name:    defaultAuthSourceName,
+						},
+					},
+				},
+			}
+
+			assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
+		}
+
+		t.Run("enable=true", func(t *testing.T) {
+			check(t, true)
+		})
+
+		t.Run("enable=false", func(t *testing.T) {
+			check(t, false)
+		})
+	})
+
 }
 
 func TestSecuritySchemes_Import(t *testing.T) {
 	const (
-		testSecurityNameToken = "my_auth_token"
-		testHeaderName        = "my-auth-token-header"
-		testCookieName        = "my-auth-token-cookie"
+		testSecurityNameToken       = "my_auth_token"
+		testSecurityNameJWT         = "my_auth_jwt"
+		testSecurityNameUnsupported = "my_auth_unsupported"
+		testHeaderName              = "my-auth-token-header"
+		testCookieName              = "my-auth-token-cookie"
 	)
 
 	t.Run("token", func(t *testing.T) {
@@ -1168,6 +1246,40 @@ func TestSecuritySchemes_Import(t *testing.T) {
 		t.Run("enable=false", func(t *testing.T) {
 			check(t, false)
 		})
+	})
+
+	t.Run("jwt", func(t *testing.T) {
+		securitySchemes := SecuritySchemes{}
+		nativeSecurityScheme := &openapi3.SecurityScheme{
+			Type:         typeHttp,
+			Scheme:       schemeBearer,
+			BearerFormat: bearerFormatJWT,
+		}
+
+		err := securitySchemes.Import(testSecurityNameJWT, nativeSecurityScheme, true)
+		assert.NoError(t, err)
+
+		expectedJWT := &JWT{
+			Enabled: true,
+			AuthSources: AuthSources{
+				Header: &AuthSource{
+					Enabled: true,
+					Name:    defaultAuthSourceName,
+				},
+			},
+		}
+
+		assert.Equal(t, expectedJWT, securitySchemes[testSecurityNameJWT])
+	})
+
+	t.Run("unsupported scheme", func(t *testing.T) {
+		securitySchemes := SecuritySchemes{}
+		nativeSecurityScheme := &openapi3.SecurityScheme{
+			Type: "unknown",
+		}
+
+		err := securitySchemes.Import(testSecurityNameUnsupported, nativeSecurityScheme, true)
+		assert.Error(t, err, fmt.Sprintf(unsupportedSecuritySchemeFmt, testSecurityNameUnsupported))
 	})
 
 	t.Run("update existing one", func(t *testing.T) {
@@ -1209,6 +1321,43 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	})
 }
 
+func TestToken_Import(t *testing.T) {
+	const testHeaderName = "my-auth-token-header"
+	const testCookieName = "my-auth-token-cookie"
+
+	token := &Token{
+		AuthSources: AuthSources{
+			Cookie: &AuthSource{
+				Enabled: true,
+				Name:    testCookieName,
+			},
+		},
+	}
+
+	nativeSecurityScheme := &openapi3.SecurityScheme{
+		Type: typeApiKey,
+		In:   header,
+		Name: testHeaderName,
+	}
+
+	token.Import(nativeSecurityScheme, true)
+
+	expectedToken := &Token{
+		Enabled: true,
+		AuthSources: AuthSources{
+			Header: &AuthSource{
+				Enabled: true,
+			},
+			Cookie: &AuthSource{
+				Enabled: true,
+				Name:    testCookieName,
+			},
+		},
+	}
+
+	assert.Equal(t, expectedToken, token)
+}
+
 func TestAuthSources_Import(t *testing.T) {
 	expectedAuthSource := &AuthSource{Enabled: true}
 
@@ -1232,4 +1381,14 @@ func TestAuthSources_Import(t *testing.T) {
 
 		assert.Equal(t, expectedAuthSource, as.Cookie)
 	})
+}
+
+func TestJWT_Import(t *testing.T) {
+	jwt := &JWT{}
+	jwt.Import(nil, true)
+
+	expectedJWT := &JWT{Enabled: true}
+	expectedJWT.Header = &AuthSource{true, defaultAuthSourceName}
+
+	assert.Equal(t, expectedJWT, jwt)
 }
