@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -165,4 +166,48 @@ func TestOAS_UpdateServers(t *testing.T) {
 			assert.Equal(t, tt.expectedURL, s.Servers[0].URL)
 		})
 	}
+}
+
+func TestOAS_GetSecuritySchemes(t *testing.T) {
+	token := Token{}
+	Fill(t, &token, 0)
+
+	jwt := JWT{}
+	Fill(t, &jwt, 0)
+
+	oauth := OAuth{}
+	Fill(t, &oauth, 0)
+
+	basic := Basic{}
+	Fill(t, &basic, 0)
+
+	expectedSS := SecuritySchemes{
+		"my_auth":  &token,
+		"my_jwt":   &jwt,
+		"my_oauth": &oauth,
+		"my_basic": &basic,
+	}
+
+	oas := OAS{}
+	xTykAPIGateway := XTykAPIGateway{
+		Server: Server{
+			Authentication: &Authentication{
+				SecuritySchemes: expectedSS,
+			},
+		},
+	}
+
+	oas.SetTykExtension(&xTykAPIGateway)
+
+	oasInBytes, err := json.Marshal(&oas)
+	assert.NoError(t, err)
+
+	var resOAS OAS
+	err = json.Unmarshal(oasInBytes, &resOAS)
+	assert.NoError(t, err)
+
+	assert.Equal(t, &token, resOAS.getTykTokenAuth("my_auth"))
+	assert.Equal(t, &jwt, resOAS.getTykJWTAuth("my_jwt"))
+	assert.Equal(t, &basic, resOAS.getTykBasicAuth("my_basic"))
+	assert.Equal(t, &oauth, resOAS.getTykOAuthAuth("my_oauth"))
 }

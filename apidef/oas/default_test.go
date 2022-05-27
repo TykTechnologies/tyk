@@ -1420,7 +1420,7 @@ func TestAuthSources_Import(t *testing.T) {
 
 func TestJWT_Import(t *testing.T) {
 	jwt := &JWT{}
-	jwt.Import(nil, true)
+	jwt.Import(true)
 
 	expectedJWT := &JWT{Enabled: true}
 	expectedJWT.Header = &AuthSource{true, defaultAuthSourceName}
@@ -1430,7 +1430,7 @@ func TestJWT_Import(t *testing.T) {
 
 func TestOAuth_Import(t *testing.T) {
 	oauth := &OAuth{}
-	oauth.Import(nil, true)
+	oauth.Import(true)
 
 	expectedOAuth := &OAuth{Enabled: true}
 	expectedOAuth.Header = &AuthSource{true, defaultAuthSourceName}

@@ -120,7 +120,7 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
-type SecuritySchemes map[string]SecurityScheme
+type SecuritySchemes map[string]interface{}
 
 type SecurityScheme interface {
 	Import(nativeSS *openapi3.SecurityScheme, enable bool)
@@ -129,22 +129,32 @@ type SecurityScheme interface {
 func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme, enable bool) error {
 	switch {
 	case nativeSS.Type == typeApiKey:
+		var token *Token
 		if ss[name] == nil {
 			ss[name] = &Token{}
 		}
+
+		token = ss[name].(*Token)
+		token.Import(nativeSS, enable)
 	case nativeSS.Type == typeHttp && nativeSS.Scheme == schemeBearer && nativeSS.BearerFormat == bearerFormatJWT:
+		var jwt *JWT
 		if ss[name] == nil {
 			ss[name] = &JWT{}
 		}
+
+		jwt = ss[name].(*JWT)
+		jwt.Import(enable)
 	case nativeSS.Type == typeOAuth2:
+		var oauth *OAuth
 		if ss[name] == nil {
 			ss[name] = &OAuth{}
 		}
+
+		oauth = ss[name].(*OAuth)
+		oauth.Import(enable)
 	default:
 		return fmt.Errorf(unsupportedSecuritySchemeFmt, name)
 	}
-
-	ss[name].Import(nativeSS, enable)
 
 	return nil
 }
