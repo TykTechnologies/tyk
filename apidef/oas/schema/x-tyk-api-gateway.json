@@ -680,8 +680,7 @@
           "pattern": "\\S+"
         },
         "default": {
-          "type": "string",
-          "pattern": "\\S+"
+          "type": "string"
         },
         "location": {
           "type": "string",
@@ -695,8 +694,7 @@
           "type": "array",
           "items": [
             {
-              "type": "string",
-              "pattern": "\\S+"
+              "$ref": "#/definitions/X-Tyk-VersionToID"
             }
           ]
         },
@@ -711,6 +709,18 @@
         "key",
         "versions"
       ]
+    },
+    "X-Tyk-VersionToID": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "\\S+"
+        }
+      }
     },
     "X-Tyk-Info": {
       "type": "object",
