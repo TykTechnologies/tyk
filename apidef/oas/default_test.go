@@ -157,12 +157,15 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					Title: "OAS API",
 				},
 				Security: openapi3.SecurityRequirements{
-					{testSSMyAuth: []string{}},
+					{testSSMyAuth: []string{}, testSSMyAuthWithAnd: []string{}},
 				},
 				Components: openapi3.Components{
 					SecuritySchemes: openapi3.SecuritySchemes{
 						testSSMyAuth: &openapi3.SecuritySchemeRef{
 							Value: openapi3.NewSecurityScheme().WithType(typeApiKey).WithIn(header).WithName(testHeader),
+						},
+						testSSMyAuthWithAnd: &openapi3.SecuritySchemeRef{
+							Value: openapi3.NewSecurityScheme().WithType(typeOAuth2),
 						},
 					},
 				},
@@ -213,6 +216,15 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 							AuthSources: AuthSources{
 								Header: &AuthSource{
 									Enabled: true,
+								},
+							},
+						},
+						testSSMyAuthWithAnd: &OAuth{
+							Enabled: true,
+							AuthSources: AuthSources{
+								Header: &AuthSource{
+									Enabled: true,
+									Name:    defaultAuthSourceName,
 								},
 							},
 						},
@@ -1210,6 +1222,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	const (
 		testSecurityNameToken       = "my_auth_token"
 		testSecurityNameJWT         = "my_auth_jwt"
+		testSecurityNameOauth       = "my_auth_oauth"
 		testSecurityNameUnsupported = "my_auth_unsupported"
 		testHeaderName              = "my-auth-token-header"
 		testCookieName              = "my-auth-token-cookie"
@@ -1270,6 +1283,28 @@ func TestSecuritySchemes_Import(t *testing.T) {
 		}
 
 		assert.Equal(t, expectedJWT, securitySchemes[testSecurityNameJWT])
+	})
+
+	t.Run("oauth", func(t *testing.T) {
+		securitySchemes := SecuritySchemes{}
+		nativeSecurityScheme := &openapi3.SecurityScheme{
+			Type: typeOAuth2,
+		}
+
+		err := securitySchemes.Import(testSecurityNameOauth, nativeSecurityScheme, true)
+		assert.NoError(t, err)
+
+		expectedOAuth := &OAuth{
+			Enabled: true,
+			AuthSources: AuthSources{
+				Header: &AuthSource{
+					Enabled: true,
+					Name:    defaultAuthSourceName,
+				},
+			},
+		}
+
+		assert.Equal(t, expectedOAuth, securitySchemes[testSecurityNameOauth])
 	})
 
 	t.Run("unsupported scheme", func(t *testing.T) {
@@ -1391,4 +1426,14 @@ func TestJWT_Import(t *testing.T) {
 	expectedJWT.Header = &AuthSource{true, defaultAuthSourceName}
 
 	assert.Equal(t, expectedJWT, jwt)
+}
+
+func TestOAuth_Import(t *testing.T) {
+	oauth := &OAuth{}
+	oauth.Import(nil, true)
+
+	expectedOAuth := &OAuth{Enabled: true}
+	expectedOAuth.Header = &AuthSource{true, defaultAuthSourceName}
+
+	assert.Equal(t, expectedOAuth, oauth)
 }
