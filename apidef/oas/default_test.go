@@ -158,6 +158,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				},
 				Security: openapi3.SecurityRequirements{
 					{testSSMyAuth: []string{}, testSSMyAuthWithAnd: []string{}},
+					{testSSMyAuthWithOR: []string{}},
 				},
 				Components: openapi3.Components{
 					SecuritySchemes: openapi3.SecuritySchemes{
@@ -166,6 +167,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						},
 						testSSMyAuthWithAnd: &openapi3.SecuritySchemeRef{
 							Value: openapi3.NewSecurityScheme().WithType(typeOAuth2),
+						},
+						testSSMyAuthWithOR: &openapi3.SecuritySchemeRef{
+							Value: openapi3.NewSecurityScheme().WithType(typeHttp).WithScheme(schemeBasic),
 						},
 					},
 				},
@@ -1222,6 +1226,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	const (
 		testSecurityNameToken       = "my_auth_token"
 		testSecurityNameJWT         = "my_auth_jwt"
+		testSecurityNameBasic       = "my_auth_basic"
 		testSecurityNameOauth       = "my_auth_oauth"
 		testSecurityNameUnsupported = "my_auth_unsupported"
 		testHeaderName              = "my-auth-token-header"
@@ -1283,6 +1288,29 @@ func TestSecuritySchemes_Import(t *testing.T) {
 		}
 
 		assert.Equal(t, expectedJWT, securitySchemes[testSecurityNameJWT])
+	})
+
+	t.Run("basic", func(t *testing.T) {
+		securitySchemes := SecuritySchemes{}
+		nativeSecurityScheme := &openapi3.SecurityScheme{
+			Type:   typeHttp,
+			Scheme: schemeBasic,
+		}
+
+		err := securitySchemes.Import(testSecurityNameBasic, nativeSecurityScheme, true)
+		assert.NoError(t, err)
+
+		expectedBasic := &Basic{
+			Enabled: true,
+			AuthSources: AuthSources{
+				Header: &AuthSource{
+					Enabled: true,
+					Name:    defaultAuthSourceName,
+				},
+			},
+		}
+
+		assert.Equal(t, expectedBasic, securitySchemes[testSecurityNameBasic])
 	})
 
 	t.Run("oauth", func(t *testing.T) {
@@ -1426,6 +1454,16 @@ func TestJWT_Import(t *testing.T) {
 	expectedJWT.Header = &AuthSource{true, defaultAuthSourceName}
 
 	assert.Equal(t, expectedJWT, jwt)
+}
+
+func TestBasic_Import(t *testing.T) {
+	basic := &Basic{}
+	basic.Import(true)
+
+	expectedBasic := &Basic{Enabled: true}
+	expectedBasic.Header = &AuthSource{true, defaultAuthSourceName}
+
+	assert.Equal(t, expectedBasic, basic)
 }
 
 func TestOAuth_Import(t *testing.T) {
