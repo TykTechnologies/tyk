@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"reflect"
 	"strconv"
-	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -203,17 +202,18 @@ func getURLFormatErr(fromParam bool, upstreamURL string) error {
 	return nil
 }
 
-func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
-	queries := r.URL.Query()
-	upstreamURL := strings.TrimSpace(queries.Get("upstreamURL"))
-	listenPath := strings.TrimSpace(queries.Get("listenPath"))
-	customDomain := strings.TrimSpace(queries.Get("customDomain"))
-	apiID := strings.TrimSpace(queries.Get("apiID"))
-	validateRequest := getQueryValPtr(strings.TrimSpace(queries.Get("validateRequest")))
-	allowList := getQueryValPtr(strings.TrimSpace(queries.Get("allowList")))
+func GetTykExtensionConfigParams(r *http.Request) (params *TykExtensionConfigParams) {
+	upstreamURL := r.FormValue("upstreamURL")
+	listenPath := r.FormValue("listenPath")
+	customDomain := r.FormValue("customDomain")
+	apiID := r.FormValue("apiID")
+
+	authentication := getQueryValPtr(r.FormValue("authentication"))
+	validateRequest := getQueryValPtr(r.FormValue("validateRequest"))
+	allowList := getQueryValPtr(r.FormValue("allowList"))
 
 	if upstreamURL == "" && listenPath == "" && customDomain == "" && apiID == "" &&
-		validateRequest == nil && allowList == nil {
+		authentication == nil && validateRequest == nil && allowList == nil {
 		return nil
 	}
 
@@ -221,6 +221,7 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 		UpstreamURL:     upstreamURL,
 		ListenPath:      listenPath,
 		CustomDomain:    customDomain,
+		Authentication:  authentication,
 		ValidateRequest: validateRequest,
 		ApiID:           apiID,
 		AllowList:       allowList,

@@ -978,6 +978,7 @@ func TestGetTykExtensionConfigParams(t *testing.T) {
 		queryParams.Set("upstreamURL", upstreamURL)
 		queryParams.Set("customDomain", customDomain)
 		queryParams.Set("validateRequest", "true")
+		queryParams.Set("authentication", "true")
 		queryParams.Set("allowList", "false")
 
 		endpoint.RawQuery = queryParams.Encode()
@@ -990,6 +991,7 @@ func TestGetTykExtensionConfigParams(t *testing.T) {
 			ListenPath:      listenPath,
 			UpstreamURL:     upstreamURL,
 			CustomDomain:    customDomain,
+			Authentication:  &trueVal,
 			AllowList:       &falseVal,
 			ValidateRequest: &trueVal,
 		}
