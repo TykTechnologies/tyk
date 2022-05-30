@@ -1471,7 +1471,7 @@ func TestRetainOldServerURL(t *testing.T) {
 			},
 		},
 		{
-			name: "exising old servers",
+			name: "existing old servers",
 			args: args{
 				oldServers: openapi3.Servers{
 					{
