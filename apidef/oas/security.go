@@ -99,7 +99,7 @@ type JWT struct {
 	ExpiresAtValidationSkew uint64   `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
 }
 
-func (j *JWT) Import(_ *openapi3.SecurityScheme, enable bool) {
+func (j *JWT) Import(enable bool) {
 	j.Enabled = enable
 	j.Header = &AuthSource{
 		Enabled: true,
@@ -302,7 +302,7 @@ type OAuth struct {
 	Notifications         *Notifications              `bson:"notifications,omitempty" json:"notifications,omitempty"`
 }
 
-func (o *OAuth) Import(_ *openapi3.SecurityScheme, enable bool) {
+func (o *OAuth) Import(enable bool) {
 	o.Enabled = enable
 	o.Header = &AuthSource{
 		Enabled: true,
