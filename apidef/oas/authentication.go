@@ -144,6 +144,14 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 
 		jwt = ss[name].(*JWT)
 		jwt.Import(enable)
+	case nativeSS.Type == typeHttp && nativeSS.Scheme == schemeBasic:
+		var basic *Basic
+		if ss[name] == nil {
+			ss[name] = &Basic{}
+		}
+
+		basic = ss[name].(*Basic)
+		basic.Import(enable)
 	case nativeSS.Type == typeOAuth2:
 		var oauth *OAuth
 		if ss[name] == nil {
