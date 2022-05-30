@@ -103,6 +103,7 @@ var (
 	ErrAPINotMigrated  = errors.New("the supplied API definition is in OAS format, please use the Tyk native format for this API")
 	ErrOASGetForOldAPI = errors.New("the requested API definition is in Tyk native format, please use old api endpoint")
 	ErrAPINotFound     = errors.New("API not found")
+	ErrMissingAPIID    = errors.New("missing API ID")
 )
 
 type ObjectId bson.ObjectId

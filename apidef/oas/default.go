@@ -3,11 +3,13 @@ package oas
 import (
 	"errors"
 	"fmt"
-	"github.com/getkin/kin-openapi/openapi3"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strconv"
+	"strings"
+
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const (
@@ -18,9 +20,10 @@ const (
 )
 
 var (
-	errEmptyServersObject  = errors.New("servers object is empty in OAS")
-	errInvalidUpstreamURL  = errors.New("invalid upstream URL")
-	errInvalidServerURL    = errors.New("error validating servers entry in OAS")
+	errEmptyServersObject = errors.New("servers object is empty in OAS")
+	errInvalidUpstreamURL = errors.New("invalid upstream URL")
+	errInvalidServerURL   = errors.New("error validating servers entry in OAS")
+
 	errEmptySecurityObject = errors.New("security object is empty in OAS")
 	allowedMethods         = []string{
 		http.MethodConnect,
@@ -39,6 +42,7 @@ type TykExtensionConfigParams struct {
 	UpstreamURL     string
 	ListenPath      string
 	CustomDomain    string
+	ApiID           string
 	Authentication  *bool
 	AllowList       *bool
 	ValidateRequest *bool
@@ -54,6 +58,10 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 
 	if xTykAPIGateway.Info.Name == "" {
 		xTykAPIGateway.Info.Name = s.Info.Title
+	}
+
+	if overRideValues.ApiID != "" {
+		xTykAPIGateway.Info.ID = overRideValues.ApiID
 	}
 
 	xTykAPIGateway.Info.State.Active = true
@@ -194,15 +202,15 @@ func getURLFormatErr(fromParam bool, upstreamURL string) error {
 }
 
 func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
-	upstreamURL := r.URL.Query().Get("upstreamURL")
-	listenPath := r.URL.Query().Get("listenPath")
-	customDomain := r.URL.Query().Get("customDomain")
+	queries := r.URL.Query()
+	upstreamURL := strings.TrimSpace(queries.Get("upstreamURL"))
+	listenPath := strings.TrimSpace(queries.Get("listenPath"))
+	customDomain := strings.TrimSpace(queries.Get("customDomain"))
+	apiID := strings.TrimSpace(queries.Get("apiID"))
+	validateRequest := getQueryValPtr(strings.TrimSpace(queries.Get("validateRequest")))
+	allowList := getQueryValPtr(strings.TrimSpace(queries.Get("allowList")))
 
-	validateRequest := getQueryValPtr(r.URL.Query().Get("validateRequest"))
-
-	allowList := getQueryValPtr(r.URL.Query().Get("allowList"))
-
-	if upstreamURL == "" && listenPath == "" && customDomain == "" &&
+	if upstreamURL == "" && listenPath == "" && customDomain == "" && apiID == "" &&
 		validateRequest == nil && allowList == nil {
 		return nil
 	}
@@ -212,6 +220,7 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 		ListenPath:      listenPath,
 		CustomDomain:    customDomain,
 		ValidateRequest: validateRequest,
+		ApiID:           apiID,
 		AllowList:       allowList,
 	}
 }
