@@ -3,12 +3,13 @@ package oas
 import (
 	"errors"
 	"fmt"
-	"github.com/getkin/kin-openapi/openapi3"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const (
