@@ -14,6 +14,8 @@ const (
 	schemeBasic     = "basic"
 	bearerFormatJWT = "JWT"
 
+	defaultAuthSourceName = "Authorization"
+
 	header = "header"
 	query  = "query"
 	cookie = "cookie"
@@ -30,6 +32,11 @@ type Token struct {
 	//
 	// Old API Definition:
 	Signature *Signature `bson:"signatureValidation,omitempty" json:"signatureValidation,omitempty"`
+}
+
+func (t *Token) Import(nativeSS *openapi3.SecurityScheme, enable bool) {
+	t.Enabled = enable
+	t.AuthSources.Import(nativeSS.In)
 }
 
 func (s *OAS) fillToken(api apidef.APIDefinition) {
@@ -90,6 +97,14 @@ type JWT struct {
 	IssuedAtValidationSkew  uint64   `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
 	NotBeforeValidationSkew uint64   `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
 	ExpiresAtValidationSkew uint64   `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
+}
+
+func (j *JWT) Import(enable bool) {
+	j.Enabled = enable
+	j.Header = &AuthSource{
+		Enabled: true,
+		Name:    defaultAuthSourceName,
+	}
 }
 
 func (s *OAS) fillJWT(api apidef.APIDefinition) {
@@ -188,6 +203,9 @@ type Basic struct {
 	ExtractCredentialsFromBody *ExtractCredentialsFromBody `bson:"extractCredentialsFromBody,omitempty" json:"extractCredentialsFromBody,omitempty"`
 }
 
+func (b *Basic) Import(_ *openapi3.SecurityScheme, enable bool) {
+}
+
 func (s *OAS) fillBasic(api apidef.APIDefinition) {
 	ac, ok := api.AuthConfigs[apidef.BasicType]
 	if !ok || ac.Name == "" {
@@ -284,6 +302,14 @@ type OAuth struct {
 	Notifications         *Notifications              `bson:"notifications,omitempty" json:"notifications,omitempty"`
 }
 
+func (o *OAuth) Import(enable bool) {
+	o.Enabled = enable
+	o.Header = &AuthSource{
+		Enabled: true,
+		Name:    defaultAuthSourceName,
+	}
+}
+
 func (s *OAS) fillOAuth(api apidef.APIDefinition) {
 	authConfig, ok := api.AuthConfigs[apidef.OAuthType]
 	if !ok || authConfig.Name == "" {
@@ -368,7 +394,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	}
 
 	if tykAuthentication.SecuritySchemes == nil {
-		s.GetTykExtension().Server.Authentication.SecuritySchemes = make(map[string]interface{})
+		s.GetTykExtension().Server.Authentication.SecuritySchemes = make(SecuritySchemes)
 	}
 
 	tykAuthentication.Fill(api)

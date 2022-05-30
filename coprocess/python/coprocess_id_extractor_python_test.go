@@ -146,6 +146,7 @@ def MyAuthHook(request, session, metadata, spec):
 // Our `pythonBundleWithAuthCheck` plugin restrict more then 1 call
 // With ID extractor, it should run multiple times (because cache)
 func TestValueExtractorHeaderSource(t *testing.T) {
+	test.Flaky(t)
 	pythonVersion := test.GetPythonVersion()
 	ts := gateway.StartTest(nil, gateway.TestConfig{
 		CoprocessConfig: config.CoProcessConfig{

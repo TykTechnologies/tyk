@@ -172,6 +172,14 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 	req.PostForm = formParams
 	req.Form = formParams
 
+	if tc.QueryParams != nil {
+		queryParams := req.URL.Query()
+		for k, v := range tc.QueryParams {
+			queryParams.Add(k, v)
+		}
+		req.URL.RawQuery = queryParams.Encode()
+	}
+
 	return req, nil
 }
 

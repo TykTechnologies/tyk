@@ -112,23 +112,21 @@ func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 }
 
 func (s *OAS) getTykTokenAuth(name string) (token *Token) {
-	if securitySchemes := s.getTykSecuritySchemes(); securitySchemes != nil {
-		securityScheme := securitySchemes[name]
-		if securityScheme == nil {
-			return
-		}
-
-		mapSecurityScheme, ok := securityScheme.(map[string]interface{})
-		if ok {
-			token = &Token{}
-			inBytes, _ := json.Marshal(mapSecurityScheme)
-			_ = json.Unmarshal(inBytes, token)
-			s.getTykSecuritySchemes()[name] = token
-			return
-		}
-
-		token = s.getTykSecuritySchemes()[name].(*Token)
+	securityScheme := s.getTykSecurityScheme(name)
+	if securityScheme == nil {
+		return
 	}
+
+	mapSecurityScheme, ok := securityScheme.(map[string]interface{})
+	if ok {
+		token = &Token{}
+		inBytes, _ := json.Marshal(mapSecurityScheme)
+		_ = json.Unmarshal(inBytes, token)
+		s.getTykSecuritySchemes()[name] = token
+		return
+	}
+
+	token = securityScheme.(*Token)
 
 	return
 }
@@ -173,29 +171,27 @@ func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 	return
 }
 
-func (s *OAS) getTykOAuthAuth(name string) (oAuth *OAuth) {
-	if securitySchemes := s.getTykSecuritySchemes(); securitySchemes != nil {
-		securityScheme := securitySchemes[name]
-		if securityScheme == nil {
-			return
-		}
-
-		mapSecurityScheme, ok := securityScheme.(map[string]interface{})
-		if ok {
-			oAuth = &OAuth{}
-			inBytes, _ := json.Marshal(mapSecurityScheme)
-			_ = json.Unmarshal(inBytes, oAuth)
-			s.getTykSecuritySchemes()[name] = oAuth
-			return
-		}
-
-		oAuth = s.getTykSecuritySchemes()[name].(*OAuth)
+func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
+	securityScheme := s.getTykSecurityScheme(name)
+	if securityScheme == nil {
+		return
 	}
+
+	mapSecurityScheme, ok := securityScheme.(map[string]interface{})
+	if ok {
+		oauth = &OAuth{}
+		inBytes, _ := json.Marshal(mapSecurityScheme)
+		_ = json.Unmarshal(inBytes, oauth)
+		s.getTykSecuritySchemes()[name] = oauth
+		return
+	}
+
+	oauth = securityScheme.(*OAuth)
 
 	return
 }
 
-func (s *OAS) getTykSecuritySchemes() (securitySchemes map[string]interface{}) {
+func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
 	if s.getTykAuthentication() != nil {
 		securitySchemes = s.getTykAuthentication().SecuritySchemes
 	}

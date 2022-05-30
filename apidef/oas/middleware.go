@@ -503,6 +503,10 @@ func (a *Allowance) ExtractTo(endpointMeta *apidef.EndPointMeta) {
 	endpointMeta.IgnoreCase = a.IgnoreCase
 }
 
+func (a *Allowance) Import(enabled bool) {
+	a.Enabled = enabled
+}
+
 type MockResponse struct {
 	// Enabled enables Mock response in the given path and method.
 	Enabled bool `bson:"enabled" json:"enabled"`

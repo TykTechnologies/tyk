@@ -202,6 +202,7 @@ pre.NewProcessRequest(function(request, session) {
 }
 
 func TestResponseOverride(t *testing.T) {
+	test.Flaky(t)
 	pythonVersion := test.GetPythonVersion()
 
 	ts := StartTest(nil, TestConfig{
