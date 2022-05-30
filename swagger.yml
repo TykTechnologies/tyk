@@ -312,8 +312,7 @@ paths:
   /tyk/apis/oas:
     get:
       description: |-
-         List APIs, in OAS format(only APIs saved in OAS format)
-         Only if used without the Tyk Dashboard
+         List all OAS format APIs, when used without the Tyk Dashboard.
       tags:
         - OASAPIs
       operationId: listApisOAS
@@ -633,8 +632,7 @@ paths:
           type: string
     get:
       description: |-
-        download API definition in OAS format(only APIs saved in OAS format),
-        Only if used without the Tyk Dashboard
+        Download all OAS format APIs, when used without the Tyk Dashboard.
       tags:
         - OASAPIs
       operationId: downloadApiOASPublic
@@ -657,15 +655,14 @@ paths:
   /tyk/apis/oas/export:
     get:
       description: |-
-        Download list of API definition in OAS format(only APIs saved in OAS format),
-        Only if used without the Tyk Dashboard
+        Download all OAS format APIs, when used without the Tyk Dashboard.
       tags:
         - OASAPIs
       operationId: downloadApisOASPublic
       parameters:
         - description: |-
-            Mode of OAS export, by default mode could be empty which means to export OAS spec including OAS Tyk extension. 
-            When mode=public, OAS spec excluding Tyk extension is exported
+            The mode of OAS export. By default the mode is not set which means the OAS spec is exported including the OAS Tyk extension.  
+            If the mode is set to public, the OAS spec excluding the Tyk extension is exported.
           name: mode
           in: query
           schema:
@@ -683,8 +680,8 @@ paths:
   /tyk/import/oas:
     post:
       description: |-
-        Create new API definitions with OAS without x-tyk-gateway.
-        The developer is starting with their own OAS definition that they would like to expose via Tyk (New)
+        Create a new OAS format API, without x-tyk-gateway.
+        For use with an existing OAS API that you want to expose via your Tyk Gateway. (New)
       tags:
         - OASAPIs
       operationId: importOAS
@@ -703,7 +700,7 @@ paths:
               $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
       responses:
         '200':
-          description: API definition
+          description: API definition created
           content:
             application/json:
               schema:
@@ -725,18 +722,18 @@ paths:
                     message: "Request malformed"
                     status: "error"
                 invalidUpstreamURL:
-                  summary: When the client sends query param upstreamURL which isn't valid
+                  summary: When the client sends a query param upstreamURL which isn't valid
                   value:
                     message: "invalid upstream URL"
                     status: "error"
         500:
-         description: When import request is send while using dashboard app configs
+         description: When an import request is sent using your Tyk Dashboard app configs
          content:
             application/json:
               schema:
                 $ref: "#/components/schemas/apiStatusMessage"
               example:
-                summary: Dashboard app configs is used for tyk api definitions
+                summary: Tyk Dashboard app configs are being used for Tyk API definitions
                 value:
                   message: "Due to enabled use_db_app_configs, please use the Dashboard API"
                   status: "error"
@@ -750,7 +747,7 @@ paths:
           type: string
     delete:
       summary: Invalidate cache
-      description: Invalidate cache for given API
+      description: Invalidate cache for the given API
       tags:
         - Cache Invalidation
       operationId: invalidateCache
@@ -767,9 +764,9 @@ paths:
   '/tyk/reload/':
     get:
       summary: Hot-reload a single node
-      description: Tyk is capable of reloading configurations without having to stop serving requests, this means that API configurations can be added at runtime, or even modified at runtime and those rules applied immediately without any downtime.
+      description: Tyk is capable of reloading configurations without having to stop serving requests. This means that API configurations can be added at runtime, or even modified at runtime and those rules applied immediately without any downtime.
       parameters:
-        - description: Block a response, until the reload is performed. This can be useful in scripting environments like CI/CD workflows.
+        - description: Block a response until the reload is performed. This can be useful in scripting environments like CI/CD workflows.
           name: block
           in: query
           required: false
@@ -791,13 +788,13 @@ paths:
   '/tyk/reload/group':
     get:
       summary: Hot-reload a Tyk group
-      description: To reload a whole group of Tyk nodes (without using the Dashboard or host manager), you can send an API request to a single node, this node will then send a notification through the pub/sub infrastructure to all other listening nodes (including the host manager if it is being used to manage NginX) which will then trigger a global reload.
+      description: To reload a whole group of Tyk nodes (without using the Dashboard or host manager). You can send an API request to a single node, this node will then send a notification through the pub/sub infrastructure to all other listening nodes (including the host manager if it is being used to manage NginX) which will then trigger a global reload.
       tags:
         - Hot Reload
       operationId: hotReloadGroup
       responses:
         '200':
-          description: Reload gateway
+          description: Reload the Tyk Gateway
           content:
             application/json:
               schema:
@@ -806,7 +803,7 @@ paths:
                 status: ok
   '/tyk/hello':
     get:
-      summary: Check the Health of the Gateway
+      summary: Check the Health of the Tyk Gateway
       description: |
         From v2.7.5 you can now rename the `/hello`  endpoint by using the `health_check_endpoint_name` option
         
@@ -832,7 +829,7 @@ paths:
           type: string
     get:
       summary: Check the Health of the API
-      description: Should point to API domain if it has own
+      description: Should point to API domain if it has its own
       tags:
         - Health Checking
       operationId: helloAPI
@@ -847,7 +844,7 @@ paths:
   '/tyk/certs':
     get:
       parameters:
-        - description: Organization ID to list the certificates
+        - description: Organisation ID to list the certificates
           in: query
           name: org_id
           required: true
@@ -868,7 +865,7 @@ paths:
             type: string
           example: 'e6ce2b49-3e31-44de-95a7-12f054724283,234a37ac-28d1-4f12-b936-ffb4211b79f1'
       summary: List Certificates
-      description: List All Certificates in Gateway
+      description: List All Certificates in the Tyk Gateway
       tags:
         - Certs
       operationId: listCerts
@@ -886,12 +883,12 @@ paths:
                       $ref: '#/components/schemas/CertificateMeta'
     post:
       summary: Add a certificate
-      description: Add a certificate to the gateway
+      description: Add a certificate to the Tyk Gateway
       tags:
         - Certs
       operationId: addCert
       parameters:
-        - description: Organization ID to list the certificates
+        - description: Organisation ID to list the certificates
           in: query
           name: org_id
           required: true
@@ -930,7 +927,7 @@ paths:
           required: true
           schema:
             type: string
-        - description: Organization ID to list the certificates
+        - description: Organisation ID to list the certificates
           in: query
           name: org_id
           required: true
@@ -1349,7 +1346,7 @@ paths:
                 status: error
     delete:
       summary: Delete a Policy
-      description: Delete a policy by ID in your tyk instance.
+      description: Delete a policy by ID in your Tyk instance.
       tags:
         - Policies
       operationId: deletePolicy
@@ -1590,7 +1587,7 @@ paths:
                   description: id of oauth client
                   type: string
                 client_secret:
-                  description: oauth client secret to ensure that its a valid operation
+                  description: OAuth client secret to ensure that its a valid operation
                   type: string
             example:
               client_id: 411f0800957c4a3e81fe181141dbc22a
@@ -1847,7 +1844,7 @@ paths:
                 status: Success
                 schema: <open api 3.0.3 schema>
         '400':
-          description: response when parameter oasVersion is missing
+          description: The response when the parameter oasVersion is missing
           content:
             application/json:
               schema:
@@ -1856,7 +1853,7 @@ paths:
                 message: 'Should provide a value for parameter oasVersion'
                 status: 'Failed'
         '404':
-          description: response when requested OAS schema is not found
+          description: The response when the requested OAS schema is not found
           content:
             application/json:
               schema:
@@ -3710,7 +3707,7 @@ components:
     Authentication:
       name: authentication
       in: query
-      description: Enable/disable authentication mechanism in tyk gw as per OAS document
+      description: Enable or disable authentication in your Tyk Gateway as per your OAS document.
       schema:
         $ref: '#/components/schemas/BooleanQueryParam'
   securitySchemes:
