@@ -203,7 +203,12 @@ type Basic struct {
 	ExtractCredentialsFromBody *ExtractCredentialsFromBody `bson:"extractCredentialsFromBody,omitempty" json:"extractCredentialsFromBody,omitempty"`
 }
 
-func (b *Basic) Import(_ *openapi3.SecurityScheme, enable bool) {
+func (b *Basic) Import(enable bool) {
+	b.Enabled = enable
+	b.Header = &AuthSource{
+		Enabled: true,
+		Name:    defaultAuthSourceName,
+	}
 }
 
 func (s *OAS) fillBasic(api apidef.APIDefinition) {
