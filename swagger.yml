@@ -312,7 +312,7 @@ paths:
   '/tyk/apis/oas':
     get:
       description: |-
-         List APIs, in OAS format
+         List APIs, in OAS format(only APIs saved in OAS format)
          Only if used without the Tyk Dashboard
       tags:
         - OASAPIs
@@ -553,6 +553,7 @@ paths:
                 status: "error"
                 message: "Malformed API data"
     patch:
+      summary: Patch a single OAS API by ID
       description: |-
         Update API with OAS format. You can use this endpoint to update OAS part of the tyk API definition.
         This endpoint allows you to configure tyk OAS extension based on query params provided(similar to import)
@@ -563,6 +564,9 @@ paths:
         - $ref: '#/components/parameters/UpstreamURL'
         - $ref: '#/components/parameters/ListenPath'
         - $ref: '#/components/parameters/CustomDomain'
+        - $ref: '#/components/parameters/ValidateRequest'
+        - $ref: '#/components/parameters/AllowList'
+        - $ref: '#/components/parameters/Authentication'
       requestBody:
         content:
           application/json:
@@ -653,7 +657,7 @@ paths:
           type: string
     get:
       description: |-
-        download API definition in OAS format,
+        download API definition in OAS format(only APIs saved in OAS format),
         Only if used without the Tyk Dashboard
       tags:
         - OASAPIs
@@ -683,7 +687,7 @@ paths:
   '/tyk/apis/oas/export':
     get:
       description: |-
-        Download list of API definition in OAS format,
+        Download list of API definition in OAS format(only APIs saved in OAS format),
         Only if used without the Tyk Dashboard
       tags:
         - OASAPIs
@@ -724,7 +728,10 @@ paths:
         - $ref: '#/components/parameters/UpstreamURL'
         - $ref: '#/components/parameters/ListenPath'
         - $ref: '#/components/parameters/CustomDomain'
-        - $ref: '#/components/parameters/ApiId'
+        - $ref: '#/components/parameters/ApiID'
+        - $ref: '#/components/parameters/AllowList'
+        - $ref: '#/components/parameters/ValidateRequest'
+        - $ref: '#/components/parameters/Authentication'
       requestBody:
         content:
           application/json:
@@ -3689,6 +3696,10 @@ components:
         schema:
           type: string
           description: <OAS schema definition>
+    BooleanQueryParam:
+      type: string
+      enum: [ true, false ]
+      example: true
   parameters:
     UpstreamURL:
       name: upstreamURL
@@ -3718,6 +3729,26 @@ components:
       description: ID of the API
       in: query
       required: false
+    ValidateRequest:
+      name: validateRequest
+      in: query
+      description: Enable validateRequest middleware for all endpoints having a request body with media type application/json
+      required: false
+      schema:
+        $ref: '#/components/schemas/BooleanQueryParam'
+    AllowList:
+      name: allowList
+      in: query
+      description: Enable allowList middleware for all endpoints
+      required: false
+      schema:
+        $ref: '#/components/schemas/BooleanQueryParam'
+    Authentication:
+      name: authentication
+      in: query
+      description: Enable/disable authentication mechanism in tyk gw as per OAS document
+      schema:
+        $ref: '#/components/schemas/BooleanQueryParam'
   securitySchemes:
     api_key:
       in: header
