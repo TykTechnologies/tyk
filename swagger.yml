@@ -309,7 +309,7 @@ paths:
               example:
                 status: "error"
                 message: "Malformed API data"
-  '/tyk/apis/oas':
+  /tyk/apis/oas:
     get:
       description: |-
          List APIs, in OAS format(only APIs saved in OAS format)
@@ -335,12 +335,6 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/OASSchemaResponse'
-              example:
-                - name: "TestAPI"
-                  use_keyless: true
-                  active: true
-                  proxy:
-                    listen_path: "/test"
     post:
       description: |-
         Create API with OAS format
@@ -352,13 +346,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/OASSchemaResponse"
-            example:
-              name: "TestAPI"
-              use_keyless: true
-              active: true
-              proxy:
-                listen_path: "/test"
+              $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
       responses:
         '200':
           description: API created
@@ -506,12 +494,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OASSchemaResponse"
-              example:
-                name: "TestAPI"
-                use_keyless: true
-                active: true
-                proxy:
-                  listen_path: "/test"
     put:
       description: |
         Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
@@ -525,13 +507,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/OASSchemaResponse"
-            example:
-              name: "TestAPI"
-              use_keyless: true
-              active: true
-              proxy:
-                listen_path: "/test"
+              $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
       responses:
         '200':
           description: API updated
@@ -678,13 +654,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OASSchemaResponse"
-              example:
-                name: "TestAPI"
-                use_keyless: true
-                active: true
-                proxy:
-                  listen_path: "/test"
-  '/tyk/apis/oas/export':
+  /tyk/apis/oas/export:
     get:
       description: |-
         Download list of API definition in OAS format(only APIs saved in OAS format),
@@ -710,13 +680,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/OASSchemaResponse'
-              example:
-                - name: "TestAPI"
-                  use_keyless: true
-                  active: true
-                  proxy:
-                    listen_path: "/test"
-  '/tyk/import/oas':
+  /tyk/import/oas:
     post:
       description: |-
         Create new API definitions with OAS without x-tyk-gateway.
