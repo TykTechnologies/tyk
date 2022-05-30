@@ -2413,6 +2413,69 @@ func TestOAS(t *testing.T) {
 			testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 		})
 
+		t.Run("retain old OAS servers", func(t *testing.T) {
+			t.Run("should retain first entry in existing API", func(t *testing.T) {
+				apiInOAS := copyOAS(oasAPI)
+				fillPaths(&apiInOAS)
+
+				tykExt := apiInOAS.GetTykExtension()
+				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+
+				apiInOAS.T.Info.Title = "patched-oas-doc"
+
+				serverURL := "https://upstream.org/api"
+				apiInOAS.Servers = openapi3.Servers{
+					{
+						URL: serverURL,
+					},
+				}
+
+				gwServerURL := oasAPI.Servers[0].URL
+
+				testPatchOAS(t, ts, apiInOAS, nil, apiID)
+				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
+
+				assert.EqualValues(t, gwServerURL, patchedOASObj.Servers[0].URL)
+				assert.Equal(t, serverURL, patchedOASObj.Servers[1].URL)
+				// Reset
+				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
+			})
+
+			t.Run("do not modify if first server is same as that of gw", func(t *testing.T) {
+				apiInOAS := copyOAS(oasAPI)
+				fillPaths(&apiInOAS)
+
+				tykExt := apiInOAS.GetTykExtension()
+				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+
+				apiInOAS.T.Info.Title = "patched-oas-doc"
+
+				serverURL1 := oasAPI.Servers[0].URL
+				serverURL2 := "https://upstream.org/api"
+				serverURL3 := "https://upstream.com/api"
+				apiInOAS.Servers = openapi3.Servers{
+					{
+						URL: serverURL1,
+					},
+					{
+						URL: serverURL2,
+					},
+					{
+						URL: serverURL3,
+					},
+				}
+
+				testPatchOAS(t, ts, apiInOAS, nil, apiID)
+				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
+
+				assert.EqualValues(t, serverURL1, patchedOASObj.Servers[0].URL)
+				assert.Equal(t, serverURL2, patchedOASObj.Servers[1].URL)
+				assert.Equal(t, serverURL3, patchedOASObj.Servers[2].URL)
+				// Reset
+				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
+			})
+		})
+
 		t.Run("error on invalid upstreamURL", func(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
 			fillPaths(&apiInOAS)
@@ -2424,24 +2487,26 @@ func TestOAS(t *testing.T) {
 				"upstreamURL": upstreamURL,
 			}
 
-			pathPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
+			patchPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
 
 			_, _ = ts.Run(t, []test.TestCase{
-				{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &apiInOAS,
+				{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &apiInOAS,
 					QueryParams: params, BodyMatch: `"message":"invalid upstream URL"`, Code: http.StatusBadRequest},
 			}...)
 		})
 
 		t.Run("request validation", func(t *testing.T) {
+			patchPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
+
 			t.Run("empty apiID", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
 				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
 
-				pathPath := fmt.Sprintf("/tyk/apis/oas/%s", " ")
+				patchPath := fmt.Sprintf("/tyk/apis/oas/%s", " ")
 
 				_, _ = ts.Run(t, []test.TestCase{
-					{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &apiInOAS,
+					{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &apiInOAS,
 						BodyMatch: `"message":"Must specify an apiID to patch"`, Code: http.StatusBadRequest},
 				}...)
 			})
@@ -2451,10 +2516,8 @@ func TestOAS(t *testing.T) {
 				fillPaths(&apiInOAS)
 				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
 
-				pathPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
-
 				_, _ = ts.Run(t, []test.TestCase{
-					{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: `oas-body`,
+					{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: `oas-body`,
 						BodyMatch: `"message":"request malformed"`, Code: http.StatusBadRequest},
 				}...)
 			})
@@ -2466,17 +2529,17 @@ func TestOAS(t *testing.T) {
 				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
 
 				nonExistingAPIID := "non-existing-api-id"
-				pathPath := fmt.Sprintf("/tyk/apis/oas/%s", nonExistingAPIID)
+				patchPath := fmt.Sprintf("/tyk/apis/oas/%s", nonExistingAPIID)
 
 				_, _ = ts.Run(t, []test.TestCase{
-					{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &apiInOAS,
+					{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &apiInOAS,
 						BodyMatchFunc: func(body []byte) bool {
 							resp := apiStatusMessage{}
 							err := json.Unmarshal(body, &resp)
 							if err != nil {
 								return false
 							}
-							return fmt.Sprintf("No API found for APIID %q", nonExistingAPIID) == resp.Message
+							return apidef.ErrAPINotFound.Error() == resp.Message
 						},
 						Code: http.StatusNotFound},
 				}...)
@@ -2497,12 +2560,29 @@ func TestOAS(t *testing.T) {
 
 				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
 
-				pathPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
-
 				_, _ = ts.Run(t, []test.TestCase{
-					{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &apiInOAS,
+					{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &apiInOAS,
 						BodyMatch: "Due to enabled use_db_app_configs, please use the Dashboard API",
 						Code:      http.StatusInternalServerError},
+				}...)
+			})
+
+			t.Run("fail when non OAS API tried to patch", func(t *testing.T) {
+				oldAPI.OAS.Fill(*oldAPI.APIDefinition)
+				apiInOAS := oldAPI.OAS
+				fillPaths(&apiInOAS)
+				tykExt := apiInOAS.GetTykExtension()
+				tykExt.Info.Name = "patched-oas-api"
+				tykExt.Info.Versioning.Default = "default"
+				tykExt.Info.Versioning.Versions = []oas.VersionToID{}
+				apiInOAS.T.Info = &openapi3.Info{Title: "patched-oas-doc"}
+				apiInOAS.OpenAPI = "3.0.3"
+
+				patchPath := fmt.Sprintf("/tyk/apis/oas/%s", oldAPI.APIID)
+				_, _ = ts.Run(t, []test.TestCase{
+					{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &apiInOAS,
+						BodyMatch: apidef.ErrAPINotMigrated.Error(),
+						Code:      http.StatusBadRequest},
 				}...)
 			})
 
@@ -2515,10 +2595,10 @@ func TestOAS(t *testing.T) {
 			delete(apiInOAS.T.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
 			apiInOAS.Paths = nil
 
-			pathPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
+			patchPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
 
 			_, _ = ts.Run(t, []test.TestCase{
-				{AdminAuth: true, Method: http.MethodPatch, Path: pathPath, Data: &apiInOAS,
+				{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &apiInOAS,
 					BodyMatch: `"paths: Invalid type. Expected: object, given: null"`, Code: http.StatusBadRequest},
 			}...)
 		})
