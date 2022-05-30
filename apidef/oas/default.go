@@ -81,7 +81,7 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 
 	if overRideValues.UpstreamURL != "" {
 		upstreamURL = overRideValues.UpstreamURL
-	} else {
+	} else if xTykAPIGateway.Upstream.URL == "" {
 		if len(s.Servers) == 0 {
 			return errEmptyServersObject
 		}
@@ -89,11 +89,13 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 		upstreamURL = s.Servers[0].URL
 	}
 
-	if err := getURLFormatErr(overRideValues.UpstreamURL != "", upstreamURL); err != nil {
-		return err
-	}
+	if upstreamURL != "" {
+		if err := getURLFormatErr(overRideValues.UpstreamURL != "", upstreamURL); err != nil {
+			return err
+		}
 
-	xTykAPIGateway.Upstream.URL = upstreamURL
+		xTykAPIGateway.Upstream.URL = upstreamURL
+	}
 
 	if overRideValues.Authentication != nil {
 		err := s.importAuthentication(*overRideValues.Authentication)
