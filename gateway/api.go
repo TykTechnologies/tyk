@@ -1297,6 +1297,17 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	existingAPISpec := gw.getApiSpec(apiID)
+	if existingAPISpec == nil {
+		doJSONWrite(w, http.StatusNotFound, apiError(apidef.ErrAPINotFound.Error()))
+		return
+	}
+
+	if !existingAPISpec.IsOAS {
+		doJSONWrite(w, http.StatusBadRequest, apiError(apidef.ErrAPINotMigrated.Error()))
+		return
+	}
+
 	reqBodyInBytes, oasObj, err := extractOASObjFromReq(r.Body)
 
 	if err != nil {
@@ -1314,13 +1325,8 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var oasObjToPatch oas.OAS
-
-	if spec := gw.getApiSpec(apiID); spec != nil {
-		oasObjToPatch.Fill(*spec.APIDefinition)
-	} else {
-		doJSONWrite(w, http.StatusNotFound, apiError(fmt.Sprintf("No API found for APIID %q", apiID)))
-		return
-	}
+	existingAPISpec.OAS.Fill(*existingAPISpec.APIDefinition)
+	oasObjToPatch = existingAPISpec.OAS
 
 	var tykExtToPatch *oas.XTykAPIGateway
 
@@ -1329,6 +1335,8 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		tykExtToPatch = oasObjToPatch.GetTykExtension()
 	}
+
+	oasObj.Servers = oas.RetainOldServerURL(oasObjToPatch.Servers, oasObj.Servers)
 
 	oasObjToPatch.T = oasObj.T
 
