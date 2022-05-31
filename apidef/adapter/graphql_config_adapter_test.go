@@ -724,6 +724,8 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 					ClientID:             "test.client.id",
 					KafkaVersion:         "V2_8_0_0",
 					StartConsumingLatest: true,
+					BalanceStrategy:      kafkaDataSource.BalanceStrategySticky,
+					IsolationLevel:       kafkaDataSource.IsolationLevelReadCommitted,
 				},
 			}),
 		},
@@ -743,6 +745,8 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 					ClientID:             "test.client.id",
 					KafkaVersion:         "V2_8_0_0",
 					StartConsumingLatest: true,
+					BalanceStrategy:      kafkaDataSource.BalanceStrategySticky,
+					IsolationLevel:       kafkaDataSource.IsolationLevelReadCommitted,
 				},
 			}),
 		},
@@ -992,7 +996,9 @@ var graphqlEngineV2ConfigJson = `{
 					"group_id": "test.consumer.group",
 					"client_id": "test.client.id",
 					"kafka_version": "V2_8_0_0",
-					"start_consuming_latest": true
+					"start_consuming_latest": true,
+					"balance_strategy": "BalanceStrategySticky",
+					"isolation_level": "ReadCommitted"
 				}
 			},
 			{
@@ -1011,7 +1017,9 @@ var graphqlEngineV2ConfigJson = `{
 					"group_id": "test.consumer.group",
 					"client_id": "test.client.id",
 					"kafka_version": "V2_8_0_0",
-					"start_consuming_latest": true
+					"start_consuming_latest": true,
+					"balance_strategy": "BalanceStrategySticky",
+					"isolation_level": "ReadCommitted"
 				}
 			}
 		]
