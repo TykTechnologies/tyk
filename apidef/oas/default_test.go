@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 )
@@ -213,7 +215,8 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				},
 				CustomDomain: newCustomDomain,
 				Authentication: &Authentication{
-					Enabled: true,
+					Enabled:              true,
+					BaseIdentityProvider: apidef.AuthToken,
 					SecuritySchemes: SecuritySchemes{
 						testSSMyAuth: &Token{
 							Enabled: true,
@@ -1125,6 +1128,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 			}
 
 			assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
+			assert.Equal(t, apidef.AuthTypeNone, authentication.BaseIdentityProvider)
 		}
 
 		t.Run("enable=true", func(t *testing.T) {
@@ -1199,7 +1203,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 		assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
 	})
 
-	t.Run("add multiple authentication with and condition", func(t *testing.T) {
+	t.Run("add multiple authentication with AND condition", func(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
 			oas := OAS{}
 			oas.Security = openapi3.SecurityRequirements{
@@ -1255,6 +1259,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 			}
 
 			assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
+			assert.Equal(t, apidef.AuthToken, authentication.BaseIdentityProvider)
 		}
 
 		t.Run("enable=true", func(t *testing.T) {
@@ -1427,6 +1432,43 @@ func TestSecuritySchemes_Import(t *testing.T) {
 		}
 
 		assert.Equal(t, expectedToken, securitySchemes[testSecurityNameToken])
+	})
+}
+
+func TestSecuritySchemes_GetBaseIdentityProvider(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		ss := SecuritySchemes{}
+		t.Run("zero", func(t *testing.T) {
+			assert.Equal(t, apidef.AuthTypeNone, ss.GetBaseIdentityProvider())
+		})
+
+		ss["token"] = &Token{}
+
+		t.Run("one", func(t *testing.T) {
+			assert.Equal(t, apidef.AuthTypeNone, ss.GetBaseIdentityProvider())
+		})
+	})
+
+	ss := SecuritySchemes{}
+	ss["token"] = &Token{}
+	ss["jwt"] = &JWT{}
+	ss["oauth"] = &OAuth{}
+	ss["basic"] = &Basic{}
+
+	t.Run("token", func(t *testing.T) {
+		assert.Equal(t, apidef.AuthToken, ss.GetBaseIdentityProvider())
+	})
+
+	delete(ss, "token")
+
+	t.Run("jwt", func(t *testing.T) {
+		assert.Equal(t, apidef.JWTClaim, ss.GetBaseIdentityProvider())
+	})
+
+	delete(ss, "jwt")
+
+	t.Run("oauth", func(t *testing.T) {
+		assert.Equal(t, apidef.OAuthKey, ss.GetBaseIdentityProvider())
 	})
 }
 

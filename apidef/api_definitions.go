@@ -66,6 +66,7 @@ const (
 	RegexExtractor IdExtractorType = "regex"
 
 	// For multi-type auth
+	AuthTypeNone  AuthTypeEnum = ""
 	AuthToken     AuthTypeEnum = "auth_token"
 	HMACKey       AuthTypeEnum = "hmac_key"
 	BasicAuthUser AuthTypeEnum = "basic_auth_user"
