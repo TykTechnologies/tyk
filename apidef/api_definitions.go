@@ -66,6 +66,7 @@ const (
 	RegexExtractor IdExtractorType = "regex"
 
 	// For multi-type auth
+	AuthTypeNone  AuthTypeEnum = ""
 	AuthToken     AuthTypeEnum = "auth_token"
 	HMACKey       AuthTypeEnum = "hmac_key"
 	BasicAuthUser AuthTypeEnum = "basic_auth_user"
@@ -103,6 +104,7 @@ var (
 	ErrAPINotMigrated  = errors.New("the supplied API definition is in OAS format, please use the Tyk native format for this API")
 	ErrOASGetForOldAPI = errors.New("the requested API definition is in Tyk native format, please use old api endpoint")
 	ErrAPINotFound     = errors.New("API not found")
+	ErrMissingAPIID    = errors.New("missing API ID")
 )
 
 type ObjectId bson.ObjectId
@@ -817,6 +819,8 @@ type GraphQLEngineDataSourceConfigKafka struct {
 	ClientID             string `bson:"client_id" json:"client_id"`
 	KafkaVersion         string `bson:"kafka_version" json:"kafka_version"`
 	StartConsumingLatest bool   `json:"start_consuming_latest"`
+	BalanceStrategy      string `json:"balance_strategy"`
+	IsolationLevel       string `json:"isolation_level"`
 }
 
 type QueryVariable struct {

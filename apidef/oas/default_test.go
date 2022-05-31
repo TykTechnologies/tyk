@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 )
@@ -158,6 +160,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				},
 				Security: openapi3.SecurityRequirements{
 					{testSSMyAuth: []string{}, testSSMyAuthWithAnd: []string{}},
+					{testSSMyAuthWithOR: []string{}},
 				},
 				Components: openapi3.Components{
 					SecuritySchemes: openapi3.SecuritySchemes{
@@ -166,6 +169,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						},
 						testSSMyAuthWithAnd: &openapi3.SecuritySchemeRef{
 							Value: openapi3.NewSecurityScheme().WithType(typeOAuth2),
+						},
+						testSSMyAuthWithOR: &openapi3.SecuritySchemeRef{
+							Value: openapi3.NewSecurityScheme().WithType(typeHttp).WithScheme(schemeBasic),
 						},
 					},
 				},
@@ -209,7 +215,8 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				},
 				CustomDomain: newCustomDomain,
 				Authentication: &Authentication{
-					Enabled: true,
+					Enabled:              true,
+					BaseIdentityProvider: apidef.AuthToken,
 					SecuritySchemes: SecuritySchemes{
 						testSSMyAuth: &Token{
 							Enabled: true,
@@ -913,6 +920,50 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 	})
 
+	t.Run("do not configure upstream URL with servers when upstream URL params is not provided and "+
+		"upstream URL in x-tyk in not empty", func(t *testing.T) {
+		oasDef := OAS{
+			T: openapi3.T{
+				Info: &openapi3.Info{
+					Title: "OAS API",
+				},
+				Servers: openapi3.Servers{
+					{
+						URL: "https://example-org.com/api",
+					},
+				},
+			},
+		}
+
+		existingTykExtension := XTykAPIGateway{
+			Info: Info{
+				Name: "New OAS API",
+			},
+			Server: Server{
+				ListenPath: ListenPath{
+					Value: "/listen-api",
+				},
+			},
+			Upstream: Upstream{
+				URL: "https://upstream.org/api",
+			},
+		}
+
+		oasDef.SetTykExtension(&existingTykExtension)
+
+		newListenPath := "/new-listen-api"
+
+		expectedTykExtension := existingTykExtension
+		expectedTykExtension.Server.ListenPath.Value = newListenPath
+		expectedTykExtension.Info.State.Active = true
+
+		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
+			ListenPath: newListenPath,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
+	})
+
 }
 
 func TestGetTykExtensionConfigParams(t *testing.T) {
@@ -930,6 +981,7 @@ func TestGetTykExtensionConfigParams(t *testing.T) {
 		queryParams.Set("upstreamURL", upstreamURL)
 		queryParams.Set("customDomain", customDomain)
 		queryParams.Set("validateRequest", "true")
+		queryParams.Set("authentication", "true")
 		queryParams.Set("allowList", "false")
 
 		endpoint.RawQuery = queryParams.Encode()
@@ -942,6 +994,7 @@ func TestGetTykExtensionConfigParams(t *testing.T) {
 			ListenPath:      listenPath,
 			UpstreamURL:     upstreamURL,
 			CustomDomain:    customDomain,
+			Authentication:  &trueVal,
 			AllowList:       &falseVal,
 			ValidateRequest: &trueVal,
 		}
@@ -1075,6 +1128,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 			}
 
 			assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
+			assert.Equal(t, apidef.AuthTypeNone, authentication.BaseIdentityProvider)
 		}
 
 		t.Run("enable=true", func(t *testing.T) {
@@ -1149,7 +1203,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 		assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
 	})
 
-	t.Run("add multiple authentication with and condition", func(t *testing.T) {
+	t.Run("add multiple authentication with AND condition", func(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
 			oas := OAS{}
 			oas.Security = openapi3.SecurityRequirements{
@@ -1205,6 +1259,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 			}
 
 			assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
+			assert.Equal(t, apidef.AuthToken, authentication.BaseIdentityProvider)
 		}
 
 		t.Run("enable=true", func(t *testing.T) {
@@ -1222,6 +1277,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	const (
 		testSecurityNameToken       = "my_auth_token"
 		testSecurityNameJWT         = "my_auth_jwt"
+		testSecurityNameBasic       = "my_auth_basic"
 		testSecurityNameOauth       = "my_auth_oauth"
 		testSecurityNameUnsupported = "my_auth_unsupported"
 		testHeaderName              = "my-auth-token-header"
@@ -1283,6 +1339,29 @@ func TestSecuritySchemes_Import(t *testing.T) {
 		}
 
 		assert.Equal(t, expectedJWT, securitySchemes[testSecurityNameJWT])
+	})
+
+	t.Run("basic", func(t *testing.T) {
+		securitySchemes := SecuritySchemes{}
+		nativeSecurityScheme := &openapi3.SecurityScheme{
+			Type:   typeHttp,
+			Scheme: schemeBasic,
+		}
+
+		err := securitySchemes.Import(testSecurityNameBasic, nativeSecurityScheme, true)
+		assert.NoError(t, err)
+
+		expectedBasic := &Basic{
+			Enabled: true,
+			AuthSources: AuthSources{
+				Header: &AuthSource{
+					Enabled: true,
+					Name:    defaultAuthSourceName,
+				},
+			},
+		}
+
+		assert.Equal(t, expectedBasic, securitySchemes[testSecurityNameBasic])
 	})
 
 	t.Run("oauth", func(t *testing.T) {
@@ -1356,6 +1435,43 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	})
 }
 
+func TestSecuritySchemes_GetBaseIdentityProvider(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		ss := SecuritySchemes{}
+		t.Run("zero", func(t *testing.T) {
+			assert.Equal(t, apidef.AuthTypeNone, ss.GetBaseIdentityProvider())
+		})
+
+		ss["token"] = &Token{}
+
+		t.Run("one", func(t *testing.T) {
+			assert.Equal(t, apidef.AuthTypeNone, ss.GetBaseIdentityProvider())
+		})
+	})
+
+	ss := SecuritySchemes{}
+	ss["token"] = &Token{}
+	ss["jwt"] = &JWT{}
+	ss["oauth"] = &OAuth{}
+	ss["basic"] = &Basic{}
+
+	t.Run("token", func(t *testing.T) {
+		assert.Equal(t, apidef.AuthToken, ss.GetBaseIdentityProvider())
+	})
+
+	delete(ss, "token")
+
+	t.Run("jwt", func(t *testing.T) {
+		assert.Equal(t, apidef.JWTClaim, ss.GetBaseIdentityProvider())
+	})
+
+	delete(ss, "jwt")
+
+	t.Run("oauth", func(t *testing.T) {
+		assert.Equal(t, apidef.OAuthKey, ss.GetBaseIdentityProvider())
+	})
+}
+
 func TestToken_Import(t *testing.T) {
 	const testHeaderName = "my-auth-token-header"
 	const testCookieName = "my-auth-token-cookie"
@@ -1426,6 +1542,16 @@ func TestJWT_Import(t *testing.T) {
 	expectedJWT.Header = &AuthSource{true, defaultAuthSourceName}
 
 	assert.Equal(t, expectedJWT, jwt)
+}
+
+func TestBasic_Import(t *testing.T) {
+	basic := &Basic{}
+	basic.Import(true)
+
+	expectedBasic := &Basic{Enabled: true}
+	expectedBasic.Header = &AuthSource{true, defaultAuthSourceName}
+
+	assert.Equal(t, expectedBasic, basic)
 }
 
 func TestOAuth_Import(t *testing.T) {

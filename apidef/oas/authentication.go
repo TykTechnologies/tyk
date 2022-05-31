@@ -144,6 +144,14 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 
 		jwt = ss[name].(*JWT)
 		jwt.Import(enable)
+	case nativeSS.Type == typeHttp && nativeSS.Scheme == schemeBasic:
+		var basic *Basic
+		if ss[name] == nil {
+			ss[name] = &Basic{}
+		}
+
+		basic = ss[name].(*Basic)
+		basic.Import(enable)
 	case nativeSS.Type == typeOAuth2:
 		var oauth *OAuth
 		if ss[name] == nil {
@@ -157,6 +165,45 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 	}
 
 	return nil
+}
+
+func baseIdentityProviderPrecedence(authType apidef.AuthTypeEnum) int {
+	switch authType {
+	case apidef.AuthToken:
+		return 1
+	case apidef.JWTClaim:
+		return 2
+	case apidef.OAuthKey:
+		return 3
+	case apidef.BasicAuthUser:
+		return 4
+	default:
+		return 5
+	}
+}
+
+func (ss SecuritySchemes) GetBaseIdentityProvider() (res apidef.AuthTypeEnum) {
+	if len(ss) < 2 {
+		return
+	}
+
+	resBaseIdentityProvider := baseIdentityProviderPrecedence(apidef.AuthTypeNone)
+	res = apidef.OAuthKey
+
+	for _, scheme := range ss {
+		if _, ok := scheme.(*Token); ok {
+			return apidef.AuthToken
+		}
+
+		if _, ok := scheme.(*JWT); ok {
+			if baseIdentityProviderPrecedence(apidef.JWTClaim) < resBaseIdentityProvider {
+				resBaseIdentityProvider = baseIdentityProviderPrecedence(apidef.JWTClaim)
+				res = apidef.JWTClaim
+			}
+		}
+	}
+
+	return
 }
 
 type AuthSources struct {
