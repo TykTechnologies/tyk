@@ -359,6 +359,9 @@
     "enable_custom_domains": {
       "type": "boolean"
     },
+    "enable_strict_routes": {
+      "type": "boolean"
+    },
     "enable_jsvm": {
       "type": "boolean"
     },
