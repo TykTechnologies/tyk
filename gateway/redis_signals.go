@@ -61,6 +61,10 @@ func (gw *Gateway) startPubSubLoop(restartOnError bool) {
 	}
 
 	for {
+		err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
+			gw.handleRedisEvent(v, nil, nil)
+		})
+
 		select {
 		case <-gw.ctx.Done():
 			pubSubLog.Info("Context cancelled, exiting pubsub loop")
@@ -68,9 +72,6 @@ func (gw *Gateway) startPubSubLoop(restartOnError bool) {
 		default:
 		}
 
-		err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
-			gw.handleRedisEvent(v, nil, nil)
-		})
 		if err != nil {
 			pubSubLog.WithError(err).Error(message)
 			if restartOnError {
