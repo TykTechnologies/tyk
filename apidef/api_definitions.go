@@ -818,6 +818,8 @@ type GraphQLEngineDataSourceConfigKafka struct {
 	ClientID             string `bson:"client_id" json:"client_id"`
 	KafkaVersion         string `bson:"kafka_version" json:"kafka_version"`
 	StartConsumingLatest bool   `json:"start_consuming_latest"`
+	BalanceStrategy      string `json:"balance_strategy"`
+	IsolationLevel       string `json:"isolation_level"`
 }
 
 type QueryVariable struct {
