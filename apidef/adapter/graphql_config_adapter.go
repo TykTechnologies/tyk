@@ -261,8 +261,6 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 					ClientID:             kafkaConfig.ClientID,
 					KafkaVersion:         kafkaConfig.KafkaVersion,
 					StartConsumingLatest: kafkaConfig.StartConsumingLatest,
-					BalanceStrategy:      kafkaConfig.BalanceStrategy,
-					IsolationLevel:       kafkaConfig.IsolationLevel,
 				},
 			})
 		}
