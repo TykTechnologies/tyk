@@ -139,6 +139,8 @@ func (s *OAS) importAuthentication(enable bool) error {
 		}
 	}
 
+	authentication.BaseIdentityProvider = tykSecuritySchemes.GetBaseIdentityProvider()
+
 	return nil
 }
 
