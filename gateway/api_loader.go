@@ -677,7 +677,12 @@ func (h *explicitRouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	h.muxer.handle404(w, r)
 }
 
-func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux) http.Handler {
+func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux, enabled bool) http.Handler {
+	// feature is enabled via config option
+	if !enabled {
+		return handler
+	}
+
 	// keep trailing slash paths as-is
 	if strings.HasSuffix(prefix, "/") {
 		return handler
@@ -704,10 +709,10 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	if spec.ListenPort != 0 {
 		port = spec.ListenPort
 	}
-	router := muxer.router(port, spec.Protocol, gw.GetConfig())
+	router := muxer.router(port, spec.Protocol, gwConfig)
 	if router == nil {
 		router = mux.NewRouter()
-		muxer.setRouter(port, spec.Protocol, router, gw.GetConfig())
+		muxer.setRouter(port, spec.Protocol, router, gwConfig)
 	}
 
 	hostname := gwConfig.HostName
@@ -731,7 +736,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 	}
 
-	httpHandler := explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer)
+	httpHandler := explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, gwConfig.EnableStrictRoutes)
 	subrouter.NewRoute().Handler(httpHandler)
 
 	return chainObj.ThisHandler

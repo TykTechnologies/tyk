@@ -312,10 +312,12 @@ func TestHandle404(t *testing.T) {
 }
 
 func TestHandleSubroutes(t *testing.T) {
-	g := StartTest(nil)
-	defer g.Close()
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.EnableStrictRoutes = true
+	})
+	defer ts.Close()
 
-	g.Gw.BuildAndLoadAPI(
+	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.UseKeylessAccess = false
@@ -337,7 +339,7 @@ func TestHandleSubroutes(t *testing.T) {
 			spec.UseKeylessAccess = true
 		},
 	)
-	_, _ = g.Run(t, []test.TestCase{
+	_, _ = ts.Run(t, []test.TestCase{
 		{Path: "/", Code: http.StatusUnauthorized},
 		{Path: "/app", Code: http.StatusUnauthorized},
 		{Path: "/apple", Code: http.StatusOK},
