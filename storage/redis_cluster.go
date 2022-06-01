@@ -665,14 +665,36 @@ func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channel string, c
 	defer pubsub.Close()
 
 	for {
-		// quit pubsub loop on context cancellation
-		select {
-		case <-ctx.Done():
-			return nil
-		case msg := <-pubsub.Channel():
-			callback(msg)
+		if err := r.handleReceive(ctx, pubsub.Receive, callback); err != nil {
+			return err
 		}
 	}
+}
+
+// handleReceive is split from pubsub inner loop to inject fake
+// receive function for code coverage tests.
+func (r *RedisCluster) handleReceive(ctx context.Context, receiveFn func(context.Context) (interface{}, error), callback func(interface{})) error {
+	msg, err := receiveFn(ctx)
+	return r.handleMessage(msg, err, callback)
+}
+
+func (r *RedisCluster) handleMessage(msg interface{}, err error, callback func(interface{})) error {
+	if err == nil {
+		if callback != nil {
+			callback(msg)
+		}
+		return err
+	}
+
+	log.Error("Error while receiving pubsub message:", err)
+
+	// This error occurs when we cancel the context for pubsub.
+	// To enable handling the error, it is coalesced to ErrClosed.
+	if strings.Contains(err.Error(), "use of closed network connection") {
+		return redis.ErrClosed
+	}
+
+	return err
 }
 
 func (r *RedisCluster) Publish(channel, message string) error {
