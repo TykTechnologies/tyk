@@ -2350,7 +2350,7 @@ func TestOAS(t *testing.T) {
 						},
 						ValidateRequest: &oas.ValidateRequest{
 							Enabled:           true,
-							ErrorResponseCode: http.StatusBadRequest,
+							ErrorResponseCode: http.StatusUnprocessableEntity,
 						},
 					},
 				},
@@ -2397,7 +2397,7 @@ func TestOAS(t *testing.T) {
 						},
 						ValidateRequest: &oas.ValidateRequest{
 							Enabled:           false,
-							ErrorResponseCode: http.StatusBadRequest,
+							ErrorResponseCode: http.StatusUnprocessableEntity,
 						},
 					},
 				},
