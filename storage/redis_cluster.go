@@ -665,13 +665,17 @@ func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channel string, c
 	defer pubsub.Close()
 
 	for {
-		msg, err := pubsub.Receive(ctx)
-		err = r.handleMessage(msg, err, callback)
-		if err == nil {
-			continue
+		if err := r.handleReceive(ctx, pubsub.Receive, callback); err != nil {
+			return err
 		}
-		return err
 	}
+}
+
+// handleReceive is split from pubsub inner loop to inject fake
+// receive function for code coverage tests.
+func (r *RedisCluster) handleReceive(ctx context.Context, receiveFn func(context.Context) (interface{}, error), callback func(interface{})) error {
+	msg, err := receiveFn(ctx)
+	return r.handleMessage(msg, err, callback)
 }
 
 func (r *RedisCluster) handleMessage(msg interface{}, err error, callback func(interface{})) error {

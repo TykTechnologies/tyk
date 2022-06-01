@@ -48,9 +48,22 @@ func TestHandleMessage(t *testing.T) {
 	})
 
 	t.Run("handle message with err coalescing", func(t *testing.T) {
-		err := errors.New("xxx: use of closed network connection")
+		err := errors.New("Test error (expected): use of closed network connection")
 		want := cluster.handleMessage(nil, err, nil)
 		assert.Equal(t, redis.ErrClosed, want)
+	})
+}
+
+func TestHandleReceive(t *testing.T) {
+	cluster := &RedisCluster{}
+	ctx := context.Background()
+
+	t.Run("handle receive without err", func(t *testing.T) {
+		receiveFn := func(context.Context) (interface{}, error) {
+			return nil, nil
+		}
+		err := cluster.handleReceive(ctx, receiveFn, nil)
+		assert.NoError(t, err)
 	})
 }
 
