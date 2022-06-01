@@ -11,7 +11,9 @@ import (
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/kelseyhightower/envconfig"
 	"github.com/nsf/jsondiff"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
@@ -283,4 +285,17 @@ func TestLoad_tracing(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestCustomEnvDecoders(t *testing.T) {
+	var c Config
+	os.Setenv("TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES", "[{\"domain_name\":\"testCerts\"}]")
+	err := envconfig.Process("TYK_GW", &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Len(t, c.HttpServerOptions.Certificates, 1, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES should have len 1")
+	assert.Equal(t, "testCerts", c.HttpServerOptions.Certificates[0].Name, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES domain_name should be equals to testCerts")
+
 }
