@@ -414,7 +414,7 @@ func (v *ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operat
 
 func (v *ValidateRequest) Import(enabled bool) {
 	v.Enabled = enabled
-	v.ErrorResponseCode = http.StatusBadRequest
+	v.ErrorResponseCode = http.StatusUnprocessableEntity
 }
 
 func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {
