@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 
@@ -54,12 +55,37 @@ func (gw *Gateway) startPubSubLoop() {
 	cacheStore := storage.RedisCluster{RedisController: gw.RedisController}
 	cacheStore.Connect()
 
-	err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
-		gw.handleRedisEvent(v, nil, nil)
-	})
-	if err != nil {
-		log.WithError(err).Error("Exiting pubsub")
+	message := "Connection to Redis failed, reconnect in 10s"
+
+	for {
+		err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
+			gw.handleRedisEvent(v, nil, nil)
+		})
+
+		select {
+		case <-gw.ctx.Done():
+			pubSubLog.Info("Context cancelled, exiting pubsub loop")
+			return
+		default:
+		}
+
+		gw.logPubSubError(err, message)
+		gw.addPubSubDelay(10 * time.Second)
 	}
+}
+
+// addPubSubDelay sleeps for duration
+func (gw *Gateway) addPubSubDelay(dur time.Duration) {
+	time.Sleep(dur)
+}
+
+// isPubSubError returns true if err != nil, logs error
+func (gw *Gateway) logPubSubError(err error, message string) bool {
+	if err != nil {
+		pubSubLog.WithError(err).Error(message)
+		return true
+	}
+	return false
 }
 
 func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {

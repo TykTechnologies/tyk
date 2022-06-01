@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -18,24 +19,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/certs"
-
-	"github.com/TykTechnologies/tyk/config"
-
-	"github.com/TykTechnologies/tyk/apidef"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-redis/redis/v8"
-
 	uuid "github.com/satori/go.uuid"
-
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"fmt"
-
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -1478,33 +1472,59 @@ func TestUpdateOauthClientHandler(t *testing.T) {
 
 func TestGroupResetHandler(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	tryReloadCount := 100
+	reloadCount := 0
 
-	didReload := make(chan bool)
+	didSubscribe := make(chan bool, 1)
+	didReload := make(chan bool, tryReloadCount)
+
 	cacheStore := storage.RedisCluster{RedisController: ts.Gw.RedisController}
 	cacheStore.Connect()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	// Test usually takes 0.05sec or so, timeout after 1s
+	ctx, cancel := context.WithTimeout(ts.Gw.ctx, time.Second)
 	defer cancel()
 
+	// Using waitgroup to test cancellation
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	go func() {
+		// Clean up resources on exit
+		defer func() {
+			close(didReload)
+			close(didSubscribe)
+			wg.Done()
+		}()
+
 		err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
 			switch x := v.(type) {
+			case *redis.Subscription:
+				didSubscribe <- true
 			case *redis.Message:
 				notf := Notification{Gw: ts.Gw}
-				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
-					t.Error(err)
-				}
+
+				err := json.Unmarshal([]byte(x.Payload), &notf)
+				assert.NoError(t, err)
+
 				if notf.Command == NoticeGroupReload {
 					didReload <- true
+					reloadCount++
 				}
 			}
 		})
-		if err != nil {
-			t.Log(err)
-			t.Fail()
+
+		select {
+		case <-ctx.Done():
+			// A cancelled context is expected at the end
+			return
+		default:
 		}
-		close(didReload)
+
+		// Apart from a cancelled context, any error is
+		// considered a fatal error.
+		require.NoError(t, err)
+
 	}()
 
 	uri := "/tyk/reload/group"
@@ -1515,35 +1535,42 @@ func TestGroupResetHandler(t *testing.T) {
 
 	ts.Gw.LoadSampleAPI(apiTestDef)
 
-	recorder := httptest.NewRecorder()
-
 	// If we don't wait for the subscription to be done, we might do
 	// the reload before pub/sub is in place to receive our message.
-	req := ts.withAuth(TestReq(t, "GET", uri, nil))
+	<-didSubscribe
 
-	ts.mainRouter().ServeHTTP(recorder, req)
+	// Do a loop of tryReloadCount reloads
+	for try := 1; try <= tryReloadCount; try++ {
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
 
-	if recorder.Code != 200 {
-		t.Fatal("Hot reload (group) failed, response code was: ", recorder.Code)
-	}
+		recorder := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(recorder, req)
 
-	ts.Gw.apisMu.RLock()
-	if len(ts.Gw.apisByID) == 0 {
-		t.Fatal("Hot reload (group) was triggered but no APIs were found.")
-	}
-	ts.Gw.apisMu.RUnlock()
+		assert.Equal(t, http.StatusOK, recorder.Code, "Hot reload (group) failed")
 
-	// We wait for the right notification (NoticeGroupReload), other
-	// type of notifications may be received during tests, as this
-	// is the cluster channel:
-	select {
-	case <-time.After(time.Second):
-		t.Fatal("Timeout waiting for reload signal")
-	case ok := <-didReload:
-		if !ok {
-			t.Fatal("Reload failed (closed pubsub)")
+		ts.Gw.apisMu.RLock()
+		require.Len(t, ts.Gw.apisByID, 1, "Unexpected API count after hot reload (group) was triggered.")
+		ts.Gw.apisMu.RUnlock()
+
+		// We wait for the right notification (NoticeGroupReload), other
+		// type of notifications may be received during tests, as this
+		// is the cluster channel:
+		select {
+		case <-ctx.Done():
+			t.Fatalf("Timeout waiting for reload signal, registered %d reloads", reloadCount)
+		case ok := <-didReload:
+			require.True(t, ok, "Reload failed (closed pubsub?)")
 		}
 	}
+
+	// Close our *Test object, ensuring a cancelled context
+	ts.Close()
+
+	// Wait for our pubsub loop to exit
+	wg.Wait()
+
+	// Assert total reload count matches expected value
+	assert.Equal(t, tryReloadCount, reloadCount, "Unexpected number of reloads registered from pubsub")
 }
 
 func TestHotReloadSingle(t *testing.T) {
