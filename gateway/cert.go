@@ -372,7 +372,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 						}
 					}
 				}
-			case spec.AuthConfigs[authTokenType].UseCertificate:
+			case spec.Auth.UseCertificate, spec.AuthConfigs[authTokenType].UseCertificate:
 				// Dynamic certificate check required, falling back to HTTP level check
 				// TODO: Change to VerifyPeerCertificate hook instead, when possible
 				if domainRequireCert[spec.Domain] < tls.RequestClientCert {
@@ -407,13 +407,30 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 			}
 		}
 
-		newConfig.ClientAuth = tls.NoClientCert
+		if clientAuth, found := domainRequireCert[hello.ServerName]; found {
+			newConfig.ClientAuth = clientAuth
+		} else {
+			newConfig.ClientAuth = tls.NoClientCert
 
-		for key, clientAuth := range domainRequireCert {
-			req := http.Request{Host: hello.ServerName, URL: &url.URL{}}
-			if mux.NewRouter().Host(key).Match(&req, &mux.RouteMatch{}) {
-				newConfig.ClientAuth = clientAuth
-				break
+			for domain, clientAuth := range domainRequireCert {
+				isRegex := false
+				for _, c := range domain {
+					if c == '{' {
+						isRegex = true
+						break
+					}
+				}
+
+				req := http.Request{Host: hello.ServerName, URL: &url.URL{}}
+				if isRegex && mux.NewRouter().Host(domain).Match(&req, &mux.RouteMatch{}) {
+					if clientAuth > newConfig.ClientAuth {
+						newConfig.ClientAuth = clientAuth
+					}
+
+					if newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+						break
+					}
+				}
 			}
 		}
 
