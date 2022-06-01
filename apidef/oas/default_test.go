@@ -446,7 +446,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					oasPostOperationID: {
 						ValidateRequest: &ValidateRequest{
 							Enabled:           enabled,
-							ErrorResponseCode: http.StatusBadRequest,
+							ErrorResponseCode: http.StatusUnprocessableEntity,
 						},
 					},
 				}
@@ -455,7 +455,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					tykPostOperationID: {
 						ValidateRequest: &ValidateRequest{
 							Enabled:           enabled,
-							ErrorResponseCode: http.StatusBadRequest,
+							ErrorResponseCode: http.StatusUnprocessableEntity,
 						},
 					},
 				}
