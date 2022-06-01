@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -25,6 +26,32 @@ func init() {
 
 		time.Sleep(10 * time.Millisecond)
 	}
+}
+
+func TestHandleMessage(t *testing.T) {
+	cluster := &RedisCluster{}
+
+	testErr := errors.New("Test error (expected)")
+
+	t.Run("handle message without err", func(t *testing.T) {
+		ok := false
+		err := cluster.handleMessage(nil, nil, func(_ interface{}) {
+			ok = true
+		})
+		assert.NoError(t, err)
+		assert.True(t, ok)
+	})
+
+	t.Run("handle message with err", func(t *testing.T) {
+		got := cluster.handleMessage(nil, testErr, nil)
+		assert.Equal(t, testErr, got)
+	})
+
+	t.Run("handle message with err coalescing", func(t *testing.T) {
+		err := errors.New("xxx: use of closed network connection")
+		want := cluster.handleMessage(nil, err, nil)
+		assert.Equal(t, redis.ErrClosed, want)
+	})
 }
 
 func TestRedisClusterGetMultiKey(t *testing.T) {

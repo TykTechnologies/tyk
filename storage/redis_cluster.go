@@ -666,17 +666,31 @@ func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channel string, c
 
 	for {
 		msg, err := pubsub.Receive(ctx)
+		err = r.handleMessage(msg, err, callback)
+		if err == nil {
+			continue
+		}
+		return err
+	}
+}
 
-		switch {
-		case err != nil && strings.Contains(err.Error(), "use of closed network connection"):
-			log.Error("Error while receiving pubsub message:", err)
-			return redis.ErrClosed
-		case err != nil:
-			return err
-		default:
+func (r *RedisCluster) handleMessage(msg interface{}, err error, callback func(interface{})) error {
+	if err == nil {
+		if callback != nil {
 			callback(msg)
 		}
+		return err
 	}
+
+	log.Error("Error while receiving pubsub message:", err)
+
+	// This error occurs when we cancel the context for pubsub.
+	// To enable handling the error, it is coalesced to ErrClosed.
+	if strings.Contains(err.Error(), "use of closed network connection") {
+		return redis.ErrClosed
+	}
+
+	return err
 }
 
 func (r *RedisCluster) Publish(channel, message string) error {
