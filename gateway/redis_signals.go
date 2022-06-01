@@ -51,14 +51,11 @@ func (n *Notification) Sign() {
 	n.Signature = hex.EncodeToString(hash[:])
 }
 
-func (gw *Gateway) startPubSubLoop(restartOnError bool) {
+func (gw *Gateway) startPubSubLoop() {
 	cacheStore := storage.RedisCluster{RedisController: gw.RedisController}
 	cacheStore.Connect()
 
 	message := "Connection to Redis failed, reconnect in 10s"
-	if !restartOnError {
-		message = "Connection to Redis failed, exiting pubsub loop"
-	}
 
 	for {
 		err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
@@ -72,15 +69,23 @@ func (gw *Gateway) startPubSubLoop(restartOnError bool) {
 		default:
 		}
 
-		if err != nil {
-			pubSubLog.WithError(err).Error(message)
-			if restartOnError {
-				time.Sleep(10 * time.Second)
-				continue
-			}
-			return
-		}
+		gw.logPubSubError(err, message)
+		gw.addPubSubDelay(10 * time.Second)
 	}
+}
+
+// addPubSubDelay sleeps for duration
+func (gw *Gateway) addPubSubDelay(dur time.Duration) {
+	time.Sleep(dur)
+}
+
+// isPubSubError returns true if err != nil, logs error
+func (gw *Gateway) logPubSubError(err error, message string) bool {
+	if err != nil {
+		pubSubLog.WithError(err).Error(message)
+		return true
+	}
+	return false
 }
 
 func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {

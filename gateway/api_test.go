@@ -1485,36 +1485,46 @@ func TestGroupResetHandler(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ts.Gw.ctx, time.Second)
 	defer cancel()
 
+	// Using waitgroup to test cancellation
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
+		// Clean up resources on exit
+		defer func() {
+			close(didReload)
+			close(didSubscribe)
+			wg.Done()
+		}()
+
 		err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
 			switch x := v.(type) {
 			case *redis.Subscription:
 				didSubscribe <- true
 			case *redis.Message:
 				notf := Notification{Gw: ts.Gw}
-				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
-					t.Error(err)
-				}
+
+				err := json.Unmarshal([]byte(x.Payload), &notf)
+				assert.NoError(t, err)
+
 				if notf.Command == NoticeGroupReload {
 					didReload <- true
 					reloadCount++
 				}
 			}
 		})
+
 		select {
 		case <-ctx.Done():
 			// A cancelled context is expected at the end
+			return
 		default:
-			// Apart from a cancelled context, any error is
-			// considered a fatal error.
-			require.NoError(t, err)
 		}
-		close(didReload)
-		close(didSubscribe)
-		wg.Done()
+
+		// Apart from a cancelled context, any error is
+		// considered a fatal error.
+		require.NoError(t, err)
+
 	}()
 
 	uri := "/tyk/reload/group"
@@ -1525,8 +1535,6 @@ func TestGroupResetHandler(t *testing.T) {
 
 	ts.Gw.LoadSampleAPI(apiTestDef)
 
-	recorder := httptest.NewRecorder()
-
 	// If we don't wait for the subscription to be done, we might do
 	// the reload before pub/sub is in place to receive our message.
 	<-didSubscribe
@@ -1535,10 +1543,10 @@ func TestGroupResetHandler(t *testing.T) {
 	for try := 1; try <= tryReloadCount; try++ {
 		req := ts.withAuth(TestReq(t, "GET", uri, nil))
 
+		recorder := httptest.NewRecorder()
 		ts.mainRouter().ServeHTTP(recorder, req)
-		if recorder.Code != 200 {
-			t.Fatal("Hot reload (group) failed, response code was: ", recorder.Code)
-		}
+
+		assert.Equal(t, http.StatusOK, recorder.Code, "Hot reload (group) failed")
 
 		ts.Gw.apisMu.RLock()
 		require.Len(t, ts.Gw.apisByID, 1, "Unexpected API count after hot reload (group) was triggered.")

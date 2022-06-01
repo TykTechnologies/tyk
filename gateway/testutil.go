@@ -1120,7 +1120,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	// Start listening for reload messages
 	if !gw.GetConfig().SuppressRedisSignalReload {
-		go gw.startPubSubLoop(false)
+		go gw.startPubSubLoop()
 	}
 
 	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
