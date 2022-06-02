@@ -323,7 +323,7 @@ type ValidatePathMeta struct {
 	Disabled    bool                    `bson:"disabled" json:"disabled"`
 	Path        string                  `bson:"path" json:"path"`
 	Method      string                  `bson:"method" json:"method"`
-	Schema      map[string]interface{}  `bson:"schema" json:"schema"`
+	Schema      map[string]interface{}  `bson:"-" json:"-"`
 	SchemaB64   string                  `bson:"schema_b64" json:"schema_b64,omitempty"`
 	SchemaCache gojsonschema.JSONLoader `bson:"-" json:"-"`
 	// Allows override of default 422 Unprocessible Entity response code for validation errors.
