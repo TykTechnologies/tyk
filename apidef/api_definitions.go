@@ -854,7 +854,7 @@ type GraphQLPlayground struct {
 	Path string `bson:"path" json:"path"`
 }
 
-// Clean will URL encode map[string]struct variables for saving
+// EncodeForDB will encode map[string]struct variables for saving in URL format
 func (a *APIDefinition) EncodeForDB() {
 	newVersion := make(map[string]VersionInfo)
 	for k, v := range a.VersionData.Versions {
@@ -883,7 +883,6 @@ func (a *APIDefinition) EncodeForDB() {
 
 			jsBytes, _ := json.Marshal(oldSchema.Schema)
 			oldSchema.SchemaB64 = base64.StdEncoding.EncodeToString(jsBytes)
-			oldSchema.Schema = nil
 
 			a.VersionData.Versions[i].ExtendedPaths.ValidateJSON[j] = oldSchema
 		}
