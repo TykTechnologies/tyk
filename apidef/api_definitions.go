@@ -8,8 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"text/template"
 	"time"
+
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 
@@ -1033,6 +1036,10 @@ func (s *StringRegexMap) Init() error {
 	}
 
 	return nil
+}
+
+func (a *APIDefinition) GenerateAPIID() {
+	a.APIID = strings.Replace(uuid.NewV4().String(), "-", "", -1)
 }
 
 func DummyAPI() APIDefinition {
