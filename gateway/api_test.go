@@ -1877,6 +1877,24 @@ func TestHandleAddApi(t *testing.T) {
 		assert.Equal(t, http.StatusOK, statusCode)
 	})
 
+	t.Run("generate api id if not provided", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = ""
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := ts.Gw.handleAddApi(req, testFs, false)
+		successResponse, ok := response.(apiModifyKeySuccess)
+		require.True(t, ok)
+
+		assert.NotEmpty(t, successResponse.Key)
+		assert.Equal(t, "added", successResponse.Action)
+		assert.Equal(t, http.StatusOK, statusCode)
+	})
+
 }
 
 func TestHandleUpdateApi(t *testing.T) {
