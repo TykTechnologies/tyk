@@ -1544,7 +1544,7 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 }
 
 func (a *APISpec) StripListenPath(r *http.Request, path string) string {
-	return stripListenPath(a.Proxy.ListenPath, path, mux.Vars(r))
+	return stripListenPath(a.Proxy.ListenPath, path)
 }
 
 func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
@@ -1575,9 +1575,7 @@ func (r *RoundRobin) WithLen(len int) int {
 	return int(cur) % len
 }
 
-var listenPathVarsRE = regexp.MustCompile(`{[^:]+(:[^}]+)?}`)
-
-func stripListenPath(listenPath, path string, muxVars map[string]string) (res string) {
+func stripListenPath(listenPath, path string) (res string) {
 	defer func() {
 		if !strings.HasPrefix(res, "/") {
 			res = "/" + res
@@ -1589,13 +1587,11 @@ func stripListenPath(listenPath, path string, muxVars map[string]string) (res st
 		return
 	}
 
-	lp := listenPathVarsRE.ReplaceAllStringFunc(listenPath, func(match string) string {
-		match = strings.TrimLeft(match, "{")
-		match = strings.TrimRight(match, "}")
-		aliasVar := strings.Split(match, ":")[0]
-		return muxVars[aliasVar]
-	})
-
-	res = strings.TrimPrefix(path, lp)
-	return
+	tmp := new(mux.Route).PathPrefix(listenPath)
+	s, err := tmp.GetPathRegexp()
+	if err != nil {
+		return path
+	}
+	reg := regexp.MustCompile(s)
+	return reg.ReplaceAllString(path, "")
 }
