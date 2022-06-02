@@ -129,36 +129,56 @@ type SecurityScheme interface {
 func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme, enable bool) error {
 	switch {
 	case nativeSS.Type == typeApiKey:
-		var token *Token
+		token := &Token{}
 		if ss[name] == nil {
-			ss[name] = &Token{}
+			ss[name] = token
+		} else {
+			if tokenVal, ok := ss[name].(*Token); ok {
+				token = tokenVal
+			} else {
+				toStructIfMap(ss[name], token)
+			}
 		}
 
-		token = ss[name].(*Token)
 		token.Import(nativeSS, enable)
 	case nativeSS.Type == typeHttp && nativeSS.Scheme == schemeBearer && nativeSS.BearerFormat == bearerFormatJWT:
-		var jwt *JWT
+		jwt := &JWT{}
 		if ss[name] == nil {
-			ss[name] = &JWT{}
+			ss[name] = jwt
+		} else {
+			if jwtVal, ok := ss[name].(*JWT); ok {
+				jwt = jwtVal
+			} else {
+				toStructIfMap(ss[name], jwt)
+			}
 		}
 
-		jwt = ss[name].(*JWT)
 		jwt.Import(enable)
 	case nativeSS.Type == typeHttp && nativeSS.Scheme == schemeBasic:
-		var basic *Basic
+		basic := &Basic{}
 		if ss[name] == nil {
-			ss[name] = &Basic{}
+			ss[name] = basic
+		} else {
+			if basicVal, ok := ss[name].(*Basic); ok {
+				basic = basicVal
+			} else {
+				toStructIfMap(ss[name], basic)
+			}
 		}
 
-		basic = ss[name].(*Basic)
 		basic.Import(enable)
 	case nativeSS.Type == typeOAuth2:
-		var oauth *OAuth
+		oauth := &OAuth{}
 		if ss[name] == nil {
-			ss[name] = &OAuth{}
+			ss[name] = oauth
+		} else {
+			if oauthVal, ok := ss[name].(*OAuth); ok {
+				oauth = oauthVal
+			} else {
+				toStructIfMap(ss[name], oauth)
+			}
 		}
 
-		oauth = ss[name].(*OAuth)
 		oauth.Import(enable)
 	default:
 		return fmt.Errorf(unsupportedSecuritySchemeFmt, name)

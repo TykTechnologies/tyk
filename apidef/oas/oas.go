@@ -117,16 +117,14 @@ func (s *OAS) getTykTokenAuth(name string) (token *Token) {
 		return
 	}
 
-	mapSecurityScheme, ok := securityScheme.(map[string]interface{})
-	if ok {
-		token = &Token{}
-		inBytes, _ := json.Marshal(mapSecurityScheme)
-		_ = json.Unmarshal(inBytes, token)
-		s.getTykSecuritySchemes()[name] = token
-		return
+	token = &Token{}
+	if tokenVal, ok := securityScheme.(*Token); ok {
+		token = tokenVal
+	} else {
+		toStructIfMap(securityScheme, token)
 	}
 
-	token = securityScheme.(*Token)
+	s.getTykSecuritySchemes()[name] = token
 
 	return
 }
@@ -137,16 +135,14 @@ func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
 		return
 	}
 
-	mapSecurityScheme, ok := securityScheme.(map[string]interface{})
-	if ok {
-		jwt = &JWT{}
-		inBytes, _ := json.Marshal(mapSecurityScheme)
-		_ = json.Unmarshal(inBytes, jwt)
-		s.getTykSecuritySchemes()[name] = jwt
-		return
+	jwt = &JWT{}
+	if jwtVal, ok := securityScheme.(*JWT); ok {
+		jwt = jwtVal
+	} else {
+		toStructIfMap(securityScheme, jwt)
 	}
 
-	jwt = securityScheme.(*JWT)
+	s.getTykSecuritySchemes()[name] = jwt
 
 	return
 }
@@ -157,16 +153,14 @@ func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 		return
 	}
 
-	mapSecurityScheme, ok := securityScheme.(map[string]interface{})
-	if ok {
-		basic = &Basic{}
-		inBytes, _ := json.Marshal(mapSecurityScheme)
-		_ = json.Unmarshal(inBytes, basic)
-		s.getTykSecuritySchemes()[name] = basic
-		return
+	basic = &Basic{}
+	if basicVal, ok := securityScheme.(*Basic); ok {
+		basic = basicVal
+	} else {
+		toStructIfMap(securityScheme, basic)
 	}
 
-	basic = securityScheme.(*Basic)
+	s.getTykSecuritySchemes()[name] = basic
 
 	return
 }
@@ -177,16 +171,14 @@ func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
 		return
 	}
 
-	mapSecurityScheme, ok := securityScheme.(map[string]interface{})
-	if ok {
-		oauth = &OAuth{}
-		inBytes, _ := json.Marshal(mapSecurityScheme)
-		_ = json.Unmarshal(inBytes, oauth)
-		s.getTykSecuritySchemes()[name] = oauth
-		return
+	oauth = &OAuth{}
+	if oauthVal, ok := securityScheme.(*OAuth); ok {
+		oauth = oauthVal
+	} else {
+		toStructIfMap(securityScheme, oauth)
 	}
 
-	oauth = securityScheme.(*OAuth)
+	s.getTykSecuritySchemes()[name] = oauth
 
 	return
 }

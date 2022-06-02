@@ -323,8 +323,8 @@ type ValidatePathMeta struct {
 	Disabled    bool                    `bson:"disabled" json:"disabled"`
 	Path        string                  `bson:"path" json:"path"`
 	Method      string                  `bson:"method" json:"method"`
-	Schema      map[string]interface{}  `bson:"schema" json:"schema"`
-	SchemaB64   string                  `bson:"schema_b64" json:"schema_b64,omitempty"`
+	Schema      map[string]interface{}  `bson:"-" json:"schema"`
+	SchemaB64   string                  `bson:"schema_b64" json:"-"`
 	SchemaCache gojsonschema.JSONLoader `bson:"-" json:"-"`
 	// Allows override of default 422 Unprocessible Entity response code for validation errors.
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
@@ -854,7 +854,7 @@ type GraphQLPlayground struct {
 	Path string `bson:"path" json:"path"`
 }
 
-// Clean will URL encode map[string]struct variables for saving
+// EncodeForDB will encode map[string]struct variables for saving in URL format
 func (a *APIDefinition) EncodeForDB() {
 	newVersion := make(map[string]VersionInfo)
 	for k, v := range a.VersionData.Versions {
@@ -883,7 +883,6 @@ func (a *APIDefinition) EncodeForDB() {
 
 			jsBytes, _ := json.Marshal(oldSchema.Schema)
 			oldSchema.SchemaB64 = base64.StdEncoding.EncodeToString(jsBytes)
-			oldSchema.Schema = nil
 
 			a.VersionData.Versions[i].ExtendedPaths.ValidateJSON[j] = oldSchema
 		}
