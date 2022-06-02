@@ -211,3 +211,21 @@ func TestOAS_GetSecuritySchemes(t *testing.T) {
 	assert.Equal(t, &basic, resOAS.getTykBasicAuth("my_basic"))
 	assert.Equal(t, &oauth, resOAS.getTykOAuthAuth("my_oauth"))
 }
+
+func Test_toStructIfMap(t *testing.T) {
+	token := &Token{}
+	Fill(t, token, 0)
+
+	resToken := &Token{}
+	toStructIfMap(token, resToken)
+	assert.Equal(t, &Token{}, resToken)
+
+	tokenInBytes, _ := json.Marshal(token)
+
+	var mapToken map[string]interface{}
+	_ = json.Unmarshal(tokenInBytes, &mapToken)
+
+	toStructIfMap(mapToken, resToken)
+
+	assert.Equal(t, token, resToken)
+}
