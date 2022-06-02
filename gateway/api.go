@@ -994,6 +994,10 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		return *validationErr, http.StatusBadRequest
 	}
 
+	if newDef.APIID == "" {
+		newDef.GenerateAPIID()
+	}
+
 	if oasEndpoint {
 		newAPIURL := getAPIURL(newDef, gw.GetConfig())
 		oasObj.AddServers(newAPIURL)
