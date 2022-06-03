@@ -17,7 +17,7 @@ RUN apt update \
     && apt dist-upgrade -y ca-certificates curl \
     && apt install -y python3-setuptools libpython3.9 python3.9-dev \
     && curl https://bootstrap.pypa.io/get-pip.py | python3 \
-    && pip3 install --only-binary ":all:" grpcio protobuf
+    && pip3 install --only-binary ":all:" grpcio protobuf==3.20.1
 
 # Remove some things to decrease CVE surface
 RUN  apt remove -y --allow-remove-essential libtiff5 ncurses-base \
