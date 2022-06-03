@@ -146,3 +146,9 @@ func TestAPIDefinition_DecodeFromDB_AuthDeprecation(t *testing.T) {
 	})
 
 }
+
+func TestAPIDefinition_GenerateAPIID(t *testing.T) {
+	a := APIDefinition{}
+	a.GenerateAPIID()
+	assert.NotEmpty(t, a.APIID)
+}
