@@ -2046,6 +2046,7 @@ func TestOAS(t *testing.T) {
 		Info: &openapi3.Info{
 			Title: "oas doc",
 		},
+		Paths: make(openapi3.Paths),
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
@@ -2067,6 +2068,17 @@ func TestOAS(t *testing.T) {
 
 	createdOldAPI := testGetOldAPI(t, ts, oldAPIID, "old api")
 	assert.NotNil(t, createdOldAPI)
+
+	t.Run("OAS validation - should fail without paths", func(t *testing.T) {
+		invalidOASAPI := oasAPI
+		invalidOASAPI.Paths = nil
+		_, _ = ts.Run(t, []test.TestCase{
+			{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas/", Data: &oasAPI,
+				BodyMatch: `"paths: Invalid type. Expected: object, given: null"`, Code: http.StatusBadRequest},
+		}...)
+	})
+
+	oasAPI.Paths = make(openapi3.Paths)
 
 	t.Run("get old api in OAS format - should fail", func(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID,
@@ -2124,7 +2136,14 @@ func TestOAS(t *testing.T) {
 
 				var oldAPIInOAS oas.OAS
 				oldAPIInOAS.Fill(*oldAPI.APIDefinition)
+				oldAPIInOAS.OpenAPI = "3.0.3"
+				oldAPIInOAS.Info = &openapi3.Info{
+					Title: "old-api",
+				}
 
+				oldAPIInOAS.GetTykExtension().Info.Versioning = nil
+
+				oldAPIInOAS.Paths = make(openapi3.Paths)
 				updatePath := "/tyk/apis/oas/" + apiID
 
 				_, _ = ts.Run(t, []test.TestCase{
@@ -2160,7 +2179,14 @@ func TestOAS(t *testing.T) {
 
 				oasAPIInOAS.Extensions[oas.ExtensionTykAPIGateway] = oas.XTykAPIGateway{
 					Info: oas.Info{Name: "oas-updated oas api", ID: apiID},
+					Server: oas.Server{
+						ListenPath: oas.ListenPath{
+							Value: "/oas-updated",
+						},
+					},
 				}
+
+				oasAPIInOAS.Paths = make(openapi3.Paths)
 
 				oasAPIInOAS.Info.Title = "oas-updated oas doc"
 				testUpdateAPI(t, ts, &oasAPIInOAS, apiID, true)
@@ -2177,6 +2203,21 @@ func TestOAS(t *testing.T) {
 
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, apiID, true)
+			})
+
+			t.Run("OAS validation", func(t *testing.T) {
+				oasAPIInOAS := testGetOASAPI(t, ts, apiID, "oas api", "oas doc")
+
+				oasAPIInOAS.Info.Title = "oas-updated oas doc"
+
+				oasAPIInOAS.Paths = nil
+
+				updatePath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
+
+				_, _ = ts.Run(t, []test.TestCase{
+					{AdminAuth: true, Method: http.MethodPut, Path: updatePath, Data: &oasAPIInOAS,
+						BodyMatch: `"paths: Invalid type. Expected: object, given: null"`, Code: http.StatusBadRequest},
+				}...)
 			})
 		})
 
