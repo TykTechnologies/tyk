@@ -677,7 +677,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/OASSchemaResponse'
-  /tyk/import/oas:
+  /tyk/apis/oas/import:
     post:
       description: |-
         Create a new OAS format API, without x-tyk-gateway.
