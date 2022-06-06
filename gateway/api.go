@@ -2796,6 +2796,11 @@ func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		if strings.HasSuffix(r.URL.Path, "/import") && oasObj.GetTykExtension() != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(apidef.ErrImportWithTykExtension.Error()))
+			return
+		}
+
 		if err = oas.ValidateOASObject(reqBodyInBytes, oasObj.OpenAPI); err != nil {
 			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 			return
