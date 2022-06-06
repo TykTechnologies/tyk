@@ -1003,6 +1003,7 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		oasObj.AddServers(newAPIURL)
 
 		newDef.IsOAS = true
+		oasObj.GetTykExtension().Info.ID = newDef.APIID
 		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
 		if err != nil {
 			return apiError(err.Error()), errCode
@@ -2795,6 +2796,11 @@ func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		if strings.HasSuffix(r.URL.Path, "/import") && oasObj.GetTykExtension() != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(apidef.ErrImportWithTykExtension.Error()))
+			return
+		}
+
 		if err = oas.ValidateOASObject(reqBodyInBytes, oasObj.OpenAPI); err != nil {
 			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 			return
@@ -2834,10 +2840,6 @@ func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc
 			return
 		}
 
-		if oasObj.GetTykExtension().Info.ID == "" {
-			doJSONWrite(w, http.StatusBadRequest, apiError(apidef.ErrMissingAPIID.Error()))
-			return
-		}
 		apiInBytes, err := oasObj.MarshalJSON()
 		if err != nil {
 			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))

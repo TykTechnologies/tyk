@@ -2838,6 +2838,12 @@ func TestOAS(t *testing.T) {
 			return data
 		}
 
+		t.Run("error with tyk extension", func(t *testing.T) {
+			testImportOAS(t, ts, test.TestCase{
+				Code: http.StatusBadRequest, BodyMatch: apidef.ErrImportWithTykExtension.Error(), Data: oasCopy(true, nil), AdminAuth: true,
+			})
+		})
+
 		t.Run("success without tyk extension", func(t *testing.T) {
 			params := configParams(ext)
 			testImportOAS(t, ts, test.TestCase{
@@ -2868,42 +2874,7 @@ func TestOAS(t *testing.T) {
 			})
 			testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: "servers object is empty in OAS"})
 		})
-
-		t.Run("missing api ID", func(t *testing.T) {
-			oasAPI := oasCopy(true, func(oasApi *openapi3.T) {
-				if ext, ok := oasApi.Extensions[oas.ExtensionTykAPIGateway].(*oas.XTykAPIGateway); ok {
-					ext.Info.ID = ""
-				} else {
-					t.Fatal("expected *oas.XTykAPIGateway")
-				}
-			})
-			testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: apidef.ErrMissingAPIID.Error()})
-		})
-
-		t.Run("success without config query params", func(t *testing.T) {
-			testImportOAS(t, ts, test.TestCase{Code: http.StatusOK, Data: oasCopy(true, nil), AdminAuth: true})
-		})
-
-		t.Run("override ID from x-tyk-gateway", func(t *testing.T) {
-			var (
-				params            = configParams(ext)
-				apiTitle, apiName string
-			)
-			data := oasCopy(true, func(oasApi *openapi3.T) {
-				apiTitle = oasApi.Info.Title
-				if ext, ok := oasApi.Extensions[oas.ExtensionTykAPIGateway].(*oas.XTykAPIGateway); ok {
-					ext.Info.ID = "unwanted-id"
-					apiName = ext.Info.Name
-				} else {
-					t.Fatal("expected *oas.XTykAPIGateway")
-				}
-			})
-
-			testImportOAS(t, ts, test.TestCase{QueryParams: params, Code: http.StatusOK, Data: data, AdminAuth: true})
-			testGetOASAPI(t, ts, oasAPIID, apiName, apiTitle)
-		})
 	})
-
 }
 
 func testUpdateAPI(t *testing.T, ts *Test, api interface{}, apiID string, oasTyped bool) {
@@ -2963,7 +2934,7 @@ func testPatchOAS(t *testing.T, ts *Test, api oas.OAS, params map[string]string,
 }
 
 func testImportOAS(t *testing.T, ts *Test, testCase test.TestCase) {
-	testCase.Path = "/tyk/import/oas"
+	testCase.Path = "/tyk/apis/oas/import"
 	testCase.Method = http.MethodPost
 	_, _ = ts.Run(t, testCase)
 
