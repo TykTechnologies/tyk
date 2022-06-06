@@ -960,13 +960,18 @@ func TestAPIDefinitionLoader_Template(t *testing.T) {
 }
 
 func TestStripListenPath(t *testing.T) {
-	assert.Equal(t, "/get", stripListenPath("/listen", "/listen/get", nil))
-	assert.Equal(t, "/get", stripListenPath("/listen/", "/listen/get", nil))
-	assert.Equal(t, "/get", stripListenPath("listen", "listen/get", nil))
-	assert.Equal(t, "/get", stripListenPath("listen/", "listen/get", nil))
-	assert.Equal(t, "/", stripListenPath("/listen/", "/listen/", nil))
-	assert.Equal(t, "/", stripListenPath("/listen", "/listen", nil))
-	assert.Equal(t, "/", stripListenPath("listen/", "", nil))
+	assert.Equal(t, "/get", stripListenPath("/listen", "/listen/get"))
+	assert.Equal(t, "/get", stripListenPath("/listen/", "/listen/get"))
+	assert.Equal(t, "/get", stripListenPath("listen", "listen/get"))
+	assert.Equal(t, "/get", stripListenPath("listen/", "listen/get"))
+	assert.Equal(t, "/", stripListenPath("/listen/", "/listen/"))
+	assert.Equal(t, "/", stripListenPath("/listen", "/listen"))
+	assert.Equal(t, "/", stripListenPath("listen/", ""))
+
+	assert.Equal(t, "/get", stripListenPath("/{_:.*}/post/", "/listen/post/get"))
+	assert.Equal(t, "/get", stripListenPath("/{_:.*}/", "/listen/get"))
+	assert.Equal(t, "/get", stripListenPath("/pre/{_:.*}/", "/pre/listen/get"))
+	assert.Equal(t, "/", stripListenPath("/{_:.*}", "/listen"))
 }
 
 func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
