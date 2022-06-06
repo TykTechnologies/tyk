@@ -2952,7 +2952,7 @@ func testPatchOAS(t *testing.T, ts *Test, api oas.OAS, params map[string]string,
 }
 
 func testImportOAS(t *testing.T, ts *Test, testCase test.TestCase) {
-	testCase.Path = "/tyk/import/oas"
+	testCase.Path = "/tyk/apis/oas/import"
 	testCase.Method = http.MethodPost
 	_, _ = ts.Run(t, testCase)
 
