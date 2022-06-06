@@ -2432,7 +2432,6 @@ func TestOAS(t *testing.T) {
 			expectedTykExt.Server.ListenPath.Value = listenPath
 			expectedTykExt.Upstream.URL = upstreamURL
 			expectedTykExt.Server.CustomDomain = customDomain
-			expectedTykExt.Info.State.Active = true
 
 			expectedTykExt.Middleware = &oas.Middleware{
 				Operations: oas.Operations{
@@ -2480,7 +2479,6 @@ func TestOAS(t *testing.T) {
 
 			expectedTykExt.Upstream.URL = upstreamURL
 			expectedTykExt.Server.CustomDomain = customDomain
-			expectedTykExt.Info.State.Active = true
 			expectedTykExt.Middleware = &oas.Middleware{
 				Operations: oas.Operations{
 					"petsGET": {
@@ -2890,10 +2888,10 @@ func TestOAS(t *testing.T) {
 			_ = testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: "servers object is empty in OAS"})
 		})
 
-		t.Run("success without config query params", func(t *testing.T) {
-			importedOASAPIID := testImportOAS(t, ts, test.TestCase{Code: http.StatusOK, Data: oasCopy(true, nil), AdminAuth: true})
+		t.Run("success without config query params, no tyk ext", func(t *testing.T) {
+			importedOASAPIID := testImportOAS(t, ts, test.TestCase{Code: http.StatusOK, Data: oasCopy(false, nil), AdminAuth: true})
 
-			importT := testGetOASAPI(t, ts, importedOASAPIID, "oas api", "example oas doc")
+			importT := testGetOASAPI(t, ts, importedOASAPIID, "example oas doc", "example oas doc")
 			importedOAS := oas.OAS{T: importT}
 			assert.True(t, importedOAS.GetTykExtension().Server.ListenPath.Strip)
 		})
