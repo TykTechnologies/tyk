@@ -2845,6 +2845,8 @@ func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc
 			return
 		}
 
+		oasObj.GetTykExtension().Server.ListenPath.Strip = true
+
 		apiInBytes, err := oasObj.MarshalJSON()
 		if err != nil {
 			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
