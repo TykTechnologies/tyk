@@ -100,6 +100,84 @@ func TestTagsImport(t *testing.T) {
 		})
 	}
 }
+func TestCustomDomain(t *testing.T) {
+	t.Run("extractTo api definition", func(t *testing.T) {
+		testcases := []struct {
+			title        string
+			input        Domain
+			expectValues apidef.Domain
+		}{
+			{
+				"enabled=false, name=nil",
+				Domain{Enabled: false, Name: ""},
+				apidef.Domain{Disabled: true, Name: ""},
+			},
+			{
+				"enabled=false, name=(valid-domain)",
+				Domain{Enabled: false, Name: "example.com"},
+				apidef.Domain{Disabled: true, Name: "example.com"},
+			},
+			{
+				"enabled=true, name=nil",
+				Domain{Enabled: true, Name: ""},
+				apidef.Domain{Disabled: false, Name: ""},
+			},
+			{
+				"enabled=true, name=(valid-domain)",
+				Domain{Enabled: true, Name: "example.com"},
+				apidef.Domain{Disabled: false, Name: "example.com"},
+			},
+		}
+
+		for _, tc := range testcases {
+			t.Run(tc.title, func(t *testing.T) {
+				var apidef apidef.APIDefinition
+
+				tc.input.ExtractTo(&apidef)
+
+				assert.Equal(t, tc.expectValues, apidef.Domain)
+			})
+		}
+	})
+	t.Run("fillFrom api definition", func(t *testing.T) {
+		testcases := []struct {
+			title        string
+			input        apidef.Domain
+			expectValues Domain
+		}{
+			{
+				"disabled=false, name=nil",
+				apidef.Domain{Disabled: false, Name: ""},
+				Domain{Enabled: true, Name: ""},
+			},
+			{
+				"disabled=false, name=(valid-domain)",
+				apidef.Domain{Disabled: false, Name: "example.com"},
+				Domain{Enabled: true, Name: "example.com"},
+			},
+			{
+				"disabled=true, name=nil",
+				apidef.Domain{Disabled: true, Name: ""},
+				Domain{Enabled: false, Name: ""},
+			},
+			{
+				"disabled=true, name=(valid-domain)",
+				apidef.Domain{Disabled: true, Name: "example.com"},
+				Domain{Enabled: false, Name: "example.com"},
+			},
+		}
+
+		for _, tc := range testcases {
+			t.Run(tc.title, func(t *testing.T) {
+				var customDomain Domain
+
+				customDomain.Fill(apidef.APIDefinition{Domain: tc.input})
+
+				assert.Equal(t, tc.expectValues, customDomain)
+			})
+		}
+	})
+}
 
 func TestTagsExportServer(t *testing.T) {
 	t.Parallel()
