@@ -2869,17 +2869,6 @@ func TestOAS(t *testing.T) {
 			testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: "servers object is empty in OAS"})
 		})
 
-		t.Run("missing api ID", func(t *testing.T) {
-			oasAPI := oasCopy(true, func(oasApi *openapi3.T) {
-				if ext, ok := oasApi.Extensions[oas.ExtensionTykAPIGateway].(*oas.XTykAPIGateway); ok {
-					ext.Info.ID = ""
-				} else {
-					t.Fatal("expected *oas.XTykAPIGateway")
-				}
-			})
-			testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: apidef.ErrMissingAPIID.Error()})
-		})
-
 		t.Run("success without config query params", func(t *testing.T) {
 			testImportOAS(t, ts, test.TestCase{Code: http.StatusOK, Data: oasCopy(true, nil), AdminAuth: true})
 		})
