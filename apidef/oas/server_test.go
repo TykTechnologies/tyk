@@ -103,66 +103,66 @@ func TestTagsImport(t *testing.T) {
 func TestCustomDomain(t *testing.T) {
 	t.Run("extractTo api definition", func(t *testing.T) {
 		testcases := []struct {
-			title        string
-			input        Domain
-			expectValues apidef.Domain
+			title       string
+			input       Domain
+			expectValue apidef.APIDefinition
 		}{
 			{
 				"enabled=false, name=nil",
 				Domain{Enabled: false, Name: ""},
-				apidef.Domain{Disabled: true, Name: ""},
+				apidef.APIDefinition{DomainDisabled: true, Domain: ""},
 			},
 			{
 				"enabled=false, name=(valid-domain)",
 				Domain{Enabled: false, Name: "example.com"},
-				apidef.Domain{Disabled: true, Name: "example.com"},
+				apidef.APIDefinition{DomainDisabled: true, Domain: "example.com"},
 			},
 			{
 				"enabled=true, name=nil",
 				Domain{Enabled: true, Name: ""},
-				apidef.Domain{Disabled: false, Name: ""},
+				apidef.APIDefinition{DomainDisabled: false, Domain: ""},
 			},
 			{
 				"enabled=true, name=(valid-domain)",
 				Domain{Enabled: true, Name: "example.com"},
-				apidef.Domain{Disabled: false, Name: "example.com"},
+				apidef.APIDefinition{DomainDisabled: false, Domain: "example.com"},
 			},
 		}
 
 		for _, tc := range testcases {
 			t.Run(tc.title, func(t *testing.T) {
-				var apidef apidef.APIDefinition
+				var apiDef apidef.APIDefinition
 
-				tc.input.ExtractTo(&apidef)
+				tc.input.ExtractTo(&apiDef)
 
-				assert.Equal(t, tc.expectValues, apidef.Domain)
+				assert.Equal(t, tc.expectValue, apiDef)
 			})
 		}
 	})
 	t.Run("fillFrom api definition", func(t *testing.T) {
 		testcases := []struct {
-			title        string
-			input        apidef.Domain
-			expectValues Domain
+			title         string
+			input         apidef.APIDefinition
+			expectedValue Domain
 		}{
 			{
 				"disabled=false, name=nil",
-				apidef.Domain{Disabled: false, Name: ""},
+				apidef.APIDefinition{DomainDisabled: false, Domain: ""},
 				Domain{Enabled: true, Name: ""},
 			},
 			{
 				"disabled=false, name=(valid-domain)",
-				apidef.Domain{Disabled: false, Name: "example.com"},
+				apidef.APIDefinition{DomainDisabled: false, Domain: "example.com"},
 				Domain{Enabled: true, Name: "example.com"},
 			},
 			{
 				"disabled=true, name=nil",
-				apidef.Domain{Disabled: true, Name: ""},
+				apidef.APIDefinition{DomainDisabled: true, Domain: ""},
 				Domain{Enabled: false, Name: ""},
 			},
 			{
 				"disabled=true, name=(valid-domain)",
-				apidef.Domain{Disabled: true, Name: "example.com"},
+				apidef.APIDefinition{DomainDisabled: true, Domain: "example.com"},
 				Domain{Enabled: false, Name: "example.com"},
 			},
 		}
@@ -171,9 +171,9 @@ func TestCustomDomain(t *testing.T) {
 			t.Run(tc.title, func(t *testing.T) {
 				var customDomain Domain
 
-				customDomain.Fill(apidef.APIDefinition{Domain: tc.input})
+				customDomain.Fill(tc.input)
 
-				assert.Equal(t, tc.expectValues, customDomain)
+				assert.Equal(t, tc.expectedValue, customDomain)
 			})
 		}
 	})

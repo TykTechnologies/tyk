@@ -173,18 +173,18 @@ func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
 }
 
 type Domain struct {
-	// Enabled allow/disallow the usage of the domain
+	// Enabled allow/disallow the usage of the domain.
 	Enabled bool `json:"enabled" bson:"enabled"`
-	// Name is the name of the domain
+	// Name is the name of the domain.
 	Name string `json:"name" bson:"name"`
 }
 
 func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {
-	api.Domain.Disabled = !cd.Enabled
-	api.Domain.Name = cd.Name
+	api.DomainDisabled = !cd.Enabled
+	api.Domain = cd.Name
 }
 
 func (cd *Domain) Fill(api apidef.APIDefinition) {
-	cd.Enabled = !api.Domain.Disabled
-	cd.Name = api.Domain.Name
+	cd.Enabled = !api.DomainDisabled
+	cd.Name = api.Domain
 }

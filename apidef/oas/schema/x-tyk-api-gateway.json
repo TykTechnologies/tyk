@@ -962,7 +962,10 @@
     "X-Tyk-CustomDomain": {
       "type": "object",
       "properties": {
-        "name": "string",
+        "name": {
+          "type": "string",
+          "format": "hostname"
+        },
         "enabled": "boolean"
       },
       "required": [

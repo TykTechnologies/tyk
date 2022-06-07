@@ -174,7 +174,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, gw *Gate
 	conf := gw.GetConfig()
 	hostname := spec.GlobalConfig.HostName
 	if spec.GlobalConfig.EnableCustomDomains {
-		hostname = spec.Domain
+		hostname = spec.GetAPIDomain()
 	} else {
 		hostname = ""
 	}
