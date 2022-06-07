@@ -2083,10 +2083,14 @@ func TestOAS(t *testing.T) {
 	t.Run("OAS validation - should fail without paths", func(t *testing.T) {
 		invalidOASAPI := oasAPI
 		invalidOASAPI.Paths = nil
-		_, _ = ts.Run(t, []test.TestCase{
-			{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas/", Data: &oasAPI,
-				BodyMatch: `"paths: Invalid type. Expected: object, given: null"`, Code: http.StatusBadRequest},
-		}...)
+		_, _ = ts.Run(t, test.TestCase{
+			AdminAuth: true,
+			Method:    http.MethodPost,
+			Path:      "/tyk/apis/oas/",
+			Data:      &invalidOASAPI,
+			BodyMatch: `"paths: Invalid type. Expected: object, given: null"`,
+			Code:      http.StatusBadRequest,
+		})
 	})
 
 	oasAPI.Paths = make(openapi3.Paths)
