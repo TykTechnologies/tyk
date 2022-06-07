@@ -103,12 +103,13 @@ const (
 )
 
 var (
-	ErrAPIMigrated            = errors.New("the supplied API definition is in Tyk native format, please use OAS format for this API")
-	ErrAPINotMigrated         = errors.New("the supplied API definition is in OAS format, please use the Tyk native format for this API")
-	ErrOASGetForOldAPI        = errors.New("the requested API definition is in Tyk native format, please use old api endpoint")
-	ErrImportWithTykExtension = errors.New("import payload should not contain x-tyk-api-gateway")
-	ErrAPINotFound            = errors.New("API not found")
-	ErrMissingAPIID           = errors.New("missing API ID")
+	ErrAPIMigrated                = errors.New("the supplied API definition is in Tyk native format, please use OAS format for this API")
+	ErrAPINotMigrated             = errors.New("the supplied API definition is in OAS format, please use the Tyk native format for this API")
+	ErrOASGetForOldAPI            = errors.New("the requested API definition is in Tyk native format, please use old api endpoint")
+	ErrImportWithTykExtension     = errors.New("the import payload should not contain x-tyk-api-gateway")
+	ErrPayloadWithoutTykExtension = errors.New("the payload should contain x-tyk-api-gateway")
+	ErrAPINotFound                = errors.New("API not found")
+	ErrMissingAPIID               = errors.New("missing API ID")
 )
 
 type ObjectId bson.ObjectId
@@ -598,6 +599,7 @@ type APIDefinition struct {
 	ResponseProcessors         []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
 	CORS                       CORSConfig             `bson:"CORS" json:"CORS"`
 	Domain                     string                 `bson:"domain" json:"domain"`
+	DomainDisabled             bool                   `bson:"domain_disabled" json:"domain_disabled"`
 	Certificates               []string               `bson:"certificates" json:"certificates"`
 	DoNotTrack                 bool                   `bson:"do_not_track" json:"do_not_track"`
 	EnableContextVars          bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
@@ -1053,6 +1055,13 @@ func (s *StringRegexMap) Init() error {
 
 func (a *APIDefinition) GenerateAPIID() {
 	a.APIID = strings.Replace(uuid.NewV4().String(), "-", "", -1)
+}
+
+func (a *APIDefinition) GetAPIDomain() string {
+	if a.DomainDisabled {
+		return ""
+	}
+	return a.Domain
 }
 
 func DummyAPI() APIDefinition {

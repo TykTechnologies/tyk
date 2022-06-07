@@ -48,12 +48,18 @@ type TykExtensionConfigParams struct {
 	ValidateRequest *bool
 }
 
-func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) error {
+func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, isImport bool) error {
 	xTykAPIGateway := s.GetTykExtension()
 
 	if xTykAPIGateway == nil {
 		xTykAPIGateway = &XTykAPIGateway{}
 		s.SetTykExtension(xTykAPIGateway)
+	}
+
+	if isImport {
+		xTykAPIGateway.Info.State.Active = true
+		xTykAPIGateway.Info.State.Internal = false
+		xTykAPIGateway.Server.ListenPath.Strip = true
 	}
 
 	if xTykAPIGateway.Info.Name == "" {
@@ -64,9 +70,6 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 		xTykAPIGateway.Info.ID = overRideValues.ApiID
 	}
 
-	xTykAPIGateway.Info.State.Active = true
-	xTykAPIGateway.Info.State.Internal = false
-
 	if overRideValues.ListenPath != "" {
 		xTykAPIGateway.Server.ListenPath.Value = overRideValues.ListenPath
 	} else if xTykAPIGateway.Server.ListenPath.Value == "" {
@@ -74,7 +77,10 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams) 
 	}
 
 	if overRideValues.CustomDomain != "" {
-		xTykAPIGateway.Server.CustomDomain = overRideValues.CustomDomain
+		if xTykAPIGateway.Server.CustomDomain == nil {
+			xTykAPIGateway.Server.CustomDomain = &Domain{Enabled: true}
+		}
+		xTykAPIGateway.Server.CustomDomain.Name = overRideValues.CustomDomain
 	}
 
 	var upstreamURL string

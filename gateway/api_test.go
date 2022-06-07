@@ -2069,6 +2069,17 @@ func TestOAS(t *testing.T) {
 	createdOldAPI := testGetOldAPI(t, ts, oldAPIID, "old api")
 	assert.NotNil(t, createdOldAPI)
 
+	t.Run("OAS validation - should fail without x-tyk-api-gateway", func(t *testing.T) {
+		oasAPI.Paths = make(openapi3.Paths)
+		delete(oasAPI.Extensions, oas.ExtensionTykAPIGateway)
+		_, _ = ts.Run(t, []test.TestCase{
+			{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas/", Data: &oasAPI,
+				BodyMatch: apidef.ErrPayloadWithoutTykExtension.Error(), Code: http.StatusBadRequest},
+		}...)
+
+		oasAPI = testGetOASAPI(t, ts, oasAPIID, "oas api", "oas doc")
+	})
+
 	t.Run("OAS validation - should fail without paths", func(t *testing.T) {
 		invalidOASAPI := oasAPI
 		invalidOASAPI.Paths = nil
@@ -2420,8 +2431,7 @@ func TestOAS(t *testing.T) {
 
 			expectedTykExt.Server.ListenPath.Value = listenPath
 			expectedTykExt.Upstream.URL = upstreamURL
-			expectedTykExt.Server.CustomDomain = customDomain
-			expectedTykExt.Info.State.Active = true
+			expectedTykExt.Server.CustomDomain = &oas.Domain{Enabled: true, Name: customDomain}
 
 			expectedTykExt.Middleware = &oas.Middleware{
 				Operations: oas.Operations{
@@ -2468,8 +2478,7 @@ func TestOAS(t *testing.T) {
 			expectedTykExt := *apiInOAS.GetTykExtension()
 
 			expectedTykExt.Upstream.URL = upstreamURL
-			expectedTykExt.Server.CustomDomain = customDomain
-			expectedTykExt.Info.State.Active = true
+			expectedTykExt.Server.CustomDomain = &oas.Domain{Enabled: true, Name: customDomain}
 			expectedTykExt.Middleware = &oas.Middleware{
 				Operations: oas.Operations{
 					"petsGET": {
@@ -2846,9 +2855,13 @@ func TestOAS(t *testing.T) {
 
 		t.Run("success without tyk extension", func(t *testing.T) {
 			params := configParams(ext)
-			testImportOAS(t, ts, test.TestCase{
+			importedOASAPIID := testImportOAS(t, ts, test.TestCase{
 				Code: http.StatusOK, QueryParams: params, BodyMatch: "added", Data: oasCopy(false, nil), AdminAuth: true,
 			})
+
+			importT := testGetOASAPI(t, ts, importedOASAPIID, "example oas doc", "example oas doc")
+			importedOAS := oas.OAS{T: importT}
+			assert.True(t, importedOAS.GetTykExtension().Server.ListenPath.Strip)
 		})
 
 		t.Run("missing paths from OAS", func(t *testing.T) {
@@ -2863,7 +2876,7 @@ func TestOAS(t *testing.T) {
 			newParam := ext
 			newParam.UpstreamURL = "upstream.example.com"
 			params := configParams(newParam)
-			testImportOAS(t, ts, test.TestCase{QueryParams: params,
+			_ = testImportOAS(t, ts, test.TestCase{QueryParams: params,
 				Code: http.StatusBadRequest, Data: oasCopy(false, nil), AdminAuth: true, BodyMatch: "invalid upstream URL",
 			})
 		})
@@ -2872,8 +2885,17 @@ func TestOAS(t *testing.T) {
 			oasAPI := oasCopy(false, func(t *openapi3.T) {
 				t.Servers = openapi3.Servers{}
 			})
-			testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: "servers object is empty in OAS"})
+			_ = testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: "servers object is empty in OAS"})
 		})
+
+		t.Run("success without config query params, no tyk ext", func(t *testing.T) {
+			importedOASAPIID := testImportOAS(t, ts, test.TestCase{Code: http.StatusOK, Data: oasCopy(false, nil), AdminAuth: true})
+
+			importT := testGetOASAPI(t, ts, importedOASAPIID, "example oas doc", "example oas doc")
+			importedOAS := oas.OAS{T: importT}
+			assert.True(t, importedOAS.GetTykExtension().Server.ListenPath.Strip)
+		})
+
 	})
 }
 
@@ -2933,10 +2955,17 @@ func testPatchOAS(t *testing.T, ts *Test, api oas.OAS, params map[string]string,
 	ts.Gw.DoReload()
 }
 
-func testImportOAS(t *testing.T, ts *Test, testCase test.TestCase) {
+func testImportOAS(t *testing.T, ts *Test, testCase test.TestCase) string {
+	var importResp apiModifyKeySuccess
+
 	testCase.Path = "/tyk/apis/oas/import"
 	testCase.Method = http.MethodPost
-	_, _ = ts.Run(t, testCase)
+	resp, _ := ts.Run(t, testCase)
+
+	respInBytes, _ := ioutil.ReadAll(resp.Body)
+	_ = json.Unmarshal(respInBytes, &importResp)
 
 	ts.Gw.DoReload()
+
+	return importResp.Key
 }

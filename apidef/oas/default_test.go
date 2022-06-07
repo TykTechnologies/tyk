@@ -29,13 +29,14 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			},
 		}
 
-		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{})
+		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{}, true)
 		assert.NoError(t, err)
 
 		expectedTykExtension := XTykAPIGateway{
 			Server: Server{
 				ListenPath: ListenPath{
 					Value: "/",
+					Strip: true,
 				},
 			},
 			Upstream: Upstream{
@@ -66,12 +67,15 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			},
 		}
 
-		customDomain := "custom-domain.org"
+		customDomain := &Domain{
+			Name:    "custom-domain.org",
+			Enabled: true,
+		}
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
 			ListenPath:   "/listen-api",
 			UpstreamURL:  "https://example.org/api",
-			CustomDomain: customDomain,
-		})
+			CustomDomain: customDomain.Name,
+		}, true)
 
 		assert.Nil(t, err)
 
@@ -79,6 +83,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			Server: Server{
 				ListenPath: ListenPath{
 					Value: "/listen-api",
+					Strip: true,
 				},
 				CustomDomain: customDomain,
 			},
@@ -123,13 +128,14 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 		oasDef.SetTykExtension(&existingTykExtension)
 
-		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{})
+		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{}, true)
 		assert.Nil(t, err)
 
 		expectedTykExtension := XTykAPIGateway{
 			Server: Server{
 				ListenPath: ListenPath{
 					Value: "/new-listen-path",
+					Strip: true,
 				},
 			},
 			Upstream: Upstream{
@@ -190,21 +196,22 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			Server: Server{
 				ListenPath: ListenPath{
 					Value: "/listen-api",
+					Strip: true,
 				},
-				CustomDomain: "custom-domain.org",
+				CustomDomain: &Domain{true, "custom-domain.org"},
 			},
 		}
 
 		oasDef.SetTykExtension(&existingTykExtension)
 
-		newCustomDomain := "new-custom-domain.org"
+		newCustomDomain := &Domain{true, "new-custom-domain.org"}
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
 			ListenPath:     "/new-listen-api",
 			UpstreamURL:    "https://example.org/api",
 			Authentication: getBoolPointer(true),
-			CustomDomain:   newCustomDomain,
-		})
+			CustomDomain:   newCustomDomain.Name,
+		}, true)
 
 		assert.Nil(t, err)
 
@@ -212,6 +219,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			Server: Server{
 				ListenPath: ListenPath{
 					Value: "/new-listen-api",
+					Strip: true,
 				},
 				CustomDomain: newCustomDomain,
 				Authentication: &Authentication{
@@ -282,7 +290,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
 			ListenPath:  "/new-listen-api",
 			UpstreamURL: "invalid-url",
-		})
+		}, true)
 		assert.ErrorIs(t, err, errInvalidUpstreamURL)
 	})
 
@@ -313,7 +321,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 		oasDef.SetTykExtension(&existingTykExtension)
 
-		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{})
+		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{}, true)
 		assert.ErrorIs(t, err, errInvalidServerURL)
 	})
 
@@ -339,7 +347,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 		oasDef.SetTykExtension(&existingTykExtension)
 
-		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{})
+		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{}, true)
 		assert.ErrorIs(t, err, errEmptyServersObject)
 	})
 
@@ -473,7 +481,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					AllowList: &trueVal,
 				}
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 				assert.NoError(t, err)
 				assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
@@ -488,7 +496,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					AllowList: &trueVal,
 				}
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 				assert.NoError(t, err)
 				assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
@@ -503,7 +511,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					AllowList: &falseVal,
 				}
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 				assert.NoError(t, err)
 				assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
@@ -518,7 +526,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					AllowList: &falseVal,
 				}
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 				assert.NoError(t, err)
 				assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
@@ -589,7 +597,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					AllowList: &falseVal,
 				}
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 				assert.NoError(t, err)
 
@@ -655,7 +663,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					AllowList: &trueVal,
 				}
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 				assert.NoError(t, err)
 
@@ -707,7 +715,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					AllowList: nil,
 				}
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 				assert.NoError(t, err)
 				assert.EqualValues(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
@@ -727,7 +735,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						ValidateRequest: &trueVal,
 					}
 
-					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 					assert.NoError(t, err)
 					assert.EqualValues(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
@@ -744,7 +752,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						ValidateRequest: &trueVal,
 					}
 
-					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 					assert.NoError(t, err)
 					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
@@ -761,7 +769,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						ValidateRequest: &trueVal,
 					}
 
-					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 					assert.NoError(t, err)
 					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
@@ -777,7 +785,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						ValidateRequest: &falseVal,
 					}
 
-					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 					assert.NoError(t, err)
 					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
@@ -794,7 +802,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						ValidateRequest: &falseVal,
 					}
 
-					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 					assert.NoError(t, err)
 					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
@@ -838,7 +846,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					ValidateRequest: &trueVal,
 				}
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 				assert.NoError(t, err)
 
@@ -896,7 +904,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					ValidateRequest: nil,
 				}
 
-				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 				assert.NoError(t, err)
 				actualTykExtension := oasDef.GetTykExtension()
@@ -911,7 +919,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						ValidateRequest: &falseVal,
 					}
 
-					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 					assert.NoError(t, err)
 					assert.Nil(t, oasDef.GetTykExtension().Middleware)
@@ -942,6 +950,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			Server: Server{
 				ListenPath: ListenPath{
 					Value: "/listen-api",
+					Strip: true,
 				},
 			},
 			Upstream: Upstream{
@@ -959,8 +968,47 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
 			ListenPath: newListenPath,
-		})
+		}, true)
 		assert.NoError(t, err)
+		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
+	})
+
+	t.Run("do not configure state active, internal or strip listen path when not importing", func(t *testing.T) {
+		oasDef := OAS{
+			T: openapi3.T{
+				Info: &openapi3.Info{
+					Title: "OAS API",
+				},
+				Servers: openapi3.Servers{
+					{
+						URL: "https://example-org.com/api",
+					},
+				},
+			},
+		}
+
+		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{}, false)
+		assert.NoError(t, err)
+
+		expectedTykExtension := XTykAPIGateway{
+			Server: Server{
+				ListenPath: ListenPath{
+					Value: "/",
+					Strip: false,
+				},
+			},
+			Upstream: Upstream{
+				URL: "https://example-org.com/api",
+			},
+			Info: Info{
+				Name: "OAS API",
+				State: State{
+					Active:   false,
+					Internal: false,
+				},
+			},
+		}
+
 		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
 	})
 

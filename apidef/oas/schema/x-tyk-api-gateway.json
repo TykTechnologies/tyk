@@ -593,7 +593,7 @@
           "$ref": "#/definitions/X-Tyk-GatewayTags"
         },
         "customDomain": {
-          "type": "string"
+          "$ref": "#/definitions/X-Tyk-CustomDomain"
         }
       },
       "required": [
@@ -958,6 +958,18 @@
       "required": [
         "enabled"
       ]
+    },
+    "X-Tyk-CustomDomain": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "format": "hostname"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }
