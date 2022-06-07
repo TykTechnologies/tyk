@@ -2069,6 +2069,17 @@ func TestOAS(t *testing.T) {
 	createdOldAPI := testGetOldAPI(t, ts, oldAPIID, "old api")
 	assert.NotNil(t, createdOldAPI)
 
+	t.Run("OAS validation - should fail without x-tyk-api-gateway", func(t *testing.T) {
+		oasAPI.Paths = make(openapi3.Paths)
+		delete(oasAPI.Extensions, oas.ExtensionTykAPIGateway)
+		_, _ = ts.Run(t, []test.TestCase{
+			{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas/", Data: &oasAPI,
+				BodyMatch: apidef.ErrPayloadWithoutTykExtension.Error(), Code: http.StatusBadRequest},
+		}...)
+
+		oasAPI = testGetOASAPI(t, ts, oasAPIID, "oas api", "oas doc")
+	})
+
 	t.Run("OAS validation - should fail without paths", func(t *testing.T) {
 		invalidOASAPI := oasAPI
 		invalidOASAPI.Paths = nil
