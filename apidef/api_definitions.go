@@ -513,11 +513,6 @@ type Scopes struct {
 	OIDC ScopeClaim `bson:"oidc" json:"oidc"`
 }
 
-type Domain struct {
-	Disabled bool   `json:"disabled" bson:"disabled"`
-	Name     string `json:"name" bson:"name"`
-}
-
 // APIDefinition represents the configuration for a single proxied API and it's versions.
 //
 // swagger:model
@@ -602,7 +597,8 @@ type APIDefinition struct {
 	ExpireAnalyticsAfter       int64                  `mapstructure:"expire_analytics_after" bson:"expire_analytics_after" json:"expire_analytics_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
 	ResponseProcessors         []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
 	CORS                       CORSConfig             `bson:"CORS" json:"CORS"`
-	Domain                     Domain                 `bson:"domain" json:"domain"`
+	Domain                     string                 `bson:"domain" json:"domain"`
+	DomainDisabled             bool                   `bson:"domain_disabled" json:"domain_disabled"`
 	Certificates               []string               `bson:"certificates" json:"certificates"`
 	DoNotTrack                 bool                   `bson:"do_not_track" json:"do_not_track"`
 	EnableContextVars          bool                   `bson:"enable_context_vars" json:"enable_context_vars"`

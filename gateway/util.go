@@ -123,9 +123,10 @@ func FileExist(filepath string) bool {
 }
 
 func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
+	domain := getAPIDomain(apiDef)
 	var result = url.URL{
 		Scheme: "http",
-		Host:   apiDef.Domain,
+		Host:   domain,
 		Path:   apiDef.Proxy.ListenPath,
 	}
 
@@ -156,4 +157,12 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 	result.Host = net.JoinHostPort(result.Host, strconv.Itoa(gwConfig.ListenPort))
 
 	return result.String()
+}
+
+func getAPIDomain(apiDef apidef.APIDefinition) string {
+	domain := apiDef.Domain
+	if apiDef.DomainDisabled {
+		domain = ""
+	}
+	return domain
 }

@@ -81,9 +81,10 @@ func countApisByListenHash(specs []*APISpec) map[string]int {
 	count := make(map[string]int, len(specs))
 	// We must track the hostname no matter what
 	for _, spec := range specs {
-		domainHash := generateDomainPath(spec.Domain, spec.Proxy.ListenPath)
+		domain := getAPIDomain(*spec.APIDefinition)
+		domainHash := generateDomainPath(domain, spec.Proxy.ListenPath)
 		if count[domainHash] == 0 {
-			dN := spec.Domain
+			dN := domain
 			if dN == "" {
 				dN = "(no host)"
 			}
@@ -151,7 +152,8 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	pathModified := false
 	for {
-		hash := generateDomainPath(spec.Domain, spec.Proxy.ListenPath)
+		domain := getAPIDomain(*spec.APIDefinition)
+		hash := generateDomainPath(domain, spec.Proxy.ListenPath)
 
 		if apisByListen[hash] < 2 {
 			// not a duplicate
@@ -675,7 +677,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 	hostname := gwConfig.HostName
 	if gwConfig.EnableCustomDomains && spec.Domain != "" {
-		hostname = spec.Domain
+		hostname = getAPIDomain(*spec.APIDefinition)
 	}
 
 	if hostname != "" {

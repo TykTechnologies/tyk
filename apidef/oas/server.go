@@ -180,11 +180,11 @@ type Domain struct {
 }
 
 func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {
-	api.Domain.Disabled = !cd.Enabled
-	api.Domain.Name = cd.Name
+	api.DomainDisabled = !cd.Enabled
+	api.Domain = cd.Name
 }
 
 func (cd *Domain) Fill(api apidef.APIDefinition) {
-	cd.Enabled = !api.Domain.Disabled
-	cd.Name = api.Domain.Name
+	cd.Enabled = !api.DomainDisabled
+	cd.Name = api.Domain
 }
