@@ -64,6 +64,8 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validate
 type AllowanceType int
 
 func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
+	// Regardless if `ep` is a zero value, we need a non-nil paths
+	// to produce a valid OAS document
 	if s.Paths == nil {
 		s.Paths = make(openapi3.Paths)
 	}

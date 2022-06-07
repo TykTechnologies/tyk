@@ -46,15 +46,20 @@ func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 
 	s.extractSecurityTo(api)
 
-	var ep apidef.ExtendedPathsSet
-	s.extractPathsAndOperations(&ep)
+	versions := make(map[string]apidef.VersionInfo)
+	versions[Main] = apidef.VersionInfo{}
 
-	api.VersionData.Versions = map[string]apidef.VersionInfo{
-		Main: {
+	if s.Paths != nil {
+		var ep apidef.ExtendedPathsSet
+		s.extractPathsAndOperations(&ep)
+
+		versions[Main] = apidef.VersionInfo{
 			UseExtendedPaths: true,
 			ExtendedPaths:    ep,
-		},
+		}
 	}
+
+	api.VersionData.Versions = versions
 }
 
 func (s *OAS) SetTykExtension(xTykAPIGateway *XTykAPIGateway) {
