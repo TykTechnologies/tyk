@@ -364,6 +364,14 @@ type HttpServerOptionsConfig struct {
 	// Enable HTTP2 protocol handling
 	EnableHttp2 bool `json:"enable_http2"`
 
+	// EnableStrictRoutes changes the routing to avoid nearest-neighbour requests on overlapping routes
+	//
+	// - if disabled, `/apple` will route to `/app`, the current default behavior,
+	// - if enabled, `/app` only responds to `/app`, `/app/` and `/app/*` but not `/apple`
+	//
+	// Regular expressions and parameterized routes will be left alone regardless of this setting.
+	EnableStrictRoutes bool `json:"enable_strict_routes"`
+
 	// Disable TLS verification. Required if you are using self-signed certificates.
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
 
@@ -724,14 +732,6 @@ type Config struct {
 
 	// Allows you to use custom domains
 	EnableCustomDomains bool `json:"enable_custom_domains"`
-
-	// EnableStrictRoutes changes the routing to avoid nearest-neighbour requests on overlapping routes
-	//
-	// - if disabled, `/apple` will route to `/app`, the current default behavior,
-	// - if enabled, `/app` only responds to `/app`, `/app/` and `/app/*` but not `/apple`
-	//
-	// Regular expressions and parameterized routes will be left alone regardless of this setting.
-	EnableStrictRoutes bool `json:"enable_strict_routes"`
 
 	// If AllowMasterKeys is set to true, session objects (key definitions) that do not have explicit access rights set
 	// will be allowed by Tyk. This means that keys that are created have access to ALL APIs, which in many cases is

@@ -313,7 +313,7 @@ func TestHandle404(t *testing.T) {
 
 func TestHandleSubroutes(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.EnableStrictRoutes = true
+		globalConf.HttpServerOptions.EnableStrictRoutes = true
 	})
 	defer ts.Close()
 

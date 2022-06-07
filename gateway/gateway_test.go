@@ -444,7 +444,7 @@ func TestListener(t *testing.T) {
 
 func TestListenerWithStrictRoutes(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.EnableStrictRoutes = true
+		globalConf.HttpServerOptions.EnableStrictRoutes = true
 	})
 	defer ts.Close()
 
