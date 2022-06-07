@@ -599,6 +599,7 @@ type APIDefinition struct {
 	ResponseProcessors         []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
 	CORS                       CORSConfig             `bson:"CORS" json:"CORS"`
 	Domain                     string                 `bson:"domain" json:"domain"`
+	DomainDisabled             bool                   `bson:"domain_disabled" json:"domain_disabled"`
 	Certificates               []string               `bson:"certificates" json:"certificates"`
 	DoNotTrack                 bool                   `bson:"do_not_track" json:"do_not_track"`
 	EnableContextVars          bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
@@ -1054,6 +1055,13 @@ func (s *StringRegexMap) Init() error {
 
 func (a *APIDefinition) GenerateAPIID() {
 	a.APIID = strings.Replace(uuid.NewV4().String(), "-", "", -1)
+}
+
+func (a *APIDefinition) GetAPIDomain() string {
+	if a.DomainDisabled {
+		return ""
+	}
+	return a.Domain
 }
 
 func DummyAPI() APIDefinition {

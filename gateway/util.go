@@ -125,7 +125,7 @@ func FileExist(filepath string) bool {
 func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 	var result = url.URL{
 		Scheme: "http",
-		Host:   apiDef.Domain,
+		Host:   apiDef.GetAPIDomain(),
 		Path:   apiDef.Proxy.ListenPath,
 	}
 

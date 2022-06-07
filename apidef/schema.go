@@ -315,6 +315,9 @@ const Schema = `{
         "domain": {
             "type": "string"
         },
+        "domain_disabled": {
+             "type": "boolean"
+        },
         "listen_port": {
             "type": "number"
         },

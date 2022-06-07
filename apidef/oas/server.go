@@ -22,7 +22,7 @@ type Server struct {
 	GatewayTags *GatewayTags `bson:"gatewayTags,omitempty" json:"gatewayTags,omitempty"`
 	// CustomDomain is the domain to bind this API to.
 	// Old API Definition: `domain`
-	CustomDomain string `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
+	CustomDomain *Domain `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
 }
 
 func (s *Server) Fill(api apidef.APIDefinition) {
@@ -46,7 +46,9 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 		s.GatewayTags = nil
 	}
 
-	s.CustomDomain = api.Domain
+	if s.CustomDomain != nil {
+		s.CustomDomain.Fill(api)
+	}
 }
 
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
@@ -60,7 +62,9 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 		s.GatewayTags.ExtractTo(api)
 	}
 
-	api.Domain = s.CustomDomain
+	if s.CustomDomain != nil {
+		s.CustomDomain.ExtractTo(api)
+	}
 }
 
 type ListenPath struct {
@@ -170,4 +174,29 @@ func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
 	for _, publicKey := range ppk {
 		publicKeys[publicKey.Domain] = strings.Join(publicKey.List, ",")
 	}
+}
+
+type Domain struct {
+	// Enabled allow/disallow the usage of the domain.
+	Enabled bool `json:"enabled" bson:"enabled"`
+	// Name is the name of the domain.
+	Name string `json:"name" bson:"name"`
+}
+
+func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {
+	if !cd.Enabled && cd.Name == "" {
+		// nothing was configured
+		return
+	}
+	api.DomainDisabled = !cd.Enabled
+	api.Domain = cd.Name
+}
+
+func (cd *Domain) Fill(api apidef.APIDefinition) {
+	if !api.DomainDisabled && api.Domain == "" {
+		// nothing was configured.
+		return
+	}
+	cd.Enabled = !api.DomainDisabled
+	cd.Name = api.Domain
 }

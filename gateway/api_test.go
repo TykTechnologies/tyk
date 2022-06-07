@@ -2431,7 +2431,7 @@ func TestOAS(t *testing.T) {
 
 			expectedTykExt.Server.ListenPath.Value = listenPath
 			expectedTykExt.Upstream.URL = upstreamURL
-			expectedTykExt.Server.CustomDomain = customDomain
+			expectedTykExt.Server.CustomDomain = &oas.Domain{Enabled: true, Name: customDomain}
 
 			expectedTykExt.Middleware = &oas.Middleware{
 				Operations: oas.Operations{
@@ -2478,7 +2478,7 @@ func TestOAS(t *testing.T) {
 			expectedTykExt := *apiInOAS.GetTykExtension()
 
 			expectedTykExt.Upstream.URL = upstreamURL
-			expectedTykExt.Server.CustomDomain = customDomain
+			expectedTykExt.Server.CustomDomain = &oas.Domain{Enabled: true, Name: customDomain}
 			expectedTykExt.Middleware = &oas.Middleware{
 				Operations: oas.Operations{
 					"petsGET": {

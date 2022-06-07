@@ -100,6 +100,84 @@ func TestTagsImport(t *testing.T) {
 		})
 	}
 }
+func TestCustomDomain(t *testing.T) {
+	t.Run("extractTo api definition", func(t *testing.T) {
+		testcases := []struct {
+			title       string
+			input       Domain
+			expectValue apidef.APIDefinition
+		}{
+			{
+				"enabled=false, name=nil",
+				Domain{Enabled: false, Name: ""},
+				apidef.APIDefinition{},
+			},
+			{
+				"enabled=false, name=(valid-domain)",
+				Domain{Enabled: false, Name: "example.com"},
+				apidef.APIDefinition{DomainDisabled: true, Domain: "example.com"},
+			},
+			{
+				"enabled=true, name=nil",
+				Domain{Enabled: true, Name: ""},
+				apidef.APIDefinition{DomainDisabled: false, Domain: ""},
+			},
+			{
+				"enabled=true, name=(valid-domain)",
+				Domain{Enabled: true, Name: "example.com"},
+				apidef.APIDefinition{DomainDisabled: false, Domain: "example.com"},
+			},
+		}
+
+		for _, tc := range testcases {
+			t.Run(tc.title, func(t *testing.T) {
+				var apiDef apidef.APIDefinition
+
+				tc.input.ExtractTo(&apiDef)
+
+				assert.Equal(t, tc.expectValue, apiDef)
+			})
+		}
+	})
+	t.Run("fillFrom api definition", func(t *testing.T) {
+		testcases := []struct {
+			title         string
+			input         apidef.APIDefinition
+			expectedValue Domain
+		}{
+			{
+				"disabled=false, name=nil",
+				apidef.APIDefinition{DomainDisabled: false, Domain: ""},
+				Domain{},
+			},
+			{
+				"disabled=false, name=(valid-domain)",
+				apidef.APIDefinition{DomainDisabled: false, Domain: "example.com"},
+				Domain{Enabled: true, Name: "example.com"},
+			},
+			{
+				"disabled=true, name=nil",
+				apidef.APIDefinition{DomainDisabled: true, Domain: ""},
+				Domain{Enabled: false, Name: ""},
+			},
+			{
+				"disabled=true, name=(valid-domain)",
+				apidef.APIDefinition{DomainDisabled: true, Domain: "example.com"},
+				Domain{Enabled: false, Name: "example.com"},
+			},
+		}
+
+		for _, tc := range testcases {
+			t.Run(tc.title, func(t *testing.T) {
+				var customDomain Domain
+
+				customDomain.Fill(tc.input)
+
+				assert.Equal(t, tc.expectedValue, customDomain)
+			})
+		}
+	})
+}
 
 func TestTagsExportServer(t *testing.T) {
 	t.Parallel()
