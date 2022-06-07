@@ -966,12 +966,10 @@
           "type": "string",
           "format": "hostname"
         },
-        "enabled": "boolean"
-      },
-      "required": [
-        "name",
-        "enabled"
-      ]
+        "enabled": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }

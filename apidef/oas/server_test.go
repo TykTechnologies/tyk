@@ -110,7 +110,7 @@ func TestCustomDomain(t *testing.T) {
 			{
 				"enabled=false, name=nil",
 				Domain{Enabled: false, Name: ""},
-				apidef.APIDefinition{DomainDisabled: true, Domain: ""},
+				apidef.APIDefinition{},
 			},
 			{
 				"enabled=false, name=(valid-domain)",
@@ -148,7 +148,7 @@ func TestCustomDomain(t *testing.T) {
 			{
 				"disabled=false, name=nil",
 				apidef.APIDefinition{DomainDisabled: false, Domain: ""},
-				Domain{Enabled: true, Name: ""},
+				Domain{},
 			},
 			{
 				"disabled=false, name=(valid-domain)",
