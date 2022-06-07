@@ -82,7 +82,7 @@ mongo-shell:
 .PHONY: docker docker-std docker-slim
 
 docker:
-	docker build --no-cache --rm -t internal/tyk-gateway .
+	docker build --no-cache --rm -t internal/tyk-gateway --squash .
 
 docker-slim: build
 	docker build --no-cache -t internal/tyk-gateway:slim -f ci/Dockerfile.slim .
