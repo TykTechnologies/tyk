@@ -77,7 +77,10 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 	}
 
 	if overRideValues.CustomDomain != "" {
-		xTykAPIGateway.Server.CustomDomain = overRideValues.CustomDomain
+		if xTykAPIGateway.Server.CustomDomain == nil {
+			xTykAPIGateway.Server.CustomDomain = &Domain{Enabled: true}
+		}
+		xTykAPIGateway.Server.CustomDomain.Name = overRideValues.CustomDomain
 	}
 
 	var upstreamURL string
