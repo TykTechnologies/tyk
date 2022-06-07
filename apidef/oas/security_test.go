@@ -383,6 +383,7 @@ func TestOAS_OAuth(t *testing.T) {
 	}
 
 	var oas OAS
+	oas.Paths = make(openapi3.Paths)
 	oas.Security = openapi3.SecurityRequirements{
 		{
 			securityName: []string{},
@@ -526,6 +527,7 @@ func TestOAS_TykAuthentication_NoOASSecurity(t *testing.T) {
 	Fill(t, &hmac, 0)
 
 	var oas OAS
+	oas.Paths = make(openapi3.Paths)
 	oas.Extensions = map[string]interface{}{
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{

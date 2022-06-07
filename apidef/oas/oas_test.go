@@ -13,6 +13,7 @@ import (
 func TestOAS(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyOAS OAS
+		emptyOAS.Paths = make(openapi3.Paths)
 
 		var convertedAPI apidef.APIDefinition
 		emptyOAS.ExtractTo(&convertedAPI)

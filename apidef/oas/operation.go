@@ -75,10 +75,6 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillValidateRequest(ep.ValidateJSON)
-
-	if len(s.Paths) == 0 {
-		s.Paths = nil
-	}
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
