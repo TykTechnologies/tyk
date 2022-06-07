@@ -1348,7 +1348,7 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 	oasObjToPatch.SetTykExtension(tykExtToPatch)
 
 	if tykExtensionConfigParams != nil {
-		err = oasObjToPatch.BuildDefaultTykExtension(*tykExtensionConfigParams)
+		err = oasObjToPatch.BuildDefaultTykExtension(*tykExtensionConfigParams, false)
 		if err != nil {
 			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 			return
@@ -2839,11 +2839,13 @@ func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc
 			tykExtensionConfigParams = &oas.TykExtensionConfigParams{}
 		}
 
-		err = oasObj.BuildDefaultTykExtension(*tykExtensionConfigParams)
+		err = oasObj.BuildDefaultTykExtension(*tykExtensionConfigParams, true)
 		if err != nil {
 			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 			return
 		}
+
+		oasObj.GetTykExtension().Server.ListenPath.Strip = true
 
 		apiInBytes, err := oasObj.MarshalJSON()
 		if err != nil {
