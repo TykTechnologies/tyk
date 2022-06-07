@@ -49,7 +49,8 @@ func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 	versions := make(map[string]apidef.VersionInfo)
 	versions[Main] = apidef.VersionInfo{}
 
-	if s.Paths != nil {
+	// Handle zero value (from json if empty) and nil paths (from code)
+	if len(s.Paths) == 0 {
 		var ep apidef.ExtendedPathsSet
 		s.extractPathsAndOperations(&ep)
 
