@@ -531,6 +531,9 @@
         "enable_websockets": {
           "type": "boolean"
         },
+        "enable_strict_routes": {
+          "type": "boolean"
+        },
         "flush_interval": {
           "type": "integer"
         },
