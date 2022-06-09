@@ -987,7 +987,6 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 			log.Error("Couldn't decode new API Definition object: ", err)
 			return apiError("Request malformed"), http.StatusBadRequest
 		}
-
 	}
 
 	if validationErr := validateAPIDef(&newDef); validationErr != nil {
@@ -1353,7 +1352,6 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 			return
 		}
-
 	}
 
 	oasAPIInBytes, err := oasObj.MarshalJSON()
@@ -3195,16 +3193,11 @@ func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAut
 	}
 }
 
-func extractOASObjFromReq(reqBody io.ReadCloser) ([]byte, *oas.OAS, error) {
+func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	var oasObj oas.OAS
 	reqBodyInBytes, err := ioutil.ReadAll(reqBody)
 	if err != nil {
 		return nil, nil, ErrRequestMalformed
-	}
-
-	err = reqBody.Close()
-	if err != nil {
-		return nil, nil, errors.New("")
 	}
 
 	err = oasObj.UnmarshalJSON(reqBodyInBytes)
