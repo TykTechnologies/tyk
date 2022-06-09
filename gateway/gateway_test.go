@@ -442,6 +442,45 @@ func TestListener(t *testing.T) {
 	ts.RunExt(t, tests...)
 }
 
+func TestListenerWithStrictRoutes(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.EnableStrictRoutes = true
+	})
+	defer ts.Close()
+
+	ts.Gw.ReloadTestCase.Enable()
+	defer ts.Gw.ReloadTestCase.Disable()
+
+	ts.Gw.ReloadTestCase.StartTicker()
+	defer ts.Gw.ReloadTestCase.StopTicker()
+	tests := []test.TestCase{
+		// Cleanup before tests
+		{Method: "DELETE", Path: "/tyk/apis/test", AdminAuth: true},
+		{Method: "GET", Path: "/tyk/reload/?block=true", AdminAuth: true, Code: 200},
+
+		{Method: "GET", Path: "/sample", Code: 404},
+		{Method: "GET", Path: "/tyk/apis/", Code: 403},
+		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: `\[\]`},
+		{Method: "GET", Path: "/tyk/apis", Code: 403},
+		{Method: "GET", Path: "/tyk/apis", AdminAuth: true, Code: 200},
+		{Method: "POST", Path: "/tyk/apis", Data: sampleAPI, AdminAuth: true, Code: 200},
+		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: `\[\]`},
+		{Method: "POST", Path: "/tyk/apis/mismatch", AdminAuth: true, Code: 400},
+		{Method: "GET", Path: "/tyk/apis/test", AdminAuth: true, Code: 404},
+		// API definitions not reloaded yet
+		{Method: "GET", Path: "/sample", Code: 404},
+		{Method: "GET", Path: "/tyk/reload/?block=true", AdminAuth: true, Code: 200},
+		{Method: "GET", Path: "/tyk/apis/test", AdminAuth: true, Code: 200, BodyMatch: `^{.*"api_id":"test".*}`},
+		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: `^\[.*"api_id":"test".*\]`},
+		{Method: "GET", Path: "/sample", Code: 200},
+		{Method: "GET", Path: "/samplefoo", Code: 404},
+		{Method: "GET", Path: "/sample/", Code: 200},
+		{Method: "GET", Path: "/sample/foo", Code: 200},
+	}
+
+	ts.RunExt(t, tests...)
+}
+
 // Admin api located on separate port
 func TestControlListener(t *testing.T) {
 	ts := StartTest(nil, TestConfig{
