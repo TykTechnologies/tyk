@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	keyDefinitions = "definitions"
-	keyProperties  = "properties"
+	keyDefinitions              = "definitions"
+	keyProperties               = "properties"
+	oasSchemaVersionNotFoundFmt = "Schema not found for version %q"
 )
 
 var (
@@ -99,7 +100,12 @@ func loadOASSchema() error {
 }
 
 func ValidateOASObject(documentBody []byte, oasVersion string) error {
-	schemaLoader := gojsonschema.NewBytesLoader(GetOASSchema(oasVersion))
+	oasSchema, err := GetOASSchema(oasVersion)
+	if err != nil {
+		return err
+	}
+
+	schemaLoader := gojsonschema.NewBytesLoader(oasSchema)
 	documentLoader := gojsonschema.NewBytesLoader(documentBody)
 	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
 
@@ -121,14 +127,25 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	return nil
 }
 
-func GetOASSchema(version string) []byte {
+func GetOASSchema(reqOASVersion string) ([]byte, error) {
 	mu.Lock()
 	defer mu.Unlock()
-	if version == "" {
-		return oasJsonSchemas[defaultVersion]
+
+	if reqOASVersion == "" {
+		return oasJsonSchemas[defaultVersion], nil
 	}
 
-	return oasJsonSchemas[version]
+	minorVersion, err := getMinorVersion(reqOASVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	oasSchema, ok := oasJsonSchemas[minorVersion]
+	if !ok {
+		return nil, fmt.Errorf(oasSchemaVersionNotFoundFmt, reqOASVersion)
+	}
+
+	return oasSchema, nil
 }
 
 func findDefaultVersion(rawVersions []string) string {
@@ -139,7 +156,9 @@ func findDefaultVersion(rawVersions []string) string {
 	}
 
 	sort.Sort(version.Collection(versions))
-	return versions[len(rawVersions)-1].String()
+	latestVersion := versions[len(rawVersions)-1].String()
+	latestMinor, _ := getMinorVersion(latestVersion)
+	return latestMinor
 }
 
 func setDefaultVersion() {
@@ -151,4 +170,14 @@ func setDefaultVersion() {
 	}
 
 	defaultVersion = findDefaultVersion(versions)
+}
+
+func getMinorVersion(reqOASVersion string) (string, error) {
+	v, err := version.NewVersion(reqOASVersion)
+	if err != nil {
+		return "", err
+	}
+
+	segments := v.Segments()
+	return fmt.Sprintf("%d.%d", segments[0], segments[1]), nil
 }
