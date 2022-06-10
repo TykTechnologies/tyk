@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -23,9 +22,9 @@ func (gw *Gateway) schemaHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 
-		data := oas.GetOASSchema(oasVersion)
-		if data == nil {
-			resp.Message = fmt.Sprintf("Schema not found for version %q", oasVersion)
+		data, err := oas.GetOASSchema(oasVersion)
+		if err != nil {
+			resp.Message = err.Error()
 			resp.Status = "Failed"
 			code = http.StatusNotFound
 			break
