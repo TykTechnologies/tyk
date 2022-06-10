@@ -40,6 +40,10 @@ func (m *GoAnalyticsPlugin) loadAnalyticsPlugin() bool {
 }
 
 func (m *GoAnalyticsPlugin) processRecord(record *analytics.AnalyticsRecord) (err error) {
+	if m == nil {
+		return errors.New("GoAnalyticsPlugin has nil value")
+	}
+
 	// make sure tyk recover in case Go-plugin function panics
 	defer func() {
 
