@@ -90,7 +90,7 @@ func TestTagsImport(t *testing.T) {
 			"keep tagsDisabled=false behavior if undefined tags",
 			nil,
 			false,
-			nil,
+			[]string{},
 		},
 	}
 
@@ -208,7 +208,7 @@ func TestTagsExportServer(t *testing.T) {
 		{
 			"export segment tags if disabled",
 			apidef.APIDefinition{
-				TagsDisabled: false,
+				TagsDisabled: true,
 				Tags:         []string{"a", "b", "c"},
 			},
 			&GatewayTags{
@@ -221,6 +221,7 @@ func TestTagsExportServer(t *testing.T) {
 			apidef.APIDefinition{},
 			&GatewayTags{
 				Enabled: true,
+				Tags:    []string{},
 			},
 		},
 	}

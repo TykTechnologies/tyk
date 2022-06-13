@@ -420,6 +420,7 @@ func TestOAS_OAuth(t *testing.T) {
 				},
 				GatewayTags: &GatewayTags{
 					Enabled: true,
+					Tags:    []string{},
 				},
 			},
 		},
