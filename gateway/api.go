@@ -2818,6 +2818,7 @@ func (gw *Gateway) blockInDashboardMode(next http.HandlerFunc) http.HandlerFunc 
 	return func(w http.ResponseWriter, r *http.Request) {
 		if gw.GetConfig().UseDBAppConfigs {
 			doJSONWrite(w, http.StatusInternalServerError, apiError("Due to enabled use_db_app_configs, please use the Dashboard API"))
+			return
 		}
 
 		next.ServeHTTP(w, r)
