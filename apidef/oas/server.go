@@ -58,7 +58,9 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	if s.ClientCertificates != nil {
 		s.ClientCertificates.ExtractTo(api)
 	}
-	s.GatewayTags.ExtractTo(api)
+	if s.GatewayTags != nil {
+		s.GatewayTags.ExtractTo(api)
+	}
 
 	if s.CustomDomain != nil {
 		s.CustomDomain.ExtractTo(api)
@@ -119,11 +121,6 @@ func (gt *GatewayTags) Fill(api apidef.APIDefinition) {
 }
 
 func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
-	if gt == nil {
-		api.TagsDisabled = false
-		api.Tags = []string{}
-		return
-	}
 	api.TagsDisabled = !gt.Enabled
 	if gt.Tags == nil {
 		gt.Tags = []string{}

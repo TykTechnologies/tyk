@@ -77,20 +77,14 @@ func TestTagsImport(t *testing.T) {
 		{
 			"keep segment tags values if disabled",
 			&GatewayTags{Enabled: false, Tags: []string{"a", "b", "c"}},
-			false,
+			true,
 			[]string{"a", "b", "c"},
 		},
 		{
 			"keep segment tags values if enabled",
 			&GatewayTags{Enabled: true, Tags: []string{"a", "b", "c"}},
-			true,
-			[]string{"a", "b", "c"},
-		},
-		{
-			"keep tagsDisabled=false behavior if undefined tags",
-			nil,
 			false,
-			[]string{},
+			[]string{"a", "b", "c"},
 		},
 	}
 
