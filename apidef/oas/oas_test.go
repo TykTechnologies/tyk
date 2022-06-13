@@ -14,7 +14,14 @@ func TestOAS(t *testing.T) {
 	t.Parallel()
 
 	var nilOASPaths OAS
+
 	var emptyOASPaths OAS
+	xTykAPIGateway := &XTykAPIGateway{}
+	xTykAPIGateway.Server.GatewayTags = &GatewayTags{
+		Enabled: true,
+	}
+
+	emptyOASPaths.SetTykExtension(xTykAPIGateway)
 	emptyOASPaths.Paths = make(openapi3.Paths)
 
 	t.Run("empty paths", func(t *testing.T) {

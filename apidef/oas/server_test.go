@@ -11,6 +11,7 @@ func TestServer(t *testing.T) {
 	t.Parallel()
 
 	var emptyServer Server
+	Fill(t, &emptyServer.GatewayTags, 0)
 
 	var convertedAPI apidef.APIDefinition
 	emptyServer.ExtractTo(&convertedAPI)
@@ -68,10 +69,10 @@ func TestTagsImport(t *testing.T) {
 	t.Parallel()
 
 	testcases := []struct {
-		title         string
-		input         *GatewayTags
-		expectEnabled bool
-		expectValues  []string
+		title          string
+		input          *GatewayTags
+		expectDisabled bool
+		expectValues   []string
 	}{
 		{
 			"keep segment tags values if disabled",
@@ -85,6 +86,12 @@ func TestTagsImport(t *testing.T) {
 			true,
 			[]string{"a", "b", "c"},
 		},
+		{
+			"keep tagsDisabled=false behavior if undefined tags",
+			nil,
+			false,
+			nil,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -95,7 +102,7 @@ func TestTagsImport(t *testing.T) {
 
 			tc.input.ExtractTo(&apidef)
 
-			assert.Equal(t, tc.expectEnabled, apidef.EnableTags)
+			assert.Equal(t, tc.expectDisabled, apidef.TagsDisabled)
 			assert.Equal(t, tc.expectValues, apidef.Tags)
 		})
 	}
@@ -190,8 +197,8 @@ func TestTagsExportServer(t *testing.T) {
 		{
 			"export segment tags if enabled",
 			apidef.APIDefinition{
-				EnableTags: true,
-				Tags:       []string{"a", "b", "c"},
+				TagsDisabled: false,
+				Tags:         []string{"a", "b", "c"},
 			},
 			&GatewayTags{
 				Enabled: true,
@@ -201,8 +208,8 @@ func TestTagsExportServer(t *testing.T) {
 		{
 			"export segment tags if disabled",
 			apidef.APIDefinition{
-				EnableTags: true,
-				Tags:       []string{"a", "b", "c"},
+				TagsDisabled: false,
+				Tags:         []string{"a", "b", "c"},
 			},
 			&GatewayTags{
 				Enabled: false,
@@ -212,7 +219,9 @@ func TestTagsExportServer(t *testing.T) {
 		{
 			"empty segment tags",
 			apidef.APIDefinition{},
-			nil,
+			&GatewayTags{
+				Enabled: true,
+			},
 		},
 	}
 

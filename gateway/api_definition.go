@@ -430,6 +430,9 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 		}
 
 		for _, apiEntry := range list.Message {
+			if apiEntry.ApiDefinition.TagsDisabled {
+				continue
+			}
 			for _, t := range apiEntry.ApiDefinition.Tags {
 				if tagList[t] {
 					toLoad[apiEntry.ApiDefinition.APIID] = apiEntry.ApiDefinition
