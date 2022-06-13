@@ -370,6 +370,59 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	return spec
 }
 
+// fromDashboardServiceResponse is the response body for FromDashboardService
+type fromDashboardServiceResponse struct {
+	Message []nestedApiDefinition
+	Nonce   string
+}
+
+type nestedApiDefinition struct {
+	ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
+}
+
+func (f *fromDashboardServiceResponse) set(defs []*apidef.APIDefinition) {
+	for _, def := range defs {
+		f.Message = append(f.Message, nestedApiDefinition{def})
+	}
+}
+
+func (f *fromDashboardServiceResponse) filter(enabled bool, tags ...string) []*apidef.APIDefinition {
+	if !enabled {
+		return f.all()
+	}
+
+	if len(tags) == 0 {
+		return nil
+	}
+
+	tagMap := map[string]bool{}
+	for _, tag := range tags {
+		tagMap[tag] = true
+	}
+
+	result := make([]*apidef.APIDefinition, 0, len(f.Message))
+	for _, v := range f.Message {
+		if v.ApiDefinition.TagsDisabled {
+			continue
+		}
+		for _, tag := range v.ApiDefinition.Tags {
+			if ok := tagMap[tag]; ok {
+				result = append(result, v.ApiDefinition)
+				break
+			}
+		}
+	}
+	return result
+}
+
+func (f *fromDashboardServiceResponse) all() []*apidef.APIDefinition {
+	result := make([]*apidef.APIDefinition, 0, len(f.Message))
+	for _, v := range f.Message {
+		result = append(result, v.ApiDefinition)
+	}
+	return result
+}
+
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
 func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
 	// Get the definitions
@@ -379,7 +432,9 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 		log.Error("Failed to create request: ", err)
 	}
 
-	newRequest.Header.Set("authorization", a.Gw.GetConfig().NodeSecret)
+	gwConfig := a.Gw.GetConfig()
+
+	newRequest.Header.Set("authorization", gwConfig.NodeSecret)
 	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
 	newRequest.Header.Set(headers.XTykNodeID, a.Gw.GetNodeID())
 
@@ -407,47 +462,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Extract tagged APIs#
-	var list struct {
-		Message []struct {
-			ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
-		}
-		Nonce string
-	}
+	list := &fromDashboardServiceResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		body, _ := ioutil.ReadAll(resp.Body)
 		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
 	}
 
 	// Extract tagged entries only
-	apiDefs := make([]*apidef.APIDefinition, 0)
-
-	if a.Gw.GetConfig().DBAppConfOptions.NodeIsSegmented {
-		tagList := make(map[string]bool, len(a.Gw.GetConfig().DBAppConfOptions.Tags))
-		toLoad := make(map[string]*apidef.APIDefinition)
-
-		for _, mt := range a.Gw.GetConfig().DBAppConfOptions.Tags {
-			tagList[mt] = true
-		}
-
-		for _, apiEntry := range list.Message {
-			if apiEntry.ApiDefinition.TagsDisabled {
-				continue
-			}
-			for _, t := range apiEntry.ApiDefinition.Tags {
-				if tagList[t] {
-					toLoad[apiEntry.ApiDefinition.APIID] = apiEntry.ApiDefinition
-				}
-			}
-		}
-
-		for _, apiDef := range toLoad {
-			apiDefs = append(apiDefs, apiDef)
-		}
-	} else {
-		for _, apiEntry := range list.Message {
-			apiDefs = append(apiDefs, apiEntry.ApiDefinition)
-		}
-	}
+	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
 	var specs []*APISpec
