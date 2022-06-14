@@ -418,12 +418,18 @@ func TestOAS_OAuth(t *testing.T) {
 						securityName: &oauth,
 					},
 				},
+				GatewayTags: &GatewayTags{
+					Enabled: true,
+					Tags:    []string{},
+				},
 			},
 		},
 	}
 
 	var api apidef.APIDefinition
 	oas.ExtractTo(&api)
+
+	assert.False(t, api.TagsDisabled)
 
 	var convertedOAS OAS
 	convertedOAS.Components.SecuritySchemes = oas.Components.SecuritySchemes
@@ -533,6 +539,9 @@ func TestOAS_TykAuthentication_NoOASSecurity(t *testing.T) {
 			Server: Server{
 				Authentication: &Authentication{
 					HMAC: &hmac,
+				},
+				GatewayTags: &GatewayTags{
+					Enabled: true,
 				},
 			},
 		},
