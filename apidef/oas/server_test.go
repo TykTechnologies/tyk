@@ -36,6 +36,83 @@ func TestListenPath(t *testing.T) {
 	assert.Equal(t, emptyListenPath, resultListenPath)
 }
 
+func TestGatewayTags(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		input GatewayTags
+		want  GatewayTags
+		omit  bool
+	}{
+		{
+			input: GatewayTags{},
+			want:  GatewayTags{},
+			omit:  true,
+		},
+		{
+			input: GatewayTags{Enabled: true},
+			want:  GatewayTags{},
+			omit:  true,
+		},
+		{
+			input: GatewayTags{Enabled: true, Tags: []string{}},
+			want:  GatewayTags{},
+			omit:  true,
+		},
+		{
+			input: GatewayTags{Enabled: true, Tags: []string{"test"}},
+			want:  GatewayTags{Enabled: true, Tags: []string{"test"}},
+		},
+		{
+			input: GatewayTags{Enabled: true, Tags: []string{"t1", "t2"}},
+			want:  GatewayTags{Enabled: true, Tags: []string{"t1", "t2"}},
+		},
+		{
+			input: GatewayTags{Enabled: false, Tags: []string{"t1", "t2"}},
+			want:  GatewayTags{},
+			omit:  true,
+		},
+	}
+
+	t.Run("Fill GatewayTags from APIDef", func(t *testing.T) {
+		// We currently don't match APIDef direct fill with OAS
+		t.Skip() // TODO: TT-5720
+
+		t.Parallel()
+
+		for idx, tc := range testcases {
+			var api apidef.APIDefinition
+			tc.input.ExtractTo(&api)
+
+			got := new(GatewayTags)
+			got.Fill(api)
+
+			assert.Equal(t, tc.want, *got, fmt.Sprintf("Test case %d", idx))
+		}
+	})
+
+	t.Run("Fill OAS GatewayTags from APIDef", func(t *testing.T) {
+		t.Parallel()
+
+		for idx, tc := range testcases {
+			var api apidef.APIDefinition
+			tc.input.ExtractTo(&api)
+
+			var oas OAS
+			oas.Fill(api)
+
+			var schema = oas.GetTykExtension()
+			var got = schema.Server.GatewayTags
+
+			if tc.omit {
+				assert.Nil(t, got, idx)
+			} else {
+				assert.Equal(t, tc.want, *got, fmt.Sprintf("Test case %d", idx))
+			}
+		}
+	})
+}
+
 func TestClientCertificates(t *testing.T) {
 	t.Parallel()
 
