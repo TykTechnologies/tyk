@@ -860,7 +860,8 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	}
 	ts.Gw.handleRedisEvent(&msg, handled, wg.Done)
 
-	ts.Gw.ReloadTestCase.TickOk(t)
+	assert.NoError(t, ts.Gw.ReloadTestCase.TickOk())
+
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
 	ts.Gw.apisMu.RLock()
@@ -1198,7 +1199,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	}
 	ts.Gw.handleRedisEvent(&msg, handled, wg.Done)
 
-	ts.Gw.ReloadTestCase.TickOk(t)
+	assert.NoError(t, ts.Gw.ReloadTestCase.TickOk())
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
@@ -1215,7 +1216,8 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	ts.Gw.ReloadTestCase.Reset()
 	ts.Gw.handleRedisEvent(&msg, handled, wg2.Done)
 
-	ts.Gw.ReloadTestCase.TickOk(t)
+	assert.NoError(t, ts.Gw.ReloadTestCase.TickOk())
+
 	// Wait for the reload to finish, then check it worked
 	wg2.Wait()
 	ts.Gw.apisMu.RLock()

@@ -239,7 +239,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
 
-	req := TestReq(t, "GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	rec := httptest.NewRecorder()
 	proxy.ServeHTTP(rec, req)
 	if rec.Code != 503 {

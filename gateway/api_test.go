@@ -1541,7 +1541,7 @@ func TestGroupResetHandler(t *testing.T) {
 
 	// Do a loop of tryReloadCount reloads
 	for try := 1; try <= tryReloadCount; try++ {
-		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		req := ts.withAuth(testReq(t, "GET", uri, nil))
 
 		recorder := httptest.NewRecorder()
 		ts.mainRouter().ServeHTTP(recorder, req)
@@ -1589,7 +1589,9 @@ func TestHotReloadSingle(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	ts.Gw.reloadURLStructure(wg.Done)
-	ts.Gw.ReloadTestCase.TickOk(t)
+
+	assert.NoError(t, ts.Gw.ReloadTestCase.TickOk())
+
 	wg.Wait()
 	if ts.mainRouter() == oldRouter {
 		t.Fatal("router wasn't swapped")

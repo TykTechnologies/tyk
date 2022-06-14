@@ -153,7 +153,7 @@ func testPrepareHMACAuthSessionPass(tb testing.TB, hashFn func() hash.Hash, even
 		tb.Error("could not update session in Session Manager. " + err.Error())
 	}
 
-	req := TestReq(tb, "GET", "/", nil)
+	req := testReq(tb, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -210,7 +210,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 		tb.Error("could not update session in Session Manager. " + err.Error())
 	}
 
-	req := TestReq(tb, "GET", "/", nil)
+	req := testReq(tb, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -340,7 +340,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req := TestReq(t, "GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -398,7 +398,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req := TestReq(t, "GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -457,7 +457,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req := TestReq(t, "GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -515,7 +515,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req := TestReq(t, "GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -637,7 +637,7 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req := TestReq(t, "GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 

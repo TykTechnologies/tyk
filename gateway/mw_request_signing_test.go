@@ -89,7 +89,7 @@ func TestHMACRequestSigning(t *testing.T) {
 			sessionKey := ts.generateSession(algo, secret)
 			specs := ts.generateSpec(algo, secret, sessionKey, nil)
 
-			req := TestReq(t, "get", "/test/get", nil)
+			req := testReq(t, "get", "/test/get", nil)
 			recorder := httptest.NewRecorder()
 			chain := ts.getMiddlewareChain(specs[0])
 			chain.ServeHTTP(recorder, req)
@@ -113,7 +113,7 @@ func TestHMACRequestSigning(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 		chain.ServeHTTP(recorder, req)
 
 		if recorder.Code != 500 {
@@ -134,7 +134,7 @@ func TestHMACRequestSigning(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 		chain.ServeHTTP(recorder, req)
 
 		if recorder.Code != 400 {
@@ -155,7 +155,7 @@ func TestHMACRequestSigning(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 		refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 		tim := time.Now().Format(refDate)
 		req.Header.Add("foo", "bar")
@@ -177,7 +177,7 @@ func TestHMACRequestSigning(t *testing.T) {
 		sessionKey := ts.generateSession(algo, secret)
 		specs := ts.generateSpec(algo, secret, sessionKey, headerList)
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
 		chain.ServeHTTP(recorder, req)
@@ -195,7 +195,7 @@ func TestHMACRequestSigning(t *testing.T) {
 		sessionKey := ts.generateSession(algo, secret)
 		specs := ts.generateSpec(algo, secret, sessionKey, nil)
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
 		chain.ServeHTTP(recorder, req)
@@ -213,7 +213,7 @@ func TestHMACRequestSigning(t *testing.T) {
 		sessionKey := ts.generateSession(algo, secret)
 		specs := ts.generateSpec(algo, secret, sessionKey, nil)
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 		// invalid date
 		req.Header.Add("date", "Mon, 02 Jan 2006 15:04:05 GMT")
 
@@ -246,7 +246,7 @@ func TestHMACRequestSigning(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(api)
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 		chain.ServeHTTP(recorder, req)
 
 		if recorder.Code != 200 {
@@ -276,7 +276,7 @@ func TestRSARequestSigning(t *testing.T) {
 		sessionKey := ts.generateSession(algo, pubCertId)
 		specs := ts.generateSpec(algo, privCertId, sessionKey, nil)
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
 		chain.ServeHTTP(recorder, req)
@@ -291,7 +291,7 @@ func TestRSARequestSigning(t *testing.T) {
 		sessionKey := ts.generateSession(algo, pubCertId)
 		specs := ts.generateSpec(algo, "12345", sessionKey, nil)
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
 		chain.ServeHTTP(recorder, req)
@@ -306,7 +306,7 @@ func TestRSARequestSigning(t *testing.T) {
 		sessionKey := ts.generateSession(algo, pubCertId)
 		specs := ts.generateSpec(algo, "", sessionKey, nil)
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
 		chain.ServeHTTP(recorder, req)
@@ -321,7 +321,7 @@ func TestRSARequestSigning(t *testing.T) {
 		sessionKey := ts.generateSession(algo, pubCertId)
 		specs := ts.generateSpec(algo, privCertId, sessionKey, nil)
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
 		chain.ServeHTTP(recorder, req)
@@ -336,7 +336,7 @@ func TestRSARequestSigning(t *testing.T) {
 		sessionKey := ts.generateSession(algo, pubCertId)
 		specs := ts.generateSpec(algo, privCertId, sessionKey, nil)
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 		req.Header.Add("date", "Mon, 02 Jan 2006 15:04:05 GMT")
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
@@ -354,7 +354,7 @@ func TestRSARequestSigning(t *testing.T) {
 		sessionKey := ts.generateSession(algo, pubCertId)
 		specs := ts.generateSpec(algo, privCertId, sessionKey, headerList)
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 
 		refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 		tim := time.Now().Format(refDate)
@@ -377,7 +377,7 @@ func TestRSARequestSigning(t *testing.T) {
 		sessionKey := ts.generateSession(algo, pubCertId)
 		specs := ts.generateSpec(algo, privCertId, sessionKey, headerList)
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
@@ -402,7 +402,7 @@ func TestRSARequestSigning(t *testing.T) {
 
 		api.RequestSigning.SignatureHeader = "something"
 
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
@@ -424,7 +424,7 @@ func TestAPISpec_StripListenPath(t *testing.T) {
 
 		sessionKey := ts.generateSession(algo, secret)
 		specs := ts.generateSpec(algo, secret, sessionKey, nil)
-		req := TestReq(t, "get", "/test/get", nil)
+		req := testReq(t, "get", "/test/get", nil)
 
 		recorder := httptest.NewRecorder()
 		chain := ts.getMiddlewareChain(specs[0])
@@ -576,7 +576,7 @@ func TestWithURLRewrite(t *testing.T) {
 
 }
 
-func TestRequestSigning_getRequestPath(t *testing.T) {
+func testRequestSigning_getRequestPath(t *testing.T) {
 	api := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/test/"
 		spec.Proxy.StripListenPath = false

@@ -357,7 +357,7 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req := TestReq(t, "GET", "/auth_key_test/", nil)
+	req := testReq(t, "GET", "/auth_key_test/", nil)
 
 	req.Header.Set("authorization", "Bearer "+customToken)
 
@@ -381,7 +381,7 @@ func BenchmarkBearerTokenAuthKeySession(b *testing.B) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req := TestReq(b, "GET", "/auth_key_test/", nil)
+	req := testReq(b, "GET", "/auth_key_test/", nil)
 
 	req.Header.Set("authorization", "Bearer "+customToken)
 
@@ -421,7 +421,7 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req := TestReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
+	req := testReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
 
 	chain := getAuthKeyChain(spec, ts)
 	chain.ServeHTTP(recorder, req)
@@ -443,7 +443,7 @@ func BenchmarkMultiAuthBackwardsCompatibleSession(b *testing.B) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req := TestReq(b, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
+	req := testReq(b, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
 
 	chain := getAuthKeyChain(spec, ts)
 
@@ -490,7 +490,7 @@ func TestMultiAuthSession(t *testing.T) {
 
 	// Set the url param
 	recorder := httptest.NewRecorder()
-	req := TestReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
+	req := testReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
 
 	chain := getAuthKeyChain(spec, ts)
 	chain.ServeHTTP(recorder, req)
@@ -502,7 +502,7 @@ func TestMultiAuthSession(t *testing.T) {
 
 	// Set the header
 	recorder = httptest.NewRecorder()
-	req = TestReq(t, "GET", "/auth_key_test/?token=", nil)
+	req = testReq(t, "GET", "/auth_key_test/?token=", nil)
 	req.Header.Set("authorization", customToken)
 
 	chain.ServeHTTP(recorder, req)
@@ -514,7 +514,7 @@ func TestMultiAuthSession(t *testing.T) {
 
 	// Set the cookie
 	recorder = httptest.NewRecorder()
-	req = TestReq(t, "GET", "/auth_key_test/?token=", nil)
+	req = testReq(t, "GET", "/auth_key_test/?token=", nil)
 	req.AddCookie(&http.Cookie{Name: "oreo", Value: customToken})
 
 	chain.ServeHTTP(recorder, req)
@@ -526,7 +526,7 @@ func TestMultiAuthSession(t *testing.T) {
 
 	// No header, param or cookie
 	recorder = httptest.NewRecorder()
-	req = TestReq(t, "GET", "/auth_key_test/", nil)
+	req = testReq(t, "GET", "/auth_key_test/", nil)
 
 	chain.ServeHTTP(recorder, req)
 

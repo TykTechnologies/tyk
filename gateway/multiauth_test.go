@@ -131,7 +131,7 @@ func (ts *Test) testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec,
 	toEncode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(toEncode))
 
-	req := TestReq(t, "GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
@@ -200,7 +200,7 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req := TestReq(t, "GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
@@ -246,7 +246,7 @@ func TestMultiSession_BA_Standard_FailBA(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req := TestReq(t, "GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
@@ -287,7 +287,7 @@ func TestMultiSession_BA_Standard_FailStandard(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req := TestReq(t, "GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", "WRONGTOKEN"))
 

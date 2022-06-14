@@ -69,7 +69,7 @@ func TestRLOpen(t *testing.T) {
 
 	spec := ts.Gw.LoadSampleAPI(openRLDefSmall)
 
-	req := TestReq(t, "GET", "/rl_test/", nil)
+	req := testReq(t, "GET", "/rl_test/", nil)
 
 	ts.Gw.DRLManager.SetCurrentTokenValue(1)
 	ts.Gw.DRLManager.RequestTokenValue = 1
@@ -199,7 +199,7 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 	}
 }
 
-func TestRequestThrottling(t *testing.T) {
+func testRequestThrottling(t *testing.T) {
 	test.Flaky(t) // TODO TT-5236
 
 	t.Run("PolicyLevel", func(t *testing.T) {
@@ -221,7 +221,7 @@ func TestRLClosed(t *testing.T) {
 
 	spec := ts.Gw.LoadSampleAPI(closedRLDefSmall)
 
-	req := TestReq(t, "GET", "/rl_closed_test/", nil)
+	req := testReq(t, "GET", "/rl_closed_test/", nil)
 
 	session := createRLSession()
 	customToken := uuid.NewV4().String()
@@ -261,7 +261,7 @@ func TestRLOpenWithReload(t *testing.T) {
 
 	spec := ts.Gw.LoadSampleAPI(openRLDefSmall)
 
-	req := TestReq(t, "GET", "/rl_test/", nil)
+	req := testReq(t, "GET", "/rl_test/", nil)
 
 	ts.Gw.DRLManager.SetCurrentTokenValue(1)
 	ts.Gw.DRLManager.RequestTokenValue = 1

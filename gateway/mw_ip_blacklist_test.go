@@ -29,7 +29,7 @@ func TestIPBlacklistMiddleware(t *testing.T) {
 
 	for ti, tc := range testBlackListIPData {
 		rec := httptest.NewRecorder()
-		req := TestReq(t, "GET", "/", nil)
+		req := testReq(t, "GET", "/", nil)
 		req.RemoteAddr = tc.remote
 		if tc.forwarded != "" {
 			req.Header.Set("X-Forwarded-For", tc.forwarded)
@@ -57,7 +57,7 @@ func BenchmarkIPBlacklistMiddleware(b *testing.B) {
 	rec := httptest.NewRecorder()
 	for i := 0; i < b.N; i++ {
 		for ti, tc := range testBlackListIPData {
-			req := TestReq(b, "GET", "/", nil)
+			req := testReq(b, "GET", "/", nil)
 			req.RemoteAddr = tc.remote
 			if tc.forwarded != "" {
 				req.Header.Set("X-Forwarded-For", tc.forwarded)

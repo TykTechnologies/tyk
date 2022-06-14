@@ -109,7 +109,7 @@ func TestReverseProxyRetainHost(t *testing.T) {
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}, URLRewriteEnabled: true}
 			spec.URLRewriteEnabled = true
 
-			req := TestReq(t, http.MethodGet, tc.inURL, nil)
+			req := testReq(t, http.MethodGet, tc.inURL, nil)
 			req.URL.Path = tc.inPath
 			if tc.retainHost {
 				setCtxValue(req, ctx.RetainHost, true)
@@ -298,7 +298,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 				EnforcedTimeoutEnabled: true,
 				GlobalConfig:           config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 0.1}}
 
-			req := TestReq(t, tc.Method, tc.URL, tc.Body)
+			req := testReq(t, tc.Method, tc.URL, tc.Body)
 			for name, value := range tc.Headers {
 				req.Header.Add(name, strings.Join(value, ";"))
 			}
@@ -445,7 +445,7 @@ func TestSingleJoiningSlash(t *testing.T) {
 	}
 }
 
-func TestRequestIP(t *testing.T) {
+func testRequestIP(t *testing.T) {
 	tests := []struct {
 		remote, real, forwarded, want string
 	}{

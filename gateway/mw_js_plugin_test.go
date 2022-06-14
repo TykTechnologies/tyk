@@ -243,7 +243,7 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	}
 	dynMid.Spec.JSVM = jsvm
 
-	r := TestReq(t, "GET", "/v1/test-data", nil)
+	r := testReq(t, "GET", "/v1/test-data", nil)
 	dynMid.ProcessRequest(nil, r, nil)
 	if want, got := "bar", r.Header.Get("data-foo"); want != got {
 		t.Fatalf("wanted header to be %q, got %q", want, got)
@@ -273,7 +273,7 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	}
 	dynMid.Spec.JSVM = jsvm
 
-	r := TestReq(t, "GET", "/v1/test-data", nil)
+	r := testReq(t, "GET", "/v1/test-data", nil)
 	dynMid.ProcessRequest(nil, r, nil)
 	if want, got := NonCanonicalHeaderKey, r.Header.Get(NonCanonicalHeaderKey); want != got {
 		t.Fatalf("wanted header to be %q, got %q", want, got)
@@ -332,7 +332,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	}
 	dynMid.Spec.JSVM = jsvm
 
-	r := TestReq(t, "GET", "/foo", nil)
+	r := testReq(t, "GET", "/foo", nil)
 	dynMid.ProcessRequest(nil, r, nil)
 
 	if want, got := "globalValue", r.Header.Get("global"); want != got {
