@@ -14,6 +14,7 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 
 	"github.com/clbanning/mxj"
@@ -838,14 +839,15 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
-	BrokerAddr           string `bson:"broker_addr" json:"broker_addr"`
-	Topic                string `bson:"topic" json:"topic"`
-	GroupID              string `bson:"group_id" json:"group_id"`
-	ClientID             string `bson:"client_id" json:"client_id"`
-	KafkaVersion         string `bson:"kafka_version" json:"kafka_version"`
-	StartConsumingLatest bool   `json:"start_consuming_latest"`
-	BalanceStrategy      string `json:"balance_strategy"`
-	IsolationLevel       string `json:"isolation_level"`
+	BrokerAddr           string                `bson:"broker_addr" json:"broker_addr"`
+	Topic                string                `bson:"topic" json:"topic"`
+	GroupID              string                `bson:"group_id" json:"group_id"`
+	ClientID             string                `bson:"client_id" json:"client_id"`
+	KafkaVersion         string                `bson:"kafka_version" json:"kafka_version"`
+	StartConsumingLatest bool                  `json:"start_consuming_latest"`
+	BalanceStrategy      string                `json:"balance_strategy"`
+	IsolationLevel       string                `json:"isolation_level"`
+	SASL                 kafka_datasource.SASL `json:"sasl"`
 }
 
 type QueryVariable struct {
