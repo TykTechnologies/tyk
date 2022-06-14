@@ -11,7 +11,6 @@ func TestServer(t *testing.T) {
 	t.Parallel()
 
 	var emptyServer Server
-	Fill(t, &emptyServer.GatewayTags, 0)
 
 	var convertedAPI apidef.APIDefinition
 	emptyServer.ExtractTo(&convertedAPI)
@@ -34,6 +33,20 @@ func TestListenPath(t *testing.T) {
 	resultListenPath.Fill(convertedAPI)
 
 	assert.Equal(t, emptyListenPath, resultListenPath)
+}
+
+func TestGatewayTags(t *testing.T) {
+	t.Parallel()
+
+	var emptyGatewayTags GatewayTags
+
+	var convertedAPI apidef.APIDefinition
+	emptyGatewayTags.ExtractTo(&convertedAPI)
+
+	var resultGatewayTags GatewayTags
+	resultGatewayTags.Fill(convertedAPI)
+
+	assert.Equal(t, emptyGatewayTags, resultGatewayTags)
 }
 
 func TestClientCertificates(t *testing.T) {
@@ -178,56 +191,4 @@ func TestCustomDomain(t *testing.T) {
 			})
 		}
 	})
-}
-
-func TestTagsExportServer(t *testing.T) {
-	t.Parallel()
-
-	testcases := []struct {
-		title    string
-		input    apidef.APIDefinition
-		expected *GatewayTags
-	}{
-		{
-			"export segment tags if enabled",
-			apidef.APIDefinition{
-				TagsDisabled: false,
-				Tags:         []string{"a", "b", "c"},
-			},
-			&GatewayTags{
-				Enabled: true,
-				Tags:    []string{"a", "b", "c"},
-			},
-		},
-		{
-			"export segment tags if disabled",
-			apidef.APIDefinition{
-				TagsDisabled: true,
-				Tags:         []string{"a", "b", "c"},
-			},
-			&GatewayTags{
-				Enabled: false,
-				Tags:    []string{"a", "b", "c"},
-			},
-		},
-		{
-			"empty segment tags",
-			apidef.APIDefinition{},
-			&GatewayTags{
-				Enabled: true,
-				Tags:    []string{},
-			},
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.title, func(t *testing.T) {
-			t.Parallel()
-
-			server := new(Server)
-			server.Fill(tc.input)
-
-			assert.Equal(t, tc.expected, server.GatewayTags)
-		})
-	}
 }

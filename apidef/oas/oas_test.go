@@ -14,15 +14,11 @@ func TestOAS(t *testing.T) {
 	t.Parallel()
 
 	var nilOASPaths OAS
+	nilOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 	var emptyOASPaths OAS
-	xTykAPIGateway := &XTykAPIGateway{}
-	Fill(t, &xTykAPIGateway.Server.GatewayTags, 0)
-
-	emptyOASPaths.SetTykExtension(xTykAPIGateway)
 	emptyOASPaths.Paths = make(openapi3.Paths)
-
-	nilOASPaths.SetTykExtension(xTykAPIGateway)
+	emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 	t.Run("empty paths", func(t *testing.T) {
 		t.Parallel()
@@ -33,6 +29,7 @@ func TestOAS(t *testing.T) {
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
 
+		emptyOASPaths.Extensions = nil
 		assert.Equal(t, emptyOASPaths, resultOAS)
 	})
 
@@ -45,6 +42,7 @@ func TestOAS(t *testing.T) {
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
 
+		emptyOASPaths.Extensions = nil
 		assert.Equal(t, emptyOASPaths, resultOAS)
 	})
 

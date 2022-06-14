@@ -41,6 +41,7 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	if s.GatewayTags == nil {
 		s.GatewayTags = &GatewayTags{}
 	}
+
 	s.GatewayTags.Fill(api)
 	if ShouldOmit(s.GatewayTags) {
 		s.GatewayTags = nil
@@ -58,8 +59,11 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	if s.ClientCertificates != nil {
 		s.ClientCertificates.ExtractTo(api)
 	}
+
 	if s.GatewayTags != nil {
 		s.GatewayTags.ExtractTo(api)
+	} else {
+		api.TagsDisabled = true
 	}
 
 	if s.CustomDomain != nil {
@@ -114,17 +118,14 @@ type GatewayTags struct {
 
 func (gt *GatewayTags) Fill(api apidef.APIDefinition) {
 	gt.Enabled = !api.TagsDisabled
-	if api.Tags == nil {
-		api.Tags = []string{}
-	}
 	gt.Tags = api.Tags
+	if gt.Tags == nil {
+		gt.Tags = []string{}
+	}
 }
 
 func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
 	api.TagsDisabled = !gt.Enabled
-	if gt.Tags == nil {
-		gt.Tags = []string{}
-	}
 	api.Tags = gt.Tags
 }
 
