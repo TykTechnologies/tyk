@@ -2224,37 +2224,6 @@ func TestOAS(t *testing.T) {
 				testUpdateAPI(t, ts, &oasAPI, apiID, true)
 			})
 
-			t.Run("with oas and gateway tags disabled", func(t *testing.T) {
-				oasAPIInOAS := testGetOASAPI(t, ts, apiID, "oas api", "oas doc")
-
-				oasAPIInOAS.Extensions[oas.ExtensionTykAPIGateway] = oas.XTykAPIGateway{
-					Info: oas.Info{Name: "oas-updated oas api", ID: apiID},
-					Server: oas.Server{
-						ListenPath: oas.ListenPath{
-							Value: "/oas-updated",
-						},
-					},
-				}
-
-				oasAPIInOAS.Paths = make(openapi3.Paths)
-
-				oasAPIInOAS.Info.Title = "oas-updated oas doc"
-				testUpdateAPI(t, ts, &oasAPIInOAS, apiID, true)
-
-				t.Run("get", func(t *testing.T) {
-					t.Run("in oas", func(t *testing.T) {
-						testGetOASAPI(t, ts, apiID, "oas-updated oas api", "oas-updated oas doc")
-					})
-
-					t.Run("in old", func(t *testing.T) {
-						testGetOldAPI(t, ts, apiID, "oas-updated oas api")
-					})
-				})
-
-				// Reset
-				testUpdateAPI(t, ts, &oasAPI, apiID, true)
-			})
-
 			t.Run("with oas", func(t *testing.T) {
 				oasAPIInOAS := testGetOASAPI(t, ts, apiID, "oas api", "oas doc")
 
