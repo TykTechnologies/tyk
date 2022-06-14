@@ -177,6 +177,15 @@ func TestValidateOASObject(t *testing.T) {
 			"paths./pets.get.tags: Invalid type. Expected: array, given: string")
 		assert.Equal(t, expectedErr, err.Error())
 	})
+
+	t.Run("should error when requested oas schema not found", func(t *testing.T) {
+		t.Parallel()
+		reqOASVersion := "4.0.3"
+		err := ValidateOASObject(validOAS3Definition, reqOASVersion)
+		expectedErr := fmt.Errorf(oasSchemaVersionNotFoundFmt, reqOASVersion)
+		assert.Equal(t, expectedErr, err)
+	})
+
 }
 
 func Test_loadOASSchema(t *testing.T) {
@@ -202,15 +211,15 @@ func Test_loadOASSchema(t *testing.T) {
 func Test_findDefaultVersion(t *testing.T) {
 	t.Parallel()
 	t.Run("single version", func(t *testing.T) {
-		rawVersions := []string{"3.0.3"}
+		rawVersions := []string{"3.0"}
 
-		assert.Equal(t, "3.0.3", findDefaultVersion(rawVersions))
+		assert.Equal(t, "3.0", findDefaultVersion(rawVersions))
 	})
 
 	t.Run("multiple versions", func(t *testing.T) {
-		rawVersions := []string{"3.0.3", "3.0.4", "3.1.0"}
+		rawVersions := []string{"3.0", "2.0", "3.1.0"}
 
-		assert.Equal(t, "3.1.0", findDefaultVersion(rawVersions))
+		assert.Equal(t, "3.1", findDefaultVersion(rawVersions))
 	})
 }
 
@@ -219,5 +228,42 @@ func Test_setDefaultVersion(t *testing.T) {
 	assert.NoError(t, err)
 
 	setDefaultVersion()
-	assert.Equal(t, "3.0.3", defaultVersion)
+	assert.Equal(t, "3.0", defaultVersion)
+}
+
+func TestGetOASSchema(t *testing.T) {
+	err := loadOASSchema()
+	assert.NoError(t, err)
+
+	t.Run("return default version when req version is empty", func(t *testing.T) {
+		_, err = GetOASSchema("")
+		assert.NoError(t, err)
+		assert.NotEmpty(t, oasJsonSchemas["3.0"])
+	})
+
+	t.Run("return minor version schema when req version is including patch version", func(t *testing.T) {
+		_, err = GetOASSchema("3.0.8")
+		assert.NoError(t, err)
+		assert.NotEmpty(t, oasJsonSchemas["3.0"])
+	})
+
+	t.Run("return minor version 0 when only major version is requested", func(t *testing.T) {
+		_, err = GetOASSchema("3")
+		assert.NoError(t, err)
+		assert.NotEmpty(t, oasJsonSchemas["3.0"])
+	})
+
+	t.Run("return error when non existing oas schema is requested", func(t *testing.T) {
+		reqOASVersion := "4.0.3"
+		_, err = GetOASSchema(reqOASVersion)
+		expectedErr := fmt.Errorf(oasSchemaVersionNotFoundFmt, reqOASVersion)
+		assert.Equal(t, expectedErr, err)
+	})
+
+	t.Run("return error when requested version is not of semver", func(t *testing.T) {
+		reqOASVersion := "a.0.3"
+		_, err = GetOASSchema(reqOASVersion)
+		expectedErr := fmt.Errorf("Malformed version: %s", reqOASVersion)
+		assert.Equal(t, expectedErr, err)
+	})
 }

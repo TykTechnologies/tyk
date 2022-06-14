@@ -64,6 +64,8 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validate
 type AllowanceType int
 
 func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
+	// Regardless if `ep` is a zero value, we need a non-nil paths
+	// to produce a valid OAS document
 	if s.Paths == nil {
 		s.Paths = make(openapi3.Paths)
 	}
@@ -75,10 +77,6 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillValidateRequest(ep.ValidateJSON)
-
-	if len(s.Paths) == 0 {
-		s.Paths = nil
-	}
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {

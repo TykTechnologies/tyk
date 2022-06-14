@@ -11,32 +11,61 @@ import (
 )
 
 func TestOAS(t *testing.T) {
-	t.Run("empty", func(t *testing.T) {
-		var emptyOAS OAS
+	t.Parallel()
+
+	var nilOASPaths OAS
+
+	var emptyOASPaths OAS
+	xTykAPIGateway := &XTykAPIGateway{}
+	Fill(t, &xTykAPIGateway.Server.GatewayTags, 0)
+
+	emptyOASPaths.SetTykExtension(xTykAPIGateway)
+	emptyOASPaths.Paths = make(openapi3.Paths)
+
+	nilOASPaths.SetTykExtension(xTykAPIGateway)
+
+	t.Run("empty paths", func(t *testing.T) {
+		t.Parallel()
 
 		var convertedAPI apidef.APIDefinition
-		emptyOAS.ExtractTo(&convertedAPI)
+		emptyOASPaths.ExtractTo(&convertedAPI)
 
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
 
-		assert.Equal(t, emptyOAS, resultOAS)
+		assert.Equal(t, emptyOASPaths, resultOAS)
 	})
 
-	var api apidef.APIDefinition
-	api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	t.Run("nil paths", func(t *testing.T) {
+		t.Parallel()
 
-	a := apidef.AuthConfig{}
-	Fill(t, &a, 0)
-	api.AuthConfigs[apidef.AuthTokenType] = a
+		var convertedAPI apidef.APIDefinition
+		nilOASPaths.ExtractTo(&convertedAPI)
 
-	sw := &OAS{}
-	sw.Fill(api)
+		var resultOAS OAS
+		resultOAS.Fill(convertedAPI)
 
-	var converted apidef.APIDefinition
-	sw.ExtractTo(&converted)
+		assert.Equal(t, emptyOASPaths, resultOAS)
+	})
 
-	assert.Equal(t, api.AuthConfigs, converted.AuthConfigs)
+	t.Run("auth configs", func(t *testing.T) {
+		t.Parallel()
+
+		var api apidef.APIDefinition
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+
+		a := apidef.AuthConfig{}
+		Fill(t, &a, 0)
+		api.AuthConfigs[apidef.AuthTokenType] = a
+
+		sw := &OAS{}
+		sw.Fill(api)
+
+		var converted apidef.APIDefinition
+		sw.ExtractTo(&converted)
+
+		assert.Equal(t, api.AuthConfigs, converted.AuthConfigs)
+	})
 }
 
 func TestOAS_AddServers(t *testing.T) {

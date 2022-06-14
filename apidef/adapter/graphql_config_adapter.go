@@ -263,6 +263,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 					StartConsumingLatest: kafkaConfig.StartConsumingLatest,
 					BalanceStrategy:      kafkaConfig.BalanceStrategy,
 					IsolationLevel:       kafkaConfig.IsolationLevel,
+					SASL:                 kafkaConfig.SASL,
 				},
 			})
 		}
