@@ -13,19 +13,12 @@ import (
 func TestOAS(t *testing.T) {
 	t.Parallel()
 
-	var nilOASPaths OAS
-
-	var emptyOASPaths OAS
-	xTykAPIGateway := &XTykAPIGateway{}
-	Fill(t, &xTykAPIGateway.Server.GatewayTags, 0)
-
-	emptyOASPaths.SetTykExtension(xTykAPIGateway)
-	emptyOASPaths.Paths = make(openapi3.Paths)
-
-	nilOASPaths.SetTykExtension(xTykAPIGateway)
-
 	t.Run("empty paths", func(t *testing.T) {
 		t.Parallel()
+
+		var emptyOASPaths OAS
+		emptyOASPaths.Paths = make(openapi3.Paths)
+		emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 		var convertedAPI apidef.APIDefinition
 		emptyOASPaths.ExtractTo(&convertedAPI)
@@ -33,11 +26,15 @@ func TestOAS(t *testing.T) {
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
 
+		// This tests that zero-value extensions are cleared
+		emptyOASPaths.Extensions = nil
 		assert.Equal(t, emptyOASPaths, resultOAS)
 	})
 
 	t.Run("nil paths", func(t *testing.T) {
 		t.Parallel()
+
+		var nilOASPaths OAS
 
 		var convertedAPI apidef.APIDefinition
 		nilOASPaths.ExtractTo(&convertedAPI)
@@ -45,7 +42,9 @@ func TestOAS(t *testing.T) {
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
 
-		assert.Equal(t, emptyOASPaths, resultOAS)
+		// No paths in base OAS produce empty paths{} when converted back
+		nilOASPaths.Paths = make(openapi3.Paths)
+		assert.Equal(t, nilOASPaths, resultOAS)
 	})
 
 	t.Run("auth configs", func(t *testing.T) {

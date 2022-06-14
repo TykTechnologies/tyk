@@ -425,8 +425,6 @@ func TestOAS_OAuth(t *testing.T) {
 	var api apidef.APIDefinition
 	oas.ExtractTo(&api)
 
-	assert.False(t, api.TagsDisabled)
-
 	var convertedOAS OAS
 	convertedOAS.Components.SecuritySchemes = oas.Components.SecuritySchemes
 	convertedOAS.Fill(api)

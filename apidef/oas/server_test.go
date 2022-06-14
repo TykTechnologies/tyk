@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -11,7 +12,6 @@ func TestServer(t *testing.T) {
 	t.Parallel()
 
 	var emptyServer Server
-	Fill(t, &emptyServer.GatewayTags, 0)
 
 	var convertedAPI apidef.APIDefinition
 	emptyServer.ExtractTo(&convertedAPI)
