@@ -725,6 +725,11 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 					StartConsumingLatest: true,
 					BalanceStrategy:      kafkaDataSource.BalanceStrategySticky,
 					IsolationLevel:       kafkaDataSource.IsolationLevelReadCommitted,
+					SASL: kafkaDataSource.SASL{
+						Enable:   true,
+						User:     "admin",
+						Password: "admin-secret",
+					},
 				},
 			}),
 		},
@@ -746,6 +751,11 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 					StartConsumingLatest: true,
 					BalanceStrategy:      kafkaDataSource.BalanceStrategySticky,
 					IsolationLevel:       kafkaDataSource.IsolationLevelReadCommitted,
+					SASL: kafkaDataSource.SASL{
+						Enable:   true,
+						User:     "admin",
+						Password: "admin-secret",
+					},
 				},
 			}),
 		},
@@ -997,7 +1007,12 @@ var graphqlEngineV2ConfigJson = `{
 					"kafka_version": "V2_8_0_0",
 					"start_consuming_latest": true,
 					"balance_strategy": "BalanceStrategySticky",
-					"isolation_level": "ReadCommitted"
+					"isolation_level": "ReadCommitted",
+					"sasl": {
+						"enable": true,
+						"user": "admin",
+						"password": "admin-secret"
+					}
 				}
 			},
 			{
@@ -1018,7 +1033,12 @@ var graphqlEngineV2ConfigJson = `{
 					"kafka_version": "V2_8_0_0",
 					"start_consuming_latest": true,
 					"balance_strategy": "BalanceStrategySticky",
-					"isolation_level": "ReadCommitted"
+					"isolation_level": "ReadCommitted",
+					"sasl": {
+						"enable": true,
+						"user": "admin",
+						"password": "admin-secret"
+					}
 				}
 			}
 		]
