@@ -1314,6 +1314,8 @@ func TestStripListenPath(t *testing.T) {
 	assert.Equal(t, "/get", stripListenPath("/{_:.*}/", "/listen/get"))
 	assert.Equal(t, "/get", stripListenPath("/pre/{_:.*}/", "/pre/listen/get"))
 	assert.Equal(t, "/", stripListenPath("/{_:.*}", "/listen"))
+	assert.Equal(t, "/get", stripListenPath("/{myPattern:foo|bar}", "/foo/get"))
+	assert.Equal(t, "/anything/get", stripListenPath("/{myPattern:foo|bar}", "/anything/get"))
 }
 
 func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
