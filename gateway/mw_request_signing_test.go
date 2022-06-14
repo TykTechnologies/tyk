@@ -414,7 +414,7 @@ func TestRSARequestSigning(t *testing.T) {
 	})
 }
 
-func TestRequestSigningStripListenPath(t *testing.T) {
+func TestStripListenPath(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 

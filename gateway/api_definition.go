@@ -1402,7 +1402,7 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 }
 
 func (a *APISpec) StripListenPath(r *http.Request, path string) string {
-	return stripListenPath(a.Proxy.ListenPath, path)
+	return stripListenPath(a.Proxy.ListenPath, path, mux.Vars(r))
 }
 
 type RoundRobin struct {
@@ -1418,22 +1418,17 @@ func (r *RoundRobin) WithLen(len int) int {
 	return int(cur) % len
 }
 
-func stripListenPath(listenPath, path string) (res string) {
-	defer func() {
-		if !strings.HasPrefix(res, "/") {
-			res = "/" + res
-		}
-	}()
+var listenPathVarsRE = regexp.MustCompile(`{[^:]+(:[^}]+)?}`)
 
+func stripListenPath(listenPath, path string, muxVars map[string]string) string {
 	if !strings.Contains(listenPath, "{") {
 		return strings.TrimPrefix(path, listenPath)
 	}
-
-	tmp := new(mux.Route).PathPrefix(listenPath)
-	s, err := tmp.GetPathRegexp()
-	if err != nil {
-		return path
-	}
-	reg := regexp.MustCompile(s)
-	return reg.ReplaceAllString(path, "")
+	lp := listenPathVarsRE.ReplaceAllStringFunc(listenPath, func(match string) string {
+		match = strings.TrimLeft(match, "{")
+		match = strings.TrimRight(match, "}")
+		aliasVar := strings.Split(match, ":")[0]
+		return muxVars[aliasVar]
+	})
+	return strings.TrimPrefix(path, lp)
 }
