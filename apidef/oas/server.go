@@ -42,7 +42,7 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 		s.GatewayTags = &GatewayTags{}
 	}
 	s.GatewayTags.Fill(api)
-	if ShouldOmit(s.GatewayTags) {
+	if !s.GatewayTags.Enabled || len(s.GatewayTags.Tags) == 0 {
 		s.GatewayTags = nil
 	}
 

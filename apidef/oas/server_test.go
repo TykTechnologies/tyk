@@ -205,18 +205,12 @@ func TestTagsExportServer(t *testing.T) {
 				TagsDisabled: true,
 				Tags:         []string{"a", "b", "c"},
 			},
-			&GatewayTags{
-				Enabled: false,
-				Tags:    []string{"a", "b", "c"},
-			},
+			nil,
 		},
 		{
 			"empty segment tags",
 			apidef.APIDefinition{},
-			&GatewayTags{
-				Enabled: true,
-				Tags:    []string{},
-			},
+			nil,
 		},
 	}
 
