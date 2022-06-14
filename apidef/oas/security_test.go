@@ -418,10 +418,6 @@ func TestOAS_OAuth(t *testing.T) {
 						securityName: &oauth,
 					},
 				},
-				GatewayTags: &GatewayTags{
-					Enabled: true,
-					Tags:    []string{},
-				},
 			},
 		},
 	}
@@ -539,9 +535,6 @@ func TestOAS_TykAuthentication_NoOASSecurity(t *testing.T) {
 			Server: Server{
 				Authentication: &Authentication{
 					HMAC: &hmac,
-				},
-				GatewayTags: &GatewayTags{
-					Enabled: true,
 				},
 			},
 		},

@@ -60,13 +60,7 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 	if s.GatewayTags != nil {
 		s.GatewayTags.ExtractTo(api)
-
-		// Omit gateway tags if empty or disabled
-		if !s.GatewayTags.Enabled || len(s.GatewayTags.Tags) == 0 {
-			s.GatewayTags = nil
-		}
 	}
-
 	if s.CustomDomain != nil {
 		s.CustomDomain.ExtractTo(api)
 	}
