@@ -342,14 +342,16 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			newConfig.NameToCertificate[name] = cert
 		}
 
+		domainRequireCert := map[string]tls.ClientAuthType{}
 		isControlAPI := (listenPort != 0 && gwConfig.ControlAPIPort == listenPort) || (gwConfig.ControlAPIHostname == hello.ServerName)
-
 		if isControlAPI && gwConfig.Security.ControlAPIUseMutualTLS {
 			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
 			newConfig.ClientCAs = gw.CertificateManager.CertPool(gwConfig.Security.Certificates.ControlAPI)
 
 			tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
 			return newConfig, nil
+		} else {
+			domainRequireCert[gwConfig.ControlAPIHostname] = -1
 		}
 
 		gw.apisMu.RLock()
@@ -357,10 +359,10 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 		newConfig.ClientCAs = x509.NewCertPool()
 
-		domainRequireCert := map[string]tls.ClientAuthType{}
 		for _, spec := range gw.apiSpecs {
 			switch {
 			case spec.UseMutualTLSAuth:
+
 				if domainRequireCert[spec.Domain] == 0 {
 					// Require verification only if there is a single known domain for TLS auth, otherwise use previous value
 					domainRequireCert[spec.Domain] = tls.RequireAndVerifyClientCert
