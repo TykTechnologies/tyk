@@ -16,7 +16,6 @@ import (
 func TestXTykAPIGateway(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyXTykAPIGateway XTykAPIGateway
-		Fill(t, &emptyXTykAPIGateway.Server.GatewayTags, 0)
 
 		var convertedAPI apidef.APIDefinition
 		emptyXTykAPIGateway.ExtractTo(&convertedAPI)

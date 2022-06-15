@@ -2038,10 +2038,6 @@ func TestOAS(t *testing.T) {
 				Value: "/oas-api/",
 				Strip: false,
 			},
-			GatewayTags: &oas.GatewayTags{
-				Enabled: false,
-				Tags:    []string{},
-			},
 		},
 	}
 
@@ -2161,6 +2157,7 @@ func TestOAS(t *testing.T) {
 				}
 
 				oldAPIInOAS.GetTykExtension().Info.Versioning = nil
+				oldAPIInOAS.GetTykExtension().Server.GatewayTags = nil
 
 				oldAPIInOAS.Paths = make(openapi3.Paths)
 				updatePath := "/tyk/apis/oas/" + apiID
@@ -2204,41 +2201,6 @@ func TestOAS(t *testing.T) {
 						},
 						GatewayTags: &oas.GatewayTags{
 							Enabled: true,
-							Tags:    []string{"rainbow"},
-						},
-					},
-				}
-
-				oasAPIInOAS.Paths = make(openapi3.Paths)
-
-				oasAPIInOAS.Info.Title = "oas-updated oas doc"
-				testUpdateAPI(t, ts, &oasAPIInOAS, apiID, true)
-
-				t.Run("get", func(t *testing.T) {
-					t.Run("in oas", func(t *testing.T) {
-						testGetOASAPI(t, ts, apiID, "oas-updated oas api", "oas-updated oas doc")
-					})
-
-					t.Run("in old", func(t *testing.T) {
-						testGetOldAPI(t, ts, apiID, "oas-updated oas api")
-					})
-				})
-
-				// Reset
-				testUpdateAPI(t, ts, &oasAPI, apiID, true)
-			})
-
-			t.Run("with oas and gateway tags disabled", func(t *testing.T) {
-				oasAPIInOAS := testGetOASAPI(t, ts, apiID, "oas api", "oas doc")
-
-				oasAPIInOAS.Extensions[oas.ExtensionTykAPIGateway] = oas.XTykAPIGateway{
-					Info: oas.Info{Name: "oas-updated oas api", ID: apiID},
-					Server: oas.Server{
-						ListenPath: oas.ListenPath{
-							Value: "/oas-updated",
-						},
-						GatewayTags: &oas.GatewayTags{
-							Enabled: false,
 							Tags:    []string{"rainbow"},
 						},
 					},
@@ -2461,10 +2423,6 @@ func TestOAS(t *testing.T) {
 			fillPaths(&apiInOAS)
 			tykExt := apiInOAS.GetTykExtension()
 			tykExt.Info.Name = "patched-oas-api"
-			tykExt.Server.GatewayTags = &oas.GatewayTags{
-				Enabled: true,
-				Tags:    []string{},
-			}
 
 			apiInOAS.T.Info.Title = "patched-oas-doc"
 			testPatchOAS(t, ts, apiInOAS, nil, apiID)
@@ -2482,10 +2440,6 @@ func TestOAS(t *testing.T) {
 
 			tykExt := apiInOAS.GetTykExtension()
 			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
-			tykExt.Server.GatewayTags = &oas.GatewayTags{
-				Enabled: true,
-				Tags:    []string{},
-			}
 
 			apiInOAS.T.Info.Title = "patched-oas-doc"
 			testPatchOAS(t, ts, apiInOAS, nil, apiID)
@@ -2521,10 +2475,6 @@ func TestOAS(t *testing.T) {
 			expectedTykExt.Server.CustomDomain = &oas.Domain{
 				Enabled: true,
 				Name:    customDomain,
-			}
-			expectedTykExt.Server.GatewayTags = &oas.GatewayTags{
-				Enabled: true,
-				Tags:    []string{},
 			}
 
 			expectedTykExt.Middleware = &oas.Middleware{
@@ -2576,10 +2526,6 @@ func TestOAS(t *testing.T) {
 			expectedTykExt.Server.CustomDomain = &oas.Domain{
 				Enabled: true,
 				Name:    customDomain,
-			}
-			expectedTykExt.Server.GatewayTags = &oas.GatewayTags{
-				Enabled: true,
-				Tags:    []string{},
 			}
 			expectedTykExt.Middleware = &oas.Middleware{
 				Operations: oas.Operations{
@@ -2772,6 +2718,7 @@ func TestOAS(t *testing.T) {
 				tykExt.Info.Name = "patched-oas-api"
 				tykExt.Info.Versioning.Default = "default"
 				tykExt.Info.Versioning.Versions = []oas.VersionToID{}
+				tykExt.Server.GatewayTags = nil
 				apiInOAS.T.Info = &openapi3.Info{Title: "patched-oas-doc"}
 				apiInOAS.OpenAPI = "3.0.3"
 

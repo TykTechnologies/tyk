@@ -60,8 +60,10 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 	if s.GatewayTags != nil {
 		s.GatewayTags.ExtractTo(api)
+	} else {
+		api.TagsDisabled = true
+		api.Tags = []string{}
 	}
-
 	if s.CustomDomain != nil {
 		s.CustomDomain.ExtractTo(api)
 	}
@@ -114,17 +116,14 @@ type GatewayTags struct {
 
 func (gt *GatewayTags) Fill(api apidef.APIDefinition) {
 	gt.Enabled = !api.TagsDisabled
-	if api.Tags == nil {
-		api.Tags = []string{}
-	}
 	gt.Tags = api.Tags
+	if gt.Tags == nil {
+		gt.Tags = []string{}
+	}
 }
 
 func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
 	api.TagsDisabled = !gt.Enabled
-	if gt.Tags == nil {
-		gt.Tags = []string{}
-	}
 	api.Tags = gt.Tags
 }
 
