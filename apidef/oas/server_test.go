@@ -69,8 +69,7 @@ func TestGatewayTags(t *testing.T) {
 		},
 		{
 			input: GatewayTags{Enabled: false, Tags: []string{"t1", "t2"}},
-			want:  GatewayTags{},
-			omit:  true,
+			want:  GatewayTags{Enabled: false, Tags: []string{"t1", "t2"}},
 		},
 	}
 
