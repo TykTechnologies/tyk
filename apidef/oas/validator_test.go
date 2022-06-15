@@ -71,6 +71,7 @@ func TestValidateOASObject(t *testing.T) {
 	invalidOASObject := validOASObject
 	invalidXTykAPIGateway := validXTykAPIGateway
 	invalidXTykAPIGateway.Info = Info{}
+	invalidXTykAPIGateway.Server.GatewayTags = &GatewayTags{Enabled: true, Tags: []string{}}
 	invalidOASObject.SetTykExtension(&invalidXTykAPIGateway)
 	invalidOASObject.Paths["/pets"].Get.Responses["200"].Value.Description = nil
 	invalidOAS3Definition, _ := invalidOASObject.MarshalJSON()
@@ -80,6 +81,7 @@ func TestValidateOASObject(t *testing.T) {
 		err := ValidateOASObject(invalidOAS3Definition, "3.0.3")
 		expectedErrs := []string{
 			`x-tyk-api-gateway.info.name: Does not match pattern '\S+'`,
+			"x-tyk-api-gateway.server.gatewayTags.tags: Array must have at least 1 items",
 			"paths./pets.get.responses.200: Must validate one and only one schema (oneOf)",
 			"paths./pets.get.responses.200: description is required",
 		}
