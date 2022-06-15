@@ -139,42 +139,6 @@ func TestPinnedPublicKeys(t *testing.T) {
 	assert.Equal(t, pinnedPublicKeys, resultPinnedPublicKeys)
 }
 
-func TestTagsImport(t *testing.T) {
-	t.Parallel()
-
-	testcases := []struct {
-		title          string
-		input          *GatewayTags
-		expectDisabled bool
-		expectValues   []string
-	}{
-		{
-			"keep segment tags values if disabled",
-			&GatewayTags{Enabled: false, Tags: []string{"a", "b", "c"}},
-			true,
-			[]string{"a", "b", "c"},
-		},
-		{
-			"keep segment tags values if enabled",
-			&GatewayTags{Enabled: true, Tags: []string{"a", "b", "c"}},
-			false,
-			[]string{"a", "b", "c"},
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.title, func(t *testing.T) {
-			t.Parallel()
-
-			var apidef apidef.APIDefinition
-
-			tc.input.ExtractTo(&apidef)
-
-			assert.Equal(t, tc.expectDisabled, apidef.TagsDisabled)
-			assert.Equal(t, tc.expectValues, apidef.Tags)
-		})
-	}
-}
 func TestCustomDomain(t *testing.T) {
 	t.Run("extractTo api definition", func(t *testing.T) {
 		testcases := []struct {
