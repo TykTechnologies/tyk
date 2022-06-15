@@ -71,6 +71,7 @@ func TestValidateOASObject(t *testing.T) {
 	invalidOASObject := validOASObject
 	invalidXTykAPIGateway := validXTykAPIGateway
 	invalidXTykAPIGateway.Info = Info{}
+	invalidXTykAPIGateway.Server.GatewayTags = &GatewayTags{Enabled: true, Tags: []string{}}
 	invalidOASObject.SetTykExtension(&invalidXTykAPIGateway)
 	invalidOASObject.Paths["/pets"].Get.Responses["200"].Value.Description = nil
 	invalidOAS3Definition, _ := invalidOASObject.MarshalJSON()
