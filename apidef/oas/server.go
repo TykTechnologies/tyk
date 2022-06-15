@@ -62,6 +62,7 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 		s.GatewayTags.ExtractTo(api)
 	} else {
 		api.TagsDisabled = true
+		api.Tags = []string{}
 	}
 	if s.CustomDomain != nil {
 		s.CustomDomain.ExtractTo(api)
@@ -116,6 +117,9 @@ type GatewayTags struct {
 func (gt *GatewayTags) Fill(api apidef.APIDefinition) {
 	gt.Enabled = !api.TagsDisabled
 	gt.Tags = api.Tags
+	if gt.Tags == nil {
+		gt.Tags = []string{}
+	}
 }
 
 func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {

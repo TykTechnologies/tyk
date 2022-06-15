@@ -81,7 +81,6 @@ func TestValidateOASObject(t *testing.T) {
 		err := ValidateOASObject(invalidOAS3Definition, "3.0.3")
 		expectedErrs := []string{
 			`x-tyk-api-gateway.info.name: Does not match pattern '\S+'`,
-			"x-tyk-api-gateway.server.gatewayTags.tags: Array must have at least 1 items",
 			"paths./pets.get.responses.200: Must validate one and only one schema (oneOf)",
 			"paths./pets.get.responses.200: description is required",
 		}

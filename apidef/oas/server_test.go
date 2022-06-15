@@ -46,12 +46,12 @@ func TestGatewayTags(t *testing.T) {
 	}{
 		{
 			input: GatewayTags{},
-			want:  GatewayTags{},
+			want:  GatewayTags{Tags: []string{}},
 			omit:  true,
 		},
 		{
 			input: GatewayTags{Enabled: true},
-			want:  GatewayTags{Enabled: true},
+			want:  GatewayTags{Enabled: true, Tags: []string{}},
 		},
 		{
 			input: GatewayTags{Enabled: true, Tags: []string{}},
@@ -253,6 +253,7 @@ func TestTagsExportServer(t *testing.T) {
 			apidef.APIDefinition{},
 			&GatewayTags{
 				Enabled: true,
+				Tags:    []string{},
 			},
 		},
 	}
