@@ -160,9 +160,6 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onConnect func(),
 	}
 
 	rc.redisUp.Store(up)
-	if up {
-		onConnect()
-	}
 
 	defer func() {
 		close(rc.reconnect)
