@@ -767,7 +767,7 @@
         "sharedSecret": {
           "type": "string"
         },
-        "onKeyChangeURL": {
+        "onKeyChangeUrl": {
           "type": "string"
         }
       }
