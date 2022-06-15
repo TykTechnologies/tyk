@@ -86,3 +86,6 @@ docker-slim: build
 
 docker-std: build
 	docker build --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .
+
+lint:
+	docker run -it --rm -v $(PWD):$(PWD) -w $(PWD) -u $(UID):$(GID) golangci/golangci-lint:v1.43 golangci-lint run --enable-all ./...

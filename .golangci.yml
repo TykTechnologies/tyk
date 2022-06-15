@@ -1,0 +1,55 @@
+run:
+  concurrency: 4
+  timeout: 5m
+  skip_files:
+    - '.*\\.pb\\.go$'
+    - '.*\\_gen\\.go$'
+    - '.*\\.gen\\.go$'
+
+linters:
+  disable:
+    - gomnd
+    - deadcode
+    - gochecknoglobals
+    - godox
+    - gofmt
+    - wsl
+    - lll
+    - dupl
+    - gocognit
+    - funlen
+    - testpackage
+    - godot
+    - goconst
+    - goprintffuncname
+    - forbidigo
+    - noctx
+    - interfacer
+    - goimports
+    - nestif
+    - gochecknoinits
+    - maligned
+    - whitespace
+    - wrapcheck
+    - nlreturn
+    - exhaustivestruct
+    - wastedassign
+    - nilerr
+    - gofumpt
+    - gci
+    - cyclop
+
+issues:
+  exclude-rules:
+    - path: main.go
+      text: "singleCaseSwitch"
+    - path: _test\.go
+      linters:
+        - gocyclo
+    - linters:
+        - goerr113
+      text: "do not define dynamic errors"
+  exclude:
+    - G306
+    - G404
+  fix: true
