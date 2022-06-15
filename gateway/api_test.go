@@ -2999,6 +2999,25 @@ func TestOAS(t *testing.T) {
 			assert.True(t, importedOAS.GetTykExtension().Server.ListenPath.Strip)
 		})
 
+		t.Run("block when dashboard app config set to true", func(t *testing.T) {
+			apiInOAS := oasCopy(false, nil)
+
+			conf := ts.Gw.GetConfig()
+			conf.UseDBAppConfigs = true
+			ts.Gw.SetConfig(conf)
+
+			defer func() {
+				conf.UseDBAppConfigs = false
+				ts.Gw.SetConfig(conf)
+			}()
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas/import", Data: &apiInOAS,
+					BodyMatch: "Due to enabled use_db_app_configs, please use the Dashboard API",
+					Code:      http.StatusInternalServerError},
+			}...)
+		})
+
 	})
 }
 
