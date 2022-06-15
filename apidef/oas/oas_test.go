@@ -35,6 +35,7 @@ func TestOAS(t *testing.T) {
 		t.Parallel()
 
 		var nilOASPaths OAS
+		nilOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 		var convertedAPI apidef.APIDefinition
 		nilOASPaths.ExtractTo(&convertedAPI)
@@ -44,6 +45,7 @@ func TestOAS(t *testing.T) {
 
 		// No paths in base OAS produce empty paths{} when converted back
 		nilOASPaths.Paths = make(openapi3.Paths)
+		nilOASPaths.Extensions = nil
 		assert.Equal(t, nilOASPaths, resultOAS)
 	})
 
