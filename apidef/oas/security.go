@@ -378,7 +378,7 @@ func (s *OAS) extractOAuthTo(api *apidef.APIDefinition, name string) {
 
 type Notifications struct {
 	SharedSecret   string `bson:"sharedSecret,omitempty" json:"sharedSecret,omitempty"`
-	OnKeyChangeURL string `bson:"onKeyChangeURL,omitempty" json:"onKeyChangeURL,omitempty"`
+	OnKeyChangeURL string `bson:"onKeyChangeUrl,omitempty" json:"onKeyChangeUrl,omitempty"`
 }
 
 func (n *Notifications) Fill(nm apidef.NotificationsManager) {
