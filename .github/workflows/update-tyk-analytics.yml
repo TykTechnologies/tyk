@@ -20,3 +20,9 @@ jobs:
           repository: TykTechnologies/tyk-analytics
           event-type: new-tyk
           client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
+      - uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.TYK_ANALYTICS_TOKEN }}
+          repository: TykTechnologies/tyk-sink
+          event-type: new-tyk
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
