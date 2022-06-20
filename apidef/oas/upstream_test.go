@@ -173,7 +173,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 				mutualTLS.Fill(tc.input)
 
 				assert.Equal(t, tc.expectedValue.Enabled, mutualTLS.Enabled)
-				assert.EqualValues(t, tc.expectedValue.DomainToCerts, mutualTLS.DomainToCerts)
+				assert.ElementsMatch(t, tc.expectedValue.DomainToCerts, mutualTLS.DomainToCerts)
 			})
 		}
 	})
