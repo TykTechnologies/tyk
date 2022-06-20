@@ -17,7 +17,7 @@ type Upstream struct {
 	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
 	// MutualTLS contains the configuration related to upstream mutual TLS.
 	MutualTLS        *MutualTLS       `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
-	PinnedPublicKeys PinnedPublicKeys `bson:"pinnedPublicKeys,omitempty" json:"pinnedPublicKeys,omitempty"`
+	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
 }
 
 func (u *Upstream) Fill(api apidef.APIDefinition) {
@@ -50,12 +50,15 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 		u.MutualTLS = nil
 	}
 
-	u.PinnedPublicKeys = make(PinnedPublicKeys, len(api.PinnedPublicKeys))
-	u.PinnedPublicKeys.Fill(api.PinnedPublicKeys)
-
-	if len(u.PinnedPublicKeys) == 0 {
-		u.PinnedPublicKeys = nil
+	if u.CertificatePinning == nil {
+		u.CertificatePinning = &CertificatePinning{}
 	}
+
+	u.CertificatePinning.Fill(api)
+	if ShouldOmit(u.CertificatePinning) {
+		u.CertificatePinning = nil
+	}
+
 }
 
 func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
@@ -76,9 +79,11 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 		api.UpstreamCertificates = nil
 	}
 
-	if len(u.PinnedPublicKeys) > 0 {
-		api.PinnedPublicKeys = make(map[string]string, len(u.PinnedPublicKeys))
-		u.PinnedPublicKeys.ExtractTo(api.PinnedPublicKeys)
+	if u.CertificatePinning != nil {
+		u.CertificatePinning.ExtractTo(api)
+	} else {
+		api.CertificatePinningDisabled = true
+		api.PinnedPublicKeys = nil
 	}
 }
 
@@ -240,8 +245,8 @@ func (m *MutualTLS) ExtractTo(api *apidef.APIDefinition) {
 }
 
 type PinnedPublicKey struct {
-	Domain string   `bson:"domain" json:"domain"`
-	List   []string `bson:"list" json:"list"`
+	Domain     string   `bson:"domain" json:"domain"`
+	PublicKeys []string `bson:"publicKeys" json:"publicKeys"`
 }
 
 type PinnedPublicKeys []PinnedPublicKey
@@ -261,13 +266,41 @@ func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
 
 	i = 0
 	for _, domain := range domains {
-		ppk[i] = PinnedPublicKey{Domain: domain, List: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
+		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
 		i++
 	}
 }
 
 func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
 	for _, publicKey := range ppk {
-		publicKeys[publicKey.Domain] = strings.Join(publicKey.List, ",")
+		publicKeys[publicKey.Domain] = strings.Join(publicKey.PublicKeys, ",")
+	}
+}
+
+type CertificatePinning struct {
+	Enabled                   bool             `bson:"enabled" json:"enabled"`
+	DomainToPublicKeysMapping PinnedPublicKeys `bson:"domainToPublicKeysMapping" json:"domainToPublicKeysMapping"`
+}
+
+func (cp *CertificatePinning) Fill(api apidef.APIDefinition) {
+	cp.Enabled = !api.CertificatePinningDisabled
+
+	if len(api.PinnedPublicKeys) == 0 {
+		return
+	}
+
+	if cp.DomainToPublicKeysMapping == nil {
+		cp.DomainToPublicKeysMapping = make(PinnedPublicKeys, len(api.PinnedPublicKeys))
+	}
+
+	cp.DomainToPublicKeysMapping.Fill(api.PinnedPublicKeys)
+}
+
+func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
+	api.CertificatePinningDisabled = !cp.Enabled
+
+	if len(cp.DomainToPublicKeysMapping) > 0 {
+		api.PinnedPublicKeys = make(map[string]string)
+		cp.DomainToPublicKeysMapping.ExtractTo(api.PinnedPublicKeys)
 	}
 }
