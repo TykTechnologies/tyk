@@ -46,6 +46,7 @@ func (rc *RedisController) DisableRedis(setRedisDown bool) {
 	if !rc.WaitConnect(ctx) {
 		panic("Can't reconnect to redis after disable")
 	}
+	rc.reconnect <- struct{}{}
 }
 
 func (rc *RedisController) enabled() bool {
