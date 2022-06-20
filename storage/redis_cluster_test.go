@@ -17,7 +17,7 @@ var rc RedisController
 func init() {
 	conf := config.Default
 
-	rc = *NewRedisController(context.Background())
+	rc = RedisController{ctx: context.Background(), reconnect: make(chan struct{}, 1)}
 	go rc.ConnectToRedis(context.Background(), nil, &conf)
 	for {
 		if rc.Connected() {

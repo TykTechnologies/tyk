@@ -17,14 +17,14 @@ type RedisController struct {
 
 	redisUp      atomic.Value
 	disableRedis atomic.Value
-	reconnect    chan bool
+	reconnect    chan struct{}
 	ctx          context.Context
 }
 
 func NewRedisController(ctx context.Context) *RedisController {
 	return &RedisController{
 		ctx:       ctx,
-		reconnect: make(chan bool, 1),
+		reconnect: make(chan struct{}, 1),
 	}
 }
 
@@ -192,7 +192,7 @@ func (rc *RedisController) statusCheck(ctx context.Context, conf *config.Config,
 
 			//if we weren't alerady connected but now we are connected, we trigger the reconnect
 			if !alreadyConnected && connected {
-				rc.reconnect <- true
+				rc.reconnect <- struct{}{}
 			}
 		}
 	}
