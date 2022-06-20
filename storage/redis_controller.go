@@ -159,6 +159,11 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(
 
 	rc.redisUp.Store(up)
 
+	defer func() {
+		close(rc.reconnect)
+		rc.disconnect()
+	}()
+
 	go rc.recoverLoop(ctx, onReconnect)
 
 	// We need the ticker to constantly checking the connection status of Redis. If Redis gets down and up again, we should be able to recover.
