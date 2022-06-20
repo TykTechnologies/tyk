@@ -17,8 +17,8 @@ type RedisController struct {
 
 	redisUp      atomic.Value
 	disableRedis atomic.Value
-	reconnect    chan struct{}
 	ctx          context.Context
+	reconnect    chan struct{}
 }
 
 func NewRedisController(ctx context.Context) *RedisController {
