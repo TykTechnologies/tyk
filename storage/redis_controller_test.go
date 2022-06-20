@@ -17,7 +17,7 @@ func TestRecoverLoop(t *testing.T) {
 		onReconnectCounter++
 		wg.Done()
 	}
-	ctx, _ := context.WithCancel(context.TODO())
+	ctx := context.Background()
 
 	conf := config.Default
 
