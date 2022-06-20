@@ -696,8 +696,7 @@
           "type": "array",
           "items": [
             {
-              "type": "string",
-              "pattern": "\\S+"
+              "$ref": "#/definitions/X-Tyk-VersionToID"
             }
           ]
         },
@@ -711,6 +710,23 @@
         "location",
         "key",
         "versions"
+      ]
+    },
+    "X-Tyk-VersionToID": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "\\S+"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "\\S+"
+        }
+      },
+      "required": [
+        "name",
+        "id"
       ]
     },
     "X-Tyk-Info": {
@@ -767,7 +783,7 @@
         "sharedSecret": {
           "type": "string"
         },
-        "onKeyChangeURL": {
+        "onKeyChangeUrl": {
           "type": "string"
         }
       }
