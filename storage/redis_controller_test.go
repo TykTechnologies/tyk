@@ -1,0 +1,32 @@
+package storage
+
+import (
+	"context"
+	"sync"
+	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestRecoverLoop(t *testing.T) {
+	var onReconnectCounter int
+	var wg sync.WaitGroup
+	wg.Add(1)
+	onRecover := func() {
+		onReconnectCounter++
+		wg.Done()
+	}
+	ctx, _ := context.WithCancel(context.TODO())
+
+	conf := config.Default
+
+	rc := NewRedisController(ctx)
+	go rc.ConnectToRedis(ctx, onRecover, &conf)
+	rc.WaitConnect(ctx)
+
+	rc.DisableRedis(false)
+
+	wg.Wait()
+	assert.Equal(t, 1, onReconnectCounter)
+}
