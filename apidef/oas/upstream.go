@@ -1,6 +1,10 @@
 package oas
 
-import "github.com/TykTechnologies/tyk/apidef"
+import (
+	"github.com/TykTechnologies/tyk/apidef"
+	"sort"
+	"strings"
+)
 
 type Upstream struct {
 	// URL defines the target URL that the request should be proxied to.
@@ -232,5 +236,38 @@ func (m *MutualTLS) ExtractTo(api *apidef.APIDefinition) {
 
 	for _, domainToCert := range m.DomainToCertificates {
 		api.UpstreamCertificates[domainToCert.Domain] = domainToCert.Certificate
+	}
+}
+
+type PinnedPublicKey struct {
+	Domain string   `bson:"domain" json:"domain"`
+	List   []string `bson:"list" json:"list"`
+}
+
+type PinnedPublicKeys []PinnedPublicKey
+
+func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
+	domains := make([]string, len(publicKeys))
+
+	i := 0
+	for domain := range publicKeys {
+		domains[i] = domain
+		i++
+	}
+
+	sort.Slice(domains, func(i, j int) bool {
+		return domains[i] < domains[j]
+	})
+
+	i = 0
+	for _, domain := range domains {
+		ppk[i] = PinnedPublicKey{Domain: domain, List: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
+		i++
+	}
+}
+
+func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
+	for _, publicKey := range ppk {
+		publicKeys[publicKey.Domain] = strings.Join(publicKey.List, ",")
 	}
 }
