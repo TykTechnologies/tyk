@@ -10,6 +10,8 @@ import (
 )
 
 func TestRecoverLoop(t *testing.T) {
+	t.Parallel()
+
 	var onReconnectCounter int
 	var wg sync.WaitGroup
 	wg.Add(1)
