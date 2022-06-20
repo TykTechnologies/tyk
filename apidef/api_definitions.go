@@ -554,7 +554,7 @@ type APIDefinition struct {
 	// UpstreamCertificates stores the domain to certificate mapping for upstream mutualTLS
 	UpstreamCertificates map[string]string `bson:"upstream_certificates" json:"upstream_certificates"`
 	// UpstreamCertificatesDisabled disables upstream mutualTLS on the API
-	UpstreamCertificatesDisabled bool `bson:"upstream_mtls_disabled" json:"upstream_mtls_disabled"`
+	UpstreamCertificatesDisabled bool `bson:"upstream_certificates_disabled" json:"upstream_certificates_disabled"`
 
 	PinnedPublicKeys           map[string]string      `bson:"pinned_public_keys" json:"pinned_public_keys"`
 	EnableJWT                  bool                   `bson:"enable_jwt" json:"enable_jwt"`

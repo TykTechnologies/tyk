@@ -162,6 +162,9 @@ const Schema = `{
         "upstream_certificates": {
             "type": ["object", "null"]
         },
+		"upstream_certificates_disabled": {
+			"type": "boolean"
+		},
         "pinned_public_keys": {
             "type": ["object", "null"]
         },
@@ -181,7 +184,7 @@ const Schema = `{
             "type":["object", "null"]
         },
         "use_oauth2": {
-            "type": "boolean"
+            
         },
         "oauth_meta": {
             "type":["object", "null"]
