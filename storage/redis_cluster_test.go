@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var rc RedisController
+var rc *RedisController
 
 func init() {
 	conf := config.Default
 
-	rc = RedisController{ctx: context.Background()}
+	rc = NewRedisController(context.Background())
 	go rc.ConnectToRedis(context.Background(), nil, &conf)
 	for {
 		if rc.Connected() {
@@ -70,7 +70,7 @@ func TestHandleReceive(t *testing.T) {
 func TestRedisClusterGetMultiKey(t *testing.T) {
 
 	keys := []string{"first", "second"}
-	r := RedisCluster{KeyPrefix: "test-cluster", RedisController: &rc}
+	r := RedisCluster{KeyPrefix: "test-cluster", RedisController: rc}
 	for _, v := range keys {
 		r.DeleteKey(v)
 	}
@@ -151,7 +151,7 @@ func TestRedisAddressConfiguration(t *testing.T) {
 }
 
 func TestRedisExpirationTime(t *testing.T) {
-	storage := &RedisCluster{KeyPrefix: "test-", RedisController: &rc}
+	storage := &RedisCluster{KeyPrefix: "test-", RedisController: rc}
 
 	testKey := "test-key"
 	testValue := "test-value"
