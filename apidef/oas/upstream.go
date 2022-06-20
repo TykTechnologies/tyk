@@ -11,7 +11,7 @@ type Upstream struct {
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 	// Test contains the configuration related to uptime tests.
 	Test             *Test            `bson:"test,omitempty" json:"test,omitempty"`
-	Certificates     Certificates     `bson:"certificates,omitempty" json:"certificates,omitempty"`
+	MutualTLS        *MutualTLS       `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
 	PinnedPublicKeys PinnedPublicKeys `bson:"pinnedPublicKeys,omitempty" json:"pinnedPublicKeys,omitempty"`
 }
 
@@ -36,11 +36,13 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 		u.Test = nil
 	}
 
-	u.Certificates = make(Certificates, len(api.UpstreamCertificates))
-	u.Certificates.Fill(api.UpstreamCertificates)
+	if u.MutualTLS == nil {
+		u.MutualTLS = &MutualTLS{}
+	}
 
-	if len(u.Certificates) == 0 {
-		u.Certificates = nil
+	u.MutualTLS.Fill(api)
+	if ShouldOmit(u.MutualTLS) {
+		u.MutualTLS = nil
 	}
 
 	u.PinnedPublicKeys = make(PinnedPublicKeys, len(api.PinnedPublicKeys))
@@ -62,9 +64,11 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 		u.Test.ExtractTo(&api.UptimeTests)
 	}
 
-	if len(u.Certificates) > 0 {
-		api.UpstreamCertificates = make(map[string]string, len(u.Certificates))
-		u.Certificates.ExtractTo(api.UpstreamCertificates)
+	if u.MutualTLS != nil {
+		u.MutualTLS.ExtractTo(api)
+	} else {
+		api.UpstreamCertificatesDisabled = true
+		api.UpstreamCertificates = nil
 	}
 
 	if len(u.PinnedPublicKeys) > 0 {
@@ -189,5 +193,43 @@ func (t *Test) Fill(uptimeTests apidef.UptimeTests) {
 func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	if t.ServiceDiscovery != nil {
 		t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
+	}
+}
+
+type MutualTLS struct {
+	Enabled       bool           `bson:"enabled" json:"enabled"`
+	DomainToCerts []DomainToCert `bson:"domainToCertificateMapping" json:"domainToCertificateMapping"`
+}
+
+type DomainToCert struct {
+	Domain string `bson:"domain" json:"domain"`
+	Cert   string `bson:"certificate" json:"certificate"`
+}
+
+func (m *MutualTLS) Fill(api apidef.APIDefinition) {
+	m.Enabled = !api.UpstreamCertificatesDisabled
+
+	if len(api.UpstreamCertificates) == 0 {
+		return
+	}
+
+	m.DomainToCerts = make([]DomainToCert, len(api.UpstreamCertificates))
+
+	i := 0
+	for domain, cert := range api.UpstreamCertificates {
+		m.DomainToCerts[i] = DomainToCert{Domain: domain, Cert: cert}
+		i++
+	}
+}
+
+func (m *MutualTLS) ExtractTo(api *apidef.APIDefinition) {
+	api.UpstreamCertificatesDisabled = !m.Enabled
+
+	if len(m.DomainToCerts) > 0 {
+		api.UpstreamCertificates = make(map[string]string)
+	}
+
+	for _, domainToCert := range m.DomainToCerts {
+		api.UpstreamCertificates[domainToCert.Domain] = domainToCert.Cert
 	}
 }
