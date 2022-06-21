@@ -209,10 +209,6 @@ type DomainToCert struct {
 func (m *MutualTLS) Fill(api apidef.APIDefinition) {
 	m.Enabled = !api.UpstreamCertificatesDisabled
 
-	if len(api.UpstreamCertificates) == 0 {
-		return
-	}
-
 	m.DomainToCerts = make([]DomainToCert, len(api.UpstreamCertificates))
 
 	i := 0

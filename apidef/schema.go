@@ -184,7 +184,7 @@ const Schema = `{
             "type":["object", "null"]
         },
         "use_oauth2": {
-            
+            "type": "boolean"
         },
         "oauth_meta": {
             "type":["object", "null"]

@@ -44,7 +44,9 @@ func TestTest(t *testing.T) {
 }
 
 func TestUpstreamMutualTLS(t *testing.T) {
+	t.Parallel()
 	t.Run("extractTo api definition", func(t *testing.T) {
+		t.Parallel()
 		testcases := []struct {
 			title       string
 			input       MutualTLS
@@ -103,6 +105,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 		}
 	})
 	t.Run("fillFrom api definition", func(t *testing.T) {
+		t.Parallel()
 		testcases := []struct {
 			title         string
 			input         apidef.APIDefinition
