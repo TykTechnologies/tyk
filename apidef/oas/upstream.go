@@ -10,7 +10,8 @@ type Upstream struct {
 	// Old API Definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 	// Test contains the configuration related to uptime tests.
-	Test             *Test            `bson:"test,omitempty" json:"test,omitempty"`
+	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
+	// MutualTLS contains the configuration related to upstream mutual TLS.
 	MutualTLS        *MutualTLS       `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
 	PinnedPublicKeys PinnedPublicKeys `bson:"pinnedPublicKeys,omitempty" json:"pinnedPublicKeys,omitempty"`
 }
@@ -197,11 +198,15 @@ func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
 }
 
 type MutualTLS struct {
-	Enabled              bool           `bson:"enabled" json:"enabled"`
-	DomainToCertificates []DomainToCert `bson:"domainToCertificateMapping" json:"domainToCertificateMapping"`
+	// Enabled enables/disables upstream mutual TLS auth for the API.
+	// Old API Definition: `upstream_certificates_disabled`
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// DomainToCertificate maintains the mapping of domain to certificate.
+	// Old API Definition: `upstream_certificates`
+	DomainToCertificates []DomainToCertificate `bson:"domainToCertificateMapping" json:"domainToCertificateMapping"`
 }
 
-type DomainToCert struct {
+type DomainToCertificate struct {
 	Domain      string `bson:"domain" json:"domain"`
 	Certificate string `bson:"certificate" json:"certificate"`
 }
@@ -209,11 +214,11 @@ type DomainToCert struct {
 func (m *MutualTLS) Fill(api apidef.APIDefinition) {
 	m.Enabled = !api.UpstreamCertificatesDisabled
 
-	m.DomainToCertificates = make([]DomainToCert, len(api.UpstreamCertificates))
+	m.DomainToCertificates = make([]DomainToCertificate, len(api.UpstreamCertificates))
 
 	i := 0
 	for domain, cert := range api.UpstreamCertificates {
-		m.DomainToCertificates[i] = DomainToCert{Domain: domain, Certificate: cert}
+		m.DomainToCertificates[i] = DomainToCertificate{Domain: domain, Certificate: cert}
 		i++
 	}
 }

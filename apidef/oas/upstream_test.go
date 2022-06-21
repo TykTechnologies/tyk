@@ -61,7 +61,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 			},
 			{
 				"enabled=false, valid domain to cert mapping",
-				MutualTLS{Enabled: false, DomainToCertificates: []DomainToCert{
+				MutualTLS{Enabled: false, DomainToCertificates: []DomainToCertificate{
 					{Domain: "example.org", Certificate: "cert-1"},
 					{Domain: "example.com", Certificate: "cert-2"},
 				}},
@@ -75,7 +75,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 			},
 			{
 				"enabled=true, valid domain to cert mapping",
-				MutualTLS{Enabled: true, DomainToCertificates: []DomainToCert{
+				MutualTLS{Enabled: true, DomainToCertificates: []DomainToCertificate{
 					{Domain: "example.org", Certificate: "cert-1"},
 					{Domain: "example.com", Certificate: "cert-2"},
 				}},
@@ -134,7 +134,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 					}},
 				MutualTLS{
 					Enabled: true,
-					DomainToCertificates: []DomainToCert{
+					DomainToCertificates: []DomainToCertificate{
 						{
 							Domain:      "example.org",
 							Certificate: "cert-1",
@@ -155,7 +155,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 					}},
 				MutualTLS{
 					Enabled: false,
-					DomainToCertificates: []DomainToCert{
+					DomainToCertificates: []DomainToCertificate{
 						{
 							Domain:      "example.org",
 							Certificate: "cert-1",

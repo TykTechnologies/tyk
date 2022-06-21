@@ -83,13 +83,13 @@
           "type": "array",
           "items": [
             {
-              "$ref": "#/definitions/X-Tyk-DomainToCert"
+              "$ref": "#/definitions/X-Tyk-DomainToCertificate"
             }
           ]
         }
       }
     },
-    "X-Tyk-DomainToCert": {
+    "X-Tyk-DomainToCertificate": {
       "type": "object",
       "properties": {
         "domain": {
