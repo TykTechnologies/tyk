@@ -123,7 +123,7 @@ func TestPublicKeyPinning(t *testing.T) {
 			spec.Proxy.TargetURL = upstream.URL
 		})
 
-		ts.Run(t, test.TestCase{Code: 500})
+		_, _ = ts.Run(t, test.TestCase{Code: 500})
 	})
 
 	t.Run("Global setting", func(t *testing.T) {

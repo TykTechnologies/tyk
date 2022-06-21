@@ -16,7 +16,8 @@ type Upstream struct {
 	// Test contains the configuration related to uptime tests.
 	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
 	// MutualTLS contains the configuration related to upstream mutual TLS.
-	MutualTLS        *MutualTLS       `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
+	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
+	// CertificatePinning contains the configuration related to certificate pinning.
 	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
 }
 
@@ -278,7 +279,11 @@ func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
 }
 
 type CertificatePinning struct {
-	Enabled                   bool             `bson:"enabled" json:"enabled"`
+	// Enabled enables/disables certificate pinning for the API.
+	// Old API Definition: `certificate_pinning_disabled`
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// DomainToPublicKeysMapping maintains the mapping of domain to pinned public keys.
+	// Old API Definition: `pinned_public_keys`
 	DomainToPublicKeysMapping PinnedPublicKeys `bson:"domainToPublicKeysMapping" json:"domainToPublicKeysMapping"`
 }
 
