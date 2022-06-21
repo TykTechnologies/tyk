@@ -780,6 +780,14 @@ func TestUpstreamMutualTLS(t *testing.T) {
 			// Giving a different value to proxy host, it should not interfere upstream certificate matching
 			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost, Code: http.StatusOK, Client: test.NewClientLocal()})
 		})
+
+		t.Run("honor UpstreamCertificatesDisabled flag", func(t *testing.T) {
+			api.UpstreamCertificatesDisabled = true
+			ts.Gw.LoadAPI(api)
+
+			// Giving a different value to proxy host, it should not interfere upstream certificate matching
+			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost, Code: http.StatusInternalServerError, Client: test.NewClientLocal()})
+		})
 	})
 }
 

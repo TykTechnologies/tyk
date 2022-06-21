@@ -547,9 +547,14 @@ type APIDefinition struct {
 		BodyUserRegexp     string `bson:"body_user_regexp" json:"body_user_regexp"`
 		BodyPasswordRegexp string `bson:"body_password_regexp" json:"body_password_regexp"`
 	} `bson:"basic_auth" json:"basic_auth"`
-	UseMutualTLSAuth           bool                   `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
-	ClientCertificates         []string               `bson:"client_certificates" json:"client_certificates"`
-	UpstreamCertificates       map[string]string      `bson:"upstream_certificates" json:"upstream_certificates"`
+	UseMutualTLSAuth   bool     `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
+	ClientCertificates []string `bson:"client_certificates" json:"client_certificates"`
+
+	// UpstreamCertificates stores the domain to certificate mapping for upstream mutualTLS
+	UpstreamCertificates map[string]string `bson:"upstream_certificates" json:"upstream_certificates"`
+	// UpstreamCertificatesDisabled disables upstream mutualTLS on the API
+	UpstreamCertificatesDisabled bool `bson:"upstream_certificates_disabled" json:"upstream_certificates_disabled"`
+
 	PinnedPublicKeys           map[string]string      `bson:"pinned_public_keys" json:"pinned_public_keys"`
 	EnableJWT                  bool                   `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth            bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
