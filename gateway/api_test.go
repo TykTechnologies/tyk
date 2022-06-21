@@ -2158,6 +2158,7 @@ func TestOAS(t *testing.T) {
 
 				oldAPIInOAS.GetTykExtension().Info.Versioning = nil
 				oldAPIInOAS.GetTykExtension().Server.GatewayTags = nil
+				oldAPIInOAS.GetTykExtension().Upstream.MutualTLS = nil
 
 				oldAPIInOAS.Paths = make(openapi3.Paths)
 				updatePath := "/tyk/apis/oas/" + apiID
@@ -2719,6 +2720,7 @@ func TestOAS(t *testing.T) {
 				tykExt.Info.Versioning.Default = "default"
 				tykExt.Info.Versioning.Versions = []oas.VersionToID{}
 				tykExt.Server.GatewayTags = nil
+				tykExt.Upstream.MutualTLS = nil
 				apiInOAS.T.Info = &openapi3.Info{Title: "patched-oas-doc"}
 				apiInOAS.OpenAPI = "3.0.3"
 

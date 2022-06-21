@@ -71,7 +71,7 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 
 	certMaps := []map[string]string{gw.GetConfig().Security.Certificates.Upstream}
 
-	if spec != nil && spec.UpstreamCertificates != nil {
+	if spec != nil && !spec.UpstreamCertificatesDisabled && spec.UpstreamCertificates != nil {
 		certMaps = append(certMaps, spec.UpstreamCertificates)
 	}
 

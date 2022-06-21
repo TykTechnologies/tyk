@@ -127,27 +127,6 @@ func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
 	api.Tags = gt.Tags
 }
 
-type Certificate struct {
-	Domain string `bson:"domain" json:"domain"`
-	Cert   string `bson:"certificate" json:"certificate"`
-}
-
-type Certificates []Certificate
-
-func (c Certificates) Fill(upstreamCerts map[string]string) {
-	i := 0
-	for domain, cert := range upstreamCerts {
-		c[i] = Certificate{Domain: domain, Cert: cert}
-		i++
-	}
-}
-
-func (c Certificates) ExtractTo(upstreamCerts map[string]string) {
-	for _, cert := range c {
-		upstreamCerts[cert.Domain] = cert.Cert
-	}
-}
-
 type PinnedPublicKey struct {
 	Domain string   `bson:"domain" json:"domain"`
 	List   []string `bson:"list" json:"list"`
