@@ -54,16 +54,16 @@ func TestUpstreamMutualTLS(t *testing.T) {
 		}{
 			{
 				"enabled=false, domain to certs nil",
-				MutualTLS{Enabled: false, DomainToCerts: nil},
+				MutualTLS{Enabled: false, DomainToCertificates: nil},
 				apidef.APIDefinition{
 					UpstreamCertificatesDisabled: true,
 				},
 			},
 			{
 				"enabled=false, valid domain to cert mapping",
-				MutualTLS{Enabled: false, DomainToCerts: []DomainToCert{
-					{Domain: "example.org", Cert: "cert-1"},
-					{Domain: "example.com", Cert: "cert-2"},
+				MutualTLS{Enabled: false, DomainToCertificates: []DomainToCert{
+					{Domain: "example.org", Certificate: "cert-1"},
+					{Domain: "example.com", Certificate: "cert-2"},
 				}},
 				apidef.APIDefinition{
 					UpstreamCertificatesDisabled: true,
@@ -75,9 +75,9 @@ func TestUpstreamMutualTLS(t *testing.T) {
 			},
 			{
 				"enabled=true, valid domain to cert mapping",
-				MutualTLS{Enabled: true, DomainToCerts: []DomainToCert{
-					{Domain: "example.org", Cert: "cert-1"},
-					{Domain: "example.com", Cert: "cert-2"},
+				MutualTLS{Enabled: true, DomainToCertificates: []DomainToCert{
+					{Domain: "example.org", Certificate: "cert-1"},
+					{Domain: "example.com", Certificate: "cert-2"},
 				}},
 				apidef.APIDefinition{
 					UpstreamCertificatesDisabled: false,
@@ -89,7 +89,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 			},
 			{
 				"enabled=true, empty domain to cert mapping",
-				MutualTLS{Enabled: true, DomainToCerts: nil},
+				MutualTLS{Enabled: true, DomainToCertificates: nil},
 				apidef.APIDefinition{},
 			},
 		}
@@ -134,14 +134,14 @@ func TestUpstreamMutualTLS(t *testing.T) {
 					}},
 				MutualTLS{
 					Enabled: true,
-					DomainToCerts: []DomainToCert{
+					DomainToCertificates: []DomainToCert{
 						{
-							Domain: "example.org",
-							Cert:   "cert-1",
+							Domain:      "example.org",
+							Certificate: "cert-1",
 						},
 						{
-							Domain: "example.com",
-							Cert:   "cert-2",
+							Domain:      "example.com",
+							Certificate: "cert-2",
 						},
 					},
 				},
@@ -155,14 +155,14 @@ func TestUpstreamMutualTLS(t *testing.T) {
 					}},
 				MutualTLS{
 					Enabled: false,
-					DomainToCerts: []DomainToCert{
+					DomainToCertificates: []DomainToCert{
 						{
-							Domain: "example.org",
-							Cert:   "cert-1",
+							Domain:      "example.org",
+							Certificate: "cert-1",
 						},
 						{
-							Domain: "example.com",
-							Cert:   "cert-2",
+							Domain:      "example.com",
+							Certificate: "cert-2",
 						},
 					},
 				},
@@ -176,7 +176,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 				mutualTLS.Fill(tc.input)
 
 				assert.Equal(t, tc.expectedValue.Enabled, mutualTLS.Enabled)
-				assert.ElementsMatch(t, tc.expectedValue.DomainToCerts, mutualTLS.DomainToCerts)
+				assert.ElementsMatch(t, tc.expectedValue.DomainToCertificates, mutualTLS.DomainToCertificates)
 			})
 		}
 	})
