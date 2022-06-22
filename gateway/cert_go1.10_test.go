@@ -106,6 +106,26 @@ func TestPublicKeyPinning(t *testing.T) {
 		ts.Run(t, test.TestCase{Code: 500})
 	})
 
+	t.Run("pinning disabled", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			// For host using pinning, it should ignore standard verification in all cases, e.g setting variable below does nothing
+			globalConf.ProxySSLInsecureSkipVerify = false
+		})
+		defer ts.Close()
+
+		upstream, pubID, finish := newUpstreamSSL(t, ts.Gw, serverCert, handlerEmpty)
+		defer finish()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.CertificatePinningDisabled = true
+			spec.PinnedPublicKeys = map[string]string{"127.0.0.1": pubID}
+			spec.Proxy.TargetURL = upstream.URL
+		})
+
+		_, _ = ts.Run(t, test.TestCase{Code: 500})
+	})
+
 	t.Run("Global setting", func(t *testing.T) {
 		test.Flaky(t) // TODO: TT-5260
 

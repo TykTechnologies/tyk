@@ -555,7 +555,11 @@ type APIDefinition struct {
 	// UpstreamCertificatesDisabled disables upstream mutualTLS on the API
 	UpstreamCertificatesDisabled bool `bson:"upstream_certificates_disabled" json:"upstream_certificates_disabled"`
 
-	PinnedPublicKeys           map[string]string      `bson:"pinned_public_keys" json:"pinned_public_keys"`
+	// PinnedPublicKeys stores the public key pinning details
+	PinnedPublicKeys map[string]string `bson:"pinned_public_keys" json:"pinned_public_keys"`
+	// CertificatePinningDisabled disables public key pinning
+	CertificatePinningDisabled bool `bson:"certificate_pinning_disabled" json:"certificate_pinning_disabled"`
+
 	EnableJWT                  bool                   `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth            bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
 	UseGoPluginAuth            bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`

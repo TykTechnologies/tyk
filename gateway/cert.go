@@ -112,7 +112,8 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 }
 
 func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(gw.GetConfig().Security.PinnedPublicKeys) == 0 {
+	if (spec == nil || spec.CertificatePinningDisabled || len(spec.PinnedPublicKeys) == 0) &&
+		len(gw.GetConfig().Security.PinnedPublicKeys) == 0 {
 		return nil
 	}
 
@@ -189,7 +190,7 @@ func validateCommonName(host string, cert *x509.Certificate) error {
 func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
 	var checkPinnedKeys, checkCommonName bool
 	gwConfig := gw.GetConfig()
-	if (spec != nil && len(spec.PinnedPublicKeys) != 0) || len(gwConfig.Security.PinnedPublicKeys) != 0 {
+	if (spec != nil && !spec.CertificatePinningDisabled && len(spec.PinnedPublicKeys) != 0) || len(gwConfig.Security.PinnedPublicKeys) != 0 {
 		checkPinnedKeys = true
 	}
 
@@ -237,7 +238,7 @@ func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.C
 
 	pinMaps := []map[string]string{conf.Security.PinnedPublicKeys}
 
-	if spec != nil && spec.PinnedPublicKeys != nil {
+	if spec != nil && !spec.CertificatePinningDisabled && spec.PinnedPublicKeys != nil {
 		pinMaps = append(pinMaps, spec.PinnedPublicKeys)
 	}
 

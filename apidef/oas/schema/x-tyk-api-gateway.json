@@ -104,13 +104,29 @@
         "certificate"
       ]
     },
+    "X-Tyk-CertificatePinning": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "domainToPublicKeysMapping": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-PinnedPublicKeys"
+            }
+          ]
+        }
+      }
+    },
     "X-Tyk-PinnedPublicKeys": {
       "type": "object",
       "properties": {
         "domain": {
           "type": "string"
         },
-        "list": {
+        "publicKeys": {
           "type": "array",
           "items": [
             {
@@ -654,13 +670,8 @@
         "mutualTLS": {
           "$ref": "#/definitions/X-Tyk-MutualTLS"
         },
-        "pinnedPublicKeys": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-PinnedPublicKeys"
-            }
-          ]
+        "certificatePinning": {
+          "$ref": "#/definitions/X-Tyk-CertificatePinning"
         }
       },
       "required": [

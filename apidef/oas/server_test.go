@@ -124,21 +124,6 @@ func TestClientCertificates(t *testing.T) {
 	assert.Equal(t, emptyClientCertificates, resultClientCertificates)
 }
 
-func TestPinnedPublicKeys(t *testing.T) {
-	t.Parallel()
-
-	var pinnedPublicKeys PinnedPublicKeys
-	Fill(t, &pinnedPublicKeys, 0)
-
-	convertedPinnedPublicKeys := make(map[string]string)
-	pinnedPublicKeys.ExtractTo(convertedPinnedPublicKeys)
-
-	resultPinnedPublicKeys := make(PinnedPublicKeys, len(pinnedPublicKeys))
-	resultPinnedPublicKeys.Fill(convertedPinnedPublicKeys)
-
-	assert.Equal(t, pinnedPublicKeys, resultPinnedPublicKeys)
-}
-
 func TestCustomDomain(t *testing.T) {
 	t.Run("extractTo api definition", func(t *testing.T) {
 		testcases := []struct {
