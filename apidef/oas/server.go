@@ -1,9 +1,6 @@
 package oas
 
 import (
-	"sort"
-	"strings"
-
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -125,39 +122,6 @@ func (gt *GatewayTags) Fill(api apidef.APIDefinition) {
 func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
 	api.TagsDisabled = !gt.Enabled
 	api.Tags = gt.Tags
-}
-
-type PinnedPublicKey struct {
-	Domain string   `bson:"domain" json:"domain"`
-	List   []string `bson:"list" json:"list"`
-}
-
-type PinnedPublicKeys []PinnedPublicKey
-
-func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
-	domains := make([]string, len(publicKeys))
-
-	i := 0
-	for domain := range publicKeys {
-		domains[i] = domain
-		i++
-	}
-
-	sort.Slice(domains, func(i, j int) bool {
-		return domains[i] < domains[j]
-	})
-
-	i = 0
-	for _, domain := range domains {
-		ppk[i] = PinnedPublicKey{Domain: domain, List: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
-		i++
-	}
-}
-
-func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
-	for _, publicKey := range ppk {
-		publicKeys[publicKey.Domain] = strings.Join(publicKey.List, ",")
-	}
 }
 
 type Domain struct {

@@ -168,6 +168,9 @@ const Schema = `{
         "pinned_public_keys": {
             "type": ["object", "null"]
         },
+		"certificate_pinning_disabled": {
+			"type": "boolean"
+		},
         "allowed_ips": {
             "type": ["array", "null"]
         },

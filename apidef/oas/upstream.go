@@ -1,6 +1,10 @@
 package oas
 
-import "github.com/TykTechnologies/tyk/apidef"
+import (
+	"github.com/TykTechnologies/tyk/apidef"
+	"sort"
+	"strings"
+)
 
 type Upstream struct {
 	// URL defines the target URL that the request should be proxied to.
@@ -12,8 +16,9 @@ type Upstream struct {
 	// Test contains the configuration related to uptime tests.
 	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
 	// MutualTLS contains the configuration related to upstream mutual TLS.
-	MutualTLS        *MutualTLS       `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
-	PinnedPublicKeys PinnedPublicKeys `bson:"pinnedPublicKeys,omitempty" json:"pinnedPublicKeys,omitempty"`
+	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
+	// CertificatePinning contains the configuration related to certificate pinning.
+	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
 }
 
 func (u *Upstream) Fill(api apidef.APIDefinition) {
@@ -46,11 +51,13 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 		u.MutualTLS = nil
 	}
 
-	u.PinnedPublicKeys = make(PinnedPublicKeys, len(api.PinnedPublicKeys))
-	u.PinnedPublicKeys.Fill(api.PinnedPublicKeys)
+	if u.CertificatePinning == nil {
+		u.CertificatePinning = &CertificatePinning{}
+	}
 
-	if len(u.PinnedPublicKeys) == 0 {
-		u.PinnedPublicKeys = nil
+	u.CertificatePinning.Fill(api)
+	if ShouldOmit(u.CertificatePinning) {
+		u.CertificatePinning = nil
 	}
 }
 
@@ -72,9 +79,11 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 		api.UpstreamCertificates = nil
 	}
 
-	if len(u.PinnedPublicKeys) > 0 {
-		api.PinnedPublicKeys = make(map[string]string, len(u.PinnedPublicKeys))
-		u.PinnedPublicKeys.ExtractTo(api.PinnedPublicKeys)
+	if u.CertificatePinning != nil {
+		u.CertificatePinning.ExtractTo(api)
+	} else {
+		api.CertificatePinningDisabled = true
+		api.PinnedPublicKeys = nil
 	}
 }
 
@@ -232,5 +241,70 @@ func (m *MutualTLS) ExtractTo(api *apidef.APIDefinition) {
 
 	for _, domainToCert := range m.DomainToCertificates {
 		api.UpstreamCertificates[domainToCert.Domain] = domainToCert.Certificate
+	}
+}
+
+type PinnedPublicKey struct {
+	Domain     string   `bson:"domain" json:"domain"`
+	PublicKeys []string `bson:"publicKeys" json:"publicKeys"`
+}
+
+type PinnedPublicKeys []PinnedPublicKey
+
+func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
+	domains := make([]string, len(publicKeys))
+
+	i := 0
+	for domain := range publicKeys {
+		domains[i] = domain
+		i++
+	}
+
+	sort.Slice(domains, func(i, j int) bool {
+		return domains[i] < domains[j]
+	})
+
+	i = 0
+	for _, domain := range domains {
+		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
+		i++
+	}
+}
+
+func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
+	for _, publicKey := range ppk {
+		publicKeys[publicKey.Domain] = strings.Join(publicKey.PublicKeys, ",")
+	}
+}
+
+type CertificatePinning struct {
+	// Enabled enables/disables certificate pinning for the API.
+	// Old API Definition: `certificate_pinning_disabled`
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// DomainToPublicKeysMapping maintains the mapping of domain to pinned public keys.
+	// Old API Definition: `pinned_public_keys`
+	DomainToPublicKeysMapping PinnedPublicKeys `bson:"domainToPublicKeysMapping" json:"domainToPublicKeysMapping"`
+}
+
+func (cp *CertificatePinning) Fill(api apidef.APIDefinition) {
+	cp.Enabled = !api.CertificatePinningDisabled
+
+	if cp.DomainToPublicKeysMapping == nil {
+		cp.DomainToPublicKeysMapping = make(PinnedPublicKeys, len(api.PinnedPublicKeys))
+	}
+
+	cp.DomainToPublicKeysMapping.Fill(api.PinnedPublicKeys)
+
+	if ShouldOmit(cp.DomainToPublicKeysMapping) {
+		cp.DomainToPublicKeysMapping = nil
+	}
+}
+
+func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
+	api.CertificatePinningDisabled = !cp.Enabled
+
+	if len(cp.DomainToPublicKeysMapping) > 0 {
+		api.PinnedPublicKeys = make(map[string]string)
+		cp.DomainToPublicKeysMapping.ExtractTo(api.PinnedPublicKeys)
 	}
 }
