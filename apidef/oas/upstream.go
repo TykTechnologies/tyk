@@ -59,7 +59,6 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(u.CertificatePinning) {
 		u.CertificatePinning = nil
 	}
-
 }
 
 func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
@@ -290,15 +289,15 @@ type CertificatePinning struct {
 func (cp *CertificatePinning) Fill(api apidef.APIDefinition) {
 	cp.Enabled = !api.CertificatePinningDisabled
 
-	if len(api.PinnedPublicKeys) == 0 {
-		return
-	}
-
 	if cp.DomainToPublicKeysMapping == nil {
 		cp.DomainToPublicKeysMapping = make(PinnedPublicKeys, len(api.PinnedPublicKeys))
 	}
 
 	cp.DomainToPublicKeysMapping.Fill(api.PinnedPublicKeys)
+
+	if ShouldOmit(cp.DomainToPublicKeysMapping) {
+		cp.DomainToPublicKeysMapping = nil
+	}
 }
 
 func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {

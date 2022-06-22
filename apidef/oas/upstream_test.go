@@ -182,6 +182,21 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	})
 }
 
+func TestPinnedPublicKeys(t *testing.T) {
+	t.Parallel()
+
+	var pinnedPublicKeys PinnedPublicKeys
+	Fill(t, &pinnedPublicKeys, 0)
+
+	convertedPinnedPublicKeys := make(map[string]string)
+	pinnedPublicKeys.ExtractTo(convertedPinnedPublicKeys)
+
+	resultPinnedPublicKeys := make(PinnedPublicKeys, len(pinnedPublicKeys))
+	resultPinnedPublicKeys.Fill(convertedPinnedPublicKeys)
+
+	assert.Equal(t, pinnedPublicKeys, resultPinnedPublicKeys)
+}
+
 func TestCertificatePinning(t *testing.T) {
 	t.Run("extractTo api definition", func(t *testing.T) {
 		testcases := []struct {
@@ -327,5 +342,17 @@ func TestCertificatePinning(t *testing.T) {
 				assert.ElementsMatch(t, tc.expectedValue.DomainToPublicKeysMapping, certificatePinning.DomainToPublicKeysMapping)
 			})
 		}
+	})
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var emptyCertificatePinnning CertificatePinning
+
+		var convertedAPI apidef.APIDefinition
+		emptyCertificatePinnning.ExtractTo(&convertedAPI)
+
+		var resultCertificatePinning CertificatePinning
+		resultCertificatePinning.Fill(convertedAPI)
+
+		assert.Equal(t, emptyCertificatePinnning, resultCertificatePinning)
 	})
 }
