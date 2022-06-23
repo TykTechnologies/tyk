@@ -154,6 +154,8 @@ func TestBasicAuthHashKeyFunc(t *testing.T) {
 		{"invalid", "murmur32"},
 	}
 
+	logger := log.WithField("test", "TestBasicAuthHashKeyFunc")
+
 	for idx, hashKeyFunc := range testcases {
 		t.Run(fmt.Sprintf("test case %d", idx), func(t *testing.T) {
 			globalConf.BasicAuthHashKeyFunction = hashKeyFunc.in
@@ -164,8 +166,18 @@ func TestBasicAuthHashKeyFunc(t *testing.T) {
 
 			assert.Equal(t, hashKeyFunc.out, string(session.BasicAuthData.Hash))
 			assert.NotEmpty(t, session.BasicAuthData.Password)
+
+			ts.Gw.apisMu.Lock()
+			assert.Len(t, ts.Gw.apiSpecs, 1)
+			k := &BasicAuthKeyIsValid{}
+			k.Spec = ts.Gw.apiSpecs[0]
+			ts.Gw.apisMu.Unlock()
+
+			err := k.checkPassword(session, "password", logger)
+			assert.NoError(t, err)
 		})
 	}
+
 }
 
 func TestBasicAuthCachedUserCollision(t *testing.T) {
