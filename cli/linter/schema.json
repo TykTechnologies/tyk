@@ -448,6 +448,7 @@
         "type": "string",
         "enum": [
           "",
+          "bcrypt",
           "murmur32",
           "murmur64",
           "murmur128",
@@ -459,6 +460,7 @@
       "type": "string",
       "enum": [
         "",
+        "bcrypt",
         "murmur32",
         "murmur64",
         "murmur128",
