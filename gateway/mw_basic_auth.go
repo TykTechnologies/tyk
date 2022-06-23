@@ -211,7 +211,13 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return k.handleAuthFail(w, r, token)
 		}
 	default:
-		return k.handleAuthFail(w, r, token)
+		// Checks all other storage algos implemented
+		basicAuthHashAlgo := storage.HashAlgo(string(session.BasicAuthData.Hash))
+		hashedPassword := storage.HashStr(password, basicAuthHashAlgo)
+		if session.BasicAuthData.Password != hashedPassword {
+			logger.Warn("Attempted access with existing user, failed password check.")
+			return k.handleAuthFail(w, r, token)
+		}
 	}
 
 	// Set session state on context, we will need it later
