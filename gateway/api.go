@@ -350,9 +350,6 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 
 //
 func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
-
-	log.Info("hello world!")
-
 	// Set default basic auth hash to bcrypt
 	// If specified, set it to config.
 	basicAuthHashAlgo := "bcrypt"
@@ -360,11 +357,8 @@ func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
 		basicAuthHashAlgo = gw.GetConfig().BasicAuthHashKeyFunction
 	}
 
-	var hashedPass string
-
 	// Bcrypt Hashing
 	if basicAuthHashAlgo == string(user.HashBCrypt) {
-
 		session.BasicAuthData.Hash = user.HashBCrypt
 		hashedPassBytes, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
 		if err != nil {
@@ -373,14 +367,14 @@ func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
 			return
 		}
 
-		hashedPass = string(hashedPassBytes)
-
-	} else { // Standard Hashing Algos
-		hashedPass = storage.HashStr(session.BasicAuthData.Password, basicAuthHashAlgo)
-		session.BasicAuthData.Hash = user.HashType(basicAuthHashAlgo)
+		session.BasicAuthData.Password = string(hashedPassBytes)
+		return
 	}
 
-	session.BasicAuthData.Password = hashedPass
+	basicAuthHashAlgo = storage.HashAlgo(basicAuthHashAlgo)
+
+	session.BasicAuthData.Password = storage.HashStr(session.BasicAuthData.Password, basicAuthHashAlgo)
+	session.BasicAuthData.Hash = user.HashType(basicAuthHashAlgo)
 }
 
 func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {

@@ -211,7 +211,6 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return k.handleAuthFail(w, r, token)
 		}
 	default:
-		// Todo: Implement the other hash algos here.
 		return k.handleAuthFail(w, r, token)
 	}
 
