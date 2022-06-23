@@ -49,6 +49,39 @@ func TestOAS(t *testing.T) {
 		assert.Equal(t, nilOASPaths, resultOAS)
 	})
 
+	t.Run("extract paths", func(t *testing.T) {
+		const operationID = "userGET"
+		t.Parallel()
+
+		var oasWithPaths OAS
+		oasWithPaths.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: Operations{
+					operationID: {
+						Allow: &Allowance{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+		oasWithPaths.Paths = openapi3.Paths{
+			"/user": {
+				Get: &openapi3.Operation{
+					OperationID: operationID,
+				},
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		oasWithPaths.ExtractTo(&convertedAPI)
+
+		var resultOAS OAS
+		resultOAS.Fill(convertedAPI)
+
+		assert.Equal(t, oasWithPaths, resultOAS)
+	})
+
 	t.Run("auth configs", func(t *testing.T) {
 		t.Parallel()
 
