@@ -226,14 +226,20 @@ func (k *BasicAuthKeyIsValid) checkPassword(session *user.SessionState, plainPas
 			return errUnauthorized
 		}
 	default:
-		// Checks all other storage algos implemented
-		basicAuthHashAlgo := storage.HashAlgo(string(session.BasicAuthData.Hash))
+		// Verify we have a valid Hash value
+		hashAlgo := string(session.BasicAuthData.Hash)
+		basicAuthHashAlgo := storage.HashAlgo(hashAlgo)
+		if basicAuthHashAlgo != hashAlgo {
+			return errUnauthorized
+		}
+
+		// Checks the storage algo picked
 		hashedPassword := storage.HashStr(plainPassword, basicAuthHashAlgo)
 		if session.BasicAuthData.Password != hashedPassword {
 			return errUnauthorized
 		}
 	}
-	return errUnauthorized
+	return nil
 }
 
 func (k *BasicAuthKeyIsValid) handleAuthFail(w http.ResponseWriter, r *http.Request, token string) (error, int) {
