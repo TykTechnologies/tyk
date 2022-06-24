@@ -241,7 +241,7 @@ func TestGatewayTagsFilter(t *testing.T) {
 		newApiWithTags(true, []string{"a"}),
 	})
 
-	assert.Len(t, data.all(), 5)
+	assert.Len(t, data.Message, 5)
 
 	// Test NodeIsSegmented=true
 	{
