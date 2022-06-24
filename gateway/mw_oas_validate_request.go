@@ -69,7 +69,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		Route:      route,
 	}
 
-	err = openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
+	err = openapi3filter.ValidateRequestBody(r.Context(), requestValidationInput, route.Operation.RequestBody.Value)
 	if err != nil {
 		return fmt.Errorf("request validation error: %v", err), http.StatusBadRequest
 	}
