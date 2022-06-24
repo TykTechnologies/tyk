@@ -1,9 +1,10 @@
 package oas
 
 import (
-	"github.com/TykTechnologies/tyk/apidef"
 	"sort"
 	"strings"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type Upstream struct {

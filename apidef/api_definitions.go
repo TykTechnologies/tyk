@@ -335,6 +335,14 @@ type ValidatePathMeta struct {
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
 }
 
+type ValidateRequestMeta struct {
+	Enabled bool   `bson:"enabled" json:"enabled"`
+	Path    string `bson:"path" json:"path"`
+	Method  string `bson:"method" json:"method"`
+	// Allows override of default 422 Unprocessible Entity response code for validation errors.
+	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
+}
+
 type GoPluginMeta struct {
 	Path       string `bson:"path" json:"path"`
 	Method     string `bson:"method" json:"method"`
@@ -364,6 +372,7 @@ type ExtendedPathsSet struct {
 	TrackEndpoints          []TrackEndpointMeta   `bson:"track_endpoints" json:"track_endpoints,omitempty"`
 	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
 	ValidateJSON            []ValidatePathMeta    `bson:"validate_json" json:"validate_json,omitempty"`
+	ValidateRequest         []ValidateRequestMeta `bson:"validate_request" json:"validate_request,omitempty"`
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
 }
