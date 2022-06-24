@@ -471,7 +471,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	var filter []*APISpec
 	for _, v := range s {
 		if err := v.Validate(); err != nil {
-			mainLog.Infof("Skipping loading spec:%q because it failed validation with error:%v", v.Name, err)
+			mainLog.Errorf("Skipping loading spec:%q because it failed validation with error:%v", v.Name, err)
 			continue
 		}
 		filter = append(filter, v)
