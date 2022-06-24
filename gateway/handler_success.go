@@ -278,9 +278,8 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 		return true
 	}
 
-	session := ctxGetSession(r)
-	if session != nil {
-		if session.EnableDetailedRecording || session.EnableDetailRecording {
+	if session := ctxGetSession(r); session != nil {
+		if session.EnableDetailedRecording || session.EnableDetailRecording { // nolint:staticcheck // Deprecated DetailRecording
 			return true
 		}
 	}
@@ -291,9 +290,9 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 	}
 
 	// We are, so get session data
-	sess, ok := r.Context().Value(ctx.OrgSessionContext).(*user.SessionState)
-	if ok && sess != nil {
-		return sess.EnableDetailRecording || sess.EnableDetailedRecording
+	session, ok := r.Context().Value(ctx.OrgSessionContext).(*user.SessionState)
+	if ok && session != nil {
+		return session.EnableDetailedRecording || session.EnableDetailRecording // nolint:staticcheck // Deprecated DetailRecording
 	}
 
 	// no session found, use global config
