@@ -390,17 +390,18 @@ type fromDashboardServiceResponse struct {
 
 type nestedApiDefinition struct {
 	ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
+	OAS           *oas.OAS              `json:"oas"`
 }
 
 func (f *fromDashboardServiceResponse) set(defs []*apidef.APIDefinition) {
 	for _, def := range defs {
-		f.Message = append(f.Message, nestedApiDefinition{def})
+		f.Message = append(f.Message, nestedApiDefinition{ApiDefinition: def})
 	}
 }
 
-func (f *fromDashboardServiceResponse) filter(enabled bool, tags ...string) []*apidef.APIDefinition {
+func (f *fromDashboardServiceResponse) filter(enabled bool, tags ...string) []nestedApiDefinition {
 	if !enabled {
-		return f.all()
+		return f.Message
 	}
 
 	if len(tags) == 0 {
@@ -412,25 +413,17 @@ func (f *fromDashboardServiceResponse) filter(enabled bool, tags ...string) []*a
 		tagMap[tag] = true
 	}
 
-	result := make([]*apidef.APIDefinition, 0, len(f.Message))
+	result := make([]nestedApiDefinition, 0, len(f.Message))
 	for _, v := range f.Message {
 		if v.ApiDefinition.TagsDisabled {
 			continue
 		}
 		for _, tag := range v.ApiDefinition.Tags {
 			if ok := tagMap[tag]; ok {
-				result = append(result, v.ApiDefinition)
+				result = append(result, nestedApiDefinition{v.ApiDefinition, v.OAS})
 				break
 			}
 		}
-	}
-	return result
-}
-
-func (f *fromDashboardServiceResponse) all() []*apidef.APIDefinition {
-	result := make([]*apidef.APIDefinition, 0, len(f.Message))
-	for _, v := range f.Message {
-		result = append(result, v.ApiDefinition)
 	}
 	return result
 }
@@ -486,7 +479,17 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	// Process
 	var specs []*APISpec
 	for _, def := range apiDefs {
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(def.ApiDefinition, nil)
+
+		if spec.IsOAS {
+			loader := openapi3.NewLoader()
+			if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
+				log.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.ApiDefinition.APIID)
+			}
+
+			spec.OAS = *def.OAS
+		}
+
 		specs = append(specs, spec)
 	}
 
