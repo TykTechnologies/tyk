@@ -21,8 +21,6 @@ import (
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
-	_ "gorm.io/gorm"
-	_ "gorm.io/gorm/schema"
 
 	"github.com/TykTechnologies/gojsonschema"
 
