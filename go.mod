@@ -81,7 +81,6 @@ require (
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
-	gorm.io/gorm v1.21.11
 	gotest.tools v2.2.0+incompatible // indirect
 	rsc.io/letsencrypt v0.0.2
 )
