@@ -269,7 +269,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 }
 
 func recordDetail(r *http.Request, spec *APISpec) bool {
-
 	// when streaming in grpc, we do not record the request
 	if IsGrpcStreaming(r) {
 		return false
@@ -280,7 +279,6 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 	}
 
 	session := ctxGetSession(r)
-
 	if session != nil {
 		if session.EnableDetailedRecording || session.EnableDetailRecording {
 			return true
@@ -293,16 +291,13 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 	}
 
 	// We are, so get session data
-	ses := r.Context().Value(ctx.OrgSessionContext)
-
-	if ses == nil {
-		// no session found, use global config
-		return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
+	sess, ok := r.Context().Value(ctx.OrgSessionContext).(*user.SessionState)
+	if ok && sess != nil {
+		return sess.EnableDetailRecording || sess.EnableDetailedRecording
 	}
 
-	// Session found
-	sess := ses.(*user.SessionState)
-	return sess.EnableDetailRecording || sess.EnableDetailedRecording
+	// no session found, use global config
+	return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
 }
 
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
