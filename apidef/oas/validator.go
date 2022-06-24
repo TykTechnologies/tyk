@@ -1,6 +1,6 @@
 package oas
 
-//go:generate go-bindata -pkg schema -nomemcopy -nometadata -ignore=(schema\/schema.gen.go|schema\/README.md|schema\/x-tyk-doc.json) -prefix "./schema" -o schema/schema.gen.go schema/...
+//go:generate go-bindata -pkg schema -nomemcopy -nometadata -ignore=(schema\/schema.gen.go|schema\/README.md|schema\/x-tyk-gateway.md) -prefix "./schema" -o schema/schema.gen.go schema/...
 //go:generate gofmt -w -s schema/schema.gen.go
 
 import (
