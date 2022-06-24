@@ -44,18 +44,16 @@ func TestRecordDetail(t *testing.T) {
 		expect  bool
 	}{
 		{
-			title:   "empty session",
-			spec:    testAPISpec(nil),
-			binding: nil,
-			expect:  false,
+			title:  "empty session",
+			spec:   testAPISpec(nil),
+			expect: false,
 		},
 		{
 			title: "empty session, enabled analytics",
 			spec: testAPISpec(func(spec *APISpec) {
 				spec.EnableDetailedRecording = true
 			}),
-			binding: nil,
-			expect:  true,
+			expect: true,
 		},
 		{
 			title: "empty session, enabled config",
@@ -63,8 +61,7 @@ func TestRecordDetail(t *testing.T) {
 				spec.GlobalConfig.EnforceOrgDataDetailLogging = false
 				spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording = true
 			}),
-			binding: nil,
-			expect:  true,
+			expect: true,
 		},
 		{
 			title: "normal session",
@@ -77,6 +74,13 @@ func TestRecordDetail(t *testing.T) {
 				return context.WithValue(ctx, ctxpkg.SessionData, session)
 			},
 			expect: true,
+		},
+		{
+			title: "org empty session",
+			spec: testAPISpec(func(spec *APISpec) {
+				spec.GlobalConfig.EnforceOrgDataDetailLogging = true
+			}),
+			expect: false,
 		},
 		{
 			title: "org session",
