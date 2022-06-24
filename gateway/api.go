@@ -43,6 +43,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -2809,6 +2811,11 @@ func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		if err = oasObj.Validate(r.Context()); err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
 		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
 		next.ServeHTTP(w, r)
 	}
@@ -3201,10 +3208,13 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 		return nil, nil, ErrRequestMalformed
 	}
 
-	err = oasObj.UnmarshalJSON(reqBodyInBytes)
+	loader := openapi3.NewLoader()
+	t, err := loader.LoadFromData(reqBodyInBytes)
 	if err != nil {
 		return nil, nil, ErrRequestMalformed
 	}
+
+	oasObj.T = *t
 
 	return reqBodyInBytes, &oasObj, nil
 }
