@@ -1,8 +1,6 @@
 package oas
 
 import (
-	"encoding/json"
-	"net/http"
 	"strings"
 	"testing"
 
@@ -203,95 +201,6 @@ func TestOAS_RegexPaths(t *testing.T) {
 	}
 }
 
-func schemaAsMap(schema string) (schemaMap map[string]interface{}) {
-	_ = json.Unmarshal([]byte(schema), &schemaMap)
-	return
-}
-
 func TestValidateRequest(t *testing.T) {
-	const (
-		contentType = "application/json"
-		operationID = "getGET"
-	)
 
-	const personSchema = `
-	{
-		"properties": {
-			"name": {
-				"type": "string"
-			}
-		}
-	}`
-
-	metas := []apidef.ValidatePathMeta{
-		{
-			Disabled: false,
-			Path:     "/get",
-			Method:   http.MethodGet,
-			Schema:   schemaAsMap(personSchema),
-		},
-	}
-
-	t.Run("ref", func(t *testing.T) {
-		reqBodyString := `{
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Person"
-              }
-            }
-          }
-        }`
-
-		reqBody := openapi3.NewRequestBody()
-		_ = reqBody.UnmarshalJSON([]byte(reqBodyString))
-
-		getOperation := openapi3.NewOperation()
-		getOperation.OperationID = operationID
-		getOperation.RequestBody = &openapi3.RequestBodyRef{
-			Value: reqBody,
-		}
-
-		paths := make(openapi3.Paths)
-		paths["/get"] = &openapi3.PathItem{
-			Get: getOperation,
-		}
-
-		var s OAS
-		s.Paths = paths
-
-		s.SetTykExtension(&XTykAPIGateway{Middleware: &Middleware{}})
-
-		s.fillValidateRequest(metas)
-
-		resOperationSchema := s.Paths["/get"].Get.RequestBody.Value.Content[contentType].Schema
-		assert.Equal(t, "#/components/schemas/Person", resOperationSchema.Ref)
-		assert.Nil(t, resOperationSchema.Value)
-
-		expectedComponentsSchemas := make(openapi3.Schemas)
-		oasSchema := openapi3.NewSchema()
-		_ = oasSchema.UnmarshalJSON([]byte(personSchema))
-		expectedComponentsSchemas["Person"] = openapi3.NewSchemaRef("", oasSchema)
-		assert.Equal(t, expectedComponentsSchemas, s.Components.Schemas)
-
-		var ep apidef.ExtendedPathsSet
-		s.getTykOperations()[operationID].extractValidateRequestTo(&ep, "/get", http.MethodGet,
-			s.Paths["/get"].GetOperation(http.MethodGet), &s.Components)
-
-		assert.Equal(t, metas, ep.ValidateJSON)
-	})
-
-	t.Run("value", func(t *testing.T) {
-		var s OAS
-		s.Paths = make(map[string]*openapi3.PathItem)
-		s.SetTykExtension(&XTykAPIGateway{Middleware: &Middleware{}})
-
-		s.fillValidateRequest(metas)
-
-		var ep apidef.ExtendedPathsSet
-		s.getTykOperations()[operationID].extractValidateRequestTo(&ep, "/get", http.MethodGet,
-			s.Paths["/get"].GetOperation(http.MethodGet), &s.Components)
-
-		assert.Equal(t, metas, ep.ValidateJSON)
-	})
 }
