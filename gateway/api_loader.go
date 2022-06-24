@@ -430,6 +430,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &ValidateRequest{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
 	gw.mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 	gw.mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})

@@ -18,6 +18,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/cenk/backoff"
@@ -76,6 +78,7 @@ const (
 	RequestTracked
 	RequestNotTracked
 	ValidateJSONRequest
+	ValidateRequestWithOAS
 	Internal
 	GoPlugin
 )
@@ -110,6 +113,7 @@ const (
 	StatusRequestTracked           RequestStatus = "Request Tracked"
 	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
 	StatusValidateJSON             RequestStatus = "Validate JSON"
+	StatusValidateRequest          RequestStatus = "Validate Request"
 	StatusInternal                 RequestStatus = "Internal path"
 	StatusGoPlugin                 RequestStatus = "Go plugin"
 )
@@ -141,6 +145,7 @@ type URLSpec struct {
 	TrackEndpoint             apidef.TrackEndpointMeta
 	DoNotTrackEndpoint        apidef.TrackEndpointMeta
 	ValidatePathMeta          apidef.ValidatePathMeta
+	ValidateRequest           apidef.ValidateRequestMeta
 	Internal                  apidef.InternalMeta
 	GoPluginMeta              GoPluginMiddleware
 
@@ -234,6 +239,13 @@ func (s *APISpec) Release() {
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
 func (s *APISpec) Validate() error {
+	if s.IsOAS {
+		err := s.OAS.Validate(context.Background())
+		if err != nil {
+			return err
+		}
+	}
+
 	// For tcp services we need to make sure we can bind to the port.
 	switch s.Protocol {
 	case "tcp", "tls":
@@ -594,9 +606,10 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 		_, _ = f.Seek(0, io.SeekStart)
 		_ = f.Close()
 
-		f, err = os.Open(a.GetOASFilepath(path))
+		loader := openapi3.NewLoader()
+		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(path))
 		if err == nil {
-			spec.OAS = a.ParseOAS(f)
+			spec.OAS.T = *oasDoc
 			_ = f.Close()
 		}
 
@@ -1052,6 +1065,25 @@ func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.Val
 	return urlSpec
 }
 
+func (a APIDefinitionLoader) compileValidateRequestSpec(paths []apidef.ValidateRequestMeta, stat URLStatus, conf config.Config) []URLSpec {
+	var urlSpec []URLSpec
+
+	for _, stringSpec := range paths {
+		if !stringSpec.Enabled {
+			continue
+		}
+
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
+		// Extend with method actions
+
+		newSpec.ValidateRequest = stringSpec
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
 func (a APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := []URLSpec{}
 
@@ -1103,6 +1135,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	trackedPaths := a.compileTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked, conf)
 	unTrackedPaths := a.compileUnTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked, conf)
 	validateJSON := a.compileValidateJSONPathspathSpec(apiVersionDef.ExtendedPaths.ValidateJSON, ValidateJSONRequest, conf)
+	validateRequest := a.compileValidateRequestSpec(apiVersionDef.ExtendedPaths.ValidateRequest, ValidateRequestWithOAS, conf)
 	internalPaths := a.compileInternalPathspathSpec(apiVersionDef.ExtendedPaths.Internal, Internal, conf)
 	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
 
@@ -1128,6 +1161,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, trackedPaths...)
 	combinedPath = append(combinedPath, unTrackedPaths...)
 	combinedPath = append(combinedPath, validateJSON...)
+	combinedPath = append(combinedPath, validateRequest...)
 	combinedPath = append(combinedPath, internalPaths...)
 
 	return combinedPath, len(whiteListPaths) > 0
@@ -1183,6 +1217,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusRequestNotTracked
 	case ValidateJSONRequest:
 		return StatusValidateJSON
+	case ValidateRequestWithOAS:
+		return StatusValidateRequest
 	case Internal:
 		return StatusInternal
 	case GoPlugin:
@@ -1400,6 +1436,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		case ValidateJSONRequest:
 			if method == rxPaths[i].ValidatePathMeta.Method {
 				return true, &rxPaths[i].ValidatePathMeta
+			}
+		case ValidateRequestWithOAS:
+			if method == rxPaths[i].ValidateRequest.Method {
+				return true, &rxPaths[i].ValidateRequest
 			}
 		case Internal:
 			if method == rxPaths[i].Internal.Method {

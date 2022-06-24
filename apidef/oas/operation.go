@@ -1,7 +1,6 @@
 package oas
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -76,7 +75,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTransformRequestMethod(ep.MethodTransforms)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
-	s.fillValidateRequest(ep.ValidateJSON)
+	s.fillOASValidateRequest(ep.ValidateRequest)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -96,7 +95,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTransformRequestMethodTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
-					tykOp.extractValidateRequestTo(ep, path, method, operation, &s.Components)
+					tykOp.extractOASValidateRequestTo(ep, path, method)
 					break found
 				}
 			}
@@ -233,6 +232,16 @@ func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path st
 	meta := apidef.HardTimeoutMeta{Path: path, Method: method}
 	o.EnforceTimeout.ExtractTo(&meta)
 	ep.HardTimeouts = append(ep.HardTimeouts, meta)
+}
+
+func (o *Operation) extractOASValidateRequestTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.ValidateRequest == nil {
+		return
+	}
+
+	meta := apidef.ValidateRequestMeta{Path: path, Method: method}
+	o.ValidateRequest.ExtractTo(&meta)
+	ep.ValidateRequest = append(ep.ValidateRequest, meta)
 }
 
 // detect possible regex pattern:
@@ -384,13 +393,13 @@ type ValidateRequest struct {
 	ErrorResponseCode int  `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
 }
 
-func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
-	v.Enabled = !meta.Disabled
+func (v *ValidateRequest) Fill(meta apidef.ValidateRequestMeta) {
+	v.Enabled = meta.Enabled
 	v.ErrorResponseCode = meta.ErrorResponseCode
 }
 
-func (v *ValidateRequest) ExtractTo(meta *apidef.ValidatePathMeta) {
-	meta.Disabled = !v.Enabled
+func (v *ValidateRequest) ExtractTo(meta *apidef.ValidateRequestMeta) {
+	meta.Enabled = v.Enabled
 	meta.ErrorResponseCode = v.ErrorResponseCode
 }
 
@@ -415,7 +424,24 @@ func (v *ValidateRequest) Import(enabled bool) {
 	v.ErrorResponseCode = http.StatusUnprocessableEntity
 }
 
-func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {
+func (s *OAS) fillOASValidateRequest(metas []apidef.ValidateRequestMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		tykOp := s.GetTykExtension().getOperation(operationID)
+
+		if tykOp.ValidateRequest == nil {
+			tykOp.ValidateRequest = &ValidateRequest{}
+		}
+
+		tykOp.ValidateRequest.Fill(meta)
+
+		if ShouldOmit(tykOp.ValidateRequest) {
+			tykOp.ValidateRequest = nil
+		}
+	}
+}
+
+/*func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
 		tykOp := s.GetTykExtension().getOperation(operationID)
@@ -540,3 +566,4 @@ func (o *Operation) extractValidateRequestTo(ep *apidef.ExtendedPathsSet, path s
 		log.WithError(err).Error("Path meta schema couldn't be unmarshalled")
 	}
 }
+*/
