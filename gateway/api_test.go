@@ -2044,7 +2044,8 @@ func TestOAS(t *testing.T) {
 	oasAPI := openapi3.T{
 		OpenAPI: "3.0.3",
 		Info: &openapi3.Info{
-			Title: "oas doc",
+			Title:   "oas doc",
+			Version: "1",
 		},
 		Paths: make(openapi3.Paths),
 	}
@@ -2153,7 +2154,8 @@ func TestOAS(t *testing.T) {
 				oldAPIInOAS.Fill(*oldAPI.APIDefinition)
 				oldAPIInOAS.OpenAPI = "3.0.3"
 				oldAPIInOAS.Info = &openapi3.Info{
-					Title: "old-api",
+					Title:   "old-api",
+					Version: "1",
 				}
 
 				oldAPIInOAS.GetTykExtension().Info.Versioning = nil
@@ -2723,7 +2725,7 @@ func TestOAS(t *testing.T) {
 				tykExt.Server.GatewayTags = nil
 				tykExt.Upstream.MutualTLS = nil
 				tykExt.Upstream.CertificatePinning = nil
-				apiInOAS.T.Info = &openapi3.Info{Title: "patched-oas-doc"}
+				apiInOAS.T.Info = &openapi3.Info{Title: "patched-oas-doc", Version: "1"}
 				apiInOAS.OpenAPI = "3.0.3"
 
 				patchPath := fmt.Sprintf("/tyk/apis/oas/%s", oldAPI.APIID)
@@ -2864,7 +2866,8 @@ func TestOAS(t *testing.T) {
 			toOas := oas.OAS{T: openapi3.T{
 				OpenAPI: "3.0.3",
 				Info: &openapi3.Info{
-					Title: "example oas doc",
+					Title:   "example oas doc",
+					Version: "1",
 				},
 				Paths: openapi3.Paths{},
 				Servers: openapi3.Servers{
