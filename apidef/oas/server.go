@@ -126,9 +126,9 @@ func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
 
 type Domain struct {
 	// Enabled allow/disallow the usage of the domain.
-	Enabled bool `json:"enabled" bson:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled"`
 	// Name is the name of the domain.
-	Name string `json:"name" bson:"name"`
+	Name string `bson:"name" json:"name"`
 }
 
 func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {

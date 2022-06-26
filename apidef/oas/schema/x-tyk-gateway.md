@@ -38,6 +38,14 @@
 
   Old API Definition: `api_id`
 
+- `dbId`
+
+  **Type: `object`**
+
+  DBID is the unique database ID of the API.
+
+  Old API Definition: `id`
+
 - `orgId`
 
   **Type: `string`**
@@ -331,9 +339,6 @@
   Old API Definition: `proxy.service_discovery`
 
 
-### **ServiceDiscovery**
-
-
 ### **MutualTLS**
 
 - `enabled`
@@ -480,6 +485,28 @@
 
   Old API Definition: `strip_auth_data`
 
+- `baseIdentityProvider`
+
+  **Type: `object`**
+
+  BaseIdentityProvider enables multi authentication mechanism and provides the session object that determines rate limits, ACL rules and quotas.
+
+  It should be set to one of the following:
+
+  - `auth_token`
+
+  - `hmac_key`
+
+  - `basic_auth_user`
+
+  - `jwt_claim`
+
+  - `oidc_user`
+
+  - `oauth_key`
+
+  Old API Definition: `base_identity_provided_by`
+
 - `hmac`
 
   **Type: [HMAC](#HMAC)**
@@ -512,6 +539,8 @@
 
 - `securitySchemes`
 
+  **Type: `map[string]any`**
+
 
 ### **HMAC**
 
@@ -522,6 +551,30 @@
   Enabled enables the HMAC authentication mode.
 
   Old API Definition: `enable_signature_checking`
+
+- `header`
+
+  **Type: [AuthSource](#AuthSource)**
+
+  Header contains configurations of the header auth source, it is enabled by default.
+
+  Old API Definition:
+
+- `cookie`
+
+  **Type: [AuthSource](#AuthSource)**
+
+  Cookie contains configurations of the cookie auth source.
+
+  Old API Definition: `api_id`
+
+- `query`
+
+  **Type: [AuthSource](#AuthSource)**
+
+  Param contains configurations of the param auth source.
+
+  Old API Definition: `api_id`
 
 - `allowedAlgorithms`
 
@@ -552,6 +605,52 @@
   Old API Definition: `hmac_allowed_clock_skew`
 
 
+### **AuthSources**
+
+- `header`
+
+  **Type: [AuthSource](#AuthSource)**
+
+  Header contains configurations of the header auth source, it is enabled by default.
+
+  Old API Definition:
+
+- `cookie`
+
+  **Type: [AuthSource](#AuthSource)**
+
+  Cookie contains configurations of the cookie auth source.
+
+  Old API Definition: `api_id`
+
+- `query`
+
+  **Type: [AuthSource](#AuthSource)**
+
+  Param contains configurations of the param auth source.
+
+  Old API Definition: `api_id`
+
+
+### **AuthSource**
+
+- `enabled`
+
+  **Type: `boolean`**
+
+  Enabled enables the auth source.
+
+  Old API Definition: `auth_configs[X].use_param/use_cookie`
+
+- `name`
+
+  **Type: `string`**
+
+  Name is the name of the auth source.
+
+  Old API Definition: `auth_configs[X].param_name/cookie_name`
+
+
 ### **OIDC**
 
 - `enabled`
@@ -561,6 +660,30 @@
   Enabled enables the OIDC authentication mode.
 
   Old API Definition: `use_openid`
+
+- `header`
+
+  **Type: [AuthSource](#AuthSource)**
+
+  Header contains configurations of the header auth source, it is enabled by default.
+
+  Old API Definition:
+
+- `cookie`
+
+  **Type: [AuthSource](#AuthSource)**
+
+  Cookie contains configurations of the cookie auth source.
+
+  Old API Definition: `api_id`
+
+- `query`
+
+  **Type: [AuthSource](#AuthSource)**
+
+  Param contains configurations of the param auth source.
+
+  Old API Definition: `api_id`
 
 - `segregateByClientId`
 
@@ -640,6 +763,30 @@
 
   Old API Definition: `enable_coprocess_auth`
 
+- `header`
+
+  **Type: [AuthSource](#AuthSource)**
+
+  Header contains configurations of the header auth source, it is enabled by default.
+
+  Old API Definition:
+
+- `cookie`
+
+  **Type: [AuthSource](#AuthSource)**
+
+  Cookie contains configurations of the cookie auth source.
+
+  Old API Definition: `api_id`
+
+- `query`
+
+  **Type: [AuthSource](#AuthSource)**
+
+  Param contains configurations of the param auth source.
+
+  Old API Definition: `api_id`
+
 
 ### **ClientCertificates**
 
@@ -673,6 +820,18 @@
 
 ### **Domain**
 
+- `enabled`
+
+  **Type: `boolean`**
+
+  Enabled allow/disallow the usage of the domain.
+
+- `name`
+
+  **Type: `string`**
+
+  Name is the name of the domain.
+
 
 ### **Middleware**
 
@@ -683,6 +842,8 @@
   Global contains the configurations related to the global middleware.
 
 - `operations`
+
+  **Type: [map[string]Operation](#Operation)**
 
 
 ### **Global**
@@ -800,5 +961,101 @@
   ControlTTLHeaderName is the response header which tells Tyk how long it is safe to cache the response for.
 
   Old API Definition: `cache_options.cache_control_ttl_header`
+
+
+### **Operation**
+
+- `allow`
+
+  **Type: [Allowance](#Allowance)**
+
+- `block`
+
+  **Type: [Allowance](#Allowance)**
+
+- `ignoreAuthentication`
+
+  **Type: [Allowance](#Allowance)**
+
+- `transformRequestMethod`
+
+  **Type: [TransformRequestMethod](#TransformRequestMethod)**
+
+  TransformRequestMethod allows you to transform the method of a request.
+
+- `cache`
+
+  **Type: [CachePlugin](#CachePlugin)**
+
+- `enforceTimeout`
+
+  **Type: [EnforceTimeout](#EnforceTimeout)**
+
+- `validateRequest`
+
+  **Type: [ValidateRequest](#ValidateRequest)**
+
+
+### **Allowance**
+
+- `enabled`
+
+  **Type: `boolean`**
+
+- `ignoreCase`
+
+  **Type: `boolean`**
+
+
+### **TransformRequestMethod**
+
+- `enabled`
+
+  **Type: `boolean`**
+
+  Enabled enables Method Transform for the given path and method.
+
+- `toMethod`
+
+  **Type: `string`**
+
+  ToMethod is the http method value to which the method of an incoming request will be transformed.
+
+
+### **CachePlugin**
+
+- `enabled`
+
+  **Type: `boolean`**
+
+- `cacheByRegex`
+
+  **Type: `string`**
+
+- `cacheResponseCodes`
+
+  **Type: `[]int`**
+
+
+### **EnforceTimeout**
+
+- `enabled`
+
+  **Type: `boolean`**
+
+- `value`
+
+  **Type: `int`**
+
+
+### **ValidateRequest**
+
+- `enabled`
+
+  **Type: `boolean`**
+
+- `errorResponseCode`
+
+  **Type: `int`**
 
 
