@@ -5,25 +5,25 @@
 
 - `info`
 
-  **Type: [Info](#Info)**
+  **Type: [Info](#info)**
 
   Info contains the main metadata about the API definition.
 
 - `upstream`
 
-  **Type: [Upstream](#Upstream)**
+  **Type: [Upstream](#upstream)**
 
   Upstream contains the configurations related to the upstream.
 
 - `server`
 
-  **Type: [Server](#Server)**
+  **Type: [Server](#server)**
 
   Server contains the configurations related to the server.
 
 - `middleware`
 
-  **Type: [Middleware](#Middleware)**
+  **Type: [Middleware](#middleware)**
 
   Middleware contains the configurations related to the proxy middleware.
 
@@ -68,11 +68,11 @@
 
 - `state`
 
-  **Type: [State](#State)**
+  **Type: [State](#state)**
 
 - `versioning`
 
-  **Type: [Versioning](#Versioning)**
+  **Type: [Versioning](#versioning)**
 
 
 ### **State**
@@ -118,7 +118,7 @@
 
 - `versions`
 
-  **Type: [[]VersionToID](#VersionToID)**
+  **Type: [[]VersionToID](#versiontoid)**
 
 - `stripVersioningData`
 
@@ -148,7 +148,7 @@
 
 - `serviceDiscovery`
 
-  **Type: [ServiceDiscovery](#ServiceDiscovery)**
+  **Type: [ServiceDiscovery](#servicediscovery)**
 
   ServiceDiscovery contains the configuration related to Service Discovery.
 
@@ -156,19 +156,19 @@
 
 - `test`
 
-  **Type: [Test](#Test)**
+  **Type: [Test](#test)**
 
   Test contains the configuration related to uptime tests.
 
 - `mutualTLS`
 
-  **Type: [MutualTLS](#MutualTLS)**
+  **Type: [MutualTLS](#mutualtls)**
 
   MutualTLS contains the configuration related to upstream mutual TLS.
 
 - `certificatePinning`
 
-  **Type: [CertificatePinning](#CertificatePinning)**
+  **Type: [CertificatePinning](#certificatepinning)**
 
   CertificatePinning contains the configuration related to certificate pinning.
 
@@ -332,7 +332,7 @@
 
 - `serviceDiscovery`
 
-  **Type: [ServiceDiscovery](#ServiceDiscovery)**
+  **Type: [ServiceDiscovery](#servicediscovery)**
 
   ServiceDiscovery contains the configuration related to test Service Discovery.
 
@@ -351,7 +351,7 @@
 
 - `domainToCertificateMapping`
 
-  **Type: [[]DomainToCertificate](#DomainToCertificate)**
+  **Type: [[]DomainToCertificate](#domaintocertificate)**
 
   DomainToCertificate maintains the mapping of domain to certificate.
 
@@ -381,7 +381,7 @@
 
 - `domainToPublicKeysMapping`
 
-  **Type: [[]PinnedPublicKey](#PinnedPublicKey)**
+  **Type: [[]PinnedPublicKey](#pinnedpublickey)**
 
   DomainToPublicKeysMapping maintains the mapping of domain to pinned public keys.
 
@@ -403,7 +403,7 @@
 
 - `listenPath`
 
-  **Type: [ListenPath](#ListenPath)**
+  **Type: [ListenPath](#listenpath)**
 
   ListenPath represents the path to listen on. Any requests coming into the host, on the port that Tyk is configured to run on,
 
@@ -419,25 +419,25 @@
 
 - `authentication`
 
-  **Type: [Authentication](#Authentication)**
+  **Type: [Authentication](#authentication)**
 
   Authentication contains the configurations related to authentication to the API.
 
 - `clientCertificates`
 
-  **Type: [ClientCertificates](#ClientCertificates)**
+  **Type: [ClientCertificates](#clientcertificates)**
 
   ClientCertificates contains the configurations related to static mTLS.
 
 - `gatewayTags`
 
-  **Type: [GatewayTags](#GatewayTags)**
+  **Type: [GatewayTags](#gatewaytags)**
 
   GatewayTags contains segment tags to configure which GWs your APIs connect to
 
 - `customDomain`
 
-  **Type: [Domain](#Domain)**
+  **Type: [Domain](#domain)**
 
   CustomDomain is the domain to bind this API to.
 
@@ -509,7 +509,7 @@
 
 - `hmac`
 
-  **Type: [HMAC](#HMAC)**
+  **Type: [HMAC](#hmac)**
 
   HMAC contains the configurations related to HMAC authentication mode.
 
@@ -517,7 +517,7 @@
 
 - `oidc`
 
-  **Type: [OIDC](#OIDC)**
+  **Type: [OIDC](#oidc)**
 
   OIDC contains the configurations related to OIDC authentication mode.
 
@@ -525,13 +525,13 @@
 
 - `goPlugin`
 
-  **Type: [GoPlugin](#GoPlugin)**
+  **Type: [GoPlugin](#goplugin)**
 
   GoPlugin contains the configurations related to GoPlugin authentication mode.
 
 - `customPlugin`
 
-  **Type: [CustomPlugin](#CustomPlugin)**
+  **Type: [CustomPlugin](#customplugin)**
 
   CustomPlugin contains the configurations related to CustomPlugin authentication mode.
 
@@ -554,7 +554,7 @@
 
 - `header`
 
-  **Type: [AuthSource](#AuthSource)**
+  **Type: [AuthSource](#authsource)**
 
   Header contains configurations of the header auth source, it is enabled by default.
 
@@ -562,7 +562,7 @@
 
 - `cookie`
 
-  **Type: [AuthSource](#AuthSource)**
+  **Type: [AuthSource](#authsource)**
 
   Cookie contains configurations of the cookie auth source.
 
@@ -570,7 +570,7 @@
 
 - `query`
 
-  **Type: [AuthSource](#AuthSource)**
+  **Type: [AuthSource](#authsource)**
 
   Param contains configurations of the param auth source.
 
@@ -609,7 +609,7 @@
 
 - `header`
 
-  **Type: [AuthSource](#AuthSource)**
+  **Type: [AuthSource](#authsource)**
 
   Header contains configurations of the header auth source, it is enabled by default.
 
@@ -617,7 +617,7 @@
 
 - `cookie`
 
-  **Type: [AuthSource](#AuthSource)**
+  **Type: [AuthSource](#authsource)**
 
   Cookie contains configurations of the cookie auth source.
 
@@ -625,7 +625,7 @@
 
 - `query`
 
-  **Type: [AuthSource](#AuthSource)**
+  **Type: [AuthSource](#authsource)**
 
   Param contains configurations of the param auth source.
 
@@ -663,7 +663,7 @@
 
 - `header`
 
-  **Type: [AuthSource](#AuthSource)**
+  **Type: [AuthSource](#authsource)**
 
   Header contains configurations of the header auth source, it is enabled by default.
 
@@ -671,7 +671,7 @@
 
 - `cookie`
 
-  **Type: [AuthSource](#AuthSource)**
+  **Type: [AuthSource](#authsource)**
 
   Cookie contains configurations of the cookie auth source.
 
@@ -679,7 +679,7 @@
 
 - `query`
 
-  **Type: [AuthSource](#AuthSource)**
+  **Type: [AuthSource](#authsource)**
 
   Param contains configurations of the param auth source.
 
@@ -691,11 +691,11 @@
 
 - `providers`
 
-  **Type: [[]Provider](#Provider)**
+  **Type: [[]Provider](#provider)**
 
 - `scopes`
 
-  **Type: [Scopes](#Scopes)**
+  **Type: [Scopes](#scopes)**
 
 
 ### **Provider**
@@ -706,7 +706,7 @@
 
 - `clientToPolicyMapping`
 
-  **Type: [[]ClientToPolicy](#ClientToPolicy)**
+  **Type: [[]ClientToPolicy](#clienttopolicy)**
 
 
 ### **ClientToPolicy**
@@ -728,7 +728,7 @@
 
 - `scopeToPolicyMapping`
 
-  **Type: [[]ScopeToPolicy](#ScopeToPolicy)**
+  **Type: [[]ScopeToPolicy](#scopetopolicy)**
 
 
 ### **ScopeToPolicy**
@@ -765,7 +765,7 @@
 
 - `header`
 
-  **Type: [AuthSource](#AuthSource)**
+  **Type: [AuthSource](#authsource)**
 
   Header contains configurations of the header auth source, it is enabled by default.
 
@@ -773,7 +773,7 @@
 
 - `cookie`
 
-  **Type: [AuthSource](#AuthSource)**
+  **Type: [AuthSource](#authsource)**
 
   Cookie contains configurations of the cookie auth source.
 
@@ -781,7 +781,7 @@
 
 - `query`
 
-  **Type: [AuthSource](#AuthSource)**
+  **Type: [AuthSource](#authsource)**
 
   Param contains configurations of the param auth source.
 
@@ -837,24 +837,24 @@
 
 - `global`
 
-  **Type: [Global](#Global)**
+  **Type: [Global](#global)**
 
   Global contains the configurations related to the global middleware.
 
 - `operations`
 
-  **Type: [map[string]Operation](#Operation)**
+  **Type: [map[string]Operation](#operation)**
 
 
 ### **Global**
 
 - `cors`
 
-  **Type: [CORS](#CORS)**
+  **Type: [CORS](#cors)**
 
 - `cache`
 
-  **Type: [Cache](#Cache)**
+  **Type: [Cache](#cache)**
 
   Cache contains the configurations related to caching.
 
@@ -967,33 +967,33 @@
 
 - `allow`
 
-  **Type: [Allowance](#Allowance)**
+  **Type: [Allowance](#allowance)**
 
 - `block`
 
-  **Type: [Allowance](#Allowance)**
+  **Type: [Allowance](#allowance)**
 
 - `ignoreAuthentication`
 
-  **Type: [Allowance](#Allowance)**
+  **Type: [Allowance](#allowance)**
 
 - `transformRequestMethod`
 
-  **Type: [TransformRequestMethod](#TransformRequestMethod)**
+  **Type: [TransformRequestMethod](#transformrequestmethod)**
 
   TransformRequestMethod allows you to transform the method of a request.
 
 - `cache`
 
-  **Type: [CachePlugin](#CachePlugin)**
+  **Type: [CachePlugin](#cacheplugin)**
 
 - `enforceTimeout`
 
-  **Type: [EnforceTimeout](#EnforceTimeout)**
+  **Type: [EnforceTimeout](#enforcetimeout)**
 
 - `validateRequest`
 
-  **Type: [ValidateRequest](#ValidateRequest)**
+  **Type: [ValidateRequest](#validaterequest)**
 
 
 ### **Allowance**

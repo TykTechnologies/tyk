@@ -16,7 +16,7 @@ will be updated after TestExtractDocFromXTyk has passed`
 func TestExtractDocFromXTyk(t *testing.T) {
 	fInfo, err := ExtractDocFromXTyk()
 	if err != nil {
-		if _, ok := err.(*DocErrList); ok {
+		if _, ok := err.(*FieldDocError); ok {
 			// should fail, but for now let's print errors for
 			// demonstration purpose
 			t.Log(err.Error())

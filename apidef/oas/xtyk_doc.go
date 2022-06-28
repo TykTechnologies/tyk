@@ -15,9 +15,11 @@ import (
 	"strings"
 )
 
+// XTykDoc is a list of information for exported struct type info,
+// starting from the root struct declaration(XTykGateway)
 type XTykDoc []*StructInfo
 
-func (x *XTykDoc) Append(newInfo *StructInfo) int {
+func (x *XTykDoc) append(newInfo *StructInfo) int {
 	*x = append(*x, newInfo)
 	return len(*x)
 }
@@ -45,27 +47,27 @@ type FieldInfo struct {
 	IsArray bool `json:"is_array"`
 }
 
-type DocErrList struct {
+type FieldDocError struct {
 	errs []string
 }
 
-func (err *DocErrList) Error() string {
+func (err *FieldDocError) Error() string {
 	return strings.Join(err.errs, "\n")
 }
 
-func (err *DocErrList) WriteError(errMsg string) {
+func (err *FieldDocError) WriteError(errMsg string) {
 	if errMsg == "" {
 		return
 	}
 	err.errs = append(err.errs, errMsg)
 }
 
-func (err *DocErrList) Empty() bool {
+func (err *FieldDocError) Empty() bool {
 	return len(err.errs) == 0
 }
 
 // ExtractDocFromXTyk returns documentation associated with XTykAPIGateway struct or error.
-// if err is of type *DocErrList, documentation may not be empty.
+// if err is of type *FieldDocError, documentation may not be empty.
 func ExtractDocFromXTyk() (XTykDoc, error) {
 	_, thisFilePath, _, ok := runtime.Caller(0)
 	if !ok {
@@ -87,8 +89,41 @@ func ExtractDocFromXTyk() (XTykDoc, error) {
 		return nil, fmt.Errorf("required package %s", requiredPkgName)
 	}
 
-	globals := map[string]ast.Expr{}
-	for _, fileObj := range pkgs[requiredPkgName].Files {
+	p := newObjParser(pkgs[requiredPkgName])
+	rootStructInfo := &StructInfo{
+		Name:      rootJsonName,
+		structObj: p.globals[rootStructName].(*ast.StructType),
+	}
+	p.parse(rootJsonName, rootJsonName, rootStructInfo)
+
+	if p.errList.Empty() {
+		return p.info, nil
+	}
+	return p.info, p.errList
+}
+
+type objParser struct {
+	info    XTykDoc
+	globals map[string]ast.Expr    // exported global types
+	visited map[string]*StructInfo // avoid re-visiting struct type
+	pkg     *ast.Package
+	errList *FieldDocError
+}
+
+func newObjParser(pkg *ast.Package) *objParser {
+	p := &objParser{
+		info:    XTykDoc{},
+		visited: map[string]*StructInfo{},
+		errList: &FieldDocError{},
+		pkg:     pkg,
+	}
+	p.parseGlobalExpr()
+	return p
+}
+
+func (p *objParser) parseGlobalExpr() {
+	p.globals = map[string]ast.Expr{}
+	for _, fileObj := range p.pkg.Files {
 		if fileObj.Scope == nil {
 			continue
 		}
@@ -96,62 +131,36 @@ func ExtractDocFromXTyk() (XTykDoc, error) {
 			if decl, ok := obj.Decl.(*ast.TypeSpec); ok && ast.IsExported(objName) {
 				switch obj := decl.Type.(type) {
 				case *ast.StructType, *ast.ArrayType, *ast.MapType:
-					globals[objName] = obj
+					p.globals[objName] = obj
 				}
 			}
 		}
 	}
-
-	rootStructInfo := &StructInfo{
-		Name:      rootJsonName,
-		structObj: globals[rootStructName].(*ast.StructType),
-	}
-
-	info := XTykDoc{}
-	errList := &DocErrList{}
-	// visited struct declaration
-	visited := map[string]*StructInfo{}
-	processXTykFields(&info, globals, visited, rootStructInfo, rootJsonName, errList)
-	if errList.Empty() {
-		return info, nil
-	}
-	return info, errList
 }
 
-func processXTykFields(info *XTykDoc, globals map[string]ast.Expr, visited map[string]*StructInfo, structInfo *StructInfo, goPath string, errList *DocErrList) {
-	if visited[goPath] != nil {
+func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
+	if p.visited[name] != nil {
 		return
 	}
-	visited[goPath] = structInfo
-	info.Append(structInfo)
+	p.visited[name] = structInfo
+	p.info.append(structInfo)
 	for _, field := range structInfo.structObj.Fields.List {
 		ident := extractIdentFromExpr(field.Type)
 		if ident == nil {
 			if field.Names != nil {
 				// inline fields
-				ident = extractIdentFromExpr(globals[field.Names[0].Name])
+				ident = extractIdentFromExpr(p.globals[field.Names[0].Name])
 			}
 			if ident == nil {
-				errList.WriteError(fmt.Sprintf("identifier from %s is not known\n", goPath))
+				p.errList.WriteError(fmt.Sprintf("identifier from %s is not known\n", goPath))
 				continue
 			}
 		}
 
 		jsonName, isInline := jsonTagFromBasicLit(field.Tag)
 		if isInline {
-			// for inline Global "struct", keep tree as it was but change the root struct
-			if structObj, ok := globals[ident.Name].(*ast.StructType); ok {
-				newInfo := visited[ident.Name]
-				if newInfo == nil {
-					newInfo = &StructInfo{structObj: structObj, Name: ident.Name}
-				}
-				processXTykFields(info, globals, visited, newInfo, ident.Name, errList)
-				structInfo.Fields = append(structInfo.Fields, newInfo.Fields...)
-				continue
-			} else {
-				// field is inline and exported but was not scanned
-				errList.WriteError(fmt.Sprintf("field %s.%s is declared but not found\n", goPath, ident.Name))
-			}
+			p.parseInlineField(goPath, ident.Name, structInfo)
+			continue
 		}
 
 		if jsonName == "" && !isInline {
@@ -159,55 +168,70 @@ func processXTykFields(info *XTykDoc, globals map[string]ast.Expr, visited map[s
 			continue
 		}
 
-		var goName string
 		if len(field.Names) == 0 {
-			errList.WriteError(fmt.Sprintf("unidentified field in %s", goPath))
+			p.errList.WriteError(fmt.Sprintf("unidentified field in %s", goPath))
 			continue
-		} else {
-			goName = field.Names[0].Name
 		}
+		goName := field.Names[0].Name
 
 		docs := cleanDocs(field.Doc)
 		if docs == "" {
-			errList.WriteError(fmt.Sprintf("field %s.%s is missing documentation", goPath, goName))
+			p.errList.WriteError(fmt.Sprintf("field %s.%s is missing documentation", goPath, goName))
 		}
 
 		fieldInfo := &FieldInfo{
 			JsonName: jsonName,
 			GoPath:   goPath + "." + goName,
 			Doc:      docs,
-			JsonType: goTypeToJson(globals, ident.Name),
+			JsonType: goTypeToJson(p.globals, ident.Name),
 			IsArray:  isExprArray(field.Type),
 		}
-
-		if globals[ident.Name] != nil {
-			switch obj := globals[ident.Name].(type) {
-			case *ast.StructType:
-				newInfo := &StructInfo{structObj: obj, Name: ident.Name}
-				processXTykFields(info, globals, visited, newInfo, ident.Name, errList)
-
-			case *ast.ArrayType:
-				typeName := extractIdentFromExpr(obj).Name
-				fieldInfo.JsonType = typeName
-				fieldInfo.IsArray = true
-				if structObj, ok := globals[typeName].(*ast.StructType); ok {
-					newInfo := &StructInfo{structObj: structObj, Name: typeName}
-					processXTykFields(info, globals, visited, newInfo, typeName, errList)
-				}
-
-			case *ast.MapType:
-				typeName := extractIdentFromExpr(obj).Name
-				fieldInfo.JsonType = typeName
-				fieldInfo.MapKey = extractIdentFromExpr(obj.Key).Name
-				if structObj, ok := globals[typeName].(*ast.StructType); ok {
-					newInfo := &StructInfo{structObj: structObj, Name: typeName}
-					processXTykFields(info, globals, visited, newInfo, typeName, errList)
-				}
-
-			}
-		}
-
+		p.parseNestedObj(ident.Name, fieldInfo)
 		structInfo.Fields = append(structInfo.Fields, fieldInfo)
+	}
+}
+
+func (p *objParser) parseInlineField(path, name string, structInfo *StructInfo) {
+	// for inline Global "struct", keep tree as it was but change the root struct
+	if structObj, ok := p.globals[name].(*ast.StructType); ok {
+		newInfo := p.visited[name]
+		if newInfo == nil {
+			newInfo = &StructInfo{structObj: structObj, Name: name}
+		}
+		p.parse(path, name, newInfo)
+		structInfo.Fields = append(structInfo.Fields, newInfo.Fields...)
+	} else {
+		// field is inline and exported but was not scanned
+		p.errList.WriteError(fmt.Sprintf("field %s.%s is declared but not found\n", path, name))
+	}
+}
+
+func (p *objParser) parseNestedObj(name string, field *FieldInfo) {
+	if p.globals[name] != nil {
+		switch obj := p.globals[name].(type) {
+		case *ast.StructType:
+			newInfo := &StructInfo{structObj: obj, Name: name}
+			p.parse(name, name, newInfo)
+
+		case *ast.ArrayType:
+			typeName := extractIdentFromExpr(obj).Name
+			field.JsonType = typeName
+			field.IsArray = true
+			if structObj, ok := p.globals[typeName].(*ast.StructType); ok {
+				newInfo := &StructInfo{structObj: structObj, Name: typeName}
+				p.parse(typeName, typeName, newInfo)
+			}
+
+		case *ast.MapType:
+			typeName := extractIdentFromExpr(obj).Name
+			field.JsonType = typeName
+			field.MapKey = extractIdentFromExpr(obj.Key).Name
+			if structObj, ok := p.globals[typeName].(*ast.StructType); ok {
+				newInfo := &StructInfo{structObj: structObj, Name: typeName}
+				p.parse(typeName, typeName, newInfo)
+			}
+
+		}
 	}
 }
 
@@ -330,25 +354,28 @@ func xtykDocToMarkdown(xtykDoc XTykDoc) string {
 		docWriter.WriteString(fmt.Sprintf("### **%s**\n\n", structInfo.Name))
 
 		for _, field := range structInfo.Fields {
-			docWriter.WriteString(fmt.Sprintf("- `%s`\n\n", field.JsonName))
-
-			if field.JsonType != "" {
-				docWriter.WriteString("  **Type: ")
-				docWriter.WriteString(fmt.Sprintf("%s**\n\n", jsonTypeToHTML(field)))
-			}
-
-			if field.Doc != "" {
-				for _, doc := range strings.Split(field.Doc, "\n") {
-					if doc != "" {
-						docWriter.WriteString(fmt.Sprintf("  %s\n\n", doc))
-					}
-				}
-			}
-
+			fieldInfoToMarkDown(field, &docWriter)
 		}
 		docWriter.WriteByte('\n')
 	}
 	return docWriter.String()
+}
+
+func fieldInfoToMarkDown(field *FieldInfo, docWriter *strings.Builder) {
+	docWriter.WriteString(fmt.Sprintf("- `%s`\n\n", field.JsonName))
+
+	if field.JsonType != "" {
+		docWriter.WriteString("  **Type: ")
+		docWriter.WriteString(fmt.Sprintf("%s**\n\n", jsonTypeToHTML(field)))
+	}
+
+	if field.Doc != "" {
+		for _, doc := range strings.Split(field.Doc, "\n") {
+			if doc != "" {
+				docWriter.WriteString(fmt.Sprintf("  %s\n\n", doc))
+			}
+		}
+	}
 }
 
 func jsonTypeToHTML(f *FieldInfo) string {
@@ -365,5 +392,5 @@ func jsonTypeToHTML(f *FieldInfo) string {
 		return fmt.Sprintf("`%s`", fullType)
 	}
 	// markdown link
-	return fmt.Sprintf("[%s](#%s)", fullType, f.JsonType)
+	return fmt.Sprintf("[%s](#%s)", fullType, strings.ToLower(f.JsonType))
 }
