@@ -160,6 +160,8 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 
 	globalConf := ts.Gw.GetConfig()
 	testChangeHashFunc := func(t *testing.T, authHeader map[string]string, client *http.Client, failCode int) {
+		t.Helper()
+
 		_, _ = ts.Run(t, test.TestCase{Headers: authHeader, Client: client, Code: http.StatusOK})
 
 		globalConf.HashKeyFunction = "sha256"
@@ -207,8 +209,14 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 			APIID: "test", Versions: []string{"v1"},
 		}}
 
-		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/user",
-			Data: session, Client: client, Code: http.StatusOK})
+		_, _ = ts.Run(t, test.TestCase{
+			AdminAuth: true,
+			Method:    http.MethodPost,
+			Path:      "/tyk/keys/user",
+			Data:      session,
+			Client:    client,
+			Code:      http.StatusOK,
+		})
 
 		authHeader := map[string]string{"Authorization": genAuthHeader("user", "password")}
 
