@@ -129,7 +129,7 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 
 	if !FileExist(m.Path) {
 		// if the exact name doesn't exist then try to load it using tyk version
-		m.Path = m.goPluginFromTykVersion()
+		m.Path = m.goPluginFromTykVersion(VERSION)
 	}
 
 	if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
@@ -232,7 +232,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 // goPluginFromTykVersion builds a name of plugin based on tyk version
 // os and architecture. The structure of the plugin name looks like:
 // {plugin-dir}/{plugin-name}_{GW-version}_{OS}_{arch}.so
-func (m *GoPluginMiddleware) goPluginFromTykVersion() string {
+func (m *GoPluginMiddleware) goPluginFromTykVersion(version string) string {
 	if m.Path == "" {
 		return ""
 	}
@@ -243,7 +243,13 @@ func (m *GoPluginMiddleware) goPluginFromTykVersion() string {
 	os := runtime.GOOS
 	architecture := runtime.GOARCH
 
-	newPluginName := strings.Join([]string{pluginName, VERSION, os, architecture}, "_")
+	// sanitize away `-rc15` suffixes (remove `-*`) from version
+	vs := strings.Split(version, "-")
+	if len(vs) > 0 {
+		version = vs[0]
+	}
+
+	newPluginName := strings.Join([]string{pluginName, version, os, architecture}, "_")
 	newPluginPath := pluginDir + "/" + newPluginName + ".so"
 
 	return newPluginPath
