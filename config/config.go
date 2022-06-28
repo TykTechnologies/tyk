@@ -596,7 +596,7 @@ type Config struct {
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
 
-	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256, bcrypt.
+	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
 	HashKeyFunction string `json:"hash_key_function"`
 
 	// Specify the Key hashing algorithm for "basic auth". Possible values: murmur64, murmur128, sha256, bcrypt.
