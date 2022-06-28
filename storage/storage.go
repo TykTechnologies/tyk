@@ -138,6 +138,17 @@ var (
 	HashMurmur128 = "murmur128"
 )
 
+// HashAlgo produces a sanitized hash algorythm, falling back to murmur32
+func HashAlgo(algo string) string {
+	switch algo {
+	case HashSha256, HashMurmur32, HashMurmur64, HashMurmur128:
+		return algo
+	default:
+	}
+
+	return HashMurmur32
+}
+
 func hashFunction(algorithm string) (hash.Hash, error) {
 	switch algorithm {
 	case HashSha256:
