@@ -217,26 +217,32 @@ var errUnauthorized = errors.New("Unauthorized")
 
 func (k *BasicAuthKeyIsValid) checkPassword(session *user.SessionState, plainPassword string, logger *logrus.Entry) error {
 	switch session.BasicAuthData.Hash {
-	case user.HashBCrypt:
-		if err := k.compareHashAndPassword(session.BasicAuthData.Password, plainPassword, logger); err != nil {
-			return err
-		}
 	case user.HashPlainText:
 		if session.BasicAuthData.Password != plainPassword {
 			return errUnauthorized
 		}
-	default:
+
+	case user.HashSha256:
+		fallthrough
+	case user.HashMurmur32:
+		fallthrough
+	case user.HashMurmur64:
+		fallthrough
+	case user.HashMurmur128:
 		// Verify we have a valid Hash value
 		hashAlgo := string(session.BasicAuthData.Hash)
-		basicAuthHashAlgo := storage.HashAlgo(hashAlgo)
-		if basicAuthHashAlgo != hashAlgo {
+
+		// Checks the storage algo picked
+		hashedPassword := storage.HashStr(plainPassword, hashAlgo)
+		if session.BasicAuthData.Password != hashedPassword {
 			return errUnauthorized
 		}
 
-		// Checks the storage algo picked
-		hashedPassword := storage.HashStr(plainPassword, basicAuthHashAlgo)
-		if session.BasicAuthData.Password != hashedPassword {
-			return errUnauthorized
+	case user.HashBCrypt:
+		fallthrough
+	default:
+		if err := k.compareHashAndPassword(session.BasicAuthData.Password, plainPassword, logger); err != nil {
+			return err
 		}
 	}
 	return nil

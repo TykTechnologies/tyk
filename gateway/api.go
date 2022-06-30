@@ -365,8 +365,6 @@ func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
 		return
 	}
 
-	basicAuthHashAlgo = storage.HashAlgo(basicAuthHashAlgo)
-
 	session.BasicAuthData.Password = storage.HashStr(session.BasicAuthData.Password, basicAuthHashAlgo)
 	session.BasicAuthData.Hash = user.HashType(basicAuthHashAlgo)
 }
@@ -375,12 +373,16 @@ func (gw *Gateway) basicAuthHashAlgo() string {
 	config := gw.GetConfig()
 
 	// Use `basic_auth_hash_key_function` if set;
-	if config.BasicAuthHashKeyFunction != "" {
-		return config.BasicAuthHashKeyFunction
+	algo := config.BasicAuthHashKeyFunction
+
+	// If hash function name is empty/invalid
+	if ok := user.IsHashType(algo); !ok {
+		// set default basic auth hash to bcrypt
+		return "bcrypt"
 	}
 
-	// set default basic auth hash to bcrypt
-	return "bcrypt"
+	// Algo is validated at this point
+	return algo
 }
 
 func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {

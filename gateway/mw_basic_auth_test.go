@@ -151,7 +151,7 @@ func TestBasicAuthHashKeyFunc(t *testing.T) {
 		{"murmur32", "murmur32"},
 		{"murmur64", "murmur64"},
 		{"murmur128", "murmur128"},
-		{"invalid", "murmur32"},
+		{"invalid", "bcrypt"},
 	}
 
 	logger := log.WithField("test", "TestBasicAuthHashKeyFunc")
