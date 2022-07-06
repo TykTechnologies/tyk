@@ -718,7 +718,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			Factory: &kafkaDataSource.Factory{},
 			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
 				Subscription: kafkaDataSource.SubscriptionConfiguration{
-					BrokerAddr:           "localhost:9092",
+					BrokerAddresses:      []string{"localhost:9092"},
 					Topic:                "test.topic",
 					GroupID:              "test.consumer.group",
 					ClientID:             "test.client.id",
@@ -744,7 +744,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			Factory: &kafkaDataSource.Factory{},
 			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
 				Subscription: kafkaDataSource.SubscriptionConfiguration{
-					BrokerAddr:           "localhost:9092",
+					BrokerAddresses:      []string{"localhost:9092"},
 					Topic:                "test.topic.{{.arguments.name}}",
 					GroupID:              "test.consumer.group",
 					ClientID:             "test.client.id",
@@ -1001,7 +1001,7 @@ var graphqlEngineV2ConfigJson = `{
 					]
 				}],
 				"config": {
-					"broker_addr": "localhost:9092",
+					"broker_addresses": ["localhost:9092"],
 					"topic": "test.topic",
 					"group_id": "test.consumer.group",
 					"client_id": "test.client.id",
@@ -1027,7 +1027,7 @@ var graphqlEngineV2ConfigJson = `{
 					]
 				}],
 				"config": {
-					"broker_addr": "localhost:9092",
+					"broker_addresses": ["localhost:9092"],
 					"topic": "test.topic.{{.arguments.name}}",
 					"group_id": "test.consumer.group",
 					"client_id": "test.client.id",

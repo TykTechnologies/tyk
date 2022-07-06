@@ -839,7 +839,7 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
-	BrokerAddr           string                `bson:"broker_addr" json:"broker_addr"`
+	BrokerAddresses      []string              `bson:"broker_addresses" json:"broker_addresses"`
 	Topic                string                `bson:"topic" json:"topic"`
 	GroupID              string                `bson:"group_id" json:"group_id"`
 	ClientID             string                `bson:"client_id" json:"client_id"`
