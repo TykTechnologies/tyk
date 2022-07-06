@@ -63,7 +63,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 
-	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 )
 
 var (
