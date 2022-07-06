@@ -2,10 +2,12 @@ package rpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/vmihailenco/msgpack"
 )
 
 type AnalyticsRecord struct {
@@ -121,21 +123,32 @@ func (r *Purger) PurgeCache() {
 			analyticsKeyName = fmt.Sprintf("%v_%v", ANALYTICS_KEYNAME, i)
 		}
 
-		for _, serializerMethod := range AnalyticsSerializers {
+		analyticsValues := r.Store.GetAndDeleteSet(analyticsKeyName)
+		if len(analyticsValues) == 0 {
+			continue
+		}
+		keys := make([]interface{}, len(analyticsValues))
 
-			analyticsKeyName += serializerMethod.GetSuffix()
-			analyticsValues := r.Store.GetAndDeleteSet(analyticsKeyName)
-			if len(analyticsValues) == 0 {
-				continue
+		for i, v := range analyticsValues {
+			decoded := AnalyticsRecord{}
+			if err := msgpack.Unmarshal([]byte(v.(string)), &decoded); err != nil {
+				Log.WithError(err).Error("Couldn't unmarshal analytics data")
+			} else {
+				Log.WithField("decoded", decoded).Debug("Decoded Record")
+				keys[i] = decoded
 			}
+		}
 
-			for _, v := range analyticsValues {
-				if _, err := FuncClientSingleton("PurgeAnalyticsData", v); err != nil {
-					EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
-					Log.Warn("Failed to call purge, retrying: ", err)
-				}
-			}
+		data, err := json.Marshal(keys)
+		if err != nil {
+			Log.WithError(err).Error("Failed to marshal analytics data")
+			return
+		}
 
+		// Send keys to RPC
+		if _, err := FuncClientSingleton("PurgeAnalyticsData", string(data)); err != nil {
+			EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
+			Log.Warn("Failed to call purge, retrying: ", err)
 		}
 
 	}
