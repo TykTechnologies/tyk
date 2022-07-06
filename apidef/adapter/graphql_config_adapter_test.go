@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"testing"
 
-	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	kafkaDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
-	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
+	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	kafkaDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
+	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
