@@ -6,6 +6,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestIsHashType(t *testing.T) {
+	assert.False(t, IsHashType(""))
+	assert.False(t, IsHashType("invalid"))
+	valids := []string{"sha256", "bcrypt", "murmur32", "murmur64", "murmur128"}
+	for _, ok := range valids {
+		assert.True(t, IsHashType(ok))
+	}
+}
+
 func TestSessionState_Lifetime(t *testing.T) {
 	s := SessionState{}
 
