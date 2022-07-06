@@ -304,13 +304,10 @@ func TestPortsWhiteListDecoder(t *testing.T) {
 	var c Config
 
 	err := os.Setenv("TYK_GW_PORTWHITELIST", "{\"http\":{\"ranges\":[{\"from\":8000,\"to\":9000}]},\"tls\":{\"ports\":[6000,6015]}}")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
+
 	err = envconfig.Process("TYK_GW", &c)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	httpWhiteList, ok := c.PortWhiteList["http"]
 	assert.True(t, ok, "expected to have http key in PortWhiteList")
