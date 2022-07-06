@@ -1,27 +1,27 @@
 
-## Documentation of X-Tyk-Gateway Object
+## TYK OAS API Object
 
 ### **x-tyk-gateway**
 
-- `info`
+- **`info`**
 
   **Type: [Info](#info)**
 
   Info contains the main metadata about the API definition.
 
-- `upstream`
+- **`upstream`**
 
   **Type: [Upstream](#upstream)**
 
   Upstream contains the configurations related to the upstream.
 
-- `server`
+- **`server`**
 
   **Type: [Server](#server)**
 
   Server contains the configurations related to the server.
 
-- `middleware`
+- **`middleware`**
 
   **Type: [Middleware](#middleware)**
 
@@ -30,7 +30,7 @@
 
 ### **Info**
 
-- `id`
+- **`id`**
 
   **Type: `string`**
 
@@ -38,7 +38,7 @@
 
   Old API Definition: `api_id`
 
-- `dbId`
+- **`dbId`**
 
   **Type: `object`**
 
@@ -46,7 +46,7 @@
 
   Old API Definition: `id`
 
-- `orgId`
+- **`orgId`**
 
   **Type: `string`**
 
@@ -54,7 +54,7 @@
 
   Old API Definition: `org_id`
 
-- `name`
+- **`name`**
 
   **Type: `string`**
 
@@ -62,22 +62,22 @@
 
   Old API Definition: `name`
 
-- `expiration`
+- **`expiration`**
 
   **Type: `string`**
 
-- `state`
+- **`state`**
 
   **Type: [State](#state)**
 
-- `versioning`
+- **`versioning`**
 
   **Type: [Versioning](#versioning)**
 
 
 ### **State**
 
-- `active`
+- **`active`**
 
   **Type: `boolean`**
 
@@ -85,7 +85,7 @@
 
   Old API Definition: `active`
 
-- `internal`
+- **`internal`**
 
   **Type: `boolean`**
 
@@ -96,49 +96,49 @@
 
 ### **Versioning**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
-- `name`
+- **`name`**
 
   **Type: `string`**
 
-- `default`
+- **`default`**
 
   **Type: `string`**
 
-- `location`
+- **`location`**
 
   **Type: `string`**
 
-- `key`
+- **`key`**
 
   **Type: `string`**
 
-- `versions`
+- **`versions`**
 
-  **Type: [[]VersionToID](#versiontoid)**
+  **Type: `[]`[VersionToID](#versiontoid)**
 
-- `stripVersioningData`
+- **`stripVersioningData`**
 
   **Type: `boolean`**
 
 
 ### **VersionToID**
 
-- `name`
+- **`name`**
 
   **Type: `string`**
 
-- `id`
+- **`id`**
 
   **Type: `string`**
 
 
 ### **Upstream**
 
-- `url`
+- **`url`**
 
   **Type: `string`**
 
@@ -146,7 +146,7 @@
 
   Old API Definition: `proxy.target_url`
 
-- `serviceDiscovery`
+- **`serviceDiscovery`**
 
   **Type: [ServiceDiscovery](#servicediscovery)**
 
@@ -154,19 +154,19 @@
 
   Old API Definition: `proxy.service_discovery`
 
-- `test`
+- **`test`**
 
   **Type: [Test](#test)**
 
   Test contains the configuration related to uptime tests.
 
-- `mutualTLS`
+- **`mutualTLS`**
 
   **Type: [MutualTLS](#mutualtls)**
 
   MutualTLS contains the configuration related to upstream mutual TLS.
 
-- `certificatePinning`
+- **`certificatePinning`**
 
   **Type: [CertificatePinning](#certificatepinning)**
 
@@ -175,7 +175,7 @@
 
 ### **ServiceDiscovery**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
@@ -183,7 +183,7 @@
 
   Old API Definition: `service_discovery.use_discovery_service`
 
-- `queryEndpoint`
+- **`queryEndpoint`**
 
   **Type: `string`**
 
@@ -191,7 +191,7 @@
 
   Old API Definition: `service_discovery.query_endpoint`
 
-- `dataPath`
+- **`dataPath`**
 
   **Type: `string`**
 
@@ -225,7 +225,7 @@
 
   Old API Definition: `service_discovery.data_path`
 
-- `useNestedQuery`
+- **`useNestedQuery`**
 
   **Type: `boolean`**
 
@@ -257,7 +257,7 @@
 
   Old API Definition: `service_discovery.use_nested_query`
 
-- `parentDataPath`
+- **`parentDataPath`**
 
   **Type: `string`**
 
@@ -271,7 +271,7 @@
 
   Old API Definition: `service_discovery.parent_data_path`
 
-- `portDataPath`
+- **`portDataPath`**
 
   **Type: `string`**
 
@@ -285,7 +285,7 @@
 
   Old API Definition: `service_discovery.port_data_path`
 
-- `useTargetList`
+- **`useTargetList`**
 
   **Type: `boolean`**
 
@@ -295,7 +295,7 @@
 
   Old API Definition: `service_discovery.use_target_list`
 
-- `cacheTimeout`
+- **`cacheTimeout`**
 
   **Type: `int`**
 
@@ -307,7 +307,7 @@
 
   Old API Definition: `service_discovery.cache_timeout`
 
-- `targetPath`
+- **`targetPath`**
 
   **Type: `string`**
 
@@ -319,7 +319,7 @@
 
   Old API Definition: `service_discovery.target_path`
 
-- `endpointReturnsList`
+- **`endpointReturnsList`**
 
   **Type: `boolean`**
 
@@ -330,7 +330,7 @@
 
 ### **Test**
 
-- `serviceDiscovery`
+- **`serviceDiscovery`**
 
   **Type: [ServiceDiscovery](#servicediscovery)**
 
@@ -341,7 +341,7 @@
 
 ### **MutualTLS**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
@@ -349,9 +349,9 @@
 
   Old API Definition: `upstream_certificates_disabled`
 
-- `domainToCertificateMapping`
+- **`domainToCertificateMapping`**
 
-  **Type: [[]DomainToCertificate](#domaintocertificate)**
+  **Type: `[]`[DomainToCertificate](#domaintocertificate)**
 
   DomainToCertificate maintains the mapping of domain to certificate.
 
@@ -360,18 +360,18 @@
 
 ### **DomainToCertificate**
 
-- `domain`
+- **`domain`**
 
   **Type: `string`**
 
-- `certificate`
+- **`certificate`**
 
   **Type: `string`**
 
 
 ### **CertificatePinning**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
@@ -379,9 +379,9 @@
 
   Old API Definition: `certificate_pinning_disabled`
 
-- `domainToPublicKeysMapping`
+- **`domainToPublicKeysMapping`**
 
-  **Type: [[]PinnedPublicKey](#pinnedpublickey)**
+  **Type: `[]`[PinnedPublicKey](#pinnedpublickey)**
 
   DomainToPublicKeysMapping maintains the mapping of domain to pinned public keys.
 
@@ -390,18 +390,18 @@
 
 ### **PinnedPublicKey**
 
-- `domain`
+- **`domain`**
 
   **Type: `string`**
 
-- `publicKeys`
+- **`publicKeys`**
 
   **Type: `[]string`**
 
 
 ### **Server**
 
-- `listenPath`
+- **`listenPath`**
 
   **Type: [ListenPath](#listenpath)**
 
@@ -409,7 +409,7 @@
 
   that match this path will have the rules defined in the API Definition applied.
 
-- `slug`
+- **`slug`**
 
   **Type: `string`**
 
@@ -417,25 +417,25 @@
 
   Old API Definition: `slug`
 
-- `authentication`
+- **`authentication`**
 
   **Type: [Authentication](#authentication)**
 
   Authentication contains the configurations related to authentication to the API.
 
-- `clientCertificates`
+- **`clientCertificates`**
 
   **Type: [ClientCertificates](#clientcertificates)**
 
   ClientCertificates contains the configurations related to static mTLS.
 
-- `gatewayTags`
+- **`gatewayTags`**
 
   **Type: [GatewayTags](#gatewaytags)**
 
   GatewayTags contains segment tags to configure which GWs your APIs connect to
 
-- `customDomain`
+- **`customDomain`**
 
   **Type: [Domain](#domain)**
 
@@ -446,7 +446,7 @@
 
 ### **ListenPath**
 
-- `value`
+- **`value`**
 
   **Type: `string`**
 
@@ -454,7 +454,7 @@
 
   Old API Definition: `proxy.listen_path`
 
-- `strip`
+- **`strip`**
 
   **Type: `boolean`**
 
@@ -469,7 +469,7 @@
 
 ### **Authentication**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
@@ -477,7 +477,7 @@
 
   Old API Definition: `!use_keyless`
 
-- `stripAuthorizationData`
+- **`stripAuthorizationData`**
 
   **Type: `boolean`**
 
@@ -485,7 +485,7 @@
 
   Old API Definition: `strip_auth_data`
 
-- `baseIdentityProvider`
+- **`baseIdentityProvider`**
 
   **Type: `object`**
 
@@ -507,7 +507,7 @@
 
   Old API Definition: `base_identity_provided_by`
 
-- `hmac`
+- **`hmac`**
 
   **Type: [HMAC](#hmac)**
 
@@ -515,7 +515,7 @@
 
   Old API Definition: `auth_configs["hmac"]`
 
-- `oidc`
+- **`oidc`**
 
   **Type: [OIDC](#oidc)**
 
@@ -523,13 +523,13 @@
 
   Old API Definition: `auth_configs["oidc"]`
 
-- `goPlugin`
+- **`goPlugin`**
 
   **Type: [GoPlugin](#goplugin)**
 
   GoPlugin contains the configurations related to GoPlugin authentication mode.
 
-- `customPlugin`
+- **`customPlugin`**
 
   **Type: [CustomPlugin](#customplugin)**
 
@@ -537,14 +537,14 @@
 
   Old API Definition: `auth_configs["coprocess"]`
 
-- `securitySchemes`
+- **`securitySchemes`**
 
   **Type: `map[string]any`**
 
 
 ### **HMAC**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
@@ -552,7 +552,7 @@
 
   Old API Definition: `enable_signature_checking`
 
-- `header`
+- **`header`**
 
   **Type: [AuthSource](#authsource)**
 
@@ -560,7 +560,7 @@
 
   Old API Definition:
 
-- `cookie`
+- **`cookie`**
 
   **Type: [AuthSource](#authsource)**
 
@@ -568,7 +568,7 @@
 
   Old API Definition: `api_id`
 
-- `query`
+- **`query`**
 
   **Type: [AuthSource](#authsource)**
 
@@ -576,7 +576,7 @@
 
   Old API Definition: `api_id`
 
-- `allowedAlgorithms`
+- **`allowedAlgorithms`**
 
   **Type: `[]string`**
 
@@ -594,7 +594,7 @@
 
   Old API Definition: `hmac_allowed_algorithms`
 
-- `allowedClockSkew`
+- **`allowedClockSkew`**
 
   **Type: `double`**
 
@@ -607,7 +607,7 @@
 
 ### **AuthSources**
 
-- `header`
+- **`header`**
 
   **Type: [AuthSource](#authsource)**
 
@@ -615,7 +615,7 @@
 
   Old API Definition:
 
-- `cookie`
+- **`cookie`**
 
   **Type: [AuthSource](#authsource)**
 
@@ -623,7 +623,7 @@
 
   Old API Definition: `api_id`
 
-- `query`
+- **`query`**
 
   **Type: [AuthSource](#authsource)**
 
@@ -634,7 +634,7 @@
 
 ### **AuthSource**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
@@ -642,7 +642,7 @@
 
   Old API Definition: `auth_configs[X].use_param/use_cookie`
 
-- `name`
+- **`name`**
 
   **Type: `string`**
 
@@ -653,7 +653,7 @@
 
 ### **OIDC**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
@@ -661,7 +661,7 @@
 
   Old API Definition: `use_openid`
 
-- `header`
+- **`header`**
 
   **Type: [AuthSource](#authsource)**
 
@@ -669,7 +669,7 @@
 
   Old API Definition:
 
-- `cookie`
+- **`cookie`**
 
   **Type: [AuthSource](#authsource)**
 
@@ -677,7 +677,7 @@
 
   Old API Definition: `api_id`
 
-- `query`
+- **`query`**
 
   **Type: [AuthSource](#authsource)**
 
@@ -685,66 +685,66 @@
 
   Old API Definition: `api_id`
 
-- `segregateByClientId`
+- **`segregateByClientId`**
 
   **Type: `boolean`**
 
-- `providers`
+- **`providers`**
 
-  **Type: [[]Provider](#provider)**
+  **Type: `[]`[Provider](#provider)**
 
-- `scopes`
+- **`scopes`**
 
   **Type: [Scopes](#scopes)**
 
 
 ### **Provider**
 
-- `issuer`
+- **`issuer`**
 
   **Type: `string`**
 
-- `clientToPolicyMapping`
+- **`clientToPolicyMapping`**
 
-  **Type: [[]ClientToPolicy](#clienttopolicy)**
+  **Type: `[]`[ClientToPolicy](#clienttopolicy)**
 
 
 ### **ClientToPolicy**
 
-- `clientId`
+- **`clientId`**
 
   **Type: `string`**
 
-- `policyId`
+- **`policyId`**
 
   **Type: `string`**
 
 
 ### **Scopes**
 
-- `claimName`
+- **`claimName`**
 
   **Type: `string`**
 
-- `scopeToPolicyMapping`
+- **`scopeToPolicyMapping`**
 
-  **Type: [[]ScopeToPolicy](#scopetopolicy)**
+  **Type: `[]`[ScopeToPolicy](#scopetopolicy)**
 
 
 ### **ScopeToPolicy**
 
-- `scope`
+- **`scope`**
 
   **Type: `string`**
 
-- `policyId`
+- **`policyId`**
 
   **Type: `string`**
 
 
 ### **GoPlugin**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
@@ -755,7 +755,7 @@
 
 ### **CustomPlugin**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
@@ -763,7 +763,7 @@
 
   Old API Definition: `enable_coprocess_auth`
 
-- `header`
+- **`header`**
 
   **Type: [AuthSource](#authsource)**
 
@@ -771,7 +771,7 @@
 
   Old API Definition:
 
-- `cookie`
+- **`cookie`**
 
   **Type: [AuthSource](#authsource)**
 
@@ -779,7 +779,7 @@
 
   Old API Definition: `api_id`
 
-- `query`
+- **`query`**
 
   **Type: [AuthSource](#authsource)**
 
@@ -790,13 +790,13 @@
 
 ### **ClientCertificates**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
   Enabled enables static mTLS for the API.
 
-- `allowlist`
+- **`allowlist`**
 
   **Type: `[]string`**
 
@@ -805,13 +805,13 @@
 
 ### **GatewayTags**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
   Enabled enables use of segment tags.
 
-- `tags`
+- **`tags`**
 
   **Type: `[]string`**
 
@@ -820,13 +820,13 @@
 
 ### **Domain**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
   Enabled allow/disallow the usage of the domain.
 
-- `name`
+- **`name`**
 
   **Type: `string`**
 
@@ -835,24 +835,24 @@
 
 ### **Middleware**
 
-- `global`
+- **`global`**
 
   **Type: [Global](#global)**
 
   Global contains the configurations related to the global middleware.
 
-- `operations`
+- **`operations`**
 
-  **Type: [map[string]Operation](#operation)**
+  **Type: `map[string]`[Operation](#operation)**
 
 
 ### **Global**
 
-- `cors`
+- **`cors`**
 
   **Type: [CORS](#cors)**
 
-- `cache`
+- **`cache`**
 
   **Type: [Cache](#cache)**
 
@@ -863,46 +863,46 @@
 
 ### **CORS**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
-- `maxAge`
+- **`maxAge`**
 
   **Type: `int`**
 
-- `allowCredentials`
+- **`allowCredentials`**
 
   **Type: `boolean`**
 
-- `exposedHeaders`
+- **`exposedHeaders`**
 
   **Type: `[]string`**
 
-- `allowedHeaders`
+- **`allowedHeaders`**
 
   **Type: `[]string`**
 
-- `optionsPassthrough`
+- **`optionsPassthrough`**
 
   **Type: `boolean`**
 
-- `debug`
+- **`debug`**
 
   **Type: `boolean`**
 
-- `allowedOrigins`
+- **`allowedOrigins`**
 
   **Type: `[]string`**
 
-- `allowedMethods`
+- **`allowedMethods`**
 
   **Type: `[]string`**
 
 
 ### **Cache**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
@@ -912,7 +912,7 @@
 
   Old API Definition: `cache_options.enable_cache`
 
-- `timeout`
+- **`timeout`**
 
   **Type: `int`**
 
@@ -920,7 +920,7 @@
 
   Old API Definition: `cache_options.cache_timeout`
 
-- `cacheAllSafeRequests`
+- **`cacheAllSafeRequests`**
 
   **Type: `boolean`**
 
@@ -930,7 +930,7 @@
 
   Old API Definition: `cache_options.cache_all_safe_requests`
 
-- `cacheResponseCodes`
+- **`cacheResponseCodes`**
 
   **Type: `[]int`**
 
@@ -938,7 +938,7 @@
 
   Old API Definition: `cache_options.cache_response_codes`
 
-- `cacheByHeaders`
+- **`cacheByHeaders`**
 
   **Type: `[]string`**
 
@@ -946,7 +946,7 @@
 
   Old API Definition: `cache_options.cache_by_headers`
 
-- `enableUpstreamCacheControl`
+- **`enableUpstreamCacheControl`**
 
   **Type: `boolean`**
 
@@ -954,7 +954,7 @@
 
   Old API Definition: `cache_options.enable_upstream_cache_control`
 
-- `controlTTLHeaderName`
+- **`controlTTLHeaderName`**
 
   **Type: `string`**
 
@@ -965,57 +965,57 @@
 
 ### **Operation**
 
-- `allow`
+- **`allow`**
 
   **Type: [Allowance](#allowance)**
 
-- `block`
+- **`block`**
 
   **Type: [Allowance](#allowance)**
 
-- `ignoreAuthentication`
+- **`ignoreAuthentication`**
 
   **Type: [Allowance](#allowance)**
 
-- `transformRequestMethod`
+- **`transformRequestMethod`**
 
   **Type: [TransformRequestMethod](#transformrequestmethod)**
 
   TransformRequestMethod allows you to transform the method of a request.
 
-- `cache`
+- **`cache`**
 
   **Type: [CachePlugin](#cacheplugin)**
 
-- `enforceTimeout`
+- **`enforceTimeout`**
 
   **Type: [EnforceTimeout](#enforcetimeout)**
 
-- `validateRequest`
+- **`validateRequest`**
 
   **Type: [ValidateRequest](#validaterequest)**
 
 
 ### **Allowance**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
-- `ignoreCase`
+- **`ignoreCase`**
 
   **Type: `boolean`**
 
 
 ### **TransformRequestMethod**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
   Enabled enables Method Transform for the given path and method.
 
-- `toMethod`
+- **`toMethod`**
 
   **Type: `string`**
 
@@ -1024,37 +1024,37 @@
 
 ### **CachePlugin**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
-- `cacheByRegex`
+- **`cacheByRegex`**
 
   **Type: `string`**
 
-- `cacheResponseCodes`
+- **`cacheResponseCodes`**
 
   **Type: `[]int`**
 
 
 ### **EnforceTimeout**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
-- `value`
+- **`value`**
 
   **Type: `int`**
 
 
 ### **ValidateRequest**
 
-- `enabled`
+- **`enabled`**
 
   **Type: `boolean`**
 
-- `errorResponseCode`
+- **`errorResponseCode`**
 
   **Type: `int`**
 

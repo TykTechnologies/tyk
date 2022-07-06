@@ -56,9 +56,6 @@ func (err *FieldDocError) Error() string {
 }
 
 func (err *FieldDocError) WriteError(errMsg string) {
-	if errMsg == "" {
-		return
-	}
 	err.errs = append(err.errs, errMsg)
 }
 
@@ -147,7 +144,7 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 	for _, field := range structInfo.structObj.Fields.List {
 		ident := extractIdentFromExpr(field.Type)
 		if ident == nil {
-			if field.Names != nil {
+			if len(field.Names) > 0 {
 				// inline fields
 				ident = extractIdentFromExpr(p.globals[field.Names[0].Name])
 			}
@@ -157,22 +154,28 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 			}
 		}
 
+		var goName string
+		if len(field.Names) > 0 {
+			goName = field.Names[0].Name
+		}
+		if goName == "_" {
+			// ignored field.
+			continue
+		}
+
 		jsonName, isInline := jsonTagFromBasicLit(field.Tag)
 		if isInline {
 			p.parseInlineField(goPath, ident.Name, structInfo)
 			continue
 		}
-
 		if jsonName == "" && !isInline {
 			// field is for internal use?
 			continue
 		}
-
-		if len(field.Names) == 0 {
+		if goName == "" {
 			p.errList.WriteError(fmt.Sprintf("unidentified field in %s", goPath))
 			continue
 		}
-		goName := field.Names[0].Name
 
 		docs := cleanDocs(field.Doc)
 		if docs == "" {
@@ -298,7 +301,7 @@ func jsonTagFromBasicLit(tag *ast.BasicLit) (jsonName string, isInline bool) {
 	}
 
 	if len(jsonTags) > 1 && jsonTags[1] == "inline" {
-		return jsonTags[0], true
+		return "", true
 	}
 
 	if jsonTags[0] == "" || jsonTags[0] == "-" {
@@ -341,32 +344,33 @@ func goTypeToJson(globals map[string]ast.Expr, typeName string) string {
 	return ""
 }
 
-func xtykDocToMarkdown(xtykDoc XTykDoc) string {
-	const title = `
-## Documentation of X-Tyk-Gateway Object
+const xTykDocMarkdownTitle = `
+## TYK OAS API Object
 
 `
 
+func xTykDocToMarkdown(xtykDoc XTykDoc) string {
+
 	docWriter := strings.Builder{}
-	docWriter.WriteString(title)
+	docWriter.WriteString(xTykDocMarkdownTitle)
 
 	for _, structInfo := range xtykDoc {
 		docWriter.WriteString(fmt.Sprintf("### **%s**\n\n", structInfo.Name))
 
 		for _, field := range structInfo.Fields {
-			fieldInfoToMarkDown(field, &docWriter)
+			fieldInfoToMarkdown(field, &docWriter)
 		}
 		docWriter.WriteByte('\n')
 	}
 	return docWriter.String()
 }
 
-func fieldInfoToMarkDown(field *FieldInfo, docWriter *strings.Builder) {
-	docWriter.WriteString(fmt.Sprintf("- `%s`\n\n", field.JsonName))
+func fieldInfoToMarkdown(field *FieldInfo, docWriter *strings.Builder) {
+	docWriter.WriteString(fmt.Sprintf("- **`%s`**\n\n", field.JsonName))
 
 	if field.JsonType != "" {
 		docWriter.WriteString("  **Type: ")
-		docWriter.WriteString(fmt.Sprintf("%s**\n\n", jsonTypeToHTML(field)))
+		docWriter.WriteString(fmt.Sprintf("%s**\n\n", fieldTypeToMarkdown(field)))
 	}
 
 	if field.Doc != "" {
@@ -378,19 +382,23 @@ func fieldInfoToMarkDown(field *FieldInfo, docWriter *strings.Builder) {
 	}
 }
 
-func jsonTypeToHTML(f *FieldInfo) string {
-	fullType := f.JsonType
+func fieldTypeToMarkdown(f *FieldInfo) string {
+	ext := ""
 	if f.IsArray {
-		fullType = "[]" + f.JsonType
+		ext = "[]"
 	}
 	if f.MapKey != "" {
-		fullType = fmt.Sprintf("map[%s]%s", f.MapKey, fullType)
+		ext = fmt.Sprintf("map[%s]", f.MapKey) + ext
 	}
 
 	switch f.JsonType {
 	case "boolean", "int", "float", "double", "string", "any", "object":
-		return fmt.Sprintf("`%s`", fullType)
+		return fmt.Sprintf("`%s%s`", ext, f.JsonType)
+	}
+
+	if ext != "" {
+		ext = "`" + ext + "`"
 	}
 	// markdown link
-	return fmt.Sprintf("[%s](#%s)", fullType, strings.ToLower(f.JsonType))
+	return fmt.Sprintf("%s[%s](#%s)", ext, f.JsonType, strings.ToLower(f.JsonType))
 }
