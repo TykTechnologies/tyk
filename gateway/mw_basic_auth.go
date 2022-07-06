@@ -222,13 +222,7 @@ func (k *BasicAuthKeyIsValid) checkPassword(session *user.SessionState, plainPas
 			return errUnauthorized
 		}
 
-	case user.HashSha256:
-		fallthrough
-	case user.HashMurmur32:
-		fallthrough
-	case user.HashMurmur64:
-		fallthrough
-	case user.HashMurmur128:
+	case user.HashSha256, user.HashMurmur32, user.HashMurmur64, user.HashMurmur128:
 		// Verify we have a valid Hash value
 		hashAlgo := string(session.BasicAuthData.Hash)
 
@@ -240,6 +234,7 @@ func (k *BasicAuthKeyIsValid) checkPassword(session *user.SessionState, plainPas
 
 	case user.HashBCrypt:
 		fallthrough
+
 	default:
 		if err := k.compareHashAndPassword(session.BasicAuthData.Password, plainPassword, logger); err != nil {
 			return err
