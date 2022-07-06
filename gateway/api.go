@@ -308,15 +308,39 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 // need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
 
 func setSessionPassword(session *user.SessionState) {
-	session.BasicAuthData.Hash = user.HashBCrypt
-	newPass, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
-	if err != nil {
-		log.Error("Could not hash password, setting to plaintext, error was: ", err)
-		session.BasicAuthData.Hash = user.HashPlainText
+	basicAuthHashAlgo := basicAuthHashAlgo()
+
+	if basicAuthHashAlgo == string(user.HashBCrypt) {
+		session.BasicAuthData.Hash = user.HashBCrypt
+		hashedPassBytes, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
+		if err != nil {
+			log.WithError(err).Error("Could not hash password, setting to plaintext")
+			session.BasicAuthData.Hash = user.HashPlainText
+			return
+		}
+
+		session.BasicAuthData.Password = string(hashedPassBytes)
 		return
 	}
 
-	session.BasicAuthData.Password = string(newPass)
+	session.BasicAuthData.Password = storage.HashStr(session.BasicAuthData.Password, basicAuthHashAlgo)
+	session.BasicAuthData.Hash = user.HashType(basicAuthHashAlgo)
+}
+
+func basicAuthHashAlgo() string {
+	config := config.Global()
+
+	// Use `basic_auth_hash_key_function` if set;
+	algo := config.BasicAuthHashKeyFunction
+
+	// If hash function name is empty/invalid
+	if ok := user.IsHashType(algo); !ok {
+		// set default basic auth hash to bcrypt
+		return string(user.HashBCrypt)
+	}
+
+	// Algo is validated at this point
+	return algo
 }
 
 func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
