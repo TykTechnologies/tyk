@@ -16,8 +16,20 @@ type HashType string
 
 const (
 	HashPlainText HashType = ""
-	HashBCrypt    HashType = "bcrypt"
+	HashBCrypt             = "bcrypt"
+	HashSha256             = "sha256"
+	HashMurmur32           = "murmur32"
+	HashMurmur64           = "murmur64"
+	HashMurmur128          = "murmur128"
 )
+
+func IsHashType(t string) bool {
+	switch HashType(t) {
+	case HashBCrypt, HashSha256, HashMurmur32, HashMurmur64, HashMurmur128:
+		return true
+	}
+	return false
+}
 
 // AccessSpecs define what URLS a user has access to an what methods are enabled
 type AccessSpec struct {
