@@ -378,7 +378,7 @@ func (gw *Gateway) basicAuthHashAlgo() string {
 	// If hash function name is empty/invalid
 	if ok := user.IsHashType(algo); !ok {
 		// set default basic auth hash to bcrypt
-		return "bcrypt"
+		return string(user.HashBCrypt)
 	}
 
 	// Algo is validated at this point
