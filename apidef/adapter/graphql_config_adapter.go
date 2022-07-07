@@ -8,11 +8,12 @@ import (
 	"sort"
 	"strings"
 
-	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
-	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
+	kafkaDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
+	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -243,6 +244,28 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				graphqlConfig.Method,
 				graphqlConfig.Headers,
 			))
+
+		case apidef.GraphQLEngineDataSourceKindKafka:
+			var kafkaConfig apidef.GraphQLEngineDataSourceConfigKafka
+			err = json.Unmarshal(ds.Config, &kafkaConfig)
+			if err != nil {
+				return nil, err
+			}
+
+			planDataSource.Factory = &kafkaDataSource.Factory{}
+			planDataSource.Custom = kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
+				Subscription: kafkaDataSource.SubscriptionConfiguration{
+					BrokerAddresses:      kafkaConfig.BrokerAddresses,
+					Topic:                kafkaConfig.Topic,
+					GroupID:              kafkaConfig.GroupID,
+					ClientID:             kafkaConfig.ClientID,
+					KafkaVersion:         kafkaConfig.KafkaVersion,
+					StartConsumingLatest: kafkaConfig.StartConsumingLatest,
+					BalanceStrategy:      kafkaConfig.BalanceStrategy,
+					IsolationLevel:       kafkaConfig.IsolationLevel,
+					SASL:                 kafkaConfig.SASL,
+				},
+			})
 		}
 
 		planDataSources = append(planDataSources, planDataSource)

@@ -31,9 +31,9 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
-	gqlhttp "github.com/jensneuse/graphql-go-tools/pkg/http"
-	"github.com/jensneuse/graphql-go-tools/pkg/subscription"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
 
 	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"

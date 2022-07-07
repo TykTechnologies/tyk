@@ -14,7 +14,8 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
 	"github.com/clbanning/mxj"
 
@@ -807,6 +808,7 @@ type GraphQLEngineDataSourceKind string
 const (
 	GraphQLEngineDataSourceKindREST    = "REST"
 	GraphQLEngineDataSourceKindGraphQL = "GraphQL"
+	GraphQLEngineDataSourceKindKafka   = "Kafka"
 )
 
 type GraphQLEngineDataSource struct {
@@ -834,6 +836,18 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 	URL     string            `bson:"url" json:"url"`
 	Method  string            `bson:"method" json:"method"`
 	Headers map[string]string `bson:"headers" json:"headers"`
+}
+
+type GraphQLEngineDataSourceConfigKafka struct {
+	BrokerAddresses      []string              `bson:"broker_addresses" json:"broker_addresses"`
+	Topic                string                `bson:"topic" json:"topic"`
+	GroupID              string                `bson:"group_id" json:"group_id"`
+	ClientID             string                `bson:"client_id" json:"client_id"`
+	KafkaVersion         string                `bson:"kafka_version" json:"kafka_version"`
+	StartConsumingLatest bool                  `json:"start_consuming_latest"`
+	BalanceStrategy      string                `json:"balance_strategy"`
+	IsolationLevel       string                `json:"isolation_level"`
+	SASL                 kafka_datasource.SASL `json:"sasl"`
 }
 
 type QueryVariable struct {
