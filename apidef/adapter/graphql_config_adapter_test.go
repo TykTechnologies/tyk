@@ -2,7 +2,6 @@ package adapter
 
 import (
 	"encoding/json"
-	kafkaDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"net/http"
 	"strconv"
 	"testing"
