@@ -389,13 +389,13 @@ type fromDashboardServiceResponse struct {
 }
 
 type nestedApiDefinition struct {
-	ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
-	OAS           *oas.OAS              `json:"oas"`
+	*apidef.APIDefinition `json:"api_definition,inline"`
+	OAS                   *oas.OAS `json:"oas"`
 }
 
 func (f *fromDashboardServiceResponse) set(defs []*apidef.APIDefinition) {
 	for _, def := range defs {
-		f.Message = append(f.Message, nestedApiDefinition{ApiDefinition: def})
+		f.Message = append(f.Message, nestedApiDefinition{APIDefinition: def})
 	}
 }
 
@@ -415,12 +415,12 @@ func (f *fromDashboardServiceResponse) filter(enabled bool, tags ...string) []ne
 
 	result := make([]nestedApiDefinition, 0, len(f.Message))
 	for _, v := range f.Message {
-		if v.ApiDefinition.TagsDisabled {
+		if v.TagsDisabled {
 			continue
 		}
-		for _, tag := range v.ApiDefinition.Tags {
+		for _, tag := range v.Tags {
 			if ok := tagMap[tag]; ok {
-				result = append(result, nestedApiDefinition{v.ApiDefinition, v.OAS})
+				result = append(result, nestedApiDefinition{v.APIDefinition, v.OAS})
 				break
 			}
 		}
@@ -479,12 +479,12 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	// Process
 	var specs []*APISpec
 	for _, def := range apiDefs {
-		spec := a.MakeSpec(def.ApiDefinition, nil)
+		spec := a.MakeSpec(def.APIDefinition, nil)
 
 		if spec.IsOAS {
 			loader := openapi3.NewLoader()
 			if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
-				log.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.ApiDefinition.APIID)
+				log.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
 			}
 
 			spec.OAS = *def.OAS
