@@ -14,6 +14,25 @@ type OAS struct {
 	openapi3.T
 }
 
+func (s *OAS) MarshalJSON() ([]byte, error) {
+	if ShouldOmit(s.ExternalDocs) { // for sql case
+		s.ExternalDocs = nil
+	}
+
+	if s.Info != nil && ShouldOmit(s.Info.License) { // for sql case
+		s.Info.License = nil
+	}
+
+	type Alias OAS
+
+	// to prevent infinite recursion
+	return json.Marshal(&struct {
+		*Alias
+	}{
+		Alias: (*Alias)(s),
+	})
+}
+
 func (s *OAS) Fill(api apidef.APIDefinition) {
 	xTykAPIGateway := s.GetTykExtension()
 	if xTykAPIGateway == nil {

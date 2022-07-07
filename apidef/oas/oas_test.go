@@ -292,3 +292,20 @@ func Test_toStructIfMap(t *testing.T) {
 
 	assert.Equal(t, token, resToken)
 }
+
+func TestOAS_MarshalJSON(t *testing.T) {
+	s := &OAS{
+		T: openapi3.T{
+			Info: &openapi3.Info{
+				License: &openapi3.License{},
+			},
+			ExternalDocs: &openapi3.ExternalDocs{},
+		},
+	}
+
+	inBytes, err := json.Marshal(s)
+	assert.NoError(t, err)
+
+	assert.NotContains(t, string(inBytes), "license")
+	assert.NotContains(t, string(inBytes), "externalDocs")
+}
