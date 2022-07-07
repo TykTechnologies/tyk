@@ -539,7 +539,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
 
-	var apiDefs []*apidef.APIDefinition
+	var apiDefs []*nestedApiDefinition
 	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
 		return nil, err
 	}
@@ -558,7 +558,16 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 			def.Proxy.ListenPath = newListenPath
 		}
 
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(def.APIDefinition, nil)
+		if spec.IsOAS {
+			loader := openapi3.NewLoader()
+			if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
+				log.WithError(err).Errorf("RPC loaded API's OAS reference resolve failed: %s", def.APIID)
+			}
+
+			spec.OAS = *def.OAS
+		}
+
 		specs = append(specs, spec)
 	}
 
