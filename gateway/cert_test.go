@@ -714,6 +714,8 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(fmt.Sprintf("request host is %s", r.Host)))
+		w.WriteHeader(200)
 	}))
 
 	// Mutual TLS protected upstream
@@ -771,7 +773,11 @@ func TestUpstreamMutualTLS(t *testing.T) {
 			ts.Gw.LoadAPI(api)
 
 			// Giving a different value to proxy host, it should not interfere upstream certificate matching
-			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost, Code: http.StatusOK, Client: test.NewClientLocal()})
+			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost,
+				BodyMatchFunc: func(bytes []byte) bool {
+					return strings.Contains(string(bytes), targetHost)
+				},
+				Code: http.StatusOK, Client: test.NewClientLocal()})
 		})
 
 		t.Run("PreserveHostHeader=true", func(t *testing.T) {
@@ -779,7 +785,11 @@ func TestUpstreamMutualTLS(t *testing.T) {
 			ts.Gw.LoadAPI(api)
 
 			// Giving a different value to proxy host, it should not interfere upstream certificate matching
-			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost, Code: http.StatusOK, Client: test.NewClientLocal()})
+			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost,
+				BodyMatchFunc: func(bytes []byte) bool {
+					return strings.Contains(string(bytes), proxyHost)
+				},
+				Code: http.StatusOK, Client: test.NewClientLocal()})
 		})
 
 		t.Run("honor UpstreamCertificatesDisabled flag", func(t *testing.T) {
