@@ -1,6 +1,6 @@
 # Keep the branch on tyk-analytics in sync with this branch
 
-name: Update go.mod
+name: Update tyk-analytics branch
 
 on:
   push:
