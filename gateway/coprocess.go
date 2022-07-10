@@ -562,6 +562,9 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 
 	// Set headers:
 	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
+	for k := range res.Header {
+		delete(res.Header, k)
+	}
 	for k, v := range retObject.Response.Headers {
 		setCustomHeader(res.Header, k, v, ignoreCanonical)
 	}
