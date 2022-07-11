@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: peter-evans/repository-dispatch@v1
         with:
-          token: ${{ secrets.GH_ORG_TOKEN }}
+          token: ${{ secrets.ORG_GH_TOKEN }}
           repository: TykTechnologies/tyk-docs
           event-type: tyk-oas-docs
           client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
