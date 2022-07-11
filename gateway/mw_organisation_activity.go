@@ -171,7 +171,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 	}
 
 	// Lets keep a reference of the org
-	setCtxValue(r, ctx.OrgSessionContext, &orgSession)
+	setCtxValue(r, ctx.OrgSessionContext, orgSession)
 
 	// Request is valid, carry on
 	return nil, http.StatusOK
