@@ -930,7 +930,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 		}
 
 		pipe.ZAdd(r.RedisController.ctx, keyName, &element)
-		pipe.Expire(r.RedisController.ctx, keyName, time.Duration(per)*time.Second)
+		pipe.PExpire(r.RedisController.ctx, keyName, time.Duration(per)*time.Second)
 
 		return nil
 	}
