@@ -145,14 +145,14 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 		readyToSend := false
 
-		flushTimer := time.NewTimer(recordsBufferFlushInterval)
+		//flushTimer := time.NewTimer(recordsBufferFlushInterval)
 
 		select {
 		case record, ok := <-r.recordsChan:
-			if !flushTimer.Stop() {
+			/*if !flushTimer.Stop() {
 				// if the timer has been stopped then read from the channel to avoid leak
 				<-flushTimer.C
-			}
+			}*/
 
 			// check if channel was closed and it is time to exit from worker
 			if !ok {
@@ -203,7 +203,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 			// identify that buffer is ready to be sent
 			readyToSend = uint64(len(recordsBuffer)) == r.workerBufferSize
-		case <-flushTimer.C:
+		case <-time.After(recordsBufferFlushInterval):
 			// nothing was received for that period of time
 			// anyways send whatever we have, don't hold data too long in buffer
 			readyToSend = true

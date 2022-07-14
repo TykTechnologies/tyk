@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"github.com/TykTechnologies/tyk-pump/analytics/demo"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -583,4 +584,41 @@ func BenchmarkTagHeaders(b *testing.B) {
 			b.Fatal("Existing tags have not been expanded")
 		}
 	}
+}
+
+func BenchmarkRecordWorker(b *testing.B) {
+
+	b.Run("msgpack", func(b *testing.B) {
+		RunRecordWorkerOp("msgpack", b)
+	})
+
+	b.Run("protobuf", func(b *testing.B) {
+		RunRecordWorkerOp("protobuf", b)
+	})
+}
+
+func BenchmarkRecordWorkerWithMsgPack(b *testing.B) {
+	RunRecordWorkerOp("msgpack", b)
+}
+
+func BenchmarkRecordWorkerWithProtobuf(b *testing.B) {
+	RunRecordWorkerOp("protobuf", b)
+}
+
+func RunRecordWorkerOp(serializationMethod string, b *testing.B) {
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.EnableAnalytics = true
+		globalConf.AnalyticsConfig.SerializerType = serializationMethod
+	})
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < 1000; i++ {
+		//b.Helper()
+		ar := demo.GenerateRandomAnalyticRecord("org_1")
+		g.Gw.Analytics.recordsChan <- &ar
+	}
+
+	g.Gw.Analytics.Stop()
+
 }
