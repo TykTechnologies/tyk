@@ -122,5 +122,7 @@ func TestValidateRequest(t *testing.T) {
 		{Data: `{"name": "my-product", "owner": {"name": "Furkan"}}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/post"},
 		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": 123}}}`, Code: http.StatusBadRequest, Method: http.MethodPost, Headers: headers, Path: "/post"},
 		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/post"},
+		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Domain: "custom-domain",
+			Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/post", Client: test.NewClientLocal()},
 	}...)
 }
