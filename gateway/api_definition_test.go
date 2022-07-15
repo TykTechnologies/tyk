@@ -232,7 +232,7 @@ func TestGatewayTagsFilter(t *testing.T) {
 		}
 	}
 
-	data := &fromDashboardServiceResponse{}
+	data := &nestedApiDefinitionList{}
 	data.set([]*apidef.APIDefinition{
 		newApiWithTags(false, []string{}),
 		newApiWithTags(true, []string{}),
