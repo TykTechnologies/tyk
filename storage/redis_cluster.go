@@ -38,63 +38,7 @@ type RedisCluster struct {
 }
 
 func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.UniversalClient {
-	// redisSingletonMu is locked and we know the singleton is nil
-	cfg := conf.Storage
-	if isCache && conf.EnableSeperateCacheStore {
-		cfg = conf.CacheStorage
-	} else if isAnalytics && conf.EnableAnalytics && conf.EnableSeperateAnalyticsStore {
-		cfg = conf.AnalyticsStorage
-	}
-	log.Debug("Creating new Redis connection pool")
-
-	// poolSize applies per cluster node and not for the whole cluster.
-	poolSize := 500
-	if cfg.MaxActive > 0 {
-		poolSize = cfg.MaxActive
-	}
-
-	timeout := 5 * time.Second
-
-	if cfg.Timeout > 0 {
-		timeout = time.Duration(cfg.Timeout) * time.Second
-	}
-
-	var tlsConfig *tls.Config
-
-	if cfg.UseSSL {
-		tlsConfig = &tls.Config{
-			InsecureSkipVerify: cfg.SSLInsecureSkipVerify,
-		}
-	}
-
-	var client redis.UniversalClient
-	opts := &redis.UniversalOptions{
-		Addrs:            getRedisAddrs(cfg),
-		MasterName:       cfg.MasterName,
-		SentinelPassword: cfg.SentinelPassword,
-		Username:         cfg.Username,
-		Password:         cfg.Password,
-		DB:               cfg.Database,
-		DialTimeout:      timeout,
-		ReadTimeout:      timeout,
-		WriteTimeout:     timeout,
-		IdleTimeout:      240 * timeout,
-		PoolSize:         poolSize,
-		TLSConfig:        tlsConfig,
-	}
-
-	if opts.MasterName != "" {
-		log.Info("--> [REDIS] Creating sentinel-backed failover client")
-		client = redis.NewFailoverClient(opts.Failover())
-	} else if cfg.EnableCluster {
-		log.Info("--> [REDIS] Creating cluster client")
-		client = redis.NewClusterClient(opts.Cluster())
-	} else {
-		log.Info("--> [REDIS] Creating single-node client")
-		client = redis.NewClient(opts.Simple())
-	}
-
-	return client
+	return NewRedisClusterPoolWithOptions(isCache, isAnalytics, conf, nil)
 }
 
 func NewRedisClusterPoolWithOptions(isCache, isAnalytics bool, conf config.Config, cb func(*redis.UniversalOptions)) redis.UniversalClient {
@@ -144,7 +88,9 @@ func NewRedisClusterPoolWithOptions(isCache, isAnalytics bool, conf config.Confi
 	}
 
 	// Patch default config with test config;
-	cb(opts)
+	if cb != nil {
+		cb(opts)
+	}
 
 	if opts.MasterName != "" {
 		log.Info("--> [REDIS] Creating sentinel-backed failover client")
