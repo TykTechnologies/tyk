@@ -105,22 +105,47 @@ func TestValidateRequest(t *testing.T) {
 	err = oasAPI.Validate(context.Background())
 	assert.NoError(t, err)
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.VersionData = def.VersionData
-		spec.Name = "furkan"
-		spec.OAS = oasAPI
-		spec.IsOAS = true
-		spec.Proxy.ListenPath = "/"
-	})
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.VersionData = def.VersionData
+			spec.Name = "without regexp"
+			spec.OAS = oasAPI
+			spec.IsOAS = true
+			spec.Proxy.ListenPath = "/furkan"
+		},
+		func(spec *APISpec) {
+			spec.VersionData = def.VersionData
+			spec.Name = "regexp 1"
+			spec.OAS = oasAPI
+			spec.IsOAS = true
+			spec.Proxy.ListenPath = "/bob/{name:.*}"
+			spec.UseKeylessAccess = true
+		},
+		func(spec *APISpec) {
+			spec.VersionData = def.VersionData
+			spec.Name = "regexp 2"
+			spec.OAS = oasAPI
+			spec.IsOAS = true
+			spec.Proxy.ListenPath = "/charlie/{name:.*}/suffix"
+			spec.UseKeylessAccess = true
+		})
 
 	headers := map[string]string{"Content-Type": "application/json"}
 
 	_, _ = ts.Run(t, []test.TestCase{
-		{Data: `{"name": 123}`, Code: http.StatusBadRequest, Method: http.MethodPost, Headers: headers, Path: "/post"},
-		{Data: `{"name": "my-product"}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/post"},
-		{Data: `{"name": "my-product", "owner": {"name": 123}}`, Code: http.StatusBadRequest, Method: http.MethodPost, Headers: headers, Path: "/post"},
-		{Data: `{"name": "my-product", "owner": {"name": "Furkan"}}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/post"},
-		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": 123}}}`, Code: http.StatusBadRequest, Method: http.MethodPost, Headers: headers, Path: "/post"},
-		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/post"},
+		{Data: `{"name": 123}`, Code: http.StatusBadRequest, Method: http.MethodPost, Headers: headers, Path: "/furkan/post"},
+		{Data: `{"name": "my-product"}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/furkan/post"},
+		{Data: `{"name": "my-product", "owner": {"name": 123}}`, Code: http.StatusBadRequest, Method: http.MethodPost,
+			Headers: headers, Path: "/furkan/post"},
+		{Data: `{"name": "my-product", "owner": {"name": "Furkan"}}`, Code: http.StatusOK, Method: http.MethodPost,
+			Headers: headers, Path: "/furkan/post"},
+		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": 123}}}`, Code: http.StatusBadRequest, Method: http.MethodPost,
+			Headers: headers, Path: "/furkan/post"},
+		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Code: http.StatusOK, Method: http.MethodPost,
+			Headers: headers, Path: "/furkan/post"},
+		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Domain: "custom-domain",
+			Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/bob/alice/post", Client: test.NewClientLocal()},
+		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Domain: "custom-domain",
+			Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/charlie/puth/suffix/post", Client: test.NewClientLocal()},
 	}...)
 }

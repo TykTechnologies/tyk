@@ -2,10 +2,10 @@ package gateway
 
 import (
 	"fmt"
-	"net/http"
-
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers/gorillamux"
+	"net/http"
 )
 
 type ValidateRequest struct {
@@ -52,7 +52,13 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return nil, http.StatusOK
 	}
 
-	router, err := gorillamux.NewRouter(&k.Spec.OAS.T)
+	// replacing servers object to just have listen path so that router.FindRoute(r) will not fail with strict hostname check
+	oasSpec := k.Spec.OAS.T
+	oasSpec.Servers = openapi3.Servers{
+		{URL: k.Spec.Proxy.ListenPath},
+	}
+
+	router, err := gorillamux.NewRouter(&oasSpec)
 	if err != nil {
 		return fmt.Errorf("request validation error: %v", err), http.StatusBadRequest
 	}
