@@ -10,6 +10,9 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
+// RedisClientConstructorFn creates a redis.UniversalClient instance
+type RedisClientConstructorFn func(cache bool, analytics bool, c config.Config) redis.UniversalClient
+
 type RedisController struct {
 	singlePool          redis.UniversalClient
 	singleCachePool     redis.UniversalClient
@@ -20,13 +23,22 @@ type RedisController struct {
 
 	ctx       context.Context
 	reconnect chan struct{}
+
+	constructor RedisClientConstructorFn
 }
 
+// NewRedisController creates a new *RedisController
 func NewRedisController(ctx context.Context) *RedisController {
 	return &RedisController{
-		ctx:       ctx,
-		reconnect: make(chan struct{}, 1),
+		ctx:         ctx,
+		reconnect:   make(chan struct{}, 1),
+		constructor: NewRedisClusterPool,
 	}
+}
+
+// SetConstructor overrides the default constructor. Use in tests only.
+func (rc *RedisController) SetConstructor(constructor RedisClientConstructorFn) {
+	rc.constructor = constructor
 }
 
 // DisableRedis allows to dynamically enable/disable talking with redisW
@@ -98,15 +110,15 @@ func (rc *RedisController) connectSingleton(cache, analytics bool, conf config.C
 	}
 
 	if cache {
-		rc.singleCachePool = NewRedisClusterPool(cache, analytics, conf)
+		rc.singleCachePool = rc.constructor(cache, analytics, conf)
 		return true
 	}
 
 	if analytics {
-		rc.singleAnalyticsPool = NewRedisClusterPool(cache, analytics, conf)
+		rc.singleAnalyticsPool = rc.constructor(cache, analytics, conf)
 		return true
 	}
-	rc.singlePool = NewRedisClusterPool(cache, analytics, conf)
+	rc.singlePool = rc.constructor(cache, analytics, conf)
 	return true
 }
 

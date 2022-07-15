@@ -24,10 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/rpc"
-
 	jwt "github.com/dgrijalva/jwt-go"
-
+	redis "github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
@@ -39,11 +37,13 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
-	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
 	"github.com/TykTechnologies/tyk/test"
-	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
 	"github.com/TykTechnologies/tyk/user"
+
+	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
+	_ "github.com/TykTechnologies/tyk/testdata"  // Don't delete
 )
 
 var (
@@ -1029,6 +1029,14 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	gw := NewGateway(gwConfig, s.ctx)
 	gw.setTestMode(true)
+
+	// This overrides the default dialer for redis to always use 127.0.0.1 in tests;
+	// It also avoids dns lookups, the dns mock.
+	gw.RedisController.SetConstructor(func(cache bool, analytics bool, config config.Config) redis.UniversalClient {
+		return storage.NewRedisClusterPoolWithOptions(cache, analytics, config, func(cfg *redis.UniversalOptions) {
+			cfg.Dialer = test.LocalDialer()
+		})
+	})
 
 	s.MockHandle = MockHandle
 
