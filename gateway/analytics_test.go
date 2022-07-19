@@ -612,12 +612,16 @@ func RunRecordWorkerOp(serializationMethod string, b *testing.B) {
 		globalConf.AnalyticsConfig.SerializerType = serializationMethod
 		globalConf.AnalyticsConfig.RecordsBufferSize = 200
 	})
+
+	var records []analytics.AnalyticsRecord
+	for i := 0; i < 1000; i++ {
+		records = append(records, demo.GenerateRandomAnalyticRecord("org_1"))
+	}
+
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < 1000; i++ {
-		//b.Helper()
-		ar := demo.GenerateRandomAnalyticRecord("org_1")
-		g.Gw.Analytics.recordsChan <- &ar
+	for i := 0; i < 100; i++ {
+		g.Gw.Analytics.recordsChan <- &records[i]
 	}
 
 	g.Gw.Analytics.Stop()
@@ -639,24 +643,27 @@ func BenchmarkSerialization(b *testing.B) {
 }
 
 func BenchmarkProtobufEncoding(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
 	performSerializationHelper(serializer.PROTOBUF_SERIALIZER, b)
 }
 
 func BenchmarkMsgpackEncoding(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
 	performSerializationHelper(serializer.MSGP_SERIALIZER, b)
 }
 
 func performSerializationHelper(serializerType string, b *testing.B) {
 
 	serializers := serializer.NewAnalyticsSerializer(serializerType)
+
+	var records []analytics.AnalyticsRecord
 	for i := 0; i < 100; i++ {
+		records = append(records, demo.GenerateRandomAnalyticRecord("org_1"))
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < len(records); i++ {
 		b.Helper()
-		ar := demo.GenerateRandomAnalyticRecord("org_1")
-		_, err := serializers.Encode(&ar)
+		_, err := serializers.Encode(&records[i])
 		if err != nil {
 			b.Fatal(err)
 		}
