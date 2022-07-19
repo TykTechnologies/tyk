@@ -952,6 +952,8 @@ type Config struct {
 
 	// Enable global API token expiration. Can be needed if all your APIs using JWT or oAuth 2.0 auth methods with dynamically generated keys.
 	ForceGlobalSessionLifetime bool `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
+	// SessionLifetimeRespectsKeyExpiration respects the key expiration time when the session lifetime is less than the key expiration. That is, Redis waits the key expiration for physical removal.
+	SessionLifetimeRespectsKeyExpiration bool `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration"`
 	// global session lifetime, in seconds.
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 

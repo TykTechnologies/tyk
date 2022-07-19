@@ -217,6 +217,16 @@ type APISpec struct {
 	} `json:"-"`
 }
 
+// GetSessionLifetimeRespectsKeyExpiration returns a boolean to tell whether session lifetime should respect to key expiration or not.
+// The global config takes the precedence. If the global one is `true`, value of the one in api level doesn't matter.
+func (a *APISpec) GetSessionLifetimeRespectsKeyExpiration() bool {
+	if a.GlobalConfig.SessionLifetimeRespectsKeyExpiration {
+		return true
+	}
+
+	return a.SessionLifetimeRespectsKeyExpiration
+}
+
 // Release releases all resources associated with API spec
 func (s *APISpec) Release() {
 	// release circuit breaker resources
