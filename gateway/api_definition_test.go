@@ -1386,3 +1386,25 @@ func TestEnforcedTimeout(t *testing.T) {
 		})
 	})
 }
+
+func TestAPISpec_GetSessionLifetimeRespectsKeyExpiration(t *testing.T) {
+	a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+	t.Run("GetSessionLifetimeRespectsKeyExpiration=false", func(t *testing.T) {
+		a.GlobalConfig.SessionLifetimeRespectsKeyExpiration = false
+		a.SessionLifetimeRespectsKeyExpiration = false
+		assert.False(t, a.GetSessionLifetimeRespectsKeyExpiration())
+
+		a.SessionLifetimeRespectsKeyExpiration = true
+		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
+	})
+
+	t.Run("GetSessionLifetimeRespectsKeyExpiration=true", func(t *testing.T) {
+		a.GlobalConfig.SessionLifetimeRespectsKeyExpiration = true
+		a.SessionLifetimeRespectsKeyExpiration = false
+		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
+
+		a.SessionLifetimeRespectsKeyExpiration = true
+		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
+	})
+}
