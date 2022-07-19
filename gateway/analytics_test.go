@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"github.com/TykTechnologies/tyk-pump/analytics/demo"
+	"github.com/TykTechnologies/tyk-pump/serializer"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -609,8 +610,8 @@ func RunRecordWorkerOp(serializationMethod string, b *testing.B) {
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.EnableAnalytics = true
 		globalConf.AnalyticsConfig.SerializerType = serializationMethod
+		globalConf.AnalyticsConfig.RecordsBufferSize = 200
 	})
-
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < 1000; i++ {
@@ -621,4 +622,43 @@ func RunRecordWorkerOp(serializationMethod string, b *testing.B) {
 
 	g.Gw.Analytics.Stop()
 
+}
+
+func BenchmarkSerialization(b *testing.B) {
+	b.Run("Protobuf", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		performSerializationHelper(serializer.PROTOBUF_SERIALIZER, b)
+	})
+
+	b.Run("msgpack", func(*testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		performSerializationHelper(serializer.MSGP_SERIALIZER, b)
+	})
+}
+
+func BenchmarkProtobufEncoding(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	performSerializationHelper(serializer.PROTOBUF_SERIALIZER, b)
+}
+
+func BenchmarkMsgpackEncoding(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	performSerializationHelper(serializer.MSGP_SERIALIZER, b)
+}
+
+func performSerializationHelper(serializerType string, b *testing.B) {
+
+	serializers := serializer.NewAnalyticsSerializer(serializerType)
+	for i := 0; i < 100; i++ {
+		b.Helper()
+		ar := demo.GenerateRandomAnalyticRecord("org_1")
+		_, err := serializers.Encode(&ar)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
 }
