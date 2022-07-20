@@ -1226,7 +1226,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 }
 
-func TestAPIDefinitionLoader_Template(t *testing.T) {
+func TestAPIDefinitionLoader(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -1248,6 +1248,18 @@ func TestAPIDefinitionLoader_Template(t *testing.T) {
 		assert.Equal(t, "value-1", res["value2"])
 		assert.Equal(t, "value-2", res["value1"])
 	}
+
+	t.Run("processRPCDefinitions invalid", func(t *testing.T) {
+		specs, err := l.processRPCDefinitions("{invalid json}", ts.Gw)
+		assert.Len(t, specs, 0)
+		assert.Error(t, err)
+	})
+
+	t.Run("processRPCDefinitions zero", func(t *testing.T) {
+		specs, err := l.processRPCDefinitions("[]", ts.Gw)
+		assert.Len(t, specs, 0)
+		assert.NoError(t, err)
+	})
 
 	t.Run("loadFileTemplate", func(t *testing.T) {
 		temp, err := l.loadFileTemplate(testTemplatePath)
