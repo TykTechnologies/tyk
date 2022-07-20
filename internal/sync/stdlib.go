@@ -1,7 +1,7 @@
 package sync
 
 import (
-	"sync"
+	std "sync"
 )
 
 // When naming a package `sync`, even if internal, it is shadowing
@@ -15,12 +15,12 @@ import (
 // APIs within a package.
 
 type (
-	Cond      = sync.Cond
-	Locker    = sync.Locker
-	Map       = sync.Map
-	Mutex     = sync.Mutex
-	Once      = sync.Once
-	Pool      = sync.Pool
-	RWMutex   = sync.RWMutex
-	WaitGroup = sync.WaitGroup
+	Cond      = std.Cond
+	Locker    = std.Locker
+	Map       = std.Map
+	Mutex     = std.Mutex
+	Once      = std.Once
+	Pool      = std.Pool
+	RWMutex   = std.RWMutex
+	WaitGroup = std.WaitGroup
 )
