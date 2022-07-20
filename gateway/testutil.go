@@ -20,7 +20,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -39,6 +38,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/sync"
 	"github.com/TykTechnologies/tyk/storage"
 	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
 	"github.com/TykTechnologies/tyk/test"
@@ -934,7 +934,21 @@ type SlaveDataCenter struct {
 	Redis        config.StorageOptionsConf
 }
 
+var (
+	testRunnerInit      sync.Once
+	testRunnerSemaphore *sync.Semaphore
+)
+
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
+	testRunnerInit.Do(func() {
+		testRunnerSemaphore = sync.NewSemaphore()
+	})
+
+	if !testRunnerSemaphore.CanRun() {
+		panic("Test service runs in parallel, which is unsafe. Fix tests.")
+	}
+	defer testRunnerSemaphore.Done()
+
 	t := &Test{}
 
 	// DNS mock enabled by default
