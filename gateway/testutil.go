@@ -26,16 +26,16 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	jwt "github.com/dgrijalva/jwt-go"
-	redis "github.com/go-redis/redis/v8"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/go-redis/redis/v8"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
