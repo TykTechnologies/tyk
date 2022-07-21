@@ -480,9 +480,13 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 	return a.processRPCDefinitions(apiCollection, gw)
 }
 
+type nestedApiDefinition struct {
+	*apidef.APIDefinition `json:"api_definition,inline"`
+}
+
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
 
-	var apiDefs []*apidef.APIDefinition
+	var apiDefs []*nestedApiDefinition
 	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
 		return nil, err
 	}
@@ -501,7 +505,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 			def.Proxy.ListenPath = newListenPath
 		}
 
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(def.APIDefinition, nil)
 		specs = append(specs, spec)
 	}
 
