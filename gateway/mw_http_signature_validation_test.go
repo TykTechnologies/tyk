@@ -29,7 +29,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -240,7 +239,6 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 }
 
 func TestHMACAuthSessionPass(t *testing.T) {
-	test.Racy(t) // TODO: TT-3973
 
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
@@ -268,7 +266,6 @@ func TestHMACAuthSessionPass(t *testing.T) {
 }
 
 func TestHMACAuthSessionSHA512Pass(t *testing.T) {
-	test.Flaky(t) // TODO: TT-3973
 
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
@@ -438,7 +435,6 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 }
 
 func TestHMACAuthSessionKeyMissing(t *testing.T) {
-	test.Racy(t) // TODO: TT-3973
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -555,7 +551,6 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 }
 
 func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5228
 
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
@@ -773,7 +768,6 @@ func BenchmarkRSAAuthSessionPass(b *testing.B) {
 }
 
 func TestRSAAuthSessionKeyMissing(t *testing.T) {
-	test.Racy(t) // TODO: TT-4069
 	ts := StartTest(nil)
 	defer ts.Close()
 
