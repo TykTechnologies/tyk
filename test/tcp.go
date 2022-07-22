@@ -93,6 +93,7 @@ func (r TCPTestRunner) Run(t testing.TB, testCases ...TCPTestCase) error {
 
 func TcpMock(useSSL bool, cb func(in []byte, err error) (out []byte)) net.Listener {
 	var l net.Listener
+	var err error
 
 	if useSSL {
 		tlsConfig := &tls.Config{
@@ -101,9 +102,14 @@ func TcpMock(useSSL bool, cb func(in []byte, err error) (out []byte)) net.Listen
 			MaxVersion:         tls.VersionTLS12,
 		}
 		tlsConfig.BuildNameToCertificate()
-		l, _ = tls.Listen("tcp", ":0", tlsConfig)
+		l, err = tls.Listen("tcp", ":0", tlsConfig)
 	} else {
-		l, _ = net.Listen("tcp", ":0")
+		l, err = net.Listen("tcp", ":0")
+	}
+
+	// Panic, as we don't return err
+	if err != nil {
+		panic(err)
 	}
 
 	go func() {
