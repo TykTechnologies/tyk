@@ -108,11 +108,19 @@ func (p *Proxy) Serve(l net.Listener) error {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
+			// Fixed in go 1.16 with net.ErrClosed
+			if IsSocketClosed(err) {
+				return err
+			}
+
 			log.WithError(err).Warning("Can't accept connection")
 			return err
 		}
 		go func() {
 			if err := p.handleConn(conn); err != nil {
+				if IsSocketClosed(err) || errors.Is(err, io.EOF) {
+					return
+				}
 				log.WithError(err).Warning("Can't handle connection")
 			}
 		}()
@@ -321,6 +329,7 @@ func formatAddress(a, b net.Addr) string {
 // IsSocketClosed returns true if err is a result of reading from closed network
 // connection
 func IsSocketClosed(err error) bool {
+	// Fixed in go 1.16 with net.ErrClosed
 	return strings.Contains(err.Error(), "use of closed network connection")
 }
 
