@@ -206,13 +206,15 @@ func testRunner(t *testing.T, proxy *Proxy, hostname string, useSSL bool, testCa
 		tlsConfig.BuildNameToCertificate()
 		proxyLn, err = tls.Listen("tcp", ":0", tlsConfig)
 
-		if err != nil {
-			t.Fatalf(err.Error())
-			return
-		}
 	} else {
-		proxyLn, _ = net.Listen("tcp", ":0")
+		proxyLn, err = net.Listen("tcp", ":0")
 	}
+
+	if err != nil {
+		t.Fatalf(err.Error())
+		return
+	}
+
 	defer proxyLn.Close()
 
 	go proxy.Serve(proxyLn)

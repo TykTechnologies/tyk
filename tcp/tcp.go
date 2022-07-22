@@ -265,16 +265,17 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 			wg.Done()
 		},
 		onReadError: func(err error) {
-			if IsSocketClosed(err) && connectionClosed.Load().(bool) {
+			// End of stream from the client.
+			if IsSocketClosed(err) {
+				connectionClosed.Store(true)
+			}
+
+			// Connection is closed, don't hit log
+			if connectionClosed.Load().(bool) {
 				return
 			}
-			if err == io.EOF {
-				// End of stream from the client.
-				connectionClosed.Store(true)
-				log.WithField("conn", clientConn(conn)).Debug("End of client stream")
-			} else {
-				log.WithError(err).Error("Failed to read from client connection")
-			}
+
+			log.WithError(err).Error("Failed to read from client connection")
 		},
 		onWriteError: func(err error) {
 			log.WithError(err).Info("Failed to write to upstream socket")
@@ -293,16 +294,17 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 			wg.Done()
 		},
 		onReadError: func(err error) {
-			if IsSocketClosed(err) && connectionClosed.Load().(bool) {
+			// End of stream from upstream
+			if IsSocketClosed(err) {
+				connectionClosed.Store(true)
+			}
+
+			// Connection is closed, don't hit log
+			if connectionClosed.Load().(bool) {
 				return
 			}
-			if err == io.EOF {
-				// End of stream from upstream
-				connectionClosed.Store(true)
-				log.WithField("conn", upstreamConn(rconn)).Debug("End of upstream stream")
-			} else {
-				log.WithError(err).Error("Failed to read from upstream connection")
-			}
+
+			log.WithError(err).Error("Failed to read from upstream connection")
 		},
 		onWriteError: func(err error) {
 			log.WithError(err).Info("Failed to write to client connection")
@@ -327,9 +329,12 @@ func formatAddress(a, b net.Addr) string {
 }
 
 // IsSocketClosed returns true if err is a result of reading from closed network
-// connection
+// connection, or EOF which is essentially the same.
 func IsSocketClosed(err error) bool {
-	// Fixed in go 1.16 with net.ErrClosed
+	if errors.Is(err, io.EOF) {
+		return true
+	}
+	// Fixed in go 1.16 with net.ErrClosed:
 	return strings.Contains(err.Error(), "use of closed network connection")
 }
 
