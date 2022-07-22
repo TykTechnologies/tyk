@@ -81,13 +81,15 @@ func TestValidateRequest(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const operationID = "postpost"
+
 	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(testOASForValidateRequest))
 	assert.NoError(t, err)
 
 	xTykAPIGateway := &oas.XTykAPIGateway{
 		Middleware: &oas.Middleware{
 			Operations: oas.Operations{
-				"postpost": {
+				operationID: {
 					ValidateRequest: &oas.ValidateRequest{
 						Enabled: true,
 					},
@@ -111,41 +113,61 @@ func TestValidateRequest(t *testing.T) {
 			spec.Name = "without regexp"
 			spec.OAS = oasAPI
 			spec.IsOAS = true
-			spec.Proxy.ListenPath = "/furkan"
+			spec.Proxy.ListenPath = "/product"
 		},
 		func(spec *APISpec) {
 			spec.VersionData = def.VersionData
-			spec.Name = "regexp 1"
 			spec.OAS = oasAPI
 			spec.IsOAS = true
-			spec.Proxy.ListenPath = "/bob/{name:.*}"
+			spec.Proxy.ListenPath = "/product-regexp1/{name:.*}"
 			spec.UseKeylessAccess = true
 		},
 		func(spec *APISpec) {
 			spec.VersionData = def.VersionData
-			spec.Name = "regexp 2"
 			spec.OAS = oasAPI
 			spec.IsOAS = true
-			spec.Proxy.ListenPath = "/charlie/{name:.*}/suffix"
+			spec.Proxy.ListenPath = "/product-regexp2/{name:.*}/suffix"
 			spec.UseKeylessAccess = true
 		})
 
 	headers := map[string]string{"Content-Type": "application/json"}
 
-	_, _ = ts.Run(t, []test.TestCase{
-		{Data: `{"name": 123}`, Code: http.StatusBadRequest, Method: http.MethodPost, Headers: headers, Path: "/furkan/post"},
-		{Data: `{"name": "my-product"}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/furkan/post"},
-		{Data: `{"name": "my-product", "owner": {"name": 123}}`, Code: http.StatusBadRequest, Method: http.MethodPost,
-			Headers: headers, Path: "/furkan/post"},
-		{Data: `{"name": "my-product", "owner": {"name": "Furkan"}}`, Code: http.StatusOK, Method: http.MethodPost,
-			Headers: headers, Path: "/furkan/post"},
-		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": 123}}}`, Code: http.StatusBadRequest, Method: http.MethodPost,
-			Headers: headers, Path: "/furkan/post"},
-		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Code: http.StatusOK, Method: http.MethodPost,
-			Headers: headers, Path: "/furkan/post"},
-		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Domain: "custom-domain",
-			Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/bob/alice/post", Client: test.NewClientLocal()},
-		{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Domain: "custom-domain",
-			Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/charlie/puth/suffix/post", Client: test.NewClientLocal()},
-	}...)
+	t.Run("default error response code", func(t *testing.T) {
+		_, _ = ts.Run(t, []test.TestCase{
+			{Data: `{"name": 123}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product/push"},
+			{Data: `{"name": 123}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
+			{Data: `{"name": "my-product"}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
+			{Data: `{"name": "my-product", "owner": {"name": 123}}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost,
+				Headers: headers, Path: "/product/post"},
+			{Data: `{"name": "my-product", "owner": {"name": "Furkan"}}`, Code: http.StatusOK, Method: http.MethodPost,
+				Headers: headers, Path: "/product/post"},
+			{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": 123}}}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost,
+				Headers: headers, Path: "/product/post"},
+			{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Code: http.StatusOK, Method: http.MethodPost,
+				Headers: headers, Path: "/product/post"},
+			{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": 123}}}`, Domain: "custom-domain",
+				Code: http.StatusUnprocessableEntity, Method: http.MethodPost, Headers: headers, Path: "/product-regexp1/something/post", Client: test.NewClientLocal()},
+			{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Domain: "custom-domain",
+				Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product-regexp1/something/post", Client: test.NewClientLocal()},
+			{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Domain: "custom-domain",
+				Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product-regexp2/something/suffix/post", Client: test.NewClientLocal()},
+		}...)
+	})
+
+	t.Run("custom error response code", func(t *testing.T) {
+		xTykAPIGateway.Middleware.Operations[operationID].ValidateRequest.ErrorResponseCode = http.StatusTeapot
+		oasAPI.ExtractTo(&def)
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.VersionData = def.VersionData
+			spec.OAS = oasAPI
+			spec.IsOAS = true
+			spec.Proxy.ListenPath = "/product"
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Data: `{"name": 123}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product/push"},
+			{Data: `{"name": 123}`, Code: http.StatusTeapot, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
+		}...)
+	})
+
 }
