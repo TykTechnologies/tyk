@@ -311,6 +311,7 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) er
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("----> Bundle verification failed: ", spec.CustomMiddlewareBundle)
+		return err
 	}
 	return nil
 }
