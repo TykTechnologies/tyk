@@ -175,10 +175,12 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	// if a Go plugin is found for this path, override the base handler and logger:
 	logger := m.logger
 	handler := m.handler
+	successHandler := m.successHandler
 	if !m.APILevel {
 		if pluginMw, found := m.goPluginFromRequest(r); found {
 			logger = pluginMw.logger
 			handler = pluginMw.handler
+			successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
 		}
 	}
 	if handler == nil {
@@ -236,7 +238,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
 		default:
 			// record 2XX to analytics
-			m.successHandler.RecordHit(r, analytics.Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
+			successHandler.RecordHit(r, analytics.Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
 
 			// no need to continue passing this request down to reverse proxy
 			respCode = mwStatusRespond
