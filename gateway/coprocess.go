@@ -260,6 +260,10 @@ func (gw *Gateway) CoProcessInit() {
 		}
 	}
 
+	// Make the current RedisController globally available
+	// cgo doesn't know about GW objects so this needs
+	// to be exposed this way:
+	cgoRedisController = gw.RedisController
 }
 
 // EnabledForSpec checks if this middleware should be enabled for a given API.

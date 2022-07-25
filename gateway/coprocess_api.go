@@ -3,12 +3,15 @@ package gateway
 import "C"
 
 import (
-	"context"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
+)
+
+var (
+	// Populated on CoProcessInit:
+	cgoRedisController *storage.RedisController
 )
 
 // CoProcessDefaultKeyPrefix is used as a key prefix for this CP.
@@ -20,8 +23,7 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	key := C.GoString(CKey)
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
-	rc := storage.NewRedisController(context.TODO())
-	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, RedisController: rc}
+	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, RedisController: cgoRedisController}
 	err := store.SetKey(key, value, ttl)
 	if err != nil {
 		log.WithError(err).Error("could not set key")
@@ -33,10 +35,24 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 func TykGetData(CKey *C.char) *C.char {
 	key := C.GoString(CKey)
 
-	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, RedisController: cgoRedisController}
 	// TODO: return error
 	val, _ := store.GetKey(key)
 	return C.CString(val)
+}
+
+// cgoTykStoreData wraps TykStoreData for test usage:
+func cgoTykStoreData(key string, value string, ttl int) {
+	keyStr := C.CString(key)
+	valueStr := C.CString(value)
+	TykStoreData(keyStr, valueStr, C.int(ttl))
+}
+
+// cgoTykStoreData wraps TykGetData for test usage:
+func cgoTykGetData(key string) string {
+	keyStr := C.CString(key)
+	valStr := TykGetData(keyStr)
+	return C.GoString(valStr)
 }
 
 // GatewayFireSystemEvent declared as global variable, set during gw start
