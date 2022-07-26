@@ -125,11 +125,14 @@ func (r *RedisAnalyticsHandler) RecordHit(record *analytics.AnalyticsRecord) err
 }
 
 func (r *RedisAnalyticsHandler) recordWorker() {
-	defer r.poolWg.Done()
 
 	// this is buffer to send one pipelined command to redis
 	// use r.recordsBufferSize as cap to reduce slice re-allocations
 	recordsBuffer := make([][]byte, 0, r.workerBufferSize)
+	defer func() {
+		r.poolWg.Done()
+		fmt.Printf("\nRecordBuffer: %+v\n", len(recordsBuffer))
+	}()
 	rand.Seed(time.Now().Unix())
 
 	// read records from channel and process
@@ -158,6 +161,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			if !ok {
 				// send what is left in buffer
 				r.Store.AppendToSetPipelined(analyticKey, recordsBuffer)
+				recordsBuffer = recordsBuffer[:0]
 				return
 			}
 
@@ -216,6 +220,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			lastSentTs = time.Now()
 		}
 	}
+
 }
 
 func DurationToMillisecond(d time.Duration) float64 {
