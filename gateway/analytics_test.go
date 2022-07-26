@@ -618,8 +618,8 @@ func RunRecordWorkerOp(serializationMethod string, b *testing.B) {
 		records = append(records, demo.GenerateRandomAnalyticRecord("org_1"))
 	}
 
-	b.ReportAllocs()
 	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < 100; i++ {
 		g.Gw.Analytics.recordsChan <- &records[i]
 	}
@@ -629,6 +629,7 @@ func RunRecordWorkerOp(serializationMethod string, b *testing.B) {
 }
 
 func BenchmarkSerialization(b *testing.B) {
+
 	b.Run("Protobuf", func(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
@@ -642,30 +643,113 @@ func BenchmarkSerialization(b *testing.B) {
 	})
 }
 
+var records []analytics.AnalyticsRecord
+
+func init() {
+	for i := 0; i < 100; i++ {
+		records = append(records, demo.GenerateRandomAnalyticRecord("org_1"))
+	}
+}
+
 func BenchmarkProtobufEncoding(b *testing.B) {
+	var records []analytics.AnalyticsRecord
+	for i := 0; i < 100; i++ {
+		records = append(records, demo.GenerateRandomAnalyticRecord("org_1"))
+	}
+
 	performSerializationHelper(serializer.PROTOBUF_SERIALIZER, b)
 }
 
 func BenchmarkMsgpackEncoding(b *testing.B) {
+	var records []analytics.AnalyticsRecord
+	for i := 0; i < 100; i++ {
+		records = append(records, demo.GenerateRandomAnalyticRecord("org_1"))
+	}
+
 	performSerializationHelper(serializer.MSGP_SERIALIZER, b)
 }
 
 func performSerializationHelper(serializerType string, b *testing.B) {
 
 	serializers := serializer.NewAnalyticsSerializer(serializerType)
-
-	var records []analytics.AnalyticsRecord
-	for i := 0; i < 100; i++ {
-		records = append(records, demo.GenerateRandomAnalyticRecord("org_1"))
-	}
-
 	b.ReportAllocs()
 	b.ResetTimer()
+
 	for i := 0; i < len(records); i++ {
-		b.Helper()
+		//	b.Helper()
 		_, err := serializers.Encode(&records[i])
 		if err != nil {
 			b.Fatal(err)
 		}
 	}
 }
+
+func workerDispatcher(id int, jobs <-chan int, results chan<- int, apiUrl string) {
+	for range jobs {
+		resp, err := http.Get(apiUrl)
+
+		if err != nil {
+			defer resp.Body.Close()
+		}
+
+		if resp.StatusCode != 200 {
+			panic("api did not return status 200")
+		}
+		results <- resp.StatusCode
+	}
+}
+
+func BenchmarkRequests(b *testing.B) {
+	// Run gw manually
+
+	// send x requests x in parallel
+	// to an url
+	apiUrl := "http://tyk-gateway:8081/open-keyless-api/uuid"
+	const totalRequests = 2000
+	const requestsInParallel = 120
+	jobs := make(chan int, totalRequests)
+	results := make(chan int, totalRequests)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for w := 1; w <= requestsInParallel; w++ {
+		go workerDispatcher(w, jobs, results, apiUrl)
+	}
+
+	for j := 1; j <= totalRequests; j++ {
+		jobs <- j
+	}
+	close(jobs)
+
+	for a := 1; a <= totalRequests; a++ {
+		<-results
+	}
+}
+
+func MakeRequest(apiUrl string) {
+	resp, _ := http.Get(apiUrl)
+
+	if resp.StatusCode != 200 {
+		panic("api did not return status 200")
+	}
+}
+
+// RESULTS
+
+/*
+Conditions:
+2000 requests, 120 in parallel
+
+MsgPack:
+- 7.80s
+- 7.38s
+- 7.31s
+- 7.54s
+
+
+Protobuf:
+- 7.40s
+- 7.98s
+- 9.66s
+- 9.35s
+*/
