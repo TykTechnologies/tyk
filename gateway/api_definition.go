@@ -941,24 +941,18 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 
 		events := newSpec.CircuitBreaker.CB.Subscribe()
 		go func(path string, spec *APISpec, breakerPtr *circuit.Breaker) {
-			timerActive := false
 			for e := range events {
 				switch e {
 				case circuit.BreakerTripped:
 					log.Warning("[PROXY] [CIRCUIT BREAKER] Breaker tripped for path: ", path)
 					log.Debug("Breaker tripped: ", e)
-					// Start a timer function
 
-					if !timerActive {
-						go func(timeout int, breaker *circuit.Breaker) {
-							log.Debug("-- Sleeping for (s): ", timeout)
-							time.Sleep(time.Duration(timeout) * time.Second)
-							log.Debug("-- Resetting breaker")
-							breaker.Reset()
-							timerActive = false
-						}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)
-						timerActive = true
-					}
+					go func(timeout int, breaker *circuit.Breaker) {
+						log.Debug("-- Sleeping for (s): ", timeout)
+						time.Sleep(time.Duration(timeout) * time.Second)
+						log.Debug("-- Resetting breaker")
+						breaker.Reset()
+					}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)
 
 					if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 						if ServiceCache != nil {
