@@ -154,6 +154,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			tags = append(tags, s.Spec.Tags...)
 		}
 
+		if s.Spec.GraphQL.Enabled {
+			tags = append(tags, analytics.PredefinedTagGraphAnalytics)
+		}
+
 		rawRequest := ""
 		rawResponse := ""
 

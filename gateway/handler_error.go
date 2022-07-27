@@ -252,6 +252,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			tags = append(tags, e.Spec.Tags...)
 		}
 
+		if e.Spec.GraphQL.Enabled {
+			tags = append(tags, analytics.PredefinedTagGraphAnalytics)
+		}
+
 		rawRequest := ""
 		rawResponse := ""
 
