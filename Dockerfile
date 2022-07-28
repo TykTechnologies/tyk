@@ -62,6 +62,6 @@ COPY tyk.conf.example tyk.conf
 
 RUN 	echo "Tyk: $(/opt/tyk-gateway/tyk --version 2>&1)" && \
 	echo "Go: $(go version)" && \
-	echo "Python: $(python --version)"
+	echo "Python: $(python3 --version)"
 
 ENTRYPOINT ["/opt/tyk-gateway/tyk"]

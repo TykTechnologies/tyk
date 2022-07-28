@@ -11,6 +11,8 @@ services:
   redis:
     image: redis:4.0-alpine
     networks: [ proxy ]
+    ports:
+    - 6379:6379
     command: redis-server --appendonly yes
 
 networks:
