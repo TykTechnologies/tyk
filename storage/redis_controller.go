@@ -11,9 +11,9 @@ import (
 )
 
 type RedisController struct {
-	singlePool          redis.UniversalClient
-	singleCachePool     redis.UniversalClient
-	singleAnalyticsPool redis.UniversalClient
+	singlePool          RedisDriver
+	singleCachePool     RedisDriver
+	singleAnalyticsPool RedisDriver
 
 	redisUp      atomic.Value
 	disableRedis atomic.Value
@@ -29,9 +29,9 @@ func NewRedisController(ctx context.Context) *RedisController {
 	}
 }
 
-// DisableRedis allows to dynamically enable/disable talking with redisW
-func (rc *RedisController) DisableRedis(setRedisDown bool) {
-	if setRedisDown {
+// Disable allows to dynamically enable/disable talking with storage
+func (rc *RedisController) Disable(disable bool) {
+	if disable {
 		// we make sure x set that redis is down
 		rc.disableRedis.Store(true)
 		rc.redisUp.Store(false)
@@ -48,6 +48,11 @@ func (rc *RedisController) DisableRedis(setRedisDown bool) {
 		panic("Can't reconnect to redis after disable")
 	}
 	rc.reconnect <- struct{}{}
+}
+
+// DisableRedis is deprecated
+func (rc *RedisController) DisableRedis(disable bool) {
+	rc.Disable(disable)
 }
 
 func (rc *RedisController) enabled() bool {
@@ -82,7 +87,7 @@ func (rc *RedisController) WaitConnect(ctx context.Context) bool {
 	}
 }
 
-func (rc *RedisController) singleton(cache, analytics bool) redis.UniversalClient {
+func (rc *RedisController) singleton(cache, analytics bool) RedisDriver {
 	if cache {
 		return rc.singleCachePool
 	}
@@ -112,7 +117,7 @@ func (rc *RedisController) connectSingleton(cache, analytics bool, conf config.C
 
 // disconnect all redis clients created
 func (rc *RedisController) disconnect() {
-	for _, v := range []redis.UniversalClient{
+	for _, v := range []RedisDriver{
 		rc.singleCachePool,
 		rc.singleAnalyticsPool,
 		rc.singlePool,
@@ -121,11 +126,10 @@ func (rc *RedisController) disconnect() {
 	}
 }
 
-// ConnectToRedis starts a go routine that periodically tries to connect to
-// redis.
+// Connect starts a go routine that periodically tries to connect to storage.
 //
 // onReconnect will be called when we have established a successful redis reconnection
-func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(), conf *config.Config) {
+func (rc *RedisController) Connect(ctx context.Context, onReconnect func(), conf *config.Config) {
 	if onReconnect == nil {
 		onReconnect = func() {
 			// an empty function to avoid repeated nil checks below

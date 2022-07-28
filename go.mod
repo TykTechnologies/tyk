@@ -28,6 +28,7 @@ require (
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
 	github.com/getkin/kin-openapi v0.89.0
 	github.com/go-redis/redis/v8 v8.11.5
+	github.com/go-redis/redis/v9 v9.0.0-rc.2
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/golang-jwt/jwt/v4 v4.4.2
 	github.com/golang/protobuf v1.5.2
@@ -66,8 +67,9 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/crypto v0.0.0-20220513210258-46612604a0f9
-	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c
+	go.uber.org/multierr v1.6.0
+	golang.org/x/crypto v0.1.0
+	golang.org/x/net v0.2.0
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	google.golang.org/grpc v1.36.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
@@ -81,7 +83,7 @@ require (
 require (
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // test
 	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e // test
-	github.com/stretchr/testify v1.7.1 // test
+	github.com/stretchr/testify v1.8.1 // test
 	github.com/valyala/fasthttp v1.43.0 // test
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
 )
