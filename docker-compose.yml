@@ -13,10 +13,6 @@ services:
     networks: [ proxy ]
     command: redis-server --appendonly yes
 
-  mongodb:
-    networks: [ proxy ]
-    image: mongo:3.4-jessie
-
 networks:
   proxy:
     name: proxy
