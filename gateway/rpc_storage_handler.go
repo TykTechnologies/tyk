@@ -630,8 +630,9 @@ func (r RPCStorageHandler) IsRetriableError(err error) bool {
 // GetAPIDefinitions will pull API definitions from the RPC server
 func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) string {
 	dr := apidef.DefRequest{
-		OrgId: orgId,
-		Tags:  tags,
+		OrgId:   orgId,
+		Tags:    tags,
+		LoadOAS: true,
 	}
 
 	defString, err := rpc.FuncClientSingleton("GetApiDefinitions", dr)
