@@ -767,7 +767,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	paramName := config.ParamName
-	if config.UseParam || paramName != "" {
+	if config.UseParam {
 		if paramName == "" {
 			paramName = defaultName
 		}
@@ -781,7 +781,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	cookieName := config.CookieName
-	if config.UseCookie || cookieName != "" {
+	if config.UseCookie {
 		if cookieName == "" {
 			cookieName = defaultName
 		}
