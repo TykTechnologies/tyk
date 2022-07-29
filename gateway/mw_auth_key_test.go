@@ -542,6 +542,8 @@ const multiAuthDef = `{
 	"auth": {
 		"auth_header_name": "authorization",
 		"param_name": "token",
+		"use_param": true,
+		"use_cookie": true,
 		"cookie_name": "oreo"
 	},
 	"version_data": {
