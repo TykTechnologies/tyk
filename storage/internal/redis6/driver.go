@@ -24,6 +24,23 @@ func NewDriver(client UniversalClient) *Driver {
 	}
 }
 
+func (d *Driver) Close() error {
+	return d.client.Close()
+}
+
+func (d *Driver) RPushPipelined(ctx context.Context, key string, payload ...[]byte) error {
+	pipe := d.client.Pipeline()
+	for _, load := range payload {
+		pipe.RPush(ctx, key, load)
+	}
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+func (d *Driver) Subscribe(ctx context.Context, channels ...string) model.PubSub {
+	return d.client.Subscribe(ctx, channels...)
+}
+
 func (d *Driver) TTL(ctx context.Context, key string) (int64, error) {
 	v, err := d.client.TTL(ctx, key).Result()
 	return int64(v.Seconds()), err
@@ -286,6 +303,20 @@ func (d *Driver) LRange(ctx context.Context, key string, start, stop int64) ([]s
 // LRem
 func (d *Driver) LRem(ctx context.Context, key string, count int64, value interface{}) (int64, error) {
 	return d.client.LRem(ctx, key, count, value).Result()
+}
+
+// LRangeAndDel
+func (d *Driver) LRangeAndDel(ctx context.Context, key string) ([]string, error) {
+	var lrange *StringSliceCmd
+	_, err := d.client.TxPipelined(ctx, func(pipe Pipeliner) error {
+		lrange = pipe.LRange(ctx, key, 0, -1)
+		pipe.Del(ctx, key)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return lrange.Result()
 }
 
 // ZRemRangeByScore

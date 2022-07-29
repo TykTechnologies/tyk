@@ -12,8 +12,6 @@ import (
 
 	redis "github.com/go-redis/redis/v8"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/config"
 	redis6 "github.com/TykTechnologies/tyk/storage/internal/redis6"
 	redis7 "github.com/TykTechnologies/tyk/storage/internal/redis7"
@@ -403,7 +401,7 @@ func (r *RedisCluster) Publish(channel, message string) error {
 	if err := r.up(); err != nil {
 		return err
 	}
-	err := r.singleton().Publish(r.context(), channel, message)
+	_, err := r.singleton().Publish(r.context(), channel, message)
 	r.check(err, "Publish")
 	return err
 }
@@ -414,50 +412,34 @@ func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 	}
 	fixedKey := r.fixKey(keyName)
 	client := r.singleton()
-
-	var lrange *redis.StringSliceCmd
-	_, err := client.TxPipelined(r.context(), func(pipe redis.Pipeliner) error {
-		lrange = pipe.LRange(r.context(), fixedKey, 0, -1)
-		pipe.Del(r.context(), fixedKey)
-		return nil
-	})
-	if err != nil {
-		log.Error("Multi command failed: ", err)
+	values, err := client.LRangeAndDel(r.context(), fixedKey)
+	r.check(err, "GetAndDeleteSet")
+	if err != nil || len(values) == 0 {
 		return nil
 	}
 
-	vals := lrange.Val()
-	log.Debug("Analytics returned: ", len(vals))
-	if len(vals) == 0 {
-		return nil
-	}
-
-	log.Debug("Unpacked vals: ", len(vals))
-	result := make([]interface{}, len(vals))
-	for i, v := range vals {
-		result[i] = v
-	}
-
-	return result
+	return fromStringToInterfaceSlice(values)
 }
 
 func (r *RedisCluster) AppendToSet(keyName, value string) {
-	fixedKey := r.fixKey(keyName)
 	if err := r.up(); err != nil {
 		return
 	}
-	if err := r.singleton().RPush(r.context(), fixedKey, value); err != nil {
-		log.WithError(err).Error("Error trying to append to set keys")
-	}
+	fixedKey := r.fixKey(keyName)
+	err := r.singleton().RPush(r.context(), fixedKey, value)
+	r.check(err, "AppendToSet")
 }
 
 // Exists check if keyName exists
 func (r *RedisCluster) Exists(keyName string) (bool, error) {
+	if err := r.up(); err != nil {
+		return false, err
+	}
 	fixedKey := r.fixKey(keyName)
 	exists, err := r.singleton().Exists(r.context(), fixedKey)
 	r.check(err, "Exists")
 	if err != nil {
-		return false, ErrKey
+		return false, ErrKeyNotFound
 	}
 	return exists > 0, nil
 }
@@ -473,20 +455,8 @@ func (r *RedisCluster) RemoveFromList(keyName, value string) error {
 // GetListRange gets range of elements of list identified by keyName
 func (r *RedisCluster) GetListRange(keyName string, from, to int64) ([]string, error) {
 	fixedKey := r.fixKey(keyName)
-	logEntry := logrus.Fields{
-		"keyName":  keyName,
-		"fixedKey": fixedKey,
-		"from":     from,
-		"to":       to,
-	}
-	log.WithFields(logEntry).Debug("Getting list range")
-
 	elements, err := r.singleton().LRange(r.context(), fixedKey, from, to)
-	if err != nil {
-		log.WithFields(logEntry).WithError(err).Error("LRANGE command failed")
-		return nil, err
-	}
-
+	r.check(err, "GetListRange")
 	return elements, nil
 }
 
@@ -495,20 +465,13 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 		return
 	}
 
-	fixedKey := r.fixKey(key)
 	if err := r.up(); err != nil {
 		return
 	}
-	client := r.singleton()
 
-	pipe := client.Pipeline()
-	for _, val := range values {
-		pipe.RPush(r.context(), fixedKey, val)
-	}
-
-	if _, err := pipe.Exec(r.context()); err != nil {
-		log.WithError(err).Error("Error trying to append to set keys")
-	}
+	fixedKey := r.fixKey(key)
+	err := r.singleton().RPushPipelined(r.context(), fixedKey, values...)
+	r.check(err, "AppendToSetPipelined")
 }
 
 func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
@@ -562,61 +525,16 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 	if err := r.up(); err != nil {
 		return 0, nil
 	}
-	now := time.Now()
-	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
+	ctx := r.context()
 	client := r.singleton()
-	var zrange *redis.StringSliceCmd
 
-	pipeFn := func(pipe redis.Pipeliner) error {
-		pipe.ZRemRangeByScore(r.context(), keyName, "-inf", strconv.Itoa(int(onePeriodAgo.UnixNano())))
-		zrange = pipe.ZRange(r.context(), keyName, 0, -1)
-
-		element := redis.Z{
-			Score: float64(now.UnixNano()),
-		}
-
-		if value_override != "-1" {
-			element.Member = value_override
-		} else {
-			element.Member = strconv.Itoa(int(now.UnixNano()))
-		}
-
-		pipe.ZAdd(r.context(), keyName, &element)
-		pipe.Expire(r.context(), keyName, time.Duration(per)*time.Second)
-
-		return nil
-	}
-
-	var err error
-	if pipeline {
-		_, err = client.Pipelined(r.context(), pipeFn)
-	} else {
-		_, err = client.TxPipelined(r.context(), pipeFn)
-	}
-
-	if err != nil {
-		log.Error("Multi command failed: ", err)
+	values, err := client.SetRollingWindow(ctx, keyName, per, value_override, pipeline)
+	r.check(err, "SetRollingWindow")
+	if err != nil || len(values) == 0 {
 		return 0, nil
 	}
-
-	values := zrange.Val()
-
-	// Check actual value
-	if values == nil {
-		return 0, nil
-	}
-
-	intVal := len(values)
-	result := make([]interface{}, len(values))
-
-	for i, v := range values {
-		result[i] = v
-	}
-
-	log.Debug("Returned: ", intVal)
-
-	return intVal, result
+	return len(values), fromStringToInterfaceSlice(values)
 }
 
 func (r *RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
@@ -624,20 +542,13 @@ func (r *RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool
 		return 0, nil
 	}
 
-	values, err := r.singleton().GetRollingWindow(r.context(), kerName, per, pipeline)
+	values, err := r.singleton().GetRollingWindow(r.context(), keyName, per, pipeline)
 	r.check(err, "GetRollingWindow")
 	if err != nil || len(values) == 0 {
 		return 0, nil
 	}
 
 	return len(values), fromStringToInterfaceSlice(values)
-	intVal := len(values)
-	result := make([]interface{}, intVal)
-	for i, v := range values {
-		result[i] = v
-	}
-
-	return intVal, result
 }
 
 // GetPrefix returns storage key prefix
@@ -651,14 +562,14 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 		return
 	}
 	fixedKey := r.fixKey(keyName)
-	err := r.singleton().ZAdd(r.context(), fixedKey, value, score)
+	_, err := r.singleton().ZAdd(r.context(), fixedKey, value, score)
 	r.check(err, "AddToSortedSet")
 }
 
 // GetSortedSetRange gets range of elements of sorted set identified by keyName
 func (r *RedisCluster) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
 	if err := r.up(); err != nil {
-		return
+		return nil, nil, nil
 	}
 
 	fixedKey := r.fixKey(keyName)
@@ -669,21 +580,13 @@ func (r *RedisCluster) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]
 		return nil, nil, err
 	}
 
-	elements := make([]string, len(values))
-	scores := make([]float64, len(values))
-
-	for i, v := range values {
-		elements[i] = v.Member
-		scores[i] = v.Score
-	}
-
-	return elements, scores, nil
+	return values.Members(), values.Scores(), nil
 }
 
 // RemoveSortedSetRange removes range of elements from sorted set identified by keyName
 func (r *RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
 	fixedKey := r.fixKey(keyName)
-	err := r.singleton().ZRemRangeByScore(r.context(), fixedKey, scoreFrom, scoreTo)
+	_, err := r.singleton().ZRemRangeByScore(r.context(), fixedKey, scoreFrom, scoreTo)
 	r.check(err, "RemoveSortedSetRange")
 	return err
 }

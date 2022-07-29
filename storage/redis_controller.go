@@ -5,8 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	redis "github.com/go-redis/redis/v8"
-
 	"github.com/TykTechnologies/tyk/config"
 )
 

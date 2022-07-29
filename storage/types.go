@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"time"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage/internal"
@@ -31,7 +30,7 @@ var _ Controller = &RedisController{}
 type RedisDriver = internal.RedisDriver
 
 func fromStringToInterfaceSlice(values []string) []interface{} {
-	result := make([]interface{}, len(in))
+	result := make([]interface{}, len(values))
 	for i, v := range values {
 		result[i] = v
 	}
