@@ -983,6 +983,14 @@
 
   TransformRequestMethod allows you to transform the method of a request.
 
+- **`transformRequestBody`**
+
+  **Type: [TransformRequestBody](#transformrequestbody)**
+
+  TransformRequestBody allows you to transform request body.
+
+  When both `path` and `body` are provided, body would take precedence.
+
 - **`cache`**
 
   **Type: [CachePlugin](#cacheplugin)**
@@ -1020,6 +1028,33 @@
   **Type: `string`**
 
   ToMethod is the http method value to which the method of an incoming request will be transformed.
+
+
+### **TransformRequestBody**
+
+- **`enabled`**
+
+  **Type: `boolean`**
+
+  Enabled enables or disables transform request body middleware.
+
+- **`format`**
+
+  **Type: `object`**
+
+  Format of the request body, xml or json.
+
+- **`path`**
+
+  **Type: `string`**
+
+  Path file path for the template.
+
+- **`body`**
+
+  **Type: `string`**
+
+  Body base64 encoded representation of the template.
 
 
 ### **CachePlugin**

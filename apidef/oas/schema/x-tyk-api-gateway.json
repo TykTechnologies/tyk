@@ -338,6 +338,31 @@
         "toMethod"
       ]
     },
+    "X-Tyk-TransformRequestBody": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "json",
+            "xml"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "toMethod"
+      ]
+    },
     "X-Tyk-CachePlugin": {
       "type": "object",
       "properties": {
@@ -403,6 +428,9 @@
         },
         "transformRequestMethod": {
           "$ref": "#/definitions/X-Tyk-TransformRequestMethod"
+        },
+        "transformRequestBody": {
+          "$ref": "#/definitions/X-Tyk-TransformRequestBody"
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-CachePlugin"
