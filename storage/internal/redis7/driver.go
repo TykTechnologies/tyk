@@ -43,6 +43,10 @@ func (d *Driver) Subscribe(ctx context.Context, channels ...string) model.PubSub
 
 func (d *Driver) TTL(ctx context.Context, key string) (int64, error) {
 	v, err := d.client.TTL(ctx, key).Result()
+	nsec := v.Nanoseconds()
+	if nsec < 0 {
+		return nsec, err
+	}
 	return int64(v.Seconds()), err
 }
 
