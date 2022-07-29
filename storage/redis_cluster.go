@@ -234,7 +234,8 @@ func (r *RedisCluster) IncrementWithExpire(keyName string, expire int64) int64 {
 	r.check(err, "IncrementWithExpire")
 
 	if val == 1 && expire > 0 {
-		cluster.Expire(r.context(), fixedKey, time.Duration(expire)*time.Second)
+		err = cluster.Expire(r.context(), fixedKey, time.Duration(expire)*time.Second)
+		r.check(err, "IncrementWithExpire")
 	}
 
 	return val
@@ -517,7 +518,7 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 
 	val, err := r.singleton().SIsMember(r.context(), r.fixKey(keyName), value)
 	r.check(err, "IsMemberOfSet")
-	return err == nil && val == true
+	return err == nil && val
 }
 
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values
