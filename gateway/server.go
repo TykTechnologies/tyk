@@ -184,7 +184,7 @@ type Gateway struct {
 	templatesRaw *textTemplate.Template
 
 	// RedisController keeps track of redis connection and singleton
-	RedisController storage.Handler
+	RedisController *storage.RedisController
 
 	hostDetails hostDetails
 

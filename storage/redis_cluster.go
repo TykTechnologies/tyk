@@ -63,7 +63,7 @@ func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
-	ctx := cluster.RedisController.ctx
+	ctx := cluster.RedisController.Context()
 	driver := cluster.RedisController.singleton(cluster.IsCache, cluster.IsAnalytics)
 	testKey := "redis-test-" + uuid.NewV4().String()
 
@@ -110,7 +110,7 @@ func (r *RedisCluster) cleanKey(keyName string) string {
 }
 
 func (r *RedisCluster) context() context.Context {
-	return r.RedisController.ctx
+	return r.RedisController.Context()
 }
 
 func (r *RedisCluster) up() error {

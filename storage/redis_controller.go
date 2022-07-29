@@ -124,6 +124,15 @@ func (rc *RedisController) disconnect() {
 	}
 }
 
+// Deprecated
+func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(), conf *config.Config) {
+	rc.Connect(ctx, onReconnect, conf)
+}
+
+func (rc *RedisController) Context() context.Context {
+	return rc.ctx
+}
+
 // Connect starts a go routine that periodically tries to connect to storage.
 //
 // onReconnect will be called when we have established a successful redis reconnection

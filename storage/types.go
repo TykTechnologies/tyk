@@ -10,9 +10,12 @@ import (
 // Controller interface for storage controllers
 type Controller interface {
 	Connect(ctx context.Context, onReconnect func(), conf *config.Config)
+	Context() context.Context
 	Connected() bool
 	DisableRedis(setRedisDown bool)
 	WaitConnect(ctx context.Context) bool
+
+	ControllerDeprecated
 }
 
 // ControllerDeprecated are old API endpoints for backwards compatibility
