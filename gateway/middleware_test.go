@@ -116,6 +116,140 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	assert.Equal(t, "t7", getToken(oidc.getAuthType(), oidc.getAuthToken))
 }
 
+func TestBaseMiddleware_getAuthToken(t *testing.T) {
+	t.Run("should get token from cookie", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {CookieName: "c1", UseCookie: true},
+		}
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+		r, _ := http.NewRequest(http.MethodGet, "", nil)
+		r.AddCookie(&http.Cookie{
+			Name:  "c1",
+			Value: "t1",
+		})
+
+		authKey := &AuthKey{BaseMiddleware: baseMid}
+
+		// test getAuthToken
+		getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {
+			token, _ := getAuthToken(authType, r)
+			return token
+		}
+
+		assert.Equal(t, "t1", getToken(authKey.getAuthType(), authKey.getAuthToken))
+	})
+
+	t.Run("should not get token from cookie when use cookie is false", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {CookieName: "c1", UseCookie: false},
+		}
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+		r, _ := http.NewRequest(http.MethodGet, "", nil)
+		r.AddCookie(&http.Cookie{
+			Name:  "c1",
+			Value: "t1",
+		})
+
+		authKey := &AuthKey{BaseMiddleware: baseMid}
+
+		// test getAuthToken
+		getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {
+			token, _ := getAuthToken(authType, r)
+			return token
+		}
+
+		assert.Empty(t, getToken(authKey.getAuthType(), authKey.getAuthToken))
+	})
+
+	t.Run("should get token from header", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {AuthHeaderName: "h1"},
+		}
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+		r, _ := http.NewRequest(http.MethodGet, "", nil)
+		r.Header.Set("h1", "t1")
+
+		authKey := &AuthKey{BaseMiddleware: baseMid}
+
+		// test getAuthToken
+		getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {
+			token, _ := getAuthToken(authType, r)
+			return token
+		}
+
+		assert.Equal(t, "t1", getToken(authKey.getAuthType(), authKey.getAuthToken))
+	})
+
+	t.Run("should get token from query", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {ParamName: "q1", UseParam: true},
+		}
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+		r, _ := http.NewRequest(http.MethodGet, "", nil)
+		r.URL.RawQuery = "q1=t1"
+
+		authKey := &AuthKey{BaseMiddleware: baseMid}
+
+		// test getAuthToken
+		getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {
+			token, _ := getAuthToken(authType, r)
+			return token
+		}
+
+		assert.Equal(t, "t1", getToken(authKey.getAuthType(), authKey.getAuthToken))
+	})
+
+	t.Run("should get token from query when use param is disabled", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {ParamName: "q1", UseParam: false},
+		}
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+		r, _ := http.NewRequest(http.MethodGet, "", nil)
+		r.URL.RawQuery = "q1=t1"
+
+		authKey := &AuthKey{BaseMiddleware: baseMid}
+
+		// test getAuthToken
+		getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {
+			token, _ := getAuthToken(authType, r)
+			return token
+		}
+
+		assert.Equal(t, "", getToken(authKey.getAuthType(), authKey.getAuthToken))
+	})
+
+}
+
 func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
