@@ -96,6 +96,17 @@ func TestMockResponse(t *testing.T) {
 
 func TestTransformRequestBody(t *testing.T) {
 
+	t.Run("empty", func(t *testing.T) {
+		var emptyTransformRequestBody TransformRequestBody
+
+		var convertedTransformRequestBody apidef.TemplateMeta
+		emptyTransformRequestBody.ExtractTo(&convertedTransformRequestBody)
+
+		var resultTransformRequestBody TransformRequestBody
+		resultTransformRequestBody.Fill(convertedTransformRequestBody)
+
+		assert.Equal(t, emptyTransformRequestBody, resultTransformRequestBody)
+	})
 	t.Run("blob", func(t *testing.T) {
 		transformReqBody := TransformRequestBody{
 			Body:    "test body",

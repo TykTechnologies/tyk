@@ -26,8 +26,8 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 
 	var operation Operation
 	Fill(t, &operation, 0)
-	operation.ValidateRequest = nil // This one also fills native part, let's skip it for this test.
-	operation.TransformRequestBody.Path = ""
+	operation.ValidateRequest = nil          // This one also fills native part, let's skip it for this test.
+	operation.TransformRequestBody.Path = "" // if `path` and `body` are present, `body` would take precedence, detailed tests can be found in middleware_test.go
 
 	xTykAPIGateway := &XTykAPIGateway{
 		Middleware: &Middleware{

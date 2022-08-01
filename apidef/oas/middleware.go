@@ -573,7 +573,7 @@ func (tm *TransformRequestMethod) ExtractTo(meta *apidef.MethodTransformMeta) {
 }
 
 type TransformRequestBody struct {
-	// Enabled enables or disables transform request body middleware.
+	// Enabled enables transform request body middleware.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Format of the request body, xml or json.
 	Format apidef.RequestInputType `bson:"format" json:"format"`

@@ -360,7 +360,7 @@
       },
       "required": [
         "enabled",
-        "toMethod"
+        "format"
       ]
     },
     "X-Tyk-CachePlugin": {

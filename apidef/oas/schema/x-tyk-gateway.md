@@ -1036,7 +1036,7 @@
 
   **Type: `boolean`**
 
-  Enabled enables or disables transform request body middleware.
+  Enabled enables transform request body middleware.
 
 - **`format`**
 
