@@ -584,10 +584,6 @@ type TransformRequestBody struct {
 }
 
 func (tr *TransformRequestBody) Fill(meta apidef.TemplateMeta) {
-	if ShouldOmit(meta) {
-		return
-	}
-
 	tr.Enabled = !meta.Disabled
 	tr.Format = meta.TemplateData.Input
 	if meta.TemplateData.Mode == apidef.UseBlob {
