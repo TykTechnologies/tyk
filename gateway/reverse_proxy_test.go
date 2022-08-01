@@ -408,6 +408,134 @@ func TestCircuitBreaker5xxs(t *testing.T) {
 	})
 }
 
+func TestCircuitBreakerEvents(t *testing.T) {
+	// Use this channel to capture webhook events:
+	triggeredEvent := make(chan apidef.TykEvent)
+
+	// Establish a simple HTTP server that takes webhook input and passes the event to above channel:
+	webHookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rawBody, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Unmarshal webhook input, we're only interested in event's name:
+		var eventData map[string]interface{}
+		if err := json.Unmarshal(rawBody, &eventData); err != nil {
+			t.Fatal(err)
+		}
+		eventName, ok := eventData["event"].(string)
+		if !ok {
+			t.Fatal("invalid webhook input")
+		}
+		triggeredEvent <- apidef.TykEvent(eventName)
+	}))
+
+	// Establish another HTTP server to trigger CB behavior
+	// Uses a counter to send an error response on the 1st sample:
+	var sampleCount int
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if sampleCount == 1 {
+			w.WriteHeader(500)
+			sampleCount++
+			return
+		}
+		w.WriteHeader(200)
+		sampleCount++
+	}))
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Events to capture on this API, we use default webhook template:
+	events := map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{
+		EventBreakerTripped: {
+			{
+				Handler: EH_WebHook,
+				HandlerMeta: map[string]interface{}{
+					"method":        http.MethodPost,
+					"target_path":   webHookServer.URL,
+					"template_path": "templates/default_webhook.json",
+					"event_timeout": 10,
+				},
+			},
+		},
+		EventBreakerReset: {
+			{
+				Handler: EH_WebHook,
+				HandlerMeta: map[string]interface{}{
+					"method":        http.MethodPost,
+					"target_path":   webHookServer.URL,
+					"template_path": "templates/default_webhook.json",
+					"event_timeout": 10,
+				},
+			},
+		},
+	}
+
+	// Setup an API definition with CB settings and attach above event handlers:
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.TargetURL = upstreamServer.URL
+		spec.Proxy.ListenPath = "/circuitbreaker/"
+		spec.CircuitBreakerEnabled = true
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			err := json.Unmarshal([]byte(`[
+					{
+						"path": "test",
+						"method": "GET",
+						"threshold_percent": 0.1,
+						"samples": 1,
+						"return_to_service_after": 1
+					}
+				   ]`), &v.ExtendedPaths.CircuitBreaker)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+		spec.EventHandlers.Events = events
+	})
+
+	// Run the first series of requests, 1st sample should trigger the CB:
+	_, err := ts.Run(t, []test.TestCase{
+		{Path: "/circuitbreaker/test", Code: http.StatusOK},
+		{Path: "/circuitbreaker/test", Code: http.StatusInternalServerError},
+	}...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Validate if the first event is the expected one:
+	e := <-triggeredEvent
+	if e != EventBreakerTripped {
+		t.Fatalf("invalid event, got '%s', expecting '%s'", e, EventBreakerTripped)
+	}
+
+	// Run the third request which should already be an HTTP 503 from CB:
+	_, err = ts.Run(t, []test.TestCase{
+		{Path: "/circuitbreaker/test", Code: http.StatusServiceUnavailable},
+	}...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait as long as "return_to_service_after" specifies before retrying again
+	// This request will be an HTTP 200:
+	time.Sleep(1000 * time.Millisecond)
+
+	_, err = ts.Run(t, []test.TestCase{
+		{Path: "/circuitbreaker/test", Code: http.StatusOK},
+	}...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Validate if the last emitted event is a breaker reset:
+	e = <-triggeredEvent
+	if e != EventBreakerReset {
+		t.Fatalf("invalid event, got '%s', expecting '%s'", e, EventBreakerReset)
+	}
+}
+
 func TestSingleJoiningSlash(t *testing.T) {
 	testsFalse := []struct {
 		a, b, want string
