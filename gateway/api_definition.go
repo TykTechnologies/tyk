@@ -798,6 +798,10 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 
 	log.Debug("Checking for transform paths...")
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		log.Debug("-- Generating path")
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
