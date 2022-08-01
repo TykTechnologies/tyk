@@ -656,11 +656,22 @@ func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string
 		return
 	}
 
+	var lifetime int64
+	if sess != nil && len(sess.AccessRights) > 0 {
+		for apiID, _ := range sess.AccessRights {
+			spec := gw.getApiSpec(apiID)
+			sessionLifeTime := sess.Lifetime(spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
+			if sessionLifeTime > lifetime {
+				lifetime = sessionLifeTime
+			}
+		}
+	}
+
 	var err error
 	if gw.GetConfig().HashKeys {
-		err = gw.GlobalSessionManager.UpdateSession(hashedName, sess, 0, true)
+		err = gw.GlobalSessionManager.UpdateSession(hashedName, sess, lifetime, true)
 	} else {
-		err = gw.GlobalSessionManager.UpdateSession(keyName, sess, 0, false)
+		err = gw.GlobalSessionManager.UpdateSession(keyName, sess, lifetime, false)
 	}
 	if err != nil {
 		log.WithFields(logrus.Fields{
