@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/serializer"
+
 	"github.com/cenkalti/backoff/v4"
 	"github.com/gocraft/health"
 	uuid "github.com/satori/go.uuid"
@@ -46,6 +48,8 @@ var (
 
 	// UseSyncLoginRPC for tests where we dont need to execute as a goroutine
 	UseSyncLoginRPC bool
+
+	AnalyticsSerializers []serializer.AnalyticsSerializer
 )
 
 // ErrRPCIsDown this is returned when we can't reach rpc server.

@@ -32,6 +32,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -41,6 +42,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	uuid "github.com/satori/go.uuid"
@@ -58,7 +63,11 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 
-	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+)
+
+var (
+	ErrRequestMalformed = errors.New("request malformed")
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful
@@ -111,6 +120,32 @@ func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 		job := instrument.NewJob("SystemAPIError")
 		job.Event(strconv.Itoa(code))
 	}
+}
+
+func doJSONExport(w http.ResponseWriter, code int, obj interface{}, fileName string) {
+
+	if code != http.StatusOK {
+		doJSONWrite(w, code, obj)
+		return
+	}
+
+	stream, err := json.MarshalIndent(obj, "", "  ")
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=%q", fileName))
+	w.WriteHeader(code)
+	_, err = w.Write(stream)
+
+	if err != nil {
+		job := instrument.NewJob("SystemAPIError")
+		job.Event(err.Error())
+	}
+
 }
 
 type MethodNotAllowedHandler struct{}
@@ -210,7 +245,7 @@ func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionSta
 		return err
 	}
 
-	lifetime := session.Lifetime(spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
+	lifetime := session.Lifetime(spec.GetSessionLifetimeRespectsKeyExpiration(), spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
 	if err := gw.GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed); err != nil {
 		return err
 	}
@@ -313,16 +348,41 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 // remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
 // need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
 
-func setSessionPassword(session *user.SessionState) {
-	session.BasicAuthData.Hash = user.HashBCrypt
-	newPass, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
-	if err != nil {
-		log.Error("Could not hash password, setting to plaintext, error was: ", err)
-		session.BasicAuthData.Hash = user.HashPlainText
+//
+func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
+	basicAuthHashAlgo := gw.basicAuthHashAlgo()
+
+	if basicAuthHashAlgo == string(user.HashBCrypt) {
+		session.BasicAuthData.Hash = user.HashBCrypt
+		hashedPassBytes, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
+		if err != nil {
+			log.WithError(err).Error("Could not hash password, setting to plaintext")
+			session.BasicAuthData.Hash = user.HashPlainText
+			return
+		}
+
+		session.BasicAuthData.Password = string(hashedPassBytes)
 		return
 	}
 
-	session.BasicAuthData.Password = string(newPass)
+	session.BasicAuthData.Password = storage.HashStr(session.BasicAuthData.Password, basicAuthHashAlgo)
+	session.BasicAuthData.Hash = user.HashType(basicAuthHashAlgo)
+}
+
+func (gw *Gateway) basicAuthHashAlgo() string {
+	config := gw.GetConfig()
+
+	// Use `basic_auth_hash_key_function` if set;
+	algo := config.BasicAuthHashKeyFunction
+
+	// If hash function name is empty/invalid
+	if ok := user.IsHashType(algo); !ok {
+		// set default basic auth hash to bcrypt
+		return string(user.HashBCrypt)
+	}
+
+	// Algo is validated at this point
+	return algo
 }
 
 func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
@@ -412,14 +472,14 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		switch r.Method {
 		case http.MethodPost:
 			// It's a create, so lets hash the password
-			setSessionPassword(newSession)
+			gw.setBasicAuthSessionPassword(newSession)
 		case http.MethodPut:
 			if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
 				// passwords dont match assume it's new, lets hash it
 				log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
 				log.Debug("New: newSession.BasicAuthData.Password")
 				log.Debug("Changing password")
-				setSessionPassword(newSession)
+				gw.setBasicAuthSessionPassword(newSession)
 			}
 		}
 	} else if originalKey.BasicAuthData.Password != "" {
@@ -885,50 +945,146 @@ func (gw *Gateway) handleGetAPIList() (interface{}, int) {
 	return apiIDList, http.StatusOK
 }
 
-func (gw *Gateway) handleGetAPI(apiID string, oasTyped bool) (interface{}, int) {
-	if spec := gw.getApiSpec(apiID); spec != nil {
-		if oasTyped {
-			return &spec.OAS, http.StatusOK
-		} else {
-			return spec.APIDefinition, http.StatusOK
+func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	apisList := []oas.OAS{}
+
+	for _, apiSpec := range gw.apisByID {
+		if apiSpec.IsOAS {
+			apiSpec.OAS.Fill(*apiSpec.APIDefinition)
+			if modePublic {
+				apiSpec.OAS.RemoveTykExtension()
+			}
+			apisList = append(apisList, apiSpec.OAS)
 		}
+	}
+
+	return apisList, http.StatusOK
+}
+
+func (gw *Gateway) handleGetAPI(apiID string, oasEndpoint bool) (interface{}, int) {
+	if spec := gw.getApiSpec(apiID); spec != nil {
+		if oasEndpoint && spec.IsOAS {
+			spec.OAS.Fill(*spec.APIDefinition)
+			return &spec.OAS, http.StatusOK
+		} else if oasEndpoint && !spec.IsOAS {
+			return apiError(apidef.ErrOASGetForOldAPI.Error()), http.StatusBadRequest
+		}
+
+		return spec.APIDefinition, http.StatusOK
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"apiID":  apiID,
+		"apiID":  fmt.Sprintf("%q", apiID),
 	}).Error("API doesn't exist.")
-	return apiError("API not found"), http.StatusNotFound
+
+	return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
 }
 
-func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasTyped bool) (interface{}, int) {
-	if gw.GetConfig().UseDBAppConfigs {
-		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
-		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
+func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, int) {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	obj, code := gw.handleGetAPI(apiID, true)
+	if apiOAS, ok := obj.(*oas.OAS); ok && modePublic {
+		apiOAS.RemoveTykExtension()
 	}
+	return obj, code
 
-	var newDef apidef.APIDefinition
-	var oas oas.OAS
+}
 
-	if oasTyped {
-		if err := json.NewDecoder(r.Body).Decode(&oas); err != nil {
+func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
+	var (
+		newDef apidef.APIDefinition
+		oasObj oas.OAS
+	)
+
+	if oasEndpoint {
+		if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
 			log.Error("Couldn't decode new OAS object: ", err)
 			return apiError("Request malformed"), http.StatusBadRequest
 		}
 
-		oas.ExtractTo(&newDef)
+		oasObj.ExtractTo(&newDef)
 	} else {
 		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
 			log.Error("Couldn't decode new API Definition object: ", err)
 			return apiError("Request malformed"), http.StatusBadRequest
 		}
+	}
 
-		spec := gw.getApiSpec(newDef.APIID)
-		if spec != nil {
-			oas = spec.OAS
+	if validationErr := validateAPIDef(&newDef); validationErr != nil {
+		return *validationErr, http.StatusBadRequest
+	}
+
+	if newDef.APIID == "" {
+		newDef.GenerateAPIID()
+	}
+
+	if oasEndpoint {
+		newAPIURL := getAPIURL(newDef, gw.GetConfig())
+		oasObj.AddServers(newAPIURL)
+
+		newDef.IsOAS = true
+		oasObj.GetTykExtension().Info.ID = newDef.APIID
+		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
+		if err != nil {
+			return apiError(err.Error()), errCode
 		}
 
-		oas.Fill(newDef)
+	} else {
+		newDef.IsOAS = false
+
+		err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
+		if err != nil {
+			return apiError(err.Error()), errCode
+		}
+	}
+
+	response := apiModifyKeySuccess{
+		Key:    newDef.APIID,
+		Status: "ok",
+		Action: "added",
+	}
+
+	return response, http.StatusOK
+}
+
+func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
+	spec := gw.getApiSpec(apiID)
+	if spec == nil {
+		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
+	}
+
+	var (
+		newDef apidef.APIDefinition
+		oasObj oas.OAS
+	)
+
+	if oasEndpoint {
+		if !spec.IsOAS {
+			return apiError(apidef.ErrAPINotMigrated.Error()), http.StatusBadRequest
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
+			log.Error("Couldn't decode new OAS object: ", err)
+			return apiError("Request malformed"), http.StatusBadRequest
+		}
+
+		oasObj.ExtractTo(&newDef)
+	} else {
+		if spec.IsOAS {
+			return apiError(apidef.ErrAPIMigrated.Error()), http.StatusBadRequest
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
+			log.Error("Couldn't decode new API Definition object: ", err)
+			return apiError("Request malformed"), http.StatusBadRequest
+		}
+
 	}
 
 	if apiID != "" && newDef.APIID != apiID {
@@ -936,41 +1092,49 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
 	}
 
-	validationResult := apidef.Validate(&newDef, apidef.DefaultValidationRuleSet)
-	if !validationResult.IsValid {
-		reason := "unknown"
-		if validationResult.ErrorCount() > 0 {
-			reason = validationResult.FirstError().Error()
+	if validationErr := validateAPIDef(&newDef); validationErr != nil {
+		return *validationErr, http.StatusBadRequest
+	}
+
+	if oasEndpoint && spec.IsOAS {
+		updateOASServers(spec, gw.GetConfig(), &newDef, &oasObj)
+		newDef.IsOAS = true
+
+		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
+		if err != nil {
+			return apiError(err.Error()), errCode
 		}
 
-		log.Debugf("Semantic validation for API Definition failed. Reason: %s.", reason)
-		return apiError(fmt.Sprintf("Validation of API Definition failed. Reason: %s.", reason)), http.StatusBadRequest
-	}
+	} else if !oasEndpoint {
+		newDef.IsOAS = false
 
-	// api
-	err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
-	if err != nil {
-		return apiError(err.Error()), errCode
-	}
-
-	// oas
-	err, errCode = gw.writeToFile(fs, &oas, newDef.APIID+"-oas")
-	if err != nil {
-		return apiError(err.Error()), errCode
-	}
-
-	action := "modified"
-	if r.Method == http.MethodPost {
-		action = "added"
+		err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
+		if err != nil {
+			return apiError(err.Error()), errCode
+		}
 	}
 
 	response := apiModifyKeySuccess{
 		Key:    newDef.APIID,
 		Status: "ok",
-		Action: action,
+		Action: "modified",
 	}
 
 	return response, http.StatusOK
+}
+
+func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefinition, oasObj *oas.OAS) (err error, errCode int) {
+	err, errCode = gw.writeToFile(fs, apiDef, apiDef.APIID)
+	if err != nil {
+		return
+	}
+
+	err, errCode = gw.writeToFile(fs, oasObj, apiDef.APIID+"-oas")
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string) (err error, errCode int) {
@@ -1001,9 +1165,16 @@ func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string)
 }
 
 func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
+	spec := gw.getApiSpec(apiID)
+	if spec == nil {
+		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
+	}
+
 	// Generate a filename
 	defFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+".json")
+	defFilePath = filepath.Clean(defFilePath)
 	defOASFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+"-oas.json")
+	defOASFilePath = filepath.Clean(defOASFilePath)
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {
@@ -1011,8 +1182,15 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 		return apiError("Delete failed"), http.StatusInternalServerError
 	}
 
+	if _, err := os.Stat(defFilePath); spec.IsOAS && err != nil {
+		log.Warning("File does not exist! ", err)
+		return apiError("Delete failed"), http.StatusInternalServerError
+	}
+
 	os.Remove(defFilePath)
-	os.Remove(defOASFilePath)
+	if spec.IsOAS {
+		os.Remove(defOASFilePath)
+	}
 
 	response := apiModifyKeySuccess{
 		Key:    apiID,
@@ -1062,7 +1240,6 @@ func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 
 func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
-	oasTyped := r.FormValue("type") == "oas"
 
 	var obj interface{}
 	var code int
@@ -1070,19 +1247,19 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		if apiID != "" {
-			log.Debug("Requesting API definition for", apiID)
-			obj, code = gw.handleGetAPI(apiID, oasTyped)
+			log.Debugf("Requesting API definition for %q", apiID)
+			obj, code = gw.handleGetAPI(apiID, false)
 		} else {
 			log.Debug("Requesting API list")
 			obj, code = gw.handleGetAPIList()
 		}
-	case "POST":
+	case http.MethodPost:
 		log.Debug("Creating new definition file")
-		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), oasTyped)
-	case "PUT":
+		obj, code = gw.handleAddApi(r, afero.NewOsFs(), false)
+	case http.MethodPut:
 		if apiID != "" {
-			log.Debug("Updating existing API: ", apiID)
-			obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), oasTyped)
+			log.Debugf("Updating existing API: %q", apiID)
+			obj, code = gw.handleUpdateApi(apiID, r, afero.NewOsFs(), false)
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
@@ -1096,6 +1273,156 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		apiID       = mux.Vars(r)["apiID"]
+		scopePublic = r.URL.Query().Get("mode") == "public"
+		obj         interface{}
+		code        int
+	)
+	if apiID != "" {
+		log.Debugf("Requesting API definition for %q", apiID)
+		obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
+	} else {
+		log.Debug("Requesting API list")
+		obj, code = gw.handleGetAPIListOAS(scopePublic)
+	}
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		obj  interface{}
+		code int
+	)
+
+	log.Debug("Creating new definition file")
+	obj, code = gw.handleAddApi(r, afero.NewOsFs(), true)
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		apiID = mux.Vars(r)["apiID"]
+		obj   interface{}
+		code  int
+	)
+	if apiID != "" {
+		log.Debugf("Updating existing API: %q", apiID)
+		obj, code = gw.handleUpdateApi(apiID, r, afero.NewOsFs(), true)
+	} else {
+		obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
+	}
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
+	apiID := strings.TrimSpace(mux.Vars(r)["apiID"])
+	if apiID == "" {
+		doJSONWrite(w, http.StatusBadRequest, apiError("Must specify an apiID to patch"))
+		return
+	}
+
+	existingAPISpec := gw.getApiSpec(apiID)
+	if existingAPISpec == nil {
+		doJSONWrite(w, http.StatusNotFound, apiError(apidef.ErrAPINotFound.Error()))
+		return
+	}
+
+	if !existingAPISpec.IsOAS {
+		doJSONWrite(w, http.StatusBadRequest, apiError(apidef.ErrAPINotMigrated.Error()))
+		return
+	}
+
+	reqBodyInBytes, oasObj, err := extractOASObjFromReq(r.Body)
+
+	if err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+		return
+	}
+
+	tykExtensionConfigParams := oas.GetTykExtensionConfigParams(r)
+
+	if oasObj.GetTykExtension() != nil && tykExtensionConfigParams == nil {
+		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
+		obj, code := gw.handleUpdateApi(apiID, r, afero.NewOsFs(), true)
+		doJSONWrite(w, code, obj)
+		return
+	}
+
+	var oasObjToPatch oas.OAS
+	existingAPISpec.OAS.Fill(*existingAPISpec.APIDefinition)
+	oasObjToPatch = existingAPISpec.OAS
+
+	var tykExtToPatch *oas.XTykAPIGateway
+
+	if oasObj.GetTykExtension() != nil {
+		tykExtToPatch = oasObj.GetTykExtension()
+	} else {
+		tykExtToPatch = oasObjToPatch.GetTykExtension()
+	}
+
+	oasObj.Servers = oas.RetainOldServerURL(oasObjToPatch.Servers, oasObj.Servers)
+
+	oasObjToPatch.T = oasObj.T
+
+	oasObjToPatch.SetTykExtension(tykExtToPatch)
+
+	if tykExtensionConfigParams != nil {
+		err = oasObjToPatch.BuildDefaultTykExtension(*tykExtensionConfigParams, false)
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+	}
+
+	oasAPIInBytes, err := oasObj.MarshalJSON()
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
+		return
+	}
+
+	r.Body = ioutil.NopCloser(bytes.NewReader(oasAPIInBytes))
+
+	log.Debugf("PATCHing API: %q", apiID)
+	obj, code := gw.handleUpdateApi(apiID, r, afero.NewOsFs(), true)
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASExportHandler(w http.ResponseWriter, r *http.Request) {
+	const (
+		baseFileName       = "TykOasApiDef"
+		baseFileNamePublic = "oas"
+		fileTypeJSON       = "json"
+	)
+	var (
+		apiID       = mux.Vars(r)["apiID"]
+		fileName    = baseFileName
+		scopePublic = r.URL.Query().Get("mode") == "public"
+		obj         interface{}
+		code        int
+	)
+
+	if scopePublic {
+		fileName = baseFileNamePublic
+	}
+
+	if apiID != "" {
+		log.Debugf("Requesting API definition for %q", apiID)
+		obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
+		fileName += "-" + apiID
+	} else {
+		log.Debug("Requesting API list")
+		obj, code = gw.handleGetAPIListOAS(scopePublic)
+	}
+
+	doJSONExport(w, code, obj, fmt.Sprintf("%s.%s", fileName, fileTypeJSON))
 }
 
 func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
@@ -2485,6 +2812,83 @@ func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request
 	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
 
+func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reqBodyInBytes, oasObj, err := extractOASObjFromReq(r.Body)
+
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
+		if strings.HasSuffix(r.URL.Path, "/import") && oasObj.GetTykExtension() != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(apidef.ErrImportWithTykExtension.Error()))
+			return
+		}
+
+		if (r.Method == http.MethodPost || r.Method == http.MethodPut) && !strings.HasSuffix(r.URL.Path, "/import") && oasObj.GetTykExtension() == nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(apidef.ErrPayloadWithoutTykExtension.Error()))
+			return
+		}
+
+		if err = oas.ValidateOASObject(reqBodyInBytes, oasObj.OpenAPI); err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
+		if err = oasObj.Validate(r.Context()); err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
+		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
+		next.ServeHTTP(w, r)
+	}
+}
+
+func (gw *Gateway) blockInDashboardMode(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if gw.GetConfig().UseDBAppConfigs {
+			doJSONWrite(w, http.StatusInternalServerError, apiError("Due to enabled use_db_app_configs, please use the Dashboard API"))
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
+}
+
+func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, oasObj, err := extractOASObjFromReq(r.Body)
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError("Couldn't decode OAS object"))
+			return
+		}
+
+		tykExtensionConfigParams := oas.GetTykExtensionConfigParams(r)
+		if tykExtensionConfigParams == nil {
+			tykExtensionConfigParams = &oas.TykExtensionConfigParams{}
+		}
+
+		err = oasObj.BuildDefaultTykExtension(*tykExtensionConfigParams, true)
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
+		oasObj.GetTykExtension().Server.ListenPath.Strip = true
+
+		apiInBytes, err := oasObj.MarshalJSON()
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
+		r.Body = ioutil.NopCloser(bytes.NewReader(apiInBytes))
+		next.ServeHTTP(w, r)
+	}
+}
+
 // TODO: Don't modify http.Request values in-place. We must right now
 // because our middleware design doesn't pass around http.Request
 // pointers, so we have no way to modify the pointer in a middleware.
@@ -2820,4 +3224,47 @@ func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAut
 			}
 		}
 	}
+}
+
+func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
+	var oasObj oas.OAS
+	reqBodyInBytes, err := ioutil.ReadAll(reqBody)
+	if err != nil {
+		return nil, nil, ErrRequestMalformed
+	}
+
+	loader := openapi3.NewLoader()
+	t, err := loader.LoadFromData(reqBodyInBytes)
+	if err != nil {
+		return nil, nil, ErrRequestMalformed
+	}
+
+	oasObj.T = *t
+
+	return reqBodyInBytes, &oasObj, nil
+}
+
+func validateAPIDef(apiDef *apidef.APIDefinition) *apiStatusMessage {
+	validationResult := apidef.Validate(apiDef, apidef.DefaultValidationRuleSet)
+	if !validationResult.IsValid {
+		reason := "unknown"
+		if validationResult.ErrorCount() > 0 {
+			reason = validationResult.FirstError().Error()
+		}
+
+		apiErr := apiError(fmt.Sprintf("Validation of API Definition failed. Reason: %s.", reason))
+		return &apiErr
+	}
+
+	return nil
+}
+
+func updateOASServers(spec *APISpec, conf config.Config, apiDef *apidef.APIDefinition, oasObj *oas.OAS) {
+	var oldAPIURL string
+	if spec != nil && spec.OAS.Servers != nil {
+		oldAPIURL = spec.OAS.Servers[0].URL
+	}
+
+	newAPIURL := getAPIURL(*apiDef, conf)
+	oasObj.UpdateServers(newAPIURL, oldAPIURL)
 }

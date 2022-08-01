@@ -71,7 +71,7 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 
 	certMaps := []map[string]string{gw.GetConfig().Security.Certificates.Upstream}
 
-	if spec != nil && spec.UpstreamCertificates != nil {
+	if spec != nil && !spec.UpstreamCertificatesDisabled && spec.UpstreamCertificates != nil {
 		certMaps = append(certMaps, spec.UpstreamCertificates)
 	}
 
@@ -112,7 +112,8 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 }
 
 func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(gw.GetConfig().Security.PinnedPublicKeys) == 0 {
+	if (spec == nil || spec.CertificatePinningDisabled || len(spec.PinnedPublicKeys) == 0) &&
+		len(gw.GetConfig().Security.PinnedPublicKeys) == 0 {
 		return nil
 	}
 
@@ -189,7 +190,7 @@ func validateCommonName(host string, cert *x509.Certificate) error {
 func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
 	var checkPinnedKeys, checkCommonName bool
 	gwConfig := gw.GetConfig()
-	if (spec != nil && len(spec.PinnedPublicKeys) != 0) || len(gwConfig.Security.PinnedPublicKeys) != 0 {
+	if (spec != nil && !spec.CertificatePinningDisabled && len(spec.PinnedPublicKeys) != 0) || len(gwConfig.Security.PinnedPublicKeys) != 0 {
 		checkPinnedKeys = true
 	}
 
@@ -237,7 +238,7 @@ func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.C
 
 	pinMaps := []map[string]string{conf.Security.PinnedPublicKeys}
 
-	if spec != nil && spec.PinnedPublicKeys != nil {
+	if spec != nil && !spec.CertificatePinningDisabled && spec.PinnedPublicKeys != nil {
 		pinMaps = append(pinMaps, spec.PinnedPublicKeys)
 	}
 
@@ -379,7 +380,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 						}
 					}
 				}
-			case spec.AuthConfigs[apidef.AuthTokenType].UseCertificate:
+			case spec.Auth.UseCertificate, spec.AuthConfigs[apidef.AuthTokenType].UseCertificate:
 				// Dynamic certificate check required, falling back to HTTP level check
 				// TODO: Change to VerifyPeerCertificate hook instead, when possible
 				if domainRequireCert[spec.Domain] < tls.RequestClientCert {
@@ -414,13 +415,30 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			}
 		}
 
-		newConfig.ClientAuth = tls.NoClientCert
+		if clientAuth, found := domainRequireCert[hello.ServerName]; found {
+			newConfig.ClientAuth = clientAuth
+		} else {
+			newConfig.ClientAuth = tls.NoClientCert
 
-		for key, clientAuth := range domainRequireCert {
-			req := http.Request{Host: hello.ServerName, URL: &url.URL{}}
-			if mux.NewRouter().Host(key).Match(&req, &mux.RouteMatch{}) {
-				newConfig.ClientAuth = clientAuth
-				break
+			for domain, clientAuth := range domainRequireCert {
+				isRegex := false
+				for _, c := range domain {
+					if c == '{' {
+						isRegex = true
+						break
+					}
+				}
+
+				req := http.Request{Host: hello.ServerName, URL: &url.URL{}}
+				if isRegex && mux.NewRouter().Host(domain).Match(&req, &mux.RouteMatch{}) {
+					if clientAuth > newConfig.ClientAuth {
+						newConfig.ClientAuth = clientAuth
+					}
+
+					if newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+						break
+					}
+				}
 			}
 		}
 

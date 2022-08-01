@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/headers"
@@ -83,6 +83,8 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 	})
 
 	t.Run("Policy applied key", func(t *testing.T) {
+		test.Flaky(t) // TODO: TT-5220
+
 		authHeaderWithPolicyAppliedKey := map[string]string{
 			headers.Authorization: policyAppliedKey,
 		}

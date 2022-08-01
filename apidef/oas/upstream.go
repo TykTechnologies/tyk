@@ -1,6 +1,11 @@
 package oas
 
-import "github.com/TykTechnologies/tyk/apidef"
+import (
+	"sort"
+	"strings"
+
+	"github.com/TykTechnologies/tyk/apidef"
+)
 
 type Upstream struct {
 	// URL defines the target URL that the request should be proxied to.
@@ -11,6 +16,10 @@ type Upstream struct {
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 	// Test contains the configuration related to uptime tests.
 	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
+	// MutualTLS contains the configuration related to upstream mutual TLS.
+	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
+	// CertificatePinning contains the configuration related to certificate pinning.
+	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
 }
 
 func (u *Upstream) Fill(api apidef.APIDefinition) {
@@ -33,6 +42,24 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(u.Test) {
 		u.Test = nil
 	}
+
+	if u.MutualTLS == nil {
+		u.MutualTLS = &MutualTLS{}
+	}
+
+	u.MutualTLS.Fill(api)
+	if ShouldOmit(u.MutualTLS) {
+		u.MutualTLS = nil
+	}
+
+	if u.CertificatePinning == nil {
+		u.CertificatePinning = &CertificatePinning{}
+	}
+
+	u.CertificatePinning.Fill(api)
+	if ShouldOmit(u.CertificatePinning) {
+		u.CertificatePinning = nil
+	}
 }
 
 func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
@@ -44,6 +71,20 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	if u.Test != nil {
 		u.Test.ExtractTo(&api.UptimeTests)
+	}
+
+	if u.MutualTLS != nil {
+		u.MutualTLS.ExtractTo(api)
+	} else {
+		api.UpstreamCertificatesDisabled = true
+		api.UpstreamCertificates = nil
+	}
+
+	if u.CertificatePinning != nil {
+		u.CertificatePinning.ExtractTo(api)
+	} else {
+		api.CertificatePinningDisabled = true
+		api.PinnedPublicKeys = nil
 	}
 }
 
@@ -163,5 +204,108 @@ func (t *Test) Fill(uptimeTests apidef.UptimeTests) {
 func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	if t.ServiceDiscovery != nil {
 		t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
+	}
+}
+
+type MutualTLS struct {
+	// Enabled enables/disables upstream mutual TLS auth for the API.
+	// Old API Definition: `upstream_certificates_disabled`
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// DomainToCertificate maintains the mapping of domain to certificate.
+	// Old API Definition: `upstream_certificates`
+	DomainToCertificates []DomainToCertificate `bson:"domainToCertificateMapping" json:"domainToCertificateMapping"`
+}
+
+type DomainToCertificate struct {
+	Domain      string `bson:"domain" json:"domain"`
+	Certificate string `bson:"certificate" json:"certificate"`
+}
+
+func (m *MutualTLS) Fill(api apidef.APIDefinition) {
+	m.Enabled = !api.UpstreamCertificatesDisabled
+
+	m.DomainToCertificates = make([]DomainToCertificate, len(api.UpstreamCertificates))
+
+	i := 0
+	for domain, cert := range api.UpstreamCertificates {
+		m.DomainToCertificates[i] = DomainToCertificate{Domain: domain, Certificate: cert}
+		i++
+	}
+}
+
+func (m *MutualTLS) ExtractTo(api *apidef.APIDefinition) {
+	api.UpstreamCertificatesDisabled = !m.Enabled
+
+	if len(m.DomainToCertificates) > 0 {
+		api.UpstreamCertificates = make(map[string]string)
+	}
+
+	for _, domainToCert := range m.DomainToCertificates {
+		api.UpstreamCertificates[domainToCert.Domain] = domainToCert.Certificate
+	}
+}
+
+type PinnedPublicKey struct {
+	Domain     string   `bson:"domain" json:"domain"`
+	PublicKeys []string `bson:"publicKeys" json:"publicKeys"`
+}
+
+type PinnedPublicKeys []PinnedPublicKey
+
+func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
+	domains := make([]string, len(publicKeys))
+
+	i := 0
+	for domain := range publicKeys {
+		domains[i] = domain
+		i++
+	}
+
+	sort.Slice(domains, func(i, j int) bool {
+		return domains[i] < domains[j]
+	})
+
+	i = 0
+	for _, domain := range domains {
+		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
+		i++
+	}
+}
+
+func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
+	for _, publicKey := range ppk {
+		publicKeys[publicKey.Domain] = strings.Join(publicKey.PublicKeys, ",")
+	}
+}
+
+type CertificatePinning struct {
+	// Enabled enables/disables certificate pinning for the API.
+	// Old API Definition: `certificate_pinning_disabled`
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// DomainToPublicKeysMapping maintains the mapping of domain to pinned public keys.
+	// Old API Definition: `pinned_public_keys`
+	DomainToPublicKeysMapping PinnedPublicKeys `bson:"domainToPublicKeysMapping" json:"domainToPublicKeysMapping"`
+}
+
+func (cp *CertificatePinning) Fill(api apidef.APIDefinition) {
+	cp.Enabled = !api.CertificatePinningDisabled
+
+	if cp.DomainToPublicKeysMapping == nil {
+		cp.DomainToPublicKeysMapping = make(PinnedPublicKeys, len(api.PinnedPublicKeys))
+	}
+
+	cp.DomainToPublicKeysMapping.Fill(api.PinnedPublicKeys)
+
+	if ShouldOmit(cp.DomainToPublicKeysMapping) {
+		cp.DomainToPublicKeysMapping = nil
+	}
+}
+
+func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
+	api.CertificatePinningDisabled = !cp.Enabled
+
+	if len(cp.DomainToPublicKeysMapping) > 0 {
+		api.PinnedPublicKeys = make(map[string]string)
+		cp.DomainToPublicKeysMapping.ExtractTo(api.PinnedPublicKeys)
 	}
 }

@@ -8,9 +8,29 @@ import (
 )
 
 const ExtensionTykAPIGateway = "x-tyk-api-gateway"
+const Main = ""
 
 type OAS struct {
 	openapi3.T
+}
+
+func (s *OAS) MarshalJSON() ([]byte, error) {
+	if ShouldOmit(s.ExternalDocs) { // for sql case
+		s.ExternalDocs = nil
+	}
+
+	if s.Info != nil && ShouldOmit(s.Info.License) { // for sql case
+		s.Info.License = nil
+	}
+
+	type Alias OAS
+
+	// to prevent infinite recursion
+	return json.Marshal(&struct {
+		*Alias
+	}{
+		Alias: (*Alias)(s),
+	})
 }
 
 func (s *OAS) Fill(api apidef.APIDefinition) {
@@ -21,6 +41,7 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	}
 
 	xTykAPIGateway.Fill(api)
+	s.fillPathsAndOperations(api.VersionData.Versions[Main].ExtendedPaths)
 	s.fillSecurity(api)
 
 	if ShouldOmit(xTykAPIGateway) {
@@ -30,17 +51,28 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.Extensions) {
 		s.Extensions = nil
 	}
+
+	// set external docs to nil if populated with default values
+	if ShouldOmit(s.ExternalDocs) {
+		s.ExternalDocs = nil
+	}
 }
 
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
-	if s.Security != nil {
-		s.extractSecurityTo(api)
-	} else {
-		api.UseKeylessAccess = true
-	}
-
 	if s.GetTykExtension() != nil {
 		s.GetTykExtension().ExtractTo(api)
+	}
+
+	s.extractSecurityTo(api)
+
+	var ep apidef.ExtendedPathsSet
+	s.extractPathsAndOperations(&ep)
+
+	api.VersionData.Versions = map[string]apidef.VersionInfo{
+		Main: {
+			UseExtendedPaths: true,
+			ExtendedPaths:    ep,
+		},
 	}
 }
 
@@ -81,6 +113,15 @@ func (s *OAS) GetTykExtension() *XTykAPIGateway {
 	return nil
 }
 
+func (s *OAS) RemoveTykExtension() {
+
+	if s.Extensions == nil {
+		return
+	}
+
+	delete(s.Extensions, ExtensionTykAPIGateway)
+}
+
 func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 	if s.GetTykExtension() != nil {
 		authentication = s.GetTykExtension().Server.Authentication
@@ -90,23 +131,19 @@ func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 }
 
 func (s *OAS) getTykTokenAuth(name string) (token *Token) {
-	if securitySchemes := s.getTykSecuritySchemes(); securitySchemes != nil {
-		securityScheme := securitySchemes[name]
-		if securityScheme == nil {
-			return
-		}
-
-		mapSecurityScheme, ok := securityScheme.(map[string]interface{})
-		if ok {
-			token = &Token{}
-			inBytes, _ := json.Marshal(mapSecurityScheme)
-			_ = json.Unmarshal(inBytes, token)
-			s.getTykSecuritySchemes()[name] = token
-			return
-		}
-
-		token = s.getTykSecuritySchemes()[name].(*Token)
+	securityScheme := s.getTykSecurityScheme(name)
+	if securityScheme == nil {
+		return
 	}
+
+	token = &Token{}
+	if tokenVal, ok := securityScheme.(*Token); ok {
+		token = tokenVal
+	} else {
+		toStructIfMap(securityScheme, token)
+	}
+
+	s.getTykSecuritySchemes()[name] = token
 
 	return
 }
@@ -117,16 +154,14 @@ func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
 		return
 	}
 
-	mapSecurityScheme, ok := securityScheme.(map[string]interface{})
-	if ok {
-		jwt = &JWT{}
-		inBytes, _ := json.Marshal(mapSecurityScheme)
-		_ = json.Unmarshal(inBytes, jwt)
-		s.getTykSecuritySchemes()[name] = jwt
-		return
+	jwt = &JWT{}
+	if jwtVal, ok := securityScheme.(*JWT); ok {
+		jwt = jwtVal
+	} else {
+		toStructIfMap(securityScheme, jwt)
 	}
 
-	jwt = securityScheme.(*JWT)
+	s.getTykSecuritySchemes()[name] = jwt
 
 	return
 }
@@ -137,43 +172,37 @@ func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 		return
 	}
 
-	mapSecurityScheme, ok := securityScheme.(map[string]interface{})
-	if ok {
-		basic = &Basic{}
-		inBytes, _ := json.Marshal(mapSecurityScheme)
-		_ = json.Unmarshal(inBytes, basic)
-		s.getTykSecuritySchemes()[name] = basic
+	basic = &Basic{}
+	if basicVal, ok := securityScheme.(*Basic); ok {
+		basic = basicVal
+	} else {
+		toStructIfMap(securityScheme, basic)
+	}
+
+	s.getTykSecuritySchemes()[name] = basic
+
+	return
+}
+
+func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
+	securityScheme := s.getTykSecurityScheme(name)
+	if securityScheme == nil {
 		return
 	}
 
-	basic = securityScheme.(*Basic)
-
-	return
-}
-
-func (s *OAS) getTykOAuthAuth(name string) (oAuth *OAuth) {
-	if securitySchemes := s.getTykSecuritySchemes(); securitySchemes != nil {
-		securityScheme := securitySchemes[name]
-		if securityScheme == nil {
-			return
-		}
-
-		mapSecurityScheme, ok := securityScheme.(map[string]interface{})
-		if ok {
-			oAuth = &OAuth{}
-			inBytes, _ := json.Marshal(mapSecurityScheme)
-			_ = json.Unmarshal(inBytes, oAuth)
-			s.getTykSecuritySchemes()[name] = oAuth
-			return
-		}
-
-		oAuth = s.getTykSecuritySchemes()[name].(*OAuth)
+	oauth = &OAuth{}
+	if oauthVal, ok := securityScheme.(*OAuth); ok {
+		oauth = oauthVal
+	} else {
+		toStructIfMap(securityScheme, oauth)
 	}
 
+	s.getTykSecuritySchemes()[name] = oauth
+
 	return
 }
 
-func (s *OAS) getTykSecuritySchemes() (securitySchemes map[string]interface{}) {
+func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
 	if s.getTykAuthentication() != nil {
 		securitySchemes = s.getTykAuthentication().SecuritySchemes
 	}
@@ -188,4 +217,62 @@ func (s *OAS) getTykSecurityScheme(name string) interface{} {
 	}
 
 	return securitySchemes[name]
+}
+
+func (s *OAS) getTykMiddleware() (middleware *Middleware) {
+	if s.GetTykExtension() != nil {
+		middleware = s.GetTykExtension().Middleware
+	}
+
+	return
+}
+
+func (s *OAS) getTykOperations() (operations Operations) {
+	if s.getTykMiddleware() != nil {
+		operations = s.getTykMiddleware().Operations
+	}
+
+	return
+}
+
+func (s *OAS) AddServers(apiURL string) {
+	if len(s.Servers) == 0 {
+		s.Servers = openapi3.Servers{
+			{
+				URL: apiURL,
+			},
+		}
+		return
+	}
+
+	newServers := openapi3.Servers{
+		{
+			URL: apiURL,
+		},
+	}
+
+	// check if apiURL already exists in servers object
+	for i := 0; i < len(s.Servers); i++ {
+		if s.Servers[i].URL == apiURL {
+			continue
+		}
+		newServers = append(newServers, s.Servers[i])
+	}
+
+	s.Servers = newServers
+}
+
+func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
+	if len(s.Servers) == 0 {
+		s.Servers = openapi3.Servers{
+			{
+				URL: apiURL,
+			},
+		}
+		return
+	}
+
+	if len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL {
+		s.Servers[0].URL = apiURL
+	}
 }

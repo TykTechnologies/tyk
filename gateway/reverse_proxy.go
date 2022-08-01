@@ -31,9 +31,9 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
-	gqlhttp "github.com/jensneuse/graphql-go-tools/pkg/http"
-	"github.com/jensneuse/graphql-go-tools/pkg/subscription"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
 
 	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"
@@ -403,17 +403,23 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 		dialContextFunc = p.Gw.dnsCacheManager.WrapDialer(dialer)
 	}
 
-	return &http.Transport{
+	if p.Gw.dialCtxFn != nil {
+		dialContextFunc = p.Gw.dialCtxFn
+	}
+
+	transport := &http.Transport{
 		DialContext:           dialContextFunc,
 		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
 		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
 		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
+
+	return transport
 }
 
 func singleJoiningSlash(a, b string, disableStripSlash bool) string {
-	if disableStripSlash && len(b) == 0 {
+	if disableStripSlash && (len(b) == 0 || b == "/") {
 		return a
 	}
 	a = strings.TrimRight(a, "/")

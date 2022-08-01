@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk/ctx"
@@ -128,7 +129,7 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 
 	if !FileExist(m.Path) {
 		// if the exact name doesn't exist then try to load it using tyk version
-		m.Path = m.goPluginFromTykVersion()
+		m.Path = m.goPluginFromTykVersion(VERSION)
 	}
 
 	if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
@@ -216,7 +217,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
 		default:
 			// record 2XX to analytics
-			m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
+			m.successHandler.RecordHit(r, analytics.Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
 
 			// no need to continue passing this request down to reverse proxy
 			respCode = mwStatusRespond
@@ -231,7 +232,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 // goPluginFromTykVersion builds a name of plugin based on tyk version
 // os and architecture. The structure of the plugin name looks like:
 // {plugin-dir}/{plugin-name}_{GW-version}_{OS}_{arch}.so
-func (m *GoPluginMiddleware) goPluginFromTykVersion() string {
+func (m *GoPluginMiddleware) goPluginFromTykVersion(version string) string {
 	if m.Path == "" {
 		return ""
 	}
@@ -242,7 +243,13 @@ func (m *GoPluginMiddleware) goPluginFromTykVersion() string {
 	os := runtime.GOOS
 	architecture := runtime.GOARCH
 
-	newPluginName := strings.Join([]string{pluginName, VERSION, os, architecture}, "_")
+	// sanitize away `-rc15` suffixes (remove `-*`) from version
+	vs := strings.Split(version, "-")
+	if len(vs) > 0 {
+		version = vs[0]
+	}
+
+	newPluginName := strings.Join([]string{pluginName, version, os, architecture}, "_")
 	newPluginPath := pluginDir + "/" + newPluginName + ".so"
 
 	return newPluginPath

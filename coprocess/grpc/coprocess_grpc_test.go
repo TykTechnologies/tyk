@@ -300,7 +300,10 @@ func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
 		GRPCRecvMaxSize:     grpcTestMaxSize,
 		GRPCSendMaxSize:     grpcTestMaxSize,
 	}
-	ts := gateway.StartTest(nil, gateway.TestConfig{CoprocessConfig: cfg})
+	ts := gateway.StartTest(nil, gateway.TestConfig{
+		CoprocessConfig:   cfg,
+		EnableTestDNSMock: false,
+	})
 
 	// Load test APIs:
 	loadTestGRPCAPIs(ts)
@@ -403,6 +406,8 @@ func TestGRPCDispatch(t *testing.T) {
 	})
 
 	t.Run("Post Hook with allowed message length", func(t *testing.T) {
+		test.Flaky(t)
+
 		s := randStringBytes(20000000)
 		ts.Run(t, test.TestCase{
 			Path:    "/grpc-test-api-3/",
@@ -414,6 +419,8 @@ func TestGRPCDispatch(t *testing.T) {
 	})
 
 	t.Run("Post Hook with with unallowed message length", func(t *testing.T) {
+		test.Flaky(t)
+
 		s := randStringBytes(150000000)
 		ts.Run(t, test.TestCase{
 			Path:    "/grpc-test-api-3/",
@@ -450,13 +457,7 @@ func BenchmarkGRPCDispatch(b *testing.B) {
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 func randStringBytes(n int) string {
-	b := make([]byte, n)
-
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-
-	return string(b)
+	return strings.Repeat(string(letters[rand.Intn(len(letters))]), n)
 }
 
 func TestGRPCIgnore(t *testing.T) {

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
@@ -203,11 +202,14 @@ pre.NewProcessRequest(function(request, session) {
 }
 
 func TestResponseOverride(t *testing.T) {
+	test.Flaky(t)
+	pythonVersion := test.GetPythonVersion()
+
 	ts := StartTest(nil, TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
-			PythonVersion:    "3.5",
+			PythonVersion:    pythonVersion,
 		}})
 	defer ts.Close()
 
@@ -221,8 +223,6 @@ func TestResponseOverride(t *testing.T) {
 			spec.UseKeylessAccess = true
 			spec.CustomMiddlewareBundle = bundle
 		})
-
-		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/test/?status=200", Code: 200, BodyMatch: customError, HeadersMatch: customHeader},

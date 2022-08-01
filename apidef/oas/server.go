@@ -1,6 +1,8 @@
 package oas
 
-import "github.com/TykTechnologies/tyk/apidef"
+import (
+	"github.com/TykTechnologies/tyk/apidef"
+)
 
 type Server struct {
 	// ListenPath represents the path to listen on. Any requests coming into the host, on the port that Tyk is configured to run on,
@@ -13,6 +15,11 @@ type Server struct {
 	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
 	// ClientCertificates contains the configurations related to static mTLS.
 	ClientCertificates *ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty"`
+	// GatewayTags contains segment tags to configure which GWs your APIs connect to
+	GatewayTags *GatewayTags `bson:"gatewayTags,omitempty" json:"gatewayTags,omitempty"`
+	// CustomDomain is the domain to bind this API to.
+	// Old API Definition: `domain`
+	CustomDomain *Domain `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
 }
 
 func (s *Server) Fill(api apidef.APIDefinition) {
@@ -27,6 +34,18 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.ClientCertificates) {
 		s.ClientCertificates = nil
 	}
+
+	if s.GatewayTags == nil {
+		s.GatewayTags = &GatewayTags{}
+	}
+	s.GatewayTags.Fill(api)
+	if ShouldOmit(s.GatewayTags) {
+		s.GatewayTags = nil
+	}
+
+	if s.CustomDomain != nil {
+		s.CustomDomain.Fill(api)
+	}
 }
 
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
@@ -35,6 +54,15 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	if s.ClientCertificates != nil {
 		s.ClientCertificates.ExtractTo(api)
+	}
+	if s.GatewayTags != nil {
+		s.GatewayTags.ExtractTo(api)
+	} else {
+		api.TagsDisabled = true
+		api.Tags = []string{}
+	}
+	if s.CustomDomain != nil {
+		s.CustomDomain.ExtractTo(api)
 	}
 }
 
@@ -61,7 +89,7 @@ func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 
 type ClientCertificates struct {
 	// Enabled enables static mTLS for the API.
-	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	Enabled bool `bson:"enabled" json:"enabled"`
 	// AllowList is the list of client certificates which are allowed.
 	Allowlist []string `bson:"allowlist" json:"allowlist"`
 }
@@ -74,4 +102,49 @@ func (cc *ClientCertificates) Fill(api apidef.APIDefinition) {
 func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 	api.UseMutualTLSAuth = cc.Enabled
 	api.ClientCertificates = cc.Allowlist
+}
+
+type GatewayTags struct {
+	// Enabled enables use of segment tags.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Tags is a list of segment tags
+	Tags []string `bson:"tags" json:"tags"`
+}
+
+func (gt *GatewayTags) Fill(api apidef.APIDefinition) {
+	gt.Enabled = !api.TagsDisabled
+	gt.Tags = api.Tags
+	if gt.Tags == nil {
+		gt.Tags = []string{}
+	}
+}
+
+func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
+	api.TagsDisabled = !gt.Enabled
+	api.Tags = gt.Tags
+}
+
+type Domain struct {
+	// Enabled allow/disallow the usage of the domain.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Name is the name of the domain.
+	Name string `bson:"name" json:"name"`
+}
+
+func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {
+	if !cd.Enabled && cd.Name == "" {
+		// nothing was configured
+		return
+	}
+	api.DomainDisabled = !cd.Enabled
+	api.Domain = cd.Name
+}
+
+func (cd *Domain) Fill(api apidef.APIDefinition) {
+	if !api.DomainDisabled && api.Domain == "" {
+		// nothing was configured.
+		return
+	}
+	cd.Enabled = !api.DomainDisabled
+	cd.Name = api.Domain
 }

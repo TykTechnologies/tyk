@@ -2,26 +2,48 @@ package gateway
 
 import (
 	"errors"
+	"net"
+	"net/url"
 	"os"
+	"strconv"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
-// appendIfMissing appends the given new item to the given slice.
-func appendIfMissing(slice []string, newSlice ...string) []string {
-	for _, new := range newSlice {
-		found := false
-		for _, item := range slice {
-			if item == new {
-				continue
-			}
-			found = true
-		}
-
-		if !found {
-			slice = append(slice, new)
-		}
+// appendIfMissing ensures dest slice is unique with new items.
+func appendIfMissing(src []string, in ...string) []string {
+	// Use map for uniqueness
+	srcMap := map[string]bool{}
+	for _, v := range src {
+		srcMap[v] = true
+	}
+	for _, v := range in {
+		srcMap[v] = true
 	}
 
-	return slice
+	// Produce unique []string, maintain sort order
+	uniqueSorted := func(src []string, keys map[string]bool) []string {
+		result := make([]string, 0, len(keys))
+		for _, v := range src {
+			// append missing value
+			if val := keys[v]; val {
+				result = append(result, v)
+				delete(keys, v)
+			}
+		}
+		return result
+	}
+
+	// no new items from `in`
+	if len(srcMap) == len(src) {
+		return src
+	}
+
+	src = uniqueSorted(src, srcMap)
+	in = uniqueSorted(in, srcMap)
+
+	return append(src, in...)
 }
 
 // intersection gets intersection of the given two slices.
@@ -98,4 +120,40 @@ func FileExist(filepath string) bool {
 		return false
 	}
 	return true
+}
+
+func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
+	var result = url.URL{
+		Scheme: "http",
+		Host:   apiDef.GetAPIDomain(),
+		Path:   apiDef.Proxy.ListenPath,
+	}
+
+	if gwConfig.HttpServerOptions.UseSSL {
+		result.Scheme = "https"
+	}
+
+	// apiDef has priority
+	if result.Host != "" {
+		return result.String()
+	}
+
+	result.Host = gwConfig.ListenAddress
+	if gwConfig.HostName != "" {
+		result.Host = gwConfig.HostName
+	}
+
+	if result.Host == "" {
+		result.Host = "127.0.0.1"
+	}
+
+	// Skip adding ListenPort for http/80, https/443
+	if result.Scheme == "http" && gwConfig.ListenPort == 80 ||
+		result.Scheme == "https" && gwConfig.ListenPort == 443 {
+		return result.String()
+	}
+
+	result.Host = net.JoinHostPort(result.Host, strconv.Itoa(gwConfig.ListenPort))
+
+	return result.String()
 }

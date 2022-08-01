@@ -278,7 +278,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		return false
 	}
 
-	lifetime := session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
+	lifetime := session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
 	if err := t.Gw.GlobalSessionManager.UpdateSession(token, session, lifetime, false); err != nil {
 		t.Logger().WithError(err).Error("Can't update session")
 		return false
@@ -390,7 +390,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							for ai, au := range r.AllowedURLs {
 								if u.URL == au.URL {
 									found = true
-									r.AllowedURLs[ai].Methods = append(au.Methods, u.Methods...)
+									r.AllowedURLs[ai].Methods = appendIfMissing(au.Methods, u.Methods...)
 								}
 							}
 
@@ -556,7 +556,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	// set tags
 	session.Tags = []string{}
 	for tag := range tags {
-		session.Tags = append(session.Tags, tag)
+		session.Tags = appendIfMissing(session.Tags, tag)
 	}
 
 	if len(policies) == 0 {
@@ -724,14 +724,14 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 			return session, false
 		}
 
-		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
+		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 		ctxScheduleSessionUpdate(r)
-	} else {
-		// defaulting
-		session.KeyID = key
+		return session, found
 	}
 
-	return session, found
+	// session not found
+	session.KeyID = key
+	return session, false
 }
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
@@ -767,7 +767,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	paramName := config.ParamName
-	if config.UseParam || paramName != "" {
+	if config.UseParam {
 		if paramName == "" {
 			paramName = defaultName
 		}
@@ -781,7 +781,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	cookieName := config.CookieName
-	if config.UseCookie || cookieName != "" {
+	if config.UseCookie {
 		if cookieName == "" {
 			cookieName = defaultName
 		}

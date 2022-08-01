@@ -20,8 +20,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -132,7 +132,7 @@ type configTestReverseProxyDnsCache struct {
 	dnsConfig   config.DnsCacheConfig
 }
 
-func (s *Test) SetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
+func (s *Test) flakySetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
 	pullDomains := s.MockHandle.PushDomains(cfg.etcHostsMap, nil)
 	s.Gw.dnsCacheManager.InitDNSCaching(
 		time.Duration(cfg.dnsConfig.TTL)*time.Second, time.Duration(cfg.dnsConfig.CheckInterval)*time.Second)
@@ -152,6 +152,8 @@ func (s *Test) SetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache
 }
 
 func TestReverseProxyDnsCache(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5251
+
 	const (
 		host   = "orig-host.com."
 		host2  = "orig-host2.com."
@@ -181,7 +183,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	tearDown := ts.SetupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
+	tearDown := ts.flakySetupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
 		config.DnsCacheConfig{
 			Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval,
 			MultipleIPsHandleStrategy: config.NoCacheStrategy}})
@@ -429,6 +431,8 @@ func TestSingleJoiningSlash(t *testing.T) {
 		a, b, want string
 	}{
 		{"foo/", "", "foo/"},
+		{"foo/", "/name", "foo/name"},
+		{"foo/", "/", "foo/"},
 		{"foo", "", "foo"},
 	}
 	for _, tc := range testsTrue {
@@ -1208,7 +1212,7 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 				return
 			}
 			bufrw.Flush()
-			time.Sleep(time.Second)
+			time.Sleep(20 * time.Millisecond)
 		}
 		if _, err := bufrw.WriteString(terminalMsg); err != nil {
 			select {
@@ -1291,6 +1295,8 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 }
 
 func TestSSE(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5250
+
 	// send and receive should be in order
 	var wg sync.WaitGroup
 

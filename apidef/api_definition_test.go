@@ -56,6 +56,18 @@ func TestEncodeForDB(t *testing.T) {
 		assert.Equal(t, defaultScopeName, spec.JWTScopeClaimName)
 		assert.Equal(t, scopeToPolicyMap, spec.JWTScopeToPolicyMapping)
 	})
+
+	t.Run("EncodeForDB persist schema objects from extended path", func(t *testing.T) {
+		spec := DummyAPI()
+		spec.EncodeForDB()
+		var schemaNotEmpty bool
+		for _, version := range spec.VersionData.Versions {
+			for _, validateObj := range version.ExtendedPaths.ValidateJSON {
+				schemaNotEmpty = schemaNotEmpty || (validateObj.Schema != nil)
+			}
+		}
+		assert.True(t, schemaNotEmpty, "expected EncodeForDB to persist schema objects")
+	})
 }
 
 func TestDecodeFromDB(t *testing.T) {
@@ -133,4 +145,10 @@ func TestAPIDefinition_DecodeFromDB_AuthDeprecation(t *testing.T) {
 		"jwt":       spec.Auth,
 	})
 
+}
+
+func TestAPIDefinition_GenerateAPIID(t *testing.T) {
+	a := APIDefinition{}
+	a.GenerateAPIID()
+	assert.NotEmpty(t, a.APIID)
 }

@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"testing"
 
+	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	kafkaDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
+	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -441,6 +441,16 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 				},
 			},
 		},
+		{
+			TypeName:  "Subscription",
+			FieldName: "foobarTopicWithVariable",
+			Arguments: []plan.ArgumentConfiguration{
+				{
+					Name:       "name",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		},
 	}
 
 	var gqlConfig apidef.GraphQLConfig
@@ -697,6 +707,58 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			}),
 		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Subscription",
+					FieldNames: []string{"foobar"},
+				},
+			},
+			Factory: &kafkaDataSource.Factory{},
+			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
+				Subscription: kafkaDataSource.SubscriptionConfiguration{
+					BrokerAddresses:      []string{"localhost:9092"},
+					Topic:                "test.topic",
+					GroupID:              "test.consumer.group",
+					ClientID:             "test.client.id",
+					KafkaVersion:         "V2_8_0_0",
+					StartConsumingLatest: true,
+					BalanceStrategy:      kafkaDataSource.BalanceStrategySticky,
+					IsolationLevel:       kafkaDataSource.IsolationLevelReadCommitted,
+					SASL: kafkaDataSource.SASL{
+						Enable:   true,
+						User:     "admin",
+						Password: "admin-secret",
+					},
+				},
+			}),
+		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Subscription",
+					FieldNames: []string{"foobarTopicWithVariable"},
+				},
+			},
+			Factory: &kafkaDataSource.Factory{},
+			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
+				Subscription: kafkaDataSource.SubscriptionConfiguration{
+					BrokerAddresses:      []string{"localhost:9092"},
+					Topic:                "test.topic.{{.arguments.name}}",
+					GroupID:              "test.consumer.group",
+					ClientID:             "test.client.id",
+					KafkaVersion:         "V2_8_0_0",
+					StartConsumingLatest: true,
+					BalanceStrategy:      kafkaDataSource.BalanceStrategySticky,
+					IsolationLevel:       kafkaDataSource.IsolationLevelReadCommitted,
+					SASL: kafkaDataSource.SASL{
+						Enable:   true,
+						User:     "admin",
+						Password: "admin-secret",
+					},
+				},
+			}),
+		},
 	}
 
 	var gqlConfig apidef.GraphQLConfig
@@ -755,6 +817,10 @@ type MultiRoot2 {
 }
 type DeepGQL {
   query(code: String!): String
+}
+type Subscription {
+  foobar: Int
+  foobarTopicWithVariable(name: String): Int
 }`)
 
 var graphqlEngineV2ConfigJson = `{
@@ -920,6 +986,58 @@ var graphqlEngineV2ConfigJson = `{
 					"method": "POST",
 					"headers": {
 						"Auth": "123"
+					}
+				}
+			},
+			{
+				"kind": "Kafka",
+				"name": "kafka-consumer-group",
+				"internal": false,
+				"root_fields": [{
+					"type": "Subscription",
+					"fields": [
+						"foobar"
+					]
+				}],
+				"config": {
+					"broker_addresses": ["localhost:9092"],
+					"topic": "test.topic",
+					"group_id": "test.consumer.group",
+					"client_id": "test.client.id",
+					"kafka_version": "V2_8_0_0",
+					"start_consuming_latest": true,
+					"balance_strategy": "BalanceStrategySticky",
+					"isolation_level": "ReadCommitted",
+					"sasl": {
+						"enable": true,
+						"user": "admin",
+						"password": "admin-secret"
+					}
+				}
+			},
+			{
+				"kind": "Kafka",
+				"name": "kafka-consumer-group-with-variable",
+				"internal": false,
+				"root_fields": [{
+					"type": "Subscription",
+					"fields": [
+						"foobarTopicWithVariable"
+					]
+				}],
+				"config": {
+					"broker_addresses": ["localhost:9092"],
+					"topic": "test.topic.{{.arguments.name}}",
+					"group_id": "test.consumer.group",
+					"client_id": "test.client.id",
+					"kafka_version": "V2_8_0_0",
+					"start_consuming_latest": true,
+					"balance_strategy": "BalanceStrategySticky",
+					"isolation_level": "ReadCommitted",
+					"sasl": {
+						"enable": true,
+						"user": "admin",
+						"password": "admin-secret"
 					}
 				}
 			}

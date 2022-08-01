@@ -42,6 +42,7 @@ petstore.json
 *.pdf
 *.mmdb
 *.so
+*.log
 !testdata/*.mmdb
 *.pid
 coprocess_gen_test.go
