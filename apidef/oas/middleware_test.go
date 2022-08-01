@@ -93,3 +93,92 @@ func TestMockResponse(t *testing.T) {
 
 	assert.Equal(t, emptyMockResponse, resultMockResponse)
 }
+
+func TestTransformRequestBody(t *testing.T) {
+
+	t.Run("empty", func(t *testing.T) {
+		var emptyTransformRequestBody TransformRequestBody
+
+		var convertedTransformRequestBody apidef.TemplateMeta
+		emptyTransformRequestBody.ExtractTo(&convertedTransformRequestBody)
+
+		var resultTransformRequestBody TransformRequestBody
+		resultTransformRequestBody.Fill(convertedTransformRequestBody)
+
+		assert.Equal(t, emptyTransformRequestBody, resultTransformRequestBody)
+	})
+	t.Run("blob", func(t *testing.T) {
+		transformReqBody := TransformRequestBody{
+			Body:    "test body",
+			Format:  apidef.RequestJSON,
+			Enabled: true,
+		}
+
+		meta := apidef.TemplateMeta{}
+		transformReqBody.ExtractTo(&meta)
+		assert.Equal(t, apidef.TemplateMeta{
+			Disabled: false,
+			TemplateData: apidef.TemplateData{
+				EnableSession:  true,
+				Mode:           apidef.UseBlob,
+				TemplateSource: "test body",
+				Input:          apidef.RequestJSON,
+			},
+		}, meta)
+
+		newTransformReqBody := TransformRequestBody{}
+		newTransformReqBody.Fill(meta)
+		assert.Equal(t, transformReqBody, newTransformReqBody)
+	})
+
+	t.Run("blob", func(t *testing.T) {
+		transformReqBody := TransformRequestBody{
+			Path:    "/opt/tyk-gateway/template.tmpl",
+			Format:  apidef.RequestJSON,
+			Enabled: false,
+		}
+
+		meta := apidef.TemplateMeta{}
+		transformReqBody.ExtractTo(&meta)
+		assert.Equal(t, apidef.TemplateMeta{
+			Disabled: true,
+			TemplateData: apidef.TemplateData{
+				EnableSession:  true,
+				Mode:           apidef.UseFile,
+				TemplateSource: "/opt/tyk-gateway/template.tmpl",
+				Input:          apidef.RequestJSON,
+			},
+		}, meta)
+
+		newTransformReqBody := TransformRequestBody{}
+		newTransformReqBody.Fill(meta)
+		assert.Equal(t, transformReqBody, newTransformReqBody)
+	})
+
+	t.Run("blob should have precedence", func(t *testing.T) {
+		transformReqBody := TransformRequestBody{
+			Path:    "/opt/tyk-gateway/template.tmpl",
+			Body:    "test body",
+			Format:  apidef.RequestJSON,
+			Enabled: true,
+		}
+
+		meta := apidef.TemplateMeta{}
+		transformReqBody.ExtractTo(&meta)
+		assert.Equal(t, apidef.TemplateMeta{
+			Disabled: false,
+			TemplateData: apidef.TemplateData{
+				EnableSession:  true,
+				Mode:           apidef.UseBlob,
+				TemplateSource: "test body",
+				Input:          apidef.RequestJSON,
+			},
+		}, meta)
+
+		newTransformReqBody := TransformRequestBody{}
+		newTransformReqBody.Fill(meta)
+		expectedTransformReqBody := transformReqBody
+		expectedTransformReqBody.Path = ""
+		assert.Equal(t, expectedTransformReqBody, newTransformReqBody)
+	})
+}
