@@ -82,6 +82,11 @@ var (
 
 const appName = "tyk-gateway"
 
+type apiHash struct {
+	hash   [32]byte
+	apidef *APISpec
+}
+
 type Gateway struct {
 	DefaultProxyMux *proxyMux
 	config          atomic.Value
@@ -133,6 +138,7 @@ type Gateway struct {
 	apisMu          sync.RWMutex
 	apiSpecs        []*APISpec
 	apisByID        map[string]*APISpec
+	apisByIDHash    map[string]apiHash
 	apisHandlesByID *sync.Map
 
 	policiesMu   sync.RWMutex
@@ -217,6 +223,7 @@ func NewGateway(config config.Config, ctx context.Context, cancelFn context.Canc
 	gw.UtilCache = cache.New(time.Hour, 10*time.Minute)
 
 	gw.apisByID = map[string]*APISpec{}
+	gw.apisByIDHash = map[string]apiHash{}
 	gw.apisHandlesByID = new(sync.Map)
 
 	gw.policiesByID = map[string]user.Policy{}

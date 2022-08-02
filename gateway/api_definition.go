@@ -2,11 +2,11 @@ package gateway
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -430,9 +430,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 
 	// Process
 	var specs []*APISpec
+	var apiString []byte
 	for _, def := range apiDefs {
-		spec := a.MakeSpec(def, nil)
-		specs = append(specs, spec)
+		apiString, err = json.Marshal(def)
+		if err != nil {
+			log.Error("Failed to JSON marshall API definition, skipping", def.APIID)
+			continue
+		}
+		specs = append(specs, a.processSpec(apiString, *def))
 	}
 
 	// Set the nonce
@@ -482,6 +487,8 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
 
 	var apiDefs []*apidef.APIDefinition
+	var err error
+	var apiString []byte
 	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
 		return nil, err
 	}
@@ -500,18 +507,21 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 			def.Proxy.ListenPath = newListenPath
 		}
 
-		spec := a.MakeSpec(def, nil)
-		specs = append(specs, spec)
+		apiString, err = json.Marshal(def)
+		if err != nil {
+			log.Error("Failed to JSON marshal API definition, skipping", def.APIID)
+			continue
+		}
+		specs = append(specs, a.processSpec(apiString, *def))
 	}
 
 	return specs, nil
 }
 
-func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinition) {
-	if err := json.NewDecoder(r).Decode(&api); err != nil {
+func (a APIDefinitionLoader) ParseDefinition(d []byte) (api apidef.APIDefinition) {
+	if err := json.Unmarshal(d, &api); err != nil {
 		log.Error("Couldn't unmarshal api configuration: ", err)
 	}
-
 	return
 }
 
@@ -519,6 +529,7 @@ func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinit
 // to be the JSON representation of APIDefinition object
 func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	var specs []*APISpec
+
 	// Grab json files from directory
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
@@ -529,12 +540,46 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 			continue
 		}
 
-		def := a.ParseDefinition(f)
-		f.Close()
-		spec := a.MakeSpec(&def, nil)
-		specs = append(specs, spec)
+		apiDef, err := ioutil.ReadAll(f)
+		if err != nil {
+			log.Error("Couldn't read api configuration file: ", err)
+			continue
+		}
+		if err := f.Close(); err != nil {
+			log.Error("Failed to close api configuration file: ", err)
+		}
+
+		def := a.ParseDefinition(apiDef)
+		if def.APIID == "" {
+			log.Error("Blank API ID, skipping import of API configuration: ", def.Name)
+			continue
+		}
+
+		specs = append(specs, a.processSpec(apiDef, def))
 	}
+
 	return specs
+}
+
+func (a APIDefinitionLoader) processSpec(api []byte, apiDef apidef.APIDefinition) *APISpec {
+	sum := sha256.Sum256(api)
+
+	if val, ok := a.Gw.apisByIDHash[apiDef.APIID]; ok {
+		if sum == val.hash {
+			log.Debug("API not changed, using in-memory spec", apiDef.APIID)
+			return val.apidef
+		}
+
+		log.Debug("API has changed, updating spec", apiDef.APIID)
+		spec := a.MakeSpec(&apiDef, nil)
+		a.Gw.apisByIDHash[apiDef.APIID] = apiHash{hash: sum, apidef: spec}
+		return spec
+	}
+
+	log.Debug("API is new, creating spec", apiDef.APIID)
+	spec := a.MakeSpec(&apiDef, nil)
+	a.Gw.apisByIDHash[apiDef.APIID] = apiHash{hash: sum, apidef: spec}
+	return spec
 }
 
 func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf config.Config) ([]URLSpec, bool) {
