@@ -260,24 +260,18 @@ func (s *SessionState) Lifetime(respectKeyExpiration bool, fallback int64, force
 // calculateLifetime calculates the lifetime of a session. It also sets the value to the key expiration in case of the key expiration
 // value is respected and `lifetime` < `expiration`.
 func calculateLifetime(respectExpiration bool, expiration, lifetime int64) int64 {
-	if lifetime < 0 {
-		lifetime = 0
-	}
-
-	if expiration < 0 {
-		expiration = 0
-	}
-
-	if !respectExpiration {
+	if !respectExpiration || lifetime <= 0 {
 		return lifetime
 	}
 
-	if expiration == 0 || lifetime == 0 {
-		return 0
+	if expiration <= 0 {
+		return expiration
 	}
 
-	if expiration > lifetime {
-		return expiration
+	now := time.Now()
+	lifetimeInUnix := now.Add(time.Duration(lifetime) * time.Second).Unix()
+	if expiration > lifetimeInUnix {
+		return expiration - now.Unix()
 	}
 
 	return lifetime
