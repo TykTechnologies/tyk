@@ -681,11 +681,14 @@ func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string
 		return
 	}
 
+	lifetime := GetSessionLifetime(sess, gw)
+
 	var err error
 	if gw.GetConfig().HashKeys {
-		err = gw.GlobalSessionManager.UpdateSession(hashedName, sess, 0, true)
+
+		err = gw.GlobalSessionManager.UpdateSession(hashedName, sess, lifetime, true)
 	} else {
-		err = gw.GlobalSessionManager.UpdateSession(keyName, sess, 0, false)
+		err = gw.GlobalSessionManager.UpdateSession(keyName, sess, lifetime, false)
 	}
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -3267,4 +3270,22 @@ func updateOASServers(spec *APISpec, conf config.Config, apiDef *apidef.APIDefin
 
 	newAPIURL := getAPIURL(*apiDef, conf)
 	oasObj.UpdateServers(newAPIURL, oldAPIURL)
+}
+
+// GetSessionLifetime defines the TTL of the key
+func GetSessionLifetime(sess *user.SessionState, gw *Gateway) int64 {
+	var lifetime int64
+	if sess != nil && len(sess.AccessRights) > 0 {
+		for apiID, _ := range sess.AccessRights {
+			spec := gw.getApiSpec(apiID)
+			if spec != nil {
+				sessionLifeTime := sess.Lifetime(spec.GetSessionLifetimeRespectsKeyExpiration(), spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
+				// uses the greater lifetime
+				if sessionLifeTime > lifetime {
+					lifetime = sessionLifeTime
+				}
+			}
+		}
+	}
+	return lifetime
 }
