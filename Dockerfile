@@ -1,5 +1,10 @@
 FROM debian:bullseye as assets
 
+# This Dockerfile facilitates bleeding edge development docker image builds
+# directly from source. To build a development image, run `make docker`.
+# If you need to tweak the environment for testing, you can override the
+# `GO_VERSION` and `PYTHON_VERSION` as docker build arguments.
+
 ARG GO_VERSION=1.15.15
 ARG PYTHON_VERSION=3.7.13
 
