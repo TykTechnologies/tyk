@@ -157,6 +157,10 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 	// make sure tyk recover in case Go-plugin function panics
 	defer func() {
+		// clear API definition from req context to
+		// allow GC to remove it if connections are
+		// "keep alive" and API def has changed and reloaded
+		setCtxValue(r, ctx.Definition, nil)
 		if e := recover(); e != nil {
 			err = fmt.Errorf("%v", e)
 			respCode = http.StatusInternalServerError

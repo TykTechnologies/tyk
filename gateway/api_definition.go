@@ -217,6 +217,13 @@ func (s *APISpec) Release() {
 		}
 	}
 
+	if s.JSVM.VM != nil {
+		s.JSVM.VM.Interrupt = make(chan func(), 1)
+		s.JSVM.VM.Interrupt <- func() {
+			panic("stopping VM due to API reload")
+		}
+	}
+
 	// cancel execution contexts
 	if s.GraphQLExecutor.CancelV2 != nil {
 		s.GraphQLExecutor.CancelV2()

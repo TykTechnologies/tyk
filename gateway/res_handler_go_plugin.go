@@ -67,6 +67,10 @@ func (h *ResponseGoPluginMiddleware) HandleResponse(w http.ResponseWriter, res *
 func (h *ResponseGoPluginMiddleware) HandleGoPluginResponse(w http.ResponseWriter, res *http.Response, req *http.Request) error {
 	// make sure tyk recover in case Go-plugin function panics
 	defer func() {
+		// clear API definition from req context to
+		// allow GC to remove it if connections are
+		// "keep alive" and API def has changed and reloaded
+		setCtxValue(req, ctx.Definition, nil)
 		if e := recover(); e != nil {
 			err := fmt.Errorf("%v", e)
 			w.WriteHeader(http.StatusInternalServerError)

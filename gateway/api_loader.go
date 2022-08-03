@@ -875,6 +875,14 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	}
 
 	gw.apisByID = tmpSpecRegister
+
+	// ensure handles are deleted from sync map to ensure
+	// they're removed by GC
+	gw.apisHandlesByID.Range(func(key, value interface{}) bool {
+		gw.apisHandlesByID.Delete(key)
+		return true
+	})
+
 	gw.apisHandlesByID = tmpSpecHandles
 
 	gw.apisMu.Unlock()
