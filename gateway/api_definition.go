@@ -798,6 +798,10 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 
 	log.Debug("Checking for transform paths...")
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		log.Debug("-- Generating path")
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
@@ -937,24 +941,18 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 
 		events := newSpec.CircuitBreaker.CB.Subscribe()
 		go func(path string, spec *APISpec, breakerPtr *circuit.Breaker) {
-			timerActive := false
 			for e := range events {
 				switch e {
 				case circuit.BreakerTripped:
 					log.Warning("[PROXY] [CIRCUIT BREAKER] Breaker tripped for path: ", path)
 					log.Debug("Breaker tripped: ", e)
-					// Start a timer function
 
-					if !timerActive {
-						go func(timeout int, breaker *circuit.Breaker) {
-							log.Debug("-- Sleeping for (s): ", timeout)
-							time.Sleep(time.Duration(timeout) * time.Second)
-							log.Debug("-- Resetting breaker")
-							breaker.Reset()
-							timerActive = false
-						}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)
-						timerActive = true
-					}
+					go func(timeout int, breaker *circuit.Breaker) {
+						log.Debug("-- Sleeping for (s): ", timeout)
+						time.Sleep(time.Duration(timeout) * time.Second)
+						log.Debug("-- Resetting breaker")
+						breaker.Reset()
+					}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)
 
 					if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 						if ServiceCache != nil {
@@ -970,8 +968,22 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 						APIID:            spec.APIID,
 					})
 
+					spec.FireEvent(EventBreakerTripped, EventCurcuitBreakerMeta{
+						EventMetaDefault: EventMetaDefault{Message: "Breaker Tripped"},
+						CircuitEvent:     e,
+						Path:             path,
+						APIID:            spec.APIID,
+					})
+
 				case circuit.BreakerReset:
 					spec.FireEvent(EventBreakerTriggered, EventCurcuitBreakerMeta{
+						EventMetaDefault: EventMetaDefault{Message: "Breaker Reset"},
+						CircuitEvent:     e,
+						Path:             path,
+						APIID:            spec.APIID,
+					})
+
+					spec.FireEvent(EventBreakerReset, EventCurcuitBreakerMeta{
 						EventMetaDefault: EventMetaDefault{Message: "Breaker Reset"},
 						CircuitEvent:     e,
 						Path:             path,
