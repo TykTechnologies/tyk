@@ -707,7 +707,7 @@ func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
-func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, orgId string) {
+func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	sess := &user.SessionState{}
 	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
@@ -717,13 +717,7 @@ func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, orgId string
 	}
 
 	lifetime := gw.ApplyLifetime(sess, nil)
-
-	var err error
-	if gw.GetConfig().HashKeys {
-		err = gw.GlobalSessionManager.UpdateSession(hashedName, sess, lifetime, true)
-	} else {
-		err = gw.GlobalSessionManager.UpdateSession(keyName, sess, lifetime, false)
-	}
+	err := gw.GlobalSessionManager.UpdateSession(keyName, sess, lifetime, gw.GetConfig().HashKeys)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
