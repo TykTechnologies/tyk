@@ -841,7 +841,7 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		gw.handleAddKey(keyName, hashedKeyName, sessionString, "-1", orgId)
+		gw.handleAddKey(keyName, hashedKeyName, sessionString, orgId)
 	}
 }
 

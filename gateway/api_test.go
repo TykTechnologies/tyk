@@ -3094,7 +3094,7 @@ func testImportOAS(t *testing.T, ts *Test, testCase test.TestCase) string {
 	return importResp.Key
 }
 
-func TestGetSessionLifetime(t *testing.T) {
+func TestApplyLifetime(t *testing.T) {
 
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -3163,12 +3163,19 @@ func TestGetSessionLifetime(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:             "Session without access rights",
+			expectedLifetime: 0,
+			getTestSession: func() user.SessionState {
+				return user.SessionState{}
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			session := tc.getTestSession()
-			assert.Equal(t, tc.expectedLifetime, GetSessionLifetime(&session, ts.Gw))
+			assert.Equal(t, tc.expectedLifetime, ts.Gw.ApplyLifetime(&session, nil))
 		})
 	}
 }
