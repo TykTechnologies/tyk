@@ -254,6 +254,7 @@ func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionSta
 	return nil
 }
 
+// GetApiSpecsFromAccessRights from the session.AccessRights returns the collection of api specs
 func (gw *Gateway) GetApiSpecsFromAccessRights(sess *user.SessionState) []*APISpec {
 	var apis []*APISpec
 	if sess != nil && len(sess.AccessRights) > 0 {
@@ -1872,6 +1873,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				sessionManager := gw.GlobalSessionManager
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				sessionManager.ResetQuota(newKey, newSession, false)
+				// apply polices (if any) and save key
 				err := sessionManager.UpdateSession(newKey, newSession, -1, false)
 				if err != nil {
 					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
