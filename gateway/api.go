@@ -3276,7 +3276,7 @@ func updateOASServers(spec *APISpec, conf config.Config, apiDef *apidef.APIDefin
 func GetSessionLifetime(sess *user.SessionState, gw *Gateway) int64 {
 	var lifetime int64
 	if sess != nil && len(sess.AccessRights) > 0 {
-		for apiID, _ := range sess.AccessRights {
+		for apiID := range sess.AccessRights {
 			spec := gw.getApiSpec(apiID)
 			if spec != nil {
 				sessionLifeTime := sess.Lifetime(spec.GetSessionLifetimeRespectsKeyExpiration(), spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
