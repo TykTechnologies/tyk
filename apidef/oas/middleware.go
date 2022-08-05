@@ -578,9 +578,9 @@ type TransformRequestBody struct {
 	// Format of the request body, xml or json.
 	Format apidef.RequestInputType `bson:"format" json:"format"`
 	// Path file path for the template.
-	Path string `bson:"path" json:"path"`
+	Path string `bson:"path,omitempty" json:"path,omitempty"`
 	// Body base64 encoded representation of the template.
-	Body string `bson:"body" json:"body"`
+	Body string `bson:"body,omitempty" json:"body,omitempty"`
 }
 
 func (tr *TransformRequestBody) Fill(meta apidef.TemplateMeta) {
