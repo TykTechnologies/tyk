@@ -245,12 +245,49 @@ func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionSta
 		return err
 	}
 
-	lifetime := session.Lifetime(spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
+	// calculate lifetime considering access rights
+	lifetime := gw.ApplyLifetime(session, spec)
 	if err := gw.GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// GetApiSpecsFromAccessRights from the session.AccessRights returns the collection of api specs
+func (gw *Gateway) GetApiSpecsFromAccessRights(sess *user.SessionState) []*APISpec {
+	var apis []*APISpec
+	if sess != nil && len(sess.AccessRights) > 0 {
+		for apiID := range sess.AccessRights {
+			spec := gw.getApiSpec(apiID)
+			if spec != nil {
+				apis = append(apis, spec)
+			}
+		}
+	}
+
+	return apis
+}
+
+// ApplyLifetime calculates the lifetime for the key. It considers the access rights and the bigger lifetime will be used
+func (gw *Gateway) ApplyLifetime(sess *user.SessionState, specs ...*APISpec) int64 {
+	var lifetime int64
+
+	if len(sess.AccessRights) > 0 {
+		specs = gw.GetApiSpecsFromAccessRights(sess)
+	}
+
+	for _, spec := range specs {
+		if spec != nil {
+			sessionLifeTime := sess.Lifetime(spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
+			// uses the greater lifetime
+			if sessionLifeTime > lifetime {
+				lifetime = sessionLifeTime
+			}
+		}
+	}
+
+	return lifetime
 }
 
 func resetAPILimits(accessRights map[string]user.AccessDefinition) {
@@ -274,7 +311,6 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 		// reset API-level limit to empty APILimit if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
 		// We have a specific list of access rules, only add / update those
-
 		for apiId := range newSession.AccessRights {
 			apiSpec := gw.getApiSpec(apiId)
 			if apiSpec == nil {
@@ -315,13 +351,13 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 		log.Warning("No API Access Rights set, adding key to ALL.")
 		gw.apisMu.RLock()
 		defer gw.apisMu.RUnlock()
+
 		for _, spec := range gw.apisByID {
 			if !dontReset {
 				gw.GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 			}
 			gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
-
 			// apply polices (if any) and save key
 			if err := gw.applyPoliciesAndSave(keyName, newSession, spec, isHashed); err != nil {
 				return err
@@ -647,7 +683,7 @@ func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
-func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string, orgId string) {
+func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	sess := &user.SessionState{}
 	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
@@ -656,12 +692,8 @@ func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string
 		return
 	}
 
-	var err error
-	if gw.GetConfig().HashKeys {
-		err = gw.GlobalSessionManager.UpdateSession(hashedName, sess, 0, true)
-	} else {
-		err = gw.GlobalSessionManager.UpdateSession(keyName, sess, 0, false)
-	}
+	lifetime := gw.ApplyLifetime(sess, nil)
+	err := gw.GlobalSessionManager.UpdateSession(keyName, sess, lifetime, gw.GetConfig().HashKeys)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1816,6 +1848,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				sessionManager := gw.GlobalSessionManager
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				sessionManager.ResetQuota(newKey, newSession, false)
+				// apply polices (if any) and save key
 				err := sessionManager.UpdateSession(newKey, newSession, -1, false)
 				if err != nil {
 					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
@@ -1846,7 +1879,6 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					gw.GlobalSessionManager.ResetQuota(newKey, newSession, false)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
-				// apply polices (if any) and save key
 				if err := gw.applyPoliciesAndSave(newKey, newSession, spec, false); err != nil {
 					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
 					return
