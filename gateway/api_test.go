@@ -1771,3 +1771,89 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		assert.Equal(t, http.StatusOK, statusCode)
 	})
 }
+
+func TestApplyLifetime(t *testing.T) {
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "api1"
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api2"
+			spec.SessionLifetime = 1000
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api3"
+			spec.SessionLifetime = 999
+		},
+	)
+
+	testCases := []struct {
+		name             string
+		expectedLifetime int64
+		getTestSession   func() user.SessionState
+	}{
+		{
+			name:             "single api without session lifetime set",
+			expectedLifetime: 0,
+			getTestSession: func() user.SessionState {
+				return user.SessionState{
+					AccessRights: map[string]user.AccessDefinition{
+						"api1": {
+							APIID: "api1", Versions: []string{"v1"},
+						},
+					},
+				}
+			},
+		},
+		{
+			name:             "many apis, one of them with session lifetime set",
+			expectedLifetime: 1000,
+			getTestSession: func() user.SessionState {
+				return user.SessionState{
+					AccessRights: map[string]user.AccessDefinition{
+						"api1": {
+							APIID: "api1", Versions: []string{"v1"},
+						},
+						"api2": {
+							APIID: "api2", Versions: []string{"v1"},
+						},
+					},
+				}
+			},
+		},
+		{
+			name:             "many apis with session lifetime set, greater should be used",
+			expectedLifetime: 1000,
+			getTestSession: func() user.SessionState {
+				return user.SessionState{
+					AccessRights: map[string]user.AccessDefinition{
+						"api2": {
+							APIID: "api2", Versions: []string{"v1"},
+						},
+						"api3": {
+							APIID: "api3", Versions: []string{"v1"},
+						},
+					},
+				}
+			},
+		},
+		{
+			name:             "Session without access rights",
+			expectedLifetime: 0,
+			getTestSession: func() user.SessionState {
+				return user.SessionState{}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			session := tc.getTestSession()
+			assert.Equal(t, tc.expectedLifetime, ts.Gw.ApplyLifetime(&session, nil))
+		})
+	}
+}
