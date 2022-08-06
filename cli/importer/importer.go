@@ -67,23 +67,19 @@ func (i *Importer) Import(ctx *kingpin.ParseContext) (err error) {
 		err = i.handleSwaggerMode()
 		if err != nil {
 			log.Fatal(err)
-			os.Exit(1)
 		}
 	} else if *i.bluePrintMode {
 		err = i.handleBluePrintMode()
 		if err != nil {
 			log.Fatal(err)
-			os.Exit(1)
 		}
 	} else if *i.wsdlMode {
 		err = i.handleWSDLMode()
 		if err != nil {
 			log.Fatal(err)
-			os.Exit(1)
 		}
 	} else {
 		log.Fatal(errUnknownMode)
-		os.Exit(1)
 	}
 	os.Exit(0)
 	return nil
