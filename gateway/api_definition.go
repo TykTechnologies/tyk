@@ -353,6 +353,51 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	return spec
 }
 
+// nestedApiDefinitionList is the response body for FromDashboardService
+type nestedApiDefinitionList struct {
+	Message []nestedApiDefinition
+	Nonce   string
+}
+
+type nestedApiDefinition struct {
+	*apidef.APIDefinition `json:"api_definition,inline"`
+}
+
+func (f *nestedApiDefinitionList) set(defs []*apidef.APIDefinition) {
+	for _, def := range defs {
+		f.Message = append(f.Message, nestedApiDefinition{APIDefinition: def})
+	}
+}
+
+func (f *nestedApiDefinitionList) filter(enabled bool, tags ...string) []nestedApiDefinition {
+	if !enabled {
+		return f.Message
+	}
+
+	if len(tags) == 0 {
+		return nil
+	}
+
+	tagMap := map[string]bool{}
+	for _, tag := range tags {
+		tagMap[tag] = true
+	}
+
+	result := make([]nestedApiDefinition, 0, len(f.Message))
+	for _, v := range f.Message {
+		if v.TagsDisabled {
+			continue
+		}
+		for _, tag := range v.Tags {
+			if ok := tagMap[tag]; ok {
+				result = append(result, nestedApiDefinition{v.APIDefinition})
+				break
+			}
+		}
+	}
+	return result
+}
+
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
 func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
 	// Get the definitions
@@ -390,44 +435,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Extract tagged APIs#
-	var list struct {
-		Message []struct {
-			ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
-		}
-		Nonce string
-	}
+	list := &nestedApiDefinitionList{}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		body, _ := ioutil.ReadAll(resp.Body)
 		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
 	}
 
 	// Extract tagged entries only
-	apiDefs := make([]*apidef.APIDefinition, 0)
-
-	if a.Gw.GetConfig().DBAppConfOptions.NodeIsSegmented {
-		tagList := make(map[string]bool, len(a.Gw.GetConfig().DBAppConfOptions.Tags))
-		toLoad := make(map[string]*apidef.APIDefinition)
-
-		for _, mt := range a.Gw.GetConfig().DBAppConfOptions.Tags {
-			tagList[mt] = true
-		}
-
-		for _, apiEntry := range list.Message {
-			for _, t := range apiEntry.ApiDefinition.Tags {
-				if tagList[t] {
-					toLoad[apiEntry.ApiDefinition.APIID] = apiEntry.ApiDefinition
-				}
-			}
-		}
-
-		for _, apiDef := range toLoad {
-			apiDefs = append(apiDefs, apiDef)
-		}
-	} else {
-		for _, apiEntry := range list.Message {
-			apiDefs = append(apiDefs, apiEntry.ApiDefinition)
-		}
-	}
+	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
 	var specs []*APISpec
@@ -481,11 +496,19 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 }
 
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
-
-	var apiDefs []*apidef.APIDefinition
-	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
+	var payload []nestedApiDefinition
+	if err := json.Unmarshal([]byte(apiCollection), &payload); err != nil {
 		return nil, err
 	}
+
+	list := &nestedApiDefinitionList{
+		Message: payload,
+	}
+
+	gwConfig := a.Gw.GetConfig()
+
+	// Extract tagged entries only
+	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	var specs []*APISpec
 	for _, def := range apiDefs {
