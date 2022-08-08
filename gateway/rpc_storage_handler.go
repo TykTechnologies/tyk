@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	"strconv"
 	"strings"
 	"time"
