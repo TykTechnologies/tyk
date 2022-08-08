@@ -371,9 +371,6 @@ func (f *nestedApiDefinitionList) filter(enabled bool, tags ...string) []nestedA
 
 	result := make([]nestedApiDefinition, 0, len(f.Message))
 	for _, v := range f.Message {
-		if v.TagsDisabled {
-			continue
-		}
 		for _, tag := range v.Tags {
 			if ok := tagMap[tag]; ok {
 				result = append(result, nestedApiDefinition{v.APIDefinition})
@@ -426,12 +423,13 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 	}
 
 	// Extract tagged entries only
+	gwConfig := config.Global()
 	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
 	var specs []*APISpec
 	for _, def := range apiDefs {
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(def.APIDefinition, nil)
 		specs = append(specs, spec)
 	}
 
@@ -482,7 +480,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) ([]*API
 		Message: payload,
 	}
 
-	gwConfig := a.Gw.GetConfig()
+	gwConfig := config.Global()
 
 	// Extract tagged entries only
 	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
@@ -501,7 +499,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) ([]*API
 			def.Proxy.ListenPath = newListenPath
 		}
 
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(def.APIDefinition, nil)
 		specs = append(specs, spec)
 	}
 
