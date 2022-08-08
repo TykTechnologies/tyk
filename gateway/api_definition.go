@@ -385,9 +385,6 @@ func (f *nestedApiDefinitionList) filter(enabled bool, tags ...string) []nestedA
 
 	result := make([]nestedApiDefinition, 0, len(f.Message))
 	for _, v := range f.Message {
-		if v.TagsDisabled {
-			continue
-		}
 		for _, tag := range v.Tags {
 			if ok := tagMap[tag]; ok {
 				result = append(result, nestedApiDefinition{v.APIDefinition})
@@ -407,7 +404,9 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 		log.Error("Failed to create request: ", err)
 	}
 
-	newRequest.Header.Set("authorization", a.Gw.GetConfig().NodeSecret)
+	gwConfig := a.Gw.GetConfig()
+
+	newRequest.Header.Set("authorization", gwConfig.NodeSecret)
 	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
 	newRequest.Header.Set(headers.XTykNodeID, a.Gw.GetNodeID())
 
@@ -447,7 +446,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	// Process
 	var specs []*APISpec
 	for _, def := range apiDefs {
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(def.APIDefinition, nil)
 		specs = append(specs, spec)
 	}
 
@@ -524,7 +523,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 			def.Proxy.ListenPath = newListenPath
 		}
 
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(def.APIDefinition, nil)
 		specs = append(specs, spec)
 	}
 
