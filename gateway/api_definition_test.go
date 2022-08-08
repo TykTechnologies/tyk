@@ -176,6 +176,46 @@ func TestWhitelist(t *testing.T) {
 	})
 }
 
+func TestGatewayTagsFilter(t *testing.T) {
+	t.Parallel()
+
+	newApiWithTags := func(enabled bool, tags []string) *apidef.APIDefinition {
+		return &apidef.APIDefinition{
+			TagsDisabled: !enabled,
+			Tags:         tags,
+		}
+	}
+
+	data := &nestedApiDefinitionList{}
+	data.set([]*apidef.APIDefinition{
+		newApiWithTags(false, []string{}),
+		newApiWithTags(true, []string{}),
+		newApiWithTags(true, []string{"a", "b", "c"}),
+		newApiWithTags(true, []string{"a", "b"}),
+		newApiWithTags(true, []string{"a"}),
+	})
+
+	assert.Len(t, data.Message, 5)
+
+	// Test NodeIsSegmented=true
+	{
+		enabled := true
+		assert.Len(t, data.filter(enabled), 0)
+		assert.Len(t, data.filter(enabled, "a"), 3)
+		assert.Len(t, data.filter(enabled, "b"), 2)
+		assert.Len(t, data.filter(enabled, "c"), 1)
+	}
+
+	// Test NodeIsSegmented=false
+	{
+		enabled := false
+		assert.Len(t, data.filter(enabled), 5)
+		assert.Len(t, data.filter(enabled, "a"), 5)
+		assert.Len(t, data.filter(enabled, "b"), 5)
+		assert.Len(t, data.filter(enabled, "c"), 5)
+	}
+}
+
 func TestBlacklist(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
