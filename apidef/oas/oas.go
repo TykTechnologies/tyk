@@ -23,6 +23,19 @@ func (s *OAS) MarshalJSON() ([]byte, error) {
 		s.Info.License = nil
 	}
 
+	// when OAS object is unmarshalled, the extension values are marshalled as plain []byte by kin/openapi
+	// this causes json marshaller to base64 encode the values - https://pkg.go.dev/encoding/json#Marshal.
+	// this block converts the extensions to json.RawMessage so that it's correctly marshalled.
+	for k := range s.Extensions {
+		if k == ExtensionTykAPIGateway {
+			continue
+		}
+
+		if byteV, ok := s.Extensions[k].([]byte); ok {
+			s.Extensions[k] = json.RawMessage(byteV)
+		}
+	}
+
 	type Alias OAS
 
 	// to prevent infinite recursion
