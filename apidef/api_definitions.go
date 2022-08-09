@@ -14,7 +14,7 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
 	"github.com/clbanning/mxj"
 
