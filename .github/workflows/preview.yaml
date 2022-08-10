@@ -30,6 +30,10 @@ jobs:
         id: fmt
         run: terraform fmt -check
 
+      - name: Terraform Workspace
+        working-directory: ./ci/terraform
+        run: terraform workspace select ${CLUSTER}
+        
       - name: Terraform Init
         working-directory: ./ci/terraform
         id: init
@@ -43,7 +47,6 @@ jobs:
         id: aws-creds
         working-directory: ./ci/terraform
         run: |
-          terraform workspace select ${CLUSTER}
           terraform refresh 2>&1 >/dev/null
           eval $(terraform output -json cd | jq -r 'to_entries[] | [.key,.value] | join("=")')
           region=$(terraform output region | xargs)
