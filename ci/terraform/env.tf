@@ -19,17 +19,17 @@ module "gateway" {
     mounts = [
       { src = "config", dest = "/conf" }
     ],
-    env = [],
+    env     = [],
     secrets = [],
-    region = data.terraform_remote_state.base.outputs.region
+    region  = data.terraform_remote_state.base.outputs.region
   }
 }
 
 module "redis" {
-  source = "./modules/fg-sds"
-  cluster = aws_ecs_cluster.env.arn
-  cdt = "templates/cd-awsvpc.tpl"
-  public_ip = false
+  source      = "./modules/fg-sds"
+  cluster     = aws_ecs_cluster.env.arn
+  cdt         = "templates/cd-awsvpc.tpl"
+  public_ip   = false
   sr          = aws_service_discovery_private_dns_namespace.internal.id
   tearn       = data.aws_iam_role.ecs_task_execution_role.arn
   env_name    = var.name
@@ -43,21 +43,21 @@ module "redis" {
     port      = 6379,
     log_group = aws_cloudwatch_log_group.env.name,
     image     = "redis"
-    mounts = [],
-    env = [],
-    secrets = [],
-    region = data.terraform_remote_state.base.outputs.region
+    mounts    = [],
+    env       = [],
+    secrets   = [],
+    region    = data.terraform_remote_state.base.outputs.region
   }
 }
 
 module "dashboard" {
-  source = "./modules/fg-sds"
-  cluster = aws_ecs_cluster.env.arn
-  cdt = "templates/cd-awsvpc.tpl"
-  public_ip = true
-  sr = aws_service_discovery_private_dns_namespace.internal.id
+  source      = "./modules/fg-sds"
+  cluster     = aws_ecs_cluster.env.arn
+  cdt         = "templates/cd-awsvpc.tpl"
+  public_ip   = true
+  sr          = aws_service_discovery_private_dns_namespace.internal.id
   tearn       = data.aws_iam_role.ecs_task_execution_role.arn
-  env_name = var.name
+  env_name    = var.name
   vpc         = data.terraform_remote_state.infra.outputs.vpc_id
   subnets     = data.aws_subnet_ids.public.ids
   common_tags = local.common_tags
@@ -80,11 +80,11 @@ module "dashboard" {
 }
 
 module "pump" {
-  source = "./modules/fg-sds"
-  cluster = aws_ecs_cluster.env.arn
-  cdt = "templates/cd-awsvpc.tpl"
-  public_ip = false
-  sr = aws_service_discovery_private_dns_namespace.internal.id
+  source      = "./modules/fg-sds"
+  cluster     = aws_ecs_cluster.env.arn
+  cdt         = "templates/cd-awsvpc.tpl"
+  public_ip   = false
+  sr          = aws_service_discovery_private_dns_namespace.internal.id
   tearn       = data.aws_iam_role.ecs_task_execution_role.arn
   env_name    = var.name
   vpc         = data.terraform_remote_state.infra.outputs.vpc_id
@@ -92,8 +92,8 @@ module "pump" {
   common_tags = local.common_tags
   volume_map  = { config = data.terraform_remote_state.base.outputs.config_efs }
   cd = {
-    name      = "tyk-pump",
-    command   = ["--conf=/conf/tyk-pump.conf"],
+    name    = "tyk-pump",
+    command = ["--conf=/conf/tyk-pump.conf"],
     # pump doesn't listen, but the module expects a port
     port      = 443,
     log_group = aws_cloudwatch_log_group.env.name,
@@ -101,8 +101,8 @@ module "pump" {
     mounts = [
       { src = "config", dest = "/conf" }
     ],
-    env = [],
+    env     = [],
     secrets = [],
-    region = data.terraform_remote_state.base.outputs.region
+    region  = data.terraform_remote_state.base.outputs.region
   }
 }
