@@ -4,7 +4,7 @@ on:
 
 env:
   TASK_DEFINITION: "kikitest"
-  SERVICE: ""
+  SERVICE: "kikitest"
   CLUSTER: "kikitest"
   CONTAINER_NAME: "tyk"
   IMAGE: "v4.0.0"
@@ -43,7 +43,7 @@ jobs:
         id: aws-creds
         working-directory: ./ci/terraform
         run: |
-          terraform workspace select ${{CLUSTER}}
+          terraform workspace select ${CLUSTER}
           terraform refresh 2>&1 >/dev/null
           eval $(terraform output -json cd | jq -r 'to_entries[] | [.key,.value] | join("=")')
           region=$(terraform output region | xargs)
@@ -62,20 +62,20 @@ jobs:
 
       - name: Download task definition
         run: |
-          aws ecs describe-task-definition --task-definition ${{TASK_DEFINITION}}-template --query taskDefinition > task-definition.json
+          aws ecs describe-task-definition --task-definition ${TASK_DEFINITION}-template --query taskDefinition > task-definition.json
 
       - name: Fill in the new image ID in the Amazon ECS task definition
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: task-definition.json
-          container-name: ${{CONTAINER_NAME}}
-          image: ${{ IMAGE }}
+          container-name: ${CONTAINER_NAME}
+          image: ${IMAGE}
 
       - name: Deploy to Amazon ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
           task-definition: task-definition.json
-          service: ${{SERVICE}}
-          cluster: ${{CLUSTER}}
+          service: ${SERVICE}
+          cluster: ${CLUSTER}
           wait-for-service-stability: true
