@@ -3,11 +3,7 @@
 name: Update tyk-analytics branch
 
 on:
-  push:
-    branches:
-      - master
-      - release-**
-      - integration/**
+  workflow_dispatch:
 
 jobs:
   sync:

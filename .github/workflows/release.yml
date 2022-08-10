@@ -15,16 +15,7 @@
 name: Release
 
 on:
-  pull_request:
-  push:
-    branches:
-      - master
-      - release-**
-      - integration/**
-      - feature/**
-      - perf/**
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 env:
   SLACK_CLI_TOKEN: ${{ secrets.BENDER_TOKEN }}

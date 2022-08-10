@@ -13,14 +13,7 @@
 name: Sync automation
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - .github/workflows/release.yml
-      - .github/workflows/api-tests.yml
-      - .github/workflows/ui-tests.yml
-      - ci/**
+  workflow_dispatch:
 
 env:
   FILES: ci .github/workflows/release.yml .github/dependabot.yml .github/workflows/del-env.yml .github/workflows/api-tests.yml .github/workflows/ui-tests.yml

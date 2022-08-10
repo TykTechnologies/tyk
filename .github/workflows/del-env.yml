@@ -5,10 +5,7 @@
 name: Retiring dev env
 
 on:
-  delete:
-    branches:
-      - feature/*
-      - integration/*
+  workflow_dispatch:
 
 jobs:
   retire:

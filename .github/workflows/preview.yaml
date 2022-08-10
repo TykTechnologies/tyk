@@ -1,0 +1,81 @@
+name: Persistent Environment
+on:
+  pull_request:
+
+env:
+  TASK_DEFINITION: "kikitest"
+  SERVICE: ""
+  CLUSTER: "kikitest"
+  CONTAINER_NAME: "tyk"
+  IMAGE: "v4.0.0"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Shallow checkout of tyk
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_wrapper: false
+
+      - name: Terraform Format
+        working-directory: ./ci/terraform
+        id: fmt
+        run: terraform fmt -check
+
+      - name: Terraform Init
+        working-directory: ./ci/terraform
+        id: init
+        run: terraform init
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Get AWS creds from Terraform remote state
+        id: aws-creds
+        working-directory: ./ci/terraform
+        run: |
+          terraform workspace select ${{CLUSTER}}
+          terraform refresh 2>&1 >/dev/null
+          eval $(terraform output -json cd | jq -r 'to_entries[] | [.key,.value] | join("=")')
+          region=$(terraform output region | xargs)
+          [ -z "$key" -o -z "$secret" -o -z "$region" ] && exit 1
+          echo "::set-output name=secret::$secret"
+          echo "::set-output name=key::$key"
+          echo "::set-output name=region::$region"
+
+
+      - name: Configure AWS credentials for use
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ steps.aws-creds.outputs.key }}
+          aws-secret-access-key: ${{ steps.aws-creds.outputs.secret }}
+          aws-region: ${{ steps.aws-creds.outputs.region }}
+
+      - name: Download task definition
+        run: |
+          aws ecs describe-task-definition --task-definition ${{TASK_DEFINITION}}-template --query taskDefinition > task-definition.json
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{CONTAINER_NAME}}
+          image: ${{ IMAGE }}
+
+      - name: Deploy to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          service: ${{SERVICE}}
+          cluster: ${{CLUSTER}}
+          wait-for-service-stability: true
