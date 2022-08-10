@@ -15,6 +15,8 @@ data "terraform_remote_state" "integration" {
   }
 }
 
+
+
 output "tyk" {
   value = data.terraform_remote_state.integration.outputs.tyk
   description = "ECR creds for tyk repo"
@@ -23,4 +25,9 @@ output "tyk" {
 output "region" {
   value = data.terraform_remote_state.integration.outputs.region
   description = "Region in which the env is running"
+}
+
+output "cd" {
+  value = data.terraform_remote_state.infra.outputs.cd
+  description = "Service account for continuous deployment"
 }
