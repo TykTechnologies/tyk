@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -1024,7 +1025,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				key = splitKeys[0]
-				r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
+				_, status := r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
+				if status == http.StatusNotFound {
+					// skip and don't pull it
+					continue
+				}
 				r.Gw.getSessionAndCreate(splitKeys[0], r, true, orgId)
 			} else {
 				log.Info("--> removing cached key: ", key)
@@ -1032,7 +1037,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
 				}
-				r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
+				_, status := r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
+				if status == http.StatusNotFound {
+					// skip and don't pull it
+					continue
+				}
 				r.Gw.getSessionAndCreate(splitKeys[0], r, false, orgId)
 			}
 			r.Gw.SessionCache.Delete(key)
