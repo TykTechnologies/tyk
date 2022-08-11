@@ -13,3 +13,8 @@ output "cd" {
   value       = data.terraform_remote_state.infra.outputs.cd
   description = "Service account for continuous deployment"
 }
+
+output "region" {
+  value       = data.terraform_remote_state.integration.outputs.region
+  description = "Region in which the env is running"
+}
