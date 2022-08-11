@@ -256,7 +256,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 			planDataSource.Custom = kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
 				Subscription: kafkaDataSource.SubscriptionConfiguration{
 					BrokerAddresses:      kafkaConfig.BrokerAddresses,
-					Topic:                kafkaConfig.Topic,
+					Topics:               kafkaConfig.Topics,
 					GroupID:              kafkaConfig.GroupID,
 					ClientID:             kafkaConfig.ClientID,
 					KafkaVersion:         kafkaConfig.KafkaVersion,
