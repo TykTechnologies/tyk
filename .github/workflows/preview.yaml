@@ -40,21 +40,22 @@ jobs:
           echo "::set-output name=region::$region"
 
       - name: Terraform Format
-        working-directory: ./ci/terraform
+        working-directory: ./ci/terraform/environment
         id: fmt
         run: terraform fmt -check
 
       - name: Terraform Init
-        working-directory: ./ci/terraform
+        working-directory: ./ci/terraform/environment
         id: init
         run: terraform init
 
       - name: Terraform Workspace
-        working-directory: ./ci/terraform
+        working-directory: ./ci/terraform/environment
         run: terraform workspace select ${CLUSTER}
 
       - name: Terraform Validate
         id: validate
+        working-directory: ./ci/terraform/environment
         run: terraform validate -no-color
 
       - name: Configure AWS credentials for use
