@@ -56,4 +56,4 @@ tyk_linux_*
 
 # Terraform
 .terraform*
-*.tfstate
+*.tfstate*
