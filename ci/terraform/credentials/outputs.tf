@@ -15,6 +15,6 @@ output "cd" {
 }
 
 output "region" {
-  value       = data.terraform_remote_state.integration.outputs.region
+  value       = data.terraform_remote_state.infra.outputs.region
   description = "Region in which the env is running"
 }
