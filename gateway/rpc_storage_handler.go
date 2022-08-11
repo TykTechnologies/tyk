@@ -1016,6 +1016,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		}
 	}
 
+	synchronizerEnabled := r.Gw.GetConfig().SlaveOptions.SynchoniserEnabled
 	for _, key := range keys {
 		_, isOauthTokenKey := notRegularKeys[key]
 		if !isOauthTokenKey {
@@ -1026,7 +1027,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				key = splitKeys[0]
 				_, status := r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
-				if status == http.StatusNotFound {
+				if status == http.StatusNotFound && !synchronizerEnabled {
 					// skip and don't pull it
 					continue
 				}
@@ -1034,7 +1035,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			} else {
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
-				if storage.TokenOrg(key) == "" {
+				if storage.TokenOrg(key) == "" && !synchronizerEnabled {
 					key = r.Gw.generateToken(orgId, key)
 				}
 				_, status := r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)

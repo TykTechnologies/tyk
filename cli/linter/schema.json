@@ -935,6 +935,9 @@
         },
         "rpc_global_cache_expiration": {
           "type": "number"
+        },
+        "synchoniser_enabled" : {
+          "type": "boolean"
         }
       }
     },
