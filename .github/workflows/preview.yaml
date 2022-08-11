@@ -44,6 +44,13 @@ jobs:
         id: fmt
         run: terraform fmt -check
 
+      - name: Configure AWS credentials for use
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ steps.aws-creds.outputs.key }}
+          aws-secret-access-key: ${{ steps.aws-creds.outputs.secret }}
+          aws-region: ${{ steps.aws-creds.outputs.region }}
+
       - name: Terraform Init
         working-directory: ./ci/terraform/environment
         id: init
@@ -57,13 +64,6 @@ jobs:
         id: validate
         working-directory: ./ci/terraform/environment
         run: terraform validate -no-color
-
-      - name: Configure AWS credentials for use
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ steps.aws-creds.outputs.key }}
-          aws-secret-access-key: ${{ steps.aws-creds.outputs.secret }}
-          aws-region: ${{ steps.aws-creds.outputs.region }}
 
       - name: Download task definition
         run: |
