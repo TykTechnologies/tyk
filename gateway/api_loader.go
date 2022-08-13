@@ -350,6 +350,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: HMAC")
 		}
 
+		if gw.mwAppendEnabled(&authArray, &OAuth2IntrospectionMW{BaseMiddleware: baseMid}) {
+			logger.Info("Checking security policy: OAuth2Introspection")
+		}
+
 		if gw.mwAppendEnabled(&authArray, &JWTMiddleware{baseMid}) {
 			logger.Info("Checking security policy: JWT")
 		}
