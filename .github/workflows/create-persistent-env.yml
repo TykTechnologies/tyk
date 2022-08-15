@@ -2,9 +2,6 @@ name: Persistent Environment Creation
 on:
   workflow_call:
     inputs:
-      exist:
-        required: true
-        type: string
       containerName:
         required: true
         type: string
@@ -22,7 +19,6 @@ on:
 
 jobs:
   Create:
-    if: ${{ inputs.exist }} == 'false'
     runs-on: ubuntu-latest
     env:
       SERVICE: ${{ inputs.service }}

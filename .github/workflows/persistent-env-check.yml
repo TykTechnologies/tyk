@@ -29,6 +29,7 @@ jobs:
 
 
   Create-workflow:
+    if: ${{ needs.Check.outputs.env-exist == 'false'}}
     uses: ./.github/workflows/create-persistent-env.yml
     needs:
       - Check
