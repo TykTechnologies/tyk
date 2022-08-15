@@ -65,7 +65,7 @@ jobs:
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1.1.1
         with:
-          task-definition: ./terraform/environment/task-definition.json
+          task-definition: ./ci/terraform/environment/task-definition.json
           container-name: ${{ env.CONTAINER_NAME }}
           image: ${{ env.REGISTRY }}/${{ env.IMAGE }}
 
