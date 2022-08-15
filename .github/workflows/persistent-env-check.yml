@@ -19,8 +19,43 @@ jobs:
       cluster: ${{ steps.set-output-defaults.outputs.cluster }}
       service: ${{ steps.set-output-defaults.outputs.service }}
       image: ${{ steps.set-output-defaults.outputs.image }}
-      registry: ${{ steps.set-output-defaults.outputs.registry }}
+      registry: ${{ steps.login-ecr.outputs.registry }}
     steps:
+      - name: Shallow checkout of tyk
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_wrapper: false
+
+      - name: Get AWS creds from Terraform remote state
+        id: aws-creds
+        run: |
+          cd ci/terraform
+          terraform init -input=false
+          terraform refresh 2>&1 >/dev/null
+          eval $(terraform output -json tyk | jq -r 'to_entries[] | [.key,.value] | join("=")')
+          region=$(terraform output region | xargs)
+          [ -z "$key" -o -z "$secret" -o -z "$region" ] && exit 1
+          echo "::set-output name=secret::$secret"
+          echo "::set-output name=key::$key"
+          echo "::set-output name=region::$region"
+
+      - name: Configure AWS credentials for use
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ steps.aws-creds.outputs.key }}
+          aws-secret-access-key: ${{ steps.aws-creds.outputs.secret }}
+          aws-region: ${{ steps.aws-creds.outputs.region }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
       - name: Simulate outputs from the release pipeline
         id: set-output-defaults
         run: |
@@ -29,8 +64,6 @@ jobs:
           echo "::set-output name=cluster::${{ env.CLUSTER }}"
           echo "::set-output name=service::${{ env.SERVICE }}"
           echo "::set-output name=image::${{ env.IMAGE }}"
-          echo "::set-output name=registry::${{ env.REGISTRY }}"
-
 
   Create-workflow:
     if: ${{ needs.Check.outputs.env-exist == 'false' }}
@@ -55,7 +88,7 @@ jobs:
       cluster: ${{ needs.Check.outputs.cluster }}
       service: ${{ needs.Check.outputs.service }}
       image: ${{ needs.Check.outputs.image }}
-      registry: ${{ needs.Check.outputs.registry }}
     secrets:
       aws_key: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
       aws_secret: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
+      registry: ${{ needs.Check.outputs.registry }}

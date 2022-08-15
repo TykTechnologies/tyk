@@ -11,10 +11,6 @@ on:
       service:
         required: true
         type: string
-      registry:
-        required: true
-        default:
-        type: string
       image:
         required: true
         type: string
@@ -27,13 +23,14 @@ on:
         required: true
       aws_secret:
         required: true
+      registry:
+        required: true
 env:
   TERRAFORM_DIR: ${{ inputs.terraformDir }}
   SERVICE: ${{ inputs.service }}
   CONTAINER_NAME: ${{ inputs.containerName }}
   CLUSTER: ${{ inputs.cluster }}
   IMAGE: ${{ inputs.image }}
-  REGISTRY: ${{ inputs.registry }}
 
 jobs:
   Update:
