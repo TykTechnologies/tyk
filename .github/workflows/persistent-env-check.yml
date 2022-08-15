@@ -41,8 +41,6 @@ jobs:
       containerName: ${{ needs.Check.outputs.container-name }}
       cluster: ${{ needs.Check.outputs.cluster }}
       service: ${{ needs.Check.outputs.service }}
-      image: ${{ needs.Check.outputs.image }}
-      registry: ${{ needs.Check.outputs.registry }}
     secrets:
       aws_key: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
       aws_secret: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
@@ -56,6 +54,8 @@ jobs:
       containerName: ${{ needs.Check.outputs.container-name }}
       cluster: ${{ needs.Check.outputs.cluster }}
       service: ${{ needs.Check.outputs.service }}
+      image: ${{ needs.Check.outputs.image }}
+      registry: ${{ needs.Check.outputs.registry }}
     secrets:
       aws_key: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
       aws_secret: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
