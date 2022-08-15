@@ -8,11 +8,11 @@ env:
   CLUSTER: "kikitest"
   REGISTRY: "754489498669.dkr.ecr.eu-central-1.amazonaws.com"
   IMAGE: "tyk:v4.0.0"
-  ENV_EXIST: false
+  ENV_EXIST: 'false'
 
 jobs:
   Create:
-    if: ${{ ${{ env.ENV_EXIST }} != true }}
+    if: ( ${{ env.ENV_EXIST == 'false' }} )
     runs-on: ubuntu-latest
     
     steps:
