@@ -8,7 +8,7 @@ env:
   CLUSTER: "kikitest"
   REGISTRY: "754489498669.dkr.ecr.eu-central-1.amazonaws.com"
   IMAGE: "tyk:v4.0.0"
-  ENV_EXIST: 'false'
+  ENV_EXIST: 'true'
 
 jobs:
   Create:
