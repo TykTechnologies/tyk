@@ -26,7 +26,7 @@ jobs:
           terraform_wrapper: false
 
       - name: Terraform Format
-        working-directory: ./terraform/environment
+        working-directory: ./ci/terraform/environment
         id: fmt
         run: terraform fmt -check
 
@@ -38,26 +38,26 @@ jobs:
           aws-region: "eu-central-1"
 
       - name: Terraform Init
-        working-directory: ./terraform/environment
+        working-directory: ./ci/terraform/environment
         id: init
         run: terraform init
 
       - name: Terraform Workspace
-        working-directory: ./terraform/environment
+        working-directory: ./ci/terraform/environment
         run: terraform workspace select ${CLUSTER}
 
       - name: Terraform Validate
         id: validate
-        working-directory: ./terraform/environment
+        working-directory: ./ci/terraform/environment
         run: terraform validate -no-color
 
       - name: Download task definition
-        working-directory: ./terraform/environment
+        working-directory: ./ci/terraform/environment
         run: |
           aws ecs describe-task-definition --task-definition ${CONTAINER_NAME}-${CLUSTER}-template --query taskDefinition > task-definition.json
 
       - name: Describe task definition
-        working-directory: ./terraform/environment
+        working-directory: ./ci/terraform/environment
         run: cat task-definition.json
 
       - name: Fill in the new image ID in the Amazon ECS task definition
