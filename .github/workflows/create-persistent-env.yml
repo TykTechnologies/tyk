@@ -2,7 +2,7 @@ name: Persistent Environment Creation
 on:
   workflow_call:
     inputs:
-      service:
+      exist:
         required: true
         type: string
       containerName:
@@ -11,7 +11,7 @@ on:
       cluster:
         required: true
         type: string
-      exist:
+      service:
         required: true
         type: string
 
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SERVICE: ${{ inputs.service }}
-      CONTAINER_NAME: ${{ inputs.container_name }}
+      CONTAINER_NAME: ${{ inputs.containerName }}
       CLUSTER: ${{ inputs.cluster }}
     
     steps:
