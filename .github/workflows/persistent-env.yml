@@ -4,14 +4,15 @@ on:
 
 env:
   SERVICE: "tyk"
-  CLUSTER: "kikitest"
   CONTAINER_NAME: "tyk"
+  CLUSTER: "kikitest"
   REGISTRY: "754489498669.dkr.ecr.eu-central-1.amazonaws.com"
   IMAGE: "tyk:v4.0.0"
-  ENV_EXIST: true
+  ENV_EXIST: false
 
 jobs:
-  deploy:
+  Create:
+    if: ! ${{ ENV_EXIST }}
     runs-on: ubuntu-latest
     
     steps:
@@ -25,7 +26,7 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
           terraform_wrapper: false
-
+      
       - name: Terraform Format
         working-directory: ./ci/terraform/environment
         id: fmt
@@ -45,12 +46,33 @@ jobs:
 
       - name: Terraform Workspace
         working-directory: ./ci/terraform/environment
-        run: terraform workspace select ${CLUSTER}
+        run: |
+          terraform workspace new ${CLUSTER}
+          terraform workspace show
 
-      - name: Terraform Validate
-        id: validate
+      - name: Lock environment
+        run:
+          echo "CALL - Add entry on DinamoDB"
+
+      - name: Terraform Apply
         working-directory: ./ci/terraform/environment
-        run: terraform validate -no-color
+        run: terraform apply -auto-approve -var-file=master.tfvars
+
+      - name: Unlock environment
+        run:
+          echo "CALL - Update entry on DinamoDB"
+
+
+  Update:
+    if: ${{ ENV_EXIST }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials for use
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
+          aws-region: "eu-central-1"
 
       - name: Download task definition
         working-directory: ./ci/terraform/environment
