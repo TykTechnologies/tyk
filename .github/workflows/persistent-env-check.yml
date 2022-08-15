@@ -29,12 +29,11 @@ jobs:
 
 
   Create-workflow:
-    if: ${{ needs.Check.outputs.env-exist == 'false'}}
+    if: ${{ needs.Check.outputs.env-exist == 'false' }}
     uses: ./.github/workflows/create-persistent-env.yml
     needs:
       - Check
     with:
-      exist: ${{ needs.Check.outputs.env-exist}}
       containerName: ${{ needs.Check.outputs.container-name }}
       cluster: ${{ needs.Check.outputs.cluster }}
       service: ${{ needs.Check.outputs.service }}
