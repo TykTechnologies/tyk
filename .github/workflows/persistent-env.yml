@@ -8,6 +8,7 @@ env:
   CONTAINER_NAME: "tyk"
   REGISTRY: "754489498669.dkr.ecr.eu-central-1.amazonaws.com"
   IMAGE: "tyk:v4.0.0"
+  ENV_EXIST: true
 
 jobs:
   deploy:
@@ -71,7 +72,7 @@ jobs:
       - name: Deploy to Amazon ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1.4.9
         with:
-          task-definition: ./terraform/environment/task-definition.json
+          task-definition: ./ci/terraform/environment/task-definition.json
           service: ${{ env.SERVICE }}
           cluster: ${{ env.CLUSTER }}
           wait-for-service-stability: true
