@@ -37,6 +37,8 @@ jobs:
       containerName: ${{ needs.Check.outputs.container-name }}
       cluster: ${{ needs.Check.outputs.cluster }}
       service: ${{ needs.Check.outputs.service }}
+      aws_key: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
+      aws_secret: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
     
 
   # Update:

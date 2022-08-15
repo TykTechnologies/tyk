@@ -14,6 +14,11 @@ on:
       service:
         required: true
         type: string
+    secrets:
+      aws_key:
+        required: true
+      aws_secret:
+        required: true
 
 jobs:
   Create:
@@ -44,8 +49,8 @@ jobs:
       - name: Configure AWS credentials for use
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.aws_key }}
+          aws-secret-access-key: ${{ secrets.aws_secret }}
           aws-region: "eu-central-1"
 
       - name: Terraform Init
