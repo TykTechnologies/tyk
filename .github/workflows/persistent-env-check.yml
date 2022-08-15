@@ -14,10 +14,10 @@ jobs:
   Create-workflow:
     uses: ./.github/workflows/create-persistent-env.yml
     with:
-      service: ${{ env.SERVICE }}
-      containerName: ${{ env.CONTAINER_NAME }}
-      cluster: ${{ env.CLUSTER }}
-      exist: ${{ env.ENV_EXIST }}
+      service: ${{ SERVICE }}
+      containerName: ${{ CONTAINER_NAME }}
+      cluster: ${{ CLUSTER }}
+      exist: ${{ ENV_EXIST }}
     
 
   # Update:
