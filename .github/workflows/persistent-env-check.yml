@@ -78,6 +78,12 @@ jobs:
     #   - Check
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        if: env.ENV_EXIST == 'true'
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
       - name: Configure AWS credentials for use
         if: env.ENV_EXIST == 'true'
         uses: aws-actions/configure-aws-credentials@v1
