@@ -16,7 +16,7 @@ jobs:
     with:
       service: ${{ env.SERVICE }}
       containerName: ${{ env.CONTAINER_NAME }}
-			cluster: ${{ env.CLUSTER }}
+      cluster: ${{ env.CLUSTER }}
       exist: ${{ env.ENV_EXIST }}
     
 
