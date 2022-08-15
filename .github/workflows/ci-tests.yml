@@ -1,9 +1,7 @@
 name: CI tests
 
-on: 
-  pull_request:
-  push:
-    branches: [master]
+on:
+  workflow_dispatch:
 
 env:
   TYK_DB_REDISHOST: localhost
