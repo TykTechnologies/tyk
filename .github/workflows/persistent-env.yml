@@ -64,7 +64,7 @@ jobs:
 
 
   Update:
-    if: ${{ ENV_EXIST }}
+    if: env.ENV_EXIST == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Configure AWS credentials for use
