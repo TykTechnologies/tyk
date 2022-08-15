@@ -8,7 +8,7 @@ on:
       containerName:
         required: true
         type: string
-			cluster:
+      cluster:
         required: true
         type: string
       exist:
