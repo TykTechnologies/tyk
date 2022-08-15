@@ -35,7 +35,7 @@ env:
   IMAGE: ${{ inputs.image }}
   REGISTRY: ${{ inputs.registry }}
 
-Jobs:
+jobs:
   Update:
     runs-on: ubuntu-latest
     steps:
