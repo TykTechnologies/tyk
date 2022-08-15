@@ -11,20 +11,25 @@ on:
       service:
         required: true
         type: string
+      terraformDir:
+        required: false
+        type: string
+        default: "./ci/terraform/environment"
     secrets:
       aws_key:
         required: true
       aws_secret:
         required: true
 
+env:
+  TERRAFORM_DIR: ${{ inputs.terraformDir }}
+  SERVICE: ${{ inputs.service }}
+  CONTAINER_NAME: ${{ inputs.containerName }}
+  CLUSTER: ${{ inputs.cluster }}
+
 jobs:
   Create:
-    runs-on: ubuntu-latest
-    env:
-      SERVICE: ${{ inputs.service }}
-      CONTAINER_NAME: ${{ inputs.containerName }}
-      CLUSTER: ${{ inputs.cluster }}
-    
+    runs-on: ubuntu-latest    
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -38,7 +43,7 @@ jobs:
           terraform_wrapper: false
       
       - name: Terraform Format
-        working-directory: ./ci/terraform/environment
+        working-directory: ${{ env.TERRAFORM_DIR }}
         id: fmt
         run: terraform fmt -check
 
@@ -50,12 +55,12 @@ jobs:
           aws-region: "eu-central-1"
 
       - name: Terraform Init
-        working-directory: ./ci/terraform/environment
+        working-directory: ${{ env.TERRAFORM_DIR }}
         id: init
         run: terraform init
 
       - name: Terraform Workspace
-        working-directory: ./ci/terraform/environment
+        working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
           terraform workspace new ${CLUSTER}
           terraform workspace show
@@ -65,7 +70,7 @@ jobs:
           echo "CALL - Add entry on DinamoDB"
 
       - name: Terraform Apply
-        working-directory: ./ci/terraform/environment
+        working-directory: ${{ env.TERRAFORM_DIR }}
         run: terraform apply -auto-approve -var-file=master.tfvars
 
       - name: Unlock environment

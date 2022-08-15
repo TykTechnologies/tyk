@@ -1,0 +1,77 @@
+name: Persistent Environment Update
+on:
+  workflow_call:
+    inputs:
+      containerName:
+        required: true
+        type: string
+      cluster:
+        required: true
+        type: string
+      service:
+        required: true
+        type: string
+      registry:
+        required: true
+        default:
+        type: string
+      image:
+        required: true
+        type: string
+      terraformDir:
+        required: false
+        type: string
+        default: "./ci/terraform/environment"
+    secrets:
+      aws_key:
+        required: true
+      aws_secret:
+        required: true
+env:
+  TERRAFORM_DIR: ${{ inputs.terraformDir }}
+  SERVICE: ${{ inputs.service }}
+  CONTAINER_NAME: ${{ inputs.containerName }}
+  CLUSTER: ${{ inputs.cluster }}
+  IMAGE: ${{ inputs.image }}
+  REGISTRY: ${{ inputs.registry }}
+
+Jobs:
+  Update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Configure AWS credentials for use
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.aws_key }}
+          aws-secret-access-key: ${{ secrets.aws_secret }}
+          aws-region: "eu-central-1"
+
+      - name: Download task definition
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          aws ecs describe-task-definition --task-definition ${CONTAINER_NAME}-${CLUSTER}-template --query taskDefinition > task-definition.json
+
+      - name: Describe task definition
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: cat task-definition.json
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1.1.1
+        with:
+          task-definition: ${{ env.TERRAFORM_DIR }}/task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+
+      - name: Deploy to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1.4.9
+        with:
+          task-definition: ./ci/terraform/environment/task-definition.json
+          service: ${{ env.SERVICE }}
+          cluster: ${{ env.CLUSTER }}
+          wait-for-service-stability: true

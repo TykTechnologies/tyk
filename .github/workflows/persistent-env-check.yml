@@ -18,6 +18,8 @@ jobs:
       container-name: ${{ steps.set-output-defaults.outputs.container-name }}
       cluster: ${{ steps.set-output-defaults.outputs.cluster }}
       service: ${{ steps.set-output-defaults.outputs.service }}
+      image: ${{ steps.set-output-defaults.outputs.image }}
+      registry: ${{ steps.set-output-defaults.outputs.registry }}
     steps:
       - name: Simulate outputs from the release pipeline
         id: set-output-defaults
@@ -26,6 +28,8 @@ jobs:
           echo "::set-output name=container-name::${{ env.CONTAINER_NAME }}"
           echo "::set-output name=cluster::${{ env.CLUSTER }}"
           echo "::set-output name=service::${{ env.SERVICE }}"
+          echo "::set-output name=image::${{ env.IMAGE }}"
+          echo "::set-output name=registry::${{ env.REGISTRY }}"
 
 
   Create-workflow:
@@ -37,55 +41,21 @@ jobs:
       containerName: ${{ needs.Check.outputs.container-name }}
       cluster: ${{ needs.Check.outputs.cluster }}
       service: ${{ needs.Check.outputs.service }}
+      image: ${{ needs.Check.outputs.image }}
+      registry: ${{ needs.Check.outputs.registry }}
     secrets:
       aws_key: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
       aws_secret: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
-    
 
-  # Update:
-  #   # needs:
-  #   #   - Check
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       if: env.ENV_EXIST == 'true'
-  #       uses: actions/checkout@v2
-  #       with:
-  #         fetch-depth: 1
-
-  #     - name: Configure AWS credentials for use
-  #       if: env.ENV_EXIST == 'true'
-  #       uses: aws-actions/configure-aws-credentials@v1
-  #       with:
-  #         aws-access-key-id: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
-  #         aws-region: "eu-central-1"
-
-  #     - name: Download task definition
-  #       if: env.ENV_EXIST == 'true'
-  #       working-directory: ./ci/terraform/environment
-  #       run: |
-  #         aws ecs describe-task-definition --task-definition ${CONTAINER_NAME}-${CLUSTER}-template --query taskDefinition > task-definition.json
-
-  #     - name: Describe task definition
-  #       if: env.ENV_EXIST == 'true'
-  #       working-directory: ./ci/terraform/environment
-  #       run: cat task-definition.json
-
-  #     - name: Fill in the new image ID in the Amazon ECS task definition
-  #       if: env.ENV_EXIST == 'true'
-  #       id: task-def
-  #       uses: aws-actions/amazon-ecs-render-task-definition@v1.1.1
-  #       with:
-  #         task-definition: ./ci/terraform/environment/task-definition.json
-  #         container-name: ${{ env.CONTAINER_NAME }}
-  #         image: ${{ env.REGISTRY }}/${{ env.IMAGE }}
-
-  #     - name: Deploy to Amazon ECS
-  #       if: env.ENV_EXIST == 'true'
-  #       uses: aws-actions/amazon-ecs-deploy-task-definition@v1.4.9
-  #       with:
-  #         task-definition: ./ci/terraform/environment/task-definition.json
-  #         service: ${{ env.SERVICE }}
-  #         cluster: ${{ env.CLUSTER }}
-  #         wait-for-service-stability: true
+  Update-workflow:
+    if: ${{ needs.Check.outputs.env-exist == 'true' }}
+    uses: ./.github/workflows/update-persistent-env.yml
+    needs:
+      - Check
+    with:
+      containerName: ${{ needs.Check.outputs.container-name }}
+      cluster: ${{ needs.Check.outputs.cluster }}
+      service: ${{ needs.Check.outputs.service }}
+    secrets:
+      aws_key: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
+      aws_secret: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
