@@ -1,4 +1,4 @@
-name: Persistent Environment
+name: Persistent Environment Check
 on:
   pull_request:
 
@@ -12,27 +12,32 @@ env:
 
 jobs:
   Create:
-    if: env.ENV_EXIST == 'false'
+    # needs:
+    #   - Check
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout
+        if: env.ENV_EXIST == 'false'
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
 
       - name: Setup Terraform
+        if: env.ENV_EXIST == 'false'
         uses: hashicorp/setup-terraform@v1
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
           terraform_wrapper: false
       
       - name: Terraform Format
+        if: env.ENV_EXIST == 'false'
         working-directory: ./ci/terraform/environment
         id: fmt
         run: terraform fmt -check
 
       - name: Configure AWS credentials for use
+        if: env.ENV_EXIST == 'false'
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
@@ -40,34 +45,41 @@ jobs:
           aws-region: "eu-central-1"
 
       - name: Terraform Init
+        if: env.ENV_EXIST == 'false'
         working-directory: ./ci/terraform/environment
         id: init
         run: terraform init
 
       - name: Terraform Workspace
+        if: env.ENV_EXIST == 'false'
         working-directory: ./ci/terraform/environment
         run: |
           terraform workspace new ${CLUSTER}
           terraform workspace show
 
       - name: Lock environment
+        if: env.ENV_EXIST == 'false'
         run:
           echo "CALL - Add entry on DinamoDB"
 
       - name: Terraform Apply
+        if: env.ENV_EXIST == 'false'
         working-directory: ./ci/terraform/environment
         run: terraform apply -auto-approve -var-file=master.tfvars
 
       - name: Unlock environment
+        if: env.ENV_EXIST == 'false'
         run:
           echo "CALL - Update entry on DinamoDB"
 
 
   Update:
-    if: env.ENV_EXIST == 'true'
+    # needs:
+    #   - Check
     runs-on: ubuntu-latest
     steps:
       - name: Configure AWS credentials for use
+        if: env.ENV_EXIST == 'true'
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
@@ -75,15 +87,18 @@ jobs:
           aws-region: "eu-central-1"
 
       - name: Download task definition
+        if: env.ENV_EXIST == 'true'
         working-directory: ./ci/terraform/environment
         run: |
           aws ecs describe-task-definition --task-definition ${CONTAINER_NAME}-${CLUSTER}-template --query taskDefinition > task-definition.json
 
       - name: Describe task definition
+        if: env.ENV_EXIST == 'true'
         working-directory: ./ci/terraform/environment
         run: cat task-definition.json
 
       - name: Fill in the new image ID in the Amazon ECS task definition
+        if: env.ENV_EXIST == 'true'
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1.1.1
         with:
@@ -92,6 +107,7 @@ jobs:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE }}
 
       - name: Deploy to Amazon ECS
+        if: env.ENV_EXIST == 'true'
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1.4.9
         with:
           task-definition: ./ci/terraform/environment/task-definition.json
