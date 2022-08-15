@@ -33,10 +33,10 @@ jobs:
     needs:
       - Check
     with:
-      service: ${{ needs.Check.outputs.env-exist }}
+      exist: ${{ needs.Check.outputs.env-exist}}
       containerName: ${{ needs.Check.outputs.container-name }}
       cluster: ${{ needs.Check.outputs.cluster }}
-      exist: ${{ needs.Check.outputs.service}}
+      service: ${{ needs.Check.outputs.service }}
     
 
   # Update:
