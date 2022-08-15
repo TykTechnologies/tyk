@@ -1,0 +1,77 @@
+name: Persistent Environment
+on:
+  pull_request:
+
+env:
+  SERVICE: "tyk"
+  CLUSTER: "kikitest"
+  CONTAINER_NAME: "tyk"
+  REGISTRY: "754489498669.dkr.ecr.eu-central-1.amazonaws.com"
+  IMAGE: "tyk:v4.0.0"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_wrapper: false
+
+      - name: Terraform Format
+        working-directory: ./terraform/environment
+        id: fmt
+        run: terraform fmt -check
+
+      - name: Configure AWS credentials for use
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
+          aws-region: "eu-central-1"
+
+      - name: Terraform Init
+        working-directory: ./terraform/environment
+        id: init
+        run: terraform init
+
+      - name: Terraform Workspace
+        working-directory: ./terraform/environment
+        run: terraform workspace select ${CLUSTER}
+
+      - name: Terraform Validate
+        id: validate
+        working-directory: ./terraform/environment
+        run: terraform validate -no-color
+
+      - name: Download task definition
+        working-directory: ./terraform/environment
+        run: |
+          aws ecs describe-task-definition --task-definition ${CONTAINER_NAME}-${CLUSTER}-template --query taskDefinition > task-definition.json
+
+      - name: Describe task definition
+        working-directory: ./terraform/environment
+        run: cat task-definition.json
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1.1.1
+        with:
+          task-definition: ./terraform/environment/task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+
+      - name: Deploy to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1.4.9
+        with:
+          task-definition: ./terraform/environment/task-definition.json
+          service: ${{ env.SERVICE }}
+          cluster: ${{ env.CLUSTER }}
+          wait-for-service-stability: true
