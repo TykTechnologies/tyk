@@ -5,7 +5,7 @@ on:
       service:
         required: true
         type: string
-      container_name:
+      containerName:
         required: true
         type: string
 			cluster:
