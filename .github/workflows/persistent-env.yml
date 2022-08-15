@@ -12,7 +12,7 @@ env:
 
 jobs:
   Create:
-    if: ( ${{ env.ENV_EXIST == 'false' }} )
+    if: env.ENV_EXIST == 'false'
     runs-on: ubuntu-latest
     
     steps:
