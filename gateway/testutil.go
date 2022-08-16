@@ -33,8 +33,8 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
@@ -512,7 +512,6 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 		json.NewEncoder(gz).Encode(response)
 		gz.Close()
 	})
-	r.HandleFunc("/chunked", chunkedEncodingHandler)
 	r.HandleFunc("/groupReload", gw.groupResetHandler)
 	r.HandleFunc("/bundles/{rest:.*}", s.BundleHandleFunc)
 	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
@@ -681,23 +680,6 @@ func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
 				]
 			}
 		}`))
-}
-
-func chunkedEncodingHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost, http.MethodGet:
-	default:
-		http.Error(w, `{ "error": "request method not allowed"}`, http.StatusBadRequest)
-		return
-	}
-	if f, ok := w.(http.Flusher); ok {
-		_, _ = w.Write([]byte(`{"data":{"country":{`))
-		f.Flush()
-		_, _ = w.Write([]byte(`"code":"M","name":"Mars"}}}`))
-		f.Flush()
-		return
-	}
-	http.Error(w, `{ "error": "response writer does not implement flusher"}`, http.StatusInternalServerError)
 }
 
 const jwkTestJson = `{

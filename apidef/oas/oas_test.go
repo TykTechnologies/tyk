@@ -292,3 +292,111 @@ func Test_toStructIfMap(t *testing.T) {
 
 	assert.Equal(t, token, resToken)
 }
+
+func TestOAS_MarshalJSON(t *testing.T) {
+	t.Run("nil license and extenalDocs", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Info: &openapi3.Info{
+					License: &openapi3.License{},
+				},
+				ExternalDocs: &openapi3.ExternalDocs{},
+			},
+		}
+
+		inBytes, err := json.Marshal(s)
+		assert.NoError(t, err)
+
+		assert.NotContains(t, string(inBytes), "license")
+		assert.NotContains(t, string(inBytes), "externalDocs")
+	})
+
+	t.Run("should not base64 encode extension values when it's slice of bytes", func(t *testing.T) {
+		s := OAS{
+			openapi3.T{
+				Info: &openapi3.Info{
+					Title: "OAS Doc",
+				},
+				ExtensionProps: openapi3.ExtensionProps{
+					Extensions: map[string]interface{}{
+						ExtensionTykAPIGateway: XTykAPIGateway{
+							Info: Info{
+								Name: "OAS API",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		t.Run("int", func(t *testing.T) {
+			copyOAS := s
+			intVal := 9
+			byteRep, _ := json.Marshal(intVal)
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = byteRep
+
+			data, err := copyOAS.MarshalJSON()
+			assert.NoError(t, err)
+			assert.Contains(t, string(data), `"x-abcd":9`)
+		})
+
+		t.Run("float", func(t *testing.T) {
+			copyOAS := s
+			floatVal := 9.5
+			byteRep, _ := json.Marshal(floatVal)
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = byteRep
+
+			data, err := copyOAS.MarshalJSON()
+			assert.NoError(t, err)
+			assert.Contains(t, string(data), `"x-abcd":9.5`)
+		})
+
+		t.Run("bool", func(t *testing.T) {
+			copyOAS := s
+			boolVal := false
+			byteRep, _ := json.Marshal(boolVal)
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = byteRep
+
+			data, err := copyOAS.MarshalJSON()
+			assert.NoError(t, err)
+			assert.Contains(t, string(data), `"x-abcd":false`)
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			copyOAS := s
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = nil
+
+			data, err := copyOAS.MarshalJSON()
+			assert.NoError(t, err)
+			assert.Contains(t, string(data), `"x-abcd":null`)
+		})
+
+		t.Run("string", func(t *testing.T) {
+			copyOAS := s
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = []byte(`"hello"`)
+
+			data, err := copyOAS.MarshalJSON()
+			assert.NoError(t, err)
+			assert.Contains(t, string(data), `"x-abcd":"hello"`)
+		})
+
+		t.Run("map", func(t *testing.T) {
+			copyOAS := s
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = []byte(`{"key":"value"}`)
+
+			data, err := copyOAS.MarshalJSON()
+			assert.NoError(t, err)
+			assert.Contains(t, string(data), `"x-abcd":{"key":"value"}`)
+		})
+
+		t.Run("array", func(t *testing.T) {
+			copyOAS := s
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = []byte(`[{"key":"value"},{"key":"value"}]`)
+
+			data, err := copyOAS.MarshalJSON()
+			assert.NoError(t, err)
+			assert.Contains(t, string(data), `"x-abcd":[{"key":"value"},{"key":"value"}]`)
+		})
+	})
+
+}

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/test"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -29,6 +30,7 @@ import (
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk-pump/serializer"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
@@ -183,6 +185,8 @@ type Gateway struct {
 	hostDetails     hostDetails
 
 	healthCheckInfo atomic.Value
+
+	dialCtxFn test.DialContext
 }
 
 type hostDetails struct {
@@ -350,14 +354,19 @@ func (gw *Gateway) setupGlobals() {
 		go redisPurger.PurgeLoop(gw.ctx)
 
 		if gw.GetConfig().AnalyticsConfig.Type == "rpc" {
-			mainLog.Debug("Using RPC cache purge")
+			if gw.GetConfig().AnalyticsConfig.SerializerType == serializer.PROTOBUF_SERIALIZER {
+				mainLog.Error("Protobuf analytics serialization is not supported with rpc analytics.")
+			} else {
+				mainLog.Debug("Using RPC cache purge")
 
-			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
-			purger := rpc.Purger{
-				Store: &store,
+				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
+				purger := rpc.Purger{
+					Store: &store,
+				}
+				purger.Connect()
+				go purger.PurgeLoop(gw.ctx, time.Duration(gw.GetConfig().AnalyticsConfig.PurgeInterval))
 			}
-			purger.Connect()
-			go purger.PurgeLoop(gw.ctx, time.Duration(gw.GetConfig().AnalyticsConfig.PurgeInterval))
+
 		}
 		go gw.flushNetworkAnalytics(gw.ctx)
 	}

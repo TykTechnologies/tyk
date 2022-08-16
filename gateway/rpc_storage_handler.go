@@ -630,8 +630,9 @@ func (r RPCStorageHandler) IsRetriableError(err error) bool {
 // GetAPIDefinitions will pull API definitions from the RPC server
 func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) string {
 	dr := apidef.DefRequest{
-		OrgId: orgId,
-		Tags:  tags,
+		OrgId:   orgId,
+		Tags:    tags,
+		LoadOAS: true,
 	}
 
 	defString, err := rpc.FuncClientSingleton("GetApiDefinitions", dr)
@@ -830,17 +831,17 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 
 func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isHashed bool, orgId string) {
 
-	hashedKeyName := keyName
+	key := keyName
 	// avoid double hashing
 	if !isHashed {
-		hashedKeyName = storage.HashKey(keyName, gw.GetConfig().HashKeys)
+		key = storage.HashKey(keyName, gw.GetConfig().HashKeys)
 	}
 
-	sessionString, err := r.GetRawKey("apikey-" + hashedKeyName)
+	sessionString, err := r.GetRawKey("apikey-" + key)
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		gw.handleAddKey(keyName, hashedKeyName, sessionString, "-1", orgId)
+		gw.handleAddKey(key, sessionString, orgId)
 	}
 }
 

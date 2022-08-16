@@ -17,9 +17,12 @@ type Operation struct {
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 	// TransformRequestMethod allows you to transform the method of a request.
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
-	Cache                  *CachePlugin            `bson:"cache,omitempty" json:"cache,omitempty"`
-	EnforceTimeout         *EnforceTimeout         `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
-	ValidateRequest        *ValidateRequest        `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
+	// TransformRequestBody allows you to transform request body.
+	// When both `path` and `body` are provided, body would take precedence.
+	TransformRequestBody *TransformRequestBody `bson:"transformRequestBody,omitempty" json:"transformRequestBody,omitempty"`
+	Cache                *CachePlugin          `bson:"cache,omitempty" json:"cache,omitempty"`
+	EnforceTimeout       *EnforceTimeout       `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
+	ValidateRequest      *ValidateRequest      `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
 }
 
 const (
@@ -73,6 +76,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillAllowance(ep.BlackList, block)
 	s.fillAllowance(ep.Ignored, ignoreAuthentication)
 	s.fillTransformRequestMethod(ep.MethodTransforms)
+	s.fillTransformRequestBody(ep.Transform)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillOASValidateRequest(ep.ValidateRequest)
@@ -93,6 +97,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractAllowanceTo(ep, path, method, block)
 					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
 					tykOp.extractTransformRequestMethodTo(ep, path, method)
+					tykOp.extractTransformRequestBodyTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
 					tykOp.extractOASValidateRequestTo(ep, path, method)
@@ -145,6 +150,22 @@ func (s *OAS) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {
 		operation.TransformRequestMethod.Fill(meta)
 		if ShouldOmit(operation.TransformRequestMethod) {
 			operation.TransformRequestMethod = nil
+		}
+	}
+}
+
+func (s *OAS) fillTransformRequestBody(metas []apidef.TemplateMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		if operation.TransformRequestBody == nil {
+			operation.TransformRequestBody = &TransformRequestBody{}
+		}
+
+		operation.TransformRequestBody.Fill(meta)
+		if ShouldOmit(operation.TransformRequestBody) {
+			operation.TransformRequestBody = nil
 		}
 	}
 }
@@ -209,6 +230,16 @@ func (o *Operation) extractTransformRequestMethodTo(ep *apidef.ExtendedPathsSet,
 	meta := apidef.MethodTransformMeta{Path: path, Method: method}
 	o.TransformRequestMethod.ExtractTo(&meta)
 	ep.MethodTransforms = append(ep.MethodTransforms, meta)
+}
+
+func (o *Operation) extractTransformRequestBodyTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.TransformRequestBody == nil {
+		return
+	}
+
+	meta := apidef.TemplateMeta{Path: path, Method: method}
+	o.TransformRequestBody.ExtractTo(&meta)
+	ep.Transform = append(ep.Transform, meta)
 }
 
 func (o *Operation) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {
