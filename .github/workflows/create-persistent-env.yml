@@ -69,6 +69,14 @@ jobs:
         run:
           echo "CALL - Add entry on DinamoDB"
 
+      - name: Generate Templates on EFS
+        run:
+          echo "CALL - Generate templates on EFS"
+
+      - name: Make Input Var Files
+        run:
+          echo "CALL - Make input var files"
+
       - name: Terraform Apply
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: terraform apply -auto-approve -var-file=master.tfvars
