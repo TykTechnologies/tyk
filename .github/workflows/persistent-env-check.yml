@@ -91,3 +91,8 @@ jobs:
       aws_key: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
       aws_secret: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
       registry: ${{ needs.Check.outputs.registry }}
+
+  Record-update:
+    steps:
+      - name: Updating DNS records
+        run: echo "Updating DNS RECORDS"

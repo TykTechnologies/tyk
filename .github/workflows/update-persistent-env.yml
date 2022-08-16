@@ -72,3 +72,8 @@ jobs:
           service: ${{ env.SERVICE }}
           cluster: ${{ env.CLUSTER }}
           wait-for-service-stability: true
+
+      - name: Update environment status
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          echo "Update environment status"
