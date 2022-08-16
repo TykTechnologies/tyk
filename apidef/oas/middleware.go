@@ -36,6 +36,9 @@ type Global struct {
 	// Cache contains the configurations related to caching.
 	// Old API Definition: `cache_options`
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
+	// ConfigData contains the config data for coprocess.
+	// Old API Definition: `config_data`.
+	ConfigData map[string]interface{} `bson:"configData,omitempty" json:"configData,omitempty"`
 }
 
 func (g *Global) Fill(api apidef.APIDefinition) {
@@ -58,6 +61,11 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(g.Cache) {
 		g.Cache = nil
 	}
+
+	g.ConfigData = api.ConfigData
+	if ShouldOmit(g.ConfigData) {
+		g.ConfigData = nil
+	}
 }
 
 func (g *Global) ExtractTo(api *apidef.APIDefinition) {
@@ -67,6 +75,10 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	if g.Cache != nil {
 		g.Cache.ExtractTo(&api.CacheOptions)
+	}
+
+	if g.ConfigData != nil {
+		api.ConfigData = g.ConfigData
 	}
 }
 
