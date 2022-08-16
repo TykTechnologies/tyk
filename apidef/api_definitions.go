@@ -375,6 +375,13 @@ type ExtendedPathsSet struct {
 	ValidateRequest         []ValidateRequestMeta `bson:"validate_request" json:"validate_request,omitempty"`
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
+	CustomConfig            []CustomConfig        `bson:"custom_config" json:"custom_config"`
+}
+
+type CustomConfig struct {
+	Path   string                 `bson:"path" json:"path"`
+	Method string                 `bson:"method" json:"method"`
+	Data   map[string]interface{} `bson:"data" json:"data"`
 }
 
 type VersionDefinition struct {

@@ -306,6 +306,9 @@
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-Cache"
+        },
+        "configData": {
+          "type": "object"
         }
       }
     },
@@ -440,6 +443,9 @@
         },
         "validateRequest": {
           "$ref": "#/definitions/X-Tyk-ValidateRequest"
+        },
+        "custom": {
+          "type": "object"
         }
       }
     },

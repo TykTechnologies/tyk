@@ -860,6 +860,14 @@
 
   Old API Definition: `cache_options`
 
+- **`configData`**
+
+  **Type: `any`**
+
+  ConfigData contains the config data for coprocess.
+
+  Old API Definition: `config_data`.
+
 
 ### **CORS**
 
@@ -1002,6 +1010,12 @@
 - **`validateRequest`**
 
   **Type: [ValidateRequest](#validaterequest)**
+
+- **`custom`**
+
+  **Type: `any`**
+
+  Custom for config data
 
 
 ### **Allowance**

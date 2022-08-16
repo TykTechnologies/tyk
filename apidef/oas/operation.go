@@ -23,6 +23,8 @@ type Operation struct {
 	Cache                *CachePlugin          `bson:"cache,omitempty" json:"cache,omitempty"`
 	EnforceTimeout       *EnforceTimeout       `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
 	ValidateRequest      *ValidateRequest      `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
+	// Custom for config data
+	Custom map[string]interface{} `bson:"custom,omitempty" json:"custom,omitempty"`
 }
 
 const (
@@ -80,6 +82,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillOASValidateRequest(ep.ValidateRequest)
+	s.fillCustomConfig(ep.CustomConfig)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -101,6 +104,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
 					tykOp.extractOASValidateRequestTo(ep, path, method)
+					tykOp.extractCustomConfig(ep, path, method)
 					break found
 				}
 			}
@@ -273,6 +277,15 @@ func (o *Operation) extractOASValidateRequestTo(ep *apidef.ExtendedPathsSet, pat
 	meta := apidef.ValidateRequestMeta{Path: path, Method: method}
 	o.ValidateRequest.ExtractTo(&meta)
 	ep.ValidateRequest = append(ep.ValidateRequest, meta)
+}
+
+func (o *Operation) extractCustomConfig(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.Custom == nil {
+		return
+	}
+
+	meta := apidef.CustomConfig{Path: path, Method: method, Data: o.Custom}
+	ep.CustomConfig = append(ep.CustomConfig, meta)
 }
 
 // detect possible regex pattern:
@@ -469,6 +482,15 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidateRequestMeta) {
 		if ShouldOmit(tykOp.ValidateRequest) {
 			tykOp.ValidateRequest = nil
 		}
+	}
+}
+
+func (s *OAS) fillCustomConfig(metas []apidef.CustomConfig) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		tykOp := s.GetTykExtension().getOperation(operationID)
+
+		tykOp.Custom = meta.Data
 	}
 }
 
