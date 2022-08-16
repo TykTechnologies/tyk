@@ -93,6 +93,7 @@ jobs:
       registry: ${{ needs.Check.outputs.registry }}
 
   Record-update:
+    runs-on: ubuntu-latest
     steps:
       - name: Updating DNS records
         run: echo "Updating DNS RECORDS"
