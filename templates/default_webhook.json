@@ -34,6 +34,20 @@
     "path": "{{.Meta.Path}}",
     "Status": "{{.Meta.CircuitEvent}}"
 }
+{{ else if eq .Type "BreakerTripped"}}
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "api_id": "{{.Meta.APIID}}",
+    "path": "{{.Meta.Path}}"
+}
+{{ else if eq .Type "BreakerReset"}}
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "api_id": "{{.Meta.APIID}}",
+    "path": "{{.Meta.Path}}"
+}
 {{ else}}
 {
     "event": "{{.Type}}",

@@ -10,8 +10,9 @@ type InboundData struct {
 }
 
 type DefRequest struct {
-	OrgId string
-	Tags  []string
+	OrgId   string
+	Tags    []string
+	LoadOAS bool
 }
 
 type GroupLoginRequest struct {

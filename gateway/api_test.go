@@ -1192,6 +1192,54 @@ func TestKeyHandler_HashingDisabled(t *testing.T) {
 	})
 }
 
+func TestSessionLifetimeRespectsKeyExpiration(t *testing.T) {
+	const respectingAPI = "respectingAPI"
+	const overridingAPI = "overridingAPI"
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("override session lifetime with api level", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = overridingAPI
+			spec.UseKeylessAccess = false
+			spec.SessionLifetime = 1
+			spec.SessionLifetimeRespectsKeyExpiration = false
+		})
+
+		_, toBeOverriddenKey := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{overridingAPI: {
+				APIID: overridingAPI,
+			}}
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{AdminAuth: true, Path: "/tyk/keys/" + toBeOverriddenKey, Code: http.StatusOK, Delay: time.Second},
+			{AdminAuth: true, Path: "/tyk/keys/" + toBeOverriddenKey, Code: http.StatusNotFound},
+		}...)
+	})
+
+	t.Run("respect key expiration", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = respectingAPI
+			spec.UseKeylessAccess = false
+			spec.SessionLifetime = 1
+			spec.SessionLifetimeRespectsKeyExpiration = true
+		})
+
+		_, toBeRespectedKey := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{respectingAPI: {
+				APIID: respectingAPI,
+			}}
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{AdminAuth: true, Path: "/tyk/keys/" + toBeRespectedKey, Code: http.StatusOK, Delay: time.Second},
+			{AdminAuth: true, Path: "/tyk/keys/" + toBeRespectedKey, Code: http.StatusOK},
+		}...)
+	})
+}
+
 func TestInvalidateCache(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -3044,4 +3092,90 @@ func testImportOAS(t *testing.T, ts *Test, testCase test.TestCase) string {
 	ts.Gw.DoReload()
 
 	return importResp.Key
+}
+
+func TestApplyLifetime(t *testing.T) {
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "api1"
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api2"
+			spec.SessionLifetime = 1000
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api3"
+			spec.SessionLifetime = 999
+		},
+	)
+
+	testCases := []struct {
+		name             string
+		expectedLifetime int64
+		getTestSession   func() user.SessionState
+	}{
+		{
+			name:             "single api without session lifetime set",
+			expectedLifetime: 0,
+			getTestSession: func() user.SessionState {
+				return user.SessionState{
+					AccessRights: map[string]user.AccessDefinition{
+						"api1": {
+							APIID: "api1", Versions: []string{"v1"},
+						},
+					},
+				}
+			},
+		},
+		{
+			name:             "many apis, one of them with session lifetime set",
+			expectedLifetime: 1000,
+			getTestSession: func() user.SessionState {
+				return user.SessionState{
+					AccessRights: map[string]user.AccessDefinition{
+						"api1": {
+							APIID: "api1", Versions: []string{"v1"},
+						},
+						"api2": {
+							APIID: "api2", Versions: []string{"v1"},
+						},
+					},
+				}
+			},
+		},
+		{
+			name:             "many apis with session lifetime set, greater should be used",
+			expectedLifetime: 1000,
+			getTestSession: func() user.SessionState {
+				return user.SessionState{
+					AccessRights: map[string]user.AccessDefinition{
+						"api2": {
+							APIID: "api2", Versions: []string{"v1"},
+						},
+						"api3": {
+							APIID: "api3", Versions: []string{"v1"},
+						},
+					},
+				}
+			},
+		},
+		{
+			name:             "Session without access rights",
+			expectedLifetime: 0,
+			getTestSession: func() user.SessionState {
+				return user.SessionState{}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			session := tc.getTestSession()
+			assert.Equal(t, tc.expectedLifetime, ts.Gw.ApplyLifetime(&session, nil))
+		})
+	}
 }

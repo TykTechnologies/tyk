@@ -14,7 +14,7 @@ RUN apt-get install -y --no-install-recommends \
         libpython3.7 \
         python3.7-dev \
         python3-pip \
-        && pip3 install protobuf grpcio==1.24.0 \
+        && pip3 install protobuf==3.20.1 grpcio==1.24.0 \
         && apt-get purge -y build-essential \
         && rm -rf /root/.cache
 RUN apt-get autoremove -y 
