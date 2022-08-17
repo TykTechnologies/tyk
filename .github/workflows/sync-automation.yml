@@ -43,6 +43,7 @@ jobs:
           git config --local user.email "wf-gen@tyk-ci"
           git config --local user.name "Bender"
           git fetch origin ${{ matrix.branch }}
+          git fetch origin master
           prbranch=sync/auto/${{ matrix.branch }}/${{ github.run_id }}
           git checkout -b $prbranch
           rm -rf .github/workflows/release.yml .github/workflows/api-tests.yml ci
