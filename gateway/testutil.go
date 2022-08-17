@@ -505,13 +505,8 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 		io.WriteString(w, jwkTestJsonLegacy)
 	})
 
-	r.HandleFunc("/compressed", func(w http.ResponseWriter, r *http.Request) {
-		response := "This is a compressed response"
-		w.Header().Set("Content-Encoding", "gzip")
-		gz := gzip.NewWriter(w)
-		json.NewEncoder(gz).Encode(response)
-		gz.Close()
-	})
+	r.HandleFunc("/compressed", compressedResponseHandler)
+	r.HandleFunc("/chunked", chunkedResponseHandler)
 	r.HandleFunc("/groupReload", gw.groupResetHandler)
 	r.HandleFunc("/bundles/{rest:.*}", s.BundleHandleFunc)
 	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
@@ -521,6 +516,23 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 	r.HandleFunc("/{rest:.*}", handleMethod(""))
 
 	return r
+}
+
+func compressedResponseHandler(w http.ResponseWriter, r *http.Request) {
+	response := "This is a compressed response"
+	w.Header().Set("Content-Encoding", "gzip")
+	gz := gzip.NewWriter(w)
+	_ = json.NewEncoder(gz).Encode(response)
+	_ = gz.Close()
+}
+
+func chunkedResponseHandler(w http.ResponseWriter, r *http.Request) {
+	f, _ := w.(http.Flusher)
+	_, _ = w.Write([]byte(`This is a `))
+	f.Flush()
+
+	_, _ = w.Write([]byte(`chunked response`))
+	f.Flush()
 }
 
 func graphqlProxyUpstreamHandler(w http.ResponseWriter, r *http.Request) {
