@@ -20,6 +20,7 @@ on:
       - .github/workflows/release.yml
       - .github/workflows/api-tests.yml
       - .github/workflows/ui-tests.yml
+      - .github/dependabot.yml
       - ci/**
 
 jobs:
@@ -46,10 +47,11 @@ jobs:
           git fetch origin master
           prbranch=sync/auto/${{ matrix.branch }}/${{ github.run_id }}
           git checkout -b $prbranch
-          rm -rf .github/workflows/release.yml .github/workflows/api-tests.yml ci
+          rm -rf .github/workflows/release.yml .github/workflows/api-tests.yml .github/dependabot.yml ci
           git restore --source master -- ci
           git restore --source master -- .github/workflows/release.yml
           git restore --source master -- .github/workflows/api-tests.yml
+          git restore --source master -- .github/dependabot.yml
           git add -A && git commit -m "[CI]: Syncing CI changes to {{ matrix.branch }}"
           git push origin $prbranch
           echo "::set-output name=prbranch::$prbranch"
