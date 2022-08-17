@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -22,9 +20,7 @@ import (
 type IPsHandleStrategy string
 
 var (
-	log      = logger.Get()
-	global   atomic.Value
-	globalMu sync.Mutex
+	log = logger.Get()
 
 	Default = Config{
 		ListenPort:     8080,

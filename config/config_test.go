@@ -315,8 +315,14 @@ func TestPortsWhiteListDecoder(t *testing.T) {
 	assert.Len(t, httpWhiteList.Ports, 0, "http should have 0 Ports")
 	assert.Len(t, httpWhiteList.Ranges, 1, "http should have 1 Ranges")
 
+	assert.Equal(t, 8000, httpWhiteList.Ranges[0].From, "http Range From should be equals to 8000")
+	assert.Equal(t, 9000, httpWhiteList.Ranges[0].To, "http Range To should be equals to 9000")
+
 	tlsWhiteList, ok := c.PortWhiteList["tls"]
 	assert.True(t, ok, "expected to have tls key in PortWhiteList")
 	assert.Len(t, tlsWhiteList.Ports, 2, "tls should have 2 Ports")
 	assert.Len(t, tlsWhiteList.Ranges, 0, "tls should have 0 Ranges")
+
+	assert.Contains(t, tlsWhiteList.Ports, 6000, "tls should have 6000 port")
+	assert.Contains(t, tlsWhiteList.Ports, 6015, "tls should have 6015 port")
 }
