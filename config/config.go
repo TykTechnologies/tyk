@@ -336,7 +336,8 @@ type CertsData []CertData
 func (certs *CertsData) Decode(value string) error {
 	err := json.Unmarshal([]byte(value), certs)
 	if err != nil {
-		log.Error("Error unmarshalling TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES")
+		log.Error("Error unmarshalling TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES: ", err)
+		return err
 	}
 	return nil
 }
@@ -540,7 +541,8 @@ type PortsWhiteList map[string]PortWhiteList
 func (pwl *PortsWhiteList) Decode(value string) error {
 	err := json.Unmarshal([]byte(value), pwl)
 	if err != nil {
-		log.Error("Error unmarshalling TYK_GW_PORTWHITELIST")
+		log.Error("Error unmarshalling TYK_GW_PORTWHITELIST: ", err)
+		return err
 	}
 
 	return nil
@@ -630,6 +632,7 @@ type Config struct {
 	// Defines the ports that will be available for the API services to bind to.
 	// This is a map of protocol to PortWhiteList. This allows per protocol
 	// configurations.
+	// Example: {"http":{"ranges":[{"from":8000,"to":9000}]},"tls":{"ports":[6000,6015]}}
 	PortWhiteList PortsWhiteList `json:"ports_whitelist"`
 
 	// Disable port whilisting, essentially allowing you to use any port for your API.
