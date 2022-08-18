@@ -23,6 +23,8 @@ jobs:
     container:
       # A Docker image with Semgrep installed. Don't change this.
       image: returntocorp/semgrep
+      volumes:
+        - ".semgrep:rules"
     # Skip any PR created by dependabot to avoid permission issues
     if: (github.actor != 'dependabot[bot]')
     steps:
@@ -30,7 +32,7 @@ jobs:
       - uses: actions/checkout@v3
 
       # Run the "semgrep ci" command on the command line of the docker image.
-      - run: semgrep --config=/semgrep-rules ci
+      - run: semgrep -config=rules ci
         env:
           # Select rules for your scan with one of these two options.
           # Option 1: Scan with rules set in Semgrep App's rule board
