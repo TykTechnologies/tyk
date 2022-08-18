@@ -9,3 +9,5 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    reviewers:
+      - "TykTechnologies/devops"
