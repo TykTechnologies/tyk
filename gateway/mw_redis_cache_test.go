@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
 	"hash"
 	"net/http"
@@ -22,6 +23,11 @@ func TestRedisCacheMiddleware(t *testing.T) {
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
+
+	ts.Gw.analytics.mockEnabled = true
+	defer func() {
+		ts.Gw.analytics.mockEnabled = false
+	}()
 
 	const compressed = "/compressed"
 	const chunked = "/chunked"
@@ -49,6 +55,13 @@ func TestRedisCacheMiddleware(t *testing.T) {
 			if cachingActive {
 				headersMatch["x-tyk-cached-response"] = "1"
 				p.transferEncoding = nil
+			}
+
+			ts.Gw.analytics.mockRecordHit = func(record *AnalyticsRecord) {
+				response, err := base64.StdEncoding.DecodeString(record.RawResponse)
+				assert.NoError(t, err)
+
+				assert.Contains(t, string(response), p.bodyMatch)
 			}
 
 			resp, _ := ts.Run(t, []test.TestCase{
