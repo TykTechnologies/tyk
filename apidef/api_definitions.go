@@ -514,13 +514,13 @@ type OpenIDOptions struct {
 }
 
 type ScopeClaim struct {
-	ScopeClaimName string            `bson:"scope_claim_name" json:"scope_claim_name"`
-	ScopeToPolicy  map[string]string `json:"scope_to_policy"`
+	ScopeClaimName string            `bson:"scope_claim_name" json:"scope_claim_name,omitempty"`
+	ScopeToPolicy  map[string]string `json:"scope_to_policy,omitempty"`
 }
 
 type Scopes struct {
-	JWT  ScopeClaim `bson:"jwt" json:"jwt"`
-	OIDC ScopeClaim `bson:"oidc" json:"oidc"`
+	JWT  ScopeClaim `bson:"jwt" json:"jwt,omitempty"`
+	OIDC ScopeClaim `bson:"oidc" json:"oidc,omitempty"`
 }
 
 // APIDefinition represents the configuration for a single proxied API and it's versions.
@@ -583,7 +583,7 @@ type APIDefinition struct {
 	JWTExpiresAtValidationSkew           uint64                 `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
 	JWTNotBeforeValidationSkew           uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	JWTSkipKid                           bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
-	Scopes                               Scopes                 `bson:"scopes" json:"scopes"`
+	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
 	JWTScopeToPolicyMapping              map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
 	JWTScopeClaimName                    string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
 	NotificationsDetails                 NotificationsManager   `bson:"notifications" json:"notifications"`
@@ -601,7 +601,7 @@ type APIDefinition struct {
 	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
 	CustomMiddlewareBundle               string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
-	SessionLifetimeRespectsKeyExpiration bool                   `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration"`
+	SessionLifetimeRespectsKeyExpiration bool                   `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration,omitempty"`
 	SessionLifetime                      int64                  `bson:"session_lifetime" json:"session_lifetime"`
 	Active                               bool                   `bson:"active" json:"active"`
 	Internal                             bool                   `bson:"internal" json:"internal"`
@@ -635,13 +635,13 @@ type APIDefinition struct {
 	Tags         []string `bson:"tags" json:"tags"`
 
 	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
-	IsOAS bool `json:"is_oas" bson:"is_oas,omitempty"`
+	IsOAS bool `bson:"is_oas" json:"is_oas,omitempty"`
 }
 
 type AnalyticsPluginConfig struct {
-	Enabled    bool   `bson:"enable" json:"enable"`
-	PluginPath string `bson:"plugin_path" json:"plugin_path"`
-	FuncName   string `bson:"func_name" json:"func_name"`
+	Enabled    bool   `bson:"enable" json:"enable,omitempty"`
+	PluginPath string `bson:"plugin_path" json:"plugin_path,omitempty"`
+	FuncName   string `bson:"func_name" json:"func_name,omitempty"`
 }
 
 type UptimeTests struct {
