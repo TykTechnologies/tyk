@@ -23,8 +23,6 @@ jobs:
     container:
       # A Docker image with Semgrep installed. Don't change this.
       image: returntocorp/semgrep
-      volumes:
-        - ${GITHUB_WORKSPACE}/tyk/.github/workflows/semgrep-rules:/semgrep-rules
     # Skip any PR created by dependabot to avoid permission issues
     if: (github.actor != 'dependabot[bot]')
     steps:
