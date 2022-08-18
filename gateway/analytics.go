@@ -53,6 +53,10 @@ type RedisAnalyticsHandler struct {
 	Gw                          *Gateway `json:"-"`
 	mu                          sync.Mutex
 	analyticsSerializer         serializer.AnalyticsSerializer
+
+	// testing purposes
+	mockEnabled   bool
+	mockRecordHit func(record *analytics.AnalyticsRecord)
 }
 
 func (r *RedisAnalyticsHandler) Init() {
@@ -110,6 +114,11 @@ func (r *RedisAnalyticsHandler) Flush() {
 
 // RecordHit will store an analytics.Record in Redis
 func (r *RedisAnalyticsHandler) RecordHit(record *analytics.AnalyticsRecord) error {
+	if r.mockEnabled {
+		r.mockRecordHit(record)
+		return nil
+	}
+
 	// check if we should stop sending records 1st
 	if atomic.LoadUint32(&r.shouldStop) > 0 {
 		return nil
