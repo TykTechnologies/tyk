@@ -529,7 +529,7 @@ type Scopes struct {
 type APIDefinition struct {
 	Id                  ObjectId      `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
 	Name                string        `bson:"name" json:"name"`
-	Expiration          string        `bson:"expiration" json:"expiration"`
+	Expiration          string        `bson:"expiration" json:"expiration,omitempty"`
 	ExpirationTs        time.Time     `bson:"-" json:"-"`
 	Slug                string        `bson:"slug" json:"slug"`
 	ListenPort          int           `bson:"listen_port" json:"listen_port"`
@@ -562,12 +562,12 @@ type APIDefinition struct {
 	// UpstreamCertificates stores the domain to certificate mapping for upstream mutualTLS
 	UpstreamCertificates map[string]string `bson:"upstream_certificates" json:"upstream_certificates"`
 	// UpstreamCertificatesDisabled disables upstream mutualTLS on the API
-	UpstreamCertificatesDisabled bool `bson:"upstream_certificates_disabled" json:"upstream_certificates_disabled"`
+	UpstreamCertificatesDisabled bool `bson:"upstream_certificates_disabled" json:"upstream_certificates_disabled,omitempty"`
 
 	// PinnedPublicKeys stores the public key pinning details
 	PinnedPublicKeys map[string]string `bson:"pinned_public_keys" json:"pinned_public_keys"`
 	// CertificatePinningDisabled disables public key pinning
-	CertificatePinningDisabled bool `bson:"certificate_pinning_disabled" json:"certificate_pinning_disabled"`
+	CertificatePinningDisabled bool `bson:"certificate_pinning_disabled" json:"certificate_pinning_disabled,omitempty"`
 
 	EnableJWT                            bool                   `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth                      bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
@@ -618,7 +618,7 @@ type APIDefinition struct {
 	ResponseProcessors                   []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
 	CORS                                 CORSConfig             `bson:"CORS" json:"CORS"`
 	Domain                               string                 `bson:"domain" json:"domain"`
-	DomainDisabled                       bool                   `bson:"domain_disabled" json:"domain_disabled"`
+	DomainDisabled                       bool                   `bson:"domain_disabled" json:"domain_disabled,omitempty"`
 	Certificates                         []string               `bson:"certificates" json:"certificates"`
 	DoNotTrack                           bool                   `bson:"do_not_track" json:"do_not_track"`
 	EnableContextVars                    bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
@@ -628,10 +628,10 @@ type APIDefinition struct {
 	StripAuthData                        bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 	EnableDetailedRecording              bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 	GraphQL                              GraphQLConfig          `bson:"graphql" json:"graphql"`
-	AnalyticsPlugin                      AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin"`
+	AnalyticsPlugin                      AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin,omitempty"`
 
 	// Gateway segment tags
-	TagsDisabled bool     `bson:"tags_disabled" json:"tags_disabled"`
+	TagsDisabled bool     `bson:"tags_disabled" json:"tags_disabled,omitempty"`
 	Tags         []string `bson:"tags" json:"tags"`
 
 	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
