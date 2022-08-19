@@ -2,12 +2,14 @@ package gateway
 
 import (
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
 	"hash"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -22,6 +24,11 @@ func TestRedisCacheMiddleware(t *testing.T) {
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
+
+	ts.Gw.Analytics.mockEnabled = true
+	defer func() {
+		ts.Gw.Analytics.mockEnabled = false
+	}()
 
 	const compressed = "/compressed"
 	const chunked = "/chunked"
@@ -49,6 +56,13 @@ func TestRedisCacheMiddleware(t *testing.T) {
 			if cachingActive {
 				headersMatch["x-tyk-cached-response"] = "1"
 				p.transferEncoding = nil
+			}
+
+			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
+				response, err := base64.StdEncoding.DecodeString(record.RawResponse)
+				assert.NoError(t, err)
+
+				assert.Contains(t, string(response), p.bodyMatch)
 			}
 
 			resp, _ := ts.Run(t, []test.TestCase{
