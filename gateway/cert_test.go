@@ -247,9 +247,9 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 		ts.ReloadGatewayProxy()
 
-		// Should pass request with valid client cert
+		// Should fail as no valid cert IDs exist in Certificates.ControlAPI
 		_, _ = ts.Run(t, test.TestCase{
-			Path: "/tyk/certs", ErrorMatch: badcertErr, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
+			Path: "/tyk/certs", Code: http.StatusForbidden, ErrorMatch: badcertErr, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
 		})
 	})
 
