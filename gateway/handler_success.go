@@ -234,11 +234,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			record.GetGeo(ip, s.Gw.Analytics.GeoIPDB)
 		}
 
-		if s.Spec.GraphQL.Enabled {
-			record.Tags = append(record.Tags, "tyk-graph-analytics")
-			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(s.Spec.GraphQL.Schema))
-		}
-
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 
 		if s.Spec.GlobalConfig.EnforceOrgDataAge {
