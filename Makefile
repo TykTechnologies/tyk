@@ -75,10 +75,11 @@ db-stop: redis-stop mongo-stop
 .PHONY: redis-start
 redis-start:
 	docker run -itd --rm --name redis -p 127.0.0.1:6379:6379 redis:4.0-alpine redis-server --appendonly yes
+	docker run -itd --rm --name redis7 -p 127.0.0.1:6380:6379 redis:7.0-alpine redis-server --appendonly yes
 
 .PHONY: redis-stop
 redis-stop:
-	docker stop redis
+	docker stop redis redis7
 
 .PHONY: redis-cli
 redis-cli:
