@@ -137,6 +137,8 @@ func (rc *RedisController) Context() context.Context {
 //
 // onReconnect will be called when we have established a successful redis reconnection
 func (rc *RedisController) Connect(ctx context.Context, onReconnect func(), conf *config.Config) {
+	log.Infof("Connecting redis tests to host=%s:%d, type=%s", conf.Storage.Host, conf.Storage.Port, conf.Storage.Type)
+
 	if onReconnect == nil {
 		onReconnect = func() {
 			// an empty function to avoid repeated nil checks below

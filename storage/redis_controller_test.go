@@ -6,8 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestRecoverLoop(t *testing.T) {
@@ -22,10 +20,10 @@ func TestRecoverLoop(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	conf := config.Default
+	conf := rcConfig()
 
 	rc := NewRedisController(ctx)
-	go rc.Connect(ctx, onRecover, &conf)
+	go rc.Connect(ctx, onRecover, conf)
 
 	rc.Disable(false)
 
