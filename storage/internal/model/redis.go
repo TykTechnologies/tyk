@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-// PubSub v8 and v9 :D
+// PubSub interface thankfully satisfies both v8 and v9 redis pks.
 type PubSub interface {
-	// I bet myself a burger this won't work
+	// Receive waits to receive data from a pubsub channel
 	Receive(ctx context.Context) (interface{}, error)
 
-	// Close my ass
+	// Close pubsub channel
 	Close() error
 }
 

@@ -34,7 +34,7 @@ func rc(ctx context.Context, cfg *config.Config) (rc *RedisController) {
 	rc = NewRedisController(ctx)
 	go rc.Connect(ctx, nil, cfg)
 
-	ctx, cancel := context.WithTimeout(ctx, 5 * time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	if !rc.WaitConnect(ctx) {
