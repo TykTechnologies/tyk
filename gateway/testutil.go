@@ -1203,7 +1203,7 @@ func (s *Test) ReloadGatewayProxy() {
 }
 
 func (s *Test) Close() {
-	s.cancel()
+	defer s.cancel()
 
 	for _, p := range s.Gw.DefaultProxyMux.proxies {
 		if p.listener != nil {
