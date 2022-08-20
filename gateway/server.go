@@ -331,7 +331,7 @@ func (gw *Gateway) setupGlobals() {
 			time.Duration(gwConfig.DnsCache.CheckInterval)*time.Second)
 	}
 
-	if gwConfig.EnableAnalytics && contains(validStorageDriversForAnalytics, gwConfig.Storage.Type) {
+	if gwConfig.EnableAnalytics && !contains(validStorageDriversForAnalytics, gwConfig.Storage.Type) {
 		mainLog.Fatalf("Analytics storage details incorrect, invalid type %q. Supported storage types for analytics are: %s", gwConfig.Storage.Type, strings.Join(validStorageDriversForAnalytics, ", "))
 	}
 
