@@ -28,6 +28,10 @@ func (d *Driver) Close() error {
 	return d.client.Close()
 }
 
+func (d *Driver) Ping(ctx context.Context) error {
+	return d.client.Ping(ctx).Err()
+}
+
 func (d *Driver) RPushPipelined(ctx context.Context, key string, payload ...[]byte) error {
 	pipe := d.client.Pipeline()
 	for _, load := range payload {

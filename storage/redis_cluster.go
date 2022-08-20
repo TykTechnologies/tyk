@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
-
 	redis "github.com/go-redis/redis/v8"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -66,18 +64,7 @@ func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
 	ctx := cluster.RedisController.Context()
 	driver := cluster.RedisController.singleton(cluster.IsCache, cluster.IsAnalytics)
-
-	// This leaks random key/value pairs into redis.
-	// Maybe we should use something like ping?
-
-	testKey := "redis-test-" + uuid.NewV4().String()
-
-	if err := driver.Set(ctx, testKey, "test", time.Second); err != nil {
-		return false
-	}
-
-	_, err := driver.Get(ctx, testKey)
-	return err == nil
+	return driver.Ping(ctx) == nil
 }
 
 // Connect will establish a connection this is always true because we are
