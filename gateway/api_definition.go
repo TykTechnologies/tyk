@@ -334,24 +334,6 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 
 	spec.GlobalConfig = a.Gw.GetConfig()
 
-	// Create and init the virtual Machine
-	if a.Gw.GetConfig().EnableJSVM {
-		mwPaths, _, _, _, _, _, _ := a.Gw.loadCustomMiddleware(spec)
-
-		hasVirtualEndpoint := false
-
-		for _, version := range spec.VersionData.Versions {
-			if len(version.ExtendedPaths.Virtual) > 0 {
-				hasVirtualEndpoint = true
-				break
-			}
-		}
-
-		if spec.CustomMiddlewareBundle != "" || len(mwPaths) > 0 || hasVirtualEndpoint {
-			spec.JSVM.Init(spec, logger, a.Gw)
-		}
-	}
-
 	// Set up Event Handlers
 	if len(def.EventHandlers.Events) > 0 {
 		logger.Debug("Initializing event handlers")
@@ -1694,4 +1676,14 @@ func stripListenPath(listenPath, path string) (res string) {
 	}
 	reg := regexp.MustCompile(s)
 	return reg.ReplaceAllString(path, "")
+}
+
+func (s *APISpec) hasVirtualEndpoint() bool {
+	for _, version := range s.VersionData.Versions {
+		if len(version.ExtendedPaths.Virtual) > 0 {
+			return true
+		}
+	}
+
+	return false
 }
