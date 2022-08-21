@@ -230,7 +230,8 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	var mwPaths []string
 
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = gw.loadCustomMiddleware(spec)
-	if gw.GetConfig().EnableJSVM && mwDriver == apidef.OttoDriver {
+	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || mwDriver == apidef.OttoDriver) {
+		spec.JSVM.Init(spec, logger, gw)
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
 	}
 
