@@ -11,8 +11,7 @@ import (
 	redis "github.com/go-redis/redis/v8"
 
 	"github.com/TykTechnologies/tyk/config"
-	redis6 "github.com/TykTechnologies/tyk/storage/internal/redis6"
-	redis7 "github.com/TykTechnologies/tyk/storage/internal/redis7"
+	"github.com/TykTechnologies/tyk/storage/internal"
 )
 
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
@@ -36,11 +35,8 @@ type RedisCluster struct {
 }
 
 func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) RedisDriver {
-	if conf.Storage.Type == "redis7" {
-		return redis7.New(isCache, isAnalytics, conf)
-	}
-
-	return redis6.New(isCache, isAnalytics, conf)
+	storageConfig := getStorageConfig(isCache, isAnalytics, conf)
+	return internal.New(storageConfig)
 }
 
 func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
