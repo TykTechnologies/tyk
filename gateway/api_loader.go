@@ -883,6 +883,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
 
+	gw.apisMu.Lock()
+
 OUTER:
 	for _, spec := range specs {
 		for _, curSpec := range gw.apisByID {
@@ -934,9 +936,6 @@ OUTER:
 	}
 
 	gw.DefaultProxyMux.swap(muxer, gw)
-
-	// Swap in the new register
-	gw.apisMu.Lock()
 
 	// release current specs resources before overwriting map
 	for _, spec := range specsToReload {
