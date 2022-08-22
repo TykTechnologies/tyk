@@ -398,12 +398,29 @@ type nestedApiDefinitionList struct {
 	Nonce   string
 }
 
+func (f *nestedApiDefinitionList) validate() error {
+	for idx, v := range f.Message {
+		if err := v.validate(); err != nil {
+			return fmt.Errorf("error validating api definition payload index=%d, %w", idx, err)
+		}
+	}
+	return nil
+}
+
 type nestedApiDefinition struct {
 	*apidef.APIDefinition `json:"api_definition"`
 	OAS                   *oas.OAS `json:"oas"`
 }
 
+func (n nestedApiDefinition) validate() error {
+	if n.APIDefinition == nil {
+		return errors.New("empty api definition")
+	}
+	return nil
+}
+
 func (f *nestedApiDefinitionList) set(defs []*apidef.APIDefinition) {
+	f.Message = make([]nestedApiDefinition, 0, len(defs))
 	for _, def := range defs {
 		f.Message = append(f.Message, nestedApiDefinition{APIDefinition: def})
 	}
@@ -454,16 +471,16 @@ func (f *nestedApiDefinitionList) filter(enabled bool, tags ...string) []nestedA
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
 func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
 	// Get the definitions
-	log.Debug("Calling: ", endpoint)
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
-		log.Error("Failed to create request: ", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	gwConfig := a.Gw.GetConfig()
 
-	newRequest.Header.Set("authorization", gwConfig.NodeSecret)
 	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
+
+	newRequest.Header.Set("authorization", gwConfig.NodeSecret)
 	newRequest.Header.Set(headers.XTykNodeID, a.Gw.GetNodeID())
 
 	a.Gw.ServiceNonceMutex.RLock()
@@ -473,14 +490,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	c := a.Gw.initialiseClient()
 	resp, err := c.Do(newRequest)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error issuing request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
 		a.Gw.reLogin()
-		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
+		return nil, fmt.Errorf("login failure, response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -489,11 +506,20 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("can't read http request body: %w", err)
+	}
+
 	// Extract tagged APIs#
 	list := &nestedApiDefinitionList{}
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
+	if err := json.Unmarshal(body, &list); err != nil {
+		return nil, fmt.Errorf("failed to decode body: %v, error: %w", string(body), err)
+	}
+
+	// Validate payloads
+	if err := list.validate(); err != nil {
+		return nil, fmt.Errorf("failed to validate body: %v, error: %w", string(body), err)
 	}
 
 	// Extract tagged entries only
@@ -549,6 +575,20 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 
 	apiCollection := store.GetApiDefinitions(orgId, tags)
 
+	var payload []nestedApiDefinition
+	if err := json.Unmarshal([]byte(apiCollection), &payload); err != nil {
+		return nil, fmt.Errorf("failed to decode body: %v, error: %w", apiCollection, err)
+	}
+
+	list := &nestedApiDefinitionList{
+		Message: payload,
+	}
+
+	// Validate payloads
+	if err := list.validate(); err != nil {
+		return nil, fmt.Errorf("failed to validate body: %v, error: %w", apiCollection, err)
+	}
+
 	//store.Disconnect()
 
 	if rpc.LoadCount() > 0 {
@@ -557,20 +597,28 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 		}
 	}
 
-	return a.processRPCDefinitions(apiCollection, gw)
+	return a.processRPCDefinitionList(list, gw)
 }
 
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
-
 	var payload []nestedApiDefinition
 	if err := json.Unmarshal([]byte(apiCollection), &payload); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode body: %v, error: %w", apiCollection, err)
 	}
 
 	list := &nestedApiDefinitionList{
 		Message: payload,
 	}
 
+	// Validate payloads
+	if err := list.validate(); err != nil {
+		return nil, fmt.Errorf("failed to validate body: %v, error: %w", apiCollection, err)
+	}
+
+	return a.processRPCDefinitionList(list, gw)
+}
+
+func (a APIDefinitionLoader) processRPCDefinitionList(list *nestedApiDefinitionList, gw *Gateway) ([]*APISpec, error) {
 	gwConfig := a.Gw.GetConfig()
 
 	// Extract tagged entries only

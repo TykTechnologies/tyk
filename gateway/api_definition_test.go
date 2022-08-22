@@ -242,6 +242,20 @@ func TestGatewayTagsFilter(t *testing.T) {
 		newApiWithTags(true, []string{"a"}),
 	})
 
+	// the "nil" value should fail validation
+	assert.Error(t, data.validate())
+	assert.Len(t, data.all(), 5)
+
+	// reset to valid values
+	data.set([]*apidef.APIDefinition{
+		newApiWithTags(false, []string{}),
+		newApiWithTags(true, []string{}),
+		newApiWithTags(true, []string{"a", "b", "c"}),
+		newApiWithTags(true, []string{"a", "b"}),
+		newApiWithTags(true, []string{"a"}),
+	})
+
+	assert.NoError(t, data.validate())
 	assert.Len(t, data.all(), 5)
 
 	// Test NodeIsSegmented=true
@@ -1249,18 +1263,6 @@ func TestAPIDefinitionLoader(t *testing.T) {
 		assert.Equal(t, "value-1", res["value2"])
 		assert.Equal(t, "value-2", res["value1"])
 	}
-
-	t.Run("processRPCDefinitions invalid", func(t *testing.T) {
-		specs, err := l.processRPCDefinitions("{invalid json}", ts.Gw)
-		assert.Len(t, specs, 0)
-		assert.Error(t, err)
-	})
-
-	t.Run("processRPCDefinitions zero", func(t *testing.T) {
-		specs, err := l.processRPCDefinitions("[]", ts.Gw)
-		assert.Len(t, specs, 0)
-		assert.NoError(t, err)
-	})
 
 	t.Run("loadFileTemplate", func(t *testing.T) {
 		temp, err := l.loadFileTemplate(testTemplatePath)
