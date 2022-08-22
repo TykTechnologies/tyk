@@ -231,6 +231,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = gw.loadCustomMiddleware(spec)
 	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || mwDriver == apidef.OttoDriver) {
+		logger.Debug("Initializing JSVM")
 		spec.JSVM.Init(spec, logger, gw)
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
 	}
@@ -851,6 +852,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
 	tmpSpecRegister := make(map[string]*APISpec)
+	specsToReload := make([]*APISpec, 0)
 	tmpSpecHandles := new(sync.Map)
 
 	// sort by listen path from longer to shorter, so that /foo
@@ -880,7 +882,21 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
+
+OUTER:
 	for _, spec := range specs {
+		for _, curSpec := range gw.apisByID {
+			if spec.APIID == curSpec.APIID {
+				if spec.Checksum == curSpec.Checksum {
+					// if API has not changed, do not reload it
+					tmpSpecRegister[spec.APIID] = spec
+					continue OUTER
+				} else {
+					specsToReload = append(specsToReload, curSpec)
+				}
+			}
+		}
+
 		func() {
 			defer func() {
 				// recover from panic if one occured. Set err to nil otherwise.
@@ -923,8 +939,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gw.apisMu.Lock()
 
 	// release current specs resources before overwriting map
-	for _, curSpec := range gw.apisByID {
-		curSpec.Release()
+	for _, spec := range specsToReload {
+		spec.Release()
 	}
 
 	gw.apisByID = tmpSpecRegister
