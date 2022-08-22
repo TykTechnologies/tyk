@@ -10,15 +10,7 @@ import (
 )
 
 // New returns a go-redis:v8 universal client
-func New(isCache, isAnalytics bool, conf config.Config) *Driver {
-	// redisSingletonMu is locked and we know the singleton is nil
-	cfg := conf.Storage
-	if isCache && conf.EnableSeperateCacheStore {
-		cfg = conf.CacheStorage
-	} else if isAnalytics && conf.EnableAnalytics && conf.EnableSeperateAnalyticsStore {
-		cfg = conf.AnalyticsStorage
-	}
-
+func New(cfg config.StorageOptionsConf) *Driver {
 	log := logger.Get()
 	log.Debug("Creating new Redis connection pool")
 
@@ -88,10 +80,4 @@ func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
 	}
 
 	return addrs
-}
-
-// PubSub v8 and v9 :D
-type PubSub interface {
-	// I bet myself a burger this won't work
-
 }

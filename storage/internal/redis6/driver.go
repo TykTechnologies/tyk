@@ -159,25 +159,7 @@ func (d *Driver) GetKeysAndValuesWithFilter(ctx context.Context, pattern string)
 }
 
 func (d *Driver) DeleteScanMatch(ctx context.Context, pattern string) (int64, error) {
-	var (
-		err  error
-		keys []string
-	)
-
-	switch v := d.client.(type) {
-	case *ClusterClient:
-		err = v.ForEachMaster(ctx, func(ctx context.Context, client *Client) error {
-			values, err := scan(ctx, client, pattern)
-			if err != nil {
-				return err
-			}
-			keys = append(keys, values...)
-			return nil
-		})
-	case *Client:
-		keys, err = scan(ctx, v, pattern)
-	}
-
+	keys, err := d.Keys(ctx, pattern)
 	if err != nil {
 		return 0, err
 	}

@@ -9,16 +9,8 @@ import (
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
-// New returns a go-redis:v8 universal client
-func New(isCache, isAnalytics bool, conf config.Config) *Driver {
-	// redisSingletonMu is locked and we know the singleton is nil
-	cfg := conf.Storage
-	if isCache && conf.EnableSeperateCacheStore {
-		cfg = conf.CacheStorage
-	} else if isAnalytics && conf.EnableAnalytics && conf.EnableSeperateAnalyticsStore {
-		cfg = conf.AnalyticsStorage
-	}
-
+// New returns a go-redis:v9 universal client
+func New(cfg config.StorageOptionsConf) *Driver {
 	log := logger.Get()
 	log.Debug("Creating new Redis connection pool")
 
