@@ -883,21 +883,22 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
 
-	gw.apisMu.Lock()
-
 OUTER:
 	for _, spec := range specs {
+		gw.apisMu.RLock()
 		for _, curSpec := range gw.apisByID {
 			if spec.APIID == curSpec.APIID {
 				if spec.Checksum == curSpec.Checksum {
 					// if API has not changed, do not reload it
 					tmpSpecRegister[spec.APIID] = spec
+					gw.apisMu.RUnlock()
 					continue OUTER
 				} else {
 					specsToReload = append(specsToReload, curSpec)
 				}
 			}
 		}
+		gw.apisMu.RUnlock()
 
 		func() {
 			defer func() {
@@ -941,6 +942,8 @@ OUTER:
 	for _, spec := range specsToReload {
 		spec.Release()
 	}
+
+	gw.apisMu.Lock()
 
 	gw.apisByID = tmpSpecRegister
 	gw.apisHandlesByID = tmpSpecHandles
