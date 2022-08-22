@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -22,9 +20,7 @@ import (
 type IPsHandleStrategy string
 
 var (
-	log      = logger.Get()
-	global   atomic.Value
-	globalMu sync.Mutex
+	log = logger.Get()
 
 	Default = Config{
 		ListenPort:     8080,
@@ -334,7 +330,8 @@ type CertsData []CertData
 func (certs *CertsData) Decode(value string) error {
 	err := json.Unmarshal([]byte(value), certs)
 	if err != nil {
-		log.Error("Error unmarshaling TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES")
+		log.Error("Error unmarshalling TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES: ", err)
+		return err
 	}
 	return nil
 }
@@ -533,6 +530,18 @@ func (r PortRange) Match(port int) bool {
 	return r.From <= port && r.To >= port
 }
 
+type PortsWhiteList map[string]PortWhiteList
+
+func (pwl *PortsWhiteList) Decode(value string) error {
+	err := json.Unmarshal([]byte(value), pwl)
+	if err != nil {
+		log.Error("Error unmarshalling TYK_GW_PORTWHITELIST: ", err)
+		return err
+	}
+
+	return nil
+}
+
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
 	// OriginalPath is the path to the config file that is read. If
@@ -614,10 +623,10 @@ type Config struct {
 	// A policy can be defined in a file (Open Source installations) or from the same database as the Dashboard.
 	Policies PoliciesConfig `json:"policies"`
 
-	// Defines the ports that will be available for the API services to bind to.
+	// Defines the ports that will be available for the API services to bind to in the following format: `{ “": “” }``.
 	// This is a map of protocol to PortWhiteList. This allows per protocol
 	// configurations.
-	PortWhiteList map[string]PortWhiteList `json:"ports_whitelist"`
+	PortWhiteList PortsWhiteList `json:"ports_whitelist"`
 
 	// Disable port whilisting, essentially allowing you to use any port for your API.
 	DisablePortWhiteList bool `json:"disable_ports_whitelist"`
