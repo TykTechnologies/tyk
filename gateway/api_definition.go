@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -175,6 +176,7 @@ type APISpec struct {
 	OAS oas.OAS
 	sync.RWMutex
 
+	Checksum                 string
 	RxPaths                  map[string][]URLSpec
 	WhiteListEnabled         map[string]bool
 	target                   *url.URL
@@ -245,6 +247,11 @@ func (s *APISpec) Release() {
 	}
 
 	// release all other resources associated with spec
+
+	// JSVM object is a circular dependecy hell, but we can check if it initialized like this
+	if s.JSVM.Spec != nil {
+		s.JSVM.DeInit()
+	}
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
@@ -318,6 +325,16 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 	}
 
 	spec.APIDefinition = def.APIDefinition
+
+	apiString, err := json.Marshal(def)
+	if err != nil {
+		logger.WithError(err).WithField("name", def.Name).Error("Failed to JSON marshal API definition")
+		return spec
+	}
+
+	sha256hash := sha256.Sum256(apiString)
+	// Unique API content ID, to check if we already have if it changed from previous sync
+	spec.Checksum = base64.URLEncoding.EncodeToString(sha256hash[:])
 
 	// We'll push the default HealthChecker:
 	spec.Health = &DefaultHealthChecker{
