@@ -151,7 +151,16 @@ func (d *Driver) GetKeysAndValuesWithFilter(ctx context.Context, pattern string)
 		return nil, err
 	}
 
-	return d.MGet(ctx, keys)
+	values, err := d.MGet(ctx, keys)
+	if err != nil || len(values) == 0 {
+		return nil, err
+	}
+
+	result := map[string]interface{}{}
+	for key, val := range values {
+		result[keys[key]] = val
+	}
+	return result, nil
 }
 
 func (d *Driver) DeleteScanMatch(ctx context.Context, pattern string) (int64, error) {
@@ -180,7 +189,7 @@ func (d *Driver) DeleteKeys(ctx context.Context, keys []string) (int64, error) {
 	return deleted, errs
 }
 
-func (d *Driver) MGet(ctx context.Context, keys []string) (map[string]interface{}, error) {
+func (d *Driver) MGet(ctx context.Context, keys []string) ([]interface{}, error) {
 	var err error
 	values := []interface{}{}
 
@@ -201,18 +210,12 @@ func (d *Driver) MGet(ctx context.Context, keys []string) (map[string]interface{
 		}
 	case *Client:
 		values, err = v.MGet(ctx, keys...).Result()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
-	result := map[string]interface{}{}
-	for key, val := range values {
-		result[keys[key]] = val
-	}
-	return result, nil
-
+	return values, nil
 }
 
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values

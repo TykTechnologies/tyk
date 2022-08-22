@@ -32,7 +32,7 @@ type RedisDriver interface {
 
 	Incr(context.Context, string) (int64, error)
 	Decr(context.Context, string) (int64, error)
-	MGet(context.Context, []string) (map[string]interface{}, error)
+	MGet(context.Context, []string) ([]interface{}, error)
 	GetKeysAndValuesWithFilter(context.Context, string) (map[string]interface{}, error)
 
 	Exists(context.Context, string) (int64, error)
