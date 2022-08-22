@@ -140,20 +140,23 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 		keyNames[index] = r.fixKey(val)
 	}
 
-	resultMap, err := driver.MGet(r.context(), keyNames)
-	r.check(err, "GetMultiKey")
+	values, err := driver.MGet(r.context(), keyNames)
+	r.check(err, "GetMultiKey", fromStringToInterfaceSlice(keys)...)
 
-	if err != nil {
-		return nil, ErrKeyNotFound
+	result := make([]string, 0, len(values))
+
+	ok := false
+	for _, val := range values {
+		strVal := fmt.Sprint(val)
+		if strVal == "<nil>" {
+			strVal = ""
+		}
+		ok = ok || strVal != ""
+		result = append(result, strVal)
 	}
 
-	result := make([]string, 0, len(resultMap))
-	for _, key := range keyNames {
-		val, ok := resultMap[key]
-		if val == nil || !ok {
-			return nil, ErrKeyNotFound
-		}
-		result = append(result, fmt.Sprint(val))
+	if !ok {
+		return nil, ErrKeyNotFound
 	}
 
 	return result, nil
