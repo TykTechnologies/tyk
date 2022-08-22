@@ -5,21 +5,17 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
 
-	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage/internal/model"
 )
 
 type Driver struct {
 	client UniversalClient
-	log    *logrus.Logger
 }
 
 func NewDriver(client UniversalClient) *Driver {
 	return &Driver{
-		log:    logger.Get(),
 		client: client,
 	}
 }
@@ -151,7 +147,7 @@ func (d *Driver) Keys(ctx context.Context, pattern string) ([]string, error) {
 
 func (d *Driver) GetKeysAndValuesWithFilter(ctx context.Context, pattern string) (map[string]interface{}, error) {
 	keys, err := d.Keys(ctx, pattern)
-	if err != nil {
+	if err != nil || len(keys) == 0 {
 		return nil, err
 	}
 
@@ -160,9 +156,10 @@ func (d *Driver) GetKeysAndValuesWithFilter(ctx context.Context, pattern string)
 
 func (d *Driver) DeleteScanMatch(ctx context.Context, pattern string) (int64, error) {
 	keys, err := d.Keys(ctx, pattern)
-	if err != nil {
+	if err != nil || len(keys) == 0 {
 		return 0, err
 	}
+
 	return d.DeleteKeys(ctx, keys)
 }
 

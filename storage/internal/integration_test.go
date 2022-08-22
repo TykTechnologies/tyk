@@ -1,5 +1,5 @@
-//go:build e2e
-// +build e2e
+//go:build integration
+// +build integration
 
 package internal
 
@@ -46,6 +46,7 @@ func TestRedis(t *testing.T) {
 		missingKey = "key-404"
 		listKey    = "list-items"
 		channelKey = "pubsub-channel-name"
+		windowKey  = "rolling-window-key"
 	)
 
 	for _, tc := range testcases {
@@ -69,7 +70,11 @@ func TestRedis(t *testing.T) {
 				assert.NoError(t, client.Del(ctx, testKey))
 				assert.NoError(t, client.Set(ctx, testKey, "baz", time.Second))
 
-				val, err := client.Get(ctx, testKey)
+				val, err := client.Get(ctx, missingKey)
+				assert.Error(t, err)
+				assert.Equal(t, "", val)
+
+				val, err = client.Get(ctx, testKey)
 				assert.NoError(t, err)
 				assert.Equal(t, "baz", val)
 
@@ -187,14 +192,65 @@ func TestRedis(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, z1.Members(), []string{"slovenia"})
 				assert.Equal(t, z1.Scores(), []float64{100})
+
+				z1, err = client.ZRangeByScoreWithScores(ctx, testKey, "0", "10")
+				assert.NoError(t, err)
+				assert.Nil(t, z1.Members())
+				assert.Nil(t, z1.Scores())
 			})
 
 			t.Run("Expire, DeleteScanMatch", func(t *testing.T) {
-				assert.NoError(t, client.Expire(ctx, testKey, time.Second))
+				assert.NoError(t, client.Del(ctx, testKey))
+				assert.NoError(t, client.Set(ctx, testKey, "baz", time.Second))
+
+				keys, err := client.GetKeysAndValuesWithFilter(ctx, "foo*")
+				assert.NoError(t, err)
+				assert.Len(t, keys, 1)
+
+				val, ok := keys["foobar"].(string)
+				assert.Equal(t, "baz", val)
+				assert.True(t, ok)
+
+				keys, err = client.GetKeysAndValuesWithFilter(ctx, "bar*")
+				assert.NoError(t, err)
+				assert.Len(t, keys, 0)
 
 				c1, err := client.DeleteScanMatch(ctx, "foo*")
 				assert.NoError(t, err)
 				assert.True(t, c1 == 1)
+
+				c1, err = client.DeleteScanMatch(ctx, "foo*")
+				assert.NoError(t, err)
+				assert.True(t, c1 == 0)
+
+				assert.NoError(t, client.Expire(ctx, testKey, time.Second))
+			})
+
+			t.Run("SetRollingWindow", func(t *testing.T) {
+				assert.NoError(t, client.Del(ctx, windowKey))
+
+				v1, err := client.SetRollingWindow(ctx, windowKey, 10, "-1", true)
+				assert.NoError(t, err)
+				assert.Len(t, v1, 0)
+
+				v2a, err := client.GetRollingWindow(ctx, windowKey, 10, true)
+				assert.NoError(t, err)
+
+				v2b, err := client.GetRollingWindow(ctx, windowKey, 10, false)
+				assert.NoError(t, err)
+
+				assert.Equal(t, v2a, v2b)
+				assert.Len(t, v2a, 1)
+
+				v3, err := client.SetRollingWindow(ctx, windowKey, 10, "-1", false)
+				assert.NoError(t, err)
+				assert.Len(t, v3, 1)
+				assert.Equal(t, v3, v2a)
+			})
+
+			t.Run("Subscribe", func(t *testing.T) {
+				pubsub := client.Subscribe(ctx, "topic")
+				pubsub.Close()
 			})
 		})
 	}
