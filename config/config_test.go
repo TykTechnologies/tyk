@@ -287,7 +287,7 @@ func TestLoad_tracing(t *testing.T) {
 	})
 }
 
-func TestCustomEnvDecoders(t *testing.T) {
+func TestCustomCertsDataDecoder(t *testing.T) {
 	var c Config
 	os.Setenv("TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES", "[{\"domain_name\":\"testCerts\"}]")
 	err := envconfig.Process("TYK_GW", &c)
@@ -298,4 +298,56 @@ func TestCustomEnvDecoders(t *testing.T) {
 	assert.Len(t, c.HttpServerOptions.Certificates, 1, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES should have len 1")
 	assert.Equal(t, "testCerts", c.HttpServerOptions.Certificates[0].Name, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES domain_name should be equals to testCerts")
 
+}
+
+func TestPortsWhiteListDecoder(t *testing.T) {
+	var c Config
+
+	//testing invalid value
+	err := os.Setenv("TYK_GW_PORTWHITELIST", "invalid-value")
+	assert.NoError(t, err)
+
+	httpWhiteList, ok := c.PortWhiteList["http"]
+	assert.False(t, ok)
+	assert.Empty(t, httpWhiteList)
+
+	tlsWhiteList, ok := c.PortWhiteList["tls"]
+	assert.False(t, ok)
+	assert.Empty(t, tlsWhiteList)
+
+	//testing empty value
+	err = os.Setenv("TYK_GW_PORTWHITELIST", "")
+	assert.NoError(t, err)
+
+	httpWhiteList, ok = c.PortWhiteList["http"]
+	assert.False(t, ok)
+	assert.Empty(t, httpWhiteList)
+
+	tlsWhiteList, ok = c.PortWhiteList["tls"]
+	assert.False(t, ok)
+	assert.Empty(t, tlsWhiteList)
+
+	//testing real value
+	err = os.Setenv("TYK_GW_PORTWHITELIST", `{"http":{"ranges":[{"from":8000,"to":9000}]},"tls":{"ports":[6000,6015]}}`)
+	assert.NoError(t, err)
+
+	err = envconfig.Process("TYK_GW", &c)
+	assert.NoError(t, err)
+
+	httpWhiteList, ok = c.PortWhiteList["http"]
+	assert.True(t, ok, "expected to have http key in PortWhiteList")
+
+	assert.Len(t, httpWhiteList.Ports, 0, "http should have 0 Ports")
+	assert.Len(t, httpWhiteList.Ranges, 1, "http should have 1 Ranges")
+
+	assert.Equal(t, 8000, httpWhiteList.Ranges[0].From, "http Range From should be equals to 8000")
+	assert.Equal(t, 9000, httpWhiteList.Ranges[0].To, "http Range To should be equals to 9000")
+
+	tlsWhiteList, ok = c.PortWhiteList["tls"]
+	assert.True(t, ok, "expected to have tls key in PortWhiteList")
+	assert.Len(t, tlsWhiteList.Ports, 2, "tls should have 2 Ports")
+	assert.Len(t, tlsWhiteList.Ranges, 0, "tls should have 0 Ranges")
+
+	assert.Contains(t, tlsWhiteList.Ports, 6000, "tls should have 6000 port")
+	assert.Contains(t, tlsWhiteList.Ports, 6015, "tls should have 6015 port")
 }
