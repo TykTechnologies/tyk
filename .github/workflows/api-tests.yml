@@ -115,6 +115,7 @@ jobs:
 
     - name: Print compose logs
       run: |
+        sleep 60
         docker-compose -f ci/ci_testing_env.yml logs
       working-directory: tyk-automated-tests
 
