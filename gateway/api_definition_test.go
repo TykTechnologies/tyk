@@ -234,6 +234,7 @@ func TestGatewayTagsFilter(t *testing.T) {
 
 	data := &nestedApiDefinitionList{}
 	data.set([]*apidef.APIDefinition{
+		nil,
 		newApiWithTags(false, []string{}),
 		newApiWithTags(true, []string{}),
 		newApiWithTags(true, []string{"a", "b", "c"}),
@@ -241,7 +242,7 @@ func TestGatewayTagsFilter(t *testing.T) {
 		newApiWithTags(true, []string{"a"}),
 	})
 
-	assert.Len(t, data.Message, 5)
+	assert.Len(t, data.all(), 5)
 
 	// Test NodeIsSegmented=true
 	{

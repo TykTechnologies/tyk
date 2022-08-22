@@ -399,7 +399,7 @@ type nestedApiDefinitionList struct {
 }
 
 type nestedApiDefinition struct {
-	*apidef.APIDefinition `json:"api_definition,inline"`
+	*apidef.APIDefinition `json:"api_definition"`
 	OAS                   *oas.OAS `json:"oas"`
 }
 
@@ -409,9 +409,21 @@ func (f *nestedApiDefinitionList) set(defs []*apidef.APIDefinition) {
 	}
 }
 
+func (f *nestedApiDefinitionList) all() []nestedApiDefinition {
+	result := make([]nestedApiDefinition, 0, len(f.Message))
+	for _, v := range f.Message {
+		// Clear nil APIDefinitions avoiding nil panics.
+		if v.APIDefinition == nil {
+			continue
+		}
+		result = append(result, nestedApiDefinition{v.APIDefinition, v.OAS})
+	}
+	return result
+}
+
 func (f *nestedApiDefinitionList) filter(enabled bool, tags ...string) []nestedApiDefinition {
 	if !enabled {
-		return f.Message
+		return f.all()
 	}
 
 	if len(tags) == 0 {
@@ -423,8 +435,9 @@ func (f *nestedApiDefinitionList) filter(enabled bool, tags ...string) []nestedA
 		tagMap[tag] = true
 	}
 
-	result := make([]nestedApiDefinition, 0, len(f.Message))
-	for _, v := range f.Message {
+	apis := f.all()
+	result := make([]nestedApiDefinition, 0, len(apis))
+	for _, v := range apis {
 		if v.TagsDisabled {
 			continue
 		}
