@@ -327,7 +327,8 @@ type SlaveOptionsConfig struct {
 	// RPCKeysCacheExpiration defines the expiration time of the rpc cache that stores the keys, defined in seconds
 	RPCGlobalCacheExpiration float32 `json:"rpc_global_cache_expiration"`
 
-	SynchoniserEnabled bool `json:"synchoniser_enabled"`
+	// SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources
+	SynchroniserEnabled bool `json:"synchroniser_enabled"`
 }
 
 type LocalSessionCacheConf struct {
