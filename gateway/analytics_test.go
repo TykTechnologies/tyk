@@ -40,12 +40,10 @@ func TestAnalytics_Write(t *testing.T) {
 			defer ts.Close()
 			base := ts.Gw.GetConfig()
 
-			/*	*/
-
 			redisAnalyticsKeyName := analyticsKeyName + ts.Gw.Analytics.analyticsSerializer.GetSuffix()
 
 			// Cleanup before test
-			// let records to to be sent
+			// let records to be sent
 			ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 
 			t.Run("Log errors", func(t *testing.T) {
@@ -402,12 +400,12 @@ func TestAnalytics_Write(t *testing.T) {
 					t.Error("Error executing test case")
 				}
 
-				// let records to to be sent
+				// let records to be sent
 				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				if len(results) != 2 {
-					t.Fatal("Should return 1 record: ", len(results))
+					t.Fatal("Should return 2 records: ", len(results))
 				}
 
 				// Take second cached request
