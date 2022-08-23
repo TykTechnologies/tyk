@@ -1192,7 +1192,20 @@ func (s *Test) Close() {
 	s.Gw.ReloadTestCase.StopTicker()
 	s.Gw.GlobalHostChecker.StopPoller()
 
-	os.RemoveAll(s.Gw.GetConfig().AppPath)
+	s.RemoveApis()
+}
+
+// RemoveApis clean all the apis from a living gw
+func (s *Test) RemoveApis() error {
+	s.Gw.apiSpecs = []*APISpec{}
+	s.Gw.apisByID = map[string]*APISpec{}
+
+	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
+	if err != nil {
+		log.WithError(err).Error("removing apis from gw")
+	}
+
+	return err
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
