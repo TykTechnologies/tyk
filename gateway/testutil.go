@@ -1192,13 +1192,19 @@ func (s *Test) Close() {
 	s.Gw.ReloadTestCase.StopTicker()
 	s.Gw.GlobalHostChecker.StopPoller()
 
-	s.RemoveApis()
+	err = s.RemoveApis()
+	if err != nil {
+		log.Error("could not remove apis")
+	}
 }
 
 // RemoveApis clean all the apis from a living gw
 func (s *Test) RemoveApis() error {
+	s.Gw.apisMu.RLock()
 	s.Gw.apiSpecs = []*APISpec{}
 	s.Gw.apisByID = map[string]*APISpec{}
+
+	s.Gw.apisMu.RUnlock()
 
 	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
 	if err != nil {
