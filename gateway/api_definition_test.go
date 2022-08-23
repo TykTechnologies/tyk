@@ -523,7 +523,7 @@ func TestIgnored(t *testing.T) {
 			globalConf := ts.Gw.GetConfig()
 			globalConf.IgnoreEndpointCase = true
 			ts.Gw.SetConfig(globalConf)
-
+			ts.RemoveApis()
 			ts.Gw.LoadAPI(spec)
 
 			_, _ = ts.Run(t, []test.TestCase{
@@ -542,7 +542,7 @@ func TestIgnored(t *testing.T) {
 			v := spec.VersionData.Versions["v1"]
 			v.IgnoreEndpointCase = true
 			spec.VersionData.Versions["v1"] = v
-
+			ts.RemoveApis()
 			ts.Gw.LoadAPI(spec)
 
 			_, _ = ts.Run(t, []test.TestCase{
