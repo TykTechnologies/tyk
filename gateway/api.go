@@ -745,7 +745,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 		// Go through ALL managed API's and delete the key
 		gw.apisMu.RLock()
 		removed := gw.GlobalSessionManager.RemoveSession(orgID, keyName, false)
-		gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
+		//	gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
 		gw.apisMu.RUnlock()
 
 		if !removed {
@@ -848,6 +848,7 @@ func (gw *Gateway) handleDeleteHashedKey(keyName, orgID, apiID string, resetQuot
 	}
 
 	if resetQuota {
+		log.Info("Resetting quota")
 		gw.GlobalSessionManager.ResetQuota(keyName, &session, true)
 	}
 
