@@ -40,10 +40,7 @@ func TestAnalytics_Write(t *testing.T) {
 			defer ts.Close()
 			base := ts.Gw.GetConfig()
 
-			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-				spec.UseKeylessAccess = false
-				spec.Proxy.ListenPath = "/"
-			})
+			/*	*/
 
 			redisAnalyticsKeyName := analyticsKeyName + ts.Gw.Analytics.analyticsSerializer.GetSuffix()
 
@@ -52,6 +49,14 @@ func TestAnalytics_Write(t *testing.T) {
 			ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 
 			t.Run("Log errors", func(t *testing.T) {
+				if err := ts.RemoveApis(); err != nil {
+					t.Error("removing apis:" + err.Error())
+				}
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+				})
+
 				_, err := ts.Run(t, []test.TestCase{
 					{Path: "/", Code: 401},
 					{Path: "/", Code: 401},
@@ -79,6 +84,14 @@ func TestAnalytics_Write(t *testing.T) {
 			})
 
 			t.Run("Log success", func(t *testing.T) {
+				if err := ts.RemoveApis(); err != nil {
+					t.Error("removing apis:" + err.Error())
+				}
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+				})
+
 				key := CreateSession(ts.Gw)
 
 				authHeaders := map[string]string{
@@ -114,6 +127,10 @@ func TestAnalytics_Write(t *testing.T) {
 				defer func() {
 					ts.Gw.SetConfig(base)
 				}()
+				if err := ts.RemoveApis(); err != nil {
+					t.Error("removing apis:" + err.Error())
+				}
+
 				globalConf := ts.Gw.GetConfig()
 				globalConf.AnalyticsConfig.EnableDetailedRecording = false
 				ts.Gw.SetConfig(globalConf)
@@ -171,6 +188,10 @@ func TestAnalytics_Write(t *testing.T) {
 				globalConf.AnalyticsConfig.EnableDetailedRecording = false
 				ts.Gw.SetConfig(globalConf)
 
+				if err := ts.RemoveApis(); err != nil {
+					t.Error("removing apis:" + err.Error())
+				}
+
 				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 					spec.UseKeylessAccess = false
 					spec.Proxy.ListenPath = "/"
@@ -217,6 +238,7 @@ func TestAnalytics_Write(t *testing.T) {
 					t.Error("Detailed response info not found", record)
 				}
 			})
+
 			t.Run("Detailed analytics", func(t *testing.T) {
 				defer func() {
 					ts.Gw.SetConfig(base)
@@ -225,6 +247,9 @@ func TestAnalytics_Write(t *testing.T) {
 				globalConf.AnalyticsConfig.EnableDetailedRecording = true
 				ts.Gw.SetConfig(globalConf)
 
+				if err := ts.RemoveApis(); err != nil {
+					t.Error("removing apis:" + err.Error())
+				}
 				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 					spec.UseKeylessAccess = false
 					spec.Proxy.ListenPath = "/"
@@ -282,6 +307,11 @@ func TestAnalytics_Write(t *testing.T) {
 					time.Sleep(2 * time.Millisecond)
 				}))
 				defer ls.Close()
+
+				if err := ts.RemoveApis(); err != nil {
+					t.Error("removing apis:" + err.Error())
+				}
+
 				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 					spec.UseKeylessAccess = false
 					spec.Proxy.ListenPath = "/"
@@ -343,6 +373,10 @@ func TestAnalytics_Write(t *testing.T) {
 				globalConf := ts.Gw.GetConfig()
 				globalConf.AnalyticsConfig.EnableDetailedRecording = true
 				ts.Gw.SetConfig(globalConf)
+
+				if err := ts.RemoveApis(); err != nil {
+					t.Error("removing apis:" + err.Error())
+				}
 
 				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 					spec.UseKeylessAccess = false
