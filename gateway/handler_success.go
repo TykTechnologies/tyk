@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
@@ -170,14 +171,17 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			// mw_redis_cache instead? is there a reason not
 			// to include that in the analytics?
 			if responseCopy != nil {
-				// the body is assumed to be a nopCloser*
-				body := responseCopy.Body
+				contents, err := ioutil.ReadAll(responseCopy.Body)
+				if err != nil {
+					log.Error("Couldn't read response body", err)
+				}
+
 				responseCopy.Body = respBodyReader(r, responseCopy)
 
 				// Get the wire format representation
 				var wireFormatRes bytes.Buffer
 				responseCopy.Write(&wireFormatRes)
-				responseCopy.Body = body
+				responseCopy.Body = ioutil.NopCloser(bytes.NewBuffer(contents))
 				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 			}
 		}

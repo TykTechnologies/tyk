@@ -1122,8 +1122,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// Do this before we make a shallow copy
 	session := ctxGetSession(req)
-	// mantain the body
-	copyRequest(req)
 
 	outreq := new(http.Request)
 	logreq := new(http.Request)
@@ -1702,9 +1700,7 @@ func copyBody(body io.ReadCloser) io.ReadCloser {
 }
 
 func copyRequest(r *http.Request) *http.Request {
-	if r.ContentLength == -1 &&
-		// for unknown length, if request is not gRPC we assume it's chunked transfer encoding
-		IsGrpcStreaming(r) {
+	if r.ContentLength == -1 {
 		return r
 	}
 
@@ -1715,12 +1711,6 @@ func copyRequest(r *http.Request) *http.Request {
 }
 
 func copyResponse(r *http.Response) *http.Response {
-	// for the case of streaming for which Content-Length might be unset = -1.
-
-	if r.ContentLength == -1 {
-		return r
-	}
-
 	// If the response is 101 Switching Protocols then the body will contain a
 	// `*http.readWriteCloserBody` which cannot be copied (see stdlib documentation).
 	// In this case we want to return immediately to avoid a silent crash.
@@ -1770,7 +1760,5 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 
 // IsGrpcStreaming  determines wether a request represents a grpc streaming req
 func IsGrpcStreaming(r *http.Request) bool {
-	return r.ContentLength == -1 &&
-		// gRPC over HTTP/2 requests content-type should begin with "application/grpc"
-		strings.HasPrefix(r.Header.Get(headers.ContentType), "application/grpc")
+	return r.ContentLength == -1 && r.Header.Get(headers.ContentType) == "application/grpc"
 }
