@@ -79,7 +79,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: response.data.number,
-              team_reviewers: 'TykTechnologies/devops'});
+              team_reviewers: ['TykTechnologies/devops'] });
             github.rest.issues.addLabels({
               owner:  context.repo.owner,
               repo: context.repo.repo,
