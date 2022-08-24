@@ -74,6 +74,7 @@ func (gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 			j.Log.Error("[JSVM] Blobs not allowed on this node")
 			return
 		}
+
 		j.Log.Debug("Loading JS blob")
 		js, err := base64.StdEncoding.DecodeString(meta.FunctionSourceURI)
 		if err != nil {

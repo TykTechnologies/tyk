@@ -1598,7 +1598,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	}()
 
 	for i, spec := range specs {
-		specBytes, err := json.Marshal(spec)
+		specBytes, err := json.Marshal(spec.APIDefinition)
 		if err != nil {
 			fmt.Printf(" \n %+v \n", spec)
 			panic(err)
