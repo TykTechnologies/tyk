@@ -192,6 +192,11 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 	return value, nil
 }
 
+// Deprecated: Use GetExp()
+func (r *RedisCluster) GetKeyTTL(keyName string) (int64, error) {
+	return r.GetExp(keyName)
+}
+
 func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
 	if err := r.up(); err != nil {
 		return err
