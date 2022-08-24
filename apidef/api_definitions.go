@@ -583,7 +583,7 @@ type APIDefinition struct {
 	JWTExpiresAtValidationSkew           uint64                 `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
 	JWTNotBeforeValidationSkew           uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	JWTSkipKid                           bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
-	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
+	Scopes                               *Scopes                `bson:"scopes" json:"scopes,omitempty"`
 	JWTScopeToPolicyMapping              map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
 	JWTScopeClaimName                    string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
 	NotificationsDetails                 NotificationsManager   `bson:"notifications" json:"notifications"`
@@ -628,7 +628,7 @@ type APIDefinition struct {
 	StripAuthData                        bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 	EnableDetailedRecording              bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 	GraphQL                              GraphQLConfig          `bson:"graphql" json:"graphql"`
-	AnalyticsPlugin                      AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin,omitempty"`
+	AnalyticsPlugin                      *AnalyticsPluginConfig `bson:"analytics_plugin" json:"analytics_plugin,omitempty"`
 
 	// Gateway segment tags
 	TagsDisabled bool     `bson:"tags_disabled" json:"tags_disabled,omitempty"`
@@ -1218,7 +1218,7 @@ func DummyAPI() APIDefinition {
 		BlacklistedIPs:       []string{},
 		TagHeaders:           []string{},
 		UpstreamCertificates: map[string]string{},
-		Scopes: Scopes{
+		Scopes: &Scopes{
 			JWT: ScopeClaim{
 				ScopeToPolicy: map[string]string{},
 			},
@@ -1270,22 +1270,3 @@ var Template = template.New("").Funcs(map[string]interface{}{
 		return string(xmlValue), err
 	},
 })
-
-func (s *Scopes) MarshalJSON() ([]byte, error) {
-	fmt.Println("marshaling0")
-
-	if s.JWT.ScopeClaimName == "" && s.OIDC.ScopeClaimName == "" {
-		return []byte("null"), nil
-	}
-	type ref2 Scopes
-	return json.Marshal((*ref2)(s))
-}
-
-func (a *AnalyticsPluginConfig) MarshalJSON() ([]byte, error) {
-	fmt.Println("marshaling")
-	if a.Enabled == false && a.FuncName == "" && a.PluginPath == "" {
-		return []byte("null"), nil
-	}
-	type ref2 AnalyticsPluginConfig
-	return json.Marshal((*ref2)(a))
-}

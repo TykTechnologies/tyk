@@ -997,7 +997,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.JWTDefaultPolicies = []string{defaultPolicyID}
 		spec.Proxy.ListenPath = "/base"
-		spec.Scopes = apidef.Scopes{
+		spec.Scopes = &apidef.Scopes{
 			JWT: apidef.ScopeClaim{
 				ScopeToPolicy: map[string]string{
 					"user:read":  p1ID,
