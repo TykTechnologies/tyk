@@ -1270,3 +1270,22 @@ var Template = template.New("").Funcs(map[string]interface{}{
 		return string(xmlValue), err
 	},
 })
+
+func (s *Scopes) MarshalJSON() ([]byte, error) {
+	fmt.Println("marshaling0")
+
+	if s.JWT.ScopeClaimName == "" && s.OIDC.ScopeClaimName == "" {
+		return []byte("null"), nil
+	}
+	type ref2 Scopes
+	return json.Marshal((*ref2)(s))
+}
+
+func (a *AnalyticsPluginConfig) MarshalJSON() ([]byte, error) {
+	fmt.Println("marshaling")
+	if a.Enabled == false && a.FuncName == "" && a.PluginPath == "" {
+		return []byte("null"), nil
+	}
+	type ref2 AnalyticsPluginConfig
+	return json.Marshal((*ref2)(a))
+}
