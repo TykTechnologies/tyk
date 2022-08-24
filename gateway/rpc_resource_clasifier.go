@@ -34,7 +34,7 @@ func (d *DefaultRPCResourceClassifier) classify(keys []string) (
 			case ResetQuota:
 				keysToReset[splitKeys[0]] = true
 				standardKeys[key] = key
-			case "hashed":
+			case HashedKey:
 				standardKeys[key] = key
 			case CertificateRemoved:
 				CertificatesToRemove[key] = splitKeys[0]
