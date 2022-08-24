@@ -62,6 +62,7 @@ jobs:
         id: create-pr
         uses: actions/github-script@v6
         with:
+          github-token: ${{ secrets.ORG_GH_TOKEN }}
           script: |
             const response = await github.rest.pulls.create({
               title: '[CI] Sync automation: Syncing commits from master',
