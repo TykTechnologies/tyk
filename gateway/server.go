@@ -932,6 +932,7 @@ func (gw *Gateway) DoReload() {
 			return
 		}
 	}
+
 	gw.loadGlobalApps()
 
 	mainLog.Info("API reload complete")
