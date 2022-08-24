@@ -162,6 +162,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 
 	t.Run("Sequentieal order", func(t *testing.T) {
 		// Load initial API
+		ts.RemoveApis()
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
 		)
@@ -181,6 +182,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	})
 
 	t.Run("Should re-order", func(t *testing.T) {
+		ts.RemoveApis()
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "2" },
 			func(spec *APISpec) { spec.APIID = "3" },
@@ -193,6 +195,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	})
 
 	t.Run("Restore original order", func(t *testing.T) {
+		ts.RemoveApis()
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
 			func(spec *APISpec) { spec.APIID = "2" },

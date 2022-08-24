@@ -1397,6 +1397,7 @@ func TestEnforcedTimeout(t *testing.T) {
 		UpdateAPIVersion(api, "", func(version *apidef.VersionInfo) {
 			version.ExtendedPaths.HardTimeouts[0].Disabled = true
 		})
+		ts.RemoveApis()
 		ts.Gw.LoadAPI(api)
 
 		_, _ = ts.Run(t, test.TestCase{
