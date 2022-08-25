@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -886,10 +887,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		if !isOauthTokenKey {
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
+			var status int
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
 				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
-				r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
+				_, status = r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
 				r.Gw.getSessionAndCreate(splitKeys[0], r, true, orgId)
 			} else {
 				log.Info("--> removing cached key: ", key)
@@ -897,9 +899,14 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
 				}
-				r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
+				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
 				r.Gw.getSessionAndCreate(splitKeys[0], r, false, orgId)
 			}
+			// if key not found locally then we should not pull it from management layer
+			if status == http.StatusNotFound {
+				continue
+			}
+
 			r.Gw.SessionCache.Delete(key)
 			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
 		}
