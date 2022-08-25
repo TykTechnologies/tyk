@@ -1598,9 +1598,12 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	}()
 
 	for i, spec := range specs {
+		// if the api already exist then remove it and load the new one
+		if gw.getApiSpec(spec.APIID) != nil {
+			gw.removeApiById(spec.APIID)
+		}
 		specBytes, err := json.Marshal(spec.APIDefinition)
 		if err != nil {
-			fmt.Printf(" \n %+v \n", spec)
 			panic(err)
 		}
 
@@ -1611,7 +1614,6 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 
 		oasSpecBytes, err := json.Marshal(&spec.OAS)
 		if err != nil {
-			fmt.Printf(" \n %+v \n", spec)
 			panic(err)
 		}
 
