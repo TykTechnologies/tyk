@@ -71,7 +71,6 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 		globalConf.HashKeys = hashKeys
 		ts.Gw.SetConfig(globalConf)
 
-		ts.RemoveApis()
 		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
@@ -201,7 +200,6 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		api.AuthConfigs = map[string]apidef.AuthConfig{
 			apidef.AuthTokenType: {UseCertificate: true},
 		}
-		ts.RemoveApis()
 		ts.Gw.LoadAPI(api)
 		globalConf = ts.Gw.GetConfig()
 
@@ -234,7 +232,6 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		api.AuthConfigs = map[string]apidef.AuthConfig{
 			apidef.AuthTokenType: {UseCertificate: true},
 		}
-		ts.RemoveApis()
 		ts.Gw.LoadAPI(api)
 		session := CreateStandardSession()
 		session.Certificate = clientCertID

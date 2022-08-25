@@ -523,10 +523,7 @@ func TestIgnored(t *testing.T) {
 			globalConf := ts.Gw.GetConfig()
 			globalConf.IgnoreEndpointCase = true
 			ts.Gw.SetConfig(globalConf)
-			err := ts.RemoveApis()
-			if err != nil {
-				t.Error(err)
-			}
+
 			ts.Gw.LoadAPI(spec)
 
 			_, _ = ts.Run(t, []test.TestCase{
@@ -545,10 +542,7 @@ func TestIgnored(t *testing.T) {
 			v := spec.VersionData.Versions["v1"]
 			v.IgnoreEndpointCase = true
 			spec.VersionData.Versions["v1"] = v
-			err := ts.RemoveApis()
-			if err != nil {
-				t.Error(err)
-			}
+
 			ts.Gw.LoadAPI(spec)
 
 			_, _ = ts.Run(t, []test.TestCase{
@@ -1397,7 +1391,7 @@ func TestEnforcedTimeout(t *testing.T) {
 		UpdateAPIVersion(api, "", func(version *apidef.VersionInfo) {
 			version.ExtendedPaths.HardTimeouts[0].Disabled = true
 		})
-		ts.RemoveApis()
+
 		ts.Gw.LoadAPI(api)
 
 		_, _ = ts.Run(t, test.TestCase{
