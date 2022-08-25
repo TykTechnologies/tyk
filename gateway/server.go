@@ -1455,6 +1455,7 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 }
 
 func Start() {
+	setGODebugEnv()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1751,4 +1752,19 @@ func (gw *Gateway) SetConfig(conf config.Config) {
 	gw.configMu.Lock()
 	defer gw.configMu.Unlock()
 	gw.config.Store(conf)
+}
+
+// setGODebugEnv sets GODEBUG variable disable ignoreCN in x509 certs
+func setGODebugEnv() {
+	var (
+		goDebugEnvKey           = "GODEBUG"
+		disableIgnoreCNDebugVal = "x509ignoreCN=0"
+	)
+
+	existingGoDebug := os.Getenv(goDebugEnvKey)
+	if existingGoDebug == "" {
+		os.Setenv(goDebugEnvKey, disableIgnoreCNDebugVal)
+	} else {
+		os.Setenv(goDebugEnvKey, fmt.Sprintf("%s,%s", existingGoDebug, disableIgnoreCNDebugVal))
+	}
 }
