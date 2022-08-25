@@ -15,13 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage/internal"
 )
 
-// ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
-
-const (
-	defaultRedisPort = 6379
-)
-
-// ErrRedisIsDown is returned when we can't communicate with redis
+// ErrRedisIsDown is returned when we can't communicate with redis.
 var ErrRedisIsDown = errors.New("storage: Redis is either down or was not configured")
 
 // RedisCluster is a storage manager that uses the redis database.
@@ -56,12 +50,6 @@ func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
 	}
 
 	return addrs
-}
-
-func clusterConnectionIsOpen(cluster *RedisCluster) bool {
-	ctx := cluster.RedisController.Context()
-	driver := cluster.RedisController.singleton(cluster.IsCache, cluster.IsAnalytics)
-	return driver.Ping(ctx) == nil
 }
 
 // Connect will establish a connection this is always true because we are
@@ -567,7 +555,7 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 }
 
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values
-func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_override string, pipeline bool) (int, []interface{}) {
+func (r *RedisCluster) SetRollingWindow(keyName string, per int64, valueOverride string, pipeline bool) (int, []interface{}) {
 	if err := r.up(); err != nil {
 		return 0, nil
 	}
@@ -575,7 +563,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 	ctx := r.context()
 	client := r.singleton()
 
-	values, err := client.SetRollingWindow(ctx, keyName, per, value_override, pipeline)
+	values, err := client.SetRollingWindow(ctx, keyName, per, valueOverride, pipeline)
 	r.check(err, "SetRollingWindow", keyName)
 
 	if err != nil || len(values) == 0 {

@@ -44,7 +44,8 @@ func TestHandleReceive(t *testing.T) {
 
 	t.Run("handle receive without err", func(t *testing.T) {
 		receiveFn := func(context.Context) (interface{}, error) {
-			return nil, nil
+			var err error
+			return nil, err
 		}
 		err := cluster.handleReceive(ctx, receiveFn, nil)
 		assert.NoError(t, err)
@@ -59,26 +60,19 @@ func TestRedisClusterGetMultiKey(t *testing.T) {
 	for _, v := range keys {
 		r.DeleteKey(v)
 	}
+
 	_, err := r.GetMultiKey(keys)
-	if err != ErrKeyNotFound {
-		t.Errorf("expected %v got %v", ErrKeyNotFound, err)
-	}
+	assert.ErrorIs(t, ErrKeyNotFound, err)
+
 	err = r.SetKey(keys[0], keys[0], 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
+
 	err = r.SetKey(keys[1], keys[1], 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	v, err := r.GetMultiKey([]string{"first", "second"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if v[0] != keys[0] {
-		t.Errorf("expected %s got %s", keys[0], v[0])
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, keys[0], v[0])
 }
 
 func TestRedisAddressConfiguration(t *testing.T) {
@@ -146,26 +140,28 @@ func TestRedisExpirationTime(t *testing.T) {
 
 	testKey := "test-key"
 	testValue := "test-value"
-	storage.SetKey(testKey, testValue, 0)
+
+	assert.NoError(t, storage.SetKey(testKey, testValue, 0))
+
 	key, err := storage.GetKey(testKey)
 	assert.Equal(t, testValue, key)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 
-	//testing if GetExp returns -2 for non existent keys
+	// testing if GetExp returns -2 for non existent keys
 	ttl, errGetExp := storage.GetExp(testKey + "random")
 	assert.Equal(t, int64(-2), ttl)
-	assert.Equal(t, nil, errGetExp)
+	assert.NoError(t, errGetExp)
 
-	//testing if GetExp returns -1 for keys without expiration
+	// testing if GetExp returns -1 for keys without expiration
 	ttl, errGetExp = storage.GetExp(testKey)
 	assert.Equal(t, int64(-1), ttl)
-	assert.Equal(t, nil, errGetExp)
+	assert.NoError(t, errGetExp)
 
-	//Testing if SetExp actually sets the expiration.
+	// Testing if SetExp actually sets the expiration.
 	errSetExp := storage.SetExp(testKey, 40)
-	assert.Equal(t, nil, errSetExp)
+	assert.NoError(t, errSetExp)
 	ttl, errGetExp = storage.GetExp(testKey)
 	assert.Equal(t, int64(40), ttl)
-	assert.Equal(t, nil, errGetExp)
+	assert.NoError(t, errGetExp)
 
 }

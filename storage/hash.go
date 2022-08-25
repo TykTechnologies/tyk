@@ -19,7 +19,7 @@ const defaultHashAlgorithm = "murmur64"
 // If hashing algorithm is empty, use legacy key generation
 func GenerateToken(orgID, keyID, hashAlgorithm string) (string, error) {
 	if keyID == "" {
-		keyID = strings.Replace(uuid.NewV4().String(), "-", "", -1)
+		keyID = strings.ReplaceAll(uuid.NewV4().String(), "-", "")
 	}
 
 	if hashAlgorithm != "" {
@@ -97,7 +97,7 @@ func hashFunction(algorithm string) (hash.Hash, error) {
 	case "", HashMurmur32:
 		return murmur3.New32(), nil
 	default:
-		return murmur3.New32(), fmt.Errorf("Unknown key hash function: %s. Falling back to murmur32.", algorithm)
+		return murmur3.New32(), fmt.Errorf("Unknown key hash function: %s. Falling back to murmur32", algorithm)
 	}
 }
 

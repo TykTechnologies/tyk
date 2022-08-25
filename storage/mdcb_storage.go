@@ -58,9 +58,9 @@ func (m MdcbStorage) GetRawKey(string) (string, error) {
 	panic("implement me")
 }
 
-func (m MdcbStorage) SetKey(key string, content string, TTL int64) error {
+func (m MdcbStorage) SetKey(key string, content string, ttl int64) error {
 	// only set the value locally as rpc writtes is not allowed
-	errLocal := m.local.SetKey(key, content, TTL)
+	errLocal := m.local.SetKey(key, content, ttl)
 
 	if errLocal != nil {
 		return errors.New("cannot save key in local")

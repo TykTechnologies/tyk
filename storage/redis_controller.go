@@ -9,9 +9,9 @@ import (
 )
 
 type RedisController struct {
-	singlePool          RedisDriver
-	singleCachePool     RedisDriver
-	singleAnalyticsPool RedisDriver
+	poolSingle    RedisDriver
+	poolCache     RedisDriver
+	poolAnalytics RedisDriver
 
 	redisUp      atomic.Value
 	disableRedis atomic.Value
@@ -27,7 +27,7 @@ func NewRedisController(ctx context.Context) *RedisController {
 	}
 }
 
-// Disable allows to dynamically enable/disable talking with storage
+// Disable allows to dynamically enable/disable talking with storage.
 func (rc *RedisController) Disable(disable bool) {
 	if disable {
 		// we make sure x set that redis is down
@@ -48,26 +48,20 @@ func (rc *RedisController) Disable(disable bool) {
 	rc.reconnect <- struct{}{}
 }
 
-// DisableRedis is deprecated
+// DisableRedis is deprecated, use Disable.
 func (rc *RedisController) DisableRedis(disable bool) {
 	rc.Disable(disable)
 }
 
 func (rc *RedisController) enabled() bool {
-	ok := true
-	if v := rc.disableRedis.Load(); v != nil {
-		ok = !v.(bool)
-	}
+	ok, _ := rc.disableRedis.Load().(bool)
 	return ok
 }
 
-// Connected returns true if we are connected to redis
+// Connected returns true if we are connected to redis.
 func (rc *RedisController) Connected() bool {
-	v := rc.redisUp.Load()
-	if v != nil {
-		return v.(bool)
-	}
-	return false
+	ok, _ := rc.redisUp.Load().(bool)
+	return ok
 }
 
 func (rc *RedisController) WaitConnect(ctx context.Context) bool {
@@ -85,40 +79,12 @@ func (rc *RedisController) WaitConnect(ctx context.Context) bool {
 	}
 }
 
-func (rc *RedisController) singleton(cache, analytics bool) RedisDriver {
-	if cache {
-		return rc.singleCachePool
-	}
-	if analytics {
-		return rc.singleAnalyticsPool
-	}
-	return rc.singlePool
-}
-
-func (rc *RedisController) connectSingleton(cache, analytics bool, conf config.Config) bool {
-	if conn := rc.singleton(cache, analytics); conn != nil {
-		return true
-	}
-
-	if cache {
-		rc.singleCachePool = NewRedisClusterPool(cache, analytics, conf)
-		return true
-	}
-
-	if analytics {
-		rc.singleAnalyticsPool = NewRedisClusterPool(cache, analytics, conf)
-		return true
-	}
-	rc.singlePool = NewRedisClusterPool(cache, analytics, conf)
-	return true
-}
-
 // disconnect all redis clients created
 func (rc *RedisController) disconnect() {
 	for _, v := range []RedisDriver{
-		rc.singleCachePool,
-		rc.singleAnalyticsPool,
-		rc.singlePool,
+		rc.poolCache,
+		rc.poolAnalytics,
+		rc.poolSingle,
 	} {
 		defer v.Close()
 	}
@@ -144,34 +110,28 @@ func (rc *RedisController) Connect(ctx context.Context, onReconnect func(), conf
 			// an empty function to avoid repeated nil checks below
 		}
 	}
-	c := []RedisCluster{
-		{
+
+	rc.initClusterPool(&rc.poolSingle, false, false, conf)
+	rc.initClusterPool(&rc.poolCache, true, false, conf)
+	rc.initClusterPool(&rc.poolAnalytics, false, true, conf)
+
+	clusters := []*RedisCluster{
+		&RedisCluster{
 			RedisController: rc,
 		},
-		{
+		&RedisCluster{
 			IsCache:         true,
 			RedisController: rc,
 		},
-		{
+		&RedisCluster{
 			IsAnalytics:     true,
 			RedisController: rc,
 		},
 	}
 
-	// First time connecting to the clusters. We need this for the first connection (and avoid waiting 1second for the rc.statusCheck loop).
-	up := true
-	for _, v := range c {
-		if !rc.connectSingleton(v.IsCache, v.IsAnalytics, *conf) {
-			up = false
-			break
-		}
-
-		if !clusterConnectionIsOpen(&v) {
-			up = false
-			break
-		}
-	}
-
+	// First time connecting to the clusters.
+	// We need this for the first connection (and avoid waiting 1second for the rc.statusCheck loop).
+	up := rc.connectCluster(ctx, clusters)
 	rc.redisUp.Store(up)
 
 	defer func() {
@@ -181,13 +141,24 @@ func (rc *RedisController) Connect(ctx context.Context, onReconnect func(), conf
 
 	go rc.recoverLoop(ctx, onReconnect)
 
-	// We need the ticker to constantly checking the connection status of Redis. If Redis gets down and up again, we should be able to recover.
-	rc.statusCheck(ctx, conf, c)
+	// We need the ticker to constantly checking the connection status of Redis.
+	// If Redis gets down and up again, we should be able to recover.
+	rc.statusCheck(ctx, clusters)
 }
 
-// statusCheck will check the Redis status each second. If we transition from a disconnected to connected state, it will send a msg to the reconnect chan.
-// This method will be constantly modifying the redisUp control flag.
-func (rc *RedisController) statusCheck(ctx context.Context, conf *config.Config, clusters []RedisCluster) {
+// initClusterPool will create a new RedisClient for the passed pool variable.
+func (rc *RedisController) initClusterPool(pool *RedisDriver, cache, analytics bool, conf *config.Config) {
+	if *pool == nil {
+		*pool = NewRedisClusterPool(cache, analytics, *conf)
+	}
+}
+
+// statusCheck will check the Redis status each second.
+//
+// If we transition from a disconnected to connected state, it will send
+// a msg to the reconnect chan. This method will be constantly modifying
+// the redisUp control flag.
+func (rc *RedisController) statusCheck(ctx context.Context, clusters []*RedisCluster) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 
@@ -196,21 +167,21 @@ func (rc *RedisController) statusCheck(ctx context.Context, conf *config.Config,
 		case <-ctx.Done():
 			return
 		case <-tick.C:
-			//if we disabled redis - we don't want to check anything
+			// if we disabled redis - we don't want to check anything
 			if !rc.enabled() {
 				continue
 			}
 
-			//we check if the clusters are initialised and if connections are open
-			connected := rc.connectCluster(*conf, clusters...)
+			// we check if the clusters are initialised and if connections are open
+			connected := rc.connectCluster(ctx, clusters)
 
-			//we check if we are already connected connected
+			// we check if we are already connected connected
 			alreadyConnected := rc.Connected()
 
-			//store the actual status of redis
+			// store the actual status of redis
 			rc.redisUp.Store(connected)
 
-			//if we weren't alerady connected but now we are connected, we trigger the reconnect
+			// if we weren't alerady connected but now we are connected, we trigger the reconnect
 			if !alreadyConnected && connected {
 				rc.reconnect <- struct{}{}
 			}
@@ -230,18 +201,28 @@ func (rc *RedisController) recoverLoop(ctx context.Context, onReconnect func()) 
 	}
 }
 
-func (rc *RedisController) connectCluster(conf config.Config, v ...RedisCluster) bool {
+// connectCluster will go over each *RedisCluster and return true if all are online.
+func (rc *RedisController) connectCluster(ctx context.Context, v []*RedisCluster) bool {
+	ok := true
 	for _, x := range v {
-		if ok := rc.establishConnection(&x, conf); ok {
-			return ok
-		}
+		ok = rc.establishConnection(ctx, x) && ok
 	}
-	return false
+	return ok
 }
 
-func (rc *RedisController) establishConnection(v *RedisCluster, conf config.Config) bool {
-	if !rc.connectSingleton(v.IsCache, v.IsAnalytics, conf) {
-		return false
+// establishConnection issues a Ping() over a RedisCluster individual RedisDriver to verify connectivity.
+func (rc *RedisController) establishConnection(ctx context.Context, v *RedisCluster) bool {
+	return rc.singleton(v.IsCache, v.IsAnalytics).Ping(ctx) == nil
+}
+
+// singleton returns a desired RedisDriver instance. Instances are created in Connect().
+func (rc *RedisController) singleton(cache, analytics bool) RedisDriver {
+	switch {
+	case cache:
+		return rc.poolCache
+	case analytics:
+		return rc.poolAnalytics
+	default:
+		return rc.poolSingle
 	}
-	return clusterConnectionIsOpen(v)
 }
