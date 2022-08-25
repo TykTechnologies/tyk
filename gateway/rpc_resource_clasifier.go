@@ -14,16 +14,14 @@ func (d *DefaultRPCResourceClassifier) classify(keys []string) (
 	TokensToBeRevoked,
 	ClientsToBeRevoked,
 	standardKeys,
-	CertificatesToRemove,
-	CertificatesToAdd,
+	Certificates,
 	OauthClients map[string]string) {
 
 	keysToReset = map[string]bool{}
 	TokensToBeRevoked = map[string]string{}
 	ClientsToBeRevoked = map[string]string{}
 	standardKeys = map[string]string{}
-	CertificatesToRemove = map[string]string{}
-	CertificatesToAdd = map[string]string{}
+	Certificates = map[string]string{}
 	OauthClients = map[string]string{}
 
 	for _, key := range keys {
@@ -36,10 +34,9 @@ func (d *DefaultRPCResourceClassifier) classify(keys []string) (
 				standardKeys[key] = key
 			case HashedKey:
 				standardKeys[key] = key
-			case CertificateRemoved:
-				CertificatesToRemove[key] = splitKeys[0]
-			case CertificateAdded:
-				CertificatesToAdd[key] = splitKeys[0]
+			case CertificateRemoved, CertificateAdded:
+				certId := splitKeys[0]
+				Certificates[certId] = action
 			case OAuthRevokeToken, OAuthRevokeAccessToken, OAuthRevokeRefreshToken:
 				TokensToBeRevoked[splitKeys[0]] = key
 			case OAuthRevokeAllTokens:

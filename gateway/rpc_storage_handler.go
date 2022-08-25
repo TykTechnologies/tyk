@@ -852,7 +852,7 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
 
 	var df DefaultRPCResourceClassifier
-	keysToReset, TokensToBeRevoked, ClientsToBeRevoked, standardKeys, CertificatesToRemove, CertificatesToAdd, OauthClients := df.classify(keys)
+	keysToReset, TokensToBeRevoked, ClientsToBeRevoked, standardKeys, Certificates, OauthClients := df.classify(keys)
 
 	keyProcessor := StandardKeysProcessor{
 		synchronizerEnabled: r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled,
@@ -908,21 +908,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
 
-	// remove certs
-	for _, certId := range CertificatesToRemove {
-		log.Debugf("Removing certificate: %v", certId)
-		r.Gw.CertificateManager.Delete(certId, orgId)
-		r.Gw.RPCCertCache.Delete("cert-raw-" + certId)
+	certificatesProcessor := CertificateProcessor{
+		orgId: orgId,
+		gw:    r.Gw,
 	}
-
-	for _, certId := range CertificatesToAdd {
-		log.Debugf("Adding certificate: %v", certId)
-		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally
-		content, err := r.Gw.CertificateManager.GetRaw(certId)
-		if content == "" && err != nil {
-			log.Debugf("Error getting certificate content")
-		}
-	}
+	certificatesProcessor.Process(Certificates)
 
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{

@@ -128,3 +128,29 @@ func (o *OauthClientsProcessor) processSingleOauthClientEvent(apiId, oauthClient
 		log.Warningf("Oauth client event not supported:%v", event)
 	}
 }
+
+type CertificateProcessor struct {
+	gw    *Gateway
+	orgId string
+}
+
+func (c *CertificateProcessor) Process(certificates map[string]string) {
+
+	for certId, action := range certificates {
+		switch action {
+		case CertificateAdded:
+			log.Debugf("Adding certificate: %v", certId)
+			//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally
+			content, err := c.gw.CertificateManager.GetRaw(certId)
+			if content == "" && err != nil {
+				log.Debugf("Error getting certificate content")
+			}
+		case CertificateRemoved:
+			log.Debugf("Removing certificate: %v", certId)
+			c.gw.CertificateManager.Delete(certId, c.orgId)
+			c.gw.RPCCertCache.Delete("cert-raw-" + certId)
+		default:
+			log.Debugf("ignoring certificate action: %v", action)
+		}
+	}
+}

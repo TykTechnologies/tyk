@@ -718,7 +718,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
 				Subscription: kafkaDataSource.SubscriptionConfiguration{
 					BrokerAddresses:      []string{"localhost:9092"},
-					Topic:                "test.topic",
+					Topics:               []string{"test.topic"},
 					GroupID:              "test.consumer.group",
 					ClientID:             "test.client.id",
 					KafkaVersion:         "V2_8_0_0",
@@ -744,7 +744,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
 				Subscription: kafkaDataSource.SubscriptionConfiguration{
 					BrokerAddresses:      []string{"localhost:9092"},
-					Topic:                "test.topic.{{.arguments.name}}",
+					Topics:               []string{"test.topic.{{.arguments.name}}"},
 					GroupID:              "test.consumer.group",
 					ClientID:             "test.client.id",
 					KafkaVersion:         "V2_8_0_0",
@@ -1001,7 +1001,7 @@ var graphqlEngineV2ConfigJson = `{
 				}],
 				"config": {
 					"broker_addresses": ["localhost:9092"],
-					"topic": "test.topic",
+					"topics": ["test.topic"],
 					"group_id": "test.consumer.group",
 					"client_id": "test.client.id",
 					"kafka_version": "V2_8_0_0",
@@ -1027,7 +1027,7 @@ var graphqlEngineV2ConfigJson = `{
 				}],
 				"config": {
 					"broker_addresses": ["localhost:9092"],
-					"topic": "test.topic.{{.arguments.name}}",
+					"topics": ["test.topic.{{.arguments.name}}"],
 					"group_id": "test.consumer.group",
 					"client_id": "test.client.id",
 					"kafka_version": "V2_8_0_0",
