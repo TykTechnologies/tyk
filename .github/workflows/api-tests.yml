@@ -113,11 +113,6 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       working-directory: tyk-automated-tests
 
-    - name: Print compose logs
-      run: |
-        docker-compose -f ci/ci_testing_env.yml logs
-      working-directory: tyk-automated-tests
-
     - name: Waiting for dashboard
       run: |
         while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:3000/hello/)" != "200" ]]; do sleep 60 && echo "waiting for dashboard '$(date +"%T")'"; done
