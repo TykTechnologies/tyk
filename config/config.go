@@ -539,6 +539,7 @@ func (r PortRange) Match(port int) bool {
 type PortsWhiteList map[string]PortWhiteList
 
 func (pwl *PortsWhiteList) Decode(value string) error {
+	fmt.Println("value:", value)
 	err := json.Unmarshal([]byte(value), pwl)
 	if err != nil {
 		log.Error("Error unmarshalling TYK_GW_PORTWHITELIST: ", err)
@@ -629,7 +630,7 @@ type Config struct {
 	// A policy can be defined in a file (Open Source installations) or from the same database as the Dashboard.
 	Policies PoliciesConfig `json:"policies"`
 
-	// Defines the ports that will be available for the API services to bind to in the following format: `{ “": “” }``.
+	// Defines the ports that will be available for the API services to bind to in the following format: `{“":“”}` (Remember to insert \ before the “ character).
 	// This is a map of protocol to PortWhiteList. This allows per protocol
 	// configurations.
 	PortWhiteList PortsWhiteList `json:"ports_whitelist"`
