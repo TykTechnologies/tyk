@@ -79,7 +79,6 @@ func TestInternalAPIUsage(t *testing.T) {
 
 	t.Run("with api id", func(t *testing.T) {
 		normal.Proxy.TargetURL = fmt.Sprintf("tyk://%s", internal.APIID)
-		g.RemoveApis()
 		g.Gw.LoadAPI(internal, normal)
 
 		_, _ = g.Run(t, []test.TestCase{
@@ -298,7 +297,6 @@ func TestCORS(t *testing.T) {
 
 	t.Run("CORS enabled", func(t *testing.T) {
 		apis[0].CORS.Enable = true
-		g.RemoveApis()
 		g.Gw.LoadAPI(apis...)
 
 		_, _ = g.Run(t, []test.TestCase{
