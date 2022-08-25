@@ -904,6 +904,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
 		}
 	}
+
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
