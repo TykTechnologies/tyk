@@ -539,7 +539,6 @@ func (r PortRange) Match(port int) bool {
 type PortsWhiteList map[string]PortWhiteList
 
 func (pwl *PortsWhiteList) Decode(value string) error {
-	fmt.Println("value:", value)
 	err := json.Unmarshal([]byte(value), pwl)
 	if err != nil {
 		log.Error("Error unmarshalling TYK_GW_PORTWHITELIST: ", err)
