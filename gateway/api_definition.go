@@ -480,7 +480,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 
 	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
 
-	newRequest.Header.Set("authorization", gwConfig.NodeSecret)
+	newRequest.Header.Set(headers.Authorization, gwConfig.NodeSecret)
 	newRequest.Header.Set(headers.XTykNodeID, a.Gw.GetNodeID())
 
 	a.Gw.ServiceNonceMutex.RLock()
