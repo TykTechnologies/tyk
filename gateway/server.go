@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk/pkg"
 	"github.com/TykTechnologies/tyk/test"
 	"html/template"
 	"io/ioutil"
@@ -1455,7 +1454,6 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 }
 
 func Start() {
-	pkg.SetGODebugEnv()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
