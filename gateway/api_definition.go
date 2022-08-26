@@ -408,7 +408,7 @@ func (f *nestedApiDefinitionList) validate() error {
 }
 
 type nestedApiDefinition struct {
-	*apidef.APIDefinition `json:"api_definition"`
+	*apidef.APIDefinition `json:"api_definition,inline"`
 	OAS                   *oas.OAS `json:"oas"`
 }
 
