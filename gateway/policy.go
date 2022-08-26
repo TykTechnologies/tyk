@@ -23,6 +23,7 @@ type DBAccessDefinition struct {
 	Versions          []string                     `json:"versions"`
 	AllowedURLs       []user.AccessSpec            `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
 	RestrictedTypes   []graphql.Type               `json:"restricted_types"`
+	AllowedTypes      []graphql.Type               `json:"allowed_types"`
 	FieldAccessRights []user.FieldAccessDefinition `json:"field_access_rights"`
 	Limit             *user.APILimit               `json:"limit"`
 }
@@ -34,6 +35,7 @@ func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
 		Versions:          d.Versions,
 		AllowedURLs:       d.AllowedURLs,
 		RestrictedTypes:   d.RestrictedTypes,
+		AllowedTypes:      d.AllowedTypes,
 		FieldAccessRights: d.FieldAccessRights,
 	}
 
