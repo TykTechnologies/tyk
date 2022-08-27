@@ -1600,10 +1600,6 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	}()
 
 	for i, spec := range specs {
-		// if the api already exist then remove it and load the new one
-		if gw.getApiSpec(spec.APIID) != nil {
-			gw.removeApiById(spec.APIID)
-		}
 		specBytes, err := json.Marshal(spec.APIDefinition)
 		if err != nil {
 			panic(err)
