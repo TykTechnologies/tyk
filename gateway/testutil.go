@@ -1572,12 +1572,14 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 		apiGens = append(apiGens, func(spec *APISpec) {})
 	}
 
-	for _, gen := range apiGens {
+	for idx, gen := range apiGens {
 		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 		if err := json.Unmarshal([]byte(sampleAPI), spec.APIDefinition); err != nil {
 			panic(err)
 		}
-		spec.APIID = randStringBytes(8)
+		if idx > 0 {
+			spec.APIID = randStringBytes(8)
+		}
 		gen(spec)
 		specs = append(specs, spec)
 	}
