@@ -890,6 +890,8 @@ OUTER:
 				if spec.Checksum == curSpec.Checksum {
 					// if API has not changed, do not reload it
 					tmpSpecRegister[spec.APIID] = spec
+					curHandle, _ := gw.apisHandlesByID.Load(spec.APIID)
+					tmpSpecHandles.Store(spec.APIID, curHandle)
 					gw.apisMu.RUnlock()
 					continue OUTER
 				} else {
