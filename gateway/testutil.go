@@ -1577,7 +1577,7 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 		if err := json.Unmarshal([]byte(sampleAPI), spec.APIDefinition); err != nil {
 			panic(err)
 		}
-
+		spec.APIID = randStringBytes(8)
 		gen(spec)
 		specs = append(specs, spec)
 	}
