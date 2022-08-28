@@ -85,6 +85,8 @@ var (
 const appName = "tyk-gateway"
 
 type Gateway struct {
+	started bool
+
 	DefaultProxyMux *proxyMux
 	config          atomic.Value
 	configMu        sync.Mutex
@@ -1754,8 +1756,8 @@ func (gw *Gateway) GetConfig() config.Config {
 	return gw.config.Load().(config.Config)
 }
 
-func (gw *Gateway) SetConfig(conf config.Config) {
+func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
-	defer gw.configMu.Unlock()
 	gw.config.Store(conf)
+	gw.configMu.Unlock()
 }
