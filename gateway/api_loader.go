@@ -907,6 +907,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				spec.Proxy.ListenPath = converted
 			}
 
+			gw.apisMu.RLock()
 			for _, spec := range specs {
 				for _, curSpec := range gw.apisByID {
 					if spec.APIID == curSpec.APIID && spec.Checksum != curSpec.Checksum {
@@ -914,6 +915,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 					}
 				}
 			}
+			gw.apisMu.RUnlock()
 
 			if _, found := tmpSpecRegister[spec.APIID]; !found {
 				tmpSpecRegister[spec.APIID] = spec
