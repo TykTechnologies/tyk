@@ -562,14 +562,14 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
 			if h, found := d.Gw.apisHandlesByID.Load(d.SH.Spec.APIID); found {
-				handler = h.(http.Handler)
+				handler = h.(*ChainObject).ThisHandler
 			}
 		} else {
 			ctxSetVersionInfo(r, nil)
 
 			if targetAPI := d.Gw.fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
 				if h, found := d.Gw.apisHandlesByID.Load(targetAPI.APIID); found {
-					handler = h.(http.Handler)
+					handler = h.(*ChainObject).ThisHandler
 				}
 			} else {
 				handler := ErrorHandler{*d.SH.Base()}
@@ -620,7 +620,7 @@ func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handle
 		return nil, nil, false
 	}
 
-	return h.(http.Handler), targetAPI, true
+	return h.(*ChainObject).ThisHandler, targetAPI, true
 }
 
 func (gw *Gateway) loadGlobalApps() {
@@ -705,7 +705,7 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux,
 //
 // - register gorilla/mux routing handless with proxyMux directly (wrapped),
 // - return a raw http.Handler for tyk://ID urls.
-func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) http.Handler {
+func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) *ChainObject {
 	gwConfig := gw.GetConfig()
 	port := gwConfig.ListenPort
 	if spec.ListenPort != 0 {
@@ -729,9 +729,18 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 	subrouter := router.PathPrefix(spec.Proxy.ListenPath).Subrouter()
 
-	chainObj := gw.processSpec(spec, apisByListen, gs, subrouter, logrus.NewEntry(log))
+	var chainObj *ChainObject
+
+	if curSpec, ok := gw.apisByID[spec.APIID]; ok && curSpec.Checksum == spec.Checksum {
+		if chain, found := gw.apisHandlesByID.Load(spec.APIID); found {
+			chainObj = chain.(*ChainObject)
+		}
+	} else {
+		chainObj = gw.processSpec(spec, apisByListen, gs, subrouter, logrus.NewEntry(log))
+	}
+
 	if chainObj.Skip {
-		return chainObj.ThisHandler
+		return chainObj
 	}
 
 	if !chainObj.Open {
@@ -741,7 +750,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	httpHandler := explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, gwConfig.HttpServerOptions.EnableStrictRoutes)
 	subrouter.NewRoute().Handler(httpHandler)
 
-	return chainObj.ThisHandler
+	return chainObj
 }
 
 func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
@@ -851,7 +860,6 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
 	tmpSpecRegister := make(map[string]*APISpec)
-	specsToReload := make([]*APISpec, 0)
 	tmpSpecHandles := new(sync.Map)
 
 	// sort by listen path from longer to shorter, so that /foo
@@ -882,25 +890,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
 
-OUTER:
 	for _, spec := range specs {
-		gw.apisMu.RLock()
-		for _, curSpec := range gw.apisByID {
-			if spec.APIID == curSpec.APIID {
-				if spec.Checksum == curSpec.Checksum {
-					// if API has not changed, do not reload it
-					tmpSpecRegister[spec.APIID] = spec
-					curHandle, _ := gw.apisHandlesByID.Load(spec.APIID)
-					tmpSpecHandles.Store(spec.APIID, curHandle)
-					gw.apisMu.RUnlock()
-					continue OUTER
-				} else {
-					specsToReload = append(specsToReload, curSpec)
-				}
-			}
-		}
-		gw.apisMu.RUnlock()
-
 		func() {
 			defer func() {
 				// recover from panic if one occured. Set err to nil otherwise.
@@ -939,12 +929,15 @@ OUTER:
 
 	gw.DefaultProxyMux.swap(muxer, gw)
 
-	// release current specs resources before overwriting map
-	for _, spec := range specsToReload {
-		spec.Release()
-	}
-
 	gw.apisMu.Lock()
+
+	for _, spec := range specs {
+		for _, curSpec := range gw.apisByID {
+			if spec.APIID == curSpec.APIID && spec.Checksum != curSpec.Checksum {
+				spec.Release()
+			}
+		}
+	}
 
 	gw.apisByID = tmpSpecRegister
 	gw.apisHandlesByID = tmpSpecHandles
