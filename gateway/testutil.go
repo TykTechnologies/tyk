@@ -1144,6 +1144,8 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	go s.reloadSimulation(s.ctx, gw)
 
+	gw.started = true
+
 	return gw
 }
 
@@ -1191,6 +1193,7 @@ func (s *Test) Close() {
 	s.Gw.Analytics.Stop()
 	s.Gw.ReloadTestCase.StopTicker()
 	s.Gw.GlobalHostChecker.StopPoller()
+	s.Gw.started = false
 
 	err = s.RemoveApis()
 	if err != nil {
@@ -1591,12 +1594,12 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	gwConf := gw.GetConfig()
 	oldPath := gwConf.AppPath
 	gwConf.AppPath, _ = ioutil.TempDir("", "apps")
-	gw.SetConfig(gwConf)
+	gw.SetConfig(gwConf, true)
 	defer func() {
 		globalConf := gw.GetConfig()
 		os.RemoveAll(globalConf.AppPath)
 		globalConf.AppPath = oldPath
-		gw.SetConfig(globalConf)
+		gw.SetConfig(globalConf, true)
 	}()
 
 	for i, spec := range specs {

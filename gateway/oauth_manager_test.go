@@ -110,7 +110,6 @@ func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 }
 
 func (s *Test) LoadTestOAuthSpec() *APISpec {
-	s.Gw.BuildAndLoadAPI()
 	return s.Gw.LoadAPI(buildTestOAuthSpec())[0]
 }
 
@@ -632,9 +631,10 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 		// cleanup tokens older than 300 seconds
 		globalConf.OauthTokenExpiredRetainPeriod = 300
 	}
-	ts := StartTest(conf)
-	defer ts.Close()
 	testPagination := func(pageParam int, expectedPageNumber int, tokenRequestCount int, expectedRes int) {
+		ts := StartTest(conf)
+		defer ts.Close()
+
 		spec := ts.LoadTestOAuthSpec()
 
 		clientID := uuid.NewV4().String()
