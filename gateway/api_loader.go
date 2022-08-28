@@ -907,7 +907,17 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				spec.Proxy.ListenPath = converted
 			}
 
-			tmpSpecRegister[spec.APIID] = spec
+			for _, spec := range specs {
+				for _, curSpec := range gw.apisByID {
+					if spec.APIID == curSpec.APIID && spec.Checksum != curSpec.Checksum {
+						tmpSpecRegister[spec.APIID] = curSpec
+					}
+				}
+			}
+
+			if _, found := tmpSpecRegister[spec.APIID]; !found {
+				tmpSpecRegister[spec.APIID] = spec
+			}
 
 			switch spec.Protocol {
 			case "", "http", "https", "h2c":
