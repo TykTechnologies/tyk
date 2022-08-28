@@ -731,6 +731,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 	var chainObj *ChainObject
 
+	gw.apisMu.RLock()
 	if curSpec, ok := gw.apisByID[spec.APIID]; ok && curSpec.Checksum == spec.Checksum {
 		if chain, found := gw.apisHandlesByID.Load(spec.APIID); found {
 			chainObj = chain.(*ChainObject)
@@ -738,6 +739,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	} else {
 		chainObj = gw.processSpec(spec, apisByListen, gs, subrouter, logrus.NewEntry(log))
 	}
+	gw.apisMu.RUnlock()
 
 	if chainObj.Skip {
 		return chainObj
@@ -908,18 +910,12 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			}
 
 			gw.apisMu.RLock()
-			for _, spec := range specs {
-				for _, curSpec := range gw.apisByID {
-					if spec.APIID == curSpec.APIID && spec.Checksum != curSpec.Checksum {
-						tmpSpecRegister[spec.APIID] = curSpec
-					}
-				}
-			}
-			gw.apisMu.RUnlock()
-
-			if _, found := tmpSpecRegister[spec.APIID]; !found {
+			if curSpec, found := gw.apisByID[spec.APIID]; found && spec.Checksum != curSpec.Checksum {
+				tmpSpecRegister[spec.APIID] = curSpec
+			} else {
 				tmpSpecRegister[spec.APIID] = spec
 			}
+			gw.apisMu.RUnlock()
 
 			switch spec.Protocol {
 			case "", "http", "https", "h2c":
