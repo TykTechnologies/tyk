@@ -110,6 +110,7 @@ func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 }
 
 func (s *Test) LoadTestOAuthSpec() *APISpec {
+	s.Gw.BuildAndLoadAPI()
 	return s.Gw.LoadAPI(buildTestOAuthSpec())[0]
 }
 

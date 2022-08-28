@@ -232,6 +232,9 @@ func TestAnalytics_Write(t *testing.T) {
 				globalConf.AnalyticsConfig.EnableDetailedRecording = true
 				ts.Gw.SetConfig(globalConf)
 
+				// Since we changed config, we need to force all APIs be reloaded
+				ts.Gw.BuildAndLoadAPI()
+
 				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 					spec.UseKeylessAccess = false
 					spec.Proxy.ListenPath = "/"
