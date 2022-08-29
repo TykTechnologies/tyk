@@ -72,8 +72,9 @@ jobs:
           
           if [[ "${failures}" == "null" ]];then
             if [[ "$env_status" == "ACTIVE" ]]
-            echo "::set-output name=env-exist::'true'"
-          elif [[ "${failures}" == "MISSING" ]]
+              echo "::set-output name=env-exist::'true'"
+            fi
+          elif [[ "${failures}" == "MISSING" ]];then
             echo "::set-output name=env-exist::'false'"
           fi
 
