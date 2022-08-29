@@ -71,7 +71,7 @@ jobs:
           env_status="$(echo "$output" | jq -r '.clusters[0].status')"
           
           if [[ "${failures}" == "null" ]];then
-            if [[ "$env_status" == "ACTIVE" ]]
+            if [[ "$env_status" == "ACTIVE" ]];then
               echo "::set-output name=env-exist::'true'"
             fi
           elif [[ "${failures}" == "MISSING" ]];then
