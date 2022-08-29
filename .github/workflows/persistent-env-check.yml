@@ -67,8 +67,8 @@ jobs:
         run:
           output=$(aws ecs describe-clusters --clusters ${{ env.CLUSTER }})
 
-          failures=$(echo $output | jq '.failures[0].reason')
-          env-status=$(echo $output | jq '.clusters[0].status')
+          failures="$(echo $output | jq '.failures[0].reason')"
+          env-status="$(echo $output | jq '.clusters[0].status')"
           
           if [[ "${failures}" == "null" ]];then
             if [[ "$env-status" == "ACTIVE" ]]
