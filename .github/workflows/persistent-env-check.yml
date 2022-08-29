@@ -13,7 +13,7 @@ jobs:
   Check:
     runs-on: ubuntu-latest
     outputs: 
-      #env-exist: ${{ steps.set-output-defaults.outputs.env-exist }}
+      env-exist: ${{ steps.check-env.outputs.env-exist }}
       container-name: ${{ steps.set-output-defaults.outputs.container-name }}
       cluster: ${{ steps.set-output-defaults.outputs.cluster }}
       service: ${{ steps.set-output-defaults.outputs.service }}
@@ -63,7 +63,7 @@ jobs:
           aws-region: ${{ steps.aws-creds.outputs.region }}
 
       - name: Check environment exist
-        id: env-exists
+        id: check-env
         run: |
           output="$(aws ecs describe-clusters --clusters ${{ env.CLUSTER }})"
           echo "$output"
