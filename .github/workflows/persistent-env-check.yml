@@ -64,7 +64,7 @@ jobs:
 
       - name: Check environment exist
         id: env-exists
-        run:
+        run: |
           output="$(aws ecs describe-clusters --clusters ${{ env.CLUSTER }})"
           failures="$(echo $output | jq -r '.failures[0].reason')"
           env-status="$(echo $output | jq -r '.clusters[0].status')"
