@@ -8,9 +8,6 @@ on:
       cluster:
         required: true
         type: string
-      service:
-        required: true
-        type: string
       terraformDir:
         required: false
         type: string
@@ -23,7 +20,6 @@ on:
 
 env:
   TERRAFORM_DIR: ${{ inputs.terraformDir }}
-  SERVICE: ${{ inputs.service }}
   CONTAINER_NAME: ${{ inputs.containerName }}
   CLUSTER: ${{ inputs.cluster }}
 
