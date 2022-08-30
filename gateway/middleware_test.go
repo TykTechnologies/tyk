@@ -19,6 +19,7 @@ import (
 
 type mockStore struct {
 	SessionHandler
+	//DetailNotFound is used to make mocked SessionDetail return (x,false), as if it don't find the session in the mocked storage.
 	DetailNotFound bool
 }
 
@@ -59,7 +60,7 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 	m.Spec.OrgSessionManager = mockStore{DetailNotFound: true}
 	noOrgSess := "nonexistent_org"
 	got = m.OrgSessionExpiry(noOrgSess)
-	assert.Equal(t, defaultOrgSessionExpiry, got)
+	assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
 
 }
 

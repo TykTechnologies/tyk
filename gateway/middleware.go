@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	mwStatusRespond         = 666
-	defaultOrgSessionExpiry = int64(604800)
+	mwStatusRespond                = 666
+	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
 )
 
 var (
@@ -268,8 +268,8 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	if err != nil {
 
 		t.Logger().Debug("no cached entry found, returning 7 days")
-		t.SetOrgExpiry(orgid, defaultOrgSessionExpiry)
-		return defaultOrgSessionExpiry
+		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
+		return DEFAULT_ORG_SESSION_EXPIRATION
 	}
 
 	return id.(int64)
