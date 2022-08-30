@@ -100,6 +100,7 @@ jobs:
     secrets:
       aws_key: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
       aws_secret: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
+      tf_token: ${{ secrets.TF_API_TOKEN }}
 
   Update-workflow:
     if: ${{ needs.Check.outputs.env-exist == 'true' }}

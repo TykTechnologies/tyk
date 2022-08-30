@@ -17,6 +17,8 @@ on:
         required: true
       aws_secret:
         required: true
+      tf_token:
+        required: true
 
 env:
   TERRAFORM_DIR: ${{ inputs.terraformDir }}
@@ -35,7 +37,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
         with:
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          cli_config_credentials_token: ${{ secrets.tf_token }}
           terraform_wrapper: false
       
       - name: Terraform Format
