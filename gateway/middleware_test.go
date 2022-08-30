@@ -19,6 +19,8 @@ import (
 
 type mockStore struct {
 	SessionHandler
+	//DetailNotFound is used to make mocked SessionDetail return (x,false), as if it don't find the session in the mocked storage.
+	DetailNotFound bool
 }
 
 var sess = user.SessionState{
@@ -26,8 +28,8 @@ var sess = user.SessionState{
 	DataExpires: 110,
 }
 
-func (mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
-	return sess.Clone(), true
+func (m mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+	return sess.Clone(), !m.DetailNotFound
 }
 
 func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
@@ -48,14 +50,18 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 	ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
 
 	got := m.OrgSessionExpiry(sess.OrgID)
-	if got != v {
-		t.Errorf("expected %d got %d", v, got)
-	}
+	assert.Equal(t, v, got)
 	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+
 	got = m.OrgSessionExpiry(sess.OrgID)
-	if got != sess.DataExpires {
-		t.Errorf("expected %d got %d", sess.DataExpires, got)
-	}
+	assert.Equal(t, sess.DataExpires, got)
+	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+
+	m.Spec.OrgSessionManager = mockStore{DetailNotFound: true}
+	noOrgSess := "nonexistent_org"
+	got = m.OrgSessionExpiry(noOrgSess)
+	assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+
 }
 
 func TestBaseMiddleware_getAuthType(t *testing.T) {
