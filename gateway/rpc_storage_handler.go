@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -1028,9 +1027,18 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
 			var status int
+
 			if isHashed {
-				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				key = splitKeys[0]
+			}
+			_, found := r.Gw.GlobalSessionManager.SessionDetail(orgId, key, isHashed)
+			// if key not found locally and synchroniser disabled then we should not pull from management layer
+			if !found && !synchronizerEnabled {
+				continue
+			}
+
+			if isHashed {
+				log.Info("--> removing cached (hashed) key: ", key)
 				_, status = r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
 			} else {
 				log.Info("--> removing cached key: ", key)
@@ -1040,11 +1048,8 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				}
 				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
 			}
+			// if synchroniser is off, do not remove because we dont know if we will be able to pull it later
 
-			// if key not found locally and synchroniser disabled then we should not pull it from management layer
-			if status == http.StatusNotFound && !synchronizerEnabled {
-				continue
-			}
 			r.Gw.getSessionAndCreate(splitKeys[0], r, isHashed, orgId)
 			r.Gw.SessionCache.Delete(key)
 			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
