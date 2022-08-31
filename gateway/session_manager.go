@@ -338,6 +338,7 @@ func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, api 
 			accessDef.Limit = rights.Limit
 			accessDef.FieldAccessRights = rights.FieldAccessRights
 			accessDef.RestrictedTypes = rights.RestrictedTypes
+			accessDef.AllowedTypes = rights.AllowedTypes
 			allowanceScope = rights.AllowanceScope
 		}
 	}
