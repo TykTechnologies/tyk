@@ -1026,8 +1026,6 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			_, resetQuota := keysToReset[splitKeys[0]]
 
 			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
-			var status int
-
 			if isHashed {
 				key = splitKeys[0]
 			}
@@ -1039,16 +1037,15 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 			if isHashed {
 				log.Info("--> removing cached (hashed) key: ", key)
-				_, status = r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
+				r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
 			} else {
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
 				}
-				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
+				r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
 			}
-			// if synchroniser is off, do not remove because we dont know if we will be able to pull it later
 
 			r.Gw.getSessionAndCreate(splitKeys[0], r, isHashed, orgId)
 			r.Gw.SessionCache.Delete(key)
