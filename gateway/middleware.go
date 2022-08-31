@@ -416,6 +416,14 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							}
 						}
 
+						for _, t := range v.AllowedTypes {
+							for ri, rt := range r.AllowedTypes {
+								if t.Name == rt.Name {
+									r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+								}
+							}
+						}
+
 						mergeFieldLimits := func(res *user.FieldLimits, new user.FieldLimits) {
 							if greaterThanInt(new.MaxQueryDepth, res.MaxQueryDepth) {
 								res.MaxQueryDepth = new.MaxQueryDepth
