@@ -29,7 +29,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const mwStatusRespond = 666
+const (
+	mwStatusRespond                = 666
+	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
+)
 
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
@@ -232,7 +235,8 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
-		t.Logger().Debug("Setting data expiry: ", session.OrgID)
+		t.Logger().Debug("Setting data expiry: ", orgID)
+
 		t.Gw.ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
@@ -253,16 +257,21 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 		if found {
 			return cachedVal, nil
 		}
+
 		s, found := t.OrgSession(orgid)
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 			return s.DataExpires, nil
 		}
+
 		return 0, errors.New("missing session")
 	})
 	if err != nil {
+
 		t.Logger().Debug("no cached entry found, returning 7 days")
-		return int64(604800)
+		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
+		return DEFAULT_ORG_SESSION_EXPIRATION
 	}
+
 	return id.(int64)
 }
 
@@ -403,6 +412,14 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							for ri, rt := range r.RestrictedTypes {
 								if t.Name == rt.Name {
 									r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+								}
+							}
+						}
+
+						for _, t := range v.AllowedTypes {
+							for ri, rt := range r.AllowedTypes {
+								if t.Name == rt.Name {
+									r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
 								}
 							}
 						}
