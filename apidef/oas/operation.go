@@ -474,10 +474,18 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidateRequestMeta) {
 }
 
 type MockResponse struct {
-	Enabled bool              `bson:"enabled" json:"enabled"`
-	Code    int               `bson:"code,omitempty" json:"code,omitempty"`
-	Body    string            `bson:"body,omitempty" json:"body,omitempty"`
-	Headers map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
+	Enabled         bool              `bson:"enabled" json:"enabled"`
+	Code            int               `bson:"code,omitempty" json:"code,omitempty"`
+	Body            string            `bson:"body,omitempty" json:"body,omitempty"`
+	Headers         map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
+	FromOASExamples *FromOASExamples  `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
+}
+
+type FromOASExamples struct {
+	Enabled     bool   `bson:"enabled" json:"enabled"`
+	Code        int    `bson:"code,omitempty" json:"code,omitempty"`
+	ContentType string `bson:"contentType,omitempty" json:"contentType,omitempty"`
+	ExampleName string `bson:"exampleName,omitempty" json:"exampleName,omitempty"`
 }
 
 /*func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {

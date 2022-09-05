@@ -1116,4 +1116,27 @@
 
   **Type: `string`**
 
+- **`fromOASExamples`**
+
+  **Type: [FromOASExamples](#fromoasexamples)**
+
+
+### **FromOASExamples**
+
+- **`enabled`**
+
+  **Type: `boolean`**
+
+- **`code`**
+
+  **Type: `int`**
+
+- **`contentType`**
+
+  **Type: `string`**
+
+- **`exampleName`**
+
+  **Type: `string`**
+
 
