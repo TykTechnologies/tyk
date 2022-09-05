@@ -140,9 +140,9 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		}
 	}
 
-	/*if example == nil {
+	if example == nil {
 		example = oas.ExampleExtractor(media.Schema)
-	}*/
+	}
 
 	body, err := json.Marshal(example)
 	if err != nil {
