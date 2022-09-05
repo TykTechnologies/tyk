@@ -62,6 +62,7 @@ type AccessDefinition struct {
 	AllowedURLs       []AccessSpec            `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
 	RestrictedTypes   []graphql.Type          `json:"restricted_types" msg:"restricted_types"`
 	AllowedTypes      []graphql.Type          `json:"allowed_types" msg:"allowed_types"`
+	EnableAllow       bool                    `json:"enable_allow" msg:"enable_allow"`
 	Limit             APILimit                `json:"limit" msg:"limit"`
 	FieldAccessRights []FieldAccessDefinition `json:"field_access_rights" msg:"field_access_rights"`
 
