@@ -18,6 +18,10 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/getkin/kin-openapi/routers"
+
+	"github.com/getkin/kin-openapi/routers/gorillamux"
+
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -215,6 +219,9 @@ type APISpec struct {
 		Client *http.Client
 		Schema *graphql.Schema
 	} `json:"-"`
+
+	hasMock   bool
+	OASRouter routers.Router
 }
 
 // GetSessionLifetimeRespectsKeyExpiration returns a boolean to tell whether session lifetime should respect to key expiration or not.
@@ -397,6 +404,14 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 
 		spec.OAS = *def.OAS
 	}
+
+	var err error
+	spec.OASRouter, err = gorillamux.NewRouter(&spec.OAS.T)
+	if err != nil {
+		log.WithError(err).Error("Could not create OAS router")
+	}
+
+	spec.setHasMock()
 
 	return spec
 }
@@ -1660,6 +1675,41 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	}
 
 	log.Debug("Upstream path is: ", r.URL.Path)
+}
+
+func (a *APISpec) HasMock() bool {
+	return a.hasMock
+}
+
+func (a *APISpec) setHasMock() {
+	if !a.IsOAS {
+		a.hasMock = false
+		return
+	}
+
+	middleware := a.OAS.GetTykExtension().Middleware
+	if middleware == nil {
+		a.hasMock = false
+		return
+	}
+
+	if len(middleware.Operations) == 0 {
+		a.hasMock = false
+		return
+	}
+
+	for _, operation := range middleware.Operations {
+		if operation.MockResponse == nil {
+			continue
+		}
+
+		if operation.MockResponse.Enabled {
+			a.hasMock = true
+			return
+		}
+	}
+
+	a.hasMock = false
 }
 
 type RoundRobin struct {
