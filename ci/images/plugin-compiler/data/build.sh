@@ -69,7 +69,7 @@ rm -rf $TYK_GW_PATH/vendor
 
 rm /go/src/modules.txt
 
-if [[ $GOOS == "arm64" ]]; then
+if [[ $GOARCH == "arm64" ]] && [[ $GOOS == "linux" ]] ; then
     CC=aarch64-linux-gnu-gcc
 else
     CC=$(go env CC)
