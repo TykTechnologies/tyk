@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -96,7 +95,7 @@ func (g *GraphqlGranularAccessChecker) CheckGraphqlRequestFieldAllowance(gqlRequ
 			// Allow list feature is enabled but the list is empty.
 			var errors graphql.RequestErrors = []graphql.RequestError{
 				{
-					Message: fmt.Sprintf("the allow list is empty"),
+					Message: "the allow list is empty",
 				},
 			}
 			return GraphqlGranularAccessResult{
