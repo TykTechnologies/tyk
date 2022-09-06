@@ -272,7 +272,7 @@ func TestGraphQL_AllowedTypes_Empty_List(t *testing.T) {
 				Data:    restrictedQuery,
 				Headers: authHeaderWithDirectKey,
 				BodyMatchFunc: func(bytes []byte) bool {
-					return assert.Contains(t, string(bytes), `{"errors":[{"message":"there are no allowed types"}]}`)
+					return assert.Contains(t, string(bytes), `{"errors":[{"message":"the allow list is empty"}]}`)
 				},
 				Code: http.StatusBadRequest,
 			},
@@ -292,7 +292,7 @@ func TestGraphQL_AllowedTypes_Empty_List(t *testing.T) {
 				Data:    restrictedQuery,
 				Headers: authHeaderWithPolicyAppliedKey,
 				BodyMatchFunc: func(bytes []byte) bool {
-					return assert.Contains(t, string(bytes), `{"errors":[{"message":"there are no allowed types"}]}`)
+					return assert.Contains(t, string(bytes), `{"errors":[{"message":"the allow list is empty"}]}`)
 				},
 				Code: http.StatusBadRequest,
 			},
