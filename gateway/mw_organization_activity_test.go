@@ -1,4 +1,3 @@
-//go:build !race
 // +build !race
 
 package gateway
