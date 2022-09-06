@@ -75,5 +75,5 @@ else
     CC=$(go env CC)
 fi
 
-GO111MODULE=off GOOS=$GOOS GOARCH=$GOARCH CC=$CC  go build -buildmode=plugin -o $plugin_name \
+GO111MODULE=off CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH CC=$CC  go build -buildmode=plugin -o $plugin_name \
     && mv $plugin_name $PLUGIN_SOURCE_PATH
