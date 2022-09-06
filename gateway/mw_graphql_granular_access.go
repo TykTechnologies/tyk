@@ -93,9 +93,10 @@ func (g *GraphqlGranularAccessChecker) validateFieldRestrictions(gqlRequest *gra
 func (g *GraphqlGranularAccessChecker) CheckGraphqlRequestFieldAllowance(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) GraphqlGranularAccessResult {
 	if accessDef.EnableAllow {
 		if len(accessDef.AllowedTypes) == 0 {
+			// Allow list feature is enabled but the list is empty.
 			var errors graphql.RequestErrors = []graphql.RequestError{
 				{
-					Message: fmt.Sprintf("there are no allowed types"),
+					Message: fmt.Sprintf("the allow list is empty"),
 				},
 			}
 			return GraphqlGranularAccessResult{
@@ -114,7 +115,7 @@ func (g *GraphqlGranularAccessChecker) CheckGraphqlRequestFieldAllowance(gqlRequ
 	}
 
 	if len(accessDef.RestrictedTypes) == 0 {
-		// There is no restricted types. Every field is allowed to access.
+		// There are no restricted types. Every field is allowed access.
 		return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonNone}
 	}
 	fieldRestrictionList := graphql.FieldRestrictionList{
