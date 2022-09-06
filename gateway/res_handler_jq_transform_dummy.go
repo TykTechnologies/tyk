@@ -1,4 +1,5 @@
-//+build !jq
+//go:build !jq
+// +build !jq
 
 package gateway
 

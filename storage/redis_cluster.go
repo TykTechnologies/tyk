@@ -387,6 +387,12 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 		log.Error("Error trying to get TTL: ", err)
 		return 0, ErrKeyNotFound
 	}
+
+	//since redis-go v8.3.1, if there's no expiration or the key doesn't exists, the ttl returned is measured in nanoseconds
+	if value.Nanoseconds() == -1 || value.Nanoseconds() == -2 {
+		return value.Nanoseconds(), nil
+	}
+
 	return int64(value.Seconds()), nil
 }
 

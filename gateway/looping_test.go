@@ -1,3 +1,4 @@
+//go:build !race
 // +build !race
 
 // Looping by itself has race nature
