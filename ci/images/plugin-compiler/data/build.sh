@@ -7,14 +7,13 @@ plugin_id=$2
 # GOOS and GOARCH can be send to override the name of the plugin
 GOOS=$3
 GOARCH=$4
-CGOENABLED=0
 
-  PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}$plugin_id"
+PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}$plugin_id"
 
 function usage() {
     cat <<EOF
 To build a plugin:
-      $0 <plugin_name> <plugin_id>
+      $0 <plugin_name> <plugin_id> [<GOOS>] [<GOARCH>]
 
 <plugin_id> is optional
 EOF
@@ -36,9 +35,6 @@ if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
   plugin_name="${plugin_name%.*}_${CURRENTVERS}_${GOOS}_${GOARCH}.so"
 fi
 
-if [[ $GOOS != "linux" ]];then
-    CGOENABLED=1
-fi
 
 mkdir -p $PLUGIN_BUILD_PATH
 # Plugin's vendor folder, has precedence over the cached vendor'd dependencies from tyk
@@ -73,5 +69,11 @@ rm -rf $TYK_GW_PATH/vendor
 
 rm /go/src/modules.txt
 
-GO111MODULE=off CGO_ENABLE=$CGO_ENABLE GOOS=$GOOS GOARCH=$GOARCH  go build -buildmode=plugin -o $plugin_name \
+if [[ $GOOS == "arm64" ]]; then
+    CC=aarch64-linux-gnu-gcc
+else
+    CC=$(go env CC)
+fi
+
+GO111MODULE=off GOOS=$GOOS GOARCH=$GOARCH CC=$CC  go build -buildmode=plugin -o $plugin_name \
     && mv $plugin_name $PLUGIN_SOURCE_PATH
