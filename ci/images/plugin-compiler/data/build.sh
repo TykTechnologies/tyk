@@ -34,8 +34,12 @@ if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
   plugin_name="${plugin_name%.*}_${CURRENTVERS}_${GOOS}_${GOARCH}.so"
 fi
 
-cd $PLUGIN_SOURCE_PATH
+cd $TYK_GW_PATH
+go mod download
+go list -m -f '{{ if not .Main }}{{ .Path }} {{ .Version }}{{ end }}' all > dependencies.txt
 
+cd $PLUGIN_SOURCE_PATH
+go get
 
 # Get plugin dependencies
 go list -m -f '{{ if not .Main }}{{ .Path }} {{ .Version }}{{ end }}' all > dependencies.txt
