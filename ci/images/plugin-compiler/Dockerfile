@@ -17,7 +17,8 @@ COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
 COPY . $TYK_GW_PATH
-RUN cd $TYK_GW_PATH && go mod vendor
+RUN cd $TYK_GW_PATH
+RUN go list -m -f '{{ if not .Main }}{{ .Path }} {{ .Version }}{{ end }}' all > dependencies.txt
 
 ENTRYPOINT ["/build.sh"]
 
