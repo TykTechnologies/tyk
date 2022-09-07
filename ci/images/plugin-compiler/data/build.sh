@@ -13,9 +13,10 @@ PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}$plugin_id"
 function usage() {
     cat <<EOF
 To build a plugin:
-      $0 <plugin_name> <plugin_id> [<GOOS>] [<GOARCH>]
+      $0 <plugin_name> [<plugin_id>] [<GOOS>] [<GOARCH>]
 
-<plugin_id> is optional
+<plugin_id>,<GOOS> and <GOARCH> are optional
+default values for <GOOS> and <GOARCH> are the same as the plugin-compiler image(GOOS=linux,GOARCH=amd64)
 EOF
 }
 
@@ -69,6 +70,7 @@ rm -rf $TYK_GW_PATH/vendor
 
 rm /go/src/modules.txt
 
+# set appropriate X-build gcc binary for arm64.
 if [[ $GOARCH == "arm64" ]] && [[ $GOOS == "linux" ]] ; then
     CC=aarch64-linux-gnu-gcc
 else
