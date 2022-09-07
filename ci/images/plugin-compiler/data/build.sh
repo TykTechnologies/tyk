@@ -8,8 +8,6 @@ plugin_id=$2
 GOOS=$3
 GOARCH=$4
 
-PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}$plugin_id"
-
 function usage() {
     cat <<EOF
 To build a plugin:
@@ -36,39 +34,19 @@ if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
   plugin_name="${plugin_name%.*}_${CURRENTVERS}_${GOOS}_${GOARCH}.so"
 fi
 
+cd $PLUGIN_SOURCE_PATH
 
-mkdir -p $PLUGIN_BUILD_PATH
-# Plugin's vendor folder, has precedence over the cached vendor'd dependencies from tyk
-yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
 
-cd $PLUGIN_BUILD_PATH
+# Get plugin dependencies
+go list -m -f '{{ if not .Main }}{{ .Path }} {{ .Version }}{{ end }}' all > dependencies.txt
 
-# Handle if plugin has own vendor folder, and ignore error if not
-[ -f go.mod ] && [ ! -d ./vendor ] && GO111MODULE=on go mod vendor
-# Ensure that go modules not used
-rm -rf go.mod
+# for any shared dependency, pin the version to Tyk gateway version
+awk 'NR==FNR{seen[$1]=$2; next} seen[$1] && seen[$1] != $2' $PLUGIN_SOURCE_PATH/dependencies.txt $TYK_GW_PATH/dependencies.txt | while read PKG VER; do
+  go mod edit -replace $PKG=$PKG@$VER
+done
 
-# We do not need to care which version of Tyk vendored in plugin, since we going to use version inside compiler
-rm -rf $PLUGIN_BUILD_PATH/vendor/github.com/TykTechnologies/tyk
+go mod edit -replace github.com/TykTechnologies/tyk=$TYK_GW_PATH
 
-# Copy plugin vendored pkgs to GOPATH
-yes | cp -rf $PLUGIN_BUILD_PATH/vendor/* $GOPATH/src || true \
-        && rm -rf $PLUGIN_BUILD_PATH/vendor
-
-# Ensure that GW package versions have priorities
-
-# We can't just copy Tyk dependencies on top of plugin dependencies, since different package versions have different file structures
-# First we need to find which deps GW already has, remove this folders, and after copy fresh versions from GW
-
-# github.com and rest of packages have different nesting levels, so have to handle it separately
-ls -d $TYK_GW_PATH/vendor/github.com/*/* | sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | xargs -d '\n' rm -rf
-ls -d $TYK_GW_PATH/vendor/*/* | sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | grep -v github | xargs -d '\n' rm -rf
-
-# Copy GW dependencies
-yes | cp -rf $TYK_GW_PATH/vendor/* $GOPATH/src
-rm -rf $TYK_GW_PATH/vendor
-
-rm /go/src/modules.txt
 
 # set appropriate X-build gcc binary for arm64.
 if [[ $GOARCH == "arm64" ]] && [[ $GOOS == "linux" ]] ; then
@@ -77,5 +55,4 @@ else
     CC=$(go env CC)
 fi
 
-GO111MODULE=off CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH CC=$CC  go build -buildmode=plugin -o $plugin_name \
-    && mv $plugin_name $PLUGIN_SOURCE_PATH
+CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH CC=$CC  go build -buildmode=plugin -o $plugin_name
