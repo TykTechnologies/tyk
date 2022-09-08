@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var testVersion = "3.5"
+var testVersion = "3.9"
 
 func init() {
 	if versionOverride := os.Getenv("PYTHON_VERSION"); versionOverride != "" {
