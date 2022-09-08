@@ -124,9 +124,8 @@ func TestGraphQL_AllowedTypes(t *testing.T) {
 	_, directKey := g.CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
-				APIID:       api.APIID,
-				APIName:     api.Name,
-				EnableAllow: true,
+				APIID:   api.APIID,
+				APIName: api.Name,
 				AllowedTypes: []graphql.Type{
 					{
 						Name:   "Country",
@@ -144,9 +143,8 @@ func TestGraphQL_AllowedTypes(t *testing.T) {
 	pID := g.CreatePolicy(func(p *user.Policy) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
-				APIID:       api.APIID,
-				APIName:     api.Name,
-				EnableAllow: true,
+				APIID:   api.APIID,
+				APIName: api.Name,
 				AllowedTypes: []graphql.Type{
 					{
 						Name:   "Country",
@@ -220,87 +218,6 @@ func TestGraphQL_AllowedTypes(t *testing.T) {
 	})
 }
 
-func TestGraphQL_AllowedTypes_Empty_List(t *testing.T) {
-	g := StartTest(nil)
-	defer g.Close()
-
-	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.UseKeylessAccess = false
-		spec.GraphQL.Enabled = true
-	})[0]
-
-	_, directKey := g.CreateSession(func(s *user.SessionState) {
-		s.AccessRights = map[string]user.AccessDefinition{
-			api.APIID: {
-				APIID:       api.APIID,
-				APIName:     api.Name,
-				EnableAllow: true,
-			},
-		}
-	})
-
-	pID := g.CreatePolicy(func(p *user.Policy) {
-		p.AccessRights = map[string]user.AccessDefinition{
-			api.APIID: {
-				APIID:       api.APIID,
-				APIName:     api.Name,
-				EnableAllow: true,
-			},
-		}
-	})
-
-	_, policyAppliedKey := g.CreateSession(func(s *user.SessionState) {
-		s.ApplyPolicies = []string{pID}
-	})
-
-	allowedQuery := graphql.Request{
-		Query: "query Query { countries { code } }",
-	}
-
-	restrictedQuery := graphql.Request{
-		Query: "query Query { countries { name } }",
-	}
-
-	t.Run("Direct key", func(t *testing.T) {
-		authHeaderWithDirectKey := map[string]string{
-			headers.Authorization: directKey,
-		}
-
-		_, _ = g.Run(t, []test.TestCase{
-			{
-				Data:    restrictedQuery,
-				Headers: authHeaderWithDirectKey,
-				BodyMatchFunc: func(bytes []byte) bool {
-					return assert.Contains(t, string(bytes), `{"errors":[{"message":"the allow list is empty"}]}`)
-				},
-				Code: http.StatusBadRequest,
-			},
-			{Data: allowedQuery, Headers: authHeaderWithDirectKey, Code: http.StatusBadRequest},
-		}...)
-	})
-
-	t.Run("Policy applied key", func(t *testing.T) {
-		test.Flaky(t) // TODO: TT-5220
-
-		authHeaderWithPolicyAppliedKey := map[string]string{
-			headers.Authorization: policyAppliedKey,
-		}
-
-		_, _ = g.Run(t, []test.TestCase{
-			{
-				Data:    restrictedQuery,
-				Headers: authHeaderWithPolicyAppliedKey,
-				BodyMatchFunc: func(bytes []byte) bool {
-					return assert.Contains(t, string(bytes), `{"errors":[{"message":"the allow list is empty"}]}`)
-				},
-				Code: http.StatusBadRequest,
-			},
-			{Data: allowedQuery, Headers: authHeaderWithPolicyAppliedKey, Code: http.StatusBadRequest},
-		}...)
-	})
-}
-
 func TestGraphQL_AllowedTypes_Override_RestrictedTypes(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
@@ -314,9 +231,8 @@ func TestGraphQL_AllowedTypes_Override_RestrictedTypes(t *testing.T) {
 	_, directKey := g.CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
-				APIID:       api.APIID,
-				APIName:     api.Name,
-				EnableAllow: true,
+				APIID:   api.APIID,
+				APIName: api.Name,
 				AllowedTypes: []graphql.Type{
 					{
 						Name:   "Country",
@@ -340,9 +256,8 @@ func TestGraphQL_AllowedTypes_Override_RestrictedTypes(t *testing.T) {
 	pID := g.CreatePolicy(func(p *user.Policy) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
-				APIID:       api.APIID,
-				APIName:     api.Name,
-				EnableAllow: true,
+				APIID:   api.APIID,
+				APIName: api.Name,
 				AllowedTypes: []graphql.Type{
 					{
 						Name:   "Country",
