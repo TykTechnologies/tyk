@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -630,8 +631,9 @@ func (r RPCStorageHandler) IsRetriableError(err error) bool {
 // GetAPIDefinitions will pull API definitions from the RPC server
 func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) string {
 	dr := apidef.DefRequest{
-		OrgId: orgId,
-		Tags:  tags,
+		OrgId:   orgId,
+		Tags:    tags,
+		LoadOAS: true,
 	}
 
 	defString, err := rpc.FuncClientSingleton("GetApiDefinitions", dr)
@@ -830,17 +832,17 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 
 func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isHashed bool, orgId string) {
 
-	hashedKeyName := keyName
+	key := keyName
 	// avoid double hashing
 	if !isHashed {
-		hashedKeyName = storage.HashKey(keyName, gw.GetConfig().HashKeys)
+		key = storage.HashKey(keyName, gw.GetConfig().HashKeys)
 	}
 
-	sessionString, err := r.GetRawKey("apikey-" + hashedKeyName)
+	sessionString, err := r.GetRawKey("apikey-" + key)
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		gw.handleAddKey(keyName, hashedKeyName, sessionString, "-1", orgId)
+		gw.handleAddKey(key, sessionString, orgId)
 	}
 }
 
@@ -920,6 +922,9 @@ func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 	}
 }
 
+// ProcessKeySpaceChanges receives an array of keys to be processed, those keys are considered changes in the keyspace in the
+// management layer, they could be: regular keys (hashed, unhashed), revoke oauth client, revoke single oauth token,
+// certificates (added, removed), oauth client (added, updated, removed)
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
@@ -1014,30 +1019,38 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		}
 	}
 
+	synchronizerEnabled := r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled
 	for _, key := range keys {
 		_, isOauthTokenKey := notRegularKeys[key]
 		if !isOauthTokenKey {
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
 
-			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
+			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
+			var status int
+			if isHashed {
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				key = splitKeys[0]
-				r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
-				r.Gw.getSessionAndCreate(splitKeys[0], r, true, orgId)
+				_, status = r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
 			} else {
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
 				}
-				r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
-				r.Gw.getSessionAndCreate(splitKeys[0], r, false, orgId)
+				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
 			}
+
+			// if key not found locally and synchroniser disabled then we should not pull it from management layer
+			if status == http.StatusNotFound && !synchronizerEnabled {
+				continue
+			}
+			r.Gw.getSessionAndCreate(splitKeys[0], r, isHashed, orgId)
 			r.Gw.SessionCache.Delete(key)
 			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
 		}
 	}
+
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,

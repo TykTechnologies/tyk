@@ -165,8 +165,8 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	clientWithCert := GetTLSClient(&clientCert, serverCertPem)
 
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
-	t.Run("Separate domain", func(t *testing.T) {
 
+	t.Run("Separate domain", func(t *testing.T) {
 		conf := func(globalConf *config.Config) {
 			globalConf.HttpServerOptions.UseSSL = true
 			globalConf.Security.ControlAPIUseMutualTLS = true
@@ -202,7 +202,6 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	})
 
 	t.Run("Separate domain/ control api with valid cert", func(t *testing.T) {
-
 		clientCertID, _, _ := certs.GetCertIDAndChainPEM(clientCertPem, "")
 		conf := func(globalConf *config.Config) {
 			globalConf.HttpServerOptions.UseSSL = true
@@ -210,6 +209,58 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			globalConf.ControlAPIHostname = "localhost"
 			globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 			globalConf.Security.Certificates.ControlAPI = []string{clientCertID}
+		}
+
+		ts := StartTest(conf)
+		defer ts.Close()
+
+		certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		clientCertID, _ = ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+		ts.ReloadGatewayProxy()
+
+		// Should pass request with valid client cert
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/tyk/certs", Code: 200, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
+		})
+	})
+
+	t.Run("Separate domain/ control api with invalid certs", func(t *testing.T) {
+		clientCertID, _, _ := certs.GetCertIDAndChainPEM(clientCertPem, "")
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.Security.ControlAPIUseMutualTLS = true
+			globalConf.ControlAPIHostname = "localhost"
+			globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+			globalConf.Security.Certificates.ControlAPI = []string{"invalid", "invalid-" + clientCertID}
+		}
+
+		ts := StartTest(conf)
+		defer ts.Close()
+
+		certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		clientCertID, _ = ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+		ts.ReloadGatewayProxy()
+
+		// Should fail as no valid cert IDs exist in Certificates.ControlAPI
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/tyk/certs", Code: http.StatusForbidden, ErrorMatch: badcertErr, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
+		})
+	})
+
+	t.Run("Separate domain/ control api with invalid + valid cert", func(t *testing.T) {
+		clientCertID, _, _ := certs.GetCertIDAndChainPEM(clientCertPem, "")
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.Security.ControlAPIUseMutualTLS = true
+			globalConf.ControlAPIHostname = "localhost"
+			globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+			globalConf.Security.Certificates.ControlAPI = []string{"invalid", clientCertID}
 		}
 
 		ts := StartTest(conf)
@@ -704,15 +755,18 @@ func TestAPIMutualTLS(t *testing.T) {
 }
 
 func TestUpstreamMutualTLS(t *testing.T) {
-	test.Flaky(t) // TODO: 5262
 
 	ts := StartTest(nil)
 	defer ts.Close()
+
+	ts.Gw.dialCtxFn = test.LocalDialer()
 
 	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(fmt.Sprintf("request host is %s", r.Host)))
+		w.WriteHeader(200)
 	}))
 
 	// Mutual TLS protected upstream
@@ -770,7 +824,11 @@ func TestUpstreamMutualTLS(t *testing.T) {
 			ts.Gw.LoadAPI(api)
 
 			// Giving a different value to proxy host, it should not interfere upstream certificate matching
-			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost, Code: http.StatusOK, Client: test.NewClientLocal()})
+			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost,
+				BodyMatchFunc: func(bytes []byte) bool {
+					return strings.Contains(string(bytes), targetHost)
+				},
+				Code: http.StatusOK, Client: test.NewClientLocal()})
 		})
 
 		t.Run("PreserveHostHeader=true", func(t *testing.T) {
@@ -778,7 +836,11 @@ func TestUpstreamMutualTLS(t *testing.T) {
 			ts.Gw.LoadAPI(api)
 
 			// Giving a different value to proxy host, it should not interfere upstream certificate matching
-			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost, Code: http.StatusOK, Client: test.NewClientLocal()})
+			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost,
+				BodyMatchFunc: func(bytes []byte) bool {
+					return strings.Contains(string(bytes), proxyHost)
+				},
+				Code: http.StatusOK, Client: test.NewClientLocal()})
 		})
 
 		t.Run("honor UpstreamCertificatesDisabled flag", func(t *testing.T) {

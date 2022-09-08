@@ -217,6 +217,16 @@ type APISpec struct {
 	} `json:"-"`
 }
 
+// GetSessionLifetimeRespectsKeyExpiration returns a boolean to tell whether session lifetime should respect to key expiration or not.
+// The global config takes the precedence. If the global one is `true`, value of the one in api level doesn't matter.
+func (a *APISpec) GetSessionLifetimeRespectsKeyExpiration() bool {
+	if a.GlobalConfig.SessionLifetimeRespectsKeyExpiration {
+		return true
+	}
+
+	return a.SessionLifetimeRespectsKeyExpiration
+}
+
 // Release releases all resources associated with API spec
 func (s *APISpec) Release() {
 	// release circuit breaker resources
@@ -382,8 +392,8 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	return spec
 }
 
-// fromDashboardServiceResponse is the response body for FromDashboardService
-type fromDashboardServiceResponse struct {
+// nestedApiDefinitionList is the response body for FromDashboardService
+type nestedApiDefinitionList struct {
 	Message []nestedApiDefinition
 	Nonce   string
 }
@@ -393,13 +403,13 @@ type nestedApiDefinition struct {
 	OAS                   *oas.OAS `json:"oas"`
 }
 
-func (f *fromDashboardServiceResponse) set(defs []*apidef.APIDefinition) {
+func (f *nestedApiDefinitionList) set(defs []*apidef.APIDefinition) {
 	for _, def := range defs {
 		f.Message = append(f.Message, nestedApiDefinition{APIDefinition: def})
 	}
 }
 
-func (f *fromDashboardServiceResponse) filter(enabled bool, tags ...string) []nestedApiDefinition {
+func (f *nestedApiDefinitionList) filter(enabled bool, tags ...string) []nestedApiDefinition {
 	if !enabled {
 		return f.Message
 	}
@@ -467,7 +477,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Extract tagged APIs#
-	list := &fromDashboardServiceResponse{}
+	list := &nestedApiDefinitionList{}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		body, _ := ioutil.ReadAll(resp.Body)
 		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
@@ -539,16 +549,25 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
 
-	var apiDefs []*nestedApiDefinition
-	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
+	var payload []nestedApiDefinition
+	if err := json.Unmarshal([]byte(apiCollection), &payload); err != nil {
 		return nil, err
 	}
+
+	list := &nestedApiDefinitionList{
+		Message: payload,
+	}
+
+	gwConfig := a.Gw.GetConfig()
+
+	// Extract tagged entries only
+	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	var specs []*APISpec
 	for _, def := range apiDefs {
 		def.DecodeFromDB()
 
-		if gw.GetConfig().SlaveOptions.BindToSlugsInsteadOfListenPaths {
+		if gwConfig.SlaveOptions.BindToSlugsInsteadOfListenPaths {
 			newListenPath := "/" + def.Slug //+ "/"
 			log.Warning("Binding to ",
 				newListenPath,
@@ -779,6 +798,10 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 
 	log.Debug("Checking for transform paths...")
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		log.Debug("-- Generating path")
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
@@ -918,24 +941,18 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 
 		events := newSpec.CircuitBreaker.CB.Subscribe()
 		go func(path string, spec *APISpec, breakerPtr *circuit.Breaker) {
-			timerActive := false
 			for e := range events {
 				switch e {
 				case circuit.BreakerTripped:
 					log.Warning("[PROXY] [CIRCUIT BREAKER] Breaker tripped for path: ", path)
 					log.Debug("Breaker tripped: ", e)
-					// Start a timer function
 
-					if !timerActive {
-						go func(timeout int, breaker *circuit.Breaker) {
-							log.Debug("-- Sleeping for (s): ", timeout)
-							time.Sleep(time.Duration(timeout) * time.Second)
-							log.Debug("-- Resetting breaker")
-							breaker.Reset()
-							timerActive = false
-						}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)
-						timerActive = true
-					}
+					go func(timeout int, breaker *circuit.Breaker) {
+						log.Debug("-- Sleeping for (s): ", timeout)
+						time.Sleep(time.Duration(timeout) * time.Second)
+						log.Debug("-- Resetting breaker")
+						breaker.Reset()
+					}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)
 
 					if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 						if ServiceCache != nil {
@@ -951,8 +968,22 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 						APIID:            spec.APIID,
 					})
 
+					spec.FireEvent(EventBreakerTripped, EventCurcuitBreakerMeta{
+						EventMetaDefault: EventMetaDefault{Message: "Breaker Tripped"},
+						CircuitEvent:     e,
+						Path:             path,
+						APIID:            spec.APIID,
+					})
+
 				case circuit.BreakerReset:
 					spec.FireEvent(EventBreakerTriggered, EventCurcuitBreakerMeta{
+						EventMetaDefault: EventMetaDefault{Message: "Breaker Reset"},
+						CircuitEvent:     e,
+						Path:             path,
+						APIID:            spec.APIID,
+					})
+
+					spec.FireEvent(EventBreakerReset, EventCurcuitBreakerMeta{
 						EventMetaDefault: EventMetaDefault{Message: "Breaker Reset"},
 						CircuitEvent:     e,
 						Path:             path,

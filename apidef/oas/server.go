@@ -89,7 +89,7 @@ func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 
 type ClientCertificates struct {
 	// Enabled enables static mTLS for the API.
-	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	Enabled bool `bson:"enabled" json:"enabled"`
 	// AllowList is the list of client certificates which are allowed.
 	Allowlist []string `bson:"allowlist" json:"allowlist"`
 }
@@ -106,7 +106,7 @@ func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 
 type GatewayTags struct {
 	// Enabled enables use of segment tags.
-	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	Enabled bool `bson:"enabled" json:"enabled"`
 	// Tags is a list of segment tags
 	Tags []string `bson:"tags" json:"tags"`
 }
