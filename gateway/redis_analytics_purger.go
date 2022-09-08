@@ -44,7 +44,7 @@ func (r *RedisPurger) PurgeCache() {
 	}
 
 	exp, _ := r.Store.GetExp(analyticsKeyName)
-	if exp <= -1 {
+	if exp == -1 {
 		r.Store.SetExp(analyticsKeyName, int64(expireAfter))
 	}
 }
