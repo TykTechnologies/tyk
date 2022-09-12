@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/trace"
 )
 
 const XTykAPIExpires = "x-tyk-api-expires"
@@ -63,6 +65,17 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	targetVersion := v.Spec.getVersionFromRequest(r)
 	if targetVersion == "" {
 		targetVersion = v.Spec.VersionDefinition.Default
+	}
+
+	//We can probably do something more clean around base middleware
+	if trace.IsEnabled(){
+		fmt.Println("saving data in ctx")
+		data := MiddlewareTraceData{Values: map[string]string{}}
+		data.Values["tyk.apidef.targetversion"]= targetVersion
+		data.Values["tyk.apidef.version_enabled"] = fmt.Sprint(v.Spec.VersionDefinition.Enabled)
+		mwData:= make(map[string]interface{})
+		mwData[v.Name()] = data
+		ctxSetData(r, mwData)
 	}
 
 	if v.Spec.VersionDefinition.Enabled && targetVersion != apidef.Self && targetVersion != v.Spec.VersionDefinition.Name {

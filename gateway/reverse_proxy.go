@@ -29,12 +29,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
-	"github.com/jensneuse/abstractlogger"
-
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
+	"github.com/gorilla/websocket"
+	"github.com/jensneuse/abstractlogger"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/akutz/memconn"
 	"github.com/sirupsen/logrus"
@@ -778,6 +778,11 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	if rt.h2ctransport != nil {
 		return rt.h2ctransport.RoundTrip(r)
 	}
+	if trace.IsEnabled() {
+		tr :=  otelhttp.NewTransport(rt.transport)
+		return tr.RoundTrip(r)
+	}
+
 	return rt.transport.RoundTrip(r)
 }
 
