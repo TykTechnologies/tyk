@@ -83,6 +83,4 @@ require (
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace gorm.io/gorm => github.com/TykTechnologies/gorm v1.20.7-0.20210409171139-b5c340f85ed0
-
 //replace github.com/TykTechnologies/graphql-go-tools => ../graphql-go-tools
