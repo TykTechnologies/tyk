@@ -86,7 +86,7 @@ jobs:
       - name: Tell gromit about new build
         run: |
             curl -fsSL -H "Authorization: ${{secrets.GROMIT_TOKEN}}" 'https://domu-kun.cloud.tyk.io/gromit/newbuild' \
-                 -X POST -d '{ "repo": "${{ github.repository}}", "ref": "${{ github.ref }}", "sha": "${{ github.sha }}" }'
+                 -X POST -d '{ "repo": "${{ github.repository}}", "ref": "${{ github.ref }}", "sha": "${{ github.sha }}" }' || true
 
       - name: Logout of Amazon ECR
         if: always()
