@@ -19,6 +19,13 @@ on:
         required: true
       tf_token:
         required: true
+      etcd_pass:
+        required: true
+      docker_user:
+        required: true
+      docker_pass:
+        required: true                
+
 
 env:
   TERRAFORM_DIR: ${{ inputs.terraformDir }}
@@ -52,33 +59,50 @@ jobs:
           aws-secret-access-key: ${{ secrets.aws_secret }}
           aws-region: "eu-central-1"
 
-      - name: Terraform Init
-        working-directory: ${{ env.TERRAFORM_DIR }}
-        id: init
-        run: terraform init
+      - name: Login to DockerHub
+        # if: startsWith(github.ref, 'refs/tags')
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.docker_user }}
+          password: ${{ secrets.docker_pass }}
 
-      - name: Terraform Workspace
-        working-directory: ${{ env.TERRAFORM_DIR }}
-        run: |
-          terraform workspace new ${CLUSTER}
-          terraform workspace show
+      - uses: addnab/docker-run-action@v3
+        with:
+          username: ${{ secrets.docker_user }}
+          password: ${{ secrets.docker_pass }}
+          registry: docker.io
+          image: tykio/gromit:v1.4.5-rc1
+          options: -v ${{ github.workspace }}:/scripts -e ETCD_PASS=${{ secrets.etcd_pass }}
+          run: gromit mutex get master --script /scripts/ci/devenv/create_env.sh
+            
 
-      - name: Lock environment
-        run:
-          echo "CALL - Add entry on DinamoDB"
+      # - name: Terraform Init
+      #   working-directory: ${{ env.TERRAFORM_DIR }}
+      #   id: init
+      #   run: terraform init
 
-      - name: Generate Templates on EFS
-        run:
-          echo "CALL - Generate templates on EFS"
+      # - name: Lock environment
+      #   run:
+      #     echo "CALL - Add entry on DinamoDB"
 
-      - name: Make Input Var Files
-        run:
-          echo "CALL - Make input var files"
+      # - name: Terraform Workspace
+      #   working-directory: ${{ env.TERRAFORM_DIR }}
+      #   run: |
+      #     terraform workspace new ${CLUSTER}
+      #     terraform workspace show
 
-      - name: Terraform Apply
-        working-directory: ${{ env.TERRAFORM_DIR }}
-        run: terraform apply -auto-approve -var-file=master.tfvars
+      # - name: Generate Templates on EFS
+      #   run:
+      #     echo "CALL - Generate templates on EFS"
 
-      - name: Unlock environment
-        run:
-          echo "CALL - Update entry on DinamoDB"
+      # - name: Make Input Var Files
+      #   run:
+      #     echo "CALL - Make input var files"
+
+      # - name: Terraform Apply
+      #   working-directory: ${{ env.TERRAFORM_DIR }}
+      #   run: terraform apply -auto-approve -var-file=master.tfvars
+
+      # - name: Unlock environment
+      #   run:
+      #     echo "CALL - Update entry on DinamoDB"
