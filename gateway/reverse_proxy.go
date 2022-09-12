@@ -18,6 +18,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/opentracing/opentracing-go"
 	"io"
 	"io/ioutil"
 	"net"
@@ -36,8 +37,6 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
 
 	"github.com/akutz/memconn"
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
@@ -1146,8 +1145,8 @@ func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outr
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
 	if trace.IsEnabled() {
 		span, ctx := trace.Span(req.Context(), req.URL.Path)
-		defer span.Finish()
-		ext.SpanKindRPCClient.Set(span)
+		defer span.End()
+		//ext.SpanKindRPCClient.Set(span)
 		req = req.WithContext(ctx)
 	}
 	var roundTripper *TykRoundTripper

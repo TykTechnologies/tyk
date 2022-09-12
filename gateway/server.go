@@ -1548,7 +1548,7 @@ func Start() {
 	if tr := gwConfig.Tracer; tr.Enabled {
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)
-		defer trace.Close()
+
 	}
 	gw.start()
 	configs := gw.GetConfig()
