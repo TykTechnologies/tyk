@@ -61,6 +61,12 @@ func (w *customResponseWriter) WriteHeader(statusCode int) {
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
+func (w *customResponseWriter) Flush() {
+       if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+              flusher.Flush()
+       }
+}
+
 func (w *customResponseWriter) getHttpResponse(r *http.Request) *http.Response {
 	// craft response on the fly for analytics
 	httpResponse := &http.Response{
