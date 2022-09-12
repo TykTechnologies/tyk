@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"sync"
 	"sync/atomic"
 
-	"github.com/TykTechnologies/tyk/request"
 	opentracing "github.com/opentracing/opentracing-go"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ErrManagerDisabled is returned when trying to use global trace manager when
@@ -81,23 +80,10 @@ func Get(service string) Tracer {
 	if t, ok := services.Load(service); ok {
 		return t.(Tracer)
 	}
-	return NoopTracer{}
-}
-
-// Close calls Close on the global tace manager.
-func Close() error {
-	var s []string
-	services.Range(func(k, v interface{}) bool {
-		s = append(s, k.(string))
-		v.(Tracer).Close()
-		return true
-	})
-	for _, v := range s {
-		services.Delete(v)
-	}
-	Disable()
 	return nil
 }
+
+
 
 // IsEnabled returns true if the global trace manager is enabled.
 func IsEnabled() bool {
@@ -153,28 +139,10 @@ func SetupTracing(name string, opts map[string]interface{}) {
 	enabled.Store(true)
 }
 
-func Root(service string, r *http.Request) (opentracing.Span, *http.Request) {
-	tr := Get(service)
-	mainCtx, err := Extract(tr, r.Header)
-	tags := opentracing.Tags{
-		"from_ip":  request.RealIP(r),
-		"method":   r.Method,
-		"endpoint": r.URL.Path,
-		"raw_url":  r.URL.String(),
-		"size":     strconv.Itoa(int(r.ContentLength)),
-	}
-	if err != nil {
-		// TODO log this error?
-		// We just create a new span here so the log should be a warning.
-		span, ctx := opentracing.StartSpanFromContextWithTracer(r.Context(),
-			tr,
-			service, tags)
-		return span, r.WithContext(SetServiceID(ctx, service))
-	}
-	span, ctx := opentracing.StartSpanFromContextWithTracer(r.Context(),
-		tr,
-		service,
-		opentracing.ChildOf(mainCtx), tags)
+func Root(service string, r *http.Request) (trace.Span, *http.Request) {
+	//tr := Get(service)
+	ctx := r.Context()
+	span := trace.SpanFromContext(ctx)
 	return span, r.WithContext(SetServiceID(ctx, service))
 }
 
@@ -184,30 +152,22 @@ func Root(service string, r *http.Request) (opentracing.Span, *http.Request) {
 // Note that the returned context contains the returned span as active span. So
 // any spans created form the returned context will be children of the returned
 // span.
-func Span(ctx context.Context, ops string, opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
-	return opentracing.StartSpanFromContextWithTracer(ctx,
-		Get(GetServiceID(ctx)),
-		ops, opts...)
+func Span(ctx context.Context, ops string, opts ...opentracing.StartSpanOption) (trace.Span, context.Context) {
+	tr:=Get(GetServiceID(ctx))
+	newCtx, span := tr.Start(ctx,ops)
+	return span, newCtx
 }
 
 func Extract(tr Tracer, h http.Header) (opentracing.SpanContext, error) {
-	return tr.Extract(
-		opentracing.HTTPHeaders,
-		opentracing.HTTPHeadersCarrier(h),
-	)
+	return nil,nil
 }
 
 func ExtractFromContext(ctx context.Context, h http.Header) (opentracing.SpanContext, error) {
-	return Extract(Get(GetServiceID(ctx)), h)
+	return nil,nil
 }
 
 func Inject(service string, span opentracing.Span, h http.Header) error {
-	tr := Get(service)
-	return tr.Inject(
-		span.Context(),
-		opentracing.HTTPHeaders,
-		opentracing.HTTPHeadersCarrier(h),
-	)
+	return nil
 }
 
 func InjectFromContext(ctx context.Context, span opentracing.Span, h http.Header) error {

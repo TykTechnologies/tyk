@@ -60,7 +60,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		span, ctx := trace.Span(r.Context(),
 			tr.Name(),
 		)
-		defer span.Finish()
+		defer span.End()
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
 	}
@@ -866,7 +866,7 @@ func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res
 func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState, shouldTrace bool) error {
 	if shouldTrace {
 		span, ctx := trace.Span(req.Context(), rh.Name())
-		defer span.Finish()
+		defer span.End()
 		req = req.WithContext(ctx)
 	}
 	return rh.HandleResponse(rw, res, req, ses)

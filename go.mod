@@ -22,7 +22,7 @@ require (
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 	github.com/buger/jsonparser v1.1.1
 	github.com/cenk/backoff v2.2.1+incompatible
-	github.com/cenkalti/backoff/v4 v4.0.2
+	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/clbanning/mxj v1.8.4
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/evalphobia/logrus_sentry v0.8.2
@@ -64,22 +64,27 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.6.0
 	github.com/square/go-jose v2.4.1+incompatible
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.0
 	github.com/uber/jaeger-client-go v2.20.0+incompatible
 	github.com/valyala/fasthttp v1.15.1
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/xeipuuv/gojsonschema v1.2.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.34.0
+	go.opentelemetry.io/otel v1.9.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.9.0
+	go.opentelemetry.io/otel/sdk v1.9.0
+	go.opentelemetry.io/otel/trace v1.9.0
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	google.golang.org/grpc v1.36.0
+	google.golang.org/grpc v1.46.2
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 v3.0.1
 	rsc.io/letsencrypt v0.0.2
 )
 

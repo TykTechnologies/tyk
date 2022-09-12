@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk/test"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -20,6 +19,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/TykTechnologies/tyk/test"
 
 	"sync/atomic"
 	textTemplate "text/template"
@@ -1508,7 +1509,7 @@ func Start() {
 	if tr := gwConfig.Tracer; tr.Enabled {
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)
-		defer trace.Close()
+
 	}
 	gw.start()
 	configs := gw.GetConfig()

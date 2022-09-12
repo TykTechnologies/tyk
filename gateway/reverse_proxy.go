@@ -37,7 +37,6 @@ import (
 
 	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
 	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpguts"
@@ -1099,8 +1098,8 @@ func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outr
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
 	if trace.IsEnabled() {
 		span, ctx := trace.Span(req.Context(), req.URL.Path)
-		defer span.Finish()
-		ext.SpanKindRPCClient.Set(span)
+		defer span.End()
+		//ext.SpanKindRPCClient.Set(span)
 		req = req.WithContext(ctx)
 	}
 	var roundTripper *TykRoundTripper
