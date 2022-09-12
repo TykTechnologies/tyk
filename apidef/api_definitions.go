@@ -225,6 +225,7 @@ type TemplateData struct {
 }
 
 type TemplateMeta struct {
+	Disabled     bool         `bson:"disabled" json:"disabled"`
 	TemplateData TemplateData `bson:"template_data" json:"template_data"`
 	Path         string       `bson:"path" json:"path"`
 	Method       string       `bson:"method" json:"method"`
@@ -513,13 +514,13 @@ type OpenIDOptions struct {
 }
 
 type ScopeClaim struct {
-	ScopeClaimName string            `bson:"scope_claim_name" json:"scope_claim_name"`
-	ScopeToPolicy  map[string]string `json:"scope_to_policy"`
+	ScopeClaimName string            `bson:"scope_claim_name" json:"scope_claim_name,omitempty"`
+	ScopeToPolicy  map[string]string `json:"scope_to_policy,omitempty"`
 }
 
 type Scopes struct {
-	JWT  ScopeClaim `bson:"jwt" json:"jwt"`
-	OIDC ScopeClaim `bson:"oidc" json:"oidc"`
+	JWT  ScopeClaim `bson:"jwt" json:"jwt,omitempty"`
+	OIDC ScopeClaim `bson:"oidc" json:"oidc,omitempty"`
 }
 
 // APIDefinition represents the configuration for a single proxied API and it's versions.
@@ -528,7 +529,7 @@ type Scopes struct {
 type APIDefinition struct {
 	Id                  ObjectId      `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
 	Name                string        `bson:"name" json:"name"`
-	Expiration          string        `bson:"expiration" json:"expiration"`
+	Expiration          string        `bson:"expiration" json:"expiration,omitempty"`
 	ExpirationTs        time.Time     `bson:"-" json:"-"`
 	Slug                string        `bson:"slug" json:"slug"`
 	ListenPort          int           `bson:"listen_port" json:"listen_port"`
@@ -561,85 +562,86 @@ type APIDefinition struct {
 	// UpstreamCertificates stores the domain to certificate mapping for upstream mutualTLS
 	UpstreamCertificates map[string]string `bson:"upstream_certificates" json:"upstream_certificates"`
 	// UpstreamCertificatesDisabled disables upstream mutualTLS on the API
-	UpstreamCertificatesDisabled bool `bson:"upstream_certificates_disabled" json:"upstream_certificates_disabled"`
+	UpstreamCertificatesDisabled bool `bson:"upstream_certificates_disabled" json:"upstream_certificates_disabled,omitempty"`
 
 	// PinnedPublicKeys stores the public key pinning details
 	PinnedPublicKeys map[string]string `bson:"pinned_public_keys" json:"pinned_public_keys"`
 	// CertificatePinningDisabled disables public key pinning
-	CertificatePinningDisabled bool `bson:"certificate_pinning_disabled" json:"certificate_pinning_disabled"`
+	CertificatePinningDisabled bool `bson:"certificate_pinning_disabled" json:"certificate_pinning_disabled,omitempty"`
 
-	EnableJWT                  bool                   `bson:"enable_jwt" json:"enable_jwt"`
-	UseStandardAuth            bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
-	UseGoPluginAuth            bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`
-	EnableCoProcessAuth        bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
-	JWTSigningMethod           string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
-	JWTSource                  string                 `bson:"jwt_source" json:"jwt_source"`
-	JWTIdentityBaseField       string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
-	JWTClientIDBaseField       string                 `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
-	JWTPolicyFieldName         string                 `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
-	JWTDefaultPolicies         []string               `bson:"jwt_default_policies" json:"jwt_default_policies"`
-	JWTIssuedAtValidationSkew  uint64                 `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
-	JWTExpiresAtValidationSkew uint64                 `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
-	JWTNotBeforeValidationSkew uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
-	JWTSkipKid                 bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
-	Scopes                     Scopes                 `bson:"scopes" json:"scopes"`
-	JWTScopeToPolicyMapping    map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
-	JWTScopeClaimName          string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
-	NotificationsDetails       NotificationsManager   `bson:"notifications" json:"notifications"`
-	EnableSignatureChecking    bool                   `bson:"enable_signature_checking" json:"enable_signature_checking"`
-	HmacAllowedClockSkew       float64                `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
-	HmacAllowedAlgorithms      []string               `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
-	RequestSigning             RequestSigningMeta     `bson:"request_signing" json:"request_signing"`
-	BaseIdentityProvidedBy     AuthTypeEnum           `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
-	VersionDefinition          VersionDefinition      `bson:"definition" json:"definition"`
-	VersionData                VersionData            `bson:"version_data" json:"version_data"` // Deprecated. Use VersionDefinition instead.
-	UptimeTests                UptimeTests            `bson:"uptime_tests" json:"uptime_tests"`
-	Proxy                      ProxyConfig            `bson:"proxy" json:"proxy"`
-	DisableRateLimit           bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
-	DisableQuota               bool                   `bson:"disable_quota" json:"disable_quota"`
-	CustomMiddleware           MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
-	CustomMiddlewareBundle     string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
-	CacheOptions               CacheOptions           `bson:"cache_options" json:"cache_options"`
-	SessionLifetime            int64                  `bson:"session_lifetime" json:"session_lifetime"`
-	Active                     bool                   `bson:"active" json:"active"`
-	Internal                   bool                   `bson:"internal" json:"internal"`
-	AuthProvider               AuthProviderMeta       `bson:"auth_provider" json:"auth_provider"`
-	SessionProvider            SessionProviderMeta    `bson:"session_provider" json:"session_provider"`
-	EventHandlers              EventHandlerMetaConfig `bson:"event_handlers" json:"event_handlers"`
-	EnableBatchRequestSupport  bool                   `bson:"enable_batch_request_support" json:"enable_batch_request_support"`
-	EnableIpWhiteListing       bool                   `mapstructure:"enable_ip_whitelisting" bson:"enable_ip_whitelisting" json:"enable_ip_whitelisting"`
-	AllowedIPs                 []string               `mapstructure:"allowed_ips" bson:"allowed_ips" json:"allowed_ips"`
-	EnableIpBlacklisting       bool                   `mapstructure:"enable_ip_blacklisting" bson:"enable_ip_blacklisting" json:"enable_ip_blacklisting"`
-	BlacklistedIPs             []string               `mapstructure:"blacklisted_ips" bson:"blacklisted_ips" json:"blacklisted_ips"`
-	DontSetQuotasOnCreate      bool                   `mapstructure:"dont_set_quota_on_create" bson:"dont_set_quota_on_create" json:"dont_set_quota_on_create"`
-	ExpireAnalyticsAfter       int64                  `mapstructure:"expire_analytics_after" bson:"expire_analytics_after" json:"expire_analytics_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
-	ResponseProcessors         []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
-	CORS                       CORSConfig             `bson:"CORS" json:"CORS"`
-	Domain                     string                 `bson:"domain" json:"domain"`
-	DomainDisabled             bool                   `bson:"domain_disabled" json:"domain_disabled"`
-	Certificates               []string               `bson:"certificates" json:"certificates"`
-	DoNotTrack                 bool                   `bson:"do_not_track" json:"do_not_track"`
-	EnableContextVars          bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
-	ConfigData                 map[string]interface{} `bson:"config_data" json:"config_data"`
-	TagHeaders                 []string               `bson:"tag_headers" json:"tag_headers"`
-	GlobalRateLimit            GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
-	StripAuthData              bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
-	EnableDetailedRecording    bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
-	GraphQL                    GraphQLConfig          `bson:"graphql" json:"graphql"`
-	AnalyticsPlugin            AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin"`
+	EnableJWT                            bool                   `bson:"enable_jwt" json:"enable_jwt"`
+	UseStandardAuth                      bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
+	UseGoPluginAuth                      bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`
+	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
+	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
+	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
+	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
+	JWTClientIDBaseField                 string                 `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
+	JWTPolicyFieldName                   string                 `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
+	JWTDefaultPolicies                   []string               `bson:"jwt_default_policies" json:"jwt_default_policies"`
+	JWTIssuedAtValidationSkew            uint64                 `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
+	JWTExpiresAtValidationSkew           uint64                 `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
+	JWTNotBeforeValidationSkew           uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
+	JWTSkipKid                           bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
+	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
+	JWTScopeToPolicyMapping              map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
+	JWTScopeClaimName                    string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
+	NotificationsDetails                 NotificationsManager   `bson:"notifications" json:"notifications"`
+	EnableSignatureChecking              bool                   `bson:"enable_signature_checking" json:"enable_signature_checking"`
+	HmacAllowedClockSkew                 float64                `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
+	HmacAllowedAlgorithms                []string               `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
+	RequestSigning                       RequestSigningMeta     `bson:"request_signing" json:"request_signing"`
+	BaseIdentityProvidedBy               AuthTypeEnum           `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
+	VersionDefinition                    VersionDefinition      `bson:"definition" json:"definition"`
+	VersionData                          VersionData            `bson:"version_data" json:"version_data"` // Deprecated. Use VersionDefinition instead.
+	UptimeTests                          UptimeTests            `bson:"uptime_tests" json:"uptime_tests"`
+	Proxy                                ProxyConfig            `bson:"proxy" json:"proxy"`
+	DisableRateLimit                     bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
+	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
+	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
+	CustomMiddlewareBundle               string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
+	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
+	SessionLifetimeRespectsKeyExpiration bool                   `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration,omitempty"`
+	SessionLifetime                      int64                  `bson:"session_lifetime" json:"session_lifetime"`
+	Active                               bool                   `bson:"active" json:"active"`
+	Internal                             bool                   `bson:"internal" json:"internal"`
+	AuthProvider                         AuthProviderMeta       `bson:"auth_provider" json:"auth_provider"`
+	SessionProvider                      SessionProviderMeta    `bson:"session_provider" json:"session_provider"`
+	EventHandlers                        EventHandlerMetaConfig `bson:"event_handlers" json:"event_handlers"`
+	EnableBatchRequestSupport            bool                   `bson:"enable_batch_request_support" json:"enable_batch_request_support"`
+	EnableIpWhiteListing                 bool                   `mapstructure:"enable_ip_whitelisting" bson:"enable_ip_whitelisting" json:"enable_ip_whitelisting"`
+	AllowedIPs                           []string               `mapstructure:"allowed_ips" bson:"allowed_ips" json:"allowed_ips"`
+	EnableIpBlacklisting                 bool                   `mapstructure:"enable_ip_blacklisting" bson:"enable_ip_blacklisting" json:"enable_ip_blacklisting"`
+	BlacklistedIPs                       []string               `mapstructure:"blacklisted_ips" bson:"blacklisted_ips" json:"blacklisted_ips"`
+	DontSetQuotasOnCreate                bool                   `mapstructure:"dont_set_quota_on_create" bson:"dont_set_quota_on_create" json:"dont_set_quota_on_create"`
+	ExpireAnalyticsAfter                 int64                  `mapstructure:"expire_analytics_after" bson:"expire_analytics_after" json:"expire_analytics_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
+	ResponseProcessors                   []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
+	CORS                                 CORSConfig             `bson:"CORS" json:"CORS"`
+	Domain                               string                 `bson:"domain" json:"domain"`
+	DomainDisabled                       bool                   `bson:"domain_disabled" json:"domain_disabled,omitempty"`
+	Certificates                         []string               `bson:"certificates" json:"certificates"`
+	DoNotTrack                           bool                   `bson:"do_not_track" json:"do_not_track"`
+	EnableContextVars                    bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
+	ConfigData                           map[string]interface{} `bson:"config_data" json:"config_data"`
+	TagHeaders                           []string               `bson:"tag_headers" json:"tag_headers"`
+	GlobalRateLimit                      GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
+	StripAuthData                        bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
+	EnableDetailedRecording              bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
+	GraphQL                              GraphQLConfig          `bson:"graphql" json:"graphql"`
+	AnalyticsPlugin                      AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin,omitempty"`
 
 	// Gateway segment tags
-	TagsDisabled bool     `bson:"tags_disabled" json:"tags_disabled"`
+	TagsDisabled bool     `bson:"tags_disabled" json:"tags_disabled,omitempty"`
 	Tags         []string `bson:"tags" json:"tags"`
 
 	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
-	IsOAS bool `json:"is_oas" bson:"is_oas"`
+	IsOAS bool `bson:"is_oas" json:"is_oas,omitempty"`
 }
 
 type AnalyticsPluginConfig struct {
-	Enabled    bool   `bson:"enable" json:"enable"`
-	PluginPath string `bson:"plugin_path" json:"plugin_path"`
-	FuncName   string `bson:"func_name" json:"func_name"`
+	Enabled    bool   `bson:"enable" json:"enable,omitempty"`
+	PluginPath string `bson:"plugin_path" json:"plugin_path,omitempty"`
+	FuncName   string `bson:"func_name" json:"func_name,omitempty"`
 }
 
 type UptimeTests struct {
@@ -838,7 +840,7 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 
 type GraphQLEngineDataSourceConfigKafka struct {
 	BrokerAddresses      []string              `bson:"broker_addresses" json:"broker_addresses"`
-	Topic                string                `bson:"topic" json:"topic"`
+	Topics               []string              `bson:"topics" json:"topics"`
 	GroupID              string                `bson:"group_id" json:"group_id"`
 	ClientID             string                `bson:"client_id" json:"client_id"`
 	KafkaVersion         string                `bson:"kafka_version" json:"kafka_version"`

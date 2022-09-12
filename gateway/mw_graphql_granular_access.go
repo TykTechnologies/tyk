@@ -77,17 +77,8 @@ type GraphqlGranularAccessResult struct {
 
 type GraphqlGranularAccessChecker struct{}
 
-func (GraphqlGranularAccessChecker) CheckGraphqlRequestFieldAllowance(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) GraphqlGranularAccessResult {
-	if len(accessDef.RestrictedTypes) == 0 {
-		return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonNone}
-	}
-
-	restrictedFieldsList := graphql.FieldRestrictionList{
-		Kind:  graphql.BlockList,
-		Types: accessDef.RestrictedTypes,
-	}
-
-	result, err := gqlRequest.ValidateFieldRestrictions(schema, restrictedFieldsList, graphql.DefaultFieldsValidator{})
+func (g *GraphqlGranularAccessChecker) validateFieldRestrictions(gqlRequest *graphql.Request, fieldRestrictionList graphql.FieldRestrictionList, schema *graphql.Schema) GraphqlGranularAccessResult {
+	result, err := gqlRequest.ValidateFieldRestrictions(schema, fieldRestrictionList, graphql.DefaultFieldsValidator{})
 	if err != nil {
 		return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonInternalError, internalErr: err}
 	}
@@ -95,6 +86,26 @@ func (GraphqlGranularAccessChecker) CheckGraphqlRequestFieldAllowance(gqlRequest
 	if !result.Valid || (result.Errors != nil && result.Errors.Count() > 0) {
 		return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonValidationError, validationResult: &result}
 	}
+	return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonNone}
+}
 
+func (g *GraphqlGranularAccessChecker) CheckGraphqlRequestFieldAllowance(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) GraphqlGranularAccessResult {
+	if len(accessDef.AllowedTypes) != 0 {
+		fieldRestrictionList := graphql.FieldRestrictionList{
+			Kind:  graphql.AllowList,
+			Types: accessDef.AllowedTypes,
+		}
+		return g.validateFieldRestrictions(gqlRequest, fieldRestrictionList, schema)
+	}
+
+	if len(accessDef.RestrictedTypes) != 0 {
+		fieldRestrictionList := graphql.FieldRestrictionList{
+			Kind:  graphql.BlockList,
+			Types: accessDef.RestrictedTypes,
+		}
+		return g.validateFieldRestrictions(gqlRequest, fieldRestrictionList, schema)
+	}
+
+	// There are no restricted types. Every field is allowed access.
 	return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonNone}
 }

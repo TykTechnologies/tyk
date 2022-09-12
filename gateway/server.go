@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/test"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -184,6 +185,8 @@ type Gateway struct {
 	hostDetails     hostDetails
 
 	healthCheckInfo atomic.Value
+
+	dialCtxFn test.DialContext
 }
 
 type hostDetails struct {

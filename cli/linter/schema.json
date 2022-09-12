@@ -423,6 +423,9 @@
     "global_session_lifetime": {
       "type": "integer"
     },
+    "session_lifetime_respects_key_expiration": {
+      "type": "boolean"
+    },
     "graylog_network_addr": {
       "type": "string"
     },
@@ -932,6 +935,9 @@
         },
         "rpc_global_cache_expiration": {
           "type": "number"
+        },
+        "synchroniser_enabled" : {
+          "type": "boolean"
         }
       }
     },
