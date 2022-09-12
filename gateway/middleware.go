@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/rpc"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/TykTechnologies/tyk/headers"
 
@@ -55,6 +57,10 @@ type TraceMiddleware struct {
 	TykMiddleware
 }
 
+type MiddlewareTraceData struct{
+	Values map[string]string
+}
+
 func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
 	if trace.IsEnabled() {
 		span, ctx := trace.Span(r.Context(),
@@ -62,7 +68,30 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		)
 		defer span.End()
 		setContext(r, ctx)
-		return tr.TykMiddleware.ProcessRequest(w, r, conf)
+		err, i :=  tr.TykMiddleware.ProcessRequest(w, r, conf)
+		attr := []attribute.KeyValue{
+		}
+		sess := ctxGetSession(r)
+		if sess != nil{
+			fmt.Println("appending data from session")
+			attr = append(attr,attribute.String("org_id", sess.OrgID))
+		}
+
+		data := ctxGetData(r)
+		if values, ok := data[tr.TykMiddleware.Name()]; ok {
+			fmt.Println("appending data from context")
+			mwTraceData := values.(MiddlewareTraceData)
+			for key, val := range mwTraceData.Values{
+				attribute:= attribute.String(key,val)
+				attr = append(attr,attribute)
+			}
+		}
+		span.SetAttributes(attr...)
+
+		if err != nil {
+			span.SetStatus(codes.Error,err.Error())
+		}
+		return err, i
 	}
 
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)

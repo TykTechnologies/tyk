@@ -155,6 +155,7 @@ func Root(service string, r *http.Request) (trace.Span, *http.Request) {
 func Span(ctx context.Context, ops string, opts ...opentracing.StartSpanOption) (trace.Span, context.Context) {
 	tr:=Get(GetServiceID(ctx))
 	newCtx, span := tr.Start(ctx,ops)
+
 	return span, newCtx
 }
 
