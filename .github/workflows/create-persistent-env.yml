@@ -67,6 +67,8 @@ jobs:
           password: ${{ secrets.docker_pass }}
 
       - uses: addnab/docker-run-action@v3
+        env:
+          ETCD_PASS=${{ secrets.etcd_pass }}
         with:
           username: ${{ secrets.docker_user }}
           password: ${{ secrets.docker_pass }}
