@@ -1717,8 +1717,10 @@ func newNopCloserBuffer(buf io.ReadCloser) (*nopCloserBuffer, error) {
 func (n *nopCloserBuffer) copy() (err error) {
 	n.once.Do(func() {
 		_, err = io.Copy(&n.buf, n.reader)
-		n.reader.Close()
-		n.reader = nil
+		if err == nil {
+			n.reader.Close()
+			n.reader = nil
+		}
 	})
 	return
 }
