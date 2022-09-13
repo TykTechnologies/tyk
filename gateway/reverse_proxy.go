@@ -1696,14 +1696,73 @@ func (n nopCloser) Read(p []byte) (int, error) {
 	return num, err
 }
 
+// nopCloserBuffer is like nopCloser above but uses pointer receiver for seeking
+// within an internal bytes.Buffer reference.
+type nopCloserBuffer struct {
+	buf      bytes.Buffer
+	position int64
+}
+
+// newNopCloserBuffer creates a new instance of a *nopCloserBuffer.
+func newNopCloserBuffer(buf io.Reader) (*nopCloserBuffer, error) {
+	nc := &nopCloserBuffer{}
+	_, err := io.Copy(&nc.buf, buf)
+	return nc, err
+}
+
+// Read just a wrapper around real Read which also moves position to the start if we get EOF
+// to have it ready for next read-cycle
+func (n *nopCloserBuffer) Read(p []byte) (int, error) {
+	idx := n.position
+	num, err := bytes.NewBuffer(n.buf.Bytes()[idx:]).Read(p)
+
+	if err == nil {
+		cnt := int64(n.buf.Len())
+		if idx+int64(len(p)) < cnt {
+			n.position += int64(len(p))
+		} else {
+			n.position = cnt
+		}
+	}
+
+	// move to start to have it ready for next read cycle
+	if err == io.EOF {
+		n.Seek(0, io.SeekStart)
+	}
+
+	return num, err
+}
+
+// Seek seeks within the buffer
+func (n *nopCloserBuffer) Seek(offset int64, whence int64) (int64, error) {
+	if whence != io.SeekStart {
+		return 0, errors.New("invalid seek method, only supporting SeekStart")
+	}
+
+	cnt := int64(n.buf.Len())
+
+	if offset >= cnt || offset < 0 {
+		return 0, errors.New("invalid seek offset")
+	}
+
+	n.position = offset
+
+	return offset, nil
+}
+
 // Close is a no-op Close
 func (n nopCloser) Close() error {
 	return nil
 }
 
+// Close is a no-op Close
+func (n *nopCloserBuffer) Close() error {
+	return nil
+}
+
 func copyBody(body io.ReadCloser) io.ReadCloser {
 	// check if body was already read and converted into our nopCloser
-	if nc, ok := body.(nopCloser); ok {
+	if nc, ok := body.(*nopCloserBuffer); ok {
 		// seek to the beginning to have it ready for next read
 		nc.Seek(0, io.SeekStart)
 		return body
@@ -1713,15 +1772,14 @@ func copyBody(body io.ReadCloser) io.ReadCloser {
 	defer body.Close()
 
 	// body is http's io.ReadCloser - read it up
-	bodyRead, err := ioutil.ReadAll(body)
+	rwc, err := newNopCloserBuffer(body)
 	if err != nil {
 		log.Error("copyBody failed", err)
+		return body
 	}
 
 	// use seek-able reader for further body usage
-	reusableBody := bytes.NewReader(bodyRead)
-
-	return nopCloser{reusableBody}
+	return rwc
 }
 
 func copyRequest(r *http.Request) *http.Request {
