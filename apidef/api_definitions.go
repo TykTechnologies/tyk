@@ -343,6 +343,12 @@ type ValidateRequestMeta struct {
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
 }
 
+type PersistGraphQLMeta struct {
+	Path      string `bson:"path" json:"path"`
+	Method    string `bson:"method" json:"method"`
+	Operation string `bson:"operation" json:"operation"`
+}
+
 type GoPluginMeta struct {
 	Path       string `bson:"path" json:"path"`
 	Method     string `bson:"method" json:"method"`
@@ -375,6 +381,7 @@ type ExtendedPathsSet struct {
 	ValidateRequest         []ValidateRequestMeta `bson:"validate_request" json:"validate_request,omitempty"`
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
+	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
 }
 
 type VersionDefinition struct {

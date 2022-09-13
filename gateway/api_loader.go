@@ -436,6 +436,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
+
+	// TODO: work out where this goes
+	gw.mwAppendEnabled(&chainArray, &PersistGraphQLOperationMiddleware{BaseMiddleware: baseMid})
+
 	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid})

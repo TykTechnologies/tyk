@@ -1,0 +1,54 @@
+{
+  "name": "Persisted Query API",
+  "api_id": "trevorblades",
+  "org_id": "default",
+  "use_keyless": true,
+  "definition": {
+    "location": "header",
+    "key": "version"
+  },
+  "version_data": {
+    "not_versioned": true,
+    "versions": {
+      "Default": {
+        "name": "Default",
+        "expires": "3000-01-02 15:04",
+        "use_extended_paths": true,
+        "extended_paths": {
+          "transform_": [
+            {
+              "disabled": false,
+              "template_data": {
+                "input_type": "json",
+                "template_mode": "blob",
+                "enable_session": false,
+                "template_source": "ewogICJmb28iOiAiYmFyIgp9",
+                "input": "",
+                "output": ""
+              },
+              "path": "/foo",
+              "method": "GET"
+            }
+          ],
+          "persist_graphql": [
+            {
+              "method": "GET",
+              "path": "/foo",
+              "operation": "{}"
+            },
+            {
+              "method": "GET",
+              "path": "/bar",
+              "operation": "{FOOBAR}"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "proxy": {
+    "listen_path": "/trevorblades/",
+    "target_url": "https://countries.trevorblades.com",
+    "strip_listen_path": true
+  }
+}
