@@ -72,10 +72,8 @@ jobs:
         with:
           registry: docker.io
           image: tykio/gromit:v1.4.5-rc2
-          options: -v ${{ github.workspace }}:/scripts
-          run: |
-            ls /scripts/ci/devenv/create_env.sh
-            gromit mutex get master --script /scripts/ci/devenv/create_env.sh -l debug
+          options: -v ${{ github.workspace }}:/repo
+          run: gromit mutex get master --script /repo/ci/devenv/create_env.sh -l debug
             
 
       # - name: Terraform Init
