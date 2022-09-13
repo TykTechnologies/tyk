@@ -3,6 +3,7 @@
   "api_id": "trevorblades",
   "org_id": "default",
   "use_keyless": true,
+  "enable_context_vars": true,
   "definition": {
     "location": "header",
     "key": "version"
@@ -15,31 +16,22 @@
         "expires": "3000-01-02 15:04",
         "use_extended_paths": true,
         "extended_paths": {
-          "transform_": [
-            {
-              "disabled": false,
-              "template_data": {
-                "input_type": "json",
-                "template_mode": "blob",
-                "enable_session": false,
-                "template_source": "ewogICJmb28iOiAiYmFyIgp9",
-                "input": "",
-                "output": ""
-              },
-              "path": "/foo",
-              "method": "GET"
-            }
-          ],
           "persist_graphql": [
             {
               "method": "GET",
-              "path": "/foo",
-              "operation": "{}"
+              "path": "/getContinentByCode",
+              "operation": "query ($continentCode: ID!) {\n    continent(code: $continentCode) {\n        code\n        name\n        countries {\n            name\n        }\n    }\n}",
+              "variables": {
+                "continentCode": "EU"
+              }
             },
             {
               "method": "GET",
-              "path": "/bar",
-              "operation": "{FOOBAR}"
+              "path": "/getCountryByCode",
+              "operation": "query ($countryCode: ID!) {\n    country(code: $countryCode) {\n        code\n        name\n    }\n}",
+              "variables": {
+                "countryCode": "$tyk_context.headers_Code"
+              }
             }
           ]
         }
