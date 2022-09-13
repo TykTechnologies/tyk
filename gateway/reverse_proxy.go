@@ -1712,15 +1712,14 @@ func copyBody(body io.ReadCloser) io.ReadCloser {
 	// body is http's io.ReadCloser - let's close it after we read data
 	defer body.Close()
 
-	// body is http's io.ReadCloser - read it up until EOF
-	var bodyRead bytes.Buffer
-	_, err := io.Copy(&bodyRead, body)
+	// body is http's io.ReadCloser - read it up
+	bodyRead, err := ioutil.ReadAll(body)
 	if err != nil {
 		log.Error("copyBody failed", err)
 	}
 
 	// use seek-able reader for further body usage
-	reusableBody := bytes.NewReader(bodyRead.Bytes())
+	reusableBody := bytes.NewReader(bodyRead)
 
 	return nopCloser{reusableBody}
 }
