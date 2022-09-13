@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ls
 # pushd terraform/environment
 # terraform init
