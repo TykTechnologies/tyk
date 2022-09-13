@@ -1,7 +1,13 @@
 package gateway
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // PersistGraphQLOperationMiddleware lets you convert any HTTP request into a GraphQL Operation
@@ -26,10 +32,53 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 		// PersistGraphQLOperationMiddleware not enabled for this endpoint
 		return nil, http.StatusOK
 	}
-	_ = meta
-	ctxSetRequestMethod(r, http.MethodPost)
-	originalPath := r.URL
-	ctxSetURLRewriteTarget(r, originalPath)
+	mwSpec, _ := meta.(*apidef.PersistGraphQLMeta)
+	r.Method = http.MethodPost
+
+	_, _ = io.ReadAll(r.Body)
+	defer r.Body.Close()
+
+	type GraphQLRequest struct {
+		Query     string          `json:"query"`
+		Variables json.RawMessage `json:"variables"`
+	}
+
+	contextData := ctxGetData(r)
+	_ = contextData
+
+	varBytes, _ := json.Marshal(mwSpec.Variables)
+	//varString := string(varBytes)
+
+	replacers := make(map[string]int)
+	paths := strings.Split(mwSpec.Path, "/")
+	for i, part := range paths {
+		println(i, part)
+		if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
+			key := "$path." + strings.Replace(part, "{", "", -1)
+			key = strings.Replace(key, "}", "", -1)
+			replacers[key] = i
+		}
+	}
+
+	variablesStr := i.Gw.replaceTykVariables(r, string(varBytes), false)
+
+	requestPathParts := strings.Split(r.RequestURI, "/")
+	for replacer, pathIndex := range replacers {
+		variablesStr = strings.ReplaceAll(variablesStr, replacer, requestPathParts[pathIndex+1])
+	}
+
+	graphqlQuery := GraphQLRequest{
+		Query:     mwSpec.Operation,
+		Variables: []byte(variablesStr),
+	}
+
+	graphQLQueryBytes, _ := json.Marshal(graphqlQuery)
+	newBuf := bytes.NewBuffer(graphQLQueryBytes)
+
+	r.Body = io.NopCloser(newBuf)
+	r.ContentLength = int64(newBuf.Len())
+	nopCloseRequestBody(r)
+
 	r.Header.Set("Content-Type", "application/json")
 
 	return nil, http.StatusOK

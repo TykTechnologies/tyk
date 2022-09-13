@@ -357,9 +357,10 @@ type ValidateRequestMeta struct {
 }
 
 type PersistGraphQLMeta struct {
-	Path      string `bson:"path" json:"path"`
-	Method    string `bson:"method" json:"method"`
-	Operation string `bson:"operation" json:"operation"`
+	Path      string                 `bson:"path" json:"path"`
+	Method    string                 `bson:"method" json:"method"`
+	Operation string                 `bson:"operation" json:"operation"`
+	Variables map[string]interface{} `bson:"variables" json:"variables"`
 }
 
 type GoPluginMeta struct {

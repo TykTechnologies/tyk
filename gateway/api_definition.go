@@ -1123,6 +1123,7 @@ func (a APIDefinitionLoader) compilePersistGraphQLPathSpec(paths []apidef.Persis
 		newSpec.PersistGraphQL.Path = stringSpec.Path
 		newSpec.PersistGraphQL.Method = stringSpec.Method
 		newSpec.PersistGraphQL.Operation = stringSpec.Operation
+		newSpec.PersistGraphQL.Variables = stringSpec.Variables
 
 		urlSpec = append(urlSpec, newSpec)
 	}
