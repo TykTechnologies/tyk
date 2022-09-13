@@ -1,5 +1,5 @@
 #!/bin/sh
-pushd repo/ci/terraform/environment
+pushd /repo/ci/terraform/environment
 terraform init
 terraform workspace new ${CLUSTER}
 terraform workspace show
