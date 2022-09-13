@@ -70,14 +70,12 @@ jobs:
         env:
           ETCD_PASS: ${{ secrets.etcd_pass }}
         with:
-          # username: ${{ secrets.docker_user }}
-          # password: ${{ secrets.docker_pass }}
           registry: docker.io
           image: tykio/gromit:v1.4.5-rc1
           options: -v ${{ github.workspace }}:/scripts
           run: |
             ls /scripts
-            gromit mutex get master --script /scripts/ci/devenv/create_env.sh
+            gromit mutex get master --script /scripts/ci/devenv/create_env.sh -l debug
             
 
       # - name: Terraform Init
