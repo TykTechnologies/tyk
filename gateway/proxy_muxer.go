@@ -52,6 +52,7 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.router.ServeHTTP(w, r)
+	r.Body = nil
 }
 
 type proxy struct {
