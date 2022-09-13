@@ -95,7 +95,7 @@ func addBodyHash(req *http.Request, regex string, h hash.Hash) (err error) {
 }
 
 func readBody(req *http.Request) (bodyBytes []byte, err error) {
-	if n, ok := req.Body.(nopCloser); ok {
+	if n, ok := req.Body.(*nopCloserBuffer); ok {
 		n.Seek(0, io.SeekStart)
 		bodyBytes, err = ioutil.ReadAll(n)
 		if err != nil {
@@ -105,12 +105,12 @@ func readBody(req *http.Request) (bodyBytes []byte, err error) {
 		return
 	}
 
-	req.Body = copyBody(req.Body)
+	req.Body = copyBody(req.Body, false)
 	bodyBytes, err = ioutil.ReadAll(req.Body)
 	if err != nil {
 		return nil, err
 	}
-	req.Body.(nopCloser).Seek(0, io.SeekStart) // reset for any next read.
+	req.Body.(*nopCloserBuffer).Seek(0, io.SeekStart) // reset for any next read.
 	return
 }
 
