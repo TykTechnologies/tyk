@@ -74,7 +74,7 @@ jobs:
           image: tykio/gromit:v1.4.5-rc2
           options: -v ${{ github.workspace }}:/scripts
           run: |
-            ls /scripts
+            ls /scripts/ci/devenv/create_env.sh
             gromit mutex get master --script /scripts/ci/devenv/create_env.sh -l debug
             
 
