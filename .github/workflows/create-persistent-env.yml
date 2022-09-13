@@ -68,7 +68,7 @@ jobs:
 
       - uses: TykTechnologies/docker-run-action@main
         env:
-          ETCD_PASS=${{ secrets.etcd_pass }}
+          ETCD_PASS: ${{ secrets.etcd_pass }}
         with:
           username: ${{ secrets.docker_user }}
           password: ${{ secrets.docker_pass }}
