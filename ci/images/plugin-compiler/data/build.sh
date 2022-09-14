@@ -4,21 +4,19 @@ set -xe
 CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' $TYK_GW_PATH/gateway/version.go)
 plugin_name=$1
 plugin_id=$2
-# GOOS and GOARCH can be send to override the name of the plugin
-GOOS=$3
-GOARCH=$4
 
 function usage() {
     cat <<EOF
 To build a plugin:
-      $0 <plugin_name> [<plugin_id>] [<GOOS>] [<GOARCH>]
+      $0 <plugin_name> [<plugin_id>]
 
-<plugin_id>,<GOOS> and <GOARCH> are optional
-default values for <GOOS> and <GOARCH> are the same as the plugin-compiler image(GOOS=linux,GOARCH=amd64)
+<plugin_id> is  optional
+If you want to build for a separate arch, please provide GOARCH and GOOS ad docker env vars.
 EOF
 }
 
-# if params were not send, then attempt to get them from env vars
+# if GOOS and GOENV is not set from docker env, derive it from the host
+# golang-X image.
 if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
   GOOS=$(go env GOOS)
   GOARCH=$(go env GOARCH)
@@ -33,6 +31,8 @@ fi
 if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
   plugin_name="${plugin_name%.*}_${CURRENTVERS}_${GOOS}_${GOARCH}.so"
 fi
+
+echo "Building plugin: $plugin_name"
 
 cd $TYK_GW_PATH
 go mod download
