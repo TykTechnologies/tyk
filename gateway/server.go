@@ -664,11 +664,6 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 
 	r.HandleFunc("/schema", gw.schemaHandler).Methods(http.MethodGet)
 
-	r.HandleFunc("/runtime_gc", func(w http.ResponseWriter, r *http.Request) {
-		runtime.GC()
-		w.Write([]byte("OK"))
-	}).Methods(http.MethodGet)
-
 	mainLog.Debug("Loaded API Endpoints")
 }
 
