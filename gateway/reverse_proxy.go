@@ -1707,10 +1707,9 @@ type nopCloserBuffer struct {
 
 // newNopCloserBuffer creates a new instance of a *nopCloserBuffer.
 func newNopCloserBuffer(buf io.ReadCloser) (*nopCloserBuffer, error) {
-	n := &nopCloserBuffer{
+	return &nopCloserBuffer{
 		reader: buf,
-	}
-	return n, nil
+	}, nil
 }
 
 // copy creates a copy of the io.Reader when we read from it (lazy).
@@ -1718,7 +1717,9 @@ func (n *nopCloserBuffer) copy() (err error) {
 	n.once.Do(func() {
 		_, err = io.Copy(&n.buf, n.reader)
 		if err == nil {
-			n.reader.Close()
+			if closeErr := n.reader.Close(); closeErr != nil {
+				log.WithError(closeErr).Warn("nopCloserBuffer: error closing original reader")
+			}
 			n.reader = nil
 		}
 	})
@@ -1728,7 +1729,9 @@ func (n *nopCloserBuffer) copy() (err error) {
 // Read just a wrapper around real Read which also moves position to the start if we get EOF
 // to have it ready for next read-cycle
 func (n *nopCloserBuffer) Read(p []byte) (int, error) {
-	n.copy()
+	if err := n.copy(); err != nil {
+		return 0, err
+	}
 
 	idx := n.position
 	num, err := bytes.NewBuffer(n.buf.Bytes()[idx:]).Read(p)
@@ -1760,7 +1763,9 @@ func (n *nopCloserBuffer) Seek(offset int64, whence int64) (int64, error) {
 		return 0, nil
 	}
 
-	n.copy()
+	if err := n.copy(); err != nil {
+		return 0, err
+	}
 
 	cnt := int64(n.buf.Len())
 
@@ -1794,7 +1799,8 @@ func copyBody(body io.ReadCloser, isClientResponseBody bool) io.ReadCloser {
 	// body is http's io.ReadCloser - read it up
 	rwc, err := newNopCloserBuffer(body)
 	if err != nil {
-		log.Error("copyBody failed", err)
+		log.WithError(err).Error("error creating buffered request body")
+		return body
 	}
 
 	// Consume reader if it's from a http client response.
@@ -1802,7 +1808,10 @@ func copyBody(body io.ReadCloser, isClientResponseBody bool) io.ReadCloser {
 	// Server would automatically call Close(), we only do it for
 	// the *http.Response struct, but not *http.Request.
 	if isClientResponseBody {
-		rwc.copy()
+		if err := rwc.copy(); err != nil {
+			log.WithError(err).Error("error reading request body")
+			return body
+		}
 	}
 
 	// use seek-able reader for further body usage
@@ -1817,6 +1826,7 @@ func copyRequest(r *http.Request) *http.Request {
 	if r.Body != nil {
 		r.Body = copyBody(r.Body, false)
 	}
+
 	return r
 }
 
@@ -1831,6 +1841,7 @@ func copyResponse(r *http.Response) *http.Response {
 	if r.Body != nil {
 		r.Body = copyBody(r.Body, true)
 	}
+
 	return r
 }
 
