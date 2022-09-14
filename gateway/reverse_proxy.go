@@ -1691,7 +1691,10 @@ type nopCloser struct {
 func (n nopCloser) Read(p []byte) (int, error) {
 	num, err := n.ReadSeeker.Read(p)
 	if err == io.EOF { // move to start to have it ready for next read cycle
-		n.Seek(0, io.SeekStart)
+		_, seekErr := n.Seek(0, io.SeekStart)
+		if seekErr != nil {
+			log.WithError(seekErr).Error("can't rewind nopCloser")
+		}
 	}
 	return num, err
 }
@@ -1747,7 +1750,10 @@ func (n *nopCloserBuffer) Read(p []byte) (int, error) {
 
 	// move to start to have it ready for next read cycle
 	if err == io.EOF {
-		n.Seek(0, io.SeekStart)
+		_, seekErr := n.Seek(0, io.SeekStart)
+		if seekErr != nil {
+			log.WithError(seekErr).Error("can't rewind nopCloserBuffer")
+		}
 	}
 
 	return num, err
