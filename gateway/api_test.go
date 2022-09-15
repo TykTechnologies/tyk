@@ -573,6 +573,100 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 	})
 }
 
+func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
+	const testAPIID = "testAPIID"
+	const orgId = "default"
+
+	hashCases := []struct {
+		name     string
+		hashKeys bool
+	}{
+		{
+			name:     "Key Hashing disabled",
+			hashKeys: false,
+		},
+		{
+			name:     "Key hashing enabled",
+			hashKeys: true,
+		},
+	}
+
+	resetQuotaTestCases := []struct {
+		name       string
+		resetQuota bool
+		quotaFound bool
+	}{
+		{
+			name:       "Reset quota",
+			resetQuota: true,
+			quotaFound: false,
+		},
+		{
+			name:       "Do not reset quota",
+			resetQuota: false,
+			quotaFound: true,
+		},
+	}
+
+	for _, quotaTc := range resetQuotaTestCases {
+		t.Run(quotaTc.name, func(t *testing.T) {
+			for _, tc := range hashCases {
+				t.Run(tc.name, func(t *testing.T) {
+					ts := StartTest(func(globalConf *config.Config) {
+						globalConf.HashKeys = tc.hashKeys
+					})
+					defer ts.Close()
+
+					ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+						spec.APIID = testAPIID
+						spec.UseKeylessAccess = false
+						//	spec.Auth.UseParam = true
+						spec.OrgID = orgId
+						spec.Proxy.ListenPath = "/my-api"
+					})
+
+					pID := ts.CreatePolicy(func(p *user.Policy) {
+						p.QuotaMax = 1
+					})
+
+					_, key := ts.CreateSession(func(s *user.SessionState) {
+						s.ApplyPolicies = []string{pID}
+						s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
+							APIID: testAPIID,
+						}}
+					})
+
+					withAccess := CreateStandardSession()
+					withAccess.AccessRights = map[string]user.AccessDefinition{testAPIID: {
+						APIID: testAPIID,
+					}}
+
+					authHeaders := map[string]string{
+						"authorization": key,
+					}
+
+					// consume api so quota is decreased
+					_, _ = ts.Run(t, []test.TestCase{
+						// Without data
+						{Method: "GET", Path: "/my-api", Headers: authHeaders, Code: 200},
+						{Method: "GET", Path: "/my-api", Headers: authHeaders, Code: 403},
+					}...)
+
+					// remove the key, but not always the quota key
+					ts.Gw.handleDeleteKey(key, orgId, "-1", quotaTc.resetQuota)
+
+					// we might remove the key, but for rpc sometimes we just remove the key and not the quota
+					// so we can get the updated key and still preserving the quota count
+					_, err := ts.Gw.DefaultQuotaStore.Store().GetRawKey("quota-" + storage.HashKey(key, tc.hashKeys))
+					found := err == nil
+					assert.Equal(t, quotaTc.quotaFound, found)
+				})
+			}
+		})
+	}
+
+}
+
 func TestUpdateKeyWithCert(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
