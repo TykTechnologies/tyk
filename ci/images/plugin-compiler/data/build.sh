@@ -11,9 +11,14 @@ To build a plugin:
       $0 <plugin_name> [<plugin_id>]
 
 <plugin_id> is  optional
-If you want to build for a separate arch, please provide GOARCH and GOOS ad docker env vars.
+If you want to build for a separate platform, please provide GOARCH and GOOS as docker env vars.
 EOF
 }
+
+if [ -z "$plugin_name" ]; then
+    usage
+    exit 1
+fi
 
 # if GOOS and GOENV is not set from docker env, derive it from the host
 # golang-X image.
@@ -22,10 +27,6 @@ if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
   GOARCH=$(go env GOARCH)
 fi
 
-if [ -z "$plugin_name" ]; then
-    usage
-    exit 1
-fi
 
 # if arch and os present then update the name of file with those params
 if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
