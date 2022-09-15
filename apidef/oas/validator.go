@@ -1,23 +1,24 @@
 package oas
 
-//go:generate go-bindata -pkg schema -nomemcopy -nometadata -ignore=(schema\/schema.gen.go|schema\/README.md|schema\/x-tyk-gateway.md) -prefix "./schema" -o schema/schema.gen.go schema/...
-//go:generate gofmt -w -s schema/schema.gen.go
-
 import (
+	"embed"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 
 	"github.com/buger/jsonparser"
 
-	"github.com/TykTechnologies/tyk/apidef/oas/schema"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/go-version"
 	"github.com/xeipuuv/gojsonschema"
 )
+
+//go:embed schema/*
+var schemaDir embed.FS
 
 const (
 	keyDefinitions              = "definitions"
@@ -56,25 +57,31 @@ func init() {
 func loadOASSchema() error {
 	mu.Lock()
 	defer mu.Unlock()
-	xTykAPIGwSchema, err := schema.Asset(fmt.Sprintf("%s.json", ExtensionTykAPIGateway))
+
+	xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykAPIGateway))
 	if err != nil {
 		return fmt.Errorf("%s loading failed: %w", ExtensionTykAPIGateway, err)
 	}
 
 	xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
 	oasJsonSchemas = make(map[string][]byte)
-	fileNames := schema.AssetNames()
-	for _, fileName := range fileNames {
+	members, err := schemaDir.ReadDir("schema")
+	for _, member := range members {
+		if member.IsDir() {
+			continue
+		}
+
+		fileName := member.Name()
 		if !strings.HasSuffix(fileName, ".json") {
 			continue
 		}
 
-		if strings.HasPrefix(fileName, ExtensionTykAPIGateway) {
+		if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) {
 			continue
 		}
 
 		var data []byte
-		data, err = schema.Asset(fileName)
+		data, err = schemaDir.ReadFile(filepath.Join("schema/", fileName))
 		if err != nil {
 			return err
 		}
