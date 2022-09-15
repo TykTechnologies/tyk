@@ -285,7 +285,7 @@ type APIDefinitionLoader struct {
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a APIDefinitionLoader) MakeSpec(def nestedApiDefinition, logger *logrus.Entry) *APISpec {
+func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.Entry) *APISpec {
 	spec := &APISpec{}
 
 	if logger == nil {
@@ -498,7 +498,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	// Process
 	var specs []*APISpec
 	for _, def := range apiDefs {
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(&def, nil)
 		specs = append(specs, spec)
 	}
 
@@ -576,7 +576,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 			def.Proxy.ListenPath = newListenPath
 		}
 
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(&def, nil)
 		specs = append(specs, spec)
 	}
 
@@ -629,7 +629,7 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 			nestDef.OAS = &oas.OAS{T: *oasDoc}
 		}
 
-		spec := a.MakeSpec(nestDef, nil)
+		spec := a.MakeSpec(&nestDef, nil)
 
 		_, _ = f.Seek(0, io.SeekStart)
 		_ = f.Close()
