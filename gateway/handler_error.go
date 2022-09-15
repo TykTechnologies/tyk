@@ -318,6 +318,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
 			record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)
 		}
+		if e.Spec.GraphQL.Enabled {
+			record.Tags = append(record.Tags, "tyk-graph-analytics")
+			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(e.Spec.GraphQL.Schema))
+		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
 

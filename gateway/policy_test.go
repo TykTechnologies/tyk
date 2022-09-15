@@ -302,6 +302,26 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					},
 				}},
 		},
+		"allowed-types1": {
+			ID: "allowed_types_1",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					AllowedTypes: []graphql.Type{
+						{Name: "Country", Fields: []string{"code", "name"}},
+						{Name: "Person", Fields: []string{"name", "height"}},
+					},
+				}},
+		},
+		"allowed-types2": {
+			ID: "allowed_types_2",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					AllowedTypes: []graphql.Type{
+						{Name: "Country", Fields: []string{"code", "phone"}},
+						{Name: "Person", Fields: []string{"name", "mass"}},
+					},
+				}},
+		},
 		"field-level-depth-limit1": {
 			ID: "field-level-depth-limit1",
 			AccessRights: map[string]user.AccessDefinition{
@@ -665,6 +685,23 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				want := map[string]user.AccessDefinition{
 					"a": { // It should get intersection of restricted types.
 						RestrictedTypes: []graphql.Type{
+							{Name: "Country", Fields: []string{"code"}},
+							{Name: "Person", Fields: []string{"name"}},
+						},
+						Limit: user.APILimit{},
+					},
+				}
+
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name:     "Merge allowed fields for the same GraphQL API",
+			policies: []string{"allowed-types1", "allowed-types2"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": { // It should get intersection of restricted types.
+						AllowedTypes: []graphql.Type{
 							{Name: "Country", Fields: []string{"code"}},
 							{Name: "Person", Fields: []string{"name"}},
 						},

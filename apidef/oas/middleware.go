@@ -158,7 +158,6 @@ func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillAllowance(ep.WhiteList, allow)
 	ps.fillAllowance(ep.BlackList, block)
 	ps.fillAllowance(ep.Ignored, ignoreAuthentication)
-	ps.fillMockResponse(ep.MockResponse)
 	ps.fillTransformRequestMethod(ep.MethodTransforms)
 	ps.fillCache(ep.AdvanceCacheConfig)
 	ps.fillEnforceTimeout(ep.HardTimeouts)
@@ -197,24 +196,6 @@ func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ Allowance
 		allowance.Fill(em)
 		if ShouldOmit(allowance) {
 			allowance = nil
-		}
-	}
-}
-
-func (ps Paths) fillMockResponse(mockMetas []apidef.MockResponseMeta) {
-	for _, mm := range mockMetas {
-		if _, ok := ps[mm.Path]; !ok {
-			ps[mm.Path] = &Path{}
-		}
-
-		plugins := ps[mm.Path].getMethod(mm.Method)
-		if plugins.MockResponse == nil {
-			plugins.MockResponse = &MockResponse{}
-		}
-
-		plugins.MockResponse.Fill(mm)
-		if ShouldOmit(plugins.MockResponse) {
-			plugins.MockResponse = nil
 		}
 	}
 }
@@ -405,8 +386,6 @@ type Plugins struct {
 	Allow                *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
 	Block                *Allowance `bson:"block,omitempty" json:"block,omitempty"`
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
-	// MockResponse allows you to mock responses for an API endpoint.
-	MockResponse *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
 	// TransformRequestMethod allows you to transform the method of a request.
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
 	Cache                  *CachePlugin            `bson:"cache,omitempty" json:"cache,omitempty"`
@@ -417,7 +396,6 @@ func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method str
 	p.extractAllowanceTo(ep, path, method, allow)
 	p.extractAllowanceTo(ep, path, method, block)
 	p.extractAllowanceTo(ep, path, method, ignoreAuthentication)
-	p.extractMockResponseTo(ep, path, method)
 	p.extractTransformRequestMethodTo(ep, path, method)
 	p.extractCacheTo(ep, path, method)
 	p.extractEnforcedTimeoutTo(ep, path, method)
@@ -443,16 +421,6 @@ func (p *Plugins) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, m
 	endpointMeta := apidef.EndPointMeta{Path: path, Method: method}
 	allowance.ExtractTo(&endpointMeta)
 	*endpointMetas = append(*endpointMetas, endpointMeta)
-}
-
-func (p *Plugins) extractMockResponseTo(ep *apidef.ExtendedPathsSet, path string, method string) {
-	if p.MockResponse == nil {
-		return
-	}
-
-	mockMeta := apidef.MockResponseMeta{Path: path, Method: method}
-	p.MockResponse.ExtractTo(&mockMeta)
-	ep.MockResponse = append(ep.MockResponse, mockMeta)
 }
 
 func (p *Plugins) extractTransformRequestMethodTo(ep *apidef.ExtendedPathsSet, path string, method string) {
@@ -505,49 +473,6 @@ func (a *Allowance) ExtractTo(endpointMeta *apidef.EndPointMeta) {
 
 func (a *Allowance) Import(enabled bool) {
 	a.Enabled = enabled
-}
-
-type MockResponse struct {
-	// Enabled enables Mock response in the given path and method.
-	Enabled bool `bson:"enabled" json:"enabled"`
-	// IgnoreCase ignores case while matching incoming request path.
-	IgnoreCase bool `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
-	// Code is the mock response's http response code that will be returned to client.
-	Code int `bson:"code" json:"code"`
-	// Body is the mock response's body that will be returned to client.
-	Body string `bson:"body" json:"body"`
-	// Headers is the mock response's headers that will be returned to client.
-	Headers []Header `bson:"headers,omitempty" json:"headers,omitempty"`
-}
-
-func (mr *MockResponse) Fill(mockMeta apidef.MockResponseMeta) {
-	mr.Enabled = !mockMeta.Disabled
-	mr.IgnoreCase = mockMeta.IgnoreCase
-	mr.Code = mockMeta.Code
-	mr.Body = mockMeta.Body
-	mr.Headers = []Header{}
-	for name, value := range mockMeta.Headers {
-		mr.Headers = append(mr.Headers, Header{Name: name, Value: value})
-	}
-
-	sort.Slice(mr.Headers, func(i, j int) bool {
-		return mr.Headers[i].Name < mr.Headers[j].Name
-	})
-
-	if len(mr.Headers) == 0 {
-		mr.Headers = nil
-	}
-}
-
-func (mr *MockResponse) ExtractTo(mockMeta *apidef.MockResponseMeta) {
-	mockMeta.Disabled = !mr.Enabled
-	mockMeta.IgnoreCase = mr.IgnoreCase
-	mockMeta.Code = mr.Code
-	mockMeta.Body = mr.Body
-	mockMeta.Headers = make(map[string]string)
-	for _, h := range mr.Headers {
-		mockMeta.Headers[h.Name] = h.Value
-	}
 }
 
 type Header struct {
