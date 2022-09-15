@@ -285,7 +285,7 @@ type APIDefinitionLoader struct {
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.Entry) *APISpec {
+func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.Entry) *APISpec {
 	spec := &APISpec{}
 
 	if logger == nil {
@@ -317,7 +317,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		}
 	}
 
-	spec.APIDefinition = def
+	spec.APIDefinition = def.APIDefinition
 
 	// We'll push the default HealthChecker:
 	spec.Health = &DefaultHealthChecker{
@@ -387,6 +387,15 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		}
 		spec.RxPaths[v.Name] = pathSpecs
 		spec.WhiteListEnabled[v.Name] = whiteListSpecs
+	}
+
+	if spec.IsOAS && def.OAS != nil {
+		loader := openapi3.NewLoader()
+		if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
+			log.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
+		}
+
+		spec.OAS = *def.OAS
 	}
 
 	return spec
@@ -489,17 +498,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	// Process
 	var specs []*APISpec
 	for _, def := range apiDefs {
-		spec := a.MakeSpec(def.APIDefinition, nil)
-
-		if spec.IsOAS {
-			loader := openapi3.NewLoader()
-			if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
-				log.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
-			}
-
-			spec.OAS = *def.OAS
-		}
-
+		spec := a.MakeSpec(&def, nil)
 		specs = append(specs, spec)
 	}
 
@@ -577,16 +576,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 			def.Proxy.ListenPath = newListenPath
 		}
 
-		spec := a.MakeSpec(def.APIDefinition, nil)
-		if spec.IsOAS {
-			loader := openapi3.NewLoader()
-			if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
-				log.WithError(err).Errorf("RPC loaded API's OAS reference resolve failed: %s", def.APIID)
-			}
-
-			spec.OAS = *def.OAS
-		}
-
+		spec := a.MakeSpec(&def, nil)
 		specs = append(specs, spec)
 	}
 
@@ -632,17 +622,17 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 		}
 
 		def := a.ParseDefinition(f)
-		spec := a.MakeSpec(&def, nil)
-
-		_, _ = f.Seek(0, io.SeekStart)
-		_ = f.Close()
-
+		nestDef := nestedApiDefinition{APIDefinition: &def}
 		loader := openapi3.NewLoader()
 		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(path))
 		if err == nil {
-			spec.OAS.T = *oasDoc
-			_ = f.Close()
+			nestDef.OAS = &oas.OAS{T: *oasDoc}
 		}
+
+		spec := a.MakeSpec(&nestDef, nil)
+
+		_, _ = f.Seek(0, io.SeekStart)
+		_ = f.Close()
 
 		specs = append(specs, spec)
 	}
