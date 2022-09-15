@@ -708,11 +708,14 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 	}
 	keyName = session.KeyID
 
+	if resetQuota {
+		gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
+	}
+
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		gw.apisMu.RLock()
 		removed := gw.GlobalSessionManager.RemoveSession(orgID, keyName, false)
-		gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
 		gw.apisMu.RUnlock()
 
 		if !removed {
@@ -740,10 +743,6 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 			"status": "fail",
 		}).Error("Failed to remove the key")
 		return apiError("Failed to remove the key"), http.StatusBadRequest
-	}
-
-	if resetQuota {
-		gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
 	}
 
 	statusObj := apiModifyKeySuccess{
