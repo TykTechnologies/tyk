@@ -28,7 +28,7 @@ const (
 
 func (ts *Test) createSpecTestFrom(t testing.TB, def *apidef.APIDefinition) *APISpec {
 	loader := APIDefinitionLoader{Gw: ts.Gw}
-	spec := loader.MakeSpec(def, nil)
+	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: def}, nil)
 	tname := t.Name()
 	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey.", RedisController: ts.Gw.RedisController}
 	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth.", RedisController: ts.Gw.RedisController}
