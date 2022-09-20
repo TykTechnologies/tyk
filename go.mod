@@ -31,7 +31,6 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/consul/api v1.3.0
@@ -61,25 +60,26 @@ require (
 	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d
 	github.com/rs/cors v1.7.0
 	github.com/satori/go.uuid v1.2.0
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/afero v1.6.0
 	github.com/square/go-jose v2.4.1+incompatible
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.0
+	github.com/thomaspoignant/go-feature-flag v0.27.2
 	github.com/uber/jaeger-client-go v2.20.0+incompatible
 	github.com/valyala/fasthttp v1.15.1
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	google.golang.org/grpc v1.36.0
+	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
+	golang.org/x/net v0.0.0-20220722155237-a158d28d115b
+	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
+	google.golang.org/grpc v1.48.0
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 v3.0.1
 	rsc.io/letsencrypt v0.0.2
 )
 

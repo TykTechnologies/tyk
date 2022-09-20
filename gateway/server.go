@@ -52,6 +52,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/internal/flags"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -188,6 +189,9 @@ type Gateway struct {
 	healthCheckInfo atomic.Value
 
 	dialCtxFn test.DialContext
+
+	// Feature Flags evaluator
+	Flags flags.Flags
 }
 
 type hostDetails struct {
@@ -202,7 +206,6 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 		},
 		ctx: ctx,
 	}
-
 	gw.Analytics = RedisAnalyticsHandler{Gw: &gw}
 	gw.SetConfig(config)
 	sessionManager := DefaultSessionManager{Gw: &gw}
@@ -1109,6 +1112,12 @@ func (gw *Gateway) setupLogger() {
 }
 
 func (gw *Gateway) initialiseSystem() error {
+	fflag, err := flags.NewFlags(gw.ctx)
+	if err != nil {
+		mainLog.WithError(err).Warn("unexpected feature flags error")
+	}
+	gw.Flags = fflag
+
 	if gw.isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output

@@ -354,6 +354,13 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: JWT")
 		}
 
+		introspectionMW := NewIntrospectionMiddleware(baseMid, gw.Flags)
+		if gw.mwAppendEnabled(&authArray, introspectionMW) {
+			logger.Info("Checking security policy: Introspection")
+		} else {
+			logger.Info("Disabled security policy: Introspection")
+		}
+
 		if gw.mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid}) {
 			logger.Info("Checking security policy: OpenID")
 		}

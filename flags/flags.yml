@@ -1,0 +1,6 @@
+middleware.introspection-enabled:
+  description: Enable OAuth introspection middleware
+  default: true
+  "true": true
+  "false": false
+  percentage: 100
