@@ -910,7 +910,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			}
 
 			gw.apisMu.RLock()
-			if curSpec, found := gw.apisByID[spec.APIID]; found && spec.Checksum != curSpec.Checksum {
+			if curSpec, found := gw.apisByID[spec.APIID]; found && spec.Checksum == curSpec.Checksum {
 				tmpSpecRegister[spec.APIID] = curSpec
 			} else {
 				tmpSpecRegister[spec.APIID] = spec
@@ -942,7 +942,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	for _, spec := range specs {
 		for _, curSpec := range gw.apisByID {
 			if spec.APIID == curSpec.APIID && spec.Checksum != curSpec.Checksum {
-				spec.Release()
+				curSpec.Release()
 			}
 		}
 	}
