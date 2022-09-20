@@ -152,6 +152,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	}
 
 	assertListenPaths := func(t *testing.T, tests []testCase) {
+		t.Helper()
 		for _, tc := range tests {
 			s := ts.Gw.getApiSpec(tc.APIID)
 			if want, got := tc.ListenPath, s.Proxy.ListenPath; want != got {
@@ -201,8 +202,14 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	t.Run("Restore original order", func(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
-			func(spec *APISpec) { spec.APIID = "2" },
-			func(spec *APISpec) { spec.APIID = "3" },
+			func(spec *APISpec) {
+				spec.APIID = "2"
+				spec.Name = "new"
+			},
+			func(spec *APISpec) {
+				spec.APIID = "3"
+				spec.Name = "new"
+			},
 		)
 
 		assertListenPaths(t, []testCase{
