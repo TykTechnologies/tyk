@@ -362,6 +362,9 @@
     "enable_jsvm": {
       "type": "boolean"
     },
+    "enable_introspection": {
+      "type": "boolean"
+    },
     "jsvm_timeout": {
       "type": "integer"
     },
