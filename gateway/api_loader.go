@@ -943,6 +943,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		for _, curSpec := range gw.apisByID {
 			if spec.APIID == curSpec.APIID && spec.Checksum != curSpec.Checksum {
 				curSpec.Release()
+			} else if spec.APIID == curSpec.APIID && spec.Checksum == curSpec.Checksum {
+				spec.Release()
 			}
 		}
 	}
