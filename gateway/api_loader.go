@@ -940,12 +940,11 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gw.apisMu.Lock()
 
 	for _, spec := range specs {
-		for _, curSpec := range gw.apisByID {
-			if spec.APIID == curSpec.APIID && spec.Checksum != curSpec.Checksum {
-				curSpec.Release()
-			} else if spec.APIID == curSpec.APIID && spec.Checksum == curSpec.Checksum {
-				spec.Release()
-			}
+		curSpec, ok := gw.apisByID[spec.APIID]
+		if ok && curSpec.Checksum != spec.Checksum {
+			curSpec.Release()
+		} else if ok && curSpec.Checksum == spec.Checksum {
+			spec.Release()
 		}
 	}
 
