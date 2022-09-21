@@ -285,12 +285,6 @@ func (gw *Gateway) getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
-func (gw *Gateway) removeApiById(apiID string) {
-	gw.apisMu.RLock()
-	delete(gw.apisByID, apiID)
-	gw.apisMu.RUnlock()
-}
-
 func (gw *Gateway) getPolicy(polID string) user.Policy {
 	gw.policiesMu.RLock()
 	pol := gw.policiesByID[polID]
