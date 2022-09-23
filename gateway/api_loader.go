@@ -104,12 +104,29 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
+func (gw *Gateway) generateSubRoutes(spec *APISpec, subRouter *mux.Router, logger *logrus.Entry) {
+	if spec.GraphQL.GraphQLPlayground.Enabled {
+		gw.loadGraphQLPlayground(spec, subRouter)
+	}
+
+	if spec.EnableBatchRequestSupport {
+		gw.addBatchEndpoint(spec, subRouter)
+	}
+
+	if spec.UseOauth2 {
+		logger.Debug("Loading OAuth Manager")
+		oauthManager := gw.addOAuthHandlers(spec, subRouter)
+		logger.Debug("-- Added OAuth Handlers")
+
+		spec.OAuthManager = oauthManager
+		logger.Debug("Done loading OAuth Manager")
+	}
+}
+
 func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
-	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
+	gs *generalStores, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
-
-	handleCORS(subrouter, spec)
 
 	logger = logger.WithFields(logrus.Fields{
 		"org_id":   spec.OrgID,
@@ -242,23 +259,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		fixFuncPath(prefix, mwPostFuncs)
 		fixFuncPath(prefix, mwPostAuthCheckFuncs)
 		fixFuncPath(prefix, mwResponseFuncs)
-	}
-
-	if spec.GraphQL.GraphQLPlayground.Enabled {
-		gw.loadGraphQLPlayground(spec, subrouter)
-	}
-
-	if spec.EnableBatchRequestSupport {
-		gw.addBatchEndpoint(spec, subrouter)
-	}
-
-	if spec.UseOauth2 {
-		logger.Debug("Loading OAuth Manager")
-		oauthManager := gw.addOAuthHandlers(spec, subrouter)
-		logger.Debug("-- Added OAuth Handlers")
-
-		spec.OAuthManager = oauthManager
-		logger.Debug("Done loading OAuth Manager")
 	}
 
 	enableVersionOverrides := false
@@ -737,9 +737,12 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 			chainObj = chain.(*ChainObject)
 		}
 	} else {
-		chainObj = gw.processSpec(spec, apisByListen, gs, subrouter, logrus.NewEntry(log))
+		chainObj = gw.processSpec(spec, apisByListen, gs, logrus.NewEntry(log))
 	}
 	gw.apisMu.RUnlock()
+
+	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(log))
+	handleCORS(subrouter, spec)
 
 	if chainObj.Skip {
 		return chainObj
