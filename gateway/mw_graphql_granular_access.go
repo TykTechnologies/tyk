@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -8,6 +9,8 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+var errIntrospectionDisabled = errors.New("introspection is disabled")
 
 type GranularAccessFailReason int
 
@@ -47,6 +50,17 @@ func (m *GraphQLGranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, 
 	gqlRequest := ctxGetGraphQLRequest(r)
 	if gqlRequest == nil {
 		return nil, http.StatusOK
+	}
+
+	var isIntrospection bool
+	isIntrospection, err := gqlRequest.IsIntrospectionQuery()
+	if err != nil {
+		return err, http.StatusInternalServerError
+	}
+	if isIntrospection {
+		if accessDef.DisableIntrospection {
+			return errIntrospectionDisabled, http.StatusForbidden
+		}
 	}
 
 	checker := &GraphqlGranularAccessChecker{}
