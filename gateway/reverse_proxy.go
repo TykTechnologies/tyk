@@ -1047,14 +1047,12 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		// if this context vars are enabled and this is a supergraph, inject the sub request id header
 		if p.TykAPISpec.EnableContextVars && p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph {
 			ctxData := ctxGetData(outreq)
-			if reqID, ok := ctxData["request_id"]; ok {
-				if requestID, ok := reqID.(string); ok {
-					execOptions = append(execOptions, graphql.WithUpstreamHeaders(http.Header{
-						"X-Tyk-Parent-Request-Id": {requestID},
-					}))
-				}
-			} else {
+			if reqID, exists := ctxData["request_id"]; !exists {
 				log.Warn("context variables enabled but request_id missing")
+			} else if requestID, ok := reqID.(string); ok {
+				execOptions = append(execOptions, graphql.WithUpstreamHeaders(http.Header{
+					"X-Tyk-Parent-Request-Id": {requestID},
+				}))
 			}
 		}
 
