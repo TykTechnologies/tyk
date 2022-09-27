@@ -336,3 +336,125 @@ func TestGraphQL_AllowedTypes_Override_RestrictedTypes(t *testing.T) {
 		}...)
 	})
 }
+
+func TestGraphQL_DisableIntrospection(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	disabledIntrospectionBody := `{
+    "error": "introspection is disabled"
+}`
+
+	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = false
+		spec.GraphQL.Enabled = true
+	})[0]
+
+	introspectionQuery := graphql.Request{
+		Query: "query Query { __schema { types { name } } }",
+	}
+
+	t.Run("Disable Introspection with direct key", func(t *testing.T) {
+		_, disableIntrospectionKey := g.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				api.APIID: {
+					APIID:                api.APIID,
+					APIName:              api.Name,
+					DisableIntrospection: true,
+				},
+			}
+		})
+
+		authHeaderWithDirectKey := map[string]string{
+			headers.Authorization: disableIntrospectionKey,
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			{
+				Data:    introspectionQuery,
+				Headers: authHeaderWithDirectKey,
+				BodyMatchFunc: func(bytes []byte) bool {
+					return assert.Contains(t, string(bytes), disabledIntrospectionBody)
+				},
+				Code: http.StatusForbidden,
+			},
+		}...)
+	})
+
+	t.Run("Enable Introspection with direct key", func(t *testing.T) {
+		_, enabledIntrospectionKey := g.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				api.APIID: {
+					APIID:   api.APIID,
+					APIName: api.Name,
+				},
+			}
+		})
+
+		authHeaderWithDirectKey := map[string]string{
+			headers.Authorization: enabledIntrospectionKey,
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			{Data: introspectionQuery, Headers: authHeaderWithDirectKey, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("Disable introspection with policy applied key", func(t *testing.T) {
+		test.Flaky(t) // TODO: TT-5220
+
+		pID := g.CreatePolicy(func(p *user.Policy) {
+			p.AccessRights = map[string]user.AccessDefinition{
+				api.APIID: {
+					APIID:                api.APIID,
+					APIName:              api.Name,
+					DisableIntrospection: true,
+				},
+			}
+		})
+
+		_, policyAppliedKey := g.CreateSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{pID}
+		})
+
+		authHeaderWithPolicyAppliedKey := map[string]string{
+			headers.Authorization: policyAppliedKey,
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			{
+				Data:    introspectionQuery,
+				Headers: authHeaderWithPolicyAppliedKey,
+				BodyMatchFunc: func(bytes []byte) bool {
+					return assert.Contains(t, string(bytes), disabledIntrospectionBody)
+				},
+				Code: http.StatusForbidden,
+			},
+		}...)
+	})
+
+	t.Run("Enable introspection with policy applied key", func(t *testing.T) {
+		test.Flaky(t) // TODO: TT-5220
+
+		pID := g.CreatePolicy(func(p *user.Policy) {
+			p.AccessRights = map[string]user.AccessDefinition{
+				api.APIID: {
+					APIID:   api.APIID,
+					APIName: api.Name,
+				},
+			}
+		})
+
+		_, policyAppliedKey := g.CreateSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{pID}
+		})
+
+		authHeaderWithPolicyAppliedKey := map[string]string{
+			headers.Authorization: policyAppliedKey,
+		}
+		_, _ = g.Run(t, []test.TestCase{
+			{Data: introspectionQuery, Headers: authHeaderWithPolicyAppliedKey, Code: http.StatusOK},
+		}...)
+	})
+}

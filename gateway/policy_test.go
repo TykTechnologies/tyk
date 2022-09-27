@@ -322,6 +322,20 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					},
 				}},
 		},
+		"introspection-disabled": {
+			ID: "introspection_disabled",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					DisableIntrospection: true,
+				}},
+		},
+		"introspection-enabled": {
+			ID: "introspection_enabled",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					DisableIntrospection: false,
+				}},
+		},
 		"field-level-depth-limit1": {
 			ID: "field-level-depth-limit1",
 			AccessRights: map[string]user.AccessDefinition{
@@ -706,6 +720,20 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 							{Name: "Person", Fields: []string{"name"}},
 						},
 						Limit: user.APILimit{},
+					},
+				}
+
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name:     "If GQL introspection is disabled, it remains disabled after merging",
+			policies: []string{"introspection-disabled", "introspection-enabled"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": {
+						DisableIntrospection: true, // If GQL introspection is disabled, it remains disabled after merging.
+						Limit:                user.APILimit{},
 					},
 				}
 

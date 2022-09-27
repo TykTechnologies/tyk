@@ -18,25 +18,27 @@ import (
 )
 
 type DBAccessDefinition struct {
-	APIName           string                       `json:"apiname"`
-	APIID             string                       `json:"apiid"`
-	Versions          []string                     `json:"versions"`
-	AllowedURLs       []user.AccessSpec            `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
-	RestrictedTypes   []graphql.Type               `json:"restricted_types"`
-	AllowedTypes      []graphql.Type               `json:"allowed_types"`
-	FieldAccessRights []user.FieldAccessDefinition `json:"field_access_rights"`
-	Limit             *user.APILimit               `json:"limit"`
+	APIName              string                       `json:"apiname"`
+	APIID                string                       `json:"apiid"`
+	Versions             []string                     `json:"versions"`
+	AllowedURLs          []user.AccessSpec            `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
+	RestrictedTypes      []graphql.Type               `json:"restricted_types"`
+	AllowedTypes         []graphql.Type               `json:"allowed_types"`
+	DisableIntrospection bool                         `json:"disable_introspection"`
+	FieldAccessRights    []user.FieldAccessDefinition `json:"field_access_rights"`
+	Limit                *user.APILimit               `json:"limit"`
 }
 
 func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
 	ad := user.AccessDefinition{
-		APIName:           d.APIName,
-		APIID:             d.APIID,
-		Versions:          d.Versions,
-		AllowedURLs:       d.AllowedURLs,
-		RestrictedTypes:   d.RestrictedTypes,
-		AllowedTypes:      d.AllowedTypes,
-		FieldAccessRights: d.FieldAccessRights,
+		APIName:              d.APIName,
+		APIID:                d.APIID,
+		Versions:             d.Versions,
+		AllowedURLs:          d.AllowedURLs,
+		RestrictedTypes:      d.RestrictedTypes,
+		AllowedTypes:         d.AllowedTypes,
+		DisableIntrospection: d.DisableIntrospection,
+		FieldAccessRights:    d.FieldAccessRights,
 	}
 
 	if d.Limit != nil {

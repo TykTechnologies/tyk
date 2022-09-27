@@ -372,6 +372,13 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
+				if r, ok := session.AccessRights[apiID]; ok {
+					// If GQL introspection is disabled, keep that configuration.
+					if r.DisableIntrospection {
+						accessRights.DisableIntrospection = r.DisableIntrospection
+					}
+				}
+
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
 
@@ -392,6 +399,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					// Merge ACLs for the same API
 					if r, ok := rights[k]; ok {
+						// If GQL introspection is disabled, keep that configuration.
+						if v.DisableIntrospection {
+							r.DisableIntrospection = v.DisableIntrospection
+						}
 						r.Versions = appendIfMissing(rights[k].Versions, v.Versions...)
 
 						for _, u := range v.AllowedURLs {
