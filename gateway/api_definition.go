@@ -249,7 +249,7 @@ func (s *APISpec) Release() {
 	// release all other resources associated with spec
 
 	// JSVM object is a circular dependecy hell, but we can check if it initialized like this
-	if s.JSVM.Spec != nil {
+	if s.JSVM.VM != nil {
 		s.JSVM.DeInit()
 	}
 }
