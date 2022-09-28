@@ -358,8 +358,11 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 
 	spec.GlobalConfig = a.Gw.GetConfig()
 
-	_, _, _, _, _, _, mwDriver := a.Gw.loadCustomMiddleware(spec)
-	if a.Gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || mwDriver == apidef.OttoDriver) {
+	if err = a.Gw.loadBundle(spec); err != nil {
+		logger.WithError(err).Error("Couldn't load bundle")
+	}
+
+	if a.Gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || spec.CustomMiddleware.Driver == apidef.OttoDriver) {
 		logger.Debug("Initializing JSVM")
 		spec.JSVM.Init(spec, logger, a.Gw)
 	}
