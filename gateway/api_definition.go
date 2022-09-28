@@ -631,10 +631,12 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 
 		def := a.ParseDefinition(f)
 		nestDef := nestedApiDefinition{APIDefinition: &def}
-		loader := openapi3.NewLoader()
-		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(path))
-		if err == nil {
-			nestDef.OAS = &oas.OAS{T: *oasDoc}
+		if def.IsOAS {
+			loader := openapi3.NewLoader()
+			oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(path))
+			if err == nil {
+				nestDef.OAS = &oas.OAS{T: *oasDoc}
+			}
 		}
 
 		spec := a.MakeSpec(&nestDef, nil)
