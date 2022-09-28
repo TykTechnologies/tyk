@@ -441,6 +441,7 @@ func TestIgnored(t *testing.T) {
 		}...)
 
 		t.Run("ignore-case globally", func(t *testing.T) {
+			spec.Name = "ignore endpoint case globally"
 			globalConf := ts.Gw.GetConfig()
 			globalConf.IgnoreEndpointCase = true
 			ts.Gw.SetConfig(globalConf)
@@ -464,6 +465,7 @@ func TestIgnored(t *testing.T) {
 			v.IgnoreEndpointCase = true
 			spec.VersionData.Versions["v1"] = v
 
+			spec.Name = "ignore endpoint in api level"
 			ts.Gw.LoadAPI(spec)
 
 			_, _ = ts.Run(t, []test.TestCase{

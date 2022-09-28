@@ -23,17 +23,20 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	assert := func(hashKeys bool) {
+	assert := func(t *testing.T, ts *Test, hashKeys bool) {
+		t.Helper()
 		globalConf := ts.Gw.GetConfig()
 		globalConf.HashKeys = hashKeys
 		ts.Gw.SetConfig(globalConf)
 
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
+			// change the name so that it reloads with change in checksum
+			if hashKeys {
+				// change name to change checksum and reload
+				spec.Name = "hash keys"
+			}
 		})[0]
 
 		key := CreateSession(ts.Gw, func(s *user.SessionState) {
@@ -54,11 +57,11 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 	}
 
 	t.Run("HashKeys=false", func(t *testing.T) {
-		assert(false)
+		assert(t, ts, false)
 	})
 
 	t.Run("HashKeys=true", func(t *testing.T) {
-		assert(true)
+		assert(t, ts, true)
 	})
 }
 
@@ -66,7 +69,8 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	assert := func(hashKeys bool) {
+	assert := func(t *testing.T, ts *Test, hashKeys bool) {
+		t.Helper()
 		globalConf := ts.Gw.GetConfig()
 		globalConf.HashKeys = hashKeys
 		ts.Gw.SetConfig(globalConf)
@@ -74,6 +78,11 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
+			// change the name so that it reloads with change in checksum
+			if hashKeys {
+				// change name to change checksum and reload
+				spec.Name = "hash keys"
+			}
 		})[0]
 
 		key := ts.Gw.generateToken("", "")
@@ -112,11 +121,11 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 	}
 
 	t.Run("HashKeys=false", func(t *testing.T) {
-		assert(false)
+		assert(t, ts, false)
 	})
 
 	t.Run("HashKeys=true", func(t *testing.T) {
-		assert(true)
+		assert(t, ts, true)
 	})
 }
 

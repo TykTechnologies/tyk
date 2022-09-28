@@ -267,6 +267,8 @@ func TestProxyTransport(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
+			// change name to change checksum and reload
+			spec.Name = t.Name()
 		})
 		ts.Run(t, test.TestCase{Path: "/", Code: 500})
 	})
@@ -283,6 +285,8 @@ func TestProxyTransport(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+			// change name to change checksum and reload
+			spec.Name = t.Name()
 		})
 
 		ts.Run(t, test.TestCase{Path: "/", Code: 200})
@@ -300,6 +304,8 @@ func TestProxyTransport(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+			// change name to change checksum and reload
+			spec.Name = t.Name()
 		})
 
 		ts.Run(t, test.TestCase{Path: "/", Code: 500})

@@ -1132,6 +1132,8 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 	}
 
 	go s.reloadSimulation()
+
+	s.Gw.started = true
 }
 
 func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
@@ -1183,7 +1185,29 @@ func (s *Test) Close() {
 	s.Gw.analytics.Stop()
 	s.Gw.GlobalHostChecker.StopPoller()
 	s.gwMu.Unlock()
-	os.RemoveAll(s.Gw.GetConfig().AppPath)
+
+	s.Gw.started = false
+
+	err = s.RemoveApis()
+	if err != nil {
+		log.Error("could not remove apis")
+	}
+}
+
+// RemoveApis clean all the apis from a living gw
+func (s *Test) RemoveApis() error {
+	s.Gw.apisMu.RLock()
+	s.Gw.apiSpecs = []*APISpec{}
+	s.Gw.apisByID = map[string]*APISpec{}
+
+	s.Gw.apisMu.RUnlock()
+
+	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
+	if err != nil {
+		log.WithError(err).Error("removing apis from gw")
+	}
+
+	return err
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
@@ -1558,12 +1582,15 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 		apiGens = append(apiGens, func(spec *APISpec) {})
 	}
 
-	for _, gen := range apiGens {
+	for idx, gen := range apiGens {
 		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 		if err := json.Unmarshal([]byte(sampleAPI), spec.APIDefinition); err != nil {
 			panic(err)
 		}
 
+		if idx > 0 {
+			spec.APIID = randStringBytes(8)
+		}
 		gen(spec)
 		specs = append(specs, spec)
 	}
@@ -1575,16 +1602,16 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	gwConf := gw.GetConfig()
 	oldPath := gwConf.AppPath
 	gwConf.AppPath, _ = ioutil.TempDir("", "apps")
-	gw.SetConfig(gwConf)
+	gw.SetConfig(gwConf, true)
 	defer func() {
 		globalConf := gw.GetConfig()
 		os.RemoveAll(globalConf.AppPath)
 		globalConf.AppPath = oldPath
-		gw.SetConfig(globalConf)
+		gw.SetConfig(globalConf, true)
 	}()
 
 	for i, spec := range specs {
-		specBytes, err := json.Marshal(spec)
+		specBytes, err := json.Marshal(spec.APIDefinition)
 		if err != nil {
 			fmt.Printf(" \n %+v \n", spec)
 			panic(err)

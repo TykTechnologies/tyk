@@ -83,6 +83,8 @@ var (
 const appName = "tyk-gateway"
 
 type Gateway struct {
+	started bool
+
 	DefaultProxyMux *proxyMux
 	config          atomic.Value
 	configMu        sync.Mutex
@@ -703,7 +705,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	mwPostFuncs := []apidef.MiddlewareDefinition{}
 	mwPostKeyAuthFuncs := []apidef.MiddlewareDefinition{}
 	mwResponseFuncs := []apidef.MiddlewareDefinition{}
-	mwDriver := apidef.OttoDriver
+	mwDriver := apidef.MiddlewareDriver("")
 
 	// Set AuthCheck hook
 	if spec.CustomMiddleware.AuthCheck.Name != "" {
@@ -865,6 +867,7 @@ func (gw *Gateway) DoReload() {
 
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
+		gw.GlobalEventsJSVM.DeInit()
 		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
 	}
 
@@ -1680,7 +1683,7 @@ func (gw *Gateway) GetConfig() config.Config {
 	return gw.config.Load().(config.Config)
 }
 
-func (gw *Gateway) SetConfig(conf config.Config) {
+func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
 	defer gw.configMu.Unlock()
 	gw.config.Store(conf)
