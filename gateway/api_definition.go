@@ -637,31 +637,38 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 			continue
 		}
 
-		log.Info("Loading API Specification from ", path)
-		f, err := os.Open(path)
+		spec, err := a.loadDefFromFilePath(path)
+
 		if err != nil {
-			log.Error("Couldn't open api configuration file: ", err)
 			continue
 		}
-
-		def := a.ParseDefinition(f)
-		nestDef := nestedApiDefinition{APIDefinition: &def}
-		if def.IsOAS {
-			loader := openapi3.NewLoader()
-			oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(path))
-			if err == nil {
-				nestDef.OAS = &oas.OAS{T: *oasDoc}
-			}
-		}
-
-		spec := a.MakeSpec(&nestDef, nil)
-
-		_, _ = f.Seek(0, io.SeekStart)
-		_ = f.Close()
 
 		specs = append(specs, spec)
 	}
 	return specs
+}
+func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, error) {
+	log.Info("Loading API Specification from ", filePath)
+	f, err := os.Open(filePath)
+	defer f.Close()
+	if err != nil {
+		log.Error("Couldn't open api configuration file: ", err)
+		return nil, err
+	}
+
+	def := a.ParseDefinition(f)
+	nestDef := nestedApiDefinition{APIDefinition: &def}
+	if def.IsOAS {
+		loader := openapi3.NewLoader()
+		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(filePath))
+		if err == nil {
+			nestDef.OAS = &oas.OAS{T: *oasDoc}
+		}
+	}
+
+	spec := a.MakeSpec(&nestDef, nil)
+
+	return spec, nil
 }
 
 func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf config.Config) ([]URLSpec, bool) {
