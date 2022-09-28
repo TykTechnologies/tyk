@@ -181,10 +181,6 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return errors.New("Middleware error"), 500
 	}
 	vm := d.Spec.JSVM.VM.Copy()
-	defer func() {
-		logger.Debug("setting copied vm to nil")
-		vm = nil
-	}()
 	vm.Interrupt = make(chan func(), 1)
 	logger.Debug("Running: ", middlewareClassname)
 	// buffered, leaving no chance of a goroutine leak since the
