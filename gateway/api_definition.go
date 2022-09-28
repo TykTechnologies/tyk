@@ -351,6 +351,12 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 
 	spec.GlobalConfig = a.Gw.GetConfig()
 
+	_, _, _, _, _, _, mwDriver := a.Gw.loadCustomMiddleware(spec)
+	if a.Gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || mwDriver == apidef.OttoDriver) {
+		logger.Debug("Initializing JSVM")
+		spec.JSVM.Init(spec, logger, a.Gw)
+	}
+
 	// Set up Event Handlers
 	if len(def.EventHandlers.Events) > 0 {
 		logger.Debug("Initializing event handlers")
