@@ -23,6 +23,7 @@ type Operation struct {
 	Cache                *CachePlugin          `bson:"cache,omitempty" json:"cache,omitempty"`
 	EnforceTimeout       *EnforceTimeout       `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
 	ValidateRequest      *ValidateRequest      `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
+	MockResponse         *MockResponse         `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
 }
 
 const (
@@ -470,6 +471,13 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidateRequestMeta) {
 			tykOp.ValidateRequest = nil
 		}
 	}
+}
+
+type MockResponse struct {
+	Enabled bool              `bson:"enabled" json:"enabled"`
+	Code    int               `bson:"code,omitempty" json:"code,omitempty"`
+	Body    string            `bson:"body,omitempty" json:"body,omitempty"`
+	Headers map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
 }
 
 /*func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {
