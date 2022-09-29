@@ -161,7 +161,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 		}
 	}
 
-	t.Run("Sequentieal order", func(t *testing.T) {
+	t.Run("Sequential order", func(t *testing.T) {
 		// Load initial API
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
@@ -185,11 +185,9 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) {
 				spec.APIID = "2"
-				spec.Name = "new" // changing API to trigger the reload
 			},
 			func(spec *APISpec) {
 				spec.APIID = "3"
-				spec.Name = "new"
 			},
 		)
 
@@ -204,11 +202,9 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 			func(spec *APISpec) { spec.APIID = "1" },
 			func(spec *APISpec) {
 				spec.APIID = "2"
-				spec.Name = "new"
 			},
 			func(spec *APISpec) {
 				spec.APIID = "3"
-				spec.Name = "new"
 			},
 		)
 

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -64,9 +65,7 @@ func TestAnalytics_Write(t *testing.T) {
 				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
-				if len(results) != 2 {
-					t.Error("Should return 2 record", len(results))
-				}
+				assert.Equal(t, 2, len(results), "Should return 2 records")
 
 				var record analytics.AnalyticsRecord
 				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
