@@ -923,6 +923,12 @@ func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outr
 		latency = time.Since(begin)
 	}()
 
+	if p.TykAPISpec.HasMock() {
+		if res, err = p.mockResponse(outreq); res != nil {
+			return
+		}
+	}
+
 	if p.TykAPISpec.GraphQL.Enabled {
 		res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
 		return
@@ -1289,6 +1295,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			"org_id":      p.TykAPISpec.OrgID,
 			"api_id":      p.TykAPISpec.APIID,
 		}).Error("http: proxy error: ", err)
+
+		if strings.HasPrefix(err.Error(), "mock:") {
+			p.ErrorHandler.HandleError(rw, logreq, err.Error(), res.StatusCode, true)
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
+		}
+
 		if strings.Contains(err.Error(), "timeout awaiting response headers") {
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", http.StatusGatewayTimeout, true)
 
