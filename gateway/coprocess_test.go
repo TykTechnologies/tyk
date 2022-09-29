@@ -9,6 +9,7 @@ import (
 
 func TestRebuildResponseHeaders(t *testing.T) {
 	ts := StartTest(nil)
+	defer ts.Close()
 	h := CustomMiddlewareResponseHook{
 		mw: nil,
 		Gw: ts.Gw,
