@@ -1003,6 +1003,10 @@
 
   **Type: [ValidateRequest](#validaterequest)**
 
+- **`mockResponse`**
+
+  **Type: [MockResponse](#mockresponse)**
+
 
 ### **Allowance**
 
@@ -1092,5 +1096,24 @@
 - **`errorResponseCode`**
 
   **Type: `int`**
+
+
+### **MockResponse**
+
+- **`enabled`**
+
+  **Type: `boolean`**
+
+- **`code`**
+
+  **Type: `int`**
+
+- **`body`**
+
+  **Type: `string`**
+
+- **`headers`**
+
+  **Type: `string`**
 
 
