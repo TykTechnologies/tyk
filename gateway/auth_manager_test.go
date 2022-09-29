@@ -32,11 +32,6 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
-			// change the name so that it reloads with change in checksum
-			if hashKeys {
-				// change name to change checksum and reload
-				spec.Name = "hash keys"
-			}
 		})[0]
 
 		key := CreateSession(ts.Gw, func(s *user.SessionState) {
@@ -78,11 +73,6 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
-			// change the name so that it reloads with change in checksum
-			if hashKeys {
-				// change name to change checksum and reload
-				spec.Name = "hash keys"
-			}
 		})[0]
 
 		key := ts.Gw.generateToken("", "")
