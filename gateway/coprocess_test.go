@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestSetResponseHeaders(t *testing.T) {
+func TestRebuildResponseHeaders(t *testing.T) {
 	ts := StartTest(nil)
 	h := CustomMiddlewareResponseHook{
 		mw: nil,

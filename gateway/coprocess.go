@@ -560,7 +560,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		return errors.New("Middleware error")
 	}
 
-	h.SetResponseHeaders(res, retObject)
+	h.RebuildResponseHeaders(res, retObject)
 	// Set headers:
 	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for k, v := range retObject.Response.Headers {
@@ -575,9 +575,9 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	return nil
 }
 
-// SetResponseHeaders cleans the headers from the upstream and populate them again after the mw call
+// RebuildResponseHeaders cleans the headers from the upstream and populate them again after the mw call
 // as some mws modify the headers
-func (h *CustomMiddlewareResponseHook) SetResponseHeaders(res *http.Response, retObject *coprocess.Object) {
+func (h *CustomMiddlewareResponseHook) RebuildResponseHeaders(res *http.Response, retObject *coprocess.Object) {
 	// Clear all response headers before populating from coprocess response object:
 	for k := range res.Header {
 		delete(res.Header, k)
