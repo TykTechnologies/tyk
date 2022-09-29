@@ -413,7 +413,6 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		spec.OAS = *def.OAS
 	}
 
-	var err error
 	spec.OASRouter, err = gorillamux.NewRouter(&spec.OAS.T)
 	if err != nil {
 		log.WithError(err).Error("Could not create OAS router")
@@ -650,7 +649,11 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, error) {
 	log.Info("Loading API Specification from ", filePath)
 	f, err := os.Open(filePath)
-	defer f.Close()
+	defer func() {
+		err = f.Close()
+		log.Error("error while closing file ", filePath)
+	}()
+
 	if err != nil {
 		log.Error("Couldn't open api configuration file: ", err)
 		return nil, err
