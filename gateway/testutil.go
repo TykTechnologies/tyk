@@ -1603,6 +1603,10 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	}()
 
 	for i, spec := range specs {
+		if spec.Name == "" {
+			spec.Name = randStringBytes(15)
+		}
+
 		specBytes, err := json.Marshal(spec.APIDefinition)
 		if err != nil {
 			panic(err)

@@ -944,6 +944,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		if ok && curSpec.Checksum != spec.Checksum {
 			curSpec.Release()
 		} else if ok && curSpec.Checksum == spec.Checksum {
+			// spec is new spec but it has already some resources allocated during MakeSpec phase even if it's not in use yet
+			// so it's necessary to call spec.Release()
 			spec.Release()
 		}
 	}
