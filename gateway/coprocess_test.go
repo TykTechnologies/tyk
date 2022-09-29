@@ -77,7 +77,7 @@ func TestRebuildResponseHeaders(t *testing.T) {
 			}
 			ret.Response.Headers = tc.responseHeadersFromCoprocessPlugin
 
-			h.SetResponseHeaders(&upstreamRes, &ret)
+			h.RebuildResponseHeaders(&upstreamRes, &ret)
 
 			assert.Equal(t, len(tc.expectedFinalResponseHeaders), len(upstreamRes.Header))
 
