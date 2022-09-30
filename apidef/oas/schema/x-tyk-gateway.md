@@ -1127,16 +1127,24 @@
 
   **Type: `boolean`**
 
+  Enabled enables getting a mock response from OAS examples or schemas documented in OAS.
+
 - **`code`**
 
   **Type: `int`**
+
+  Code is the default HTTP response code that the gateway reads from the path responses documented in OAS.
 
 - **`contentType`**
 
   **Type: `string`**
 
+  ContentType is the default HTTP response body type that the gateway reads from the path responses documented in OAS.
+
 - **`exampleName`**
 
   **Type: `string`**
+
+  ExampleName is the default example name among multiple path response examples documented in OAS.
 
 

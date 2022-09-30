@@ -482,9 +482,13 @@ type MockResponse struct {
 }
 
 type FromOASExamples struct {
-	Enabled     bool   `bson:"enabled" json:"enabled"`
-	Code        int    `bson:"code,omitempty" json:"code,omitempty"`
+	// Enabled enables getting a mock response from OAS examples or schemas documented in OAS.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Code is the default HTTP response code that the gateway reads from the path responses documented in OAS.
+	Code int `bson:"code,omitempty" json:"code,omitempty"`
+	// ContentType is the default HTTP response body type that the gateway reads from the path responses documented in OAS.
 	ContentType string `bson:"contentType,omitempty" json:"contentType,omitempty"`
+	// ExampleName is the default example name among multiple path response examples documented in OAS.
 	ExampleName string `bson:"exampleName,omitempty" json:"exampleName,omitempty"`
 }
 
