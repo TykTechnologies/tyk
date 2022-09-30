@@ -728,15 +728,13 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 	var chainObj *ChainObject
 
-	gw.apisMu.RLock()
-	if curSpec, ok := gw.apisByID[spec.APIID]; ok && curSpec.Checksum == spec.Checksum {
+	if curSpec := gw.getApiSpec(spec.APIID); curSpec != nil && curSpec.Checksum == spec.Checksum {
 		if chain, found := gw.apisHandlesByID.Load(spec.APIID); found {
 			chainObj = chain.(*ChainObject)
 		}
 	} else {
 		chainObj = gw.processSpec(spec, apisByListen, gs, logrus.NewEntry(log))
 	}
-	gw.apisMu.RUnlock()
 
 	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(log))
 	handleCORS(subrouter, spec)
