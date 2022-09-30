@@ -20,18 +20,21 @@ func TestMockResponse(t *testing.T) {
 	const headerKey = "my-mock-response-header-key"
 	const headerValue = "my-mock-response-header-value"
 
+	mockResponse := &oas.MockResponse{
+		Enabled: true,
+		Code:    http.StatusTeapot,
+		Body:    body,
+		Headers: map[string]string{
+			headerKey: headerValue,
+		},
+		FromOASExamples: &oas.FromOASExamples{},
+	}
+
 	xTyk := &oas.XTykAPIGateway{
 		Middleware: &oas.Middleware{
 			Operations: oas.Operations{
 				operationID: {
-					MockResponse: &oas.MockResponse{
-						Enabled: true,
-						Code:    http.StatusTeapot,
-						Body:    body,
-						Headers: map[string]string{
-							headerKey: headerValue,
-						},
-					},
+					MockResponse: mockResponse,
 				},
 			},
 		},
@@ -43,11 +46,31 @@ func TestMockResponse(t *testing.T) {
 		Version: "1",
 		Title:   "title",
 	}
+
+	desc := "desc"
+	responses := openapi3.NewResponses()
+	responses["200"] = &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Description: &desc,
+			Content: openapi3.Content{
+				"application/json": &openapi3.MediaType{
+					Examples: openapi3.Examples{
+						"engineer": &openapi3.ExampleRef{
+							Value: &openapi3.Example{
+								Value: "Furkan",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
 	oasDoc.Paths = openapi3.Paths{
 		"/get": {
 			Get: &openapi3.Operation{
 				OperationID: operationID,
-				Responses:   openapi3.NewResponses(),
+				Responses:   responses,
 			},
 		},
 	}
@@ -74,6 +97,27 @@ func TestMockResponse(t *testing.T) {
 		api.UseKeylessAccess = false
 		g.Gw.LoadAPI(api)
 		_, _ = g.Run(t, test.TestCase{Path: "/get", BodyMatch: "Authorization field missing", Code: http.StatusUnauthorized})
+	})
+
+	t.Run("from OAS", func(t *testing.T) {
+		mockResponse.FromOASExamples.Enabled = true
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+		})[0]
+
+		g.Gw.LoadAPI(api)
+
+		_, _ = g.Run(t, test.TestCase{Path: "/get", BodyMatch: "Furkan", Code: http.StatusOK})
+		_, _ = g.Run(t, test.TestCase{Path: "/elma", BodyMatch: "/elma", Code: http.StatusOK})
+
+		t.Run("not found", func(t *testing.T) {
+			mockResponse.FromOASExamples.ContentType = "application/xml"
+			g.Gw.LoadAPI(api)
+
+			_, _ = g.Run(t, test.TestCase{Path: "/get", BodyMatch: "mock: there is no example response for the content type: application/xml"})
+		})
 	})
 }
 
@@ -102,5 +146,156 @@ func Test_mockFromConfig(t *testing.T) {
 		resCode, _, _ = mockFromConfig(tykMockRespOp)
 
 		assert.Equal(t, http.StatusOK, resCode)
+	})
+}
+
+func Test_mockFromOAS(t *testing.T) {
+	fromOASExamples := &oas.FromOASExamples{}
+	operation := openapi3.NewOperation()
+	operation.Responses = openapi3.Responses{
+		"200": &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Content: openapi3.Content{
+					"application/json": {
+						Example: "Furkan",
+					},
+				},
+			},
+		},
+		"208": &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Content: openapi3.Content{
+					"application/xml": {
+						Example: "test-example-1",
+					},
+				},
+			},
+		},
+		"418": &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Content: openapi3.Content{
+					"text": {
+						Example: "test-example-2",
+					},
+				},
+			},
+		},
+		"404": &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Content: openapi3.Content{
+					"text": {
+						Examples: openapi3.Examples{
+							"first": &openapi3.ExampleRef{
+								Value: &openapi3.Example{
+									Value: "first-value",
+								},
+							},
+							"second": &openapi3.ExampleRef{
+								Value: &openapi3.Example{
+									Value: "second-value",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	t.Run("select by config", func(t *testing.T) {
+		t.Run("empty config", func(t *testing.T) {
+			code, contentType, body, headers, err := mockFromOAS(&http.Request{}, operation, fromOASExamples)
+			assert.NoError(t, err)
+
+			assert.Equal(t, http.StatusOK, code)
+			assert.Equal(t, "application/json", contentType)
+			assert.Equal(t, `"Furkan"`, string(body))
+			assert.Len(t, headers, 0)
+		})
+
+		t.Run("filled config", func(t *testing.T) {
+			fromOASExamples.Code = http.StatusAlreadyReported
+			fromOASExamples.ContentType = "application/xml"
+			code, contentType, body, headers, err := mockFromOAS(&http.Request{}, operation, fromOASExamples)
+			assert.NoError(t, err)
+
+			assert.Equal(t, http.StatusAlreadyReported, code)
+			assert.Equal(t, "application/xml", contentType)
+			assert.Equal(t, `"test-example-1"`, string(body))
+			assert.Len(t, headers, 0)
+		})
+	})
+
+	t.Run("override config by request", func(t *testing.T) {
+		request := &http.Request{Header: http.Header{}}
+		request.Header.Set(acceptContentType, "text")
+		request.Header.Set(acceptCode, "418")
+		code, contentType, body, _, err := mockFromOAS(request, operation, fromOASExamples)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusTeapot, code)
+		assert.Equal(t, "text", contentType)
+		assert.Equal(t, `"test-example-2"`, string(body))
+	})
+
+	t.Run("examples", func(t *testing.T) {
+		fromOASExamples.ExampleName = "first"
+		fromOASExamples.Code = http.StatusNotFound
+		fromOASExamples.ContentType = "text"
+		code, contentType, body, _, err := mockFromOAS(&http.Request{}, operation, fromOASExamples)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusNotFound, code)
+		assert.Equal(t, "text", contentType)
+		assert.Equal(t, `"first-value"`, string(body))
+
+		t.Run("by request", func(t *testing.T) {
+			request := &http.Request{Header: http.Header{}}
+			request.Header.Set(acceptExampleName, "second")
+			_, _, body, _, err := mockFromOAS(request, operation, fromOASExamples)
+			assert.NoError(t, err)
+
+			assert.Equal(t, `"second-value"`, string(body))
+		})
+
+		t.Run("randomly select", func(t *testing.T) {
+			fromOASExamples.ExampleName = ""
+			fromOASExamples.Code = http.StatusNotFound
+			fromOASExamples.ContentType = "text"
+			code, _, body, _, err = mockFromOAS(&http.Request{}, operation, fromOASExamples)
+			assert.NoError(t, err)
+
+			assert.Equal(t, http.StatusNotFound, code)
+			assert.Contains(t, []string{`"first-value"`, `"second-value"`}, string(body))
+		})
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		t.Run("content type", func(t *testing.T) {
+			request := &http.Request{Header: http.Header{}}
+			request.Header.Set(acceptContentType, "undefined")
+			_, _, _, _, err := mockFromOAS(request, operation, fromOASExamples)
+			assert.EqualError(t, err, "there is no example response for the content type: undefined")
+		})
+
+		t.Run("code", func(t *testing.T) {
+			request := &http.Request{Header: http.Header{}}
+			request.Header.Set(acceptCode, "undefined")
+			_, _, _, _, err := mockFromOAS(request, operation, fromOASExamples)
+			assert.EqualError(t, err, "given code undefined is not a valid integer value")
+
+			request.Header.Set(acceptCode, "202")
+			_, _, _, _, err = mockFromOAS(request, operation, fromOASExamples)
+			assert.EqualError(t, err, "there is no example response for the code: 202")
+		})
+
+		t.Run("example name", func(t *testing.T) {
+			request := &http.Request{Header: http.Header{}}
+			request.Header.Set(acceptCode, "404")
+			request.Header.Set(acceptContentType, "text")
+			request.Header.Set(acceptExampleName, "undefined")
+			_, _, _, _, err := mockFromOAS(request, operation, fromOASExamples)
+			assert.EqualError(t, err, "there is no example response for the example name: undefined")
+		})
 	})
 }
