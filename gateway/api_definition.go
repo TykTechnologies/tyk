@@ -301,6 +301,19 @@ type APIDefinitionLoader struct {
 // keyed to the Api version name, which is determined during routing to speed up lookups
 func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.Entry) *APISpec {
 	spec := &APISpec{}
+	apiString, err := json.Marshal(def)
+	if err != nil {
+		logger.WithError(err).WithField("name", def.Name).Error("Failed to JSON marshal API definition")
+		return spec
+	}
+
+	sha256hash := sha256.Sum256(apiString)
+	// Unique API content ID, to check if we already have if it changed from previous sync
+	spec.Checksum = base64.URLEncoding.EncodeToString(sha256hash[:])
+
+	if a.Gw.checkSumExist(spec.Checksum) && a.Gw.isStarted() {
+		return a.Gw.getApiSpec(def.APIID)
+	}
 
 	if logger == nil {
 		logger = logrus.NewEntry(log)
@@ -332,16 +345,6 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 	}
 
 	spec.APIDefinition = def.APIDefinition
-
-	apiString, err := json.Marshal(def)
-	if err != nil {
-		logger.WithError(err).WithField("name", def.Name).Error("Failed to JSON marshal API definition")
-		return spec
-	}
-
-	sha256hash := sha256.Sum256(apiString)
-	// Unique API content ID, to check if we already have if it changed from previous sync
-	spec.Checksum = base64.URLEncoding.EncodeToString(sha256hash[:])
 
 	// We'll push the default HealthChecker:
 	spec.Health = &DefaultHealthChecker{
