@@ -85,11 +85,7 @@ var (
 const appName = "tyk-gateway"
 
 type Gateway struct {
-	startMu sync.Mutex
 	started bool
-
-	checkSumSetMu   sync.Mutex
-	currCheckSumSet map[string]struct{}
 
 	DefaultProxyMux *proxyMux
 	config          atomic.Value
@@ -287,19 +283,6 @@ func (gw *Gateway) getApiSpec(apiID string) *APISpec {
 	spec := gw.apisByID[apiID]
 	gw.apisMu.RUnlock()
 	return spec
-}
-
-func (gw *Gateway) checkSumExist(checksum string) bool {
-	gw.checkSumSetMu.Lock()
-	defer gw.checkSumSetMu.Unlock()
-	_, checkSumExist := gw.currCheckSumSet[checksum]
-	return checkSumExist
-}
-
-func (gw *Gateway) isStarted() bool {
-	gw.startMu.Lock()
-	defer gw.startMu.Unlock()
-	return gw.started
 }
 
 func (gw *Gateway) getPolicy(polID string) user.Policy {
@@ -507,9 +490,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 		filter = append(filter, v)
 		tmpCheckSum[v.Checksum] = struct{}{}
 	}
-	gw.checkSumSetMu.Lock()
-	gw.currCheckSumSet = tmpCheckSum
-	gw.checkSumSetMu.Unlock()
+
 	gw.apisMu.Lock()
 	gw.apiSpecs = filter
 	apiLen := len(gw.apiSpecs)
@@ -1764,16 +1745,8 @@ func (gw *Gateway) startServer() {
 	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
 	mainLog.Info("--> PID: ", gw.hostDetails.PID)
 	if !rpc.IsEmergencyMode() {
-		gw.doFirstReload()
+		gw.DoReload()
 	}
-}
-
-func (gw *Gateway) doFirstReload() {
-	gw.currCheckSumSet = make(map[string]struct{})
-	gw.DoReload()
-	gw.startMu.Lock()
-	defer gw.startMu.Unlock()
-	gw.started = true
 }
 
 func (gw *Gateway) GetConfig() config.Config {
