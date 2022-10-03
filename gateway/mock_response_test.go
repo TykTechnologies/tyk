@@ -200,6 +200,19 @@ func Test_mockFromOAS(t *testing.T) {
 				},
 			},
 		},
+		"405": &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Content: openapi3.Content{
+					"text": {
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{
+								Example: 5,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	t.Run("select by config", func(t *testing.T) {
@@ -268,6 +281,17 @@ func Test_mockFromOAS(t *testing.T) {
 			assert.Equal(t, http.StatusNotFound, code)
 			assert.Contains(t, []string{`"first-value"`, `"second-value"`}, string(body))
 		})
+	})
+
+	t.Run("extraction from schema", func(t *testing.T) {
+		fromOASExamples.ExampleName = ""
+		fromOASExamples.Code = http.StatusMethodNotAllowed
+		fromOASExamples.ContentType = "text"
+		code, _, body, _, err := mockFromOAS(&http.Request{}, operation, fromOASExamples)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusMethodNotAllowed, code)
+		assert.Equal(t, "5", string(body))
 	})
 
 	t.Run("errors", func(t *testing.T) {
