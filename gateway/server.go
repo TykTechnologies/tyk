@@ -559,7 +559,7 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 	mwPostFuncs := []apidef.MiddlewareDefinition{}
 	mwPostKeyAuthFuncs := []apidef.MiddlewareDefinition{}
 	mwResponseFuncs := []apidef.MiddlewareDefinition{}
-	mwDriver := apidef.OttoDriver
+	mwDriver := apidef.MiddlewareDriver("")
 
 	// Set AuthCheck hook
 	if spec.CustomMiddleware.AuthCheck.Name != "" {
@@ -723,6 +723,7 @@ func DoReload() {
 
 	// Initialize/reset the JSVM
 	if config.Global().EnableJSVM {
+		GlobalEventsJSVM.DeInit()
 		GlobalEventsJSVM.Init(nil, logrus.NewEntry(log))
 	}
 

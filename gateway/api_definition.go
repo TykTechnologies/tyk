@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -162,6 +163,7 @@ type APISpec struct {
 	*apidef.APIDefinition
 	sync.RWMutex
 
+	Checksum                 string
 	RxPaths                  map[string][]URLSpec
 	WhiteListEnabled         map[string]bool
 	target                   *url.URL
@@ -202,7 +204,7 @@ type APISpec struct {
 	}
 }
 
-// Release re;leases all resources associated with API spec
+// Release releases all resources associated with API spec
 func (s *APISpec) Release() {
 	// release circuit breaker resources
 	for _, path := range s.RxPaths {
@@ -215,6 +217,11 @@ func (s *APISpec) Release() {
 	}
 
 	// release all other resources associated with spec
+
+	// JSVM object is a circular dependecy hell, but we can check if it initialized like this
+	if s.JSVM.VM != nil {
+		s.JSVM.DeInit()
+	}
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
@@ -251,6 +258,19 @@ var ServiceNonce string
 // keyed to the Api version name, which is determined during routing to speed up lookups
 func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.Entry) *APISpec {
 	spec := &APISpec{}
+	apiString, err := json.Marshal(def)
+	if err != nil {
+		logger.WithError(err).WithField("name", def.Name).Error("Failed to JSON marshal API definition")
+		return spec
+	}
+
+	sha256hash := sha256.Sum256(apiString)
+	// Unique API content ID, to check if we already have if it changed from previous sync
+	spec.Checksum = base64.URLEncoding.EncodeToString(sha256hash[:])
+
+	if currSpec := getApiSpec(def.APIID); currSpec != nil && currSpec.Checksum == spec.Checksum {
+		return getApiSpec(def.APIID)
+	}
 
 	if logger == nil {
 		logger = logrus.NewEntry(log)
@@ -286,22 +306,13 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 
 	spec.GlobalConfig = config.Global()
 
-	// Create and init the virtual Machine
-	if config.Global().EnableJSVM {
-		mwPaths, _, _, _, _, _, _ := loadCustomMiddleware(spec)
+	if err = loadBundle(spec); err != nil {
+		logger.WithError(err).Error("Couldn't load bundle")
+	}
 
-		hasVirtualEndpoint := false
-
-		for _, version := range spec.VersionData.Versions {
-			if len(version.ExtendedPaths.Virtual) > 0 {
-				hasVirtualEndpoint = true
-				break
-			}
-		}
-
-		if spec.CustomMiddlewareBundle != "" || len(mwPaths) > 0 || hasVirtualEndpoint {
-			spec.JSVM.Init(spec, logger)
-		}
+	if config.Global().EnableJSVM && (spec.hasVirtualEndpoint() || spec.CustomMiddleware.Driver == apidef.OttoDriver) {
+		logger.Debug("Initializing JSVM")
+		spec.JSVM.Init(spec, logger)
 	}
 
 	// Set up Event Handlers
@@ -506,18 +517,32 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	// Grab json files from directory
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
-		log.Info("Loading API Specification from ", path)
-		f, err := os.Open(path)
+		spec, err := a.loadDefFromFilePath(path)
 		if err != nil {
-			log.Error("Couldn't open api configuration file: ", err)
 			continue
 		}
-		def := a.ParseDefinition(f)
-		f.Close()
-		spec := a.MakeSpec(def, nil)
+
 		specs = append(specs, spec)
 	}
 	return specs
+}
+func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, error) {
+	log.Info("Loading API Specification from ", filePath)
+	f, err := os.Open(filePath)
+	defer func() {
+		err = f.Close()
+		log.Error("error while closing file ", filePath)
+	}()
+
+	if err != nil {
+		log.Error("Couldn't open api configuration file: ", err)
+		return nil, err
+	}
+
+	def := a.ParseDefinition(f)
+	spec := a.MakeSpec(def, nil)
+
+	return spec, nil
 }
 
 func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]URLSpec, bool) {
@@ -1376,4 +1401,14 @@ func stripListenPath(listenPath, path string, muxVars map[string]string) string 
 		return muxVars[aliasVar]
 	})
 	return strings.TrimPrefix(path, lp)
+}
+
+func (s *APISpec) hasVirtualEndpoint() bool {
+	for _, version := range s.VersionData.Versions {
+		if len(version.ExtendedPaths.Virtual) > 0 {
+			return true
+		}
+	}
+
+	return false
 }

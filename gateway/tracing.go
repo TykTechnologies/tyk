@@ -117,7 +117,9 @@ func traceHandler(w http.ResponseWriter, r *http.Request) {
 	loader := &APIDefinitionLoader{}
 	spec := loader.MakeSpec(traceReq.Spec, logrus.NewEntry(logger))
 
-	chainObj := processSpec(spec, nil, &gs, subrouter, logrus.NewEntry(logger))
+	chainObj := processSpec(spec, nil, &gs, logrus.NewEntry(logger))
+	generateSubRoutes(spec, subrouter, logrus.NewEntry(logger))
+	handleCORS(subrouter, spec)
 	spec.middlewareChain = chainObj
 
 	if chainObj.ThisHandler == nil {

@@ -18,7 +18,8 @@ import (
 )
 
 func TestAuthenticationAfterDeleteKey(t *testing.T) {
-	assert := func(hashKeys bool) {
+	assert := func(t *testing.T, ts *Test, hashKeys bool) {
+		t.Helper()
 		globalConf := config.Global()
 		globalConf.HashKeys = hashKeys
 		config.SetGlobal(globalConf)
@@ -49,16 +50,17 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 	}
 
 	t.Run("HashKeys=false", func(t *testing.T) {
-		assert(false)
+		assert(t, ts, false)
 	})
 
 	t.Run("HashKeys=true", func(t *testing.T) {
-		assert(true)
+		assert(t, ts, true)
 	})
 }
 
 func TestAuthenticationAfterUpdateKey(t *testing.T) {
-	assert := func(hashKeys bool) {
+	assert := func(t *testing.T, ts *Test, hashKeys bool) {
+		t.Helper()
 		globalConf := config.Global()
 		globalConf.HashKeys = hashKeys
 		config.SetGlobal(globalConf)
@@ -101,11 +103,11 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 	}
 
 	t.Run("HashKeys=false", func(t *testing.T) {
-		assert(false)
+		assert(t, ts, false)
 	})
 
 	t.Run("HashKeys=true", func(t *testing.T) {
-		assert(true)
+		assert(t, ts, true)
 	})
 }
 
