@@ -42,7 +42,7 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -485,10 +485,10 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 
 	newRequest.Header.Set("authorization", gwConfig.NodeSecret)
 	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
-	newRequest.Header.Set(headers.XTykNodeID, a.Gw.GetNodeID())
+	newRequest.Header.Set(header.XTykNodeID, a.Gw.GetNodeID())
 
 	a.Gw.ServiceNonceMutex.RLock()
-	newRequest.Header.Set(headers.XTykNonce, a.Gw.ServiceNonce)
+	newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
 	a.Gw.ServiceNonceMutex.RUnlock()
 
 	c := a.Gw.initialiseClient()
