@@ -59,7 +59,7 @@ jobs:
           git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
 
       - name: Checkout of tyk
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 1
       - uses: docker/setup-qemu-action@v1
@@ -159,7 +159,7 @@ jobs:
 
     steps:
       - name: Shallow checkout of tyk
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 1
       - name: Setup Terraform
@@ -256,7 +256,7 @@ jobs:
           - debian:bullseye
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 1
 
@@ -309,7 +309,7 @@ jobs:
           - ubi8/ubi
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 1
 
@@ -356,7 +356,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 1
 
@@ -404,7 +404,7 @@ jobs:
 
     steps:
       - name: Checkout tyk
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 1
 

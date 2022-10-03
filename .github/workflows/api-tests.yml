@@ -34,7 +34,7 @@ jobs:
         git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
     
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: tyk
         token: ${{ secrets.ORG_GH_TOKEN }}
@@ -57,7 +57,7 @@ jobs:
         fi
 
     - name: Checkout test repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: TykTechnologies/tyk-automated-tests
         token: ${{ secrets.ORG_GH_TOKEN }}
@@ -81,7 +81,7 @@ jobs:
         fi
 
     - name: Checkout dashboard
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: TykTechnologies/tyk-analytics
         token: ${{ secrets.ORG_GH_TOKEN }}
