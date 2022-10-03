@@ -181,7 +181,11 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	)
 
 	ts := StartTest(nil)
+	ts.MockHandle, _ = test.InitDNSMock(etcHostsMap, nil)
 	defer ts.Close()
+	defer func() {
+		_ = ts.MockHandle.ShutdownDnsMock()
+	}()
 
 	tearDown := ts.flakySetupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
 		config.DnsCacheConfig{

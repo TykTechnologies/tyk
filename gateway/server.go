@@ -479,12 +479,14 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 		}
 	}
 	var filter []*APISpec
+	var tmpCheckSum = make(map[string]struct{})
 	for _, v := range s {
 		if err := v.Validate(); err != nil {
 			mainLog.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")
 			continue
 		}
 		filter = append(filter, v)
+		tmpCheckSum[v.Checksum] = struct{}{}
 	}
 
 	gw.apisMu.Lock()
@@ -747,7 +749,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	mwPostFuncs := []apidef.MiddlewareDefinition{}
 	mwPostKeyAuthFuncs := []apidef.MiddlewareDefinition{}
 	mwResponseFuncs := []apidef.MiddlewareDefinition{}
-	mwDriver := apidef.OttoDriver
+	mwDriver := apidef.MiddlewareDriver("")
 
 	// Set AuthCheck hook
 	if spec.CustomMiddleware.AuthCheck.Name != "" {
@@ -911,6 +913,7 @@ func (gw *Gateway) DoReload() {
 
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
+		gw.GlobalEventsJSVM.DeInit()
 		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
 	}
 
@@ -932,6 +935,7 @@ func (gw *Gateway) DoReload() {
 			return
 		}
 	}
+
 	gw.loadGlobalApps()
 
 	mainLog.Info("API reload complete")
@@ -1747,8 +1751,8 @@ func (gw *Gateway) GetConfig() config.Config {
 	return gw.config.Load().(config.Config)
 }
 
-func (gw *Gateway) SetConfig(conf config.Config) {
+func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
-	defer gw.configMu.Unlock()
 	gw.config.Store(conf)
+	gw.configMu.Unlock()
 }
