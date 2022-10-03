@@ -371,6 +371,13 @@ func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 	j.RawLog = rawLog
 }
 
+func (j *JSVM) DeInit() {
+	j.Spec = nil
+	j.Log = nil
+	j.RawLog = nil
+	j.Gw = nil
+}
+
 // LoadJSPaths will load JS classes and functionality in to the VM by file
 func (j *JSVM) LoadJSPaths(paths []string, prefix string) {
 	for _, mwPath := range paths {

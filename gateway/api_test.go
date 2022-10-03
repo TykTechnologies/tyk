@@ -71,7 +71,8 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 		APIID, ListenPath string
 	}
 
-	assertListenPaths := func(tests []testCase) {
+	assertListenPaths := func(t *testing.T, tests []testCase) {
+		t.Helper()
 		for _, tc := range tests {
 			s := ts.Gw.getApiSpec(tc.APIID)
 			if want, got := tc.ListenPath, s.Proxy.ListenPath; want != got {
@@ -80,7 +81,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 		}
 	}
 
-	t.Run("Sequentieal order", func(t *testing.T) {
+	t.Run("Sequential order", func(t *testing.T) {
 		// Load initial API
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
@@ -92,7 +93,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 			func(spec *APISpec) { spec.APIID = "3" },
 		)
 
-		assertListenPaths([]testCase{
+		assertListenPaths(t, []testCase{
 			// Should retain original API
 			{"1", "/sample"},
 			{"2", "/sample-2"},
@@ -102,11 +103,15 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 
 	t.Run("Should re-order", func(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(
-			func(spec *APISpec) { spec.APIID = "2" },
-			func(spec *APISpec) { spec.APIID = "3" },
+			func(spec *APISpec) {
+				spec.APIID = "2"
+			},
+			func(spec *APISpec) {
+				spec.APIID = "3"
+			},
 		)
 
-		assertListenPaths([]testCase{
+		assertListenPaths(t, []testCase{
 			{"2", "/sample-2"},
 			{"3", "/sample-3"},
 		})
@@ -115,11 +120,15 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	t.Run("Restore original order", func(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
-			func(spec *APISpec) { spec.APIID = "2" },
-			func(spec *APISpec) { spec.APIID = "3" },
+			func(spec *APISpec) {
+				spec.APIID = "2"
+			},
+			func(spec *APISpec) {
+				spec.APIID = "3"
+			},
 		)
 
-		assertListenPaths([]testCase{
+		assertListenPaths(t, []testCase{
 			// Since API was not loaded previously first it has prefixed id
 			{"1", "/sample-1"},
 			{"2", "/sample-2"},

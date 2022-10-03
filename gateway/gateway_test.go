@@ -324,6 +324,8 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
+			// change name to change checksum and reload
+			spec.Name = t.Name()
 		})
 
 		ts.Run(t, []test.TestCase{
@@ -342,6 +344,8 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
+			// change name to change checksum and reload
+			spec.Name = t.Name()
 		})
 
 		ts.Run(t, []test.TestCase{

@@ -104,12 +104,29 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
+func (gw *Gateway) generateSubRoutes(spec *APISpec, subRouter *mux.Router, logger *logrus.Entry) {
+	if spec.GraphQL.GraphQLPlayground.Enabled {
+		gw.loadGraphQLPlayground(spec, subRouter)
+	}
+
+	if spec.EnableBatchRequestSupport {
+		gw.addBatchEndpoint(spec, subRouter)
+	}
+
+	if spec.UseOauth2 {
+		logger.Debug("Loading OAuth Manager")
+		oauthManager := gw.addOAuthHandlers(spec, subRouter)
+		logger.Debug("-- Added OAuth Handlers")
+
+		spec.OAuthManager = oauthManager
+		logger.Debug("Done loading OAuth Manager")
+	}
+}
+
 func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
-	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
+	gs *generalStores, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
-
-	handleCORS(subrouter, spec)
 
 	logger = logger.WithFields(logrus.Fields{
 		"org_id":   spec.OrgID,
@@ -219,9 +236,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	var prefix string
 	if spec.CustomMiddlewareBundle != "" {
-		if err := gw.loadBundle(spec); err != nil {
-			logger.WithError(err).Error("Couldn't load bundle")
-		}
 		prefix = gw.getBundleDestPath(spec)
 	}
 
@@ -229,7 +243,8 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	var mwPaths []string
 
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = gw.loadCustomMiddleware(spec)
-	if gw.GetConfig().EnableJSVM && mwDriver == apidef.OttoDriver {
+	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || mwDriver == apidef.OttoDriver) {
+		logger.Debug("Loading JS Paths")
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
 	}
 
@@ -240,23 +255,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		fixFuncPath(prefix, mwPostFuncs)
 		fixFuncPath(prefix, mwPostAuthCheckFuncs)
 		fixFuncPath(prefix, mwResponseFuncs)
-	}
-
-	if spec.GraphQL.GraphQLPlayground.Enabled {
-		gw.loadGraphQLPlayground(spec, subrouter)
-	}
-
-	if spec.EnableBatchRequestSupport {
-		gw.addBatchEndpoint(spec, subrouter)
-	}
-
-	if spec.UseOauth2 {
-		logger.Debug("Loading OAuth Manager")
-		oauthManager := gw.addOAuthHandlers(spec, subrouter)
-		logger.Debug("-- Added OAuth Handlers")
-
-		spec.OAuthManager = oauthManager
-		logger.Debug("Done loading OAuth Manager")
 	}
 
 	enableVersionOverrides := false
@@ -546,14 +544,22 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
 			if h, found := d.Gw.apisHandlesByID.Load(d.SH.Spec.APIID); found {
-				handler = h.(http.Handler)
+				if chain, ok := h.(*ChainObject); ok {
+					handler = chain.ThisHandler
+				} else {
+					log.WithFields(logrus.Fields{"api_id": d.SH.Spec.APIID}).Debug("failed to cast stored api handles to *ChainObject")
+				}
 			}
 		} else {
 			ctxSetVersionInfo(r, nil)
 
 			if targetAPI := d.Gw.fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
 				if h, found := d.Gw.apisHandlesByID.Load(targetAPI.APIID); found {
-					handler = h.(http.Handler)
+					if chain, ok := h.(*ChainObject); ok {
+						handler = chain.ThisHandler
+					} else {
+						log.WithFields(logrus.Fields{"api_id": d.SH.Spec.APIID}).Debug("failed to cast stored api handles to *ChainObject")
+					}
 				}
 			} else {
 				handler := ErrorHandler{*d.SH.Base()}
@@ -689,7 +695,7 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux,
 //
 // - register gorilla/mux routing handless with proxyMux directly (wrapped),
 // - return a raw http.Handler for tyk://ID urls.
-func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) http.Handler {
+func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) *ChainObject {
 	gwConfig := gw.GetConfig()
 	port := gwConfig.ListenPort
 	if spec.ListenPort != 0 {
@@ -713,9 +719,21 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 	subrouter := router.PathPrefix(spec.Proxy.ListenPath).Subrouter()
 
-	chainObj := gw.processSpec(spec, apisByListen, gs, subrouter, logrus.NewEntry(log))
+	var chainObj *ChainObject
+
+	if curSpec := gw.getApiSpec(spec.APIID); curSpec != nil && curSpec.Checksum == spec.Checksum {
+		if chain, found := gw.apisHandlesByID.Load(spec.APIID); found {
+			chainObj = chain.(*ChainObject)
+		}
+	} else {
+		chainObj = gw.processSpec(spec, apisByListen, gs, logrus.NewEntry(log))
+	}
+
+	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(log))
+	handleCORS(subrouter, spec)
+
 	if chainObj.Skip {
-		return chainObj.ThisHandler
+		return chainObj
 	}
 
 	if !chainObj.Open {
@@ -725,7 +743,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	httpHandler := explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, gwConfig.HttpServerOptions.EnableStrictRoutes)
 	subrouter.NewRoute().Handler(httpHandler)
 
-	return chainObj.ThisHandler
+	return chainObj
 }
 
 func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
@@ -863,6 +881,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	muxer.setRouter(port, "", router, gw.GetConfig())
 	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
+
 	for _, spec := range specs {
 		func() {
 			defer func() {
@@ -880,7 +899,11 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				spec.Proxy.ListenPath = converted
 			}
 
-			tmpSpecRegister[spec.APIID] = spec
+			if currSpec := gw.getApiSpec(spec.APIID); currSpec != nil && spec.Checksum == currSpec.Checksum {
+				tmpSpecRegister[spec.APIID] = currSpec
+			} else {
+				tmpSpecRegister[spec.APIID] = spec
+			}
 
 			switch spec.Protocol {
 			case "", "http", "https", "h2c":
@@ -902,12 +925,13 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gw.DefaultProxyMux.swap(muxer, gw)
 
-	// Swap in the new register
 	gw.apisMu.Lock()
 
-	// release current specs resources before overwriting map
-	for _, curSpec := range gw.apisByID {
-		curSpec.Release()
+	for _, spec := range specs {
+		curSpec, ok := gw.apisByID[spec.APIID]
+		if ok && curSpec.Checksum != spec.Checksum {
+			curSpec.Release()
+		}
 	}
 
 	gw.apisByID = tmpSpecRegister
