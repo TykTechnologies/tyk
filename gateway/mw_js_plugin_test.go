@@ -623,6 +623,7 @@ post.NewProcessRequest(function(request, session) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/test"
 			spec.CustomMiddlewareBundle = bundle
+			spec.CustomMiddleware.Driver = apidef.OttoDriver
 		})
 
 		ts.Run(t, []test.TestCase{
@@ -641,6 +642,7 @@ post.NewProcessRequest(function(request, session) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = "jsvm_file_test"
 			spec.Proxy.ListenPath = "/test"
+			spec.CustomMiddleware.Driver = apidef.OttoDriver
 		})
 
 		ts.Run(t, []test.TestCase{
@@ -659,6 +661,7 @@ post.NewProcessRequest(function(request, session) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/test"
 			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.OttoDriver,
 				Pre: []apidef.MiddlewareDefinition{{
 					Name: "pre",
 					Path: ts.Gw.GetConfig().MiddlewarePath + "/jsvm_api/pre.js",
