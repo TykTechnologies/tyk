@@ -382,9 +382,7 @@ func TestAnalytics_Write(t *testing.T) {
 				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
-				if len(results) != 2 {
-					t.Fatal("Should return 2 records: ", len(results))
-				}
+				assert.Equal(t, 2, len(results))
 
 				// Take second cached request
 				var record analytics.AnalyticsRecord

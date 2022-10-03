@@ -1144,8 +1144,6 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	go s.reloadSimulation(s.ctx, gw)
 
-	gw.started = true
-
 	return gw
 }
 
@@ -1193,7 +1191,6 @@ func (s *Test) Close() {
 	s.Gw.Analytics.Stop()
 	s.Gw.ReloadTestCase.StopTicker()
 	s.Gw.GlobalHostChecker.StopPoller()
-	s.Gw.started = false
 
 	err = s.RemoveApis()
 	if err != nil {
@@ -1203,11 +1200,10 @@ func (s *Test) Close() {
 
 // RemoveApis clean all the apis from a living gw
 func (s *Test) RemoveApis() error {
-	s.Gw.apisMu.RLock()
+	s.Gw.apisMu.Lock()
+	defer s.Gw.apisMu.Unlock()
 	s.Gw.apiSpecs = []*APISpec{}
 	s.Gw.apisByID = map[string]*APISpec{}
-
-	s.Gw.apisMu.RUnlock()
 
 	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
 	if err != nil {

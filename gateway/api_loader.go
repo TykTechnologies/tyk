@@ -559,14 +559,22 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
 			if h, found := d.Gw.apisHandlesByID.Load(d.SH.Spec.APIID); found {
-				handler = h.(*ChainObject).ThisHandler
+				if chain, ok := h.(*ChainObject); ok {
+					handler = chain.ThisHandler
+				} else {
+					log.WithFields(logrus.Fields{"api_id": d.SH.Spec.APIID}).Debug("failed to cast stored api handles to *ChainObject")
+				}
 			}
 		} else {
 			ctxSetVersionInfo(r, nil)
 
 			if targetAPI := d.Gw.fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
 				if h, found := d.Gw.apisHandlesByID.Load(targetAPI.APIID); found {
-					handler = h.(*ChainObject).ThisHandler
+					if chain, ok := h.(*ChainObject); ok {
+						handler = chain.ThisHandler
+					} else {
+						log.WithFields(logrus.Fields{"api_id": d.SH.Spec.APIID}).Debug("failed to cast stored api handles to *ChainObject")
+					}
 				}
 			} else {
 				handler := ErrorHandler{*d.SH.Base()}
@@ -907,13 +915,11 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				spec.Proxy.ListenPath = converted
 			}
 
-			gw.apisMu.RLock()
-			if curSpec, found := gw.apisByID[spec.APIID]; found && spec.Checksum == curSpec.Checksum {
-				tmpSpecRegister[spec.APIID] = curSpec
+			if currSpec := gw.getApiSpec(spec.APIID); currSpec != nil && spec.Checksum == currSpec.Checksum {
+				tmpSpecRegister[spec.APIID] = currSpec
 			} else {
 				tmpSpecRegister[spec.APIID] = spec
 			}
-			gw.apisMu.RUnlock()
 
 			switch spec.Protocol {
 			case "", "http", "https", "h2c":

@@ -85,8 +85,6 @@ var (
 const appName = "tyk-gateway"
 
 type Gateway struct {
-	started bool
-
 	DefaultProxyMux *proxyMux
 	config          atomic.Value
 	configMu        sync.Mutex
