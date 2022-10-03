@@ -116,9 +116,9 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 	}
 
 	headers := make(map[string]string)
-	/*for key, val := range response.Value.Headers {
+	for key, val := range response.Value.Headers {
 		headers[key] = fmt.Sprintf("%v", oas.ExampleExtractor(val.Value.Schema))
-	}*/
+	}
 
 	var example interface{}
 	if media.Example != nil {

@@ -155,6 +155,30 @@ func Test_mockFromOAS(t *testing.T) {
 	operation.Responses = openapi3.Responses{
 		"200": &openapi3.ResponseRef{
 			Value: &openapi3.Response{
+				Headers: openapi3.Headers{
+					"Test-header-1": &openapi3.HeaderRef{
+						Value: &openapi3.Header{
+							Parameter: openapi3.Parameter{
+								Schema: &openapi3.SchemaRef{
+									Value: &openapi3.Schema{
+										Example: "test-header-value-1",
+									},
+								},
+							},
+						},
+					},
+					"Test-header-2": &openapi3.HeaderRef{
+						Value: &openapi3.Header{
+							Parameter: openapi3.Parameter{
+								Schema: &openapi3.SchemaRef{
+									Value: &openapi3.Schema{
+										Example: "test-header-value-2",
+									},
+								},
+							},
+						},
+					},
+				},
 				Content: openapi3.Content{
 					"application/json": {
 						Example: "Furkan",
@@ -223,7 +247,12 @@ func Test_mockFromOAS(t *testing.T) {
 			assert.Equal(t, http.StatusOK, code)
 			assert.Equal(t, "application/json", contentType)
 			assert.Equal(t, `"Furkan"`, string(body))
-			assert.Len(t, headers, 0)
+
+			expectedHeaders := map[string]string{
+				"Test-header-1": "test-header-value-1",
+				"Test-header-2": "test-header-value-2",
+			}
+			assert.Equal(t, expectedHeaders, headers)
 		})
 
 		t.Run("filled config", func(t *testing.T) {
