@@ -48,7 +48,10 @@ jobs:
           terraform_wrapper: false
 
       - name: Inspect dir
-        run: find /home/runner/work -name .terraformrc
+        run: find /home/runner -name credentials.tfrc.json
+
+      - name: Inspect dir2
+        run: find /home/runner -name .terraformrc
 
 
 
