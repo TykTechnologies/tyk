@@ -48,7 +48,7 @@ jobs:
           terraform_wrapper: false
 
       - name: Inspect dir
-        run: find /home -name .terraformrc
+        run: find /home/runner/work -name .terraformrc
 
 
 
