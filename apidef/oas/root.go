@@ -69,7 +69,7 @@ type Info struct {
 
 // Fill *Info from apidef.APIDefinition
 func (i *Info) Fill(api apidef.APIDefinition) {
-	i.ID = api.ApiID
+	i.ID = api.APIID
 	i.DBID = api.Id
 	i.OrgID = api.OrgID
 	i.Name = api.Name
@@ -88,7 +88,7 @@ func (i *Info) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *Info into an *apidef.APIDefinition
 func (i *Info) ExtractTo(api *apidef.APIDefinition) {
-	api.ApiID = i.ID
+	api.APIID = i.ID
 	api.Id = i.DBID
 	api.OrgID = i.OrgID
 	api.Name = i.Name
