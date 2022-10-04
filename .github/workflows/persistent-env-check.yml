@@ -5,7 +5,7 @@ on:
 env:
   SERVICE: "tyk"
   CONTAINER_NAME: "tyk"
-  CLUSTER: "kikitest2"
+  CLUSTER: "kikitest4"
   IMAGE: "tyk:v4.0.0"
 
 jobs:
