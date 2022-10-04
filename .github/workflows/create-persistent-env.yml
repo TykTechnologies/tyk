@@ -47,38 +47,31 @@ jobs:
           cli_config_credentials_token: ${{ secrets.tf_token }}
           terraform_wrapper: false
 
-      - name: Inspect dir
-        run: find /home/runner -name credentials.tfrc.json
+      - name: Terraform Format
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        id: fmt
+        run: terraform fmt -check
 
-      - name: Inspect dir2
-        run: find /home/runner -name .terraformrc
+      - name: Configure AWS credentials for use
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.aws_key }}
+          aws-secret-access-key: ${{ secrets.aws_secret }}
+          aws-region: "eu-central-1"
 
+      - name: Login to DockerHub
+        # if: startsWith(github.ref, 'refs/tags')
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.docker_user }}
+          password: ${{ secrets.docker_pass }}
 
-
-      # - name: Terraform Format
-      #   working-directory: ${{ env.TERRAFORM_DIR }}
-      #   id: fmt
-      #   run: terraform fmt -check
-
-      # - name: Configure AWS credentials for use
-      #   uses: aws-actions/configure-aws-credentials@v1
-      #   with:
-      #     aws-access-key-id: ${{ secrets.aws_key }}
-      #     aws-secret-access-key: ${{ secrets.aws_secret }}
-      #     aws-region: "eu-central-1"
-
-      # - name: Login to DockerHub
-      #   # if: startsWith(github.ref, 'refs/tags')
-      #   uses: docker/login-action@v1
-      #   with:
-      #     username: ${{ secrets.docker_user }}
-      #     password: ${{ secrets.docker_pass }}
-
-      # - uses: TykTechnologies/docker-run-action@main
-      #   env:
-      #     ETCD_PASS: ${{ secrets.etcd_pass }}
-      #   with:
-      #     registry: docker.io
-      #     image: tykio/gromit:v1.4.5-rc2
-      #     options: -v ${{ github.workspace }}:/repo -v ${{ github.workspace }}/.terraform.d:/root/.terraform.d
-      #     run: gromit mutex get master --script /repo/ci/devenv/create_env.sh -l debug
+      - uses: TykTechnologies/docker-run-action@main
+        env:
+          ETCD_PASS: ${{ secrets.etcd_pass }}
+          TF_CLI_CONFIG_FILE: /root/.terraformrc
+        with:
+          registry: docker.io
+          image: tykio/gromit:v1.4.5-rc2
+          options: -v ${{ github.workspace }}:/repo -v /home/runner/.terraformrc:/root/.terraformrc
+          run: gromit mutex get master --script /repo/ci/devenv/create_env.sh -l debug
