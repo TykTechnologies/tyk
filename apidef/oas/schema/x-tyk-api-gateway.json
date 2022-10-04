@@ -414,6 +414,45 @@
         "enabled"
       ]
     },
+    "X-Tyk-MockResponse": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "code": {
+          "type": "integer"
+        },
+        "body": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object"
+        },
+        "fromOASExamples": {
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "code": {
+              "type": "integer"
+            },
+            "contentType": {
+              "type": "string"
+            },
+            "exampleName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "enabled"
+          ]
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-Operation": {
       "type": "object",
       "properties": {
@@ -440,6 +479,9 @@
         },
         "validateRequest": {
           "$ref": "#/definitions/X-Tyk-ValidateRequest"
+        },
+        "mockResponse": {
+          "$ref": "#/definitions/X-Tyk-MockResponse"
         }
       }
     },
