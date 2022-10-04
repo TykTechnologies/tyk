@@ -7,7 +7,7 @@ if [[ -z "${CLUSTER}" ]];then
 	exit 1
 fi
 echo "DEBUG: CLUSTER = ${CLUSTER}"
-ls
+ls -a
 terraform workspace new ${CLUSTER}
 terraform workspace show
 terraform init
