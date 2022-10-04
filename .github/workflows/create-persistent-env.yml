@@ -49,7 +49,7 @@ jobs:
 
       - name: Inspect dir
         working-directory: ${{ env.TERRAFORM_DIR }}
-        run: ls -la ${{ github.workspace }}
+        run: find ${{ github.workspace }} -name credentials.tfrc.json
 
 
       # - name: Terraform Format
