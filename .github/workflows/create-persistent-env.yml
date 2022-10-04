@@ -34,7 +34,7 @@ env:
 
 jobs:
   Create:
-    runs-on: tykio/gromit:v1.4.5-rc2   
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
