@@ -44,7 +44,7 @@ type TykExtensionConfigParams struct {
 	UpstreamURL     string
 	ListenPath      string
 	CustomDomain    string
-	APIID           string
+	ApiID           string
 	Authentication  *bool
 	AllowList       *bool
 	ValidateRequest *bool
@@ -69,8 +69,8 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		xTykAPIGateway.Info.Name = s.Info.Title
 	}
 
-	if overRideValues.APIID != "" {
-		xTykAPIGateway.Info.ID = overRideValues.APIID
+	if overRideValues.ApiID != "" {
+		xTykAPIGateway.Info.ID = overRideValues.ApiID
 	}
 
 	if overRideValues.ListenPath != "" {
@@ -238,7 +238,7 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 		CustomDomain:    customDomain,
 		Authentication:  authentication,
 		ValidateRequest: validateRequest,
-		APIID:           apiID,
+		ApiID:           apiID,
 		AllowList:       allowList,
 	}
 }
