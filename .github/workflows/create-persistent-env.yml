@@ -49,7 +49,7 @@ jobs:
 
       - name: Inspect dir
         working-directory: ${{ env.TERRAFORM_DIR }}
-        run: ls -la
+        run: ls -la ${{ github.workspace }}
 
 
       # - name: Terraform Format
