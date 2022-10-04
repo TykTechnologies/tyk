@@ -34,7 +34,7 @@ env:
 
 jobs:
   Create:
-    runs-on: ubuntu-latest    
+    runs-on: tykio/gromit:v1.4.5-rc2   
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -66,14 +66,14 @@ jobs:
           username: ${{ secrets.docker_user }}
           password: ${{ secrets.docker_pass }}
 
-      - uses: TykTechnologies/docker-run-action@main
-        env:
-          ETCD_PASS: ${{ secrets.etcd_pass }}
-        with:
-          registry: docker.io
-          image: tykio/gromit:v1.4.5-rc2
-          options: -v ${{ github.workspace }}:/repo
-          run: gromit mutex get master --script /repo/ci/devenv/create_env.sh -l debug
+      # - uses: TykTechnologies/docker-run-action@main
+      #   env:
+      #     ETCD_PASS: ${{ secrets.etcd_pass }}
+      #   with:
+      #     registry: docker.io
+      #     image: tykio/gromit:v1.4.5-rc2
+      #     options: -v ${{ github.workspace }}:/repo
+      #     run: gromit mutex get master --script /repo/ci/devenv/create_env.sh -l debug
             
 
       # - name: Terraform Init
