@@ -15,17 +15,18 @@ import (
 const (
 	invalidServerURLFmt          = "Please update %q to be a valid url or pass a valid url with upstreamURL query param"
 	unsupportedSecuritySchemeFmt = "unsupported security scheme: %s"
-	MiddlewareValidateRequest    = "validateRequest"
-	MiddlewareAllowList          = "allowList"
+
+	middlewareValidateRequest = "validateRequest"
+	middlewareAllowList       = "allowList"
 )
 
 var (
-	errEmptyServersObject = errors.New("servers object is empty in OAS")
-	errInvalidUpstreamURL = errors.New("invalid upstream URL")
-	errInvalidServerURL   = errors.New("error validating servers entry in OAS")
-
+	errEmptyServersObject  = errors.New("servers object is empty in OAS")
 	errEmptySecurityObject = errors.New("security object is empty in OAS")
-	allowedMethods         = []string{
+	errInvalidUpstreamURL  = errors.New("invalid upstream URL")
+	errInvalidServerURL    = errors.New("error validating servers entry in OAS")
+
+	allowedMethods = []string{
 		http.MethodConnect,
 		http.MethodDelete,
 		http.MethodGet,
@@ -38,16 +39,18 @@ var (
 	}
 )
 
+// TykExtensionConfigParams holds the essential configuration required for the Tyk Extension schema.
 type TykExtensionConfigParams struct {
 	UpstreamURL     string
 	ListenPath      string
 	CustomDomain    string
-	ApiID           string
+	APIID           string
 	Authentication  *bool
 	AllowList       *bool
 	ValidateRequest *bool
 }
 
+// BuildDefaultTykExtension builds a default tyk extension in *OAS based on function arguments.
 func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, isImport bool) error {
 	xTykAPIGateway := s.GetTykExtension()
 
@@ -66,8 +69,8 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		xTykAPIGateway.Info.Name = s.Info.Title
 	}
 
-	if overRideValues.ApiID != "" {
-		xTykAPIGateway.Info.ID = overRideValues.ApiID
+	if overRideValues.APIID != "" {
+		xTykAPIGateway.Info.ID = overRideValues.APIID
 	}
 
 	if overRideValues.ListenPath != "" {
@@ -150,6 +153,7 @@ func (s *OAS) importAuthentication(enable bool) error {
 	return nil
 }
 
+// Import populates *AuthSources based on arguments.
 func (as *AuthSources) Import(in string) {
 	source := &AuthSource{Enabled: true}
 
@@ -211,6 +215,7 @@ func getURLFormatErr(fromParam bool, upstreamURL string) error {
 	return nil
 }
 
+// GetTykExtensionConfigParams extracts a *TykExtensionConfigParams from a *http.Request.
 func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 	queries := r.URL.Query()
 	upstreamURL := strings.TrimSpace(queries.Get("upstreamURL"))
@@ -233,7 +238,7 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 		CustomDomain:    customDomain,
 		Authentication:  authentication,
 		ValidateRequest: validateRequest,
-		ApiID:           apiID,
+		APIID:           apiID,
 		AllowList:       allowList,
 	}
 }

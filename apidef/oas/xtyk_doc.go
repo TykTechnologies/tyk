@@ -24,6 +24,7 @@ func (x *XTykDoc) append(newInfo *StructInfo) int {
 	return len(*x)
 }
 
+// StructInfo holds ast field information for the docs generator.
 type StructInfo struct {
 	// Name is struct go name
 	Name string
@@ -32,13 +33,14 @@ type StructInfo struct {
 	structObj *ast.StructType `json:"-"`
 }
 
+// FieldInfo holds details about a field.
 type FieldInfo struct {
 	// Doc is field docs. comments that are not part of docs are excluded.
 	Doc string `json:"doc"`
-	// JsonName is the corresponding json name of the field.
-	JsonName string `json:"json_name"`
-	// JsonType valid json type if it was found
-	JsonType string `json:"json_type"`
+	// JSONName is the corresponding json name of the field.
+	JSONName string `json:"json_name"`
+	// JSONType valid json type if it was found
+	JSONType string `json:"json_type"`
 	// GoPath is the go path of this field starting from root object
 	GoPath string `json:"go_path"`
 	// MapKey is the map key type, if this field is a map
@@ -47,18 +49,22 @@ type FieldInfo struct {
 	IsArray bool `json:"is_array"`
 }
 
+// FieldDocError holds a list of errors.
 type FieldDocError struct {
 	errs []string
 }
 
+// Error implements the error interface.
 func (err *FieldDocError) Error() string {
 	return strings.Join(err.errs, "\n")
 }
 
+// WriteError appends an error message to the error list.
 func (err *FieldDocError) WriteError(errMsg string) {
 	err.errs = append(err.errs, errMsg)
 }
 
+// Empty returns true if there are no errors in the list.
 func (err *FieldDocError) Empty() bool {
 	return len(err.errs) == 0
 }
@@ -79,7 +85,7 @@ func ExtractDocFromXTyk() (XTykDoc, error) {
 
 	const (
 		rootStructName  = "XTykAPIGateway"
-		rootJsonName    = "x-tyk-gateway"
+		rootJSONName    = "x-tyk-gateway"
 		requiredPkgName = "oas"
 	)
 	if _, ok = pkgs[requiredPkgName]; !ok {
@@ -88,10 +94,10 @@ func ExtractDocFromXTyk() (XTykDoc, error) {
 
 	p := newObjParser(pkgs[requiredPkgName])
 	rootStructInfo := &StructInfo{
-		Name:      rootJsonName,
+		Name:      rootJSONName,
 		structObj: p.globals[rootStructName].(*ast.StructType),
 	}
-	p.parse(rootJsonName, rootJsonName, rootStructInfo)
+	p.parse(rootJSONName, rootJSONName, rootStructInfo)
 
 	if p.errList.Empty() {
 		return p.info, nil
@@ -163,12 +169,12 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 			continue
 		}
 
-		jsonName, isInline := jsonTagFromBasicLit(field.Tag)
+		JSONName, isInline := jsonTagFromBasicLit(field.Tag)
 		if isInline {
 			p.parseInlineField(goPath, ident.Name, structInfo)
 			continue
 		}
-		if jsonName == "" && !isInline {
+		if JSONName == "" && !isInline {
 			// field is for internal use?
 			continue
 		}
@@ -183,10 +189,10 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 		}
 
 		fieldInfo := &FieldInfo{
-			JsonName: jsonName,
+			JSONName: JSONName,
 			GoPath:   goPath + "." + goName,
 			Doc:      docs,
-			JsonType: goTypeToJson(p.globals, ident.Name),
+			JSONType: goTypeToJSON(p.globals, ident.Name),
 			IsArray:  isExprArray(field.Type),
 		}
 		p.parseNestedObj(ident.Name, fieldInfo)
@@ -218,7 +224,7 @@ func (p *objParser) parseNestedObj(name string, field *FieldInfo) {
 
 		case *ast.ArrayType:
 			typeName := extractIdentFromExpr(obj).Name
-			field.JsonType = typeName
+			field.JSONType = typeName
 			field.IsArray = true
 			if structObj, ok := p.globals[typeName].(*ast.StructType); ok {
 				newInfo := &StructInfo{structObj: structObj, Name: typeName}
@@ -227,7 +233,7 @@ func (p *objParser) parseNestedObj(name string, field *FieldInfo) {
 
 		case *ast.MapType:
 			typeName := extractIdentFromExpr(obj).Name
-			field.JsonType = typeName
+			field.JSONType = typeName
 			field.MapKey = extractIdentFromExpr(obj.Key).Name
 			if structObj, ok := p.globals[typeName].(*ast.StructType); ok {
 				newInfo := &StructInfo{structObj: structObj, Name: typeName}
@@ -245,14 +251,67 @@ func cleanDocs(docs ...*ast.CommentGroup) string {
 			continue
 		}
 		docText := doc.Text()
+
+		var codeBlock bool
+		var lastCh string
+
 		for _, lineComment := range strings.Split(docText, "\n") {
 			lineComment = strings.TrimLeft(lineComment, "/")
 			lineComment = strings.TrimLeft(lineComment, "/*")
 			lineComment = strings.TrimLeft(lineComment, "*\\")
 			lineComment = strings.TrimSpace(lineComment)
+
+			// Handle codeblock leading/trailing space
+			if lineComment == "```" {
+				codeBlock = !codeBlock
+				s.WriteByte('\n')
+				if codeBlock {
+					s.WriteByte('\n')
+					s.WriteString(lineComment)
+				} else {
+					s.WriteString(lineComment)
+					s.WriteByte('\n')
+				}
+				s.WriteByte('\n')
+				continue
+			}
+
+			// Append dot after Tyk native API definition, consistency.
+			if lineComment == "" && lastCh == "`" {
+				s.WriteString(".\n")
+				lastCh = ""
+				continue
+			}
+
 			if lineComment != "" {
 				s.WriteString(lineComment)
-				s.WriteByte('\n')
+
+				// Each codeblock line needs a trailing \n,
+				// each bullet point (-) also needs a \n.
+				if codeBlock || lineComment[0] == '-' {
+					s.WriteByte('\n')
+					continue
+				}
+
+				// Group other text as sentences with trailing dot.
+				length := len(lineComment)
+				lastCh = lineComment[length-1 : length]
+
+				// Line ends with code block, next line determines
+				// which trailing space goes after
+				if lastCh == "`" {
+					continue
+				}
+
+				// Group sentences into individual lines in markdown
+				// or join them together with a space if split.
+				if lastCh == "." || lastCh == ":" {
+					s.WriteByte('\n')
+					continue
+				} else {
+					s.WriteByte(' ')
+					continue
+				}
 			}
 		}
 	}
@@ -290,7 +349,7 @@ func isExprArray(expr ast.Expr) bool {
 	return false
 }
 
-func jsonTagFromBasicLit(tag *ast.BasicLit) (jsonName string, isInline bool) {
+func jsonTagFromBasicLit(tag *ast.BasicLit) (name string, isInline bool) {
 	if tag == nil {
 		return "", false
 	}
@@ -322,7 +381,7 @@ func filterXTykGoFile(fInfo os.FileInfo) bool {
 	return !(ignoreList[fInfo.Name()] || strings.HasSuffix(fInfo.Name(), "_test.go"))
 }
 
-func goTypeToJson(globals map[string]ast.Expr, typeName string) string {
+func goTypeToJSON(globals map[string]ast.Expr, typeName string) string {
 	switch typeName {
 	case "string":
 		return "string"
@@ -366,9 +425,9 @@ func xTykDocToMarkdown(xtykDoc XTykDoc) string {
 }
 
 func fieldInfoToMarkdown(field *FieldInfo, docWriter *strings.Builder) {
-	docWriter.WriteString(fmt.Sprintf("- **`%s`**\n\n", field.JsonName))
+	docWriter.WriteString(fmt.Sprintf("- **`%s`**\n\n", field.JSONName))
 
-	if field.JsonType != "" {
+	if field.JSONType != "" {
 		docWriter.WriteString("  **Type: ")
 		docWriter.WriteString(fmt.Sprintf("%s**\n\n", fieldTypeToMarkdown(field)))
 	}
@@ -391,14 +450,14 @@ func fieldTypeToMarkdown(f *FieldInfo) string {
 		ext = fmt.Sprintf("map[%s]", f.MapKey) + ext
 	}
 
-	switch f.JsonType {
+	switch f.JSONType {
 	case "boolean", "int", "float", "double", "string", "any", "object":
-		return fmt.Sprintf("`%s%s`", ext, f.JsonType)
+		return fmt.Sprintf("`%s%s`", ext, f.JSONType)
 	}
 
 	if ext != "" {
 		ext = "`" + ext + "`"
 	}
 	// markdown link
-	return fmt.Sprintf("%s[%s](#%s)", ext, f.JsonType, strings.ToLower(f.JsonType))
+	return fmt.Sprintf("%s[%s](#%s)", ext, f.JSONType, strings.ToLower(f.JSONType))
 }

@@ -9,30 +9,52 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
+// Operations holds Operation definitions
 type Operations map[string]*Operation
 
+// Operation holds a request operation configuration, allowances, tranformations, caching, timeouts and validation.
 type Operation struct {
-	Allow                *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
-	Block                *Allowance `bson:"block,omitempty" json:"block,omitempty"`
+	// Allow request by allowance.
+	Allow *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
+
+	// Block request by allowance.
+	Block *Allowance `bson:"block,omitempty" json:"block,omitempty"`
+
+	// Ignore authentication on request by allowance.
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
+
 	// TransformRequestMethod allows you to transform the method of a request.
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
+
 	// TransformRequestBody allows you to transform request body.
 	// When both `path` and `body` are provided, body would take precedence.
 	TransformRequestBody *TransformRequestBody `bson:"transformRequestBody,omitempty" json:"transformRequestBody,omitempty"`
-	Cache                *CachePlugin          `bson:"cache,omitempty" json:"cache,omitempty"`
-	EnforceTimeout       *EnforceTimeout       `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
-	ValidateRequest      *ValidateRequest      `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
-	MockResponse         *MockResponse         `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
+
+	// Cache plugin configuration.
+	Cache *CachePlugin `bson:"cache,omitempty" json:"cache,omitempty"`
+
+	// Enforce timeout configuration.
+	EnforceTimeout *EnforceTimeout `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
+
+	// Validate request configuration.
+	ValidateRequest *ValidateRequest `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
+
+	// MockResponse response configuration.
+	MockResponse *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
 }
+
+// AllowanceType holds the valid allowance types values
+type AllowanceType int
 
 const (
 	allow                AllowanceType = 0
 	block                AllowanceType = 1
 	ignoreAuthentication AllowanceType = 2
-	contentTypeJSON                    = "application/json"
+
+	contentTypeJSON = "application/json"
 )
 
+// Import takes the arguments and populates the receiver *Operation values
 func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validateRequest *bool) {
 	if allowList != nil {
 		allow := o.Allow
@@ -63,8 +85,6 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validate
 		o.ValidateRequest = validate
 	}
 }
-
-type AllowanceType int
 
 func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	// Regardless if `ep` is a zero value, we need a non-nil paths
@@ -420,16 +440,22 @@ func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
 	return operations[operationID]
 }
 
+// ValidateRequest holds configuration required for validating requests.
 type ValidateRequest struct {
-	Enabled           bool `bson:"enabled" json:"enabled"`
-	ErrorResponseCode int  `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
+	// If set to `true`, it enables request validation.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// If request fails validation, this will be the error code emitted.
+	// If unset or zero, the response will return with http status 422 Unprocessable Entity.
+	ErrorResponseCode int `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
 }
 
+// Fill *ValidateRequest receiver from apidef.ValidateRequestMeta
 func (v *ValidateRequest) Fill(meta apidef.ValidateRequestMeta) {
 	v.Enabled = meta.Enabled
 	v.ErrorResponseCode = meta.ErrorResponseCode
 }
 
+// ExtractTo extracts *ValidateRequest into *apidef.ValidateRequestMeta
 func (v *ValidateRequest) ExtractTo(meta *apidef.ValidateRequestMeta) {
 	meta.Enabled = v.Enabled
 	meta.ErrorResponseCode = v.ErrorResponseCode
@@ -451,6 +477,7 @@ func (v *ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operat
 	return media != nil
 }
 
+// Import populates *ValidateRequest with enabled argument and a default error response code.
 func (v *ValidateRequest) Import(enabled bool) {
 	v.Enabled = enabled
 	v.ErrorResponseCode = http.StatusUnprocessableEntity
@@ -473,6 +500,7 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidateRequestMeta) {
 	}
 }
 
+// MockResponse configures the mock responses.
 type MockResponse struct {
 	// Enabled enables the mock response middleware.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -486,6 +514,7 @@ type MockResponse struct {
 	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }
 
+// FromOASExamples configures mock responses should be returned from OAS example responses.
 type FromOASExamples struct {
 	// Enabled enables getting a mock response from OAS examples or schemas documented in OAS.
 	Enabled bool `bson:"enabled" json:"enabled"`

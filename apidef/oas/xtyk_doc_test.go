@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/ioutil"
+	"path"
 	"strings"
 	"testing"
 
@@ -17,24 +18,24 @@ var (
 	dumpXTykDocHelp = `if this flag is passed in tests, file "./schema/x-tyk-gateway.md"
 will be updated after TestExtractDocFromXTyk has passed`
 	dumpXTykDoc = flag.Bool("x-tyk-dump-doc", false, dumpXTykDocHelp)
-	xTykDocPath = "./schema/x-tyk-gateway.md"
+	xTykDocPath = "x-tyk-gateway.md"
 )
 
 func TestExtractDocFromXTyk(t *testing.T) {
 	fInfo, err := ExtractDocFromXTyk()
 	if err != nil {
-		if _, ok := err.(*FieldDocError); ok {
-			// should fail, but for now let's print errors.
-			t.Log(err.Error())
-		} else {
-			t.Fatal(err.Error())
-		}
+		t.Fatal(err.Error())
 	}
 	if !flag.Parsed() {
 		flag.Parse()
 	}
 	if *dumpXTykDoc {
-		_ = ioutil.WriteFile(xTykDocPath, []byte(xTykDocToMarkdown(fInfo)), 0666)
+		filename := path.Join("schema", xTykDocPath)
+		t.Logf("Writing out: %s", filename)
+		err = ioutil.WriteFile(filename, []byte(xTykDocToMarkdown(fInfo)), 0666)
+		assert.NoError(t, err)
+	} else {
+		t.Log("Skipping writing out x-tyk-gateway.md docs")
 	}
 }
 
@@ -71,8 +72,8 @@ func TestExtractDocUtils(t *testing.T) {
 				Name: "Server",
 				Fields: []*FieldInfo{
 					{
-						JsonType: "string",
-						JsonName: "name",
+						JSONType: "string",
+						JSONName: "name",
 						GoPath:   "Server.Name",
 						Doc:      "Name doc.\n",
 					},
@@ -106,8 +107,8 @@ func TestExtractDocUtils(t *testing.T) {
 				Name: "Server",
 				Fields: []*FieldInfo{
 					{
-						JsonType: "string",
-						JsonName: "name",
+						JSONType: "string",
+						JSONName: "name",
 						GoPath:   "Server.Name",
 						Doc:      "Name doc.\n",
 					},
@@ -180,35 +181,35 @@ func TestExtractDocUtils(t *testing.T) {
 			markdown string
 		}{
 			{
-				value:    &FieldInfo{JsonType: "boolean"},
+				value:    &FieldInfo{JSONType: "boolean"},
 				markdown: "`boolean`",
 			},
 			{
-				value:    &FieldInfo{JsonType: "boolean", IsArray: true},
+				value:    &FieldInfo{JSONType: "boolean", IsArray: true},
 				markdown: "`[]boolean`",
 			},
 			{
-				value:    &FieldInfo{JsonType: "boolean", IsArray: true, MapKey: "string"},
+				value:    &FieldInfo{JSONType: "boolean", IsArray: true, MapKey: "string"},
 				markdown: "`map[string][]boolean`",
 			},
 			{
-				value:    &FieldInfo{JsonType: "boolean", MapKey: "string"},
+				value:    &FieldInfo{JSONType: "boolean", MapKey: "string"},
 				markdown: "`map[string]boolean`",
 			},
 			{
-				value:    &FieldInfo{JsonType: "Server"},
+				value:    &FieldInfo{JSONType: "Server"},
 				markdown: "[Server](#server)",
 			},
 			{
-				value:    &FieldInfo{JsonType: "Server", IsArray: true},
+				value:    &FieldInfo{JSONType: "Server", IsArray: true},
 				markdown: "`[]`[Server](#server)",
 			},
 			{
-				value:    &FieldInfo{JsonType: "Server", IsArray: true, MapKey: "string"},
+				value:    &FieldInfo{JSONType: "Server", IsArray: true, MapKey: "string"},
 				markdown: "`map[string][]`[Server](#server)",
 			},
 			{
-				value:    &FieldInfo{JsonType: "Server", MapKey: "string"},
+				value:    &FieldInfo{JSONType: "Server", MapKey: "string"},
 				markdown: "`map[string]`[Server](#server)",
 			},
 		}
@@ -223,20 +224,20 @@ func TestExtractDocUtils(t *testing.T) {
 			markdown string
 		}{
 			{
-				value:    &FieldInfo{JsonName: "id", JsonType: "object", Doc: "ID is an id of an API.\nOld API definition: `api_id`."},
-				markdown: "- **`id`**\n\n  **Type: `object`**\n\n  ID is an id of an API.\n\n  Old API definition: `api_id`.\n\n",
+				value:    &FieldInfo{JSONName: "id", JSONType: "object", Doc: "ID is an id of an API.\nTyk native API definition: `api_id`."},
+				markdown: "- **`id`**\n\n  **Type: `object`**\n\n  ID is an id of an API.\n\n  Tyk native API definition: `api_id`.\n\n",
 			},
 			{
-				value:    &FieldInfo{JsonName: "id", JsonType: "object"},
+				value:    &FieldInfo{JSONName: "id", JSONType: "object"},
 				markdown: "- **`id`**\n\n  **Type: `object`**\n\n",
 			},
 			{
-				value:    &FieldInfo{JsonName: "id", JsonType: "object", Doc: "ID is an id of an API.\n\n"},
+				value:    &FieldInfo{JSONName: "id", JSONType: "object", Doc: "ID is an id of an API.\n\n"},
 				markdown: "- **`id`**\n\n  **Type: `object`**\n\n  ID is an id of an API.\n\n",
 			},
 			{
-				value:    &FieldInfo{JsonName: "id", JsonType: "object", Doc: "ID is an id of an API.\n\n\nOld API definition: `api_id`.\n\n"},
-				markdown: "- **`id`**\n\n  **Type: `object`**\n\n  ID is an id of an API.\n\n  Old API definition: `api_id`.\n\n",
+				value:    &FieldInfo{JSONName: "id", JSONType: "object", Doc: "ID is an id of an API.\n\n\nTyk native API definition: `api_id`.\n\n"},
+				markdown: "- **`id`**\n\n  **Type: `object`**\n\n  ID is an id of an API.\n\n  Tyk native API definition: `api_id`.\n\n",
 			},
 		}
 		for _, run := range runs {
@@ -252,11 +253,11 @@ func TestExtractDocUtils(t *testing.T) {
 			markdown string
 		}{
 			{
-				value:    XTykDoc{{Name: "Server", Fields: []*FieldInfo{{JsonName: "id", JsonType: "object"}}}},
+				value:    XTykDoc{{Name: "Server", Fields: []*FieldInfo{{JSONName: "id", JSONType: "object"}}}},
 				markdown: fmt.Sprintf("%s### **Server**\n\n- **`id`**\n\n  **Type: `object`**\n\n\n", xTykDocMarkdownTitle),
 			},
 			{
-				value:    XTykDoc{{Name: "Server", Fields: []*FieldInfo{{JsonName: "id", JsonType: "object"}, {JsonName: "id", JsonType: "object"}}}},
+				value:    XTykDoc{{Name: "Server", Fields: []*FieldInfo{{JSONName: "id", JSONType: "object"}, {JSONName: "id", JSONType: "object"}}}},
 				markdown: fmt.Sprintf("%s### **Server**\n\n- **`id`**\n\n  **Type: `object`**\n\n- **`id`**\n\n  **Type: `object`**\n\n\n", xTykDocMarkdownTitle),
 			},
 			{

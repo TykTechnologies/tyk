@@ -195,14 +195,14 @@ func Test_loadOASSchema(t *testing.T) {
 		t.Parallel()
 		err := loadOASSchema()
 		assert.Nil(t, err)
-		assert.NotNil(t, oasJsonSchemas)
-		for oasVersion := range oasJsonSchemas {
+		assert.NotNil(t, oasJSONSchemas)
+		for oasVersion := range oasJSONSchemas {
 			var xTykAPIGateway, xTykServer []byte
-			xTykAPIGateway, _, _, err = jsonparser.Get(oasJsonSchemas[oasVersion], keyProperties, ExtensionTykAPIGateway)
+			xTykAPIGateway, _, _, err = jsonparser.Get(oasJSONSchemas[oasVersion], keyProperties, ExtensionTykAPIGateway)
 			assert.NoError(t, err)
 			assert.NotNil(t, xTykAPIGateway)
 
-			xTykServer, _, _, err = jsonparser.Get(oasJsonSchemas[oasVersion], keyDefinitions, "X-Tyk-Server")
+			xTykServer, _, _, err = jsonparser.Get(oasJSONSchemas[oasVersion], keyDefinitions, "X-Tyk-Server")
 			assert.NoError(t, err)
 			assert.NotNil(t, xTykServer)
 		}
@@ -239,19 +239,19 @@ func TestGetOASSchema(t *testing.T) {
 	t.Run("return default version when req version is empty", func(t *testing.T) {
 		_, err = GetOASSchema("")
 		assert.NoError(t, err)
-		assert.NotEmpty(t, oasJsonSchemas["3.0"])
+		assert.NotEmpty(t, oasJSONSchemas["3.0"])
 	})
 
 	t.Run("return minor version schema when req version is including patch version", func(t *testing.T) {
 		_, err = GetOASSchema("3.0.8")
 		assert.NoError(t, err)
-		assert.NotEmpty(t, oasJsonSchemas["3.0"])
+		assert.NotEmpty(t, oasJSONSchemas["3.0"])
 	})
 
 	t.Run("return minor version 0 when only major version is requested", func(t *testing.T) {
 		_, err = GetOASSchema("3")
 		assert.NoError(t, err)
-		assert.NotEmpty(t, oasJsonSchemas["3.0"])
+		assert.NotEmpty(t, oasJSONSchemas["3.0"])
 	})
 
 	t.Run("return error when non existing oas schema is requested", func(t *testing.T) {
