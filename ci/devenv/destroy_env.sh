@@ -7,8 +7,8 @@ if [[ -z "${CLUSTER}" ]];then
 	exit 1
 fi
 echo "DEBUG: CLUSTER = ${CLUSTER}"
-ls
-terraform workspace select ${CLUSTER}
+ls -a
 terraform init
+terraform workspace select ${CLUSTER}
 terraform workspace show
 terraform destroy -auto-approve -var "name=${CLUSTER}" -var-file=master.tfvars
