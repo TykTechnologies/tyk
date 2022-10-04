@@ -46,63 +46,36 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.tf_token }}
           terraform_wrapper: false
-      
-      - name: Terraform Format
+
+      - name: Inspect dir
         working-directory: ${{ env.TERRAFORM_DIR }}
-        id: fmt
-        run: terraform fmt -check
+        run: ls -la
 
-      - name: Configure AWS credentials for use
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.aws_key }}
-          aws-secret-access-key: ${{ secrets.aws_secret }}
-          aws-region: "eu-central-1"
 
-      - name: Login to DockerHub
-        # if: startsWith(github.ref, 'refs/tags')
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.docker_user }}
-          password: ${{ secrets.docker_pass }}
-
-      - uses: TykTechnologies/docker-run-action@main
-        env:
-          ETCD_PASS: ${{ secrets.etcd_pass }}
-        with:
-          registry: docker.io
-          image: tykio/gromit:v1.4.5-rc2
-          options: -v ${{ github.workspace }}:/repo -v ${{ github.workspace }}/.terraform.d:/root/.terraform.d
-          run: gromit mutex get master --script /repo/ci/devenv/create_env.sh -l debug
-            
-
-      # - name: Terraform Init
+      # - name: Terraform Format
       #   working-directory: ${{ env.TERRAFORM_DIR }}
-      #   id: init
-      #   run: terraform init
+      #   id: fmt
+      #   run: terraform fmt -check
 
-      # - name: Lock environment
-      #   run:
-      #     echo "CALL - Add entry on DinamoDB"
+      # - name: Configure AWS credentials for use
+      #   uses: aws-actions/configure-aws-credentials@v1
+      #   with:
+      #     aws-access-key-id: ${{ secrets.aws_key }}
+      #     aws-secret-access-key: ${{ secrets.aws_secret }}
+      #     aws-region: "eu-central-1"
 
-      # - name: Terraform Workspace
-      #   working-directory: ${{ env.TERRAFORM_DIR }}
-      #   run: |
-      #     terraform workspace new ${CLUSTER}
-      #     terraform workspace show
+      # - name: Login to DockerHub
+      #   # if: startsWith(github.ref, 'refs/tags')
+      #   uses: docker/login-action@v1
+      #   with:
+      #     username: ${{ secrets.docker_user }}
+      #     password: ${{ secrets.docker_pass }}
 
-      # - name: Generate Templates on EFS
-      #   run:
-      #     echo "CALL - Generate templates on EFS"
-
-      # - name: Make Input Var Files
-      #   run:
-      #     echo "CALL - Make input var files"
-
-      # - name: Terraform Apply
-      #   working-directory: ${{ env.TERRAFORM_DIR }}
-      #   run: terraform apply -auto-approve -var-file=master.tfvars
-
-      # - name: Unlock environment
-      #   run:
-      #     echo "CALL - Update entry on DinamoDB"
+      # - uses: TykTechnologies/docker-run-action@main
+      #   env:
+      #     ETCD_PASS: ${{ secrets.etcd_pass }}
+      #   with:
+      #     registry: docker.io
+      #     image: tykio/gromit:v1.4.5-rc2
+      #     options: -v ${{ github.workspace }}:/repo -v ${{ github.workspace }}/.terraform.d:/root/.terraform.d
+      #     run: gromit mutex get master --script /repo/ci/devenv/create_env.sh -l debug
