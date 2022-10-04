@@ -1,10 +1,16 @@
 #!/bin/sh
+set -ea
 cd /repo/ci/terraform/environment
-#cd ../terraform/environment
+
+if [[ -z "${CLUSTER}" ]];then
+	echo "Error: Cluster name not defined"
+	exit 1
+fi
+echo "DEBUG: CLUSTER = ${CLUSTER}"
 ls
-terraform init
-terraform workspace select kikitest3
+terraform workspace new ${CLUSTER}
 terraform workspace show
-# echo "CALL - Generate templates on EFS"
-# echo "CALL - Make input var files"
-terraform apply -auto-approve -var-file=master.tfvars
+terraform init
+echo "CALL - Generate templates on EFS"
+echo "CALL - Make input var files"
+terraform apply -auto-approve -var "name=${CLUSTER}" -var-file=master.tfvars
