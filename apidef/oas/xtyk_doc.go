@@ -1,6 +1,6 @@
 package oas
 
-//go:generate go test -run=TestExtractDocFromXTyk . -timeout 7s -v -x-tyk-dump-doc
+//go:generate go test -run=TestExtractDocFromXTyk . -count 1 -v -timeout 7s -x-tyk-dump-doc
 
 import (
 	"errors"
