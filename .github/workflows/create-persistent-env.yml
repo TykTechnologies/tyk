@@ -48,8 +48,8 @@ jobs:
           terraform_wrapper: false
 
       - name: Inspect dir
-        working-directory: ${{ env.TERRAFORM_DIR }}
-        run: find ${{ github.workspace }} -name credentials.tfrc.json
+        run: find /home -name .terraformrc
+
 
 
       # - name: Terraform Format
