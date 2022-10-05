@@ -80,7 +80,6 @@ jobs:
             echo "false"
           fi
 
-
       - name: Simulate outputs from the release pipeline
         id: set-output-defaults
         run: |
