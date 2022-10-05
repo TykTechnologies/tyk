@@ -36,7 +36,7 @@ env:
   CLUSTER: ${{ inputs.cluster }}
 
 jobs:
-  Create:
+  Gromit:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
