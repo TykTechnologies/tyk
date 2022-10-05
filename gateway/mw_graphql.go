@@ -17,7 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/adapter"
 
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -253,7 +253,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 }
 
 func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.Errors) (error, int) {
-	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(http.StatusBadRequest)
 	_, _ = errors.WriteResponse(w)
 	m.Logger().Debugf("Error while validating GraphQL request: '%s'", errors)
@@ -261,7 +261,7 @@ func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.
 }
 
 func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request) bool {
-	websocketProtocol := r.Header.Get(headers.SecWebSocketProtocol)
+	websocketProtocol := r.Header.Get(header.SecWebSocketProtocol)
 	return websocketProtocol == GraphQLWebSocketProtocol
 }
 

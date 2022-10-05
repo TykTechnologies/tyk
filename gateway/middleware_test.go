@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	headers2 "github.com/TykTechnologies/tyk/headers"
+	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 	cache "github.com/pmylund/go-cache"
 	"github.com/stretchr/testify/assert"

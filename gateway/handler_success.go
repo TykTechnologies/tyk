@@ -13,7 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -203,7 +203,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			trackedPath,
 			r.URL.Path,
 			r.ContentLength,
-			r.Header.Get(headers.UserAgent),
+			r.Header.Get(header.UserAgent),
 			t.Day(),
 			t.Month(),
 			t.Year(),

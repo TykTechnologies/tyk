@@ -44,7 +44,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
@@ -294,10 +294,10 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		} else {
 			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
 		}
-		if _, ok := req.Header[headers.UserAgent]; !ok {
+		if _, ok := req.Header[header.UserAgent]; !ok {
 			// Set Tyk's own default user agent. Without
 			// this line, we would get the net/http default.
-			req.Header.Set(headers.UserAgent, defaultUserAgent)
+			req.Header.Set(header.UserAgent, defaultUserAgent)
 		}
 
 		if spec.GlobalConfig.HttpServerOptions.SkipTargetPathEscaping {
@@ -979,7 +979,7 @@ func (p *ReverseProxy) handleGraphQLIntrospection() (res *http.Response, err err
 
 func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoundTripper, r *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	conn, err := p.wsUpgrader.Upgrade(w, r, http.Header{
-		headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+		header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
 	})
 	if err != nil {
 		p.logger.Error("websocket upgrade for GraphQL engine failed: ", err)
@@ -1178,8 +1178,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	addrs := requestIPHops(req)
-	if !p.CheckHeaderInRemoveList(headers.XForwardFor, p.TykAPISpec, req) {
-		outreq.Header.Set(headers.XForwardFor, addrs)
+	if !p.CheckHeaderInRemoveList(header.XForwardFor, p.TykAPISpec, req) {
+		outreq.Header.Set(header.XForwardFor, addrs)
 	}
 
 	// Circuit breaker
@@ -1367,7 +1367,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 	// Remove hop-by-hop headers listed in the
 	// "Connection" header of the response.
-	if c := res.Header.Get(headers.Connection); c != "" {
+	if c := res.Header.Get(header.Connection); c != "" {
 		for _, f := range strings.Split(c, ",") {
 			if f = strings.TrimSpace(f); f != "" {
 				res.Header.Del(f)
@@ -1382,16 +1382,16 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 	// Close connections
 	if p.Gw.GetConfig().CloseConnections {
-		res.Header.Set(headers.Connection, "close")
+		res.Header.Set(header.Connection, "close")
 	}
 
 	// Add resource headers
 	if ses != nil {
 		// We have found a session, lets report back
 		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(p.TykAPISpec.APIID)
-		res.Header.Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		res.Header.Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+		res.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		res.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		res.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
@@ -1728,7 +1728,7 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 		return false, ""
 	}
 
-	connection := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Connection)))
+	connection := strings.ToLower(strings.TrimSpace(req.Header.Get(header.Connection)))
 	if connection != "upgrade" {
 		return false, ""
 	}
@@ -1743,5 +1743,5 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 
 // IsGrpcStreaming  determines wether a request represents a grpc streaming req
 func IsGrpcStreaming(r *http.Request) bool {
-	return r.ContentLength == -1 && r.Header.Get(headers.ContentType) == "application/grpc"
+	return r.ContentLength == -1 && r.Header.Get(header.ContentType) == "application/grpc"
 }

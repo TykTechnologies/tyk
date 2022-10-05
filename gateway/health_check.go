@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/sirupsen/logrus"
@@ -230,7 +230,7 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res.Status = status
-	w.Header().Set("Content-Type", headers.ApplicationJSON)
+	w.Header().Set("Content-Type", header.ApplicationJSON)
 
 	// If this option is not set, or is explicitly set to false, add the mascot headers
 	if !gw.GetConfig().HideGeneratorHeader {

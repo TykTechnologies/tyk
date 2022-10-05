@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -113,11 +113,11 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 		})
 
 		authHeaderWithDirectKey := map[string]string{
-			headers.Authorization: directKey,
+			header.Authorization: directKey,
 		}
 
 		authHeaderWithPolicyAppliedKey := map[string]string{
-			headers.Authorization: policyAppliedKey,
+			header.Authorization: policyAppliedKey,
 		}
 
 		request := gql.Request{
@@ -163,7 +163,7 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 		t.Run("Invalid query should return 403 when auth is failing", func(t *testing.T) {
 			request.Query = "query Hello {"
 			authHeaderWithInvalidDirectKey := map[string]string{
-				headers.Authorization: "invalid key",
+				header.Authorization: "invalid key",
 			}
 			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithInvalidDirectKey, Data: request, BodyMatch: "", Code: http.StatusForbidden})
 		})
@@ -399,11 +399,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
-								headers.Connection:           "upgrade",
-								headers.Upgrade:              "websocket",
-								headers.SecWebSocketProtocol: "graphql-ws",
-								headers.SecWebSocketVersion:  "13",
-								headers.SecWebSocketKey:      "123abc",
+								header.Connection:           "upgrade",
+								header.Upgrade:              "websocket",
+								header.SecWebSocketProtocol: "graphql-ws",
+								header.SecWebSocketVersion:  "13",
+								header.SecWebSocketKey:      "123abc",
 							},
 							Code:      http.StatusUnprocessableEntity,
 							BodyMatch: "websockets are not allowed",
@@ -421,11 +421,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
-								headers.Connection:           "upgrade",
-								headers.Upgrade:              "websocket",
-								headers.SecWebSocketProtocol: "invalid",
-								headers.SecWebSocketVersion:  "13",
-								headers.SecWebSocketKey:      "123abc",
+								header.Connection:           "upgrade",
+								header.Upgrade:              "websocket",
+								header.SecWebSocketProtocol: "invalid",
+								header.SecWebSocketVersion:  "13",
+								header.SecWebSocketKey:      "123abc",
 							},
 							Code:      http.StatusBadRequest,
 							BodyMatch: "invalid websocket protocol for upgrading to a graphql websocket connection",
@@ -435,7 +435,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 				t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
 					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-						headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+						header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
 					})
 					require.NoError(t, err)
 					defer wsConn.Close()
@@ -472,8 +472,8 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						})
 
 						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
-							headers.Authorization:        {directKey},
+							header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							header.Authorization:        {directKey},
 						})
 						require.NoError(t, err)
 						defer wsConn.Close()
@@ -508,8 +508,8 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						})
 
 						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
-							headers.Authorization:        {directKey},
+							header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							header.Authorization:        {directKey},
 						})
 						require.NoError(t, err)
 						defer wsConn.Close()
@@ -611,11 +611,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
-								headers.Connection:           "upgrade",
-								headers.Upgrade:              "websocket",
-								headers.SecWebSocketProtocol: "graphql-ws",
-								headers.SecWebSocketVersion:  "13",
-								headers.SecWebSocketKey:      "123abc",
+								header.Connection:           "upgrade",
+								header.Upgrade:              "websocket",
+								header.SecWebSocketProtocol: "graphql-ws",
+								header.SecWebSocketVersion:  "13",
+								header.SecWebSocketKey:      "123abc",
 							},
 							Code:      http.StatusUnprocessableEntity,
 							BodyMatch: "websockets are not allowed",
@@ -633,11 +633,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
-								headers.Connection:           "upgrade",
-								headers.Upgrade:              "websocket",
-								headers.SecWebSocketProtocol: "graphql-ws",
-								headers.SecWebSocketVersion:  "13",
-								headers.SecWebSocketKey:      "123abc",
+								header.Connection:           "upgrade",
+								header.Upgrade:              "websocket",
+								header.SecWebSocketProtocol: "graphql-ws",
+								header.SecWebSocketVersion:  "13",
+								header.SecWebSocketKey:      "123abc",
 							},
 							Code:      http.StatusUnprocessableEntity,
 							BodyMatch: "websockets are not allowed",

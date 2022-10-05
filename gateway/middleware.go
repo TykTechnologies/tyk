@@ -12,7 +12,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
@@ -768,7 +768,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	if config.AuthHeaderName == "" {
-		config.AuthHeaderName = headers.Authorization
+		config.AuthHeaderName = header.Authorization
 	}
 
 	key := r.Header.Get(config.AuthHeaderName)

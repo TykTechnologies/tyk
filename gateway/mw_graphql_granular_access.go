@@ -5,7 +5,7 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -59,7 +59,7 @@ func (m *GraphQLGranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, 
 		m.Logger().Errorf(RestrictedFieldValidationFailedLogMsg, result.internalErr)
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	case GranularAccessFailReasonValidationError:
-		w.Header().Set(headers.ContentType, headers.ApplicationJSON)
+		w.Header().Set(header.ContentType, header.ApplicationJSON)
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = result.validationResult.Errors.WriteResponse(w)
 		m.Logger().Debugf(RestrictedFieldValidationFailedLogMsg, result.validationResult.Errors)
