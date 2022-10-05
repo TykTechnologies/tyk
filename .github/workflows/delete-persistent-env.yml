@@ -1,5 +1,6 @@
 name: Persistent Environment Deletion
 on:
+  workflow_dispatch:
   workflow_call:
     inputs:
       containerName:

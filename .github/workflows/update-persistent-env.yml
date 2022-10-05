@@ -72,6 +72,7 @@ jobs:
           service: ${{ env.SERVICE }}
           cluster: ${{ env.CLUSTER }}
           wait-for-service-stability: true
+          wait-for-minutes: 10
 
       - name: Update environment status
         working-directory: ${{ env.TERRAFORM_DIR }}
