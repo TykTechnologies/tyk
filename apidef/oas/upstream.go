@@ -249,17 +249,17 @@ type MutualTLS struct {
 	// Tyk native API definition: `upstream_certificates_disabled`
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// DomainToCertificate maintains the mapping of domain to certificate.
+	// DomainToCertificates maintains the mapping of domain to certificate.
 	// Tyk native API definition: `upstream_certificates`
 	DomainToCertificates []DomainToCertificate `bson:"domainToCertificateMapping" json:"domainToCertificateMapping"`
 }
 
 // DomainToCertificate holds a single mapping of domain name into a certificate.
 type DomainToCertificate struct {
-	// The domain name.
+	// Domain contains the domain name.
 	Domain string `bson:"domain" json:"domain"`
 
-	// The certificate mapped to the domain.
+	// Certificate contains the certificate mapped to the domain.
 	Certificate string `bson:"certificate" json:"certificate"`
 }
 
@@ -290,10 +290,10 @@ func (m *MutualTLS) ExtractTo(api *apidef.APIDefinition) {
 
 // PinnedPublicKey contains a mapping from the domain name into a list of public keys.
 type PinnedPublicKey struct {
-	// The domain name.
+	// Domain contains the domain name.
 	Domain string `bson:"domain" json:"domain"`
 
-	// The public keys pinned to the domain name.
+	// PublicKeys contains a list of the public keys pinned to the domain name.
 	PublicKeys []string `bson:"publicKeys" json:"publicKeys"`
 }
 
@@ -330,10 +330,13 @@ func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
 
 // CertificatePinning holds the configuration about mapping of domains to pinned public keys.
 type CertificatePinning struct {
-	// If set to `true`, it enables certificate pinning for the API.
+	// Enabled is a boolean flag, if set to `true`, it enables certificate pinning for the API.
+	//
 	// Tyk native API definition: `certificate_pinning_disabled`
 	Enabled bool `bson:"enabled" json:"enabled"`
+
 	// DomainToPublicKeysMapping maintains the mapping of domain to pinned public keys.
+	//
 	// Tyk native API definition: `pinned_public_keys`
 	DomainToPublicKeysMapping PinnedPublicKeys `bson:"domainToPublicKeysMapping" json:"domainToPublicKeysMapping"`
 }

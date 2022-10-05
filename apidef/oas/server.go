@@ -9,16 +9,22 @@ type Server struct {
 	// ListenPath represents the path to listen on. Any requests coming into the host, on the port that Tyk is configured to run on,
 	// that match this path will have the rules defined in the API definition applied.
 	ListenPath ListenPath `bson:"listenPath" json:"listenPath"` // required
+
 	// Slug is the Tyk Cloud equivalent of listen path.
 	// Tyk native API definition: `slug`
 	Slug string `bson:"slug,omitempty" json:"slug,omitempty"`
+
 	// Authentication contains the configurations related to authentication to the API.
 	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
+
 	// ClientCertificates contains the configurations related to static mTLS.
 	ClientCertificates *ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty"`
+
 	// GatewayTags contains segment tags to configure which GWs your APIs connect to.
 	GatewayTags *GatewayTags `bson:"gatewayTags,omitempty" json:"gatewayTags,omitempty"`
+
 	// CustomDomain is the domain to bind this API to.
+	//
 	// Tyk native API definition: `domain`
 	CustomDomain *Domain `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
 }
@@ -97,7 +103,7 @@ func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 type ClientCertificates struct {
 	// Enabled enables static mTLS for the API.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// AllowList is the list of client certificates which are allowed.
+	// Allowlist is the list of client certificates which are allowed.
 	Allowlist []string `bson:"allowlist" json:"allowlist"`
 }
 

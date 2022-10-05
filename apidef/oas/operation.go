@@ -20,7 +20,7 @@ type Operation struct {
 	// Block request by allowance.
 	Block *Allowance `bson:"block,omitempty" json:"block,omitempty"`
 
-	// Ignore authentication on request by allowance.
+	// IgnoreAuthentication ignores authentication on request by allowance.
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 
 	// TransformRequestMethod allows you to transform the method of a request.
@@ -442,10 +442,11 @@ func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
 
 // ValidateRequest holds configuration required for validating requests.
 type ValidateRequest struct {
-	// If set to `true`, it enables request validation.
+	// Enabled is a boolean flag, if set to `true`, it enables request validation.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// If request fails validation, this will be the error code emitted.
-	// If unset or zero, the response will return with http status 422 Unprocessable Entity.
+
+	// ErrorResponseCode is the error code emitted when the request fails validation.
+	// If unset or zero, the response will returned with http status 422 Unprocessable Entity.
 	ErrorResponseCode int `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
 }
 

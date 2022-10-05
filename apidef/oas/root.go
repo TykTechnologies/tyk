@@ -61,9 +61,9 @@ type Info struct {
 	Name string `bson:"name" json:"name"` // required
 	// Expiration date.
 	Expiration string `bson:"expiration,omitempty" json:"expiration,omitempty"`
-	// API state configuration.
+	// State holds configuration about API definition states (active, internal).
 	State State `bson:"state" json:"state"` // required
-	// API versioning info.
+	// Versioning holds configuration for API versioning.
 	Versioning *Versioning `bson:"versioning,omitempty" json:"versioning,omitempty"`
 }
 
@@ -129,21 +129,27 @@ func (s *State) ExtractTo(api *apidef.APIDefinition) {
 	api.Internal = s.Internal
 }
 
-// Versioning holds configuration about API versioning.
+// Versioning holds configuration for API versioning.
+//
+// Tyk native API definition: `version_data`.
 type Versioning struct {
-	// Enabled: If set to `true`, it enables versioning of an API.
+	// Enabled is a boolean flag, if set to `true` it will enable versioning of an API.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
-	// Name: The name of the version as entered by the user ("v1" or similar).
+	// Name contains the name of the version as entered by the user ("v1" or similar).
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
-	// Default: The default version name if a request is issued without a version.
+	// Default contains the default version name if a request is issued without a version.
 	Default string `bson:"default" json:"default"` // required
-	// Location: Versioning location.
+	// Location contains versioning location information. It can be one of the following:
+	//
+	// - `header`,
+	// - `url-param`,
+	// - `url`.
 	Location string `bson:"location" json:"location"` // required
-	// Key: Versioning key.
+	// Key contains the name of the key to check for versioning information.
 	Key string `bson:"key" json:"key"` // required
-	// Versions: A list of versions that map to individual API IDs.
+	// Versions contains a list of versions that map to individual API IDs.
 	Versions []VersionToID `bson:"versions" json:"versions"` // required
-	// StripVersioningData: If set to `true`, the API responses will strip versioning data.
+	// StripVersioningData is a boolean flag, if set to `true`, the API responses will be stripped of versioning data.
 	StripVersioningData bool `bson:"stripVersioningData,omitempty" json:"stripVersioningData,omitempty"`
 }
 
@@ -190,8 +196,8 @@ func (v *Versioning) ExtractTo(api *apidef.APIDefinition) {
 
 // VersionToID contains a single mapping from a version name into an API ID.
 type VersionToID struct {
-	// Version name.
+	// Name contains the user chosen version name, e.g. `v1` or similar.
 	Name string `bson:"name" json:"name"`
-	// API ID.
+	// ID is the API ID for the version set in Name.
 	ID string `bson:"id" json:"id"`
 }

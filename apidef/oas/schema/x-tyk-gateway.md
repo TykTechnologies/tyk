@@ -5,1268 +5,1240 @@
 
 - **`info`**
 
-  **Type: [Info](#info)**
+**Type: [Info](#info)**
 
-  Info contains the main metadata about the API definition.
+Info contains the main metadata about the API definition.
 
 - **`upstream`**
 
-  **Type: [Upstream](#upstream)**
+**Type: [Upstream](#upstream)**
 
-  Upstream contains the configurations related to the upstream.
+Upstream contains the configurations related to the upstream.
 
 - **`server`**
 
-  **Type: [Server](#server)**
+**Type: [Server](#server)**
 
-  Server contains the configurations related to the server.
+Server contains the configurations related to the server.
 
 - **`middleware`**
 
-  **Type: [Middleware](#middleware)**
+**Type: [Middleware](#middleware)**
 
-  Middleware contains the configurations related to the proxy middleware.
+Middleware contains the configurations related to the proxy middleware.
 
 
 ### **Info**
 
 - **`id`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  ID is the unique ID of the API.
+ID is the unique ID of the API.
 
-  Tyk native API definition: `api_id`.
+Tyk native API definition: `api_id`.
 
 - **`dbId`**
 
-  **Type: `object`**
+**Type: `object`**
 
-  DBID is the unique database ID of the API.
+DBID is the unique database ID of the API.
 
-  Tyk native API definition: `id`.
+Tyk native API definition: `id`.
 
 - **`orgId`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  OrgID is the ID of the organisation which the API belongs to.
+OrgID is the ID of the organisation which the API belongs to.
 
-  Tyk native API definition: `org_id`.
+Tyk native API definition: `org_id`.
 
 - **`name`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Name is the name of the API.
+Name is the name of the API.
 
-  Tyk native API definition: `name`.
+Tyk native API definition: `name`.
 
 - **`expiration`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Expiration date.
+Expiration date.
 
 - **`state`**
 
-  **Type: [State](#state)**
+**Type: [State](#state)**
 
-  API state configuration.
+State holds configuration about API definition states (active, internal).
 
 - **`versioning`**
 
-  **Type: [Versioning](#versioning)**
+**Type: [Versioning](#versioning)**
 
-  API versioning info.
+Versioning holds configuration for API versioning.
 
 
 ### **State**
 
 - **`active`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Active enables the API.
+Active enables the API.
 
-  Tyk native API definition: `active`.
+Tyk native API definition: `active`.
 
 - **`internal`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Internal makes the API accessible only internally.
+Internal makes the API accessible only internally.
 
-  Tyk native API definition: `internal`.
+Tyk native API definition: `internal`.
 
 
 ### **Versioning**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled: If set to `true`, it enables versioning of an API.
+Enabled is a boolean flag, if set to `true` it will enable versioning of an API.
 
 - **`name`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Name: The name of the version as entered by the user ("v1" or similar).
+Name contains the name of the version as entered by the user ("v1" or similar).
 
 - **`default`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Default: The default version name if a request is issued without a version.
+Default contains the default version name if a request is issued without a version.
 
 - **`location`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Location: Versioning location.
+Location contains versioning location information. It can be one of the following:
+
+- `header`,
+- `url-param`,
+- `url`.
 
 - **`key`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Key: Versioning key.
+Key contains the name of the key to check for versioning information.
 
 - **`versions`**
 
-  **Type: `[]`[VersionToID](#versiontoid)**
+**Type: `[]`[VersionToID](#versiontoid)**
 
-  Versions: A list of versions that map to individual API IDs.
+Versions contains a list of versions that map to individual API IDs.
 
 - **`stripVersioningData`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  StripVersioningData: If set to `true`, the API responses will strip versioning data.
+StripVersioningData is a boolean flag, if set to `true`, the API responses will be stripped of versioning data.
 
 
 ### **VersionToID**
 
 - **`name`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Version name.
+Name contains the user chosen version name, e.g. `v1` or similar.
 
 - **`id`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  API ID.
+ID is the API ID for the version set in Name.
 
 
 ### **Upstream**
 
 - **`url`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  URL defines the target URL that the request should be proxied to.
+URL defines the target URL that the request should be proxied to.
 
-  Tyk native API definition: `proxy.target_url`.
+Tyk native API definition: `proxy.target_url`.
 
 - **`serviceDiscovery`**
 
-  **Type: [ServiceDiscovery](#servicediscovery)**
+**Type: [ServiceDiscovery](#servicediscovery)**
 
-  ServiceDiscovery contains the configuration related to Service Discovery.
+ServiceDiscovery contains the configuration related to Service Discovery.
 
-  Tyk native API definition: `proxy.service_discovery`.
+Tyk native API definition: `proxy.service_discovery`.
 
 - **`test`**
 
-  **Type: [Test](#test)**
+**Type: [Test](#test)**
 
-  Test contains the configuration related to uptime tests.
+Test contains the configuration related to uptime tests.
 
 - **`mutualTLS`**
 
-  **Type: [MutualTLS](#mutualtls)**
+**Type: [MutualTLS](#mutualtls)**
 
-  MutualTLS contains the configuration related to upstream mutual TLS.
+MutualTLS contains the configuration related to upstream mutual TLS.
 
 - **`certificatePinning`**
 
-  **Type: [CertificatePinning](#certificatepinning)**
+**Type: [CertificatePinning](#certificatepinning)**
 
-  CertificatePinning contains the configuration related to certificate pinning.
+CertificatePinning contains the configuration related to certificate pinning.
 
 
 ### **ServiceDiscovery**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables Service Discovery.
+Enabled enables Service Discovery.
 
-  Tyk native API definition: `service_discovery.use_discovery_service`.
+Tyk native API definition: `service_discovery.use_discovery_service`.
 
 - **`queryEndpoint`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  QueryEndpoint is the endpoint to call, this would usually be Consul, etcd or Eureka K/V store.
+QueryEndpoint is the endpoint to call, this would usually be Consul, etcd or Eureka K/V store.
 
-  Tyk native API definition: `service_discovery.query_endpoint`.
+Tyk native API definition: `service_discovery.query_endpoint`.
 
 - **`dataPath`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  DataPath is the namespace of the data path - where exactly in your service response the namespace can be found.
+DataPath is the namespace of the data path - where exactly in your service response the namespace can be found.
+For example, if your service responds with:
 
-  For example, if your service responds with:
 
-  ```
+```
+{
+ "action": "get",
+ "node": {
+   "key": "/services/single",
+   "value": "http://httpbin.org:6000",
+   "modifiedIndex": 6,
+   "createdIndex": 6
+ }
+}
 
-  {
+```
 
-  "action": "get",
+then your namespace would be `node.value`.
 
-  "node": {
-
-  "key": "/services/single",
-
-  "value": "http://httpbin.org:6000",
-
-  "modifiedIndex": 6,
-
-  "createdIndex": 6
-
-  }
-
-  }
-
-  ```
-
-  then your namespace would be `node.value`.
-
-  Tyk native API definition: `service_discovery.data_path`.
+Tyk native API definition: `service_discovery.data_path`.
 
 - **`useNestedQuery`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  UseNestedQuery enables using a combination of `dataPath` and `parentDataPath`.
+UseNestedQuery enables using a combination of `dataPath` and `parentDataPath`.
+It is necessary when the data lives within this string-encoded JSON object.
 
-  It is necessary when the data lives within this string-encoded JSON object.
 
-  ```
+```
+{
+ "action": "get",
+ "node": {
+   "key": "/services/single",
+   "value": "{"hostname": "http://httpbin.org", "port": "80"}",
+   "modifiedIndex": 6,
+   "createdIndex": 6
+ }
+}
 
-  {
+```
 
-  "action": "get",
 
-  "node": {
-
-  "key": "/services/single",
-
-  "value": "{"hostname": "http://httpbin.org", "port": "80"}",
-
-  "modifiedIndex": 6,
-
-  "createdIndex": 6
-
-  }
-
-  }
-
-  ```
-
-  Tyk native API definition: `service_discovery.use_nested_query`.
+Tyk native API definition: `service_discovery.use_nested_query`.
 
 - **`parentDataPath`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  ParentDataPath is the namespace of the where to find the nested value, if `useNestedQuery` is `true`. In the above example, it would be `node.value`. You would change the `dataPath` setting to be `hostname`, since this is where the host name data resides in the JSON string. Tyk automatically assumes that `dataPath` in this case is in a string-encoded JSON object and will try to deserialize it.
+ParentDataPath is the namespace of the where to find the nested value, if `useNestedQuery` is `true`. In the above example, it would be `node.value`. You would change the `dataPath` setting to be `hostname`, since this is where the host name data resides in the JSON string. Tyk automatically assumes that `dataPath` in this case is in a string-encoded JSON object and will try to deserialize it.
 
-  Tyk native API definition: `service_discovery.parent_data_path`.
+Tyk native API definition: `service_discovery.parent_data_path`.
 
 - **`portDataPath`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  PortDataPath is the port of the data path. In the above nested example, we can see that there is a separate `port` value for the service in the nested JSON. In this case, you can set the `portDataPath` value and Tyk will treat `dataPath` as the hostname and zip them together (this assumes that the hostname element does not end in a slash or resource identifier such as `/widgets/`). In the above example, the `portDataPath` would be `port`.
+PortDataPath is the port of the data path. In the above nested example, we can see that there is a separate `port` value for the service in the nested JSON. In this case, you can set the `portDataPath` value and Tyk will treat `dataPath` as the hostname and zip them together (this assumes that the hostname element does not end in a slash or resource identifier such as `/widgets/`). In the above example, the `portDataPath` would be `port`.
 
-  Tyk native API definition: `service_discovery.port_data_path`.
+Tyk native API definition: `service_discovery.port_data_path`.
 
 - **`useTargetList`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  UseTargetList should be set to `true`, if you are using load balancing. Tyk will treat the data path as a list and inject it into the target list of your API definition.
+UseTargetList should be set to `true`, if you are using load balancing. Tyk will treat the data path as a list and inject it into the target list of your API definition.
 
-  Tyk native API definition: `service_discovery.use_target_list`.
+Tyk native API definition: `service_discovery.use_target_list`.
 
 - **`cacheTimeout`**
 
-  **Type: `int`**
+**Type: `int`**
 
-  CacheTimeout is the timeout of a cache value when a new data is loaded from a discovery service.
+CacheTimeout is the timeout of a cache value when a new data is loaded from a discovery service.
+Setting it too low will cause Tyk to call the SD service too often, setting it too high could mean that failures are not recovered from quickly enough.
 
-  Setting it too low will cause Tyk to call the SD service too often, setting it too high could mean that failures are not recovered from quickly enough.
-
-  Tyk native API definition: `service_discovery.cache_timeout`.
+Tyk native API definition: `service_discovery.cache_timeout`.
 
 - **`targetPath`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  TargetPath is to set a target path to append to the discovered endpoint, since many SD services only provide host and port data. It is important to be able to target a specific resource on that host.
+TargetPath is to set a target path to append to the discovered endpoint, since many SD services only provide host and port data. It is important to be able to target a specific resource on that host.
+Setting this value will enable that.
 
-  Setting this value will enable that.
-
-  Tyk native API definition: `service_discovery.target_path`.
+Tyk native API definition: `service_discovery.target_path`.
 
 - **`endpointReturnsList`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  EndpointReturnsList is set `true` when the response type is a list instead of an object.
+EndpointReturnsList is set `true` when the response type is a list instead of an object.
 
-  Tyk native API definition: `service_discovery.endpoint_returns_list`.
+Tyk native API definition: `service_discovery.endpoint_returns_list`.
 
 
 ### **Test**
 
 - **`serviceDiscovery`**
 
-  **Type: [ServiceDiscovery](#servicediscovery)**
+**Type: [ServiceDiscovery](#servicediscovery)**
 
-  ServiceDiscovery contains the configuration related to test Service Discovery.
+ServiceDiscovery contains the configuration related to test Service Discovery.
 
-  Tyk native API definition: `proxy.service_discovery`.
+Tyk native API definition: `proxy.service_discovery`.
 
 
 ### **MutualTLS**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables/disables upstream mutual TLS auth for the API.
+Enabled enables/disables upstream mutual TLS auth for the API.
 
-  Tyk native API definition: `upstream_certificates_disabled`.
+Tyk native API definition: `upstream_certificates_disabled`.
 
 - **`domainToCertificateMapping`**
 
-  **Type: `[]`[DomainToCertificate](#domaintocertificate)**
+**Type: `[]`[DomainToCertificate](#domaintocertificate)**
 
-  DomainToCertificate maintains the mapping of domain to certificate.
+DomainToCertificates maintains the mapping of domain to certificate.
 
-  Tyk native API definition: `upstream_certificates`.
+Tyk native API definition: `upstream_certificates`.
 
 
 ### **DomainToCertificate**
 
 - **`domain`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  The domain name.
+Domain contains the domain name.
 
 - **`certificate`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  The certificate mapped to the domain.
+Certificate contains the certificate mapped to the domain.
 
 
 ### **CertificatePinning**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  If set to `true`, it enables certificate pinning for the API.
+Enabled is a boolean flag, if set to `true`, it enables certificate pinning for the API.
 
-  Tyk native API definition: `certificate_pinning_disabled`.
+Tyk native API definition: `certificate_pinning_disabled`.
 
 - **`domainToPublicKeysMapping`**
 
-  **Type: `[]`[PinnedPublicKey](#pinnedpublickey)**
+**Type: `[]`[PinnedPublicKey](#pinnedpublickey)**
 
-  DomainToPublicKeysMapping maintains the mapping of domain to pinned public keys.
+DomainToPublicKeysMapping maintains the mapping of domain to pinned public keys.
 
-  Tyk native API definition: `pinned_public_keys`.
+Tyk native API definition: `pinned_public_keys`.
 
 
 ### **PinnedPublicKey**
 
 - **`domain`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  The domain name.
+Domain contains the domain name.
 
 - **`publicKeys`**
 
-  **Type: `[]string`**
+**Type: `[]string`**
 
-  The public keys pinned to the domain name.
+PublicKeys contains a list of the public keys pinned to the domain name.
 
 
 ### **Server**
 
 - **`listenPath`**
 
-  **Type: [ListenPath](#listenpath)**
+**Type: [ListenPath](#listenpath)**
 
-  ListenPath represents the path to listen on. Any requests coming into the host, on the port that Tyk is configured to run on, that match this path will have the rules defined in the API definition applied.
+ListenPath represents the path to listen on. Any requests coming into the host, on the port that Tyk is configured to run on, that match this path will have the rules defined in the API definition applied.
 
 - **`slug`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Slug is the Tyk Cloud equivalent of listen path.
+Slug is the Tyk Cloud equivalent of listen path.
 
-  Tyk native API definition: `slug`.
+Tyk native API definition: `slug`.
 
 - **`authentication`**
 
-  **Type: [Authentication](#authentication)**
+**Type: [Authentication](#authentication)**
 
-  Authentication contains the configurations related to authentication to the API.
+Authentication contains the configurations related to authentication to the API.
 
 - **`clientCertificates`**
 
-  **Type: [ClientCertificates](#clientcertificates)**
+**Type: [ClientCertificates](#clientcertificates)**
 
-  ClientCertificates contains the configurations related to static mTLS.
+ClientCertificates contains the configurations related to static mTLS.
 
 - **`gatewayTags`**
 
-  **Type: [GatewayTags](#gatewaytags)**
+**Type: [GatewayTags](#gatewaytags)**
 
-  GatewayTags contains segment tags to configure which GWs your APIs connect to.
+GatewayTags contains segment tags to configure which GWs your APIs connect to.
 
 - **`customDomain`**
 
-  **Type: [Domain](#domain)**
+**Type: [Domain](#domain)**
 
-  CustomDomain is the domain to bind this API to.
+CustomDomain is the domain to bind this API to.
 
-  Tyk native API definition: `domain`.
+Tyk native API definition: `domain`.
 
 
 ### **ListenPath**
 
 - **`value`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Value is the value of the listen path e.g. `/api/` or `/` or `/httpbin/`.
+Value is the value of the listen path e.g. `/api/` or `/` or `/httpbin/`.
 
-  Tyk native API definition: `proxy.listen_path`.
+Tyk native API definition: `proxy.listen_path`.
 
 - **`strip`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Strip removes the inbound listen path in the outgoing request. e.g. `http://acme.com/httpbin/get` where `httpbin`is the listen path. The `httpbin` listen path which is used to identify the API loaded in Tyk is removed, and the outbound request would be `http://httpbin.org/get`.
+Strip removes the inbound listen path in the outgoing request. e.g. `http://acme.com/httpbin/get` where `httpbin`is the listen path. The `httpbin` listen path which is used to identify the API loaded in Tyk is removed, and the outbound request would be `http://httpbin.org/get`.
 
-  Tyk native API definition: `proxy.strip_listen_path`.
+Tyk native API definition: `proxy.strip_listen_path`.
 
 
 ### **Authentication**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled makes the API protected when one of the authentication modes is enabled.
+Enabled makes the API protected when one of the authentication modes is enabled.
 
-  Tyk native API definition: `!use_keyless`.
+Tyk native API definition: `!use_keyless`.
 
 - **`stripAuthorizationData`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  StripAuthorizationData ensures that any security tokens used for accessing APIs are stripped and not leaked to the upstream.
+StripAuthorizationData ensures that any security tokens used for accessing APIs are stripped and not leaked to the upstream.
 
-  Tyk native API definition: `strip_auth_data`.
+Tyk native API definition: `strip_auth_data`.
 
 - **`baseIdentityProvider`**
 
-  **Type: `object`**
+**Type: `object`**
 
-  BaseIdentityProvider enables multi authentication mechanism and provides the session object that determines rate limits, ACL rules and quotas.
+BaseIdentityProvider enables multi authentication mechanism and provides the session object that determines rate limits, ACL rules and quotas.
+It should be set to one of the following:
 
-  It should be set to one of the following:
+- `auth_token`,
+- `hmac_key`,
+- `basic_auth_user`,
+- `jwt_claim`,
+- `oidc_user`,
+- `oauth_key`.
 
-  - `auth_token`
 
-  - `hmac_key`
-
-  - `basic_auth_user`
-
-  - `jwt_claim`
-
-  - `oidc_user`
-
-  - `oauth_key`
-
-  Tyk native API definition: `base_identity_provided_by`.
+Tyk native API definition: `base_identity_provided_by`.
 
 - **`hmac`**
 
-  **Type: [HMAC](#hmac)**
+**Type: [HMAC](#hmac)**
 
-  HMAC contains the configurations related to HMAC authentication mode.
+HMAC contains the configurations related to HMAC authentication mode.
 
-  Tyk native API definition: `auth_configs["hmac"]`.
+Tyk native API definition: `auth_configs["hmac"]`.
 
 - **`oidc`**
 
-  **Type: [OIDC](#oidc)**
+**Type: [OIDC](#oidc)**
 
-  OIDC contains the configurations related to OIDC authentication mode.
+OIDC contains the configurations related to OIDC authentication mode.
 
-  Tyk native API definition: `auth_configs["oidc"]`.
+Tyk native API definition: `auth_configs["oidc"]`.
 
 - **`goPlugin`**
 
-  **Type: [GoPlugin](#goplugin)**
+**Type: [GoPlugin](#goplugin)**
 
-  GoPlugin contains the configurations related to GoPlugin authentication mode.
+GoPlugin contains the configurations related to GoPlugin authentication mode.
 
 - **`customPlugin`**
 
-  **Type: [CustomPlugin](#customplugin)**
+**Type: [CustomPlugin](#customplugin)**
 
-  CustomPlugin contains the configurations related to CustomPlugin authentication mode.
+CustomPlugin contains the configurations related to CustomPlugin authentication mode.
 
-  Tyk native API definition: `auth_configs["coprocess"]`.
+Tyk native API definition: `auth_configs["coprocess"]`.
 
 - **`securitySchemes`**
 
-  **Type: `map[string]any`**
+**Type: `map[string]any`**
 
-  SecuritySchemes contains security schemes definitions.
+SecuritySchemes contains security schemes definitions.
 
 
 ### **HMAC**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables the HMAC authentication mode.
+Enabled enables the HMAC authentication mode.
 
-  Tyk native API definition: `enable_signature_checking`.
+Tyk native API definition: `enable_signature_checking`.
 
 - **`header`**
 
-  **Type: [AuthSource](#authsource)**
+**Type: [AuthSource](#authsource)**
 
-  Header contains configurations of the header auth source, it is enabled by default.
+Header contains configurations for the header value auth source, it is enabled by default.
 
-  Tyk native API definition: `auth_configs[x].header`.
+Tyk native API definition: `auth_configs[x].header`.
 
 - **`cookie`**
 
-  **Type: [AuthSource](#authsource)**
+**Type: [AuthSource](#authsource)**
 
-  Cookie contains configurations of the cookie auth source.
+Cookie contains configurations for the cookie value auth source.
 
-  Tyk native API definition: `auth_configs[x].cookie`.
+Tyk native API definition: `auth_configs[x].cookie`.
 
 - **`query`**
 
-  **Type: [AuthSource](#authsource)**
+**Type: [AuthSource](#authsource)**
 
-  Param contains configurations of the param auth source.
+Query contains configurations for the query parameters auth source.
 
-  Tyk native API definition: `auth_configs[x].query`.
+Tyk native API definition: `auth_configs[x].query`.
 
 - **`allowedAlgorithms`**
 
-  **Type: `[]string`**
+**Type: `[]string`**
 
-  AllowedAlgorithms is the array of HMAC algorithms which are allowed. Tyk supports the following HMAC algorithms:
+AllowedAlgorithms is the array of HMAC algorithms which are allowed. Tyk supports the following HMAC algorithms:
 
-  - `hmac-sha1`
+- `hmac-sha1`
+- `hmac-sha256`
+- `hmac-sha384`
+- `hmac-sha512`
 
-  - `hmac-sha256`
+and reads the value from algorithm header.
 
-  - `hmac-sha384`
-
-  - `hmac-sha512`
-
-  and reads the value from algorithm header.
-
-  Tyk native API definition: `hmac_allowed_algorithms`.
+Tyk native API definition: `hmac_allowed_algorithms`.
 
 - **`allowedClockSkew`**
 
-  **Type: `double`**
+**Type: `double`**
 
-  AllowedClockSkew is the amount of milliseconds that will be tolerated for clock skew. It is used against replay attacks.
+AllowedClockSkew is the amount of milliseconds that will be tolerated for clock skew. It is used against replay attacks.
+The default value is `0`, which deactivates clock skew checks.
 
-  The default value is `0`, which deactivates clock skew checks.
-
-  Tyk native API definition: `hmac_allowed_clock_skew`.
+Tyk native API definition: `hmac_allowed_clock_skew`.
 
 
 ### **AuthSources**
 
 - **`header`**
 
-  **Type: [AuthSource](#authsource)**
+**Type: [AuthSource](#authsource)**
 
-  Header contains configurations of the header auth source, it is enabled by default.
+Header contains configurations for the header value auth source, it is enabled by default.
 
-  Tyk native API definition: `auth_configs[x].header`.
+Tyk native API definition: `auth_configs[x].header`.
 
 - **`cookie`**
 
-  **Type: [AuthSource](#authsource)**
+**Type: [AuthSource](#authsource)**
 
-  Cookie contains configurations of the cookie auth source.
+Cookie contains configurations for the cookie value auth source.
 
-  Tyk native API definition: `auth_configs[x].cookie`.
+Tyk native API definition: `auth_configs[x].cookie`.
 
 - **`query`**
 
-  **Type: [AuthSource](#authsource)**
+**Type: [AuthSource](#authsource)**
 
-  Param contains configurations of the param auth source.
+Query contains configurations for the query parameters auth source.
 
-  Tyk native API definition: `auth_configs[x].query`.
+Tyk native API definition: `auth_configs[x].query`.
 
 
 ### **AuthSource**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables the auth source.
+Enabled enables the auth source.
 
-  Tyk native API definition: `auth_configs[X].use_param/use_cookie`.
+Tyk native API definition: `auth_configs[X].use_param/use_cookie`.
 
 - **`name`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Name is the name of the auth source.
+Name is the name of the auth source.
 
-  Tyk native API definition: `auth_configs[X].param_name/cookie_name`.
+Tyk native API definition: `auth_configs[X].param_name/cookie_name`.
 
 
 ### **OIDC**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables the OIDC authentication mode.
+Enabled enables the OIDC authentication mode.
 
-  Tyk native API definition: `use_openid`.
+Tyk native API definition: `use_openid`.
 
 - **`header`**
 
-  **Type: [AuthSource](#authsource)**
+**Type: [AuthSource](#authsource)**
 
-  Header contains configurations of the header auth source, it is enabled by default.
+Header contains configurations for the header value auth source, it is enabled by default.
 
-  Tyk native API definition: `auth_configs[x].header`.
+Tyk native API definition: `auth_configs[x].header`.
 
 - **`cookie`**
 
-  **Type: [AuthSource](#authsource)**
+**Type: [AuthSource](#authsource)**
 
-  Cookie contains configurations of the cookie auth source.
+Cookie contains configurations for the cookie value auth source.
 
-  Tyk native API definition: `auth_configs[x].cookie`.
+Tyk native API definition: `auth_configs[x].cookie`.
 
 - **`query`**
 
-  **Type: [AuthSource](#authsource)**
+**Type: [AuthSource](#authsource)**
 
-  Param contains configurations of the param auth source.
+Query contains configurations for the query parameters auth source.
 
-  Tyk native API definition: `auth_configs[x].query`.
+Tyk native API definition: `auth_configs[x].query`.
 
 - **`segregateByClientId`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  SeggregateByClientId: If set to `true, the policies will be applied to a combination of Client ID and User ID.
+SegregateByClientId is a boolean flag. If set to `true, the policies will be applied to a combination of Client ID and User ID.
 
-  Tyk native API definition: `openid_options.segregate_by_client`.
+Tyk native API definition: `openid_options.segregate_by_client`.
 
 - **`providers`**
 
-  **Type: `[]`[Provider](#provider)**
+**Type: `[]`[Provider](#provider)**
 
-  Providers contains a list of authorised providers and their Client IDs, and matched policies.
+Providers contains a list of authorised providers and their Client IDs, and matched policies.
 
-  Tyk native API definition: `openid_options.providers`.
+Tyk native API definition: `openid_options.providers`.
 
 - **`scopes`**
 
-  **Type: [Scopes](#scopes)**
+**Type: [Scopes](#scopes)**
 
-  Scopes contains the defined scope claims.
+Scopes contains the defined scope claims.
 
 
 ### **Provider**
 
 - **`issuer`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  The issuer to validate, usually a domain name e.g. `accounts.google.com` or similar.
+Issuer contains a validation value for the issuer claim, usually a domain name e.g. `accounts.google.com` or similar.
 
 - **`clientToPolicyMapping`**
 
-  **Type: `[]`[ClientToPolicy](#clienttopolicy)**
+**Type: `[]`[ClientToPolicy](#clienttopolicy)**
 
-  Client ID to Policy ID mappings.
+ClientToPolicyMapping contains mappings of Client IDs to Policy IDs.
 
 
 ### **ClientToPolicy**
 
 - **`clientId`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Client ID.
+ClientID contains a Client ID.
 
 - **`policyId`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Policy ID.
+PolicyID contains a Policy ID.
 
 
 ### **Scopes**
 
 - **`claimName`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Claim name.
+ClaimName contains the claim name.
 
 - **`scopeToPolicyMapping`**
 
-  **Type: `[]`[ScopeToPolicy](#scopetopolicy)**
+**Type: `[]`[ScopeToPolicy](#scopetopolicy)**
 
-  Scope to policy mapping.
+ScopeToPolicyMapping contains the mappings of scopes to policy IDs.
 
 
 ### **ScopeToPolicy**
 
 - **`scope`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Scope name.
+Scope contains the scope name.
 
 - **`policyId`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Policy ID.
+PolicyID contains the Policy ID.
 
 
 ### **GoPlugin**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables the GoPlugin authentication mode.
+Enabled enables the GoPlugin authentication mode.
 
-  Tyk native API definition: `use_go_plugin_auth`.
+Tyk native API definition: `use_go_plugin_auth`.
 
 
 ### **CustomPlugin**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables the CustomPlugin authentication mode.
+Enabled enables the CustomPlugin authentication mode.
 
-  Tyk native API definition: `enable_coprocess_auth`.
+Tyk native API definition: `enable_coprocess_auth`.
 
 - **`header`**
 
-  **Type: [AuthSource](#authsource)**
+**Type: [AuthSource](#authsource)**
 
-  Header contains configurations of the header auth source, it is enabled by default.
+Header contains configurations for the header value auth source, it is enabled by default.
 
-  Tyk native API definition: `auth_configs[x].header`.
+Tyk native API definition: `auth_configs[x].header`.
 
 - **`cookie`**
 
-  **Type: [AuthSource](#authsource)**
+**Type: [AuthSource](#authsource)**
 
-  Cookie contains configurations of the cookie auth source.
+Cookie contains configurations for the cookie value auth source.
 
-  Tyk native API definition: `auth_configs[x].cookie`.
+Tyk native API definition: `auth_configs[x].cookie`.
 
 - **`query`**
 
-  **Type: [AuthSource](#authsource)**
+**Type: [AuthSource](#authsource)**
 
-  Param contains configurations of the param auth source.
+Query contains configurations for the query parameters auth source.
 
-  Tyk native API definition: `auth_configs[x].query`.
+Tyk native API definition: `auth_configs[x].query`.
 
 
 ### **ClientCertificates**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables static mTLS for the API.
+Enabled enables static mTLS for the API.
 
 - **`allowlist`**
 
-  **Type: `[]string`**
+**Type: `[]string`**
 
-  AllowList is the list of client certificates which are allowed.
+Allowlist is the list of client certificates which are allowed.
 
 
 ### **GatewayTags**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables use of segment tags.
+Enabled enables use of segment tags.
 
 - **`tags`**
 
-  **Type: `[]string`**
+**Type: `[]string`**
 
-  Tags is a list of segment tags 
+Tags is a list of segment tags
 
 
 ### **Domain**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled allow/disallow the usage of the domain.
+Enabled allow/disallow the usage of the domain.
 
 - **`name`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Name is the name of the domain.
+Name is the name of the domain.
 
 
 ### **Middleware**
 
 - **`global`**
 
-  **Type: [Global](#global)**
+**Type: [Global](#global)**
 
-  Global contains the configurations related to the global middleware.
+Global contains the configurations related to the global middleware.
 
 - **`operations`**
 
-  **Type: `map[string]`[Operation](#operation)**
+**Type: `map[string]`[Operation](#operation)**
 
-  Operations configuration.
+Operations configuration.
 
 
 ### **Global**
 
 - **`cors`**
 
-  **Type: [CORS](#cors)**
+**Type: [CORS](#cors)**
 
-  CORS contains the configuration related to cross origin resource sharing.
+CORS contains the configuration related to cross origin resource sharing.
 
-  Tyk native API definition: `CORS`.
+Tyk native API definition: `CORS`.
 
 - **`cache`**
 
-  **Type: [Cache](#cache)**
+**Type: [Cache](#cache)**
 
-  Cache contains the configurations related to caching.
+Cache contains the configurations related to caching.
 
-  Tyk native API definition: `cache_options`.
+Tyk native API definition: `cache_options`.
 
 
 ### **CORS**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled: If set to `true`, this option turns CORS processing on or off.
+Enabled is a boolean flag, if set to `true`, this option enables CORS processing.
 
-  Tyk native API definition: `CORS.enable`.
+Tyk native API definition: `CORS.enable`.
 
 - **`maxAge`**
 
-  **Type: `int`**
+**Type: `int`**
 
-  MaxAge indicates how long (in seconds) the results of a preflight request can be cached. The default is 0 which stands for no max age.
+MaxAge indicates how long (in seconds) the results of a preflight request can be cached. The default is 0 which stands for no max age.
 
-  Tyk native API definition: `CORS.max_age`.
+Tyk native API definition: `CORS.max_age`.
 
 - **`allowCredentials`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  AllowCredentials indicates whether the request can include user credentials like cookies, HTTP authentication or client side SSL certificates.
+AllowCredentials indicates whether the request can include user credentials like cookies, HTTP authentication or client side SSL certificates.
 
-  Tyk native API definition: `CORS.allow_credentials`.
+Tyk native API definition: `CORS.allow_credentials`.
 
 - **`exposedHeaders`**
 
-  **Type: `[]string`**
+**Type: `[]string`**
 
-  ExposedHeaders indicates which headers are safe to expose to the API of a CORS API specification.
+ExposedHeaders indicates which headers are safe to expose to the API of a CORS API specification.
 
-  Tyk native API definition: `CORS.exposed_headers`.
+Tyk native API definition: `CORS.exposed_headers`.
 
 - **`allowedHeaders`**
 
-  **Type: `[]string`**
+**Type: `[]string`**
 
-  AllowedHeaders holds a list of non simple headers the client is allowed to use with cross-domain requests.
+AllowedHeaders holds a list of non simple headers the client is allowed to use with cross-domain requests.
 
-  Tyk native API definition: `CORS.allowed_headers`.
+Tyk native API definition: `CORS.allowed_headers`.
 
 - **`optionsPassthrough`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  OptionsPassthrough: If set to `true`, allow CORS OPTIONS preflight request to be proxied directly to upstream, without authentication and rest of checks. This means that pre-flight requests generated by web-clients such as SwaggerUI or the Tyk Portal documentation system will be able to test the API using trial keys.
+OptionsPassthrough is a boolean flag. If set to `true`, it will proxy the CORS OPTIONS pre-flight request directly to upstream, without authentication and any CORS checks. This means that pre-flight requests generated by web-clients such as SwaggerUI or the Tyk Portal documentation system will be able to test the API using trial keys.
+If your service handles CORS natively, then enable this option.
 
-  If your service handles CORS natively, then enable this option.
-
-  Tyk native API definition: `CORS.options_passthrough`.
+Tyk native API definition: `CORS.options_passthrough`.
 
 - **`debug`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Debug: If set to `true`, this option produces log files for the CORS middleware.
+Debug is a boolean flag, If set to `true`, this option produces log files for the CORS middleware.
 
-  Tyk native API definition: `CORS.debug`.
+Tyk native API definition: `CORS.debug`.
 
 - **`allowedOrigins`**
 
-  **Type: `[]string`**
+**Type: `[]string`**
 
-  AllowedOrigins holds a list of origin domains to allow access from. Wildcards are also supported, e.g. `http://*.foo.com`.
+AllowedOrigins holds a list of origin domains to allow access from. Wildcards are also supported, e.g. `http://*.foo.com`.
 
-  Tyk native API definition: `CORS.allowed_origins`.
+Tyk native API definition: `CORS.allowed_origins`.
 
 - **`allowedMethods`**
 
-  **Type: `[]string`**
+**Type: `[]string`**
 
-  AllowedMethods holds a list of methods to allow access via.
+AllowedMethods holds a list of methods to allow access via.
 
-  Tyk native API definition: `CORS.allowed_methods`.
+Tyk native API definition: `CORS.allowed_methods`.
 
 
 ### **Cache**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled turns global cache middleware on or off. It is still possible to enable caching on a per-path basis by explicitly setting the endpoint cache middleware.
+Enabled turns global cache middleware on or off. It is still possible to enable caching on a per-path basis by explicitly setting the endpoint cache middleware.
 
-  Tyk native API definition: `cache_options.enable_cache`.
+Tyk native API definition: `cache_options.enable_cache`.
 
 - **`timeout`**
 
-  **Type: `int`**
+**Type: `int`**
 
-  Timeout is the TTL for a cached object in seconds.
+Timeout is the TTL for a cached object in seconds.
 
-  Tyk native API definition: `cache_options.cache_timeout`.
+Tyk native API definition: `cache_options.cache_timeout`.
 
 - **`cacheAllSafeRequests`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  CacheAllSafeRequests caches responses to (`GET`, `HEAD`, `OPTIONS`) requests overrides per-path cache settings in versions, applies across versions.
+CacheAllSafeRequests caches responses to (`GET`, `HEAD`, `OPTIONS`) requests overrides per-path cache settings in versions, applies across versions.
 
-  Tyk native API definition: `cache_options.cache_all_safe_requests`.
+Tyk native API definition: `cache_options.cache_all_safe_requests`.
 
 - **`cacheResponseCodes`**
 
-  **Type: `[]int`**
+**Type: `[]int`**
 
-  CacheResponseCodes is an array of response codes which are safe to cache e.g. `404`.
+CacheResponseCodes is an array of response codes which are safe to cache e.g. `404`.
 
-  Tyk native API definition: `cache_options.cache_response_codes`.
+Tyk native API definition: `cache_options.cache_response_codes`.
 
 - **`cacheByHeaders`**
 
-  **Type: `[]string`**
+**Type: `[]string`**
 
-  CacheByHeaders allows header values to be used as part of the cache key.
+CacheByHeaders allows header values to be used as part of the cache key.
 
-  Tyk native API definition: `cache_options.cache_by_headers`.
+Tyk native API definition: `cache_options.cache_by_headers`.
 
 - **`enableUpstreamCacheControl`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  EnableUpstreamCacheControl instructs Tyk Cache to respect upstream cache control headers.
+EnableUpstreamCacheControl instructs Tyk Cache to respect upstream cache control headers.
 
-  Tyk native API definition: `cache_options.enable_upstream_cache_control`.
+Tyk native API definition: `cache_options.enable_upstream_cache_control`.
 
 - **`controlTTLHeaderName`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  ControlTTLHeaderName is the response header which tells Tyk how long it is safe to cache the response for.
+ControlTTLHeaderName is the response header which tells Tyk how long it is safe to cache the response for.
 
-  Tyk native API definition: `cache_options.cache_control_ttl_header`.
+Tyk native API definition: `cache_options.cache_control_ttl_header`.
 
 
 ### **Operation**
 
 - **`allow`**
 
-  **Type: [Allowance](#allowance)**
+**Type: [Allowance](#allowance)**
 
-  Allow request by allowance.
+Allow request by allowance.
 
 - **`block`**
 
-  **Type: [Allowance](#allowance)**
+**Type: [Allowance](#allowance)**
 
-  Block request by allowance.
+Block request by allowance.
 
 - **`ignoreAuthentication`**
 
-  **Type: [Allowance](#allowance)**
+**Type: [Allowance](#allowance)**
 
-  Ignore authentication on request by allowance.
+IgnoreAuthentication ignores authentication on request by allowance.
 
 - **`transformRequestMethod`**
 
-  **Type: [TransformRequestMethod](#transformrequestmethod)**
+**Type: [TransformRequestMethod](#transformrequestmethod)**
 
-  TransformRequestMethod allows you to transform the method of a request.
+TransformRequestMethod allows you to transform the method of a request.
 
 - **`transformRequestBody`**
 
-  **Type: [TransformRequestBody](#transformrequestbody)**
+**Type: [TransformRequestBody](#transformrequestbody)**
 
-  TransformRequestBody allows you to transform request body.
-
-  When both `path` and `body` are provided, body would take precedence.
+TransformRequestBody allows you to transform request body.
+When both `path` and `body` are provided, body would take precedence.
 
 - **`cache`**
 
-  **Type: [CachePlugin](#cacheplugin)**
+**Type: [CachePlugin](#cacheplugin)**
 
-  Cache contains the caching plugin configuration.
+Cache contains the caching plugin configuration.
 
 - **`enforceTimeout`**
 
-  **Type: [EnforceTimeout](#enforcetimeout)**
+**Type: [EnforceTimeout](#enforcetimeout)**
 
-  EnforceTimeout contains the request timeout configuration.
+EnforceTimeout contains the request timeout configuration.
 
 - **`validateRequest`**
 
-  **Type: [ValidateRequest](#validaterequest)**
+**Type: [ValidateRequest](#validaterequest)**
 
-  ValidateRequest contains the request validation configuration.
+ValidateRequest contains the request validation configuration.
 
 - **`mockResponse`**
 
-  **Type: [MockResponse](#mockresponse)**
+**Type: [MockResponse](#mockresponse)**
 
-  MockResponse contains the mock response configuration.
+MockResponse contains the mock response configuration.
 
 
 ### **Allowance**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  If set to `true`, then individual allowances (allow, block, ignore) will be enforced.
+Enabled is a boolean flag, if set to `true`, then individual allowances (allow, block, ignore) will be enforced.
 
 - **`ignoreCase`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  If set to `true`, requests allowance will be case insensitive.
+IgnoreCase is a boolean flag, If set to `true`, checks for requests allowance will be case insensitive.
 
 
 ### **TransformRequestMethod**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables Method Transform for the given path and method.
+Enabled enables Method Transform for the given path and method.
 
 - **`toMethod`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  ToMethod is the http method value to which the method of an incoming request will be transformed.
+ToMethod is the http method value to which the method of an incoming request will be transformed.
 
 
 ### **TransformRequestBody**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables transform request body middleware.
+Enabled enables transform request body middleware.
 
 - **`format`**
 
-  **Type: `object`**
+**Type: `object`**
 
-  Format of the request body, xml or json.
+Format of the request body, xml or json.
 
 - **`path`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Path file path for the template.
+Path file path for the template.
 
 - **`body`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Body base64 encoded representation of the template.
+Body base64 encoded representation of the template.
 
 
 ### **CachePlugin**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  If set to `true`, the advanced caching plugin will be enabled.
+Enabled is a boolean flag. If set to `true`, the advanced caching plugin will be enabled.
 
 - **`cacheByRegex`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Cache by regex matches the request body to produce a cache key.
-
-  Example value: `\"id\":[^,]*` (quoted json value).
+CacheByRegex defines a regular expression used against the request body to produce a cache key.
+Example value: `\"id\":[^,]*` (quoted json value).
 
 - **`cacheResponseCodes`**
 
-  **Type: `[]int`**
+**Type: `[]int`**
 
-  Only response codes listed here will be considered for caching.
+CacheResponseCodes contains a list of valid response codes for responses that are okay to add to the cache.
 
 
 ### **EnforceTimeout**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  If set to `true`, requests will enforce a timeout.
+Enabled is a boolean flag. If set to `true`, requests will enforce a configured timeout.
 
 - **`value`**
 
-  **Type: `int`**
+**Type: `int`**
 
-  Enforced timeout value in seconds.
+Value is the configured timeout in seconds.
 
 
 ### **ValidateRequest**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  If set to `true`, it enables request validation.
+Enabled is a boolean flag, if set to `true`, it enables request validation.
 
 - **`errorResponseCode`**
 
-  **Type: `int`**
+**Type: `int`**
 
-  If request fails validation, this will be the error code emitted.
-
-  If unset or zero, the response will return with http status 422 Unprocessable Entity.
+ErrorResponseCode is the error code emitted when the request fails validation.
+If unset or zero, the response will returned with http status 422 Unprocessable Entity.
 
 
 ### **MockResponse**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables the mock response middleware.
+Enabled enables the mock response middleware.
 
 - **`code`**
 
-  **Type: `int`**
+**Type: `int`**
 
-  Code is the HTTP response code that will be returned.
+Code is the HTTP response code that will be returned.
 
 - **`body`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Body is the HTTP response body that will be returned.
+Body is the HTTP response body that will be returned.
 
 - **`headers`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  Headers are the HTTP response headers that will be returned.
+Headers are the HTTP response headers that will be returned.
 
 - **`fromOASExamples`**
 
-  **Type: [FromOASExamples](#fromoasexamples)**
+**Type: [FromOASExamples](#fromoasexamples)**
 
-  FromOASExamples is the configuration to extract a mock response from OAS documentation.
+FromOASExamples is the configuration to extract a mock response from OAS documentation.
 
 
 ### **FromOASExamples**
 
 - **`enabled`**
 
-  **Type: `boolean`**
+**Type: `boolean`**
 
-  Enabled enables getting a mock response from OAS examples or schemas documented in OAS.
+Enabled enables getting a mock response from OAS examples or schemas documented in OAS.
 
 - **`code`**
 
-  **Type: `int`**
+**Type: `int`**
 
-  Code is the default HTTP response code that the gateway reads from the path responses documented in OAS.
+Code is the default HTTP response code that the gateway reads from the path responses documented in OAS.
 
 - **`contentType`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  ContentType is the default HTTP response body type that the gateway reads from the path responses documented in OAS.
+ContentType is the default HTTP response body type that the gateway reads from the path responses documented in OAS.
 
 - **`exampleName`**
 
-  **Type: `string`**
+**Type: `string`**
 
-  ExampleName is the default example name among multiple path response examples documented in OAS.
+ExampleName is the default example name among multiple path response examples documented in OAS.
 
 

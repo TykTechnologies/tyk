@@ -24,14 +24,14 @@ type Authentication struct {
 	// BaseIdentityProvider enables multi authentication mechanism and provides the session object that determines rate limits, ACL rules and quotas.
 	// It should be set to one of the following:
 	//
-	// - `auth_token`
-	// - `hmac_key`
-	// - `basic_auth_user`
-	// - `jwt_claim`
-	// - `oidc_user`
-	// - `oauth_key`
+	// - `auth_token`,
+	// - `hmac_key`,
+	// - `basic_auth_user`,
+	// - `jwt_claim`,
+	// - `oidc_user`,
+	// - `oauth_key`.
 	//
-	// Tyk native API definition: `base_identity_provided_by`
+	// Tyk native API definition: `base_identity_provided_by`.
 	BaseIdentityProvider apidef.AuthTypeEnum `bson:"baseIdentityProvider,omitempty" json:"baseIdentityProvider,omitempty"`
 
 	// HMAC contains the configurations related to HMAC authentication mode.
@@ -250,15 +250,21 @@ func (ss SecuritySchemes) GetBaseIdentityProvider() (res apidef.AuthTypeEnum) {
 }
 
 // AuthSources defines authentication source configuration: headers, cookies and query parameters.
+//
 // Tyk native API definition: `auth_configs{}`.
 type AuthSources struct {
-	// Header contains configurations of the header auth source, it is enabled by default.
+	// Header contains configurations for the header value auth source, it is enabled by default.
+	//
 	// Tyk native API definition: `auth_configs[x].header`
 	Header *AuthSource `bson:"header,omitempty" json:"header,omitempty"`
-	// Cookie contains configurations of the cookie auth source.
+
+	// Cookie contains configurations for the cookie value auth source.
+	//
 	// Tyk native API definition: `auth_configs[x].cookie`
 	Cookie *AuthSource `bson:"cookie,omitempty" json:"cookie,omitempty"`
-	// Param contains configurations of the param auth source.
+
+	// Query contains configurations for the query parameters auth source.
+	//
 	// Tyk native API definition: `auth_configs[x].query`
 	Query *AuthSource `bson:"query,omitempty" json:"query,omitempty"`
 }
@@ -378,9 +384,10 @@ func (s *Signature) ExtractTo(authConfig *apidef.AuthConfig) {
 
 // Scopes holds the scope to policy mappings for a claim name.
 type Scopes struct {
-	// Claim name.
+	// ClaimName contains the claim name.
 	ClaimName string `bson:"claimName,omitempty" json:"claimName,omitempty"`
-	// Scope to policy mapping.
+
+	// ScopeToPolicyMapping contains the mappings of scopes to policy IDs.
 	ScopeToPolicyMapping []ScopeToPolicy `bson:"scopeToPolicyMapping,omitempty" json:"scopeToPolicyMapping,omitempty"`
 }
 
@@ -418,9 +425,10 @@ func (s *Scopes) ExtractTo(scopeClaim *apidef.ScopeClaim) {
 
 // ScopeToPolicy contains a single scope to policy ID mapping.
 type ScopeToPolicy struct {
-	// Scope name.
+	// Scope contains the scope name.
 	Scope string `bson:"scope,omitempty" json:"scope,omitempty"`
-	// Policy ID.
+
+	// PolicyID contains the Policy ID.
 	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
@@ -488,7 +496,7 @@ type OIDC struct {
 	// AuthSources contains authentication token source configuration (header, cookie, query).
 	AuthSources `bson:",inline" json:",inline"`
 
-	// SeggregateByClientId: If set to `true, the policies will be applied to a combination of Client ID and User ID.
+	// SegregateByClientId is a boolean flag. If set to `true, the policies will be applied to a combination of Client ID and User ID.
 	//
 	// Tyk native API definition: `openid_options.segregate_by_client`.
 	SegregateByClientId bool `bson:"segregateByClientId,omitempty" json:"segregateByClientId,omitempty"`
@@ -573,19 +581,19 @@ func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 
 // Provider defines an issuer to validate and the Client ID to Policy ID mappings.
 type Provider struct {
-	// The issuer to validate, usually a domain name e.g. `accounts.google.com` or similar.
+	// Issuer contains a validation value for the issuer claim, usually a domain name e.g. `accounts.google.com` or similar.
 	Issuer string `bson:"issuer,omitempty" json:"issuer,omitempty"`
 
-	// Client ID to Policy ID mappings.
+	// ClientToPolicyMapping contains mappings of Client IDs to Policy IDs.
 	ClientToPolicyMapping []ClientToPolicy `bson:"clientToPolicyMapping,omitempty" json:"clientToPolicyMapping,omitempty"`
 }
 
 // ClientToPolicy contains a 1-1 mapping between Client ID and Policy ID.
 type ClientToPolicy struct {
-	// Client ID.
+	// ClientID contains a Client ID.
 	ClientID string `bson:"clientId,omitempty" json:"clientId,omitempty"`
 
-	// Policy ID.
+	// PolicyID contains a Policy ID.
 	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
