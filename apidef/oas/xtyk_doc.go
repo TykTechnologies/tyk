@@ -32,6 +32,9 @@ type StructInfo struct {
 	// Fields holds information of the fields, if this object is a struct.
 	Fields []*FieldInfo `json:"fields,omitempty"`
 
+	// fileSet holds a token.FileSet, used to resolve symbols to file:line
+	fileSet *token.FileSet
+
 	// structObj is the raw ast.StructType value, private.
 	structObj *ast.StructType
 }
@@ -40,16 +43,24 @@ type StructInfo struct {
 type FieldInfo struct {
 	// Doc is field docs. comments that are not part of docs are excluded.
 	Doc string `json:"doc"`
+
 	// JSONName is the corresponding json name of the field.
 	JSONName string `json:"json_name"`
+
 	// JSONType valid json type if it was found
 	JSONType string `json:"json_type"`
+
 	// GoPath is the go path of this field starting from root object
 	GoPath string `json:"go_path"`
+
 	// MapKey is the map key type, if this field is a map
 	MapKey string `json:"map_key,omitempty"`
+
 	// IsArray reports if this field is an array.
 	IsArray bool `json:"is_array"`
+
+	// fileSet holds a token.FileSet, used to resolve symbols to file:line
+	fileSet *token.FileSet
 }
 
 // FieldDocError holds a list of errors.
@@ -98,6 +109,7 @@ func ExtractDocFromXTyk() (XTykDoc, error) {
 	p := newObjParser(pkgs[requiredPkgName])
 	rootStructInfo := &StructInfo{
 		Name:      rootJSONName,
+		fileSet:   fileSet,
 		structObj: p.globals[rootStructName].(*ast.StructType),
 	}
 	p.parse(rootJSONName, rootJSONName, rootStructInfo)
@@ -151,6 +163,9 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 	p.visited[name] = structInfo
 	p.info.append(structInfo)
 	for _, field := range structInfo.structObj.Fields.List {
+		pos := structInfo.fileSet.Position(field.Pos())
+		filePos := path.Base(pos.String())
+
 		ident := extractIdentFromExpr(field.Type)
 		if ident == nil {
 			if len(field.Names) > 0 {
@@ -158,7 +173,7 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 				ident = extractIdentFromExpr(p.globals[field.Names[0].Name])
 			}
 			if ident == nil {
-				p.errList.WriteError(fmt.Sprintf("identifier from %s is not known\n", goPath))
+				p.errList.WriteError(fmt.Sprintf("[%s] identifier from %s is not known\n", filePos, goPath))
 				continue
 			}
 		}
@@ -181,14 +196,19 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 			// field is for internal use?
 			continue
 		}
+
 		if goName == "" {
-			p.errList.WriteError(fmt.Sprintf("unidentified field in %s", goPath))
+			p.errList.WriteError(fmt.Sprintf("[%s] unidentified field in %s", filePos, goPath))
 			continue
 		}
 
 		docs := cleanDocs(field.Doc)
 		if docs == "" {
-			p.errList.WriteError(fmt.Sprintf("field %s.%s is missing documentation", goPath, goName))
+			p.errList.WriteError(fmt.Sprintf("[%s] %s.%s is missing documentation", filePos, goPath, goName))
+		}
+
+		if len(docs) <= len(goName) || !strings.HasPrefix(docs, goName+" ") {
+			p.errList.WriteError(fmt.Sprintf("[%s] %s.%s has invalid documentation, should start with field name", filePos, goPath, goName))
 		}
 
 		fieldInfo := &FieldInfo{
@@ -197,6 +217,7 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 			Doc:      docs,
 			JSONType: goTypeToJSON(p.globals, ident.Name),
 			IsArray:  isExprArray(field.Type),
+			fileSet:  structInfo.fileSet,
 		}
 		p.parseNestedObj(ident.Name, fieldInfo)
 		structInfo.Fields = append(structInfo.Fields, fieldInfo)
@@ -208,7 +229,11 @@ func (p *objParser) parseInlineField(pathName, name string, structInfo *StructIn
 	if structObj, ok := p.globals[name].(*ast.StructType); ok {
 		newInfo := p.visited[name]
 		if newInfo == nil {
-			newInfo = &StructInfo{structObj: structObj, Name: name}
+			newInfo = &StructInfo{
+				structObj: structObj,
+				fileSet:   structInfo.fileSet,
+				Name:      name,
+			}
 		}
 		p.parse(pathName, name, newInfo)
 		structInfo.Fields = append(structInfo.Fields, newInfo.Fields...)
@@ -222,7 +247,11 @@ func (p *objParser) parseNestedObj(name string, field *FieldInfo) {
 	if p.globals[name] != nil {
 		switch obj := p.globals[name].(type) {
 		case *ast.StructType:
-			newInfo := &StructInfo{structObj: obj, Name: name}
+			newInfo := &StructInfo{
+				structObj: obj,
+				fileSet:   field.fileSet,
+				Name:      name,
+			}
 			p.parse(name, name, newInfo)
 
 		case *ast.ArrayType:
@@ -230,7 +259,11 @@ func (p *objParser) parseNestedObj(name string, field *FieldInfo) {
 			field.JSONType = typeName
 			field.IsArray = true
 			if structObj, ok := p.globals[typeName].(*ast.StructType); ok {
-				newInfo := &StructInfo{structObj: structObj, Name: typeName}
+				newInfo := &StructInfo{
+					structObj: structObj,
+					fileSet:   field.fileSet,
+					Name:      typeName,
+				}
 				p.parse(typeName, typeName, newInfo)
 			}
 
@@ -239,7 +272,11 @@ func (p *objParser) parseNestedObj(name string, field *FieldInfo) {
 			field.JSONType = typeName
 			field.MapKey = extractIdentFromExpr(obj.Key).Name
 			if structObj, ok := p.globals[typeName].(*ast.StructType); ok {
-				newInfo := &StructInfo{structObj: structObj, Name: typeName}
+				newInfo := &StructInfo{
+					structObj: structObj,
+					fileSet:   field.fileSet,
+					Name:      typeName,
+				}
 				p.parse(typeName, typeName, newInfo)
 			}
 		}
@@ -254,14 +291,20 @@ func cleanDocs(docs ...*ast.CommentGroup) string {
 		}
 		docText := doc.Text()
 
-		var codeBlock bool
-		var lastCh string
+		var (
+			codeBlock      bool
+			openBulletList bool
+			lastCh         string
+		)
 
 		for _, lineComment := range strings.Split(docText, "\n") {
 			lineComment = strings.TrimLeft(lineComment, "/")
 			lineComment = strings.TrimLeft(lineComment, "/*")
 			lineComment = strings.TrimLeft(lineComment, "*\\")
-			lineComment = strings.TrimSpace(lineComment)
+
+			if !codeBlock {
+				lineComment = strings.TrimSpace(lineComment)
+			}
 
 			// Handle codeblock leading/trailing space
 			if lineComment == "```" {
@@ -278,6 +321,26 @@ func cleanDocs(docs ...*ast.CommentGroup) string {
 				continue
 			}
 
+			// Handle bullet lists formatting
+			if lineComment != "" && lineComment[0] == '-' {
+				if !openBulletList {
+					s.WriteString("\n")
+				}
+				s.WriteString(lineComment + "\n")
+				openBulletList = true
+				continue
+			}
+
+			if openBulletList {
+				openBulletList = false
+				s.WriteString("\n")
+			}
+
+			// Prepend empty line if line starts with `Tyk native API definition`
+			if strings.HasPrefix(lineComment, "Tyk native API definition") {
+				s.WriteString("\n")
+			}
+
 			// Append dot after Tyk native API definition, consistency.
 			if lineComment == "" && lastCh == "`" {
 				s.WriteString(".\n")
@@ -288,9 +351,8 @@ func cleanDocs(docs ...*ast.CommentGroup) string {
 			if lineComment != "" {
 				s.WriteString(lineComment)
 
-				// Each codeblock line needs a trailing \n,
-				// each bullet point (-) also needs a \n.
-				if codeBlock || lineComment[0] == '-' {
+				// Each codeblock line needs a trailing \n
+				if codeBlock {
 					s.WriteByte('\n')
 					continue
 				}
@@ -317,6 +379,7 @@ func cleanDocs(docs ...*ast.CommentGroup) string {
 			}
 		}
 	}
+
 	return s.String()
 }
 
@@ -424,19 +487,8 @@ func xTykDocToMarkdown(xtykDoc XTykDoc) string {
 
 func fieldInfoToMarkdown(field *FieldInfo, docWriter *strings.Builder) {
 	docWriter.WriteString(fmt.Sprintf("- **`%s`**\n\n", field.JSONName))
-
-	if field.JSONType != "" {
-		docWriter.WriteString("  **Type: ")
-		docWriter.WriteString(fmt.Sprintf("%s**\n\n", fieldTypeToMarkdown(field)))
-	}
-
-	if field.Doc != "" {
-		for _, doc := range strings.Split(field.Doc, "\n") {
-			if doc != "" {
-				docWriter.WriteString(fmt.Sprintf("  %s\n\n", doc))
-			}
-		}
-	}
+	docWriter.WriteString(fmt.Sprintf("**Type: %s**\n\n", fieldTypeToMarkdown(field)))
+	docWriter.WriteString(strings.TrimSpace(field.Doc) + "\n\n")
 }
 
 func fieldTypeToMarkdown(f *FieldInfo) string {

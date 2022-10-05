@@ -24,7 +24,7 @@ will be updated after TestExtractDocFromXTyk has passed`
 func TestExtractDocFromXTyk(t *testing.T) {
 	fInfo, err := ExtractDocFromXTyk()
 	if err != nil {
-		t.Fatal(err.Error())
+		t.Fatal("\n" + err.Error())
 	}
 	if !flag.Parsed() {
 		flag.Parse()
