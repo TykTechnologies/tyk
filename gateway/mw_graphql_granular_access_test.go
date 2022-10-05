@@ -7,7 +7,7 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -58,7 +58,7 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 
 	t.Run("Direct key", func(t *testing.T) {
 		authHeaderWithDirectKey := map[string]string{
-			headers.Authorization: directKey,
+			header.Authorization: directKey,
 		}
 
 		restrictedQuery := graphql.Request{
@@ -86,7 +86,7 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 		test.Flaky(t) // TODO: TT-5220
 
 		authHeaderWithPolicyAppliedKey := map[string]string{
-			headers.Authorization: policyAppliedKey,
+			header.Authorization: policyAppliedKey,
 		}
 
 		restrictedQuery := graphql.Request{
@@ -165,7 +165,7 @@ func TestGraphQL_AllowedTypes(t *testing.T) {
 
 	t.Run("Direct key", func(t *testing.T) {
 		authHeaderWithDirectKey := map[string]string{
-			headers.Authorization: directKey,
+			header.Authorization: directKey,
 		}
 
 		allowedQuery := graphql.Request{
@@ -193,7 +193,7 @@ func TestGraphQL_AllowedTypes(t *testing.T) {
 		test.Flaky(t) // TODO: TT-5220
 
 		authHeaderWithPolicyAppliedKey := map[string]string{
-			headers.Authorization: policyAppliedKey,
+			header.Authorization: policyAppliedKey,
 		}
 
 		allowedQuery := graphql.Request{
@@ -284,7 +284,7 @@ func TestGraphQL_AllowedTypes_Override_RestrictedTypes(t *testing.T) {
 
 	t.Run("Direct key", func(t *testing.T) {
 		authHeaderWithDirectKey := map[string]string{
-			headers.Authorization: directKey,
+			header.Authorization: directKey,
 		}
 
 		allowedQuery := graphql.Request{
@@ -312,7 +312,7 @@ func TestGraphQL_AllowedTypes_Override_RestrictedTypes(t *testing.T) {
 		test.Flaky(t) // TODO: TT-5220
 
 		authHeaderWithPolicyAppliedKey := map[string]string{
-			headers.Authorization: policyAppliedKey,
+			header.Authorization: policyAppliedKey,
 		}
 
 		allowedQuery := graphql.Request{
@@ -367,7 +367,7 @@ func TestGraphQL_DisableIntrospection(t *testing.T) {
 		})
 
 		authHeaderWithDirectKey := map[string]string{
-			headers.Authorization: disableIntrospectionKey,
+			header.Authorization: disableIntrospectionKey,
 		}
 
 		_, _ = g.Run(t, []test.TestCase{
@@ -393,7 +393,7 @@ func TestGraphQL_DisableIntrospection(t *testing.T) {
 		})
 
 		authHeaderWithDirectKey := map[string]string{
-			headers.Authorization: enabledIntrospectionKey,
+			header.Authorization: enabledIntrospectionKey,
 		}
 
 		_, _ = g.Run(t, []test.TestCase{
@@ -419,7 +419,7 @@ func TestGraphQL_DisableIntrospection(t *testing.T) {
 		})
 
 		authHeaderWithPolicyAppliedKey := map[string]string{
-			headers.Authorization: policyAppliedKey,
+			header.Authorization: policyAppliedKey,
 		}
 
 		_, _ = g.Run(t, []test.TestCase{
@@ -451,7 +451,7 @@ func TestGraphQL_DisableIntrospection(t *testing.T) {
 		})
 
 		authHeaderWithPolicyAppliedKey := map[string]string{
-			headers.Authorization: policyAppliedKey,
+			header.Authorization: policyAppliedKey,
 		}
 		_, _ = g.Run(t, []test.TestCase{
 			{Data: introspectionQuery, Headers: authHeaderWithPolicyAppliedKey, Code: http.StatusOK},

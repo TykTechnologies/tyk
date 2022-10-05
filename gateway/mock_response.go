@@ -12,7 +12,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
-	header "github.com/TykTechnologies/tyk/headers"
+	header "github.com/TykTechnologies/tyk/header"
 )
 
 const acceptContentType = "Accept"
