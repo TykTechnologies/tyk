@@ -8,11 +8,9 @@ import (
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	_ "github.com/TykTechnologies/tyk/headers"
-
 	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/test"
@@ -191,7 +189,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
 			Data: session, Client: client, Code: http.StatusOK})
 
-		testChangeHashFunc(t, map[string]string{headers.Authorization: customKey}, client, http.StatusForbidden)
+		testChangeHashFunc(t, map[string]string{header.Authorization: customKey}, client, http.StatusForbidden)
 	})
 
 	t.Run("basic auth key", func(t *testing.T) {
