@@ -135,7 +135,7 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	return nil
 }
 
-// GetOASSchema returns an oas schema for a particular version
+// GetOASSchema returns an oas schema for a particular version.
 func GetOASSchema(version string) ([]byte, error) {
 	mu.Lock()
 	defer mu.Unlock()

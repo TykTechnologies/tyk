@@ -296,7 +296,7 @@ func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
 	}
 }
 
-// ExtractTo extracts *AuthSources to *apidef.AuthConfig
+// ExtractTo extracts *AuthSources to *apidef.AuthConfig.
 func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
 	// Header
 	if as.Header != nil {
@@ -318,7 +318,7 @@ func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
 	}
 }
 
-// AuthSource defines an authentication source
+// AuthSource defines an authentication source.
 type AuthSource struct {
 	// Enabled enables the auth source.
 	// Tyk native API definition: `auth_configs[X].use_param/use_cookie`

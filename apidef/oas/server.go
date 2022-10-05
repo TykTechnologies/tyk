@@ -23,7 +23,7 @@ type Server struct {
 	CustomDomain *Domain `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
 }
 
-// Fill fills *Server from apidef.APIDefinition
+// Fill fills *Server from apidef.APIDefinition.
 func (s *Server) Fill(api apidef.APIDefinition) {
 	s.ListenPath.Fill(api)
 	s.Slug = api.Slug

@@ -18,7 +18,7 @@ type XTykAPIGateway struct {
 	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
 }
 
-// Fill fills *XTykAPIGateway from apidef.APIDefinition
+// Fill fills *XTykAPIGateway from apidef.APIDefinition.
 func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	x.Info.Fill(api)
 	x.Upstream.Fill(api)
@@ -34,7 +34,7 @@ func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	}
 }
 
-// ExtractTo extracts *XTykAPIGateway into *apidef.APIDefinition
+// ExtractTo extracts *XTykAPIGateway into *apidef.APIDefinition.
 func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	x.Info.ExtractTo(api)
 	x.Upstream.ExtractTo(api)
@@ -67,7 +67,7 @@ type Info struct {
 	Versioning *Versioning `bson:"versioning,omitempty" json:"versioning,omitempty"`
 }
 
-// Fill fills *Info from apidef.APIDefinition
+// Fill fills *Info from apidef.APIDefinition.
 func (i *Info) Fill(api apidef.APIDefinition) {
 	i.ID = api.APIID
 	i.DBID = api.Id
@@ -86,7 +86,7 @@ func (i *Info) Fill(api apidef.APIDefinition) {
 	}
 }
 
-// ExtractTo extracts *Info into an *apidef.APIDefinition
+// ExtractTo extracts *Info into an *apidef.APIDefinition.
 func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	api.APIID = i.ID
 	api.Id = i.DBID
@@ -117,13 +117,13 @@ type State struct {
 	Internal bool `bson:"internal,omitempty" json:"internal,omitempty"`
 }
 
-// Fill fills *State from apidef.APIDefinition
+// Fill fills *State from apidef.APIDefinition.
 func (s *State) Fill(api apidef.APIDefinition) {
 	s.Active = api.Active
 	s.Internal = api.Internal
 }
 
-// ExtractTo extracts *State to *apidef.APIDefinition
+// ExtractTo extracts *State to *apidef.APIDefinition.
 func (s *State) ExtractTo(api *apidef.APIDefinition) {
 	api.Active = s.Active
 	api.Internal = s.Internal

@@ -16,7 +16,7 @@ import (
 )
 
 // XTykDoc is a list of information for exported struct type info,
-// starting from the root struct declaration(XTykGateway)
+// starting from the root struct declaration(XTykGateway).
 type XTykDoc []*StructInfo
 
 func (x *XTykDoc) append(newInfo *StructInfo) int {

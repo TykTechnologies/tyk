@@ -39,16 +39,16 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 // Global holds configuration applies globally: CORS and caching.
 type Global struct {
 	// CORS contains the configuration related to cross origin resource sharing.
-	// Tyk native API definition: `CORS`
+	// Tyk native API definition: `CORS`.
 	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
+
 	// Cache contains the configurations related to caching.
-	// Tyk native API definition: `cache_options`
+	// Tyk native API definition: `cache_options`.
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
 }
 
 // Fill fills *Global from apidef.APIDefinition.
 func (g *Global) Fill(api apidef.APIDefinition) {
-	// CORS
 	if g.CORS == nil {
 		g.CORS = &CORS{}
 	}
@@ -58,7 +58,6 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 		g.CORS = nil
 	}
 
-	// Cache
 	if g.Cache == nil {
 		g.Cache = &Cache{}
 	}
@@ -582,13 +581,13 @@ type TransformRequestMethod struct {
 	ToMethod string `bson:"toMethod" json:"toMethod"`
 }
 
-// Fill fills *TransformRequestMethod from apidef.MethodTransformMeta
+// Fill fills *TransformRequestMethod from apidef.MethodTransformMeta.
 func (tm *TransformRequestMethod) Fill(meta apidef.MethodTransformMeta) {
 	tm.Enabled = !meta.Disabled
 	tm.ToMethod = meta.ToMethod
 }
 
-// ExtractTo extracts *TransformRequestMethod into *apidef.MethodTransformMeta
+// ExtractTo extracts *TransformRequestMethod into *apidef.MethodTransformMeta.
 func (tm *TransformRequestMethod) ExtractTo(meta *apidef.MethodTransformMeta) {
 	meta.Disabled = !tm.Enabled
 	meta.ToMethod = tm.ToMethod
@@ -606,7 +605,7 @@ type TransformRequestBody struct {
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 }
 
-// Fill fills *TransformRequestBody from apidef.TemplateMeta
+// Fill fills *TransformRequestBody from apidef.TemplateMeta.
 func (tr *TransformRequestBody) Fill(meta apidef.TemplateMeta) {
 	tr.Enabled = !meta.Disabled
 	tr.Format = meta.TemplateData.Input
@@ -617,7 +616,7 @@ func (tr *TransformRequestBody) Fill(meta apidef.TemplateMeta) {
 	}
 }
 
-// ExtractTo extracts data from *TransformRequestBody into *apidef.TemplateMeta
+// ExtractTo extracts data from *TransformRequestBody into *apidef.TemplateMeta.
 func (tr *TransformRequestBody) ExtractTo(meta *apidef.TemplateMeta) {
 	meta.Disabled = !tr.Enabled
 	meta.TemplateData.Input = tr.Format
@@ -642,14 +641,14 @@ type CachePlugin struct {
 	CacheResponseCodes []int `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
 }
 
-// Fill fills *CachePlugin from apidef.CacheMeta
+// Fill fills *CachePlugin from apidef.CacheMeta.
 func (a *CachePlugin) Fill(cm apidef.CacheMeta) {
 	a.Enabled = !cm.Disabled
 	a.CacheByRegex = cm.CacheKeyRegex
 	a.CacheResponseCodes = cm.CacheOnlyResponseCodes
 }
 
-// ExtractTo extracts *CachePlugin values to *apidef.CacheMeta
+// ExtractTo extracts *CachePlugin values to *apidef.CacheMeta.
 func (a *CachePlugin) ExtractTo(cm *apidef.CacheMeta) {
 	cm.Disabled = !a.Enabled
 	cm.CacheKeyRegex = a.CacheByRegex
@@ -664,13 +663,13 @@ type EnforceTimeout struct {
 	Value int `bson:"value" json:"value"`
 }
 
-// Fill fills *EnforceTimeout from apidef.HardTimeoutMeta
+// Fill fills *EnforceTimeout from apidef.HardTimeoutMeta.
 func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 	et.Enabled = !meta.Disabled
 	et.Value = meta.TimeOut
 }
 
-// ExtractTo extracts *EnforceTimeout to *apidef.HardTimeoutMeta
+// ExtractTo extracts *EnforceTimeout to *apidef.HardTimeoutMeta.
 func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	meta.Disabled = !et.Enabled
 	meta.TimeOut = et.Value

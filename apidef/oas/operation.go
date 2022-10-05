@@ -9,7 +9,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-// Operations holds Operation definitions
+// Operations holds Operation definitions.
 type Operations map[string]*Operation
 
 // Operation holds a request operation configuration, allowances, tranformations, caching, timeouts and validation.
@@ -43,7 +43,7 @@ type Operation struct {
 	MockResponse *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
 }
 
-// AllowanceType holds the valid allowance types values
+// AllowanceType holds the valid allowance types values.
 type AllowanceType int
 
 const (
@@ -54,7 +54,7 @@ const (
 	contentTypeJSON = "application/json"
 )
 
-// Import takes the arguments and populates the receiver *Operation values
+// Import takes the arguments and populates the receiver *Operation values.
 func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validateRequest *bool) {
 	if allowList != nil {
 		allow := o.Allow
@@ -301,7 +301,7 @@ func (o *Operation) extractOASValidateRequestTo(ep *apidef.ExtendedPathsSet, pat
 // - greedy match (*)
 // - ungreedy match (+)
 // - any char (.)
-// - end of string ($)
+// - end of string ($).
 const regexPatterns = "[].+*$"
 
 type pathPart struct {
@@ -318,7 +318,7 @@ func (p pathPart) String() string {
 	return p.value
 }
 
-// splitPath splits url into folder parts, detecting regex patterns
+// splitPath splits url into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
 	// Each url fragment can contain a regex, but the whole
 	// url isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
@@ -344,7 +344,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 }
 
 // buildPath converts the url paths with regex to named parameters
-// e.g. ["a", ".*"] becomes /a/{customRegex1}
+// e.g. ["a", ".*"] becomes /a/{customRegex1}.
 func buildPath(parts []pathPart, appendSlash bool) string {
 	newPath := ""
 
@@ -449,13 +449,13 @@ type ValidateRequest struct {
 	ErrorResponseCode int `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
 }
 
-// Fill fills *ValidateRequest receiver from apidef.ValidateRequestMeta
+// Fill fills *ValidateRequest receiver from apidef.ValidateRequestMeta.
 func (v *ValidateRequest) Fill(meta apidef.ValidateRequestMeta) {
 	v.Enabled = meta.Enabled
 	v.ErrorResponseCode = meta.ErrorResponseCode
 }
 
-// ExtractTo extracts *ValidateRequest into *apidef.ValidateRequestMeta
+// ExtractTo extracts *ValidateRequest into *apidef.ValidateRequestMeta.
 func (v *ValidateRequest) ExtractTo(meta *apidef.ValidateRequestMeta) {
 	meta.Enabled = v.Enabled
 	meta.ErrorResponseCode = v.ErrorResponseCode

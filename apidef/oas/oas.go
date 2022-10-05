@@ -10,7 +10,7 @@ import (
 // ExtensionTykAPIGateway is the OAS schema key for the Tyk extension.
 const ExtensionTykAPIGateway = "x-tyk-api-gateway"
 
-// Main holds the default version value (empty)
+// Main holds the default version value (empty).
 const Main = ""
 
 // OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
@@ -18,7 +18,7 @@ type OAS struct {
 	openapi3.T
 }
 
-// MarshalJSON implements json.Marshaller
+// MarshalJSON implements json.Marshaller.
 func (s *OAS) MarshalJSON() ([]byte, error) {
 	if ShouldOmit(s.ExternalDocs) { // for sql case
 		s.ExternalDocs = nil
@@ -51,7 +51,7 @@ func (s *OAS) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// Fill fills *OAS definition from apidef.APIDefinition
+// Fill fills *OAS definition from apidef.APIDefinition.
 func (s *OAS) Fill(api apidef.APIDefinition) {
 	xTykAPIGateway := s.GetTykExtension()
 	if xTykAPIGateway == nil {
@@ -77,7 +77,7 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	}
 }
 
-// ExtractTo extracts *OAS into *apidef.APIDefinition
+// ExtractTo extracts *OAS into *apidef.APIDefinition.
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 	if s.GetTykExtension() != nil {
 		s.GetTykExtension().ExtractTo(api)
@@ -105,7 +105,7 @@ func (s *OAS) SetTykExtension(xTykAPIGateway *XTykAPIGateway) {
 	s.Extensions[ExtensionTykAPIGateway] = xTykAPIGateway
 }
 
-// GetTykExtension returns our OAS schema extension from inside *OAS
+// GetTykExtension returns our OAS schema extension from inside *OAS.
 func (s *OAS) GetTykExtension() *XTykAPIGateway {
 	if s.Extensions == nil {
 		return nil
@@ -135,7 +135,7 @@ func (s *OAS) GetTykExtension() *XTykAPIGateway {
 	return nil
 }
 
-// RemoveTykExtension clears the Tyk extensions from *OAS
+// RemoveTykExtension clears the Tyk extensions from *OAS.
 func (s *OAS) RemoveTykExtension() {
 	if s.Extensions == nil {
 		return
@@ -275,7 +275,7 @@ func (s *OAS) getTykOperations() (operations Operations) {
 	return
 }
 
-// AddServers adds a server into the servers definition if not already present
+// AddServers adds a server into the servers definition if not already present.
 func (s *OAS) AddServers(apiURL string) {
 	if len(s.Servers) == 0 {
 		s.Servers = openapi3.Servers{
@@ -303,7 +303,7 @@ func (s *OAS) AddServers(apiURL string) {
 	s.Servers = newServers
 }
 
-// UpdateServers sets or updates the first servers URL if it matches oldAPIURL
+// UpdateServers sets or updates the first servers URL if it matches oldAPIURL.
 func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
 	if len(s.Servers) == 0 {
 		s.Servers = openapi3.Servers{

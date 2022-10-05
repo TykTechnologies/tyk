@@ -87,7 +87,7 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
-// JWT holds the configuration for the JWT middleware
+// JWT holds the configuration for the JWT middleware.
 type JWT struct {
 	Enabled                 bool `bson:"enabled" json:"enabled"` // required
 	AuthSources             `bson:",inline" json:",inline"`
@@ -295,14 +295,14 @@ type ExtractCredentialsFromBody struct {
 	PasswordRegexp string `bson:"passwordRegexp,omitempty" json:"passwordRegexp,omitempty"`
 }
 
-// Fill fills *ExtractCredentialsFromBody from apidef.APIDefinition
+// Fill fills *ExtractCredentialsFromBody from apidef.APIDefinition.
 func (e *ExtractCredentialsFromBody) Fill(api apidef.APIDefinition) {
 	e.Enabled = api.BasicAuth.ExtractFromBody
 	e.UserRegexp = api.BasicAuth.BodyUserRegexp
 	e.PasswordRegexp = api.BasicAuth.BodyPasswordRegexp
 }
 
-// ExtractTo extracts *ExtractCredentialsFromBody and populates *apidef.APIDefinition
+// ExtractTo extracts *ExtractCredentialsFromBody and populates *apidef.APIDefinition.
 func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
 	api.BasicAuth.ExtractFromBody = e.Enabled
 	api.BasicAuth.BodyUserRegexp = e.UserRegexp
@@ -572,13 +572,13 @@ type Notifications struct {
 	OnKeyChangeURL string `bson:"onKeyChangeUrl,omitempty" json:"onKeyChangeUrl,omitempty"`
 }
 
-// Fill fills *Notifications from apidef.NotificationsManager
+// Fill fills *Notifications from apidef.NotificationsManager.
 func (n *Notifications) Fill(nm apidef.NotificationsManager) {
 	n.SharedSecret = nm.SharedSecret
 	n.OnKeyChangeURL = nm.OAuthKeyChangeURL
 }
 
-// ExtractTo extracts *Notifications into *apidef.NotificationsManager
+// ExtractTo extracts *Notifications into *apidef.NotificationsManager.
 func (n *Notifications) ExtractTo(nm *apidef.NotificationsManager) {
 	nm.SharedSecret = n.SharedSecret
 	nm.OAuthKeyChangeURL = n.OnKeyChangeURL
