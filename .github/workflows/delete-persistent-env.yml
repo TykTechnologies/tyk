@@ -1,6 +1,6 @@
 name: Persistent Environment Deletion
 on:
-  pull_request:
+  workflow_dispatch:
     inputs:
       containerName:
         required: true
