@@ -27,7 +27,7 @@ type Upstream struct {
 	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
 }
 
-// Fill *Upstream from apidef.APIDefinition.
+// Fill fills *Upstream from apidef.APIDefinition.
 func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.URL = api.Proxy.TargetURL
 
@@ -189,7 +189,7 @@ type ServiceDiscovery struct {
 	EndpointReturnsList bool `bson:"endpointReturnsList,omitempty" json:"endpointReturnsList,omitempty"`
 }
 
-// Fill *ServiceDiscovery from apidef.ServiceDiscoveryConfiguration.
+// Fill fills *ServiceDiscovery from apidef.ServiceDiscoveryConfiguration.
 func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfiguration) {
 	sd.Enabled = serviceDiscovery.UseDiscoveryService
 	sd.EndpointReturnsList = serviceDiscovery.EndpointReturnsList
@@ -224,7 +224,7 @@ type Test struct {
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 }
 
-// Fill *Test from apidef.UptimeTests.
+// Fill fills *Test from apidef.UptimeTests.
 func (t *Test) Fill(uptimeTests apidef.UptimeTests) {
 	if t.ServiceDiscovery == nil {
 		t.ServiceDiscovery = &ServiceDiscovery{}
@@ -263,7 +263,7 @@ type DomainToCertificate struct {
 	Certificate string `bson:"certificate" json:"certificate"`
 }
 
-// Fill *MutualTLS from apidef.APIDefinition.
+// Fill fills *MutualTLS from apidef.APIDefinition.
 func (m *MutualTLS) Fill(api apidef.APIDefinition) {
 	m.Enabled = !api.UpstreamCertificatesDisabled
 	m.DomainToCertificates = make([]DomainToCertificate, len(api.UpstreamCertificates))
@@ -300,7 +300,7 @@ type PinnedPublicKey struct {
 // PinnedPublicKeys is a list of domains and pinned public keys for them.
 type PinnedPublicKeys []PinnedPublicKey
 
-// Fill PinnerPublicKeys slice from publicKeys argument.
+// Fill fills *PinnerPublicKeys (slice) from publicKeys argument.
 func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
 	domains := make([]string, len(publicKeys))
 
@@ -338,7 +338,7 @@ type CertificatePinning struct {
 	DomainToPublicKeysMapping PinnedPublicKeys `bson:"domainToPublicKeysMapping" json:"domainToPublicKeysMapping"`
 }
 
-// Fill *CertificatePinning from apidef.APIDefinition.
+// Fill fills *CertificatePinning from apidef.APIDefinition.
 func (cp *CertificatePinning) Fill(api apidef.APIDefinition) {
 	cp.Enabled = !api.CertificatePinningDisabled
 

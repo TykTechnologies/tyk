@@ -51,7 +51,7 @@ func (s *OAS) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// Fill *OAS definition from apidef.APIDefinition
+// Fill fills *OAS definition from apidef.APIDefinition
 func (s *OAS) Fill(api apidef.APIDefinition) {
 	xTykAPIGateway := s.GetTykExtension()
 	if xTykAPIGateway == nil {

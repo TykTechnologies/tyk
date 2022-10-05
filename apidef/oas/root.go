@@ -18,7 +18,7 @@ type XTykAPIGateway struct {
 	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
 }
 
-// Fill *XTykAPIGateway from apidef.APIDefinition
+// Fill fills *XTykAPIGateway from apidef.APIDefinition
 func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	x.Info.Fill(api)
 	x.Upstream.Fill(api)
@@ -67,7 +67,7 @@ type Info struct {
 	Versioning *Versioning `bson:"versioning,omitempty" json:"versioning,omitempty"`
 }
 
-// Fill *Info from apidef.APIDefinition
+// Fill fills *Info from apidef.APIDefinition
 func (i *Info) Fill(api apidef.APIDefinition) {
 	i.ID = api.APIID
 	i.DBID = api.Id
@@ -117,7 +117,7 @@ type State struct {
 	Internal bool `bson:"internal,omitempty" json:"internal,omitempty"`
 }
 
-// Fill *State from apidef.APIDefinition
+// Fill fills *State from apidef.APIDefinition
 func (s *State) Fill(api apidef.APIDefinition) {
 	s.Active = api.Active
 	s.Internal = api.Internal
@@ -147,7 +147,7 @@ type Versioning struct {
 	StripVersioningData bool `bson:"stripVersioningData,omitempty" json:"stripVersioningData,omitempty"`
 }
 
-// Fill *Versioning from apidef.APIDefinition.
+// Fill fills *Versioning from apidef.APIDefinition.
 func (v *Versioning) Fill(api apidef.APIDefinition) {
 	v.Enabled = api.VersionDefinition.Enabled
 	v.Name = api.VersionDefinition.Name

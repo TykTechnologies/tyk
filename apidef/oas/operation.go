@@ -449,7 +449,7 @@ type ValidateRequest struct {
 	ErrorResponseCode int `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
 }
 
-// Fill *ValidateRequest receiver from apidef.ValidateRequestMeta
+// Fill fills *ValidateRequest receiver from apidef.ValidateRequestMeta
 func (v *ValidateRequest) Fill(meta apidef.ValidateRequestMeta) {
 	v.Enabled = meta.Enabled
 	v.ErrorResponseCode = meta.ErrorResponseCode

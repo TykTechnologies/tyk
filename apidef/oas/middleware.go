@@ -17,7 +17,7 @@ type Middleware struct {
 	Operations Operations `bson:"operations,omitempty" json:"operations,omitempty"`
 }
 
-// Fill *Middleware from apidef.APIDefinition.
+// Fill fills *Middleware from apidef.APIDefinition.
 func (m *Middleware) Fill(api apidef.APIDefinition) {
 	if m.Global == nil {
 		m.Global = &Global{}
@@ -46,7 +46,7 @@ type Global struct {
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
 }
 
-// Fill *Global from apidef.APIDefinition.
+// Fill fills *Global from apidef.APIDefinition.
 func (g *Global) Fill(api apidef.APIDefinition) {
 	// CORS
 	if g.CORS == nil {
@@ -134,7 +134,7 @@ type CORS struct {
 	AllowedMethods []string `bson:"allowedMethods,omitempty" json:"allowedMethods,omitempty"`
 }
 
-// Fill *CORS from apidef.CORSConfig.
+// Fill fills *CORS from apidef.CORSConfig.
 func (c *CORS) Fill(cors apidef.CORSConfig) {
 	c.Enabled = cors.Enable
 	c.MaxAge = cors.MaxAge
@@ -200,7 +200,7 @@ type Cache struct {
 	ControlTTLHeaderName string `bson:"controlTTLHeaderName,omitempty" json:"controlTTLHeaderName,omitempty"`
 }
 
-// Fill *Cache from apidef.CacheOptions.
+// Fill fills *Cache from apidef.CacheOptions.
 func (c *Cache) Fill(cache apidef.CacheOptions) {
 	c.Enabled = cache.EnableCache
 	c.Timeout = cache.CacheTimeout
@@ -225,7 +225,7 @@ func (c *Cache) ExtractTo(cache *apidef.CacheOptions) {
 // Paths is a mapping of API endpoints to Path plugin configurations.
 type Paths map[string]*Path
 
-// Fill Paths map from apidef.ExtendedPathSet.
+// Fill fills *Paths (map) from apidef.ExtendedPathSet.
 func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillAllowance(ep.WhiteList, allow)
 	ps.fillAllowance(ep.BlackList, block)
@@ -478,7 +478,7 @@ type Plugins struct {
 	EnforceTimeout *EnforceTimeout `bson:"enforcedTimeout,omitempty" json:"enforcedTimeout,omitempty"`
 }
 
-// ExtractTo fills the apidef.EXtendedPathsSet argument from *Plugins receiver
+// ExtractTo extracts *Plugins into *apidef.ExtendedPathsSet.
 func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	p.extractAllowanceTo(ep, path, method, allow)
 	p.extractAllowanceTo(ep, path, method, block)
@@ -551,13 +551,13 @@ type Allowance struct {
 	IgnoreCase bool `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
 }
 
-// Fill populates the receiver *Allowance from apidef.EndPointMeta
+// Fill fills *Allowance from apidef.EndPointMeta.
 func (a *Allowance) Fill(endpointMeta apidef.EndPointMeta) {
 	a.Enabled = !endpointMeta.Disabled
 	a.IgnoreCase = endpointMeta.IgnoreCase
 }
 
-// ExtractTo extracts the *Allowance into *apidef.EndPointMeta
+// ExtractTo extracts the *Allowance into *apidef.EndPointMeta.
 func (a *Allowance) ExtractTo(endpointMeta *apidef.EndPointMeta) {
 	endpointMeta.Disabled = !a.Enabled
 	endpointMeta.IgnoreCase = a.IgnoreCase
@@ -582,7 +582,7 @@ type TransformRequestMethod struct {
 	ToMethod string `bson:"toMethod" json:"toMethod"`
 }
 
-// Fill *TransformRequestMethod from apidef.MethodTransformMeta
+// Fill fills *TransformRequestMethod from apidef.MethodTransformMeta
 func (tm *TransformRequestMethod) Fill(meta apidef.MethodTransformMeta) {
 	tm.Enabled = !meta.Disabled
 	tm.ToMethod = meta.ToMethod
@@ -642,7 +642,7 @@ type CachePlugin struct {
 	CacheResponseCodes []int `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
 }
 
-// Fill *CachePlugin from apidef.CacheMeta
+// Fill fills *CachePlugin from apidef.CacheMeta
 func (a *CachePlugin) Fill(cm apidef.CacheMeta) {
 	a.Enabled = !cm.Disabled
 	a.CacheByRegex = cm.CacheKeyRegex
@@ -664,7 +664,7 @@ type EnforceTimeout struct {
 	Value int `bson:"value" json:"value"`
 }
 
-// Fill *EnforceTimeout from apidef.HardTimeoutMeta
+// Fill fills *EnforceTimeout from apidef.HardTimeoutMeta
 func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 	et.Enabled = !meta.Disabled
 	et.Value = meta.TimeOut

@@ -56,7 +56,7 @@ type Authentication struct {
 	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
 }
 
-// Fill takes the argument APIDefinition and fills the *Authentication receiver method type.
+// Fill fills *Authentication from apidef.APIDefinition.
 func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.Enabled = !api.UseKeylessAccess
 	a.StripAuthorizationData = api.StripAuthData
@@ -114,7 +114,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	}
 }
 
-// ExtractTo takes the values from the receiver *Authentication and writes them to the argument *APIDefinition.
+// ExtractTo extracts *Authentication into *apidef.APIDefinition.
 func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	api.UseKeylessAccess = !a.Enabled
 	api.StripAuthData = a.StripAuthorizationData
@@ -263,7 +263,7 @@ type AuthSources struct {
 	Query *AuthSource `bson:"query,omitempty" json:"query,omitempty"`
 }
 
-// Fill takes apidef.AuthConfig and populates the receiver *AuthSources
+// Fill fills *AuthSources from apidef.AuthConfig.
 func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
 	// Header
 	if as.Header == nil {
@@ -328,13 +328,13 @@ type AuthSource struct {
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
 }
 
-// Fill populates *AuthSource from the parameters
+// Fill fills *AuthSource with values from the parameters.
 func (as *AuthSource) Fill(enabled bool, name string) {
 	as.Enabled = enabled
 	as.Name = name
 }
 
-// ExtractTo populates the parameters from *AuthSource
+// ExtractTo extracts *AuthSource into the function parameters.
 func (as *AuthSource) ExtractTo(enabled *bool, name *string) {
 	*enabled = as.Enabled
 	*name = as.Name
@@ -352,7 +352,7 @@ type Signature struct {
 	ErrorMessage     string     `bson:"errorMessage,omitempty" json:"errorMessage,omitempty"`
 }
 
-// Fill *Signature from apidef.AuthConfig.
+// Fill fills *Signature from apidef.AuthConfig.
 func (s *Signature) Fill(authConfig apidef.AuthConfig) {
 	signature := authConfig.Signature
 
@@ -387,7 +387,7 @@ type Scopes struct {
 	ScopeToPolicyMapping []ScopeToPolicy `bson:"scopeToPolicyMapping,omitempty" json:"scopeToPolicyMapping,omitempty"`
 }
 
-// Fill *Scopes from *apidef.ScopeClaim.
+// Fill fills *Scopes from *apidef.ScopeClaim.
 func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	s.ClaimName = scopeClaim.ScopeClaimName
 
@@ -452,7 +452,7 @@ type HMAC struct {
 	AllowedClockSkew float64 `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
 }
 
-// Fill *HMAC from apidef.APIDefinition.
+// Fill fills *HMAC from apidef.APIDefinition.
 func (h *HMAC) Fill(api apidef.APIDefinition) {
 	h.Enabled = api.EnableSignatureChecking
 
@@ -503,7 +503,7 @@ type OIDC struct {
 	Scopes *Scopes `bson:"scopes,omitempty" json:"scopes,omitempty"`
 }
 
-// Fill *OIDC from apidef.APIDefinition.
+// Fill fills *OIDC from apidef.APIDefinition.
 func (o *OIDC) Fill(api apidef.APIDefinition) {
 	o.Enabled = api.UseOpenID
 
@@ -598,7 +598,7 @@ type GoPlugin struct {
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 }
 
-// Fill *GoPlugin from apidef.AuthConfig.
+// Fill fills *GoPlugin from apidef.AuthConfig.
 func (g *GoPlugin) Fill(api apidef.APIDefinition) {
 	g.Enabled = api.UseGoPluginAuth
 }
@@ -619,7 +619,7 @@ type CustomPlugin struct {
 	AuthSources `bson:",inline" json:",inline"`
 }
 
-// Fill *CustomPlugin from apidef.AuthConfig.
+// Fill fills *CustomPlugin from apidef.AuthConfig.
 func (c *CustomPlugin) Fill(api apidef.APIDefinition) {
 	c.Enabled = api.EnableCoProcessAuth
 

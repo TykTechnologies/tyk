@@ -23,7 +23,7 @@ type Server struct {
 	CustomDomain *Domain `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
 }
 
-// Fill *Server from apidef.APIDefinition
+// Fill fills *Server from apidef.APIDefinition
 func (s *Server) Fill(api apidef.APIDefinition) {
 	s.ListenPath.Fill(api)
 	s.Slug = api.Slug
@@ -50,7 +50,7 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	}
 }
 
-// ExtractTo extracts *Server into *apidef.APIDefinition
+// ExtractTo extracts *Server into *apidef.APIDefinition.
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	s.ListenPath.ExtractTo(api)
 	api.Slug = s.Slug
@@ -81,13 +81,13 @@ type ListenPath struct {
 	Strip bool `bson:"strip,omitempty" json:"strip,omitempty"`
 }
 
-// Fill *ListenPath from apidef.APIDefinition.
+// Fill fills *ListenPath from apidef.APIDefinition.
 func (lp *ListenPath) Fill(api apidef.APIDefinition) {
 	lp.Value = api.Proxy.ListenPath
 	lp.Strip = api.Proxy.StripListenPath
 }
 
-// ExtractTo from *ListenPath into *apidef.APIDefinition.
+// ExtractTo extracts *ListenPath into *apidef.APIDefinition.
 func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.ListenPath = lp.Value
 	api.Proxy.StripListenPath = lp.Strip
@@ -101,13 +101,13 @@ type ClientCertificates struct {
 	Allowlist []string `bson:"allowlist" json:"allowlist"`
 }
 
-// Fill *ClientCertificates from apidef.APIDefinition.
+// Fill fills *ClientCertificates from apidef.APIDefinition.
 func (cc *ClientCertificates) Fill(api apidef.APIDefinition) {
 	cc.Enabled = api.UseMutualTLSAuth
 	cc.Allowlist = api.ClientCertificates
 }
 
-// ExtractTo from *ClientCertificates into *apidef.APIDefinition.
+// ExtractTo extracts *ClientCertificates into *apidef.APIDefinition.
 func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 	api.UseMutualTLSAuth = cc.Enabled
 	api.ClientCertificates = cc.Allowlist
@@ -121,7 +121,7 @@ type GatewayTags struct {
 	Tags []string `bson:"tags" json:"tags"`
 }
 
-// Fill *GatewayTags from apidef.APIDefinition.
+// Fill fills *GatewayTags from apidef.APIDefinition.
 func (gt *GatewayTags) Fill(api apidef.APIDefinition) {
 	gt.Enabled = !api.TagsDisabled
 	gt.Tags = api.Tags
@@ -130,7 +130,7 @@ func (gt *GatewayTags) Fill(api apidef.APIDefinition) {
 	}
 }
 
-// ExtractTo from *GatewayTags into *apidef.APIDefinition.
+// ExtractTo extracts *GatewayTags into *apidef.APIDefinition.
 func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
 	api.TagsDisabled = !gt.Enabled
 	api.Tags = gt.Tags
@@ -144,7 +144,7 @@ type Domain struct {
 	Name string `bson:"name" json:"name"`
 }
 
-// ExtractTo from *Domain into *apidef.APIDefinition.
+// ExtractTo extracts *Domain into *apidef.APIDefinition.
 func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {
 	if !cd.Enabled && cd.Name == "" {
 		// nothing was configured
@@ -154,7 +154,7 @@ func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {
 	api.Domain = cd.Name
 }
 
-// Fill *Domain from apidef.APIDefinition.
+// Fill fills *Domain from apidef.APIDefinition.
 func (cd *Domain) Fill(api apidef.APIDefinition) {
 	if !api.DomainDisabled && api.Domain == "" {
 		// nothing was configured.
