@@ -203,18 +203,18 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 	}
 }
 
-func (p *objParser) parseInlineField(path, name string, structInfo *StructInfo) {
+func (p *objParser) parseInlineField(pathName, name string, structInfo *StructInfo) {
 	// for inline Global "struct", keep tree as it was but change the root struct
 	if structObj, ok := p.globals[name].(*ast.StructType); ok {
 		newInfo := p.visited[name]
 		if newInfo == nil {
 			newInfo = &StructInfo{structObj: structObj, Name: name}
 		}
-		p.parse(path, name, newInfo)
+		p.parse(pathName, name, newInfo)
 		structInfo.Fields = append(structInfo.Fields, newInfo.Fields...)
 	} else {
 		// field is inline and exported but was not scanned
-		p.errList.WriteError(fmt.Sprintf("field %s.%s is declared but not found\n", path, name))
+		p.errList.WriteError(fmt.Sprintf("field %s.%s is declared but not found\n", pathName, name))
 	}
 }
 
@@ -344,11 +344,8 @@ func extractIdentFromExpr(expr ast.Expr) *ast.Ident {
 }
 
 func isExprArray(expr ast.Expr) bool {
-	switch expr.(type) {
-	case *ast.ArrayType:
-		return true
-	}
-	return false
+	_, ok := expr.(*ast.ArrayType)
+	return ok
 }
 
 func jsonTagFromBasicLit(tag *ast.BasicLit) (name string, isInline bool) {
