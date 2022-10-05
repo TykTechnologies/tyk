@@ -88,6 +88,7 @@ jobs:
           echo "::set-output name=cluster::${{ env.CLUSTER }}"
           echo "::set-output name=service::${{ env.SERVICE }}"
           echo "::set-output name=image::${{ env.IMAGE }}"
+          echo "::set-output name=destroy::${{ env.DESTROY }}"
 
   Create-workflow:
     if: ${{ needs.Check.outputs.env-exist == 'false' }}
@@ -122,9 +123,9 @@ jobs:
       registry: ${{ needs.Check.outputs.registry }}
 
   Delete-workflow:
-    if: ${{ always() && env.DESTROY == 'true' }}
+    if: ${{ always() && needs.Check.outputs.destroy == 'true' }}
     uses: ./.github/workflows/gromit-run.yml
-    needs: [ Create-workflow, Update-workflow ]
+    needs: [ Check, Create-workflow, Update-workflow ]
     with:
       containerName: ${{ needs.Check.outputs.container-name }}
       cluster: ${{ needs.Check.outputs.cluster }}
