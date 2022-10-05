@@ -416,7 +416,17 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		spec.OAS = *def.OAS
 	}
 
-	spec.OASRouter, err = gorillamux.NewRouter(&spec.OAS.T)
+	serverURL := spec.Proxy.ListenPath
+	if spec.Proxy.StripListenPath {
+		serverURL = "/"
+	}
+
+	oasSpec := spec.OAS.T
+	oasSpec.Servers = openapi3.Servers{
+		{URL: serverURL},
+	}
+
+	spec.OASRouter, err = gorillamux.NewRouter(&oasSpec)
 	if err != nil {
 		log.WithError(err).Error("Could not create OAS router")
 	}
