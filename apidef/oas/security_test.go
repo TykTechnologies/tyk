@@ -283,7 +283,6 @@ func TestOAS_AppendSecurity(t *testing.T) {
 		assert.Contains(t, oas.Security[1], "three")
 		assert.Contains(t, oas.Security[1], "four")
 	})
-
 }
 
 func TestOAS_JWT(t *testing.T) {

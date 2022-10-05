@@ -30,16 +30,16 @@ type Operation struct {
 	// When both `path` and `body` are provided, body would take precedence.
 	TransformRequestBody *TransformRequestBody `bson:"transformRequestBody,omitempty" json:"transformRequestBody,omitempty"`
 
-	// Cache plugin configuration.
+	// Cache contains the caching plugin configuration.
 	Cache *CachePlugin `bson:"cache,omitempty" json:"cache,omitempty"`
 
-	// Enforce timeout configuration.
+	// EnforceTimeout contains the request timeout configuration.
 	EnforceTimeout *EnforceTimeout `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
 
-	// Validate request configuration.
+	// ValidateRequest contains the request validation configuration.
 	ValidateRequest *ValidateRequest `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
 
-	// MockResponse response configuration.
+	// MockResponse contains the mock response configuration.
 	MockResponse *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
 }
 
@@ -461,7 +461,7 @@ func (v *ValidateRequest) ExtractTo(meta *apidef.ValidateRequestMeta) {
 	meta.ErrorResponseCode = v.ErrorResponseCode
 }
 
-func (v *ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operation) bool {
+func (*ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operation) bool {
 	reqBody := operation.RequestBody
 	if reqBody == nil {
 		return false

@@ -26,11 +26,14 @@ func (x *XTykDoc) append(newInfo *StructInfo) int {
 
 // StructInfo holds ast field information for the docs generator.
 type StructInfo struct {
-	// Name is struct go name
+	// Name is struct go name.
 	Name string
+
 	// Fields holds information of the fields, if this object is a struct.
-	Fields    []*FieldInfo    `json:"fields,omitempty"`
-	structObj *ast.StructType `json:"-"`
+	Fields []*FieldInfo `json:"fields,omitempty"`
+
+	// structObj is the raw ast.StructType value, private.
+	structObj *ast.StructType
 }
 
 // FieldInfo holds details about a field.
@@ -169,12 +172,12 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 			continue
 		}
 
-		JSONName, isInline := jsonTagFromBasicLit(field.Tag)
+		jsonName, isInline := jsonTagFromBasicLit(field.Tag)
 		if isInline {
 			p.parseInlineField(goPath, ident.Name, structInfo)
 			continue
 		}
-		if JSONName == "" && !isInline {
+		if jsonName == "" && !isInline {
 			// field is for internal use?
 			continue
 		}
@@ -189,7 +192,7 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 		}
 
 		fieldInfo := &FieldInfo{
-			JSONName: JSONName,
+			JSONName: jsonName,
 			GoPath:   goPath + "." + goName,
 			Doc:      docs,
 			JSONType: goTypeToJSON(p.globals, ident.Name),
@@ -239,7 +242,6 @@ func (p *objParser) parseNestedObj(name string, field *FieldInfo) {
 				newInfo := &StructInfo{structObj: structObj, Name: typeName}
 				p.parse(typeName, typeName, newInfo)
 			}
-
 		}
 	}
 }
@@ -308,10 +310,10 @@ func cleanDocs(docs ...*ast.CommentGroup) string {
 				if lastCh == "." || lastCh == ":" {
 					s.WriteByte('\n')
 					continue
-				} else {
-					s.WriteByte(' ')
-					continue
 				}
+
+				s.WriteByte(' ')
+				continue
 			}
 		}
 	}
@@ -409,7 +411,6 @@ const xTykDocMarkdownTitle = `
 `
 
 func xTykDocToMarkdown(xtykDoc XTykDoc) string {
-
 	docWriter := strings.Builder{}
 	docWriter.WriteString(xTykDocMarkdownTitle)
 

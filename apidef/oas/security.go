@@ -24,15 +24,20 @@ const (
 // Token holds the values related to authentication tokens.
 type Token struct {
 	// Enabled enables the token based authentication mode.
+	//
 	// Tyk native API definition: `auth_configs["authToken"].use_standard_auth`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
+
 	// AuthSources contains the configuration for authentication sources.
 	AuthSources `bson:",inline" json:",inline"`
+
 	// EnableClientCertificate allows to create dynamic keys based on certificates.
+	//
 	// Tyk native API definition: `auth_configs["authToken"].use_certificate`
 	EnableClientCertificate bool `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty"`
+
 	// Signature holds the configuration for verifying the signature of the token.
-	// Tyk native API definition: `
+	//
 	// Tyk native API definition: `auth_configs["authToken"].use_certificate`
 	Signature *Signature `bson:"signatureValidation,omitempty" json:"signatureValidation,omitempty"`
 }

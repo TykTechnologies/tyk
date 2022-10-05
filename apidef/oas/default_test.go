@@ -723,7 +723,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		})
 
 		t.Run("validateRequest", func(t *testing.T) {
-
 			t.Run("do not configure validateRequest for paths where request body is not specified for application/json",
 				func(t *testing.T) {
 					oasDef := getOASDef(false)
@@ -925,7 +924,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					assert.Nil(t, oasDef.GetTykExtension().Middleware)
 				})
 		})
-
 	})
 
 	t.Run("do not configure upstream URL with servers when upstream URL params is not provided and "+
@@ -1011,7 +1009,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
 	})
-
 }
 
 func TestGetTykExtensionConfigParams(t *testing.T) {
@@ -1186,7 +1183,6 @@ func TestOAS_importAuthentication(t *testing.T) {
 		t.Run("enable=false", func(t *testing.T) {
 			check(t, false)
 		})
-
 	})
 
 	t.Run("update existing one", func(t *testing.T) {
@@ -1318,7 +1314,6 @@ func TestOAS_importAuthentication(t *testing.T) {
 			check(t, false)
 		})
 	})
-
 }
 
 func TestSecuritySchemes_Import(t *testing.T) {

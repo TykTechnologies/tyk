@@ -186,7 +186,6 @@ func TestValidateOASObject(t *testing.T) {
 		expectedErr := fmt.Errorf(oasSchemaVersionNotFoundFmt, reqOASVersion)
 		assert.Equal(t, expectedErr, err)
 	})
-
 }
 
 func Test_loadOASSchema(t *testing.T) {

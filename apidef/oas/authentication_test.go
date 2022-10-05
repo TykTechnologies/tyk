@@ -56,7 +56,6 @@ func TestAuthSources(t *testing.T) {
 }
 
 func TestAuthSource(t *testing.T) {
-
 	t.Run("param", func(t *testing.T) {
 		var emptyParamSource AuthSource
 

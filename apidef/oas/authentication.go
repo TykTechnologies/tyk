@@ -265,40 +265,37 @@ type AuthSources struct {
 
 // Fill fills *AuthSources from apidef.AuthConfig.
 func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
-	// Header
+	// Allocate auth sources being filled.
 	if as.Header == nil {
 		as.Header = &AuthSource{}
 	}
-
-	as.Header.Fill(!authConfig.DisableHeader, authConfig.AuthHeaderName)
-	if ShouldOmit(as.Header) {
-		as.Header = nil
+	if as.Cookie == nil {
+		as.Cookie = &AuthSource{}
 	}
-
-	// Query
 	if as.Query == nil {
 		as.Query = &AuthSource{}
 	}
 
+	// Fill the auth source structures.
+	as.Header.Fill(!authConfig.DisableHeader, authConfig.AuthHeaderName)
 	as.Query.Fill(authConfig.UseParam, authConfig.ParamName)
-	if ShouldOmit(as.Query) {
-		as.Query = nil
-	}
-
-	// Cookie
-	if as.Cookie == nil {
-		as.Cookie = &AuthSource{}
-	}
-
 	as.Cookie.Fill(authConfig.UseCookie, authConfig.CookieName)
+
+	// Check if auth sources should be omitted as they may be undefined.
 	if ShouldOmit(as.Cookie) {
 		as.Cookie = nil
+	}
+	if ShouldOmit(as.Header) {
+		as.Header = nil
+	}
+	if ShouldOmit(as.Query) {
+		as.Query = nil
 	}
 }
 
 // ExtractTo extracts *AuthSources to *apidef.AuthConfig.
 func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
-	// Header
+	// Extract Header auth source.
 	if as.Header != nil {
 		var enabled bool
 		as.Header.ExtractTo(&enabled, &authConfig.AuthHeaderName)
@@ -307,12 +304,12 @@ func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
 		authConfig.DisableHeader = true
 	}
 
-	// Query
+	// Extract Query auth source.
 	if as.Query != nil {
 		as.Query.ExtractTo(&authConfig.UseParam, &authConfig.ParamName)
 	}
 
-	// Cookie
+	// Extract Cookie auth source.
 	if as.Cookie != nil {
 		as.Cookie.ExtractTo(&authConfig.UseCookie, &authConfig.CookieName)
 	}
@@ -433,16 +430,18 @@ type HMAC struct {
 	// Tyk native API definition: `enable_signature_checking`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
-	// Authentication token sources (header, cookie, query).
+	// AuthSources contains authentication token source configuration (header, cookie, query).
 	AuthSources `bson:",inline" json:",inline"`
 
 	// AllowedAlgorithms is the array of HMAC algorithms which are allowed. Tyk supports the following HMAC algorithms:
+	//
 	// - `hmac-sha1`
 	// - `hmac-sha256`
 	// - `hmac-sha384`
 	// - `hmac-sha512`
 	//
 	// and reads the value from algorithm header.
+	//
 	// Tyk native API definition: `hmac_allowed_algorithms`
 	AllowedAlgorithms []string `bson:"allowedAlgorithms,omitempty" json:"allowedAlgorithms,omitempty"`
 
@@ -486,7 +485,7 @@ type OIDC struct {
 	// Tyk native API definition: `use_openid`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
-	// AuthSources contains authentication token sources (header, cookie, query).
+	// AuthSources contains authentication token source configuration (header, cookie, query).
 	AuthSources `bson:",inline" json:",inline"`
 
 	// SeggregateByClientId: If set to `true, the policies will be applied to a combination of Client ID and User ID.

@@ -1077,25 +1077,25 @@
 
   **Type: [CachePlugin](#cacheplugin)**
 
-  Cache plugin configuration.
+  Cache contains the caching plugin configuration.
 
 - **`enforceTimeout`**
 
   **Type: [EnforceTimeout](#enforcetimeout)**
 
-  Enforce timeout configuration.
+  EnforceTimeout contains the request timeout configuration.
 
 - **`validateRequest`**
 
   **Type: [ValidateRequest](#validaterequest)**
 
-  Validate request configuration.
+  ValidateRequest contains the request validation configuration.
 
 - **`mockResponse`**
 
   **Type: [MockResponse](#mockresponse)**
 
-  MockResponse response configuration.
+  MockResponse contains the mock response configuration.
 
 
 ### **Allowance**
