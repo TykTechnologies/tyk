@@ -7,6 +7,7 @@ env:
   CONTAINER_NAME: "tyk"
   CLUSTER: "kikitest4"
   IMAGE: "tyk:v4.0.0"
+  DESTROY: "true"
 
 jobs:
   Check:
@@ -90,12 +91,13 @@ jobs:
 
   Create-workflow:
     if: ${{ needs.Check.outputs.env-exist == 'false' }}
-    uses: ./.github/workflows/create-persistent-env.yml
+    uses: ./.github/workflows/gromit-run.yml
     needs:
       - Check
     with:
       containerName: ${{ needs.Check.outputs.container-name }}
       cluster: ${{ needs.Check.outputs.cluster }}
+      script: "/repo/ci/devenv/create_env.sh"
     secrets:
       aws_key: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
       aws_secret: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
@@ -118,6 +120,22 @@ jobs:
       aws_key: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
       aws_secret: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
       registry: ${{ needs.Check.outputs.registry }}
+
+  Delete-workflow:
+    if: ${{ always() && env.DESTROY == 'true' }}
+    uses: ./.github/workflows/gromit-run.yml
+    needs: [ Create-workflow, Update-workflow ]
+    with:
+      containerName: ${{ needs.Check.outputs.container-name }}
+      cluster: ${{ needs.Check.outputs.cluster }}
+      script: "/repo/ci/devenv/delete_env.sh"
+    secrets:
+      aws_key: ${{ secrets.GROMIT_AWS_ACCESS_KEY_ID }}
+      aws_secret: ${{ secrets.GROMIT_AWS_SECRET_ACCESS_KEY }}
+      tf_token: ${{ secrets.TF_API_TOKEN }}
+      etcd_pass: ${{ secrets.ETCD_PASS }}
+      docker_user: ${{ secrets.DOCKER_USERNAME }}
+      docker_pass: ${{ secrets.DOCKER_PASSWORD }}
 
   Record-update:
     runs-on: ubuntu-latest

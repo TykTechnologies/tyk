@@ -12,3 +12,5 @@ terraform init
 terraform workspace select ${CLUSTER}
 terraform workspace show
 terraform destroy -auto-approve -var "name=${CLUSTER}" -var-file=master.tfvars
+terraform workspace select default
+terraform workspace delete ${CLUSTER}
