@@ -19,6 +19,7 @@ jobs:
       service: ${{ steps.set-output-defaults.outputs.service }}
       image: ${{ steps.set-output-defaults.outputs.image }}
       registry: ${{ steps.login-ecr.outputs.registry }}
+      destroy: ${{ steps.set-output-defaults.outputs.destroy }}
     steps:
       - name: Shallow checkout of tyk
         uses: actions/checkout@v2
