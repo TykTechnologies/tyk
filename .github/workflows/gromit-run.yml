@@ -78,4 +78,4 @@ jobs:
           registry: docker.io
           image: tykio/gromit:v1.4.5-rc2
           options: -v ${{ github.workspace }}:/repo -v /home/runner/.terraformrc:/root/.terraformrc
-          run: gromit mutex get master --script ${{ inputs.script }} -l debug
+          run: gromit mutex get ${{ env.CLUSTER }} --script ${{ inputs.script }} -l debug

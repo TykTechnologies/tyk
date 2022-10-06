@@ -5,9 +5,9 @@ on:
 env:
   SERVICE: "tyk"
   CONTAINER_NAME: "tyk"
-  CLUSTER: "kikitest3"
+  CLUSTER: "kikitest4"
   IMAGE: "tyk:v4.0.0"
-  DESTROY: "false"
+  DESTROY: "true"
 
 jobs:
   Check:
