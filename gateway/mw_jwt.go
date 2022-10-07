@@ -1,16 +1,10 @@
 package gateway
 
 import (
-	"bytes"
 	"crypto/md5"
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -27,7 +21,7 @@ import (
 )
 
 type JWTMiddleware struct {
-	BaseMiddleware
+	JWTBase
 }
 
 const (
@@ -83,171 +77,6 @@ func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
 	return &j, nil
 }
 
-func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
-	// Implement a cache
-	if JWKCache == nil {
-		JWKCache = cache.New(240*time.Second, 30*time.Second)
-	}
-
-	var client http.Client
-	client.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
-	}
-
-	var jwkSet JWKs
-	cachedJWK, found := JWKCache.Get("legacy-" + k.Spec.APIID)
-	if !found {
-		resp, err := client.Get(url)
-		if err != nil {
-			k.Logger().WithError(err).Error("Failed to get resource URL")
-			return nil, err
-		}
-		defer resp.Body.Close()
-
-		// Decode it
-		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
-			k.Logger().WithError(err).Error("Failed to decode body JWK")
-			return nil, err
-		}
-
-		JWKCache.Set("legacy-"+k.Spec.APIID, jwkSet, cache.DefaultExpiration)
-	} else {
-		jwkSet = cachedJWK.(JWKs)
-	}
-
-	for _, val := range jwkSet.Keys {
-		if val.KID != kid || strings.ToLower(val.Kty) != strings.ToLower(keyType) {
-			continue
-		}
-		if len(val.X5c) > 0 {
-			// Use the first cert only
-			decodedCert, err := base64.StdEncoding.DecodeString(val.X5c[0])
-			if !bytes.Contains(decodedCert, []byte("-----")) {
-				return nil, errors.New("No legacy public keys found")
-			}
-			if err != nil {
-				return nil, err
-			}
-			return ParseRSAPublicKey(decodedCert)
-		}
-		return nil, errors.New("no certificates in JWK")
-	}
-
-	return nil, errors.New("No matching KID could be found")
-}
-
-func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{}, error) {
-	// Implement a cache
-	if JWKCache == nil {
-		k.Logger().Debug("Creating JWK Cache")
-		JWKCache = cache.New(240*time.Second, 30*time.Second)
-	}
-
-	var jwkSet *jose.JSONWebKeySet
-	var client http.Client
-	client.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
-	}
-
-	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
-	if !found {
-		// Get the JWK
-		k.Logger().Debug("Pulling JWK")
-		resp, err := client.Get(url)
-		if err != nil {
-			k.Logger().WithError(err).Error("Failed to get resource URL")
-			return nil, err
-		}
-		defer resp.Body.Close()
-		buf, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			k.Logger().WithError(err).Error("Failed to get read response body")
-			return nil, err
-		}
-		if jwkSet, err = parseJWK(buf); err != nil {
-			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
-
-			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
-			if legacyError == nil {
-				return key, nil
-			}
-
-			return nil, err
-		}
-
-		// Cache it
-		k.Logger().Debug("Caching JWK")
-		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
-	} else {
-		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
-	}
-	k.Logger().Debug("Checking JWKs...")
-	if keys := jwkSet.Key(kid); len(keys) > 0 {
-		return keys[0].Key, nil
-	}
-	return nil, errors.New("No matching KID could be found")
-}
-
-func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
-	// Check which claim is used for the id - kid or sub header
-	// If is not supposed to ignore KID - will use this as ID if not empty
-	if !k.Spec.APIDefinition.JWTSkipKid {
-		if tykId, idFound := token.Header[KID].(string); idFound {
-			k.Logger().Debug("Found: ", tykId)
-			return tykId, nil
-		}
-	}
-	// In case KID was empty or was set to ignore KID ==> Will try to get the Id from JWTIdentityBaseField or fallback to 'sub'
-	tykId, err := k.getUserIdFromClaim(token.Claims.(jwt.MapClaims))
-	return tykId, err
-}
-
-func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.Token) (interface{}, error) {
-	config := k.Spec.APIDefinition
-	// Check for central JWT source
-	if config.JWTSource != "" {
-		// Is it a URL?
-		if httpScheme.MatchString(config.JWTSource) {
-			return k.getSecretFromURL(config.JWTSource, token.Header[KID].(string), k.Spec.JWTSigningMethod)
-		}
-
-		// If not, return the actual value
-		decodedCert, err := base64.StdEncoding.DecodeString(config.JWTSource)
-		if err != nil {
-			return nil, err
-		}
-
-		// Is decoded url too?
-		if httpScheme.MatchString(string(decodedCert)) {
-			secret, err := k.getSecretFromURL(string(decodedCert), token.Header[KID].(string), k.Spec.JWTSigningMethod)
-			if err != nil {
-				return nil, err
-			}
-
-			return secret, nil
-		}
-
-		return decodedCert, nil // Returns the decoded secret
-	}
-
-	// If we are here, there's no central JWT source
-
-	// Get the ID from the token (in KID header or configured claim or SUB claim)
-	tykId, err := k.getIdentityFromToken(token)
-	if err != nil {
-		return nil, err
-	}
-
-	// Couldn't base64 decode the kid, so lets try it raw
-	k.Logger().Debug("Getting key: ", tykId)
-	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(tykId, r)
-	tykId = session.KeyID
-	if !rawKeyExists {
-		return nil, errors.New("token invalid, key not found")
-	}
-	return []byte(session.JWTData.Secret), nil
-}
-
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
 	policyID, foundPolicy := claims[k.Spec.JWTPolicyFieldName].(string)
 	if !foundPolicy {
@@ -291,41 +120,6 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 	}
 
 	return
-}
-
-func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error) {
-	var userId string
-	var found = false
-
-	if k.Spec.JWTIdentityBaseField != "" {
-		if userId, found = claims[k.Spec.JWTIdentityBaseField].(string); found {
-			if len(userId) > 0 {
-				k.Logger().WithField("userId", userId).Debug("Found User Id in Base Field")
-				return userId, nil
-			}
-			message := "found an empty user ID in predefined base field claim " + k.Spec.JWTIdentityBaseField
-			k.Logger().Error(message)
-			return "", errors.New(message)
-		}
-
-		if !found {
-			k.Logger().WithField("Base Field", k.Spec.JWTIdentityBaseField).Warning("Base Field claim not found, trying to find user ID in 'sub' claim.")
-		}
-	}
-
-	if userId, found = claims[SUB].(string); found {
-		if len(userId) > 0 {
-			k.Logger().WithField("userId", userId).Debug("Found User Id in 'sub' claim")
-			return userId, nil
-		}
-		message := "found an empty user ID in sub claim"
-		k.Logger().Error(message)
-		return "", errors.New(message)
-	}
-
-	message := "no suitable claims for user ID were found"
-	k.Logger().Error(message)
-	return "", errors.New(message)
 }
 
 func toStrings(v interface{}) []string {
@@ -726,53 +520,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	parser := &jwt.Parser{SkipClaimsValidation: true}
 
 	// Verify the token
-	token, err := parser.Parse(rawJWT, func(token *jwt.Token) (interface{}, error) {
-		// Don't forget to validate the alg is what you expect:
-		switch k.Spec.JWTSigningMethod {
-		case HMACSign:
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("%v: %v and not HMAC signature", UnexpectedSigningMethod, token.Header["alg"])
-			}
-		case RSASign:
-			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-				return nil, fmt.Errorf("%v: %v and not RSA signature", UnexpectedSigningMethod, token.Header["alg"])
-			}
-		case ECDSASign:
-			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
-				return nil, fmt.Errorf("%v: %v and not ECDSA signature", UnexpectedSigningMethod, token.Header["alg"])
-			}
-		default:
-			logger.Warning("No signing method found in API Definition, defaulting to HMAC signature")
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("%v: %v", UnexpectedSigningMethod, token.Header["alg"])
-			}
-		}
-
-		val, err := k.getSecretToVerifySignature(r, token)
-		if err != nil {
-			k.Logger().WithError(err).Error("Couldn't get token")
-			return nil, err
-		}
-		switch k.Spec.JWTSigningMethod {
-		case RSASign, ECDSASign:
-			switch e := val.(type) {
-			case []byte:
-				key, err := ParseRSAPublicKey(e)
-				if err != nil {
-					logger.WithError(err).Error("Failed to decode JWT key")
-					return nil, errors.New("Failed to decode JWT key")
-				}
-				return key, nil
-			default:
-				// We have already parsed the correct key so we just return it here.No need
-				// for checks because they already happened somewhere ele.
-				return e, nil
-			}
-
-		default:
-			return val, nil
-		}
-	})
+	token, err := parser.Parse(rawJWT, k.ParseJWTHook(r, true))
 
 	if err == nil && token.Valid {
 		if jwtErr := k.timeValidateJWTClaims(token.Claims.(jwt.MapClaims)); jwtErr != nil {
@@ -800,53 +548,6 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		}
 	}
 	return errors.New("Key not authorized"), http.StatusForbidden
-}
-
-func ParseRSAPublicKey(data []byte) (interface{}, error) {
-	input := data
-	block, _ := pem.Decode(data)
-	if block != nil {
-		input = block.Bytes
-	}
-	var pub interface{}
-	var err error
-	pub, err = x509.ParsePKIXPublicKey(input)
-	if err != nil {
-		cert, err0 := x509.ParseCertificate(input)
-		if err0 != nil {
-			return nil, err0
-		}
-		pub = cert.PublicKey
-		err = nil
-	}
-	return pub, err
-}
-
-func (k *JWTMiddleware) timeValidateJWTClaims(c jwt.MapClaims) *jwt.ValidationError {
-	vErr := new(jwt.ValidationError)
-	now := time.Now().Unix()
-	// The claims below are optional, by default, so if they are set to the
-	// default value in Go, let's not fail the verification for them.
-	if !c.VerifyExpiresAt(now-int64(k.Spec.JWTExpiresAtValidationSkew), false) {
-		vErr.Inner = errors.New("token has expired")
-		vErr.Errors |= jwt.ValidationErrorExpired
-	}
-
-	if c.VerifyIssuedAt(now+int64(k.Spec.JWTIssuedAtValidationSkew), false) == false {
-		vErr.Inner = errors.New("token used before issued")
-		vErr.Errors |= jwt.ValidationErrorIssuedAt
-	}
-
-	if c.VerifyNotBefore(now+int64(k.Spec.JWTNotBeforeValidationSkew), false) == false {
-		vErr.Inner = errors.New("token is not valid yet")
-		vErr.Errors |= jwt.ValidationErrorNotValidYet
-	}
-
-	if vErr.Errors == 0 {
-		return nil
-	}
-
-	return vErr
 }
 
 func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {

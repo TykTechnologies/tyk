@@ -94,7 +94,7 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	basic := &BasicAuthKeyIsValid{BaseMiddleware: baseMid}
 	coprocess := &CoProcessMiddleware{BaseMiddleware: baseMid}
 	hmac := &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid}
-	jwt := &JWTMiddleware{BaseMiddleware: baseMid}
+	jwt := &JWTMiddleware{JWTBase: JWTBase{baseMid}}
 	oauth := &Oauth2KeyExists{BaseMiddleware: baseMid}
 	oidc := &OpenIDMW{BaseMiddleware: baseMid}
 
