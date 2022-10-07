@@ -39,10 +39,7 @@ func SetServiceID(ctx context.Context, service string) context.Context {
 // GetServiceID returns service name attched to context returns an empty string
 // if the service name key is not found.
 func GetServiceID(ctx context.Context) string {
-	if v := ctx.Value(serviceID{}); v != nil {
-		return v.(string)
-	}
-	return ""
+	return "tyk-gateway"
 }
 
 // Logger defines api for logging messages by the OpenTracer struct. This is a
@@ -108,6 +105,8 @@ func AddTracer(tracer, service string) error {
 	if !IsEnabled() {
 		return ErrManagerDisabled
 	}
+
+	service = "tyk-gateway"
 	if _, ok := services.Load(service); !ok {
 		if v, ok := manager.Load(tracer); ok {
 			c := v.(Config)

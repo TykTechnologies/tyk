@@ -66,6 +66,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		span, ctx := trace.Span(r.Context(),
 			tr.Name(),
 		)
+
 		defer span.End()
 		setContext(r, ctx)
 		err, i :=  tr.TykMiddleware.ProcessRequest(w, r, conf)
@@ -85,6 +86,14 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 				attribute:= attribute.String(key,val)
 				attr = append(attr,attribute)
 			}
+		}
+		baseMw := tr.Base()
+		if baseMw != nil {
+			spec := baseMw.Spec
+			attr = append(attr, attribute.String("tyk.apidef.api_id",spec.APIID))
+			attr = append(attr, attribute.String("tyk.apidef.org_id",spec.OrgID))
+			attr = append(attr, attribute.String("tyk.apidef.name",spec.Name))
+
 		}
 		span.SetAttributes(attr...)
 
