@@ -136,7 +136,7 @@ dockers:
     - ci/images/plugin-compiler
     - go.mod
     - apidef
-    - certs
+    - cert
     - checkup
     - cli
     - config

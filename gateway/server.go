@@ -20,6 +20,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/TykTechnologies/tyk/cert"
+
 	"github.com/TykTechnologies/tyk/test"
 
 	"sync/atomic"
@@ -46,7 +48,6 @@ import (
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/checkup"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
@@ -106,7 +107,7 @@ type Gateway struct {
 	MonitoringHandler    config.TykEventHandler
 	RPCListener          RPCStorageHandler
 	DashService          DashboardServiceSender
-	CertificateManager   *certs.CertificateManager
+	CertificateManager   *cert.CertificateManager
 	GlobalHostChecker    HostCheckerManager
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
@@ -406,14 +407,14 @@ func (gw *Gateway) setupGlobals() {
 	}
 
 	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, RedisController: gw.RedisController}
-	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
+	gw.CertificateManager = cert.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		rpcStore := &RPCStorageHandler{
 			KeyPrefix: "cert-",
 			HashKeys:  false,
 			Gw:        gw,
 		}
-		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
+		gw.CertificateManager = cert.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {

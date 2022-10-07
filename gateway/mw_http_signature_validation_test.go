@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/cert"
 
 	"github.com/justinas/alice"
 	"github.com/lonelycode/go-uuid/uuid"
@@ -707,7 +707,7 @@ func TestRSAAuthSessionPass(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, _, serverCert := certs.GenServerCertificate()
+	_, _, _, serverCert := cert.GenServerCertificate()
 	privateKey := serverCert.PrivateKey.(*rsa.PrivateKey)
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
@@ -742,7 +742,7 @@ func BenchmarkRSAAuthSessionPass(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, _, serverCert := certs.GenServerCertificate()
+	_, _, _, serverCert := cert.GenServerCertificate()
 	privateKey := serverCert.PrivateKey.(*rsa.PrivateKey)
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
@@ -771,7 +771,7 @@ func TestRSAAuthSessionKeyMissing(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, _, serverCert := certs.GenServerCertificate()
+	_, _, _, serverCert := cert.GenServerCertificate()
 	privateKey := serverCert.PrivateKey.(*rsa.PrivateKey)
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)

@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TykTechnologies/tyk/cert"
+
 	"github.com/TykTechnologies/tyk/config"
 
 	//	"net"
@@ -19,7 +21,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -29,8 +30,8 @@ func (gw *Gateway) uploadCertPublicKey(serverCert tls.Certificate) (string, erro
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
 	pubID, _ := gw.CertificateManager.Add(pubPem, "")
 
-	if pubID != certs.HexSHA256(pubDer) {
-		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", certs.HexSHA256(pubDer), pubID)
+	if pubID != cert.HexSHA256(pubDer) {
+		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", cert.HexSHA256(pubDer), pubID)
 		return "", errors.New(errStr)
 	}
 
@@ -67,7 +68,7 @@ func newUpstreamSSL(t *testing.T, gw *Gateway, serverCert tls.Certificate, handl
 }
 
 func TestPublicKeyPinning(t *testing.T) {
-	_, _, _, serverCert := certs.GenServerCertificate()
+	_, _, _, serverCert := cert.GenServerCertificate()
 
 	t.Run("Pub key match", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
@@ -154,7 +155,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		upstream, _, finish := newUpstreamSSL(t, ts.Gw, serverCert, handlerEmpty)
 		defer finish()
 
-		_, _, _, proxyCert := certs.GenServerCertificate()
+		_, _, _, proxyCert := cert.GenServerCertificate()
 		proxy := initProxy("https", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
 			MaxVersion:   tls.VersionTLS12,
@@ -185,7 +186,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		defer ts.Close()
 
 		// start upstream server
-		_, _, _, serverCert := certs.GenCertificate(&x509.Certificate{
+		_, _, _, serverCert := cert.GenCertificate(&x509.Certificate{
 			EmailAddresses: []string{"test@test.com"},
 			Subject:        pkix.Name{CommonName: "localhost"},
 		}, false)
@@ -194,7 +195,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		defer finish()
 
 		// start proxy
-		_, _, _, proxyCert := certs.GenCertificate(&x509.Certificate{
+		_, _, _, proxyCert := cert.GenCertificate(&x509.Certificate{
 			Subject: pkix.Name{CommonName: "local1.host"},
 		}, false)
 		proxyPubID, err := ts.Gw.uploadCertPublicKey(proxyCert)
@@ -345,7 +346,7 @@ func TestProxyTransport(t *testing.T) {
 		globalConf.ProxySSLMinVersion = 771
 		ts.Gw.SetConfig(globalConf)
 
-		_, _, _, proxyCert := certs.GenServerCertificate()
+		_, _, _, proxyCert := cert.GenServerCertificate()
 		proxy := initProxy("https", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
 			MaxVersion:   tls.VersionTLS12,
