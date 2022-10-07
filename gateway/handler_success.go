@@ -14,7 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -204,7 +204,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			Path:          trackedPath,
 			RawPath:       r.URL.Path,
 			ContentLength: r.ContentLength,
-			UserAgent:     r.Header.Get(headers.UserAgent),
+			UserAgent:     r.Header.Get(header.UserAgent),
 			Day:           t.Day(),
 			Month:         t.Month(),
 			Year:          t.Year(),

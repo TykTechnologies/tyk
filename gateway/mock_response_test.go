@@ -102,21 +102,30 @@ func TestMockResponse(t *testing.T) {
 	t.Run("from OAS", func(t *testing.T) {
 		mockResponse.FromOASExamples.Enabled = true
 		api := BuildAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
+			spec.Proxy.ListenPath = "/listen-path/"
+			spec.Proxy.StripListenPath = false
 			spec.IsOAS = true
 			spec.OAS = oasDoc
 		})[0]
 
 		g.Gw.LoadAPI(api)
 
-		_, _ = g.Run(t, test.TestCase{Path: "/get", BodyMatch: "Furkan", Code: http.StatusOK})
-		_, _ = g.Run(t, test.TestCase{Path: "/elma", BodyMatch: "/elma", Code: http.StatusOK})
+		_, _ = g.Run(t, test.TestCase{Path: "/listen-path/get", BodyMatch: "Furkan", Code: http.StatusOK})
+		_, _ = g.Run(t, test.TestCase{Path: "/listen-path/elma", BodyMatch: "/elma", Code: http.StatusOK})
+
+		t.Run("strip listen path", func(t *testing.T) {
+			api.Proxy.StripListenPath = true
+			g.Gw.LoadAPI(api)
+
+			_, _ = g.Run(t, test.TestCase{Path: "/listen-path/get", BodyMatch: "Furkan", Code: http.StatusOK})
+			_, _ = g.Run(t, test.TestCase{Path: "/listen-path/elma", BodyMatch: "/elma", Code: http.StatusOK})
+		})
 
 		t.Run("not found", func(t *testing.T) {
 			mockResponse.FromOASExamples.ContentType = "application/xml"
 			g.Gw.LoadAPI(api)
 
-			_, _ = g.Run(t, test.TestCase{Path: "/get", BodyMatch: "mock: there is no example response for the content type: application/xml"})
+			_, _ = g.Run(t, test.TestCase{Path: "/listen-path/get", BodyMatch: "mock: there is no example response for the content type: application/xml"})
 		})
 	})
 }

@@ -17,7 +17,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -86,7 +86,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		}
 
 		if strings.HasSuffix(w.conf.TemplatePath, ".json") {
-			w.contentType = headers.ApplicationJSON
+			w.contentType = header.ApplicationJSON
 		}
 	}
 
@@ -105,7 +105,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 			}).Error("Could not load the default template: ", err)
 			return err
 		}
-		w.contentType = headers.ApplicationJSON
+		w.contentType = header.ApplicationJSON
 	}
 
 	log.WithFields(logrus.Fields{
@@ -193,15 +193,15 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 		return nil, err
 	}
 
-	req.Header.Set(headers.UserAgent, headers.TykHookshot)
+	req.Header.Set(header.UserAgent, header.TykHookshot)
 
 	ignoreCanonical := w.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for key, val := range w.conf.HeaderList {
 		setCustomHeader(req.Header, key, val, ignoreCanonical)
 	}
 
-	if req.Header.Get(headers.ContentType) == "" {
-		req.Header.Set(headers.ContentType, w.contentType)
+	if req.Header.Get(header.ContentType) == "" {
+		req.Header.Set(header.ContentType, w.contentType)
 	}
 
 	return req, nil

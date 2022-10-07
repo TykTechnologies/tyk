@@ -19,7 +19,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/murmur3"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
@@ -347,9 +347,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	// Only add ratelimit data to keyed sessions
 	if session != nil {
 		quotaMax, quotaRemaining, _, quotaRenews := session.GetQuotaLimitByAPIID(m.Spec.APIID)
-		w.Header().Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		w.Header().Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		w.Header().Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+		w.Header().Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		w.Header().Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		w.Header().Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 	w.Header().Set("x-tyk-cached-response", "1")
 
