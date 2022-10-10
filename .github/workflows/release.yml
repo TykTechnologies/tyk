@@ -229,7 +229,7 @@ jobs:
           --author 'Bender' \
           --author-icon 'https://hcoop.net/~alephnull/bender/bender-arms.jpg' \
           --author-link 'https://github.com/TykTechnologies/tyk-ci' \
-          --channel '#integration' \
+          --channel '#service-integration' \
           --color $colour \
           --fields '{"title": "Repo", "value": "${{ github.repository }}", "short": false}' \
           --footer 'github-actions' \
