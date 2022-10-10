@@ -1034,6 +1034,164 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 	})
 }
 
+func TestGraphQL_SubgraphBatchRequest(t *testing.T) {
+	g := StartTest(nil)
+	t.Cleanup(func() {
+		g.Close()
+	})
+
+	bankAccountSubgraphPath := "/subgraph-bank-accounts"
+	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
+		spec.Name = "subgraph-accounts-modified"
+		spec.APIID = "subgraph-accounts-modified"
+		spec.Proxy.TargetURL = testSubgraphAccountsModified
+		spec.Proxy.ListenPath = "/tyk-subgraph-accounts-modified"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaAccounts,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLAccounts,
+			},
+		}
+	})[0]
+	tykSubgraphBankAccounts := BuildAPI(func(spec *APISpec) {
+		spec.Name = "subgraph-bank-accounts"
+		spec.APIID = "subgraph-bank-accounts"
+		spec.Proxy.TargetURL = TestHttpAny + bankAccountSubgraphPath
+		spec.Proxy.ListenPath = "/subgraph-bank-accounts"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaBankAccounts,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLBankAccounts,
+			},
+		}
+	})[0]
+
+	t.Run("should batch requests", func(t *testing.T) {
+		subgraphRequest := `{"query":"query($representations: [_Any!]!){_entities(representations: $representations){__typename ... on User {account {number}}}}","variables":{"representations":[{"id":"1","__typename":"User"},{"id":"2","__typename":"User"}]}}`
+		supergraph := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/batched-supergraph"
+			spec.APIID = "batched-supergraph"
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				Version:       apidef.GraphQLConfigVersion2,
+				ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
+				Supergraph: apidef.GraphQLSupergraphConfig{
+					Subgraphs: []apidef.GraphQLSubgraphEntity{
+						{
+							APIID: "subgraph-accounts-modified",
+							URL:   "tyk://" + tykSubgraphAccounts.Name,
+							SDL:   gqlSubgraphSDLAccounts,
+						},
+						{
+							APIID: "subgraph-bank-accounts",
+							URL:   "tyk://" + tykSubgraphBankAccounts.Name,
+							SDL:   gqlSubgraphSDLBankAccounts,
+						},
+					},
+					MergedSDL: gqlMergedSupergraphSDL,
+				},
+				Schema: gqlMergedSupergraphSDL,
+			}
+		})[0]
+		g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphBankAccounts, supergraph)
+		timesHit := 0
+		lock := sync.Mutex{}
+		failChan := make(chan struct{})
+		g.AddDynamicHandler(bankAccountSubgraphPath, func(writer http.ResponseWriter, r *http.Request) {
+			lock.Lock()
+			timesHit++
+			lock.Unlock()
+			d, _ := io.ReadAll(r.Body)
+			defer r.Body.Close()
+			if timesHit > 1 || string(d) != subgraphRequest {
+				failChan <- struct{}{}
+				return
+			}
+		})
+
+		q := graphql.Request{
+			Query: `query Query { allUsers { id username account { number } } }`,
+		}
+		// run this in a goroutine to prevent blocking, we don't actually need the test to match body or response
+		go func() {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Data: q, Path: "/batched-supergraph",
+				},
+			}...)
+		}()
+
+		timer := time.NewTimer(time.Second * 5)
+		select {
+		case <-timer.C:
+			return
+		case <-failChan:
+			t.Error("request not batched")
+		}
+	})
+
+	t.Run("shouldn't batch requests", func(t *testing.T) {
+		supergraph := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/unbatched-supergraph"
+			spec.APIID = "unbatched-supergraph"
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				Version:       apidef.GraphQLConfigVersion2,
+				ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
+				Supergraph: apidef.GraphQLSupergraphConfig{
+					DisableQueryBatching: true,
+					Subgraphs: []apidef.GraphQLSubgraphEntity{
+						{
+							APIID: "subgraph-accounts-modified",
+							URL:   "tyk://" + tykSubgraphAccounts.Name,
+							SDL:   gqlSubgraphSDLAccounts,
+						},
+						{
+							APIID: "subgraph-bank-accounts",
+							URL:   "tyk://" + tykSubgraphBankAccounts.Name,
+							SDL:   gqlSubgraphSDLBankAccounts,
+						},
+					},
+					MergedSDL: gqlMergedSupergraphSDL,
+				},
+				Schema: gqlMergedSupergraphSDL,
+			}
+		})[0]
+		g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphBankAccounts, supergraph)
+		timesHit := 0
+		lock := sync.Mutex{}
+		g.AddDynamicHandler(bankAccountSubgraphPath, func(writer http.ResponseWriter, r *http.Request) {
+			lock.Lock()
+			timesHit++
+			lock.Unlock()
+		})
+
+		q := graphql.Request{
+			Query: `query Query { allUsers { id username account { number } } }`,
+		}
+		// run this in a goroutine to prevent blocking, we don't actually need the test to match body or response
+		go func() {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Data: q, Path: "/unbatched-supergraph",
+				},
+			}...)
+		}()
+
+		assert.Eventually(t, func() bool {
+			lock.Lock()
+			defer lock.Unlock()
+			return timesHit == 2
+		}, time.Second*5, time.Millisecond*100)
+	})
+}
+
 func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
