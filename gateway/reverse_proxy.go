@@ -965,7 +965,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 		gqlRequest.SetHeader(outreq.Header)
 
 		var isIntrospection bool
-		isIntrospection, err = gqlRequest.IsIntrospectionQuery()
+		isIntrospection, err = gqlRequest.IsIntrospectionQueryStrict()
 		if err != nil {
 			return
 		}
