@@ -92,13 +92,14 @@ const (
 
 	Self = "self"
 
-	AuthTokenType = "authToken"
-	JWTType       = "jwt"
-	HMACType      = "hmac"
-	BasicType     = "basic"
-	CoprocessType = "coprocess"
-	OAuthType     = "oauth"
-	OIDCType      = "oidc"
+	AuthTokenType     = "authToken"
+	JWTType           = "jwt"
+	HMACType          = "hmac"
+	BasicType         = "basic"
+	CoprocessType     = "coprocess"
+	OAuthType         = "oauth"
+	ExternalOAuthType = "externalOAuth"
+	OIDCType          = "oidc"
 )
 
 var (
@@ -539,6 +540,7 @@ type APIDefinition struct {
 	OrgID               string        `bson:"org_id" json:"org_id"`
 	UseKeylessAccess    bool          `bson:"use_keyless" json:"use_keyless"`
 	UseOauth2           bool          `bson:"use_oauth2" json:"use_oauth2"`
+	ExternalOAuth       ExternalOAuth `bson:"external_oauth" json:"external_oauth"`
 	UseOpenID           bool          `bson:"use_openid" json:"use_openid"`
 	OpenIDOptions       OpenIDOptions `bson:"openid_options" json:"openid_options"`
 	Oauth2Meta          struct {
@@ -1270,3 +1272,21 @@ var Template = template.New("").Funcs(map[string]interface{}{
 		return string(xmlValue), err
 	},
 })
+
+type ExternalOAuth struct {
+	Enabled   bool       `bson:"enabled" json:"enabled"`
+	Providers []Provider `bson:"providers" json:"providers"`
+}
+
+type Provider struct {
+	JWT           JWTValidation `bson:"jwt" json:"jwt"`
+	Introspection Introspection `bson:"introspection" json:"introspection"`
+}
+
+type JWTValidation struct {
+	Enabled bool `bson:"enabled" json:"enabled"`
+}
+
+type Introspection struct {
+	Enabled bool `bson:"enabled" json:"enabled"`
+}

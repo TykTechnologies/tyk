@@ -1104,21 +1104,31 @@
 
   **Type: `boolean`**
 
+  Enabled enables the mock response middleware.
+
 - **`code`**
 
   **Type: `int`**
+
+  Code is the HTTP response code that will be returned.
 
 - **`body`**
 
   **Type: `string`**
 
+  Body is the HTTP response body that will be returned.
+
 - **`headers`**
 
   **Type: `string`**
 
+  Headers are the HTTP response headers that will be returned.
+
 - **`fromOASExamples`**
 
   **Type: [FromOASExamples](#fromoasexamples)**
+
+  FromOASExamples is the configuration to extract a mock response from OAS documentation.
 
 
 ### **FromOASExamples**

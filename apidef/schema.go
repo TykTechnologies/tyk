@@ -192,6 +192,9 @@ const Schema = `{
         "oauth_meta": {
             "type":["object", "null"]
         },
+		"external_oauth": {
+            "type":["object", "null"]
+        },
         "cache_options": {
             "type":["object", "null"]
         },
