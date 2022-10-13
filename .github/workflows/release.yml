@@ -166,8 +166,8 @@ jobs:
       - name: Configure AWS credentials for use
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: arn:aws:iam::046805072452:role/gromit-test
-          role-session-name: gromitci
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: githubciecr
           aws-region: eu-central-1
 
       - name: Login to Amazon ECR
