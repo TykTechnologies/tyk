@@ -156,6 +156,8 @@ jobs:
     needs:
       - goreleaser
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
 
     steps:
       - name: Shallow checkout of tyk
