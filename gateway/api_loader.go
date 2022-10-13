@@ -340,7 +340,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: OAuth")
 		}
 
-		if gw.mwAppendEnabled(&authArray, &ExternalOAuthMiddleware{baseMid}) {
+		if gw.mwAppendEnabled(&authArray, &ExternalOAuthMiddleware{BaseMiddleware: baseMid}) {
 			logger.Info("Checking security policy: External OAuth")
 		}
 

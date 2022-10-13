@@ -1284,7 +1284,13 @@ type Provider struct {
 }
 
 type JWTValidation struct {
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled                 bool   `bson:"enabled" json:"enabled"`
+	SigningMethod           string `bson:"signingMethod" json:"signingMethod"`
+	Source                  string `bson:"source" json:"source"`
+	IssuedAtValidationSkew  uint64 `bson:"issuedAtValidationSkew" json:"issuedAtValidationSkew"`
+	NotBeforeValidationSkew uint64 `bson:"notBeforeValidationSkew" json:"notBeforeValidationSkew"`
+	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew" json:"expiresAtValidationSkew"`
+	IdentityBaseField       string `bson:"identityBaseField" json:"identityBaseField"`
 }
 
 type Introspection struct {
