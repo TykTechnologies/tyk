@@ -474,11 +474,16 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidateRequestMeta) {
 }
 
 type MockResponse struct {
-	Enabled         bool              `bson:"enabled" json:"enabled"`
-	Code            int               `bson:"code,omitempty" json:"code,omitempty"`
-	Body            string            `bson:"body,omitempty" json:"body,omitempty"`
-	Headers         map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
-	FromOASExamples *FromOASExamples  `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
+	// Enabled enables the mock response middleware.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Code is the HTTP response code that will be returned.
+	Code int `bson:"code,omitempty" json:"code,omitempty"`
+	// Body is the HTTP response body that will be returned.
+	Body string `bson:"body,omitempty" json:"body,omitempty"`
+	// Headers are the HTTP response headers that will be returned.
+	Headers map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
+	// FromOASExamples is the configuration to extract a mock response from OAS documentation.
+	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }
 
 type FromOASExamples struct {
