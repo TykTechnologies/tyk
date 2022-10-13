@@ -78,7 +78,7 @@ func (c *GraphqlComplexityChecker) DepthLimitExceeded(gqlRequest *graphql.Reques
 		return ComplexityFailReasonNone
 	}
 
-	isIntrospectionQuery, err := gqlRequest.IsIntrospectionQueryStrict()
+	isIntrospectionQuery, err := gqlRequest.IsIntrospectionQuery()
 	if err != nil {
 		c.logger.Debugf("Error while checking for introspection query: '%s'", err.Error())
 		return ComplexityFailReasonInternalError
