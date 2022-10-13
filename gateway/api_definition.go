@@ -42,7 +42,7 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -416,7 +416,17 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		spec.OAS = *def.OAS
 	}
 
-	spec.OASRouter, err = gorillamux.NewRouter(&spec.OAS.T)
+	serverURL := spec.Proxy.ListenPath
+	if spec.Proxy.StripListenPath {
+		serverURL = "/"
+	}
+
+	oasSpec := spec.OAS.T
+	oasSpec.Servers = openapi3.Servers{
+		{URL: serverURL},
+	}
+
+	spec.OASRouter, err = gorillamux.NewRouter(&oasSpec)
 	if err != nil {
 		log.WithError(err).Error("Could not create OAS router")
 	}
@@ -485,10 +495,10 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 
 	newRequest.Header.Set("authorization", gwConfig.NodeSecret)
 	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
-	newRequest.Header.Set(headers.XTykNodeID, a.Gw.GetNodeID())
+	newRequest.Header.Set(header.XTykNodeID, a.Gw.GetNodeID())
 
 	a.Gw.ServiceNonceMutex.RLock()
-	newRequest.Header.Set(headers.XTykNonce, a.Gw.ServiceNonce)
+	newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
 	a.Gw.ServiceNonceMutex.RUnlock()
 
 	c := a.Gw.initialiseClient()

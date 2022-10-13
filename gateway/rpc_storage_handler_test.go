@@ -7,7 +7,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -177,7 +177,7 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 	})
 
 	auth := map[string]string{
-		headers.Authorization: key,
+		header.Authorization: key,
 	}
 
 	// Call 3 times
@@ -259,7 +259,7 @@ func TestRPCUpdateKey(t *testing.T) {
 			})
 
 			auth := map[string]string{
-				headers.Authorization: key,
+				header.Authorization: key,
 			}
 
 			_, _ = g.Run(t, []test.TestCase{

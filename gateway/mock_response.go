@@ -12,7 +12,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
-	header "github.com/TykTechnologies/tyk/headers"
+	header "github.com/TykTechnologies/tyk/header"
 )
 
 const acceptContentType = "Accept"
@@ -20,8 +20,8 @@ const acceptCode = "X-Tyk-Accept-Example-Code"
 const acceptExampleName = "X-Tyk-Accept-Example-Name"
 
 func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {
-	route, _, _ := p.TykAPISpec.OASRouter.FindRoute(r)
-	if route == nil {
+	route, _, err := p.TykAPISpec.OASRouter.FindRoute(r)
+	if route == nil || err != nil {
 		return nil, nil
 	}
 
@@ -36,7 +36,6 @@ func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {
 	var contentType string
 	var body []byte
 	var headers map[string]string
-	var err error
 
 	tykExampleRespOp := p.TykAPISpec.OAS.GetTykExtension().Middleware.Operations[route.Operation.OperationID].MockResponse
 

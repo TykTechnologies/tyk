@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -42,7 +42,7 @@ func (s *Test) TestHandleError_text_xml(t *testing.T) {
 		Path: "/",
 		Code: http.StatusInternalServerError,
 		Headers: map[string]string{
-			headers.ContentType: headers.TextXML,
+			header.ContentType: header.TextXML,
 		},
 		BodyMatchFunc: func(b []byte) bool {
 			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
@@ -53,7 +53,7 @@ func (s *Test) TestHandleError_text_xml(t *testing.T) {
 		Path: "/",
 		Code: http.StatusInternalServerError,
 		Headers: map[string]string{
-			headers.ContentType: headers.TextXML + "; charset=UTF-8",
+			header.ContentType: header.TextXML + "; charset=UTF-8",
 		},
 		BodyMatchFunc: func(b []byte) bool {
 			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
@@ -76,7 +76,7 @@ func TestHandleDefaultErrorXml(t *testing.T) {
 		Path: "/",
 		Code: http.StatusInternalServerError,
 		Headers: map[string]string{
-			headers.ContentType: headers.TextXML,
+			header.ContentType: header.TextXML,
 		},
 		BodyMatchFunc: func(b []byte) bool {
 			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
@@ -87,7 +87,7 @@ func TestHandleDefaultErrorXml(t *testing.T) {
 		Path: "/",
 		Code: http.StatusInternalServerError,
 		Headers: map[string]string{
-			headers.ContentType: headers.TextXML + "; charset=UTF-8",
+			header.ContentType: header.TextXML + "; charset=UTF-8",
 		},
 		BodyMatchFunc: func(b []byte) bool {
 			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
@@ -114,7 +114,7 @@ func TestHandleDefaultErrorJSON(t *testing.T) {
 		Path: "/",
 		Code: http.StatusInternalServerError,
 		Headers: map[string]string{
-			headers.ContentType: headers.ApplicationJSON,
+			header.ContentType: header.ApplicationJSON,
 		},
 		BodyMatchFunc: func(b []byte) bool {
 			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
