@@ -94,17 +94,17 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string) (bool, string, error) 
 	// Verify the token
 	token, err := parser.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
-		if err := assertSigningMethod(k.Spec.JWTSigningMethod, token); err != nil {
+		if err := assertSigningMethod(jwtValidation.SigningMethod, token); err != nil {
 			return nil, err
 		}
 
-		val, err := k.getSecretFromJWKOrConfig(token.Header[KID])
+		val, err := k.getSecretFromJWKOrConfig(token.Header[KID], jwtValidation)
 		if err != nil {
 			k.Logger().WithError(err).Error("Couldn't get token")
 			return nil, err
 		}
 
-		return parseJWTKey(k.Spec.JWTSigningMethod, val)
+		return parseJWTKey(jwtValidation.SigningMethod, val)
 	})
 
 	if err != nil {
@@ -168,13 +168,13 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 
 // getSecretFromJWKOrConfig gets the secret to verify jwt signature from API definition
 // or from JWK set if config is set to a URL
-func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid interface{}) (interface{}, error) {
+func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid interface{}, jwtValidation apidef.JWTValidation) (interface{}, error) {
 	// is it a JWK URL?
-	if httpScheme.MatchString(k.Spec.JWTSource) {
-		return k.getSecretFromJWKURL(k.Spec.JWTSource, kid)
+	if httpScheme.MatchString(jwtValidation.Source) {
+		return k.getSecretFromJWKURL(jwtValidation.Source, kid)
 	}
 
-	decodedSource, err := base64.StdEncoding.DecodeString(k.Spec.JWTSource)
+	decodedSource, err := base64.StdEncoding.DecodeString(jwtValidation.Source)
 	if err != nil {
 		return nil, err
 	}
@@ -195,5 +195,5 @@ func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, strin
 
 // generateVirtualSessionFor generates a virtual session for the given access token by using its identifier.
 func (k *ExternalOAuthMiddleware) generateVirtualSessionFor(r *http.Request, identifier string) user.SessionState {
-	return user.SessionState{}
+	return *CreateStandardSession() // temporary session until policy middleware is decided upon
 }
