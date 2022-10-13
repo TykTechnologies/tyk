@@ -162,31 +162,13 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 1
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
-          terraform_wrapper: false
-
-      - name: Get AWS creds from Terraform remote state
-        id: aws-creds
-        run: |
-          cd ci/terraform
-          terraform init -input=false
-          terraform refresh 2>&1 >/dev/null
-          eval $(terraform output -json tyk | jq -r 'to_entries[] | [.key,.value] | join("=")')
-          region=$(terraform output region | xargs)
-          [ -z "$key" -o -z "$secret" -o -z "$region" ] && exit 1
-          echo "::set-output name=secret::$secret"
-          echo "::set-output name=key::$key"
-          echo "::set-output name=region::$region"
 
       - name: Configure AWS credentials for use
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ steps.aws-creds.outputs.key }}
-          aws-secret-access-key: ${{ steps.aws-creds.outputs.secret }}
-          aws-region: ${{ steps.aws-creds.outputs.region }}
+          role-to-assume: arn:aws:iam::046805072452:role/gromit-test
+          role-session-name: gromitci
+          aws-region: eu-central-1
 
       - name: Login to Amazon ECR
         id: login-ecr
