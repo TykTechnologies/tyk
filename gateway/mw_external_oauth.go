@@ -106,8 +106,12 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string, jwtValidation apidef.J
 		return parseJWTKey(k.Spec.JWTSigningMethod, val)
 	})
 
-	if err != nil || (token != nil && !token.Valid) {
-		return false, "", fmt.Errorf("invalid token: %w", err)
+	if err != nil {
+		return false, "", fmt.Errorf("token verification failed %w", err)
+	}
+
+	if token != nil && !token.Valid {
+		return false, "", errors.New("invalid token")
 	}
 
 	if err := timeValidateJWTClaims(token.Claims.(jwt.MapClaims), jwtValidation.ExpiresAtValidationSkew,
