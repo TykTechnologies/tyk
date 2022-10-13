@@ -126,7 +126,7 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string, jwtValidation apidef.J
 // or from JWK set if config is set to a URL
 func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig() (interface{}, error) {
 	if k.jwkCache == nil {
-		JWKCache = cache.New(240*time.Second, 30*time.Second)
+		k.jwkCache = cache.New(240*time.Second, 30*time.Second)
 	}
 
 	// is it a JWK URL?
