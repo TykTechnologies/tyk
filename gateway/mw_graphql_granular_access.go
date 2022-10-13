@@ -52,7 +52,7 @@ func (m *GraphQLGranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, 
 		return nil, http.StatusOK
 	}
 
-	isIntrospection, err := gqlRequest.IsIntrospectionQuery()
+	isIntrospection, err := gqlRequest.IsIntrospectionQueryStrict()
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
