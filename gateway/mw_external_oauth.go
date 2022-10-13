@@ -97,7 +97,7 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string, jwtValidation apidef.J
 			return nil, err
 		}
 
-		val, err := k.getSecretFromJWKOrConfig(token.Header[KID].(string))
+		val, err := k.getSecretFromJWKOrConfig(token.Header[KID])
 		if err != nil {
 			k.Logger().WithError(err).Error("Couldn't get token")
 			return nil, err
@@ -110,12 +110,13 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string, jwtValidation apidef.J
 		return false, "", fmt.Errorf("invalid token: %w", err)
 	}
 
-	if err = timeValidateJWTClaims(token.Claims.(jwt.MapClaims), jwtValidation.ExpiresAtValidationSkew,
+	if err := timeValidateJWTClaims(token.Claims.(jwt.MapClaims), jwtValidation.ExpiresAtValidationSkew,
 		jwtValidation.IssuedAtValidationSkew, jwtValidation.NotBeforeValidationSkew); err != nil {
 		return false, "", fmt.Errorf("key not authorized: %w", err)
 	}
 
-	userId, err := getUserIdFromClaim(token.Claims.(jwt.MapClaims), jwtValidation.IdentityBaseField)
+	var userId string
+	userId, err = getUserIdFromClaim(token.Claims.(jwt.MapClaims), jwtValidation.IdentityBaseField)
 
 	if err != nil {
 		return false, "", err
@@ -124,7 +125,12 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string, jwtValidation apidef.J
 	return true, userId, nil
 }
 
-func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url, kid string) (interface{}, error) {
+func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{}) (interface{}, error) {
+	kidStr, ok := kid.(string)
+	if !ok {
+		return nil, errors.New("kid is not a string")
+	}
+
 	if externalOAuthJWKCache == nil {
 		externalOAuthJWKCache = cache.New(240*time.Second, 30*time.Second)
 	}
@@ -148,7 +154,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url, kid string) (interfac
 	}
 
 	k.Logger().Debug("Checking JWKs...")
-	if keys := jwkSet.Key(kid); len(keys) > 0 {
+	if keys := jwkSet.Key(kidStr); len(keys) > 0 {
 		return keys[0].Key, nil
 	}
 
@@ -157,7 +163,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url, kid string) (interfac
 
 // getSecretFromJWKOrConfig gets the secret to verify jwt signature from API definition
 // or from JWK set if config is set to a URL
-func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid string) (interface{}, error) {
+func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid interface{}) (interface{}, error) {
 	// is it a JWK URL?
 	if httpScheme.MatchString(k.Spec.JWTSource) {
 		return k.getSecretFromJWKURL(k.Spec.JWTSource, kid)
