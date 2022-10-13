@@ -14,9 +14,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+var externalOAuthJWKCache *cache.Cache
+
 type ExternalOAuthMiddleware struct {
 	BaseMiddleware
-	jwkCache *cache.Cache
 }
 
 func (k *ExternalOAuthMiddleware) Name() string {
@@ -124,8 +125,8 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string, jwtValidation apidef.J
 }
 
 func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url, kid string) (interface{}, error) {
-	if k.jwkCache == nil {
-		k.jwkCache = cache.New(240*time.Second, 30*time.Second)
+	if externalOAuthJWKCache == nil {
+		externalOAuthJWKCache = cache.New(240*time.Second, 30*time.Second)
 	}
 
 	var (
@@ -133,16 +134,15 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url, kid string) (interfac
 		err    error
 	)
 
-	cachedJWK, found := k.jwkCache.Get(k.Spec.APIID)
+	cachedJWK, found := externalOAuthJWKCache.Get(k.Spec.APIID)
 	if !found {
 		if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
 			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
 			return nil, err
 		}
 
-		// cache it
 		k.Logger().Debug("Caching JWK")
-		k.jwkCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+		externalOAuthJWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
 		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
 	}
