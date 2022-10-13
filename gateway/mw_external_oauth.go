@@ -59,7 +59,7 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 	provider := k.Spec.ExternalOAuth.Providers[0]
 
 	if provider.JWT.Enabled {
-		valid, identifier, err = k.jwt(token, provider.JWT)
+		valid, identifier, err = k.jwt(token)
 	} else if provider.Introspection.Enabled {
 		valid, identifier, err = k.introspection(token)
 	} else {
@@ -88,7 +88,8 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 
 // jwt makes access token validation without making a network call and validates access token locally.
 // The access token should be JWT type.
-func (k *ExternalOAuthMiddleware) jwt(accessToken string, jwtValidation apidef.JWTValidation) (bool, string, error) {
+func (k *ExternalOAuthMiddleware) jwt(accessToken string) (bool, string, error) {
+	jwtValidation := k.Spec.ExternalOAuth.Providers[0].JWT
 	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
 	// Verify the token
 	token, err := parser.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
