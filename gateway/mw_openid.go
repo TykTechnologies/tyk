@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"sync"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/openid2go/openid"

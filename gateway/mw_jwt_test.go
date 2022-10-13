@@ -13,7 +13,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
+
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 

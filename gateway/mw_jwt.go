@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/osin"
 	cache "github.com/pmylund/go-cache"
 	jose "github.com/square/go-jose"
@@ -723,7 +723,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	rawJWT = stripBearer(rawJWT)
 
 	// Use own validation logic, see below
-	parser := &jwt.Parser{SkipClaimsValidation: true}
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
 
 	// Verify the token
 	token, err := parser.Parse(rawJWT, func(token *jwt.Token) (interface{}, error) {
