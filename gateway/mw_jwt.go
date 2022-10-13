@@ -150,7 +150,7 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{},
 
 	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
 	if !found {
-		if jwkSet, err = getJWK(url, k.Spec.APIID, k.Gw.GetConfig().JWTSSLInsecureSkipVerify, JWKCache); err != nil {
+		if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
 			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
 
 			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
@@ -160,6 +160,10 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{},
 
 			return nil, err
 		}
+
+		// Cache it
+		k.Logger().Debug("Caching JWK")
+		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
 		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
 	}
@@ -864,7 +868,7 @@ func parseJWTKey(signInMethod string, secret interface{}) (interface{}, error) {
 	}
 }
 
-func getJWK(url, apiID string, jwtSSLInsecureSkipVerify bool, jwkCache *cache.Cache) (*jose.JSONWebKeySet, error) {
+func getJWK(url string, jwtSSLInsecureSkipVerify bool) (*jose.JSONWebKeySet, error) {
 	client := http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: jwtSSLInsecureSkipVerify},
@@ -893,10 +897,6 @@ func getJWK(url, apiID string, jwtSSLInsecureSkipVerify bool, jwkCache *cache.Ca
 	if err != nil {
 		return nil, err
 	}
-
-	// Cache it
-	log.Debug("Caching JWK")
-	jwkCache.Set(apiID, jwkSet, cache.DefaultExpiration)
 
 	return jwkSet, nil
 }

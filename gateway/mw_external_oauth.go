@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/pmylund/go-cache"
+	"github.com/square/go-jose"
 	"net/http"
 	"time"
 
@@ -95,7 +96,7 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string, jwtValidation apidef.J
 			return nil, err
 		}
 
-		val, err := k.getSecretFromJWKOrConfig()
+		val, err := k.getSecretFromJWKOrConfig(token.Header[KID].(string))
 		if err != nil {
 			k.Logger().WithError(err).Error("Couldn't get token")
 			return nil, err
@@ -108,9 +109,9 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string, jwtValidation apidef.J
 		return false, "", fmt.Errorf("invalid token: %w", err)
 	}
 
-	if jwtErr := timeValidateJWTClaims(token.Claims.(jwt.MapClaims), jwtValidation.ExpiresAtValidationSkew,
-		jwtValidation.IssuedAtValidationSkew, jwtValidation.NotBeforeValidationSkew); jwtErr != nil {
-		return false, "", fmt.Errorf("key not authorized: %w", jwtErr)
+	if err = timeValidateJWTClaims(token.Claims.(jwt.MapClaims), jwtValidation.ExpiresAtValidationSkew,
+		jwtValidation.IssuedAtValidationSkew, jwtValidation.NotBeforeValidationSkew); err != nil {
+		return false, "", fmt.Errorf("key not authorized: %w", err)
 	}
 
 	userId, err := getUserIdFromClaim(token.Claims.(jwt.MapClaims), jwtValidation.IdentityBaseField)
@@ -122,29 +123,57 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string, jwtValidation apidef.J
 	return true, userId, nil
 }
 
-// getSecretFromJWKOrConfig gets the secret to verify jwt signature from API definition
-// or from JWK set if config is set to a URL
-func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig() (interface{}, error) {
+func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url, kid string) (interface{}, error) {
 	if k.jwkCache == nil {
 		k.jwkCache = cache.New(240*time.Second, 30*time.Second)
 	}
 
-	// is it a JWK URL?
-	if httpScheme.MatchString(k.Spec.JWTSource) {
-		return getJWK(k.Spec.JWTSource, k.Spec.APIID, k.Gw.GetConfig().JWTSSLInsecureSkipVerify, k.jwkCache)
+	var (
+		jwkSet *jose.JSONWebKeySet
+		err    error
+	)
+
+	cachedJWK, found := k.jwkCache.Get(k.Spec.APIID)
+	if !found {
+		if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
+			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
+			return nil, err
+		}
+
+		// cache it
+		k.Logger().Debug("Caching JWK")
+		k.jwkCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+	} else {
+		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
 	}
 
-	decodedCert, err := base64.StdEncoding.DecodeString(k.Spec.JWTSource)
+	k.Logger().Debug("Checking JWKs...")
+	if keys := jwkSet.Key(kid); len(keys) > 0 {
+		return keys[0].Key, nil
+	}
+
+	return nil, errors.New("no matching KID could be found")
+}
+
+// getSecretFromJWKOrConfig gets the secret to verify jwt signature from API definition
+// or from JWK set if config is set to a URL
+func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid string) (interface{}, error) {
+	// is it a JWK URL?
+	if httpScheme.MatchString(k.Spec.JWTSource) {
+		return k.getSecretFromJWKURL(k.Spec.JWTSource, kid)
+	}
+
+	decodedSource, err := base64.StdEncoding.DecodeString(k.Spec.JWTSource)
 	if err != nil {
 		return nil, err
 	}
 
 	// is decoded a JWK url too?
-	if httpScheme.MatchString(string(decodedCert)) {
-		return getJWK(string(decodedCert), k.Spec.APIID, k.Gw.GetConfig().JWTSSLInsecureSkipVerify, k.jwkCache)
+	if httpScheme.MatchString(string(decodedSource)) {
+		return k.getSecretFromJWKURL(string(decodedSource), kid)
 	}
 
-	return decodedCert, nil
+	return decodedSource, nil
 }
 
 // introspection makes an introspection request to third-party provider to check whether the access token is valid or not.
