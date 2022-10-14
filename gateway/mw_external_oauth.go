@@ -135,14 +135,14 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string) (bool, string, error) 
 		return false, "", fmt.Errorf("key not authorized: %w", err)
 	}
 
-	var userId string
-	userId, err = getUserIdFromClaim(token.Claims.(jwt.MapClaims), jwtValidation.IdentityBaseField)
+	var userID string
+	userID, err = getUserIdFromClaim(token.Claims.(jwt.MapClaims), jwtValidation.IdentityBaseField)
 
 	if err != nil {
 		return false, "", err
 	}
 
-	return true, userId, nil
+	return true, userID, nil
 }
 
 func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{}) (interface{}, error) {
