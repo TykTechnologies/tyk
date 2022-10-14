@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/md5"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -67,6 +68,12 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 	}
 
 	if err != nil {
+		switch {
+		case errors.Is(err, jwt.ErrSignatureInvalid), errors.Is(err, jwt.ErrTokenMalformed), errors.Is(err, jwt.ErrTokenNotValidYet),
+			errors.Is(err, jwt.ErrTokenUsedBeforeIssued), errors.Is(err, jwt.ErrTokenExpired):
+			return err, http.StatusUnauthorized
+		}
+
 		return errors.New("error happened during the access token validation"), http.StatusInternalServerError
 	}
 
@@ -74,10 +81,18 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 		return errors.New("access token is not valid"), http.StatusUnauthorized
 	}
 
+	// generate a virtual token
+	data := []byte(identifier)
+	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	sessionID := k.Gw.generateToken(k.Spec.OrgID, keyID)
+
+	k.Logger().Debug("External OAuth Temporary session ID is: ", sessionID)
+
+	// CheckSessionAndIdentityForValidKey returns a session with keyID populated
 	var virtualSession user.SessionState
-	virtualSession, exists := k.CheckSessionAndIdentityForValidKey(identifier, r)
+	virtualSession, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
 	if !exists {
-		virtualSession = k.generateVirtualSessionFor(r, identifier)
+		virtualSession = k.generateVirtualSessionFor(r, sessionID)
 	}
 
 	ctxSetSession(r, &virtualSession, false, k.Gw.GetConfig().HashKeys)
@@ -108,7 +123,7 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string) (bool, string, error) 
 	})
 
 	if err != nil {
-		return false, "", fmt.Errorf("token verification failed %w", err)
+		return false, "", fmt.Errorf("token verification failed: %w", err)
 	}
 
 	if token != nil && !token.Valid {
@@ -148,7 +163,6 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 	cachedJWK, found := externalOAuthJWKCache.Get(k.Spec.APIID)
 	if !found {
 		if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
-			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
 			return nil, err
 		}
 
@@ -194,6 +208,9 @@ func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, strin
 }
 
 // generateVirtualSessionFor generates a virtual session for the given access token by using its identifier.
-func (k *ExternalOAuthMiddleware) generateVirtualSessionFor(r *http.Request, identifier string) user.SessionState {
-	return *CreateStandardSession() // temporary session until policy middleware is decided upon
+func (k *ExternalOAuthMiddleware) generateVirtualSessionFor(r *http.Request, sessionID string) user.SessionState {
+	virtualSession := *CreateStandardSession()
+	virtualSession.KeyID = sessionID
+	virtualSession.OrgID = k.Spec.OrgID
+	return virtualSession
 }
