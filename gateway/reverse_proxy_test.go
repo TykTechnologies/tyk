@@ -1073,7 +1073,6 @@ func TestGraphQL_SubgraphBatchRequest(t *testing.T) {
 	})[0]
 
 	t.Run("should batch requests", func(t *testing.T) {
-		subgraphRequest := `{"query":"query($representations: [_Any!]!){_entities(representations: $representations){__typename ... on User {account {number}}}}","variables":{"representations":[{"id":"1","__typename":"User"},{"id":"2","__typename":"User"}]}}`
 		supergraph := BuildAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/batched-supergraph"
 			spec.APIID = "batched-supergraph"
@@ -1100,40 +1099,25 @@ func TestGraphQL_SubgraphBatchRequest(t *testing.T) {
 			}
 		})[0]
 		g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphBankAccounts, supergraph)
-		timesHit := 0
-		lock := sync.Mutex{}
-		failChan := make(chan struct{})
+		handlerCtx, cancel := context.WithCancel(context.Background())
 		g.AddDynamicHandler(bankAccountSubgraphPath, func(writer http.ResponseWriter, r *http.Request) {
-			lock.Lock()
-			timesHit++
-			lock.Unlock()
-			d, _ := io.ReadAll(r.Body)
-			defer r.Body.Close()
-			if timesHit > 1 || string(d) != subgraphRequest {
-				failChan <- struct{}{}
-				return
+			select {
+			case <-handlerCtx.Done():
+				assert.Fail(t, "Called twice time")
+			default:
 			}
+			cancel()
 		})
 
 		q := graphql.Request{
 			Query: `query Query { allUsers { id username account { number } } }`,
 		}
-		// run this in a goroutine to prevent blocking, we don't actually need the test to match body or response
-		go func() {
-			_, _ = g.Run(t, []test.TestCase{
-				{
-					Data: q, Path: "/batched-supergraph",
-				},
-			}...)
-		}()
 
-		timer := time.NewTimer(time.Second * 5)
-		select {
-		case <-timer.C:
-			return
-		case <-failChan:
-			t.Error("request not batched")
-		}
+		_, _ = g.Run(t, []test.TestCase{
+			{
+				Data: q, Path: "/batched-supergraph",
+			},
+		}...)
 	})
 
 	t.Run("shouldn't batch requests", func(t *testing.T) {
