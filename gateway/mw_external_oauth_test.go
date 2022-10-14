@@ -15,7 +15,7 @@ func TestExternalOAuth_JWT(t *testing.T) {
 	defer ts.Close()
 
 	t.Run("JWT HMAC", func(t *testing.T) {
-		_ = ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec := BuildAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.ExternalOAuth = apidef.ExternalOAuth{
 				Enabled: true,
@@ -30,7 +30,9 @@ func TestExternalOAuth_JWT(t *testing.T) {
 				},
 			}
 			spec.Proxy.ListenPath = "/"
-		})
+		})[0]
+
+		_ = ts.Gw.LoadAPI(spec)
 
 		t.Run("base64 encoded static secret - success", func(t *testing.T) {
 			jwtToken := createJWKTokenHMAC(func(t *jwt.Token) {
@@ -75,6 +77,29 @@ func TestExternalOAuth_JWT(t *testing.T) {
 				authHeaders := map[string]string{"authorization": token}
 				_, _ = ts.Run(t, test.TestCase{
 					Headers: authHeaders, Code: http.StatusInternalServerError,
+				})
+			})
+
+			t.Run("identityBaseField is not set and sub is not present", func(t *testing.T) {
+				jwtToken := createJWKTokenHMAC(func(t *jwt.Token) {
+					t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+				})
+
+				authHeaders := map[string]string{"authorization": jwtToken}
+				_, _ = ts.Run(t, test.TestCase{
+					Headers: authHeaders, Code: http.StatusInternalServerError,
+					BodyMatch: ErrTokenValidationFailed.Error(),
+				})
+			})
+
+			t.Run("invalid base64 encoded secret", func(t *testing.T) {
+				spec.ExternalOAuth.Providers[0].JWT.Source = "invalid-secret"
+				_ = ts.Gw.LoadAPI(spec)
+
+				authHeaders := map[string]string{"authorization": jwtToken}
+				_, _ = ts.Run(t, test.TestCase{
+					Headers: authHeaders, Code: http.StatusInternalServerError,
+					BodyMatch: ErrTokenValidationFailed.Error(),
 				})
 			})
 
@@ -304,12 +329,25 @@ func TestExternalOAuth_JWT(t *testing.T) {
 		}
 
 		t.Run("Direct JWK URL", func(t *testing.T) {
-			spec.ExternalOAuth.Providers[0].JWT.Source = testHttpJWK
-			_ = ts.Gw.LoadAPI(spec)
-			flush()
-			_, _ = ts.Run(t, test.TestCase{
-				Headers: authHeaders, Code: http.StatusOK,
+			t.Run("valid jwk url", func(t *testing.T) {
+				spec.ExternalOAuth.Providers[0].JWT.Source = testHttpJWK
+				_ = ts.Gw.LoadAPI(spec)
+				flush()
+				_, _ = ts.Run(t, test.TestCase{
+					Headers: authHeaders, Code: http.StatusOK,
+				})
 			})
+
+			t.Run("invalid jwk url", func(t *testing.T) {
+				spec.ExternalOAuth.Providers[0].JWT.Source = testHttpJWK + "-invalid"
+				_ = ts.Gw.LoadAPI(spec)
+				flush()
+				_, _ = ts.Run(t, test.TestCase{
+					Headers: authHeaders, Code: http.StatusInternalServerError,
+					BodyMatch: ErrTokenValidationFailed.Error(),
+				})
+			})
+
 		})
 
 		t.Run("Base64", func(t *testing.T) {

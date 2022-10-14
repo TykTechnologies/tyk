@@ -15,7 +15,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-var externalOAuthJWKCache *cache.Cache
+var (
+	externalOAuthJWKCache    *cache.Cache
+	ErrTokenValidationFailed = errors.New("error happened during the access token validation")
+)
 
 type ExternalOAuthMiddleware struct {
 	BaseMiddleware
@@ -74,7 +77,7 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 			return err, http.StatusUnauthorized
 		}
 
-		return errors.New("error happened during the access token validation"), http.StatusInternalServerError
+		return ErrTokenValidationFailed, http.StatusInternalServerError
 	}
 
 	if !valid {
