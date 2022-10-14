@@ -332,9 +332,16 @@ func TestExternalOAuth_JWT(t *testing.T) {
 			t.Run("valid jwk url", func(t *testing.T) {
 				spec.ExternalOAuth.Providers[0].JWT.Source = testHttpJWK
 				_ = ts.Gw.LoadAPI(spec)
-				flush()
-				_, _ = ts.Run(t, test.TestCase{
-					Headers: authHeaders, Code: http.StatusOK,
+				t.Run("empty cache", func(t *testing.T) {
+					flush()
+					_, _ = ts.Run(t, test.TestCase{
+						Headers: authHeaders, Code: http.StatusOK,
+					})
+				})
+				t.Run("with cache", func(t *testing.T) {
+					_, _ = ts.Run(t, test.TestCase{
+						Headers: authHeaders, Code: http.StatusOK,
+					})
 				})
 			})
 
