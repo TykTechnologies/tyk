@@ -376,6 +376,143 @@ func (s *OAS) extractOAuthTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.OAuthType] = authConfig
 }
 
+type OAuthProvider struct {
+	JWT           *JWTValidation `bson:"jwt,omitempty" json:"jwt,omitempty"`
+	Introspection *Introspection `bson:"introspection,omitempty" json:"introspection,omitempty"`
+}
+
+type JWTValidation struct {
+	Enabled                 bool   `bson:"enabled" json:"enabled"`
+	SigningMethod           string `bson:"signingMethod" json:"signingMethod"`
+	Source                  string `bson:"source" json:"source"`
+	IdentityBaseField       string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	IssuedAtValidationSkew  uint64 `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
+	NotBeforeValidationSkew uint64 `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
+	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
+}
+
+func (j *JWTValidation) Fill(jwt apidef.JWTValidation) {
+	j.Enabled = jwt.Enabled
+	j.SigningMethod = jwt.SigningMethod
+	j.Source = jwt.Source
+	j.IdentityBaseField = jwt.IdentityBaseField
+	j.IssuedAtValidationSkew = jwt.IssuedAtValidationSkew
+	j.NotBeforeValidationSkew = jwt.NotBeforeValidationSkew
+	j.ExpiresAtValidationSkew = jwt.ExpiresAtValidationSkew
+}
+
+func (j *JWTValidation) ExtractTo(jwt *apidef.JWTValidation) {
+	jwt.Enabled = j.Enabled
+	jwt.SigningMethod = j.SigningMethod
+	jwt.Source = j.Source
+	jwt.IdentityBaseField = j.IdentityBaseField
+	jwt.IssuedAtValidationSkew = j.IssuedAtValidationSkew
+	jwt.NotBeforeValidationSkew = j.NotBeforeValidationSkew
+	jwt.ExpiresAtValidationSkew = j.ExpiresAtValidationSkew
+}
+
+type Introspection struct {
+	Enabled           bool   `bson:"enabled" json:"enabled"`
+	URL               string `bson:"url" json:"url"`
+	ClientID          string `bson:"clientId" json:"clientId"`
+	ClientSecret      string `bson:"clientSecret" json:"clientSecret"`
+	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+}
+
+func (i *Introspection) Fill(intros apidef.Introspection) {
+	i.Enabled = intros.Enabled
+	i.URL = intros.URL
+	i.ClientID = intros.ClientID
+	i.ClientSecret = intros.ClientSecret
+	i.IdentityBaseField = intros.IdentityBaseField
+}
+
+func (i *Introspection) ExtractTo(intros *apidef.Introspection) {
+	intros.Enabled = i.Enabled
+	intros.URL = i.URL
+	intros.ClientID = i.ClientID
+	intros.ClientSecret = i.ClientSecret
+	intros.IdentityBaseField = i.IdentityBaseField
+}
+
+type ExternalOAuth struct {
+	Enabled     bool `bson:"enabled" json:"enabled"` // required
+	AuthSources `bson:",inline" json:",inline"`
+	Providers   []OAuthProvider `bson:"providers" json:"providers"` // required
+}
+
+func (s *OAS) fillExternalOAuth(api apidef.APIDefinition) {
+	authConfig, ok := api.AuthConfigs[apidef.ExternalOAuthType]
+	if !ok || authConfig.Name == "" {
+		return
+	}
+
+	s.fillOAuthSchemeForExternal(authConfig.Name)
+
+	externalOAuth := &ExternalOAuth{}
+	externalOAuth.Enabled = api.ExternalOAuth.Enabled
+	externalOAuth.AuthSources.Fill(authConfig)
+
+	externalOAuth.Providers = make([]OAuthProvider, len(api.ExternalOAuth.Providers))
+	for i, provider := range api.ExternalOAuth.Providers {
+		p := OAuthProvider{}
+		if p.JWT == nil {
+			p.JWT = &JWTValidation{}
+		}
+
+		p.JWT.Fill(provider.JWT)
+		if ShouldOmit(p.JWT) {
+			p.JWT = nil
+		}
+
+		if p.Introspection == nil {
+			p.Introspection = &Introspection{}
+		}
+
+		p.Introspection.Fill(provider.Introspection)
+		if ShouldOmit(p.Introspection) {
+			p.Introspection = nil
+		}
+
+		externalOAuth.Providers[i] = p
+	}
+
+	if len(externalOAuth.Providers) == 0 {
+		externalOAuth.Providers = nil
+	}
+
+	if ShouldOmit(externalOAuth) {
+		externalOAuth = nil
+	}
+
+	s.getTykSecuritySchemes()[authConfig.Name] = externalOAuth
+}
+
+func (s *OAS) extractExternalOAuthTo(api *apidef.APIDefinition, name string) {
+	authConfig := apidef.AuthConfig{Name: name, DisableHeader: true}
+
+	if externalOAuth := s.getTykExternalOAuthAuth(name); externalOAuth != nil {
+		api.ExternalOAuth.Enabled = externalOAuth.Enabled
+		externalOAuth.AuthSources.ExtractTo(&authConfig)
+		api.ExternalOAuth.Providers = make([]apidef.Provider, len(externalOAuth.Providers))
+		for i, provider := range externalOAuth.Providers {
+			p := apidef.Provider{}
+
+			if provider.JWT != nil {
+				provider.JWT.ExtractTo(&p.JWT)
+			}
+
+			if provider.Introspection != nil {
+				provider.Introspection.ExtractTo(&p.Introspection)
+			}
+
+			api.ExternalOAuth.Providers[i] = p
+		}
+	}
+
+	api.AuthConfigs[apidef.ExternalOAuthType] = authConfig
+}
+
 type Notifications struct {
 	SharedSecret   string `bson:"sharedSecret,omitempty" json:"sharedSecret,omitempty"`
 	OnKeyChangeURL string `bson:"onKeyChangeUrl,omitempty" json:"onKeyChangeUrl,omitempty"`
@@ -408,6 +545,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillJWT(api)
 	s.fillBasic(api)
 	s.fillOAuth(api)
+	s.fillExternalOAuth(api)
 
 	if len(tykAuthentication.SecuritySchemes) == 0 {
 		tykAuthentication.SecuritySchemes = nil
@@ -445,7 +583,23 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 			case v.Type == typeHttp && v.Scheme == schemeBasic:
 				s.extractBasicTo(api, schemeName)
 			case v.Type == typeOAuth2:
-				s.extractOAuthTo(api, schemeName)
+				securityScheme := s.getTykSecurityScheme(schemeName)
+				if securityScheme == nil {
+					return
+				}
+
+				externalOAuth := &ExternalOAuth{}
+				if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
+					externalOAuth = oauthVal
+				} else {
+					toStructIfMap(securityScheme, externalOAuth)
+				}
+
+				if len(externalOAuth.Providers) > 0 {
+					s.extractExternalOAuthTo(api, schemeName)
+				} else {
+					s.extractOAuthTo(api, schemeName)
+				}
 			}
 		}
 	}
@@ -561,6 +715,39 @@ func (s *OAS) fillOAuthScheme(accessTypes []osin.AccessRequestType, name string)
 			setScopesIfEmpty(flows.Implicit)
 		}
 	}
+
+	ref.Value.WithType(typeOAuth2).Flows = flows
+
+	s.appendSecurity(name)
+}
+
+func (s *OAS) fillOAuthSchemeForExternal(name string) {
+	ss := s.Components.SecuritySchemes
+	if ss == nil {
+		ss = make(map[string]*openapi3.SecuritySchemeRef)
+		s.Components.SecuritySchemes = ss
+	}
+
+	ref, ok := ss[name]
+	if !ok {
+		ref = &openapi3.SecuritySchemeRef{
+			Value: openapi3.NewSecurityScheme(),
+		}
+		ss[name] = ref
+	}
+
+	flows := ref.Value.Flows
+	if flows == nil {
+		flows = &openapi3.OAuthFlows{}
+	}
+
+	if flows.AuthorizationCode == nil {
+		flows.AuthorizationCode = &openapi3.OAuthFlow{}
+	}
+
+	setAuthorizationURLIfEmpty(flows.AuthorizationCode)
+	setTokenURLIfEmpty(flows.AuthorizationCode)
+	setScopesIfEmpty(flows.AuthorizationCode)
 
 	ref.Value.WithType(typeOAuth2).Flows = flows
 

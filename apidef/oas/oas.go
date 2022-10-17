@@ -215,6 +215,24 @@ func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
 	return
 }
 
+func (s *OAS) getTykExternalOAuthAuth(name string) (externalOAuth *ExternalOAuth) {
+	securityScheme := s.getTykSecurityScheme(name)
+	if securityScheme == nil {
+		return
+	}
+
+	externalOAuth = &ExternalOAuth{}
+	if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
+		externalOAuth = oauthVal
+	} else {
+		toStructIfMap(securityScheme, externalOAuth)
+	}
+
+	s.getTykSecuritySchemes()[name] = externalOAuth
+
+	return
+}
+
 func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
 	if s.getTykAuthentication() != nil {
 		securitySchemes = s.getTykAuthentication().SecuritySchemes
