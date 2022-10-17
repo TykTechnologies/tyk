@@ -13,7 +13,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
+
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
@@ -2114,4 +2115,161 @@ func TestJWTExpOverride(t *testing.T) {
 		}...)
 	})
 
+}
+
+func TestTimeValidateClaims(t *testing.T) {
+
+	type testCase struct {
+		name        string
+		claimSkew   int64
+		configSkew  uint64
+		expectedErr error
+	}
+
+	t.Run("expires at", func(t *testing.T) {
+		expJWTClaimsGen := func(skew int64) jwt.MapClaims {
+			jsonClaims := fmt.Sprintf(`{
+				"user_id": "user123",
+				"exp":     %d
+			}`, uint64(time.Now().Add(time.Duration(skew)*time.Second).Unix()))
+			jwtClaims := jwt.MapClaims{}
+			_ = json.Unmarshal([]byte(jsonClaims), &jwtClaims)
+			return jwtClaims
+		}
+
+		testCases := []testCase{
+			{name: "after now - valid", claimSkew: 1, configSkew: 0, expectedErr: nil},
+			{name: "after now add skew - valid", claimSkew: 1, configSkew: 1, expectedErr: nil},
+			{name: "before now with skew - valid", claimSkew: -1, configSkew: 1000, expectedErr: nil},
+			{name: "before now - invalid", claimSkew: -1, configSkew: 1, expectedErr: jwt.ErrTokenExpired},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				jwtClaims := expJWTClaimsGen(tc.claimSkew)
+				err := timeValidateJWTClaims(jwtClaims, tc.configSkew, 0, 0)
+				if tc.expectedErr == nil {
+					assert.Nil(t, err)
+				} else {
+					assert.True(t, err.Is(tc.expectedErr))
+				}
+
+			})
+		}
+	})
+
+	t.Run("issued at", func(t *testing.T) {
+		iatJWTClaimsGen := func(skew int64) jwt.MapClaims {
+			jsonClaims := fmt.Sprintf(`{
+				"user_id": "user123",
+				"iat":     %d
+			}`, uint64(time.Now().Add(time.Duration(skew)*time.Second).Unix()))
+			jwtClaims := jwt.MapClaims{}
+			_ = json.Unmarshal([]byte(jsonClaims), &jwtClaims)
+			return jwtClaims
+		}
+
+		testCases := []testCase{
+			{name: "before now - valid jwt", claimSkew: -1, configSkew: 0, expectedErr: nil},
+			{name: "after now with large skew - valid jwt", claimSkew: 1, configSkew: 1000, expectedErr: nil},
+			{name: "before now, add skew - valid jwt", claimSkew: -3, configSkew: 2, expectedErr: nil},
+			{name: "after now, add skew - valid jwt", claimSkew: 1, configSkew: 1, expectedErr: nil},
+			{name: "after now, no skew - invalid jwt", claimSkew: 60, configSkew: 0, expectedErr: jwt.ErrTokenUsedBeforeIssued},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				jwtClaims := iatJWTClaimsGen(tc.claimSkew)
+				err := timeValidateJWTClaims(jwtClaims, 0, tc.configSkew, 0)
+				if tc.expectedErr == nil {
+					assert.Nil(t, err)
+				} else {
+					assert.True(t, err.Is(tc.expectedErr))
+				}
+
+			})
+		}
+	})
+
+	t.Run("not before", func(t *testing.T) {
+		nbfJWTClaimsGen := func(skew int64) jwt.MapClaims {
+			jsonClaims := fmt.Sprintf(`{
+				"user_id": "user123",
+				"nbf":     %d
+			}`, uint64(time.Now().Add(time.Duration(skew)*time.Second).Unix()))
+			jwtClaims := jwt.MapClaims{}
+			_ = json.Unmarshal([]byte(jsonClaims), &jwtClaims)
+			return jwtClaims
+		}
+
+		testCases := []testCase{
+			{name: "not before now - valid jwt", claimSkew: -1, configSkew: 0, expectedErr: nil},
+			{name: "after now, add skew - valid jwt", claimSkew: 1, configSkew: 1, expectedErr: nil},
+			{name: "after now with huge skew - valid_jwt", claimSkew: 1, configSkew: 1000, expectedErr: nil},
+			{name: "after now - invalid jwt", claimSkew: 1, configSkew: 0, expectedErr: jwt.ErrTokenNotValidYet},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				jwtClaims := nbfJWTClaimsGen(tc.claimSkew)
+				err := timeValidateJWTClaims(jwtClaims, 0, 0, tc.configSkew)
+				if tc.expectedErr == nil {
+					assert.Nil(t, err)
+				} else {
+					assert.True(t, err.Is(tc.expectedErr))
+				}
+
+			})
+		}
+	})
+}
+
+func TestGetUserIDFromClaim(t *testing.T) {
+	userID := "123"
+	userIDKey := "user_id"
+	t.Run("identity base field exists", func(t *testing.T) {
+		jwtClaims := jwt.MapClaims{
+			userIDKey: userID,
+			"iss":     "example.com",
+		}
+		identity, err := getUserIDFromClaim(jwtClaims, "user_id")
+		assert.NoError(t, err)
+		assert.Equal(t, identity, userID)
+	})
+
+	t.Run("identity base field doesn't exist, fallback to sub", func(t *testing.T) {
+		jwtClaims := jwt.MapClaims{
+			"iss": "example.com",
+			"sub": userID,
+		}
+		identity, err := getUserIDFromClaim(jwtClaims, userIDKey)
+		assert.NoError(t, err)
+		assert.Equal(t, identity, userID)
+	})
+
+	t.Run("identity base field and sub doesn't exist", func(t *testing.T) {
+		jwtClaims := jwt.MapClaims{
+			"iss": "example.com",
+		}
+		_, err := getUserIDFromClaim(jwtClaims, userIDKey)
+		assert.ErrorIs(t, err, ErrNoSuitableUserIDClaimFound)
+	})
+
+	t.Run("identity base field doesn't exist, empty sub", func(t *testing.T) {
+		jwtClaims := jwt.MapClaims{
+			"iss": "example.com",
+			"sub": "",
+		}
+		_, err := getUserIDFromClaim(jwtClaims, userIDKey)
+		assert.ErrorIs(t, err, ErrEmptyUserIDInSubClaim)
+	})
+
+	t.Run("empty identity base field", func(t *testing.T) {
+		jwtClaims := jwt.MapClaims{
+			"iss":     "example.com",
+			userIDKey: "",
+		}
+		_, err := getUserIDFromClaim(jwtClaims, userIDKey)
+		assert.Equal(t, fmt.Sprintf("found an empty user ID in predefined base field claim %s", userIDKey), err.Error())
+	})
 }

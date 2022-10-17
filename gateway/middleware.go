@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
@@ -826,6 +827,13 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	return key, config
+}
+
+func (b BaseMiddleware) generateSessionID(id string) string {
+	// generate a virtual token
+	data := []byte(id)
+	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	return b.Gw.generateToken(b.Spec.OrgID, keyID)
 }
 
 type TykResponseHandler interface {

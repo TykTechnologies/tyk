@@ -21,14 +21,15 @@ import (
 )
 
 const (
-	defaultTemplateName    = "error"
-	defaultTemplateFormat  = "json"
-	defaultContentType     = headers.ApplicationJSON
-	MsgAuthFieldMissing    = "Authorization field missing"
-	MsgApiAccessDisallowed = "Access to this API has been disallowed"
-	MsgBearerMailformed    = "Bearer token malformed"
-	MsgKeyNotAuthorized    = "Key not authorised"
-	MsgOauthClientRevoked  = "Key not authorised. OAuth client access was revoked"
+	defaultTemplateName                        = "error"
+	defaultTemplateFormat                      = "json"
+	defaultContentType                         = headers.ApplicationJSON
+	MsgAuthFieldMissing                        = "Authorization field missing"
+	MsgApiAccessDisallowed                     = "Access to this API has been disallowed"
+	MsgBearerMailformed                        = "Bearer token malformed"
+	MsgKeyNotAuthorized                        = "Key not authorised"
+	MsgOauthClientRevoked                      = "Key not authorised. OAuth client access was revoked"
+	MsgKeyNotAuthorizedUnexpectedSigningMethod = "Key not authorized: Unexpected signing method"
 )
 
 var errCustomBodyResponse = errors.New("errCustomBodyResponse")
