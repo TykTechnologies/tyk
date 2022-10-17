@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"crypto/md5"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -84,10 +83,7 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 		return errors.New("access token is not valid"), http.StatusUnauthorized
 	}
 
-	// generate a virtual token
-	data := []byte(identifier)
-	keyID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := k.Gw.generateToken(k.Spec.OrgID, keyID)
+	sessionID := k.generateSessionID(identifier)
 
 	k.Logger().Debug("External OAuth Temporary session ID is: ", sessionID)
 
@@ -111,7 +107,7 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string) (bool, string, error) 
 	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
 	// Verify the token
 	token, err := parser.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
-		// Don't forget to validate the alg is what you expect:
+		// don't forget to validate the alg is what you expect:
 		if err := assertSigningMethod(jwtValidation.SigningMethod, token); err != nil {
 			return nil, err
 		}
@@ -139,8 +135,7 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string) (bool, string, error) 
 	}
 
 	var userID string
-	userID, err = getUserIdFromClaim(token.Claims.(jwt.MapClaims), jwtValidation.IdentityBaseField)
-
+	userID, err = getUserIDFromClaim(token.Claims.(jwt.MapClaims), jwtValidation.IdentityBaseField)
 	if err != nil {
 		return false, "", err
 	}
@@ -148,6 +143,7 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string) (bool, string, error) 
 	return true, userID, nil
 }
 
+// getSecretFromJWKURL gets the secret to verify jwt signature from a JWK URL.
 func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{}) (interface{}, error) {
 	kidStr, ok := kid.(string)
 	if !ok {
@@ -215,5 +211,10 @@ func (k *ExternalOAuthMiddleware) generateVirtualSessionFor(r *http.Request, ses
 	virtualSession := *CreateStandardSession()
 	virtualSession.KeyID = sessionID
 	virtualSession.OrgID = k.Spec.OrgID
+	virtualSession.AccessRights = map[string]user.AccessDefinition{
+		k.Spec.APIID: {
+			Limit: user.APILimit{},
+		},
+	}
 	return virtualSession
 }

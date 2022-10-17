@@ -280,7 +280,7 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 }
 
 func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error) {
-	return getUserIdFromClaim(claims, k.Spec.JWTIdentityBaseField)
+	return getUserIDFromClaim(claims, k.Spec.JWTIdentityBaseField)
 }
 
 func toStrings(v interface{}) []string {
@@ -822,6 +822,7 @@ func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg 
 	return session.Clone(), nil
 }
 
+// assertSigningMethod asserts the provided signing method with that of jwt.
 func assertSigningMethod(signingMethod string, token *jwt.Token) error {
 	switch signingMethod {
 	case HMACSign:
@@ -846,8 +847,9 @@ func assertSigningMethod(signingMethod string, token *jwt.Token) error {
 	return nil
 }
 
-func parseJWTKey(signInMethod string, secret interface{}) (interface{}, error) {
-	switch signInMethod {
+// parseJWTKey parses JWT key based on signing Method
+func parseJWTKey(signingMethod string, secret interface{}) (interface{}, error) {
+	switch signingMethod {
 	case RSASign, ECDSASign:
 		switch e := secret.(type) {
 		case []byte:
@@ -868,6 +870,7 @@ func parseJWTKey(signInMethod string, secret interface{}) (interface{}, error) {
 	}
 }
 
+// getJWK gets the JWK from URL.
 func getJWK(url string, jwtSSLInsecureSkipVerify bool) (*jose.JSONWebKeySet, error) {
 	client := http.Client{
 		Transport: &http.Transport{
@@ -901,6 +904,7 @@ func getJWK(url string, jwtSSLInsecureSkipVerify bool) (*jose.JSONWebKeySet, err
 	return jwkSet, nil
 }
 
+// timeValidateJWTClaims validates JWT with provided clock skew, to overcome skew occurred with distributed systems.
 func timeValidateJWTClaims(c jwt.MapClaims, expiresAt, issuedAt, notBefore uint64) *jwt.ValidationError {
 	vErr := new(jwt.ValidationError)
 	now := time.Now().Unix()
@@ -928,17 +932,18 @@ func timeValidateJWTClaims(c jwt.MapClaims, expiresAt, issuedAt, notBefore uint6
 	return vErr
 }
 
-func getUserIdFromClaim(claims jwt.MapClaims, identityBaseField string) (string, error) {
+// getUserIDFromClaim parses jwt claims and get the userID from provided identityBaseField.
+func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string) (string, error) {
 	var (
-		userId string
+		userID string
 		found  bool
 	)
 
 	if identityBaseField != "" {
-		if userId, found = claims[identityBaseField].(string); found {
-			if len(userId) > 0 {
-				log.WithField("userId", userId).Debug("Found User Id in Base Field")
-				return userId, nil
+		if userID, found = claims[identityBaseField].(string); found {
+			if len(userID) > 0 {
+				log.WithField("userId", userID).Debug("Found User Id in Base Field")
+				return userID, nil
 			}
 
 			message := "found an empty user ID in predefined base field claim " + identityBaseField
@@ -951,10 +956,10 @@ func getUserIdFromClaim(claims jwt.MapClaims, identityBaseField string) (string,
 		}
 	}
 
-	if userId, found = claims[SUB].(string); found {
-		if len(userId) > 0 {
-			log.WithField("userId", userId).Debug("Found User Id in 'sub' claim")
-			return userId, nil
+	if userID, found = claims[SUB].(string); found {
+		if len(userID) > 0 {
+			log.WithField("userId", userID).Debug("Found User Id in 'sub' claim")
+			return userID, nil
 		}
 		message := "found an empty user ID in sub claim"
 		log.Error(message)
