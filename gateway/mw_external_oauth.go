@@ -4,11 +4,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/pmylund/go-cache"
 	"github.com/square/go-jose"
-	"net/http"
-	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
@@ -205,7 +206,28 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid interface{}, jwtV
 // introspection makes an introspection request to third-party provider to check whether the access token is valid or not.
 // The access token can be both JWT and opaque type.
 func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, string, error) {
-	return false, "", errors.New("introspection not implemented yet")
+	introsp := k.Spec.ExternalOAuth.Providers[0].Introspection
+
+	claims, err := introsp.Call(accessToken)
+	if err != nil {
+		return false, "", fmt.Errorf("introspection err: %s", err)
+	}
+
+	active, ok := claims["active"]
+	if !ok {
+		return false, "", errors.New("introspection result doesn't have active flag")
+	}
+
+	if !active.(bool) {
+		return false, "", nil
+	}
+
+	userID, err := getUserIDFromClaim(claims, introsp.IdentityBaseField)
+	if err != nil {
+		return false, "", err
+	}
+
+	return true, userID, nil
 }
 
 // generateVirtualSessionFor generates a virtual session for the given access token by using its identifier.

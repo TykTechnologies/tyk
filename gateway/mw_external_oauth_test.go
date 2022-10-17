@@ -2,13 +2,16 @@ package gateway
 
 import (
 	"encoding/base64"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
-	"time"
 )
 
 func TestExternalOAuth_JWT(t *testing.T) {
@@ -305,4 +308,58 @@ func TestGetSecretFromJWKOrConfig(t *testing.T) {
 		_, err := k.getSecretFromJWKOrConfig("12345", spec.ExternalOAuth.Providers[0].JWT)
 		assert.NoError(t, err)
 	})
+}
+
+func TestExternalOAuthMiddleware_introspection(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		testClientID     = "test-client-id"
+		testClientSecret = "test-client-secret"
+		testAccessToken  = "test-access-token"
+		user             = "furkan@example.com"
+	)
+
+	accessTokenActive := true
+
+	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, testAccessToken, r.FormValue("token"))
+		assert.Equal(t, testClientID, r.FormValue("client_id"))
+		assert.Equal(t, testClientSecret, r.FormValue("client_secret"))
+
+		_, _ = w.Write([]byte(fmt.Sprintf(`{"active": %t,"username": "%s"}`, accessTokenActive, user)))
+	}))
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = false
+		spec.ExternalOAuth.Enabled = true
+		spec.ExternalOAuth.Providers = []apidef.Provider{
+			{
+				Introspection: apidef.Introspection{
+					Enabled:           true,
+					URL:               introspectionServer.URL,
+					ClientID:          testClientID,
+					ClientSecret:      testClientSecret,
+					IdentityBaseField: "username",
+				},
+			},
+		}
+	})
+
+	headers := map[string]string{
+		"Authorization": testAccessToken,
+	}
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/get", BodyMatch: "authorization field missing", Code: http.StatusBadRequest},
+		{Path: "/get", Headers: headers, BodyMatch: "/get", Code: http.StatusOK},
+	}...)
+
+	// deactivated access token should not be validated
+	accessTokenActive = false
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/get", Headers: headers, BodyMatch: "access token is not valid", Code: http.StatusUnauthorized},
+	}...)
 }

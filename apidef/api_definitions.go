@@ -7,10 +7,14 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/golang-jwt/jwt/v4"
 
 	uuid "github.com/satori/go.uuid"
 
@@ -1294,5 +1298,40 @@ type JWTValidation struct {
 }
 
 type Introspection struct {
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled           bool   `bson:"enabled" json:"enabled"`
+	URL               string `bson:"url" json:"url"`
+	ClientID          string `bson:"client_id" json:"client_id"`
+	ClientSecret      string `bson:"client_secret" json:"client_secret"`
+	IdentityBaseField string `bson:"identity_base_field" json:"identity_base_field"`
+}
+
+func (i *Introspection) Call(accessToken string) (jwt.MapClaims, error) {
+	body := url.Values{}
+	body.Set("token", accessToken)
+	body.Set("client_id", i.ClientID)
+	body.Set("client_secret", i.ClientSecret)
+
+	res, err := http.Post(i.URL, "application/x-www-form-urlencoded", strings.NewReader(body.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("error happened during the introspection call: %s", err)
+	}
+
+	defer res.Body.Close()
+
+	bodyInBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read the introspection call response: %s", err)
+	}
+
+	var claims jwt.MapClaims
+	err = json.Unmarshal(bodyInBytes, &claims)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't unmarshal the introspection call response: %s", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status does not indicate success: code: %d, body: %v", res.StatusCode, res.Body)
+	}
+
+	return claims, nil
 }
