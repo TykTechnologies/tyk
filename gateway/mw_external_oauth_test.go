@@ -5,6 +5,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
 	"time"
@@ -80,29 +81,6 @@ func TestExternalOAuth_JWT(t *testing.T) {
 				})
 			})
 
-			t.Run("identityBaseField is not set and sub is not present", func(t *testing.T) {
-				jwtToken := createJWKTokenHMAC(func(t *jwt.Token) {
-					t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
-				})
-
-				authHeaders := map[string]string{"authorization": jwtToken}
-				_, _ = ts.Run(t, test.TestCase{
-					Headers: authHeaders, Code: http.StatusInternalServerError,
-					BodyMatch: ErrTokenValidationFailed.Error(),
-				})
-			})
-
-			t.Run("invalid base64 encoded secret", func(t *testing.T) {
-				spec.ExternalOAuth.Providers[0].JWT.Source = "invalid-secret"
-				_ = ts.Gw.LoadAPI(spec)
-
-				authHeaders := map[string]string{"authorization": jwtToken}
-				_, _ = ts.Run(t, test.TestCase{
-					Headers: authHeaders, Code: http.StatusInternalServerError,
-					BodyMatch: ErrTokenValidationFailed.Error(),
-				})
-			})
-
 		})
 	})
 
@@ -127,59 +105,6 @@ func TestExternalOAuth_JWT(t *testing.T) {
 			}
 			spec.Proxy.ListenPath = "/"
 		})[0]
-
-		jwtToken := CreateJWKToken(func(t *jwt.Token) {
-			t.Header["kid"] = "12345"
-			t.Claims.(jwt.MapClaims)["foo"] = "bar"
-			t.Claims.(jwt.MapClaims)["user_id"] = "user"
-			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
-		})
-
-		authHeaders := map[string]string{"authorization": jwtToken}
-		flush := func() {
-			if externalOAuthJWKCache != nil {
-				externalOAuthJWKCache.Flush()
-			}
-		}
-
-		t.Run("Direct JWK URL", func(t *testing.T) {
-			t.Run("valid jwk url", func(t *testing.T) {
-				spec.ExternalOAuth.Providers[0].JWT.Source = testHttpJWK
-				_ = ts.Gw.LoadAPI(spec)
-				t.Run("empty cache", func(t *testing.T) {
-					flush()
-					_, _ = ts.Run(t, test.TestCase{
-						Headers: authHeaders, Code: http.StatusOK,
-					})
-				})
-
-				t.Run("with cache", func(t *testing.T) {
-					_, _ = ts.Run(t, test.TestCase{
-						Headers: authHeaders, Code: http.StatusOK,
-					})
-				})
-			})
-
-			t.Run("invalid jwk url", func(t *testing.T) {
-				spec.ExternalOAuth.Providers[0].JWT.Source = testHttpJWK + "-invalid"
-				_ = ts.Gw.LoadAPI(spec)
-				flush()
-				_, _ = ts.Run(t, test.TestCase{
-					Headers: authHeaders, Code: http.StatusInternalServerError,
-					BodyMatch: ErrTokenValidationFailed.Error(),
-				})
-			})
-
-		})
-
-		t.Run("Base64", func(t *testing.T) {
-			spec.ExternalOAuth.Providers[0].JWT.Source = base64.StdEncoding.EncodeToString([]byte(testHttpJWK))
-			_ = ts.Gw.LoadAPI(spec)
-			flush()
-			_, _ = ts.Run(t, test.TestCase{
-				Headers: authHeaders, Code: http.StatusOK,
-			})
-		})
 
 		t.Run("with skew", func(t *testing.T) {
 			t.Run("expires at", func(t *testing.T) {
@@ -278,5 +203,106 @@ func TestExternalOAuth_JWT(t *testing.T) {
 
 			})
 		})
+
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Header["kid"] = "12345"
+			t.Claims.(jwt.MapClaims)["foo"] = "bar"
+			t.Claims.(jwt.MapClaims)["user_id"] = "user"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		flush := func() {
+			if externalOAuthJWKCache != nil {
+				externalOAuthJWKCache.Flush()
+			}
+		}
+
+		t.Run("Direct JWK URL", func(t *testing.T) {
+			t.Run("valid jwk url", func(t *testing.T) {
+				spec.ExternalOAuth.Providers[0].JWT.Source = testHttpJWK
+				_ = ts.Gw.LoadAPI(spec)
+				t.Run("empty cache", func(t *testing.T) {
+					flush()
+					_, _ = ts.Run(t, test.TestCase{
+						Headers: authHeaders, Code: http.StatusOK,
+					})
+				})
+
+				t.Run("with cache", func(t *testing.T) {
+					_, _ = ts.Run(t, test.TestCase{
+						Headers: authHeaders, Code: http.StatusOK,
+					})
+				})
+			})
+
+		})
+
+	})
+}
+
+func TestGetSecretFromJWKOrConfig(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.ExternalOAuth = apidef.ExternalOAuth{
+			Enabled: true,
+			Providers: []apidef.Provider{
+				{
+					JWT: apidef.JWTValidation{
+						Enabled:           true,
+						IdentityBaseField: "user_id",
+					},
+				},
+			},
+		}
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	k := ExternalOAuthMiddleware{
+		BaseMiddleware{
+			Gw:   ts.Gw,
+			Spec: spec,
+		},
+	}
+
+	t.Run("kid is not a string", func(t *testing.T) {
+		spec.ExternalOAuth.Providers[0].JWT.SigningMethod = RSASign
+		spec.ExternalOAuth.Providers[0].JWT.Source = testHttpJWK
+		_, err := k.getSecretFromJWKOrConfig(23, spec.ExternalOAuth.Providers[0].JWT)
+		assert.ErrorIs(t, err, ErrKIDNotAString)
+	})
+
+	t.Run("from config", func(t *testing.T) {
+		spec.ExternalOAuth.Providers[0].JWT.SigningMethod = HMACSign
+		spec.ExternalOAuth.Providers[0].JWT.Source = base64.StdEncoding.EncodeToString([]byte(jwtSecret))
+		secret, err := k.getSecretFromJWKOrConfig(nil, spec.ExternalOAuth.Providers[0].JWT)
+		assert.NoError(t, err)
+		assert.Equal(t, jwtSecret, string(secret.([]byte)))
+	})
+
+	t.Run("invalid base64 encoded secret", func(t *testing.T) {
+		spec.ExternalOAuth.Providers[0].JWT.SigningMethod = HMACSign
+		spec.ExternalOAuth.Providers[0].JWT.Source = "invalid-secret"
+		_, err := k.getSecretFromJWKOrConfig(nil, spec.ExternalOAuth.Providers[0].JWT)
+
+		assert.Error(t, err)
+
+	})
+
+	t.Run("direct jwk url", func(t *testing.T) {
+		spec.ExternalOAuth.Providers[0].JWT.Source = testHttpJWK
+		spec.ExternalOAuth.Providers[0].JWT.SigningMethod = RSASign
+		_, err := k.getSecretFromJWKOrConfig("12345", spec.ExternalOAuth.Providers[0].JWT)
+		assert.NoError(t, err)
+
+	})
+
+	t.Run("base64 encoded jwk url", func(t *testing.T) {
+		spec.ExternalOAuth.Providers[0].JWT.SigningMethod = HMACSign
+		spec.ExternalOAuth.Providers[0].JWT.Source = base64.StdEncoding.EncodeToString([]byte(testHttpJWK))
+		_, err := k.getSecretFromJWKOrConfig("12345", spec.ExternalOAuth.Providers[0].JWT)
+		assert.NoError(t, err)
 	})
 }

@@ -47,6 +47,9 @@ var (
 		"cid",       // OKTA
 		"client_id", // Gluu
 	}
+
+	ErrNoSuitableUserIDClaimFound = errors.New("no suitable claims for user ID were found")
+	ErrEmptyUserIDInSubClaim      = errors.New("found an empty user ID in sub claim")
 )
 
 func (k *JWTMiddleware) Name() string {
@@ -961,12 +964,11 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string) (string,
 			log.WithField("userId", userID).Debug("Found User Id in 'sub' claim")
 			return userID, nil
 		}
-		message := "found an empty user ID in sub claim"
-		log.Error(message)
-		return "", errors.New(message)
+
+		log.Error(ErrEmptyUserIDInSubClaim)
+		return "", ErrEmptyUserIDInSubClaim
 	}
 
-	message := "no suitable claims for user ID were found"
-	log.Error(message)
-	return "", errors.New(message)
+	log.Error(ErrNoSuitableUserIDClaimFound)
+	return "", ErrNoSuitableUserIDClaimFound
 }

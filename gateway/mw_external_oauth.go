@@ -17,6 +17,8 @@ import (
 var (
 	externalOAuthJWKCache    *cache.Cache
 	ErrTokenValidationFailed = errors.New("error happened during the access token validation")
+	ErrKIDNotAString         = errors.New("kid is not a string")
+	ErrNoMatchingKIDFound    = errors.New("no matching KID could be found")
 )
 
 type ExternalOAuthMiddleware struct {
@@ -147,7 +149,7 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string) (bool, string, error) 
 func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{}) (interface{}, error) {
 	kidStr, ok := kid.(string)
 	if !ok {
-		return nil, errors.New("kid is not a string")
+		return nil, ErrKIDNotAString
 	}
 
 	if externalOAuthJWKCache == nil {
@@ -176,7 +178,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 		return keys[0].Key, nil
 	}
 
-	return nil, errors.New("no matching KID could be found")
+	return nil, ErrNoMatchingKIDFound
 }
 
 // getSecretFromJWKOrConfig gets the secret to verify jwt signature from API definition
