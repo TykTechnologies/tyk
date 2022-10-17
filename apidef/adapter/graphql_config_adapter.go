@@ -123,6 +123,10 @@ func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*grap
 		return nil, err
 	}
 
+	if !g.apiDefinition.GraphQL.Supergraph.DisableQueryBatching {
+		conf.EnableDataLoader(true)
+	}
+
 	return &conf, nil
 }
 
