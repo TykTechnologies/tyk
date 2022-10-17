@@ -10,7 +10,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -890,7 +890,7 @@ func getJWK(url string, jwtSSLInsecureSkipVerify bool) (*jose.JSONWebKeySet, err
 		_ = resp.Body.Close()
 	}()
 
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.WithError(err).Error("Failed to get read response body")
 		return nil, err
