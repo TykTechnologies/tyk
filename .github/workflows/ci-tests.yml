@@ -31,9 +31,9 @@ jobs:
           go-version: ${{ matrix.go }}
 
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
-            python-version: '3.5'
+          python-version: '3.5'
 
       - name: Install Dependencies and basic hygiene test
         id: hygiene
