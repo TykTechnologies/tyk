@@ -34,10 +34,27 @@ func WithHttpClient(httpClient *http.Client) GraphQLConfigAdapterOption {
 	}
 }
 
+func WithStreamingClient(streamingClient *http.Client) GraphQLConfigAdapterOption {
+	return func(adapter *GraphQLConfigAdapter) {
+		adapter.streamingClient = streamingClient
+	}
+}
+
+// Use this option function to set a dummy SubscriptionClient for testing.
+func withDummySubscriptionClient(subscriptionClient *graphqlDataSource.SubscriptionClient) GraphQLConfigAdapterOption {
+	return func(adapter *GraphQLConfigAdapter) {
+		adapter.dummySubscriptionClient = subscriptionClient
+	}
+}
+
 type GraphQLConfigAdapter struct {
-	apiDefinition *apidef.APIDefinition
-	httpClient    *http.Client
-	schema        *graphql.Schema
+	apiDefinition   *apidef.APIDefinition
+	httpClient      *http.Client
+	streamingClient *http.Client
+	schema          *graphql.Schema
+
+	// For testing purposes
+	dummySubscriptionClient *graphqlDataSource.SubscriptionClient
 }
 
 func NewGraphQLConfigAdapter(apiDefinition *apidef.APIDefinition, options ...GraphQLConfigAdapterOption) GraphQLConfigAdapter {
@@ -239,14 +256,12 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			planDataSource.Factory = &graphqlDataSource.Factory{
-				HTTPClient: g.getHttpClient(),
-			}
-
+			planDataSource.Factory = g.createGraphQLDataSourceFactory(graphqlConfig)
 			planDataSource.Custom = graphqlDataSource.ConfigJson(g.graphqlDataSourceConfiguration(
 				graphqlConfig.URL,
 				graphqlConfig.Method,
 				graphqlConfig.Headers,
+				graphqlConfig.SubscriptionType,
 			))
 
 		case apidef.GraphQLEngineDataSourceKindKafka:
@@ -290,7 +305,11 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 			continue
 		}
 		hdr := g.removeDuplicateHeaders(apiDefSubgraphConf.Headers, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
-		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, hdr)
+		conf := g.graphqlDataSourceConfiguration(
+			apiDefSubgraphConf.URL,
+			http.MethodPost,
+			hdr,
+			apiDefSubgraphConf.SubscriptionType)
 		conf.Federation = graphqlDataSource.FederationConfiguration{
 			Enabled:    true,
 			ServiceSDL: apiDefSubgraphConf.SDL,
@@ -302,7 +321,7 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 	return confs
 }
 
-func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method string, headers map[string]string) graphqlDataSource.Configuration {
+func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method string, headers map[string]string, subscriptionType apidef.SubscriptionType) graphqlDataSource.Configuration {
 	dataSourceHeaders := make(map[string]string)
 	for name, value := range headers {
 		dataSourceHeaders[name] = value
@@ -320,7 +339,8 @@ func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method
 			Header: g.convertHeadersToHttpHeaders(dataSourceHeaders),
 		},
 		Subscription: graphqlDataSource.SubscriptionConfiguration{
-			URL: url,
+			URL:    url,
+			UseSSE: subscriptionType == apidef.GQLSubscriptionSSE,
 		},
 	}
 
@@ -486,4 +506,44 @@ func (g *GraphQLConfigAdapter) getHttpClient() *http.Client {
 	}
 
 	return g.httpClient
+}
+
+func (g *GraphQLConfigAdapter) getStreamingClient() *http.Client {
+	if g.streamingClient == nil {
+		g.streamingClient = httpclient.DefaultNetHttpClient
+		g.streamingClient.Timeout = 0
+	}
+
+	return g.streamingClient
+}
+
+func (g *GraphQLConfigAdapter) createGraphQLDataSourceFactory(graphqlConfig apidef.GraphQLEngineDataSourceConfigGraphQL) *graphqlDataSource.Factory {
+	factory := &graphqlDataSource.Factory{
+		HTTPClient:      g.getHttpClient(),
+		StreamingClient: g.getStreamingClient(),
+	}
+
+	// We can set a dummy SubscriptionClient for testing to not overcomplicate stuff.
+	// SubscriptionClient itself is tested already in library.
+	if g.dummySubscriptionClient != nil {
+		factory.SubscriptionClient = g.dummySubscriptionClient
+		return factory
+	}
+
+	wsProtocol := g.graphqlDataSourceWebSocketProtocol(graphqlConfig.SubscriptionType)
+	factory.SubscriptionClient = graphqlDataSource.NewGraphQLSubscriptionClient(
+		g.getHttpClient(),
+		g.getStreamingClient(),
+		nil,
+		graphqlDataSource.WithWSSubProtocol(wsProtocol),
+	)
+	return factory
+}
+
+func (g *GraphQLConfigAdapter) graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType) string {
+	wsProtocol := graphqlDataSource.ProtocolGraphQLWS
+	if subscriptionType == apidef.GQLSubscriptionTransportWS {
+		wsProtocol = graphqlDataSource.ProtocolGraphQLTWS
+	}
+	return wsProtocol
 }
