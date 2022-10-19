@@ -46,6 +46,8 @@ type IdExtractorType string
 type AuthTypeEnum string
 type RoutingTriggerOnType string
 
+type SubscriptionType string
+
 const (
 	NoAction EndpointMethodAction = "no_action"
 	Reply    EndpointMethodAction = "reply"
@@ -85,6 +87,12 @@ const (
 	All    RoutingTriggerOnType = "all"
 	Any    RoutingTriggerOnType = "any"
 	Ignore RoutingTriggerOnType = ""
+
+	// Subscription Types
+	GQLSubscriptionUndefined   SubscriptionType = ""
+	GQLSubscriptionWS          SubscriptionType = "graphql-ws"
+	GQLSubscriptionTransportWS SubscriptionType = "graphql-transport-ws"
+	GQLSubscriptionSSE         SubscriptionType = "sse"
 
 	// TykInternalApiHeader - flags request as internal api looping request
 	TykInternalApiHeader = "x-tyk-internal"
@@ -790,11 +798,12 @@ type GraphQLSupergraphConfig struct {
 }
 
 type GraphQLSubgraphEntity struct {
-	APIID   string            `bson:"api_id" json:"api_id"`
-	Name    string            `bson:"name" json:"name"`
-	URL     string            `bson:"url" json:"url"`
-	SDL     string            `bson:"sdl" json:"sdl"`
-	Headers map[string]string `bson:"headers" json:"headers"`
+	APIID            string            `bson:"api_id" json:"api_id"`
+	Name             string            `bson:"name" json:"name"`
+	URL              string            `bson:"url" json:"url"`
+	SDL              string            `bson:"sdl" json:"sdl"`
+	Headers          map[string]string `bson:"headers" json:"headers"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type"`
 }
 
 type GraphQLEngineConfig struct {
@@ -839,9 +848,10 @@ type GraphQLEngineDataSourceConfigREST struct {
 }
 
 type GraphQLEngineDataSourceConfigGraphQL struct {
-	URL     string            `bson:"url" json:"url"`
-	Method  string            `bson:"method" json:"method"`
-	Headers map[string]string `bson:"headers" json:"headers"`
+	URL              string            `bson:"url" json:"url"`
+	Method           string            `bson:"method" json:"method"`
+	Headers          map[string]string `bson:"headers" json:"headers"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type"`
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
