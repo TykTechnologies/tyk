@@ -136,7 +136,7 @@ jobs:
 
     - name: Archive Integration tests report
       if: ${{ always() }}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
          name: api-test-report
          path: ./tyk-automated-tests/reports/
