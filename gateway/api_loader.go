@@ -611,6 +611,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		d.SH.Spec.SanitizeProxyPaths(r)
+		ctxSetVersionInfo(r, nil)
 		handler.ServeHTTP(w, r)
 		return
 	}
