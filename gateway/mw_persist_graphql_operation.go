@@ -23,6 +23,11 @@ func (i *PersistGraphQLOperationMiddleware) EnabledForSpec() bool {
 	return true
 }
 
+type GraphQLRequest struct {
+	Query     string          `json:"query"`
+	Variables json.RawMessage `json:"variables"`
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	vInfo, _ := i.Spec.Version(r)
@@ -38,11 +43,6 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 	_, _ = io.ReadAll(r.Body)
 	defer r.Body.Close()
 
-	type GraphQLRequest struct {
-		Query     string          `json:"query"`
-		Variables json.RawMessage `json:"variables"`
-	}
-
 	contextData := ctxGetData(r)
 	_ = contextData
 
@@ -52,7 +52,6 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 	replacers := make(map[string]int)
 	paths := strings.Split(mwSpec.Path, "/")
 	for i, part := range paths {
-		println(i, part)
 		if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
 			key := "$path." + strings.Replace(part, "{", "", -1)
 			key = strings.Replace(key, "}", "", -1)
