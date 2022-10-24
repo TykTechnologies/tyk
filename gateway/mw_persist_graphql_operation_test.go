@@ -60,6 +60,14 @@ func TestGraphqlPersistMatchPathInfo(t *testing.T) {
 						Operation: testGQLQueryCountries,
 						Method:    "GET",
 					},
+					{
+						Path:      "continent",
+						Operation: testQueryContinentCode,
+						Method:    "POST",
+						Variables: map[string]interface{}{
+							"code": "AF",
+						},
+					},
 				},
 			},
 		}
@@ -83,6 +91,18 @@ func TestGraphqlPersistMatchPathInfo(t *testing.T) {
 				return false
 			}
 			return testResp.Body == ""
+		}},
+		test.TestCase{Path: "/continent", Method: "POST", BodyMatchFunc: func(bytes []byte) bool {
+			var testResp TestHttpResponse
+			if err := json.Unmarshal(bytes, &testResp); err != nil {
+				return false
+			}
+			// Get query and variables
+			var q GraphQLRequest
+			if err := json.Unmarshal([]byte(testResp.Body), &q); err != nil {
+				return false
+			}
+			return q.Query == testQueryContinentCode && string(q.Variables) == `{"code":"AF"}` && testResp.Method == "POST"
 		}},
 	)
 	assert.NoError(t, err)
@@ -112,6 +132,14 @@ func TestGraphqlPersistVariables(t *testing.T) {
 						Method:    "GET",
 						Variables: map[string]interface{}{
 							"code": "NG",
+						},
+					},
+					{
+						Path:      "/continent/{code}",
+						Operation: testQueryContinentCode,
+						Method:    "GET",
+						Variables: map[string]interface{}{
+							"code": "$path.code",
 						},
 					},
 					{
@@ -168,6 +196,18 @@ func TestGraphqlPersistVariables(t *testing.T) {
 				return false
 			}
 			return q.Query == testQueryContinentCode && string(q.Variables) == `{"code":""}`
+		}},
+		test.TestCase{Path: "/continent/AF", Method: "GET", BodyMatchFunc: func(bytes []byte) bool {
+			var testResp TestHttpResponse
+			if err := json.Unmarshal(bytes, &testResp); err != nil {
+				return false
+			}
+			// Get query and variables
+			var q GraphQLRequest
+			if err := json.Unmarshal([]byte(testResp.Body), &q); err != nil {
+				return false
+			}
+			return q.Query == testQueryContinentCode && string(q.Variables) == `{"code":"AF"}`
 		}},
 	)
 	assert.NoError(t, err)

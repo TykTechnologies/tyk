@@ -46,9 +46,6 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 	contextData := ctxGetData(r)
 	_ = contextData
 
-	varBytes, _ := json.Marshal(mwSpec.Variables)
-	//varString := string(varBytes)
-
 	replacers := make(map[string]int)
 	paths := strings.Split(mwSpec.Path, "/")
 	for i, part := range paths {
@@ -59,11 +56,12 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 		}
 	}
 
+	varBytes, _ := json.Marshal(mwSpec.Variables)
 	variablesStr := i.Gw.replaceTykVariables(r, string(varBytes), false)
 
 	requestPathParts := strings.Split(r.RequestURI, "/")
 	for replacer, pathIndex := range replacers {
-		variablesStr = strings.ReplaceAll(variablesStr, replacer, requestPathParts[pathIndex+1])
+		variablesStr = strings.ReplaceAll(variablesStr, replacer, requestPathParts[pathIndex])
 	}
 
 	graphqlQuery := GraphQLRequest{
