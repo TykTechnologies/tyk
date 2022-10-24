@@ -172,3 +172,103 @@ func TestGraphqlPersistVariables(t *testing.T) {
 	)
 	assert.NoError(t, err)
 }
+
+func TestGraphqlPersistMultipleVersions(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(func() {
+		ts.Close()
+	})
+	gqlRequestCountries, err := json.Marshal(GraphQLRequest{
+		Query: testGQLQueryCountries,
+	})
+	gqlRequestContinent, err := json.Marshal(GraphQLRequest{
+		Query:     testQueryContinentCode,
+		Variables: json.RawMessage(`{"code":"AF"}`),
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "rest-graph"
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = TestHttpAny
+		spec.VersionDefinition.Location = "header"
+		spec.VersionDefinition.Key = "Api-Version"
+		spec.EnableContextVars = true
+		spec.VersionData.NotVersioned = false
+		spec.VersionData.DefaultVersion = "Default"
+		spec.VersionData.Versions["Default"] = apidef.VersionInfo{
+			Name:    "Default",
+			Expires: "3000-01-02 00:00",
+		}
+		spec.VersionData.Versions["version2"] = apidef.VersionInfo{
+			Name:             "version_two",
+			UseExtendedPaths: true,
+			ExtendedPaths: apidef.ExtendedPathsSet{
+				PersistGraphQL: []apidef.PersistGraphQLMeta{
+					{
+						Path:      "/countries",
+						Method:    "GET",
+						Operation: testGQLQueryCountries,
+					},
+				},
+			},
+		}
+		spec.VersionData.Versions["version3"] = apidef.VersionInfo{
+			Name:             "version_three",
+			UseExtendedPaths: true,
+			ExtendedPaths: apidef.ExtendedPathsSet{PersistGraphQL: []apidef.PersistGraphQLMeta{
+				{
+					Path:      "/continent",
+					Method:    "GET",
+					Operation: testQueryContinentCode,
+					Variables: map[string]interface{}{
+						"code": "AF",
+					},
+				},
+			}},
+		}
+	})
+
+	_, err = ts.Run(
+		t,
+		test.TestCase{Path: "/countries", Method: "GET", BodyMatchFunc: func(bytes []byte) bool {
+			var testResp TestHttpResponse
+			err := json.Unmarshal(bytes, &testResp)
+			if err != nil {
+				return false
+			}
+			return testResp.Body == ""
+		}},
+		test.TestCase{Path: "/countries", Method: "GET", Headers: map[string]string{
+			"Api-Version": "version2",
+		}, BodyMatchFunc: func(bytes []byte) bool {
+			var testResp TestHttpResponse
+			err := json.Unmarshal(bytes, &testResp)
+			if err != nil {
+				return false
+			}
+			return testResp.Body == string(gqlRequestCountries)
+		}},
+		test.TestCase{Path: "/continent", Method: "GET", Headers: map[string]string{
+			"Api-Version": "version2",
+		}, BodyMatchFunc: func(bytes []byte) bool {
+			var testResp TestHttpResponse
+			err := json.Unmarshal(bytes, &testResp)
+			if err != nil {
+				return false
+			}
+			return testResp.Body == ""
+		}},
+		test.TestCase{Path: "/continent", Method: "GET", Headers: map[string]string{
+			"Api-Version": "version3",
+		}, BodyMatchFunc: func(bytes []byte) bool {
+			var testResp TestHttpResponse
+			err := json.Unmarshal(bytes, &testResp)
+			if err != nil {
+				return false
+			}
+			return testResp.Body == string(gqlRequestContinent)
+		}},
+	)
+	assert.NoError(t, err)
+}
