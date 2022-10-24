@@ -610,7 +610,7 @@ func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handle
 		return nil, false
 	}
 
-	return h.(http.Handler), true
+	return h.(*ChainObject).ThisHandler, true
 }
 
 func (gw *Gateway) loadGlobalApps() {
