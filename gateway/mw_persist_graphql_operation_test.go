@@ -30,7 +30,7 @@ query continent($code: ID!) {
   }
 }`
 
-func TestGraphqlPersistMatchPathInfo(t *testing.T) {
+func TestGraphqlPersist_MatchPathInfo(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(func() {
 		ts.Close()
@@ -83,6 +83,17 @@ func TestGraphqlPersistMatchPathInfo(t *testing.T) {
 			}
 			return testResp.Method == "POST" && testResp.Body == string(gqlRequestCountries) && testResp.URI == "/countries"
 		}},
+		test.TestCase{Path: "/countries", Method: "GET", Headers: map[string]string{
+			"Test-Header": "value",
+		}, BodyMatchFunc: func(bytes []byte) bool {
+			var testResp TestHttpResponse
+			err := json.Unmarshal(bytes, &testResp)
+			if err != nil {
+				return false
+			}
+			v, ok := testResp.Headers["Test-Header"]
+			return testResp.Method == "POST" && testResp.Body == string(gqlRequestCountries) && testResp.URI == "/countries" && ok && v == "value"
+		}},
 		test.TestCase{Path: "/countries", Method: "POST", BodyMatchFunc: func(bytes []byte) bool {
 			// graphql request shouldn't be sent due to mismatched method
 			var testResp TestHttpResponse
@@ -108,7 +119,7 @@ func TestGraphqlPersistMatchPathInfo(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestGraphqlPersistVariables(t *testing.T) {
+func TestGraphqlPersist_Variables(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(func() {
 		ts.Close()
@@ -213,7 +224,7 @@ func TestGraphqlPersistVariables(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestGraphqlPersistMultipleVersions(t *testing.T) {
+func TestGraphqlPersist_MultipleVersions(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(func() {
 		ts.Close()
@@ -221,10 +232,12 @@ func TestGraphqlPersistMultipleVersions(t *testing.T) {
 	gqlRequestCountries, err := json.Marshal(GraphQLRequest{
 		Query: testGQLQueryCountries,
 	})
+	assert.NoError(t, err)
 	gqlRequestContinent, err := json.Marshal(GraphQLRequest{
 		Query:     testQueryContinentCode,
 		Variables: json.RawMessage(`{"code":"AF"}`),
 	})
+	assert.NoError(t, err)
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "rest-graph"
