@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -40,11 +41,12 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 	mwSpec, _ := meta.(*apidef.PersistGraphQLMeta)
 	r.Method = http.MethodPost
 
-	_, _ = io.ReadAll(r.Body)
+	_, err := io.ReadAll(r.Body)
+	if err != nil {
+		i.Logger().WithError(err).Error("error reading request")
+		return errors.New("error reading the request"), http.StatusBadRequest
+	}
 	defer r.Body.Close()
-
-	contextData := ctxGetData(r)
-	_ = contextData
 
 	replacers := make(map[string]int)
 	paths := strings.Split(mwSpec.Path, "/")
@@ -56,7 +58,12 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 		}
 	}
 
-	varBytes, _ := json.Marshal(mwSpec.Variables)
+	varBytes, err := json.Marshal(mwSpec.Variables)
+	if err != nil {
+		i.Logger().WithError(err).Error("error proxying request")
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+
 	variablesStr := i.Gw.replaceTykVariables(r, string(varBytes), false)
 
 	requestPathParts := strings.Split(r.RequestURI, "/")
@@ -69,7 +76,11 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 		Variables: []byte(variablesStr),
 	}
 
-	graphQLQueryBytes, _ := json.Marshal(graphqlQuery)
+	graphQLQueryBytes, err := json.Marshal(graphqlQuery)
+	if err != nil {
+		i.Logger().WithError(err).Error("error proxying request")
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
 	newBuf := bytes.NewBuffer(graphQLQueryBytes)
 
 	r.Body = io.NopCloser(newBuf)

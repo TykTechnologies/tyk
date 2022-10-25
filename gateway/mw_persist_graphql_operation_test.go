@@ -48,7 +48,7 @@ func TestGraphqlPersist_MatchPathInfo(t *testing.T) {
 		spec.OrgID = "default"
 		spec.Proxy.ListenPath = "/"
 		spec.Proxy.TargetURL = TestHttpAny
-		spec.VersionData.NotVersioned = true
+		spec.VersionData.NotVersioned = false
 		spec.VersionData.Versions["Default"] = apidef.VersionInfo{
 			Name:             "Default",
 			Expires:          "3000-01-02 00:00",
@@ -130,7 +130,7 @@ func TestGraphqlPersist_Variables(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		spec.Proxy.TargetURL = TestHttpAny
 		spec.EnableContextVars = true
-		spec.VersionData.NotVersioned = true
+		spec.VersionData.NotVersioned = false
 		spec.VersionData.Versions["Default"] = apidef.VersionInfo{
 			Name:             "Default",
 			Expires:          "3000-01-02 00:00",
