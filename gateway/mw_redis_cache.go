@@ -95,23 +95,8 @@ func addBodyHash(req *http.Request, regex string, h hash.Hash) (err error) {
 }
 
 func readBody(req *http.Request) (bodyBytes []byte, err error) {
-	if n, ok := req.Body.(nopCloser); ok {
-		n.Seek(0, io.SeekStart)
-		bodyBytes, err = ioutil.ReadAll(n)
-		if err != nil {
-			return nil, err
-		}
-		n.Seek(0, io.SeekStart) // reset for any next read.
-		return
-	}
-
-	req.Body = copyBody(req.Body)
-	bodyBytes, err = ioutil.ReadAll(req.Body)
-	if err != nil {
-		return nil, err
-	}
-	req.Body.(nopCloser).Seek(0, io.SeekStart) // reset for any next read.
-	return
+	req.Body = copyBody(req.Body, false)
+	return ioutil.ReadAll(req.Body)
 }
 
 func isBodyHashRequired(request *http.Request) bool {
