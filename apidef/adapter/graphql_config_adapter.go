@@ -40,13 +40,6 @@ func WithStreamingClient(streamingClient *http.Client) GraphQLConfigAdapterOptio
 	}
 }
 
-// Use this option function to set a dummy SubscriptionClient for testing.
-/*func withDummySubscriptionClient(subscriptionClient *graphqlDataSource.SubscriptionClient) GraphQLConfigAdapterOption {
-	return func(adapter *GraphQLConfigAdapter) {
-		adapter.dummySubscriptionClient = subscriptionClient
-	}
-}*/
-
 func withGraphQLSubscriptionClientFactory(factory graphqlDataSource.GraphQLSubscriptionClientFactory) GraphQLConfigAdapterOption {
 	return func(adapter *GraphQLConfigAdapter) {
 		adapter.subscriptionClientFactory = factory
