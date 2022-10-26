@@ -762,7 +762,7 @@ func TestNopCloseRequestBody(t *testing.T) {
 	// try to pass not nil body and check that it was replaced with nopCloser
 	req = httptest.NewRequest(http.MethodGet, "/test", strings.NewReader("abcxyz"))
 	nopCloseRequestBody(req)
-	if body, ok := req.Body.(nopCloser); !ok {
+	if body, ok := req.Body.(*nopCloserBuffer); !ok {
 		t.Error("Request's body was not replaced with nopCloser")
 	} else {
 		// try to read body 1st time
@@ -807,7 +807,7 @@ func TestNopCloseResponseBody(t *testing.T) {
 	resp = &http.Response{}
 	resp.Body = ioutil.NopCloser(strings.NewReader("abcxyz"))
 	nopCloseResponseBody(resp)
-	if body, ok := resp.Body.(nopCloser); !ok {
+	if body, ok := resp.Body.(*nopCloserBuffer); !ok {
 		t.Error("Response's body was not replaced with nopCloser")
 	} else {
 		// try to read body 1st time
@@ -1260,9 +1260,12 @@ func BenchmarkWrappedServeHTTP(b *testing.B) {
 }
 
 func BenchmarkCopyRequestResponse(b *testing.B) {
+
+	// stress test this with 20mb payload
+	str := strings.Repeat("x!", 10000000)
+
 	b.ReportAllocs()
 
-	str := strings.Repeat("very long body line that is repeated", 128)
 	req := &http.Request{}
 	res := &http.Response{}
 	for i := 0; i < b.N; i++ {
