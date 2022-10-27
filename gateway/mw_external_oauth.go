@@ -2,10 +2,13 @@ package gateway
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/pmylund/go-cache"
@@ -16,10 +19,11 @@ import (
 )
 
 var (
-	externalOAuthJWKCache    *cache.Cache
-	ErrTokenValidationFailed = errors.New("error happened during the access token validation")
-	ErrKIDNotAString         = errors.New("kid is not a string")
-	ErrNoMatchingKIDFound    = errors.New("no matching KID could be found")
+	externalOAuthJWKCache           *cache.Cache
+	externalOAuthIntrospectionCache *introspectionCache
+	ErrTokenValidationFailed        = errors.New("error happened during the access token validation")
+	ErrKIDNotAString                = errors.New("kid is not a string")
+	ErrNoMatchingKIDFound           = errors.New("no matching KID could be found")
 )
 
 type ExternalOAuthMiddleware struct {
@@ -208,9 +212,35 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid interface{}, jwtV
 func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, string, error) {
 	introsp := k.Spec.ExternalOAuth.Providers[0].Introspection
 
-	claims, err := introsp.Call(accessToken)
-	if err != nil {
-		return false, "", fmt.Errorf("introspection err: %s", err)
+	var (
+		claims jwt.MapClaims
+		cached bool
+		err    error
+	)
+
+	if introsp.Cache.Enabled {
+		if externalOAuthIntrospectionCache == nil {
+			externalOAuthIntrospectionCache = newIntrospectionCache(k.Gw)
+		}
+
+		claims, cached = externalOAuthIntrospectionCache.GetRes(accessToken)
+	}
+
+	if !cached {
+		log.WithError(err).Debug("Doing OAuth introspection call")
+		claims, err = introsp.Call(accessToken)
+		if err != nil {
+			return false, "", fmt.Errorf("introspection err: %s", err)
+		}
+
+		if introsp.Cache.Enabled {
+			err = externalOAuthIntrospectionCache.SetRes(accessToken, claims, introsp.Cache.Timeout)
+			if err != nil {
+				log.WithError(err).Debug("OAuth introspection caching is enabled but the result couldn't be cached in redis")
+			}
+		}
+	} else {
+		log.WithError(err).Debug("Found OAuth introspection result in the redis cache")
 	}
 
 	active, ok := claims["active"]
@@ -241,4 +271,36 @@ func (k *ExternalOAuthMiddleware) generateVirtualSessionFor(r *http.Request, ses
 		},
 	}
 	return virtualSession
+}
+
+func newIntrospectionCache(gw *Gateway) *introspectionCache {
+	return &introspectionCache{RedisCluster: storage.RedisCluster{KeyPrefix: "introspection-", RedisController: gw.RedisController}}
+}
+
+type introspectionCache struct {
+	storage.RedisCluster
+}
+
+func (c *introspectionCache) GetRes(token string) (jwt.MapClaims, bool) {
+	var claims jwt.MapClaims
+	claimsStr, err := c.GetKey(token)
+	if err != nil {
+		return nil, false
+	}
+
+	err = json.Unmarshal([]byte(claimsStr), &claims)
+	if err != nil {
+		return nil, false
+	}
+
+	return claims, true
+}
+
+func (c *introspectionCache) SetRes(token string, res jwt.MapClaims, timeout int64) error {
+	claimsInBytes, err := json.Marshal(res)
+	if err != nil {
+		return err
+	}
+
+	return c.SetKey(token, string(claimsInBytes), timeout)
 }
