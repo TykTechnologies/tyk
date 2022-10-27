@@ -412,11 +412,12 @@ func (j *JWTValidation) ExtractTo(jwt *apidef.JWTValidation) {
 }
 
 type Introspection struct {
-	Enabled           bool   `bson:"enabled" json:"enabled"`
-	URL               string `bson:"url" json:"url"`
-	ClientID          string `bson:"clientId" json:"clientId"`
-	ClientSecret      string `bson:"clientSecret" json:"clientSecret"`
-	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	Enabled           bool               `bson:"enabled" json:"enabled"`
+	URL               string             `bson:"url" json:"url"`
+	ClientID          string             `bson:"clientId" json:"clientId"`
+	ClientSecret      string             `bson:"clientSecret" json:"clientSecret"`
+	IdentityBaseField string             `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	Cache             IntrospectionCache `bson:"cache" json:"cache"`
 }
 
 func (i *Introspection) Fill(intros apidef.Introspection) {
@@ -425,6 +426,8 @@ func (i *Introspection) Fill(intros apidef.Introspection) {
 	i.ClientID = intros.ClientID
 	i.ClientSecret = intros.ClientSecret
 	i.IdentityBaseField = intros.IdentityBaseField
+
+	i.Cache.Fill(intros.Cache) // no need nil check because it is a required one and not a pointer
 }
 
 func (i *Introspection) ExtractTo(intros *apidef.Introspection) {
@@ -433,6 +436,23 @@ func (i *Introspection) ExtractTo(intros *apidef.Introspection) {
 	intros.ClientID = i.ClientID
 	intros.ClientSecret = i.ClientSecret
 	intros.IdentityBaseField = i.IdentityBaseField
+
+	i.Cache.ExtractTo(&intros.Cache)
+}
+
+type IntrospectionCache struct {
+	Enabled bool  `bson:"enabled" json:"enabled"`
+	Timeout int64 `bson:"timeout" json:"timeout"`
+}
+
+func (c *IntrospectionCache) Fill(cache apidef.IntrospectionCache) {
+	c.Enabled = cache.Enabled
+	c.Timeout = cache.Timeout
+}
+
+func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
+	cache.Enabled = c.Enabled
+	cache.Timeout = c.Timeout
 }
 
 type ExternalOAuth struct {
