@@ -412,11 +412,18 @@ func (j *JWTValidation) ExtractTo(jwt *apidef.JWTValidation) {
 }
 
 type Introspection struct {
-	Enabled           bool   `bson:"enabled" json:"enabled"`
-	URL               string `bson:"url" json:"url"`
-	ClientID          string `bson:"clientId" json:"clientId"`
-	ClientSecret      string `bson:"clientSecret" json:"clientSecret"`
+	// Enabled enables OAuth access token validation by introspection to a third party.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// URL is the URL of the third party provider's introspection endpoint.
+	URL string `bson:"url" json:"url"`
+	// ClientID is the public identifier for the client, acquired from the third party.
+	ClientID string `bson:"clientId" json:"clientId"`
+	// ClientSecret is a secret known only to the client and the authorization server, acquired from the third party.
+	ClientSecret string `bson:"clientSecret" json:"clientSecret"`
+	// IdentityBaseField is the key showing where to find the user id in the claims. If it is empty, the `sub` key is looked at.
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	// Cache is the caching mechanism for introspection responses.
+	Cache *IntrospectionCache `bson:"cache" json:"cache"`
 }
 
 func (i *Introspection) Fill(intros apidef.Introspection) {
@@ -425,6 +432,15 @@ func (i *Introspection) Fill(intros apidef.Introspection) {
 	i.ClientID = intros.ClientID
 	i.ClientSecret = intros.ClientSecret
 	i.IdentityBaseField = intros.IdentityBaseField
+
+	if i.Cache == nil {
+		i.Cache = &IntrospectionCache{}
+	}
+
+	i.Cache.Fill(intros.Cache)
+	if ShouldOmit(i.Cache) {
+		i.Cache = nil
+	}
 }
 
 func (i *Introspection) ExtractTo(intros *apidef.Introspection) {
@@ -433,6 +449,28 @@ func (i *Introspection) ExtractTo(intros *apidef.Introspection) {
 	intros.ClientID = i.ClientID
 	intros.ClientSecret = i.ClientSecret
 	intros.IdentityBaseField = i.IdentityBaseField
+
+	if i.Cache != nil {
+		i.Cache.ExtractTo(&intros.Cache)
+	}
+}
+
+type IntrospectionCache struct {
+	// Enabled enables the caching mechanism for introspection responses.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Timeout is the duration in seconds of how long the cached value stays.
+	// For introspection caching, it is suggested to use a short interval.
+	Timeout int64 `bson:"timeout" json:"timeout"`
+}
+
+func (c *IntrospectionCache) Fill(cache apidef.IntrospectionCache) {
+	c.Enabled = cache.Enabled
+	c.Timeout = cache.Timeout
+}
+
+func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
+	cache.Enabled = c.Enabled
+	cache.Timeout = c.Timeout
 }
 
 type ExternalOAuth struct {

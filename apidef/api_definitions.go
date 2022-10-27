@@ -781,7 +781,8 @@ const (
 )
 
 type GraphQLProxyConfig struct {
-	AuthHeaders map[string]string `bson:"auth_headers" json:"auth_headers"`
+	AuthHeaders      map[string]string `bson:"auth_headers" json:"auth_headers"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type"`
 }
 
 type GraphQLSubgraphConfig struct {
@@ -1308,11 +1309,17 @@ type JWTValidation struct {
 }
 
 type Introspection struct {
-	Enabled           bool   `bson:"enabled" json:"enabled"`
-	URL               string `bson:"url" json:"url"`
-	ClientID          string `bson:"client_id" json:"client_id"`
-	ClientSecret      string `bson:"client_secret" json:"client_secret"`
-	IdentityBaseField string `bson:"identity_base_field" json:"identity_base_field"`
+	Enabled           bool               `bson:"enabled" json:"enabled"`
+	URL               string             `bson:"url" json:"url"`
+	ClientID          string             `bson:"client_id" json:"client_id"`
+	ClientSecret      string             `bson:"client_secret" json:"client_secret"`
+	IdentityBaseField string             `bson:"identity_base_field" json:"identity_base_field"`
+	Cache             IntrospectionCache `bson:"cache" json:"cache"`
+}
+
+type IntrospectionCache struct {
+	Enabled bool  `bson:"enabled" json:"enabled"`
+	Timeout int64 `bson:"timeout" json:"timeout"`
 }
 
 func (i *Introspection) Call(accessToken string) (jwt.MapClaims, error) {

@@ -331,7 +331,7 @@ func TestExternalOAuthMiddleware_introspection(t *testing.T) {
 		_, _ = w.Write([]byte(fmt.Sprintf(`{"active": %t,"username": "%s"}`, accessTokenActive, user)))
 	}))
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
 		spec.ExternalOAuth.Enabled = true
@@ -346,7 +346,7 @@ func TestExternalOAuthMiddleware_introspection(t *testing.T) {
 				},
 			},
 		}
-	})
+	})[0]
 
 	headers := map[string]string{
 		"Authorization": testAccessToken,
@@ -362,4 +362,26 @@ func TestExternalOAuthMiddleware_introspection(t *testing.T) {
 	_, _ = ts.Run(t, []test.TestCase{
 		{Path: "/get", Headers: headers, BodyMatch: "access token is not valid", Code: http.StatusUnauthorized},
 	}...)
+
+	t.Run("cache", func(t *testing.T) {
+		api.ExternalOAuth.Providers[0].Introspection.Cache.Enabled = true
+		api.ExternalOAuth.Providers[0].Introspection.Cache.Timeout = 0
+		ts.Gw.LoadAPI(api)
+
+		accessTokenActive = true
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/get", Headers: headers, BodyMatch: "/get", Code: http.StatusOK},
+		}...)
+
+		accessTokenActive = false
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/get", Headers: headers, BodyMatch: "/get", Code: http.StatusOK},
+		}...)
+
+		// invalidate cache
+		externalOAuthIntrospectionCache.DeleteAllKeys()
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/get", Headers: headers, BodyMatch: "access token is not valid", Code: http.StatusUnauthorized},
+		}...)
+	})
 }
