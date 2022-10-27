@@ -27,19 +27,22 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/cenk/backoff"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 
 	"github.com/Masterminds/sprig/v3"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/gojsonschema"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
@@ -218,8 +221,9 @@ type APISpec struct {
 			BeforeFetchHook resolve.BeforeFetchHook
 			AfterFetchHook  resolve.AfterFetchHook
 		}
-		Client *http.Client
-		Schema *graphql.Schema
+		Client          *http.Client
+		StreamingClient *http.Client
+		Schema          *graphql.Schema
 	} `json:"-"`
 
 	hasMock   bool

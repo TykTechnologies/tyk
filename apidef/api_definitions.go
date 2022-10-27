@@ -783,7 +783,8 @@ const (
 )
 
 type GraphQLProxyConfig struct {
-	AuthHeaders map[string]string `bson:"auth_headers" json:"auth_headers"`
+	AuthHeaders      map[string]string `bson:"auth_headers" json:"auth_headers"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type"`
 }
 
 type GraphQLSubgraphConfig struct {

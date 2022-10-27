@@ -75,6 +75,10 @@ func (m *GraphQLMiddleware) Init() {
 		m.Spec.GraphQLExecutor.Client = &http.Client{
 			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec)},
 		}
+		m.Spec.GraphQLExecutor.StreamingClient = &http.Client{
+			Timeout:   0,
+			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec)},
+		}
 
 		if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 {
 			m.initGraphQLEngineV1(absLogger)
@@ -163,6 +167,7 @@ func (m *GraphQLMiddleware) initGraphQLEngineV1(logger *abstractlogger.LogrusLog
 func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLogger) {
 	configAdapter := adapter.NewGraphQLConfigAdapter(m.Spec.APIDefinition,
 		adapter.WithHttpClient(m.Spec.GraphQLExecutor.Client),
+		adapter.WithStreamingClient(m.Spec.GraphQLExecutor.StreamingClient),
 		adapter.WithSchema(m.Spec.GraphQLExecutor.Schema),
 	)
 
