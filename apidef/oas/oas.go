@@ -277,27 +277,27 @@ func (s *OAS) getTykOperations() (operations Operations) {
 }
 
 // AddServers adds a server into the servers definition if not already present.
-func (s *OAS) AddServers(apiURL string) {
-	if len(s.Servers) == 0 {
-		s.Servers = openapi3.Servers{
-			{
-				URL: apiURL,
-			},
-		}
-		return
+func (s *OAS) AddServers(apiURLs ...string) {
+	apiURLSet := make(map[string]struct{})
+	newServers := openapi3.Servers{}
+	for _, apiURL := range apiURLs {
+		newServers = append(newServers, &openapi3.Server{
+			URL: apiURL,
+		})
+		apiURLSet[apiURL] = struct{}{}
 	}
 
-	newServers := openapi3.Servers{
-		{
-			URL: apiURL,
-		},
+	if len(s.Servers) == 0 {
+		s.Servers = newServers
+		return
 	}
 
 	// check if apiURL already exists in servers object
 	for i := 0; i < len(s.Servers); i++ {
-		if s.Servers[i].URL == apiURL {
+		if _, ok := apiURLSet[s.Servers[i].URL]; ok {
 			continue
 		}
+
 		newServers = append(newServers, s.Servers[i])
 	}
 
@@ -318,4 +318,21 @@ func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
 	if len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL {
 		s.Servers[0].URL = apiURL
 	}
+}
+
+func (s *OAS) ReplaceServers(oldServersCount int, apiURLs []string) {
+	userAddedServers := openapi3.Servers{}
+	if len(s.Servers) >= oldServersCount {
+		userAddedServers = s.Servers[oldServersCount:]
+	}
+
+	newServers := openapi3.Servers{}
+	for _, apiURL := range apiURLs {
+		newServers = append(newServers, &openapi3.Server{
+			URL: apiURL,
+		})
+	}
+	newServers = append(newServers, userAddedServers...)
+
+	s.Servers = newServers
 }
