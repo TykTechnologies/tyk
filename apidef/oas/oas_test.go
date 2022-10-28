@@ -398,5 +398,4 @@ func TestOAS_MarshalJSON(t *testing.T) {
 			assert.Contains(t, string(data), `"x-abcd":[{"key":"value"},{"key":"value"}]`)
 		})
 	})
-
 }
