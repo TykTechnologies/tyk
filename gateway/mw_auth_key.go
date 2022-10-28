@@ -5,7 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/cert"
+
 	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/user"
@@ -96,7 +97,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		key = stripBearer(key)
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 		log.Debug("Trying to find key by client certificate")
-		certHash = k.Spec.OrgID + certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+		certHash = k.Spec.OrgID + cert.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")

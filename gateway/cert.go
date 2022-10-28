@@ -14,9 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/cert"
+
 	"github.com/TykTechnologies/tyk/apidef"
 
-	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/gorilla/mux"
@@ -36,7 +37,7 @@ type APIAllCertificates struct {
 }
 
 type APIAllCertificateBasics struct {
-	Certs []*certs.CertificateBasics `json:"certs"`
+	Certs []*cert.CertificateBasics `json:"certs"`
 }
 
 var cipherSuites = map[string]uint16{
@@ -66,7 +67,7 @@ var cipherSuites = map[string]uint16{
 
 var certLog = log.WithField("prefix", "certs")
 
-func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
+func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (certificate *tls.Certificate) {
 	var certID string
 
 	certMaps := []map[string]string{gw.GetConfig().Security.Certificates.Upstream}
@@ -102,7 +103,7 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 		return nil
 	}
 
-	certs := gw.CertificateManager.List([]string{certID}, certs.CertificatePrivate)
+	certs := gw.CertificateManager.List([]string{certID}, cert.CertificatePrivate)
 
 	if len(certs) == 0 {
 		return nil
@@ -128,13 +129,13 @@ func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tl
 		certLog.Debug("Checking certificate public key")
 
 		for _, rawCert := range rawCerts {
-			cert, _ := x509.ParseCertificate(rawCert)
-			pub, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
+			certificate, _ := x509.ParseCertificate(rawCert)
+			pub, err := x509.MarshalPKIXPublicKey(certificate.PublicKey)
 			if err != nil {
 				continue
 			}
 
-			fingerprint := certs.HexSHA256(pub)
+			fingerprint := cert.HexSHA256(pub)
 
 			for _, w := range whitelist {
 				if w == fingerprint {
@@ -164,7 +165,7 @@ func (gw *Gateway) validatePublicKeys(host string, conn *tls.Conn, spec *APISpec
 		if err != nil {
 			continue
 		}
-		fingerprint := certs.HexSHA256(der)
+		fingerprint := cert.HexSHA256(der)
 
 		for _, w := range whitelist {
 			if w == fingerprint {
@@ -311,7 +312,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
-	for _, cert := range gw.CertificateManager.List(gwConfig.HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
+	for _, cert := range gw.CertificateManager.List(gwConfig.HttpServerOptions.SSLCertificates, cert.CertificatePrivate) {
 		if cert != nil {
 			serverCerts = append(serverCerts, *cert)
 		}
@@ -374,7 +375,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 				if spec.Domain == "" || spec.Domain == hello.ServerName {
 					certIDs := append(spec.ClientCertificates, gwConfig.Security.Certificates.API...)
 
-					for _, cert := range gw.CertificateManager.List(certIDs, certs.CertificatePublic) {
+					for _, cert := range gw.CertificateManager.List(certIDs, cert.CertificatePublic) {
 						if cert != nil {
 							newConfig.ClientCAs.AddCert(cert.Leaf)
 						}
@@ -397,7 +398,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 			// Dynamically add API specific certificates
 			if len(spec.Certificates) != 0 {
-				for _, cert := range gw.CertificateManager.List(spec.Certificates, certs.CertificatePrivate) {
+				for _, cert := range gw.CertificateManager.List(spec.Certificates, cert.CertificatePrivate) {
 					if cert == nil {
 						continue
 					}
@@ -477,10 +478,10 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 			mode := r.URL.Query().Get("mode")
 			certIDs := gw.CertificateManager.ListAllIds(orgID)
 			if mode == ListDetailed {
-				var certificateBasics = make([]*certs.CertificateBasics, len(certIDs))
-				certificates := gw.CertificateManager.List(certIDs, certs.CertificateAny)
+				var certificateBasics = make([]*cert.CertificateBasics, len(certIDs))
+				certificates := gw.CertificateManager.List(certIDs, cert.CertificateAny)
 				for ci, certificate := range certificates {
-					certificateBasics[ci] = certs.ExtractCertificateBasics(certificate, certIDs[ci])
+					certificateBasics[ci] = cert.ExtractCertificateBasics(certificate, certIDs[ci])
 				}
 
 				doJSONWrite(w, http.StatusOK, &APIAllCertificateBasics{Certs: certificateBasics})
@@ -492,7 +493,7 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		certIDs := strings.Split(certID, ",")
-		certificates := gw.CertificateManager.List(certIDs, certs.CertificateAny)
+		certificates := gw.CertificateManager.List(certIDs, cert.CertificateAny)
 
 		if len(certIDs) == 1 {
 			if certificates[0] == nil {
@@ -500,13 +501,13 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			doJSONWrite(w, http.StatusOK, certs.ExtractCertificateMeta(certificates[0], certIDs[0]))
+			doJSONWrite(w, http.StatusOK, cert.ExtractCertificateMeta(certificates[0], certIDs[0]))
 			return
 		} else {
-			var meta []*certs.CertificateMeta
-			for ci, cert := range certificates {
-				if cert != nil {
-					meta = append(meta, certs.ExtractCertificateMeta(cert, certIDs[ci]))
+			var meta []*cert.CertificateMeta
+			for ci, crt := range certificates {
+				if crt != nil {
+					meta = append(meta, cert.ExtractCertificateMeta(crt, certIDs[ci]))
 				} else {
 					meta = append(meta, nil)
 				}

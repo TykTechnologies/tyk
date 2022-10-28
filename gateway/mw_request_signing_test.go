@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/cert"
 
 	"github.com/stretchr/testify/assert"
 
@@ -260,7 +260,7 @@ func TestRSARequestSigning(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, combinedPem, cert := certs.GenServerCertificate()
+	_, _, combinedPem, cert := cert.GenServerCertificate()
 	privCertId, _ := ts.Gw.CertificateManager.Add(combinedPem, "")
 	defer ts.Gw.CertificateManager.Delete(privCertId, "")
 

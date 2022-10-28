@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/cert"
 )
 
 type RequestSigning struct {
@@ -133,7 +133,7 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 			return errors.New("CertificateID is empty"), http.StatusInternalServerError
 		}
 
-		certList := s.Gw.CertificateManager.List([]string{s.Spec.RequestSigning.CertificateId}, certs.CertificatePrivate)
+		certList := s.Gw.CertificateManager.List([]string{s.Spec.RequestSigning.CertificateId}, cert.CertificatePrivate)
 		if len(certList) == 0 || certList[0] == nil {
 			log.Error("Certificate not found")
 			return errors.New("Certificate not found"), http.StatusInternalServerError

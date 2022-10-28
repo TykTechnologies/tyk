@@ -5,7 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/cert"
+
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -121,8 +122,8 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	orgId := "default"
 
 	//We generate the combinedPEM and get its serverCertID
-	_, _, combinedPEM, _ := certs.GenServerCertificate()
-	serverCertID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
+	_, _, combinedPEM, _ := cert.GenServerCertificate()
+	serverCertID, _, _ := cert.GetCertIDAndChainPEM(combinedPEM, "")
 
 	client := GetTLSClient(nil, nil)
 	conf := func(globalConf *config.Config) {
@@ -141,7 +142,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	//We reload the gw proxy so it uses the added server certificate
 	ts.ReloadGatewayProxy()
 
-	clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
+	clientPEM, _, _, clientCert := cert.GenCertificate(&x509.Certificate{}, false)
 	clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 	if err != nil {
 		t.Fatal("certificate should be added to cert manager")
