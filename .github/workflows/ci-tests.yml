@@ -48,7 +48,7 @@ jobs:
           make lint
           
           git add --all
-          git diff-index HEAD > git-state.log
+          git diff HEAD > git-state.log
           echo "::set-output name=git-state::$(sed -ze 's/%/%25/g;s/\n/%0A/g' git-state.log)"
 
           git_state_count=$(wc -l < git-state.log)
