@@ -83,7 +83,6 @@ func TestExtendedPaths(t *testing.T) {
 }
 
 func TestTransformRequestBody(t *testing.T) {
-
 	t.Run("empty", func(t *testing.T) {
 		var emptyTransformRequestBody TransformRequestBody
 

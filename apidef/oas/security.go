@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	typeApiKey      = "apiKey"
-	typeHttp        = "http"
+	typeAPIKey      = "apiKey"
+	typeHTTP        = "http"
 	typeOAuth2      = "oauth2"
 	schemeBearer    = "bearer"
 	schemeBasic     = "basic"
@@ -21,19 +21,28 @@ const (
 	cookie = "cookie"
 )
 
+// Token holds the values related to authentication tokens.
 type Token struct {
 	// Enabled enables the token based authentication mode.
-	// Old API Definition: `api_id`
-	Enabled     bool `bson:"enabled" json:"enabled"` // required
-	AuthSources `bson:",inline" json:",inline"`
-	// EnableClientCertificate allows to create dynamic keys based on certificates.
-	// Old API Definition: `auth_configs["authToken"].use_certificate`
-	EnableClientCertificate bool `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty"`
 	//
-	// Old API Definition:
+	// Tyk native API definition: `auth_configs["authToken"].use_standard_auth`
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+
+	// AuthSources contains the configuration for authentication sources.
+	AuthSources `bson:",inline" json:",inline"`
+
+	// EnableClientCertificate allows to create dynamic keys based on certificates.
+	//
+	// Tyk native API definition: `auth_configs["authToken"].use_certificate`
+	EnableClientCertificate bool `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty"`
+
+	// Signature holds the configuration for verifying the signature of the token.
+	//
+	// Tyk native API definition: `auth_configs["authToken"].use_certificate`
 	Signature *Signature `bson:"signatureValidation,omitempty" json:"signatureValidation,omitempty"`
 }
 
+// Import populates *Token from argument values.
 func (t *Token) Import(nativeSS *openapi3.SecurityScheme, enable bool) {
 	t.Enabled = enable
 	t.AuthSources.Import(nativeSS.In)
@@ -45,7 +54,7 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 		return
 	}
 
-	s.fillApiKeyScheme(&authConfig)
+	s.fillAPIKeyScheme(&authConfig)
 
 	token := &Token{}
 	token.Enabled = api.UseStandardAuth
@@ -78,11 +87,12 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 		token.Signature.ExtractTo(&authConfig)
 	}
 
-	s.extractApiKeySchemeTo(&authConfig, name)
+	s.extractAPIKeySchemeTo(&authConfig, name)
 
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
+// JWT holds the configuration for the JWT middleware.
 type JWT struct {
 	Enabled                 bool `bson:"enabled" json:"enabled"` // required
 	AuthSources             `bson:",inline" json:",inline"`
@@ -99,6 +109,7 @@ type JWT struct {
 	ExpiresAtValidationSkew uint64   `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
 }
 
+// Import populates *JWT based on arguments.
 func (j *JWT) Import(enable bool) {
 	j.Enabled = enable
 	j.Header = &AuthSource{
@@ -127,7 +138,7 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 		ss[ac.Name] = ref
 	}
 
-	ref.Value.WithType(typeHttp).WithScheme(schemeBearer).WithBearerFormat(bearerFormatJWT)
+	ref.Value.WithType(typeHTTP).WithScheme(schemeBearer).WithBearerFormat(bearerFormatJWT)
 
 	s.appendSecurity(ac.Name)
 
@@ -187,22 +198,24 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.JWTType] = ac
 }
 
+// Basic type holds configuration values related to http basic authentication.
 type Basic struct {
 	// Enabled enables the basic authentication mode.
-	// Old API Definition: `use_basic_auth`
+	// Tyk native API definition: `use_basic_auth`
 	Enabled     bool `bson:"enabled" json:"enabled"` // required
 	AuthSources `bson:",inline" json:",inline"`
 	// DisableCaching disables the caching of basic authentication key.
-	// Old API Definition: `basic_auth.disable_caching`
+	// Tyk native API definition: `basic_auth.disable_caching`
 	DisableCaching bool `bson:"disableCaching,omitempty" json:"disableCaching,omitempty"`
 	// CacheTTL is the TTL for a cached basic authentication key in seconds.
-	// Old API Definition: `basic_auth.cache_ttl`
+	// Tyk native API definition: `basic_auth.cache_ttl`
 	CacheTTL int `bson:"cacheTTL,omitempty" json:"cacheTTL,omitempty"`
 	// ExtractCredentialsFromBody helps to extract username and password from body. In some cases, like dealing with SOAP,
 	// user credentials can be passed via request body.
 	ExtractCredentialsFromBody *ExtractCredentialsFromBody `bson:"extractCredentialsFromBody,omitempty" json:"extractCredentialsFromBody,omitempty"`
 }
 
+// Import populates *Basic from it's arguments.
 func (b *Basic) Import(enable bool) {
 	b.Enabled = enable
 	b.Header = &AuthSource{
@@ -231,7 +244,7 @@ func (s *OAS) fillBasic(api apidef.APIDefinition) {
 		ss[ac.Name] = ref
 	}
 
-	ref.Value.WithType(typeHttp).WithScheme(schemeBasic)
+	ref.Value.WithType(typeHTTP).WithScheme(schemeBasic)
 
 	s.appendSecurity(ac.Name)
 
@@ -274,30 +287,34 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.BasicType] = ac
 }
 
+// ExtractCredentialsFromBody configures extracting credentials from the request body.
 type ExtractCredentialsFromBody struct {
 	// Enabled enables extracting credentials from body.
-	// Old API Definition: `basic_auth.extract_from_body`
+	// Tyk native API definition: `basic_auth.extract_from_body`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// UserRegexp is the regex for username e.g. `<User>(.*)</User>`.
-	// Old API Definition: `basic_auth.userRegexp`
+	// Tyk native API definition: `basic_auth.userRegexp`
 	UserRegexp string `bson:"userRegexp,omitempty" json:"userRegexp,omitempty"`
 	// PasswordRegexp is the regex for password e.g. `<Password>(.*)</Password>`.
-	// Old API Definition: `basic_auth.passwordRegexp`
+	// Tyk native API definition: `basic_auth.passwordRegexp`
 	PasswordRegexp string `bson:"passwordRegexp,omitempty" json:"passwordRegexp,omitempty"`
 }
 
+// Fill fills *ExtractCredentialsFromBody from apidef.APIDefinition.
 func (e *ExtractCredentialsFromBody) Fill(api apidef.APIDefinition) {
 	e.Enabled = api.BasicAuth.ExtractFromBody
 	e.UserRegexp = api.BasicAuth.BodyUserRegexp
 	e.PasswordRegexp = api.BasicAuth.BodyPasswordRegexp
 }
 
+// ExtractTo extracts *ExtractCredentialsFromBody and populates *apidef.APIDefinition.
 func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
 	api.BasicAuth.ExtractFromBody = e.Enabled
 	api.BasicAuth.BodyUserRegexp = e.UserRegexp
 	api.BasicAuth.BodyPasswordRegexp = e.PasswordRegexp
 }
 
+// OAuth configures the OAuth middleware.
 type OAuth struct {
 	Enabled               bool `bson:"enabled" json:"enabled"` // required
 	AuthSources           `bson:",inline" json:",inline"`
@@ -307,6 +324,7 @@ type OAuth struct {
 	Notifications         *Notifications              `bson:"notifications,omitempty" json:"notifications,omitempty"`
 }
 
+// Import populates *OAuth from it's arguments.
 func (o *OAuth) Import(enable bool) {
 	o.Enabled = enable
 	o.Header = &AuthSource{
@@ -551,16 +569,21 @@ func (s *OAS) extractExternalOAuthTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.ExternalOAuthType] = authConfig
 }
 
+// Notifications holds configuration for updates to keys.
 type Notifications struct {
-	SharedSecret   string `bson:"sharedSecret,omitempty" json:"sharedSecret,omitempty"`
+	// SharedSecret is the shared secret used in the notification request.
+	SharedSecret string `bson:"sharedSecret,omitempty" json:"sharedSecret,omitempty"`
+	// OnKeyChangeURL is the URL a request will be triggered against.
 	OnKeyChangeURL string `bson:"onKeyChangeUrl,omitempty" json:"onKeyChangeUrl,omitempty"`
 }
 
+// Fill fills *Notifications from apidef.NotificationsManager.
 func (n *Notifications) Fill(nm apidef.NotificationsManager) {
 	n.SharedSecret = nm.SharedSecret
 	n.OnKeyChangeURL = nm.OAuthKeyChangeURL
 }
 
+// ExtractTo extracts *Notifications into *apidef.NotificationsManager.
 func (n *Notifications) ExtractTo(nm *apidef.NotificationsManager) {
 	nm.SharedSecret = n.SharedSecret
 	nm.OAuthKeyChangeURL = n.OnKeyChangeURL
@@ -614,11 +637,11 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		if _, ok := s.Security[0][schemeName]; ok {
 			v := s.Components.SecuritySchemes[schemeName].Value
 			switch {
-			case v.Type == typeApiKey:
+			case v.Type == typeAPIKey:
 				s.extractTokenTo(api, schemeName)
-			case v.Type == typeHttp && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT:
+			case v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT:
 				s.extractJWTTo(api, schemeName)
-			case v.Type == typeHttp && v.Scheme == schemeBasic:
+			case v.Type == typeHTTP && v.Scheme == schemeBasic:
 				s.extractBasicTo(api, schemeName)
 			case v.Type == typeOAuth2:
 				securityScheme := s.getTykSecurityScheme(schemeName)
@@ -643,7 +666,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	}
 }
 
-func (s *OAS) fillApiKeyScheme(ac *apidef.AuthConfig) {
+func (s *OAS) fillAPIKeyScheme(ac *apidef.AuthConfig) {
 	ss := s.Components.SecuritySchemes
 	if ss == nil {
 		ss = make(map[string]*openapi3.SecuritySchemeRef)
@@ -678,12 +701,12 @@ func (s *OAS) fillApiKeyScheme(ac *apidef.AuthConfig) {
 		ac.UseCookie = false
 	}
 
-	ref.Value.WithName(key).WithIn(loc).WithType(typeApiKey)
+	ref.Value.WithName(key).WithIn(loc).WithType(typeAPIKey)
 
 	s.appendSecurity(ac.Name)
 }
 
-func (s *OAS) extractApiKeySchemeTo(ac *apidef.AuthConfig, name string) {
+func (s *OAS) extractAPIKeySchemeTo(ac *apidef.AuthConfig, name string) {
 	ref := s.Components.SecuritySchemes[name]
 	ac.Name = name
 
