@@ -27,12 +27,12 @@ lint: lint-install
 	goimports -w .
 	gofmt -w .
 	faillint -ignore-tests -paths "$(shell grep -v '^#' .faillint | xargs echo | sed 's/ /,/g')" ./...
-	go mod tidy
 
 lint-fast:
 	go generate ./...
 	go test -count 1 -v ./cli/linter/...
 	go fmt ./...
+	go mod tidy
 
 lint-install: lint-fast
 	go install golang.org/x/tools/cmd/goimports@latest
