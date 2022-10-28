@@ -2,15 +2,16 @@ package gateway
 
 import (
 	"encoding/json"
+	"net/http"
+	"strings"
+	"testing"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net/http"
-	"strings"
-	"testing"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
