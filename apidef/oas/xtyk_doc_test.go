@@ -2,13 +2,11 @@ package oas
 
 import (
 	"flag"
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/ioutil"
 	"path"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,13 +39,15 @@ func TestExtractDocFromXTyk(t *testing.T) {
 
 func TestExtractDocUtils(t *testing.T) {
 	t.Run("objParser", func(t *testing.T) {
-		buildASTPackage := func(t *testing.T, src string) *ast.Package {
-			f, err := parser.ParseFile(token.NewFileSet(), "oas.go", src, parser.ParseComments)
+		buildASTPackage := func(t *testing.T, src string) (*ast.Package, *token.FileSet) {
+			fs := token.NewFileSet()
+			f, err := parser.ParseFile(fs, "oas.go", src, parser.ParseComments)
 			assert.Nil(t, err)
-			return &ast.Package{Files: map[string]*ast.File{"oas.go": f}}
+			return &ast.Package{Files: map[string]*ast.File{"oas.go": f}}, fs
 		}
 
 		structInfoEqual := func(t *testing.T, expect, actual StructInfo) {
+			t.Helper()
 			assert.Equal(t, expect.Name, actual.Name)
 			if assert.Equal(t, len(expect.Fields), len(actual.Fields)) {
 				for i, field := range expect.Fields {
@@ -57,25 +57,35 @@ func TestExtractDocUtils(t *testing.T) {
 		}
 
 		t.Run("empty scope", func(t *testing.T) {
-			p := newObjParser(buildASTPackage(t, "package oas\n"))
+			pkg, _ := buildASTPackage(t, "package oas\n")
+			p := newObjParser(pkg)
 			assert.Empty(t, p.globals)
 		})
 
 		t.Run("field for internal use", func(t *testing.T) {
 			// field "password" is marshaled for external use.
 			const src = "package oas\n\ntype Server struct {\n\t// Name doc.\n\tName     string `bson:\"name\" json:\"name\"`\n\tpassword string\n}\n"
-			p := newObjParser(buildASTPackage(t, src))
-			p.parse("Server", "Server", &StructInfo{structObj: p.globals["Server"].(*ast.StructType), Name: "Server"})
+
+			pkg, fs := buildASTPackage(t, src)
+
+			p := newObjParser(pkg)
+			p.parse("Server", "Server", &StructInfo{
+				fileSet:   fs,
+				structObj: p.globals["Server"].(*ast.StructType),
+				Name:      "Server",
+			})
 
 			assert.Empty(t, p.errList.errs)
 			actual := StructInfo{
-				Name: "Server",
+				fileSet: fs,
+				Name:    "Server",
 				Fields: []*FieldInfo{
 					{
 						JSONType: "string",
 						JSONName: "name",
 						GoPath:   "Server.Name",
 						Doc:      "Name doc.\n",
+						fileSet:  fs,
 					},
 				},
 			}
@@ -85,13 +95,21 @@ func TestExtractDocUtils(t *testing.T) {
 		t.Run("ignored field", func(t *testing.T) {
 			// object "Inline" is ignored as a field in Server.
 			const src = "package oas\n\ntype Server struct {\n\t_ Inline `bson:\",inline\" json:\",inline\"`\n}\n\ntype Inline struct {\n\tName string `bson:\"name\" json:\"name\"`\n}\n"
-			p := newObjParser(buildASTPackage(t, src))
-			p.parse("Server", "Server", &StructInfo{structObj: p.globals["Server"].(*ast.StructType), Name: "Server"})
+
+			pkg, fs := buildASTPackage(t, src)
+
+			p := newObjParser(pkg)
+			p.parse("Server", "Server", &StructInfo{
+				fileSet:   fs,
+				structObj: p.globals["Server"].(*ast.StructType),
+				Name:      "Server",
+			})
 
 			assert.Empty(t, p.errList.errs)
 			expect := StructInfo{
-				Name:   "Server",
-				Fields: []*FieldInfo{},
+				fileSet: fs,
+				Name:    "Server",
+				Fields:  []*FieldInfo{},
 			}
 			structInfoEqual(t, expect, *p.info[0])
 		})
@@ -99,18 +117,27 @@ func TestExtractDocUtils(t *testing.T) {
 		t.Run("parse inline field with name", func(t *testing.T) {
 			// object "Inline" is exposed as inline field in Server.
 			const src = "package oas\n\ntype Server struct {\n\tInline `bson:\",inline\" json:\",inline\"`\n}\n\ntype Inline struct {\n\t// Name doc.\n\tName string `bson:\"name\" json:\"name\"`\n}\n"
-			p := newObjParser(buildASTPackage(t, src))
-			p.parse("Server", "Server", &StructInfo{structObj: p.globals["Server"].(*ast.StructType), Name: "Server"})
+
+			pkg, fs := buildASTPackage(t, src)
+
+			p := newObjParser(pkg)
+			p.parse("Server", "Server", &StructInfo{
+				fileSet:   fs,
+				structObj: p.globals["Server"].(*ast.StructType),
+				Name:      "Server",
+			})
 
 			assert.Empty(t, p.errList.errs)
 			expect := StructInfo{
-				Name: "Server",
+				fileSet: fs,
+				Name:    "Server",
 				Fields: []*FieldInfo{
 					{
 						JSONType: "string",
 						JSONName: "name",
 						GoPath:   "Server.Name",
 						Doc:      "Name doc.\n",
+						fileSet:  fs,
 					},
 				},
 			}
@@ -120,8 +147,15 @@ func TestExtractDocUtils(t *testing.T) {
 		t.Run("field not known", func(t *testing.T) {
 			// object "Inline" is not defined anywhere.
 			const src = "package oas\n\ntype Server struct {\n\tInline `bson:\",inline\" json:\",inline\"`\n}\n\n"
-			p := newObjParser(buildASTPackage(t, src))
-			p.parse("Server", "Server", &StructInfo{structObj: p.globals["Server"].(*ast.StructType), Name: "Server"})
+
+			pkg, fs := buildASTPackage(t, src)
+
+			p := newObjParser(pkg)
+			p.parse("Server", "Server", &StructInfo{
+				fileSet:   fs,
+				structObj: p.globals["Server"].(*ast.StructType),
+				Name:      "Server",
+			})
 
 			assert.ElementsMatch(t, p.errList.errs, []string{"field Server.Inline is declared but not found\n"})
 			expect := StructInfo{
@@ -215,58 +249,6 @@ func TestExtractDocUtils(t *testing.T) {
 		}
 		for _, run := range runs {
 			assert.Equal(t, run.markdown, fieldTypeToMarkdown(run.value))
-		}
-	})
-
-	t.Run("fieldInfoToMarkdown", func(t *testing.T) {
-		runs := []struct {
-			value    *FieldInfo
-			markdown string
-		}{
-			{
-				value:    &FieldInfo{JSONName: "id", JSONType: "object", Doc: "ID is an id of an API.\nTyk native API definition: `api_id`."},
-				markdown: "- **`id`**\n\n  **Type: `object`**\n\n  ID is an id of an API.\n\n  Tyk native API definition: `api_id`.\n\n",
-			},
-			{
-				value:    &FieldInfo{JSONName: "id", JSONType: "object"},
-				markdown: "- **`id`**\n\n  **Type: `object`**\n\n",
-			},
-			{
-				value:    &FieldInfo{JSONName: "id", JSONType: "object", Doc: "ID is an id of an API.\n\n"},
-				markdown: "- **`id`**\n\n  **Type: `object`**\n\n  ID is an id of an API.\n\n",
-			},
-			{
-				value:    &FieldInfo{JSONName: "id", JSONType: "object", Doc: "ID is an id of an API.\n\n\nTyk native API definition: `api_id`.\n\n"},
-				markdown: "- **`id`**\n\n  **Type: `object`**\n\n  ID is an id of an API.\n\n  Tyk native API definition: `api_id`.\n\n",
-			},
-		}
-		for _, run := range runs {
-			var res strings.Builder
-			fieldInfoToMarkdown(run.value, &res)
-			assert.Equal(t, run.markdown, res.String())
-		}
-	})
-
-	t.Run("xTykDocToMarkdown", func(t *testing.T) {
-		runs := []struct {
-			value    XTykDoc
-			markdown string
-		}{
-			{
-				value:    XTykDoc{{Name: "Server", Fields: []*FieldInfo{{JSONName: "id", JSONType: "object"}}}},
-				markdown: fmt.Sprintf("%s### **Server**\n\n- **`id`**\n\n  **Type: `object`**\n\n\n", xTykDocMarkdownTitle),
-			},
-			{
-				value:    XTykDoc{{Name: "Server", Fields: []*FieldInfo{{JSONName: "id", JSONType: "object"}, {JSONName: "id", JSONType: "object"}}}},
-				markdown: fmt.Sprintf("%s### **Server**\n\n- **`id`**\n\n  **Type: `object`**\n\n- **`id`**\n\n  **Type: `object`**\n\n\n", xTykDocMarkdownTitle),
-			},
-			{
-				value:    XTykDoc{{Name: "Server", Fields: []*FieldInfo{}}},
-				markdown: fmt.Sprintf("%s### **Server**\n\n\n", xTykDocMarkdownTitle),
-			},
-		}
-		for _, run := range runs {
-			assert.Equal(t, run.markdown, xTykDocToMarkdown(run.value))
 		}
 	})
 }
