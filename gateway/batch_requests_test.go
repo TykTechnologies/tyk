@@ -15,9 +15,10 @@ import (
 
 	"github.com/TykTechnologies/tyk/certs"
 
+	"github.com/valyala/fasthttp"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
-	"github.com/valyala/fasthttp"
 )
 
 const testBatchRequest = `{
