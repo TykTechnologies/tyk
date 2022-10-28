@@ -8,11 +8,12 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/buger/jsonparser"
+
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/buger/jsonparser"
 )
 
 // MyPluginPre checks if session is NOT present, adds custom header

@@ -12,8 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/request"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/request"
 
 	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"

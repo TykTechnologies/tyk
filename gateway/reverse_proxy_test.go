@@ -20,9 +20,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"

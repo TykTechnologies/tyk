@@ -47,8 +47,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/TykTechnologies/tyk/apidef/oas"
 	uuid "github.com/satori/go.uuid"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"

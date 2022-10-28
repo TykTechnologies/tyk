@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"testing"
 
+	cache "github.com/pmylund/go-cache"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	headers2 "github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/test"
-	cache "github.com/pmylund/go-cache"
-	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"

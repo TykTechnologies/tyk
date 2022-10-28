@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef/oas"
-	"github.com/TykTechnologies/tyk/test"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestMockResponse(t *testing.T) {

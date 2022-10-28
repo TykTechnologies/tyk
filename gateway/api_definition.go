@@ -33,9 +33,10 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 
-	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+
+	circuit "github.com/TykTechnologies/circuitbreaker"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
