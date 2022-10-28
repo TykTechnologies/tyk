@@ -17,9 +17,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/user"
 

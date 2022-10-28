@@ -6,12 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/user"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 

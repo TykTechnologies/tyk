@@ -13,10 +13,11 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/TykTechnologies/tyk/request"
-	"github.com/sirupsen/logrus"
 )
 
 // customResponseWriter is a wrapper around standard http.ResponseWriter

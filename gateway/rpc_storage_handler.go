@@ -10,9 +10,10 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
+	"github.com/go-redis/redis/v8"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/go-redis/redis/v8"
 
 	"github.com/sirupsen/logrus"
 )
