@@ -2,10 +2,11 @@ package gateway
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 const testGQLQueryCountries = `
