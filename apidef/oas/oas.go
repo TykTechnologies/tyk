@@ -320,19 +320,34 @@ func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
 	}
 }
 
-func (s *OAS) ReplaceServers(oldServersCount int, apiURLs []string) {
-	userAddedServers := openapi3.Servers{}
-	if len(s.Servers) >= oldServersCount {
-		userAddedServers = s.Servers[oldServersCount:]
+// ReplaceServers replaces OAS servers entry having oldAPIURLs with new apiURLs .
+func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
+	if len(s.Servers) == 0 && len(apiURLs) == 1 {
+		s.Servers = openapi3.Servers{
+			{
+				URL: apiURLs[0],
+			},
+		}
+		return
+	}
+
+	oldAPIURLSet := make(map[string]struct{})
+	for _, apiURL := range oldAPIURLs {
+		oldAPIURLSet[apiURL] = struct{}{}
 	}
 
 	newServers := openapi3.Servers{}
 	for _, apiURL := range apiURLs {
-		newServers = append(newServers, &openapi3.Server{
-			URL: apiURL,
-		})
+		newServers = append(newServers, &openapi3.Server{URL: apiURL})
 	}
-	newServers = append(newServers, userAddedServers...)
 
-	s.Servers = newServers
+	userAddedServers := openapi3.Servers{}
+	for _, server := range s.Servers {
+		if _, ok := oldAPIURLSet[server.URL]; ok {
+			continue
+		}
+		userAddedServers = append(userAddedServers, server)
+	}
+
+	s.Servers = append(newServers, userAddedServers...)
 }

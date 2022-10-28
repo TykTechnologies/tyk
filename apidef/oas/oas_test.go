@@ -244,19 +244,21 @@ func TestOAS_ReplaceServers(t *testing.T) {
 	}
 
 	type args struct {
-		apiURLs         []string
-		oldServersCount int
+		apiURLs    []string
+		oldAPIURLs []string
 	}
 
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
+		name               string
+		fields             fields
+		args               args
+		expectedServerURls []string
 	}{
 		{
-			name:   "empty servers",
-			fields: fields{T: openapi3.T{}},
-			args:   args{apiURLs: []string{"http://127.0.0.1:8080/api"}, oldServersCount: 1},
+			name:               "empty servers",
+			fields:             fields{T: openapi3.T{}},
+			args:               args{apiURLs: []string{"http://127.0.0.1:8080/api"}, oldAPIURLs: nil},
+			expectedServerURls: []string{"http://127.0.0.1:8080/api"},
 		},
 		{
 			name: "non-empty servers - remove old and add new",
@@ -270,7 +272,9 @@ func TestOAS_ReplaceServers(t *testing.T) {
 					},
 				},
 			}},
-			args: args{[]string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"}, 2},
+			args: args{apiURLs: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"},
+				oldAPIURLs: []string{"http://tyk.gateway-1.com/api", "http://tyk.gateway-2.com/api"}},
+			expectedServerURls: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"},
 		},
 		{
 			name: "non-empty servers - remove old and add new, retain userAdded ones",
@@ -287,7 +291,22 @@ func TestOAS_ReplaceServers(t *testing.T) {
 					},
 				},
 			}},
-			args: args{[]string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"}, 2},
+			args: args{apiURLs: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"},
+				oldAPIURLs: []string{"http://tyk.gateway-1.com/api", "http://tyk.gateway-2.com/api"}},
+			expectedServerURls: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api", "http://upstream.org/api"},
+		},
+		{
+			name: "retain user added servers",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://upstream.org/api",
+					},
+				},
+			}},
+			args: args{apiURLs: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"},
+				oldAPIURLs: []string{"http://tyk.gateway-1.com/api", "http://tyk.gateway-2.com/api"}},
+			expectedServerURls: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api", "http://upstream.org/api"},
 		},
 	}
 	for _, tt := range tests {
@@ -295,18 +314,12 @@ func TestOAS_ReplaceServers(t *testing.T) {
 			s := &OAS{
 				T: tt.fields.T,
 			}
-			s.ReplaceServers(tt.args.oldServersCount, tt.args.apiURLs)
-			replacedServerURLs := make([]string, len(tt.args.apiURLs))
-			for i, server := range s.Servers[:len(tt.args.apiURLs)] {
-				replacedServerURLs[i] = server.URL
+			s.ReplaceServers(tt.args.apiURLs, tt.args.oldAPIURLs)
+			var serverURLs []string
+			for _, server := range s.Servers {
+				serverURLs = append(serverURLs, server.URL)
 			}
-
-			assert.ElementsMatch(t, tt.args.apiURLs, replacedServerURLs)
-			userAddedServerCount := 0
-			if len(tt.fields.T.Servers) > tt.args.oldServersCount {
-				userAddedServerCount = len(tt.fields.T.Servers) - tt.args.oldServersCount
-			}
-			assert.Equal(t, userAddedServerCount, len(s.Servers)-len(tt.args.apiURLs))
+			assert.Equal(t, tt.expectedServerURls, serverURLs)
 		})
 	}
 }
