@@ -388,6 +388,9 @@ func TestExternalOAuthMiddleware_introspection(t *testing.T) {
 
 		t.Run("expired", func(t *testing.T) {
 			externalOAuthIntrospectionCache.DeleteAllKeys()
+
+			// normally for expired token, the introspection returns active false
+			// this is to get rid of putting delay to wait until expiration
 			accessTokenActive = true
 			exp = time.Now().Add(-3 * time.Minute).Unix()
 			_, _ = ts.Run(t, []test.TestCase{
