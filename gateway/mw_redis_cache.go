@@ -15,8 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
 	"golang.org/x/sync/singleflight"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/header"

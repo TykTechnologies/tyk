@@ -39,7 +39,7 @@ func TestXTykAPIGateway(t *testing.T) {
 		oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
 			"custom": {
 				Value: &openapi3.SecurityScheme{
-					Type: typeApiKey,
+					Type: typeAPIKey,
 					Name: "x-query",
 					In:   "query",
 				},
@@ -68,7 +68,7 @@ func TestXTykAPIGateway(t *testing.T) {
 	})
 
 	t.Run("filled old", func(t *testing.T) {
-		t.SkipNow() // when we don't need to skip this, it means OAS and old API definition match
+		t.SkipNow() // when we don't need to skip this, it means OAS and Tyk native API definition match
 		initialAPI := apidef.APIDefinition{}
 		Fill(t, &initialAPI, 0)
 

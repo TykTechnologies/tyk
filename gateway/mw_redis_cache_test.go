@@ -9,8 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/tyk/config"
 
