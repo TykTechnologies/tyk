@@ -323,13 +323,14 @@ func TestExternalOAuthMiddleware_introspection(t *testing.T) {
 	)
 
 	accessTokenActive := true
+	exp := time.Now().Add(3 * time.Minute).Unix()
 
 	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, testAccessToken, r.FormValue("token"))
 		assert.Equal(t, testClientID, r.FormValue("client_id"))
 		assert.Equal(t, testClientSecret, r.FormValue("client_secret"))
 
-		_, _ = w.Write([]byte(fmt.Sprintf(`{"active": %t,"username": "%s"}`, accessTokenActive, user)))
+		_, _ = w.Write([]byte(fmt.Sprintf(`{"active": %t,"username": "%s", "exp":%d}`, accessTokenActive, user, exp)))
 	}))
 
 	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -384,5 +385,18 @@ func TestExternalOAuthMiddleware_introspection(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/get", Headers: headers, BodyMatch: "access token is not valid", Code: http.StatusUnauthorized},
 		}...)
+
+		t.Run("expired", func(t *testing.T) {
+			externalOAuthIntrospectionCache.DeleteAllKeys()
+
+			// normally for expired token, the introspection returns active false
+			// this is to get rid of putting delay to wait until expiration
+			accessTokenActive = true
+			exp = time.Now().Add(-3 * time.Minute).Unix()
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/get", Headers: headers, BodyMatch: "/get", Code: http.StatusOK},
+				{Path: "/get", Headers: headers, BodyMatch: jwt.ErrTokenExpired.Error(), Code: http.StatusUnauthorized},
+			}...)
+		})
 	})
 }
