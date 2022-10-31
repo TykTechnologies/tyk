@@ -17,10 +17,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	redis "github.com/go-redis/redis/v8"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	redis "github.com/go-redis/redis/v8"
 )
 
 func TestURLRewrites(t *testing.T) {

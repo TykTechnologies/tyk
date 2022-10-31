@@ -4,9 +4,10 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestOAS_Security(t *testing.T) {
@@ -48,7 +49,7 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 	}
 
 	check := func(in, name string, ac apidef.AuthConfig, s OAS) {
-		s.fillApiKeyScheme(&ac)
+		s.fillAPIKeyScheme(&ac)
 
 		expectedAC := ac
 		expExtractedAC := apidef.AuthConfig{Name: authName}
@@ -77,7 +78,7 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 		expSecuritySchemes := openapi3.SecuritySchemes{
 			authName: &openapi3.SecuritySchemeRef{
 				Value: &openapi3.SecurityScheme{
-					Type: typeApiKey,
+					Type: typeAPIKey,
 					In:   in,
 					Name: name,
 				},
@@ -89,7 +90,7 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 		assert.Equal(t, expectedAC, ac)
 
 		var extractedAC apidef.AuthConfig
-		s.extractApiKeySchemeTo(&extractedAC, authName)
+		s.extractAPIKeySchemeTo(&extractedAC, authName)
 
 		assert.Equal(t, expExtractedAC, extractedAC)
 	}
@@ -113,7 +114,7 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 		oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
 			authName: &openapi3.SecuritySchemeRef{
 				Value: &openapi3.SecurityScheme{
-					Type: typeApiKey,
+					Type: typeAPIKey,
 					In:   in,
 					Name: name,
 				},
@@ -155,7 +156,7 @@ func TestOAS_Token(t *testing.T) {
 	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
 		securityName: {
 			Value: &openapi3.SecurityScheme{
-				Type: typeApiKey,
+				Type: typeAPIKey,
 				Name: "x-query",
 				In:   query,
 			},
@@ -205,14 +206,14 @@ func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
 	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
 		securityName: {
 			Value: &openapi3.SecurityScheme{
-				Type: typeApiKey,
+				Type: typeAPIKey,
 				Name: "x-query",
 				In:   query,
 			},
 		},
 		securityName2: {
 			Value: &openapi3.SecurityScheme{
-				Type: typeApiKey,
+				Type: typeAPIKey,
 				Name: "x-header",
 				In:   header,
 			},
@@ -283,7 +284,6 @@ func TestOAS_AppendSecurity(t *testing.T) {
 		assert.Contains(t, oas.Security[1], "three")
 		assert.Contains(t, oas.Security[1], "four")
 	})
-
 }
 
 func TestOAS_JWT(t *testing.T) {
@@ -299,7 +299,7 @@ func TestOAS_JWT(t *testing.T) {
 	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
 		securityName: {
 			Value: &openapi3.SecurityScheme{
-				Type:         typeHttp,
+				Type:         typeHTTP,
 				Scheme:       schemeBearer,
 				BearerFormat: bearerFormatJWT,
 			},
@@ -344,7 +344,7 @@ func TestOAS_Basic(t *testing.T) {
 	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
 		securityName: {
 			Value: &openapi3.SecurityScheme{
-				Type:   typeHttp,
+				Type:   typeHTTP,
 				Scheme: schemeBasic,
 			},
 		},

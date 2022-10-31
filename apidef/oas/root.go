@@ -6,6 +6,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// XTykAPIGateway contains custom Tyk API extensions for the OAS definition.
 type XTykAPIGateway struct {
 	// Info contains the main metadata about the API definition.
 	Info Info `bson:"info" json:"info"` // required
@@ -17,6 +18,7 @@ type XTykAPIGateway struct {
 	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
 }
 
+// Fill fills *XTykAPIGateway from apidef.APIDefinition.
 func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	x.Info.Fill(api)
 	x.Upstream.Fill(api)
@@ -32,6 +34,7 @@ func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// ExtractTo extracts *XTykAPIGateway into *apidef.APIDefinition.
 func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	x.Info.ExtractTo(api)
 	x.Upstream.ExtractTo(api)
@@ -42,24 +45,29 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// Info contains the main metadata about the API definition.
 type Info struct {
 	// ID is the unique ID of the API.
-	// Old API Definition: `api_id`
+	// Tyk native API definition: `api_id`
 	ID string `bson:"id" json:"id,omitempty"`
 	// DBID is the unique database ID of the API.
-	// Old API Definition: `id`
+	// Tyk native API definition: `id`
 	DBID apidef.ObjectId `bson:"dbId" json:"dbId,omitempty"`
 	// OrgID is the ID of the organisation which the API belongs to.
-	// Old API Definition: `org_id`
+	// Tyk native API definition: `org_id`
 	OrgID string `bson:"orgId" json:"orgId,omitempty"`
 	// Name is the name of the API.
-	// Old API Definition: `name`
-	Name       string      `bson:"name" json:"name"` // required
-	Expiration string      `bson:"expiration,omitempty" json:"expiration,omitempty"`
-	State      State       `bson:"state" json:"state"` // required
+	// Tyk native API definition: `name`
+	Name string `bson:"name" json:"name"` // required
+	// Expiration date.
+	Expiration string `bson:"expiration,omitempty" json:"expiration,omitempty"`
+	// State holds configuration about API definition states (active, internal).
+	State State `bson:"state" json:"state"` // required
+	// Versioning holds configuration for API versioning.
 	Versioning *Versioning `bson:"versioning,omitempty" json:"versioning,omitempty"`
 }
 
+// Fill fills *Info from apidef.APIDefinition.
 func (i *Info) Fill(api apidef.APIDefinition) {
 	i.ID = api.APIID
 	i.DBID = api.Id
@@ -78,6 +86,7 @@ func (i *Info) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// ExtractTo extracts *Info into an *apidef.APIDefinition.
 func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	api.APIID = i.ID
 	api.Id = i.DBID
@@ -98,35 +107,53 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// State holds configuration about API definition states (active, internal).
 type State struct {
 	// Active enables the API.
-	// Old API Definition: `active`
+	// Tyk native API definition: `active`
 	Active bool `bson:"active" json:"active"` // required
 	// Internal makes the API accessible only internally.
-	// Old API Definition: `internal`
+	// Tyk native API definition: `internal`
 	Internal bool `bson:"internal,omitempty" json:"internal,omitempty"`
 }
 
+// Fill fills *State from apidef.APIDefinition.
 func (s *State) Fill(api apidef.APIDefinition) {
 	s.Active = api.Active
 	s.Internal = api.Internal
 }
 
+// ExtractTo extracts *State to *apidef.APIDefinition.
 func (s *State) ExtractTo(api *apidef.APIDefinition) {
 	api.Active = s.Active
 	api.Internal = s.Internal
 }
 
+// Versioning holds configuration for API versioning.
+//
+// Tyk native API definition: `version_data`.
 type Versioning struct {
-	Enabled             bool          `bson:"enabled" json:"enabled"` // required
-	Name                string        `bson:"name,omitempty" json:"name,omitempty"`
-	Default             string        `bson:"default" json:"default"`   // required
-	Location            string        `bson:"location" json:"location"` // required
-	Key                 string        `bson:"key" json:"key"`           // required
-	Versions            []VersionToID `bson:"versions" json:"versions"` // required
-	StripVersioningData bool          `bson:"stripVersioningData,omitempty" json:"stripVersioningData,omitempty"`
+	// Enabled is a boolean flag, if set to `true` it will enable versioning of an API.
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+	// Name contains the name of the version as entered by the user ("v1" or similar).
+	Name string `bson:"name,omitempty" json:"name,omitempty"`
+	// Default contains the default version name if a request is issued without a version.
+	Default string `bson:"default" json:"default"` // required
+	// Location contains versioning location information. It can be one of the following:
+	//
+	// - `header`,
+	// - `url-param`,
+	// - `url`.
+	Location string `bson:"location" json:"location"` // required
+	// Key contains the name of the key to check for versioning information.
+	Key string `bson:"key" json:"key"` // required
+	// Versions contains a list of versions that map to individual API IDs.
+	Versions []VersionToID `bson:"versions" json:"versions"` // required
+	// StripVersioningData is a boolean flag, if set to `true`, the API responses will be stripped of versioning data.
+	StripVersioningData bool `bson:"stripVersioningData,omitempty" json:"stripVersioningData,omitempty"`
 }
 
+// Fill fills *Versioning from apidef.APIDefinition.
 func (v *Versioning) Fill(api apidef.APIDefinition) {
 	v.Enabled = api.VersionDefinition.Enabled
 	v.Name = api.VersionDefinition.Name
@@ -149,6 +176,7 @@ func (v *Versioning) Fill(api apidef.APIDefinition) {
 	v.StripVersioningData = api.VersionDefinition.StripVersioningData
 }
 
+// ExtractTo extracts *Versioning into *apidef.APIDefinition.
 func (v *Versioning) ExtractTo(api *apidef.APIDefinition) {
 	api.VersionDefinition.Enabled = v.Enabled
 	api.VersionDefinition.Name = v.Name
@@ -166,7 +194,10 @@ func (v *Versioning) ExtractTo(api *apidef.APIDefinition) {
 	api.VersionDefinition.StripVersioningData = v.StripVersioningData
 }
 
+// VersionToID contains a single mapping from a version name into an API ID.
 type VersionToID struct {
+	// Name contains the user chosen version name, e.g. `v1` or similar.
 	Name string `bson:"name" json:"name"`
-	ID   string `bson:"id" json:"id"`
+	// ID is the API ID for the version set in Name.
+	ID string `bson:"id" json:"id"`
 }

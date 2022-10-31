@@ -1646,6 +1646,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 
 		specBytes, err := json.Marshal(spec.APIDefinition)
 		if err != nil {
+			log.WithError(err).Errorf("API Spec Marshal failed: %+v", spec)
 			panic(err)
 		}
 
@@ -1656,6 +1657,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 
 		oasSpecBytes, err := json.Marshal(&spec.OAS)
 		if err != nil {
+			log.WithError(err).Errorf("OAS Marshal failed: %+v", spec)
 			panic(err)
 		}
 

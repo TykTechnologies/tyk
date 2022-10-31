@@ -27,19 +27,23 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/cenk/backoff"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 
 	"github.com/Masterminds/sprig/v3"
 
-	circuit "github.com/TykTechnologies/circuitbreaker"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+
+	circuit "github.com/TykTechnologies/circuitbreaker"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/gojsonschema"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
@@ -48,7 +52,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-//const used by cache middleware
+// const used by cache middleware
 const SAFE_METHODS = "SAFE_METHODS"
 
 const (
@@ -86,6 +90,7 @@ const (
 	ValidateRequestWithOAS
 	Internal
 	GoPlugin
+	PersistGraphQL
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -121,6 +126,7 @@ const (
 	StatusValidateRequest          RequestStatus = "Validate Request"
 	StatusInternal                 RequestStatus = "Internal path"
 	StatusGoPlugin                 RequestStatus = "Go plugin"
+	StatusPersistGraphQL           RequestStatus = "Persist GraphQL"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -153,6 +159,7 @@ type URLSpec struct {
 	ValidateRequest           apidef.ValidateRequestMeta
 	Internal                  apidef.InternalMeta
 	GoPluginMeta              GoPluginMiddleware
+	PersistGraphQL            apidef.PersistGraphQLMeta
 
 	IgnoreCase bool
 }
@@ -218,8 +225,9 @@ type APISpec struct {
 			BeforeFetchHook resolve.BeforeFetchHook
 			AfterFetchHook  resolve.AfterFetchHook
 		}
-		Client *http.Client
-		Schema *graphql.Schema
+		Client          *http.Client
+		StreamingClient *http.Client
+		Schema          *graphql.Schema
 	} `json:"-"`
 
 	hasMock   bool
@@ -1104,6 +1112,26 @@ func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPlugi
 	return urlSpec
 }
 
+func (a APIDefinitionLoader) compilePersistGraphQLPathSpec(paths []apidef.PersistGraphQLMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	urlSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
+		// Extend with method actions
+		newSpec.PersistGraphQL.Path = stringSpec.Path
+		newSpec.PersistGraphQL.Method = stringSpec.Method
+		newSpec.PersistGraphQL.Operation = stringSpec.Operation
+		newSpec.PersistGraphQL.Variables = stringSpec.Variables
+
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
 func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
 
 	urlSpec := []URLSpec{}
@@ -1219,6 +1247,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	validateRequest := a.compileValidateRequestSpec(apiVersionDef.ExtendedPaths.ValidateRequest, ValidateRequestWithOAS, conf)
 	internalPaths := a.compileInternalPathspathSpec(apiVersionDef.ExtendedPaths.Internal, Internal, conf)
 	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
+	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
@@ -1237,6 +1266,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, urlRewrites...)
 	combinedPath = append(combinedPath, requestSizes...)
 	combinedPath = append(combinedPath, goPlugins...)
+	combinedPath = append(combinedPath, persistGraphQL...)
 	combinedPath = append(combinedPath, virtualPaths...)
 	combinedPath = append(combinedPath, methodTransforms...)
 	combinedPath = append(combinedPath, trackedPaths...)
@@ -1304,7 +1334,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusInternal
 	case GoPlugin:
 		return StatusGoPlugin
-
+	case PersistGraphQL:
+		return StatusPersistGraphQL
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -1529,6 +1560,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		case GoPlugin:
 			if method == rxPaths[i].GoPluginMeta.Meta.Method {
 				return true, &rxPaths[i].GoPluginMeta
+			}
+		case PersistGraphQL:
+			if method == rxPaths[i].PersistGraphQL.Method {
+				return true, &rxPaths[i].PersistGraphQL
 			}
 		}
 	}
