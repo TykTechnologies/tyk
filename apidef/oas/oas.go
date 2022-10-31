@@ -2,6 +2,7 @@ package oas
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -13,6 +14,10 @@ const ExtensionTykAPIGateway = "x-tyk-api-gateway"
 
 // Main holds the default version value (empty).
 const Main = ""
+
+var (
+	errEmptyServers = errors.New("empty servers")
+)
 
 // OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
 type OAS struct {
@@ -277,7 +282,11 @@ func (s *OAS) getTykOperations() (operations Operations) {
 }
 
 // AddServers adds a server into the servers definition if not already present.
-func (s *OAS) AddServers(apiURLs ...string) {
+func (s *OAS) AddServers(apiURLs ...string) error {
+	if len(apiURLs) == 0 && len(s.Servers) == 0 {
+		return errEmptyServers
+	}
+
 	apiURLSet := make(map[string]struct{})
 	newServers := openapi3.Servers{}
 	for _, apiURL := range apiURLs {
@@ -289,7 +298,7 @@ func (s *OAS) AddServers(apiURLs ...string) {
 
 	if len(s.Servers) == 0 {
 		s.Servers = newServers
-		return
+		return nil
 	}
 
 	// check if apiURL already exists in servers object
@@ -302,6 +311,7 @@ func (s *OAS) AddServers(apiURLs ...string) {
 	}
 
 	s.Servers = newServers
+	return nil
 }
 
 // UpdateServers sets or updates the first servers URL if it matches oldAPIURL.
