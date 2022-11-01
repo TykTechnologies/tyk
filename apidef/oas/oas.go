@@ -2,18 +2,29 @@ package oas
 
 import (
 	"encoding/json"
+	"errors"
+
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/getkin/kin-openapi/openapi3"
 )
 
+// ExtensionTykAPIGateway is the OAS schema key for the Tyk extension.
 const ExtensionTykAPIGateway = "x-tyk-api-gateway"
+
+// Main holds the default version value (empty).
 const Main = ""
 
+var (
+	errEmptyServers = errors.New("empty servers")
+)
+
+// OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
 type OAS struct {
 	openapi3.T
 }
 
+// MarshalJSON implements json.Marshaller.
 func (s *OAS) MarshalJSON() ([]byte, error) {
 	if ShouldOmit(s.ExternalDocs) { // for sql case
 		s.ExternalDocs = nil
@@ -46,6 +57,7 @@ func (s *OAS) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// Fill fills *OAS definition from apidef.APIDefinition.
 func (s *OAS) Fill(api apidef.APIDefinition) {
 	xTykAPIGateway := s.GetTykExtension()
 	if xTykAPIGateway == nil {
@@ -71,6 +83,7 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// ExtractTo extracts *OAS into *apidef.APIDefinition.
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 	if s.GetTykExtension() != nil {
 		s.GetTykExtension().ExtractTo(api)
@@ -89,6 +102,7 @@ func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// SetTykExtension populates our OAS schema extension inside *OAS.
 func (s *OAS) SetTykExtension(xTykAPIGateway *XTykAPIGateway) {
 	if s.Extensions == nil {
 		s.Extensions = make(map[string]interface{})
@@ -97,6 +111,7 @@ func (s *OAS) SetTykExtension(xTykAPIGateway *XTykAPIGateway) {
 	s.Extensions[ExtensionTykAPIGateway] = xTykAPIGateway
 }
 
+// GetTykExtension returns our OAS schema extension from inside *OAS.
 func (s *OAS) GetTykExtension() *XTykAPIGateway {
 	if s.Extensions == nil {
 		return nil
@@ -126,8 +141,8 @@ func (s *OAS) GetTykExtension() *XTykAPIGateway {
 	return nil
 }
 
+// RemoveTykExtension clears the Tyk extensions from *OAS.
 func (s *OAS) RemoveTykExtension() {
-
 	if s.Extensions == nil {
 		return
 	}
@@ -215,6 +230,24 @@ func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
 	return
 }
 
+func (s *OAS) getTykExternalOAuthAuth(name string) (externalOAuth *ExternalOAuth) {
+	securityScheme := s.getTykSecurityScheme(name)
+	if securityScheme == nil {
+		return
+	}
+
+	externalOAuth = &ExternalOAuth{}
+	if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
+		externalOAuth = oauthVal
+	} else {
+		toStructIfMap(securityScheme, externalOAuth)
+	}
+
+	s.getTykSecuritySchemes()[name] = externalOAuth
+
+	return
+}
+
 func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
 	if s.getTykAuthentication() != nil {
 		securitySchemes = s.getTykAuthentication().SecuritySchemes
@@ -248,33 +281,40 @@ func (s *OAS) getTykOperations() (operations Operations) {
 	return
 }
 
-func (s *OAS) AddServers(apiURL string) {
-	if len(s.Servers) == 0 {
-		s.Servers = openapi3.Servers{
-			{
-				URL: apiURL,
-			},
-		}
-		return
+// AddServers adds a server into the servers definition if not already present.
+func (s *OAS) AddServers(apiURLs ...string) error {
+	if len(apiURLs) == 0 && len(s.Servers) == 0 {
+		return errEmptyServers
 	}
 
-	newServers := openapi3.Servers{
-		{
+	apiURLSet := make(map[string]struct{})
+	newServers := openapi3.Servers{}
+	for _, apiURL := range apiURLs {
+		newServers = append(newServers, &openapi3.Server{
 			URL: apiURL,
-		},
+		})
+		apiURLSet[apiURL] = struct{}{}
+	}
+
+	if len(s.Servers) == 0 {
+		s.Servers = newServers
+		return nil
 	}
 
 	// check if apiURL already exists in servers object
 	for i := 0; i < len(s.Servers); i++ {
-		if s.Servers[i].URL == apiURL {
+		if _, ok := apiURLSet[s.Servers[i].URL]; ok {
 			continue
 		}
+
 		newServers = append(newServers, s.Servers[i])
 	}
 
 	s.Servers = newServers
+	return nil
 }
 
+// UpdateServers sets or updates the first servers URL if it matches oldAPIURL.
 func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
 	if len(s.Servers) == 0 {
 		s.Servers = openapi3.Servers{
@@ -288,4 +328,36 @@ func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
 	if len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL {
 		s.Servers[0].URL = apiURL
 	}
+}
+
+// ReplaceServers replaces OAS servers entry having oldAPIURLs with new apiURLs .
+func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
+	if len(s.Servers) == 0 && len(apiURLs) == 1 {
+		s.Servers = openapi3.Servers{
+			{
+				URL: apiURLs[0],
+			},
+		}
+		return
+	}
+
+	oldAPIURLSet := make(map[string]struct{})
+	for _, apiURL := range oldAPIURLs {
+		oldAPIURLSet[apiURL] = struct{}{}
+	}
+
+	newServers := openapi3.Servers{}
+	for _, apiURL := range apiURLs {
+		newServers = append(newServers, &openapi3.Server{URL: apiURL})
+	}
+
+	userAddedServers := openapi3.Servers{}
+	for _, server := range s.Servers {
+		if _, ok := oldAPIURLSet[server.URL]; ok {
+			continue
+		}
+		userAddedServers = append(userAddedServers, server)
+	}
+
+	s.Servers = append(newServers, userAddedServers...)
 }

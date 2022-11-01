@@ -433,6 +433,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &ValidateRequest{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &PersistGraphQLOperationMiddleware{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
 	gw.mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 	gw.mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
@@ -611,6 +612,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		d.SH.Spec.SanitizeProxyPaths(r)
+		ctxSetVersionInfo(r, nil)
 		handler.ServeHTTP(w, r)
 		return
 	}

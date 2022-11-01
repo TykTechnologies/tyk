@@ -3,8 +3,9 @@ package oas
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestAuthentication(t *testing.T) {
@@ -56,7 +57,6 @@ func TestAuthSources(t *testing.T) {
 }
 
 func TestAuthSource(t *testing.T) {
-
 	t.Run("param", func(t *testing.T) {
 		var emptyParamSource AuthSource
 

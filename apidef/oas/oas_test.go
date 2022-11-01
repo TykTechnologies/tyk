@@ -6,8 +6,9 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestOAS(t *testing.T) {
@@ -108,17 +109,19 @@ func TestOAS_AddServers(t *testing.T) {
 		T openapi3.T
 	}
 	type args struct {
-		apiURL string
+		apiURLs []string
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
+		name        string
+		fields      fields
+		args        args
+		expectedErr error
 	}{
 		{
-			name:   "empty servers",
-			fields: fields{T: openapi3.T{}},
-			args:   args{apiURL: "http://127.0.0.1:8080/api"},
+			name:        "empty servers",
+			fields:      fields{T: openapi3.T{}},
+			args:        args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+			expectedErr: nil,
 		},
 		{
 			name: "non-empty servers",
@@ -129,7 +132,8 @@ func TestOAS_AddServers(t *testing.T) {
 					},
 				},
 			}},
-			args: args{apiURL: "http://127.0.0.1:8080/api"},
+			args:        args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+			expectedErr: nil,
 		},
 		{
 			name: "non-empty servers having same URL that of apiURL",
@@ -146,7 +150,8 @@ func TestOAS_AddServers(t *testing.T) {
 					},
 				},
 			}},
-			args: args{apiURL: "http://127.0.0.1:8080/api"},
+			args:        args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+			expectedErr: nil,
 		},
 		{
 			name: "non-empty servers having same URL that of apiURL",
@@ -160,7 +165,14 @@ func TestOAS_AddServers(t *testing.T) {
 					},
 				},
 			}},
-			args: args{apiURL: "http://127.0.0.1:8080/api"},
+			args:        args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+			expectedErr: nil,
+		},
+		{
+			name:        "empty servers",
+			fields:      fields{T: openapi3.T{}},
+			args:        args{apiURLs: []string{}},
+			expectedErr: errEmptyServers,
 		},
 	}
 	for _, tt := range tests {
@@ -168,8 +180,18 @@ func TestOAS_AddServers(t *testing.T) {
 			s := &OAS{
 				T: tt.fields.T,
 			}
-			s.AddServers(tt.args.apiURL)
-			assert.Equal(t, tt.args.apiURL, s.Servers[0].URL)
+			err := s.AddServers(tt.args.apiURLs...)
+			if tt.expectedErr != nil {
+				assert.Equal(t, errEmptyServers, err)
+				return
+			}
+
+			addedServerURLs := make([]string, len(tt.args.apiURLs))
+			for i, server := range s.Servers[:len(tt.args.apiURLs)] {
+				addedServerURLs[i] = server.URL
+			}
+
+			assert.ElementsMatch(t, tt.args.apiURLs, addedServerURLs)
 		})
 	}
 }
@@ -227,6 +249,93 @@ func TestOAS_UpdateServers(t *testing.T) {
 			}
 			s.UpdateServers(tt.args.apiURL, tt.args.oldAPIURL)
 			assert.Equal(t, tt.expectedURL, s.Servers[0].URL)
+		})
+	}
+}
+
+func TestOAS_ReplaceServers(t *testing.T) {
+	t.Parallel()
+	type fields struct {
+		T openapi3.T
+	}
+
+	type args struct {
+		apiURLs    []string
+		oldAPIURLs []string
+	}
+
+	tests := []struct {
+		name               string
+		fields             fields
+		args               args
+		expectedServerURls []string
+	}{
+		{
+			name:               "empty servers",
+			fields:             fields{T: openapi3.T{}},
+			args:               args{apiURLs: []string{"http://127.0.0.1:8080/api"}, oldAPIURLs: nil},
+			expectedServerURls: []string{"http://127.0.0.1:8080/api"},
+		},
+		{
+			name: "non-empty servers - remove old and add new",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://tyk.gateway-1.com/api",
+					},
+					{
+						URL: "http://tyk.gateway-2.com/api",
+					},
+				},
+			}},
+			args: args{apiURLs: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"},
+				oldAPIURLs: []string{"http://tyk.gateway-1.com/api", "http://tyk.gateway-2.com/api"}},
+			expectedServerURls: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"},
+		},
+		{
+			name: "non-empty servers - remove old and add new, retain userAdded ones",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://tyk.gateway-1.com/api",
+					},
+					{
+						URL: "http://tyk.gateway-2.com/api",
+					},
+					{
+						URL: "http://upstream.org/api",
+					},
+				},
+			}},
+			args: args{apiURLs: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"},
+				oldAPIURLs: []string{"http://tyk.gateway-1.com/api", "http://tyk.gateway-2.com/api"}},
+			expectedServerURls: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api", "http://upstream.org/api"},
+		},
+		{
+			name: "retain user added servers",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://upstream.org/api",
+					},
+				},
+			}},
+			args: args{apiURLs: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"},
+				oldAPIURLs: []string{"http://tyk.gateway-1.com/api", "http://tyk.gateway-2.com/api"}},
+			expectedServerURls: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api", "http://upstream.org/api"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &OAS{
+				T: tt.fields.T,
+			}
+			s.ReplaceServers(tt.args.apiURLs, tt.args.oldAPIURLs)
+			var serverURLs []string
+			for _, server := range s.Servers {
+				serverURLs = append(serverURLs, server.URL)
+			}
+			assert.Equal(t, tt.expectedServerURls, serverURLs)
 		})
 	}
 }
@@ -398,5 +507,4 @@ func TestOAS_MarshalJSON(t *testing.T) {
 			assert.Contains(t, string(data), `"x-abcd":[{"key":"value"},{"key":"value"}]`)
 		})
 	})
-
 }

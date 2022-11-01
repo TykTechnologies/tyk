@@ -56,10 +56,10 @@ func IsZero(v reflect.Value) bool {
 	}
 }
 
-func toStructIfMap(input interface{}, val interface{}) {
+func toStructIfMap(input interface{}, val interface{}) bool {
 	mapInput, ok := input.(map[string]interface{})
 	if !ok {
-		return
+		return false
 	}
 
 	inBytes, err := json.Marshal(mapInput)
@@ -71,4 +71,6 @@ func toStructIfMap(input interface{}, val interface{}) {
 	if err != nil {
 		log.Debug("Unmarshalling to struct couldn't succeed")
 	}
+
+	return true
 }

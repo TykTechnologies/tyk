@@ -1,14 +1,15 @@
 package oas
 
 import (
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/lonelycode/osin"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const (
-	typeApiKey      = "apiKey"
-	typeHttp        = "http"
+	typeAPIKey      = "apiKey"
+	typeHTTP        = "http"
 	typeOAuth2      = "oauth2"
 	schemeBearer    = "bearer"
 	schemeBasic     = "basic"
@@ -21,19 +22,28 @@ const (
 	cookie = "cookie"
 )
 
+// Token holds the values related to authentication tokens.
 type Token struct {
 	// Enabled enables the token based authentication mode.
-	// Old API Definition: `api_id`
-	Enabled     bool `bson:"enabled" json:"enabled"` // required
-	AuthSources `bson:",inline" json:",inline"`
-	// EnableClientCertificate allows to create dynamic keys based on certificates.
-	// Old API Definition: `auth_configs["authToken"].use_certificate`
-	EnableClientCertificate bool `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty"`
 	//
-	// Old API Definition:
+	// Tyk native API definition: `auth_configs["authToken"].use_standard_auth`
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+
+	// AuthSources contains the configuration for authentication sources.
+	AuthSources `bson:",inline" json:",inline"`
+
+	// EnableClientCertificate allows to create dynamic keys based on certificates.
+	//
+	// Tyk native API definition: `auth_configs["authToken"].use_certificate`
+	EnableClientCertificate bool `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty"`
+
+	// Signature holds the configuration for verifying the signature of the token.
+	//
+	// Tyk native API definition: `auth_configs["authToken"].use_certificate`
 	Signature *Signature `bson:"signatureValidation,omitempty" json:"signatureValidation,omitempty"`
 }
 
+// Import populates *Token from argument values.
 func (t *Token) Import(nativeSS *openapi3.SecurityScheme, enable bool) {
 	t.Enabled = enable
 	t.AuthSources.Import(nativeSS.In)
@@ -45,7 +55,7 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 		return
 	}
 
-	s.fillApiKeyScheme(&authConfig)
+	s.fillAPIKeyScheme(&authConfig)
 
 	token := &Token{}
 	token.Enabled = api.UseStandardAuth
@@ -78,11 +88,12 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 		token.Signature.ExtractTo(&authConfig)
 	}
 
-	s.extractApiKeySchemeTo(&authConfig, name)
+	s.extractAPIKeySchemeTo(&authConfig, name)
 
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
+// JWT holds the configuration for the JWT middleware.
 type JWT struct {
 	Enabled                 bool `bson:"enabled" json:"enabled"` // required
 	AuthSources             `bson:",inline" json:",inline"`
@@ -99,6 +110,7 @@ type JWT struct {
 	ExpiresAtValidationSkew uint64   `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
 }
 
+// Import populates *JWT based on arguments.
 func (j *JWT) Import(enable bool) {
 	j.Enabled = enable
 	j.Header = &AuthSource{
@@ -127,7 +139,7 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 		ss[ac.Name] = ref
 	}
 
-	ref.Value.WithType(typeHttp).WithScheme(schemeBearer).WithBearerFormat(bearerFormatJWT)
+	ref.Value.WithType(typeHTTP).WithScheme(schemeBearer).WithBearerFormat(bearerFormatJWT)
 
 	s.appendSecurity(ac.Name)
 
@@ -187,22 +199,24 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.JWTType] = ac
 }
 
+// Basic type holds configuration values related to http basic authentication.
 type Basic struct {
 	// Enabled enables the basic authentication mode.
-	// Old API Definition: `use_basic_auth`
+	// Tyk native API definition: `use_basic_auth`
 	Enabled     bool `bson:"enabled" json:"enabled"` // required
 	AuthSources `bson:",inline" json:",inline"`
 	// DisableCaching disables the caching of basic authentication key.
-	// Old API Definition: `basic_auth.disable_caching`
+	// Tyk native API definition: `basic_auth.disable_caching`
 	DisableCaching bool `bson:"disableCaching,omitempty" json:"disableCaching,omitempty"`
 	// CacheTTL is the TTL for a cached basic authentication key in seconds.
-	// Old API Definition: `basic_auth.cache_ttl`
+	// Tyk native API definition: `basic_auth.cache_ttl`
 	CacheTTL int `bson:"cacheTTL,omitempty" json:"cacheTTL,omitempty"`
 	// ExtractCredentialsFromBody helps to extract username and password from body. In some cases, like dealing with SOAP,
 	// user credentials can be passed via request body.
 	ExtractCredentialsFromBody *ExtractCredentialsFromBody `bson:"extractCredentialsFromBody,omitempty" json:"extractCredentialsFromBody,omitempty"`
 }
 
+// Import populates *Basic from it's arguments.
 func (b *Basic) Import(enable bool) {
 	b.Enabled = enable
 	b.Header = &AuthSource{
@@ -231,7 +245,7 @@ func (s *OAS) fillBasic(api apidef.APIDefinition) {
 		ss[ac.Name] = ref
 	}
 
-	ref.Value.WithType(typeHttp).WithScheme(schemeBasic)
+	ref.Value.WithType(typeHTTP).WithScheme(schemeBasic)
 
 	s.appendSecurity(ac.Name)
 
@@ -274,30 +288,34 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.BasicType] = ac
 }
 
+// ExtractCredentialsFromBody configures extracting credentials from the request body.
 type ExtractCredentialsFromBody struct {
 	// Enabled enables extracting credentials from body.
-	// Old API Definition: `basic_auth.extract_from_body`
+	// Tyk native API definition: `basic_auth.extract_from_body`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// UserRegexp is the regex for username e.g. `<User>(.*)</User>`.
-	// Old API Definition: `basic_auth.userRegexp`
+	// Tyk native API definition: `basic_auth.userRegexp`
 	UserRegexp string `bson:"userRegexp,omitempty" json:"userRegexp,omitempty"`
 	// PasswordRegexp is the regex for password e.g. `<Password>(.*)</Password>`.
-	// Old API Definition: `basic_auth.passwordRegexp`
+	// Tyk native API definition: `basic_auth.passwordRegexp`
 	PasswordRegexp string `bson:"passwordRegexp,omitempty" json:"passwordRegexp,omitempty"`
 }
 
+// Fill fills *ExtractCredentialsFromBody from apidef.APIDefinition.
 func (e *ExtractCredentialsFromBody) Fill(api apidef.APIDefinition) {
 	e.Enabled = api.BasicAuth.ExtractFromBody
 	e.UserRegexp = api.BasicAuth.BodyUserRegexp
 	e.PasswordRegexp = api.BasicAuth.BodyPasswordRegexp
 }
 
+// ExtractTo extracts *ExtractCredentialsFromBody and populates *apidef.APIDefinition.
 func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
 	api.BasicAuth.ExtractFromBody = e.Enabled
 	api.BasicAuth.BodyUserRegexp = e.UserRegexp
 	api.BasicAuth.BodyPasswordRegexp = e.PasswordRegexp
 }
 
+// OAuth configures the OAuth middleware.
 type OAuth struct {
 	Enabled               bool `bson:"enabled" json:"enabled"` // required
 	AuthSources           `bson:",inline" json:",inline"`
@@ -307,6 +325,7 @@ type OAuth struct {
 	Notifications         *Notifications              `bson:"notifications,omitempty" json:"notifications,omitempty"`
 }
 
+// Import populates *OAuth from it's arguments.
 func (o *OAuth) Import(enable bool) {
 	o.Enabled = enable
 	o.Header = &AuthSource{
@@ -376,16 +395,196 @@ func (s *OAS) extractOAuthTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.OAuthType] = authConfig
 }
 
+type OAuthProvider struct {
+	JWT           *JWTValidation `bson:"jwt,omitempty" json:"jwt,omitempty"`
+	Introspection *Introspection `bson:"introspection,omitempty" json:"introspection,omitempty"`
+}
+
+type JWTValidation struct {
+	Enabled                 bool   `bson:"enabled" json:"enabled"`
+	SigningMethod           string `bson:"signingMethod" json:"signingMethod"`
+	Source                  string `bson:"source" json:"source"`
+	IdentityBaseField       string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	IssuedAtValidationSkew  uint64 `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
+	NotBeforeValidationSkew uint64 `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
+	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
+}
+
+func (j *JWTValidation) Fill(jwt apidef.JWTValidation) {
+	j.Enabled = jwt.Enabled
+	j.SigningMethod = jwt.SigningMethod
+	j.Source = jwt.Source
+	j.IdentityBaseField = jwt.IdentityBaseField
+	j.IssuedAtValidationSkew = jwt.IssuedAtValidationSkew
+	j.NotBeforeValidationSkew = jwt.NotBeforeValidationSkew
+	j.ExpiresAtValidationSkew = jwt.ExpiresAtValidationSkew
+}
+
+func (j *JWTValidation) ExtractTo(jwt *apidef.JWTValidation) {
+	jwt.Enabled = j.Enabled
+	jwt.SigningMethod = j.SigningMethod
+	jwt.Source = j.Source
+	jwt.IdentityBaseField = j.IdentityBaseField
+	jwt.IssuedAtValidationSkew = j.IssuedAtValidationSkew
+	jwt.NotBeforeValidationSkew = j.NotBeforeValidationSkew
+	jwt.ExpiresAtValidationSkew = j.ExpiresAtValidationSkew
+}
+
+type Introspection struct {
+	// Enabled enables OAuth access token validation by introspection to a third party.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// URL is the URL of the third party provider's introspection endpoint.
+	URL string `bson:"url" json:"url"`
+	// ClientID is the public identifier for the client, acquired from the third party.
+	ClientID string `bson:"clientId" json:"clientId"`
+	// ClientSecret is a secret known only to the client and the authorization server, acquired from the third party.
+	ClientSecret string `bson:"clientSecret" json:"clientSecret"`
+	// IdentityBaseField is the key showing where to find the user id in the claims. If it is empty, the `sub` key is looked at.
+	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	// Cache is the caching mechanism for introspection responses.
+	Cache *IntrospectionCache `bson:"cache" json:"cache"`
+}
+
+func (i *Introspection) Fill(intros apidef.Introspection) {
+	i.Enabled = intros.Enabled
+	i.URL = intros.URL
+	i.ClientID = intros.ClientID
+	i.ClientSecret = intros.ClientSecret
+	i.IdentityBaseField = intros.IdentityBaseField
+
+	if i.Cache == nil {
+		i.Cache = &IntrospectionCache{}
+	}
+
+	i.Cache.Fill(intros.Cache)
+	if ShouldOmit(i.Cache) {
+		i.Cache = nil
+	}
+}
+
+func (i *Introspection) ExtractTo(intros *apidef.Introspection) {
+	intros.Enabled = i.Enabled
+	intros.URL = i.URL
+	intros.ClientID = i.ClientID
+	intros.ClientSecret = i.ClientSecret
+	intros.IdentityBaseField = i.IdentityBaseField
+
+	if i.Cache != nil {
+		i.Cache.ExtractTo(&intros.Cache)
+	}
+}
+
+type IntrospectionCache struct {
+	// Enabled enables the caching mechanism for introspection responses.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Timeout is the duration in seconds of how long the cached value stays.
+	// For introspection caching, it is suggested to use a short interval.
+	Timeout int64 `bson:"timeout" json:"timeout"`
+}
+
+func (c *IntrospectionCache) Fill(cache apidef.IntrospectionCache) {
+	c.Enabled = cache.Enabled
+	c.Timeout = cache.Timeout
+}
+
+func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
+	cache.Enabled = c.Enabled
+	cache.Timeout = c.Timeout
+}
+
+type ExternalOAuth struct {
+	Enabled     bool `bson:"enabled" json:"enabled"` // required
+	AuthSources `bson:",inline" json:",inline"`
+	Providers   []OAuthProvider `bson:"providers" json:"providers"` // required
+}
+
+func (s *OAS) fillExternalOAuth(api apidef.APIDefinition) {
+	authConfig, ok := api.AuthConfigs[apidef.ExternalOAuthType]
+	if !ok || authConfig.Name == "" {
+		return
+	}
+
+	s.fillOAuthSchemeForExternal(authConfig.Name)
+
+	externalOAuth := &ExternalOAuth{}
+	externalOAuth.Enabled = api.ExternalOAuth.Enabled
+	externalOAuth.AuthSources.Fill(authConfig)
+
+	externalOAuth.Providers = make([]OAuthProvider, len(api.ExternalOAuth.Providers))
+	for i, provider := range api.ExternalOAuth.Providers {
+		p := OAuthProvider{}
+		if p.JWT == nil {
+			p.JWT = &JWTValidation{}
+		}
+
+		p.JWT.Fill(provider.JWT)
+		if ShouldOmit(p.JWT) {
+			p.JWT = nil
+		}
+
+		if p.Introspection == nil {
+			p.Introspection = &Introspection{}
+		}
+
+		p.Introspection.Fill(provider.Introspection)
+		if ShouldOmit(p.Introspection) {
+			p.Introspection = nil
+		}
+
+		externalOAuth.Providers[i] = p
+	}
+
+	if len(externalOAuth.Providers) == 0 {
+		externalOAuth.Providers = nil
+	}
+
+	if ShouldOmit(externalOAuth) {
+		externalOAuth = nil
+	}
+
+	s.getTykSecuritySchemes()[authConfig.Name] = externalOAuth
+}
+
+func (s *OAS) extractExternalOAuthTo(api *apidef.APIDefinition, name string) {
+	authConfig := apidef.AuthConfig{Name: name, DisableHeader: true}
+
+	if externalOAuth := s.getTykExternalOAuthAuth(name); externalOAuth != nil {
+		api.ExternalOAuth.Enabled = externalOAuth.Enabled
+		externalOAuth.AuthSources.ExtractTo(&authConfig)
+		api.ExternalOAuth.Providers = make([]apidef.Provider, len(externalOAuth.Providers))
+		for i, provider := range externalOAuth.Providers {
+			p := apidef.Provider{}
+
+			if provider.JWT != nil {
+				provider.JWT.ExtractTo(&p.JWT)
+			}
+
+			if provider.Introspection != nil {
+				provider.Introspection.ExtractTo(&p.Introspection)
+			}
+
+			api.ExternalOAuth.Providers[i] = p
+		}
+	}
+
+	api.AuthConfigs[apidef.ExternalOAuthType] = authConfig
+}
+
+// Notifications holds configuration for updates to keys.
 type Notifications struct {
-	SharedSecret   string `bson:"sharedSecret,omitempty" json:"sharedSecret,omitempty"`
+	// SharedSecret is the shared secret used in the notification request.
+	SharedSecret string `bson:"sharedSecret,omitempty" json:"sharedSecret,omitempty"`
+	// OnKeyChangeURL is the URL a request will be triggered against.
 	OnKeyChangeURL string `bson:"onKeyChangeUrl,omitempty" json:"onKeyChangeUrl,omitempty"`
 }
 
+// Fill fills *Notifications from apidef.NotificationsManager.
 func (n *Notifications) Fill(nm apidef.NotificationsManager) {
 	n.SharedSecret = nm.SharedSecret
 	n.OnKeyChangeURL = nm.OAuthKeyChangeURL
 }
 
+// ExtractTo extracts *Notifications into *apidef.NotificationsManager.
 func (n *Notifications) ExtractTo(nm *apidef.NotificationsManager) {
 	nm.SharedSecret = n.SharedSecret
 	nm.OAuthKeyChangeURL = n.OnKeyChangeURL
@@ -408,6 +607,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillJWT(api)
 	s.fillBasic(api)
 	s.fillOAuth(api)
+	s.fillExternalOAuth(api)
 
 	if len(tykAuthentication.SecuritySchemes) == 0 {
 		tykAuthentication.SecuritySchemes = nil
@@ -438,20 +638,36 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		if _, ok := s.Security[0][schemeName]; ok {
 			v := s.Components.SecuritySchemes[schemeName].Value
 			switch {
-			case v.Type == typeApiKey:
+			case v.Type == typeAPIKey:
 				s.extractTokenTo(api, schemeName)
-			case v.Type == typeHttp && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT:
+			case v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT:
 				s.extractJWTTo(api, schemeName)
-			case v.Type == typeHttp && v.Scheme == schemeBasic:
+			case v.Type == typeHTTP && v.Scheme == schemeBasic:
 				s.extractBasicTo(api, schemeName)
 			case v.Type == typeOAuth2:
-				s.extractOAuthTo(api, schemeName)
+				securityScheme := s.getTykSecurityScheme(schemeName)
+				if securityScheme == nil {
+					return
+				}
+
+				externalOAuth := &ExternalOAuth{}
+				if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
+					externalOAuth = oauthVal
+				} else {
+					toStructIfMap(securityScheme, externalOAuth)
+				}
+
+				if len(externalOAuth.Providers) > 0 {
+					s.extractExternalOAuthTo(api, schemeName)
+				} else {
+					s.extractOAuthTo(api, schemeName)
+				}
 			}
 		}
 	}
 }
 
-func (s *OAS) fillApiKeyScheme(ac *apidef.AuthConfig) {
+func (s *OAS) fillAPIKeyScheme(ac *apidef.AuthConfig) {
 	ss := s.Components.SecuritySchemes
 	if ss == nil {
 		ss = make(map[string]*openapi3.SecuritySchemeRef)
@@ -486,12 +702,12 @@ func (s *OAS) fillApiKeyScheme(ac *apidef.AuthConfig) {
 		ac.UseCookie = false
 	}
 
-	ref.Value.WithName(key).WithIn(loc).WithType(typeApiKey)
+	ref.Value.WithName(key).WithIn(loc).WithType(typeAPIKey)
 
 	s.appendSecurity(ac.Name)
 }
 
-func (s *OAS) extractApiKeySchemeTo(ac *apidef.AuthConfig, name string) {
+func (s *OAS) extractAPIKeySchemeTo(ac *apidef.AuthConfig, name string) {
 	ref := s.Components.SecuritySchemes[name]
 	ac.Name = name
 
@@ -561,6 +777,39 @@ func (s *OAS) fillOAuthScheme(accessTypes []osin.AccessRequestType, name string)
 			setScopesIfEmpty(flows.Implicit)
 		}
 	}
+
+	ref.Value.WithType(typeOAuth2).Flows = flows
+
+	s.appendSecurity(name)
+}
+
+func (s *OAS) fillOAuthSchemeForExternal(name string) {
+	ss := s.Components.SecuritySchemes
+	if ss == nil {
+		ss = make(map[string]*openapi3.SecuritySchemeRef)
+		s.Components.SecuritySchemes = ss
+	}
+
+	ref, ok := ss[name]
+	if !ok {
+		ref = &openapi3.SecuritySchemeRef{
+			Value: openapi3.NewSecurityScheme(),
+		}
+		ss[name] = ref
+	}
+
+	flows := ref.Value.Flows
+	if flows == nil {
+		flows = &openapi3.OAuthFlows{}
+	}
+
+	if flows.AuthorizationCode == nil {
+		flows.AuthorizationCode = &openapi3.OAuthFlow{}
+	}
+
+	setAuthorizationURLIfEmpty(flows.AuthorizationCode)
+	setTokenURLIfEmpty(flows.AuthorizationCode)
+	setScopesIfEmpty(flows.AuthorizationCode)
 
 	ref.Value.WithType(typeOAuth2).Flows = flows
 

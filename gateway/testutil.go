@@ -26,7 +26,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -45,6 +45,8 @@ import (
 	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
 	"github.com/TykTechnologies/tyk/user"
 )
+
+const jsonContentType = "application/json"
 
 var (
 	// to register to, but never used
@@ -395,6 +397,7 @@ const (
 	handlerPathGraphQLDataSource     = "/graphql-data-source"
 	handlerPathHeadersRestDataSource = "/rest-headers-data-source"
 	handlerSubgraphAccounts          = "/subgraph-accounts"
+	handlerSubgraphAccountsModified  = "/subgraph-accounts-modified"
 	handlerSubgraphReviews           = "/subgraph-reviews"
 
 	// We need a static port so that the urls can be used in static
@@ -403,19 +406,20 @@ const (
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-	TestHttpAny               = "http://" + testHttpListen
-	TestHttpGet               = TestHttpAny + "/get"
-	testHttpPost              = TestHttpAny + "/post"
-	testGraphQLProxyUpstream  = TestHttpAny + handlerPathGraphQLProxyUpstream
-	testGraphQLDataSource     = TestHttpAny + handlerPathGraphQLDataSource
-	testRESTDataSource        = TestHttpAny + handlerPathRestDataSource
-	testRESTHeadersDataSource = TestHttpAny + handlerPathHeadersRestDataSource
-	testSubgraphAccounts      = TestHttpAny + handlerSubgraphAccounts
-	testSubgraphReviews       = TestHttpAny + handlerSubgraphReviews
-	testHttpJWK               = TestHttpAny + "/jwk.json"
-	testHttpJWKLegacy         = TestHttpAny + "/jwk-legacy.json"
-	testHttpBundles           = TestHttpAny + "/bundles/"
-	testReloadGroup           = TestHttpAny + "/groupReload"
+	TestHttpAny                  = "http://" + testHttpListen
+	TestHttpGet                  = TestHttpAny + "/get"
+	testHttpPost                 = TestHttpAny + "/post"
+	testGraphQLProxyUpstream     = TestHttpAny + handlerPathGraphQLProxyUpstream
+	testGraphQLDataSource        = TestHttpAny + handlerPathGraphQLDataSource
+	testRESTDataSource           = TestHttpAny + handlerPathRestDataSource
+	testRESTHeadersDataSource    = TestHttpAny + handlerPathHeadersRestDataSource
+	testSubgraphAccounts         = TestHttpAny + handlerSubgraphAccounts
+	testSubgraphAccountsModified = TestHttpAny + handlerSubgraphAccountsModified
+	testSubgraphReviews          = TestHttpAny + handlerSubgraphReviews
+	testHttpJWK                  = TestHttpAny + "/jwk.json"
+	testHttpJWKLegacy            = TestHttpAny + "/jwk-legacy.json"
+	testHttpBundles              = TestHttpAny + "/bundles/"
+	testReloadGroup              = TestHttpAny + "/groupReload"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
@@ -482,6 +486,15 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 			}
 		}
 	}
+	dynamicHandler := func(w http.ResponseWriter, req *http.Request) {
+		path, varOk := mux.Vars(req)["rest"]
+		handler, handlerOk := s.dynamicHandlers[path]
+		if !varOk || !handlerOk {
+			handleMethod("")(w, req)
+			return
+		}
+		handler(w, req)
+	}
 
 	// use gorilla's mux as it allows to cancel URI cleaning
 	// (it is not configurable in standard http mux)
@@ -495,6 +508,7 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 	r.HandleFunc(handlerPathRestDataSource, restDataSourceHandler)
 	r.HandleFunc(handlerPathHeadersRestDataSource, restHeadersDataSourceHandler)
 	r.HandleFunc(handlerSubgraphAccounts, subgraphAccountsHandler)
+	r.HandleFunc(handlerSubgraphAccountsModified, subGraphAccountsHandlerAllAccounts)
 	r.HandleFunc(handlerSubgraphReviews, subgraphReviewsHandler)
 
 	r.HandleFunc("/ws", wsHandler)
@@ -513,7 +527,7 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
 		httpError(w, statusCode)
 	})
-	r.HandleFunc("/{rest:.*}", handleMethod(""))
+	r.HandleFunc("/{rest:.*}", dynamicHandler)
 
 	return r
 }
@@ -671,6 +685,24 @@ func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}`))
+}
+
+func subGraphAccountsHandlerAllAccounts(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", jsonContentType)
+	_, _ = w.Write([]byte(`{
+  "data": {
+    "allUsers": [
+      {
+        "id": "1",
+        "username": "tyk"
+      },
+      {
+        "id": "2",
+        "username": "kofo"
+      }
+    ]
+  }
+}`))
 }
 
 func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
@@ -921,6 +953,8 @@ type Test struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	dynamicHandlers map[string]http.HandlerFunc
 }
 
 type SlaveDataCenter struct {
@@ -929,7 +963,9 @@ type SlaveDataCenter struct {
 }
 
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
-	t := &Test{}
+	t := &Test{
+		dynamicHandlers: make(map[string]http.HandlerFunc),
+	}
 
 	// DNS mock enabled by default
 	t.config.EnableTestDNSMock = false
@@ -1000,6 +1036,11 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 	}
 
 	return gw
+}
+
+func (t *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
+	path = strings.Trim(path, "/")
+	t.dynamicHandlers[path] = handlerFunc
 }
 
 func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
@@ -1218,7 +1259,7 @@ func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, er
 	return s.testRunner.Run(t, testCases...)
 }
 
-//TODO:(gernest) when hot reload is supported enable this.
+// TODO:(gernest) when hot reload is supported enable this.
 func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	s.Run(t, testCases...)
 	var testMatrix = []struct {
@@ -1605,6 +1646,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 
 		specBytes, err := json.Marshal(spec.APIDefinition)
 		if err != nil {
+			log.WithError(err).Errorf("API Spec Marshal failed: %+v", spec)
 			panic(err)
 		}
 
@@ -1615,6 +1657,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 
 		oasSpecBytes, err := json.Marshal(&spec.OAS)
 		if err != nil {
+			log.WithError(err).Errorf("OAS Marshal failed: %+v", spec)
 			panic(err)
 		}
 

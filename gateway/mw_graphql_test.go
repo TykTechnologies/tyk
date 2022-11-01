@@ -948,6 +948,7 @@ type _Service {
 
 type Query {
   me: User
+  allUsers: [User]
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
 }
@@ -965,12 +966,65 @@ directive @extends on OBJECT | INTERFACE`
 
 const gqlSubgraphSDLAccounts = `extend type Query {
 	me: User
+	allUsers: [User]
 } 
 
 type User @key(fields: "id") { 
 	id: ID! 
 	username: String!
 }`
+
+const gqlSubgraphSDLBankAccounts = `
+extend type User @key(fields: "id") {
+  id: ID! @extends
+  account: [BankAccount!]
+}
+
+type BankAccount {
+  number: String
+  balance: Float
+}
+`
+
+const gqlSubgraphSchemaBankAccounts = `
+extend type User @key(fields: "id"){
+    id: ID! @extends
+    account: [BankAccount!]
+}
+
+type BankAccount {
+    number: String
+    balance: Float 
+}
+
+scalar _Any
+scalar _FieldSet
+union _Entity = User
+
+type _Service {
+  sdl: String
+}
+
+type Query {
+  _entities(representations: [_Any!]!): [_Entity]!
+  _service: _Service!
+}
+
+type BankAccount {
+    number: String
+    balance: Float 
+}
+
+type User @key(fields: "id"){
+    id: ID! @extends
+    account: [BankAccount!]
+}
+
+directive @external on FIELD_DEFINITION
+directive @requires(fields: _FieldSet!) on FIELD_DEFINITION
+directive @provides(fields: _FieldSet!) on FIELD_DEFINITION
+directive @key(fields: _FieldSet!) on OBJECT | INTERFACE
+directive @extends on OBJECT | INTERFACE`
 
 const gqlSubgraphSchemaReviews = `scalar _Any
 scalar _FieldSet
@@ -1045,6 +1099,7 @@ const gqlSubgraphVariables = `{
 
 const gqlMergedSupergraphSDL = `type Query {
 	me: User
+	allUsers: [User]
 	topProducts(first: Int = 5): [Product]
 }
 
@@ -1056,6 +1111,12 @@ type User {
 	id: ID!
 	username: String!
 	reviews: [Review]
+	account: [BankAccount!]
+}
+
+type BankAccount {
+    number: String
+    balance: Float 
 }
 
 type Product {

@@ -3,9 +3,10 @@ package trace
 import (
 	"io"
 
+	opentracing "github.com/opentracing/opentracing-go"
+
 	"github.com/TykTechnologies/tyk/trace/jaeger"
 	"github.com/TykTechnologies/tyk/trace/openzipkin"
-	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // InitFunc this is a function for initializing a Tracer

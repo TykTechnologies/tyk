@@ -13,11 +13,6 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-
-	"github.com/TykTechnologies/tyk-pump/analytics"
-
-	"github.com/stretchr/testify/assert"
-
 	"strings"
 	"sync"
 	"testing"
@@ -26,8 +21,10 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
+	"github.com/stretchr/testify/assert"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
