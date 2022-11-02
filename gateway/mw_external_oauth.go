@@ -242,8 +242,7 @@ func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, strin
 	} else {
 		log.WithError(err).Debug("Found OAuth introspection result in the redis cache")
 
-		exp := claims["exp"].(float64)
-		if time.Now().After(time.Unix(int64(exp), 0)) {
+		if isExpired(claims) {
 			return false, "", jwt.ErrTokenExpired
 		}
 	}
@@ -276,6 +275,21 @@ func (k *ExternalOAuthMiddleware) generateVirtualSessionFor(r *http.Request, ses
 		},
 	}
 	return virtualSession
+}
+
+func isExpired(claims jwt.MapClaims) bool {
+	exp, ok := claims["exp"]
+	if !ok {
+		return false
+	}
+
+	// casting to float64 because json.Unmarshal function builds numbers as float64
+	expVal, casted := exp.(float64)
+	if casted && time.Now().After(time.Unix(int64(expVal), 0)) {
+		return true
+	}
+
+	return false
 }
 
 func newIntrospectionCache(gw *Gateway) *introspectionCache {
