@@ -241,6 +241,11 @@ func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, strin
 		}
 	} else {
 		log.WithError(err).Debug("Found OAuth introspection result in the redis cache")
+
+		exp := claims["exp"].(float64)
+		if time.Now().After(time.Unix(int64(exp), 0)) {
+			return false, "", jwt.ErrTokenExpired
+		}
 	}
 
 	active, ok := claims["active"]
