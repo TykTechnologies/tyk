@@ -792,7 +792,7 @@ const (
 
 type GraphQLProxyConfig struct {
 	AuthHeaders      map[string]string `bson:"auth_headers" json:"auth_headers"`
-	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
 }
 
 type GraphQLSubgraphConfig struct {
@@ -814,7 +814,7 @@ type GraphQLSubgraphEntity struct {
 	URL              string            `bson:"url" json:"url"`
 	SDL              string            `bson:"sdl" json:"sdl"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
-	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
 }
 
 type GraphQLEngineConfig struct {
@@ -862,7 +862,7 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 	URL              string            `bson:"url" json:"url"`
 	Method           string            `bson:"method" json:"method"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
-	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
