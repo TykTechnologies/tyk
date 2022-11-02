@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -399,4 +400,19 @@ func TestExternalOAuthMiddleware_introspection(t *testing.T) {
 			}...)
 		})
 	})
+}
+
+func Test_isExpired(t *testing.T) {
+	assert.False(t, isExpired(jwt.MapClaims{}))
+	assert.False(t, isExpired(jwt.MapClaims{"exp": "not integer"}))
+
+	claimsBuilder := func(d time.Duration) jwt.MapClaims {
+		claimsStr := fmt.Sprintf(`{"exp":%d}`, time.Now().Add(d).Unix())
+		var claims jwt.MapClaims
+		_ = json.Unmarshal([]byte(claimsStr), &claims)
+		return claims
+	}
+
+	assert.False(t, isExpired(claimsBuilder(10*time.Minute)))
+	assert.True(t, isExpired(claimsBuilder(-10*time.Minute)))
 }
