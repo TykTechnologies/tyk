@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"github.com/TykTechnologies/tyk/apidef"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -233,7 +234,9 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
 			record.GetGeo(ip, s.Gw.Analytics.GeoIPDB)
 		}
-		if s.Spec.GraphQL.Enabled {
+
+		// skip tagging subgraph requests for graphpump, it only handles generated supergraph requests
+		if s.Spec.GraphQL.Enabled && s.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
 			record.Tags = append(record.Tags, "tyk-graph-analytics")
 			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(s.Spec.GraphQL.Schema))
 		}
