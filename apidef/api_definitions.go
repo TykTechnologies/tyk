@@ -409,6 +409,7 @@ type VersionDefinition struct {
 	StripPath           bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
 	StripVersioningData bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
 	Versions            map[string]string `bson:"versions" json:"versions"`
+	BaseID              string            `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
 type VersionData struct {
@@ -660,6 +661,9 @@ type APIDefinition struct {
 
 	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
 	IsOAS bool `bson:"is_oas" json:"is_oas,omitempty"`
+
+	VersionChangeActions map[string]string `bson:"-" json:"-"`
+	ExistingAPI          *APIDefinition    `bson:"-" json:"-"`
 }
 
 type AnalyticsPluginConfig struct {
