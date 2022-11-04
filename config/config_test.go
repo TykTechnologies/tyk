@@ -10,10 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nsf/jsondiff"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestDefaultValueAndWriteDefaultConf(t *testing.T) {

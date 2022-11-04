@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestServer(t *testing.T) {

@@ -4,8 +4,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/hashicorp/vault/api"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // Vault is an implementation of a KV store which uses Consul as it's backend

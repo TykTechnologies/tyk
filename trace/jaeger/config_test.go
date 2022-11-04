@@ -4,9 +4,10 @@ import (
 	"reflect"
 	"testing"
 
-	tykconf "github.com/TykTechnologies/tyk/config"
 	jaeger "github.com/uber/jaeger-client-go"
 	"github.com/uber/jaeger-client-go/config"
+
+	tykconf "github.com/TykTechnologies/tyk/config"
 )
 
 func TestLoad(t *testing.T) {

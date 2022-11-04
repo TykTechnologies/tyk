@@ -171,13 +171,13 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				Components: openapi3.Components{
 					SecuritySchemes: openapi3.SecuritySchemes{
 						testSSMyAuth: &openapi3.SecuritySchemeRef{
-							Value: openapi3.NewSecurityScheme().WithType(typeApiKey).WithIn(header).WithName(testHeader),
+							Value: openapi3.NewSecurityScheme().WithType(typeAPIKey).WithIn(header).WithName(testHeader),
 						},
 						testSSMyAuthWithAnd: &openapi3.SecuritySchemeRef{
 							Value: openapi3.NewSecurityScheme().WithType(typeOAuth2),
 						},
 						testSSMyAuthWithOR: &openapi3.SecuritySchemeRef{
-							Value: openapi3.NewSecurityScheme().WithType(typeHttp).WithScheme(schemeBasic),
+							Value: openapi3.NewSecurityScheme().WithType(typeHTTP).WithScheme(schemeBasic),
 						},
 					},
 				},
@@ -421,7 +421,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		}
 
 		getExpectedOperations := func(enabled bool, middleware string, oasOperationID bool) Operations {
-			if middleware == MiddlewareAllowList && oasOperationID {
+			if middleware == middlewareAllowList && oasOperationID {
 				return Operations{
 					oasGetOperationID: {
 						Allow: &Allowance{
@@ -434,7 +434,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						},
 					},
 				}
-			} else if middleware == MiddlewareAllowList && !oasOperationID {
+			} else if middleware == middlewareAllowList && !oasOperationID {
 				return Operations{
 					tykGetOperationID: {
 						Allow: &Allowance{
@@ -449,7 +449,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				}
 			}
 
-			if middleware == MiddlewareValidateRequest && oasOperationID {
+			if middleware == middlewareValidateRequest && oasOperationID {
 				return Operations{
 					oasPostOperationID: {
 						ValidateRequest: &ValidateRequest{
@@ -458,7 +458,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						},
 					},
 				}
-			} else if middleware == MiddlewareValidateRequest && !oasOperationID {
+			} else if middleware == middlewareValidateRequest && !oasOperationID {
 				return Operations{
 					tykPostOperationID: {
 						ValidateRequest: &ValidateRequest{
@@ -475,7 +475,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		t.Run("allowList", func(t *testing.T) {
 			t.Run("enable allowList for all paths when no configured operationID in OAS", func(t *testing.T) {
 				oasDef := getOASDef(false)
-				expectedOperations := getExpectedOperations(true, MiddlewareAllowList, false)
+				expectedOperations := getExpectedOperations(true, middlewareAllowList, false)
 
 				tykExtensionConfigParams := TykExtensionConfigParams{
 					AllowList: &trueVal,
@@ -490,7 +490,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			t.Run("enable allowList for all paths when operationID is configured in OAS", func(t *testing.T) {
 				oasDef := getOASDef(true)
 
-				expectedOperations := getExpectedOperations(true, MiddlewareAllowList, true)
+				expectedOperations := getExpectedOperations(true, middlewareAllowList, true)
 
 				tykExtensionConfigParams := TykExtensionConfigParams{
 					AllowList: &trueVal,
@@ -505,7 +505,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			t.Run("disable allowList for all paths when no configured operationID in OAS", func(t *testing.T) {
 				oasDef := getOASDef(false)
 
-				expectedOperations := getExpectedOperations(false, MiddlewareAllowList, false)
+				expectedOperations := getExpectedOperations(false, middlewareAllowList, false)
 
 				tykExtensionConfigParams := TykExtensionConfigParams{
 					AllowList: &falseVal,
@@ -520,7 +520,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			t.Run("disable allowList for all paths when operationID is configured in OAS", func(t *testing.T) {
 				oasDef := getOASDef(true)
 
-				expectedOperations := getExpectedOperations(false, MiddlewareAllowList, true)
+				expectedOperations := getExpectedOperations(false, middlewareAllowList, true)
 
 				tykExtensionConfigParams := TykExtensionConfigParams{
 					AllowList: &falseVal,
@@ -723,13 +723,12 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		})
 
 		t.Run("validateRequest", func(t *testing.T) {
-
 			t.Run("do not configure validateRequest for paths where request body is not specified for application/json",
 				func(t *testing.T) {
 					oasDef := getOASDef(false)
 					fillReqBody(&oasDef, "/pets", http.MethodPost)
 
-					expectedOperations := getExpectedOperations(true, MiddlewareValidateRequest, false)
+					expectedOperations := getExpectedOperations(true, middlewareValidateRequest, false)
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						ValidateRequest: &trueVal,
@@ -746,7 +745,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					oasDef := getOASDef(false)
 					fillReqBody(&oasDef, "/pets", http.MethodPost)
 
-					expectedOperations := getExpectedOperations(true, MiddlewareValidateRequest, false)
+					expectedOperations := getExpectedOperations(true, middlewareValidateRequest, false)
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						ValidateRequest: &trueVal,
@@ -763,7 +762,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					oasDef := getOASDef(true)
 					fillReqBody(&oasDef, "/pets", http.MethodPost)
 
-					expectedOperations := getExpectedOperations(true, MiddlewareValidateRequest, true)
+					expectedOperations := getExpectedOperations(true, middlewareValidateRequest, true)
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						ValidateRequest: &trueVal,
@@ -779,7 +778,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				func(t *testing.T) {
 					oasDef := getOASDef(false)
 					fillReqBody(&oasDef, "/pets", http.MethodPost)
-					expectedOperations := getExpectedOperations(false, MiddlewareValidateRequest, false)
+					expectedOperations := getExpectedOperations(false, middlewareValidateRequest, false)
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						ValidateRequest: &falseVal,
@@ -796,7 +795,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					oasDef := getOASDef(true)
 					fillReqBody(&oasDef, "/pets", http.MethodPost)
 
-					expectedOperations := getExpectedOperations(false, MiddlewareValidateRequest, true)
+					expectedOperations := getExpectedOperations(false, middlewareValidateRequest, true)
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						ValidateRequest: &falseVal,
@@ -840,7 +839,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 				oasDef.SetTykExtension(&tykExt)
 
-				expectedOperations := getExpectedOperations(true, MiddlewareValidateRequest, true)
+				expectedOperations := getExpectedOperations(true, middlewareValidateRequest, true)
 
 				tykExtensionConfigParams := TykExtensionConfigParams{
 					ValidateRequest: &trueVal,
@@ -925,7 +924,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					assert.Nil(t, oasDef.GetTykExtension().Middleware)
 				})
 		})
-
 	})
 
 	t.Run("do not configure upstream URL with servers when upstream URL params is not provided and "+
@@ -1011,7 +1009,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
 	})
-
 }
 
 func TestGetTykExtensionConfigParams(t *testing.T) {
@@ -1137,12 +1134,12 @@ func TestOAS_importAuthentication(t *testing.T) {
 			}
 
 			tokenScheme := openapi3.NewSecurityScheme()
-			tokenScheme.Type = typeApiKey
+			tokenScheme.Type = typeAPIKey
 			tokenScheme.In = cookie
 			tokenScheme.Name = testCookieName
 
 			jwtScheme := openapi3.NewSecurityScheme()
-			jwtScheme.Type = typeHttp
+			jwtScheme.Type = typeHTTP
 			jwtScheme.Scheme = schemeBearer
 			jwtScheme.BearerFormat = bearerFormatJWT
 
@@ -1186,7 +1183,6 @@ func TestOAS_importAuthentication(t *testing.T) {
 		t.Run("enable=false", func(t *testing.T) {
 			check(t, false)
 		})
-
 	})
 
 	t.Run("update existing one", func(t *testing.T) {
@@ -1196,7 +1192,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 		}
 
 		securityScheme := openapi3.NewSecurityScheme()
-		securityScheme.Type = typeApiKey
+		securityScheme.Type = typeAPIKey
 		securityScheme.In = cookie
 		securityScheme.Name = testCookieName
 
@@ -1259,12 +1255,12 @@ func TestOAS_importAuthentication(t *testing.T) {
 			}
 
 			tokenScheme := openapi3.NewSecurityScheme()
-			tokenScheme.Type = typeApiKey
+			tokenScheme.Type = typeAPIKey
 			tokenScheme.In = cookie
 			tokenScheme.Name = testCookieName
 
 			jwtScheme := openapi3.NewSecurityScheme()
-			jwtScheme.Type = typeHttp
+			jwtScheme.Type = typeHTTP
 			jwtScheme.Scheme = schemeBearer
 			jwtScheme.BearerFormat = bearerFormatJWT
 
@@ -1318,7 +1314,6 @@ func TestOAS_importAuthentication(t *testing.T) {
 			check(t, false)
 		})
 	})
-
 }
 
 func TestSecuritySchemes_Import(t *testing.T) {
@@ -1336,7 +1331,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
 			securitySchemes := SecuritySchemes{}
 			nativeSecurityScheme := &openapi3.SecurityScheme{
-				Type: typeApiKey,
+				Type: typeAPIKey,
 				In:   header,
 				Name: testHeaderName,
 			}
@@ -1368,7 +1363,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	t.Run("jwt", func(t *testing.T) {
 		securitySchemes := SecuritySchemes{}
 		nativeSecurityScheme := &openapi3.SecurityScheme{
-			Type:         typeHttp,
+			Type:         typeHTTP,
 			Scheme:       schemeBearer,
 			BearerFormat: bearerFormatJWT,
 		}
@@ -1392,7 +1387,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
 		securitySchemes := SecuritySchemes{}
 		nativeSecurityScheme := &openapi3.SecurityScheme{
-			Type:   typeHttp,
+			Type:   typeHTTP,
 			Scheme: schemeBasic,
 		}
 
@@ -1458,7 +1453,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 		}
 
 		nativeSecurityScheme := &openapi3.SecurityScheme{
-			Type: typeApiKey,
+			Type: typeAPIKey,
 			In:   header,
 			Name: testHeaderName,
 		}
@@ -1534,7 +1529,7 @@ func TestToken_Import(t *testing.T) {
 	}
 
 	nativeSecurityScheme := &openapi3.SecurityScheme{
-		Type: typeApiKey,
+		Type: typeAPIKey,
 		In:   header,
 		Name: testHeaderName,
 	}

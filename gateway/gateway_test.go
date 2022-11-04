@@ -13,11 +13,6 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-
-	"github.com/TykTechnologies/tyk-pump/analytics"
-
-	"github.com/stretchr/testify/assert"
-
 	"strings"
 	"sync"
 	"testing"
@@ -26,8 +21,10 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
+	"github.com/stretchr/testify/assert"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -293,6 +290,8 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
+			// change name to change checksum and reload
+			spec.Name = t.Name()
 		})
 
 		_, _ = ts.Run(t, []test.TestCase{
@@ -311,6 +310,8 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
+			// change name to change checksum and reload
+			spec.Name = t.Name()
 		})
 
 		_, _ = ts.Run(t, []test.TestCase{

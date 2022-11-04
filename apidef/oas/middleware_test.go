@@ -3,8 +3,9 @@ package oas
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestMiddleware(t *testing.T) {
@@ -82,20 +83,7 @@ func TestExtendedPaths(t *testing.T) {
 	})
 }
 
-func TestMockResponse(t *testing.T) {
-	var emptyMockResponse MockResponse
-
-	var convertedMockResponse apidef.MockResponseMeta
-	emptyMockResponse.ExtractTo(&convertedMockResponse)
-
-	var resultMockResponse MockResponse
-	resultMockResponse.Fill(convertedMockResponse)
-
-	assert.Equal(t, emptyMockResponse, resultMockResponse)
-}
-
 func TestTransformRequestBody(t *testing.T) {
-
 	t.Run("empty", func(t *testing.T) {
 		var emptyTransformRequestBody TransformRequestBody
 

@@ -34,14 +34,32 @@ func WithHttpClient(httpClient *http.Client) GraphQLConfigAdapterOption {
 	}
 }
 
+func WithStreamingClient(streamingClient *http.Client) GraphQLConfigAdapterOption {
+	return func(adapter *GraphQLConfigAdapter) {
+		adapter.streamingClient = streamingClient
+	}
+}
+
+func withGraphQLSubscriptionClientFactory(factory graphqlDataSource.GraphQLSubscriptionClientFactory) GraphQLConfigAdapterOption {
+	return func(adapter *GraphQLConfigAdapter) {
+		adapter.subscriptionClientFactory = factory
+	}
+}
+
 type GraphQLConfigAdapter struct {
-	apiDefinition *apidef.APIDefinition
-	httpClient    *http.Client
-	schema        *graphql.Schema
+	apiDefinition   *apidef.APIDefinition
+	httpClient      *http.Client
+	streamingClient *http.Client
+	schema          *graphql.Schema
+
+	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
 }
 
 func NewGraphQLConfigAdapter(apiDefinition *apidef.APIDefinition, options ...GraphQLConfigAdapterOption) GraphQLConfigAdapter {
-	adapter := GraphQLConfigAdapter{apiDefinition: apiDefinition}
+	adapter := GraphQLConfigAdapter{
+		apiDefinition:             apiDefinition,
+		subscriptionClientFactory: &graphqlDataSource.DefaultSubscriptionClientFactory{},
+	}
 	for _, option := range options {
 		option(&adapter)
 	}
@@ -78,8 +96,9 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 	}
 
 	upstreamConfig := graphql.ProxyUpstreamConfig{
-		URL:           url,
-		StaticHeaders: staticHeaders,
+		URL:              url,
+		StaticHeaders:    staticHeaders,
+		SubscriptionType: g.graphqlSubscriptionType(g.apiDefinition.GraphQL.Proxy.SubscriptionType),
 	}
 
 	if g.schema == nil {
@@ -95,6 +114,8 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 		upstreamConfig,
 		graphqlDataSource.NewBatchFactory(),
 		graphql.WithProxyHttpClient(g.httpClient),
+		graphql.WithProxyStreamingClient(g.streamingClient),
+		graphql.WithProxySubscriptionClientFactory(g.subscriptionClientFactory),
 	).EngineV2Configuration()
 
 	return &v2Config, err
@@ -104,12 +125,20 @@ func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*grap
 	dataSourceConfs := g.subgraphDataSourceConfigs()
 	var federationConfigV2Factory *graphql.FederationEngineConfigFactory
 	if g.apiDefinition.GraphQL.Supergraph.DisableQueryBatching {
-		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(dataSourceConfs, nil, graphql.WithFederationHttpClient(g.getHttpClient()))
+		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(
+			dataSourceConfs,
+			nil,
+			graphql.WithFederationHttpClient(g.getHttpClient()),
+			graphql.WithFederationStreamingClient(g.getStreamingClient()),
+			graphql.WithFederationSubscriptionClientFactory(g.subscriptionClientFactory),
+		)
 	} else {
 		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(
 			dataSourceConfs,
 			graphqlDataSource.NewBatchFactory(),
 			graphql.WithFederationHttpClient(g.getHttpClient()),
+			graphql.WithFederationStreamingClient(g.getStreamingClient()),
+			graphql.WithFederationSubscriptionClientFactory(g.subscriptionClientFactory),
 		)
 	}
 
@@ -121,6 +150,10 @@ func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*grap
 	conf, err := federationConfigV2Factory.EngineV2Configuration()
 	if err != nil {
 		return nil, err
+	}
+
+	if !g.apiDefinition.GraphQL.Supergraph.DisableQueryBatching {
+		conf.EnableDataLoader(true)
 	}
 
 	return &conf, nil
@@ -235,14 +268,16 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			planDataSource.Factory = &graphqlDataSource.Factory{
-				HTTPClient: g.getHttpClient(),
+			planDataSource.Factory, err = g.createGraphQLDataSourceFactory(graphqlConfig)
+			if err != nil {
+				return nil, err
 			}
 
 			planDataSource.Custom = graphqlDataSource.ConfigJson(g.graphqlDataSourceConfiguration(
 				graphqlConfig.URL,
 				graphqlConfig.Method,
 				graphqlConfig.Headers,
+				graphqlConfig.SubscriptionType,
 			))
 
 		case apidef.GraphQLEngineDataSourceKindKafka:
@@ -286,7 +321,11 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 			continue
 		}
 		hdr := g.removeDuplicateHeaders(apiDefSubgraphConf.Headers, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
-		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, hdr)
+		conf := g.graphqlDataSourceConfiguration(
+			apiDefSubgraphConf.URL,
+			http.MethodPost,
+			hdr,
+			apiDefSubgraphConf.SubscriptionType)
 		conf.Federation = graphqlDataSource.FederationConfiguration{
 			Enabled:    true,
 			ServiceSDL: apiDefSubgraphConf.SDL,
@@ -298,7 +337,7 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 	return confs
 }
 
-func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method string, headers map[string]string) graphqlDataSource.Configuration {
+func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method string, headers map[string]string, subscriptionType apidef.SubscriptionType) graphqlDataSource.Configuration {
 	dataSourceHeaders := make(map[string]string)
 	for name, value := range headers {
 		dataSourceHeaders[name] = value
@@ -316,7 +355,8 @@ func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method
 			Header: g.convertHeadersToHttpHeaders(dataSourceHeaders),
 		},
 		Subscription: graphqlDataSource.SubscriptionConfiguration{
-			URL: url,
+			URL:    url,
+			UseSSE: subscriptionType == apidef.GQLSubscriptionSSE,
 		},
 	}
 
@@ -482,4 +522,56 @@ func (g *GraphQLConfigAdapter) getHttpClient() *http.Client {
 	}
 
 	return g.httpClient
+}
+
+func (g *GraphQLConfigAdapter) getStreamingClient() *http.Client {
+	if g.streamingClient == nil {
+		g.streamingClient = httpclient.DefaultNetHttpClient
+		g.streamingClient.Timeout = 0
+	}
+
+	return g.streamingClient
+}
+
+func (g *GraphQLConfigAdapter) createGraphQLDataSourceFactory(graphqlConfig apidef.GraphQLEngineDataSourceConfigGraphQL) (*graphqlDataSource.Factory, error) {
+	factory := &graphqlDataSource.Factory{
+		HTTPClient:      g.getHttpClient(),
+		StreamingClient: g.getStreamingClient(),
+	}
+
+	wsProtocol := g.graphqlDataSourceWebSocketProtocol(graphqlConfig.SubscriptionType)
+	graphqlSubscriptionClient := g.subscriptionClientFactory.NewSubscriptionClient(
+		g.getHttpClient(),
+		g.getStreamingClient(),
+		nil,
+		graphqlDataSource.WithWSSubProtocol(wsProtocol),
+	)
+
+	subscriptionClient, ok := graphqlSubscriptionClient.(*graphqlDataSource.SubscriptionClient)
+	if !ok {
+		return nil, errors.New("incorrect SubscriptionClient has been created")
+	}
+	factory.SubscriptionClient = subscriptionClient
+	return factory, nil
+}
+
+func (g *GraphQLConfigAdapter) graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType) string {
+	wsProtocol := graphqlDataSource.ProtocolGraphQLWS
+	if subscriptionType == apidef.GQLSubscriptionTransportWS {
+		wsProtocol = graphqlDataSource.ProtocolGraphQLTWS
+	}
+	return wsProtocol
+}
+
+func (g *GraphQLConfigAdapter) graphqlSubscriptionType(subscriptionType apidef.SubscriptionType) graphql.SubscriptionType {
+	switch subscriptionType {
+	case apidef.GQLSubscriptionWS:
+		return graphql.SubscriptionTypeGraphQLWS
+	case apidef.GQLSubscriptionTransportWS:
+		return graphql.SubscriptionTypeGraphQLTransportWS
+	case apidef.GQLSubscriptionSSE:
+		return graphql.SubscriptionTypeSSE
+	default:
+		return graphql.SubscriptionTypeUnknown
+	}
 }

@@ -1,5 +1,7 @@
 package importer
 
+//lint:file-ignore faillint This file should be ignored by faillint (fmt in use).
+
 import (
 	"encoding/json"
 	"errors"

@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
@@ -372,6 +373,13 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
+				if r, ok := session.AccessRights[apiID]; ok {
+					// If GQL introspection is disabled, keep that configuration.
+					if r.DisableIntrospection {
+						accessRights.DisableIntrospection = r.DisableIntrospection
+					}
+				}
+
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
 
@@ -392,6 +400,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					// Merge ACLs for the same API
 					if r, ok := rights[k]; ok {
+						// If GQL introspection is disabled, keep that configuration.
+						if v.DisableIntrospection {
+							r.DisableIntrospection = v.DisableIntrospection
+						}
 						r.Versions = appendIfMissing(rights[k].Versions, v.Versions...)
 
 						for _, u := range v.AllowedURLs {
@@ -769,7 +781,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 
 	var (
 		key         string
-		defaultName = headers.Authorization
+		defaultName = header.Authorization
 	)
 
 	headerName := config.AuthHeaderName
@@ -815,6 +827,13 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	return key, config
+}
+
+func (b BaseMiddleware) generateSessionID(id string) string {
+	// generate a virtual token
+	data := []byte(id)
+	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	return b.Gw.generateToken(b.Spec.OrgID, keyID)
 }
 
 type TykResponseHandler interface {

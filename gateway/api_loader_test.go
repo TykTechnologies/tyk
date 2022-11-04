@@ -11,9 +11,10 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestOpenTracing(t *testing.T) {
@@ -79,7 +80,6 @@ func TestInternalAPIUsage(t *testing.T) {
 
 	t.Run("with api id", func(t *testing.T) {
 		normal.Proxy.TargetURL = fmt.Sprintf("tyk://%s", internal.APIID)
-
 		g.Gw.LoadAPI(internal, normal)
 
 		_, _ = g.Run(t, []test.TestCase{
@@ -312,6 +312,7 @@ func TestCORS(t *testing.T) {
 	t.Run("oauth endpoints", func(t *testing.T) {
 		apis[0].UseOauth2 = true
 		apis[0].CORS.Enable = false
+
 		g.Gw.LoadAPI(apis...)
 
 		t.Run("CORS disabled", func(t *testing.T) {

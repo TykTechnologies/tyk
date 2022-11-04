@@ -1,23 +1,24 @@
 package oas
 
-//go:generate go-bindata -pkg schema -nomemcopy -nometadata -ignore=(schema\/schema.gen.go|schema\/README.md|schema\/x-tyk-gateway.md) -prefix "./schema" -o schema/schema.gen.go schema/...
-//go:generate gofmt -w -s schema/schema.gen.go
-
 import (
+	"embed"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 
 	"github.com/buger/jsonparser"
-
-	"github.com/TykTechnologies/tyk/apidef/oas/schema"
-	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/hashicorp/go-multierror"
-	"github.com/hashicorp/go-version"
+	pkgver "github.com/hashicorp/go-version"
 	"github.com/xeipuuv/gojsonschema"
+
+	logger "github.com/TykTechnologies/tyk/log"
 )
+
+//go:embed schema/*
+var schemaDir embed.FS
 
 const (
 	keyDefinitions              = "definitions"
@@ -27,7 +28,7 @@ const (
 
 var (
 	log            = logger.Get()
-	oasJsonSchemas map[string][]byte
+	oasJSONSchemas map[string][]byte
 	mu             sync.Mutex
 	errorFormatter = func(errs []error) string {
 		var result strings.Builder
@@ -56,25 +57,31 @@ func init() {
 func loadOASSchema() error {
 	mu.Lock()
 	defer mu.Unlock()
-	xTykAPIGwSchema, err := schema.Asset(fmt.Sprintf("%s.json", ExtensionTykAPIGateway))
+
+	xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykAPIGateway))
 	if err != nil {
 		return fmt.Errorf("%s loading failed: %w", ExtensionTykAPIGateway, err)
 	}
 
 	xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
-	oasJsonSchemas = make(map[string][]byte)
-	fileNames := schema.AssetNames()
-	for _, fileName := range fileNames {
+	oasJSONSchemas = make(map[string][]byte)
+	members, err := schemaDir.ReadDir("schema")
+	for _, member := range members {
+		if member.IsDir() {
+			continue
+		}
+
+		fileName := member.Name()
 		if !strings.HasSuffix(fileName, ".json") {
 			continue
 		}
 
-		if strings.HasPrefix(fileName, ExtensionTykAPIGateway) {
+		if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) {
 			continue
 		}
 
 		var data []byte
-		data, err = schema.Asset(fileName)
+		data, err = schemaDir.ReadFile(filepath.Join("schema/", fileName))
 		if err != nil {
 			return err
 		}
@@ -93,12 +100,13 @@ func loadOASSchema() error {
 		}
 
 		oasVersion := strings.TrimSuffix(fileName, ".json")
-		oasJsonSchemas[oasVersion] = data
+		oasJSONSchemas[oasVersion] = data
 	}
 
 	return nil
 }
 
+// ValidateOASObject validates an OAS document against a particular OAS version.
 func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	oasSchema, err := GetOASSchema(oasVersion)
 	if err != nil {
@@ -127,35 +135,36 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	return nil
 }
 
-func GetOASSchema(reqOASVersion string) ([]byte, error) {
+// GetOASSchema returns an oas schema for a particular version.
+func GetOASSchema(version string) ([]byte, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if reqOASVersion == "" {
-		return oasJsonSchemas[defaultVersion], nil
+	if version == "" {
+		return oasJSONSchemas[defaultVersion], nil
 	}
 
-	minorVersion, err := getMinorVersion(reqOASVersion)
+	minorVersion, err := getMinorVersion(version)
 	if err != nil {
 		return nil, err
 	}
 
-	oasSchema, ok := oasJsonSchemas[minorVersion]
+	oasSchema, ok := oasJSONSchemas[minorVersion]
 	if !ok {
-		return nil, fmt.Errorf(oasSchemaVersionNotFoundFmt, reqOASVersion)
+		return nil, fmt.Errorf(oasSchemaVersionNotFoundFmt, version)
 	}
 
 	return oasSchema, nil
 }
 
 func findDefaultVersion(rawVersions []string) string {
-	versions := make([]*version.Version, len(rawVersions))
+	versions := make([]*pkgver.Version, len(rawVersions))
 	for i, raw := range rawVersions {
-		v, _ := version.NewVersion(raw)
+		v, _ := pkgver.NewVersion(raw)
 		versions[i] = v
 	}
 
-	sort.Sort(version.Collection(versions))
+	sort.Sort(pkgver.Collection(versions))
 	latestVersion := versions[len(rawVersions)-1].String()
 	latestMinor, _ := getMinorVersion(latestVersion)
 	return latestMinor
@@ -165,15 +174,15 @@ func setDefaultVersion() {
 	mu.Lock()
 	defer mu.Unlock()
 	var versions []string
-	for k := range oasJsonSchemas {
+	for k := range oasJSONSchemas {
 		versions = append(versions, k)
 	}
 
 	defaultVersion = findDefaultVersion(versions)
 }
 
-func getMinorVersion(reqOASVersion string) (string, error) {
-	v, err := version.NewVersion(reqOASVersion)
+func getMinorVersion(version string) (string, error) {
+	v, err := pkgver.NewVersion(version)
 	if err != nil {
 		return "", err
 	}

@@ -151,7 +151,8 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 		APIID, ListenPath string
 	}
 
-	assertListenPaths := func(tests []testCase) {
+	assertListenPaths := func(t *testing.T, tests []testCase) {
+		t.Helper()
 		for _, tc := range tests {
 			s := ts.Gw.getApiSpec(tc.APIID)
 			if want, got := tc.ListenPath, s.Proxy.ListenPath; want != got {
@@ -160,7 +161,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 		}
 	}
 
-	t.Run("Sequentieal order", func(t *testing.T) {
+	t.Run("Sequential order", func(t *testing.T) {
 		// Load initial API
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
@@ -172,7 +173,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 			func(spec *APISpec) { spec.APIID = "3" },
 		)
 
-		assertListenPaths([]testCase{
+		assertListenPaths(t, []testCase{
 			// Should retain original API
 			{"1", "/sample"},
 			{"2", "/sample-2"},
@@ -182,11 +183,15 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 
 	t.Run("Should re-order", func(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(
-			func(spec *APISpec) { spec.APIID = "2" },
-			func(spec *APISpec) { spec.APIID = "3" },
+			func(spec *APISpec) {
+				spec.APIID = "2"
+			},
+			func(spec *APISpec) {
+				spec.APIID = "3"
+			},
 		)
 
-		assertListenPaths([]testCase{
+		assertListenPaths(t, []testCase{
 			{"2", "/sample-2"},
 			{"3", "/sample-3"},
 		})
@@ -195,11 +200,15 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	t.Run("Restore original order", func(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
-			func(spec *APISpec) { spec.APIID = "2" },
-			func(spec *APISpec) { spec.APIID = "3" },
+			func(spec *APISpec) {
+				spec.APIID = "2"
+			},
+			func(spec *APISpec) {
+				spec.APIID = "3"
+			},
 		)
 
-		assertListenPaths([]testCase{
+		assertListenPaths(t, []testCase{
 			// Since API was not loaded previously first it has prefixed id
 			{"1", "/sample-1"},
 			{"2", "/sample-2"},
@@ -571,6 +580,100 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			assertMetaData(session, expected)
 		})
 	})
+}
+
+func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
+	const testAPIID = "testAPIID"
+	const orgId = "default"
+
+	hashCases := []struct {
+		name     string
+		hashKeys bool
+	}{
+		{
+			name:     "Key Hashing disabled",
+			hashKeys: false,
+		},
+		{
+			name:     "Key hashing enabled",
+			hashKeys: true,
+		},
+	}
+
+	resetQuotaTestCases := []struct {
+		name       string
+		resetQuota bool
+		quotaFound bool
+	}{
+		{
+			name:       "Reset quota",
+			resetQuota: true,
+			quotaFound: false,
+		},
+		{
+			name:       "Do not reset quota",
+			resetQuota: false,
+			quotaFound: true,
+		},
+	}
+
+	for _, quotaTc := range resetQuotaTestCases {
+		t.Run(quotaTc.name, func(t *testing.T) {
+			for _, tc := range hashCases {
+				t.Run(tc.name, func(t *testing.T) {
+					ts := StartTest(func(globalConf *config.Config) {
+						globalConf.HashKeys = tc.hashKeys
+					})
+					defer ts.Close()
+
+					ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+						spec.APIID = testAPIID
+						spec.UseKeylessAccess = false
+						//	spec.Auth.UseParam = true
+						spec.OrgID = orgId
+						spec.Proxy.ListenPath = "/my-api"
+					})
+
+					pID := ts.CreatePolicy(func(p *user.Policy) {
+						p.QuotaMax = 1
+					})
+
+					_, key := ts.CreateSession(func(s *user.SessionState) {
+						s.ApplyPolicies = []string{pID}
+						s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
+							APIID: testAPIID,
+						}}
+					})
+
+					withAccess := CreateStandardSession()
+					withAccess.AccessRights = map[string]user.AccessDefinition{testAPIID: {
+						APIID: testAPIID,
+					}}
+
+					authHeaders := map[string]string{
+						"authorization": key,
+					}
+
+					// consume api so quota is decreased
+					_, _ = ts.Run(t, []test.TestCase{
+						// Without data
+						{Method: "GET", Path: "/my-api", Headers: authHeaders, Code: 200},
+						{Method: "GET", Path: "/my-api", Headers: authHeaders, Code: 403},
+					}...)
+
+					// remove the key, but not always the quota key
+					ts.Gw.handleDeleteKey(key, orgId, "-1", quotaTc.resetQuota)
+
+					// we might remove the key, but for rpc sometimes we just remove the key and not the quota
+					// so we can get the updated key and still preserving the quota count
+					_, err := ts.Gw.DefaultQuotaStore.Store().GetRawKey("quota-" + storage.HashKey(key, tc.hashKeys))
+					found := err == nil
+					assert.Equal(t, quotaTc.quotaFound, found)
+				})
+			}
+		})
+	}
+
 }
 
 func TestUpdateKeyWithCert(t *testing.T) {
