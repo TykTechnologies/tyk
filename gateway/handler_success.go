@@ -3,7 +3,6 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
-	"github.com/TykTechnologies/tyk/apidef"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
