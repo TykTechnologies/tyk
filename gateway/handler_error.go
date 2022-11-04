@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 
@@ -318,7 +320,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
 			record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)
 		}
-		if e.Spec.GraphQL.Enabled {
+		if e.Spec.GraphQL.Enabled && e.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
 			record.Tags = append(record.Tags, "tyk-graph-analytics")
 			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(e.Spec.GraphQL.Schema))
 		}
