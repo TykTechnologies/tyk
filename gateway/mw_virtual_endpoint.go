@@ -100,11 +100,19 @@ func (d *VirtualEndpoint) EnabledForSpec() bool {
 	if !d.Spec.GlobalConfig.EnableJSVM {
 		return false
 	}
+
+	// Disable processing from here if cache is enabled
+	// See: mw_redis_cache.go for request path.
+	if d.Spec.CacheOptions.EnableCache {
+		return false
+	}
+
 	for _, version := range d.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.Virtual) > 0 {
 			return true
 		}
 	}
+
 	return false
 }
 
