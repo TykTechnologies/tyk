@@ -27,7 +27,7 @@ function testVirtData(request, session, config) {
 }
 `
 
-func (ts *Test) testPrepareVirtualEndpoint(js string, method string, path string, proxyOnError bool, keyless bool) {
+func (ts *Test) testPrepareVirtualEndpoint(js string, method string, path string, proxyOnError bool, keyless bool, cacheEnabled bool) {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "test"
@@ -60,7 +60,7 @@ func (ts *Test) testPrepareVirtualEndpoint(js string, method string, path string
 		// Address https://github.com/TykTechnologies/tyk/issues/1356
 		// VP should work with cache enabled
 		spec.CacheOptions = apidef.CacheOptions{
-			EnableCache:                true,
+			EnableCache:                cacheEnabled,
 			EnableUpstreamCacheControl: true,
 			CacheTimeout:               60,
 			CacheAllSafeRequests:       true,
@@ -72,13 +72,16 @@ func TestVirtualEndpoint(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true, true)
 
 	_, _ = ts.Run(t, []test.TestCase{
 		test.TestCase{
 			Path:      "/virt",
 			Code:      202,
 			BodyMatch: "foobar",
+			HeadersNotMatch: map[string]string{
+				cachedResponseHeader: "1",
+			},
 			HeadersMatch: map[string]string{
 				"data-foo":   "x",
 				"data-bar-y": "3",
@@ -97,20 +100,60 @@ func TestVirtualEndpoint(t *testing.T) {
 	}...)
 }
 
+func TestVirtualEndpointNotCached(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true, false)
+
+	_, _ = ts.Run(t, []test.TestCase{
+		test.TestCase{
+			Path:      "/virt",
+			Code:      202,
+			BodyMatch: "foobar",
+			HeadersNotMatch: map[string]string{
+				cachedResponseHeader: "1",
+			},
+			HeadersMatch: map[string]string{
+				"data-foo":   "x",
+				"data-bar-y": "3",
+			},
+		},
+		test.TestCase{
+			Path:      "/virt",
+			Code:      202,
+			BodyMatch: "foobar",
+			HeadersNotMatch: map[string]string{
+				cachedResponseHeader: "1",
+			},
+			HeadersMatch: map[string]string{
+				"data-foo":   "x",
+				"data-bar-y": "3",
+			},
+		},
+	}...)
+}
+
 func TestVirtualEndpoint500(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint("abc", "GET", "/abc", false, true)
+	ts.testPrepareVirtualEndpoint("abc", "GET", "/abc", false, true, true)
 
 	_, _ = ts.Run(t, []test.TestCase{
 		test.TestCase{
 			Path: "/abc",
 			Code: http.StatusInternalServerError,
+			HeadersNotMatch: map[string]string{
+				cachedResponseHeader: "1",
+			},
 		},
 		test.TestCase{
 			Path: "/abc",
 			Code: http.StatusInternalServerError,
+			HeadersNotMatch: map[string]string{
+				cachedResponseHeader: "1",
+			},
 		},
 	}...)
 }
@@ -130,7 +173,7 @@ func TestVirtualEndpointSessionMetadata(t *testing.T) {
 		}
 	})
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/abc", false, false)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/abc", false, false, true)
 
 	_, _ = ts.Run(t, test.TestCase{
 		Path:    "/abc",
@@ -145,7 +188,7 @@ func BenchmarkVirtualEndpoint(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true, true)
 
 	for i := 0; i < b.N; i++ {
 		_, _ = ts.Run(b, test.TestCase{
