@@ -27,6 +27,7 @@ import (
 const (
 	upstreamCacheHeader    = "x-tyk-cache-action-set"
 	upstreamCacheTTLHeader = "x-tyk-cache-action-set-ttl"
+	cachedResponseHeader   = "x-tyk-cached-response"
 )
 
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
@@ -213,7 +214,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			resVal, err = vp.ServeHTTPForCache(w, r, nil)
 			if err != nil {
 				log.WithError(err).Error("Upstream request failed")
-				return nil, mwStatusRespond
+				return errors.New("Upstream request failed"), http.StatusInternalServerError
 			}
 		} else {
 			// This passes through and will write the value to the writer, but spit out a copy for the cache
@@ -339,7 +340,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		w.Header().Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
 		w.Header().Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
-	w.Header().Set("x-tyk-cached-response", "1")
+	w.Header().Set(cachedResponseHeader, "1")
 
 	if reqEtag := r.Header.Get("If-None-Match"); reqEtag != "" {
 		if respEtag := newRes.Header.Get("Etag"); respEtag != "" {
