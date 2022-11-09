@@ -17,7 +17,9 @@ function testVirtData(request, session, config) {
 		Body: "foobar",
 		Headers: {
 			"data-foo": config.config_data.foo,
-			"data-bar-y": config.config_data.bar.y.toString()
+			"data-bar-y": config.config_data.bar.y.toString(),
+			"x-tyk-cache-action-set": "1",
+			"x-tyk-cache-action-set-ttl": "10",
 		},
 		Code: 202
 	}
@@ -58,9 +60,10 @@ func (ts *Test) testPrepareVirtualEndpoint(js string, method string, path string
 		// Address https://github.com/TykTechnologies/tyk/issues/1356
 		// VP should work with cache enabled
 		spec.CacheOptions = apidef.CacheOptions{
-			EnableCache:          true,
-			CacheTimeout:         60,
-			CacheAllSafeRequests: true,
+			EnableCache:                true,
+			EnableUpstreamCacheControl: true,
+			CacheTimeout:               60,
+			CacheAllSafeRequests:       true,
 		}
 	})
 }
@@ -71,15 +74,27 @@ func TestVirtualEndpoint(t *testing.T) {
 
 	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
 
-	ts.Run(t, test.TestCase{
-		Path:      "/virt",
-		Code:      202,
-		BodyMatch: "foobar",
-		HeadersMatch: map[string]string{
-			"data-foo":   "x",
-			"data-bar-y": "3",
+	ts.Run(t, []test.TestCase{
+		test.TestCase{
+			Path:      "/virt",
+			Code:      202,
+			BodyMatch: "foobar",
+			HeadersMatch: map[string]string{
+				"data-foo":   "x",
+				"data-bar-y": "3",
+			},
 		},
-	})
+		test.TestCase{
+			Path:      "/virt",
+			Code:      202,
+			BodyMatch: "foobar",
+			HeadersMatch: map[string]string{
+				"data-foo":           "x",
+				"data-bar-y":         "3",
+				cachedResponseHeader: "1",
+			},
+		},
+	}...)
 }
 
 func TestVirtualEndpoint500(t *testing.T) {
@@ -88,10 +103,16 @@ func TestVirtualEndpoint500(t *testing.T) {
 
 	ts.testPrepareVirtualEndpoint("abc", "GET", "/abc", false, true)
 
-	ts.Run(t, test.TestCase{
-		Path: "/abc",
-		Code: http.StatusInternalServerError,
-	})
+	ts.Run(t, []test.TestCase{
+		test.TestCase{
+			Path: "/abc",
+			Code: http.StatusInternalServerError,
+		},
+		test.TestCase{
+			Path: "/abc",
+			Code: http.StatusInternalServerError,
+		},
+	}...)
 }
 
 func TestVirtualEndpointSessionMetadata(t *testing.T) {
