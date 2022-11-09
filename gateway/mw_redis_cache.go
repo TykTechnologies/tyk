@@ -15,8 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/sync/singleflight"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/murmur3"
@@ -36,7 +34,6 @@ type RedisCacheMiddleware struct {
 	BaseMiddleware
 	CacheStore   storage.Handler
 	sh           SuccessHandler
-	singleFlight singleflight.Group
 }
 
 func (m *RedisCacheMiddleware) Name() string {
@@ -197,11 +194,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		log.Debug("Error creating checksum. Skipping cache check")
 		errCreatingChecksum = true
 	} else {
-		v, sfErr, _ := m.singleFlight.Do(key, func() (interface{}, error) {
-			return m.CacheStore.GetKey(key)
-		})
-		retBlob = v.(string)
-		err = sfErr
+		retBlob, err = m.CacheStore.GetKey(key)
 	}
 
 	if err != nil {
@@ -213,20 +206,29 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		var resVal *http.Response
 		if isVirtual {
 			log.Debug("This is a virtual function")
+
 			vp := VirtualEndpoint{BaseMiddleware: m.BaseMiddleware}
 			vp.Init()
-			resVal = vp.ServeHTTPForCache(w, r, nil)
+
+			resVal, err = vp.ServeHTTPForCache(w, r, nil)
+			if err != nil {
+				log.WithError(err).Error("Upstream request failed")
+				return nil, mwStatusRespond
+			}
 		} else {
 			// This passes through and will write the value to the writer, but spit out a copy for the cache
 			log.Debug("Not virtual, passing")
+
 			if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
 				r.URL = newURL
 				ctxSetURLRewriteTarget(r, nil)
 			}
+
 			if newMethod := ctxGetTransformRequestMethod(r); newMethod != "" {
 				r.Method = newMethod
 				ctxSetTransformRequestMethod(r, "")
 			}
+
 			sr := m.sh.ServeHTTPWithCache(w, r)
 			resVal = sr.Response
 		}
