@@ -74,7 +74,7 @@ func TestVirtualEndpoint(t *testing.T) {
 
 	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
 
-	ts.Run(t, []test.TestCase{
+	_, _ = ts.Run(t, []test.TestCase{
 		test.TestCase{
 			Path:      "/virt",
 			Code:      202,
@@ -103,7 +103,7 @@ func TestVirtualEndpoint500(t *testing.T) {
 
 	ts.testPrepareVirtualEndpoint("abc", "GET", "/abc", false, true)
 
-	ts.Run(t, []test.TestCase{
+	_, _ = ts.Run(t, []test.TestCase{
 		test.TestCase{
 			Path: "/abc",
 			Code: http.StatusInternalServerError,
@@ -132,7 +132,7 @@ func TestVirtualEndpointSessionMetadata(t *testing.T) {
 
 	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/abc", false, false)
 
-	ts.Run(t, test.TestCase{
+	_, _ = ts.Run(t, test.TestCase{
 		Path:    "/abc",
 		Headers: map[string]string{"Authorization": key},
 		Code:    http.StatusAccepted,
@@ -148,7 +148,7 @@ func BenchmarkVirtualEndpoint(b *testing.B) {
 	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
 
 	for i := 0; i < b.N; i++ {
-		ts.Run(b, test.TestCase{
+		_, _ = ts.Run(b, test.TestCase{
 			Path:      "/virt",
 			Code:      202,
 			BodyMatch: "foobar",
