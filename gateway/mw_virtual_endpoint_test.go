@@ -27,6 +27,16 @@ function testVirtData(request, session, config) {
 }
 `
 
+var (
+	proxyOnErrorEnabled = true
+	keylessAuthEnabled  = true
+	cacheEnabled        = true
+
+	proxyOnErrorDisabled = false
+	keylessAuthDisabled  = false
+	cacheDisabled        = false
+)
+
 func (ts *Test) testPrepareVirtualEndpoint(js string, method string, path string, proxyOnError bool, keyless bool, cacheEnabled bool) {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -72,7 +82,7 @@ func TestVirtualEndpoint(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true, true)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", keylessAuthEnabled, keylessAuthEnabled, cacheEnabled)
 
 	_, _ = ts.Run(t, []test.TestCase{
 		test.TestCase{
@@ -104,7 +114,7 @@ func TestVirtualEndpointNotCached(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true, false)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", keylessAuthEnabled, keylessAuthEnabled, cacheDisabled)
 
 	_, _ = ts.Run(t, []test.TestCase{
 		test.TestCase{
@@ -138,9 +148,20 @@ func TestVirtualEndpoint500(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint("abc", "GET", "/abc", false, true, true)
+	testErrorResponse(ts, t, cacheEnabled)
+}
 
-	_, _ = ts.Run(t, []test.TestCase{
+func TestVirtualEndpoint500NotCached(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	testErrorResponse(ts, t, cacheDisabled)
+}
+
+func testErrorResponse(ts *Test, t *testing.T, cache bool) {
+	ts.testPrepareVirtualEndpoint("abc", "GET", "/abc", keylessAuthDisabled, keylessAuthEnabled, cache)
+
+	_, _ = ts.Run(t,
 		test.TestCase{
 			Path: "/abc",
 			Code: http.StatusInternalServerError,
@@ -155,7 +176,7 @@ func TestVirtualEndpoint500(t *testing.T) {
 				cachedResponseHeader: "1",
 			},
 		},
-	}...)
+	)
 }
 
 func TestVirtualEndpointSessionMetadata(t *testing.T) {
@@ -173,13 +194,20 @@ func TestVirtualEndpointSessionMetadata(t *testing.T) {
 		}
 	})
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/abc", false, false, true)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/abc", keylessAuthDisabled, keylessAuthDisabled, cacheEnabled)
 
-	_, _ = ts.Run(t, test.TestCase{
-		Path:    "/abc",
-		Headers: map[string]string{"Authorization": key},
-		Code:    http.StatusAccepted,
-	})
+	_, _ = ts.Run(t,
+		test.TestCase{
+			Path:    "/abc",
+			Headers: map[string]string{"Authorization": key},
+			Code:    http.StatusAccepted,
+		},
+		test.TestCase{
+			Path:    "/abc",
+			Headers: map[string]string{"Authorization": key},
+			Code:    http.StatusAccepted,
+		},
+	)
 }
 
 func BenchmarkVirtualEndpoint(b *testing.B) {
@@ -188,7 +216,7 @@ func BenchmarkVirtualEndpoint(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true, true)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", keylessAuthEnabled, keylessAuthEnabled, cacheEnabled)
 
 	for i := 0; i < b.N; i++ {
 		_, _ = ts.Run(b, test.TestCase{
