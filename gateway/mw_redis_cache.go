@@ -32,8 +32,8 @@ const (
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type RedisCacheMiddleware struct {
 	BaseMiddleware
-	CacheStore   storage.Handler
-	sh           SuccessHandler
+	CacheStore storage.Handler
+	sh         SuccessHandler
 }
 
 func (m *RedisCacheMiddleware) Name() string {
