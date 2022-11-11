@@ -118,6 +118,7 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 		graphql.WithProxySubscriptionClientFactory(g.subscriptionClientFactory),
 	).EngineV2Configuration()
 
+	v2Config.EnableSingleFlight(true)
 	return &v2Config, err
 }
 
@@ -152,6 +153,7 @@ func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*grap
 		return nil, err
 	}
 
+	conf.EnableSingleFlight(true)
 	if !g.apiDefinition.GraphQL.Supergraph.DisableQueryBatching {
 		conf.EnableDataLoader(true)
 	}
@@ -165,6 +167,7 @@ func (g *GraphQLConfigAdapter) createV2ConfigForEngineExecutionMode() (*graphql.
 	}
 
 	conf := graphql.NewEngineV2Configuration(g.schema)
+	conf.EnableSingleFlight(true)
 
 	fieldConfigs := g.engineConfigV2FieldConfigs()
 	datsSources, err := g.engineConfigV2DataSources()
