@@ -711,7 +711,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 
 	actualDataSources, err := adapter.engineConfigV2DataSources()
 	assert.NoError(t, err)
-	assert.ElementsMatch(t, expectedDataSources, actualDataSources)
+	assert.Equal(t, expectedDataSources, actualDataSources)
 }
 
 const graphqlEngineV1ConfigJson = `{
