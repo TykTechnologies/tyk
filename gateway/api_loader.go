@@ -438,10 +438,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 	gw.mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
 
 	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
 
-	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid})
@@ -457,12 +457,24 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 					APILevel:       true,
 				},
 			)
-		} else if mwDriver != apidef.OttoDriver {
-			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
-		} else {
-			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
+			continue
 		}
+		if mwDriver != apidef.OttoDriver {
+			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
+			gw.mwAppendEnabled(
+				&chainArray,
+				&CoProcessMiddleware{
+					BaseMiddleware:   baseMid,
+					HookType:         coprocess.HookType_Post,
+					HookName:         obj.Name,
+					MiddlewareDriver: mwDriver,
+					RawBodyOnly:      obj.RawBodyOnly,
+				},
+			)
+			continue
+		}
+
+		chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 	}
 	//Do not add middlewares after cache middleware.
 	//It will not get executed
