@@ -307,7 +307,7 @@ func (gw *Gateway) forceResponse(
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	vmeta := d.getMetaFromRequest(r)
-	if vmeta == nil || d.Spec.CacheOptions.EnableCache {
+	if vmeta == nil {
 		// nothing can be done here, reply with 200 to allow proxy to target
 		return nil, http.StatusOK
 	}
