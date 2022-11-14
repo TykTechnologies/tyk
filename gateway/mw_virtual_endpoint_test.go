@@ -82,11 +82,11 @@ func TestVirtualEndpoint(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", proxyOnErrorEnabled, keylessAuthEnabled, cacheEnabled)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt1", proxyOnErrorDisabled, keylessAuthEnabled, cacheEnabled)
 
-	_, _ = ts.Run(t, []test.TestCase{
+	_, _ = ts.Run(t,
 		test.TestCase{
-			Path:      "/virt",
+			Path:      "/virt1",
 			Code:      202,
 			BodyMatch: "foobar",
 			HeadersNotMatch: map[string]string{
@@ -98,7 +98,7 @@ func TestVirtualEndpoint(t *testing.T) {
 			},
 		},
 		test.TestCase{
-			Path:      "/virt",
+			Path:      "/virt1",
 			Code:      202,
 			BodyMatch: "foobar",
 			HeadersMatch: map[string]string{
@@ -107,16 +107,16 @@ func TestVirtualEndpoint(t *testing.T) {
 				cachedResponseHeader: "1",
 			},
 		},
-	}...)
+	)
 }
 
 func TestVirtualEndpointNotCached(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", proxyOnErrorEnabled, keylessAuthEnabled, cacheDisabled)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", proxyOnErrorDisabled, keylessAuthEnabled, cacheDisabled)
 
-	_, _ = ts.Run(t, []test.TestCase{
+	_, _ = ts.Run(t,
 		test.TestCase{
 			Path:      "/virt",
 			Code:      202,
@@ -141,7 +141,7 @@ func TestVirtualEndpointNotCached(t *testing.T) {
 				"data-bar-y": "3",
 			},
 		},
-	}...)
+	)
 }
 
 func TestVirtualEndpoint500(t *testing.T) {
