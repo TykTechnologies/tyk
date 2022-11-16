@@ -787,7 +787,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return rt.h2ctransport.RoundTrip(r)
 	}
 	if trace.IsEnabled() {
-		tr :=  otelhttp.NewTransport(rt.transport)
+		tr := otelhttp.NewTransport(rt.transport)
 		return tr.RoundTrip(r)
 	}
 
@@ -1212,6 +1212,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	createTransport := p.TykAPISpec.HTTPTransport == nil
 
 	// Check if timeouts are set for this endpoint
+	fmt.Println("createTransport?", !createTransport)
+	fmt.Println("&& p.Gw.GetConfig().MaxConnTime != 0 -", p.Gw.GetConfig().MaxConnTime)
 	if !createTransport && p.Gw.GetConfig().MaxConnTime != 0 {
 		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(p.Gw.GetConfig().MaxConnTime)*time.Second
 	}
@@ -1378,7 +1380,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 }
 
 func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) error {
-
 	// Remove hop-by-hop headers listed in the
 	// "Connection" header of the response.
 	if c := res.Header.Get(headers.Connection); c != "" {

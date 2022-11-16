@@ -43,7 +43,6 @@ func (w wrapLogger) Error(msg string) {
 	w.Errorf("%s", msg)
 }
 
-
 func InitOtelProvider(resourceName string) (func(context.Context) error, error) {
 	ctx := context.Background()
 
@@ -92,7 +91,6 @@ func InitOtelProvider(resourceName string) (func(context.Context) error, error) 
 	return tracerProvider.Shutdown, nil
 }
 
-
 func Init(service string, opts map[string]interface{}, log Logger) (*Trace, error) {
 	_, err := InitOtelProvider(service)
 	if err != nil {
@@ -101,5 +99,5 @@ func Init(service string, opts map[string]interface{}, log Logger) (*Trace, erro
 
 	tr := otel.Tracer("tyk-gw")
 
-	return &Trace{Tracer:tr},nil
+	return &Trace{Tracer: tr}, nil
 }

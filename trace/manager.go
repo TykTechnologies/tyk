@@ -80,8 +80,6 @@ func Get(service string) Tracer {
 	return nil
 }
 
-
-
 // IsEnabled returns true if the global trace manager is enabled.
 func IsEnabled() bool {
 	if v := enabled.Load(); v != nil {
@@ -152,18 +150,18 @@ func Root(service string, r *http.Request) (trace.Span, *http.Request) {
 // any spans created form the returned context will be children of the returned
 // span.
 func Span(ctx context.Context, ops string, opts ...opentracing.StartSpanOption) (trace.Span, context.Context) {
-	tr:=Get(GetServiceID(ctx))
-	newCtx, span := tr.Start(ctx,ops)
+	tr := Get(GetServiceID(ctx))
+	newCtx, span := tr.Start(ctx, ops)
 
 	return span, newCtx
 }
 
 func Extract(tr Tracer, h http.Header) (opentracing.SpanContext, error) {
-	return nil,nil
+	return nil, nil
 }
 
 func ExtractFromContext(ctx context.Context, h http.Header) (opentracing.SpanContext, error) {
-	return nil,nil
+	return nil, nil
 }
 
 func Inject(service string, span opentracing.Span, h http.Header) error {

@@ -45,12 +45,12 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	}
 
 	//We can probably do something more clean around base middleware
-	if trace.IsEnabled(){
+	if trace.IsEnabled() {
 		fmt.Println("saving data in ctx")
 		data := MiddlewareTraceData{Values: map[string]string{}}
-		data.Values["tyk.apidef.targetversion"]= targetVersion
+		data.Values["tyk.apidef.targetversion"] = targetVersion
 		data.Values["tyk.apidef.version_enabled"] = fmt.Sprint(v.Spec.VersionDefinition.Enabled)
-		mwData:= make(map[string]interface{})
+		mwData := make(map[string]interface{})
 		mwData[v.Name()] = data
 		ctxSetData(r, mwData)
 	}

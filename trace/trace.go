@@ -3,7 +3,6 @@ package trace
 import (
 	"github.com/TykTechnologies/tyk/trace/otlp"
 	"go.opentelemetry.io/otel/trace"
-
 )
 
 // InitFunc this is a function for initializing a Tracer
@@ -18,6 +17,6 @@ type Tracer interface {
 func Init(name string, service string, opts map[string]interface{}, logger Logger) (Tracer, error) {
 	switch name {
 	default:
-		return otlp.Init(service,opts,logger)
+		return otlp.Init(service, opts, logger)
 	}
 }

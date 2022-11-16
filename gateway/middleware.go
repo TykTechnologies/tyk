@@ -57,7 +57,7 @@ type TraceMiddleware struct {
 	TykMiddleware
 }
 
-type MiddlewareTraceData struct{
+type MiddlewareTraceData struct {
 	Values map[string]string
 }
 
@@ -69,36 +69,35 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 		defer span.End()
 		setContext(r, ctx)
-		err, i :=  tr.TykMiddleware.ProcessRequest(w, r, conf)
-		attr := []attribute.KeyValue{
-		}
+		err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
+		attr := []attribute.KeyValue{}
 		sess := ctxGetSession(r)
-		if sess != nil{
+		if sess != nil {
 			fmt.Println("appending data from session")
-			attr = append(attr,attribute.String("org_id", sess.OrgID))
+			attr = append(attr, attribute.String("org_id", sess.OrgID))
 		}
 
 		data := ctxGetData(r)
 		if values, ok := data[tr.TykMiddleware.Name()]; ok {
 			fmt.Println("appending data from context")
 			mwTraceData := values.(MiddlewareTraceData)
-			for key, val := range mwTraceData.Values{
-				attribute:= attribute.String(key,val)
-				attr = append(attr,attribute)
+			for key, val := range mwTraceData.Values {
+				attribute := attribute.String(key, val)
+				attr = append(attr, attribute)
 			}
 		}
 		baseMw := tr.Base()
 		if baseMw != nil {
 			spec := baseMw.Spec
-			attr = append(attr, attribute.String("tyk.apidef.api_id",spec.APIID))
-			attr = append(attr, attribute.String("tyk.apidef.org_id",spec.OrgID))
-			attr = append(attr, attribute.String("tyk.apidef.name",spec.Name))
+			attr = append(attr, attribute.String("tyk.apidef.api_id", spec.APIID))
+			attr = append(attr, attribute.String("tyk.apidef.org_id", spec.OrgID))
+			attr = append(attr, attribute.String("tyk.apidef.name", spec.Name))
 
 		}
 		span.SetAttributes(attr...)
 
 		if err != nil {
-			span.SetStatus(codes.Error,err.Error())
+			span.SetStatus(codes.Error, err.Error())
 		}
 		return err, i
 	}
