@@ -12,9 +12,8 @@ func Handle(service string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		span, req := Root(service, r)
 		defer span.End()
-		opStr :=  r.Method + " " +r.URL.Path
-		otelHandler := otelhttp.NewHandler(h,opStr)
+		opStr := r.Method + " " + r.URL.Path
+		otelHandler := otelhttp.NewHandler(h, opStr)
 		otelHandler.ServeHTTP(w, req)
 	})
 }
-
