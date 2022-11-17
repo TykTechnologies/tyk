@@ -85,6 +85,7 @@ func addBodyHash(req *http.Request, regex string, h hash.Hash) (err error) {
 		io.WriteString(h, "-"+hex.EncodeToString(mur.Sum(nil)))
 		return nil
 	}
+
 	r, err := regexp.Compile(regex)
 	if err != nil {
 		return err
@@ -94,6 +95,7 @@ func addBodyHash(req *http.Request, regex string, h hash.Hash) (err error) {
 		mur.Write(match)
 		io.WriteString(h, "-"+hex.EncodeToString(mur.Sum(nil)))
 	}
+
 	return nil
 }
 
@@ -125,11 +127,7 @@ func (m *RedisCacheMiddleware) isTimeStampExpired(timestamp string) bool {
 		m.Logger().Error(err)
 	}
 	tm := time.Unix(i, 0)
-
-	log.Debug("Time Now: ", now)
-	log.Debug("Expires: ", tm)
 	if tm.Before(now) {
-		log.Debug("Expriy caught in TS!")
 		return true
 	}
 
@@ -157,6 +155,12 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 	return "", "", errors.New("Decoding failed, array length wrong")
 }
 
+// cacheOptions exists to transfer options from this middleware down the chain to the cache writer
+type cacheOptions struct {
+	key                    string
+	cacheOnlyResponseCodes []int
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	var stat RequestStatus
@@ -166,31 +170,23 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	version, _ := m.Spec.Version(r)
 	versionPaths := m.Spec.RxPaths[version.Name]
 
-	m.Logger().Debug("A")
-
 	// Lets see if we can throw a sledgehammer at this
 	if m.Spec.CacheOptions.CacheAllSafeRequests && isSafeMethod(r.Method) {
-		m.Logger().Debug("B")
 		stat = StatusCached
 	}
 
 	if stat != StatusCached {
-		m.Logger().Debug("C")
 		// New request checker, more targeted, less likely to fail
 		found, meta := m.Spec.CheckSpecMatchesStatus(r, versionPaths, Cached)
 		if found {
-			m.Logger().Debug("D")
 			cacheMeta = meta.(*EndPointCacheMeta)
 			stat = StatusCached
 			cacheKeyRegex = cacheMeta.CacheKeyRegex
 		}
 	}
-	m.Logger().Debug("E")
-
 	// Cached route matched, let go
 	if stat != StatusCached {
-		m.Logger().Debug("F")
-		log.Debug("Not a cached path")
+		m.Logger().Debug("Not a cached path")
 		return nil, http.StatusOK
 	}
 	token := ctxGetAuthToken(r)
@@ -203,11 +199,22 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	var retBlob string
 	key, err := m.CreateCheckSum(r, token, cacheKeyRegex, m.getCacheKeyFromHeaders(r))
 	if err != nil {
-		log.Debug("Error creating checksum. Skipping cache check")
+		m.Logger().Debug("Error creating checksum. Skipping cache check")
 		return nil, http.StatusOK
 	}
 
-	ctxSetUseCacheKey(r, key)
+	m.Logger().Debugf("Cache key: %s", key)
+
+	cacheOnlyResponseCodes := m.Spec.CacheOptions.CacheOnlyResponseCodes
+	// override api main CacheOnlyResponseCodes by endpoint specific if provided
+	if cacheMeta != nil && len(cacheMeta.CacheOnlyResponseCodes) > 0 {
+		cacheOnlyResponseCodes = cacheMeta.CacheOnlyResponseCodes
+	}
+
+	ctxSetCacheOptions(r, &cacheOptions{
+		key:                    key,
+		cacheOnlyResponseCodes: cacheOnlyResponseCodes,
+	})
 
 	retBlob, err = m.store.GetKey(key)
 	if err != nil {
@@ -227,12 +234,14 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, http.StatusOK
 	}
 
-	log.Debug("Cache got: ", cachedData)
 	bufData := bufio.NewReader(strings.NewReader(cachedData))
 	newRes, err := http.ReadResponse(bufData, r)
 	if err != nil {
-		log.Error("Could not create response object: ", err)
+		m.Logger().WithError(err).Error("Could not create response object")
+		m.store.DeleteKey(key)
+		return nil, http.StatusOK
 	}
+
 	nopCloseResponseBody(newRes)
 
 	defer newRes.Body.Close()
@@ -270,7 +279,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		m.sh.RecordHit(r, analytics.Latency{}, newRes.StatusCode, newRes)
 	}
 
-	// Stop any further execution
+	// Stop any further execution after we wrote cache out
 	return nil, mwStatusRespond
 }
 

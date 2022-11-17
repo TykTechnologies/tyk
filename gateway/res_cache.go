@@ -2,10 +2,7 @@ package gateway
 
 import (
 	"bytes"
-	"crypto/md5"
 	"encoding/base64"
-	"encoding/hex"
-	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -43,28 +40,6 @@ func (m *ResponseCacheMiddleware) EnabledForSpec() bool {
 	return m.spec.CacheOptions.EnableCache
 }
 
-func (m *ResponseCacheMiddleware) CreateCheckSum(req *http.Request, keyName string, regex string, additionalKeyFromHeaders string) (string, error) {
-	h := md5.New()
-
-	// Compose key into string
-	key := req.Method + "-" + req.URL.String()
-	if additionalKeyFromHeaders != "" {
-		key = key + "-" + additionalKeyFromHeaders
-	}
-
-	_, err := io.WriteString(h, key)
-	if err != nil {
-		return "", err
-	}
-
-	if e := addBodyHash(req, regex, h); e != nil {
-		return "", e
-	}
-
-	reqChecksum := hex.EncodeToString(h.Sum(nil))
-	return m.spec.APIID + keyName + reqChecksum, nil
-}
-
 func (m *ResponseCacheMiddleware) getTimeTTL(cacheTTL int64) string {
 	timeNow := time.Now().Unix()
 	newTTL := timeNow + cacheTTL
@@ -91,29 +66,23 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 
 	// Skip caching the request if cache disabled
 	if !m.EnabledForSpec() {
-		m.Logger().Debug("Redis cache is disabled")
 		return nil
 	}
 
 	// Has cache been enabled on the request?
-	key, ok := ctxGetUseCacheKey(r)
-	if !ok {
+	options := ctxGetCacheOptions(r)
+	if options == nil {
 		m.Logger().Debug("Request is not cacheable")
 		return nil
 	}
 
-	m.Logger().Debugf("YES, we can cache request to %s", key)
-
-	var cacheMeta *EndPointCacheMeta
+	var (
+		key                    = options.key
+		cacheOnlyResponseCodes = options.cacheOnlyResponseCodes
+	)
 
 	cacheThisRequest := true
 	cacheTTL := m.spec.CacheOptions.CacheTimeout
-
-	cacheOnlyResponseCodes := m.spec.CacheOptions.CacheOnlyResponseCodes
-	// override api main CacheOnlyResponseCodes by endpoint specific if provided
-	if cacheMeta != nil && len(cacheMeta.CacheOnlyResponseCodes) > 0 {
-		cacheOnlyResponseCodes = cacheMeta.CacheOnlyResponseCodes
-	}
 
 	// make sure the status codes match if specified
 	if len(cacheOnlyResponseCodes) > 0 {
@@ -167,6 +136,5 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 		}()
 	}
 
-	m.Logger().WithField("cached_request", cacheThisRequest).Debug("Done cache")
 	return nil
 }

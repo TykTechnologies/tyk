@@ -1450,13 +1450,6 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
-
-	log.
-		WithField("url", r.URL.String()).
-		WithField("rxPaths", rxPaths).
-		WithField("mode", mode).
-		Debugf("Check paths")
-
 	var matchPath, method string
 
 	//If url-rewrite middleware was used, call response middleware of original path and not of rewritten path
