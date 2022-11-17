@@ -112,31 +112,15 @@ func isBodyHashRequired(request *http.Request) bool {
 
 }
 
-func (m *RedisCacheMiddleware) getTimeTTL(cacheTTL int64) string {
-	timeNow := time.Now().Unix()
-	newTTL := timeNow + cacheTTL
-	asStr := strconv.Itoa(int(newTTL))
-	return asStr
-}
-
 func (m *RedisCacheMiddleware) isTimeStampExpired(timestamp string) bool {
-	now := time.Now()
-
 	i, err := strconv.ParseInt(timestamp, 10, 64)
 	if err != nil {
 		m.Logger().Error(err)
-	}
-	tm := time.Unix(i, 0)
-	if tm.Before(now) {
 		return true
 	}
 
-	return false
-}
-
-func (m *RedisCacheMiddleware) encodePayload(payload, timestamp string) string {
-	sEnc := base64.StdEncoding.EncodeToString([]byte(payload))
-	return sEnc + "|" + timestamp
+	tm := time.Unix(i, 0)
+	return tm.Before(time.Now())
 }
 
 func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, error) {

@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -40,16 +41,14 @@ func (m *ResponseCacheMiddleware) EnabledForSpec() bool {
 	return m.spec.CacheOptions.EnableCache
 }
 
-func (m *ResponseCacheMiddleware) getTimeTTL(cacheTTL int64) string {
+func (m *ResponseCacheMiddleware) getTimeTTL(cacheTTL int64) int64 {
 	timeNow := time.Now().Unix()
-	newTTL := timeNow + cacheTTL
-	asStr := strconv.Itoa(int(newTTL))
-	return asStr
+	return timeNow + cacheTTL
 }
 
-func (m *ResponseCacheMiddleware) encodePayload(payload, timestamp string) string {
+func (m *ResponseCacheMiddleware) encodePayload(payload string, timestamp int64) string {
 	sEnc := base64.StdEncoding.EncodeToString([]byte(payload))
-	return sEnc + "|" + timestamp
+	return sEnc + "|" + fmt.Sprint(timestamp)
 }
 
 func (m *ResponseCacheMiddleware) Logger() *logrus.Entry {
