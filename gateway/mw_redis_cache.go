@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
@@ -25,16 +24,15 @@ import (
 )
 
 const (
-	upstreamCacheHeader    = "x-tyk-cache-action-set"
-	upstreamCacheTTLHeader = "x-tyk-cache-action-set-ttl"
-	cachedResponseHeader   = "x-tyk-cached-response"
+	cachedResponseHeader = "x-tyk-cached-response"
 )
 
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type RedisCacheMiddleware struct {
 	BaseMiddleware
-	CacheStore storage.Handler
-	sh         SuccessHandler
+
+	store storage.Handler
+	sh    SuccessHandler
 }
 
 func (m *RedisCacheMiddleware) Name() string {
@@ -161,7 +159,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	version, _ := m.Spec.Version(r)
 	versionPaths := m.Spec.RxPaths[version.Name]
-	isVirtual, _ := m.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 
 	// Lets see if we can throw a sledgehammer at this
 	if m.Spec.CacheOptions.CacheAllSafeRequests && isSafeMethod(r.Method) {
@@ -188,132 +185,28 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		token = request.RealIP(r)
 	}
 
-	var errCreatingChecksum bool
 	var retBlob string
 	key, err := m.CreateCheckSum(r, token, cacheKeyRegex, m.getCacheKeyFromHeaders(r))
 	if err != nil {
 		log.Debug("Error creating checksum. Skipping cache check")
-		errCreatingChecksum = true
-	} else {
-		retBlob, err = m.CacheStore.GetKey(key)
+		return nil, http.StatusOK
 	}
 
+	retBlob, err = m.store.GetKey(key)
 	if err != nil {
-		if !errCreatingChecksum {
-			log.Debug("Cache enabled, but record not found")
-		}
-		// Pass through to proxy AND CACHE RESULT
-
-		var resVal *http.Response
-		if isVirtual {
-			log.Debug("This is a virtual function")
-
-			vp := VirtualEndpoint{BaseMiddleware: m.BaseMiddleware}
-			vp.Init()
-
-			resVal, err = vp.ServeHTTPForCache(w, r, nil)
-			if err != nil {
-				log.WithError(err).Error("Upstream request failed")
-				return errors.New("Upstream request failed"), http.StatusInternalServerError
-			}
-		} else {
-			// This passes through and will write the value to the writer, but spit out a copy for the cache
-			log.Debug("Not virtual, passing")
-
-			if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
-				r.URL = newURL
-				ctxSetURLRewriteTarget(r, nil)
-			}
-
-			if newMethod := ctxGetTransformRequestMethod(r); newMethod != "" {
-				r.Method = newMethod
-				ctxSetTransformRequestMethod(r, "")
-			}
-
-			sr := m.sh.ServeHTTPWithCache(w, r)
-			resVal = sr.Response
-		}
-
-		cacheThisRequest := true
-		cacheTTL := m.Spec.CacheOptions.CacheTimeout
-
-		if resVal == nil {
-			log.Warning("Upstream request must have failed, response is empty")
-			return nil, mwStatusRespond
-		}
-
-		cacheOnlyResponseCodes := m.Spec.CacheOptions.CacheOnlyResponseCodes
-		// override api main CacheOnlyResponseCodes by endpoint specific if provided
-		if cacheMeta != nil && len(cacheMeta.CacheOnlyResponseCodes) > 0 {
-			cacheOnlyResponseCodes = cacheMeta.CacheOnlyResponseCodes
-		}
-
-		// make sure the status codes match if specified
-		if len(cacheOnlyResponseCodes) > 0 {
-			foundCode := false
-			for _, code := range cacheOnlyResponseCodes {
-				if code == resVal.StatusCode {
-					foundCode = true
-					break
-				}
-			}
-			cacheThisRequest = foundCode
-		}
-
-		// Are we using upstream cache control?
-		if m.Spec.CacheOptions.EnableUpstreamCacheControl {
-			log.Debug("Upstream control enabled")
-			// Do we cache?
-			if resVal.Header.Get(upstreamCacheHeader) == "" {
-				log.Warning("Upstream cache action not found, not caching")
-				cacheThisRequest = false
-			}
-
-			cacheTTLHeader := upstreamCacheTTLHeader
-			if m.Spec.CacheOptions.CacheControlTTLHeader != "" {
-				cacheTTLHeader = m.Spec.CacheOptions.CacheControlTTLHeader
-			}
-
-			ttl := resVal.Header.Get(cacheTTLHeader)
-			if ttl != "" {
-				log.Debug("TTL Set upstream")
-				cacheAsInt, err := strconv.Atoi(ttl)
-				if err != nil {
-					log.Error("Failed to decode TTL cache value: ", err)
-					cacheTTL = m.Spec.CacheOptions.CacheTimeout
-				} else {
-					cacheTTL = int64(cacheAsInt)
-				}
-			}
-		}
-
-		if cacheThisRequest && !errCreatingChecksum {
-			log.Debug("Caching request to redis")
-			var wireFormatReq bytes.Buffer
-			resVal.Write(&wireFormatReq)
-			log.Debug("Cache TTL is:", cacheTTL)
-			ts := m.getTimeTTL(cacheTTL)
-			toStore := m.encodePayload(wireFormatReq.String(), ts)
-			go func() {
-				err := m.CacheStore.SetKey(key, toStore, cacheTTL)
-				if err != nil {
-					log.WithError(err).Error("could not save key in cache store")
-				}
-			}()
-		}
-
-		return nil, mwStatusRespond
+		// Record not found, continue with the middleware chain
+		return nil, http.StatusOK
 	}
 
 	cachedData, timestamp, err := m.decodePayload(retBlob)
 	if err != nil {
 		// Tere was an issue with this cache entry - lets remove it:
-		m.CacheStore.DeleteKey(key)
+		m.store.DeleteKey(key)
 		return nil, http.StatusOK
 	}
 
 	if m.isTimeStampExpired(timestamp) || len(cachedData) == 0 {
-		m.CacheStore.DeleteKey(key)
+		m.store.DeleteKey(key)
 		return nil, http.StatusOK
 	}
 

@@ -47,7 +47,9 @@ type TykMiddleware interface {
 	SetRequestLogger(*http.Request)
 	Logger() *logrus.Entry
 	Config() (interface{}, error)
+
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
+
 	EnabledForSpec() bool
 	Name() string
 }

@@ -835,10 +835,15 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 }
 
+// Create the response processor chain
 func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
-	// Create the response processors
+	// Prealloc size
+	chainLen := len(spec.ResponseProcessors)
+	// Append capacity
+	chainCapacity := chainLen + 1 + len(responseFuncs)
 
-	responseChain := make([]TykResponseHandler, len(spec.ResponseProcessors))
+	responseChain := make([]TykResponseHandler, chainLen, chainCapacity)
+
 	for i, processorDetail := range spec.ResponseProcessors {
 		processor := gw.responseProcessorByName(processorDetail.Name)
 		if processor == nil {
@@ -872,6 +877,16 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		}
 		responseChain = append(responseChain, processor)
 	}
+
+	keyPrefix := "cache-" + spec.APIID
+	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, RedisController: gw.RedisController}
+	cacheStore.Connect()
+
+	// Add cache writer as the final step of the response middleware chain
+	processor := &ResponseCacheMiddleware{store: cacheStore}
+	processor.Init(nil, spec)
+
+	responseChain = append(responseChain, processor)
 
 	spec.ResponseChain = responseChain
 }
