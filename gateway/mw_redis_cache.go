@@ -187,8 +187,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, http.StatusOK
 	}
 
-	m.Logger().Debugf("Cache key: %s", key)
-
 	cacheOnlyResponseCodes := m.Spec.CacheOptions.CacheOnlyResponseCodes
 	// override api main CacheOnlyResponseCodes by endpoint specific if provided
 	if cacheMeta != nil && len(cacheMeta.CacheOnlyResponseCodes) > 0 {
