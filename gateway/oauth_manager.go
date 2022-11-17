@@ -604,16 +604,16 @@ func (r *RedisOsinStorageInterface) Close() {}
 func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 	key := prefixClient + id
 
-	log.Info("Getting client ID:", id)
+	log.Debug("Getting client ID:", id)
 	clientJSON, err := r.store.GetKey(key)
 	if err != nil {
-		log.Errorf("Failure retrieving client ID key %q: %v", key, err)
+		log.Debugf("Failure retrieving client ID key %q: %v", key, err)
 		return nil, err
 	}
 
 	client := new(OAuthClient)
 	if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
-		log.Error("Couldn't unmarshal OAuth client object: ", err)
+		log.Debug("Couldn't unmarshal OAuth client object: ", err)
 	}
 	return client, nil
 }
