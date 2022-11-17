@@ -458,24 +458,12 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 					APILevel:       true,
 				},
 			)
-			continue
-		}
-		if mwDriver != apidef.OttoDriver {
+		} else if mwDriver != apidef.OttoDriver {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-			gw.mwAppendEnabled(
-				&chainArray,
-				&CoProcessMiddleware{
-					BaseMiddleware:   baseMid,
-					HookType:         coprocess.HookType_Post,
-					HookName:         obj.Name,
-					MiddlewareDriver: mwDriver,
-					RawBodyOnly:      obj.RawBodyOnly,
-				},
-			)
-			continue
+			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
+		} else {
+			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 		}
-
-		chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 	}
 
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
