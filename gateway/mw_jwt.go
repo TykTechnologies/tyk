@@ -410,9 +410,6 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		return err, http.StatusForbidden
 	}
 
-	// Get the OAuth client ID if available:
-	oauthClientID := k.getOAuthClientIDFromClaim(claims)
-
 	// Generate a virtual token
 	data := []byte(baseFieldData)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
@@ -609,6 +606,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
+	// Get the OAuth client ID if available:
+	oauthClientID := k.getOAuthClientIDFromClaim(claims)
 	session.OauthClientID = oauthClientID
 	if session.OauthClientID != "" {
 		// Initialize the OAuthManager if empty:
@@ -642,7 +641,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				}
 			}
 		} else {
-			k.Logger().WithError(err).Error("Couldn't get OAuth client")
+			k.Logger().WithError(err).Debug("Couldn't get OAuth client")
 		}
 	}
 
