@@ -2949,6 +2949,16 @@ func ctxSetData(r *http.Request, m map[string]interface{}) {
 	setCtxValue(r, ctx.ContextData, m)
 }
 
+// ctxSetUseCacheKey sets a cache key to use for the http request
+func ctxSetUseCacheKey(r *http.Request, useCache string) {
+	setCtxValue(r, ctx.UseCacheKey, useCache)
+}
+
+func ctxGetUseCacheKey(r *http.Request) (string, bool) {
+	key, ok := r.Context().Value(ctx.UseCacheKey).(string)
+	return key, ok
+}
+
 func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }

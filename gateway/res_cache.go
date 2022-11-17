@@ -5,14 +5,13 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -46,10 +45,16 @@ func (m *ResponseCacheMiddleware) EnabledForSpec() bool {
 
 func (m *ResponseCacheMiddleware) CreateCheckSum(req *http.Request, keyName string, regex string, additionalKeyFromHeaders string) (string, error) {
 	h := md5.New()
-	io.WriteString(h, req.Method)
-	io.WriteString(h, "-"+req.URL.String())
+
+	// Compose key into string
+	key := req.Method + "-" + req.URL.String()
 	if additionalKeyFromHeaders != "" {
-		io.WriteString(h, "-"+additionalKeyFromHeaders)
+		key = key + "-" + additionalKeyFromHeaders
+	}
+
+	_, err := io.WriteString(h, key)
+	if err != nil {
+		return "", err
 	}
 
 	if e := addBodyHash(req, regex, h); e != nil {
@@ -67,97 +72,39 @@ func (m *ResponseCacheMiddleware) getTimeTTL(cacheTTL int64) string {
 	return asStr
 }
 
-func (m *ResponseCacheMiddleware) isTimeStampExpired(timestamp string) bool {
-	now := time.Now()
-
-	i, err := strconv.ParseInt(timestamp, 10, 64)
-	if err != nil {
-		log.Error(err)
-	}
-	tm := time.Unix(i, 0)
-
-	log.Debug("Time Now: ", now)
-	log.Debug("Expires: ", tm)
-	if tm.Before(now) {
-		log.Debug("Expriy caught in TS!")
-		return true
-	}
-
-	return false
-}
-
 func (m *ResponseCacheMiddleware) encodePayload(payload, timestamp string) string {
 	sEnc := base64.StdEncoding.EncodeToString([]byte(payload))
 	return sEnc + "|" + timestamp
 }
 
-func (m *ResponseCacheMiddleware) decodePayload(payload string) (string, string, error) {
-	data := strings.Split(payload, "|")
-	switch len(data) {
-	case 1:
-		return data[0], "", nil
-	case 2:
-		sDec, err := base64.StdEncoding.DecodeString(data[0])
-		if err != nil {
-			return "", "", err
-		}
-
-		return string(sDec), data[1], nil
-	}
-	return "", "", errors.New("Decoding failed, array length wrong")
+func (m *ResponseCacheMiddleware) Logger() *logrus.Entry {
+	return log.WithField("mw", m.Name())
 }
 
 // HandleResponse checks if the http.Response argument can be cached and caches it for future requests.
 func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *http.Response, r *http.Request, ses *user.SessionState) error {
 	// No cache of empty responses
 	if res == nil {
-		log.Warning("Upstream request must have failed, response is empty")
+		m.Logger().Warning("Upstream request must have failed, response is empty")
 		return nil
 	}
 
 	// Skip caching the request if cache disabled
 	if !m.EnabledForSpec() {
+		m.Logger().Debug("Redis cache is disabled")
 		return nil
 	}
 
-	var stat RequestStatus
-	var cacheKeyRegex string
+	// Has cache been enabled on the request?
+	key, ok := ctxGetUseCacheKey(r)
+	if !ok {
+		m.Logger().Debug("Request is not cacheable")
+		return nil
+	}
+
+	m.Logger().Debugf("YES, we can cache request to %s", key)
+
 	var cacheMeta *EndPointCacheMeta
-
-	version, _ := m.spec.Version(r)
-	versionPaths := m.spec.RxPaths[version.Name]
-
-	// Lets see if we can throw a sledgehammer at this
-	if m.spec.CacheOptions.CacheAllSafeRequests && isSafeMethod(r.Method) {
-		stat = StatusCached
-	}
-	if stat != StatusCached {
-		// New request checker, more targeted, less likely to fail
-		found, meta := m.spec.CheckSpecMatchesStatus(r, versionPaths, Cached)
-		if found {
-			cacheMeta = meta.(*EndPointCacheMeta)
-			stat = StatusCached
-			cacheKeyRegex = cacheMeta.CacheKeyRegex
-		}
-	}
-
-	// Cached route matched, let go
-	if stat != StatusCached {
-		return nil
-	}
-
-	token := ctxGetAuthToken(r)
-
-	// No authentication data? use the IP.
-	if token == "" {
-		token = request.RealIP(r)
-	}
-
-	key, err := m.CreateCheckSum(r, token, cacheKeyRegex, m.getCacheKeyFromHeaders(r))
-	if err != nil {
-		log.WithError(err).Debug("Error creating checksum. Skipping cache write")
-		return nil
-	}
 
 	cacheThisRequest := true
 	cacheTTL := m.spec.CacheOptions.CacheTimeout
@@ -211,11 +158,12 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 		go func() {
 			err := m.store.SetKey(key, toStore, cacheTTL)
 			if err != nil {
-				log.WithError(err).Error("could not save key in cache store")
+				m.Logger().WithError(err).Error("could not save key in cache store")
 			}
 		}()
 	}
 
+	m.Logger().WithField("cached_request", cacheThisRequest).Debug("Done cache")
 	return nil
 }
 

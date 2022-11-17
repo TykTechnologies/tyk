@@ -872,13 +872,20 @@ func (gw *Gateway) responseProcessorByName(name string) TykResponseHandler {
 func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
 	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
+		name := rh.Name()
+
+		log.WithField("mw", name).Debugf("run middleware %s", name)
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
+			log.WithField("mw", name).WithError(err).Error("error when running response middleware")
+
 			// Abort the request if this handler is a response middleware hook:
 			if rh.Name() == "CustomMiddlewareResponseHook" {
 				rh.HandleError(rw, req)
 				return true, err
 			}
 			return false, err
+		} else {
+			log.WithField("mw", name).Debug("no errors")
 		}
 	}
 	return false, nil

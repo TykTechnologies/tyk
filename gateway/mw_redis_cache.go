@@ -49,10 +49,16 @@ func (m *RedisCacheMiddleware) EnabledForSpec() bool {
 
 func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string, regex string, additionalKeyFromHeaders string) (string, error) {
 	h := md5.New()
-	io.WriteString(h, req.Method)
-	io.WriteString(h, "-"+req.URL.String())
+
+	// Compose key into string
+	key := req.Method + "-" + req.URL.String()
 	if additionalKeyFromHeaders != "" {
-		io.WriteString(h, "-"+additionalKeyFromHeaders)
+		key = key + "-" + additionalKeyFromHeaders
+	}
+
+	_, err := io.WriteString(h, key)
+	if err != nil {
+		return "", err
 	}
 
 	if e := addBodyHash(req, regex, h); e != nil {
@@ -116,7 +122,7 @@ func (m *RedisCacheMiddleware) isTimeStampExpired(timestamp string) bool {
 
 	i, err := strconv.ParseInt(timestamp, 10, 64)
 	if err != nil {
-		log.Error(err)
+		m.Logger().Error(err)
 	}
 	tm := time.Unix(i, 0)
 
@@ -160,22 +166,31 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	version, _ := m.Spec.Version(r)
 	versionPaths := m.Spec.RxPaths[version.Name]
 
+	m.Logger().Debug("A")
+
 	// Lets see if we can throw a sledgehammer at this
 	if m.Spec.CacheOptions.CacheAllSafeRequests && isSafeMethod(r.Method) {
+		m.Logger().Debug("B")
 		stat = StatusCached
 	}
+
 	if stat != StatusCached {
+		m.Logger().Debug("C")
 		// New request checker, more targeted, less likely to fail
 		found, meta := m.Spec.CheckSpecMatchesStatus(r, versionPaths, Cached)
 		if found {
+			m.Logger().Debug("D")
 			cacheMeta = meta.(*EndPointCacheMeta)
 			stat = StatusCached
 			cacheKeyRegex = cacheMeta.CacheKeyRegex
 		}
 	}
+	m.Logger().Debug("E")
 
 	// Cached route matched, let go
 	if stat != StatusCached {
+		m.Logger().Debug("F")
+		log.Debug("Not a cached path")
 		return nil, http.StatusOK
 	}
 	token := ctxGetAuthToken(r)
@@ -191,6 +206,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		log.Debug("Error creating checksum. Skipping cache check")
 		return nil, http.StatusOK
 	}
+
+	ctxSetUseCacheKey(r, key)
 
 	retBlob, err = m.store.GetKey(key)
 	if err != nil {
