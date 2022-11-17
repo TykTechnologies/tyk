@@ -76,18 +76,13 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 		return nil
 	}
 
-	var (
-		key                    = options.key
-		cacheOnlyResponseCodes = options.cacheOnlyResponseCodes
-	)
-
 	cacheThisRequest := true
 	cacheTTL := m.spec.CacheOptions.CacheTimeout
 
 	// make sure the status codes match if specified
-	if len(cacheOnlyResponseCodes) > 0 {
+	if len(options.cacheOnlyResponseCodes) > 0 {
 		foundCode := false
-		for _, code := range cacheOnlyResponseCodes {
+		for _, code := range options.cacheOnlyResponseCodes {
 			if code == res.StatusCode {
 				foundCode = true
 				break
@@ -118,7 +113,16 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 		}
 	}
 
+	var toStore string
+	var err error
+
 	if cacheThisRequest {
+		res.Body, err = newNopCloserBuffer(res.Body)
+		if err != nil {
+			m.Logger().WithError(err).Error("error reading cache body")
+			return nil
+		}
+
 		var wireFormatReq bytes.Buffer
 		if err := res.Write(&wireFormatReq); err != nil {
 			m.Logger().WithError(err).Error("error encoding cache")
@@ -126,15 +130,24 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 		}
 
 		ts := m.getTimeTTL(cacheTTL)
-		toStore := m.encodePayload(wireFormatReq.String(), ts)
+		toStore = m.encodePayload(wireFormatReq.String(), ts)
 
 		go func() {
-			err := m.store.SetKey(key, toStore, cacheTTL)
+			err := m.store.SetKey(options.key, toStore, cacheTTL)
 			if err != nil {
 				m.Logger().WithError(err).Error("could not save key in cache store")
 			}
 		}()
 	}
+
+	/*
+		m.Logger().
+			WithError(err).
+			WithField("cache", cacheThisRequest).
+			WithField("stored", toStore).
+			WithField("key", options.key).
+			Debug("Done response cache")
+	*/
 
 	return nil
 }
