@@ -873,7 +873,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		}
 
 		if err := processor.Init(mw, spec); err != nil {
-			mainLog.Debug("Failed to init processor: ", err)
+			mainLog.WithError(err).Debug("Failed to init processor")
 		}
 		responseChain = append(responseChain, processor)
 	}
@@ -884,7 +884,9 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 
 	// Add cache writer as the final step of the response middleware chain
 	processor := &ResponseCacheMiddleware{store: cacheStore}
-	processor.Init(nil, spec)
+	if err := processor.Init(nil, spec); err != nil {
+		mainLog.WithError(err).Debug("Failed to init processor")
+	}
 
 	responseChain = append(responseChain, processor)
 

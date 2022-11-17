@@ -151,7 +151,11 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 
 	if cacheThisRequest {
 		var wireFormatReq bytes.Buffer
-		res.Write(&wireFormatReq)
+		if _, err = res.Write(&wireFormatReq); err != nil {
+			m.Logger().WithError(err).Error("error encoding cache")
+			return nil
+		}
+
 		ts := m.getTimeTTL(cacheTTL)
 		toStore := m.encodePayload(wireFormatReq.String(), ts)
 
@@ -165,12 +169,4 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 
 	m.Logger().WithField("cached_request", cacheThisRequest).Debug("Done cache")
 	return nil
-}
-
-func (m *ResponseCacheMiddleware) getCacheKeyFromHeaders(r *http.Request) (key string) {
-	key = ""
-	for _, header := range m.spec.CacheOptions.CacheByHeaders {
-		key += header + "-" + r.Header.Get(header)
-	}
-	return
 }
