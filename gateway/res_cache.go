@@ -151,7 +151,7 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 
 	if cacheThisRequest {
 		var wireFormatReq bytes.Buffer
-		if _, err = res.Write(&wireFormatReq); err != nil {
+		if err := res.Write(&wireFormatReq); err != nil {
 			m.Logger().WithError(err).Error("error encoding cache")
 			return nil
 		}
