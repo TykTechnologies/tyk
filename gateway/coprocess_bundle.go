@@ -101,7 +101,9 @@ func (b *Bundle) Verify() error {
 
 // AddToSpec attaches the custom middleware settings to an API definition.
 func (b *Bundle) AddToSpec() {
-	b.Spec.CustomMiddleware = b.Manifest.CustomMiddleware
+	if !b.Spec.OverwriteCustomMiddlewareBundle {
+		b.Spec.CustomMiddleware = b.Manifest.CustomMiddleware
+	}
 
 	// Load Python interpreter if the
 	if loadedDrivers[b.Spec.CustomMiddleware.Driver] == nil && b.Spec.CustomMiddleware.Driver == apidef.PythonDriver {
