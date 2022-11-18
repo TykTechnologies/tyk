@@ -1,12 +1,13 @@
 services:
-  tyk:
-    image: internal/tyk-gateway
-    networks: [ proxy ]
-    build: .
+  tyk_1:
+    container_name: "tyk"
     ports:
-    - 9000:8080
-    volumes:
-    - ./tyk.conf.example:/opt/tyk-gateway/tyk.conf
+      - "8080:8080"
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
 
   redis:
     image: redis:4.0-alpine

@@ -38,7 +38,6 @@ const (
 	XTykNonce           = "x-tyk-nonce"
 	XTykHostname        = "x-tyk-hostname"
 	XGenerator          = "X-Generator"
-	XTykAuthorization   = "X-Tyk-Authorization"
 )
 
 // upgrade and websocket
