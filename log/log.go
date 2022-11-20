@@ -8,6 +8,7 @@ import (
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
+// log ololo
 var (
 	log          = logrus.New()
 	rawLog       = logrus.New()
