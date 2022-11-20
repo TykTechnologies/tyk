@@ -66,7 +66,7 @@ require (
 	github.com/square/go-jose v2.4.1+incompatible
 	github.com/stretchr/testify v1.7.1
 	github.com/uber/jaeger-client-go v2.20.0+incompatible
-	github.com/valyala/fasthttp v1.15.1
+	github.com/valyala/fasthttp v1.34.0
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/xeipuuv/gojsonschema v1.2.0
