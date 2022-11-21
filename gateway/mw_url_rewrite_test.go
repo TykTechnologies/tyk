@@ -62,10 +62,11 @@ var testRewriterData = []struct {
 }
 
 type testRewriterCase struct {
-	name     string
-	meta     *apidef.URLRewriteMeta
-	reqMaker func() *http.Request
-	want     string
+	name         string
+	meta         *apidef.URLRewriteMeta
+	reqMaker     func() *http.Request
+	want         string
+	originalPath string
 }
 
 func prepareRewriterCases() []testRewriterCase {
@@ -81,7 +82,8 @@ func prepareRewriterCases() []testRewriterCase {
 			reqMaker: func() *http.Request {
 				return httptest.NewRequest("GET", reqTarget, nil)
 			},
-			want: td.want,
+			want:         td.want,
+			originalPath: reqTarget,
 		}
 	}
 	return tcs
@@ -101,6 +103,10 @@ func TestRewriter(t *testing.T) {
 			}
 			if got != tc.want {
 				t.Errorf("rewrite failed, want %q, got %q", tc.want, got)
+			}
+			ctxRewritePath := ctxGetUrlRewritePath(r)
+			if ctxRewritePath != tc.originalPath {
+				t.Errorf("context url rewrite path invalid, want %q, got %q", tc.originalPath, ctxRewritePath)
 			}
 		})
 	}

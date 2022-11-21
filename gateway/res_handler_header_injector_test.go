@@ -37,6 +37,13 @@ func testPrepareResponseHeaderInjection(ts *Test) {
 					"path": "/rewrite-test",
 					"method": "GET",
 					"act_on": false
+				},
+				{
+					"delete_headers": ["X-Tyk-Test"],
+					"add_headers": {"X-Test": "test"},
+					"path": "/rewrite-extended/foobar",
+					"method": "GET",
+					"act_on": false
 				}
 			]`), &v.ExtendedPaths.TransformResponseHeader)
 			json.Unmarshal([]byte(`[
@@ -49,12 +56,20 @@ func testPrepareResponseHeaderInjection(ts *Test) {
 				}
 			]`), &v.ExtendedPaths.TransformHeader)
 
-			v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
-				Path:         "/rewrite-test",
-				Method:       "GET",
-				MatchPattern: "rewrite-test",
-				RewriteTo:    "newpath",
-			}}
+			v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{
+				{
+					Path:         "/rewrite-test",
+					Method:       "GET",
+					MatchPattern: "rewrite-test",
+					RewriteTo:    "newpath",
+				},
+				{
+					Path:         "/rewrite-extended/.*$",
+					Method:       "GET",
+					MatchPattern: "/rewrite-extended/.*$",
+					RewriteTo:    "newpath",
+				},
+			}
 		})
 		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
 	})
@@ -77,6 +92,7 @@ func TestResponseHeaderInjection(t *testing.T) {
 		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"Url":"/newpath"`},
 		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"X-I-Am":"Request"`},
 		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: userAgent},
+		{Method: "GET", Path: "/rewrite-extended/foobar", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"Url":"/newpath"`},
 	}...)
 }
 
@@ -100,6 +116,7 @@ func BenchmarkResponseHeaderInjection(b *testing.B) {
 			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"Url":"/newpath"`},
 			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"X-I-Am":"Request"`},
 			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: userAgent},
+			{Method: "GET", Path: "/rewrite-extended/foobar", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"Url":"/newpath"`},
 		}...)
 	}
 }
