@@ -5,14 +5,13 @@ package goplugin
 
 import (
 	"errors"
-	"plugin"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 )
 
 func GetAnalyticsHandler(path string, symbol string) (func(record *analytics.AnalyticsRecord), error) {
 	// try to load plugin
-	loadedPlugin, err := plugin.Open(path)
+	loadedPlugin, err := pluginOpen(path)
 	if err != nil {
 		return nil, err
 	}

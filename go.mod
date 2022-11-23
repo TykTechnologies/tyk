@@ -3,6 +3,7 @@ module github.com/TykTechnologies/tyk
 go 1.16
 
 require (
+	github.com/Binject/universal v0.0.0-20220519011857-bea739e758c0
 	github.com/Jeffail/gabs v1.4.0
 	github.com/Jeffail/tunny v0.0.0-20171107125207-452a8e97d6a3
 	github.com/Masterminds/sprig/v3 v3.2.2
