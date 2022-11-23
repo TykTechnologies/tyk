@@ -407,6 +407,7 @@ type VersionDefinition struct {
 	StripPath           bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
 	StripVersioningData bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
 	Versions            map[string]string `bson:"versions" json:"versions"`
+	BaseID              string            `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
 type VersionData struct {
@@ -790,7 +791,7 @@ const (
 
 type GraphQLProxyConfig struct {
 	AuthHeaders      map[string]string `bson:"auth_headers" json:"auth_headers"`
-	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
 }
 
 type GraphQLSubgraphConfig struct {
@@ -812,7 +813,7 @@ type GraphQLSubgraphEntity struct {
 	URL              string            `bson:"url" json:"url"`
 	SDL              string            `bson:"sdl" json:"sdl"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
-	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
 }
 
 type GraphQLEngineConfig struct {
@@ -860,7 +861,7 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 	URL              string            `bson:"url" json:"url"`
 	Method           string            `bson:"method" json:"method"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
-	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {

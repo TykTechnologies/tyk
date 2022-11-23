@@ -112,16 +112,14 @@ func TestOAS_AddServers(t *testing.T) {
 		apiURLs []string
 	}
 	tests := []struct {
-		name        string
-		fields      fields
-		args        args
-		expectedErr error
+		name   string
+		fields fields
+		args   args
 	}{
 		{
-			name:        "empty servers",
-			fields:      fields{T: openapi3.T{}},
-			args:        args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
-			expectedErr: nil,
+			name:   "empty servers",
+			fields: fields{T: openapi3.T{}},
+			args:   args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
 		},
 		{
 			name: "non-empty servers",
@@ -132,8 +130,7 @@ func TestOAS_AddServers(t *testing.T) {
 					},
 				},
 			}},
-			args:        args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
-			expectedErr: nil,
+			args: args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
 		},
 		{
 			name: "non-empty servers having same URL that of apiURL",
@@ -150,8 +147,7 @@ func TestOAS_AddServers(t *testing.T) {
 					},
 				},
 			}},
-			args:        args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
-			expectedErr: nil,
+			args: args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
 		},
 		{
 			name: "non-empty servers having same URL that of apiURL",
@@ -165,14 +161,7 @@ func TestOAS_AddServers(t *testing.T) {
 					},
 				},
 			}},
-			args:        args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
-			expectedErr: nil,
-		},
-		{
-			name:        "empty servers",
-			fields:      fields{T: openapi3.T{}},
-			args:        args{apiURLs: []string{}},
-			expectedErr: errEmptyServers,
+			args: args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
 		},
 	}
 	for _, tt := range tests {
@@ -180,12 +169,7 @@ func TestOAS_AddServers(t *testing.T) {
 			s := &OAS{
 				T: tt.fields.T,
 			}
-			err := s.AddServers(tt.args.apiURLs...)
-			if tt.expectedErr != nil {
-				assert.Equal(t, errEmptyServers, err)
-				return
-			}
-
+			s.AddServers(tt.args.apiURLs...)
 			addedServerURLs := make([]string, len(tt.args.apiURLs))
 			for i, server := range s.Servers[:len(tt.args.apiURLs)] {
 				addedServerURLs[i] = server.URL

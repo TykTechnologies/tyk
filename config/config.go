@@ -633,7 +633,7 @@ type Config struct {
 	// A policy can be defined in a file (Open Source installations) or from the same database as the Dashboard.
 	Policies PoliciesConfig `json:"policies"`
 
-	// Defines the ports that will be available for the API services to bind to in the following format: `{ “": “” }``.
+	// Defines the ports that will be available for the API services to bind to in the following format: `"{“":“”}"`. Remember to escape JSON strings.
 	// This is a map of protocol to PortWhiteList. This allows per protocol
 	// configurations.
 	PortWhiteList PortsWhiteList `json:"ports_whitelist"`
