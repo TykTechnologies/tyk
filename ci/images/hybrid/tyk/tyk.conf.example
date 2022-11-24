@@ -30,7 +30,6 @@
     "enable_health_checks": false,
     "health_check_value_timeouts": 60
   },
-  "optimisations_use_async_session_write": true,
   "allow_master_keys": false,
   "policies": {
     	"policy_source": "mongo",
