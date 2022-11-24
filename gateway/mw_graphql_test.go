@@ -1,22 +1,21 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
 
+	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
+	"github.com/buger/jsonparser"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/user"
-
-	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
-	"github.com/TykTechnologies/tyk/test"
 )
 
 // Note: here we test only validation behaviour and do not expect real graphql responses here
@@ -200,6 +199,54 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			}
 			_, _ = g.Run(t, []test.TestCase{
 				{Data: countries1, BodyMatch: `"There was a problem proxying the request`, Code: http.StatusInternalServerError},
+			}...)
+		})
+	})
+
+	t.Run("invalid JSON in Headers", func(t *testing.T) {
+		// See TT-5034 on Jira.
+		g := StartTest(nil)
+		defer g.Close()
+
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/"
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+
+			// Need to update data source configuration to reproduce TT-5034
+			for i, ds := range spec.GraphQL.Engine.DataSources {
+				newValue, err := jsonparser.Set(ds.Config, []byte("{\"Test\":\"{{.request.headers.test}}\"}"), "headers")
+				require.NoError(t, err)
+				ds.Config = newValue
+
+				newValue, err = jsonparser.Set(ds.Config, []byte("\"Test\""), "default_type_name")
+				require.NoError(t, err)
+				ds.Config = newValue
+
+				spec.GraphQL.Engine.DataSources[i] = ds
+			}
+		})
+
+		t.Run("should return an error with code 500", func(t *testing.T) {
+			expectedErrorMsg := []byte(`GraphQL execution error: Value is array, but can\'t find closing \']\' symbol`)
+			countries1 := gql.Request{
+				Query: "query Query { countries { name } }",
+			}
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Data:    countries1,
+					Headers: map[string]string{"Test": `"{"hello":"world"}"`},
+					BodyMatchFunc: func(data []byte) bool {
+						errMsg, _, _, err := jsonparser.Get(data, "error")
+						if err != nil {
+							return false
+						}
+						return bytes.Equal(expectedErrorMsg, errMsg)
+					},
+					Code: http.StatusInternalServerError,
+				},
 			}...)
 		})
 	})

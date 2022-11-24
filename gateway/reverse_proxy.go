@@ -64,6 +64,14 @@ var corsHeaders = []string{
 var ServiceCache *cache.Cache
 var sdMu sync.RWMutex
 
+type graphqlExecutionError struct {
+	err error
+}
+
+func (g *graphqlExecutionError) Error() string {
+	return g.err.Error()
+}
+
 func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 
 	doCacheRefresh := func() (*apidef.HostList, error) {
@@ -1058,6 +1066,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 
 		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
 		if err != nil {
+			err = &graphqlExecutionError{err: err}
 			return
 		}
 
@@ -1336,6 +1345,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", http.StatusInternalServerError, true)
 			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
+
+		if gqlExecutionErr, ok := err.(*graphqlExecutionError); ok {
+			errMsg := fmt.Sprintf("GraphQL execution error: %v", gqlExecutionErr)
+			p.ErrorHandler.HandleError(rw, logreq, errMsg, http.StatusInternalServerError, true)
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
+		}
+
 		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", http.StatusInternalServerError, true)
 		return ProxyResponse{UpstreamLatency: upstreamLatency}
 
