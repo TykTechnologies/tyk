@@ -255,9 +255,18 @@ func (m *GoPluginMiddleware) goPluginFromTykVersion(version string) string {
 	if len(vs) > 0 {
 		version = vs[0]
 	}
+	version = EnsureSemanticVersioning(version)
 
 	newPluginName := strings.Join([]string{pluginName, version, os, architecture}, "_")
 	newPluginPath := pluginDir + "/" + newPluginName + ".so"
 
 	return newPluginPath
+}
+
+// EnsureSemanticVersioning receives a version and check that it has the prefix 'v' otherwise, it adds it
+func EnsureSemanticVersioning(version string) string {
+	if !strings.HasPrefix(version, "v") {
+		version = "v" + version
+	}
+	return version
 }
