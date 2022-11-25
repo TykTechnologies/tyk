@@ -32,7 +32,7 @@ func TestGoPluginFromTykVersion(t *testing.T) {
 	// plugin with clean version in filename (no -rc16).
 	expectVersion := "v4.1.0"
 
-	for _, version := range []string{expectVersion, expectVersion + "-rc16"} {
+	for _, version := range []string{expectVersion, expectVersion + "-rc16", "4.1.0"} {
 		testcases = append(testcases, []testCase{
 			{version, "plugin.so", fmt.Sprintf("./plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
 			{version, "/some/path/plugin.so", fmt.Sprintf("/some/path/plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
@@ -41,13 +41,41 @@ func TestGoPluginFromTykVersion(t *testing.T) {
 		}...)
 	}
 
-	for idx, tc := range testcases {
-		t.Run(fmt.Sprintf("Test case: %d", idx), func(t *testing.T) {
+	for _, tc := range testcases {
+		t.Run(fmt.Sprintf("GW version:%v-Plugin Name:%v", tc.version, tc.inferredName), func(t *testing.T) {
 			t.Parallel()
 
 			m.Path = tc.userDefinedName
 			newPluginPath := m.goPluginFromTykVersion(tc.version)
 			assert.Equal(t, tc.inferredName, newPluginPath)
+		})
+	}
+}
+
+func TestEnsureSemanticVersioning(t *testing.T) {
+	version := EnsureSemanticVersioning("v4.1.0")
+	expectedVersion := "v4.1.0"
+	assert.Equal(t, expectedVersion, version)
+
+	testCases := []struct {
+		name, version, expectedVersion string
+	}{
+		{
+			name:            "version with the prefix V",
+			version:         "v4.1.0",
+			expectedVersion: "v4.1.0",
+		},
+		{
+			name:            "version without the prefix v",
+			version:         "4.1.0",
+			expectedVersion: "v4.1.0",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			version := EnsureSemanticVersioning(tc.version)
+			assert.Equal(t, tc.expectedVersion, version)
 		})
 	}
 }
