@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGoPluginFromTykVersion(t *testing.T) {
+func TestGetGoPluginNameFromTykVersion(t *testing.T) {
 	t.Parallel()
 
 	m := GoPluginMiddleware{
@@ -32,12 +32,28 @@ func TestGoPluginFromTykVersion(t *testing.T) {
 	// plugin with clean version in filename (no -rc16).
 	expectVersion := "v4.1.0"
 
-	for _, version := range []string{expectVersion, expectVersion + "-rc16", "4.1.0"} {
+	versions := []struct {
+		version, expectedVersion string
+	}{
+		{
+			version:         expectVersion,
+			expectedVersion: expectVersion,
+		},
+		{
+			version:         expectVersion + "-rc16",
+			expectedVersion: expectVersion,
+		},
+		{
+			version:         "4.1.0",
+			expectedVersion: "4.1.0",
+		},
+	}
+	for _, version := range versions {
 		testcases = append(testcases, []testCase{
-			{version, "plugin.so", fmt.Sprintf("./plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
-			{version, "/some/path/plugin.so", fmt.Sprintf("/some/path/plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
-			{version, "/some/path/plugin", fmt.Sprintf("/some/path/plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
-			{version, "./plugin.so", fmt.Sprintf("./plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
+			{version.version, "plugin.so", fmt.Sprintf("./plugin_%v_%v_%v.so", version.expectedVersion, goos, goarch)},
+			{version.version, "/some/path/plugin.so", fmt.Sprintf("/some/path/plugin_%v_%v_%v.so", version.expectedVersion, goos, goarch)},
+			{version.version, "/some/path/plugin", fmt.Sprintf("/some/path/plugin_%v_%v_%v.so", version.expectedVersion, goos, goarch)},
+			{version.version, "./plugin.so", fmt.Sprintf("./plugin_%v_%v_%v.so", version.expectedVersion, goos, goarch)},
 		}...)
 	}
 
@@ -46,14 +62,14 @@ func TestGoPluginFromTykVersion(t *testing.T) {
 			t.Parallel()
 
 			m.Path = tc.userDefinedName
-			newPluginPath := m.goPluginFromTykVersion(tc.version)
+			newPluginPath := m.getPluginNameFromTykVersion(tc.version)
 			assert.Equal(t, tc.inferredName, newPluginPath)
 		})
 	}
 }
 
-func TestEnsureSemanticVersioning(t *testing.T) {
-	version := EnsureSemanticVersioning("v4.1.0")
+func TestGetPrefixedVersion(t *testing.T) {
+	version := getPrefixedVersion("v4.1.0")
 	expectedVersion := "v4.1.0"
 	assert.Equal(t, expectedVersion, version)
 
@@ -74,7 +90,7 @@ func TestEnsureSemanticVersioning(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			version := EnsureSemanticVersioning(tc.version)
+			version := getPrefixedVersion(tc.version)
 			assert.Equal(t, tc.expectedVersion, version)
 		})
 	}
