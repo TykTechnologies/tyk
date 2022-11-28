@@ -439,6 +439,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
+
+	// Earliest we can respond with cache get 200 ok
+	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, store: &cacheStore})
+
 	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid})
@@ -461,9 +465,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 		}
 	}
-	//Do not add middlewares after cache middleware.
-	//It will not get executed
-	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
 
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
 
