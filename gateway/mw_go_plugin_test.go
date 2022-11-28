@@ -34,10 +34,10 @@ func TestGetGoPluginNameFromTykVersion(t *testing.T) {
 
 	for _, version := range []string{expectVersion, expectVersion + "-rc16", "4.1.0"} {
 		testcases = append(testcases, []testCase{
-			{version, "plugin.so", fmt.Sprintf("./plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
-			{version, "/some/path/plugin.so", fmt.Sprintf("/some/path/plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
-			{version, "/some/path/plugin", fmt.Sprintf("/some/path/plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
-			{version, "./plugin.so", fmt.Sprintf("./plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
+			{version, "plugin.so", fmt.Sprintf("./plugin_%v_%v_%v.so", version, goos, goarch)},
+			{version, "/some/path/plugin.so", fmt.Sprintf("/some/path/plugin_%v_%v_%v.so", version, goos, goarch)},
+			{version, "/some/path/plugin", fmt.Sprintf("/some/path/plugin_%v_%v_%v.so", version, goos, goarch)},
+			{version, "./plugin.so", fmt.Sprintf("./plugin_%v_%v_%v.so", version, goos, goarch)},
 		}...)
 	}
 
