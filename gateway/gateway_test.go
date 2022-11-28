@@ -22,6 +22,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
+	"github.com/stretchr/testify/assert"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -1455,7 +1456,7 @@ func TestAdvanceCachePutRequest(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-			json.Unmarshal([]byte(`[{
+			err := json.Unmarshal([]byte(`[{
 						"method":"PUT",
 						"path":"/put/",
 						"cache_key_regex":"\"id\":[^,]*",
@@ -1476,6 +1477,7 @@ func TestAdvanceCachePutRequest(t *testing.T) {
 						"cache_key_regex":".*"
 					}
                                 ]`), &v.ExtendedPaths.AdvanceCacheConfig)
+			assert.NoError(t, err)
 		})
 		spec.Proxy.ListenPath = "/"
 	})

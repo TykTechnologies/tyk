@@ -4,18 +4,73 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"hash"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
+
+func TestRedisCacheMiddlewareUnit(t *testing.T) {
+	testcases := []struct {
+		Name string
+		Fn   func(t *testing.T)
+	}{
+		{
+			Name: "isTimeStampExpired",
+			Fn: func(t *testing.T) {
+				mw := &RedisCacheMiddleware{}
+
+				assert.True(t, mw.isTimeStampExpired("invalid"))
+				assert.True(t, mw.isTimeStampExpired("1"))
+				assert.True(t, mw.isTimeStampExpired(fmt.Sprint(time.Now().Unix()-60)))
+				assert.False(t, mw.isTimeStampExpired(fmt.Sprint(time.Now().Unix()+60)))
+			},
+		},
+		{
+			Name: "decodePayload",
+			Fn: func(t *testing.T) {
+				mw := &RedisCacheMiddleware{}
+
+				if data, expire, err := mw.decodePayload("dGVzdGluZwo=|123"); true {
+					assert.Equal(t, "testing\n", data)
+					assert.Equal(t, "123", expire)
+					assert.NoError(t, err)
+				}
+
+				if _, _, err := mw.decodePayload("payload|a|b|c"); true {
+					assert.Error(t, err)
+				}
+
+				if data, _, err := mw.decodePayload("payload"); true {
+					assert.Equal(t, "payload", data)
+					assert.NoError(t, err)
+				}
+			},
+		},
+		{
+			Name: "encodePayload",
+			Fn: func(t *testing.T) {
+				mw := &ResponseCacheMiddleware{}
+
+				result := mw.encodePayload("test", 123)
+
+				assert.True(t, strings.HasSuffix(result, "|123"))
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.Name, tc.Fn)
+	}
+}
 
 func TestRedisCacheMiddleware(t *testing.T) {
 	conf := func(globalConf *config.Config) {
