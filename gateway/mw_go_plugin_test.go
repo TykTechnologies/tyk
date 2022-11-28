@@ -62,7 +62,7 @@ func TestGetGoPluginNameFromTykVersion(t *testing.T) {
 			t.Parallel()
 
 			m.Path = tc.userDefinedName
-			newPluginPath := m.getGoPluginNameFromTykVersion(tc.version)
+			newPluginPath := m.getPluginNameFromTykVersion(tc.version)
 			assert.Equal(t, tc.inferredName, newPluginPath)
 		})
 	}
