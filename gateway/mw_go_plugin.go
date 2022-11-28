@@ -120,6 +120,10 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 	return false
 }
 
+// loadPlugin loads the plugin file from m.Path, it will try with:
+// m.path which can be {plugin_name}.so
+// if the file doesn't exist then it will try converting it to the tyk version aware format: {plugin_name}_{tyk_version}_{os}_{arch}.so
+// later if the file still doesn't exist then it will try again but ensuring that the version contains the prefix 'v'
 func (m *GoPluginMiddleware) loadPlugin() bool {
 	m.logger = log.WithFields(logrus.Fields{
 		"mwPath":       m.Path,
@@ -136,7 +140,12 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 
 	if !FileExist(m.Path) {
 		// if the exact name doesn't exist then try to load it using tyk version
-		m.Path = m.goPluginFromTykVersion(VERSION)
+		m.Path = m.getGoPluginNameFromTykVersion(VERSION)
+
+		if !FileExist(m.Path) && VERSION != getSemanticVersioning(VERSION) {
+			// if they file doesn't exist yet, then lets try with version in the format: v.x.x
+			m.Path = m.getGoPluginNameFromTykVersion(getSemanticVersioning(VERSION))
+		}
 	}
 
 	if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
@@ -236,10 +245,10 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	return
 }
 
-// goPluginFromTykVersion builds a name of plugin based on tyk version
+// getGoPluginNameFromTykVersion builds a name of plugin based on tyk version
 // os and architecture. The structure of the plugin name looks like:
 // {plugin-dir}/{plugin-name}_{GW-version}_{OS}_{arch}.so
-func (m *GoPluginMiddleware) goPluginFromTykVersion(version string) string {
+func (m *GoPluginMiddleware) getGoPluginNameFromTykVersion(version string) string {
 	if m.Path == "" {
 		return ""
 	}
@@ -255,7 +264,6 @@ func (m *GoPluginMiddleware) goPluginFromTykVersion(version string) string {
 	if len(vs) > 0 {
 		version = vs[0]
 	}
-	version = EnsureSemanticVersioning(version)
 
 	newPluginName := strings.Join([]string{pluginName, version, os, architecture}, "_")
 	newPluginPath := pluginDir + "/" + newPluginName + ".so"
@@ -263,8 +271,8 @@ func (m *GoPluginMiddleware) goPluginFromTykVersion(version string) string {
 	return newPluginPath
 }
 
-// EnsureSemanticVersioning receives a version and check that it has the prefix 'v' otherwise, it adds it
-func EnsureSemanticVersioning(version string) string {
+// getSemanticVersioning receives a version and check that it has the prefix 'v' otherwise, it adds it
+func getSemanticVersioning(version string) string {
 	if !strings.HasPrefix(version, "v") {
 		version = "v" + version
 	}

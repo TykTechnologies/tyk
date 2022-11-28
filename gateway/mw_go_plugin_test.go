@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGoPluginFromTykVersion(t *testing.T) {
+func TestGetGoPluginNameFromTykVersion(t *testing.T) {
 	t.Parallel()
 
 	m := GoPluginMiddleware{
@@ -46,14 +46,14 @@ func TestGoPluginFromTykVersion(t *testing.T) {
 			t.Parallel()
 
 			m.Path = tc.userDefinedName
-			newPluginPath := m.goPluginFromTykVersion(tc.version)
+			newPluginPath := m.getGoPluginNameFromTykVersion(tc.version)
 			assert.Equal(t, tc.inferredName, newPluginPath)
 		})
 	}
 }
 
-func TestEnsureSemanticVersioning(t *testing.T) {
-	version := EnsureSemanticVersioning("v4.1.0")
+func TestGetSemanticVersioning(t *testing.T) {
+	version := getSemanticVersioning("v4.1.0")
 	expectedVersion := "v4.1.0"
 	assert.Equal(t, expectedVersion, version)
 
@@ -74,7 +74,7 @@ func TestEnsureSemanticVersioning(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			version := EnsureSemanticVersioning(tc.version)
+			version := getSemanticVersioning(tc.version)
 			assert.Equal(t, tc.expectedVersion, version)
 		})
 	}
