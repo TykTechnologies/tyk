@@ -43,6 +43,9 @@ const (
 	RequestStatus
 	GraphQLRequest
 	GraphQLIsWebSocketUpgrade
+
+	// CacheOptions holds cache options required for cache writer middleware.
+	CacheOptions
 )
 
 func setContext(r *http.Request, ctx context.Context) {
