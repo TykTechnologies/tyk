@@ -140,12 +140,12 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 
 	if !FileExist(m.Path) {
 		// if the exact name doesn't exist then try to load it using tyk version
-		m.Path = m.getGoPluginNameFromTykVersion(VERSION)
+		m.Path = m.getPluginNameFromTykVersion(VERSION)
 
 		prefixedVersion := getPrefixedVersion(VERSION)
 		if !FileExist(m.Path) && VERSION != prefixedVersion {
 			// if they file doesn't exist yet, then lets try with version in the format: v.x.x
-			m.Path = m.getGoPluginNameFromTykVersion(prefixedVersion)
+			m.Path = m.getPluginNameFromTykVersion(prefixedVersion)
 		}
 	}
 
@@ -246,10 +246,10 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	return
 }
 
-// getGoPluginNameFromTykVersion builds a name of plugin based on tyk version
+// getPluginNameFromTykVersion builds a name of plugin based on tyk version
 // os and architecture. The structure of the plugin name looks like:
 // {plugin-dir}/{plugin-name}_{GW-version}_{OS}_{arch}.so
-func (m *GoPluginMiddleware) getGoPluginNameFromTykVersion(version string) string {
+func (m *GoPluginMiddleware) getPluginNameFromTykVersion(version string) string {
 	if m.Path == "" {
 		return ""
 	}
