@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/jeffail/tunny"
-	"github.com/oschwald/maxminddb-golang"
-	"gopkg.in/vmihailenco/msgpack.v2"
 	"net"
 	"regexp"
 	"time"
+
+	"github.com/Jeffail/tunny"
+	"github.com/oschwald/maxminddb-golang"
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 // AnalyticsRecord encodes the details of a request

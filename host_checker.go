@@ -2,12 +2,13 @@ package main
 
 import (
 	"bytes"
-	"github.com/jeffail/tunny"
-	"github.com/pmylund/go-cache"
 	"math/rand"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/Jeffail/tunny"
+	"github.com/pmylund/go-cache"
 )
 
 const (
