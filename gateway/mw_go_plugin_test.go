@@ -52,8 +52,8 @@ func TestGetGoPluginNameFromTykVersion(t *testing.T) {
 	}
 }
 
-func TestGetSemanticVersioning(t *testing.T) {
-	version := getSemanticVersioning("v4.1.0")
+func TestGetPrefixedVersion(t *testing.T) {
+	version := getPrefixedVersion("v4.1.0")
 	expectedVersion := "v4.1.0"
 	assert.Equal(t, expectedVersion, version)
 
@@ -74,7 +74,7 @@ func TestGetSemanticVersioning(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			version := getSemanticVersioning(tc.version)
+			version := getPrefixedVersion(tc.version)
 			assert.Equal(t, tc.expectedVersion, version)
 		})
 	}
