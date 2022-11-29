@@ -137,29 +137,48 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 
 	// try to load plugin
 	var err error
+	versionedPath := false
 
 	if !FileExist(m.Path) {
 		// if the exact name doesn't exist then try to load it using tyk version
-		newPath := m.getPluginNameFromTykVersion(VERSION)
-
-		prefixedVersion := getPrefixedVersion(VERSION)
-		if !FileExist(newPath) && VERSION != prefixedVersion {
-			// if the file doesn't exist yet, then lets try with version in the format: v.x.x.x
-			newPath = m.getPluginNameFromTykVersion(prefixedVersion)
-		}
-		m.Path = newPath
+		m.Path = m.getPluginNameFromTykVersion(VERSION)
+		m.logger = log.WithFields(logrus.Fields{
+			"versionedMwPath": m.Path,
+		})
+		versionedPath = true
 	}
 
 	defer func() {
 		if e := recover(); e != nil {
 			err = fmt.Errorf("%v", e)
 			m.logger.WithError(err).Error("Recovered from panic while loading Go-plugin")
+			m.Path = m.getPluginNameFromTykVersion(VERSION)
+			m.logger = log.WithFields(logrus.Fields{
+				"versionedMwPath": m.Path,
+			})
+
+			if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
+				m.logger.WithError(err).Error("Could not load Go-plugin")
+			}
 		}
 	}()
 
 	if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
 		m.logger.WithError(err).Error("Could not load Go-plugin")
-		return false
+		if versionedPath {
+			return false
+		}
+
+		m.Path = m.getPluginNameFromTykVersion(VERSION)
+		m.logger = log.WithFields(logrus.Fields{
+			"versionedMwPath": m.Path,
+		})
+		versionedPath = true
+
+		if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
+			m.logger.WithError(err).Error("Could not load Go-plugin")
+			return false
+		}
 	}
 
 	// to record 2XX hits in analytics
@@ -276,6 +295,12 @@ func (m *GoPluginMiddleware) getPluginNameFromTykVersion(version string) string 
 
 	newPluginName := strings.Join([]string{pluginName, version, os, architecture}, "_")
 	newPluginPath := pluginDir + "/" + newPluginName + ".so"
+
+	prefixedVersion := getPrefixedVersion(version)
+	if !FileExist(newPluginPath) && version != prefixedVersion {
+		// if they file doesn't exist yet, then lets try with version in the format: v.x.x
+		newPluginPath = m.getPluginNameFromTykVersion(prefixedVersion)
+	}
 
 	return newPluginPath
 }
