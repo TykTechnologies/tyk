@@ -3,6 +3,9 @@ package gateway
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -43,6 +46,15 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 
 	// try to load plugin
 	var err error
+	versionedPath := h.getPluginNameFromTykVersion(VERSION)
+
+	if FileExist(versionedPath) {
+		// Always prefer the versioned name
+		h.Path = versionedPath
+		h.logger = log.WithFields(logrus.Fields{
+			"versionedMwPath": h.Path,
+		})
+	}
 	if h.ResHandler, err = goplugin.GetResponseHandler(h.Path, h.SymbolName); err != nil {
 		h.logger.WithError(err).Error("Could not load Go-plugin")
 		return err
@@ -107,4 +119,36 @@ func (h *ResponseGoPluginMiddleware) HandleGoPluginResponse(w http.ResponseWrite
 		}
 	}
 	return nil
+}
+
+// getPluginNameFromTykVersion builds a name of plugin based on tyk version
+// os and architecture. The structure of the plugin name looks like:
+// {plugin-dir}/{plugin-name}_{GW-version}_{OS}_{arch}.so
+func (h *ResponseGoPluginMiddleware) getPluginNameFromTykVersion(version string) string {
+	if h.Path == "" {
+		return ""
+	}
+
+	pluginDir := filepath.Dir(h.Path)
+	// remove plugin extension to have the plugin's clean name
+	pluginName := strings.TrimSuffix(filepath.Base(h.Path), ".so")
+	os := runtime.GOOS
+	architecture := runtime.GOARCH
+
+	// sanitize away `-rc15` suffixes (remove `-*`) from version
+	vs := strings.Split(version, "-")
+	if len(vs) > 0 {
+		version = vs[0]
+	}
+
+	newPluginName := strings.Join([]string{pluginName, version, os, architecture}, "_")
+	newPluginPath := pluginDir + "/" + newPluginName + ".so"
+
+	prefixedVersion := getPrefixedVersion(version)
+	if !FileExist(newPluginPath) && version != prefixedVersion {
+		// if they file doesn't exist yet, then lets try with version in the format: v.x.x
+		newPluginPath = h.getPluginNameFromTykVersion(prefixedVersion)
+	}
+
+	return newPluginPath
 }

@@ -137,48 +137,26 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 
 	// try to load plugin
 	var err error
-	versionedPath := false
+	versionedPath := m.getPluginNameFromTykVersion(VERSION)
 
-	if !FileExist(m.Path) {
-		// if the exact name doesn't exist then try to load it using tyk version
-		m.Path = m.getPluginNameFromTykVersion(VERSION)
+	if FileExist(versionedPath) {
+		// Always prefer the versioned name
+		m.Path = versionedPath
 		m.logger = log.WithFields(logrus.Fields{
 			"versionedMwPath": m.Path,
 		})
-		versionedPath = true
 	}
 
 	defer func() {
 		if e := recover(); e != nil {
 			err = fmt.Errorf("%v", e)
 			m.logger.WithError(err).Error("Recovered from panic while loading Go-plugin")
-			m.Path = m.getPluginNameFromTykVersion(VERSION)
-			m.logger = log.WithFields(logrus.Fields{
-				"versionedMwPath": m.Path,
-			})
-
-			if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
-				m.logger.WithError(err).Error("Could not load Go-plugin")
-			}
 		}
 	}()
 
 	if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
 		m.logger.WithError(err).Error("Could not load Go-plugin")
-		if versionedPath {
-			return false
-		}
-
-		m.Path = m.getPluginNameFromTykVersion(VERSION)
-		m.logger = log.WithFields(logrus.Fields{
-			"versionedMwPath": m.Path,
-		})
-		versionedPath = true
-
-		if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
-			m.logger.WithError(err).Error("Could not load Go-plugin")
-			return false
-		}
+		return false
 	}
 
 	// to record 2XX hits in analytics
