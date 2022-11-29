@@ -36,7 +36,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          go get golang.org/x/tools/cmd/goimports
+          go install golang.org/x/tools/cmd/goimports
 
           python -m pip install --upgrade pip
           pip install setuptools
