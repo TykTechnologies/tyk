@@ -144,7 +144,7 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 
 		prefixedVersion := getPrefixedVersion(VERSION)
 		if !FileExist(newPath) && VERSION != prefixedVersion {
-			// if the file doesn't exist yet, then lets try with version in the format: v.x.x.x
+			// if the file doesn't exist, then lets try with version with the format: v.x.x.x
 			newPath = m.getPluginNameFromTykVersion(prefixedVersion)
 		}
 		m.Path = newPath
