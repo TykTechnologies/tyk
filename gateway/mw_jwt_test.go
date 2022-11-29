@@ -207,7 +207,7 @@ func TestJWTHMACIdInSubClaim(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:token invalid, key not found`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 
@@ -240,7 +240,7 @@ func TestJWTRSAIdInSubClaim(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:token invalid, key not found`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 
@@ -326,7 +326,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:crypto/rsa: verification error`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 }
@@ -344,7 +344,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:crypto/rsa: verification error`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 }
@@ -361,7 +361,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:token contains an invalid number of segments`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 }
@@ -428,7 +428,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "Key not authorized:illegal base64 data at input byte 6",
+			BodyMatch: "Key not authorized",
 		})
 	})
 }
@@ -2011,7 +2011,7 @@ func TestJWTRSAInvalidPublickKey(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "Failed to decode JWT key",
+			BodyMatch: "Key not authorized",
 		})
 	})
 }
