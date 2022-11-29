@@ -135,7 +135,18 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 
 	if !FileExist(m.Path) {
 		// if the exact name doesn't exist then try to load it using tyk version
+<<<<<<< HEAD
 		m.Path = m.goPluginFromTykVersion(VERSION)
+=======
+		newPath := m.getPluginNameFromTykVersion(VERSION)
+
+		prefixedVersion := getPrefixedVersion(VERSION)
+		if !FileExist(newPath) && VERSION != prefixedVersion {
+			// if the file doesn't exist yet, then lets try with version in the format: v.x.x.x
+			newPath = m.getPluginNameFromTykVersion(prefixedVersion)
+		}
+		m.Path = newPath
+>>>>>>> cf54fe53... Load go plugins that contains the prefix V (#4444)
 	}
 
 	if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
