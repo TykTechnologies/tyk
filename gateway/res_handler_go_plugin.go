@@ -55,6 +55,7 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 			"versionedMwPath": h.Path,
 		})
 	}
+
 	if h.ResHandler, err = goplugin.GetResponseHandler(h.Path, h.SymbolName); err != nil {
 		h.logger.WithError(err).Error("Could not load Go-plugin")
 		return err
