@@ -117,6 +117,7 @@ func greaterThanInt(first, second int) bool {
 
 func FileExist(filepath string) bool {
 	if _, err := os.Stat(filepath); errors.Is(err, os.ErrNotExist) {
+		log.Warningf("plugin file %v doesn't exist", filepath)
 		return false
 	}
 	return true
