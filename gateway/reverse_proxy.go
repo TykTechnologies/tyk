@@ -971,7 +971,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 		}
 
 		if isIntrospection {
-			res, err = p.handleGraphQLIntrospection()
+			res, err = p.handleGraphQLIntrospection(gqlRequest)
 			return
 		}
 		if needEngine {
@@ -983,14 +983,36 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 	return
 }
 
-func (p *ReverseProxy) handleGraphQLIntrospection() (res *http.Response, err error) {
-	result, err := graphql.SchemaIntrospection(p.TykAPISpec.GraphQLExecutor.Schema)
-	if err != nil {
+func (p *ReverseProxy) handleGraphQLIntrospection(gqlRequest *graphql.Request) (res *http.Response, err error) {
+	switch p.TykAPISpec.GraphQL.Version {
+	case apidef.GraphQLConfigVersion2:
+		if p.TykAPISpec.GraphQLExecutor.EngineV2 == nil {
+			err = errors.New("execution engine is nil")
+			return
+		}
+
+		reqCtx := context.Background()
+		resultWriter := graphql.NewEngineResultWriter()
+		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter)
+		if err != nil {
+			return
+		}
+
+		httpStatus := http.StatusOK
+		headers := make(http.Header)
+		headers.Set("Content-Type", "application/json")
+		res = resultWriter.AsHTTPResponse(httpStatus, headers)
+		return
+	default:
+		var result *graphql.ExecutionResult
+		result, err = graphql.SchemaIntrospection(p.TykAPISpec.GraphQLExecutor.Schema)
+		if err != nil {
+			return
+		}
+
+		res = result.GetAsHTTPResponse()
 		return
 	}
-
-	res = result.GetAsHTTPResponse()
-	return
 }
 
 func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoundTripper, r *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {

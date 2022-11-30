@@ -40,6 +40,7 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 
 	t.Run("Introspection query with custom query type should successfully work", func(t *testing.T) {
 		spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: word } type word { numOfLetters: Int }"
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 		g.Gw.LoadAPI(spec)
 
 		request := gql.Request{
