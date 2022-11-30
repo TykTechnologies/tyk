@@ -149,6 +149,13 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 		}
 	}
 
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v", e)
+			m.logger.WithError(err).Error("Recovered from panic while loading Go-plugin")
+		}
+	}()
+
 	if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
 		m.logger.WithError(err).Error("Could not load Go-plugin")
 		return false
