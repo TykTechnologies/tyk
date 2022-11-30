@@ -988,6 +988,8 @@ func (p *ReverseProxy) handleGraphQLIntrospection(gqlRequest *graphql.Request) (
 	case apidef.GraphQLConfigVersionNone:
 		fallthrough
 	case apidef.GraphQLConfigVersion1:
+		// Check the configuration here for the sake of consistency.
+		// If the API is wrongly configured, return an error.
 		if p.TykAPISpec.GraphQLExecutor.Engine == nil {
 			err = errors.New("execution engine is nil")
 			return
