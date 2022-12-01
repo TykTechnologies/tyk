@@ -1608,6 +1608,8 @@ func TestKeepAliveConns(t *testing.T) {
 // for the API. Meaning that a single token cannot reduce service availability for other tokens by simply going over the
 // API's global rate limit.
 func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5987
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
