@@ -1201,7 +1201,7 @@ func Load(paths []string, conf *Config) error {
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return fmt.Errorf("failed to process config env vars: %v", err)
 	}
-	if err := processCustom(envPrefix, conf, loadZipkin, loadJaeger); err != nil {
+	if err := processCustom(envPrefix, conf, loadZipkin, loadJaeger, loadOtel); err != nil {
 		return fmt.Errorf("failed to process config custom loader: %v", err)
 	}
 	return nil

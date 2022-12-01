@@ -6,6 +6,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/TykTechnologies/tyk/config"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
@@ -43,7 +44,7 @@ func (w wrapLogger) Error(msg string) {
 	w.Errorf("%s", msg)
 }
 
-func InitOtelProvider(resourceName string) (func(context.Context) error, error) {
+func InitOtelProvider(resourceName string, opts config.OpenTelemetryConfig) (func(context.Context) error, error) {
 	ctx := context.Background()
 
 	res, err := resource.New(ctx,
@@ -56,18 +57,21 @@ func InitOtelProvider(resourceName string) (func(context.Context) error, error) 
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
+	collectorURL := opts.URL
+
+	connTimeout := time.Duration(opts.Timeout) * time.Second
+
 	// If the OpenTelemetry Collector is running on a local cluster (minikube or
 	// microk8s), it should be accessible through the NodePort service at the
 	// `localhost:30080` endpoint. Otherwise, replace `localhost` with the
 	// endpoint of your cluster. If you run the app inside k8s, then you can
 	// probably connect directly to the service through dns
-	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	ctx, cancel := context.WithTimeout(ctx, connTimeout)
 	defer cancel()
-	conn, err := grpc.DialContext(ctx, ":4317", grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, collectorURL, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gRPC connection to collector: %w", err)
 	}
-
 	// Set up a trace exporter
 	traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
 	if err != nil {
@@ -92,7 +96,19 @@ func InitOtelProvider(resourceName string) (func(context.Context) error, error) 
 }
 
 func Init(service string, opts map[string]interface{}, log Logger) (*Trace, error) {
-	_, err := InitOtelProvider(service)
+	c, err := Load(opts)
+	if err != nil {
+		return nil, err
+	}
+	if c.URL == "" {
+		log.Errorf("missing OTel URL, defaulting to :4317")
+		c.URL = ":4317"
+	}
+	if c.Timeout == 0 {
+		log.Errorf("missing OTel Timeout, defaulting to 10 seconds")
+		c.Timeout = 10
+	}
+	_, err = InitOtelProvider(service, *c)
 	if err != nil {
 		return nil, err
 	}
@@ -100,4 +116,13 @@ func Init(service string, opts map[string]interface{}, log Logger) (*Trace, erro
 	tr := otel.Tracer("tyk-gw")
 
 	return &Trace{Tracer: tr}, nil
+}
+
+// Load retusn a zipkin configuration from the opts.
+func Load(opts map[string]interface{}) (*config.OpenTelemetryConfig, error) {
+	var c config.OpenTelemetryConfig
+	if err := config.DecodeJSON(&c, opts); err != nil {
+		return nil, err
+	}
+	return &c, nil
 }

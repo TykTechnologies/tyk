@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/kelseyhightower/envconfig"
 	jaeger "github.com/uber/jaeger-client-go/config"
@@ -45,6 +46,11 @@ type Sampler struct {
 	Salt int64 `json:"salt"`
 	// Mod is only used when sampler is mod
 	Mod uint64 `json:"mod"`
+}
+
+type OpenTelemetryConfig struct {
+	URL     string `json:"url"`
+	Timeout int    `json:"timeout"`
 }
 
 // DecodeJSON marshals src to json and tries to unmarshal the result into
@@ -145,5 +151,36 @@ func loadJaeger(prefix string, c *Config) error {
 		return err
 	}
 	c.Tracer.Options = o
+	return nil
+}
+
+// loads jaeger configuration from environment variables.
+//
+// List of OpenTelemetry configuration env vars
+//
+// TYK_GW_TRACER_OPTIONS_URL
+// TYK_GW_TRACER_OPTIONS_TIMEOUT
+func loadOtel(prefix string, c *Config) error {
+	if c.Tracer.Name != "otel" {
+		fmt.Println("HERE RETURNING")
+		return nil
+	}
+	var zip OpenTelemetryConfig
+	fmt.Println(c.Tracer.Options)
+	if err := DecodeJSON(&zip, c.Tracer.Options); err != nil {
+		return err
+	}
+	qualifyPrefix := prefix + "_TRACER_OPTIONS"
+	err := envconfig.Process(qualifyPrefix, &zip)
+	if err != nil {
+		return err
+	}
+	o := make(map[string]interface{})
+	if err := DecodeJSON(&o, zip); err != nil {
+		return err
+	}
+	c.Tracer.Options = o
+	fmt.Println(c.Tracer.Options)
+
 	return nil
 }
