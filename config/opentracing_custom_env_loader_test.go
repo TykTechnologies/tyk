@@ -102,3 +102,43 @@ func TestLoadJaeger(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadOtel(t *testing.T) {
+	name := "jaeger-test-service"
+	sample := []struct {
+		env   string
+		value string
+	}{
+		{"TYK_GW_TRACER_NAME", "otel"},
+		{"TYK_GW_TRACER_OPTIONS_URL", "testurl"},
+		{"TYK_GW_TRACER_OPTIONS_TIMEOUT", "testtimeout"},
+	}
+
+	t.Run("Loads env vars", func(t *testing.T) {
+		for _, v := range sample {
+			err := os.Setenv(v.env, v.value)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		defer func() {
+			for _, v := range sample {
+				os.Unsetenv(v.env)
+			}
+		}()
+
+		var conf Config
+		err := Load([]string{"testdata/jaeger.json"}, &conf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got jaeger.Configuration
+		err = DecodeYAML(&got, conf.Tracer.Options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.ServiceName != name {
+			t.Errorf("expected %#v got %#v", name, got.ServiceName)
+		}
+	})
+}
