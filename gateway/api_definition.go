@@ -1582,7 +1582,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	var vName string
 	defer ctxSetVersionName(r, &vName)
 
-	switch a.VersionDefinition.Location {
+	switch strings.ToLower(a.VersionDefinition.Location) {
 	case apidef.HeaderLocation:
 		vName = r.Header.Get(a.VersionDefinition.Key)
 		if a.VersionDefinition.StripVersioningData {

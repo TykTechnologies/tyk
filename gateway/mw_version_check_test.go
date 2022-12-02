@@ -298,6 +298,33 @@ func TestNewVersioning(t *testing.T) {
 			}...)
 		})
 	})
+
+	t.Run("version location case insensitivity", func(t *testing.T) {
+		baseAPI.VersionDefinition.Default = apidef.Self
+		t.Run("header", func(t *testing.T) {
+			baseAPI.VersionDefinition.Location = "Header"
+			ts.Gw.LoadAPI(baseAPI, v1)
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/default", Headers: map[string]string{"version": v1VersionName}, Code: http.StatusUnauthorized},
+			}...)
+		})
+
+		t.Run("url param", func(t *testing.T) {
+			baseAPI.VersionDefinition.Location = "URL-param"
+			ts.Gw.LoadAPI(baseAPI, v1)
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/default?version=" + v1VersionName, Headers: map[string]string{}, Code: http.StatusUnauthorized},
+			}...)
+		})
+
+		t.Run("url", func(t *testing.T) {
+			baseAPI.VersionDefinition.Location = "URL"
+			ts.Gw.LoadAPI(baseAPI, v1)
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/default/" + v1VersionName, Headers: map[string]string{}, Code: http.StatusUnauthorized},
+			}...)
+		})
+	})
 }
 
 func TestOldVersioning_DefaultVersionEmpty(t *testing.T) {
