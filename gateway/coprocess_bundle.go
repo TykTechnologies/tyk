@@ -1,7 +1,9 @@
 package gateway
 
 import (
+	"math"
 	"path"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -14,7 +16,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,6 +23,11 @@ import (
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/apidef"
+)
+
+const (
+	bundleGetRetryWait = 1 * time.Second
+	bundleGetRetries   = 3
 )
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
@@ -146,18 +152,40 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 	}
 	client := &http.Client{Transport: tr}
 
-	resp, err := client.Get(g.URL)
-	if err != nil {
-		return nil, err
-	}
+	var httpError string
+	for tries := bundleGetRetries; tries > 0; tries-- {
+		resp, st, err := func() ([]byte, int, error) {
+			resp, err := client.Get(g.URL)
+			if err != nil {
+				return nil, 0, err
+			}
 
-	if resp.StatusCode != 200 {
-		httpError := fmt.Sprintf("HTTP Error, got status code %d", resp.StatusCode)
-		return nil, errors.New(httpError)
-	}
+			defer func(Body io.ReadCloser) {
+				_ = Body.Close()
+			}(resp.Body)
 
-	defer resp.Body.Close()
-	return ioutil.ReadAll(resp.Body)
+			if resp.StatusCode != 200 {
+				return nil, resp.StatusCode, nil
+			}
+
+			b, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, 0, err
+			}
+			return b, resp.StatusCode, nil
+		}()
+		if st == 200 {
+			return resp, nil
+		}
+		if err != nil {
+			return nil, err
+		} else {
+			httpError = fmt.Sprintf("HTTP Error, got status code %d", st)
+			backoff := math.Pow(float64(1+bundleGetRetries-tries), 2)
+			time.Sleep(time.Duration(backoff) * bundleGetRetryWait)
+		}
+	}
+	return nil, errors.New(httpError)
 }
 
 // Get mocks an HTTP(S) GET request.
