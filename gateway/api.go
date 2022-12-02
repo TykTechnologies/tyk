@@ -47,8 +47,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/TykTechnologies/tyk/apidef/oas"
 	uuid "github.com/satori/go.uuid"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
@@ -59,7 +60,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -111,7 +112,7 @@ type paginatedOAuthClientTokens struct {
 }
 
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
-	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(obj); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -2946,6 +2947,17 @@ func ctxSetData(r *http.Request, m map[string]interface{}) {
 		panic("setting a nil context ContextData")
 	}
 	setCtxValue(r, ctx.ContextData, m)
+}
+
+// ctxSetCacheOptions sets a cache key to use for the http request
+func ctxSetCacheOptions(r *http.Request, options *cacheOptions) {
+	setCtxValue(r, ctx.CacheOptions, options)
+}
+
+// ctxGetCacheOptions returns a cache key if we need to cache request
+func ctxGetCacheOptions(r *http.Request) *cacheOptions {
+	key, _ := r.Context().Value(ctx.CacheOptions).(*cacheOptions)
+	return key
 }
 
 func ctxGetSession(r *http.Request) *user.SessionState {

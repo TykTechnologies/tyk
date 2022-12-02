@@ -17,9 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/user"
 
@@ -1044,7 +1045,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 			// key should also work without cert
 			header := map[string]string{
-				headers.Authorization: key,
+				header.Authorization: key,
 			}
 			client := &http.Client{
 				Transport: &http.Transport{
@@ -1174,7 +1175,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 		// key should also work without cert
 		header := map[string]string{
-			headers.Authorization: key,
+			header.Authorization: key,
 		}
 		newClient := &http.Client{
 			Transport: &http.Transport{

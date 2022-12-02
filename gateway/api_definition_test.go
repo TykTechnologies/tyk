@@ -17,10 +17,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	redis "github.com/go-redis/redis/v8"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	redis "github.com/go-redis/redis/v8"
 )
 
 func TestURLRewrites(t *testing.T) {
@@ -520,6 +521,7 @@ func TestIgnored(t *testing.T) {
 		}...)
 
 		t.Run("ignore-case globally", func(t *testing.T) {
+			spec.Name = "ignore endpoint case globally"
 			globalConf := ts.Gw.GetConfig()
 			globalConf.IgnoreEndpointCase = true
 			ts.Gw.SetConfig(globalConf)
@@ -543,6 +545,7 @@ func TestIgnored(t *testing.T) {
 			v.IgnoreEndpointCase = true
 			spec.VersionData.Versions["v1"] = v
 
+			spec.Name = "ignore endpoint in api level"
 			ts.Gw.LoadAPI(spec)
 
 			_, _ = ts.Run(t, []test.TestCase{
@@ -1391,6 +1394,7 @@ func TestEnforcedTimeout(t *testing.T) {
 		UpdateAPIVersion(api, "", func(version *apidef.VersionInfo) {
 			version.ExtendedPaths.HardTimeouts[0].Disabled = true
 		})
+
 		ts.Gw.LoadAPI(api)
 
 		_, _ = ts.Run(t, test.TestCase{

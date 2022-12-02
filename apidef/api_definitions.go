@@ -42,6 +42,8 @@ type IdExtractorType string
 type AuthTypeEnum string
 type RoutingTriggerOnType string
 
+type SubscriptionType string
+
 const (
 	NoAction EndpointMethodAction = "no_action"
 	Reply    EndpointMethodAction = "reply"
@@ -82,6 +84,12 @@ const (
 	Any    RoutingTriggerOnType = "any"
 	Ignore RoutingTriggerOnType = ""
 
+	// Subscription Types
+	GQLSubscriptionUndefined   SubscriptionType = ""
+	GQLSubscriptionWS          SubscriptionType = "graphql-ws"
+	GQLSubscriptionTransportWS SubscriptionType = "graphql-transport-ws"
+	GQLSubscriptionSSE         SubscriptionType = "sse"
+
 	// TykInternalApiHeader - flags request as internal api looping request
 	TykInternalApiHeader = "x-tyk-internal"
 
@@ -92,13 +100,14 @@ const (
 
 	Self = "self"
 
-	AuthTokenType = "authToken"
-	JWTType       = "jwt"
-	HMACType      = "hmac"
-	BasicType     = "basic"
-	CoprocessType = "coprocess"
-	OAuthType     = "oauth"
-	OIDCType      = "oidc"
+	AuthTokenType     = "authToken"
+	JWTType           = "jwt"
+	HMACType          = "hmac"
+	BasicType         = "basic"
+	CoprocessType     = "coprocess"
+	OAuthType         = "oauth"
+	ExternalOAuthType = "externalOAuth"
+	OIDCType          = "oidc"
 )
 
 var (
@@ -343,6 +352,13 @@ type ValidateRequestMeta struct {
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
 }
 
+type PersistGraphQLMeta struct {
+	Path      string                 `bson:"path" json:"path"`
+	Method    string                 `bson:"method" json:"method"`
+	Operation string                 `bson:"operation" json:"operation"`
+	Variables map[string]interface{} `bson:"variables" json:"variables"`
+}
+
 type GoPluginMeta struct {
 	Path       string `bson:"path" json:"path"`
 	Method     string `bson:"method" json:"method"`
@@ -375,6 +391,7 @@ type ExtendedPathsSet struct {
 	ValidateRequest         []ValidateRequestMeta `bson:"validate_request" json:"validate_request,omitempty"`
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
+	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
 }
 
 type VersionDefinition struct {
@@ -386,6 +403,7 @@ type VersionDefinition struct {
 	StripPath           bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
 	StripVersioningData bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
 	Versions            map[string]string `bson:"versions" json:"versions"`
+	BaseID              string            `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
 type VersionData struct {
@@ -539,6 +557,7 @@ type APIDefinition struct {
 	OrgID               string        `bson:"org_id" json:"org_id"`
 	UseKeylessAccess    bool          `bson:"use_keyless" json:"use_keyless"`
 	UseOauth2           bool          `bson:"use_oauth2" json:"use_oauth2"`
+	ExternalOAuth       ExternalOAuth `bson:"external_oauth" json:"external_oauth"`
 	UseOpenID           bool          `bson:"use_openid" json:"use_openid"`
 	OpenIDOptions       OpenIDOptions `bson:"openid_options" json:"openid_options"`
 	Oauth2Meta          struct {
@@ -767,7 +786,8 @@ const (
 )
 
 type GraphQLProxyConfig struct {
-	AuthHeaders map[string]string `bson:"auth_headers" json:"auth_headers"`
+	AuthHeaders      map[string]string `bson:"auth_headers" json:"auth_headers"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
 }
 
 type GraphQLSubgraphConfig struct {
@@ -784,11 +804,12 @@ type GraphQLSupergraphConfig struct {
 }
 
 type GraphQLSubgraphEntity struct {
-	APIID   string            `bson:"api_id" json:"api_id"`
-	Name    string            `bson:"name" json:"name"`
-	URL     string            `bson:"url" json:"url"`
-	SDL     string            `bson:"sdl" json:"sdl"`
-	Headers map[string]string `bson:"headers" json:"headers"`
+	APIID            string            `bson:"api_id" json:"api_id"`
+	Name             string            `bson:"name" json:"name"`
+	URL              string            `bson:"url" json:"url"`
+	SDL              string            `bson:"sdl" json:"sdl"`
+	Headers          map[string]string `bson:"headers" json:"headers"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
 }
 
 type GraphQLEngineConfig struct {
@@ -833,9 +854,10 @@ type GraphQLEngineDataSourceConfigREST struct {
 }
 
 type GraphQLEngineDataSourceConfigGraphQL struct {
-	URL     string            `bson:"url" json:"url"`
-	Method  string            `bson:"method" json:"method"`
-	Headers map[string]string `bson:"headers" json:"headers"`
+	URL              string            `bson:"url" json:"url"`
+	Method           string            `bson:"method" json:"method"`
+	Headers          map[string]string `bson:"headers" json:"headers"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
@@ -1270,3 +1292,37 @@ var Template = template.New("").Funcs(map[string]interface{}{
 		return string(xmlValue), err
 	},
 })
+
+type ExternalOAuth struct {
+	Enabled   bool       `bson:"enabled" json:"enabled"`
+	Providers []Provider `bson:"providers" json:"providers"`
+}
+
+type Provider struct {
+	JWT           JWTValidation `bson:"jwt" json:"jwt"`
+	Introspection Introspection `bson:"introspection" json:"introspection"`
+}
+
+type JWTValidation struct {
+	Enabled                 bool   `bson:"enabled" json:"enabled"`
+	SigningMethod           string `bson:"signing_method" json:"signing_method"`
+	Source                  string `bson:"source" json:"source"`
+	IssuedAtValidationSkew  uint64 `bson:"issued_at_validation_skew" json:"issued_at_validation_skew"`
+	NotBeforeValidationSkew uint64 `bson:"not_before_validation_skew" json:"not_before_validation_skew"`
+	ExpiresAtValidationSkew uint64 `bson:"expires_at_validation_skew" json:"expires_at_validation_skew"`
+	IdentityBaseField       string `bson:"identity_base_field" json:"identity_base_field"`
+}
+
+type Introspection struct {
+	Enabled           bool               `bson:"enabled" json:"enabled"`
+	URL               string             `bson:"url" json:"url"`
+	ClientID          string             `bson:"client_id" json:"client_id"`
+	ClientSecret      string             `bson:"client_secret" json:"client_secret"`
+	IdentityBaseField string             `bson:"identity_base_field" json:"identity_base_field"`
+	Cache             IntrospectionCache `bson:"cache" json:"cache"`
+}
+
+type IntrospectionCache struct {
+	Enabled bool  `bson:"enabled" json:"enabled"`
+	Timeout int64 `bson:"timeout" json:"timeout"`
+}

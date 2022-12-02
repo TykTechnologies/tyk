@@ -560,6 +560,10 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		return errors.New("Middleware error")
 	}
 
+	// Clear all response headers before populating from coprocess response object:
+	for k := range res.Header {
+		delete(res.Header, k)
+	}
 	// Set headers:
 	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for k, v := range retObject.Response.Headers {

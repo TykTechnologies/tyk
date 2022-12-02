@@ -26,12 +26,6 @@ import (
 	textTemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/again"
-	"github.com/TykTechnologies/drl"
-	gas "github.com/TykTechnologies/goautosocket"
-	"github.com/TykTechnologies/gorpc"
-	"github.com/TykTechnologies/goverify"
-	"github.com/TykTechnologies/tyk-pump/serializer"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
@@ -45,13 +39,20 @@ import (
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
 	"rsc.io/letsencrypt"
 
+	"github.com/TykTechnologies/again"
+	"github.com/TykTechnologies/drl"
+	gas "github.com/TykTechnologies/goautosocket"
+	"github.com/TykTechnologies/gorpc"
+	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk-pump/serializer"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/checkup"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -479,12 +480,14 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 		}
 	}
 	var filter []*APISpec
+	var tmpCheckSum = make(map[string]struct{})
 	for _, v := range s {
 		if err := v.Validate(); err != nil {
 			mainLog.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")
 			continue
 		}
 		filter = append(filter, v)
+		tmpCheckSum[v.Checksum] = struct{}{}
 	}
 
 	gw.apisMu.Lock()
@@ -672,7 +675,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 func (gw *Gateway) checkIsAPIOwner(next http.Handler) http.Handler {
 	secret := gw.GetConfig().Secret
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tykAuthKey := r.Header.Get(headers.XTykAuthorization)
+		tykAuthKey := r.Header.Get(header.XTykAuthorization)
 		if tykAuthKey != secret {
 			// Error
 			mainLog.Warning("Attempted administrative access with invalid or missing key!")
@@ -747,7 +750,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	mwPostFuncs := []apidef.MiddlewareDefinition{}
 	mwPostKeyAuthFuncs := []apidef.MiddlewareDefinition{}
 	mwResponseFuncs := []apidef.MiddlewareDefinition{}
-	mwDriver := apidef.OttoDriver
+	mwDriver := apidef.MiddlewareDriver("")
 
 	// Set AuthCheck hook
 	if spec.CustomMiddleware.AuthCheck.Name != "" {
@@ -832,10 +835,15 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 }
 
+// Create the response processor chain
 func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
-	// Create the response processors
+	// Prealloc size
+	chainLen := len(spec.ResponseProcessors)
+	// Append capacity
+	chainCapacity := chainLen + 1 + len(responseFuncs)
 
-	responseChain := make([]TykResponseHandler, len(spec.ResponseProcessors))
+	responseChain := make([]TykResponseHandler, chainLen, chainCapacity)
+
 	for i, processorDetail := range spec.ResponseProcessors {
 		processor := gw.responseProcessorByName(processorDetail.Name)
 		if processor == nil {
@@ -865,10 +873,22 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		}
 
 		if err := processor.Init(mw, spec); err != nil {
-			mainLog.Debug("Failed to init processor: ", err)
+			mainLog.WithError(err).Debug("Failed to init processor")
 		}
 		responseChain = append(responseChain, processor)
 	}
+
+	keyPrefix := "cache-" + spec.APIID
+	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, RedisController: gw.RedisController}
+	cacheStore.Connect()
+
+	// Add cache writer as the final step of the response middleware chain
+	processor := &ResponseCacheMiddleware{store: cacheStore}
+	if err := processor.Init(nil, spec); err != nil {
+		mainLog.WithError(err).Debug("Failed to init processor")
+	}
+
+	responseChain = append(responseChain, processor)
 
 	spec.ResponseChain = responseChain
 }
@@ -911,6 +931,7 @@ func (gw *Gateway) DoReload() {
 
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
+		gw.GlobalEventsJSVM.DeInit()
 		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
 	}
 
@@ -932,6 +953,7 @@ func (gw *Gateway) DoReload() {
 			return
 		}
 	}
+
 	gw.loadGlobalApps()
 
 	mainLog.Info("API reload complete")
@@ -1747,8 +1769,8 @@ func (gw *Gateway) GetConfig() config.Config {
 	return gw.config.Load().(config.Config)
 }
 
-func (gw *Gateway) SetConfig(conf config.Config) {
+func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
-	defer gw.configMu.Unlock()
 	gw.config.Store(conf)
+	gw.configMu.Unlock()
 }

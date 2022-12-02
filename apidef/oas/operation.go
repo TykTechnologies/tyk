@@ -5,33 +5,57 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Operations holds Operation definitions.
 type Operations map[string]*Operation
 
+// Operation holds a request operation configuration, allowances, tranformations, caching, timeouts and validation.
 type Operation struct {
-	Allow                *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
-	Block                *Allowance `bson:"block,omitempty" json:"block,omitempty"`
+	// Allow request by allowance.
+	Allow *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
+
+	// Block request by allowance.
+	Block *Allowance `bson:"block,omitempty" json:"block,omitempty"`
+
+	// IgnoreAuthentication ignores authentication on request by allowance.
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
+
 	// TransformRequestMethod allows you to transform the method of a request.
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
+
 	// TransformRequestBody allows you to transform request body.
 	// When both `path` and `body` are provided, body would take precedence.
 	TransformRequestBody *TransformRequestBody `bson:"transformRequestBody,omitempty" json:"transformRequestBody,omitempty"`
-	Cache                *CachePlugin          `bson:"cache,omitempty" json:"cache,omitempty"`
-	EnforceTimeout       *EnforceTimeout       `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
-	ValidateRequest      *ValidateRequest      `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
+
+	// Cache contains the caching plugin configuration.
+	Cache *CachePlugin `bson:"cache,omitempty" json:"cache,omitempty"`
+
+	// EnforceTimeout contains the request timeout configuration.
+	EnforceTimeout *EnforceTimeout `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
+
+	// ValidateRequest contains the request validation configuration.
+	ValidateRequest *ValidateRequest `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
+
+	// MockResponse contains the mock response configuration.
+	MockResponse *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
 }
+
+// AllowanceType holds the valid allowance types values.
+type AllowanceType int
 
 const (
 	allow                AllowanceType = 0
 	block                AllowanceType = 1
 	ignoreAuthentication AllowanceType = 2
-	contentTypeJSON                    = "application/json"
+
+	contentTypeJSON = "application/json"
 )
 
+// Import takes the arguments and populates the receiver *Operation values.
 func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validateRequest *bool) {
 	if allowList != nil {
 		allow := o.Allow
@@ -62,8 +86,6 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validate
 		o.ValidateRequest = validate
 	}
 }
-
-type AllowanceType int
 
 func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	// Regardless if `ep` is a zero value, we need a non-nil paths
@@ -280,7 +302,7 @@ func (o *Operation) extractOASValidateRequestTo(ep *apidef.ExtendedPathsSet, pat
 // - greedy match (*)
 // - ungreedy match (+)
 // - any char (.)
-// - end of string ($)
+// - end of string ($).
 const regexPatterns = "[].+*$"
 
 type pathPart struct {
@@ -297,7 +319,7 @@ func (p pathPart) String() string {
 	return p.value
 }
 
-// splitPath splits url into folder parts, detecting regex patterns
+// splitPath splits url into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
 	// Each url fragment can contain a regex, but the whole
 	// url isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
@@ -323,7 +345,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 }
 
 // buildPath converts the url paths with regex to named parameters
-// e.g. ["a", ".*"] becomes /a/{customRegex1}
+// e.g. ["a", ".*"] becomes /a/{customRegex1}.
 func buildPath(parts []pathPart, appendSlash bool) string {
 	newPath := ""
 
@@ -419,22 +441,29 @@ func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
 	return operations[operationID]
 }
 
+// ValidateRequest holds configuration required for validating requests.
 type ValidateRequest struct {
-	Enabled           bool `bson:"enabled" json:"enabled"`
-	ErrorResponseCode int  `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
+	// Enabled is a boolean flag, if set to `true`, it enables request validation.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// ErrorResponseCode is the error code emitted when the request fails validation.
+	// If unset or zero, the response will returned with http status 422 Unprocessable Entity.
+	ErrorResponseCode int `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
 }
 
+// Fill fills *ValidateRequest receiver from apidef.ValidateRequestMeta.
 func (v *ValidateRequest) Fill(meta apidef.ValidateRequestMeta) {
 	v.Enabled = meta.Enabled
 	v.ErrorResponseCode = meta.ErrorResponseCode
 }
 
+// ExtractTo extracts *ValidateRequest into *apidef.ValidateRequestMeta.
 func (v *ValidateRequest) ExtractTo(meta *apidef.ValidateRequestMeta) {
 	meta.Enabled = v.Enabled
 	meta.ErrorResponseCode = v.ErrorResponseCode
 }
 
-func (v *ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operation) bool {
+func (*ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operation) bool {
 	reqBody := operation.RequestBody
 	if reqBody == nil {
 		return false
@@ -450,6 +479,7 @@ func (v *ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operat
 	return media != nil
 }
 
+// Import populates *ValidateRequest with enabled argument and a default error response code.
 func (v *ValidateRequest) Import(enabled bool) {
 	v.Enabled = enabled
 	v.ErrorResponseCode = http.StatusUnprocessableEntity
@@ -472,129 +502,28 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidateRequestMeta) {
 	}
 }
 
-/*func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		tykOp := s.GetTykExtension().getOperation(operationID)
-
-		if tykOp.ValidateRequest == nil {
-			tykOp.ValidateRequest = &ValidateRequest{}
-		}
-
-		tykOp.ValidateRequest.Fill(meta)
-
-		if ShouldOmit(tykOp.ValidateRequest) {
-			tykOp.ValidateRequest = nil
-		}
-
-		var schema openapi3.Schema
-		schemaInBytes, err := json.Marshal(meta.Schema)
-		if err != nil {
-			log.WithError(err).Error("Path meta schema couldn't be marshalled")
-			return
-		}
-
-		err = schema.UnmarshalJSON(schemaInBytes)
-		if err != nil {
-			log.WithError(err).Error("Schema couldn't be unmarshalled")
-			return
-		}
-
-		operation := s.Paths[meta.Path].GetOperation(meta.Method)
-
-		requestBody := operation.RequestBody
-		if requestBody == nil {
-			requestBody = &openapi3.RequestBodyRef{
-				Value: openapi3.NewRequestBody(),
-			}
-
-			operation.RequestBody = requestBody
-		}
-
-		bodyContent := requestBody.Value.Content
-		if bodyContent == nil {
-			bodyContent = openapi3.NewContent()
-			requestBody.Value.Content = bodyContent
-		}
-
-		mediaType := bodyContent.Get(contentTypeJSON)
-		if mediaType == nil {
-			mediaType = openapi3.NewMediaType()
-			bodyContent[contentTypeJSON] = mediaType
-		}
-
-		schemaRef := mediaType.Schema
-
-		if schemaRef == nil {
-			schemaRef = openapi3.NewSchemaRef("", &schema)
-		}
-
-		rawRef := schemaRef.Ref
-		ref := strings.TrimPrefix(rawRef, "#/components/schemas/")
-		if ref != "" {
-			if s.Components.Schemas == nil {
-				s.Components.Schemas = make(openapi3.Schemas)
-			}
-
-			s.Components.Schemas[ref] = openapi3.NewSchemaRef("", &schema)
-		} else {
-			operation.RequestBody.Value.WithJSONSchema(&schema)
-		}
-	}
+// MockResponse configures the mock responses.
+type MockResponse struct {
+	// Enabled enables the mock response middleware.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Code is the HTTP response code that will be returned.
+	Code int `bson:"code,omitempty" json:"code,omitempty"`
+	// Body is the HTTP response body that will be returned.
+	Body string `bson:"body,omitempty" json:"body,omitempty"`
+	// Headers are the HTTP response headers that will be returned.
+	Headers map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
+	// FromOASExamples is the configuration to extract a mock response from OAS documentation.
+	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }
 
-func (o *Operation) extractValidateRequestTo(ep *apidef.ExtendedPathsSet, path string, method string, operation *openapi3.Operation, components *openapi3.Components) {
-	meta := apidef.ValidatePathMeta{Path: path, Method: method}
-	if o.ValidateRequest != nil {
-		o.ValidateRequest.ExtractTo(&meta)
-
-		defer func() {
-			ep.ValidateJSON = append(ep.ValidateJSON, meta)
-		}()
-	}
-
-	reqBody := operation.RequestBody
-	if reqBody == nil {
-		return
-	}
-
-	reqBodyVal := reqBody.Value
-	if reqBodyVal == nil {
-		return
-	}
-
-	media := reqBodyVal.Content.Get("application/json")
-	if media == nil {
-		return
-	}
-
-	schema := media.Schema
-	if schema == nil {
-		return
-	}
-
-	var schemaVal *openapi3.Schema
-
-	ref := strings.TrimPrefix(schema.Ref, "#/components/schemas/")
-	if schemaRef, ok := components.Schemas[ref]; ok {
-		schemaVal = schemaRef.Value
-	} else {
-		schemaVal = schema.Value
-	}
-
-	if schemaVal == nil {
-		return
-	}
-
-	schemaInBytes, err := json.Marshal(schemaVal)
-	if err != nil {
-		log.WithError(err).Error("Schema value couldn't be marshalled")
-		return
-	}
-
-	err = json.Unmarshal(schemaInBytes, &meta.Schema)
-	if err != nil {
-		log.WithError(err).Error("Path meta schema couldn't be unmarshalled")
-	}
+// FromOASExamples configures mock responses should be returned from OAS example responses.
+type FromOASExamples struct {
+	// Enabled enables getting a mock response from OAS examples or schemas documented in OAS.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Code is the default HTTP response code that the gateway reads from the path responses documented in OAS.
+	Code int `bson:"code,omitempty" json:"code,omitempty"`
+	// ContentType is the default HTTP response body type that the gateway reads from the path responses documented in OAS.
+	ContentType string `bson:"contentType,omitempty" json:"contentType,omitempty"`
+	// ExampleName is the default example name among multiple path response examples documented in OAS.
+	ExampleName string `bson:"exampleName,omitempty" json:"exampleName,omitempty"`
 }
-*/

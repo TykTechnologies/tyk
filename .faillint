@@ -1,0 +1,2 @@
+fmt.{Print,Printf,Println}
+net/http.Get

@@ -13,17 +13,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 )
 
 const (
 	defaultTemplateName   = "error"
 	defaultTemplateFormat = "json"
-	defaultContentType    = headers.ApplicationJSON
+	defaultContentType    = header.ApplicationJSON
 
 	MsgAuthFieldMissing                        = "Authorization field missing"
 	MsgApiAccessDisallowed                     = "Access to this API has been disallowed"
@@ -128,24 +130,24 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	if writeResponse {
 		var templateExtension string
-		contentType := r.Header.Get(headers.ContentType)
+		contentType := r.Header.Get(header.ContentType)
 		contentType = strings.Split(contentType, ";")[0]
 
 		switch contentType {
-		case headers.ApplicationXML:
+		case header.ApplicationXML:
 			templateExtension = "xml"
-			contentType = headers.ApplicationXML
-		case headers.TextXML:
+			contentType = header.ApplicationXML
+		case header.TextXML:
 			templateExtension = "xml"
-			contentType = headers.TextXML
+			contentType = header.TextXML
 		default:
 			templateExtension = "json"
-			contentType = headers.ApplicationJSON
+			contentType = header.ApplicationJSON
 		}
 
-		w.Header().Set(headers.ContentType, contentType)
+		w.Header().Set(header.ContentType, contentType)
 		response.Header = http.Header{}
-		response.Header.Set(headers.ContentType, contentType)
+		response.Header.Set(header.ContentType, contentType)
 		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
@@ -161,21 +163,21 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if tmpl == nil {
 			templateName = defaultTemplateName + "." + defaultTemplateFormat
 			tmpl = e.Gw.templates.Lookup(templateName)
-			w.Header().Set(headers.ContentType, defaultContentType)
-			response.Header.Set(headers.ContentType, defaultContentType)
+			w.Header().Set(header.ContentType, defaultContentType)
+			response.Header.Set(header.ContentType, defaultContentType)
 
 		}
 
 		//If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
-			w.Header().Add(headers.XGenerator, "tyk.io")
-			response.Header.Add(headers.XGenerator, "tyk.io")
+			w.Header().Add(header.XGenerator, "tyk.io")
+			response.Header.Add(header.XGenerator, "tyk.io")
 		}
 
 		// Close connections
 		if e.Spec.GlobalConfig.CloseConnections {
-			w.Header().Add(headers.Connection, "close")
-			response.Header.Add(headers.Connection, "close")
+			w.Header().Add(header.Connection, "close")
+			response.Header.Add(header.Connection, "close")
 
 		}
 
@@ -188,7 +190,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
 
-			if contentType == headers.ApplicationXML || contentType == headers.TextXML {
+			if contentType == header.ApplicationXML || contentType == header.TextXML {
 				apiError.Message = template.HTML(errMsg)
 
 				//we look up in the last defined templateName to obtain the template.
@@ -289,7 +291,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			Path:          trackedPath,
 			RawPath:       r.URL.Path,
 			ContentLength: r.ContentLength,
-			UserAgent:     r.Header.Get(headers.UserAgent),
+			UserAgent:     r.Header.Get(header.UserAgent),
 			Day:           t.Day(),
 			Month:         t.Month(),
 			Year:          t.Year(),
@@ -318,7 +320,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
 			record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)
 		}
-		if e.Spec.GraphQL.Enabled {
+		if e.Spec.GraphQL.Enabled && e.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
 			record.Tags = append(record.Tags, "tyk-graph-analytics")
 			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(e.Spec.GraphQL.Schema))
 		}

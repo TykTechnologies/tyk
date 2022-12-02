@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -18,32 +19,40 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/getkin/kin-openapi/routers"
+
+	"github.com/getkin/kin-openapi/routers/gorillamux"
+
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/cenk/backoff"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 
 	"github.com/Masterminds/sprig/v3"
 
-	circuit "github.com/TykTechnologies/circuitbreaker"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+
+	circuit "github.com/TykTechnologies/circuitbreaker"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/gojsonschema"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-//const used by cache middleware
+// const used by cache middleware
 const SAFE_METHODS = "SAFE_METHODS"
 
 const (
@@ -81,6 +90,7 @@ const (
 	ValidateRequestWithOAS
 	Internal
 	GoPlugin
+	PersistGraphQL
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -116,6 +126,7 @@ const (
 	StatusValidateRequest          RequestStatus = "Validate Request"
 	StatusInternal                 RequestStatus = "Internal path"
 	StatusGoPlugin                 RequestStatus = "Go plugin"
+	StatusPersistGraphQL           RequestStatus = "Persist GraphQL"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -148,6 +159,7 @@ type URLSpec struct {
 	ValidateRequest           apidef.ValidateRequestMeta
 	Internal                  apidef.InternalMeta
 	GoPluginMeta              GoPluginMiddleware
+	PersistGraphQL            apidef.PersistGraphQLMeta
 
 	IgnoreCase bool
 }
@@ -175,6 +187,7 @@ type APISpec struct {
 	OAS oas.OAS
 	sync.RWMutex
 
+	Checksum                 string
 	RxPaths                  map[string][]URLSpec
 	WhiteListEnabled         map[string]bool
 	target                   *url.URL
@@ -212,9 +225,13 @@ type APISpec struct {
 			BeforeFetchHook resolve.BeforeFetchHook
 			AfterFetchHook  resolve.AfterFetchHook
 		}
-		Client *http.Client
-		Schema *graphql.Schema
+		Client          *http.Client
+		StreamingClient *http.Client
+		Schema          *graphql.Schema
 	} `json:"-"`
+
+	hasMock   bool
+	OASRouter routers.Router
 }
 
 // GetSessionLifetimeRespectsKeyExpiration returns a boolean to tell whether session lifetime should respect to key expiration or not.
@@ -245,6 +262,11 @@ func (s *APISpec) Release() {
 	}
 
 	// release all other resources associated with spec
+
+	// JSVM object is a circular dependecy hell, but we can check if it initialized like this
+	if s.JSVM.VM != nil {
+		s.JSVM.DeInit()
+	}
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
@@ -287,6 +309,19 @@ type APIDefinitionLoader struct {
 // keyed to the Api version name, which is determined during routing to speed up lookups
 func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.Entry) *APISpec {
 	spec := &APISpec{}
+	apiString, err := json.Marshal(def)
+	if err != nil {
+		logger.WithError(err).WithField("name", def.Name).Error("Failed to JSON marshal API definition")
+		return spec
+	}
+
+	sha256hash := sha256.Sum256(apiString)
+	// Unique API content ID, to check if we already have if it changed from previous sync
+	spec.Checksum = base64.URLEncoding.EncodeToString(sha256hash[:])
+
+	if currSpec := a.Gw.getApiSpec(def.APIID); currSpec != nil && currSpec.Checksum == spec.Checksum {
+		return a.Gw.getApiSpec(def.APIID)
+	}
 
 	if logger == nil {
 		logger = logrus.NewEntry(log)
@@ -334,22 +369,13 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 
 	spec.GlobalConfig = a.Gw.GetConfig()
 
-	// Create and init the virtual Machine
-	if a.Gw.GetConfig().EnableJSVM {
-		mwPaths, _, _, _, _, _, _ := a.Gw.loadCustomMiddleware(spec)
+	if err = a.Gw.loadBundle(spec); err != nil {
+		logger.WithError(err).Error("Couldn't load bundle")
+	}
 
-		hasVirtualEndpoint := false
-
-		for _, version := range spec.VersionData.Versions {
-			if len(version.ExtendedPaths.Virtual) > 0 {
-				hasVirtualEndpoint = true
-				break
-			}
-		}
-
-		if spec.CustomMiddlewareBundle != "" || len(mwPaths) > 0 || hasVirtualEndpoint {
-			spec.JSVM.Init(spec, logger, a.Gw)
-		}
+	if a.Gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || spec.CustomMiddleware.Driver == apidef.OttoDriver) {
+		logger.Debug("Initializing JSVM")
+		spec.JSVM.Init(spec, logger, a.Gw)
 	}
 
 	// Set up Event Handlers
@@ -397,6 +423,23 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 
 		spec.OAS = *def.OAS
 	}
+
+	serverURL := spec.Proxy.ListenPath
+	if spec.Proxy.StripListenPath {
+		serverURL = "/"
+	}
+
+	oasSpec := spec.OAS.T
+	oasSpec.Servers = openapi3.Servers{
+		{URL: serverURL},
+	}
+
+	spec.OASRouter, err = gorillamux.NewRouter(&oasSpec)
+	if err != nil {
+		log.WithError(err).Error("Could not create OAS router")
+	}
+
+	spec.setHasMock()
 
 	return spec
 }
@@ -460,10 +503,10 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 
 	newRequest.Header.Set("authorization", gwConfig.NodeSecret)
 	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
-	newRequest.Header.Set(headers.XTykNodeID, a.Gw.GetNodeID())
+	newRequest.Header.Set(header.XTykNodeID, a.Gw.GetNodeID())
 
 	a.Gw.ServiceNonceMutex.RLock()
-	newRequest.Header.Set(headers.XTykNonce, a.Gw.ServiceNonce)
+	newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
 	a.Gw.ServiceNonceMutex.RUnlock()
 
 	c := a.Gw.initialiseClient()
@@ -614,29 +657,42 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 			continue
 		}
 
-		log.Info("Loading API Specification from ", path)
-		f, err := os.Open(path)
+		spec, err := a.loadDefFromFilePath(path)
+
 		if err != nil {
-			log.Error("Couldn't open api configuration file: ", err)
 			continue
 		}
-
-		def := a.ParseDefinition(f)
-		nestDef := nestedApiDefinition{APIDefinition: &def}
-		loader := openapi3.NewLoader()
-		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(path))
-		if err == nil {
-			nestDef.OAS = &oas.OAS{T: *oasDoc}
-		}
-
-		spec := a.MakeSpec(&nestDef, nil)
-
-		_, _ = f.Seek(0, io.SeekStart)
-		_ = f.Close()
 
 		specs = append(specs, spec)
 	}
 	return specs
+}
+func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, error) {
+	log.Info("Loading API Specification from ", filePath)
+	f, err := os.Open(filePath)
+	defer func() {
+		err = f.Close()
+		log.Error("error while closing file ", filePath)
+	}()
+
+	if err != nil {
+		log.Error("Couldn't open api configuration file: ", err)
+		return nil, err
+	}
+
+	def := a.ParseDefinition(f)
+	nestDef := nestedApiDefinition{APIDefinition: &def}
+	if def.IsOAS {
+		loader := openapi3.NewLoader()
+		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(filePath))
+		if err == nil {
+			nestDef.OAS = &oas.OAS{T: *oasDoc}
+		}
+	}
+
+	spec := a.MakeSpec(&nestDef, nil)
+
+	return spec, nil
 }
 
 func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf config.Config) ([]URLSpec, bool) {
@@ -1056,6 +1112,26 @@ func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPlugi
 	return urlSpec
 }
 
+func (a APIDefinitionLoader) compilePersistGraphQLPathSpec(paths []apidef.PersistGraphQLMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	urlSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
+		// Extend with method actions
+		newSpec.PersistGraphQL.Path = stringSpec.Path
+		newSpec.PersistGraphQL.Method = stringSpec.Method
+		newSpec.PersistGraphQL.Operation = stringSpec.Operation
+		newSpec.PersistGraphQL.Variables = stringSpec.Variables
+
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
 func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
 
 	urlSpec := []URLSpec{}
@@ -1171,6 +1247,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	validateRequest := a.compileValidateRequestSpec(apiVersionDef.ExtendedPaths.ValidateRequest, ValidateRequestWithOAS, conf)
 	internalPaths := a.compileInternalPathspathSpec(apiVersionDef.ExtendedPaths.Internal, Internal, conf)
 	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
+	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
@@ -1189,6 +1266,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, urlRewrites...)
 	combinedPath = append(combinedPath, requestSizes...)
 	combinedPath = append(combinedPath, goPlugins...)
+	combinedPath = append(combinedPath, persistGraphQL...)
 	combinedPath = append(combinedPath, virtualPaths...)
 	combinedPath = append(combinedPath, methodTransforms...)
 	combinedPath = append(combinedPath, trackedPaths...)
@@ -1256,7 +1334,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusInternal
 	case GoPlugin:
 		return StatusGoPlugin
-
+	case PersistGraphQL:
+		return StatusPersistGraphQL
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -1482,6 +1561,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 			if method == rxPaths[i].GoPluginMeta.Meta.Method {
 				return true, &rxPaths[i].GoPluginMeta
 			}
+		case PersistGraphQL:
+			if method == rxPaths[i].PersistGraphQL.Method {
+				return true, &rxPaths[i].PersistGraphQL
+			}
 		}
 	}
 	return false, nil
@@ -1662,6 +1745,41 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	log.Debug("Upstream path is: ", r.URL.Path)
 }
 
+func (a *APISpec) HasMock() bool {
+	return a.hasMock
+}
+
+func (a *APISpec) setHasMock() {
+	if !a.IsOAS {
+		a.hasMock = false
+		return
+	}
+
+	middleware := a.OAS.GetTykExtension().Middleware
+	if middleware == nil {
+		a.hasMock = false
+		return
+	}
+
+	if len(middleware.Operations) == 0 {
+		a.hasMock = false
+		return
+	}
+
+	for _, operation := range middleware.Operations {
+		if operation.MockResponse == nil {
+			continue
+		}
+
+		if operation.MockResponse.Enabled {
+			a.hasMock = true
+			return
+		}
+	}
+
+	a.hasMock = false
+}
+
 type RoundRobin struct {
 	pos uint32
 }
@@ -1694,4 +1812,14 @@ func stripListenPath(listenPath, path string) (res string) {
 	}
 	reg := regexp.MustCompile(s)
 	return reg.ReplaceAllString(path, "")
+}
+
+func (s *APISpec) hasVirtualEndpoint() bool {
+	for _, version := range s.VersionData.Versions {
+		if len(version.ExtendedPaths.Virtual) > 0 {
+			return true
+		}
+	}
+
+	return false
 }

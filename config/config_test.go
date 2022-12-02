@@ -10,10 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nsf/jsondiff"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
@@ -328,7 +329,7 @@ func TestPortsWhiteListDecoder(t *testing.T) {
 	assert.Empty(t, tlsWhiteList)
 
 	//testing real value
-	err = os.Setenv("TYK_GW_PORTWHITELIST", `{"http":{"ranges":[{"from":8000,"to":9000}]},"tls":{"ports":[6000,6015]}}`)
+	err = os.Setenv("TYK_GW_PORTWHITELIST", "{\"http\":{\"ranges\":[{\"from\":8000,\"to\":9000}]},\"tls\":{\"ports\":[6000,6015]}}")
 	assert.NoError(t, err)
 
 	err = envconfig.Process("TYK_GW", &c)

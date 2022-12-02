@@ -4,8 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func Test_BuildDashboardConnStr(t *testing.T) {
