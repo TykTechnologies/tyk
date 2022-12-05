@@ -27,7 +27,7 @@ import (
 
 const (
 	bundleGetRetryWait = 1 * time.Second
-	bundleGetRetries   = 3
+	bundleGetRetries   = 4
 )
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
@@ -153,7 +153,7 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 	client := &http.Client{Transport: tr}
 
 	var httpError string
-	for tries := bundleGetRetries; tries > 0; tries-- {
+	for tries := bundleGetRetries - 1; tries >= 0; tries-- {
 		resp, st, err := func() ([]byte, int, error) {
 			resp, err := client.Get(g.URL)
 			if err != nil {
@@ -181,8 +181,10 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 			return nil, err
 		} else {
 			httpError = fmt.Sprintf("HTTP Error, got status code %d", st)
-			backoff := math.Pow(float64(1+bundleGetRetries-tries), 2)
-			time.Sleep(time.Duration(backoff) * bundleGetRetryWait)
+			if tries > 0 {
+				backoff := math.Pow(float64(bundleGetRetries-tries), 2)
+				time.Sleep(time.Duration(backoff) * bundleGetRetryWait)
+			}
 		}
 	}
 	return nil, errors.New(httpError)
