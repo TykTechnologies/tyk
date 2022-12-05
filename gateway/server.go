@@ -1011,11 +1011,6 @@ func (gw *Gateway) setupLogger() {
 		}
 
 		hook, err := logrus_sentry.NewSentryHook(gwConfig.SentryCode, logLevel)
-<<<<<<< HEAD
-		hook.Timeout = 0
-=======
->>>>>>> 1beafa06... [TT-7124] Fix pointer error (#4291)
-
 		if err == nil {
 			hook.Timeout = 0
 			log.Hooks.Add(hook)
