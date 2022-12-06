@@ -350,10 +350,10 @@ type HttpServerOptionsConfig struct {
 	// No longer used
 	OverrideDefaults bool `json:"-"`
 
-	// User -> Gateway network read timeout
+	// User -> Gateway network read timeout. Not setting this config, or setting this to 0, defaults to 120 seconds
 	ReadTimeout int `json:"read_timeout"`
 
-	// User -> Gateway network write timeout
+	// User -> Gateway network write timeout. Not setting this config, or setting this to 0, defaults to 120 seconds
 	WriteTimeout int `json:"write_timeout"`
 
 	// Set to true to enable SSL connections
