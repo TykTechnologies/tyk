@@ -1321,7 +1321,11 @@
         "enabled": {
           "type": "boolean"
         }
-      }
+      },
+      "required": [
+        "enabled",
+        "name"
+      ]
     },
     "X-Tyk-Header": {
       "type": "object",
