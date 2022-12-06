@@ -159,6 +159,21 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onConnect func(),
 	}
 }
 
+<<<<<<< HEAD
+=======
+// recoverLoop will be checking waiting for a rc.reconnect signal to trigger the onReconnect func.
+func (rc *RedisController) recoverLoop(ctx context.Context, onReconnect func()) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-rc.reconnect:
+			onReconnect()
+		}
+	}
+}
+
+>>>>>>> fdb3b189... Remove unused ticker (#4188) (#4489)
 func (rc *RedisController) connectCluster(conf config.Config, v ...RedisCluster) bool {
 	for _, x := range v {
 		if ok := rc.establishConnection(&x, conf); ok {
