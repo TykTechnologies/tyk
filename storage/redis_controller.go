@@ -207,8 +207,6 @@ func (rc *RedisController) statusCheck(ctx context.Context, conf *config.Config,
 
 // recoverLoop will be checking waiting for a rc.reconnect signal to trigger the onReconnect func.
 func (rc *RedisController) recoverLoop(ctx context.Context, onReconnect func()) {
-	tick := time.NewTicker(time.Second)
-	defer tick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
