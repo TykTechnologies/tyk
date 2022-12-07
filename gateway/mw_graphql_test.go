@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -36,6 +37,23 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 		g.Gw.LoadAPI(spec)
 
 		_, _ = g.Run(t, test.TestCase{BodyMatch: "there was a problem proxying the request", Code: http.StatusInternalServerError})
+	})
+
+	t.Run("Inspect __typename without hitting the upstream", func(t *testing.T) {
+		// See TT-6419
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		g.Gw.LoadAPI(spec)
+
+		request := gql.Request{
+			Variables: nil,
+			Query:     "query { __typename }",
+		}
+
+		expectedBody := []byte(`{"data":{"__typename":"Query"}}`)
+		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatchFunc: func(body []byte) bool {
+			return bytes.Equal(expectedBody, body)
+		}, Code: http.StatusOK})
 	})
 
 	t.Run("Introspection query with custom query type should successfully work", func(t *testing.T) {
