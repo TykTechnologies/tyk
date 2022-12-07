@@ -784,7 +784,8 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 
 	if rt.h2ctransport != nil {
-		return rt.h2ctransport.RoundTrip(r)
+		h2cTransport := otelhttp.NewTransport(rt.h2ctransport)
+		return h2cTransport.RoundTrip(r)
 	}
 	if trace.IsEnabled() {
 		tr := otelhttp.NewTransport(rt.transport)
