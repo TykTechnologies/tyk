@@ -39,23 +39,6 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 		_, _ = g.Run(t, test.TestCase{BodyMatch: "there was a problem proxying the request", Code: http.StatusInternalServerError})
 	})
 
-	t.Run("Inspect __typename without hitting the upstream", func(t *testing.T) {
-		// See TT-6419
-		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
-		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
-		g.Gw.LoadAPI(spec)
-
-		request := gql.Request{
-			Variables: nil,
-			Query:     "query { __typename }",
-		}
-
-		expectedBody := []byte(`{"data":{"__typename":"Query"}}`)
-		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatchFunc: func(body []byte) bool {
-			return bytes.Equal(expectedBody, body)
-		}, Code: http.StatusOK})
-	})
-
 	t.Run("Introspection query with custom query type should successfully work", func(t *testing.T) {
 		spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: word } type word { numOfLetters: Int }"
 		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
@@ -221,6 +204,31 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				{Data: countries1, BodyMatch: `"There was a problem proxying the request`, Code: http.StatusInternalServerError},
 			}...)
 		})
+	})
+
+	t.Run("Inspect __typename without hitting the upstream", func(t *testing.T) {
+		// See TT-6419
+		g := StartTest(nil)
+		defer g.Close()
+
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/"
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		})
+
+		request := gql.Request{
+			Variables: nil,
+			Query:     "query { __typename }",
+		}
+
+		expectedBody := []byte(`{"data":{"__typename":"Query"}}`)
+		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatchFunc: func(body []byte) bool {
+			return bytes.Equal(expectedBody, body)
+		},
+			Code: http.StatusOK})
 	})
 
 	t.Run("graphql engine v2", func(t *testing.T) {
