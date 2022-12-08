@@ -8,7 +8,7 @@ on:
 env:
   TYK_DB_REDISHOST: localhost
   TYK_GW_STORAGE_HOST: localhost
-  PYTHON_VERSION: '3.7.15'
+  PYTHON_VERSION: '3.9'
 
 jobs:
   test:
@@ -18,7 +18,7 @@ jobs:
       fail-fast: true
       matrix:
         redis-version: [5]
-        python-version: ['3.7.15']
+        python-version: ['3.9']
         go: [1.16]
 
     steps:
