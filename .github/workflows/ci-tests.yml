@@ -9,6 +9,7 @@ env:
   TYK_DB_REDISHOST: localhost
   TYK_GW_STORAGE_HOST: localhost
   PYTHON_VERSION: '3.9'
+  CGO_ENABLED: 1
 
 jobs:
   test:
@@ -82,7 +83,7 @@ jobs:
         id: ci-tests
         run: |
           python3 -V
-          env | grep PYTHON
+          env | egrep '(PYTHON|CGO)'
 
           ./bin/ci-tests.sh 2>&1 | tee test.log
           result_code=${PIPESTATUS[0]}
