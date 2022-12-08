@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-import "coprocess_return_overrides.proto";
-
 package coprocess;
+
+option go_package = "github.com/TykTechnologies/tyk/coprocess";
 
 message ResponseObject {
   int32 status_code = 1;

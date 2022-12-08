@@ -1,12 +1,12 @@
 #!/bin/sh
-
+set -xe
 # Dependencies needed:
 # * grpc (for protoc)
 # * go get -u github.com/golang/protobuf/protoc-gen-go
 # * pip3 install grpcio grpcio-tools
 
 echo "Generating bindings for Go."
-protoc -I. --go_out=plugins=grpc:../ *.proto
+protoc -I. --go_out=paths=source_relative:.. *.proto
 
 echo "Generating bindings for Python."
 mkdir -p ../bindings/python
