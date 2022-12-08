@@ -9,6 +9,7 @@ env:
   TYK_DB_REDISHOST: localhost
   TYK_GW_STORAGE_HOST: localhost
   PYTHON_VERSION: '3.9'
+  TYK_LOGLEVEL: debug
   CGO_ENABLED: 1
 
 jobs:
