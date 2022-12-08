@@ -7,6 +7,10 @@
 package coprocess
 
 import (
+	context "context"
+	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -367,4 +371,120 @@ func file_coprocess_object_proto_init() {
 	file_coprocess_object_proto_rawDesc = nil
 	file_coprocess_object_proto_goTypes = nil
 	file_coprocess_object_proto_depIdxs = nil
+}
+
+// Reference imports to suppress errors if they are not otherwise used.
+var _ context.Context
+var _ grpc.ClientConnInterface
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the grpc package it is being compiled against.
+const _ = grpc.SupportPackageIsVersion6
+
+// DispatcherClient is the client API for Dispatcher service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
+type DispatcherClient interface {
+	Dispatch(ctx context.Context, in *Object, opts ...grpc.CallOption) (*Object, error)
+	DispatchEvent(ctx context.Context, in *Event, opts ...grpc.CallOption) (*EventReply, error)
+}
+
+type dispatcherClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewDispatcherClient(cc grpc.ClientConnInterface) DispatcherClient {
+	return &dispatcherClient{cc}
+}
+
+func (c *dispatcherClient) Dispatch(ctx context.Context, in *Object, opts ...grpc.CallOption) (*Object, error) {
+	out := new(Object)
+	err := c.cc.Invoke(ctx, "/coprocess.Dispatcher/Dispatch", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dispatcherClient) DispatchEvent(ctx context.Context, in *Event, opts ...grpc.CallOption) (*EventReply, error) {
+	out := new(EventReply)
+	err := c.cc.Invoke(ctx, "/coprocess.Dispatcher/DispatchEvent", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DispatcherServer is the server API for Dispatcher service.
+type DispatcherServer interface {
+	Dispatch(context.Context, *Object) (*Object, error)
+	DispatchEvent(context.Context, *Event) (*EventReply, error)
+}
+
+// UnimplementedDispatcherServer can be embedded to have forward compatible implementations.
+type UnimplementedDispatcherServer struct {
+}
+
+func (*UnimplementedDispatcherServer) Dispatch(context.Context, *Object) (*Object, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Dispatch not implemented")
+}
+func (*UnimplementedDispatcherServer) DispatchEvent(context.Context, *Event) (*EventReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DispatchEvent not implemented")
+}
+
+func RegisterDispatcherServer(s *grpc.Server, srv DispatcherServer) {
+	s.RegisterService(&_Dispatcher_serviceDesc, srv)
+}
+
+func _Dispatcher_Dispatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Object)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DispatcherServer).Dispatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/coprocess.Dispatcher/Dispatch",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DispatcherServer).Dispatch(ctx, req.(*Object))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Dispatcher_DispatchEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Event)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DispatcherServer).DispatchEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/coprocess.Dispatcher/DispatchEvent",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DispatcherServer).DispatchEvent(ctx, req.(*Event))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+var _Dispatcher_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "coprocess.Dispatcher",
+	HandlerType: (*DispatcherServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Dispatch",
+			Handler:    _Dispatcher_Dispatch_Handler,
+		},
+		{
+			MethodName: "DispatchEvent",
+			Handler:    _Dispatcher_DispatchEvent_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "coprocess_object.proto",
 }
