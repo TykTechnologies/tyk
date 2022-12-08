@@ -23,7 +23,7 @@ jobs:
     
     steps:
     - name: Set up Python 3.7
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: 3.7
 
@@ -129,6 +129,7 @@ jobs:
         TYK_TEST_REDIS: "tyk-redis"
         TYK_TEST_DB_ADMIN: "12345"
         TYK_TEST_GW_SECRET: "352d20ee67be67f6340b4c0605b044b7"
+        TYK_TEST_FEDERATION_HOST: federation
       run: |
         pytest
       working-directory: tyk-automated-tests
