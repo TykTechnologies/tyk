@@ -9,8 +9,6 @@ env:
   TYK_DB_REDISHOST: localhost
   TYK_GW_STORAGE_HOST: localhost
   PYTHON_VERSION: '3.9'
-  TYK_LOGLEVEL: debug
-  CGO_ENABLED: 1
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
@@ -84,9 +82,6 @@ jobs:
       - name: Run Gateway Tests
         id: ci-tests
         run: |
-          python3 -V
-          env | egrep '(PYTHON|CGO)'
-
           ./bin/ci-tests.sh 2>&1 | tee test.log
           result_code=${PIPESTATUS[0]}
           echo "::set-output name=log::$(sed -ze 's/%/%25/g;s/\n/%0A/g' test.log)"
