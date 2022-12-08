@@ -11,6 +11,7 @@ env:
   PYTHON_VERSION: '3.9'
   TYK_LOGLEVEL: debug
   CGO_ENABLED: 1
+  PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
   test:
