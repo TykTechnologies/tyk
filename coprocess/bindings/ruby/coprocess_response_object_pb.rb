@@ -3,7 +3,6 @@
 
 require 'google/protobuf'
 
-require 'coprocess_return_overrides_pb'
 Google::Protobuf::DescriptorPool.generated_pool.build do
   add_file("coprocess_response_object.proto", :syntax => :proto3) do
     add_message "coprocess.ResponseObject" do
