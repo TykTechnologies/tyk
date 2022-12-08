@@ -1,9 +1,10 @@
 package gateway
 
 import (
-	"github.com/cenk/backoff"
 	"path"
 	"time"
+
+	"github.com/cenk/backoff"
 
 	"github.com/sirupsen/logrus"
 
