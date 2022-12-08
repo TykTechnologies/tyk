@@ -1,7 +1,9 @@
 package gateway
 
 import (
+	"github.com/cenk/backoff"
 	"path"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -146,6 +148,7 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 	}
 	client := &http.Client{Transport: tr}
 
+	log.Infof("Attempting to download plugin bundle: %v", g.URL)
 	resp, err := client.Get(g.URL)
 	if err != nil {
 		return nil, err
@@ -259,7 +262,16 @@ func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
 		return bundle, err
 	}
 
-	bundleData, err := getter.Get()
+	var bundleData []byte
+	downloadBundle := func() error {
+		bundleData, err = getter.Get()
+		return err
+	}
+
+	exponentialBackoff := backoff.NewExponentialBackOff()
+	exponentialBackoff.Multiplier = 0.5
+	exponentialBackoff.MaxInterval = 5 * time.Second
+	err = backoff.Retry(downloadBundle, backoff.WithMaxRetries(exponentialBackoff, 4))
 
 	bundle.Name = spec.CustomMiddlewareBundle
 	bundle.Data = bundleData
