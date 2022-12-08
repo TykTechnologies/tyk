@@ -176,7 +176,7 @@ func TestHTTP2_TLS(t *testing.T) {
 	defer ts.Gw.CertificateManager.Delete(certID, "")
 
 	// reload server so it takes the new cert
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -218,7 +218,7 @@ func TestTLSTyk_H2cUpstream(t *testing.T) {
 	certID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
 	defer ts.Gw.CertificateManager.Delete(certID, "")
 
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	h2cServ := &http2.Server{}
 	expected := "HTTP/2.0"
@@ -275,7 +275,7 @@ func TestGRPC_TLS(t *testing.T) {
 
 	certID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
 	defer ts.Gw.CertificateManager.Delete(certID, "")
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -322,7 +322,7 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	certID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
 	defer ts.Gw.CertificateManager.Delete(certID, "")
 	// reload so the gw loads the cert
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	clientCertID, _ := ts.Gw.CertificateManager.Add(combinedClientPEM, "") // For upstream to know tyk
 	defer ts.Gw.CertificateManager.Delete(clientCertID, "")
@@ -379,7 +379,7 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 
 	certID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
 	defer ts.Gw.CertificateManager.Delete(certID, "")
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	session := CreateStandardSession()
 	session.BasicAuthData.Password = "password"
@@ -439,7 +439,7 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 
 	certID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
 	defer ts.Gw.CertificateManager.Delete(certID, "")
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	session := CreateStandardSession()
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
@@ -695,7 +695,7 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	clientCertID, _ := ts.Gw.CertificateManager.Add(combinedClientPEM, "") // For upstream to know tyk
 	defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	// Protected gRPC server
 	target, s := startGRPCServer(t, clientCert.Leaf, setupStreamSVC)
@@ -756,7 +756,7 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 	}
 
 	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	session := CreateStandardSession()
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
@@ -824,7 +824,7 @@ func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 
 	serverCertID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
 	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	session := CreateStandardSession()
 	session.BasicAuthData.Password = "password"

@@ -139,7 +139,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	//add the server certificate to the gateway CertificateManager
 	ts.Gw.CertificateManager.Add(combinedPEM, "")
 	//We reload the gw proxy so it uses the added server certificate
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)

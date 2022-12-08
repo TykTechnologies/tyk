@@ -138,7 +138,7 @@ func TestGatewayTLS(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer ts.Gw.CertificateManager.Delete(certID, "")
-		ts.ReloadGatewayProxy()
+		ts.reloadGatewayProxy()
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -179,7 +179,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 
 		certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
 		defer ts.Gw.CertificateManager.Delete(certID, "")
-		ts.ReloadGatewayProxy()
+		ts.reloadGatewayProxy()
 
 		defer func() {
 			ts.Gw.CertificateManager.FlushCache()
@@ -220,7 +220,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 
 		clientCertID, _ = ts.Gw.CertificateManager.Add(clientCertPem, "")
 		defer ts.Gw.CertificateManager.Delete(clientCertID, "")
-		ts.ReloadGatewayProxy()
+		ts.reloadGatewayProxy()
 
 		// Should pass request with valid client cert
 		_, _ = ts.Run(t, test.TestCase{
@@ -246,7 +246,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 
 		clientCertID, _ = ts.Gw.CertificateManager.Add(clientCertPem, "")
 		defer ts.Gw.CertificateManager.Delete(clientCertID, "")
-		ts.ReloadGatewayProxy()
+		ts.reloadGatewayProxy()
 
 		// Should fail as no valid cert IDs exist in Certificates.ControlAPI
 		_, _ = ts.Run(t, test.TestCase{
@@ -272,7 +272,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 
 		clientCertID, _ = ts.Gw.CertificateManager.Add(clientCertPem, "")
 		defer ts.Gw.CertificateManager.Delete(clientCertID, "")
-		ts.ReloadGatewayProxy()
+		ts.reloadGatewayProxy()
 
 		// Should pass request with valid client cert
 		_, _ = ts.Run(t, test.TestCase{
@@ -299,7 +299,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		panic(err)
 	}
 	defer ts.Gw.CertificateManager.Delete(certID, "")
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	// Initialize client certificates
 	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
@@ -923,7 +923,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 	serverCertID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
 	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	orgId := "default"
 	t.Run("Without domain", func(t *testing.T) {
@@ -1349,7 +1349,7 @@ func TestCipherSuites(t *testing.T) {
 
 	serverCertID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
 	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
-	ts.ReloadGatewayProxy()
+	ts.reloadGatewayProxy()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
