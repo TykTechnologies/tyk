@@ -104,14 +104,15 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
-	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
-
 	// Check sentinel
 	_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
 	if sentinelActive == nil {
 		// Sentinel is set, fail
 		return true
 	}
+
+	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
+
 	return false
 }
 
