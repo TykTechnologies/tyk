@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -202,6 +203,31 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				{Data: countries1, BodyMatch: `"There was a problem proxying the request`, Code: http.StatusInternalServerError},
 			}...)
 		})
+	})
+
+	t.Run("Inspect __typename without hitting the upstream", func(t *testing.T) {
+		// See TT-6419
+		g := StartTest(nil)
+		defer g.Close()
+
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/"
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		})
+
+		request := gql.Request{
+			Variables: nil,
+			Query:     "query { __typename }",
+		}
+
+		expectedBody := []byte(`{"data":{"__typename":"Query"}}`)
+		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatchFunc: func(body []byte) bool {
+			return bytes.Equal(expectedBody, body)
+		},
+			Code: http.StatusOK})
 	})
 
 	t.Run("graphql engine v2", func(t *testing.T) {
