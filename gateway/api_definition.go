@@ -628,11 +628,11 @@ func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition) []*APIS
 		if def.CustomMiddlewareBundle != "" {
 			wg.Add(1)
 			go func() {
-				a.appendSpec(def, &specsMutex, &specs)
+				a.appendSpec(&def, &specsMutex, &specs)
 				wg.Done()
 			}()
 		} else {
-			a.appendSpec(def, &specsMutex, &specs)
+			a.appendSpec(&def, &specsMutex, &specs)
 		}
 	}
 
@@ -640,8 +640,8 @@ func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition) []*APIS
 	return specs
 }
 
-func (a APIDefinitionLoader) appendSpec(def nestedApiDefinition, specsMutex *sync.RWMutex, specs *[]*APISpec) {
-	spec := a.MakeSpec(&def, nil)
+func (a APIDefinitionLoader) appendSpec(def *nestedApiDefinition, specsMutex *sync.RWMutex, specs *[]*APISpec) {
+	spec := a.MakeSpec(def, nil)
 	specsMutex.Lock()
 	*specs = append(*specs, spec)
 	specsMutex.Unlock()
