@@ -264,7 +264,7 @@ func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
 		return bundle, err
 	}
 
-	bundleData, err := pullBundle(getter)
+	bundleData, err := pullBundle(getter, 2)
 
 	bundle.Name = spec.CustomMiddlewareBundle
 	bundle.Data = bundleData
@@ -272,7 +272,7 @@ func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
 	return bundle, err
 }
 
-func pullBundle(getter BundleGetter) ([]byte, error) {
+func pullBundle(getter BundleGetter, backoffMultiplier float64) ([]byte, error) {
 	var bundleData []byte
 	var err error
 	downloadBundle := func() error {
@@ -281,7 +281,7 @@ func pullBundle(getter BundleGetter) ([]byte, error) {
 	}
 
 	exponentialBackoff := backoff.NewExponentialBackOff()
-	exponentialBackoff.Multiplier = 0.5
+	exponentialBackoff.Multiplier = backoffMultiplier
 	exponentialBackoff.MaxInterval = 5 * time.Second
 	err = backoff.Retry(downloadBundle, backoff.WithMaxRetries(exponentialBackoff, 4))
 	return bundleData, err

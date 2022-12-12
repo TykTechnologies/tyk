@@ -291,7 +291,7 @@ func TestPullBundle(t *testing.T) {
 				URL:                ts.URL,
 				InsecureSkipVerify: false,
 			}
-			_, err := pullBundle(getter)
+			_, err := pullBundle(getter, 0)
 
 			didErr := err != nil
 			assert.Equal(t, tc.expectedAttempts, attempts)
