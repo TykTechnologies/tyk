@@ -4,6 +4,8 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -242,4 +245,56 @@ func TestResponseOverride(t *testing.T) {
 	t.Run("JSVM", func(t *testing.T) {
 		testOverride(t, ts.RegisterBundle("jsvm_override", overrideResponseJSVM))
 	})
+}
+
+func TestPullBundle(t *testing.T) {
+
+	testCases := []struct {
+		name             string
+		expectedAttempts int
+		shouldErr        bool
+	}{
+		{
+			name:             "bundle downloaded at first attempt",
+			expectedAttempts: 1,
+			shouldErr:        false,
+		},
+		{
+			// failed the 2 first times
+			name:             "bundle downloaded at third attempt",
+			expectedAttempts: 3,
+			shouldErr:        false,
+		},
+		{
+			// should try 5 times, afterwards it will fail
+			name:             "bundle download failed",
+			expectedAttempts: 5,
+			shouldErr:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			attempts := 0
+
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				attempts++
+				if tc.expectedAttempts > attempts || tc.shouldErr {
+					// simulate not found file, so it will throw err
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer ts.Close()
+
+			getter := &HTTPBundleGetter{
+				URL:                ts.URL,
+				InsecureSkipVerify: false,
+			}
+			_, err := pullBundle(getter)
+
+			didErr := err != nil
+			assert.Equal(t, tc.expectedAttempts, attempts)
+			assert.Equal(t, tc.shouldErr, didErr)
+		})
+	}
 }

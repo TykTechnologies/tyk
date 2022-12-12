@@ -148,6 +148,7 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 		MaxVersion:         tls.VersionTLS12,
 	}
 	client := &http.Client{Transport: tr}
+	client.Timeout = 5 * time.Second
 
 	log.Infof("Attempting to download plugin bundle: %v", g.URL)
 	resp, err := client.Get(g.URL)
@@ -263,7 +264,17 @@ func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
 		return bundle, err
 	}
 
+	bundleData, err := pullBundle(getter)
+
+	bundle.Name = spec.CustomMiddlewareBundle
+	bundle.Data = bundleData
+	bundle.Spec = spec
+	return bundle, err
+}
+
+func pullBundle(getter BundleGetter) ([]byte, error) {
 	var bundleData []byte
+	var err error
 	downloadBundle := func() error {
 		bundleData, err = getter.Get()
 		return err
@@ -273,11 +284,7 @@ func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
 	exponentialBackoff.Multiplier = 0.5
 	exponentialBackoff.MaxInterval = 5 * time.Second
 	err = backoff.Retry(downloadBundle, backoff.WithMaxRetries(exponentialBackoff, 4))
-
-	bundle.Name = spec.CustomMiddlewareBundle
-	bundle.Data = bundleData
-	bundle.Spec = spec
-	return bundle, err
+	return bundleData, err
 }
 
 // saveBundle will save a bundle to the disk, see ZipBundleSaver methods for reference.
