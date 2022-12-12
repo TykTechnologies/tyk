@@ -609,9 +609,6 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfig config.Config, fromRPC bool) []*APISpec {
 	var specs []*APISpec
 
-	var wg sync.WaitGroup
-	var specsMutex sync.RWMutex
-
 	for _, def := range apiDefs {
 		if fromRPC {
 			def.DecodeFromDB()
@@ -627,26 +624,11 @@ func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfi
 			}
 		}
 
-		if def.CustomMiddlewareBundle != "" {
-			wg.Add(1)
-			go func() {
-				a.appendSpec(&def, &specsMutex, &specs)
-				wg.Done()
-			}()
-		} else {
-			a.appendSpec(&def, &specsMutex, &specs)
-		}
+		spec := a.MakeSpec(&def, nil)
+		specs = append(specs, spec)
 	}
 
-	wg.Wait()
 	return specs
-}
-
-func (a APIDefinitionLoader) appendSpec(def *nestedApiDefinition, specsMutex *sync.RWMutex, specs *[]*APISpec) {
-	spec := a.MakeSpec(def, nil)
-	specsMutex.Lock()
-	*specs = append(*specs, spec)
-	specsMutex.Unlock()
 }
 
 func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinition) {

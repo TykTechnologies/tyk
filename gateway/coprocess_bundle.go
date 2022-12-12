@@ -27,6 +27,9 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+const BackoffMultiplier = 2
+const MaxBackoffRetries = 4
+
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
 type Bundle struct {
 	Name     string
@@ -264,7 +267,7 @@ func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
 		return bundle, err
 	}
 
-	bundleData, err := pullBundle(getter, 2)
+	bundleData, err := pullBundle(getter, BackoffMultiplier)
 
 	bundle.Name = spec.CustomMiddlewareBundle
 	bundle.Data = bundleData
@@ -283,7 +286,7 @@ func pullBundle(getter BundleGetter, backoffMultiplier float64) ([]byte, error) 
 	exponentialBackoff := backoff.NewExponentialBackOff()
 	exponentialBackoff.Multiplier = backoffMultiplier
 	exponentialBackoff.MaxInterval = 5 * time.Second
-	err = backoff.Retry(downloadBundle, backoff.WithMaxRetries(exponentialBackoff, 4))
+	err = backoff.Retry(downloadBundle, backoff.WithMaxRetries(exponentialBackoff, MaxBackoffRetries))
 	return bundleData, err
 }
 
