@@ -541,7 +541,6 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	// Process
 	specs := a.prepareSpecs(apiDefs)
 
-	log.Infof("Apis: %v", len(specs))
 	// Set the nonce
 	a.Gw.ServiceNonceMutex.Lock()
 	a.Gw.ServiceNonce = list.Nonce

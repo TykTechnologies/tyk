@@ -280,7 +280,7 @@ func TestPullBundle(t *testing.T) {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				attempts++
 				if tc.expectedAttempts > attempts || tc.shouldErr {
-					// simulate not found file, so it will throw err
+					// simulate file not found, so it will throw err
 					w.WriteHeader(http.StatusNotFound)
 				}
 			}))
