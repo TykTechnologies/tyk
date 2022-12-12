@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/TykTechnologies/tyk/storage"
@@ -210,7 +213,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid interface{}, jwtV
 // introspection makes an introspection request to third-party provider to check whether the access token is valid or not.
 // The access token can be both JWT and opaque type.
 func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, string, error) {
-	introsp := k.Spec.ExternalOAuth.Providers[0].Introspection
+	opts := k.Spec.ExternalOAuth.Providers[0].Introspection
 
 	var (
 		claims jwt.MapClaims
@@ -218,7 +221,7 @@ func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, strin
 		err    error
 	)
 
-	if introsp.Cache.Enabled {
+	if opts.Cache.Enabled {
 		if externalOAuthIntrospectionCache == nil {
 			externalOAuthIntrospectionCache = newIntrospectionCache(k.Gw)
 		}
@@ -228,13 +231,13 @@ func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, strin
 
 	if !cached {
 		log.WithError(err).Debug("Doing OAuth introspection call")
-		claims, err = introsp.Call(accessToken)
+		claims, err = introspect(opts, accessToken)
 		if err != nil {
 			return false, "", fmt.Errorf("introspection err: %s", err)
 		}
 
-		if introsp.Cache.Enabled {
-			err = externalOAuthIntrospectionCache.SetRes(accessToken, claims, introsp.Cache.Timeout)
+		if opts.Cache.Enabled {
+			err = externalOAuthIntrospectionCache.SetRes(accessToken, claims, opts.Cache.Timeout)
 			if err != nil {
 				log.WithError(err).Debug("OAuth introspection caching is enabled but the result couldn't be cached in redis")
 			}
@@ -256,7 +259,7 @@ func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, strin
 		return false, "", nil
 	}
 
-	userID, err := getUserIDFromClaim(claims, introsp.IdentityBaseField)
+	userID, err := getUserIDFromClaim(claims, opts.IdentityBaseField)
 	if err != nil {
 		return false, "", err
 	}
@@ -322,4 +325,35 @@ func (c *introspectionCache) SetRes(token string, res jwt.MapClaims, timeout int
 	}
 
 	return c.SetKey(token, string(claimsInBytes), timeout)
+}
+
+func introspect(opts apidef.Introspection, accessToken string) (jwt.MapClaims, error) {
+	body := url.Values{}
+	body.Set("token", accessToken)
+	body.Set("client_id", opts.ClientID)
+	body.Set("client_secret", opts.ClientSecret)
+
+	res, err := http.Post(opts.URL, "application/x-www-form-urlencoded", strings.NewReader(body.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("error happened during the introspection call: %s", err)
+	}
+
+	defer res.Body.Close()
+
+	bodyInBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read the introspection call response: %s", err)
+	}
+
+	var claims jwt.MapClaims
+	err = json.Unmarshal(bodyInBytes, &claims)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't unmarshal the introspection call response: %s", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status does not indicate success: code: %d, body: %v", res.StatusCode, res.Body)
+	}
+
+	return claims, nil
 }

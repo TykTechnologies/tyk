@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -49,7 +50,8 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 	defer r.Body.Close()
 
 	replacers := make(map[string]int)
-	paths := strings.Split(mwSpec.Path, "/")
+	fullPath := fmt.Sprintf("%s/%s", strings.TrimRight(i.Spec.Proxy.ListenPath, "/"), strings.TrimLeft(mwSpec.Path, "/"))
+	paths := strings.Split(fullPath, "/")
 	for i, part := range paths {
 		if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
 			key := "$path." + strings.Replace(part, "{", "", -1)

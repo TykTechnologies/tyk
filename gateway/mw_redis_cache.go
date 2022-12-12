@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
@@ -15,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/sync/singleflight"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/murmur3"
@@ -27,16 +24,15 @@ import (
 )
 
 const (
-	upstreamCacheHeader    = "x-tyk-cache-action-set"
-	upstreamCacheTTLHeader = "x-tyk-cache-action-set-ttl"
+	cachedResponseHeader = "x-tyk-cached-response"
 )
 
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type RedisCacheMiddleware struct {
 	BaseMiddleware
-	CacheStore   storage.Handler
-	sh           SuccessHandler
-	singleFlight singleflight.Group
+
+	store storage.Handler
+	sh    SuccessHandler
 }
 
 func (m *RedisCacheMiddleware) Name() string {
@@ -53,10 +49,16 @@ func (m *RedisCacheMiddleware) EnabledForSpec() bool {
 
 func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string, regex string, additionalKeyFromHeaders string) (string, error) {
 	h := md5.New()
-	io.WriteString(h, req.Method)
-	io.WriteString(h, "-"+req.URL.String())
+
+	// Compose key into string
+	key := req.Method + "-" + req.URL.String()
 	if additionalKeyFromHeaders != "" {
-		io.WriteString(h, "-"+additionalKeyFromHeaders)
+		key = key + "-" + additionalKeyFromHeaders
+	}
+
+	_, err := io.WriteString(h, key)
+	if err != nil {
+		return "", err
 	}
 
 	if e := addBodyHash(req, regex, h); e != nil {
@@ -83,6 +85,7 @@ func addBodyHash(req *http.Request, regex string, h hash.Hash) (err error) {
 		io.WriteString(h, "-"+hex.EncodeToString(mur.Sum(nil)))
 		return nil
 	}
+
 	r, err := regexp.Compile(regex)
 	if err != nil {
 		return err
@@ -92,6 +95,7 @@ func addBodyHash(req *http.Request, regex string, h hash.Hash) (err error) {
 		mur.Write(match)
 		io.WriteString(h, "-"+hex.EncodeToString(mur.Sum(nil)))
 	}
+
 	return nil
 }
 
@@ -108,35 +112,15 @@ func isBodyHashRequired(request *http.Request) bool {
 
 }
 
-func (m *RedisCacheMiddleware) getTimeTTL(cacheTTL int64) string {
-	timeNow := time.Now().Unix()
-	newTTL := timeNow + cacheTTL
-	asStr := strconv.Itoa(int(newTTL))
-	return asStr
-}
-
 func (m *RedisCacheMiddleware) isTimeStampExpired(timestamp string) bool {
-	now := time.Now()
-
 	i, err := strconv.ParseInt(timestamp, 10, 64)
 	if err != nil {
-		log.Error(err)
-	}
-	tm := time.Unix(i, 0)
-
-	log.Debug("Time Now: ", now)
-	log.Debug("Expires: ", tm)
-	if tm.Before(now) {
-		log.Debug("Expriy caught in TS!")
+		m.Logger().Error(err)
 		return true
 	}
 
-	return false
-}
-
-func (m *RedisCacheMiddleware) encodePayload(payload, timestamp string) string {
-	sEnc := base64.StdEncoding.EncodeToString([]byte(payload))
-	return sEnc + "|" + timestamp
+	tm := time.Unix(i, 0)
+	return tm.Before(time.Now())
 }
 
 func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, error) {
@@ -155,20 +139,28 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 	return "", "", errors.New("Decoding failed, array length wrong")
 }
 
+// cacheOptions exists to transfer options from this middleware down the chain to the cache writer
+type cacheOptions struct {
+	key                    string
+	cacheOnlyResponseCodes []int
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	t1 := time.Now()
+
 	var stat RequestStatus
 	var cacheKeyRegex string
 	var cacheMeta *EndPointCacheMeta
 
 	version, _ := m.Spec.Version(r)
 	versionPaths := m.Spec.RxPaths[version.Name]
-	isVirtual, _ := m.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 
 	// Lets see if we can throw a sledgehammer at this
 	if m.Spec.CacheOptions.CacheAllSafeRequests && isSafeMethod(r.Method) {
 		stat = StatusCached
 	}
+
 	if stat != StatusCached {
 		// New request checker, more targeted, less likely to fail
 		found, meta := m.Spec.CheckSpecMatchesStatus(r, versionPaths, Cached)
@@ -178,9 +170,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			cacheKeyRegex = cacheMeta.CacheKeyRegex
 		}
 	}
-
 	// Cached route matched, let go
 	if stat != StatusCached {
+		m.Logger().Debug("Not a cached path")
 		return nil, http.StatusOK
 	}
 	token := ctxGetAuthToken(r)
@@ -190,136 +182,50 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		token = request.RealIP(r)
 	}
 
-	var errCreatingChecksum bool
 	var retBlob string
 	key, err := m.CreateCheckSum(r, token, cacheKeyRegex, m.getCacheKeyFromHeaders(r))
 	if err != nil {
-		log.Debug("Error creating checksum. Skipping cache check")
-		errCreatingChecksum = true
-	} else {
-		v, sfErr, _ := m.singleFlight.Do(key, func() (interface{}, error) {
-			return m.CacheStore.GetKey(key)
-		})
-		retBlob = v.(string)
-		err = sfErr
+		m.Logger().Debug("Error creating checksum. Skipping cache check")
+		return nil, http.StatusOK
 	}
 
+	cacheOnlyResponseCodes := m.Spec.CacheOptions.CacheOnlyResponseCodes
+	// override api main CacheOnlyResponseCodes by endpoint specific if provided
+	if cacheMeta != nil && len(cacheMeta.CacheOnlyResponseCodes) > 0 {
+		cacheOnlyResponseCodes = cacheMeta.CacheOnlyResponseCodes
+	}
+
+	ctxSetCacheOptions(r, &cacheOptions{
+		key:                    key,
+		cacheOnlyResponseCodes: cacheOnlyResponseCodes,
+	})
+
+	retBlob, err = m.store.GetKey(key)
 	if err != nil {
-		if !errCreatingChecksum {
-			log.Debug("Cache enabled, but record not found")
-		}
-		// Pass through to proxy AND CACHE RESULT
-
-		var resVal *http.Response
-		if isVirtual {
-			log.Debug("This is a virtual function")
-			vp := VirtualEndpoint{BaseMiddleware: m.BaseMiddleware}
-			vp.Init()
-			resVal = vp.ServeHTTPForCache(w, r, nil)
-		} else {
-			// This passes through and will write the value to the writer, but spit out a copy for the cache
-			log.Debug("Not virtual, passing")
-			if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
-				r.URL = newURL
-				ctxSetURLRewriteTarget(r, nil)
-			}
-			if newMethod := ctxGetTransformRequestMethod(r); newMethod != "" {
-				r.Method = newMethod
-				ctxSetTransformRequestMethod(r, "")
-			}
-			sr := m.sh.ServeHTTPWithCache(w, r)
-			resVal = sr.Response
-		}
-
-		cacheThisRequest := true
-		cacheTTL := m.Spec.CacheOptions.CacheTimeout
-
-		if resVal == nil {
-			log.Warning("Upstream request must have failed, response is empty")
-			return nil, mwStatusRespond
-		}
-
-		cacheOnlyResponseCodes := m.Spec.CacheOptions.CacheOnlyResponseCodes
-		// override api main CacheOnlyResponseCodes by endpoint specific if provided
-		if cacheMeta != nil && len(cacheMeta.CacheOnlyResponseCodes) > 0 {
-			cacheOnlyResponseCodes = cacheMeta.CacheOnlyResponseCodes
-		}
-
-		// make sure the status codes match if specified
-		if len(cacheOnlyResponseCodes) > 0 {
-			foundCode := false
-			for _, code := range cacheOnlyResponseCodes {
-				if code == resVal.StatusCode {
-					foundCode = true
-					break
-				}
-			}
-			cacheThisRequest = foundCode
-		}
-
-		// Are we using upstream cache control?
-		if m.Spec.CacheOptions.EnableUpstreamCacheControl {
-			log.Debug("Upstream control enabled")
-			// Do we cache?
-			if resVal.Header.Get(upstreamCacheHeader) == "" {
-				log.Warning("Upstream cache action not found, not caching")
-				cacheThisRequest = false
-			}
-
-			cacheTTLHeader := upstreamCacheTTLHeader
-			if m.Spec.CacheOptions.CacheControlTTLHeader != "" {
-				cacheTTLHeader = m.Spec.CacheOptions.CacheControlTTLHeader
-			}
-
-			ttl := resVal.Header.Get(cacheTTLHeader)
-			if ttl != "" {
-				log.Debug("TTL Set upstream")
-				cacheAsInt, err := strconv.Atoi(ttl)
-				if err != nil {
-					log.Error("Failed to decode TTL cache value: ", err)
-					cacheTTL = m.Spec.CacheOptions.CacheTimeout
-				} else {
-					cacheTTL = int64(cacheAsInt)
-				}
-			}
-		}
-
-		if cacheThisRequest && !errCreatingChecksum {
-			log.Debug("Caching request to redis")
-			var wireFormatReq bytes.Buffer
-			resVal.Write(&wireFormatReq)
-			log.Debug("Cache TTL is:", cacheTTL)
-			ts := m.getTimeTTL(cacheTTL)
-			toStore := m.encodePayload(wireFormatReq.String(), ts)
-			go func() {
-				err := m.CacheStore.SetKey(key, toStore, cacheTTL)
-				if err != nil {
-					log.WithError(err).Error("could not save key in cache store")
-				}
-			}()
-		}
-
-		return nil, mwStatusRespond
+		// Record not found, continue with the middleware chain
+		return nil, http.StatusOK
 	}
 
 	cachedData, timestamp, err := m.decodePayload(retBlob)
 	if err != nil {
 		// Tere was an issue with this cache entry - lets remove it:
-		m.CacheStore.DeleteKey(key)
+		m.store.DeleteKey(key)
 		return nil, http.StatusOK
 	}
 
 	if m.isTimeStampExpired(timestamp) || len(cachedData) == 0 {
-		m.CacheStore.DeleteKey(key)
+		m.store.DeleteKey(key)
 		return nil, http.StatusOK
 	}
 
-	log.Debug("Cache got: ", cachedData)
 	bufData := bufio.NewReader(strings.NewReader(cachedData))
 	newRes, err := http.ReadResponse(bufData, r)
 	if err != nil {
-		log.Error("Could not create response object: ", err)
+		m.Logger().WithError(err).Error("Could not create response object")
+		m.store.DeleteKey(key)
+		return nil, http.StatusOK
 	}
+
 	nopCloseResponseBody(newRes)
 
 	defer newRes.Body.Close()
@@ -337,7 +243,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		w.Header().Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
 		w.Header().Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
-	w.Header().Set("x-tyk-cached-response", "1")
+	w.Header().Set(cachedResponseHeader, "1")
 
 	if reqEtag := r.Header.Get("If-None-Match"); reqEtag != "" {
 		if respEtag := newRes.Header.Get("Etag"); respEtag != "" {
@@ -354,10 +260,11 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Record analytics
 	if !m.Spec.DoNotTrack {
-		m.sh.RecordHit(r, analytics.Latency{}, newRes.StatusCode, newRes)
+		ms := DurationToMillisecond(time.Since(t1))
+		m.sh.RecordHit(r, analytics.Latency{Total: int64(ms)}, newRes.StatusCode, newRes)
 	}
 
-	// Stop any further execution
+	// Stop any further execution after we wrote cache out
 	return nil, mwStatusRespond
 }
 
