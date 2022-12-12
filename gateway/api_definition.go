@@ -539,7 +539,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
-	specs := a.prepareSpecs(apiDefs)
+	specs := a.prepareSpecs(apiDefs, gwConfig, false)
 
 	// Set the nonce
 	a.Gw.ServiceNonceMutex.Lock()
@@ -601,30 +601,32 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 	// Extract tagged entries only
 	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
-	for _, def := range apiDefs {
-		def.DecodeFromDB()
-
-		if gwConfig.SlaveOptions.BindToSlugsInsteadOfListenPaths {
-			newListenPath := "/" + def.Slug //+ "/"
-			log.Warning("Binding to ",
-				newListenPath,
-				" instead of ",
-				def.Proxy.ListenPath)
-
-			def.Proxy.ListenPath = newListenPath
-		}
-	}
-	specs := a.prepareSpecs(apiDefs)
+	specs := a.prepareSpecs(apiDefs, gwConfig, true)
 
 	return specs, nil
 }
 
-func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition) []*APISpec {
+func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfig config.Config, fromRPC bool) []*APISpec {
 	var specs []*APISpec
 
 	var wg sync.WaitGroup
 	var specsMutex sync.RWMutex
+
 	for _, def := range apiDefs {
+		if fromRPC {
+			def.DecodeFromDB()
+
+			if gwConfig.SlaveOptions.BindToSlugsInsteadOfListenPaths {
+				newListenPath := "/" + def.Slug //+ "/"
+				log.Warning("Binding to ",
+					newListenPath,
+					" instead of ",
+					def.Proxy.ListenPath)
+
+				def.Proxy.ListenPath = newListenPath
+			}
+		}
+
 		if def.CustomMiddlewareBundle != "" {
 			wg.Add(1)
 			go func() {
