@@ -152,9 +152,9 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 	}
 	client := &http.Client{Transport: tr}
 
-	var httpError string
+	var httpError error
 	for tries := bundleGetRetries - 1; tries >= 0; tries-- {
-		resp, st, err := func() ([]byte, int, error) {
+		respBody, st, err := func() ([]byte, int, error) {
 			resp, err := client.Get(g.URL)
 			if err != nil {
 				return nil, 0, err
@@ -174,20 +174,23 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 			}
 			return b, resp.StatusCode, nil
 		}()
+
 		if st == 200 {
-			return resp, nil
+			return respBody, nil
 		}
+
 		if err != nil {
-			return nil, err
+			httpError = err
 		} else {
-			httpError = fmt.Sprintf("HTTP Error, got status code %d", st)
-			if tries > 0 {
-				backoff := math.Pow(float64(bundleGetRetries-tries), 2)
-				time.Sleep(time.Duration(backoff) * bundleGetRetryWait)
-			}
+			httpError = fmt.Errorf("HTTP Error, got status code %d", st)
+		}
+
+		if tries > 0 {
+			backoff := math.Pow(float64(bundleGetRetries-tries), 2)
+			time.Sleep(time.Duration(backoff) * bundleGetRetryWait)
 		}
 	}
-	return nil, errors.New(httpError)
+	return nil, httpError
 }
 
 // Get mocks an HTTP(S) GET request.
