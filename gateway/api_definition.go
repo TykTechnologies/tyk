@@ -539,11 +539,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
-	var specs []*APISpec
-	for _, def := range apiDefs {
-		spec := a.MakeSpec(&def, nil)
-		specs = append(specs, spec)
-	}
+	specs := a.prepareSpecs(apiDefs)
 
 	// Set the nonce
 	a.Gw.ServiceNonceMutex.Lock()
@@ -605,7 +601,6 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 	// Extract tagged entries only
 	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
-	var specs []*APISpec
 	for _, def := range apiDefs {
 		def.DecodeFromDB()
 
@@ -618,12 +613,38 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 
 			def.Proxy.ListenPath = newListenPath
 		}
-
-		spec := a.MakeSpec(&def, nil)
-		specs = append(specs, spec)
 	}
+	specs := a.prepareSpecs(apiDefs)
 
 	return specs, nil
+}
+
+func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition) []*APISpec {
+	var specs []*APISpec
+
+	var wg sync.WaitGroup
+	var specsMutex sync.RWMutex
+	for _, def := range apiDefs {
+		if def.CustomMiddlewareBundle != "" {
+			wg.Add(1)
+			go func() {
+				a.appendSpec(def, specsMutex, specs)
+				wg.Done()
+			}()
+		} else {
+			a.appendSpec(def, specsMutex, specs)
+		}
+	}
+
+	wg.Wait()
+	return specs
+}
+
+func (a APIDefinitionLoader) appendSpec(def nestedApiDefinition, specsMutex sync.RWMutex, specs []*APISpec) {
+	spec := a.MakeSpec(&def, nil)
+	specsMutex.Lock()
+	specs = append(specs, spec)
+	specsMutex.Unlock()
 }
 
 func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinition) {
