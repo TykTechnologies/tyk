@@ -151,6 +151,7 @@ func (s *Test) SetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache
 }
 
 func TestReverseProxyDnsCache(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5251
 	const (
 		host   = "orig-host.com."
 		host2  = "orig-host2.com."
