@@ -441,11 +441,15 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Process
+<<<<<<< HEAD
 	var specs []*APISpec
 	for _, def := range apiDefs {
 		spec := a.MakeSpec(def, nil)
 		specs = append(specs, spec)
 	}
+=======
+	specs := a.prepareSpecs(apiDefs, gwConfig, false)
+>>>>>>> 2230b14b... TT-7248 Added backoff algorithm to pull the plugin bundles.  (#4513)
 
 	// Set the nonce
 	a.Gw.ServiceNonceMutex.Lock()
@@ -498,25 +502,55 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 		return nil, err
 	}
 
-	var specs []*APISpec
-	for _, def := range apiDefs {
-		def.DecodeFromDB()
+<<<<<<< HEAD
+=======
+	list := &nestedApiDefinitionList{
+		Message: payload,
+	}
 
+	gwConfig := a.Gw.GetConfig()
+
+	// Extract tagged entries only
+	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
+
+	specs := a.prepareSpecs(apiDefs, gwConfig, true)
+
+	return specs, nil
+}
+
+func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfig config.Config, fromRPC bool) []*APISpec {
+>>>>>>> 2230b14b... TT-7248 Added backoff algorithm to pull the plugin bundles.  (#4513)
+	var specs []*APISpec
+
+	for _, def := range apiDefs {
+		if fromRPC {
+			def.DecodeFromDB()
+
+<<<<<<< HEAD
 		if gw.GetConfig().SlaveOptions.BindToSlugsInsteadOfListenPaths {
 			newListenPath := "/" + def.Slug //+ "/"
 			log.Warning("Binding to ",
 				newListenPath,
 				" instead of ",
 				def.Proxy.ListenPath)
+=======
+			if gwConfig.SlaveOptions.BindToSlugsInsteadOfListenPaths {
+				newListenPath := "/" + def.Slug //+ "/"
+				log.Warning("Binding to ",
+					newListenPath,
+					" instead of ",
+					def.Proxy.ListenPath)
+>>>>>>> 2230b14b... TT-7248 Added backoff algorithm to pull the plugin bundles.  (#4513)
 
-			def.Proxy.ListenPath = newListenPath
+				def.Proxy.ListenPath = newListenPath
+			}
 		}
 
 		spec := a.MakeSpec(def, nil)
 		specs = append(specs, spec)
 	}
 
-	return specs, nil
+	return specs
 }
 
 func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinition) {
