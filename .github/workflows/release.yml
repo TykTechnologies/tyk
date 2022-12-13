@@ -35,13 +35,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        golang_cross: [ 1.16, 1.16-el7 ]
+        golang_cross: [ 1.17, 1.17-el7 ]
         include:
-          - golang_cross: 1.16-el7
+          - golang_cross: 1.17-el7
             goreleaser: 'ci/goreleaser/goreleaser-el7.yml'
             rpmvers: 'el/7'
             debvers: 'ubuntu/xenial ubuntu/bionic debian/jessie'
-          - golang_cross: 1.16
+          - golang_cross: 1.17
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             rpmvers: 'el/8'
             debvers: 'ubuntu/focal debian/buster debian/bullseye'

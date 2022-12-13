@@ -21,7 +21,7 @@ jobs:
       matrix:
         redis-version: [5]
         python-version: ['3.9']
-        go: [1.16]
+        go: [1.17]
 
     steps:
       - name: Checkout Tyk
