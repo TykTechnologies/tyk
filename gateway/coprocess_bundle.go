@@ -2,6 +2,9 @@ package gateway
 
 import (
 	"path"
+	"time"
+
+	"github.com/cenk/backoff"
 
 	"github.com/sirupsen/logrus"
 
@@ -23,6 +26,9 @@ import (
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/apidef"
 )
+
+const BackoffMultiplier = 2
+const MaxBackoffRetries = 4
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
 type Bundle struct {
@@ -145,7 +151,9 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 		MaxVersion:         tls.VersionTLS12,
 	}
 	client := &http.Client{Transport: tr}
+	client.Timeout = 5 * time.Second
 
+	log.Infof("Attempting to download plugin bundle: %v", g.URL)
 	resp, err := client.Get(g.URL)
 	if err != nil {
 		return nil, err
@@ -259,12 +267,27 @@ func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
 		return bundle, err
 	}
 
-	bundleData, err := getter.Get()
+	bundleData, err := pullBundle(getter, BackoffMultiplier)
 
 	bundle.Name = spec.CustomMiddlewareBundle
 	bundle.Data = bundleData
 	bundle.Spec = spec
 	return bundle, err
+}
+
+func pullBundle(getter BundleGetter, backoffMultiplier float64) ([]byte, error) {
+	var bundleData []byte
+	var err error
+	downloadBundle := func() error {
+		bundleData, err = getter.Get()
+		return err
+	}
+
+	exponentialBackoff := backoff.NewExponentialBackOff()
+	exponentialBackoff.Multiplier = backoffMultiplier
+	exponentialBackoff.MaxInterval = 5 * time.Second
+	err = backoff.Retry(downloadBundle, backoff.WithMaxRetries(exponentialBackoff, MaxBackoffRetries))
+	return bundleData, err
 }
 
 // saveBundle will save a bundle to the disk, see ZipBundleSaver methods for reference.

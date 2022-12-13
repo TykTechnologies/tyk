@@ -539,11 +539,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
-	var specs []*APISpec
-	for _, def := range apiDefs {
-		spec := a.MakeSpec(&def, nil)
-		specs = append(specs, spec)
-	}
+	specs := a.prepareSpecs(apiDefs, gwConfig, false)
 
 	// Set the nonce
 	a.Gw.ServiceNonceMutex.Lock()
@@ -605,25 +601,34 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 	// Extract tagged entries only
 	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
+	specs := a.prepareSpecs(apiDefs, gwConfig, true)
+
+	return specs, nil
+}
+
+func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfig config.Config, fromRPC bool) []*APISpec {
 	var specs []*APISpec
+
 	for _, def := range apiDefs {
-		def.DecodeFromDB()
+		if fromRPC {
+			def.DecodeFromDB()
 
-		if gwConfig.SlaveOptions.BindToSlugsInsteadOfListenPaths {
-			newListenPath := "/" + def.Slug //+ "/"
-			log.Warning("Binding to ",
-				newListenPath,
-				" instead of ",
-				def.Proxy.ListenPath)
+			if gwConfig.SlaveOptions.BindToSlugsInsteadOfListenPaths {
+				newListenPath := "/" + def.Slug //+ "/"
+				log.Warning("Binding to ",
+					newListenPath,
+					" instead of ",
+					def.Proxy.ListenPath)
 
-			def.Proxy.ListenPath = newListenPath
+				def.Proxy.ListenPath = newListenPath
+			}
 		}
 
 		spec := a.MakeSpec(&def, nil)
 		specs = append(specs, spec)
 	}
 
-	return specs, nil
+	return specs
 }
 
 func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinition) {
