@@ -329,7 +329,7 @@ func (r *RedisCluster) Decrement(keyName string) {
 }
 
 // IncrementWithExpire will increment a key in redis
-func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
+func (r *RedisCluster) IncrementWithExpire(keyName string, expire int64) int64 {
 	// log.Debug("Incrementing raw key: ", keyName)
 	if err := r.up(); err != nil {
 		log.Debug(err)
