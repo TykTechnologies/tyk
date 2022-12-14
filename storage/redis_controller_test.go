@@ -5,11 +5,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestRecoverLoop(t *testing.T) {
