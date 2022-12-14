@@ -5,12 +5,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRecoverLoop(t *testing.T) {
+	test.Flaky(t)
 	t.Parallel()
 
 	var onReconnectCounter int
@@ -24,7 +26,7 @@ func TestRecoverLoop(t *testing.T) {
 
 	conf := config.Default
 
-	rc := NewRedisController(ctx)
+	rc := NewRedisController()
 	go rc.ConnectToRedis(ctx, onRecover, &conf)
 
 	rc.DisableRedis(false)

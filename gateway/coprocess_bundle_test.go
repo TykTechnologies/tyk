@@ -208,6 +208,7 @@ pre.NewProcessRequest(function(request, session) {
 }
 
 func TestResponseOverride(t *testing.T) {
+	test.Flaky(t)
 	ts := StartTest(nil, TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
