@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"github.com/TykTechnologies/tyk/test"
 	"sync"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 )
 
 func TestRecoverLoop(t *testing.T) {
+	test.Flaky(t)
 	t.Parallel()
 
 	var onReconnectCounter int
