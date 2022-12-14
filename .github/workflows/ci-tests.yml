@@ -13,7 +13,7 @@ jobs:
     name: Go ${{ matrix.go }} Redis ${{ matrix.redis-version }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         redis-version: [5]
         python-version: ['3.9']
