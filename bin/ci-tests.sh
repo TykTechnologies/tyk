@@ -53,7 +53,6 @@ for pkg in ${PKGS}; do
     fi
 
     show go test -v ${race} -timeout ${TEST_TIMEOUT} -coverprofile=test.cov ${pkg} ${tags} || fatal "Test Failed"
-    show go vet ${tags} ${pkg} || fatal "go vet errored"
 done
 
 # run rpc tests separately
