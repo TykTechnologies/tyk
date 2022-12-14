@@ -2,9 +2,10 @@ package storage
 
 import (
 	"context"
-	"github.com/TykTechnologies/tyk/test"
 	"sync"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/stretchr/testify/assert"
 
