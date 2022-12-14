@@ -8,15 +8,18 @@ on:
 env:
   TYK_DB_REDISHOST: localhost
   TYK_GW_STORAGE_HOST: localhost
+  PYTHON_VERSION: '3.9'
+  PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
   test:
     name: Go ${{ matrix.go }} Redis ${{ matrix.redis-version }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         redis-version: [5]
+        python-version: ['3.9']
         go: [1.16]
 
     steps:
@@ -31,9 +34,9 @@ jobs:
           go-version: ${{ matrix.go }}
 
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
-            python-version: '3.5'
+            python-version: ${{ matrix.python-version }}
 
       - name: Install Dependencies and basic hygiene test
         id: hygiene
@@ -105,12 +108,12 @@ jobs:
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --timeout=300s --max-issues-per-linter=0 --max-same-issues=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
+          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
 
       - name: golangci-lint
         if: ${{ github.event_name == 'push' }}
         run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --timeout=300s --max-issues-per-linter=0 --max-same-issues=0 --issues-exit-code=0 ./... > golanglint.xml
+          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
 
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
