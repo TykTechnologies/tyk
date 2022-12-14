@@ -1717,7 +1717,7 @@ func (n *nopCloserBuffer) Read(p []byte) (int, error) {
 }
 
 // Seek seeks within the buffer
-func (n *nopCloserBuffer) Seek(offset int64, whence int64) (int64, error) {
+func (n *nopCloserBuffer) Seek(offset int64, whence int) (int64, error) {
 	if whence != io.SeekStart {
 		return 0, errors.New("invalid seek method, only supporting SeekStart")
 	}
