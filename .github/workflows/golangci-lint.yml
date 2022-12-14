@@ -19,11 +19,11 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
-          # Version of golangci-lint to use in form of v1.2 or `latest` to use the latest version
+          # Version of golangci-lint to use in form of v1.2 or `latest` to use the latest version.
           version: latest
         
           # golangci-lint command line arguments.
           args: --timeout=5m --verbose
         
-          # If set to true and the action runs on a pull request - the action outputs only newly found issues
+          # If set to true and the action runs on a pull request - the action outputs only newly found issues.
           only-new-issues: true
