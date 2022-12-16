@@ -1328,6 +1328,13 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		obj, code = gw.handleGetAPIListOAS(scopePublic)
 	}
 
+	if oasAPI, ok := obj.(*oas.OAS); ok {
+		api := gw.getApiSpec(oasAPI.GetTykExtension().Info.ID)
+		if api != nil && api.VersionDefinition.BaseID != "" {
+			w.Header().Set(apidef.HeaderBaseAPIID, api.VersionDefinition.BaseID)
+		}
+	}
+
 	doJSONWrite(w, code, obj)
 }
 
