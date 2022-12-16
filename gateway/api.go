@@ -1285,6 +1285,12 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 			log.Debug("Requesting API list")
 			obj, code = gw.handleGetAPIList()
 		}
+
+		if api, ok := obj.(*apidef.APIDefinition); ok {
+			if api.VersionDefinition.BaseID != "" {
+				w.Header().Set(apidef.HeaderBaseAPIID, api.VersionDefinition.BaseID)
+			}
+		}
 	case http.MethodPost:
 		log.Debug("Creating new definition file")
 		obj, code = gw.handleAddApi(r, afero.NewOsFs(), false)

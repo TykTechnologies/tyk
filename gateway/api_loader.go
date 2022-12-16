@@ -943,6 +943,9 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			case "tcp", "tls":
 				gw.loadTCPService(spec, &gs, muxer)
 			}
+
+			// Set versions free to update links below
+			spec.VersionDefinition.BaseID = ""
 		}()
 	}
 
@@ -954,6 +957,13 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		curSpec, ok := gw.apisByID[spec.APIID]
 		if ok && curSpec.Checksum != spec.Checksum {
 			curSpec.Release()
+		}
+
+		// Bind versions to base APIs again
+		for _, vID := range spec.VersionDefinition.Versions {
+			if versionAPI, ok := tmpSpecRegister[vID]; ok {
+				versionAPI.VersionDefinition.BaseID = spec.APIID
+			}
 		}
 	}
 
