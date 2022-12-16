@@ -138,6 +138,10 @@ func (r *RedisCluster) singleton() redis.UniversalClient {
 	return r.RedisController.singleton(r.IsCache, r.IsAnalytics)
 }
 
+func (r *RedisCluster) GetUniversalClient() redis.UniversalClient {
+	return r.singleton()
+}
+
 func (r *RedisCluster) hashKey(in string) string {
 
 	if !r.HashKeys {
