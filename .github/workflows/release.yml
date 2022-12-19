@@ -177,16 +177,16 @@ jobs:
           eval $(terraform output -json tyk | jq -r 'to_entries[] | [.key,.value] | join("=")')
           region=$(terraform output region | xargs)
           [ -z "$key" -o -z "$secret" -o -z "$region" ] && exit 1
-          echo "secret=$secret >> $GITHUB_OUTPUT"
-          echo "key=$key >> $GITHUB_OUTPUT"
-          echo "region=$region >> $GITHUB_OUTPUT"
+          echo "secret=$secret" >> $GITHUB_OUTPUT
+          echo "key=$key" >> $GITHUB_OUTPUT
+          echo "region=$region" >> $GITHUB_OUTPUT
 
       - name: Configure AWS credentials for use
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${ key }
-          aws-secret-access-key: ${ secret }
-          aws-region: ${ region }
+          aws-access-key-id: ${{ steps.aws-creds.outputs.key }}
+          aws-secret-access-key: ${{ steps.aws-creds.outputs.secret }}
+          aws-region: ${{ steps.aws-creds.outputs.region }}
 
       - name: Login to Amazon ECR
         id: login-ecr
