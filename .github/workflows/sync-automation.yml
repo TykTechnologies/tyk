@@ -49,7 +49,7 @@ jobs:
           git restore --source master -- .github/workflows/api-tests.yml
           git add -A && git commit -m "[CI]: Syncing CI changes to ${{ matrix.branch }}"
           git push origin $prbranch
-          echo "::set-output name=prbranch::$prbranch"
+          echo "prbranch=$prbranch" >> $GITHUB_OUTPUT
           echo "::debug::Commit ${{ github.sha }} syncd for ${{matrix.branch}}"
           exit 0
 
