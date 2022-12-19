@@ -100,6 +100,7 @@ const (
 
 	Self                 = "self"
 	DefaultAPIVersionKey = "x-api-version"
+	HeaderBaseAPIID      = "x-tyk-base-api-id"
 
 	AuthTokenType     = "authToken"
 	JWTType           = "jwt"
