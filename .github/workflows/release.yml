@@ -91,7 +91,7 @@ jobs:
         run: |
           ci/bin/unlock-agent.sh
           current_tag=${GITHUB_REF##*/}
-          echo "tag=${current_tag} >> $GITHUB_OUTPUT"
+          echo "tag=${current_tag}" >> $GITHUB_OUTPUT
 
       - name: Delete old release assets
         if: startsWith(github.ref, 'refs/tags')

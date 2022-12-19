@@ -52,7 +52,7 @@ jobs:
           
           git add --all
           git diff HEAD > git-state.log
-          echo "git-state=$(sed -ze 's/%/%25/g;s/\n/%0A/g' git-state.log) >> $GITHUB_OUTPUT"
+          echo "git-state=$(sed -ze 's/%/%25/g;s/\n/%0A/g' git-state.log)" >> $GITHUB_OUTPUT
 
           git_state_count=$(wc -l < git-state.log)
           
@@ -84,7 +84,7 @@ jobs:
         run: |
           ./bin/ci-tests.sh 2>&1 | tee test.log
           result_code=${PIPESTATUS[0]}
-          echo "log=$(sed -ze 's/%/%25/g;s/\n/%0A/g' test.log) >> $GITHUB_OUTPUT"
+          echo "log=$(sed -ze 's/%/%25/g;s/\n/%0A/g' test.log)" >> $GITHUB_OUTPUT
           exit $result_code
 
       - name: Notify status

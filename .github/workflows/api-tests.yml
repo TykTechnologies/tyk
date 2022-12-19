@@ -45,15 +45,15 @@ jobs:
       env:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: |
-        echo "branch=master >> $GITHUB_OUTPUT"
+        echo "branch=master" >> $GITHUB_OUTPUT
         if [ ! -z "${{ github.head_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.head_ref	}}; then
-          echo "branch=${{ github.head_ref	}} >> $GITHUB_OUTPUT"
+          echo "branch=${{ github.head_ref	}}" >> $GITHUB_OUTPUT
         fi
         if [ ! -z "${{ github.base_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.base_ref	}}; then
-          echo "branch=${{ github.base_ref	}} >> $GITHUB_OUTPUT"
+          echo "branch=${{ github.base_ref	}}" >> $GITHUB_OUTPUT
         fi
         if [ ! -z "${{ github.ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.ref }}; then
-          echo "branch=${{ github.ref	}} >> $GITHUB_OUTPUT"
+          echo "branch=${{ github.ref	}}" >> $GITHUB_OUTPUT
         fi
 
     - name: Checkout test repository
@@ -69,15 +69,15 @@ jobs:
       env:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: |
-        echo "branch=master >> $GITHUB_OUTPUT"
+        echo "branch=master" >> $GITHUB_OUTPUT
         if [ ! -z "${{ github.head_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.head_ref	}}; then
-          echo "branch=${{ github.head_ref	}} >> $GITHUB_OUTPUT"
+          echo "branch=${{ github.head_ref	}}" >> $GITHUB_OUTPUT
         fi
         if [ ! -z "${{ github.base_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.base_ref	}}; then
-          echo "branch=${{ github.base_ref	}} >> $GITHUB_OUTPUT"
+          echo "branch=${{ github.base_ref	}}" >> $GITHUB_OUTPUT
         fi
         if [ ! -z "${{ github.ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.ref }}; then
-          echo "branch=${{ github.ref	}} >> $GITHUB_OUTPUT"
+          echo "branch=${{ github.ref	}}" >> $GITHUB_OUTPUT
         fi
 
     - name: Checkout dashboard
