@@ -98,7 +98,9 @@ const (
 	URLLocation          = "url"
 	ExpirationTimeFormat = "2006-01-02 15:04"
 
-	Self = "self"
+	Self                 = "self"
+	DefaultAPIVersionKey = "x-api-version"
+	HeaderBaseAPIID      = "x-tyk-base-api-id"
 
 	AuthTokenType     = "authToken"
 	JWTType           = "jwt"
