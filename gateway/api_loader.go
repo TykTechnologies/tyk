@@ -898,17 +898,18 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 			tmpSpecRegister[spec.APIID] = spec
 
+			if shouldTrace {
+				// opentracing works only with http services.
+				err := trace.AddTracer("", spec.Name)
+				if err != nil {
+					mainLog.Errorf("Failed to initialize tracer for %q error:%v", spec.Name, err)
+				} else {
+					mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
+				}
+			}
+
 			switch spec.Protocol {
 			case "", "http", "https", "h2c":
-				if shouldTrace {
-					// opentracing works only with http services.
-					err := trace.AddTracer("", spec.Name)
-					if err != nil {
-						mainLog.Errorf("Failed to initialize tracer for %q error:%v", spec.Name, err)
-					} else {
-						mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
-					}
-				}
 				tmpSpecHandles.Store(spec.APIID, gw.loadHTTPService(spec, apisByListen, &gs, muxer))
 			case "tcp", "tls":
 				gw.loadTCPService(spec, &gs, muxer)

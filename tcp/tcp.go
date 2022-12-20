@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"github.com/TykTechnologies/tyk/trace"
+	"go.opentelemetry.io/otel/attribute"
 	"io"
 	"net"
 	"net/url"
@@ -105,6 +107,8 @@ func (p *Proxy) RemoveDomainHandler(domain string) {
 }
 
 func (p *Proxy) Serve(l net.Listener) error {
+	shouldTrace := trace.IsEnabled()
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -112,7 +116,17 @@ func (p *Proxy) Serve(l net.Listener) error {
 			return err
 		}
 		go func() {
-			if err := p.handleConn(conn); err != nil {
+			ctx, cancel := context.WithCancel(context.Background())
+			if shouldTrace {
+				attr := []attribute.KeyValue{}
+				attr = append(attr, attribute.String("tyk.apidef.api_id", p.muxer))
+
+				span, _ := trace.Span(ctx, "serving tcp")
+				span.SetAttributes()
+				defer span.End()
+			}
+			if err := p.handleConn(conn, ctx, cancel); err != nil {
+
 				log.WithError(err).Warning("Can't handle connection")
 			}
 		}()
@@ -170,13 +184,13 @@ func (p *Proxy) getTargetConfig(conn net.Conn) (*targetConfig, error) {
 	return nil, errors.New("Can't detect service configuration")
 }
 
-func (p *Proxy) handleConn(conn net.Conn) error {
+func (p *Proxy) handleConn(conn net.Conn, ctx context.Context, cancel context.CancelFunc) error {
 	var connectionClosed atomic.Value
 	connectionClosed.Store(false)
 
 	stat := Stat{}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	//ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if p.SyncStats != nil {
 		go func() {
