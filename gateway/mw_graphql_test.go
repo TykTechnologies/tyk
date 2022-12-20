@@ -965,6 +965,15 @@ input StringQueryOperatorInput {
 
 scalar Upload`
 
+const gqlContinentQuery = `
+query {
+    continent(code: "NG"){
+        code
+        name
+    }
+}
+`
+
 const gqlSubgraphSchemaAccounts = `scalar _Any
 scalar _FieldSet
 union _Entity = User

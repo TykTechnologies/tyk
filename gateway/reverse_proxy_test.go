@@ -879,6 +879,82 @@ func TestGraphQL_HeadersInjection(t *testing.T) {
 	}...)
 }
 
+func TestGraphql_Headers(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	defaultSpec := BuildAPI(func(spec *APISpec) {
+		spec.Name = "tyk-api"
+		spec.APIID = "tyk-api"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+		spec.GraphQL.Schema = gqlCountriesSchema
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		spec.Proxy.TargetURL = TestHttpAny + "/dynamic"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	headerCheck := func(key, value string, headers map[string][]string) bool {
+		val, ok := headers[key]
+		return ok && len(val) > 0 && val[0] == value
+	}
+
+	t.Run("test introspection header", func(t *testing.T) {
+		spec := *defaultSpec
+		spec.GraphQL.Proxy.AuthHeaders = map[string]string{
+			"Test-Header": "test-value",
+		}
+		spec.GraphQL.Proxy.RequestHeaders = map[string]string{
+			"Test-Request": "test-value",
+		}
+		g.Gw.LoadAPI(&spec)
+		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+			if !headerCheck("Test-Request", "test-value", r.Header) {
+				t.Error("request header missing")
+			}
+			// TODO remove auth headers
+			if !headerCheck("Test-Header", "test-value", r.Header) {
+				t.Error("auth header missing")
+			}
+		})
+		_, err := g.Run(t,
+			test.TestCase{
+				Path:   "/",
+				Method: http.MethodPost,
+				Data: graphql.Request{
+					Query: gqlContinentQuery,
+				},
+			},
+		)
+		assert.NoError(t, err)
+	})
+
+	t.Run("test context variable request headers", func(t *testing.T) {
+		spec := *defaultSpec
+		spec.GraphQL.Proxy.RequestHeaders = map[string]string{
+			"Test-Request-Header": "$tyk_context.headers_Test_Header",
+		}
+		spec.EnableContextVars = true
+		g.Gw.LoadAPI(&spec)
+		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+			if !headerCheck("Test-Request-Header", "test-value", r.Header) {
+				t.Error("context variable header missing/incorrect")
+			}
+		})
+		_, err := g.Run(t, test.TestCase{
+			Path: "/",
+			Headers: map[string]string{
+				"Test-Header": "test-value",
+			},
+			Method: http.MethodPost,
+			Data: graphql.Request{
+				Query: gqlContinentQuery,
+			},
+		})
+		assert.NoError(t, err)
+	})
+}
+
 func TestGraphQL_InternalDataSource(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
