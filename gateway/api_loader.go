@@ -603,7 +603,7 @@ func findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler
 		return nil, false
 	}
 
-	return h.(http.Handler), true
+	return h.(*ChainObject).ThisHandler, true
 }
 
 func sanitizeProxyPaths(apiSpec *APISpec, request *http.Request) {
