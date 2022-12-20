@@ -900,14 +900,14 @@ func TestGraphql_Headers(t *testing.T) {
 	}
 
 	t.Run("test introspection header", func(t *testing.T) {
-		spec := *defaultSpec
+		spec := defaultSpec
 		spec.GraphQL.Proxy.AuthHeaders = map[string]string{
 			"Test-Header": "test-value",
 		}
 		spec.GraphQL.Proxy.RequestHeaders = map[string]string{
 			"Test-Request": "test-value",
 		}
-		g.Gw.LoadAPI(&spec)
+		g.Gw.LoadAPI(spec)
 		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
 			if !headerCheck("Test-Request", "test-value", r.Header) {
 				t.Error("request header missing")
@@ -929,12 +929,12 @@ func TestGraphql_Headers(t *testing.T) {
 	})
 
 	t.Run("test context variable request headers", func(t *testing.T) {
-		spec := *defaultSpec
+		spec := defaultSpec
 		spec.GraphQL.Proxy.RequestHeaders = map[string]string{
 			"Test-Request-Header": "$tyk_context.headers_Test_Header",
 		}
 		spec.EnableContextVars = true
-		g.Gw.LoadAPI(&spec)
+		g.Gw.LoadAPI(spec)
 		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
 			if !headerCheck("Test-Request-Header", "test-value", r.Header) {
 				t.Error("context variable header missing/incorrect")
