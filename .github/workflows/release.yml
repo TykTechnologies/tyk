@@ -95,7 +95,7 @@ jobs:
           elif [[ $current_tag =~ v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*) ]]; then
                   echo "::set-output name=upload::true"
                   echo "::set-output name=pc::tyk-gateway-unstable"
-                  echo "::debug file=.goreleaser.yml::Stable package -pushing to stable repos- requires promotion"
+                  echo "::debug file=.goreleaser.yml::Stable package -pushing to unstable repos- requires promotion"
           else
                   echo "::set-output name=upload::false"
                   echo "::debug file=.goreleaser.yml::No uploads"
