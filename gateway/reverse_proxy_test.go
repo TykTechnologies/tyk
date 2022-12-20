@@ -912,8 +912,7 @@ func TestGraphql_Headers(t *testing.T) {
 			if !headerCheck("Test-Request", "test-value", r.Header) {
 				t.Error("request header missing")
 			}
-			// TODO remove auth headers
-			if !headerCheck("Test-Header", "test-value", r.Header) {
+			if headerCheck("Test-Header", "test-value", r.Header) {
 				t.Error("auth header missing")
 			}
 		})

@@ -241,7 +241,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 				spec.GraphQL.Schema = gqlProxyUpstreamSchema
-				spec.GraphQL.Proxy.AuthHeaders = map[string]string{
+				spec.GraphQL.Proxy.RequestHeaders = map[string]string{
 					"Authorization": "123abc",
 				}
 				spec.Proxy.ListenPath = "/"
