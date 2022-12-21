@@ -45,15 +45,15 @@ jobs:
       env:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: |
-        echo "::set-output name=branch::master"
+        echo "branch=master" >> $GITHUB_OUTPUT
         if [ ! -z "${{ github.head_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.head_ref	}}; then
-          echo "::set-output name=branch::${{ github.head_ref	}}"
+          echo "branch=${{ github.head_ref	}}" >> $GITHUB_OUTPUT
         fi
         if [ ! -z "${{ github.base_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.base_ref	}}; then
-          echo "::set-output name=branch::${{ github.base_ref	}}"
+          echo "branch=${{ github.base_ref	}}" >> $GITHUB_OUTPUT
         fi
         if [ ! -z "${{ github.ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.ref }}; then
-          echo "::set-output name=branch::${{ github.ref	}}"
+          echo "branch=${{ github.ref	}}" >> $GITHUB_OUTPUT
         fi
 
     - name: Checkout test repository
@@ -69,15 +69,15 @@ jobs:
       env:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: |
-        echo "::set-output name=branch::master"
+        echo "branch=master" >> $GITHUB_OUTPUT
         if [ ! -z "${{ github.head_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.head_ref	}}; then
-          echo "::set-output name=branch::${{ github.head_ref	}}"
+          echo "branch=${{ github.head_ref	}}" >> $GITHUB_OUTPUT
         fi
         if [ ! -z "${{ github.base_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.base_ref	}}; then
-          echo "::set-output name=branch::${{ github.base_ref	}}"
+          echo "branch=${{ github.base_ref	}}" >> $GITHUB_OUTPUT
         fi
         if [ ! -z "${{ github.ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.ref }}; then
-          echo "::set-output name=branch::${{ github.ref	}}"
+          echo "branch=${{ github.ref	}}" >> $GITHUB_OUTPUT
         fi
 
     - name: Checkout dashboard
@@ -129,6 +129,7 @@ jobs:
         TYK_TEST_REDIS: "tyk-redis"
         TYK_TEST_DB_ADMIN: "12345"
         TYK_TEST_GW_SECRET: "352d20ee67be67f6340b4c0605b044b7"
+        TYK_TEST_FEDERATION_HOST: federation
       run: |
         pytest
       working-directory: tyk-automated-tests
