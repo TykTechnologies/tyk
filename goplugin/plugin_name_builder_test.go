@@ -37,7 +37,6 @@ func TestGetPrefixedVersion(t *testing.T) {
 }
 
 func TestGetGoPluginNameFromTykVersion(t *testing.T) {
-	t.Parallel()
 
 	type testCase struct {
 		version, userDefinedName, inferredName string
@@ -81,7 +80,6 @@ func TestGetGoPluginNameFromTykVersion(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(fmt.Sprintf("GW version:%v-Plugin Name:%v", tc.version, tc.inferredName), func(t *testing.T) {
-			t.Parallel()
 
 			newPluginPath := getPluginNameFromTykVersion(tc.version, tc.userDefinedName)
 			assert.Equal(t, tc.inferredName, newPluginPath)
