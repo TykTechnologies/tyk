@@ -1,4 +1,4 @@
-package gateway
+package goplugin
 
 import (
 	"fmt"
@@ -8,14 +8,36 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestGetPrefixedVersion(t *testing.T) {
+	version := getPrefixedVersion("v4.1.0")
+	expectedVersion := "v4.1.0"
+	assert.Equal(t, expectedVersion, version)
+
+	testCases := []struct {
+		name, version, expectedVersion string
+	}{
+		{
+			name:            "version with the prefix V",
+			version:         "v4.1.0",
+			expectedVersion: "v4.1.0",
+		},
+		{
+			name:            "version without the prefix v",
+			version:         "4.1.0",
+			expectedVersion: "v4.1.0",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			version := getPrefixedVersion(tc.version)
+			assert.Equal(t, tc.expectedVersion, version)
+		})
+	}
+}
+
 func TestGetGoPluginNameFromTykVersion(t *testing.T) {
 	t.Parallel()
-
-	m := GoPluginMiddleware{
-		BaseMiddleware: BaseMiddleware{},
-		Path:           "",
-		SymbolName:     "test-symbol",
-	}
 
 	type testCase struct {
 		version, userDefinedName, inferredName string
@@ -61,37 +83,8 @@ func TestGetGoPluginNameFromTykVersion(t *testing.T) {
 		t.Run(fmt.Sprintf("GW version:%v-Plugin Name:%v", tc.version, tc.inferredName), func(t *testing.T) {
 			t.Parallel()
 
-			m.Path = tc.userDefinedName
-			newPluginPath := m.getPluginNameFromTykVersion(tc.version)
+			newPluginPath := getPluginNameFromTykVersion(tc.version, tc.userDefinedName)
 			assert.Equal(t, tc.inferredName, newPluginPath)
-		})
-	}
-}
-
-func TestGetPrefixedVersion(t *testing.T) {
-	version := getPrefixedVersion("v4.1.0")
-	expectedVersion := "v4.1.0"
-	assert.Equal(t, expectedVersion, version)
-
-	testCases := []struct {
-		name, version, expectedVersion string
-	}{
-		{
-			name:            "version with the prefix V",
-			version:         "v4.1.0",
-			expectedVersion: "v4.1.0",
-		},
-		{
-			name:            "version without the prefix v",
-			version:         "4.1.0",
-			expectedVersion: "v4.1.0",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			version := getPrefixedVersion(tc.version)
-			assert.Equal(t, tc.expectedVersion, version)
 		})
 	}
 }

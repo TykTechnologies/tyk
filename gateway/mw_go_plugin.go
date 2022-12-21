@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"time"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -138,15 +135,8 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 	// try to load plugin
 	var err error
 
-	if !FileExist(m.Path) {
-		// if the exact name doesn't exist then try to load it using tyk version
-		newPath := m.getPluginNameFromTykVersion(VERSION)
-
-		prefixedVersion := getPrefixedVersion(VERSION)
-		if !FileExist(newPath) && VERSION != prefixedVersion {
-			// if the file doesn't exist yet, then lets try with version in the format: v.x.x.x
-			newPath = m.getPluginNameFromTykVersion(prefixedVersion)
-		}
+	newPath := goplugin.GetPluginFileNameToLoad(m.Path, VERSION)
+	if m.Path != newPath {
 		m.Path = newPath
 	}
 
@@ -252,38 +242,4 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	return
-}
-
-// getPluginNameFromTykVersion builds a name of plugin based on tyk version
-// os and architecture. The structure of the plugin name looks like:
-// {plugin-dir}/{plugin-name}_{GW-version}_{OS}_{arch}.so
-func (m *GoPluginMiddleware) getPluginNameFromTykVersion(version string) string {
-	if m.Path == "" {
-		return ""
-	}
-
-	pluginDir := filepath.Dir(m.Path)
-	// remove plugin extension to have the plugin's clean name
-	pluginName := strings.TrimSuffix(filepath.Base(m.Path), ".so")
-	os := runtime.GOOS
-	architecture := runtime.GOARCH
-
-	// sanitize away `-rc15` suffixes (remove `-*`) from version
-	vs := strings.Split(version, "-")
-	if len(vs) > 0 {
-		version = vs[0]
-	}
-
-	newPluginName := strings.Join([]string{pluginName, version, os, architecture}, "_")
-	newPluginPath := pluginDir + "/" + newPluginName + ".so"
-
-	return newPluginPath
-}
-
-// getPrefixedVersion receives a version and check that it has the prefix 'v' otherwise, it adds it
-func getPrefixedVersion(version string) string {
-	if !strings.HasPrefix(version, "v") {
-		version = "v" + version
-	}
-	return version
 }
