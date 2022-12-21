@@ -22,7 +22,7 @@ jobs:
       matrix:
         branch:
           - release-4
-          - release-4.2
+          - release-4.3
 
     steps:
       - uses: actions/checkout@v3

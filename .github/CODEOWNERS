@@ -1,0 +1,3 @@
+/ci/ @TykTechnologies/devops
+.github/workflows/release.yml @TykTechnologies/devops
+.github/workflows/sync-automation.yml @TykTechnologies/devops
