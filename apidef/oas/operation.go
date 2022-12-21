@@ -56,7 +56,7 @@ const (
 )
 
 // Import takes the arguments and populates the receiver *Operation values.
-func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validateRequest *bool) {
+func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validateRequest, mockResponse *bool) {
 	if allowList != nil {
 		allow := o.Allow
 		if allow == nil {
@@ -78,12 +78,22 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validate
 			validate = &ValidateRequest{}
 		}
 
-		if shouldImport := validate.shouldImportValidateRequest(oasOperation); !shouldImport {
-			return
+		if shouldImport := validate.shouldImportValidateRequest(oasOperation); shouldImport {
+			validate.Import(*validateRequest)
+			o.ValidateRequest = validate
+		}
+	}
+
+	if mockResponse != nil {
+		mock := o.MockResponse
+		if mock == nil {
+			mock = &MockResponse{}
 		}
 
-		validate.Import(*validateRequest)
-		o.ValidateRequest = validate
+		if shouldImport := mock.shouldImport(oasOperation); shouldImport {
+			mock.Import(*mockResponse)
+			o.MockResponse = mock
+		}
 	}
 }
 
@@ -526,4 +536,16 @@ type FromOASExamples struct {
 	ContentType string `bson:"contentType,omitempty" json:"contentType,omitempty"`
 	// ExampleName is the default example name among multiple path response examples documented in OAS.
 	ExampleName string `bson:"exampleName,omitempty" json:"exampleName,omitempty"`
+}
+
+func (m *MockResponse) shouldImport(operation *openapi3.Operation) bool {
+	return len(operation.Responses) > 0
+}
+
+// Import populates *ValidateRequest with enabled argument and a default error response code.
+func (m *MockResponse) Import(enabled bool) {
+	m.Enabled = enabled
+	m.FromOASExamples = &FromOASExamples{
+		Enabled: enabled,
+	}
 }

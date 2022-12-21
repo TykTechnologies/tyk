@@ -18,6 +18,7 @@ const (
 
 	middlewareValidateRequest = "validateRequest"
 	middlewareAllowList       = "allowList"
+	middlewareMockResponse    = "mockResponse"
 )
 
 var (
@@ -48,6 +49,7 @@ type TykExtensionConfigParams struct {
 	Authentication  *bool
 	AllowList       *bool
 	ValidateRequest *bool
+	MockResponse    *bool
 }
 
 // BuildDefaultTykExtension builds a default tyk extension in *OAS based on function arguments.
@@ -113,7 +115,7 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		}
 	}
 
-	s.importMiddlewares(overRideValues.AllowList, overRideValues.ValidateRequest)
+	s.importMiddlewares(overRideValues.AllowList, overRideValues.ValidateRequest, overRideValues.MockResponse)
 
 	return nil
 }
@@ -167,7 +169,7 @@ func (as *AuthSources) Import(in string) {
 	}
 }
 
-func (s *OAS) importMiddlewares(allowList, validateRequest *bool) {
+func (s *OAS) importMiddlewares(allowList, validateRequest, mockResponse *bool) {
 	xTykAPIGateway := s.GetTykExtension()
 
 	if xTykAPIGateway.Middleware == nil {
@@ -178,7 +180,7 @@ func (s *OAS) importMiddlewares(allowList, validateRequest *bool) {
 		for _, method := range allowedMethods {
 			if operation := pathItem.GetOperation(method); operation != nil {
 				tykOperation := s.getTykOperation(method, path)
-				tykOperation.Import(operation, allowList, validateRequest)
+				tykOperation.Import(operation, allowList, validateRequest, mockResponse)
 				s.deleteTykOperationIfEmpty(tykOperation, method, path)
 			}
 		}
@@ -226,9 +228,10 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 	authentication := getQueryValPtr(strings.TrimSpace(queries.Get("authentication")))
 	validateRequest := getQueryValPtr(strings.TrimSpace(queries.Get("validateRequest")))
 	allowList := getQueryValPtr(strings.TrimSpace(queries.Get("allowList")))
+	mockResponse := getQueryValPtr(strings.TrimSpace(queries.Get("mockResponse")))
 
 	if upstreamURL == "" && listenPath == "" && customDomain == "" && apiID == "" &&
-		authentication == nil && validateRequest == nil && allowList == nil {
+		authentication == nil && validateRequest == nil && allowList == nil && mockResponse == nil {
 		return nil
 	}
 
@@ -240,6 +243,7 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 		ValidateRequest: validateRequest,
 		ApiID:           apiID,
 		AllowList:       allowList,
+		MockResponse:    mockResponse,
 	}
 }
 
