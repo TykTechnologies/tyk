@@ -94,8 +94,8 @@ jobs:
           # If this is a public release, the tag is of the form vX.Y.Z where X, Y, Z ∈ ℤ
           elif [[ $current_tag =~ v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*) ]]; then
                   echo "::set-output name=upload::true"
-                  echo "::set-output name=pc::tyk-gateway"
-                  echo "::debug file=.goreleaser.yml::Pushing to stable repos"
+                  echo "::set-output name=pc::tyk-gateway-unstable"
+                  echo "::debug file=.goreleaser.yml::Stable package -pushing to unstable repos- requires promotion"
           else
                   echo "::set-output name=upload::false"
                   echo "::debug file=.goreleaser.yml::No uploads"
