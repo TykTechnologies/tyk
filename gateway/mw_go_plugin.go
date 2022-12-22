@@ -135,20 +135,8 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 	// try to load plugin
 	var err error
 
-<<<<<<< HEAD
-	if !FileExist(m.Path) {
-		// if the exact name doesn't exist then try to load it using tyk version
-		newPath := m.getPluginNameFromTykVersion(VERSION)
-
-		prefixedVersion := getPrefixedVersion(VERSION)
-		if !FileExist(newPath) && VERSION != prefixedVersion {
-			// if the file doesn't exist, then lets try with version with the format: v.x.x.x
-			newPath = m.getPluginNameFromTykVersion(prefixedVersion)
-		}
-=======
 	newPath := goplugin.GetPluginFileNameToLoad(m.Path, VERSION)
 	if m.Path != newPath {
->>>>>>> ba162637... TT-7263 make response goplugins use the plugin's naming convention (#4569)
 		m.Path = newPath
 	}
 
