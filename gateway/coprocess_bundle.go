@@ -61,9 +61,10 @@ func (b *Bundle) Verify() error {
 			if err != nil {
 				return err
 			}
+			useSignature = true
+		} else {
+			return errors.New("signature was found but NotificationVerifier is not nil")
 		}
-
-		useSignature = true
 	}
 
 	var bundleData bytes.Buffer
