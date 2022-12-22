@@ -1030,8 +1030,12 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
 	var (
-		newDef apidef.APIDefinition
-		oasObj oas.OAS
+		newDef             apidef.APIDefinition
+		oasObj             oas.OAS
+		baseAPIID          = r.FormValue("base_api_id")
+		baseAPIVersionName = r.FormValue("base_api_version_name")
+		newVersionName     = r.FormValue("new_version_name")
+		setDefault         = r.FormValue("set_default") == "true"
 	)
 
 	if oasEndpoint {
@@ -1073,6 +1077,58 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
 		if err != nil {
 			return apiError(err.Error()), errCode
+		}
+	}
+
+	if baseAPIID != "" {
+		if baseAPIPtr := gw.getApiSpec(baseAPIID); baseAPIPtr == nil {
+			log.Errorf("Couldn't find a base API to bind with the given API id: %s", baseAPIID)
+		} else {
+			apiInBytes, err := json.Marshal(baseAPIPtr)
+			if err != nil {
+				log.WithError(err).Error("Couldn't marshal API spec")
+			}
+
+			var baseAPI APISpec
+			err = json.Unmarshal(apiInBytes, &baseAPI)
+			if err != nil {
+				log.WithError(err).Error("Couldn't unmarshal API spec")
+			}
+
+			baseAPI.VersionDefinition.Enabled = true
+			if baseAPIVersionName != "" {
+				baseAPI.VersionDefinition.Name = baseAPIVersionName
+				baseAPI.VersionDefinition.Default = baseAPIVersionName
+			}
+
+			if baseAPI.VersionDefinition.Key == "" {
+				baseAPI.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+			}
+
+			if baseAPI.VersionDefinition.Location == "" {
+				baseAPI.VersionDefinition.Location = apidef.HeaderLocation
+			}
+
+			if baseAPI.VersionDefinition.Default == "" {
+				baseAPI.VersionDefinition.Default = apidef.Self
+			}
+
+			if baseAPI.VersionDefinition.Versions == nil {
+				baseAPI.VersionDefinition.Versions = make(map[string]string)
+			}
+
+			baseAPI.VersionDefinition.Versions[newVersionName] = newDef.APIID
+
+			if setDefault {
+				baseAPI.VersionDefinition.Default = newVersionName
+			}
+
+			if !oasEndpoint {
+				err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
+				if err != nil {
+					log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
+				}
+			}
 		}
 	}
 
@@ -1810,7 +1866,6 @@ func (gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
 // was in the URL parameters, it will block until the reload is done.
 // Otherwise, it won't block and fn will be called once the reload is
 // finished.
-//
 func (gw *Gateway) resetHandler(fn func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var wg sync.WaitGroup
