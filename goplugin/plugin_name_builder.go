@@ -17,6 +17,7 @@ func GetPluginFileNameToLoad(path string, version string) string {
 		newPath := getPluginNameFromTykVersion(version, path)
 
 		prefixedVersion := getPrefixedVersion(version)
+
 		if !pluginStorage.fileExist(newPath) && version != prefixedVersion {
 			// if the file doesn't exist yet, then lets try with version in the format: v.x.x.x
 			newPath = getPluginNameFromTykVersion(prefixedVersion, path)

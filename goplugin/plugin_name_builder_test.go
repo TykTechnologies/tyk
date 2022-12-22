@@ -62,6 +62,13 @@ func TestGetPluginFileNameToLoad(t *testing.T) {
 			expectedFileName: "./myplugin_4.1.0_" + OSandArch + ".so",
 			version:          gwVersionWithoutPrefix,
 		},
+		{
+			name:             "append prefix to gateway version",
+			pluginName:       "myplugin.so",
+			files:            []string{"myplugin_v4.1.0_" + OSandArch + ".so"},
+			expectedFileName: "./myplugin_v4.1.0_" + OSandArch + ".so",
+			version:          gwVersionWithoutPrefix,
+		},
 	}
 
 	for _, testCase := range testCases {
