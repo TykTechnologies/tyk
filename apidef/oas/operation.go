@@ -56,42 +56,42 @@ const (
 )
 
 // Import takes the arguments and populates the receiver *Operation values.
-func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validateRequest, mockResponse *bool) {
-	if allowList != nil {
+func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykExtensionConfigParams) {
+	if overRideValues.AllowList != nil {
 		allow := o.Allow
 		if allow == nil {
 			allow = &Allowance{}
 		}
 
-		allow.Import(*allowList)
+		allow.Import(*overRideValues.AllowList)
 
-		if block := o.Block; block != nil && block.Enabled && *allowList {
+		if block := o.Block; block != nil && block.Enabled && *overRideValues.AllowList {
 			block.Enabled = false
 		}
 
 		o.Allow = allow
 	}
 
-	if validateRequest != nil {
+	if overRideValues.ValidateRequest != nil {
 		validate := o.ValidateRequest
 		if validate == nil {
 			validate = &ValidateRequest{}
 		}
 
 		if shouldImport := validate.shouldImportValidateRequest(oasOperation); shouldImport {
-			validate.Import(*validateRequest)
+			validate.Import(*overRideValues.ValidateRequest)
 			o.ValidateRequest = validate
 		}
 	}
 
-	if mockResponse != nil {
+	if overRideValues.MockResponse != nil {
 		mock := o.MockResponse
 		if mock == nil {
 			mock = &MockResponse{}
 		}
 
 		if shouldImport := mock.shouldImport(oasOperation); shouldImport {
-			mock.Import(*mockResponse)
+			mock.Import(*overRideValues.MockResponse)
 			o.MockResponse = mock
 		}
 	}
