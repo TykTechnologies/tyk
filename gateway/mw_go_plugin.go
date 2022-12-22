@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"time"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -134,9 +131,15 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 	// try to load plugin
 	var err error
 
+<<<<<<< HEAD
 	if !FileExist(m.Path) {
 		// if the exact name doesn't exist then try to load it using tyk version
 		m.Path = m.goPluginFromTykVersion(VERSION)
+=======
+	newPath := goplugin.GetPluginFileNameToLoad(m.Path, VERSION)
+	if m.Path != newPath {
+		m.Path = newPath
+>>>>>>> ba162637... TT-7263 make response goplugins use the plugin's naming convention (#4569)
 	}
 
 	defer func() {
@@ -242,6 +245,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 	return
 }
+<<<<<<< HEAD
 
 // goPluginFromTykVersion builds a name of plugin based on tyk version
 // os and architecture. The structure of the plugin name looks like:
@@ -268,3 +272,5 @@ func (m *GoPluginMiddleware) goPluginFromTykVersion(version string) string {
 
 	return newPluginPath
 }
+=======
+>>>>>>> ba162637... TT-7263 make response goplugins use the plugin's naming convention (#4569)
