@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install ca-certificates libgnutls30 -y
 
 RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
-COPY images/plugin-compiler/data/build.sh /build.sh
+COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
 COPY . $TYK_GW_PATH
