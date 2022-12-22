@@ -1,26 +1,23 @@
 package goplugin
 
 import (
-	"errors"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	logger "github.com/TykTechnologies/tyk/log"
 )
 
-var log = logger.Get()
+// pluginStorage defaults to FileSystemStorage
+var pluginStorage storage
 
 // GetPluginFileNameToLoad check which file to load based on name, tyk version, os and architecture
 // but it also takes care of returning the name of the file that exists
 func GetPluginFileNameToLoad(path string, version string) string {
-	if !fileExist(path) {
+	if !pluginStorage.fileExist(path) {
 		// if the exact name doesn't exist then try to load it using tyk version
 		newPath := getPluginNameFromTykVersion(version, path)
 
 		prefixedVersion := getPrefixedVersion(version)
-		if !fileExist(newPath) && version != prefixedVersion {
+		if !pluginStorage.fileExist(newPath) && version != prefixedVersion {
 			// if the file doesn't exist yet, then lets try with version in the format: v.x.x.x
 			newPath = getPluginNameFromTykVersion(prefixedVersion, path)
 		}
@@ -63,12 +60,4 @@ func getPrefixedVersion(version string) string {
 		version = "v" + version
 	}
 	return version
-}
-
-func fileExist(filepath string) bool {
-	if _, err := os.Stat(filepath); errors.Is(err, os.ErrNotExist) {
-		log.Warningf("plugin file %v doesn't exist", filepath)
-		return false
-	}
-	return true
 }

@@ -3,10 +3,79 @@ package goplugin
 import (
 	"fmt"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// MockStorage implements storage to simulate which file to load.
+// its just a mock
+type MockStorage struct {
+	files []string
+}
+
+func (ms MockStorage) fileExist(path string) bool {
+	for _, v := range ms.files {
+		// clean path as some of them has ./ as prefix
+		path := strings.TrimPrefix(path, "./")
+		if v == path {
+			return true
+		}
+	}
+
+	return false
+}
+
+func TestGetPluginFileNameToLoad(t *testing.T) {
+	// it can be any version, but for testing we will take this one
+	gwVersion := "v4.1.0"
+	gwVersionWithoutPrefix := "4.1.0"
+	OSandArch := runtime.GOOS + "_" + runtime.GOARCH
+
+	testCases := []struct {
+		name             string
+		pluginName       string
+		files            []string
+		expectedFileName string
+		version          string
+	}{
+		{
+			name:             "base name file exist",
+			pluginName:       "myplugin.so",
+			files:            []string{"myplugin.so", "myplugin_v4.1.0_" + OSandArch + ".so", "myplugin_v4.1.0_linux_amd64.so", "myplugin", "anything-else"},
+			expectedFileName: "myplugin.so",
+			version:          gwVersion,
+		},
+		{
+			name:             "exist plugin file that follows new formatting",
+			pluginName:       "myplugin.so",
+			files:            []string{"myplugin_v4.1.0_" + OSandArch + ".so", "myplugin_v4.1.0_linux_amd64.so", "myplugin", "anything-else"},
+			expectedFileName: "./myplugin_v4.1.0_" + OSandArch + ".so",
+			version:          gwVersion,
+		},
+		{
+			// in some point we had an issue where name loaded didn't contain prefix v. So we keep it for backward compatibility
+			name:             "exist plugin file that follows new formatting but gw version without prefix v",
+			pluginName:       "myplugin.so",
+			files:            []string{"myplugin_4.1.0_" + OSandArch + ".so", "myplugin_v4.1.0_" + OSandArch + ".so", "myplugin_v4.1.0_linux_amd64.so", "myplugin", "anything-else"},
+			expectedFileName: "./myplugin_4.1.0_" + OSandArch + ".so",
+			version:          gwVersionWithoutPrefix,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			pluginStorage = MockStorage{
+				files: testCase.files,
+			}
+
+			filenameToLoad := GetPluginFileNameToLoad(testCase.pluginName, testCase.version)
+			assert.Equal(t, testCase.expectedFileName, filenameToLoad)
+		})
+	}
+
+}
 
 func TestGetPrefixedVersion(t *testing.T) {
 	version := getPrefixedVersion("v4.1.0")
