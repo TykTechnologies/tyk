@@ -2682,6 +2682,7 @@ func TestOAS(t *testing.T) {
 				"customDomain":    customDomain,
 				"allowList":       "true",
 				"validateRequest": "true",
+				"mockResponse":    "true",
 			}
 
 			expectedTykExt.Server.ListenPath.Value = listenPath
@@ -2697,6 +2698,10 @@ func TestOAS(t *testing.T) {
 						Allow: &oas.Allowance{
 							Enabled: true,
 						},
+						MockResponse: &oas.MockResponse{
+							Enabled:         true,
+							FromOASExamples: &oas.FromOASExamples{Enabled: true},
+						},
 					},
 					"petsPOST": {
 						Allow: &oas.Allowance{
@@ -2705,6 +2710,10 @@ func TestOAS(t *testing.T) {
 						ValidateRequest: &oas.ValidateRequest{
 							Enabled:           true,
 							ErrorResponseCode: http.StatusUnprocessableEntity,
+						},
+						MockResponse: &oas.MockResponse{
+							Enabled:         true,
+							FromOASExamples: &oas.FromOASExamples{Enabled: true},
 						},
 					},
 				},
@@ -2732,6 +2741,7 @@ func TestOAS(t *testing.T) {
 				"customDomain":    customDomain,
 				"allowList":       "false",
 				"validateRequest": "false",
+				"mockResponse":    "false",
 			}
 
 			expectedTykExt := *apiInOAS.GetTykExtension()
@@ -2747,6 +2757,10 @@ func TestOAS(t *testing.T) {
 						Allow: &oas.Allowance{
 							Enabled: false,
 						},
+						MockResponse: &oas.MockResponse{
+							Enabled:         false,
+							FromOASExamples: &oas.FromOASExamples{Enabled: false},
+						},
 					},
 					"petsPOST": {
 						Allow: &oas.Allowance{
@@ -2755,6 +2769,10 @@ func TestOAS(t *testing.T) {
 						ValidateRequest: &oas.ValidateRequest{
 							Enabled:           false,
 							ErrorResponseCode: http.StatusUnprocessableEntity,
+						},
+						MockResponse: &oas.MockResponse{
+							Enabled:         false,
+							FromOASExamples: &oas.FromOASExamples{Enabled: false},
 						},
 					},
 				},
