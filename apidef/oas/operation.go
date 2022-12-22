@@ -542,7 +542,7 @@ func (m *MockResponse) shouldImport(operation *openapi3.Operation) bool {
 	return len(operation.Responses) > 0
 }
 
-// Import populates *ValidateRequest with enabled argument and a default error response code.
+// Import populates *MockResponse with enabled argument for FromOASExamples.
 func (m *MockResponse) Import(enabled bool) {
 	m.Enabled = enabled
 	m.FromOASExamples = &FromOASExamples{
