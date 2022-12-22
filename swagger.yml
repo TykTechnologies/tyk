@@ -551,6 +551,7 @@ paths:
         - $ref: '#/components/parameters/CustomDomain'
         - $ref: '#/components/parameters/ValidateRequest'
         - $ref: '#/components/parameters/AllowList'
+        - $ref: '#/components/parameters/MockResponse'
         - $ref: '#/components/parameters/Authentication'
       requestBody:
         content:
@@ -701,6 +702,7 @@ paths:
         - $ref: '#/components/parameters/CustomDomain'
         - $ref: '#/components/parameters/ApiID'
         - $ref: '#/components/parameters/AllowList'
+        - $ref: '#/components/parameters/MockResponse'
         - $ref: '#/components/parameters/ValidateRequest'
         - $ref: '#/components/parameters/Authentication'
       requestBody:
@@ -3711,6 +3713,13 @@ components:
       name: allowList
       in: query
       description: Enable allowList middleware for all endpoints
+      required: false
+      schema:
+        $ref: '#/components/schemas/BooleanQueryParam'
+    MockResponse:
+      name: mockResponse
+      in: query
+      description: Enable mockResponse middleware for all endpoints having responses configured.
       required: false
       schema:
         $ref: '#/components/schemas/BooleanQueryParam'
