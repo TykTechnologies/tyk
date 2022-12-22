@@ -113,16 +113,6 @@ func greaterThanInt(first, second int) bool {
 	return first > second
 }
 
-<<<<<<< HEAD
-func FileExist(filepath string) bool {
-	if _, err := os.Stat(filepath); errors.Is(err, os.ErrNotExist) {
-		return false
-	}
-	return true
-}
-
-=======
->>>>>>> ba162637... TT-7263 make response goplugins use the plugin's naming convention (#4569)
 func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 	var result = url.URL{
 		Scheme: "http",
