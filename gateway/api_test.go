@@ -2048,6 +2048,65 @@ func TestHandleAddApi(t *testing.T) {
 
 }
 
+func TestHandleAddApi_AddVersionAtomically(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		baseVersionName = "base-version-name"
+		v2VersionName   = "v2-version-name"
+		v2APIID         = "v2-api-id"
+	)
+
+	baseAPI := ts.Gw.BuildAndLoadAPI(func(a *APISpec) {
+		a.APIID = "base-api-id"
+		a.VersionDefinition.Key = ""
+		a.VersionDefinition.Location = ""
+	})[0]
+
+	v2 := BuildAPI(func(spec *APISpec) {
+		spec.APIID = v2APIID
+	})[0]
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Method: http.MethodPost, Data: v2,
+			Path: fmt.Sprintf("/tyk/apis?base_api_id=%s&new_version_name=%s&set_default=true&base_api_version_name=%s", baseAPI.APIID, v2VersionName, baseVersionName),
+			BodyMatchFunc: func(i []byte) bool {
+				assert.Len(t, baseAPI.VersionDefinition.Versions, 0)
+				ts.Gw.DoReload()
+				return true
+			},
+			Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodGet, Path: "/tyk/reload", Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/apis/" + baseAPI.APIID, BodyMatchFunc: func(bytes []byte) bool {
+			var base apidef.APIDefinition
+			err := json.Unmarshal(bytes, &base)
+			assert.NoError(t, err)
+
+			expectedVersions := map[string]string{
+				v2VersionName: v2APIID,
+			}
+
+			assert.Equal(t, expectedVersions, base.VersionDefinition.Versions)
+			assert.True(t, base.VersionDefinition.Enabled)
+			assert.Equal(t, apidef.DefaultAPIVersionKey, base.VersionDefinition.Key)
+			assert.Equal(t, apidef.HeaderLocation, base.VersionDefinition.Location)
+			assert.Equal(t, baseVersionName, base.VersionDefinition.Name)
+			assert.Equal(t, v2VersionName, base.VersionDefinition.Default)
+
+			return true
+		}, Code: http.StatusOK},
+	}...)
+
+	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Path: "/tyk/apis/" + v2APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK})
+}
+
+func baseAPIHeader(id string) map[string]string {
+	return map[string]string{
+		apidef.HeaderBaseAPIID: id,
+	}
+}
+
 func TestHandleUpdateApi(t *testing.T) {
 	testFs := afero.NewMemMapFs()
 
