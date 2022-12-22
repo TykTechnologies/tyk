@@ -41,6 +41,11 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 		return nil
 	}
 
+	newPath := goplugin.GetPluginFileNameToLoad(h.Path, VERSION)
+	if h.Path != newPath {
+		h.Path = newPath
+	}
+
 	// try to load plugin
 	var err error
 	if h.ResHandler, err = goplugin.GetResponseHandler(h.Path, h.SymbolName); err != nil {
