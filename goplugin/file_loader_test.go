@@ -1,9 +1,10 @@
 package goplugin
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFileExist(t *testing.T) {
