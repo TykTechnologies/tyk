@@ -43,7 +43,7 @@ func TestGetPluginFileNameToLoad(t *testing.T) {
 		{
 			name:             "base name file exist",
 			pluginName:       "myplugin.so",
-			files:            []string{"myplugin.so", "myplugin_v4.1.0_" + OSandArch + ".so", "myplugin_v4.1.0_linux_amd64.so", "myplugin", "anything-else"},
+			files:            []string{"myplugin.so", "myplugin", "anything-else"},
 			expectedFileName: "myplugin.so",
 			version:          gwVersion,
 		},
@@ -58,7 +58,7 @@ func TestGetPluginFileNameToLoad(t *testing.T) {
 			// in some point we had an issue where name loaded didn't contain prefix v. So we keep it for backward compatibility
 			name:             "exist plugin file that follows new formatting but gw version without prefix v",
 			pluginName:       "myplugin.so",
-			files:            []string{"myplugin_4.1.0_" + OSandArch + ".so", "myplugin_v4.1.0_" + OSandArch + ".so", "myplugin_v4.1.0_linux_amd64.so", "myplugin", "anything-else"},
+			files:            []string{"myplugin_4.1.0_" + OSandArch + ".so", "myplugin", "anything-else", "myplugin.so"},
 			expectedFileName: "./myplugin_4.1.0_" + OSandArch + ".so",
 			version:          gwVersionWithoutPrefix,
 		},
