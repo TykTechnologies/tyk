@@ -117,13 +117,10 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 	return false
 }
 
-<<<<<<< HEAD
-=======
 // loadPlugin loads the plugin file from m.Path, it will try
 //converting it to the tyk version aware format: {plugin_name}_{tyk_version}_{os}_{arch}.so
 // if the file doesn't exist then it will again but with a gw version that is not prefixed by 'v'
 // later, it will try with m.path which can be {plugin_name}.so
->>>>>>> 8e0a9e72... TT-7351 changed precedence on how plugins are picked (#4576)
 func (m *GoPluginMiddleware) loadPlugin() bool {
 	m.logger = log.WithFields(logrus.Fields{
 		"mwPath":       m.Path,
