@@ -117,10 +117,10 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 	return false
 }
 
-// loadPlugin loads the plugin file from m.Path, it will try with:
-// m.path which can be {plugin_name}.so
-// if the file doesn't exist then it will try converting it to the tyk version aware format: {plugin_name}_{tyk_version}_{os}_{arch}.so
-// later if the file still doesn't exist then it will try again but ensuring that the version contains the prefix 'v'
+// loadPlugin loads the plugin file from m.Path, it will try
+//converting it to the tyk version aware format: {plugin_name}_{tyk_version}_{os}_{arch}.so
+// if the file doesn't exist then it will again but with a gw version that is not prefixed by 'v'
+// later, it will try with m.path which can be {plugin_name}.so
 func (m *GoPluginMiddleware) loadPlugin() bool {
 	m.logger = log.WithFields(logrus.Fields{
 		"mwPath":       m.Path,
@@ -135,7 +135,11 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 	// try to load plugin
 	var err error
 
-	newPath := goplugin.GetPluginFileNameToLoad(m.Path, VERSION)
+	newPath, err := goplugin.GetPluginFileNameToLoad(m.Path, VERSION)
+	if err != nil {
+		m.logger.WithError(err).Error("plugin file not found")
+		return false
+	}
 	if m.Path != newPath {
 		m.Path = newPath
 	}
