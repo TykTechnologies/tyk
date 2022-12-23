@@ -1321,7 +1321,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if err != nil {
-
+		setContext(logreq, outreq.Context())
 		token := ctxGetAuthToken(req)
 
 		var alias string
