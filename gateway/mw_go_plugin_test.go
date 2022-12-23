@@ -1,8 +1,9 @@
 package gateway
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // TestLoadPlugin test the function to load a middleware goplugin
