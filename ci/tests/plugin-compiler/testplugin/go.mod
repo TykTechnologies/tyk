@@ -1,10 +1,10 @@
-module github.com/TykTechnologies/tyk/integration/smoke-tests/plugin-compiler/testplugin
+module github.com/TykTechnologies/tyk/ci/tests/plugin-compiler/testplugin
 
-go 1.12
+go 1.16
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.0 // indirect
-	github.com/Masterminds/goutils v1.1.1 // indirect
+	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/TykTechnologies/murmur3 v0.0.0-20190927072507-ba59b2844ad7 // indirect
 	github.com/TykTechnologies/tyk v1.9.2-0.20210625184536-6b5eac3429dd
 	github.com/buger/jsonparser v1.1.1 // indirect
@@ -25,7 +25,6 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	go.uber.org/atomic v1.8.0 // indirect
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e // indirect
-	gopkg.in/Masterminds/sprig.v2 v2.21.0
 )
 
 replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210609111804-af8c15678972
