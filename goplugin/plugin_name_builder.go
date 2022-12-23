@@ -1,6 +1,7 @@
 package goplugin
 
 import (
+	"errors"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -11,14 +12,14 @@ var pluginStorage storage
 
 // GetPluginFileNameToLoad check which file to load based on name, tyk version, os and architecture
 // but it also takes care of returning the name of the file that exists
-func GetPluginFileNameToLoad(path string, version string) string {
+func GetPluginFileNameToLoad(path string, version string) (string, error) {
 
 	prefixedGwVersion := getPrefixedVersion(version)
 	newNamingFormat := getPluginNameFromTykVersion(prefixedGwVersion, path)
 
 	// 1. attempt to load a plugin that follow the new standard
 	if pluginStorage.fileExist(newNamingFormat) {
-		return newNamingFormat
+		return newNamingFormat, nil
 	}
 
 	// 2. attempt to load a plugin that follows the new standard but gw version is not prefixed
@@ -26,12 +27,16 @@ func GetPluginFileNameToLoad(path string, version string) string {
 		newNamingFormat = getPluginNameFromTykVersion(version, path)
 
 		if pluginStorage.fileExist(newNamingFormat) {
-			return newNamingFormat
+			return newNamingFormat, nil
 		}
 	}
 
 	// 3. attempt to load the exact name provided
-	return path
+	if !pluginStorage.fileExist(path) {
+		return "", errors.New("plugin file not found")
+	}
+
+	return path, nil
 }
 
 // getPluginNameFromTykVersion builds a name of plugin based on tyk version

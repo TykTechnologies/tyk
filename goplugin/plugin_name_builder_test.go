@@ -77,7 +77,7 @@ func TestGetPluginFileNameToLoad(t *testing.T) {
 				files: testCase.files,
 			}
 
-			filenameToLoad := GetPluginFileNameToLoad(testCase.pluginName, testCase.version)
+			filenameToLoad, _ := GetPluginFileNameToLoad(testCase.pluginName, testCase.version)
 			assert.Equal(t, testCase.expectedFileName, filenameToLoad)
 		})
 	}

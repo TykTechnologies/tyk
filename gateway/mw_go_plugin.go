@@ -135,7 +135,10 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 	// try to load plugin
 	var err error
 
-	newPath := goplugin.GetPluginFileNameToLoad(m.Path, VERSION)
+	newPath, err := goplugin.GetPluginFileNameToLoad(m.Path, VERSION)
+	if err != nil {
+		return false
+	}
 	if m.Path != newPath {
 		m.Path = newPath
 	}
