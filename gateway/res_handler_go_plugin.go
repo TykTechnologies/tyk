@@ -43,6 +43,7 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 
 	newPath, err := goplugin.GetPluginFileNameToLoad(h.Path, VERSION)
 	if err != nil {
+		h.logger.WithError(err).Error("Could not load Go-plugin. File was not found")
 		return err
 	}
 	if h.Path != newPath {
