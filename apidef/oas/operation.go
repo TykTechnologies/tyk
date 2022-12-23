@@ -539,7 +539,21 @@ type FromOASExamples struct {
 }
 
 func (m *MockResponse) shouldImport(operation *openapi3.Operation) bool {
-	return len(operation.Responses) > 0
+	for _, response := range operation.Responses {
+		for _, content := range response.Value.Content {
+			if content.Example != nil || content.Schema != nil {
+				return true
+			}
+
+			for _, example := range content.Examples {
+				if example.Value != nil {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // Import populates *MockResponse with enabled argument for FromOASExamples.
