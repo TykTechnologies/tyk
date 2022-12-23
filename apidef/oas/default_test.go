@@ -978,6 +978,61 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				assert.Nil(t, oasDef.GetTykExtension().Middleware)
 			})
 
+			t.Run("do not configure MockResponse if no valid examples/example/schema found but configured response",
+				func(t *testing.T) {
+					oasDef := getOASDef(false, false)
+					description := "description"
+					simpleResponse := openapi3.Responses{
+						"200": &openapi3.ResponseRef{
+							Value: &openapi3.Response{
+								Description: &description,
+							},
+						},
+					}
+					oasDef.Paths["/pets"].Get.Responses = simpleResponse
+					oasDef.Paths["/pets"].Post.Responses = simpleResponse
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						MockResponse: &trueVal,
+					}
+
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+					assert.NoError(t, err)
+					assert.Nil(t, oasDef.GetTykExtension().Middleware)
+				})
+
+			t.Run("enable oasMockResponse for all paths when operationID is configured in OAS with valid examples in response",
+				func(t *testing.T) {
+					oasDef := getOASDef(true, false)
+
+					validResponseWithExamples := openapi3.Responses{
+						"200": &openapi3.ResponseRef{
+							Value: &openapi3.Response{
+								Content: openapi3.Content{
+									"application/json": {
+										Examples: openapi3.Examples{
+											"1": &openapi3.ExampleRef{
+												Value: &openapi3.Example{Value: map[string]interface{}{"status": "ok"}},
+											},
+										},
+									},
+								},
+							},
+						},
+					}
+					oasDef.Paths["/pets"].Get.Responses = validResponseWithExamples
+					oasDef.Paths["/pets"].Post.Responses = validResponseWithExamples
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						MockResponse: &trueVal,
+					}
+
+					expectedOperations := getExpectedOperations(true, true, middlewareMockResponse)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+					assert.NoError(t, err)
+					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+				})
+
 			t.Run("enable oasMockResponse for all paths when operationID is configured in OAS with valid responses",
 				func(t *testing.T) {
 					oasDef := getOASDef(true, true)
