@@ -1123,7 +1123,13 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 				baseAPI.VersionDefinition.Default = newVersionName
 			}
 
-			if !oasEndpoint {
+			if baseAPI.IsOAS {
+				baseAPI.OAS.Fill(*baseAPI.APIDefinition)
+				err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
+				if err != nil {
+					log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
+				}
+			} else {
 				err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
 				if err != nil {
 					log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
