@@ -87,7 +87,7 @@ func (r *RedisCluster) hashKey(in string) string {
 	return HashStr(in)
 }
 
-func (r *RedisCluster) fixKey(keyName string) string {
+func (r *RedisCluster) prefixKey(keyName string) string {
 	return r.KeyPrefix + r.hashKey(keyName)
 }
 
@@ -109,7 +109,7 @@ func (r *RedisCluster) up() error {
 
 // GetKey will retrieve a key from the database
 func (r *RedisCluster) GetKey(keyName string) (string, error) {
-	val, err := r.GetRawKey(r.fixKey(keyName))
+	val, err := r.GetRawKey(r.prefixKey(keyName))
 	r.check(err, "GetKey", keyName)
 
 	return val, err
@@ -125,7 +125,7 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 	keyNames := make([]string, len(keys))
 	copy(keyNames, keys)
 	for index, val := range keyNames {
-		keyNames[index] = r.fixKey(val)
+		keyNames[index] = r.prefixKey(val)
 	}
 
 	values, err := driver.MGet(r.context(), keyNames)
@@ -170,7 +170,7 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 		return 0, err
 	}
 
-	value, err := r.singleton().TTL(r.context(), r.fixKey(keyName))
+	value, err := r.singleton().TTL(r.context(), r.prefixKey(keyName))
 	r.check(err, "GetExp", keyName)
 
 	if err != nil {
@@ -190,7 +190,7 @@ func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
 		return err
 	}
 
-	keyName = r.fixKey(keyName)
+	keyName = r.prefixKey(keyName)
 	err := r.singleton().Expire(r.context(), keyName, time.Duration(timeout)*time.Second)
 	r.check(err, "SetExp", keyName, timeout)
 
@@ -200,7 +200,7 @@ func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
 // SetKey will create (or update) a key value in the store
 func (r *RedisCluster) SetKey(keyName, value string, timeout int64) error {
 
-	keyName = r.fixKey(keyName)
+	keyName = r.prefixKey(keyName)
 	err := r.SetRawKey(keyName, value, timeout)
 	r.check(err, "SetKey", keyName, value, timeout)
 
@@ -224,7 +224,7 @@ func (r *RedisCluster) Decrement(keyName string) {
 		return
 	}
 
-	keyName = r.fixKey(keyName)
+	keyName = r.prefixKey(keyName)
 
 	_, err := r.singleton().Decr(r.context(), keyName)
 	r.check(err, "Decrement", keyName)
@@ -238,7 +238,7 @@ func (r *RedisCluster) IncrementWithExpire(keyName string, expire int64) int64 {
 
 	cluster := r.singleton()
 
-	// This function uses a raw key, so we shouldn't call fixKey
+	// This function uses a raw key, so we shouldn't call prefixKey
 	val, err := cluster.Incr(r.context(), keyName)
 	r.check(err, "IncrementWithExpire (inc)", keyName, expire)
 
@@ -311,7 +311,7 @@ func (r *RedisCluster) GetKeysAndValues() map[string]string {
 
 // DeleteKey will remove a key from the database
 func (r *RedisCluster) DeleteKey(keyName string) bool {
-	return r.DeleteRawKey(r.fixKey(keyName))
+	return r.DeleteRawKey(r.prefixKey(keyName))
 }
 
 // DeleteAllKeys will remove all keys from the database.
@@ -433,7 +433,7 @@ func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 		return nil
 	}
 
-	fixedKey := r.fixKey(keyName)
+	fixedKey := r.prefixKey(keyName)
 	client := r.singleton()
 	values, err := client.LRangeAndDel(r.context(), fixedKey)
 	r.check(err, "GetAndDeleteSet", fixedKey)
@@ -450,7 +450,7 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 		return
 	}
 
-	fixedKey := r.fixKey(keyName)
+	fixedKey := r.prefixKey(keyName)
 	err := r.singleton().RPush(r.context(), fixedKey, value)
 	r.check(err, "AppendToSet", fixedKey, value)
 }
@@ -461,7 +461,7 @@ func (r *RedisCluster) Exists(keyName string) (bool, error) {
 		return false, err
 	}
 
-	fixedKey := r.fixKey(keyName)
+	fixedKey := r.prefixKey(keyName)
 	exists, err := r.singleton().Exists(r.context(), fixedKey)
 	r.check(err, "Exists", fixedKey)
 	if err != nil {
@@ -473,7 +473,7 @@ func (r *RedisCluster) Exists(keyName string) (bool, error) {
 
 // RemoveFromList delete an value from a list idetinfied with the keyName
 func (r *RedisCluster) RemoveFromList(keyName, value string) error {
-	fixedKey := r.fixKey(keyName)
+	fixedKey := r.prefixKey(keyName)
 	_, err := r.singleton().LRem(r.context(), fixedKey, 0, value)
 	r.check(err, "RemoveFromList", fixedKey, 0, value)
 
@@ -482,7 +482,7 @@ func (r *RedisCluster) RemoveFromList(keyName, value string) error {
 
 // GetListRange gets range of elements of list identified by keyName
 func (r *RedisCluster) GetListRange(keyName string, from, to int64) ([]string, error) {
-	fixedKey := r.fixKey(keyName)
+	fixedKey := r.prefixKey(keyName)
 	elements, err := r.singleton().LRange(r.context(), fixedKey, from, to)
 	r.check(err, "GetListRange", fixedKey, from, to)
 
@@ -498,7 +498,7 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 		return
 	}
 
-	fixedKey := r.fixKey(key)
+	fixedKey := r.prefixKey(key)
 	err := r.singleton().RPushPipelined(r.context(), fixedKey, values...)
 	r.check(err, "AppendToSetPipelined", fixedKey)
 }
@@ -508,7 +508,7 @@ func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
 		return nil, err
 	}
 
-	fixedKey := r.fixKey(keyName)
+	fixedKey := r.prefixKey(keyName)
 	val, err := r.singleton().SMembers(r.context(), fixedKey)
 	r.check(err, "GetSet", fixedKey)
 
@@ -529,7 +529,7 @@ func (r *RedisCluster) AddToSet(keyName, value string) {
 		return
 	}
 
-	fixedKey := r.fixKey(keyName)
+	fixedKey := r.prefixKey(keyName)
 	err := r.singleton().SAdd(r.context(), fixedKey, value)
 	r.check(err, "AddToSet", fixedKey, value)
 }
@@ -539,7 +539,7 @@ func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 		return
 	}
 
-	fixedKey := r.fixKey(keyName)
+	fixedKey := r.prefixKey(keyName)
 	err := r.singleton().SRem(r.context(), fixedKey, value)
 	r.check(err, "RemoveFromSet", fixedKey, value)
 }
@@ -549,7 +549,7 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 		return false
 	}
 
-	fixedKey := r.fixKey(keyName)
+	fixedKey := r.prefixKey(keyName)
 	val, err := r.singleton().SIsMember(r.context(), fixedKey, value)
 	r.check(err, "IsMemberOfSet", fixedKey, value)
 
@@ -601,7 +601,7 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 		return
 	}
 
-	fixedKey := r.fixKey(keyName)
+	fixedKey := r.prefixKey(keyName)
 	_, err := r.singleton().ZAdd(r.context(), fixedKey, value, score)
 	r.check(err, "AddToSortedSet", keyName, value, score)
 }
@@ -612,7 +612,7 @@ func (r *RedisCluster) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]
 		return nil, nil, err
 	}
 
-	fixedKey := r.fixKey(keyName)
+	fixedKey := r.prefixKey(keyName)
 	values, err := r.singleton().ZRangeByScoreWithScores(r.context(), fixedKey, scoreFrom, scoreTo)
 	r.check(err, "GetSortedSetRange", keyName, scoreFrom, scoreTo)
 
@@ -629,7 +629,7 @@ func (r *RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) 
 		return err
 	}
 
-	fixedKey := r.fixKey(keyName)
+	fixedKey := r.prefixKey(keyName)
 	_, err := r.singleton().ZRemRangeByScore(r.context(), fixedKey, scoreFrom, scoreTo)
 	r.check(err, "RemoveSortedSetRange", fixedKey, scoreFrom, scoreTo)
 
