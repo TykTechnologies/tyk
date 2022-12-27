@@ -55,7 +55,7 @@ func (rc *RedisController) DisableRedis(disable bool) {
 
 func (rc *RedisController) enabled() bool {
 	ok, _ := rc.disableRedis.Load().(bool)
-	return ok
+	return !ok
 }
 
 // Connected returns true if we are connected to redis.
@@ -181,7 +181,7 @@ func (rc *RedisController) statusCheck(ctx context.Context, clusters []*RedisClu
 			// store the actual status of redis
 			rc.redisUp.Store(connected)
 
-			// if we weren't alerady connected but now we are connected, we trigger the reconnect
+			// if we weren't already connected but now we are connected, we trigger the reconnect
 			if !alreadyConnected && connected {
 				rc.reconnect <- struct{}{}
 			}
