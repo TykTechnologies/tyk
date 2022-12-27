@@ -32,6 +32,9 @@ var _ Controller = &RedisController{}
 // StorageDriver represents the API surface of the redis client library that we use
 type StorageDriver = internal.StorageDriver
 
+// IsValidDriver checks config and returns error if invalid config.
+var IsValidDriver = internal.IsValidDriver
+
 func fromStringToInterfaceSlice(values []string) []interface{} {
 	result := make([]interface{}, len(values))
 	for i, v := range values {
