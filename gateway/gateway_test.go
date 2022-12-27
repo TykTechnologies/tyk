@@ -791,14 +791,13 @@ func TestAnalytics(t *testing.T) {
 		})
 		assert.NotNil(t, err)
 
-		// we wait until the request finish
-		time.Sleep(3 * time.Millisecond)
 		// let records to to be sent
-		time.Sleep(recordsBufferFlushInterval + 100)
+		time.Sleep(recordsBufferFlushInterval * 2)
 
 		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
+			return
 		}
 
 		var record AnalyticsRecord
