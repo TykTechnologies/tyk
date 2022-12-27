@@ -14,7 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
-func TestRedis(t *testing.T) {
+func TestStorageDrivers(t *testing.T) {
 	var testcases = []struct {
 		title  string
 		config config.StorageOptionsConf

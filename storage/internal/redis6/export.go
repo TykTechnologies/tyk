@@ -6,8 +6,8 @@ import (
 	"github.com/TykTechnologies/tyk/storage/internal/model"
 )
 
-// Expose the following symbols so we can copy `redis.go` and `driver.go`
-// from redis6 to redis7 without updating the symbols every time.
+// Expose the following symbols so we can copy `driver.go` from
+// redis6 to redis7 without updating the symbols every time.
 
 type (
 	Client        = redis.Client
