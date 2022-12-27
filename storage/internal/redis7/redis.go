@@ -80,9 +80,3 @@ func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
 
 	return addrs
 }
-
-// PubSub v8 and v9 :D
-type PubSub interface {
-	// I bet myself a burger this won't work
-
-}
