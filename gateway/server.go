@@ -308,12 +308,6 @@ func (gw *Gateway) apisByIDLen() int {
 	return len(gw.apisByID)
 }
 
-// define valid storage drivers
-var validStorageDrivers = []string{"redis", "redis7"}
-
-// define allowed storage drivers for analytics
-var validStorageDriversForAnalytics = []string{"redis", "redis7"}
-
 // Create all globals and init connection handlers
 func (gw *Gateway) setupGlobals() {
 	gw.reloadMu.Lock()
@@ -331,8 +325,10 @@ func (gw *Gateway) setupGlobals() {
 			time.Duration(gwConfig.DnsCache.CheckInterval)*time.Second)
 	}
 
-	if gwConfig.EnableAnalytics && !contains(validStorageDriversForAnalytics, gwConfig.Storage.Type) {
-		mainLog.Fatalf("Analytics storage details incorrect, invalid type %q. Supported storage types for analytics are: %s", gwConfig.Storage.Type, strings.Join(validStorageDriversForAnalytics, ", "))
+	if gwConfig.EnableAnalytics {
+		if err := storage.IsValidDriver(gwConfig.Storage.Type); err != nil {
+			mainLog.Fatalf("Analytics storage details incorrect, %s", err)
+		}
 	}
 
 	// Initialise HostCheckerManager only if uptime tests are enabled.
@@ -1217,8 +1213,8 @@ func (gw *Gateway) initialiseSystem() error {
 		}
 	}
 
-	if !contains(validStorageDrivers, gwConfig.Storage.Type) {
-		mainLog.Fatalf("Storage details incorrect, invalid type %q. Available storage types are: %s", gwConfig.Storage.Type, strings.Join(validStorageDrivers, ", "))
+	if err := storage.IsValidDriver(gwConfig.Storage.Type); err != nil {
+		mainLog.Fatalf("Storage details incorrect, %s", err)
 	}
 
 	// suply rpc client globals to join it main loging and instrumentation sub systems
