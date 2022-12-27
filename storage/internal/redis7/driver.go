@@ -7,11 +7,57 @@ import (
 
 	"go.uber.org/multierr"
 
+	"github.com/TykTechnologies/tyk/config"
+	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage/internal/model"
 )
 
+// Driver is an implementation of StorageDriver.
 type Driver struct {
 	client UniversalClient
+}
+
+// New returns a package scoped driver client.
+func New(cfg config.StorageOptionsConf) *Driver {
+	log := logger.Get()
+	log.Debug("Creating new Redis connection pool")
+
+	opts := getClientConfig(cfg)
+
+	client := func() UniversalClient {
+		if opts.MasterName != "" {
+			log.Info("--> [REDIS] Creating sentinel-backed failover client")
+			return NewFailoverClient(opts.Failover())
+		}
+
+		if cfg.EnableCluster {
+			log.Info("--> [REDIS] Creating cluster client")
+			return NewClusterClient(opts.Cluster())
+		}
+
+		log.Info("--> [REDIS] Creating single-node client")
+		return NewClient(opts.Simple())
+	}()
+
+	return NewDriver(client)
+}
+
+func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
+	if len(config.Addrs) != 0 {
+		addrs = config.Addrs
+	} else {
+		for h, p := range config.Hosts {
+			addr := h + ":" + p
+			addrs = append(addrs, addr)
+		}
+	}
+
+	if len(addrs) == 0 && config.Port != 0 {
+		addr := config.Host + ":" + strconv.Itoa(config.Port)
+		addrs = append(addrs, addr)
+	}
+
+	return addrs
 }
 
 func NewDriver(client UniversalClient) *Driver {
