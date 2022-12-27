@@ -112,7 +112,6 @@ jobs:
           go mod vendor
           echo "Moving vendor"
           cp -r -f vendor/* $GOPATH/src
-          rm -rf vendor
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
 
