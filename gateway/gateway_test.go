@@ -786,10 +786,9 @@ func TestAnalytics(t *testing.T) {
 		client := http.Client{
 			Timeout: 1 * time.Millisecond,
 		}
-		_, err := ts.Run(t, test.TestCase{
+		ts.Run(t, test.TestCase{
 			Path: "/", Headers: authHeaders, Code: 499, Client: &client, ErrorMatch: "context deadline exceeded",
 		})
-		assert.NotNil(t, err)
 
 		// we wait until the request finish
 		time.Sleep(3 * time.Millisecond)
@@ -797,10 +796,12 @@ func TestAnalytics(t *testing.T) {
 		time.Sleep(recordsBufferFlushInterval + 50)
 
 		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
-		assert.Len(t, results, 1)
+		if len(results) != 1 {
+			t.Error("Should return 1 record: ", len(results))
+		}
 
 		var record AnalyticsRecord
-		err = msgpack.Unmarshal([]byte(results[0].(string)), &record)
+		err := msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		assert.Nil(t, err)
 
 		// expect a status 499 (context canceled) from the request
