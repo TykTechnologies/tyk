@@ -9,9 +9,9 @@ import (
 )
 
 type RedisController struct {
-	poolSingle    RedisDriver
-	poolCache     RedisDriver
-	poolAnalytics RedisDriver
+	poolSingle    StorageDriver
+	poolCache     StorageDriver
+	poolAnalytics StorageDriver
 
 	redisUp      atomic.Value
 	disableRedis atomic.Value
@@ -81,7 +81,7 @@ func (rc *RedisController) WaitConnect(ctx context.Context) bool {
 
 // disconnect all redis clients created
 func (rc *RedisController) disconnect() {
-	for _, v := range []RedisDriver{
+	for _, v := range []StorageDriver{
 		rc.poolCache,
 		rc.poolAnalytics,
 		rc.poolSingle,
@@ -147,7 +147,7 @@ func (rc *RedisController) Connect(ctx context.Context, onReconnect func(), conf
 }
 
 // initClusterPool will create a new RedisClient for the passed pool variable.
-func (rc *RedisController) initClusterPool(pool *RedisDriver, cache, analytics bool, conf *config.Config) {
+func (rc *RedisController) initClusterPool(pool *StorageDriver, cache, analytics bool, conf *config.Config) {
 	if *pool == nil {
 		*pool = NewRedisClusterPool(cache, analytics, *conf)
 	}
@@ -210,13 +210,13 @@ func (rc *RedisController) connectCluster(ctx context.Context, v []*RedisCluster
 	return ok
 }
 
-// establishConnection issues a Ping() over a RedisCluster individual RedisDriver to verify connectivity.
+// establishConnection issues a Ping() over a RedisCluster individual StorageDriver to verify connectivity.
 func (rc *RedisController) establishConnection(ctx context.Context, v *RedisCluster) bool {
 	return rc.singleton(v.IsCache, v.IsAnalytics).Ping(ctx) == nil
 }
 
-// singleton returns a desired RedisDriver instance. Instances are created in Connect().
-func (rc *RedisController) singleton(cache, analytics bool) RedisDriver {
+// singleton returns a desired StorageDriver instance. Instances are created in Connect().
+func (rc *RedisController) singleton(cache, analytics bool) StorageDriver {
 	switch {
 	case cache:
 		return rc.poolCache

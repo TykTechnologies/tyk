@@ -29,8 +29,8 @@ type ControllerDeprecated interface {
 // RedisController must implement Controller
 var _ Controller = &RedisController{}
 
-// RedisDriver represents the API surface of the redis client library that we use
-type RedisDriver = internal.RedisDriver
+// StorageDriver represents the API surface of the redis client library that we use
+type StorageDriver = internal.StorageDriver
 
 func fromStringToInterfaceSlice(values []string) []interface{} {
 	result := make([]interface{}, len(values))

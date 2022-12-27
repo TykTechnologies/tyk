@@ -14,8 +14,8 @@ type PubSub interface {
 	Close() error
 }
 
-// RedisDriver implements an abstraction from the underlying client libraries
-type RedisDriver interface {
+// StorageDriver implements an abstraction from the underlying client libraries
+type StorageDriver interface {
 	Ping(ctx context.Context) error
 
 	SetRollingWindow(ctx context.Context, keyName string, per int64, value_override string, pipeline bool) ([]string, error)

@@ -7,14 +7,14 @@ import (
 	redis7 "github.com/TykTechnologies/tyk/storage/internal/redis7"
 )
 
-type RedisDriver = model.RedisDriver
+type StorageDriver = model.StorageDriver
 
 // Assert that drivers implement the interface
-var _ RedisDriver = &redis6.Driver{}
-var _ RedisDriver = &redis7.Driver{}
+var _ StorageDriver = &redis6.Driver{}
+var _ StorageDriver = &redis7.Driver{}
 
 // New returns an appropriate driver instance
-func New(conf config.StorageOptionsConf) RedisDriver {
+func New(conf config.StorageOptionsConf) StorageDriver {
 	if conf.Type == "redis7" {
 		return redis7.New(conf)
 	}

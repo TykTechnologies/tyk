@@ -29,7 +29,7 @@ type RedisCluster struct {
 	RedisController *RedisController
 }
 
-func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) RedisDriver {
+func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) StorageDriver {
 	storageConfig := getStorageConfig(isCache, isAnalytics, conf)
 	return internal.New(storageConfig)
 }
@@ -58,7 +58,7 @@ func (r *RedisCluster) Connect() bool {
 	return true
 }
 
-func (r *RedisCluster) singleton() RedisDriver {
+func (r *RedisCluster) singleton() StorageDriver {
 	return r.RedisController.singleton(r.IsCache, r.IsAnalytics)
 }
 
