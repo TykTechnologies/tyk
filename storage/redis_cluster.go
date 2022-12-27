@@ -287,8 +287,10 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 		return nil
 	}
 
+	searchStr := r.KeyPrefix + filter
+
 	client := r.singleton()
-	values, err := client.GetKeysAndValuesWithFilter(r.context(), filter)
+	values, err := client.GetKeysAndValuesWithFilter(r.context(), searchStr)
 	r.check(err, "GetKeysAndValuesWithFilter", filter)
 	if err != nil || len(values) == 0 {
 		return nil
@@ -296,7 +298,7 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 
 	m := make(map[string]string)
 	for k, v := range values {
-		m[k] = fmt.Sprint(v)
+		m[r.fixKey(k)] = fmt.Sprint(v)
 	}
 
 	return m
