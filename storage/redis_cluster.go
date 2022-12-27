@@ -298,7 +298,7 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 
 	m := make(map[string]string)
 	for k, v := range values {
-		m[r.fixKey(k)] = fmt.Sprint(v)
+		m[r.cleanKey(k)] = fmt.Sprint(v)
 	}
 
 	return m
