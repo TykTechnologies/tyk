@@ -1134,6 +1134,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		outreq.Body = nil // Issue 16036: nil Body for http.Transport retries
 	}
 	outreq = outreq.WithContext(reqCtx)
+	setContext(logreq, outreq.Context())
 
 	outreq.Header = cloneHeader(req.Header)
 	if trace.IsEnabled() {
@@ -1262,7 +1263,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if err != nil {
-
 		token := ctxGetAuthToken(req)
 
 		var alias string
