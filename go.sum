@@ -58,8 +58,6 @@ github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed/go.mod h1:OU
 github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible h1:UgJdsV/fBL5Ctx43EGKFxkX0W3MqqeRruadDQ1Kzhn4=
 github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible/go.mod h1:f2+J36wN08/zLudMnO+QaqaBhTdQuIqemtaeEQbhMEM=
 github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1/go.mod h1:dLW6S3KuurRuyluxy33i57uYuTB1s/u+L8mCT0fqb98=
-github.com/TykTechnologies/drl v0.0.0-20220909161737-cbbffc9eb253 h1:1mCTEpiQ3XCa1ZTWDWSj5ITt9UGU/BWRxR8JnCAmatw=
-github.com/TykTechnologies/drl v0.0.0-20220909161737-cbbffc9eb253/go.mod h1:F3Ff6Ih4t1i/etqNJHI2K3jverRhNl759J/ra95/3Hk=
 github.com/TykTechnologies/drl v0.0.0-20221208085827-9bc9b4338f26 h1:1vrig7Ce10JAi5oosaHcQaiH6KdxlnbB9yG/0fBrMiA=
 github.com/TykTechnologies/drl v0.0.0-20221208085827-9bc9b4338f26/go.mod h1:F3Ff6Ih4t1i/etqNJHI2K3jverRhNl759J/ra95/3Hk=
 github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481 h1:fPcSnu5/IBgyqf73GHA99QuwMDbfWH+L4BEX9EZ5kUo=
