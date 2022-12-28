@@ -392,12 +392,21 @@ func (h *HostUptimeChecker) Start(ctx context.Context) {
 	log.Debug("[HOST CHECKER] Host reporter started...")
 }
 
+// eraseSyncMap uses native sync.Map functions to clear the map
+// without needing to unsafely modify the value to nil.
+func eraseSyncMap(m *sync.Map) {
+	m.Range(func(k, _ interface{}) bool {
+		m.Delete(k)
+		return true
+	})
+}
+
 func (h *HostUptimeChecker) Stop() {
 	if !h.getStopLoop() {
 		h.setStopLoop(true)
-		h.muStopLoop.Lock()
-		h.samples = new(sync.Map)
-		h.muStopLoop.Unlock()
+
+		eraseSyncMap(h.samples)
+
 		log.Info("[HOST CHECKER] Stopping poller")
 		h.pool.Close()
 	}
