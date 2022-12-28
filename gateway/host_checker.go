@@ -387,12 +387,9 @@ func eraseSyncMap(m *sync.Map) {
 func (h *HostUptimeChecker) Stop() {
 	if !h.getStopLoop() {
 		h.setStopLoop(true)
-<<<<<<< HEAD
-=======
 
 		eraseSyncMap(h.samples)
 
->>>>>>> 2ec3a3f5... [TT-7450] Safely erase a sync.Map value (#4588)
 		log.Info("[HOST CHECKER] Stopping poller")
 		h.pool.Close()
 	}
