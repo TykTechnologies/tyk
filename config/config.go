@@ -221,7 +221,7 @@ type HealthCheckConfig struct {
 }
 
 type LivenessCheckConfig struct {
-	// Frequence of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
+	// Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
 	CheckDuration time.Duration `json:"check_duration"`
 }
 
@@ -559,10 +559,10 @@ type Config struct {
 	// was written.
 	OriginalPath string `json:"-"`
 
-	// Force your Gateway to work only on a specifc domain name. Can be overriden by API custom domain.
+	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
 	HostName string `json:"hostname"`
 
-	// If your machine has mulitple network devices or IPs you can force the Gateway to use the IP address you want.
+	// If your machine has multiple network devices or IPs you can force the Gateway to use the IP address you want.
 	ListenAddress string `json:"listen_address"`
 
 	// Setting this value will change the port that Tyk listens on. Default: 8080.
@@ -685,7 +685,7 @@ type Config struct {
 	// The standard rate limiter offers similar performance as the sentinel-based limiter. This is disabled by default.
 	EnableSentinelRateLimiter bool `json:"enable_sentinel_rate_limiter"`
 
-	// An enchancment for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
+	// An enhancement for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
 	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
 
 	// How frequently a distributed rate limiter synchronises information between the Gateway nodes. Default: 2 seconds.
@@ -970,7 +970,7 @@ type Config struct {
 	// global session lifetime, in seconds.
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
-	// This section enables the use of the KV capabilites to substitute configuration values.
+	// This section enables the use of the KV capabilities to substitute configuration values.
 	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/
 	KV struct {
 		Consul ConsulConfig `json:"consul"`

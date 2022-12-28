@@ -909,7 +909,7 @@ func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, ev
 	}
 }
 
-// ProcessOauthClientsOps performs the appropiate action for the received clients
+// ProcessOauthClientsOps performs the appropriate action for the received clients
 // it can be any of the Create,Update and Delete operations
 func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 	for clientInfo, action := range clients {
