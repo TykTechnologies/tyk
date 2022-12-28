@@ -2241,6 +2241,103 @@ func TestHandleDeleteAPI_RemoveVersionAtomically(t *testing.T) {
 	}...)
 }
 
+func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		v1VersionName = "v1-version-name"
+		v2VersionName = "v2-version-name"
+	)
+
+	baseOAS := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "oas doc",
+				Version: "1",
+			},
+			Paths: make(openapi3.Paths),
+		},
+	}
+
+	v1 := BuildAPI(func(a *APISpec) {
+		a.Name = "v1"
+		a.APIID = "v1"
+		a.CertificatePinningDisabled = true
+		a.VersionDefinition.Location = ""
+		a.VersionDefinition.Key = ""
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+	v2 := BuildAPI(func(a *APISpec) {
+		a.Name = "v2"
+		a.APIID = "v2"
+		a.CertificatePinningDisabled = true
+		a.VersionDefinition.Location = ""
+		a.VersionDefinition.Key = ""
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+	baseAPI := BuildAPI(func(a *APISpec) {
+		a.Name = "base"
+		a.APIID = "base"
+		a.CertificatePinningDisabled = true
+		a.VersionDefinition.Versions = map[string]string{
+			v1VersionName: v1.APIID,
+			v2VersionName: v2.APIID,
+		}
+		a.VersionDefinition.Default = v1VersionName
+		a.VersionDefinition.Name = v2VersionName
+		a.VersionDefinition.Location = apidef.HeaderLocation
+		a.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas", Data: &v1.OAS, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas", Data: &v2.OAS, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas", Data: &baseAPI.OAS, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Path: "/tyk/apis/oas/" + v1.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/apis/oas/" + v2.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodDelete, Path: "/tyk/apis/oas/" + v1.APIID, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Path: "/tyk/apis/oas/" + v1.APIID, BodyMatch: "API not found", Code: http.StatusNotFound},
+		{AdminAuth: true, Path: "/tyk/apis/oas/" + v2.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/apis/oas/" + baseAPI.APIID, BodyMatchFunc: func(bytes []byte) bool {
+			var base oas.OAS
+			err := json.Unmarshal(bytes, &base)
+			assert.NoError(t, err)
+
+			expectedVersions := []oas.VersionToID{
+				{Name: v2VersionName, ID: v2.APIID},
+			}
+
+			versioning := base.GetTykExtension().Info.Versioning
+			assert.Equal(t, expectedVersions, versioning.Versions)
+			assert.Equal(t, v2VersionName, versioning.Default)
+
+			return true
+		}, Code: http.StatusOK},
+	}...)
+}
+
 func baseAPIHeader(id string) map[string]string {
 	return map[string]string{
 		apidef.HeaderBaseAPIID: id,
