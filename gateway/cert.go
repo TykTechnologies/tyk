@@ -272,7 +272,7 @@ func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.C
 	return gw.CertificateManager.ListPublicKeys(strings.Split(keyIDs, ","))
 }
 
-// dummyGetCertificate needed because TLSConfig require setting Certificates array or GetCertificate function from start, even if it get overriden by `getTLSConfigForClient`
+// dummyGetCertificate needed because TLSConfig require setting Certificates array or GetCertificate function from start, even if it get overridden by `getTLSConfigForClient`
 func dummyGetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return nil, nil
 }

@@ -908,7 +908,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	for _, spec := range specs {
 		func() {
 			defer func() {
-				// recover from panic if one occured. Set err to nil otherwise.
+				// recover from panic if one occurred. Set err to nil otherwise.
 				if err := recover(); err != nil {
 					log.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
 				}

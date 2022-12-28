@@ -449,7 +449,7 @@ func TestAnalytics_Write(t *testing.T) {
 
 				// expect a status 499 (context canceled) from the request
 				assert.Equal(t, 499, record.ResponseCode)
-				// expect that the analytic record mantained the APIKey
+				// expect that the analytic record maintained the APIKey
 				assert.Equal(t, key, record.APIKey)
 
 			})
