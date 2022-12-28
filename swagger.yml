@@ -278,6 +278,31 @@ paths:
       tags:
         - APIs
       operationId: createApi
+      parameters:
+        - name: base_api_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The base API which the new version will be linked to.
+        - name: base_api_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name.
+        - name: new_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the created version.
+        - name: set_default
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: If true, the new version is set as default version.
       requestBody:
         content:
           application/json:
@@ -341,6 +366,31 @@ paths:
       tags:
         - OASAPIs
       operationId: createApiOAS
+      parameters:
+        - name: base_api_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The base API which the new version will be linked to.
+        - name: base_api_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name.
+        - name: new_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the created version.
+        - name: set_default
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: If true, the new version is set as default version.
       requestBody:
         content:
           application/json:
