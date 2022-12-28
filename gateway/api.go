@@ -1311,7 +1311,13 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 		}
 
 		fs := afero.NewOsFs()
-		if !baseAPI.IsOAS {
+		if baseAPI.IsOAS {
+			baseAPI.OAS.Fill(*baseAPI.APIDefinition)
+			err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
+			if err != nil {
+				log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
+			}
+		} else {
 			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
 			if err != nil {
 				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
@@ -1372,7 +1378,7 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	switch r.Method {
-	case "GET":
+	case http.MethodGet:
 		if apiID != "" {
 			log.Debugf("Requesting API definition for %q", apiID)
 			obj, code = gw.handleGetAPI(apiID, false)
