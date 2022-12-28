@@ -64,3 +64,32 @@ run:
   # Mainly related to generics support since go1.18.
   # Default: use Go version from the go.mod file, fallback on the env var `GOVERSION`, fallback on 1.18
   go: '1.16'
+
+linters:
+  disable:
+    - varnamelen
+    - tagliatelle
+    - testpackage
+    - paralleltest
+    - forbidigo
+    - ireturn
+    - goerr113
+  enable:
+    - thelper
+    - errcheck
+    - noctx
+    - dupl
+    - nilerr
+    - misspell
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - dupl # many functions looks like dupes
+        - gocyclo # many functions can be very long
+        - funlen # many functions can be very long
+        - gosec # tests don't have CVEs
+  exclude:
+    - G404 # Use of weak random number generator (math/rand instead of crypto/rand)
+    - SA9004 # only the first constant in this group has an explicit type
