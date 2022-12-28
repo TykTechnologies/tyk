@@ -2180,6 +2180,67 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Path: "/tyk/apis/oas/" + v2APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK})
 }
 
+func TestHandleDeleteAPI_RemoveVersionAtomically(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		v1VersionName = "v1-version-name"
+		v2VersionName = "v2-version-name"
+	)
+
+	v1 := BuildAPI(func(a *APISpec) {
+		a.APIID = "v1"
+	})[0]
+	v2 := BuildAPI(func(a *APISpec) {
+		a.APIID = "v2"
+	})[0]
+	baseAPI := BuildAPI(func(a *APISpec) {
+		a.APIID = "base"
+		a.VersionDefinition.Versions = map[string]string{
+			v1VersionName: v1.APIID,
+			v2VersionName: v2.APIID,
+		}
+		a.VersionDefinition.Default = v1VersionName
+		a.VersionDefinition.Name = v2VersionName
+	})[0]
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis", Data: v1, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis", Data: v2, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis", Data: baseAPI, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Path: "/tyk/apis/" + v1.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/apis/" + v2.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodDelete, Path: "/tyk/apis/" + v1.APIID, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Path: "/tyk/apis/" + v1.APIID, BodyMatch: "API not found", Code: http.StatusNotFound},
+		{AdminAuth: true, Path: "/tyk/apis/" + v2.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/apis/" + baseAPI.APIID, BodyMatchFunc: func(bytes []byte) bool {
+			var base apidef.APIDefinition
+			err := json.Unmarshal(bytes, &base)
+			assert.NoError(t, err)
+
+			expectedVersions := map[string]string{
+				v2VersionName: v2.APIID,
+			}
+
+			assert.Equal(t, expectedVersions, base.VersionDefinition.Versions)
+			assert.Equal(t, v2VersionName, base.VersionDefinition.Default)
+
+			return true
+		}, Code: http.StatusOK},
+	}...)
+}
+
 func baseAPIHeader(id string) map[string]string {
 	return map[string]string{
 		apidef.HeaderBaseAPIID: id,
