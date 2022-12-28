@@ -77,10 +77,18 @@ linters:
   enable:
     - thelper
     - errcheck
+    - errorlint
     - noctx
     - dupl
     - nilerr
     - misspell
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      - (*github.com/TykTechnologies/tyk/gateway.Test).Run
 
 issues:
   exclude-rules:
