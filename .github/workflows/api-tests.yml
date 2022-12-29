@@ -2,11 +2,9 @@ name: API integration Tests
 
 on:
   pull_request:
-  push:
     branches:
       - master
-      - test/*
-      - release-*
+      - release-**
 
 env:
   GOPRIVATE: github.com/TykTechnologies
