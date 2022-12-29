@@ -108,7 +108,7 @@ jobs:
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
+          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
 
       - name: golangci-lint
         if: ${{ github.event_name == 'push' }}
