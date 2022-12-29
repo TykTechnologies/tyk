@@ -2,8 +2,9 @@ name: CI tests
 
 on: 
   pull_request:
-  push:
-    branches: [master]
+    branches:
+      - master
+      - release-**
 
 env:
   TYK_DB_REDISHOST: localhost
@@ -107,11 +108,6 @@ jobs:
 
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
-
-      - name: golangci-lint
-        if: ${{ github.event_name == 'push' }}
         run: |
           $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
 
