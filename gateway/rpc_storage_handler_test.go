@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/lonelycode/osin"
@@ -280,4 +281,51 @@ func TestRPCUpdateKey(t *testing.T) {
 			assert.Equal(t, tags, myUpdatedSession.Tags)
 		})
 	}
+}
+
+func TestGetGroupLoginCallback(t *testing.T) {
+	tcs := []struct {
+		testName                 string
+		syncEnabled              bool
+		givenKey                 string
+		givenGroup               string
+		expectedCallbackResponse interface{}
+	}{
+		{
+			testName:                 "sync disabled",
+			syncEnabled:              false,
+			givenKey:                 "key",
+			givenGroup:               "group",
+			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group"},
+		},
+		{
+			testName:                 "sync enabled",
+			syncEnabled:              true,
+			givenKey:                 "key",
+			givenGroup:               "group",
+			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group", ForceSync: true},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.testName, func(t *testing.T) {
+			g := StartTest(func(globalConf *config.Config) {
+				globalConf.SlaveOptions.SynchroniserEnabled = tc.syncEnabled
+			})
+			defer g.Close()
+			defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+
+			rpcListener := RPCStorageHandler{
+				KeyPrefix:        "rpc.listener.",
+				SuppressRegister: true,
+				Gw:               g.Gw,
+			}
+
+			fn := rpcListener.getGroupLoginCallback(tc.syncEnabled)
+			groupLogin := fn(tc.givenKey, tc.givenGroup).(apidef.GroupLoginRequest)
+
+			assert.Equal(t, tc.expectedCallbackResponse, groupLogin)
+		})
+	}
+
 }

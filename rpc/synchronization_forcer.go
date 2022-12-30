@@ -37,5 +37,4 @@ func (sf *SyncronizerForcer) GrouLoginCallback(userKey string, groupID string) i
 		GroupID:   groupID,
 		ForceSync: shouldForce,
 	}
-
 }

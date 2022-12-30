@@ -128,27 +128,30 @@ func (r *RPCStorageHandler) Connect() bool {
 		RPCPoolSize:           slaveOptions.RPCPoolSize,
 	}
 
+	return rpc.Connect(
+		rpcConfig,
+		r.SuppressRegister,
+		dispatcherFuncs,
+		r.getGroupLoginCallback(r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled),
+		func() {
+			r.Gw.reloadURLStructure(nil)
+		},
+		r.DoReload,
+	)
+}
+
+func (r *RPCStorageHandler) getGroupLoginCallback(synchroniserEnabled bool) func(userKey string, groupID string) interface{} {
 	groupLoginCallbackFn := func(userKey string, groupID string) interface{} {
 		return apidef.GroupLoginRequest{
 			UserKey: userKey,
 			GroupID: groupID,
 		}
 	}
-	if r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled {
+	if synchroniserEnabled {
 		forcer := rpc.NewSyncForcer(r.Gw.RedisController)
 		groupLoginCallbackFn = forcer.GrouLoginCallback
 	}
-
-	return rpc.Connect(
-		rpcConfig,
-		r.SuppressRegister,
-		dispatcherFuncs,
-		groupLoginCallbackFn,
-		func() {
-			r.Gw.reloadURLStructure(nil)
-		},
-		r.DoReload,
-	)
+	return groupLoginCallbackFn
 }
 
 func (r *RPCStorageHandler) hashKey(in string) string {
