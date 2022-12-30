@@ -246,7 +246,7 @@ func Test_addBodyHash(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if addBodyHash(tt.args.req, tt.args.regex, tt.args.h); hex.EncodeToString(tt.args.h.Sum(nil)) != tt.expected {
-				t.Errorf("addBodyHash() recieved = %v, expected %v", hex.EncodeToString(tt.args.h.Sum(nil)), tt.expected)
+				t.Errorf("addBodyHash() received = %v, expected %v", hex.EncodeToString(tt.args.h.Sum(nil)), tt.expected)
 			}
 		})
 	}

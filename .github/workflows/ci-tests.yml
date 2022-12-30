@@ -2,8 +2,9 @@ name: CI tests
 
 on: 
   pull_request:
-  push:
-    branches: [master]
+    branches:
+      - master
+      - release-**
 
 env:
   TYK_DB_REDISHOST: localhost
@@ -109,11 +110,6 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         run: |
           $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
-
-      - name: golangci-lint
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
 
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master

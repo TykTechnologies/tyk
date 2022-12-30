@@ -58,6 +58,7 @@ func TestAnalytics_Write(t *testing.T) {
 					{Path: "/", Code: 401},
 					{Path: "/", Code: 401},
 				}...)
+
 				if err != nil {
 					t.Error("Error executing test case")
 				}
@@ -402,6 +403,55 @@ func TestAnalytics_Write(t *testing.T) {
 				if record.RawResponse == "" {
 					t.Error("Detailed response info not found", record)
 				}
+			})
+
+			t.Run("Upstream error analytics", func(t *testing.T) {
+				defer func() {
+					ts.Gw.SetConfig(base)
+				}()
+				ls := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					time.Sleep(2 * time.Millisecond)
+					w.WriteHeader(http.StatusOK)
+				}))
+				defer ls.Close()
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+					spec.Proxy.TargetURL = ls.URL
+				})
+
+				key := CreateSession(ts.Gw)
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				client := http.Client{
+					Timeout: 1 * time.Millisecond,
+				}
+				_, err := ts.Run(t, test.TestCase{
+					Path: "/", Headers: authHeaders, Code: 499, Client: &client, ErrorMatch: "context deadline exceeded",
+				})
+				assert.NotNil(t, err)
+
+				// we wait until the request finish
+				time.Sleep(3 * time.Millisecond)
+				// let records to to be sent
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				assert.Len(t, results, 1)
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				assert.Nil(t, err)
+
+				// expect a status 499 (context canceled) from the request
+				assert.Equal(t, 499, record.ResponseCode)
+				// expect that the analytic record maintained the APIKey
+				assert.Equal(t, key, record.APIKey)
+
 			})
 
 		})
