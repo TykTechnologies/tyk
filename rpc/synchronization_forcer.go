@@ -1,6 +1,8 @@
 package rpc
 
 import (
+	"errors"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -22,7 +24,7 @@ func (sf *SyncronizerForcer) GrouLoginCallback(userKey string, groupID string) i
 	shouldForce := false
 
 	_, err := sf.store.GetKey(groupID)
-	if err != nil && err == storage.ErrKeyNotFound {
+	if err != nil && errors.Is(err, storage.ErrKeyNotFound) {
 		shouldForce = true
 
 		err = sf.store.SetKey(groupID, "", 0)

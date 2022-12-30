@@ -322,8 +322,8 @@ func TestGetGroupLoginCallback(t *testing.T) {
 			}
 
 			fn := rpcListener.getGroupLoginCallback(tc.syncEnabled)
-			groupLogin := fn(tc.givenKey, tc.givenGroup).(apidef.GroupLoginRequest)
-
+			groupLogin, ok := fn(tc.givenKey, tc.givenGroup).(apidef.GroupLoginRequest)
+			assert.True(t, ok)
 			assert.Equal(t, tc.expectedCallbackResponse, groupLogin)
 		})
 	}
