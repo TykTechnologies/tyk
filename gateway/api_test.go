@@ -2048,6 +2048,302 @@ func TestHandleAddApi(t *testing.T) {
 
 }
 
+func TestHandleAddApi_AddVersionAtomically(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		baseVersionName = "base-version-name"
+		v2VersionName   = "v2-version-name"
+		v2APIID         = "v2-api-id"
+	)
+
+	baseAPI := ts.Gw.BuildAndLoadAPI(func(a *APISpec) {
+		a.APIID = "base-api-id"
+		a.VersionDefinition.Key = ""
+		a.VersionDefinition.Location = ""
+	})[0]
+
+	v2 := BuildAPI(func(spec *APISpec) {
+		spec.APIID = v2APIID
+	})[0]
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Method: http.MethodPost, Data: v2,
+			Path: fmt.Sprintf("/tyk/apis?base_api_id=%s&new_version_name=%s&set_default=true&base_api_version_name=%s", baseAPI.APIID, v2VersionName, baseVersionName),
+			BodyMatchFunc: func(i []byte) bool {
+				assert.Len(t, baseAPI.VersionDefinition.Versions, 0)
+				ts.Gw.DoReload()
+				return true
+			},
+			Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodGet, Path: "/tyk/reload", Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/apis/" + baseAPI.APIID, BodyMatchFunc: func(bytes []byte) bool {
+			var base apidef.APIDefinition
+			err := json.Unmarshal(bytes, &base)
+			assert.NoError(t, err)
+
+			expectedVersions := map[string]string{
+				v2VersionName: v2APIID,
+			}
+
+			assert.Equal(t, expectedVersions, base.VersionDefinition.Versions)
+			assert.True(t, base.VersionDefinition.Enabled)
+			assert.Equal(t, apidef.DefaultAPIVersionKey, base.VersionDefinition.Key)
+			assert.Equal(t, apidef.HeaderLocation, base.VersionDefinition.Location)
+			assert.Equal(t, baseVersionName, base.VersionDefinition.Name)
+			assert.Equal(t, v2VersionName, base.VersionDefinition.Default)
+
+			return true
+		}, Code: http.StatusOK},
+	}...)
+
+	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Path: "/tyk/apis/" + v2APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK})
+}
+
+func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		baseVersionName = "base-version-name"
+		v2VersionName   = "v2-version-name"
+		v2APIID         = "v2-api-id"
+	)
+
+	baseOAS := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "oas doc",
+				Version: "1",
+			},
+			Paths: make(openapi3.Paths),
+		},
+	}
+
+	baseAPI := ts.Gw.BuildAndLoadAPI(func(a *APISpec) {
+		a.APIID = "base-api-id"
+		a.VersionDefinition.Enabled = false
+		a.VersionDefinition.Key = ""
+		a.VersionDefinition.Location = ""
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+
+	v2 := BuildAPI(func(a *APISpec) {
+		a.Name = "v2"
+		a.APIID = v2APIID
+		a.CertificatePinningDisabled = true
+		a.VersionDefinition.Location = ""
+		a.VersionDefinition.Key = ""
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Method: http.MethodPost, Data: &v2.OAS,
+			Path: fmt.Sprintf("/tyk/apis/oas?base_api_id=%s&new_version_name=%s&set_default=true&base_api_version_name=%s", baseAPI.APIID, v2VersionName, baseVersionName),
+			BodyMatchFunc: func(i []byte) bool {
+				assert.Len(t, baseAPI.VersionDefinition.Versions, 0)
+				ts.Gw.DoReload()
+				return true
+			},
+			Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodGet, Path: "/tyk/reload", Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/apis/oas/" + baseAPI.APIID, BodyMatchFunc: func(bytes []byte) bool {
+			var base oas.OAS
+			err := json.Unmarshal(bytes, &base)
+			assert.NoError(t, err)
+
+			expectedVersions := []oas.VersionToID{
+				{Name: v2VersionName, ID: v2APIID},
+			}
+
+			versioning := base.GetTykExtension().Info.Versioning
+
+			assert.Equal(t, expectedVersions, versioning.Versions)
+			assert.True(t, versioning.Enabled)
+			assert.Equal(t, apidef.DefaultAPIVersionKey, versioning.Key)
+			assert.Equal(t, apidef.HeaderLocation, versioning.Location)
+			assert.Equal(t, baseVersionName, versioning.Name)
+			assert.Equal(t, v2VersionName, versioning.Default)
+
+			return true
+		}, Code: http.StatusOK},
+	}...)
+
+	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Path: "/tyk/apis/oas/" + v2APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK})
+}
+
+func TestHandleDeleteAPI_RemoveVersionAtomically(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		v1VersionName = "v1-version-name"
+		v2VersionName = "v2-version-name"
+	)
+
+	v1 := BuildAPI(func(a *APISpec) {
+		a.APIID = "v1"
+	})[0]
+	v2 := BuildAPI(func(a *APISpec) {
+		a.APIID = "v2"
+	})[0]
+	baseAPI := BuildAPI(func(a *APISpec) {
+		a.APIID = "base"
+		a.VersionDefinition.Versions = map[string]string{
+			v1VersionName: v1.APIID,
+			v2VersionName: v2.APIID,
+		}
+		a.VersionDefinition.Default = v1VersionName
+		a.VersionDefinition.Name = v2VersionName
+	})[0]
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis", Data: v1, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis", Data: v2, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis", Data: baseAPI, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Path: "/tyk/apis/" + v1.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/apis/" + v2.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodDelete, Path: "/tyk/apis/" + v1.APIID, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Path: "/tyk/apis/" + v1.APIID, BodyMatch: "API not found", Code: http.StatusNotFound},
+		{AdminAuth: true, Path: "/tyk/apis/" + v2.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/apis/" + baseAPI.APIID, BodyMatchFunc: func(bytes []byte) bool {
+			var base apidef.APIDefinition
+			err := json.Unmarshal(bytes, &base)
+			assert.NoError(t, err)
+
+			expectedVersions := map[string]string{
+				v2VersionName: v2.APIID,
+			}
+
+			assert.Equal(t, expectedVersions, base.VersionDefinition.Versions)
+			assert.Equal(t, v2VersionName, base.VersionDefinition.Default)
+
+			return true
+		}, Code: http.StatusOK},
+	}...)
+}
+
+func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		v1VersionName = "v1-version-name"
+		v2VersionName = "v2-version-name"
+	)
+
+	baseOAS := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "oas doc",
+				Version: "1",
+			},
+			Paths: make(openapi3.Paths),
+		},
+	}
+
+	v1 := BuildAPI(func(a *APISpec) {
+		a.Name = "v1"
+		a.APIID = "v1"
+		a.CertificatePinningDisabled = true
+		a.VersionDefinition.Location = ""
+		a.VersionDefinition.Key = ""
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+	v2 := BuildAPI(func(a *APISpec) {
+		a.Name = "v2"
+		a.APIID = "v2"
+		a.CertificatePinningDisabled = true
+		a.VersionDefinition.Location = ""
+		a.VersionDefinition.Key = ""
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+	baseAPI := BuildAPI(func(a *APISpec) {
+		a.Name = "base"
+		a.APIID = "base"
+		a.CertificatePinningDisabled = true
+		a.VersionDefinition.Versions = map[string]string{
+			v1VersionName: v1.APIID,
+			v2VersionName: v2.APIID,
+		}
+		a.VersionDefinition.Default = v1VersionName
+		a.VersionDefinition.Name = v2VersionName
+		a.VersionDefinition.Location = apidef.HeaderLocation
+		a.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas", Data: &v1.OAS, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas", Data: &v2.OAS, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas", Data: &baseAPI.OAS, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Path: "/tyk/apis/oas/" + v1.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/apis/oas/" + v2.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodDelete, Path: "/tyk/apis/oas/" + v1.APIID, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Path: "/tyk/apis/oas/" + v1.APIID, BodyMatch: "API not found", Code: http.StatusNotFound},
+		{AdminAuth: true, Path: "/tyk/apis/oas/" + v2.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/apis/oas/" + baseAPI.APIID, BodyMatchFunc: func(bytes []byte) bool {
+			var base oas.OAS
+			err := json.Unmarshal(bytes, &base)
+			assert.NoError(t, err)
+
+			expectedVersions := []oas.VersionToID{
+				{Name: v2VersionName, ID: v2.APIID},
+			}
+
+			versioning := base.GetTykExtension().Info.Versioning
+			assert.Equal(t, expectedVersions, versioning.Versions)
+			assert.Equal(t, v2VersionName, versioning.Default)
+
+			return true
+		}, Code: http.StatusOK},
+	}...)
+}
+
+func baseAPIHeader(id string) map[string]string {
+	return map[string]string{
+		apidef.HeaderBaseAPIID: id,
+	}
+}
+
 func TestHandleUpdateApi(t *testing.T) {
 	testFs := afero.NewMemMapFs()
 
@@ -2623,6 +2919,7 @@ func TestOAS(t *testing.T) {
 				"customDomain":    customDomain,
 				"allowList":       "true",
 				"validateRequest": "true",
+				"mockResponse":    "true",
 			}
 
 			expectedTykExt.Server.ListenPath.Value = listenPath
@@ -2638,6 +2935,10 @@ func TestOAS(t *testing.T) {
 						Allow: &oas.Allowance{
 							Enabled: true,
 						},
+						MockResponse: &oas.MockResponse{
+							Enabled:         true,
+							FromOASExamples: &oas.FromOASExamples{Enabled: true},
+						},
 					},
 					"petsPOST": {
 						Allow: &oas.Allowance{
@@ -2646,6 +2947,10 @@ func TestOAS(t *testing.T) {
 						ValidateRequest: &oas.ValidateRequest{
 							Enabled:           true,
 							ErrorResponseCode: http.StatusUnprocessableEntity,
+						},
+						MockResponse: &oas.MockResponse{
+							Enabled:         true,
+							FromOASExamples: &oas.FromOASExamples{Enabled: true},
 						},
 					},
 				},
@@ -2673,6 +2978,7 @@ func TestOAS(t *testing.T) {
 				"customDomain":    customDomain,
 				"allowList":       "false",
 				"validateRequest": "false",
+				"mockResponse":    "false",
 			}
 
 			expectedTykExt := *apiInOAS.GetTykExtension()
@@ -2688,6 +2994,10 @@ func TestOAS(t *testing.T) {
 						Allow: &oas.Allowance{
 							Enabled: false,
 						},
+						MockResponse: &oas.MockResponse{
+							Enabled:         false,
+							FromOASExamples: &oas.FromOASExamples{Enabled: false},
+						},
 					},
 					"petsPOST": {
 						Allow: &oas.Allowance{
@@ -2696,6 +3006,10 @@ func TestOAS(t *testing.T) {
 						ValidateRequest: &oas.ValidateRequest{
 							Enabled:           false,
 							ErrorResponseCode: http.StatusUnprocessableEntity,
+						},
+						MockResponse: &oas.MockResponse{
+							Enabled:         false,
+							FromOASExamples: &oas.FromOASExamples{Enabled: false},
 						},
 					},
 				},

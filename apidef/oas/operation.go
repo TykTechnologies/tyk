@@ -56,34 +56,44 @@ const (
 )
 
 // Import takes the arguments and populates the receiver *Operation values.
-func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validateRequest *bool) {
-	if allowList != nil {
+func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykExtensionConfigParams) {
+	if overRideValues.AllowList != nil {
 		allow := o.Allow
 		if allow == nil {
 			allow = &Allowance{}
 		}
 
-		allow.Import(*allowList)
+		allow.Import(*overRideValues.AllowList)
 
-		if block := o.Block; block != nil && block.Enabled && *allowList {
+		if block := o.Block; block != nil && block.Enabled && *overRideValues.AllowList {
 			block.Enabled = false
 		}
 
 		o.Allow = allow
 	}
 
-	if validateRequest != nil {
+	if overRideValues.ValidateRequest != nil {
 		validate := o.ValidateRequest
 		if validate == nil {
 			validate = &ValidateRequest{}
 		}
 
-		if shouldImport := validate.shouldImportValidateRequest(oasOperation); !shouldImport {
-			return
+		if shouldImport := validate.shouldImportValidateRequest(oasOperation); shouldImport {
+			validate.Import(*overRideValues.ValidateRequest)
+			o.ValidateRequest = validate
+		}
+	}
+
+	if overRideValues.MockResponse != nil {
+		mock := o.MockResponse
+		if mock == nil {
+			mock = &MockResponse{}
 		}
 
-		validate.Import(*validateRequest)
-		o.ValidateRequest = validate
+		if shouldImport := mock.shouldImport(oasOperation); shouldImport {
+			mock.Import(*overRideValues.MockResponse)
+			o.MockResponse = mock
+		}
 	}
 }
 
@@ -526,4 +536,30 @@ type FromOASExamples struct {
 	ContentType string `bson:"contentType,omitempty" json:"contentType,omitempty"`
 	// ExampleName is the default example name among multiple path response examples documented in OAS.
 	ExampleName string `bson:"exampleName,omitempty" json:"exampleName,omitempty"`
+}
+
+func (m *MockResponse) shouldImport(operation *openapi3.Operation) bool {
+	for _, response := range operation.Responses {
+		for _, content := range response.Value.Content {
+			if content.Example != nil || content.Schema != nil {
+				return true
+			}
+
+			for _, example := range content.Examples {
+				if example.Value != nil {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// Import populates *MockResponse with enabled argument for FromOASExamples.
+func (m *MockResponse) Import(enabled bool) {
+	m.Enabled = enabled
+	m.FromOASExamples = &FromOASExamples{
+		Enabled: enabled,
+	}
 }

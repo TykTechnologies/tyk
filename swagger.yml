@@ -278,6 +278,31 @@ paths:
       tags:
         - APIs
       operationId: createApi
+      parameters:
+        - name: base_api_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The base API which the new version will be linked to.
+        - name: base_api_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name.
+        - name: new_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the created version.
+        - name: set_default
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: If true, the new version is set as default version.
       requestBody:
         content:
           application/json:
@@ -341,6 +366,31 @@ paths:
       tags:
         - OASAPIs
       operationId: createApiOAS
+      parameters:
+        - name: base_api_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The base API which the new version will be linked to.
+        - name: base_api_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name.
+        - name: new_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the created version.
+        - name: set_default
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: If true, the new version is set as default version.
       requestBody:
         content:
           application/json:
@@ -395,6 +445,11 @@ paths:
                 active: true
                 proxy:
                   listen_path: "/test"
+          headers:
+            x-tyk-base-api-id:
+              schema:
+                type: string
+              description: ID of the base API if the requested API is a version.
     put:
       description: |
         Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
@@ -493,6 +548,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OASSchemaResponse"
+          headers:
+            x-tyk-base-api-id:
+              schema:
+                type: string
+              description: ID of the base API if the requested API is a version.
     put:
       description: |
         Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
@@ -541,6 +601,7 @@ paths:
         - $ref: '#/components/parameters/CustomDomain'
         - $ref: '#/components/parameters/ValidateRequest'
         - $ref: '#/components/parameters/AllowList'
+        - $ref: '#/components/parameters/MockResponse'
         - $ref: '#/components/parameters/Authentication'
       requestBody:
         content:
@@ -691,6 +752,7 @@ paths:
         - $ref: '#/components/parameters/CustomDomain'
         - $ref: '#/components/parameters/ApiID'
         - $ref: '#/components/parameters/AllowList'
+        - $ref: '#/components/parameters/MockResponse'
         - $ref: '#/components/parameters/ValidateRequest'
         - $ref: '#/components/parameters/Authentication'
       requestBody:
@@ -3701,6 +3763,13 @@ components:
       name: allowList
       in: query
       description: Enable allowList middleware for all endpoints
+      required: false
+      schema:
+        $ref: '#/components/schemas/BooleanQueryParam'
+    MockResponse:
+      name: mockResponse
+      in: query
+      description: Enable mockResponse middleware for all endpoints having responses configured.
       required: false
       schema:
         $ref: '#/components/schemas/BooleanQueryParam'

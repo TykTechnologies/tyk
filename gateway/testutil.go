@@ -127,7 +127,7 @@ func (r *ReloadMachinery) OnReload() {
 	}
 }
 
-// Reloaded returns true if a read has occured since r was enabled
+// Reloaded returns true if a read has occurred since r was enabled
 func (r *ReloadMachinery) Reloaded() bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -215,7 +215,7 @@ func (r *ReloadMachinery) Tick() {
 	r.reloadTick <- time.Time{}
 }
 
-// TickOk triggers a reload and ensures a queue happend and a reload cycle
+// TickOk triggers a reload and ensures a queue happened and a reload cycle
 // happens. This will block until all the cases are met.
 func (r *ReloadMachinery) TickOk(t *testing.T) {
 	r.EnsureQueued(t)
