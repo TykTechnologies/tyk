@@ -38,6 +38,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -109,6 +110,20 @@ type paginationStatus struct {
 type paginatedOAuthClientTokens struct {
 	Pagination paginationStatus
 	Tokens     []OAuthClientToken
+}
+
+type VersionMetas struct {
+	Status string        `json:"status"`
+	Metas  []VersionMeta `json:"apis"`
+}
+
+type VersionMeta struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	VersionName      string `json:"versionName"`
+	Internal         bool   `json:"internal"`
+	ExpirationDate   string `json:"expirationDate"`
+	IsDefaultVersion bool   `json:"isDefaultVersion"`
 }
 
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
@@ -1369,6 +1384,84 @@ func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiVersionListHandler(w http.ResponseWriter, r *http.Request) {
+	apiID := mux.Vars(r)["apiID"]
+	searchText := strings.ToLower(r.URL.Query().Get("searchText"))
+	justInternal := r.URL.Query().Get("accessType") == "internal"
+	justExternal := r.URL.Query().Get("accessType") == "external"
+
+	canInclude := func(api *apidef.APIDefinition, name string) bool {
+		if justInternal && !api.Internal {
+			return false
+		}
+
+		if justExternal && api.Internal {
+			return false
+		}
+
+		if searchText == "" {
+			return true
+		}
+
+		return strings.Contains(strings.ToLower(name), searchText)
+	}
+
+	baseAPI := gw.getApiSpec(apiID)
+	if baseAPI == nil {
+		doJSONWrite(w, http.StatusNotFound, apiError("API not found"))
+		return
+	}
+
+	var (
+		versionMetas VersionMetas
+		meta         VersionMeta
+	)
+
+	if canInclude(baseAPI.APIDefinition, baseAPI.VersionDefinition.Name) {
+		meta = VersionMeta{
+			ID:               baseAPI.APIID,
+			Name:             baseAPI.Name,
+			VersionName:      baseAPI.VersionDefinition.Name,
+			Internal:         baseAPI.Internal,
+			ExpirationDate:   baseAPI.Expiration,
+			IsDefaultVersion: baseAPI.VersionDefinition.Default == baseAPI.VersionDefinition.Name,
+		}
+
+		versionMetas.Metas = append(versionMetas.Metas, meta)
+	}
+
+	for name, id := range baseAPI.VersionDefinition.Versions {
+		currentAPI := gw.getApiSpec(id)
+
+		if currentAPI == nil {
+			log.Errorf("Could not retrieve API version detail for id: %s", id)
+			continue
+		}
+
+		if !canInclude(currentAPI.APIDefinition, name) {
+			continue
+		}
+
+		meta = VersionMeta{
+			ID:               id,
+			Name:             currentAPI.Name,
+			VersionName:      name,
+			Internal:         currentAPI.Internal,
+			ExpirationDate:   currentAPI.Expiration,
+			IsDefaultVersion: baseAPI.VersionDefinition.Default == name,
+		}
+
+		versionMetas.Metas = append(versionMetas.Metas, meta)
+	}
+
+	sort.Slice(versionMetas.Metas, func(i, j int) bool {
+		return versionMetas.Metas[i].VersionName < versionMetas.Metas[j].VersionName
+	})
+
+	versionMetas.Status = "success"
+	doJSONWrite(w, http.StatusOK, versionMetas)
 }
 
 func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
