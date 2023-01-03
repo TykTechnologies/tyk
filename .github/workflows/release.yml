@@ -114,6 +114,7 @@ jobs:
           cp -r -f vendor/* $GOPATH/src
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
+          git checkout vendor
 
       - uses: goreleaser/goreleaser-action@v3
         with:
