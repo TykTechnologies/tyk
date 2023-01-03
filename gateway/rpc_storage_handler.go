@@ -149,7 +149,7 @@ func (r *RPCStorageHandler) getGroupLoginCallback(synchroniserEnabled bool) func
 	}
 	if synchroniserEnabled {
 		forcer := rpc.NewSyncForcer(r.Gw.RedisController)
-		groupLoginCallbackFn = forcer.GrouLoginCallback
+		groupLoginCallbackFn = forcer.GroupLoginCallback
 	}
 	return groupLoginCallbackFn
 }

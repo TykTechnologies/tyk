@@ -11,6 +11,7 @@ type SyncronizerForcer struct {
 	store *storage.RedisCluster
 }
 
+//NewSyncForcer returns a new syncforcer with a connected redis with a key prefix synchronizer-group- for group synchronization control.
 func NewSyncForcer(redisController *storage.RedisController) *SyncronizerForcer {
 	sf := &SyncronizerForcer{}
 
@@ -20,7 +21,9 @@ func NewSyncForcer(redisController *storage.RedisController) *SyncronizerForcer 
 	return sf
 }
 
-func (sf *SyncronizerForcer) GrouLoginCallback(userKey string, groupID string) interface{} {
+// GroupLoginCallback checks if the groupID key exists in the storage to turn on/off ForceSync param.
+// If the the key doesn't exists in the storage, it creates it and set ForceSync to true
+func (sf *SyncronizerForcer) GroupLoginCallback(userKey string, groupID string) interface{} {
 	shouldForce := false
 
 	_, err := sf.store.GetKey(groupID)
