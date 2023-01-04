@@ -1,4 +1,4 @@
-ARG GOLANG_CROSS
+ARG GOLANG_CROSS=1.12
 
 FROM tykio/golang-cross:${GOLANG_CROSS}
 LABEL description="Image for plugin development"
