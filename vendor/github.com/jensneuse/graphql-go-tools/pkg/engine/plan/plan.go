@@ -42,12 +42,13 @@ func (f FieldConfigurations) ForTypeField(typeName, fieldName string) *FieldConf
 }
 
 type FieldConfiguration struct {
-	TypeName              string
-	FieldName             string
-	DisableDefaultMapping bool
-	Path                  []string
-	Arguments      ArgumentsConfigurations
-	RequiresFields []string
+	TypeName                          string
+	FieldName                         string
+	DisableDefaultMapping             bool
+	Path                              []string
+	RespectOverrideFieldPathFromAlias bool
+	Arguments                         ArgumentsConfigurations
+	RequiresFields                    []string
 }
 
 type ArgumentsConfigurations []ArgumentConfiguration
@@ -75,10 +76,11 @@ type ArgumentConfiguration struct {
 }
 
 type DataSourceConfiguration struct {
-	RootNodes  []TypeField
-	ChildNodes []TypeField
-	Factory    PlannerFactory
-	Custom     json.RawMessage
+	RootNodes                  []TypeField
+	ChildNodes                 []TypeField
+	Factory                    PlannerFactory
+	OverrideFieldPathFromAlias bool
+	Custom                     json.RawMessage
 }
 
 func (d *DataSourceConfiguration) HasRootNode(typeName, fieldName string) bool {
@@ -105,10 +107,11 @@ type TypeField struct {
 }
 
 type FieldMapping struct {
-	TypeName              string
-	FieldName             string
-	DisableDefaultMapping bool
-	Path                  []string
+	TypeName                          string
+	FieldName                         string
+	DisableDefaultMapping             bool
+	Path                              []string
+	RespectOverrideFieldPathFromAlias bool
 }
 
 func NewPlanner(config Configuration) *Planner {
@@ -320,6 +323,16 @@ func (v *Visitor) currentFullPath() string {
 		path = path + "." + fieldAliasOrName
 	}
 	return path
+}
+
+func (v *Visitor) currentPlannerConfiguration() plannerConfiguration {
+	path := v.currentFullPath()
+	for i := range v.planners {
+		if v.planners[i].hasPath(path) {
+			return v.planners[i]
+		}
+	}
+	return plannerConfiguration{}
 }
 
 func (v *Visitor) EnterDirective(ref int) {
@@ -557,22 +570,14 @@ func (v *Visitor) EnterOperationDefinition(ref int) {
 func (v *Visitor) resolveFieldPath(ref int) []string {
 	typeName := v.Walker.EnclosingTypeDefinition.NameString(v.Definition)
 	fieldName := v.Operation.FieldNameString(ref)
-	config := v.currentOrParentPlannerConfiguration()
-	aliasOverride := false
-	if config.planner != nil {
-		aliasOverride = config.planner.DataSourcePlanningBehavior().OverrideFieldPathFromAlias
-	}
+
+	config := v.currentPlannerConfiguration()
+	aliasOverride := config.dataSourceConfiguration.OverrideFieldPathFromAlias
 
 	for i := range v.Config.Fields {
 		if v.Config.Fields[i].TypeName == typeName && v.Config.Fields[i].FieldName == fieldName {
-			if aliasOverride {
-				override,exists := config.planner.DownstreamResponseFieldAlias(ref)
-				if exists {
-					return []string{override}
-				}
-			}
-			if aliasOverride && v.Operation.FieldAliasIsDefined(ref) {
-				return []string{v.Operation.FieldAliasString(ref)}
+			if aliasOverride && v.Config.Fields[i].RespectOverrideFieldPathFromAlias {
+				return []string{v.Operation.FieldAliasOrNameString(ref)}
 			}
 			if v.Config.Fields[i].DisableDefaultMapping {
 				return nil
@@ -610,40 +615,6 @@ var (
 	selectorRegex = regexp.MustCompile(`{{\s*\.(.*?)\s*}}`)
 )
 
-func (v *Visitor) currentOrParentPlannerConfiguration() plannerConfiguration {
-	const none = -1
-	currentPath := v.currentFullPath()
-	plannerIndex := none
-	plannerPathDeepness := none
-
-	for i := range v.planners {
-		for _, plannerPath := range v.planners[i].paths {
-			if v.isCurrentOrParentPath(currentPath, plannerPath.path) {
-				currentPlannerPathDeepness := v.pathDeepness(plannerPath.path)
-				if currentPlannerPathDeepness > plannerPathDeepness {
-					plannerPathDeepness = currentPlannerPathDeepness
-					plannerIndex = i
-					break
-				}
-			}
-		}
-	}
-
-	if plannerIndex != none {
-		return v.planners[plannerIndex]
-	}
-
-	return plannerConfiguration{}
-}
-
-func (v *Visitor) isCurrentOrParentPath(currentPath string, parentPath string) bool {
-	return strings.HasPrefix(currentPath, parentPath)
-}
-
-func (v *Visitor) pathDeepness(path string) int {
-	return strings.Count(path, ".")
-}
-
 func (v *Visitor) resolveInputTemplates(config objectFetchConfiguration, input *string, variables *resolve.Variables) {
 	*input = templateRegex.ReplaceAllStringFunc(*input, func(s string) string {
 		selectors := selectorRegex.FindStringSubmatch(s)
@@ -678,8 +649,25 @@ func (v *Visitor) resolveInputTemplates(config objectFetchConfiguration, input *
 			if !v.Operation.OperationDefinitionHasVariableDefinition(v.operationDefinition, variableValue) {
 				break // omit optional argument when variable is not defined
 			}
+			variableDefinition, exists := v.Operation.VariableDefinitionByNameAndOperation(v.operationDefinition, v.Operation.VariableValueNameBytes(value.Ref))
+			if !exists {
+				break
+			}
+			typeName := v.Operation.ResolveTypeNameBytes(v.Operation.VariableDefinitions[variableDefinition].Type)
+			node, exists := v.Definition.Index.FirstNodeByNameBytes(typeName)
+			if !exists {
+				break
+			}
+			var variablePath []string
+			switch node.Kind {
+			case ast.NodeKindInputObjectTypeDefinition:
+				variablePath = append(variablePath, path...)
+			default:
+				variablePath = append(variablePath, variableValue)
+			}
+
 			variableName, _ = variables.AddVariable(&resolve.ContextVariable{
-				Path: []string{variableValue},
+				Path: variablePath,
 			}, false)
 		case "request":
 			if len(path) != 2 {
@@ -790,55 +778,10 @@ func (_ *SubscriptionResponsePlan) PlanKind() Kind {
 	return SubscriptionResponseKind
 }
 
-type DataSourcePlanningBehavior struct {
-	// MergeAliasedRootNodes will reuse a data source for multiple root fields with aliases if true.
-	// Example:
-	//  {
-	//    rootField
-	//    alias: rootField
-	//  }
-	// On dynamic data sources (e.g. GraphQL, SQL, ...) this should return true and for
-	// static data sources (e.g. REST, static, GRPC...) it should be false.
-	MergeAliasedRootNodes bool
-	// OverrideFieldPathFromAlias will let the planner know if the response path should also be aliased (= true)
-	// or not (= false)
-	// Example:
-	//  {
-	//    rootField
-	//    alias: original
-	//  }
-	// When true expected response will be { "rootField": ..., "alias": ... }
-	// When false expected response will be { "rootField": ..., "original": ... }
-	OverrideFieldPathFromAlias bool
-}
-
 type DataSourcePlanner interface {
 	Register(visitor *Visitor, customConfiguration json.RawMessage, isNested bool) error
 	ConfigureFetch() FetchConfiguration
 	ConfigureSubscription() SubscriptionConfiguration
-	DataSourcePlanningBehavior() DataSourcePlanningBehavior
-	// DownstreamResponseFieldAlias allows the DataSourcePlanner to overwrite the response path with an alias
-	// It's required to set OverrideFieldPathFromAlias to true
-	// This function is useful in the following scenario
-	// 1. The downstream Query doesn't contain an alias
-	// 2. The path configuration rewrites the field to an existing field
-	// 3. The DataSourcePlanner is using an alias to the upstream
-	// Example:
-	//
-	// type Query {
-	//		country: Country
-	//		countryAlias: Country
-	// }
-	//
-	// Both, country and countryAlias have a path in the FieldConfiguration of "country"
-	// In theory, they would be treated as the same field
-	// However, by using DownstreamResponseFieldAlias, it's possible for the DataSourcePlanner to use an alias for countryAlias.
-	// In this case, the response would contain both, country and countryAlias fields in the response.
-	// At the same time, the downstream Query would only expect the response on the path "country",
-	// as both country and countryAlias have a mapping to the path "country".
-	// The DataSourcePlanner could keep track that it rewrites the upstream query and use DownstreamResponseFieldAlias
-	// to indicate to the Planner to expect the response for countryAlias on the path "countryAlias" instead of "country".
-	DownstreamResponseFieldAlias(downstreamFieldRef int) (alias string, exists bool)
 }
 
 type SubscriptionConfiguration struct {
@@ -986,7 +929,7 @@ func (c *configurationVisitor) EnterField(ref int) {
 	}
 	isSubscription := c.isSubscription(root.Ref, current)
 	for i, planner := range c.planners {
-		if planner.hasParent(parent) && planner.hasRootNode(typeName, fieldName) && planner.planner.DataSourcePlanningBehavior().MergeAliasedRootNodes {
+		if planner.hasParent(parent) && planner.hasRootNode(typeName, fieldName) {
 			// same parent + root node = root sibling
 			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current})
 			c.fieldBuffers[ref] = planner.bufferID

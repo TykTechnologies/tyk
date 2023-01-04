@@ -226,14 +226,15 @@ func (s *Schema) addTypeFieldArgsForFieldRef(ref int, typeName string, fieldName
 }
 
 func (s *Schema) GetAllNestedFieldChildrenFromTypeField(typeName string, fieldName string, skipFieldFuncs ...SkipFieldFunc) []TypeFields {
-	fields := s.nodeFieldRefs(typeName)
+	node, fields := s.nodeFieldRefs(typeName)
 	if len(fields) == 0 {
 		return nil
 	}
+	childNodes := make([]TypeFields, 0)
+	s.findInterfaceImplementations(node, &childNodes, skipFieldFuncs...)
 	for _, ref := range fields {
 		if fieldName == s.document.FieldDefinitionNameString(ref) {
 			fieldTypeName := s.document.FieldDefinitionTypeNode(ref).NameString(&s.document)
-			childNodes := make([]TypeFields, 0)
 			s.findNestedFieldChildren(fieldTypeName, &childNodes, skipFieldFuncs...)
 			return childNodes
 		}
@@ -242,11 +243,32 @@ func (s *Schema) GetAllNestedFieldChildrenFromTypeField(typeName string, fieldNa
 	return nil
 }
 
+func (s *Schema) findInterfaceImplementations(node ast.Node, childNodes *[]TypeFields, skipFieldFuncs ...SkipFieldFunc) {
+	if node.Kind != ast.NodeKindInterfaceTypeDefinition {
+		return
+	}
+
+	implementingNodes := s.document.InterfaceTypeDefinitionImplementedByRootNodes(node.Ref)
+	for i := 0; i < len(implementingNodes); i++ {
+		var typeName string
+		switch implementingNodes[i].Kind {
+		case ast.NodeKindObjectTypeDefinition:
+			typeName = s.document.ObjectTypeDefinitionNameString(implementingNodes[i].Ref)
+		case ast.NodeKindInterfaceTypeDefinition:
+			// Not supported in this version
+		}
+
+		s.findNestedFieldChildren(typeName, childNodes, skipFieldFuncs...)
+	}
+}
+
 func (s *Schema) findNestedFieldChildren(typeName string, childNodes *[]TypeFields, skipFieldFuncs ...SkipFieldFunc) {
-	fields := s.nodeFieldRefs(typeName)
+	node, fields := s.nodeFieldRefs(typeName)
 	if len(fields) == 0 {
 		return
 	}
+
+	s.findInterfaceImplementations(node, childNodes, skipFieldFuncs...)
 	for _, ref := range fields {
 		fieldName := s.document.FieldDefinitionNameString(ref)
 		if len(skipFieldFuncs) > 0 {
@@ -272,22 +294,22 @@ func (s *Schema) findNestedFieldChildren(typeName string, childNodes *[]TypeFiel
 	}
 }
 
-func (s *Schema) nodeFieldRefs(typeName string) []int {
+func (s *Schema) nodeFieldRefs(typeName string) (node ast.Node, fieldsRefs []int) {
 	node, exists := s.document.Index.FirstNodeByNameStr(typeName)
 	if !exists {
-		return nil
-	}
-	var fields []int
-	switch node.Kind {
-	case ast.NodeKindObjectTypeDefinition:
-		fields = s.document.ObjectTypeDefinitions[node.Ref].FieldsDefinition.Refs
-	case ast.NodeKindInterfaceTypeDefinition:
-		fields = s.document.InterfaceTypeDefinitions[node.Ref].FieldsDefinition.Refs
-	default:
-		return nil
+		return ast.Node{}, nil
 	}
 
-	return fields
+	switch node.Kind {
+	case ast.NodeKindObjectTypeDefinition:
+		fieldsRefs = s.document.ObjectTypeDefinitions[node.Ref].FieldsDefinition.Refs
+	case ast.NodeKindInterfaceTypeDefinition:
+		fieldsRefs = s.document.InterfaceTypeDefinitions[node.Ref].FieldsDefinition.Refs
+	default:
+		return ast.Node{}, nil
+	}
+
+	return node, fieldsRefs
 }
 
 func (s *Schema) putChildNode(nodes *[]TypeFields, typeName, fieldName string) (added bool) {

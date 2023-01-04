@@ -113,13 +113,13 @@ func newInternalExecutionContext() *internalExecutionContext {
 	}
 }
 
-func (e *internalExecutionContext) prepare (ctx context.Context, variables []byte, request resolve.Request) {
+func (e *internalExecutionContext) prepare(ctx context.Context, variables []byte, request resolve.Request) {
 	e.setContext(ctx)
 	e.setVariables(variables)
 	e.setRequest(request)
 }
 
-func (e *internalExecutionContext) setRequest(request resolve.Request){
+func (e *internalExecutionContext) setRequest(request resolve.Request) {
 	e.resolveContext.Request = request
 }
 
@@ -138,7 +138,7 @@ func (e *internalExecutionContext) reset() {
 type ExecutionEngineV2 struct {
 	logger                       abstractlogger.Logger
 	config                       EngineV2Configuration
-	planner                      *plan.Planner
+	plannerPool                  sync.Pool
 	resolver                     *resolve.Resolver
 	internalExecutionContextPool sync.Pool
 }
@@ -159,9 +159,13 @@ func WithAfterFetchHook(hook resolve.AfterFetchHook) ExecutionOptionsV2 {
 
 func NewExecutionEngineV2(logger abstractlogger.Logger, engineConfig EngineV2Configuration) (*ExecutionEngineV2, error) {
 	return &ExecutionEngineV2{
-		logger:   logger,
-		config:   engineConfig,
-		planner:  plan.NewPlanner(engineConfig.plannerConfig),
+		logger: logger,
+		config: engineConfig,
+		plannerPool: sync.Pool{
+			New: func() interface{} {
+				return plan.NewPlanner(engineConfig.plannerConfig)
+			},
+		},
 		resolver: resolve.New(),
 		internalExecutionContextPool: sync.Pool{
 			New: func() interface{} {
@@ -186,7 +190,7 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 	execContext := e.getExecutionCtx()
 	defer e.putExecutionCtx(execContext)
 
-	execContext.prepare(ctx,operation.Variables,operation.request)
+	execContext.prepare(ctx, operation.Variables, operation.request)
 
 	for i := range options {
 		options[i](execContext)
@@ -195,7 +199,9 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 	// Optimization: Hashing the operation and caching the postprocessed plan for
 	// this specific operation will improve perfomance significantly.
 	var report operationreport.Report
-	planResult := e.planner.Plan(&operation.document, &e.config.schema.document, operation.OperationName, &report)
+	planner := e.plannerPool.Get().(*plan.Planner)
+	planResult := planner.Plan(&operation.document, &e.config.schema.document, operation.OperationName, &report)
+	e.plannerPool.Put(planner)
 	if report.HasErrors() {
 		return errors.New(report.Error())
 	}
@@ -217,7 +223,7 @@ func (e *ExecutionEngineV2) getExecutionCtx() *internalExecutionContext {
 	return e.internalExecutionContextPool.Get().(*internalExecutionContext)
 }
 
-func (e *ExecutionEngineV2) putExecutionCtx(ctx *internalExecutionContext){
+func (e *ExecutionEngineV2) putExecutionCtx(ctx *internalExecutionContext) {
 	ctx.reset()
 	e.internalExecutionContextPool.Put(ctx)
 }
