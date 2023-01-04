@@ -687,6 +687,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 		cacheKey = storage.HashStr(key, storage.HashMurmur64) // always hash cache keys with murmur64 to prevent collisions
 	}
 
+	fmt.Println("Checking in-memory cache")
 	// Check in-memory cache
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		cachedVal, found := t.Gw.SessionCache.Get(cacheKey)
@@ -702,10 +703,12 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 	}
 
 	// Check session store
+	fmt.Println("Querying keystore")
 	t.Logger().Debug("Querying keystore")
 	session, found := t.Gw.GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
 
 	if found {
+		fmt.Println("found in keystore")
 		if t.Spec.GlobalConfig.HashKeys {
 			keyHash = storage.HashStr(session.KeyID)
 		}
@@ -726,15 +729,19 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 		return session, true
 	}
 
+	fmt.Println("will check in RPC")
 	if _, ok := t.Spec.AuthManager.Store().(*RPCStorageHandler); ok && rpc.IsEmergencyMode() {
+		fmt.Println("rpc is in emergency mode")
 		return session.Clone(), false
 	}
 
 	// Only search in RPC if it's not in emergency mode
 	t.Logger().Debug("Querying authstore")
+	fmt.Println("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
+		fmt.Println("Found in RPC")
 		key = session.KeyID
 
 		session := session.Clone()
@@ -758,6 +765,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 		return session, found
 	}
 
+	fmt.Println("Not found in rpc")
 	// session not found
 	session.KeyID = key
 	return session, false
