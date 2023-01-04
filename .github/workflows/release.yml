@@ -119,6 +119,7 @@ jobs:
           cp -r -f vendor/* $GOPATH/src
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
+          # reset dirty git tree
           git checkout vendor
 
       - uses: goreleaser/goreleaser-action@v3
