@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -135,11 +136,13 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	var jsonKeyVal string
 	var err error
 	keyId := keyName
-
+	fmt.Println("SessionDetail")
 	// get session by key
 	if hashed {
+		fmt.Println("Hashed")
 		jsonKeyVal, err = b.store.GetRawKey(b.store.GetKeyPrefix() + keyName)
 	} else {
+		fmt.Println("not hashed")
 		if storage.TokenOrg(keyName) != orgID {
 			// try to get legacy and new format key at once
 			toSearchList := []string{b.Gw.generateToken(orgID, keyName), keyName}
@@ -147,10 +150,12 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 				toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName, fallback))
 			}
 
+			fmt.Println(toSearchList)
 			var jsonKeyValList []string
 
 			jsonKeyValList, err = b.store.GetMultiKey(toSearchList)
-
+			fmt.Println("Result:")
+			fmt.Println(jsonKeyValList)
 			// pick the 1st non empty from the returned list
 			for idx, val := range jsonKeyValList {
 				if val != "" {
@@ -161,11 +166,14 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 			}
 		} else {
 			// key is not an imported one
+			fmt.Println("Not imported key: " + keyName)
 			jsonKeyVal, err = b.store.GetKey(keyName)
+			fmt.Println(jsonKeyVal)
 		}
 	}
 
 	if err != nil {
+		fmt.Println("error:" + err.Error())
 		log.WithFields(logrus.Fields{
 			"prefix":      "auth-mgr",
 			"inbound-key": b.Gw.obfuscateKey(keyName),
@@ -175,6 +183,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	}
 	session := &user.SessionState{}
 	if err := json.Unmarshal([]byte(jsonKeyVal), &session); err != nil {
+		fmt.Println("error unmarshalling session: " + err.Error())
 		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
 		return user.SessionState{}, false
 	}
