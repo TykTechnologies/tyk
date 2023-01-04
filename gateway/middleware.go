@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -739,6 +740,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 	t.Logger().Debug("Querying authstore")
 	fmt.Println("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
+	fmt.Println(reflect.TypeOf(t.Spec.AuthManager))
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
 		fmt.Println("Found in RPC")

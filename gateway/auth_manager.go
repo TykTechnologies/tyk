@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -136,6 +137,8 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	var jsonKeyVal string
 	var err error
 	keyId := keyName
+
+	fmt.Println("Store type:" + reflect.TypeOf(b.store).String())
 	fmt.Println("SessionDetail")
 	// get session by key
 	if hashed {
