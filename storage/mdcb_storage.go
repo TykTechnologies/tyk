@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
 )
@@ -22,6 +23,7 @@ func NewMdcbStorage(local, rpc Handler, log *logrus.Entry) *MdcbStorage {
 }
 
 func (m MdcbStorage) GetKey(key string) (string, error) {
+	fmt.Println("GetKey from MDCBStorage")
 	var val string
 	var err error
 

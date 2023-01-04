@@ -164,6 +164,7 @@ func (r *RedisCluster) up() error {
 
 // GetKey will retrieve a key from the database
 func (r *RedisCluster) GetKey(keyName string) (string, error) {
+	fmt.Println("GetKey from RedisCluster")
 	if err := r.up(); err != nil {
 		return "", err
 	}

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -177,6 +178,7 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 
 // GetKey will retrieve a key from the database
 func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
+	fmt.Println("GetKey from RPCStorageHandler")
 	start := time.Now() // get current time
 	//	log.Debug("[STORE] Getting WAS: ", keyName)
 	//  log.Debug("[STORE] Getting: ", r.fixKey(keyName))

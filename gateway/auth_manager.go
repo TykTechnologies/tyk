@@ -167,6 +167,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 		} else {
 			// key is not an imported one
 			fmt.Println("Not imported key: " + keyName)
+
 			jsonKeyVal, err = b.store.GetKey(keyName)
 			fmt.Println(jsonKeyVal)
 		}
