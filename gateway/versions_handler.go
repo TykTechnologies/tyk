@@ -1,11 +1,13 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/gorilla/mux"
 	"net/http"
 	"sort"
 	"strings"
+
+	"github.com/gorilla/mux"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type VersionsHandler struct {
