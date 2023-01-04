@@ -517,6 +517,35 @@ paths:
                 message: API ID not specified
                 status: error
 
+  /tyk/apis/{apiID}/versions:
+    parameters:
+      - description: The API ID
+        name: apiID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      description: |-
+        Listing versions of an OAS API
+      tags:
+        - APIs
+      operationId: listApiVersions
+      parameters:
+        - $ref: '#/components/parameters/SearchText'
+        - $ref: '#/components/parameters/AccessType'
+      responses:
+        '200':
+          description: API version metas
+          content:
+            application/json:
+              schema:
+                properties:
+                  apis:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/APIVersionMeta'
+
   '/tyk/apis/oas/{apiID}':
     parameters:
       - description: The API ID
@@ -682,6 +711,36 @@ paths:
               example:
                 message: API ID not specified
                 status: error
+
+  /tyk/apis/oas/{apiID}/versions:
+    parameters:
+      - description: The API ID
+        name: apiID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      description: |-
+        Listing versions of an OAS API
+      tags:
+        - OASAPIs
+      operationId: listOASApiVersions
+      parameters:
+        - $ref: '#/components/parameters/SearchText'
+        - $ref: '#/components/parameters/AccessType'
+      responses:
+        '200':
+          description: API version metas
+          content:
+            application/json:
+              schema:
+                properties:
+                  apis:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/APIVersionMeta'
+
 
   '/tyk/apis/oas/{apiID}/export':
     parameters:
@@ -3723,6 +3782,22 @@ components:
       type: string
       enum: [ true, false ]
       example: true
+    APIVersionMeta:
+      description: API version meta
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        versionName:
+          type: string
+        internal:
+          type: boolean
+        expirationDate:
+          type: string
+        isDefaultVersion:
+          type: boolean
   parameters:
     UpstreamURL:
       name: upstreamURL
@@ -3779,6 +3854,21 @@ components:
       description: Enable or disable authentication in your Tyk Gateway as per your OAS document.
       schema:
         $ref: '#/components/schemas/BooleanQueryParam'
+    SearchText:
+      name: searchText
+      schema:
+        type: string
+      description: Search for API version name
+      in: query
+      required: false
+    AccessType:
+      name: accessType
+      schema:
+        type: string
+        enum: [ "internal", "external" ]
+      description: Filter for internal or external API versions
+      in: query
+      required: false
   securitySchemes:
     api_key:
       in: header
