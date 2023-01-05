@@ -166,6 +166,7 @@ dockers:
     - testdata
     - trace
     - user
+    - vendor
 
 docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}
