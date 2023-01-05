@@ -278,6 +278,31 @@ paths:
       tags:
         - APIs
       operationId: createApi
+      parameters:
+        - name: base_api_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The base API which the new version will be linked to.
+        - name: base_api_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name.
+        - name: new_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the created version.
+        - name: set_default
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: If true, the new version is set as default version.
       requestBody:
         content:
           application/json:
@@ -341,6 +366,31 @@ paths:
       tags:
         - OASAPIs
       operationId: createApiOAS
+      parameters:
+        - name: base_api_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The base API which the new version will be linked to.
+        - name: base_api_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name.
+        - name: new_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the created version.
+        - name: set_default
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: If true, the new version is set as default version.
       requestBody:
         content:
           application/json:
@@ -467,6 +517,35 @@ paths:
                 message: API ID not specified
                 status: error
 
+  /tyk/apis/{apiID}/versions:
+    parameters:
+      - description: The API ID
+        name: apiID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      description: |-
+        Listing versions of an OAS API
+      tags:
+        - APIs
+      operationId: listApiVersions
+      parameters:
+        - $ref: '#/components/parameters/SearchText'
+        - $ref: '#/components/parameters/AccessType'
+      responses:
+        '200':
+          description: API version metas
+          content:
+            application/json:
+              schema:
+                properties:
+                  apis:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/APIVersionMeta'
+
   '/tyk/apis/oas/{apiID}':
     parameters:
       - description: The API ID
@@ -551,6 +630,7 @@ paths:
         - $ref: '#/components/parameters/CustomDomain'
         - $ref: '#/components/parameters/ValidateRequest'
         - $ref: '#/components/parameters/AllowList'
+        - $ref: '#/components/parameters/MockResponse'
         - $ref: '#/components/parameters/Authentication'
       requestBody:
         content:
@@ -632,6 +712,36 @@ paths:
                 message: API ID not specified
                 status: error
 
+  /tyk/apis/oas/{apiID}/versions:
+    parameters:
+      - description: The API ID
+        name: apiID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      description: |-
+        Listing versions of an OAS API
+      tags:
+        - OASAPIs
+      operationId: listOASApiVersions
+      parameters:
+        - $ref: '#/components/parameters/SearchText'
+        - $ref: '#/components/parameters/AccessType'
+      responses:
+        '200':
+          description: API version metas
+          content:
+            application/json:
+              schema:
+                properties:
+                  apis:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/APIVersionMeta'
+
+
   '/tyk/apis/oas/{apiID}/export':
     parameters:
       - description: The API ID
@@ -701,6 +811,7 @@ paths:
         - $ref: '#/components/parameters/CustomDomain'
         - $ref: '#/components/parameters/ApiID'
         - $ref: '#/components/parameters/AllowList'
+        - $ref: '#/components/parameters/MockResponse'
         - $ref: '#/components/parameters/ValidateRequest'
         - $ref: '#/components/parameters/Authentication'
       requestBody:
@@ -3671,6 +3782,22 @@ components:
       type: string
       enum: [ true, false ]
       example: true
+    APIVersionMeta:
+      description: API version meta
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        versionName:
+          type: string
+        internal:
+          type: boolean
+        expirationDate:
+          type: string
+        isDefaultVersion:
+          type: boolean
   parameters:
     UpstreamURL:
       name: upstreamURL
@@ -3714,12 +3841,34 @@ components:
       required: false
       schema:
         $ref: '#/components/schemas/BooleanQueryParam'
+    MockResponse:
+      name: mockResponse
+      in: query
+      description: Enable mockResponse middleware for all endpoints having responses configured.
+      required: false
+      schema:
+        $ref: '#/components/schemas/BooleanQueryParam'
     Authentication:
       name: authentication
       in: query
       description: Enable or disable authentication in your Tyk Gateway as per your OAS document.
       schema:
         $ref: '#/components/schemas/BooleanQueryParam'
+    SearchText:
+      name: searchText
+      schema:
+        type: string
+      description: Search for API version name
+      in: query
+      required: false
+    AccessType:
+      name: accessType
+      schema:
+        type: string
+        enum: [ "internal", "external" ]
+      description: Filter for internal or external API versions
+      in: query
+      required: false
   securitySchemes:
     api_key:
       in: header

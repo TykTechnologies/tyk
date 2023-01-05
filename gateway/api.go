@@ -111,6 +111,20 @@ type paginatedOAuthClientTokens struct {
 	Tokens     []OAuthClientToken
 }
 
+type VersionMetas struct {
+	Status string        `json:"status"`
+	Metas  []VersionMeta `json:"apis"`
+}
+
+type VersionMeta struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	VersionName      string `json:"versionName"`
+	Internal         bool   `json:"internal"`
+	ExpirationDate   string `json:"expirationDate"`
+	IsDefaultVersion bool   `json:"isDefaultVersion"`
+}
+
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(code)
@@ -1123,7 +1137,13 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 				baseAPI.VersionDefinition.Default = newVersionName
 			}
 
-			if !oasEndpoint {
+			if baseAPI.IsOAS {
+				baseAPI.OAS.Fill(*baseAPI.APIDefinition)
+				err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
+				if err != nil {
+					log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
+				}
+			} else {
 				err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
 				if err != nil {
 					log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
@@ -1280,6 +1300,45 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 		os.Remove(defOASFilePath)
 	}
 
+	if spec.VersionDefinition.BaseID != "" {
+		baseAPIPtr := gw.getApiSpec(spec.VersionDefinition.BaseID)
+		apiInBytes, err := json.Marshal(baseAPIPtr)
+		if err != nil {
+			log.WithError(err).Error("Couldn't marshal API spec")
+		}
+
+		var baseAPI APISpec
+		err = json.Unmarshal(apiInBytes, &baseAPI)
+		if err != nil {
+			log.WithError(err).Error("Couldn't unmarshal API spec")
+		}
+
+		for versionName, versionAPIID := range baseAPI.VersionDefinition.Versions {
+			if apiID == versionAPIID {
+				delete(baseAPI.VersionDefinition.Versions, versionName)
+				if baseAPI.VersionDefinition.Default == versionName {
+					baseAPI.VersionDefinition.Default = baseAPI.VersionDefinition.Name
+				}
+
+				break
+			}
+		}
+
+		fs := afero.NewOsFs()
+		if baseAPI.IsOAS {
+			baseAPI.OAS.Fill(*baseAPI.APIDefinition)
+			err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
+			if err != nil {
+				log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
+			}
+		} else {
+			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
+			if err != nil {
+				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
+			}
+		}
+	}
+
 	response := apiModifyKeySuccess{
 		Key:    apiID,
 		Status: "ok",
@@ -1333,7 +1392,7 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	switch r.Method {
-	case "GET":
+	case http.MethodGet:
 		if apiID != "" {
 			log.Debugf("Requesting API definition for %q", apiID)
 			obj, code = gw.handleGetAPI(apiID, false)
@@ -1357,7 +1416,7 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
-	case "DELETE":
+	case http.MethodDelete:
 		if apiID != "" {
 			log.Debug("Deleting API definition for: ", apiID)
 			obj, code = gw.handleDeleteAPI(apiID)
