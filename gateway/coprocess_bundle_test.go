@@ -326,6 +326,24 @@ func TestBundle_Verify(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "bundle without signature",
+			bundle: Bundle{
+				Name: "test",
+				Data: []byte("test"),
+				Path: "/test/test.zip",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Signature: "",
+				},
+				Gw: &Gateway{},
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
