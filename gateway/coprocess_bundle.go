@@ -47,7 +47,7 @@ func (b *Bundle) Verify() error {
 	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
 
 	var useSignature bool
-	var bundleVerifier goverify.Verifier
+	bundleVerifier := b.Gw.NotificationVerifier
 
 	// Perform signature verification if a public key path is set:
 	if b.Gw.GetConfig().PublicKeyPath != "" {
@@ -55,14 +55,13 @@ func (b *Bundle) Verify() error {
 			// Error: A public key is set, but the bundle isn't signed.
 			return errors.New("Bundle isn't signed")
 		}
-		if b.Gw.NotificationVerifier == nil {
+		if bundleVerifier == nil {
 			var err error
 			bundleVerifier, err = goverify.LoadPublicKeyFromFile(b.Gw.GetConfig().PublicKeyPath)
 			if err != nil {
 				return err
 			}
 		}
-
 		useSignature = true
 	}
 
@@ -96,9 +95,7 @@ func (b *Bundle) Verify() error {
 		if err := bundleVerifier.Verify(bundleData.Bytes(), signed); err != nil {
 			return err
 		}
-
 	}
-
 	return nil
 }
 
