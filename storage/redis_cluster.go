@@ -890,7 +890,7 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 	val, err := r.singleton().SIsMember(r.RedisController.ctx, r.fixKey(keyName), value).Result()
 
 	if err != nil {
-		log.Error("Error trying to check set memeber: ", err)
+		log.Error("Error trying to check set member: ", err)
 		return false
 	}
 

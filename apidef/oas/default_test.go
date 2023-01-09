@@ -360,7 +360,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			oasGetOperationID  = "getPets"
 			oasPostOperationID = "postPets"
 		)
-		getOASDef := func(withOperationID bool) OAS {
+		getOASDef := func(withOperationID bool, withValidResponses bool) OAS {
 			oasDef := OAS{
 				T: openapi3.T{
 					Info: &openapi3.Info{
@@ -384,19 +384,33 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				},
 			}
 
-			if withOperationID {
-				oasDef.Paths = openapi3.Paths{
-					"/pets": {
-						Get: &openapi3.Operation{
-							OperationID: "getPets",
-							Responses:   openapi3.Responses{},
-						},
-						Post: &openapi3.Operation{
-							OperationID: oasPostOperationID,
-							Responses:   openapi3.Responses{},
+			var responses = make(openapi3.Responses)
+			if withValidResponses {
+				responses["200"] = &openapi3.ResponseRef{
+					Value: &openapi3.Response{
+						Content: map[string]*openapi3.MediaType{
+							"application/json": {
+								Example: map[string]interface{}{"status": "ok"},
+							},
 						},
 					},
 				}
+			}
+
+			oasDef.Paths = openapi3.Paths{
+				"/pets": {
+					Get: &openapi3.Operation{
+						Responses: responses,
+					},
+					Post: &openapi3.Operation{
+						Responses: responses,
+					},
+				},
+			}
+
+			if withOperationID {
+				oasDef.Paths["/pets"].Get.OperationID = oasGetOperationID
+				oasDef.Paths["/pets"].Post.OperationID = oasPostOperationID
 			}
 
 			return oasDef
@@ -420,62 +434,88 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			oasOperation.RequestBody = &openapi3.RequestBodyRef{Value: reqBody}
 		}
 
-		getExpectedOperations := func(enabled bool, middleware string, oasOperationID bool) Operations {
-			if middleware == middlewareAllowList && oasOperationID {
-				return Operations{
-					oasGetOperationID: {
-						Allow: &Allowance{
-							Enabled: enabled,
-						},
-					},
-					oasPostOperationID: {
-						Allow: &Allowance{
-							Enabled: enabled,
-						},
-					},
-				}
-			} else if middleware == middlewareAllowList && !oasOperationID {
-				return Operations{
-					tykGetOperationID: {
-						Allow: &Allowance{
-							Enabled: enabled,
-						},
-					},
-					tykPostOperationID: {
-						Allow: &Allowance{
-							Enabled: enabled,
-						},
-					},
+		getExpectedOperations := func(enabled, oasOperationID bool, middlewares ...string) Operations {
+			operations := make(Operations)
+			for _, middleware := range middlewares {
+				switch middleware {
+				case middlewareAllowList:
+					allowance := &Allowance{Enabled: enabled}
+					if oasOperationID {
+						if len(operations) > 0 {
+							operations[oasGetOperationID].Allow = allowance
+							operations[oasPostOperationID].Allow = allowance
+						} else {
+							operations = Operations{
+								oasGetOperationID:  {Allow: allowance},
+								oasPostOperationID: {Allow: allowance},
+							}
+						}
+					} else {
+						if len(operations) > 0 {
+							operations[tykGetOperationID].Allow = allowance
+							operations[tykPostOperationID].Allow = allowance
+						} else {
+							operations = Operations{
+								tykGetOperationID:  {Allow: allowance},
+								tykPostOperationID: {Allow: allowance},
+							}
+						}
+					}
+				case middlewareValidateRequest:
+					validateRequest := &ValidateRequest{
+						Enabled:           enabled,
+						ErrorResponseCode: http.StatusUnprocessableEntity,
+					}
+					if oasOperationID {
+						if len(operations) > 0 {
+							operations[oasPostOperationID].ValidateRequest = validateRequest
+						} else {
+							operations = Operations{oasPostOperationID: {ValidateRequest: validateRequest}}
+						}
+					} else {
+						if len(operations) > 0 {
+							operations[tykPostOperationID].ValidateRequest = validateRequest
+						} else {
+							operations = Operations{tykPostOperationID: {ValidateRequest: validateRequest}}
+						}
+					}
+				case middlewareMockResponse:
+					mockResponse := &MockResponse{
+						Enabled:         enabled,
+						FromOASExamples: &FromOASExamples{Enabled: enabled},
+					}
+					if oasOperationID {
+						if len(operations) > 0 {
+							operations[oasGetOperationID].MockResponse = mockResponse
+							operations[oasPostOperationID].MockResponse = mockResponse
+						} else {
+							operations = Operations{
+								oasGetOperationID:  {MockResponse: mockResponse},
+								oasPostOperationID: {MockResponse: mockResponse},
+							}
+						}
+					} else {
+						if len(operations) > 0 {
+							operations[tykGetOperationID].MockResponse = mockResponse
+							operations[tykPostOperationID].MockResponse = mockResponse
+						} else {
+							operations = Operations{
+								tykGetOperationID:  {MockResponse: mockResponse},
+								tykPostOperationID: {MockResponse: mockResponse},
+							}
+						}
+
+					}
 				}
 			}
 
-			if middleware == middlewareValidateRequest && oasOperationID {
-				return Operations{
-					oasPostOperationID: {
-						ValidateRequest: &ValidateRequest{
-							Enabled:           enabled,
-							ErrorResponseCode: http.StatusUnprocessableEntity,
-						},
-					},
-				}
-			} else if middleware == middlewareValidateRequest && !oasOperationID {
-				return Operations{
-					tykPostOperationID: {
-						ValidateRequest: &ValidateRequest{
-							Enabled:           enabled,
-							ErrorResponseCode: http.StatusUnprocessableEntity,
-						},
-					},
-				}
-			}
-
-			return nil
+			return operations
 		}
 
 		t.Run("allowList", func(t *testing.T) {
 			t.Run("enable allowList for all paths when no configured operationID in OAS", func(t *testing.T) {
-				oasDef := getOASDef(false)
-				expectedOperations := getExpectedOperations(true, middlewareAllowList, false)
+				oasDef := getOASDef(false, false)
+				expectedOperations := getExpectedOperations(true, false, middlewareAllowList)
 
 				tykExtensionConfigParams := TykExtensionConfigParams{
 					AllowList: &trueVal,
@@ -488,9 +528,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			})
 
 			t.Run("enable allowList for all paths when operationID is configured in OAS", func(t *testing.T) {
-				oasDef := getOASDef(true)
+				oasDef := getOASDef(true, false)
 
-				expectedOperations := getExpectedOperations(true, middlewareAllowList, true)
+				expectedOperations := getExpectedOperations(true, true, middlewareAllowList)
 
 				tykExtensionConfigParams := TykExtensionConfigParams{
 					AllowList: &trueVal,
@@ -503,9 +543,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			})
 
 			t.Run("disable allowList for all paths when no configured operationID in OAS", func(t *testing.T) {
-				oasDef := getOASDef(false)
+				oasDef := getOASDef(false, false)
 
-				expectedOperations := getExpectedOperations(false, middlewareAllowList, false)
+				expectedOperations := getExpectedOperations(false, false, middlewareAllowList)
 
 				tykExtensionConfigParams := TykExtensionConfigParams{
 					AllowList: &falseVal,
@@ -518,9 +558,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			})
 
 			t.Run("disable allowList for all paths when operationID is configured in OAS", func(t *testing.T) {
-				oasDef := getOASDef(true)
+				oasDef := getOASDef(true, false)
 
-				expectedOperations := getExpectedOperations(false, middlewareAllowList, true)
+				expectedOperations := getExpectedOperations(false, true, middlewareAllowList)
 
 				tykExtensionConfigParams := TykExtensionConfigParams{
 					AllowList: &falseVal,
@@ -533,7 +573,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			})
 
 			t.Run("override allowList (disable) configured in tyk extension - do not toggle block list if any", func(t *testing.T) {
-				oasDef := getOASDef(true)
+				oasDef := getOASDef(true, false)
 
 				tykExt := XTykAPIGateway{
 					Server: Server{
@@ -605,7 +645,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			})
 
 			t.Run("override allowList (enable) configured in tyk extension - toggle enabled block list if any", func(t *testing.T) {
-				oasDef := getOASDef(true)
+				oasDef := getOASDef(true, false)
 
 				tykExt := XTykAPIGateway{
 					Server: Server{
@@ -671,7 +711,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			})
 
 			t.Run("do not configure allowList when parameter is not provided (nil)", func(t *testing.T) {
-				oasDef := getOASDef(false)
+				oasDef := getOASDef(false, false)
 
 				tykExt := XTykAPIGateway{
 					Server: Server{
@@ -725,10 +765,10 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		t.Run("validateRequest", func(t *testing.T) {
 			t.Run("do not configure validateRequest for paths where request body is not specified for application/json",
 				func(t *testing.T) {
-					oasDef := getOASDef(false)
+					oasDef := getOASDef(false, false)
 					fillReqBody(&oasDef, "/pets", http.MethodPost)
 
-					expectedOperations := getExpectedOperations(true, middlewareValidateRequest, false)
+					expectedOperations := getExpectedOperations(true, false, middlewareValidateRequest)
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						ValidateRequest: &trueVal,
@@ -742,10 +782,10 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 			t.Run("enable validateRequest for all paths with application/json req body when no configured operationID in OAS",
 				func(t *testing.T) {
-					oasDef := getOASDef(false)
+					oasDef := getOASDef(false, false)
 					fillReqBody(&oasDef, "/pets", http.MethodPost)
 
-					expectedOperations := getExpectedOperations(true, middlewareValidateRequest, false)
+					expectedOperations := getExpectedOperations(true, false, middlewareValidateRequest)
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						ValidateRequest: &trueVal,
@@ -759,10 +799,10 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 			t.Run("enable validateRequest for all paths with application/json req body when operationID is configured in OAS",
 				func(t *testing.T) {
-					oasDef := getOASDef(true)
+					oasDef := getOASDef(true, false)
 					fillReqBody(&oasDef, "/pets", http.MethodPost)
 
-					expectedOperations := getExpectedOperations(true, middlewareValidateRequest, true)
+					expectedOperations := getExpectedOperations(true, true, middlewareValidateRequest)
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						ValidateRequest: &trueVal,
@@ -776,9 +816,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 			t.Run("disable validateRequest for all paths with application/json req body when no configured operationID in OAS",
 				func(t *testing.T) {
-					oasDef := getOASDef(false)
+					oasDef := getOASDef(false, false)
 					fillReqBody(&oasDef, "/pets", http.MethodPost)
-					expectedOperations := getExpectedOperations(false, middlewareValidateRequest, false)
+					expectedOperations := getExpectedOperations(false, false, middlewareValidateRequest)
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						ValidateRequest: &falseVal,
@@ -792,10 +832,10 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 			t.Run("disable validateRequest for all paths with application/json req body when operationID is configured in OAS",
 				func(t *testing.T) {
-					oasDef := getOASDef(true)
+					oasDef := getOASDef(true, false)
 					fillReqBody(&oasDef, "/pets", http.MethodPost)
 
-					expectedOperations := getExpectedOperations(false, middlewareValidateRequest, true)
+					expectedOperations := getExpectedOperations(false, true, middlewareValidateRequest)
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						ValidateRequest: &falseVal,
@@ -808,7 +848,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				})
 
 			t.Run("override validateRequest configured in tyk extension", func(t *testing.T) {
-				oasDef := getOASDef(true)
+				oasDef := getOASDef(true, false)
 				fillReqBody(&oasDef, "/pets", http.MethodPost)
 
 				tykExt := XTykAPIGateway{
@@ -839,7 +879,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 				oasDef.SetTykExtension(&tykExt)
 
-				expectedOperations := getExpectedOperations(true, middlewareValidateRequest, true)
+				expectedOperations := getExpectedOperations(true, true, middlewareValidateRequest)
 
 				tykExtensionConfigParams := TykExtensionConfigParams{
 					ValidateRequest: &trueVal,
@@ -853,7 +893,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			})
 
 			t.Run("do not configure validateRequest when parameter is not provided (nil)", func(t *testing.T) {
-				oasDef := getOASDef(true)
+				oasDef := getOASDef(true, false)
 
 				tykExt := XTykAPIGateway{
 					Server: Server{
@@ -912,7 +952,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 			t.Run("do not configure validateRequest when no paths have application/json req body",
 				func(t *testing.T) {
-					oasDef := getOASDef(true)
+					oasDef := getOASDef(true, false)
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						ValidateRequest: &falseVal,
@@ -923,6 +963,204 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					assert.NoError(t, err)
 					assert.Nil(t, oasDef.GetTykExtension().Middleware)
 				})
+		})
+
+		t.Run("mockResponse", func(t *testing.T) {
+			t.Run("do not configure MockResponse if no path contains responses", func(t *testing.T) {
+				oasDef := getOASDef(false, false)
+				tykExtensionConfigParams := TykExtensionConfigParams{
+					MockResponse: &trueVal,
+				}
+
+				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+				assert.NoError(t, err)
+				assert.Nil(t, oasDef.GetTykExtension().Middleware)
+			})
+
+			t.Run("do not configure MockResponse if no valid examples/example/schema found but configured response",
+				func(t *testing.T) {
+					oasDef := getOASDef(false, false)
+					description := "description"
+					simpleResponse := openapi3.Responses{
+						"200": &openapi3.ResponseRef{
+							Value: &openapi3.Response{
+								Description: &description,
+							},
+						},
+					}
+					oasDef.Paths["/pets"].Get.Responses = simpleResponse
+					oasDef.Paths["/pets"].Post.Responses = simpleResponse
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						MockResponse: &trueVal,
+					}
+
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+					assert.NoError(t, err)
+					assert.Nil(t, oasDef.GetTykExtension().Middleware)
+				})
+
+			t.Run("enable oasMockResponse for all paths when operationID is configured in OAS with valid examples in response",
+				func(t *testing.T) {
+					oasDef := getOASDef(true, false)
+
+					validResponseWithExamples := openapi3.Responses{
+						"200": &openapi3.ResponseRef{
+							Value: &openapi3.Response{
+								Content: openapi3.Content{
+									"application/json": {
+										Examples: openapi3.Examples{
+											"1": &openapi3.ExampleRef{
+												Value: &openapi3.Example{Value: map[string]interface{}{"status": "ok"}},
+											},
+										},
+									},
+								},
+							},
+						},
+					}
+					oasDef.Paths["/pets"].Get.Responses = validResponseWithExamples
+					oasDef.Paths["/pets"].Post.Responses = validResponseWithExamples
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						MockResponse: &trueVal,
+					}
+
+					expectedOperations := getExpectedOperations(true, true, middlewareMockResponse)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+					assert.NoError(t, err)
+					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+				})
+
+			t.Run("enable oasMockResponse for all paths when operationID is configured in OAS with valid responses",
+				func(t *testing.T) {
+					oasDef := getOASDef(true, true)
+
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						MockResponse: &trueVal,
+					}
+
+					expectedOperations := getExpectedOperations(true, true, middlewareMockResponse)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+					assert.NoError(t, err)
+					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+				})
+
+			t.Run("enable oasMockResponse for all paths when operationID is not configured in OAS with valid responses",
+				func(t *testing.T) {
+					oasDef := getOASDef(false, true)
+
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						MockResponse: &trueVal,
+					}
+
+					expectedOperations := getExpectedOperations(true, false, middlewareMockResponse)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+					assert.NoError(t, err)
+					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+				})
+
+			t.Run("disable oasMockResponse for all paths when operationID is configured in OAS with valid responses",
+				func(t *testing.T) {
+					oasDef := getOASDef(true, true)
+
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						MockResponse: &falseVal,
+					}
+
+					expectedOperations := getExpectedOperations(false, true, middlewareMockResponse)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+					assert.NoError(t, err)
+					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+				})
+
+			t.Run("disable oasMockResponse for all paths when operationID is not configured in OAS with valid responses",
+				func(t *testing.T) {
+					oasDef := getOASDef(false, true)
+
+					tykExtensionConfigParams := TykExtensionConfigParams{
+						MockResponse: &falseVal,
+					}
+
+					expectedOperations := getExpectedOperations(false, false, middlewareMockResponse)
+					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+					assert.NoError(t, err)
+					assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+				})
+
+			t.Run("do not configure oasMockResponse when parameter is not provided (nil)", func(t *testing.T) {
+				oasDef := getOASDef(false, true)
+
+				tykExt := XTykAPIGateway{
+					Server: Server{
+						ListenPath: ListenPath{
+							Value: "/",
+						},
+					},
+					Upstream: Upstream{
+						URL: "https://example-org.com/api",
+					},
+					Info: Info{
+						Name: "OAS API",
+						State: State{
+							Active: true,
+						},
+					},
+					Middleware: &Middleware{
+						Operations: Operations{
+							tykGetOperationID: {
+								MockResponse: &MockResponse{
+									Enabled: false,
+								},
+							},
+							tykPostOperationID: {
+								MockResponse: &MockResponse{
+									Enabled: true,
+								},
+							},
+						},
+					},
+				}
+
+				oasDef.SetTykExtension(&tykExt)
+
+				var expectedOperations = make(Operations)
+				for k, v := range tykExt.Middleware.Operations {
+					expectedOperations[k] = v
+				}
+
+				tykExtensionConfigParams := TykExtensionConfigParams{
+					MockResponse: nil,
+				}
+
+				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+				assert.NoError(t, err)
+				assert.EqualValues(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+			})
+		})
+
+		t.Run("enable all middlewares together - allowList, validateRequest, mockResponse", func(t *testing.T) {
+			oasDef := getOASDef(false, true)
+			fillReqBody(&oasDef, "/pets", http.MethodPost)
+			expectedOperations := getExpectedOperations(true, false, middlewareAllowList,
+				middlewareValidateRequest, middlewareMockResponse)
+
+			tykExtensionConfigParams := TykExtensionConfigParams{
+				AllowList:       &trueVal,
+				ValidateRequest: &trueVal,
+				MockResponse:    &trueVal,
+			}
+
+			err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+			assert.NoError(t, err)
+			assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
 		})
 	})
 
@@ -1028,6 +1266,7 @@ func TestGetTykExtensionConfigParams(t *testing.T) {
 		queryParams.Set("validateRequest", "true")
 		queryParams.Set("authentication", "true")
 		queryParams.Set("allowList", "false")
+		queryParams.Set("mockResponse", "true")
 
 		endpoint.RawQuery = queryParams.Encode()
 		r, err := http.NewRequest(http.MethodPatch, endpoint.String(), nil)
@@ -1042,6 +1281,7 @@ func TestGetTykExtensionConfigParams(t *testing.T) {
 			Authentication:  &trueVal,
 			AllowList:       &falseVal,
 			ValidateRequest: &trueVal,
+			MockResponse:    &trueVal,
 		}
 
 		assert.Equal(t, &expectedConfigParams, tykExtConfigParams)

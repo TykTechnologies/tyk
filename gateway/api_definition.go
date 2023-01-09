@@ -677,7 +677,9 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 	f, err := os.Open(filePath)
 	defer func() {
 		err = f.Close()
-		log.Error("error while closing file ", filePath)
+		if err != nil {
+			log.WithError(err).Error("error while closing file ", filePath)
+		}
 	}()
 
 	if err != nil {

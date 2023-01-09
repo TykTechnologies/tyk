@@ -1,10 +1,8 @@
 package gateway
 
 import (
-	"errors"
 	"net"
 	"net/url"
-	"os"
 	"strconv"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -113,14 +111,6 @@ func greaterThanInt(first, second int) bool {
 	}
 
 	return first > second
-}
-
-func FileExist(filepath string) bool {
-	if _, err := os.Stat(filepath); errors.Is(err, os.ErrNotExist) {
-		log.Warningf("plugin file %v doesn't exist", filepath)
-		return false
-	}
-	return true
 }
 
 func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {

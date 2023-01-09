@@ -58,8 +58,9 @@ github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed h1:/h52kySW0
 github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed/go.mod h1:OUrgdjjCoYX2GZY9Vathb4ExCO9WuPtU1piuOpNw19Q=
 github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible h1:UgJdsV/fBL5Ctx43EGKFxkX0W3MqqeRruadDQ1Kzhn4=
 github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible/go.mod h1:f2+J36wN08/zLudMnO+QaqaBhTdQuIqemtaeEQbhMEM=
-github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1 h1:LimXJxKH+ovz0NrcU3Ue/cYhzN4xu5sJsID0RwjSd1k=
 github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1/go.mod h1:dLW6S3KuurRuyluxy33i57uYuTB1s/u+L8mCT0fqb98=
+github.com/TykTechnologies/drl v0.0.0-20221208085827-9bc9b4338f26 h1:1vrig7Ce10JAi5oosaHcQaiH6KdxlnbB9yG/0fBrMiA=
+github.com/TykTechnologies/drl v0.0.0-20221208085827-9bc9b4338f26/go.mod h1:F3Ff6Ih4t1i/etqNJHI2K3jverRhNl759J/ra95/3Hk=
 github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481 h1:fPcSnu5/IBgyqf73GHA99QuwMDbfWH+L4BEX9EZ5kUo=
 github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481/go.mod h1:CtF8OunV123VfKa8Z9kKcIPHgcd67hSAwFMLlS7FvS4=
 github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990 h1:CJRTgg13M3vJG9S7k7kpnvDRMGMywm5OsN6eUE8VwJE=
@@ -71,8 +72,8 @@ github.com/TykTechnologies/gorpc v0.0.0-20190515174534-b9c10befc5f4/go.mod h1:vq
 github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708 h1:cmXjlMzcexhc/Cg+QB/c2CPUVs1ux9xn6162qaf/LC4=
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20221207092329-acdd20d63048 h1:p1otsVyn6x69u7hstadFoqqzf0E0V6DJBcd5hsAedoE=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20221207092329-acdd20d63048/go.mod h1:rs6RZamoJmz5oL5nOyQdzCdo87BzJyrSrug3r3ZHrFc=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230102111920-7ea949545272 h1:0q25dD2GQEAIzU8Kr5wGZazqTyGPwfI8R4SxWMP1+uw=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230102111920-7ea949545272/go.mod h1:rs6RZamoJmz5oL5nOyQdzCdo87BzJyrSrug3r3ZHrFc=
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c h1:j6fd0Fz1R4oSWOmcooGjrdahqrML+btQ+PfEJw8SzbA=
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c/go.mod h1:GnHUbsQx+ysI10osPhUdTmsxcE7ef64cVp38Fdyd7e0=
 github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465 h1:A2gBjoX8aF0G3GHEpHyj2f0ixuPkCgcGqmPdKHSkW+0=
