@@ -382,6 +382,92 @@ paths:
               example:
                 status: "error"
                 message: "Malformed API data"
+<<<<<<< HEAD
+=======
+  /tyk/apis/oas:
+    get:
+      description: |-
+         List all OAS format APIs, when used without the Tyk Dashboard.
+      tags:
+        - OAS APIs
+      operationId: listApisOAS
+      parameters:
+        - description: |- 
+            Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. 
+            When mode=public, OAS spec excluding Tyk extension will be returned in the response
+          name: mode
+          in: query
+          schema:
+            type: string
+          example: public
+      responses:
+        '200':
+          description: List of API definitions in OAS format
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OASSchemaResponse'
+    post:
+      description: |-
+        Create API with OAS format
+         A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.
+      tags:
+        - OAS APIs
+      operationId: createApiOAS
+      parameters:
+        - name: base_api_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The base API which the new version will be linked to.
+        - name: base_api_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name.
+        - name: new_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the created version.
+        - name: set_default
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: If true, the new version is set as default version.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
+      responses:
+        '200':
+          description: API created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiModifyKeySuccess"
+              example:
+                status: "ok"
+                action: "created"
+                key: "{...API JSON definition...}"
+        '400':
+          description: Malformed data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiStatusMessage"
+              example:
+                status: "error"
+                message: "Malformed API data"
+
+>>>>>>> 02e4322d... [TT-7526] Fix typo in swagger (#4552)
   '/tyk/apis/{apiID}':
     parameters:
       - description: The API ID
@@ -502,8 +588,16 @@ paths:
                 status: ok
   '/tyk/reload/':
     get:
+<<<<<<< HEAD
       summary: Hot-reload a single node
       description: Tyk is capable of reloading configurations without having to stop serving requests, this means that API configurations can be added at runtime, or even modified at runtime and those rules applied immediately without any downtime.
+=======
+      description: |-
+        Get API definition in OAS format
+        Only if used without the Tyk Dashboard
+      tags:
+        - OAS APIs
+>>>>>>> 02e4322d... [TT-7526] Fix typo in swagger (#4552)
       parameters:
       - description: Block a response, until the reload is performed. This can be useful in scripting environments like CI/CD workflows.
         name: block
@@ -513,8 +607,18 @@ paths:
           type: boolean
           enum: [true]
       tags:
+<<<<<<< HEAD
         - Hot Reload
       operationId: hotReload
+=======
+        - OAS APIs
+      operationId: updateApiOAS
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
+>>>>>>> 02e4322d... [TT-7526] Fix typo in swagger (#4552)
       responses:
         '200':
           description: Reload gateway
@@ -529,8 +633,26 @@ paths:
       summary: Hot-reload a Tyk group
       description: To reload a whole group of Tyk nodes (without using the Dashboard or host manager), you can send an API request to a single node, this node will then send a notification through the pub/sub infrastructure to all other listening nodes (including the host manager if it is being used to manage NginX) which will then trigger a global reload.
       tags:
+<<<<<<< HEAD
         - Hot Reload
       operationId: hotReloadGroup
+=======
+        - OAS APIs
+      operationId: patchApiOAS
+      parameters:
+        - $ref: '#/components/parameters/UpstreamURL'
+        - $ref: '#/components/parameters/ListenPath'
+        - $ref: '#/components/parameters/CustomDomain'
+        - $ref: '#/components/parameters/ValidateRequest'
+        - $ref: '#/components/parameters/AllowList'
+        - $ref: '#/components/parameters/MockResponse'
+        - $ref: '#/components/parameters/Authentication'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
+>>>>>>> 02e4322d... [TT-7526] Fix typo in swagger (#4552)
       responses:
         '200':
           description: Reload gateway
@@ -548,12 +670,260 @@ paths:
 
           Returns 200 response in case of success
       tags:
+<<<<<<< HEAD
+        - Health Checking
+      operationId: hello
+=======
+        - OAS APIs
+      operationId: deleteOASApi
+>>>>>>> 02e4322d... [TT-7526] Fix typo in swagger (#4552)
+      responses:
+        '200':
+          description: Success
+          content:
+<<<<<<< HEAD
+=======
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: API deleted
+                status: ok
+        '400':
+          description: No API ID specified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: API ID not specified
+                status: error
+
+  /tyk/apis/oas/{apiID}/versions:
+    parameters:
+      - description: The API ID
+        name: apiID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      description: |-
+        Listing versions of an OAS API
+      tags:
+        - OASAPIs
+      operationId: listOASApiVersions
+      parameters:
+        - $ref: '#/components/parameters/SearchText'
+        - $ref: '#/components/parameters/AccessType'
+      responses:
+        '200':
+          description: API version metas
+          content:
+            application/json:
+              schema:
+                properties:
+                  apis:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/APIVersionMeta'
+
+
+  '/tyk/apis/oas/{apiID}/export':
+    parameters:
+      - description: The API ID
+        name: apiID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      description: |-
+        Download all OAS format APIs, when used without the Tyk Dashboard.
+      tags:
+        - OAS APIs
+      operationId: downloadApiOASPublic
+      parameters:
+        - description: |-
+            Mode of OAS export, by default mode could be empty which means to export OAS spec including OAS Tyk extension. 
+            When mode=public, OAS spec excluding Tyk extension is exported
+          name: mode
+          in: query
+          schema:
+            type: string
+          example: public
+      responses:
+        '200':
+          description: API definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OASSchemaResponse"
+  /tyk/apis/oas/export:
+    get:
+      description: |-
+        Download all OAS format APIs, when used without the Tyk Dashboard.
+      tags:
+        - OAS APIs
+      operationId: downloadApisOASPublic
+      parameters:
+        - description: |-
+            The mode of OAS export. By default the mode is not set which means the OAS spec is exported including the OAS Tyk extension.  
+            If the mode is set to public, the OAS spec excluding the Tyk extension is exported.
+          name: mode
+          in: query
+          schema:
+            type: string
+          example: public
+      responses:
+        '200':
+          description: API definition
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OASSchemaResponse'
+  /tyk/apis/oas/import:
+    post:
+      description: |-
+        Create a new OAS format API, without x-tyk-gateway.
+        For use with an existing OAS API that you want to expose via your Tyk Gateway. (New)
+      tags:
+        - OAS APIs
+      operationId: importOAS
+      parameters:
+        - $ref: '#/components/parameters/UpstreamURL'
+        - $ref: '#/components/parameters/ListenPath'
+        - $ref: '#/components/parameters/CustomDomain'
+        - $ref: '#/components/parameters/ApiID'
+        - $ref: '#/components/parameters/AllowList'
+        - $ref: '#/components/parameters/MockResponse'
+        - $ref: '#/components/parameters/ValidateRequest'
+        - $ref: '#/components/parameters/Authentication'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
+      responses:
+        '200':
+          description: API definition created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiModifyKeySuccess"
+              example:
+                status: "ok"
+                action: "added"
+                key: "{created APIID}"
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiStatusMessage"
+              examples:
+                malformedBody:
+                  summary: When the request body is malformed
+                  value:
+                    message: "Request malformed"
+                    status: "error"
+                invalidUpstreamURL:
+                  summary: When the client sends a query param upstreamURL which isn't valid
+                  value:
+                    message: "invalid upstream URL"
+                    status: "error"
+        500:
+         description: When an import request is sent using your Tyk Dashboard app configs
+         content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/apiStatusMessage"
+              example:
+                summary: Tyk Dashboard app configs are being used for Tyk API definitions
+                value:
+                  message: "Due to enabled use_db_app_configs, please use the Dashboard API"
+                  status: "error"
+  '/tyk/cache/{apiID}':
+    parameters:
+      - description: The API ID
+        name: apiID
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      summary: Invalidate cache
+      description: Invalidate cache for the given API
+      tags:
+        - Cache Invalidation
+      operationId: invalidateCache
+      responses:
+        '200':
+          description: Invalidate cache
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                message: cache invalidated
+                status: ok
+  '/tyk/reload/':
+    get:
+      summary: Hot-reload a single node
+      description: Tyk is capable of reloading configurations without having to stop serving requests. This means that API configurations can be added at runtime, or even modified at runtime and those rules applied immediately without any downtime.
+      parameters:
+        - description: Block a response until the reload is performed. This can be useful in scripting environments like CI/CD workflows.
+          name: block
+          in: query
+          required: false
+          schema:
+            type: boolean
+            enum: [true]
+      tags:
+        - Hot Reload
+      operationId: hotReload
+      responses:
+        '200':
+          description: Reload gateway
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                status: ok
+  '/tyk/reload/group':
+    get:
+      summary: Hot-reload a Tyk group
+      description: To reload a whole group of Tyk nodes (without using the Dashboard or host manager). You can send an API request to a single node, this node will then send a notification through the pub/sub infrastructure to all other listening nodes (including the host manager if it is being used to manage NginX) which will then trigger a global reload.
+      tags:
+        - Hot Reload
+      operationId: hotReloadGroup
+      responses:
+        '200':
+          description: Reload the Tyk Gateway
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+              example:
+                status: ok
+  '/tyk/hello':
+    get:
+      summary: Check the Health of the Tyk Gateway
+      description: |
+        From v2.7.5 you can now rename the `/hello`  endpoint by using the `health_check_endpoint_name` option
+        
+        Returns 200 response in case of success
+      tags:
         - Health Checking
       operationId: hello
       responses:
         '200':
           description: Success
           content:
+>>>>>>> 02e4322d... [TT-7526] Fix typo in swagger (#4552)
             text/html:
               schema:
                 type: string
