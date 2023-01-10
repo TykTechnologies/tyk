@@ -52,10 +52,7 @@ func init() {
 	formatter.FullTimestamp = true
 
 	log.Formatter = formatter
-	rawLog.Formatter = new(RawFormatter)
-}
 
-func Get() *logrus.Logger {
 	switch strings.ToLower(os.Getenv("TYK_LOGLEVEL")) {
 	case "error":
 		log.Level = logrus.ErrorLevel
@@ -66,6 +63,11 @@ func Get() *logrus.Logger {
 	default:
 		log.Level = logrus.InfoLevel
 	}
+
+	rawLog.Formatter = new(RawFormatter)
+}
+
+func Get() *logrus.Logger {
 	return log
 }
 
