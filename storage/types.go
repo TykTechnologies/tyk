@@ -15,11 +15,11 @@ type Controller interface {
 	Disable(setRedisDown bool)
 	WaitConnect(ctx context.Context) bool
 
-	ControllerDeprecated
+	controllerDeprecated
 }
 
-// ControllerDeprecated are old API endpoints for backwards compatibility
-type ControllerDeprecated interface {
+// controllerDeprecated are old API endpoints for backwards compatibility
+type controllerDeprecated interface {
 	// ConnectToRedis is deprecated in favor of Connect;
 	ConnectToRedis(ctx context.Context, onReconnect func(), conf *config.Config)
 	// DisableRedis is deprecated in favor of Disable;
