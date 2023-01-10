@@ -339,7 +339,7 @@ paths:
       description: |-
          List all OAS format APIs, when used without the Tyk Dashboard.
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: listApisOAS
       parameters:
         - description: |- 
@@ -364,7 +364,7 @@ paths:
         Create API with OAS format
          A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: createApiOAS
       parameters:
         - name: base_api_id
@@ -530,7 +530,7 @@ paths:
         Get API definition in OAS format
         Only if used without the Tyk Dashboard
       tags:
-        - OASAPIs
+        - OAS APIs
       parameters:
         - description: |-
             Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. 
@@ -560,7 +560,7 @@ paths:
 
         Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: updateApiOAS
       requestBody:
         content:
@@ -593,7 +593,7 @@ paths:
         Update API with OAS format. You can use this endpoint to update OAS part of the tyk API definition.
         This endpoint allows you to configure tyk OAS extension based on query params provided(similar to import)
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: patchApiOAS
       parameters:
         - $ref: '#/components/parameters/UpstreamURL'
@@ -660,7 +660,7 @@ paths:
       description: |-
         Deleting an API definition will remove the file from the file store, the API definition will NOT be unloaded, a separate reload request will need to be made to disable the API endpoint.
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: deleteOASApi
       responses:
         '200':
@@ -694,7 +694,7 @@ paths:
       description: |-
         Download all OAS format APIs, when used without the Tyk Dashboard.
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: downloadApiOASPublic
       parameters:
         - description: |-
@@ -717,7 +717,7 @@ paths:
       description: |-
         Download all OAS format APIs, when used without the Tyk Dashboard.
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: downloadApisOASPublic
       parameters:
         - description: |-
@@ -743,7 +743,7 @@ paths:
         Create a new OAS format API, without x-tyk-gateway.
         For use with an existing OAS API that you want to expose via your Tyk Gateway. (New)
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: importOAS
       parameters:
         - $ref: '#/components/parameters/UpstreamURL'
