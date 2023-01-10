@@ -15,6 +15,11 @@ func Flaky(t *testing.T, fake ...func() (bool, func(...interface{}))) {
 	skipCI(t, "Skipping flaky test", fake...)
 }
 
+// Racy skips a racy test in a CI environment
+func Racy(t *testing.T, fake ...func() (bool, func(...interface{}))) {
+	skipCI(t, "Skipping Racy test", fake...)
+}
+
 func skipCI(t *testing.T, message string, fake ...func() (bool, func(...interface{}))) {
 	var (
 		ci   = CI()
