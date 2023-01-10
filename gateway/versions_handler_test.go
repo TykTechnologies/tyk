@@ -276,7 +276,7 @@ func TestHandleListAPIVersions(t *testing.T) {
 			})
 		})
 
-		t.Run("always keep base API as the first element regardless of version name sort in deafult list", func(t *testing.T) {
+		t.Run("always keep base API as the first element regardless of version name sort in default list", func(t *testing.T) {
 			// start base version with x to verify sort isn't changing position of base API in versions list
 			newBaseAPI := BuildOASAPI(baseAPIFunc("x-base-api-version"))[0]
 			ts.Gw.LoadAPI(newBaseAPI, v1, v2)
