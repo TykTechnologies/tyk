@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"errors"
 	"net/http"
 	"sort"
 	"strings"
@@ -9,6 +10,24 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
+
+var (
+	errVersionsNotFound = errors.New("no versions found for API")
+)
+
+type VersionMetas struct {
+	Status string        `json:"status"`
+	Metas  []VersionMeta `json:"apis"`
+}
+
+type VersionMeta struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	VersionName      string `json:"versionName"`
+	Internal         bool   `json:"internal"`
+	ExpirationDate   string `json:"expirationDate"`
+	IsDefaultVersion bool   `json:"isDefaultVersion"`
+}
 
 type VersionsHandler struct {
 	getApiDef func(string) (*apidef.APIDefinition, error)
@@ -43,6 +62,11 @@ func (h *VersionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	baseAPI, err := h.getApiDef(apiID)
 	if err != nil {
 		doJSONWrite(w, http.StatusNotFound, apiError(err.Error()))
+		return
+	}
+
+	if len(baseAPI.VersionDefinition.Versions) == 0 {
+		doJSONWrite(w, http.StatusNotFound, apiError(errVersionsNotFound.Error()))
 		return
 	}
 

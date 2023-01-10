@@ -111,20 +111,6 @@ type paginatedOAuthClientTokens struct {
 	Tokens     []OAuthClientToken
 }
 
-type VersionMetas struct {
-	Status string        `json:"status"`
-	Metas  []VersionMeta `json:"apis"`
-}
-
-type VersionMeta struct {
-	ID               string `json:"id"`
-	Name             string `json:"name"`
-	VersionName      string `json:"versionName"`
-	Internal         bool   `json:"internal"`
-	ExpirationDate   string `json:"expirationDate"`
-	IsDefaultVersion bool   `json:"isDefaultVersion"`
-}
-
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(code)

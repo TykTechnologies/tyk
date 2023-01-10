@@ -149,6 +149,27 @@ func TestHandleListAPIVersions(t *testing.T) {
 					return true
 				}})
 		})
+
+		t.Run("should error when versions doesn't exist", func(t *testing.T) {
+			api := BuildAPI(func(spec *APISpec) {
+				spec.APIID = "api"
+				spec.Name = "no-versions"
+			})[0]
+			ts.Gw.LoadAPI(api)
+
+			path := fmt.Sprintf("/tyk/apis/%s/versions", api.APIID)
+			_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: path,
+				BodyMatchFunc: func(resp []byte) bool {
+					var apiErr apiStatusMessage
+					err := json.Unmarshal(resp, &apiErr)
+					assert.NoError(t, err)
+
+					assert.Equal(t, errVersionsNotFound.Error(), apiErr.Message)
+					assert.Equal(t, "error", apiErr.Status)
+
+					return true
+				}})
+		})
 	})
 
 	t.Run("oas definition", func(t *testing.T) {
@@ -290,6 +311,29 @@ func TestHandleListAPIVersions(t *testing.T) {
 					assert.True(t, metas.Metas[1].Internal)
 					assert.False(t, metas.Metas[1].IsDefaultVersion)
 					assert.Equal(t, v1VersionName, metas.Metas[1].VersionName)
+					return true
+				}})
+		})
+
+		t.Run("should error when versions doesn't exist", func(t *testing.T) {
+			api := BuildOASAPI(func(oasDef *oas.OAS) {
+				tykExt := oasDef.GetTykExtension()
+				tykExt.Info.ID = "api"
+				tykExt.Info.Name = "no-versions"
+				tykExt.Server.ListenPath.Value = "/default"
+			})[0]
+			ts.Gw.LoadAPI(api)
+
+			path := fmt.Sprintf("/tyk/apis/%s/versions", api.APIID)
+			_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: path,
+				BodyMatchFunc: func(resp []byte) bool {
+					var apiErr apiStatusMessage
+					err := json.Unmarshal(resp, &apiErr)
+					assert.NoError(t, err)
+
+					assert.Equal(t, errVersionsNotFound.Error(), apiErr.Message)
+					assert.Equal(t, "error", apiErr.Status)
+
 					return true
 				}})
 		})
