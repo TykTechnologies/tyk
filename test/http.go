@@ -29,6 +29,7 @@ type TestCase struct {
 	Headers         map[string]string `json:",omitempty"`
 	PathParams      map[string]string `json:",omitempty"`
 	FormParams      map[string]string `json:",omitempty"`
+	QueryParams     map[string]string `json:",omitempty"`
 	Cookies         []*http.Cookie    `json:",omitempty"`
 	Delay           time.Duration     `json:",omitempty"`
 	BodyMatch       string            `json:",omitempty"` // regex
@@ -170,6 +171,14 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 	}
 	req.PostForm = formParams
 	req.Form = formParams
+
+	if tc.QueryParams != nil {
+		queryParams := req.URL.Query()
+		for k, v := range tc.QueryParams {
+			queryParams.Add(k, v)
+		}
+		req.URL.RawQuery = queryParams.Encode()
+	}
 
 	return req, nil
 }
