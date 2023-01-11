@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -295,6 +296,65 @@ func TestPullBundle(t *testing.T) {
 			didErr := err != nil
 			assert.Equal(t, tc.expectedAttempts, attempts)
 			assert.Equal(t, tc.shouldErr, didErr)
+		})
+	}
+}
+
+func TestBundle_Verify(t *testing.T) {
+
+	tests := []struct {
+		name    string
+		bundle  Bundle
+		wantErr bool
+	}{
+		{
+			name: "bundle with invalid public key path",
+			bundle: Bundle{
+				Name: "test",
+				Data: []byte("test"),
+				Path: "/test/test.zip",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Signature: "test-signature",
+				},
+				Gw: &Gateway{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "bundle without signature",
+			bundle: Bundle{
+				Name: "test",
+				Data: []byte("test"),
+				Path: "/test/test.zip",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Signature: "",
+				},
+				Gw: &Gateway{},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := tt.bundle
+
+			globalConf := config.Config{}
+			globalConf.PublicKeyPath = "test"
+			b.Gw.SetConfig(globalConf)
+
+			if err := b.Verify(); (err != nil) != tt.wantErr {
+				t.Errorf("Bundle.Verify() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }
