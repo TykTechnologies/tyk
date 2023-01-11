@@ -176,3 +176,11 @@ jobs:
         CLIENT_ID: ${{secrets.XRAY_CLIENT_ID}}
         CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
         BRANCH: ${{ github.ref }}
+
+    - name: Getting dash logs on failure
+      if: ${{ failure() }}
+      run: docker logs tyk-dashboard   
+
+    - name: Getting GW logs on failure
+      if: ${{ failure() }}
+      run: docker logs yk-gateway  
