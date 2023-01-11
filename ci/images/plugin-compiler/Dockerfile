@@ -1,6 +1,7 @@
 # Go version here should match https://github.com/TykTechnologies/golang-cross/blob/master/.github/workflows/release.yml#L16
+ARG GOLANG_CROSS
 
-FROM golang:1.12-stretch
+FROM tykio/golang-cross:${GOLANG_CROSS}
 LABEL description="Image for plugin development"
 
 ARG TYK_GW_TAG
@@ -18,7 +19,7 @@ RUN apt-get update && apt-get install ca-certificates libgnutls30 -y
 
 RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
-COPY images/plugin-compiler/data/build.sh /build.sh
+COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
 COPY . $TYK_GW_PATH

@@ -1,0 +1,13 @@
+version: "3"
+services:
+  redis:
+    image: redis
+
+  gw:
+    image: tykio/tyk-gateway:${tag}
+    volumes:
+      - ./data/api.json:/opt/tyk-gateway/apps/api.json
+    ports:
+      - "0.0.0.0:8080:8080"
+    environment:
+      - TYK_LOGLEVEL=debug
