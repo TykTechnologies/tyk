@@ -52,6 +52,9 @@ done
 
 go mod edit -replace github.com/TykTechnologies/tyk=$TYK_GW_PATH
 
+# Run a final go mod tidy to make sure that the go.sum entries are correct for
+# all replaced dependencies.
+go mod tidy
 
 # set appropriate X-build gcc binary for arm64.
 if [[ $GOARCH == "arm64" ]] && [[ $GOOS == "linux" ]] ; then
