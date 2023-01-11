@@ -590,10 +590,17 @@ type APIDefinition struct {
 	// CertificatePinningDisabled disables public key pinning
 	CertificatePinningDisabled bool `bson:"certificate_pinning_disabled" json:"certificate_pinning_disabled,omitempty"`
 
-	EnableJWT                            bool                   `bson:"enable_jwt" json:"enable_jwt"`
-	UseStandardAuth                      bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
-	UseGoPluginAuth                      bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`
-	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
+	EnableJWT           bool `bson:"enable_jwt" json:"enable_jwt"`
+	UseStandardAuth     bool `bson:"use_standard_auth" json:"use_standard_auth"`
+	UseGoPluginAuth     bool `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`
+	EnableCoProcessAuth bool `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
+
+	EnableOAuth2Introspection   bool   `bson:"enable_oauth2_introspection" json:"enable_oauth2_introspection"`
+	OAuth2IntrospectionEndpoint string `bson:"oauth2_introspection_endpoint" json:"oauth2_introspection_endpoint"`
+	OAuth2IntrospectionAuth     string `bson:"oauth2_introspection_auth" json:"oauth2_introspection_auth"`
+
+	OAuth2IntrospectionDeleteClaims []string `json:"oauth2_introspection_delete_claims" json:"oauth2_introspection_delete_claims"`
+
 	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
 	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
 	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
