@@ -46,21 +46,7 @@ func (h *VersionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var (
-		versionMetas VersionMetas
-		baseAPIMeta  VersionMeta
-	)
-
-	if canInclude(baseAPI, baseAPI.VersionDefinition.Name) {
-		baseAPIMeta = VersionMeta{
-			ID:               baseAPI.APIID,
-			Name:             baseAPI.Name,
-			VersionName:      baseAPI.VersionDefinition.Name,
-			Internal:         baseAPI.Internal,
-			ExpirationDate:   baseAPI.Expiration,
-			IsDefaultVersion: baseAPI.VersionDefinition.Default == baseAPI.VersionDefinition.Name,
-		}
-	}
+	var versionMetas VersionMetas
 
 	for name, id := range baseAPI.VersionDefinition.Versions {
 		currentAPI, err := h.getApiDef(id)
@@ -88,8 +74,15 @@ func (h *VersionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return versionMetas.Metas[i].VersionName < versionMetas.Metas[j].VersionName
 	})
 
-	if baseAPIMeta.ID != "" {
-		versionMetas.Metas = append([]VersionMeta{baseAPIMeta}, versionMetas.Metas...)
+	if canInclude(baseAPI, baseAPI.VersionDefinition.Name) {
+		versionMetas.Metas = append([]VersionMeta{{
+			ID:               baseAPI.APIID,
+			Name:             baseAPI.Name,
+			VersionName:      baseAPI.VersionDefinition.Name,
+			Internal:         baseAPI.Internal,
+			ExpirationDate:   baseAPI.Expiration,
+			IsDefaultVersion: baseAPI.VersionDefinition.Default == baseAPI.VersionDefinition.Name,
+		}}, versionMetas.Metas...)
 	}
 
 	versionMetas.Status = "success"
