@@ -65,6 +65,11 @@ func (h *VersionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(baseAPI.VersionDefinition.Versions) == 0 {
+		doJSONWrite(w, http.StatusNotFound, apiError(errVersionsNotFound.Error()))
+		return
+	}
+
 	var versionMetas VersionMetas
 
 	for name, id := range baseAPI.VersionDefinition.Versions {
