@@ -246,7 +246,6 @@ func (ss SecuritySchemes) GetBaseIdentityProvider() (res apidef.AuthTypeEnum) {
 		}
 	}
 
-	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 	return
 }
 
