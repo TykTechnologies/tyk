@@ -68,13 +68,13 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 func TestBaseMiddleware_getAuthType(t *testing.T) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	spec.AuthConfigs = map[string]apidef.AuthConfig{
-		"authToken": {AuthHeaderName: "h1"},
-		"basic":     {AuthHeaderName: "h2"},
-		"coprocess": {AuthHeaderName: "h3"},
-		"hmac":      {AuthHeaderName: "h4"},
-		"jwt":       {AuthHeaderName: "h5"},
-		"oauth":     {AuthHeaderName: "h6"},
-		"oidc":      {AuthHeaderName: "h7"},
+		apidef.AuthTokenType: {AuthHeaderName: "h1"},
+		apidef.BasicType:     {AuthHeaderName: "h2"},
+		apidef.CoprocessType: {AuthHeaderName: "h3"},
+		apidef.HMACType:      {AuthHeaderName: "h4"},
+		apidef.JWTType:       {AuthHeaderName: "h5"},
+		apidef.OAuthType:     {AuthHeaderName: "h6"},
+		apidef.OIDCType:      {AuthHeaderName: "h7"},
 	}
 
 	ts := StartTest(nil)
@@ -127,7 +127,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 	t.Run("should get token from cookie", func(t *testing.T) {
 		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			"authToken": {CookieName: "c1", UseCookie: true},
+			apidef.AuthTokenType: {CookieName: "c1", UseCookie: true},
 		}
 
 		ts := StartTest(nil)
@@ -155,7 +155,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 	t.Run("should not get token from cookie when use cookie is false", func(t *testing.T) {
 		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			"authToken": {CookieName: "c1", UseCookie: false},
+			apidef.AuthTokenType: {CookieName: "c1", UseCookie: false},
 		}
 
 		ts := StartTest(nil)
@@ -183,7 +183,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 	t.Run("should get token from header", func(t *testing.T) {
 		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			"authToken": {AuthHeaderName: "h1"},
+			apidef.AuthTokenType: {AuthHeaderName: "h1"},
 		}
 
 		ts := StartTest(nil)
@@ -208,7 +208,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 	t.Run("should get token from query", func(t *testing.T) {
 		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			"authToken": {ParamName: "q1", UseParam: true},
+			apidef.AuthTokenType: {ParamName: "q1", UseParam: true},
 		}
 
 		ts := StartTest(nil)
@@ -233,7 +233,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 	t.Run("should get token from query when use param is disabled", func(t *testing.T) {
 		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			"authToken": {ParamName: "q1", UseParam: false},
+			apidef.AuthTokenType: {ParamName: "q1", UseParam: false},
 		}
 
 		ts := StartTest(nil)

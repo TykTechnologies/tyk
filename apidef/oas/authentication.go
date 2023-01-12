@@ -463,7 +463,7 @@ type HMAC struct {
 func (h *HMAC) Fill(api apidef.APIDefinition) {
 	h.Enabled = api.EnableSignatureChecking
 
-	h.AuthSources.Fill(api.AuthConfigs["hmac"])
+	h.AuthSources.Fill(api.AuthConfigs[apidef.HMACType])
 
 	h.AllowedAlgorithms = api.HmacAllowedAlgorithms
 	h.AllowedClockSkew = api.HmacAllowedClockSkew
@@ -480,7 +480,7 @@ func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	api.AuthConfigs["hmac"] = authConfig
+	api.AuthConfigs[apidef.HMACType] = authConfig
 
 	api.HmacAllowedAlgorithms = h.AllowedAlgorithms
 	api.HmacAllowedClockSkew = h.AllowedClockSkew
@@ -514,7 +514,7 @@ type OIDC struct {
 func (o *OIDC) Fill(api apidef.APIDefinition) {
 	o.Enabled = api.UseOpenID
 
-	o.AuthSources.Fill(api.AuthConfigs["oidc"])
+	o.AuthSources.Fill(api.AuthConfigs[apidef.OIDCType])
 
 	o.SegregateByClientId = api.OpenIDOptions.SegregateByClient
 
@@ -561,7 +561,7 @@ func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	api.AuthConfigs["oidc"] = authConfig
+	api.AuthConfigs[apidef.OIDCType] = authConfig
 
 	api.OpenIDOptions.SegregateByClient = o.SegregateByClientId
 
@@ -630,7 +630,7 @@ type CustomPlugin struct {
 func (c *CustomPlugin) Fill(api apidef.APIDefinition) {
 	c.Enabled = api.EnableCoProcessAuth
 
-	c.AuthSources.Fill(api.AuthConfigs["coprocess"])
+	c.AuthSources.Fill(api.AuthConfigs[apidef.CoprocessType])
 }
 
 // ExtractTo extracts *CustomPlugin to *apidef.APIDefinition.
@@ -644,5 +644,5 @@ func (c *CustomPlugin) ExtractTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	api.AuthConfigs["coprocess"] = authConfig
+	api.AuthConfigs[apidef.CoprocessType] = authConfig
 }

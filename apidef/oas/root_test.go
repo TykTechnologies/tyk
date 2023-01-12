@@ -190,17 +190,17 @@ func FillTestAuthConfigs(t *testing.T, index int) map[string]apidef.AuthConfig {
 
 	a := apidef.AuthConfig{}
 	Fill(t, &a, index)
-	authConfigs["authToken"] = a
+	authConfigs[apidef.AuthTokenType] = a
 
 	a.UseCertificate = false
 	a.Signature = apidef.SignatureConfig{}
 	a.ValidateSignature = false
-	authConfigs["jwt"] = a
-	authConfigs["basic"] = a
-	authConfigs["oauth"] = a
-	authConfigs["hmac"] = a
-	authConfigs["coprocess"] = a
-	authConfigs["oidc"] = a
+	authConfigs[apidef.JWTType] = a
+	authConfigs[apidef.BasicType] = a
+	authConfigs[apidef.OAuthType] = a
+	authConfigs[apidef.HMACType] = a
+	authConfigs[apidef.CoprocessType] = a
+	authConfigs[apidef.OIDCType] = a
 
 	return authConfigs
 }
