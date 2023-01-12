@@ -11,6 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/user"
@@ -435,7 +436,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			ReadSeeker: strings.NewReader(returnObject.Request.ReturnOverrides.ResponseBody),
 		}
 		res.ContentLength = int64(len(returnObject.Request.ReturnOverrides.ResponseBody))
-		m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, int(returnObject.Request.ReturnOverrides.ResponseCode), res)
+		m.successHandler.RecordHit(r, analytics.Latency(analytics.Latency{Total: int64(ms)}), int(returnObject.Request.ReturnOverrides.ResponseCode), res)
 		return nil, mwStatusRespond
 	}
 
@@ -559,6 +560,10 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		return errors.New("Middleware error")
 	}
 
+	// Clear all response headers before populating from coprocess response object:
+	for k := range res.Header {
+		delete(res.Header, k)
+	}
 	// Set headers:
 	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for k, v := range retObject.Response.Headers {

@@ -49,7 +49,7 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 
-	a := APIDefinitionLoader{gw}
+	a := APIDefinitionLoader{Gw: gw}
 	return a.processRPCDefinitions(apiListAsString, gw)
 }
 
@@ -103,7 +103,7 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 		return nil, errors.New("[RPC] --> Failed to get node policy backup (" + checkKey + "): " + err.Error())
 	}
 
-	if policies, err := parsePoliciesFromRPC(listAsString); err != nil {
+	if policies, err := parsePoliciesFromRPC(listAsString, gw.GetConfig().Policies.AllowExplicitPolicyID); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
 		}).Error("Failed decode: ", err)

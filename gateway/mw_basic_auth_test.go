@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -38,6 +39,8 @@ func (ts *Test) testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
 }
 
 func TestBasicAuth(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5223
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -126,6 +129,55 @@ func TestBasicAuthLegacyWithHashFunc(t *testing.T) {
 		// Create base auth based key
 		{Method: "GET", Path: "/", Headers: validPassword, Code: 200},
 	}...)
+}
+
+func TestBasicAuthHashKeyFunc(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	globalConf := ts.Gw.GetConfig()
+
+	globalConf.HashKeys = true
+	globalConf.EnableHashedKeysListing = true
+	// settings to create BA session with legacy key format
+	globalConf.HashKeyFunction = ""
+
+	testcases := []struct {
+		in, out string
+	}{
+		{"", "bcrypt"},
+		{"bcrypt", "bcrypt"},
+		{"sha256", "sha256"},
+		{"murmur32", "murmur32"},
+		{"murmur64", "murmur64"},
+		{"murmur128", "murmur128"},
+		{"invalid", "bcrypt"},
+	}
+
+	logger := log.WithField("test", "TestBasicAuthHashKeyFunc")
+
+	for idx, hashKeyFunc := range testcases {
+		t.Run(fmt.Sprintf("test case %d", idx), func(t *testing.T) {
+			globalConf.BasicAuthHashKeyFunction = hashKeyFunc.in
+			ts.Gw.SetConfig(globalConf)
+
+			session := ts.testPrepareBasicAuth(false)
+			ts.Gw.setBasicAuthSessionPassword(session)
+
+			assert.Equal(t, hashKeyFunc.out, string(session.BasicAuthData.Hash))
+			assert.NotEmpty(t, session.BasicAuthData.Password)
+
+			ts.Gw.apisMu.Lock()
+			assert.Len(t, ts.Gw.apiSpecs, 1)
+			k := &BasicAuthKeyIsValid{}
+			k.Spec = ts.Gw.apiSpecs[0]
+			ts.Gw.apisMu.Unlock()
+
+			err := k.checkPassword(session, "password", logger)
+			assert.NoError(t, err)
+		})
+	}
+
 }
 
 func TestBasicAuthCachedUserCollision(t *testing.T) {

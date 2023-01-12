@@ -2,21 +2,23 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
-var rc RedisController
+var rc *RedisController
 
 func init() {
 	conf := config.Default
 
-	rc = RedisController{ctx: context.Background()}
+	rc = NewRedisController(context.Background())
 	go rc.ConnectToRedis(context.Background(), nil, &conf)
 	for {
 		if rc.Connected() {
@@ -27,10 +29,49 @@ func init() {
 	}
 }
 
+func TestHandleMessage(t *testing.T) {
+	cluster := &RedisCluster{}
+
+	testErr := errors.New("Test error (expected)")
+
+	t.Run("handle message without err", func(t *testing.T) {
+		ok := false
+		err := cluster.handleMessage(nil, nil, func(_ interface{}) {
+			ok = true
+		})
+		assert.NoError(t, err)
+		assert.True(t, ok)
+	})
+
+	t.Run("handle message with err", func(t *testing.T) {
+		got := cluster.handleMessage(nil, testErr, nil)
+		assert.Equal(t, testErr, got)
+	})
+
+	t.Run("handle message with err coalescing", func(t *testing.T) {
+		err := errors.New("Test error (expected): use of closed network connection")
+		want := cluster.handleMessage(nil, err, nil)
+		assert.Equal(t, redis.ErrClosed, want)
+	})
+}
+
+func TestHandleReceive(t *testing.T) {
+	cluster := &RedisCluster{}
+	ctx := context.Background()
+
+	t.Run("handle receive without err", func(t *testing.T) {
+		receiveFn := func(context.Context) (interface{}, error) {
+			return nil, nil
+		}
+		err := cluster.handleReceive(ctx, receiveFn, nil)
+		assert.NoError(t, err)
+	})
+}
+
 func TestRedisClusterGetMultiKey(t *testing.T) {
 
 	keys := []string{"first", "second"}
-	r := RedisCluster{KeyPrefix: "test-cluster", RedisController: &rc}
+	r := RedisCluster{KeyPrefix: "test-cluster", RedisController: rc}
 	for _, v := range keys {
 		r.DeleteKey(v)
 	}
@@ -111,7 +152,7 @@ func TestRedisAddressConfiguration(t *testing.T) {
 }
 
 func TestRedisExpirationTime(t *testing.T) {
-	storage := &RedisCluster{KeyPrefix: "test-", RedisController: &rc}
+	storage := &RedisCluster{KeyPrefix: "test-", RedisController: rc}
 
 	testKey := "test-key"
 	testValue := "test-value"

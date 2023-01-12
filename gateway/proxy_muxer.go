@@ -12,13 +12,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"golang.org/x/net/http2/h2c"
+
+	proxyproto "github.com/pires/go-proxyproto"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/tcp"
-	proxyproto "github.com/pires/go-proxyproto"
-	cache "github.com/pmylund/go-cache"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -172,9 +175,19 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, gw *Gate
 	conf := gw.GetConfig()
 	hostname := spec.GlobalConfig.HostName
 	if spec.GlobalConfig.EnableCustomDomains {
-		hostname = spec.Domain
+		hostname = spec.GetAPIDomain()
 	} else {
 		hostname = ""
+	}
+
+	if spec.ListenPort == spec.GlobalConfig.ListenPort {
+		mainLog.WithFields(logrus.Fields{
+			"prefix":   "gateway",
+			"org_id":   spec.OrgID,
+			"api_id":   spec.APIID,
+			"api_name": spec.Name,
+		}).Error("TCP service can't have the same port as main gateway listen port")
+		return
 	}
 
 	if p := m.getProxy(spec.ListenPort, conf); p != nil {
@@ -219,7 +232,7 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 				if spec.DoNotTrack {
 					continue
 				}
-				record := AnalyticsRecord{
+				record := analytics.AnalyticsRecord{
 					Network:      spec.network.Flush(),
 					Day:          t.Day(),
 					Month:        t.Month(),
@@ -232,7 +245,7 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 					OrgID:        spec.OrgID,
 				}
 				record.SetExpiry(spec.ExpireAnalyticsAfter)
-				gw.analytics.RecordHit(&record)
+				_ = gw.Analytics.RecordHit(&record)
 			}
 			gw.apisMu.RUnlock()
 		}

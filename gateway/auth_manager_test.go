@@ -8,11 +8,9 @@ import (
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	_ "github.com/TykTechnologies/tyk/headers"
-
 	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/test"
@@ -23,13 +21,11 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	assert := func(hashKeys bool) {
+	assert := func(t *testing.T, ts *Test, hashKeys bool) {
+		t.Helper()
 		globalConf := ts.Gw.GetConfig()
 		globalConf.HashKeys = hashKeys
 		ts.Gw.SetConfig(globalConf)
-
-		ts := StartTest(nil)
-		defer ts.Close()
 
 		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
@@ -54,11 +50,11 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 	}
 
 	t.Run("HashKeys=false", func(t *testing.T) {
-		assert(false)
+		assert(t, ts, false)
 	})
 
 	t.Run("HashKeys=true", func(t *testing.T) {
-		assert(true)
+		assert(t, ts, true)
 	})
 }
 
@@ -66,7 +62,8 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	assert := func(hashKeys bool) {
+	assert := func(t *testing.T, ts *Test, hashKeys bool) {
+		t.Helper()
 		globalConf := ts.Gw.GetConfig()
 		globalConf.HashKeys = hashKeys
 		ts.Gw.SetConfig(globalConf)
@@ -112,11 +109,11 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 	}
 
 	t.Run("HashKeys=false", func(t *testing.T) {
-		assert(false)
+		assert(t, ts, false)
 	})
 
 	t.Run("HashKeys=true", func(t *testing.T) {
-		assert(true)
+		assert(t, ts, true)
 	})
 }
 
@@ -160,6 +157,8 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 
 	globalConf := ts.Gw.GetConfig()
 	testChangeHashFunc := func(t *testing.T, authHeader map[string]string, client *http.Client, failCode int) {
+		t.Helper()
+
 		_, _ = ts.Run(t, test.TestCase{Headers: authHeader, Client: client, Code: http.StatusOK})
 
 		globalConf.HashKeyFunction = "sha256"
@@ -190,7 +189,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
 			Data: session, Client: client, Code: http.StatusOK})
 
-		testChangeHashFunc(t, map[string]string{headers.Authorization: customKey}, client, http.StatusForbidden)
+		testChangeHashFunc(t, map[string]string{header.Authorization: customKey}, client, http.StatusForbidden)
 	})
 
 	t.Run("basic auth key", func(t *testing.T) {
@@ -207,8 +206,14 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 			APIID: "test", Versions: []string{"v1"},
 		}}
 
-		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/user",
-			Data: session, Client: client, Code: http.StatusOK})
+		_, _ = ts.Run(t, test.TestCase{
+			AdminAuth: true,
+			Method:    http.MethodPost,
+			Path:      "/tyk/keys/user",
+			Data:      session,
+			Client:    client,
+			Code:      http.StatusOK,
+		})
 
 		authHeader := map[string]string{"Authorization": genAuthHeader("user", "password")}
 

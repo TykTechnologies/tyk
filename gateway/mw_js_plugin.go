@@ -176,6 +176,10 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Run the middleware
 	middlewareClassname := d.MiddlewareClassName
+	if d.Spec.JSVM.VM == nil {
+		logger.WithError(err).Error("JSVM isn't enabled, check your gateway settings")
+		return errors.New("Middleware error"), 500
+	}
 	vm := d.Spec.JSVM.VM.Copy()
 	vm.Interrupt = make(chan func(), 1)
 	logger.Debug("Running: ", middlewareClassname)
@@ -365,6 +369,13 @@ func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 
 	j.Log = logger // use the global logger by default
 	j.RawLog = rawLog
+}
+
+func (j *JSVM) DeInit() {
+	j.Spec = nil
+	j.Log = nil
+	j.RawLog = nil
+	j.Gw = nil
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file

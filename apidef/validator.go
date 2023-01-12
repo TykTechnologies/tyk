@@ -3,6 +3,7 @@ package apidef
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -99,10 +100,20 @@ var ErrAllAuthSourcesDisabled = "all auth sources are disabled for %s, at least 
 type RuleAtLeastEnableOneAuthSource struct{}
 
 func (r *RuleAtLeastEnableOneAuthSource) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
-	for k, authConfig := range apiDef.AuthConfigs {
-		if shouldValidateAuthSource(k, apiDef) && !(authConfig.UseParam || authConfig.UseCookie || !authConfig.DisableHeader) {
+	authConfigs := make([]string, len(apiDef.AuthConfigs))
+	i := 0
+	for name := range apiDef.AuthConfigs {
+		authConfigs[i] = name
+		i++
+	}
+
+	sort.Strings(authConfigs)
+
+	for _, name := range authConfigs {
+		if shouldValidateAuthSource(name, apiDef) &&
+			!(apiDef.AuthConfigs[name].UseParam || apiDef.AuthConfigs[name].UseCookie || !apiDef.AuthConfigs[name].DisableHeader) {
 			validationResult.IsValid = false
-			validationResult.AppendError(fmt.Errorf(ErrAllAuthSourcesDisabled, k))
+			validationResult.AppendError(fmt.Errorf(ErrAllAuthSourcesDisabled, name))
 		}
 	}
 

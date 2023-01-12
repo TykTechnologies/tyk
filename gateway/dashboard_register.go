@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 )
 
 var dashLog = log.WithField("prefix", "dashboard")
@@ -94,10 +94,10 @@ func (gw *Gateway) reLogin() {
 }
 
 func (h *HTTPDashboardHandler) Init() error {
-	h.RegistrationEndpoint = buildConnStr("/register/node", h.Gw.GetConfig())
-	h.DeRegistrationEndpoint = buildConnStr("/system/node", h.Gw.GetConfig())
-	h.HeartBeatEndpoint = buildConnStr("/register/ping", h.Gw.GetConfig())
-	h.KeyQuotaTriggerEndpoint = buildConnStr("/system/key/quota_trigger", h.Gw.GetConfig())
+	h.RegistrationEndpoint = h.Gw.buildDashboardConnStr("/register/node")
+	h.DeRegistrationEndpoint = h.Gw.buildDashboardConnStr("/system/node")
+	h.HeartBeatEndpoint = h.Gw.buildDashboardConnStr("/register/ping")
+	h.KeyQuotaTriggerEndpoint = h.Gw.buildDashboardConnStr("/system/key/quota_trigger")
 
 	if h.Secret = h.Gw.GetConfig().NodeSecret; h.Secret == "" {
 		dashLog.Fatal("Node secret is not set, required for dashboard connection")
@@ -127,9 +127,9 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	}
 
 	req.Header.Set("authorization", h.Secret)
-	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
+	req.Header.Set(header.XTykNodeID, h.Gw.GetNodeID())
 	h.Gw.ServiceNonceMutex.RLock()
-	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
+	req.Header.Set(header.XTykNonce, h.Gw.ServiceNonce)
 	h.Gw.ServiceNonceMutex.RUnlock()
 
 	c := h.Gw.initialiseClient()
@@ -241,15 +241,15 @@ func (h *HTTPDashboardHandler) newRequest(method, endpoint string) *http.Request
 		panic(err)
 	}
 	req.Header.Set("authorization", h.Secret)
-	req.Header.Set(headers.XTykHostname, h.Gw.hostDetails.Hostname)
-	req.Header.Set(headers.XTykSessionID, h.Gw.SessionID)
+	req.Header.Set(header.XTykHostname, h.Gw.hostDetails.Hostname)
+	req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
 	return req
 }
 
 func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client) error {
-	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
+	req.Header.Set(header.XTykNodeID, h.Gw.GetNodeID())
 	h.Gw.ServiceNonceMutex.RLock()
-	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
+	req.Header.Set(header.XTykNonce, h.Gw.ServiceNonce)
 	h.Gw.ServiceNonceMutex.RUnlock()
 
 	resp, err := client.Do(req)
@@ -283,9 +283,9 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 func (h *HTTPDashboardHandler) DeRegister() error {
 	req := h.newRequest(http.MethodDelete, h.DeRegistrationEndpoint)
 
-	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
+	req.Header.Set(header.XTykNodeID, h.Gw.GetNodeID())
 	h.Gw.ServiceNonceMutex.RLock()
-	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
+	req.Header.Set(header.XTykNonce, h.Gw.ServiceNonce)
 	h.Gw.ServiceNonceMutex.RUnlock()
 
 	c := h.Gw.initialiseClient()

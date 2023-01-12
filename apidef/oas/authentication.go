@@ -1,53 +1,62 @@
 package oas
 
 import (
+	"fmt"
 	"sort"
 
-	"github.com/lonelycode/osin"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Authentication types contains configuration about the authentication methods and security policies applied to requests.
 type Authentication struct {
 	// Enabled makes the API protected when one of the authentication modes is enabled.
-	// Old API Definition: `!use_keyless`
+	//
+	// Tyk native API definition: `!use_keyless`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
+
 	// StripAuthorizationData ensures that any security tokens used for accessing APIs are stripped and not leaked to the upstream.
-	// Old API Definition: `strip_auth_data`
+	//
+	// Tyk native API definition: `strip_auth_data`.
 	StripAuthorizationData bool `bson:"stripAuthorizationData,omitempty" json:"stripAuthorizationData,omitempty"`
+
 	// BaseIdentityProvider enables multi authentication mechanism and provides the session object that determines rate limits, ACL rules and quotas.
 	// It should be set to one of the following:
-	// - `auth_token`
-	// - `hmac_key`
-	// - `basic_auth_user`
-	// - `jwt_claim`
-	// - `oidc_user`
-	// - `oauth_key`
 	//
-	// Old API Definition: `base_identity_provided_by`
+	// - `auth_token`,
+	// - `hmac_key`,
+	// - `basic_auth_user`,
+	// - `jwt_claim`,
+	// - `oidc_user`,
+	// - `oauth_key`.
+	//
+	// Tyk native API definition: `base_identity_provided_by`.
 	BaseIdentityProvider apidef.AuthTypeEnum `bson:"baseIdentityProvider,omitempty" json:"baseIdentityProvider,omitempty"`
-	// Token contains the configurations related to standard token based authentication mode.
-	// Old API Definition: `auth_configs["authToken"]`
-	Token *Token `bson:"token,omitempty" json:"token,omitempty"`
-	JWT   *JWT   `bson:"jwt,omitempty" json:"jwt,omitempty"`
-	// Basic contains the configurations related to basic authentication mode.
-	// Old API Definition: `auth_configs["basic"]`
-	Basic *Basic `bson:"basic,omitempty" json:"basic,omitempty"`
-	OAuth *OAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
+
 	// HMAC contains the configurations related to HMAC authentication mode.
-	// Old API Definition: `auth_configs["hmac"]`
+	//
+	// Tyk native API definition: `auth_configs["hmac"]`
 	HMAC *HMAC `bson:"hmac,omitempty" json:"hmac,omitempty"`
+
 	// OIDC contains the configurations related to OIDC authentication mode.
-	// Old API Definition: `auth_configs["oidc"]`
+	//
+	// Tyk native API definition: `auth_configs["oidc"]`
 	OIDC *OIDC `bson:"oidc,omitempty" json:"oidc,omitempty"`
+
 	// GoPlugin contains the configurations related to GoPlugin authentication mode.
 	GoPlugin *GoPlugin `bson:"goPlugin,omitempty" json:"goPlugin,omitempty"`
+
 	// CustomPlugin contains the configurations related to CustomPlugin authentication mode.
-	// Old API Definition: `auth_configs["coprocess"]`
-	CustomPlugin    *CustomPlugin          `bson:"customPlugin,omitempty" json:"customPlugin,omitempty"`
-	SecuritySchemes map[string]interface{} `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
+	//
+	// Tyk native API definition: `auth_configs["coprocess"]`
+	CustomPlugin *CustomPlugin `bson:"customPlugin,omitempty" json:"customPlugin,omitempty"`
+
+	// SecuritySchemes contains security schemes definitions.
+	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
 }
 
+// Fill fills *Authentication from apidef.APIDefinition.
 func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.Enabled = !api.UseKeylessAccess
 	a.StripAuthorizationData = api.StripAuthData
@@ -66,54 +75,6 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 
 	if api.AuthConfigs == nil || len(api.AuthConfigs) == 0 {
 		return
-	}
-
-	if authToken, ok := api.AuthConfigs[apidef.AuthTokenType]; ok {
-		if a.Token == nil {
-			a.Token = &Token{}
-		}
-
-		a.Token.Fill(api.UseStandardAuth, authToken)
-	}
-
-	if ShouldOmit(a.Token) {
-		a.Token = nil
-	}
-
-	if _, ok := api.AuthConfigs[apidef.JWTType]; ok {
-		if a.JWT == nil {
-			a.JWT = &JWT{}
-		}
-
-		a.JWT.Fill(api)
-	}
-
-	if ShouldOmit(a.JWT) {
-		a.JWT = nil
-	}
-
-	if _, ok := api.AuthConfigs[apidef.BasicType]; ok {
-		if a.Basic == nil {
-			a.Basic = &Basic{}
-		}
-
-		a.Basic.Fill(api)
-	}
-
-	if ShouldOmit(a.Basic) {
-		a.Basic = nil
-	}
-
-	if _, ok := api.AuthConfigs[apidef.OAuthType]; ok {
-		if a.OAuth == nil {
-			a.OAuth = &OAuth{}
-		}
-
-		a.OAuth.Fill(api)
-	}
-
-	if ShouldOmit(a.OAuth) {
-		a.OAuth = nil
 	}
 
 	if _, ok := api.AuthConfigs[apidef.HMACType]; ok {
@@ -153,26 +114,11 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// ExtractTo extracts *Authentication into *apidef.APIDefinition.
 func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	api.UseKeylessAccess = !a.Enabled
 	api.StripAuthData = a.StripAuthorizationData
 	api.BaseIdentityProvidedBy = a.BaseIdentityProvider
-
-	if a.Token != nil {
-		a.Token.ExtractTo(api)
-	}
-
-	if a.JWT != nil {
-		a.JWT.ExtractTo(api)
-	}
-
-	if a.Basic != nil {
-		a.Basic.ExtractTo(api)
-	}
-
-	if a.OAuth != nil {
-		a.OAuth.ExtractTo(api)
-	}
 
 	if a.HMAC != nil {
 		a.HMAC.ExtractTo(api)
@@ -191,102 +137,172 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
-type Token struct {
-	// Enabled enables the token based authentication mode.
-	// Old API Definition: `api_id`
-	Enabled     bool `bson:"enabled" json:"enabled"` // required
-	AuthSources `bson:",inline" json:",inline"`
-	// EnableClientCertificate allows to create dynamic keys based on certificates.
-	// Old API Definition: `auth_configs["authToken"].use_certificate`
-	EnableClientCertificate bool `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty"`
-	//
-	// Old API Definition:
-	Signature *Signature `bson:"signatureValidation,omitempty" json:"signatureValidation,omitempty"`
+// SecuritySchemes holds security scheme values, filled with Import().
+type SecuritySchemes map[string]interface{}
+
+// SecurityScheme defines an Importer interface for security schemes.
+type SecurityScheme interface {
+	Import(nativeSS *openapi3.SecurityScheme, enable bool)
 }
 
-func (t *Token) Fill(enabled bool, authToken apidef.AuthConfig) {
-	t.Enabled = enabled
+// Import takes the openapi3.SecurityScheme as argument and applies it to the receiver. The
+// SecuritySchemes receiver is a map, so modification of the receiver is enabled, regardless
+// of the fact that the receiver isn't a pointer type. The map is a pointer type itself.
+func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme, enable bool) error {
+	switch {
+	case nativeSS.Type == typeAPIKey:
+		token := &Token{}
+		if ss[name] == nil {
+			ss[name] = token
+		} else {
+			if tokenVal, ok := ss[name].(*Token); ok {
+				token = tokenVal
+			} else {
+				toStructIfMap(ss[name], token)
+			}
+		}
 
-	// No need to check for emptiness like other optional fields(like Signature below) after filling because it is an inline field.
-	t.AuthSources.Fill(authToken)
+		token.Import(nativeSS, enable)
+	case nativeSS.Type == typeHTTP && nativeSS.Scheme == schemeBearer && nativeSS.BearerFormat == bearerFormatJWT:
+		jwt := &JWT{}
+		if ss[name] == nil {
+			ss[name] = jwt
+		} else {
+			if jwtVal, ok := ss[name].(*JWT); ok {
+				jwt = jwtVal
+			} else {
+				toStructIfMap(ss[name], jwt)
+			}
+		}
 
-	t.EnableClientCertificate = authToken.UseCertificate
+		jwt.Import(enable)
+	case nativeSS.Type == typeHTTP && nativeSS.Scheme == schemeBasic:
+		basic := &Basic{}
+		if ss[name] == nil {
+			ss[name] = basic
+		} else {
+			if basicVal, ok := ss[name].(*Basic); ok {
+				basic = basicVal
+			} else {
+				toStructIfMap(ss[name], basic)
+			}
+		}
 
-	if t.Signature == nil {
-		t.Signature = &Signature{}
+		basic.Import(enable)
+	case nativeSS.Type == typeOAuth2:
+		oauth := &OAuth{}
+		if ss[name] == nil {
+			ss[name] = oauth
+		} else {
+			if oauthVal, ok := ss[name].(*OAuth); ok {
+				oauth = oauthVal
+			} else {
+				toStructIfMap(ss[name], oauth)
+			}
+		}
+
+		oauth.Import(enable)
+	default:
+		return fmt.Errorf(unsupportedSecuritySchemeFmt, name)
 	}
 
-	t.Signature.Fill(authToken)
-	if ShouldOmit(t.Signature) {
-		t.Signature = nil
+	return nil
+}
+
+func baseIdentityProviderPrecedence(authType apidef.AuthTypeEnum) int {
+	switch authType {
+	case apidef.AuthToken:
+		return 1
+	case apidef.JWTClaim:
+		return 2
+	case apidef.OAuthKey:
+		return 3
+	case apidef.BasicAuthUser:
+		return 4
+	default:
+		return 5
 	}
 }
 
-func (t *Token) ExtractTo(api *apidef.APIDefinition) {
-	api.UseStandardAuth = t.Enabled
-
-	authConfig := apidef.AuthConfig{}
-	authConfig.UseCertificate = t.EnableClientCertificate
-
-	t.AuthSources.ExtractTo(&authConfig)
-
-	if t.Signature != nil {
-		t.Signature.ExtractTo(&authConfig)
+// GetBaseIdentityProvider returns the identity provider by precedence from SecuritySchemes.
+func (ss SecuritySchemes) GetBaseIdentityProvider() (res apidef.AuthTypeEnum) {
+	if len(ss) < 2 {
+		return
 	}
 
-	if api.AuthConfigs == nil {
-		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	resBaseIdentityProvider := baseIdentityProviderPrecedence(apidef.AuthTypeNone)
+	res = apidef.OAuthKey
+
+	for _, scheme := range ss {
+		if _, ok := scheme.(*Token); ok {
+			return apidef.AuthToken
+		}
+
+		if _, ok := scheme.(*JWT); ok {
+			if baseIdentityProviderPrecedence(apidef.JWTClaim) < resBaseIdentityProvider {
+				resBaseIdentityProvider = baseIdentityProviderPrecedence(apidef.JWTClaim)
+				res = apidef.JWTClaim
+			}
+		}
 	}
 
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
+	return
 }
 
+// AuthSources defines authentication source configuration: headers, cookies and query parameters.
+//
+// Tyk native API definition: `auth_configs{}`.
 type AuthSources struct {
-	// Header contains configurations of the header auth source, it is enabled by default.
-	// Old API Definition:
+	// Header contains configurations for the header value auth source, it is enabled by default.
+	//
+	// Tyk native API definition: `auth_configs[x].header`
 	Header *AuthSource `bson:"header,omitempty" json:"header,omitempty"`
-	// Cookie contains configurations of the cookie auth source.
-	// Old API Definition: `api_id`
+
+	// Cookie contains configurations for the cookie value auth source.
+	//
+	// Tyk native API definition: `auth_configs[x].cookie`
 	Cookie *AuthSource `bson:"cookie,omitempty" json:"cookie,omitempty"`
-	// Param contains configurations of the param auth source.
-	// Old API Definition: `api_id`
+
+	// Query contains configurations for the query parameters auth source.
+	//
+	// Tyk native API definition: `auth_configs[x].query`
 	Query *AuthSource `bson:"query,omitempty" json:"query,omitempty"`
 }
 
+// Fill fills *AuthSources from apidef.AuthConfig.
 func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
-	// Header
+	// Allocate auth sources being filled.
 	if as.Header == nil {
 		as.Header = &AuthSource{}
 	}
-
-	as.Header.Fill(!authConfig.DisableHeader, authConfig.AuthHeaderName)
-	if ShouldOmit(as.Header) {
-		as.Header = nil
+	if as.Cookie == nil {
+		as.Cookie = &AuthSource{}
 	}
-
-	// Query
 	if as.Query == nil {
 		as.Query = &AuthSource{}
 	}
 
+	// Fill the auth source structures.
+	as.Header.Fill(!authConfig.DisableHeader, authConfig.AuthHeaderName)
 	as.Query.Fill(authConfig.UseParam, authConfig.ParamName)
-	if ShouldOmit(as.Query) {
-		as.Query = nil
-	}
-
-	// Cookie
-	if as.Cookie == nil {
-		as.Cookie = &AuthSource{}
-	}
-
 	as.Cookie.Fill(authConfig.UseCookie, authConfig.CookieName)
+
+	// Check if auth sources should be omitted as they may be undefined.
 	if ShouldOmit(as.Cookie) {
 		as.Cookie = nil
 	}
+	if ShouldOmit(as.Header) {
+		as.Header = nil
+	}
+	if ShouldOmit(as.Query) {
+		as.Query = nil
+	}
 }
 
+// ExtractTo extracts *AuthSources to *apidef.AuthConfig.
 func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
-	// Header
+	// Extract Header auth source.
 	if as.Header != nil {
 		var enabled bool
 		as.Header.ExtractTo(&enabled, &authConfig.AuthHeaderName)
@@ -295,42 +311,40 @@ func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
 		authConfig.DisableHeader = true
 	}
 
-	// Query
+	// Extract Query auth source.
 	if as.Query != nil {
 		as.Query.ExtractTo(&authConfig.UseParam, &authConfig.ParamName)
 	}
 
-	// Cookie
+	// Extract Cookie auth source.
 	if as.Cookie != nil {
 		as.Cookie.ExtractTo(&authConfig.UseCookie, &authConfig.CookieName)
 	}
 }
 
-type HeaderAuthSource struct {
-	// Name is the name of the header which contains the token.
-	// Old API Definition: `auth_configs[X].auth_header_name`
-	Name string `bson:"name" json:"name"` // required
-}
-
+// AuthSource defines an authentication source.
 type AuthSource struct {
 	// Enabled enables the auth source.
-	// Old API Definition: `auth_configs[X].use_param/use_cookie`
+	// Tyk native API definition: `auth_configs[X].use_param/use_cookie`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// Name is the name of the auth source.
-	// Old API Definition: `auth_configs[X].param_name/cookie_name`
+	// Tyk native API definition: `auth_configs[X].param_name/cookie_name`
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
 }
 
+// Fill fills *AuthSource with values from the parameters.
 func (as *AuthSource) Fill(enabled bool, name string) {
 	as.Enabled = enabled
 	as.Name = name
 }
 
+// ExtractTo extracts *AuthSource into the function parameters.
 func (as *AuthSource) ExtractTo(enabled *bool, name *string) {
 	*enabled = as.Enabled
 	*name = as.Name
 }
 
+// Signature holds the configuration for signature validation.
 type Signature struct {
 	Enabled          bool       `bson:"enabled" json:"enabled"` // required
 	Algorithm        string     `bson:"algorithm,omitempty" json:"algorithm,omitempty"`
@@ -342,6 +356,7 @@ type Signature struct {
 	ErrorMessage     string     `bson:"errorMessage,omitempty" json:"errorMessage,omitempty"`
 }
 
+// Fill fills *Signature from apidef.AuthConfig.
 func (s *Signature) Fill(authConfig apidef.AuthConfig) {
 	signature := authConfig.Signature
 
@@ -355,6 +370,7 @@ func (s *Signature) Fill(authConfig apidef.AuthConfig) {
 	s.ErrorMessage = signature.ErrorMessage
 }
 
+// ExtractTo extracts *Signature to *apidef.AuthConfig.
 func (s *Signature) ExtractTo(authConfig *apidef.AuthConfig) {
 	authConfig.ValidateSignature = s.Enabled
 
@@ -367,81 +383,16 @@ func (s *Signature) ExtractTo(authConfig *apidef.AuthConfig) {
 	authConfig.Signature.ErrorMessage = s.ErrorMessage
 }
 
-type JWT struct {
-	Enabled                 bool `bson:"enabled" json:"enabled"` // required
-	AuthSources             `bson:",inline" json:",inline"`
-	Source                  string   `bson:"source,omitempty" json:"source,omitempty"`
-	SigningMethod           string   `bson:"signingMethod,omitempty" json:"signingMethod,omitempty"`
-	IdentityBaseField       string   `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
-	SkipKid                 bool     `bson:"skipKid,omitempty" json:"skipKid,omitempty"`
-	PolicyFieldName         string   `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
-	ClientBaseField         string   `bson:"clientBaseField,omitempty" json:"clientBaseField,omitempty"`
-	Scopes                  *Scopes  `bson:"scopes,omitempty" json:"scopes,omitempty"`
-	DefaultPolicies         []string `bson:"defaultPolicies,omitempty" json:"defaultPolicies,omitempty"`
-	IssuedAtValidationSkew  uint64   `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
-	NotBeforeValidationSkew uint64   `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
-	ExpiresAtValidationSkew uint64   `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
-}
-
-func (j *JWT) Fill(api apidef.APIDefinition) {
-	j.AuthSources.Fill(api.AuthConfigs[apidef.JWTType])
-
-	j.Enabled = api.EnableJWT
-	j.Source = api.JWTSource
-	j.SigningMethod = api.JWTSigningMethod
-	j.IdentityBaseField = api.JWTIdentityBaseField
-	j.SkipKid = api.JWTSkipKid
-	j.PolicyFieldName = api.JWTPolicyFieldName
-	j.ClientBaseField = api.JWTClientIDBaseField
-
-	if j.Scopes == nil {
-		j.Scopes = &Scopes{}
-	}
-
-	j.Scopes.Fill(&api.Scopes.JWT)
-	if ShouldOmit(j.Scopes) {
-		j.Scopes = nil
-	}
-
-	j.DefaultPolicies = api.JWTDefaultPolicies
-	j.IssuedAtValidationSkew = api.JWTIssuedAtValidationSkew
-	j.NotBeforeValidationSkew = api.JWTNotBeforeValidationSkew
-	j.ExpiresAtValidationSkew = api.JWTExpiresAtValidationSkew
-}
-
-func (j *JWT) ExtractTo(api *apidef.APIDefinition) {
-	authConfig := apidef.AuthConfig{}
-	j.AuthSources.ExtractTo(&authConfig)
-
-	if api.AuthConfigs == nil {
-		api.AuthConfigs = make(map[string]apidef.AuthConfig)
-	}
-
-	api.AuthConfigs[apidef.JWTType] = authConfig
-
-	api.EnableJWT = j.Enabled
-	api.JWTSource = j.Source
-	api.JWTSigningMethod = j.SigningMethod
-	api.JWTIdentityBaseField = j.IdentityBaseField
-	api.JWTSkipKid = j.SkipKid
-	api.JWTPolicyFieldName = j.PolicyFieldName
-	api.JWTClientIDBaseField = j.ClientBaseField
-
-	if j.Scopes != nil {
-		j.Scopes.ExtractTo(&api.Scopes.JWT)
-	}
-
-	api.JWTDefaultPolicies = j.DefaultPolicies
-	api.JWTIssuedAtValidationSkew = j.IssuedAtValidationSkew
-	api.JWTNotBeforeValidationSkew = j.NotBeforeValidationSkew
-	api.JWTExpiresAtValidationSkew = j.ExpiresAtValidationSkew
-}
-
+// Scopes holds the scope to policy mappings for a claim name.
 type Scopes struct {
-	ClaimName            string          `bson:"claimName,omitempty" json:"claimName,omitempty"`
+	// ClaimName contains the claim name.
+	ClaimName string `bson:"claimName,omitempty" json:"claimName,omitempty"`
+
+	// ScopeToPolicyMapping contains the mappings of scopes to policy IDs.
 	ScopeToPolicyMapping []ScopeToPolicy `bson:"scopeToPolicyMapping,omitempty" json:"scopeToPolicyMapping,omitempty"`
 }
 
+// Fill fills *Scopes from *apidef.ScopeClaim.
 func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	s.ClaimName = scopeClaim.ScopeClaimName
 
@@ -460,6 +411,7 @@ func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	}
 }
 
+// ExtractTo extracts *Scopes to *apidef.ScopeClaim.
 func (s *Scopes) ExtractTo(scopeClaim *apidef.ScopeClaim) {
 	scopeClaim.ScopeClaimName = s.ClaimName
 
@@ -472,175 +424,43 @@ func (s *Scopes) ExtractTo(scopeClaim *apidef.ScopeClaim) {
 	}
 }
 
+// ScopeToPolicy contains a single scope to policy ID mapping.
 type ScopeToPolicy struct {
-	Scope    string `bson:"scope,omitempty" json:"scope,omitempty"`
+	// Scope contains the scope name.
+	Scope string `bson:"scope,omitempty" json:"scope,omitempty"`
+
+	// PolicyID contains the Policy ID.
 	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
-type Basic struct {
-	// Enabled enables the basic authentication mode.
-	// Old API Definition: `use_basic_auth`
-	Enabled     bool `bson:"enabled" json:"enabled"` // required
-	AuthSources `bson:",inline" json:",inline"`
-	// DisableCaching disables the caching of basic authentication key.
-	// Old API Definition: `basic_auth.disable_caching`
-	DisableCaching bool `bson:"disableCaching,omitempty" json:"disableCaching,omitempty"`
-	// CacheTTL is the TTL for a cached basic authentication key in seconds.
-	// Old API Definition: `basic_auth.cache_ttl`
-	CacheTTL int `bson:"cacheTTL,omitempty" json:"cacheTTL,omitempty"`
-	// ExtractCredentialsFromBody helps to extract username and password from body. In some cases, like dealing with SOAP,
-	// user credentials can be passed via request body.
-	ExtractCredentialsFromBody *ExtractCredentialsFromBody `bson:"extractCredentialsFromBody,omitempty" json:"extractCredentialsFromBody,omitempty"`
-}
-
-func (b *Basic) Fill(api apidef.APIDefinition) {
-	b.Enabled = api.UseBasicAuth
-
-	b.AuthSources.Fill(api.AuthConfigs[apidef.BasicType])
-
-	b.DisableCaching = api.BasicAuth.DisableCaching
-	b.CacheTTL = api.BasicAuth.CacheTTL
-
-	if b.ExtractCredentialsFromBody == nil {
-		b.ExtractCredentialsFromBody = &ExtractCredentialsFromBody{}
-	}
-
-	b.ExtractCredentialsFromBody.Fill(api)
-
-	if ShouldOmit(b.ExtractCredentialsFromBody) {
-		b.ExtractCredentialsFromBody = nil
-	}
-}
-
-func (b *Basic) ExtractTo(api *apidef.APIDefinition) {
-	api.UseBasicAuth = b.Enabled
-
-	authConfig := apidef.AuthConfig{}
-	b.AuthSources.ExtractTo(&authConfig)
-
-	if api.AuthConfigs == nil {
-		api.AuthConfigs = make(map[string]apidef.AuthConfig)
-	}
-
-	api.AuthConfigs[apidef.BasicType] = authConfig
-
-	api.BasicAuth.DisableCaching = b.DisableCaching
-	api.BasicAuth.CacheTTL = b.CacheTTL
-
-	if b.ExtractCredentialsFromBody != nil {
-		b.ExtractCredentialsFromBody.ExtractTo(api)
-	}
-}
-
-type ExtractCredentialsFromBody struct {
-	// Enabled enables extracting credentials from body.
-	// Old API Definition: `basic_auth.extract_from_body`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
-	// UserRegexp is the regex for username e.g. `<User>(.*)</User>`.
-	// Old API Definition: `basic_auth.userRegexp`
-	UserRegexp string `bson:"userRegexp,omitempty" json:"userRegexp,omitempty"`
-	// PasswordRegexp is the regex for password e.g. `<Password>(.*)</Password>`.
-	// Old API Definition: `basic_auth.passwordRegexp`
-	PasswordRegexp string `bson:"passwordRegexp,omitempty" json:"passwordRegexp,omitempty"`
-}
-
-func (e *ExtractCredentialsFromBody) Fill(api apidef.APIDefinition) {
-	e.Enabled = api.BasicAuth.ExtractFromBody
-	e.UserRegexp = api.BasicAuth.BodyUserRegexp
-	e.PasswordRegexp = api.BasicAuth.BodyPasswordRegexp
-}
-
-func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
-	api.BasicAuth.ExtractFromBody = e.Enabled
-	api.BasicAuth.BodyUserRegexp = e.UserRegexp
-	api.BasicAuth.BodyPasswordRegexp = e.PasswordRegexp
-}
-
-type OAuth struct {
-	Enabled               bool `bson:"enabled" json:"enabled"` // required
-	AuthSources           `bson:",inline" json:",inline"`
-	AllowedAccessTypes    []osin.AccessRequestType    `bson:"allowedAccessTypes,omitempty" json:"allowedAccessTypes,omitempty"`
-	AllowedAuthorizeTypes []osin.AuthorizeRequestType `bson:"allowedAuthorizeTypes,omitempty" json:"allowedAuthorizeTypes,omitempty"`
-	AuthLoginRedirect     string                      `bson:"authLoginRedirect,omitempty" json:"authLoginRedirect,omitempty"`
-	Notifications         *Notifications              `bson:"notifications,omitempty" json:"notifications,omitempty"`
-}
-
-func (o *OAuth) Fill(api apidef.APIDefinition) {
-	o.Enabled = api.UseOauth2
-
-	o.AuthSources.Fill(api.AuthConfigs[apidef.OAuthType])
-
-	o.AllowedAccessTypes = api.Oauth2Meta.AllowedAccessTypes
-	o.AllowedAuthorizeTypes = api.Oauth2Meta.AllowedAuthorizeTypes
-	o.AuthLoginRedirect = api.Oauth2Meta.AuthorizeLoginRedirect
-
-	if o.Notifications == nil {
-		o.Notifications = &Notifications{}
-	}
-
-	o.Notifications.Fill(api.NotificationsDetails)
-
-	if ShouldOmit(o.Notifications) {
-		o.Notifications = nil
-	}
-}
-
-func (o *OAuth) ExtractTo(api *apidef.APIDefinition) {
-	api.UseOauth2 = o.Enabled
-
-	authConfig := apidef.AuthConfig{}
-	o.AuthSources.ExtractTo(&authConfig)
-
-	if api.AuthConfigs == nil {
-		api.AuthConfigs = make(map[string]apidef.AuthConfig)
-	}
-
-	api.AuthConfigs[apidef.OAuthType] = authConfig
-
-	api.Oauth2Meta.AllowedAccessTypes = o.AllowedAccessTypes
-	api.Oauth2Meta.AllowedAuthorizeTypes = o.AllowedAuthorizeTypes
-	api.Oauth2Meta.AuthorizeLoginRedirect = o.AuthLoginRedirect
-
-	if o.Notifications != nil {
-		o.Notifications.ExtractTo(&api.NotificationsDetails)
-	}
-}
-
-type Notifications struct {
-	SharedSecret   string `bson:"sharedSecret,omitempty" json:"sharedSecret,omitempty"`
-	OnKeyChangeURL string `bson:"onKeyChangeURL,omitempty" json:"onKeyChangeURL,omitempty"`
-}
-
-func (n *Notifications) Fill(nm apidef.NotificationsManager) {
-	n.SharedSecret = nm.SharedSecret
-	n.OnKeyChangeURL = nm.OAuthKeyChangeURL
-}
-
-func (n *Notifications) ExtractTo(nm *apidef.NotificationsManager) {
-	nm.SharedSecret = n.SharedSecret
-	nm.OAuthKeyChangeURL = n.OnKeyChangeURL
-}
-
+// HMAC holds the configuration for the HMAC authentication mode.
 type HMAC struct {
 	// Enabled enables the HMAC authentication mode.
-	// Old API Definition: `enable_signature_checking`
-	Enabled     bool `bson:"enabled" json:"enabled"` // required
+	// Tyk native API definition: `enable_signature_checking`
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+
+	// AuthSources contains authentication token source configuration (header, cookie, query).
 	AuthSources `bson:",inline" json:",inline"`
+
 	// AllowedAlgorithms is the array of HMAC algorithms which are allowed. Tyk supports the following HMAC algorithms:
+	//
 	// - `hmac-sha1`
 	// - `hmac-sha256`
 	// - `hmac-sha384`
 	// - `hmac-sha512`
 	//
 	// and reads the value from algorithm header.
-	// Old API Definition: `hmac_allowed_algorithms`
+	//
+	// Tyk native API definition: `hmac_allowed_algorithms`
 	AllowedAlgorithms []string `bson:"allowedAlgorithms,omitempty" json:"allowedAlgorithms,omitempty"`
+
 	// AllowedClockSkew is the amount of milliseconds that will be tolerated for clock skew. It is used against replay attacks.
 	// The default value is `0`, which deactivates clock skew checks.
-	// Old API Definition: `hmac_allowed_clock_skew`
+	// Tyk native API definition: `hmac_allowed_clock_skew`
 	AllowedClockSkew float64 `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
 }
 
+// Fill fills *HMAC from apidef.APIDefinition.
 func (h *HMAC) Fill(api apidef.APIDefinition) {
 	h.Enabled = api.EnableSignatureChecking
 
@@ -650,6 +470,7 @@ func (h *HMAC) Fill(api apidef.APIDefinition) {
 	h.AllowedClockSkew = api.HmacAllowedClockSkew
 }
 
+// ExtractTo extracts *HMAC to *apidef.APIDefinition.
 func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 	api.EnableSignatureChecking = h.Enabled
 
@@ -666,17 +487,31 @@ func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 	api.HmacAllowedClockSkew = h.AllowedClockSkew
 }
 
+// OIDC contains configuration for the OIDC authentication mode.
 type OIDC struct {
 	// Enabled enables the OIDC authentication mode.
-	// Old API Definition: `use_openid`
-	Enabled     bool `bson:"enabled" json:"enabled"` // required
+	//
+	// Tyk native API definition: `use_openid`
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+
+	// AuthSources contains authentication token source configuration (header, cookie, query).
 	AuthSources `bson:",inline" json:",inline"`
 
-	SegregateByClientId bool       `bson:"segregateByClientId,omitempty" json:"segregateByClientId,omitempty"`
-	Providers           []Provider `bson:"providers,omitempty" json:"providers,omitempty"`
-	Scopes              *Scopes    `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	// SegregateByClientId is a boolean flag. If set to `true, the policies will be applied to a combination of Client ID and User ID.
+	//
+	// Tyk native API definition: `openid_options.segregate_by_client`.
+	SegregateByClientId bool `bson:"segregateByClientId,omitempty" json:"segregateByClientId,omitempty"`
+
+	// Providers contains a list of authorised providers and their Client IDs, and matched policies.
+	//
+	// Tyk native API definition: `openid_options.providers`.
+	Providers []Provider `bson:"providers,omitempty" json:"providers,omitempty"`
+
+	// Scopes contains the defined scope claims.
+	Scopes *Scopes `bson:"scopes,omitempty" json:"scopes,omitempty"`
 }
 
+// Fill fills *OIDC from apidef.APIDefinition.
 func (o *OIDC) Fill(api apidef.APIDefinition) {
 	o.Enabled = api.UseOpenID
 
@@ -716,6 +551,7 @@ func (o *OIDC) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// ExtractTo extracts *OIDC to *apidef.APIDefinition.
 func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 	api.UseOpenID = o.Enabled
 
@@ -744,43 +580,61 @@ func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// Provider defines an issuer to validate and the Client ID to Policy ID mappings.
 type Provider struct {
-	Issuer                string           `bson:"issuer,omitempty" json:"issuer,omitempty"`
+	// Issuer contains a validation value for the issuer claim, usually a domain name e.g. `accounts.google.com` or similar.
+	Issuer string `bson:"issuer,omitempty" json:"issuer,omitempty"`
+
+	// ClientToPolicyMapping contains mappings of Client IDs to Policy IDs.
 	ClientToPolicyMapping []ClientToPolicy `bson:"clientToPolicyMapping,omitempty" json:"clientToPolicyMapping,omitempty"`
 }
 
+// ClientToPolicy contains a 1-1 mapping between Client ID and Policy ID.
 type ClientToPolicy struct {
+	// ClientID contains a Client ID.
 	ClientID string `bson:"clientId,omitempty" json:"clientId,omitempty"`
+
+	// PolicyID contains a Policy ID.
 	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
+// GoPlugin holds confugration related to the Go Plugin authentication mode.
 type GoPlugin struct {
 	// Enabled enables the GoPlugin authentication mode.
-	// Old API Definition: `use_go_plugin_auth`
+	//
+	// Tyk native API definition: `use_go_plugin_auth`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 }
 
+// Fill fills *GoPlugin from apidef.AuthConfig.
 func (g *GoPlugin) Fill(api apidef.APIDefinition) {
 	g.Enabled = api.UseGoPluginAuth
 }
 
+// ExtractTo extracts *GoPlugin into *apidef.APIDefinition.
 func (g *GoPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.UseGoPluginAuth = g.Enabled
 }
 
+// CustomPlugin holds configuration for custom plugins.
 type CustomPlugin struct {
 	// Enabled enables the CustomPlugin authentication mode.
-	// Old API Definition: `enable_coprocess_auth`
-	Enabled     bool `bson:"enabled" json:"enabled"` // required
+	//
+	// Tyk native API definition: `enable_coprocess_auth`
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+
+	// Authentication token sources (header, cookie, query).
 	AuthSources `bson:",inline" json:",inline"`
 }
 
+// Fill fills *CustomPlugin from apidef.AuthConfig.
 func (c *CustomPlugin) Fill(api apidef.APIDefinition) {
 	c.Enabled = api.EnableCoProcessAuth
 
 	c.AuthSources.Fill(api.AuthConfigs[apidef.CoprocessType])
 }
 
+// ExtractTo extracts *CustomPlugin to *apidef.APIDefinition.
 func (c *CustomPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.EnableCoProcessAuth = c.Enabled
 

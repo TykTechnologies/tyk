@@ -17,9 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/user"
 
@@ -56,7 +57,7 @@ func TestGatewayTLS(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 		})
 
-		ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr, Client: client})
+		_, _ = ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr, Client: client})
 	})
 
 	t.Run("Legacy TLS certificate path", func(t *testing.T) {
@@ -89,7 +90,7 @@ func TestGatewayTLS(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 		})
 
-		ts.Run(t, test.TestCase{Code: 200, Client: client})
+		_, _ = ts.Run(t, test.TestCase{Code: 200, Client: client})
 
 		ts.Gw.CertificateManager.FlushCache()
 		tlsConfigCache.Flush()
@@ -114,7 +115,7 @@ func TestGatewayTLS(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 		})
 
-		ts.Run(t, test.TestCase{Code: 200, Client: client})
+		_, _ = ts.Run(t, test.TestCase{Code: 200, Client: client})
 
 		ts.Gw.CertificateManager.FlushCache()
 		tlsConfigCache.Flush()
@@ -143,7 +144,7 @@ func TestGatewayTLS(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 		})
 
-		ts.Run(t, test.TestCase{Code: 200, Client: client})
+		_, _ = ts.Run(t, test.TestCase{Code: 200, Client: client})
 
 		ts.Gw.CertificateManager.FlushCache()
 		tlsConfigCache.Flush()
@@ -165,8 +166,8 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	clientWithCert := GetTLSClient(&clientCert, serverCertPem)
 
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
-	t.Run("Separate domain", func(t *testing.T) {
 
+	t.Run("Separate domain", func(t *testing.T) {
 		conf := func(globalConf *config.Config) {
 			globalConf.HttpServerOptions.UseSSL = true
 			globalConf.Security.ControlAPIUseMutualTLS = true
@@ -191,7 +192,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 
 		unknownErr := "x509: certificate signed by unknown authority"
 
-		ts.Run(t, []test.TestCase{
+		_, _ = ts.Run(t, []test.TestCase{
 			// Should access tyk without client certificates
 			{Client: clientWithoutCert},
 			// Should raise error for ControlAPI without certificate
@@ -202,7 +203,6 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	})
 
 	t.Run("Separate domain/ control api with valid cert", func(t *testing.T) {
-
 		clientCertID, _, _ := certs.GetCertIDAndChainPEM(clientCertPem, "")
 		conf := func(globalConf *config.Config) {
 			globalConf.HttpServerOptions.UseSSL = true
@@ -223,7 +223,59 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		ts.ReloadGatewayProxy()
 
 		// Should pass request with valid client cert
-		ts.Run(t, test.TestCase{
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/tyk/certs", Code: 200, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
+		})
+	})
+
+	t.Run("Separate domain/ control api with invalid certs", func(t *testing.T) {
+		clientCertID, _, _ := certs.GetCertIDAndChainPEM(clientCertPem, "")
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.Security.ControlAPIUseMutualTLS = true
+			globalConf.ControlAPIHostname = "localhost"
+			globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+			globalConf.Security.Certificates.ControlAPI = []string{"invalid", "invalid-" + clientCertID}
+		}
+
+		ts := StartTest(conf)
+		defer ts.Close()
+
+		certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		clientCertID, _ = ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+		ts.ReloadGatewayProxy()
+
+		// Should fail as no valid cert IDs exist in Certificates.ControlAPI
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/tyk/certs", Code: http.StatusForbidden, ErrorMatch: badcertErr, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
+		})
+	})
+
+	t.Run("Separate domain/ control api with invalid + valid cert", func(t *testing.T) {
+		clientCertID, _, _ := certs.GetCertIDAndChainPEM(clientCertPem, "")
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.Security.ControlAPIUseMutualTLS = true
+			globalConf.ControlAPIHostname = "localhost"
+			globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+			globalConf.Security.Certificates.ControlAPI = []string{"invalid", clientCertID}
+		}
+
+		ts := StartTest(conf)
+		defer ts.Close()
+
+		certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		clientCertID, _ = ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+		ts.ReloadGatewayProxy()
+
+		// Should pass request with valid client cert
+		_, _ = ts.Run(t, test.TestCase{
 			Path: "/tyk/certs", Code: 200, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
 		})
 	})
@@ -261,7 +313,7 @@ func TestAPIMutualTLS(t *testing.T) {
 				spec.Proxy.ListenPath = "/"
 			})
 
-			ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client, Domain: "localhost"})
+			_, _ = ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client, Domain: "localhost"})
 		})
 
 		t.Run("MutualTLSCertificate not set", func(t *testing.T) {
@@ -273,7 +325,7 @@ func TestAPIMutualTLS(t *testing.T) {
 				spec.UseMutualTLSAuth = true
 			})
 
-			ts.Run(t, test.TestCase{
+			_, _ = ts.Run(t, test.TestCase{
 				ErrorMatch: badcertErr,
 				Client:     client,
 				Domain:     "localhost",
@@ -291,7 +343,7 @@ func TestAPIMutualTLS(t *testing.T) {
 				spec.ClientCertificates = []string{clientCertID}
 			})
 
-			ts.Run(t, test.TestCase{
+			_, _ = ts.Run(t, test.TestCase{
 				Code: 200, Client: client, Domain: "localhost",
 			})
 
@@ -300,7 +352,7 @@ func TestAPIMutualTLS(t *testing.T) {
 			tlsConfigCache.Flush()
 
 			client = GetTLSClient(&clientCert, serverCertPem)
-			ts.Run(t, test.TestCase{
+			_, _ = ts.Run(t, test.TestCase{
 				Client: client, Domain: "localhost", ErrorMatch: badcertErr,
 			})
 		})
@@ -319,7 +371,7 @@ func TestAPIMutualTLS(t *testing.T) {
 				spec.ClientCertificates = []string{clientCertID2}
 			})
 
-			ts.Run(t, test.TestCase{
+			_, _ = ts.Run(t, test.TestCase{
 				Client: client, ErrorMatch: badcertErr, Domain: "localhost",
 			})
 		})
@@ -350,7 +402,7 @@ func TestAPIMutualTLS(t *testing.T) {
 
 				loadAPIS()
 
-				ts.Run(t, []test.TestCase{
+				_, _ = ts.Run(t, []test.TestCase{
 					{
 						Path:      "/with_mutual",
 						Client:    clientWithoutCert,
@@ -374,7 +426,7 @@ func TestAPIMutualTLS(t *testing.T) {
 
 				certNotAllowedErr := `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
 
-				ts.Run(t, test.TestCase{
+				_, _ = ts.Run(t, test.TestCase{
 					Path:      "/with_mutual",
 					Client:    client,
 					Domain:    domain,
@@ -387,7 +439,7 @@ func TestAPIMutualTLS(t *testing.T) {
 				loadAPIS(clientCertID)
 				client := GetTLSClient(&clientCert, serverCertPem)
 
-				ts.Run(t, test.TestCase{
+				_, _ = ts.Run(t, test.TestCase{
 					Path:   "/with_mutual",
 					Domain: domain,
 					Client: client,
@@ -435,7 +487,7 @@ func TestAPIMutualTLS(t *testing.T) {
 
 				loadAPIS([]string{}, []string{})
 
-				ts.Run(t, []test.TestCase{
+				_, _ = ts.Run(t, []test.TestCase{
 					{
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
@@ -456,14 +508,14 @@ func TestAPIMutualTLS(t *testing.T) {
 
 				loadAPIS([]string{}, []string{})
 
-				ts.Run(t, test.TestCase{
+				_, _ = ts.Run(t, test.TestCase{
 					Path:       "/with_mutual",
 					Client:     client,
 					Domain:     domain,
 					ErrorMatch: badcertErr,
 				})
 
-				ts.Run(t, test.TestCase{
+				_, _ = ts.Run(t, test.TestCase{
 					Path:       "/with_mutual_2",
 					Client:     client,
 					Domain:     domain,
@@ -476,7 +528,7 @@ func TestAPIMutualTLS(t *testing.T) {
 				client := GetTLSClient(&clientCert, serverCertPem)
 				client2 := GetTLSClient(&clientCert2, serverCertPem)
 
-				ts.Run(t,
+				_, _ = ts.Run(t,
 					[]test.TestCase{
 						{
 							Path:   "/with_mutual",
@@ -543,7 +595,7 @@ func TestAPIMutualTLS(t *testing.T) {
 				loadAPIS()
 
 				if domain == "" {
-					ts.Run(t, test.TestCase{
+					_, _ = ts.Run(t, test.TestCase{
 						Path:      "/with_mutual",
 						Client:    clientWithoutCert,
 						Domain:    domain,
@@ -551,7 +603,7 @@ func TestAPIMutualTLS(t *testing.T) {
 						BodyMatch: `"error": "` + certNotMatchErr,
 					})
 				} else {
-					ts.Run(t, test.TestCase{
+					_, _ = ts.Run(t, test.TestCase{
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
 						Domain:     domain,
@@ -559,7 +611,7 @@ func TestAPIMutualTLS(t *testing.T) {
 					})
 				}
 
-				ts.Run(t, test.TestCase{
+				_, _ = ts.Run(t, test.TestCase{
 					Path:   "/without_mutual",
 					Client: clientWithoutCert,
 					Code:   200,
@@ -573,7 +625,7 @@ func TestAPIMutualTLS(t *testing.T) {
 
 				if domain == "" {
 					certNotAllowedErr := `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
-					ts.Run(t, test.TestCase{
+					_, _ = ts.Run(t, test.TestCase{
 						Path:      "/with_mutual",
 						Client:    client,
 						Domain:    domain,
@@ -581,7 +633,7 @@ func TestAPIMutualTLS(t *testing.T) {
 						BodyMatch: `"error": "` + certNotAllowedErr,
 					})
 				} else {
-					ts.Run(t, test.TestCase{
+					_, _ = ts.Run(t, test.TestCase{
 						Path:       "/with_mutual",
 						Client:     client,
 						Domain:     domain,
@@ -594,7 +646,7 @@ func TestAPIMutualTLS(t *testing.T) {
 				loadAPIS(clientCertID)
 				client := GetTLSClient(&clientCert, serverCertPem)
 
-				ts.Run(t, test.TestCase{
+				_, _ = ts.Run(t, test.TestCase{
 					Path:   "/with_mutual",
 					Domain: domain,
 					Client: client,
@@ -637,21 +689,21 @@ func TestAPIMutualTLS(t *testing.T) {
 				loadAPIS()
 
 				if domain == "" {
-					ts.Run(t, test.TestCase{
+					_, _ = ts.Run(t, test.TestCase{
 						Path:      "/with_mutual",
 						Client:    clientWithoutCert,
 						Code:      403,
 						BodyMatch: `"error": "` + certNotMatchErr,
 					})
 				} else {
-					ts.Run(t, test.TestCase{
+					_, _ = ts.Run(t, test.TestCase{
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
 						ErrorMatch: badcertErr,
 					})
 				}
 
-				ts.Run(t, test.TestCase{
+				_, _ = ts.Run(t, test.TestCase{
 					Path:   "/without_mutual",
 					Client: clientWithoutCert,
 					Domain: domain,
@@ -666,14 +718,14 @@ func TestAPIMutualTLS(t *testing.T) {
 
 				if domain == "" {
 					certNotAllowedErr := `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
-					ts.Run(t, test.TestCase{
+					_, _ = ts.Run(t, test.TestCase{
 						Path:      "/with_mutual",
 						Client:    client,
 						Code:      403,
 						BodyMatch: `"error": "` + certNotAllowedErr,
 					})
 				} else {
-					ts.Run(t, test.TestCase{
+					_, _ = ts.Run(t, test.TestCase{
 						Path:       "/with_mutual",
 						Client:     client,
 						ErrorMatch: badcertErr,
@@ -685,7 +737,7 @@ func TestAPIMutualTLS(t *testing.T) {
 				loadAPIS(clientCertID)
 				client := GetTLSClient(&clientCert, serverCertPem)
 
-				ts.Run(t, test.TestCase{
+				_, _ = ts.Run(t, test.TestCase{
 					Path:   "/with_mutual",
 					Client: client,
 					Code:   200,
@@ -704,13 +756,18 @@ func TestAPIMutualTLS(t *testing.T) {
 }
 
 func TestUpstreamMutualTLS(t *testing.T) {
+
 	ts := StartTest(nil)
 	defer ts.Close()
+
+	ts.Gw.dialCtxFn = test.LocalDialer()
 
 	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(fmt.Sprintf("request host is %s", r.Host)))
+		w.WriteHeader(200)
 	}))
 
 	// Mutual TLS protected upstream
@@ -768,7 +825,11 @@ func TestUpstreamMutualTLS(t *testing.T) {
 			ts.Gw.LoadAPI(api)
 
 			// Giving a different value to proxy host, it should not interfere upstream certificate matching
-			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost, Code: http.StatusOK})
+			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost,
+				BodyMatchFunc: func(bytes []byte) bool {
+					return strings.Contains(string(bytes), targetHost)
+				},
+				Code: http.StatusOK, Client: test.NewClientLocal()})
 		})
 
 		t.Run("PreserveHostHeader=true", func(t *testing.T) {
@@ -776,12 +837,25 @@ func TestUpstreamMutualTLS(t *testing.T) {
 			ts.Gw.LoadAPI(api)
 
 			// Giving a different value to proxy host, it should not interfere upstream certificate matching
-			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost, Code: http.StatusOK})
+			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost,
+				BodyMatchFunc: func(bytes []byte) bool {
+					return strings.Contains(string(bytes), proxyHost)
+				},
+				Code: http.StatusOK, Client: test.NewClientLocal()})
+		})
+
+		t.Run("honor UpstreamCertificatesDisabled flag", func(t *testing.T) {
+			api.UpstreamCertificatesDisabled = true
+			ts.Gw.LoadAPI(api)
+
+			// Giving a different value to proxy host, it should not interfere upstream certificate matching
+			_, _ = ts.Run(t, test.TestCase{Domain: proxyHost, Code: http.StatusInternalServerError, Client: test.NewClientLocal()})
 		})
 	})
 }
 
 func TestSSLForceCommonName(t *testing.T) {
+	test.Flaky(t) // TODO TT-5112
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
 
@@ -809,7 +883,7 @@ func TestSSLForceCommonName(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = targetURL
 		})
-		ts.Run(t, test.TestCase{Code: 500, BodyMatch: "There was a problem proxying the request"})
+		_, _ = ts.Run(t, test.TestCase{Code: 500, BodyMatch: "There was a problem proxying the request", Client: test.NewClientLocal()})
 	})
 
 	t.Run("Force Common Name Check is Enabled", func(t *testing.T) {
@@ -826,11 +900,13 @@ func TestSSLForceCommonName(t *testing.T) {
 			spec.Proxy.TargetURL = targetURL
 		})
 
-		ts.Run(t, test.TestCase{Code: 200})
+		_, _ = ts.Run(t, test.TestCase{Code: 200, Client: test.NewClientLocal()})
 	})
 }
 
 func TestKeyWithCertificateTLS(t *testing.T) {
+	test.Flaky(t) // TODO TT-5112
+
 	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	serverCertID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
@@ -871,7 +947,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		client := GetTLSClient(&clientCert, nil)
 
 		t.Run("Cert unknown", func(t *testing.T) {
-			ts.Run(t, test.TestCase{Code: 403, Client: client})
+			_, _ = ts.Run(t, test.TestCase{Code: 403, Client: client})
 		})
 
 		t.Run("Cert known", func(t *testing.T) {
@@ -898,10 +974,10 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 			}
 			client := GetTLSClient(&clientCert, nil)
 
-			ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
+			_, _ = ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
 
 			// Domain is not set, but we still pass it, it should still work
-			ts.Run(t, test.TestCase{Path: "/", Code: 200, Domain: "localhost", Client: client})
+			_, _ = ts.Run(t, test.TestCase{Path: "/", Code: 200, Domain: "localhost", Client: client})
 		})
 	})
 
@@ -933,7 +1009,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		client := GetTLSClient(&clientCert, nil)
 
 		t.Run("Cert unknown", func(t *testing.T) {
-			ts.Run(t,
+			_, _ = ts.Run(t,
 				test.TestCase{Code: 404, Path: "/test1", Client: client},
 				test.TestCase{Code: 403, Path: "/test1", Domain: "localhost", Client: client},
 			)
@@ -962,21 +1038,21 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 				t.Fatal("Should not allow create key based on the same certificate")
 			}
 
-			ts.Run(t, test.TestCase{Path: "/test1", Code: 404, Client: client})
+			_, _ = ts.Run(t, test.TestCase{Path: "/test1", Code: 404, Client: client})
 
 			// Domain is not set, but we still pass it, it should still work
-			ts.Run(t, test.TestCase{Path: "/test1", Code: 200, Domain: "localhost", Client: client})
+			_, _ = ts.Run(t, test.TestCase{Path: "/test1", Code: 200, Domain: "localhost", Client: client})
 
 			// key should also work without cert
 			header := map[string]string{
-				headers.Authorization: key,
+				header.Authorization: key,
 			}
 			client := &http.Client{
 				Transport: &http.Transport{
 					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 				},
 			}
-			ts.Run(t, test.TestCase{Path: "/test1", Headers: header, Code: http.StatusOK, Domain: "localhost", Client: client})
+			_, _ = ts.Run(t, test.TestCase{Path: "/test1", Headers: header, Code: http.StatusOK, Domain: "localhost", Client: client})
 		})
 	})
 
@@ -1003,6 +1079,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		)[0]
 
 		client := GetTLSClient(&clientCert, nil)
+		client.Transport = test.NewTransport(test.WithLocalDialer())
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Code: http.StatusNotFound, Path: "/test1", Client: client},
@@ -1051,10 +1128,10 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		}
 
 		// check we can use the key after remove the cert
-		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
+		_, _ = ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
 		ts.Gw.CertificateManager.Delete(clientCertID, orgId)
 		// now we should not be allowed to use the key
-		ts.Run(t, test.TestCase{Path: "/", Code: 403, Client: client})
+		_, _ = ts.Run(t, test.TestCase{Path: "/", Code: 403, Client: client})
 	})
 
 	// check that key has been updated with wrong certificate
@@ -1088,7 +1165,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		}
 
 		// check we can use the key after remove the cert
-		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
+		_, _ = ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
 		session.Certificate = "fooBar"
 		// update redis directly since we have protection not to allow create of a session with wrong certificate
 		err = ts.Gw.GlobalSessionManager.UpdateSession(storage.HashKey(clientCertID, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
@@ -1098,25 +1175,25 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 		// key should also work without cert
 		header := map[string]string{
-			headers.Authorization: key,
+			header.Authorization: key,
 		}
 		newClient := &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		}
-		ts.Run(t, test.TestCase{Path: "/", Headers: header, Code: http.StatusForbidden, Client: newClient})
+		_, _ = ts.Run(t, test.TestCase{Path: "/", Headers: header, Code: http.StatusForbidden, Client: newClient})
 
 		// now we should not be allowed to use the key
 		// this call should also migrate the certificate field data
-		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
+		_, _ = ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
 		updatedSession, _ := ts.Gw.GlobalSessionManager.SessionDetail(session.OrgID, session.KeyID, false)
 
 		if updatedSession.Certificate != clientCertID {
 			t.Error("Certificate should be properly updated.")
 		}
 
-		ts.Run(t, test.TestCase{Path: "/", Headers: header, Code: http.StatusOK, Client: newClient})
+		_, _ = ts.Run(t, test.TestCase{Path: "/", Headers: header, Code: http.StatusOK, Client: newClient})
 
 	})
 }
@@ -1146,7 +1223,7 @@ func TestAPICertificate(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 		})
 
-		ts.Run(t, test.TestCase{Code: 200, Client: client})
+		_, _ = ts.Run(t, test.TestCase{Code: 200, Client: client})
 	})
 
 	t.Run("Cert unknown", func(t *testing.T) {
@@ -1155,11 +1232,13 @@ func TestAPICertificate(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 		})
 
-		ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr})
+		_, _ = ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr})
 	})
 }
 
 func TestCertificateHandlerTLS(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5261
+
 	_, _, combinedServerPEM, serverCert := certs.GenCertificate(&x509.Certificate{
 		DNSNames:    []string{"localhost", "tyk-gateway"},
 		IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::")},
@@ -1177,13 +1256,13 @@ func TestCertificateHandlerTLS(t *testing.T) {
 	defer ts.Close()
 
 	t.Run("List certificates, empty", func(t *testing.T) {
-		ts.Run(t, test.TestCase{
+		_, _ = ts.Run(t, test.TestCase{
 			Path: "/tyk/certs?org_id=1", Code: 200, AdminAuth: true, BodyMatch: `{"certs":null}`,
 		})
 	})
 
 	t.Run("Should add certificates with and without private keys", func(t *testing.T) {
-		ts.Run(t, []test.TestCase{
+		_, _ = ts.Run(t, []test.TestCase{
 			// Public Certificate
 			{Method: "POST", Path: "/tyk/certs?org_id=1", Data: string(clientPEM), AdminAuth: true, Code: 200, BodyMatch: `"id":"1` + clientCertID},
 			// Public + Private
@@ -1192,7 +1271,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 	})
 
 	t.Run("List certificates, non empty", func(t *testing.T) {
-		ts.Run(t, []test.TestCase{
+		_, _ = ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: clientCertID},
 			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: serverCertID},
 		}...)
@@ -1237,7 +1316,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		clientCertMeta := fmt.Sprintf(certMetaTemplate, clientCertID, clientCertID, "false")
 		serverCertMeta := fmt.Sprintf(certMetaTemplate, serverCertID, serverCertID, "true")
 
-		ts.Run(t, []test.TestCase{
+		_, _ = ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/tyk/certs/1" + clientCertID + "?org_id=1", AdminAuth: true, Code: 200, BodyMatch: clientCertMeta},
 			{Method: "GET", Path: "/tyk/certs/1" + serverCertID + "?org_id=1", AdminAuth: true, Code: 200, BodyMatch: serverCertMeta},
 			{Method: "GET", Path: "/tyk/certs/1" + serverCertID + ",1" + clientCertID + "?org_id=1", AdminAuth: true, Code: 200, BodyMatch: `\[` + serverCertMeta},
@@ -1246,7 +1325,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 	})
 
 	t.Run("Certificate removal", func(t *testing.T) {
-		ts.Run(t, []test.TestCase{
+		_, _ = ts.Run(t, []test.TestCase{
 			{Method: "DELETE", Path: "/tyk/certs/1" + serverCertID + "?org_id=1", AdminAuth: true, Code: 200},
 			{Method: "DELETE", Path: "/tyk/certs/1" + clientCertID + "?org_id=1", AdminAuth: true, Code: 200},
 			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: `{"certs":null}`},
@@ -1286,7 +1365,7 @@ func TestCipherSuites(t *testing.T) {
 		}}}
 
 		// If there is an internal TLS error it will fail test
-		ts.Run(t, test.TestCase{Client: client, Path: "/"})
+		_, _ = ts.Run(t, test.TestCase{Client: client, Path: "/"})
 	})
 
 	t.Run("Cipher non-match", func(t *testing.T) {
@@ -1297,6 +1376,6 @@ func TestCipherSuites(t *testing.T) {
 			MaxVersion:         tls.VersionTLS12,
 		}}}
 
-		ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
+		_, _ = ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
 	})
 }

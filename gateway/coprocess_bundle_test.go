@@ -4,12 +4,16 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -203,11 +207,14 @@ pre.NewProcessRequest(function(request, session) {
 }
 
 func TestResponseOverride(t *testing.T) {
+	test.Flaky(t)
+	pythonVersion := test.GetPythonVersion()
+
 	ts := StartTest(nil, TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
-			PythonVersion:    "3.5",
+			PythonVersion:    pythonVersion,
 		}})
 	defer ts.Close()
 
@@ -221,8 +228,6 @@ func TestResponseOverride(t *testing.T) {
 			spec.UseKeylessAccess = true
 			spec.CustomMiddlewareBundle = bundle
 		})
-
-		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/test/?status=200", Code: 200, BodyMatch: customError, HeadersMatch: customHeader},
@@ -242,4 +247,115 @@ func TestResponseOverride(t *testing.T) {
 	t.Run("JSVM", func(t *testing.T) {
 		testOverride(t, ts.RegisterBundle("jsvm_override", overrideResponseJSVM))
 	})
+}
+
+func TestPullBundle(t *testing.T) {
+
+	testCases := []struct {
+		name             string
+		expectedAttempts int
+		shouldErr        bool
+	}{
+		{
+			name:             "bundle downloaded at first attempt",
+			expectedAttempts: 1,
+			shouldErr:        false,
+		},
+		{
+			// failed the 2 first times
+			name:             "bundle downloaded at third attempt",
+			expectedAttempts: 3,
+			shouldErr:        false,
+		},
+		{
+			// should try 5 times, afterwards it will fail
+			name:             "bundle download failed",
+			expectedAttempts: 5,
+			shouldErr:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			attempts := 0
+
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				attempts++
+				if tc.expectedAttempts > attempts || tc.shouldErr {
+					// simulate file not found, so it will throw err
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer ts.Close()
+
+			getter := &HTTPBundleGetter{
+				URL:                ts.URL,
+				InsecureSkipVerify: false,
+			}
+			_, err := pullBundle(getter, 0)
+
+			didErr := err != nil
+			assert.Equal(t, tc.expectedAttempts, attempts)
+			assert.Equal(t, tc.shouldErr, didErr)
+		})
+	}
+}
+
+func TestBundle_Verify(t *testing.T) {
+
+	tests := []struct {
+		name    string
+		bundle  Bundle
+		wantErr bool
+	}{
+		{
+			name: "bundle with invalid public key path",
+			bundle: Bundle{
+				Name: "test",
+				Data: []byte("test"),
+				Path: "/test/test.zip",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Signature: "test-signature",
+				},
+				Gw: &Gateway{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "bundle without signature",
+			bundle: Bundle{
+				Name: "test",
+				Data: []byte("test"),
+				Path: "/test/test.zip",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Signature: "",
+				},
+				Gw: &Gateway{},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := tt.bundle
+
+			globalConf := config.Config{}
+			globalConf.PublicKeyPath = "test"
+			b.Gw.SetConfig(globalConf)
+
+			if err := b.Verify(); (err != nil) != tt.wantErr {
+				t.Errorf("Bundle.Verify() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }

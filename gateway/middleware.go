@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
@@ -29,7 +30,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const mwStatusRespond = 666
+const (
+	mwStatusRespond                = 666
+	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
+)
 
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
@@ -232,7 +236,8 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
-		t.Logger().Debug("Setting data expiry: ", session.OrgID)
+		t.Logger().Debug("Setting data expiry: ", orgID)
+
 		t.Gw.ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
@@ -253,16 +258,21 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 		if found {
 			return cachedVal, nil
 		}
+
 		s, found := t.OrgSession(orgid)
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 			return s.DataExpires, nil
 		}
+
 		return 0, errors.New("missing session")
 	})
 	if err != nil {
+
 		t.Logger().Debug("no cached entry found, returning 7 days")
-		return int64(604800)
+		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
+		return DEFAULT_ORG_SESSION_EXPIRATION
 	}
+
 	return id.(int64)
 }
 
@@ -278,7 +288,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		return false
 	}
 
-	lifetime := session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
+	lifetime := session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
 	if err := t.Gw.GlobalSessionManager.UpdateSession(token, session, lifetime, false); err != nil {
 		t.Logger().WithError(err).Error("Can't update session")
 		return false
@@ -363,6 +373,13 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
+				if r, ok := session.AccessRights[apiID]; ok {
+					// If GQL introspection is disabled, keep that configuration.
+					if r.DisableIntrospection {
+						accessRights.DisableIntrospection = r.DisableIntrospection
+					}
+				}
+
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
 
@@ -383,6 +400,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					// Merge ACLs for the same API
 					if r, ok := rights[k]; ok {
+						// If GQL introspection is disabled, keep that configuration.
+						if v.DisableIntrospection {
+							r.DisableIntrospection = v.DisableIntrospection
+						}
 						r.Versions = appendIfMissing(rights[k].Versions, v.Versions...)
 
 						for _, u := range v.AllowedURLs {
@@ -390,7 +411,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							for ai, au := range r.AllowedURLs {
 								if u.URL == au.URL {
 									found = true
-									r.AllowedURLs[ai].Methods = append(au.Methods, u.Methods...)
+									r.AllowedURLs[ai].Methods = appendIfMissing(au.Methods, u.Methods...)
 								}
 							}
 
@@ -403,6 +424,14 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							for ri, rt := range r.RestrictedTypes {
 								if t.Name == rt.Name {
 									r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+								}
+							}
+						}
+
+						for _, t := range v.AllowedTypes {
+							for ri, rt := range r.AllowedTypes {
+								if t.Name == rt.Name {
+									r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
 								}
 							}
 						}
@@ -556,7 +585,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	// set tags
 	session.Tags = []string{}
 	for tag := range tags {
-		session.Tags = append(session.Tags, tag)
+		session.Tags = appendIfMissing(session.Tags, tag)
 	}
 
 	if len(policies) == 0 {
@@ -724,14 +753,14 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 			return session, false
 		}
 
-		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
+		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 		ctxScheduleSessionUpdate(r)
-	} else {
-		// defaulting
-		session.KeyID = key
+		return session, found
 	}
 
-	return session, found
+	// session not found
+	session.KeyID = key
+	return session, false
 }
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
@@ -752,7 +781,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 
 	var (
 		key         string
-		defaultName = headers.Authorization
+		defaultName = header.Authorization
 	)
 
 	headerName := config.AuthHeaderName
@@ -767,7 +796,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	paramName := config.ParamName
-	if config.UseParam || paramName != "" {
+	if config.UseParam {
 		if paramName == "" {
 			paramName = defaultName
 		}
@@ -781,7 +810,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	cookieName := config.CookieName
-	if config.UseCookie || cookieName != "" {
+	if config.UseCookie {
 		if cookieName == "" {
 			cookieName = defaultName
 		}
@@ -798,6 +827,13 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	return key, config
+}
+
+func (b BaseMiddleware) generateSessionID(id string) string {
+	// generate a virtual token
+	data := []byte(id)
+	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	return b.Gw.generateToken(b.Spec.OrgID, keyID)
 }
 
 type TykResponseHandler interface {

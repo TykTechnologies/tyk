@@ -3,94 +3,20 @@ package gateway
 import (
 	"fmt"
 	"math/rand"
-	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk-pump/serializer"
+
 	maxminddb "github.com/oschwald/maxminddb-golang"
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 )
-
-type NetworkStats struct {
-	OpenConnections  int64
-	ClosedConnection int64
-	BytesIn          int64
-	BytesOut         int64
-}
-
-func (n *NetworkStats) Flush() NetworkStats {
-	s := NetworkStats{
-		OpenConnections:  atomic.LoadInt64(&n.OpenConnections),
-		ClosedConnection: atomic.LoadInt64(&n.ClosedConnection),
-		BytesIn:          atomic.LoadInt64(&n.BytesIn),
-		BytesOut:         atomic.LoadInt64(&n.BytesOut),
-	}
-	atomic.StoreInt64(&n.OpenConnections, 0)
-	atomic.StoreInt64(&n.ClosedConnection, 0)
-	atomic.StoreInt64(&n.BytesIn, 0)
-	atomic.StoreInt64(&n.BytesOut, 0)
-	return s
-}
-
-type Latency struct {
-	Total    int64
-	Upstream int64
-}
-
-// AnalyticsRecord encodes the details of a request
-type AnalyticsRecord struct {
-	Method        string
-	Host          string
-	Path          string // HTTP path, can be overriden by "track path" plugin
-	RawPath       string // Original HTTP path
-	ContentLength int64
-	UserAgent     string
-	Day           int
-	Month         time.Month
-	Year          int
-	Hour          int
-	ResponseCode  int
-	APIKey        string
-	TimeStamp     time.Time
-	APIVersion    string
-	APIName       string
-	APIID         string
-	OrgID         string
-	OauthID       string
-	RequestTime   int64
-	Latency       Latency
-	RawRequest    string // Base64 encoded request data (if detailed recording turned on)
-	RawResponse   string // ^ same but for response
-	IPAddress     string
-	Geo           GeoData
-	Network       NetworkStats
-	Tags          []string
-	Alias         string
-	TrackPath     bool
-	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
-}
-
-type GeoData struct {
-	Country struct {
-		ISOCode string `maxminddb:"iso_code"`
-	} `maxminddb:"country"`
-
-	City struct {
-		Names map[string]string `maxminddb:"names"`
-	} `maxminddb:"city"`
-
-	Location struct {
-		Latitude  float64 `maxminddb:"latitude"`
-		Longitude float64 `maxminddb:"longitude"`
-		TimeZone  string  `maxminddb:"time_zone"`
-	} `maxminddb:"location"`
-}
 
 const analyticsKeyName = "tyk-system-analytics"
 
@@ -98,45 +24,6 @@ const (
 	recordsBufferFlushInterval       = 200 * time.Millisecond
 	recordsBufferForcedFlushInterval = 1 * time.Second
 )
-
-func (a *AnalyticsRecord) GetGeo(ipStr string, gw *Gateway) {
-	// Not great, tightly coupled
-	if gw.analytics.GeoIPDB == nil {
-		return
-	}
-
-	record, err := geoIPLookup(ipStr, gw)
-	if err != nil {
-		log.Error("GeoIP Failure (not recorded): ", err)
-		return
-	}
-	if record == nil {
-		return
-	}
-
-	log.Debug("ISO Code: ", record.Country.ISOCode)
-	log.Debug("City: ", record.City.Names["en"])
-	log.Debug("Lat: ", record.Location.Latitude)
-	log.Debug("Lon: ", record.Location.Longitude)
-	log.Debug("TZ: ", record.Location.TimeZone)
-
-	a.Geo = *record
-}
-
-func geoIPLookup(ipStr string, gw *Gateway) (*GeoData, error) {
-	if ipStr == "" {
-		return nil, nil
-	}
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid IP address %q", ipStr)
-	}
-	record := new(GeoData)
-	if err := gw.analytics.GeoIPDB.Lookup(ip, record); err != nil {
-		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %v", ipStr, err)
-	}
-	return record, nil
-}
 
 func (gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
@@ -152,37 +39,13 @@ func (gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns
 	return
 }
 
-func (a *AnalyticsRecord) NormalisePath(globalConfig *config.Config) {
-	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
-		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
-	}
-	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
-		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
-	}
-	for _, r := range globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
-		a.Path = r.ReplaceAllString(a.Path, "{var}")
-	}
-}
-
-func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
-	expiry := time.Duration(expiresInSeconds) * time.Second
-	if expiresInSeconds == 0 {
-		// Expiry is set to 100 years
-		expiry = (24 * time.Hour) * (365 * 100)
-	}
-
-	t := time.Now()
-	t2 := t.Add(expiry)
-	a.ExpireAt = t2
-}
-
 // RedisAnalyticsHandler will record analytics data to a redis back end
 // as defined in the Config object
 type RedisAnalyticsHandler struct {
 	Store                       storage.AnalyticsHandler
 	GeoIPDB                     *maxminddb.Reader
 	globalConf                  config.Config
-	recordsChan                 chan *AnalyticsRecord
+	recordsChan                 chan *analytics.AnalyticsRecord
 	workerBufferSize            uint64
 	shouldStop                  uint32
 	poolWg                      sync.WaitGroup
@@ -190,6 +53,11 @@ type RedisAnalyticsHandler struct {
 	Clean                       Purger
 	Gw                          *Gateway `json:"-"`
 	mu                          sync.Mutex
+	analyticsSerializer         serializer.AnalyticsSerializer
+
+	// testing purposes
+	mockEnabled   bool
+	mockRecordHit func(record *analytics.AnalyticsRecord)
 }
 
 func (r *RedisAnalyticsHandler) Init() {
@@ -208,17 +76,23 @@ func (r *RedisAnalyticsHandler) Init() {
 
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
-	r.enableMultipleAnalyticsKeys = r.Gw.GetConfig().AnalyticsConfig.EnableMultipleAnalyticsKeys
-	r.recordsChan = make(chan *AnalyticsRecord, recordsBufferSize)
+	r.enableMultipleAnalyticsKeys = r.globalConf.AnalyticsConfig.EnableMultipleAnalyticsKeys
+	r.analyticsSerializer = serializer.NewAnalyticsSerializer(r.globalConf.AnalyticsConfig.SerializerType)
 
-	// start worker pool
+	r.Start()
+}
+
+//Start initialize the records channel and spawn the record workers
+func (r *RedisAnalyticsHandler) Start() {
+	r.recordsChan = make(chan *analytics.AnalyticsRecord, r.globalConf.AnalyticsConfig.RecordsBufferSize)
 	atomic.SwapUint32(&r.shouldStop, 0)
-	for i := 0; i < ps; i++ {
+	for i := 0; i < r.Gw.GetConfig().AnalyticsConfig.PoolSize; i++ {
 		r.poolWg.Add(1)
 		go r.recordWorker()
 	}
 }
 
+//Stop stops the analytics processing
 func (r *RedisAnalyticsHandler) Stop() {
 	// flag to stop sending records into channel
 	atomic.SwapUint32(&r.shouldStop, 1)
@@ -232,8 +106,20 @@ func (r *RedisAnalyticsHandler) Stop() {
 	r.poolWg.Wait()
 }
 
-// RecordHit will store an AnalyticsRecord in Redis
-func (r *RedisAnalyticsHandler) RecordHit(record *AnalyticsRecord) error {
+//Flush will stop the analytics processing and empty the analytics buffer and then re-init the workers again
+func (r *RedisAnalyticsHandler) Flush() {
+	r.Stop()
+
+	r.Start()
+}
+
+// RecordHit will store an analytics.Record in Redis
+func (r *RedisAnalyticsHandler) RecordHit(record *analytics.AnalyticsRecord) error {
+	if r.mockEnabled {
+		r.mockRecordHit(record)
+		return nil
+	}
+
 	// check if we should stop sending records 1st
 	if atomic.LoadUint32(&r.shouldStop) > 0 {
 		return nil
@@ -264,10 +150,20 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			suffix := rand.Intn(10)
 			analyticKey = fmt.Sprintf("%v_%v", analyticKey, suffix)
 		}
-		readyToSend := false
-		select {
+		serliazerSuffix := r.analyticsSerializer.GetSuffix()
+		analyticKey += serliazerSuffix
 
+		readyToSend := false
+
+		flushTimer := time.NewTimer(recordsBufferFlushInterval)
+
+		select {
 		case record, ok := <-r.recordsChan:
+			if !flushTimer.Stop() {
+				// if the timer has been stopped then read from the channel to avoid leak
+				<-flushTimer.C
+			}
+
 			// check if channel was closed and it is time to exit from worker
 			if !ok {
 				// send what is left in buffer
@@ -309,7 +205,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 				record.RawPath = "/" + record.RawPath
 			}
 
-			if encoded, err := msgpack.Marshal(record); err != nil {
+			if encoded, err := r.analyticsSerializer.Encode(record); err != nil {
 				log.WithError(err).Error("Error encoding analytics data")
 			} else {
 				recordsBuffer = append(recordsBuffer, encoded)
@@ -317,8 +213,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 			// identify that buffer is ready to be sent
 			readyToSend = uint64(len(recordsBuffer)) == r.workerBufferSize
-
-		case <-time.After(recordsBufferFlushInterval):
+		case <-flushTimer.C:
 			// nothing was received for that period of time
 			// anyways send whatever we have, don't hold data too long in buffer
 			readyToSend = true
@@ -335,4 +230,19 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 func DurationToMillisecond(d time.Duration) float64 {
 	return float64(d) / 1e6
+}
+
+func NormalisePath(a *analytics.AnalyticsRecord, globalConfig *config.Config) {
+
+	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
+		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
+	}
+
+	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
+		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
+	}
+
+	for _, r := range globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
+		a.Path = r.ReplaceAllString(a.Path, "{var}")
+	}
 }

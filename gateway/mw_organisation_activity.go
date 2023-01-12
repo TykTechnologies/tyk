@@ -49,7 +49,7 @@ func (k *OrganizationMonitor) setOrgHasNoSession(val bool) {
 	k.Spec.OrgHasNoSession = val
 }
 
-func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
+func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Skip rate limiting and quotas for looping
 	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
@@ -115,7 +115,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		false,
 	)
 
-	sessionLifeTime := orgSession.Lifetime(k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
+	sessionLifeTime := orgSession.Lifetime(k.Spec.GetSessionLifetimeRespectsKeyExpiration(), k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
 
 	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, orgSession, sessionLifeTime, false); err == nil {
 		// update in-app cache if needed
@@ -171,7 +171,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 	}
 
 	// Lets keep a reference of the org
-	setCtxValue(r, ctx.OrgSessionContext, &orgSession)
+	setCtxValue(r, ctx.OrgSessionContext, orgSession)
 
 	// Request is valid, carry on
 	return nil, http.StatusOK
@@ -246,7 +246,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		false,
 	)
 
-	sessionLifeTime := session.Lifetime(k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
+	sessionLifeTime := session.Lifetime(k.Spec.GetSessionLifetimeRespectsKeyExpiration(), k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
 
 	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, session, sessionLifeTime, false); err == nil {
 		// update in-app cache if needed

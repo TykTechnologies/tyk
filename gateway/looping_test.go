@@ -1,3 +1,4 @@
+//go:build !race
 // +build !race
 
 // Looping by itself has race nature
@@ -7,6 +8,11 @@ import (
 	"encoding/json"
 	"sync"
 	"testing"
+
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -198,7 +204,7 @@ func TestLooping(t *testing.T) {
                 }
                 return TykJsResponse(resp, session.meta_data)
             }
-        `, "POST", "/virt", true, true)
+        `, "POST", "/virt", true, true, false)
 
 		ts.Run(t, []test.TestCase{
 			{Method: "POST", Path: "/virt", Data: postAction, BodyMatch: `"Url":"/post_action`},
@@ -265,6 +271,59 @@ func TestLooping(t *testing.T) {
 			{Method: "GET", Path: "/recursion", Headers: authHeaders, BodyNotMatch: "Quota exceeded"},
 		}...)
 	})
+
+	t.Run("loop external native def to internal OAS", func(t *testing.T) {
+		// Create internal OAS API
+		tykExtension := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "internal",
+				ID:   "internal-api",
+				State: oas.State{
+					Active:   false,
+					Internal: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/internal/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "oas doc",
+				Version: "1",
+			},
+			Paths: make(openapi3.Paths),
+		}
+
+		oasObj := oas.OAS{T: oasAPI}
+		oasObj.SetTykExtension(&tykExtension)
+
+		oasAPIDef := apidef.APIDefinition{}
+		oasObj.ExtractTo(&oasAPIDef)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "external-api"
+			spec.Name = "external"
+			spec.Proxy.ListenPath = "/external/"
+			spec.Proxy.TargetURL = "tyk://internal/"
+		}, func(spec *APISpec) {
+			spec.APIDefinition = &oasAPIDef
+			spec.OAS = oasObj
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/external/", Code: 200},
+		}...)
+	})
+
 }
 
 func TestConcurrencyReloads(t *testing.T) {

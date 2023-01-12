@@ -6,10 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/user"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // SessionHandler handles all update/create/access session functions and deals exclusively with
@@ -63,15 +64,15 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	}).Info("Reset quota for key.")
 
 	rateLimiterSentinelKey := RateLimitKeyPrefix + keyName + ".BLOCKED"
+
 	// Clear the rate limiter
-	go b.store.DeleteRawKey(rateLimiterSentinelKey)
+	b.store.DeleteRawKey(rateLimiterSentinelKey)
 	// Fix the raw key
-	go b.store.DeleteRawKey(rawKey)
-	//go b.store.SetKey(rawKey, "0", session.QuotaRenewalRate)
+	b.store.DeleteRawKey(rawKey)
 
 	for _, acl := range session.AccessRights {
 		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
-		go b.store.DeleteRawKey(rawKey)
+		b.store.DeleteRawKey(rawKey)
 	}
 }
 

@@ -16,7 +16,7 @@ import (
 
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -74,7 +74,7 @@ func (k *BasicAuthKeyIsValid) EnabledForSpec() bool {
 func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg string) (error, int) {
 	authReply := "Basic realm=\"" + k.Spec.Name + "\""
 
-	w.Header().Add(headers.WWWAuthenticate, authReply)
+	w.Header().Add(header.WWWAuthenticate, authReply)
 	return errors.New(msg), http.StatusUnauthorized
 }
 
@@ -162,10 +162,10 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	username, password, err, code := k.basicAuthHeaderCredentials(w, r)
-	token := r.Header.Get(headers.Authorization)
+	token := r.Header.Get(header.Authorization)
 	if err != nil {
 		if k.Spec.BasicAuth.ExtractFromBody {
-			w.Header().Del(headers.WWWAuthenticate)
+			w.Header().Del(header.WWWAuthenticate)
 			username, password, err, code = k.basicAuthBodyCredentials(w, r)
 		} else {
 			k.Logger().Warn("Attempted access with malformed header, no auth header found.")
@@ -199,17 +199,9 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	switch session.BasicAuthData.Hash {
-	case user.HashBCrypt:
-		if err := k.compareHashAndPassword(session.BasicAuthData.Password, password, logger); err != nil {
-			logger.Warn("Attempted access with existing user, failed password check.")
-			return k.handleAuthFail(w, r, token)
-		}
-	case user.HashPlainText:
-		if session.BasicAuthData.Password != password {
-			logger.Warn("Attempted access with existing user, failed password check.")
-			return k.handleAuthFail(w, r, token)
-		}
+	if err := k.checkPassword(&session, password, logger); err != nil {
+		logger.WithError(err).Warn("Attempted access with existing user, failed password check.")
+		return k.handleAuthFail(w, r, token)
 	}
 
 	// Set session state on context, we will need it later
@@ -221,8 +213,37 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	return nil, http.StatusOK
 }
 
-func (k *BasicAuthKeyIsValid) handleAuthFail(w http.ResponseWriter, r *http.Request, token string) (error, int) {
+var errUnauthorized = errors.New("Unauthorized")
 
+func (k *BasicAuthKeyIsValid) checkPassword(session *user.SessionState, plainPassword string, logger *logrus.Entry) error {
+	switch session.BasicAuthData.Hash {
+	case user.HashPlainText:
+		if session.BasicAuthData.Password != plainPassword {
+			return errUnauthorized
+		}
+
+	case user.HashSha256, user.HashMurmur32, user.HashMurmur64, user.HashMurmur128:
+		// Verify we have a valid Hash value
+		hashAlgo := string(session.BasicAuthData.Hash)
+
+		// Checks the storage algo picked
+		hashedPassword := storage.HashStr(plainPassword, hashAlgo)
+		if session.BasicAuthData.Password != hashedPassword {
+			return errUnauthorized
+		}
+
+	case user.HashBCrypt:
+		fallthrough
+
+	default:
+		if err := k.compareHashAndPassword(session.BasicAuthData.Password, plainPassword, logger); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (k *BasicAuthKeyIsValid) handleAuthFail(w http.ResponseWriter, r *http.Request, token string) (error, int) {
 	// Fire Authfailed Event
 	AuthFailed(k, r, token)
 
@@ -270,8 +291,8 @@ func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password strin
 
 	hasher := murmur3.New64()
 	hasher.Write(passwordBytes)
-	if cachedPass.(string) != string(hasher.Sum(nil)) {
 
+	if cachedPass.(string) != string(hasher.Sum(nil)) {
 		logEntry.Warn("cache enabled: hit: failed auth: bcrypt")
 		return bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
 	}

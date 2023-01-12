@@ -172,6 +172,9 @@
         },
         "type": {
           "type": "string"
+        },
+        "serializer_type": {
+          "type": "string"
         }
       }
     },
@@ -420,6 +423,9 @@
     "global_session_lifetime": {
       "type": "integer"
     },
+    "session_lifetime_respects_key_expiration": {
+      "type": "boolean"
+    },
     "graylog_network_addr": {
       "type": "string"
     },
@@ -451,6 +457,17 @@
           "sha256"
         ]
       }
+    },
+    "basic_auth_hash_key_function": {
+      "type": "string",
+      "enum": [
+        "",
+        "bcrypt",
+        "murmur32",
+        "murmur64",
+        "murmur128",
+        "sha256"
+      ]
     },
     "health_check": {
       "type": [
@@ -529,6 +546,9 @@
           }
         },
         "enable_websockets": {
+          "type": "boolean"
+        },
+        "enable_strict_routes": {
           "type": "boolean"
         },
         "flush_interval": {
@@ -909,6 +929,15 @@
         },
         "key_space_sync_interval": {
           "type": "number"
+        },
+        "rpc_cert_cache_expiration": {
+          "type": "number"
+        },
+        "rpc_global_cache_expiration": {
+          "type": "number"
+        },
+        "synchroniser_enabled" : {
+          "type": "boolean"
         }
       }
     },

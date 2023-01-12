@@ -24,12 +24,13 @@ import (
 
 	"golang.org/x/net/http2/h2c"
 
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	pb "google.golang.org/grpc/examples/helloworld/helloworld"
+
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk in H2C configuration also for insecure grpc over http.
@@ -481,7 +482,9 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 }
 
 // server is used to implement helloworld.GreeterServer.
-type server struct{}
+type server struct {
+	pb.UnimplementedGreeterServer
+}
 
 // SayHello implements helloworld.GreeterServer
 func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {

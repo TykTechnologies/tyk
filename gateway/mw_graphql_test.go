@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -11,10 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 
-	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -40,6 +41,7 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 
 	t.Run("Introspection query with custom query type should successfully work", func(t *testing.T) {
 		spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: word } type word { numOfLetters: Int }"
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 		g.Gw.LoadAPI(spec)
 
 		request := gql.Request{
@@ -111,11 +113,11 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 		})
 
 		authHeaderWithDirectKey := map[string]string{
-			headers.Authorization: directKey,
+			header.Authorization: directKey,
 		}
 
 		authHeaderWithPolicyAppliedKey := map[string]string{
-			headers.Authorization: policyAppliedKey,
+			header.Authorization: policyAppliedKey,
 		}
 
 		request := gql.Request{
@@ -161,7 +163,7 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 		t.Run("Invalid query should return 403 when auth is failing", func(t *testing.T) {
 			request.Query = "query Hello {"
 			authHeaderWithInvalidDirectKey := map[string]string{
-				headers.Authorization: "invalid key",
+				header.Authorization: "invalid key",
 			}
 			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithInvalidDirectKey, Data: request, BodyMatch: "", Code: http.StatusForbidden})
 		})
@@ -204,6 +206,31 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 	})
 
+	t.Run("Inspect __typename without hitting the upstream", func(t *testing.T) {
+		// See TT-6419
+		g := StartTest(nil)
+		defer g.Close()
+
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/"
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		})
+
+		request := gql.Request{
+			Variables: nil,
+			Query:     "query { __typename }",
+		}
+
+		expectedBody := []byte(`{"data":{"__typename":"Query"}}`)
+		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatchFunc: func(body []byte) bool {
+			return bytes.Equal(expectedBody, body)
+		},
+			Code: http.StatusOK})
+	})
+
 	t.Run("graphql engine v2", func(t *testing.T) {
 		g := StartTest(nil)
 		defer g.Close()
@@ -214,7 +241,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 				spec.GraphQL.Schema = gqlProxyUpstreamSchema
-				spec.GraphQL.Proxy.AuthHeaders = map[string]string{
+				spec.GraphQL.Proxy.RequestHeaders = map[string]string{
 					"Authorization": "123abc",
 				}
 				spec.Proxy.ListenPath = "/"
@@ -397,11 +424,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
-								headers.Connection:           "upgrade",
-								headers.Upgrade:              "websocket",
-								headers.SecWebSocketProtocol: "graphql-ws",
-								headers.SecWebSocketVersion:  "13",
-								headers.SecWebSocketKey:      "123abc",
+								header.Connection:           "upgrade",
+								header.Upgrade:              "websocket",
+								header.SecWebSocketProtocol: "graphql-ws",
+								header.SecWebSocketVersion:  "13",
+								header.SecWebSocketKey:      "123abc",
 							},
 							Code:      http.StatusUnprocessableEntity,
 							BodyMatch: "websockets are not allowed",
@@ -419,11 +446,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
-								headers.Connection:           "upgrade",
-								headers.Upgrade:              "websocket",
-								headers.SecWebSocketProtocol: "invalid",
-								headers.SecWebSocketVersion:  "13",
-								headers.SecWebSocketKey:      "123abc",
+								header.Connection:           "upgrade",
+								header.Upgrade:              "websocket",
+								header.SecWebSocketProtocol: "invalid",
+								header.SecWebSocketVersion:  "13",
+								header.SecWebSocketKey:      "123abc",
 							},
 							Code:      http.StatusBadRequest,
 							BodyMatch: "invalid websocket protocol for upgrading to a graphql websocket connection",
@@ -433,7 +460,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 				t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
 					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-						headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+						header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
 					})
 					require.NoError(t, err)
 					defer wsConn.Close()
@@ -470,8 +497,8 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						})
 
 						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
-							headers.Authorization:        {directKey},
+							header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							header.Authorization:        {directKey},
 						})
 						require.NoError(t, err)
 						defer wsConn.Close()
@@ -506,8 +533,8 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						})
 
 						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
-							headers.Authorization:        {directKey},
+							header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							header.Authorization:        {directKey},
 						})
 						require.NoError(t, err)
 						defer wsConn.Close()
@@ -608,11 +635,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
-								headers.Connection:           "upgrade",
-								headers.Upgrade:              "websocket",
-								headers.SecWebSocketProtocol: "graphql-ws",
-								headers.SecWebSocketVersion:  "13",
-								headers.SecWebSocketKey:      "123abc",
+								header.Connection:           "upgrade",
+								header.Upgrade:              "websocket",
+								header.SecWebSocketProtocol: "graphql-ws",
+								header.SecWebSocketVersion:  "13",
+								header.SecWebSocketKey:      "123abc",
 							},
 							Code:      http.StatusUnprocessableEntity,
 							BodyMatch: "websockets are not allowed",
@@ -630,11 +657,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
-								headers.Connection:           "upgrade",
-								headers.Upgrade:              "websocket",
-								headers.SecWebSocketProtocol: "graphql-ws",
-								headers.SecWebSocketVersion:  "13",
-								headers.SecWebSocketKey:      "123abc",
+								header.Connection:           "upgrade",
+								header.Upgrade:              "websocket",
+								header.SecWebSocketProtocol: "graphql-ws",
+								header.SecWebSocketVersion:  "13",
+								header.SecWebSocketKey:      "123abc",
 							},
 							Code:      http.StatusUnprocessableEntity,
 							BodyMatch: "websockets are not allowed",
@@ -938,6 +965,15 @@ input StringQueryOperatorInput {
 
 scalar Upload`
 
+const gqlContinentQuery = `
+query {
+    continent(code: "NG"){
+        code
+        name
+    }
+}
+`
+
 const gqlSubgraphSchemaAccounts = `scalar _Any
 scalar _FieldSet
 union _Entity = User
@@ -948,6 +984,7 @@ type _Service {
 
 type Query {
   me: User
+  allUsers: [User]
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
 }
@@ -965,12 +1002,65 @@ directive @extends on OBJECT | INTERFACE`
 
 const gqlSubgraphSDLAccounts = `extend type Query {
 	me: User
+	allUsers: [User]
 } 
 
 type User @key(fields: "id") { 
 	id: ID! 
 	username: String!
 }`
+
+const gqlSubgraphSDLBankAccounts = `
+extend type User @key(fields: "id") {
+  id: ID! @extends
+  account: [BankAccount!]
+}
+
+type BankAccount {
+  number: String
+  balance: Float
+}
+`
+
+const gqlSubgraphSchemaBankAccounts = `
+extend type User @key(fields: "id"){
+    id: ID! @extends
+    account: [BankAccount!]
+}
+
+type BankAccount {
+    number: String
+    balance: Float 
+}
+
+scalar _Any
+scalar _FieldSet
+union _Entity = User
+
+type _Service {
+  sdl: String
+}
+
+type Query {
+  _entities(representations: [_Any!]!): [_Entity]!
+  _service: _Service!
+}
+
+type BankAccount {
+    number: String
+    balance: Float 
+}
+
+type User @key(fields: "id"){
+    id: ID! @extends
+    account: [BankAccount!]
+}
+
+directive @external on FIELD_DEFINITION
+directive @requires(fields: _FieldSet!) on FIELD_DEFINITION
+directive @provides(fields: _FieldSet!) on FIELD_DEFINITION
+directive @key(fields: _FieldSet!) on OBJECT | INTERFACE
+directive @extends on OBJECT | INTERFACE`
 
 const gqlSubgraphSchemaReviews = `scalar _Any
 scalar _FieldSet
@@ -1045,6 +1135,7 @@ const gqlSubgraphVariables = `{
 
 const gqlMergedSupergraphSDL = `type Query {
 	me: User
+	allUsers: [User]
 	topProducts(first: Int = 5): [Product]
 }
 
@@ -1056,6 +1147,12 @@ type User {
 	id: ID!
 	username: String!
 	reviews: [Review]
+	account: [BankAccount!]
+}
+
+type BankAccount {
+    number: String
+    balance: Float 
 }
 
 type Product {

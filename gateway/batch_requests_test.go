@@ -12,13 +12,13 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
 
+	"github.com/valyala/fasthttp"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
-	"github.com/valyala/fasthttp"
 )
 
 const testBatchRequest = `{
@@ -239,9 +239,6 @@ func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 			}
 		})
 	})
-
-	// Let the server start
-	time.Sleep(500 * time.Millisecond)
 
 	ts.Run(t, test.TestCase{Path: "/virt", Code: 202})
 	got := header.Load().(string)

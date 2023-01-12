@@ -13,16 +13,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 )
 
 const (
 	defaultTemplateName   = "error"
 	defaultTemplateFormat = "json"
-	defaultContentType    = headers.ApplicationJSON
+	defaultContentType    = header.ApplicationJSON
 
 	MsgAuthFieldMissing                        = "Authorization field missing"
 	MsgApiAccessDisallowed                     = "Access to this API has been disallowed"
@@ -86,6 +89,7 @@ func defaultTykErrors() {
 
 func overrideTykErrors(gw *Gateway) {
 	gwConfig := gw.GetConfig()
+
 	for id, err := range gwConfig.OverrideMessages {
 
 		overridenErr := TykErrors[id]
@@ -126,24 +130,24 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	if writeResponse {
 		var templateExtension string
-		contentType := r.Header.Get(headers.ContentType)
+		contentType := r.Header.Get(header.ContentType)
 		contentType = strings.Split(contentType, ";")[0]
 
 		switch contentType {
-		case headers.ApplicationXML:
+		case header.ApplicationXML:
 			templateExtension = "xml"
-			contentType = headers.ApplicationXML
-		case headers.TextXML:
+			contentType = header.ApplicationXML
+		case header.TextXML:
 			templateExtension = "xml"
-			contentType = headers.TextXML
+			contentType = header.TextXML
 		default:
 			templateExtension = "json"
-			contentType = headers.ApplicationJSON
+			contentType = header.ApplicationJSON
 		}
 
-		w.Header().Set(headers.ContentType, contentType)
+		w.Header().Set(header.ContentType, contentType)
 		response.Header = http.Header{}
-		response.Header.Set(headers.ContentType, contentType)
+		response.Header.Set(header.ContentType, contentType)
 		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
@@ -159,21 +163,21 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if tmpl == nil {
 			templateName = defaultTemplateName + "." + defaultTemplateFormat
 			tmpl = e.Gw.templates.Lookup(templateName)
-			w.Header().Set(headers.ContentType, defaultContentType)
-			response.Header.Set(headers.ContentType, defaultContentType)
+			w.Header().Set(header.ContentType, defaultContentType)
+			response.Header.Set(header.ContentType, defaultContentType)
 
 		}
 
 		//If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
-			w.Header().Add(headers.XGenerator, "tyk.io")
-			response.Header.Add(headers.XGenerator, "tyk.io")
+			w.Header().Add(header.XGenerator, "tyk.io")
+			response.Header.Add(header.XGenerator, "tyk.io")
 		}
 
 		// Close connections
 		if e.Spec.GlobalConfig.CloseConnections {
-			w.Header().Add(headers.Connection, "close")
-			response.Header.Add(headers.Connection, "close")
+			w.Header().Add(header.Connection, "close")
+			response.Header.Add(header.Connection, "close")
 
 		}
 
@@ -185,7 +189,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			tmplExecutor = tmpl
 
 			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
-			if contentType == headers.ApplicationXML || contentType == headers.TextXML {
+
+			if contentType == header.ApplicationXML || contentType == header.TextXML {
 				apiError.Message = template.HTML(errMsg)
 
 				//we look up in the last defined templateName to obtain the template.
@@ -214,6 +219,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	var alias string
 
 	ip := request.RealIP(r)
+
 	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
 
 		t := time.Now()
@@ -221,6 +227,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		addVersionHeader(w, r, e.Spec.GlobalConfig)
 
 		version := e.Spec.getVersionFromRequest(r)
+
 		if version == "" {
 			version = "Non Versioned"
 		}
@@ -232,6 +239,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		oauthClientID := ""
 		session := ctxGetSession(r)
 		tags := make([]string, 0, estimateTagsCapacity(session, e.Spec))
+
 		if session != nil {
 			oauthClientID = session.OauthClientID
 			alias = session.Alias
@@ -248,6 +256,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		rawRequest := ""
 		rawResponse := ""
+
 		if recordDetail(r, e.Spec) {
 
 			// Get the wire format representation
@@ -264,53 +273,60 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		trackEP := false
 		trackedPath := r.URL.Path
+
 		if p := ctxGetTrackedPath(r); p != "" {
 			trackEP = true
 			trackedPath = p
 		}
 
 		host := r.URL.Host
+
 		if host == "" && e.Spec.target != nil {
 			host = e.Spec.target.Host
 		}
 
-		record := AnalyticsRecord{
-			r.Method,
-			host,
-			trackedPath,
-			r.URL.Path,
-			r.ContentLength,
-			r.Header.Get(headers.UserAgent),
-			t.Day(),
-			t.Month(),
-			t.Year(),
-			t.Hour(),
-			errCode,
-			token,
-			t,
-			version,
-			e.Spec.Name,
-			e.Spec.APIID,
-			e.Spec.OrgID,
-			oauthClientID,
-			0,
-			Latency{},
-			rawRequest,
-			rawResponse,
-			ip,
-			GeoData{},
-			NetworkStats{},
-			tags,
-			alias,
-			trackEP,
-			t,
+		record := analytics.AnalyticsRecord{
+			Method:        r.Method,
+			Host:          host,
+			Path:          trackedPath,
+			RawPath:       r.URL.Path,
+			ContentLength: r.ContentLength,
+			UserAgent:     r.Header.Get(header.UserAgent),
+			Day:           t.Day(),
+			Month:         t.Month(),
+			Year:          t.Year(),
+			Hour:          t.Hour(),
+			ResponseCode:  errCode,
+			APIKey:        token,
+			TimeStamp:     t,
+			APIVersion:    version,
+			APIName:       e.Spec.Name,
+			APIID:         e.Spec.APIID,
+			OrgID:         e.Spec.OrgID,
+			OauthID:       oauthClientID,
+			RequestTime:   0,
+			Latency:       analytics.Latency{},
+			RawRequest:    rawRequest,
+			RawResponse:   rawResponse,
+			IPAddress:     ip,
+			Geo:           analytics.GeoData{},
+			Network:       analytics.NetworkStats{},
+			Tags:          tags,
+			Alias:         alias,
+			TrackPath:     trackEP,
+			ExpireAt:      t,
 		}
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip, e.Gw)
+			record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)
+		}
+		if e.Spec.GraphQL.Enabled && e.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
+			record.Tags = append(record.Tags, "tyk-graph-analytics")
+			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(e.Spec.GraphQL.Schema))
 		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
+
 		if e.Spec.GlobalConfig.EnforceOrgDataAge {
 			orgExpireDataTime := e.OrgSessionExpiry(e.Spec.OrgID)
 
@@ -319,12 +335,18 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			}
 
 		}
-
 		record.SetExpiry(expiresAfter)
+
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-			record.NormalisePath(&e.Spec.GlobalConfig)
+			NormalisePath(&record, &e.Spec.GlobalConfig)
 		}
-		err := e.Gw.analytics.RecordHit(&record)
+
+		if e.Spec.AnalyticsPlugin.Enabled {
+			_ = e.Spec.AnalyticsPluginConfig.processRecord(&record)
+		}
+
+		err := e.Gw.Analytics.RecordHit(&record)
+
 		if err != nil {
 			log.WithError(err).Error("could not store analytic record")
 		}

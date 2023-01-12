@@ -1,13 +1,18 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
 
+	"github.com/buger/jsonparser"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -20,16 +25,16 @@ func MyPluginPre(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rw.Header().Add(headers.XInitialURI, r.URL.RequestURI())
+	rw.Header().Add(header.XInitialURI, r.URL.RequestURI())
 }
 
 // MyPluginAuthCheck does custom auth and will be used as
 // "auth_check" custom MW
 func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	// perform auth (only one token "abc" is allowed)
-	token := r.Header.Get(headers.Authorization)
+	token := r.Header.Get(header.Authorization)
 	if token != "abc" {
-		rw.Header().Add(headers.XAuthResult, "failed")
+		rw.Header().Add(header.XAuthResult, "failed")
 		rw.WriteHeader(http.StatusForbidden)
 		_, _ = rw.Write([]byte("auth failed"))
 		return
@@ -43,7 +48,7 @@ func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx.SetSession(r, session, true, true)
-	rw.Header().Add(headers.XAuthResult, "OK")
+	rw.Header().Add(header.XAuthResult, "OK")
 }
 
 // MyPluginPostKeyAuth checks if session is present, adds custom header with session-alias
@@ -51,12 +56,12 @@ func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 func MyPluginPostKeyAuth(rw http.ResponseWriter, r *http.Request) {
 	session := ctx.GetSession(r)
 	if session == nil {
-		rw.Header().Add(headers.XSessionAlias, "not found")
+		rw.Header().Add(header.XSessionAlias, "not found")
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	rw.Header().Add(headers.XSessionAlias, session.Alias)
+	rw.Header().Add(header.XSessionAlias, session.Alias)
 }
 
 // MyPluginPost prepares and sends reply, will be used as "post" custom MW
@@ -84,7 +89,7 @@ func MyPluginPost(rw http.ResponseWriter, r *http.Request) {
 		}
 
 	}
-	rw.Header().Set(headers.ContentType, headers.ApplicationJSON)
+	rw.Header().Set(header.ContentType, header.ApplicationJSON)
 	rw.WriteHeader(http.StatusOK)
 	rw.Write(jsonData)
 }
@@ -142,4 +147,50 @@ func MyPluginPerPathResp(rw http.ResponseWriter, r *http.Request) {
 	rw.Write(jsonData)
 }
 
-func main() {}
+func MyAnalyticsPluginDeleteHeader(record *analytics.AnalyticsRecord) {
+	str, err := base64.StdEncoding.DecodeString(record.RawResponse)
+	if err != nil {
+		return
+	}
+
+	var b = &bytes.Buffer{}
+	b.Write(str)
+
+	r := bufio.NewReader(b)
+	var resp *http.Response
+	resp, err = http.ReadResponse(r, nil)
+	if err != nil {
+		return
+	}
+	resp.Header.Del("Server")
+	var bNew bytes.Buffer
+	_ = resp.Write(&bNew)
+	record.RawResponse = base64.StdEncoding.EncodeToString(bNew.Bytes())
+}
+
+func MyAnalyticsPluginMaskJSONLoginBody(record *analytics.AnalyticsRecord) {
+	if record.ContentLength < 1 {
+		return
+	}
+	d, err := base64.StdEncoding.DecodeString(record.RawRequest)
+	if err != nil {
+		return
+	}
+	var mask = []byte("\"****\"")
+	const endOfHeaders = "\r\n\r\n"
+	paths := [][]string{
+		{"email"},
+		{"password"},
+		{"data", "email"},
+		{"data", "password"},
+	}
+	if i := bytes.Index(d, []byte(endOfHeaders)); i > 0 || (i+4) < len(d) {
+		body := d[i+4:]
+		jsonparser.EachKey(body, func(idx int, _ []byte, _ jsonparser.ValueType, _ error) {
+			body, _ = jsonparser.Set(body, mask, paths[idx]...)
+		}, paths...)
+		if err == nil {
+			record.RawRequest = base64.StdEncoding.EncodeToString(append(d[:i+4], body...))
+		}
+	}
+}

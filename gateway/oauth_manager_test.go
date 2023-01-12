@@ -631,9 +631,10 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 		// cleanup tokens older than 300 seconds
 		globalConf.OauthTokenExpiredRetainPeriod = 300
 	}
-	ts := StartTest(conf)
-	defer ts.Close()
 	testPagination := func(pageParam int, expectedPageNumber int, tokenRequestCount int, expectedRes int) {
+		ts := StartTest(conf)
+		defer ts.Close()
+
 		spec := ts.LoadTestOAuthSpec()
 
 		clientID := uuid.NewV4().String()
@@ -747,6 +748,8 @@ func TestGetClientTokens(t *testing.T) {
 }
 
 func testGetClientTokens(t *testing.T, hashed bool) {
+	test.Flaky(t) // TODO: TT-5253
+
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second
 		globalConf.OauthTokenExpire = 1

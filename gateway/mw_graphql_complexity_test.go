@@ -4,10 +4,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/user"
 )

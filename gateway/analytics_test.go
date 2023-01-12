@@ -1,10 +1,463 @@
 package gateway
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
+
+func TestAnalytics_Write(t *testing.T) {
+
+	tcs := []struct {
+		TestName            string
+		analyticsSerializer string
+	}{
+		{
+			TestName:            "Testing analytics flows with msgpack",
+			analyticsSerializer: "",
+		},
+		{
+			TestName:            "Testing analytics flows with protobuf",
+			analyticsSerializer: "protobuf",
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.TestName, func(t *testing.T) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.AnalyticsConfig.SerializerType = tc.analyticsSerializer
+			}, TestConfig{
+				Delay: 20 * time.Millisecond,
+			})
+
+			defer ts.Close()
+			base := ts.Gw.GetConfig()
+
+			redisAnalyticsKeyName := analyticsKeyName + ts.Gw.Analytics.analyticsSerializer.GetSuffix()
+
+			// Cleanup before test
+			// let records to be sent
+			ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+
+			t.Run("Log errors", func(t *testing.T) {
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+				})
+
+				_, err := ts.Run(t, []test.TestCase{
+					{Path: "/", Code: 401},
+					{Path: "/", Code: 401},
+				}...)
+
+				if err != nil {
+					t.Error("Error executing test case")
+				}
+
+				//Restart will empty the analytics buffer into redis, stop the analytics processing and start it again
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				assert.Equal(t, 2, len(results), "Should return 2 records")
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
+				if record.ResponseCode != 401 {
+					t.Error("Analytics record do not match: ", record)
+				}
+			})
+
+			t.Run("Log success", func(t *testing.T) {
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+				})
+
+				key := CreateSession(ts.Gw)
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				_, err := ts.Run(t, test.TestCase{
+					Path: "/", Headers: authHeaders, Code: 200,
+				})
+				if err != nil {
+					t.Error("Error executing test case")
+				}
+				// let records to to be sent
+
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				if len(results) != 1 {
+					t.Error("Should return 1 record: ", len(results))
+				}
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
+				if record.ResponseCode != 200 {
+					t.Error("Analytics record do not match", record)
+				}
+			})
+
+			t.Run("Detailed analytics with api spec config enabled", func(t *testing.T) {
+				defer func() {
+					ts.Gw.SetConfig(base)
+				}()
+
+				globalConf := ts.Gw.GetConfig()
+				globalConf.AnalyticsConfig.EnableDetailedRecording = false
+				ts.Gw.SetConfig(globalConf)
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+					spec.EnableDetailedRecording = true
+				})
+
+				key := CreateSession(ts.Gw)
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				_, err := ts.Run(t, test.TestCase{
+					Path: "/", Headers: authHeaders, Code: 200,
+				})
+				if err != nil {
+					t.Error("Error executing test case")
+				}
+
+				// let records to  be sent
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				if len(results) != 1 {
+					t.Error("Should return 1 record: ", len(results))
+				}
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
+				if record.ResponseCode != 200 {
+					t.Error("Analytics record do not match", record)
+				}
+
+				if record.RawRequest == "" {
+					t.Error("Detailed request info not found", record)
+				}
+
+				if record.RawResponse == "" {
+					t.Error("Detailed response info not found", record)
+				}
+			})
+
+			t.Run("Detailed analytics with only key flag set", func(t *testing.T) {
+				defer func() {
+					ts.Gw.SetConfig(base)
+				}()
+				globalConf := ts.Gw.GetConfig()
+				globalConf.AnalyticsConfig.EnableDetailedRecording = false
+				ts.Gw.SetConfig(globalConf)
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+					spec.EnableDetailedRecording = false
+				})
+
+				key := CreateSession(ts.Gw, func(sess *user.SessionState) {
+					sess.EnableDetailedRecording = true
+				})
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				_, err := ts.Run(t, test.TestCase{
+					Path: "/", Headers: authHeaders, Code: 200,
+				})
+				if err != nil {
+					t.Error("Error executing test case")
+				}
+
+				// let records to to be sent
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				if len(results) != 1 {
+					t.Error("Should return 1 record: ", len(results))
+				}
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
+				if record.ResponseCode != 200 {
+					t.Error("Analytics record do not match", record)
+				}
+
+				if record.RawRequest == "" {
+					t.Error("Detailed request info not found", record)
+				}
+
+				if record.RawResponse == "" {
+					t.Error("Detailed response info not found", record)
+				}
+			})
+
+			t.Run("Detailed analytics", func(t *testing.T) {
+				defer func() {
+					ts.Gw.SetConfig(base)
+				}()
+				globalConf := ts.Gw.GetConfig()
+				globalConf.AnalyticsConfig.EnableDetailedRecording = true
+				ts.Gw.SetConfig(globalConf)
+
+				// Since we changed config, we need to force all APIs be reloaded
+				ts.Gw.BuildAndLoadAPI()
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+				})
+
+				key := CreateSession(ts.Gw)
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				_, err := ts.Run(t, test.TestCase{
+					Path: "/", Headers: authHeaders, Code: 200,
+				})
+				if err != nil {
+					t.Error("Error executing test case")
+				}
+				// let records to to be sent
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				if len(results) != 1 {
+					t.Error("Should return 1 record: ", len(results))
+				}
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
+				if record.ResponseCode != 200 {
+					t.Error("Analytics record do not match", record)
+				}
+
+				if record.RawRequest == "" {
+					t.Error("Detailed request info not found", record)
+				}
+
+				if record.RawResponse == "" {
+					t.Error("Detailed response info not found", record)
+				}
+			})
+
+			t.Run("Detailed analytics with latency", func(t *testing.T) {
+				defer func() {
+					ts.Gw.SetConfig(base)
+				}()
+				globalConf := ts.Gw.GetConfig()
+				globalConf.AnalyticsConfig.EnableDetailedRecording = true
+				ts.Gw.SetConfig(globalConf)
+				ls := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					// We are delaying the response by 2 ms. This is important because anytime
+					// less than 0 eg  0.2 ms will be round off to 0 which is not good to check if we have
+					// latency correctly set.
+					time.Sleep(2 * time.Millisecond)
+				}))
+				defer ls.Close()
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+					spec.Proxy.TargetURL = ls.URL
+				})
+
+				key := CreateSession(ts.Gw)
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				_, err := ts.Run(t, test.TestCase{
+					Path: "/", Headers: authHeaders, Code: 200,
+				})
+				if err != nil {
+					t.Error("Error executing test case")
+				}
+
+				// let records to to be sent
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				if len(results) != 1 {
+					t.Error("Should return 1 record: ", len(results))
+				}
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
+				if record.ResponseCode != 200 {
+					t.Error("Analytics record do not match", record)
+				}
+
+				if record.RawRequest == "" {
+					t.Error("Detailed request info not found", record)
+				}
+
+				if record.RawResponse == "" {
+					t.Error("Detailed response info not found", record)
+				}
+				if record.Latency.Total == 0 {
+					t.Error("expected total latency to be set")
+				}
+				if record.Latency.Upstream == 0 {
+					t.Error("expected upstream latency to be set")
+				}
+				if record.Latency.Total != record.RequestTime {
+					t.Errorf("expected %d got %d", record.RequestTime, record.Latency.Total)
+				}
+			})
+
+			t.Run("Detailed analytics with cache", func(t *testing.T) {
+				defer func() {
+					ts.Gw.SetConfig(base)
+				}()
+				globalConf := ts.Gw.GetConfig()
+				globalConf.AnalyticsConfig.EnableDetailedRecording = true
+				ts.Gw.SetConfig(globalConf)
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+					spec.CacheOptions = apidef.CacheOptions{
+						CacheTimeout:         120,
+						EnableCache:          true,
+						CacheAllSafeRequests: true,
+					}
+				})
+
+				key := CreateSession(ts.Gw)
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				_, err := ts.Run(t, []test.TestCase{
+					{Path: "/", Headers: authHeaders, Code: 200},
+					{Path: "/", Headers: authHeaders, Code: 200},
+				}...)
+				if err != nil {
+					t.Error("Error executing test case")
+				}
+
+				// let records to be sent
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				assert.Equal(t, 2, len(results))
+
+				// Take second cached request
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[1].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
+				if record.ResponseCode != 200 {
+					t.Error("Analytics record do not match", record)
+				}
+
+				if record.RawRequest == "" {
+					t.Error("Detailed request info not found", record)
+				}
+
+				if record.RawResponse == "" {
+					t.Error("Detailed response info not found", record)
+				}
+			})
+
+			t.Run("Upstream error analytics", func(t *testing.T) {
+				defer func() {
+					ts.Gw.SetConfig(base)
+				}()
+				ls := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					time.Sleep(2 * time.Millisecond)
+					w.WriteHeader(http.StatusOK)
+				}))
+				defer ls.Close()
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+					spec.Proxy.TargetURL = ls.URL
+				})
+
+				key := CreateSession(ts.Gw)
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				client := http.Client{
+					Timeout: 1 * time.Millisecond,
+				}
+				_, err := ts.Run(t, test.TestCase{
+					Path: "/", Headers: authHeaders, Code: 499, Client: &client, ErrorMatch: "context deadline exceeded",
+				})
+				assert.NotNil(t, err)
+
+				// we wait until the request finish
+				time.Sleep(3 * time.Millisecond)
+				// let records to to be sent
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				assert.Len(t, results, 1)
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				assert.Nil(t, err)
+
+				// expect a status 499 (context canceled) from the request
+				assert.Equal(t, 499, record.ResponseCode)
+				// expect that the analytic record maintained the APIKey
+				assert.Equal(t, key, record.APIKey)
+
+			})
+
+		})
+	}
+
+}
 
 func TestGeoIPLookup(t *testing.T) {
 	ts := StartTest(nil)
@@ -19,7 +472,7 @@ func TestGeoIPLookup(t *testing.T) {
 		{"1.2.3.4", false},
 	}
 	for _, tc := range testCases {
-		_, err := geoIPLookup(tc.in, ts.Gw)
+		_, err := analytics.GeoIPLookup(tc.in, ts.Gw.Analytics.GeoIPDB)
 		switch {
 		case tc.wantErr && err == nil:
 			t.Errorf("geoIPLookup(%q) did not error", tc.in)
@@ -40,22 +493,22 @@ func TestURLReplacer(t *testing.T) {
 	defer ts.Close()
 	globalConf := ts.Gw.GetConfig()
 
-	recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
-	recordUUID2 := AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
-	recordUUID3 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-	recordUUID4 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-	recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
-	recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
+	recordUUID1 := analytics.AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
+	recordUUID2 := analytics.AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
+	recordUUID3 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+	recordUUID4 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+	recordID1 := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams"}
+	recordCust := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
 	globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = ts.Gw.initNormalisationPatterns()
 	ts.Gw.SetConfig(globalConf)
 
-	recordUUID1.NormalisePath(&globalConf)
-	recordUUID2.NormalisePath(&globalConf)
-	recordUUID3.NormalisePath(&globalConf)
-	recordUUID4.NormalisePath(&globalConf)
-	recordID1.NormalisePath(&globalConf)
-	recordCust.NormalisePath(&globalConf)
+	NormalisePath(&recordUUID1, &globalConf)
+	NormalisePath(&recordUUID2, &globalConf)
+	NormalisePath(&recordUUID3, &globalConf)
+	NormalisePath(&recordUUID4, &globalConf)
+	NormalisePath(&recordID1, &globalConf)
+	NormalisePath(&recordCust, &globalConf)
 
 	if recordUUID1.Path != "/{uuid}/search" {
 		t.Error("Path not altered, is:")
@@ -104,19 +557,19 @@ func BenchmarkURLReplacer(b *testing.B) {
 	ts.Gw.SetConfig(globalConf)
 
 	for i := 0; i < b.N; i++ {
-		recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
-		recordUUID2 := AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
-		recordUUID3 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-		recordUUID4 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-		recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
-		recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
+		recordUUID1 := analytics.AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
+		recordUUID2 := analytics.AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
+		recordUUID3 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+		recordUUID4 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+		recordID1 := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams"}
+		recordCust := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
-		recordUUID1.NormalisePath(&globalConf)
-		recordUUID2.NormalisePath(&globalConf)
-		recordUUID3.NormalisePath(&globalConf)
-		recordUUID4.NormalisePath(&globalConf)
-		recordID1.NormalisePath(&globalConf)
-		recordCust.NormalisePath(&globalConf)
+		NormalisePath(&recordUUID1, &globalConf)
+		NormalisePath(&recordUUID2, &globalConf)
+		NormalisePath(&recordUUID3, &globalConf)
+		NormalisePath(&recordUUID4, &globalConf)
+		NormalisePath(&recordID1, &globalConf)
+		NormalisePath(&recordCust, &globalConf)
 	}
 }
 

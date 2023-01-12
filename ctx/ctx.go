@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
@@ -41,6 +43,9 @@ const (
 	RequestStatus
 	GraphQLRequest
 	GraphQLIsWebSocketUpgrade
+
+	// CacheOptions holds cache options required for cache writer middleware.
+	CacheOptions
 )
 
 func setContext(r *http.Request, ctx context.Context) {
@@ -84,7 +89,7 @@ func GetSession(r *http.Request) *user.SessionState {
 	if v := r.Context().Value(SessionData); v != nil {
 		if val, ok := v.(*user.SessionState); ok {
 			return val
-		}else {
+		} else {
 			logger.Get().Warning("SessionState struct differ from the gateway version, trying to unmarshal.")
 			sess := user.SessionState{}
 			b, _ := json.Marshal(v)
@@ -97,8 +102,12 @@ func GetSession(r *http.Request) *user.SessionState {
 	return nil
 }
 
-func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
-	ctxSetSession(r, s, scheduleUpdate, hashKey)
+func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey ...bool) {
+	if len(hashKey) > 1 {
+		ctxSetSession(r, s, scheduleUpdate, hashKey[0])
+	} else {
+		ctxSetSession(r, s, scheduleUpdate, config.Global().HashKeys)
+	}
 }
 
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
@@ -111,7 +120,7 @@ func GetDefinition(r *http.Request) *apidef.APIDefinition {
 	if v := r.Context().Value(Definition); v != nil {
 		if val, ok := v.(*apidef.APIDefinition); ok {
 			return val
-		}else {
+		} else {
 			logger.Get().Warning("APIDefinition struct differ from the gateway version, trying to unmarshal.")
 			def := apidef.APIDefinition{}
 			b, _ := json.Marshal(v)

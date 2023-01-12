@@ -4,10 +4,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -36,7 +37,7 @@ func TestRateLimit_Unlimited(t *testing.T) {
 	})
 
 	authHeader := map[string]string{
-		headers.Authorization: key,
+		header.Authorization: key,
 	}
 
 	_, _ = g.Run(t, []test.TestCase{
@@ -93,7 +94,7 @@ func TestNeverRenewQuota(t *testing.T) {
 	})
 
 	authHeader := map[string]string{
-		headers.Authorization: key,
+		header.Authorization: key,
 	}
 
 	_, _ = g.Run(t, []test.TestCase{
@@ -152,9 +153,9 @@ func TestMwRateLimiting_DepthLimit(t *testing.T) {
 		}
 	})
 
-	authHeader := map[string]string{headers.Authorization: keyWithGlobalDepthLimit}
-	authHeaderWithAPILevelDepthLimit := map[string]string{headers.Authorization: keyWithAPILevelDepthLimit}
-	authHeaderWithFieldLevelDepthLimit := map[string]string{headers.Authorization: keyWithFieldLevelDepthLimit}
+	authHeader := map[string]string{header.Authorization: keyWithGlobalDepthLimit}
+	authHeaderWithAPILevelDepthLimit := map[string]string{header.Authorization: keyWithAPILevelDepthLimit}
+	authHeaderWithFieldLevelDepthLimit := map[string]string{header.Authorization: keyWithFieldLevelDepthLimit}
 
 	request := graphql.Request{
 		OperationName: "Query",

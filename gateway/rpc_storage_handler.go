@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -9,9 +10,10 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
+	"github.com/go-redis/redis/v8"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/go-redis/redis/v8"
 
 	"github.com/sirupsen/logrus"
 )
@@ -130,17 +132,26 @@ func (r *RPCStorageHandler) Connect() bool {
 		rpcConfig,
 		r.SuppressRegister,
 		dispatcherFuncs,
-		func(userKey string, groupID string) interface{} {
-			return apidef.GroupLoginRequest{
-				UserKey: userKey,
-				GroupID: groupID,
-			}
-		},
+		r.getGroupLoginCallback(r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled),
 		func() {
 			r.Gw.reloadURLStructure(nil)
 		},
 		r.DoReload,
 	)
+}
+
+func (r *RPCStorageHandler) getGroupLoginCallback(synchroniserEnabled bool) func(userKey string, groupID string) interface{} {
+	groupLoginCallbackFn := func(userKey string, groupID string) interface{} {
+		return apidef.GroupLoginRequest{
+			UserKey: userKey,
+			GroupID: groupID,
+		}
+	}
+	if synchroniserEnabled {
+		forcer := rpc.NewSyncForcer(r.Gw.RedisController)
+		groupLoginCallbackFn = forcer.GroupLoginCallback
+	}
+	return groupLoginCallbackFn
 }
 
 func (r *RPCStorageHandler) hashKey(in string) string {
@@ -179,9 +190,16 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
+
 	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
-		cachedVal, found := r.Gw.RPCGlobalCache.Get(keyName)
+
+		cacheStore := r.Gw.RPCGlobalCache
+		if strings.Contains(keyName, "cert-") {
+			cacheStore = r.Gw.RPCCertCache
+		}
+
+		cachedVal, found := cacheStore.Get(keyName)
 		log.Debug("--> Found? ", found)
 		if found {
 			return cachedVal.(string), nil
@@ -208,7 +226,11 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	}
 	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
 		// Cache key
-		r.Gw.RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
+		cacheStore := r.Gw.RPCGlobalCache
+		if strings.Contains(keyName, "cert-") {
+			cacheStore = r.Gw.RPCCertCache
+		}
+		cacheStore.Set(keyName, value, cache.DefaultExpiration)
 	}
 	//return hash key without prefix so it doesnt get double prefixed in redis
 	return value.(string), nil
@@ -619,8 +641,9 @@ func (r RPCStorageHandler) IsRetriableError(err error) bool {
 // GetAPIDefinitions will pull API definitions from the RPC server
 func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) string {
 	dr := apidef.DefRequest{
-		OrgId: orgId,
-		Tags:  tags,
+		OrgId:   orgId,
+		Tags:    tags,
+		LoadOAS: true,
 	}
 
 	defString, err := rpc.FuncClientSingleton("GetApiDefinitions", dr)
@@ -681,7 +704,13 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 }
 
 // CheckForReload will start a long poll
-func (r *RPCStorageHandler) CheckForReload(orgId string) {
+func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
+	select {
+	case <-r.Gw.ctx.Done():
+		return false
+	default:
+	}
+
 	log.Debug("[RPC STORE] Check Reload called...")
 	reload, err := rpc.FuncClientSingleton("CheckReload", orgId)
 	if err != nil {
@@ -710,6 +739,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 			r.Gw.MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: r.Gw})
 		}()
 	}
+	return true
 }
 
 func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
@@ -731,6 +761,12 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 		"prefix": "RPC Conn Mgr",
 	}).Info("[RPC Conn Mgr] Starting keepalive watcher...")
 	for {
+
+		select {
+		case <-r.Gw.ctx.Done():
+			return
+		default:
+		}
 
 		if err := r.SetKey("0000", "0000", 10); err != nil {
 			log.WithError(err).WithFields(logrus.Fields{
@@ -806,17 +842,17 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 
 func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isHashed bool, orgId string) {
 
-	hashedKeyName := keyName
+	key := keyName
 	// avoid double hashing
 	if !isHashed {
-		hashedKeyName = storage.HashKey(keyName, gw.GetConfig().HashKeys)
+		key = storage.HashKey(keyName, gw.GetConfig().HashKeys)
 	}
 
-	sessionString, err := r.GetRawKey("apikey-" + hashedKeyName)
+	sessionString, err := r.GetRawKey("apikey-" + key)
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		gw.handleAddKey(keyName, hashedKeyName, sessionString, "-1", orgId)
+		gw.handleAddKey(key, sessionString, orgId)
 	}
 }
 
@@ -882,7 +918,7 @@ func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, ev
 	}
 }
 
-// ProcessOauthClientsOps performs the appropiate action for the received clients
+// ProcessOauthClientsOps performs the appropriate action for the received clients
 // it can be any of the Create,Update and Delete operations
 func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 	for clientInfo, action := range clients {
@@ -896,6 +932,9 @@ func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 	}
 }
 
+// ProcessKeySpaceChanges receives an array of keys to be processed, those keys are considered changes in the keyspace in the
+// management layer, they could be: regular keys (hashed, unhashed), revoke oauth client, revoke single oauth token,
+// certificates (added, removed), oauth client (added, updated, removed)
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
@@ -978,7 +1017,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	for _, certId := range CertificatesToRemove {
 		log.Debugf("Removing certificate: %v", certId)
 		r.Gw.CertificateManager.Delete(certId, orgId)
+		r.Gw.RPCCertCache.Delete("cert-raw-" + certId)
 	}
+
 	for _, certId := range CertificatesToAdd {
 		log.Debugf("Adding certificate: %v", certId)
 		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally
@@ -988,30 +1029,38 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		}
 	}
 
+	synchronizerEnabled := r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled
 	for _, key := range keys {
 		_, isOauthTokenKey := notRegularKeys[key]
 		if !isOauthTokenKey {
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
 
-			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
+			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
+			var status int
+			if isHashed {
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				key = splitKeys[0]
-				r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
-				r.Gw.getSessionAndCreate(splitKeys[0], r, true, orgId)
+				_, status = r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
 			} else {
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
 				}
-				r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
-				r.Gw.getSessionAndCreate(splitKeys[0], r, false, orgId)
+				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
 			}
+
+			// if key not found locally and synchroniser disabled then we should not pull it from management layer
+			if status == http.StatusNotFound && !synchronizerEnabled {
+				continue
+			}
+			r.Gw.getSessionAndCreate(splitKeys[0], r, isHashed, orgId)
 			r.Gw.SessionCache.Delete(key)
 			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
 		}
 	}
+
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,

@@ -17,10 +17,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	redis "github.com/go-redis/redis/v8"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	redis "github.com/go-redis/redis/v8"
 )
 
 func TestURLRewrites(t *testing.T) {
@@ -220,6 +221,46 @@ func TestWhitelist(t *testing.T) {
 			{Path: "/bar", Code: http.StatusForbidden},
 		}...)
 	})
+}
+
+func TestGatewayTagsFilter(t *testing.T) {
+	t.Parallel()
+
+	newApiWithTags := func(enabled bool, tags []string) *apidef.APIDefinition {
+		return &apidef.APIDefinition{
+			TagsDisabled: !enabled,
+			Tags:         tags,
+		}
+	}
+
+	data := &nestedApiDefinitionList{}
+	data.set([]*apidef.APIDefinition{
+		newApiWithTags(false, []string{}),
+		newApiWithTags(true, []string{}),
+		newApiWithTags(true, []string{"a", "b", "c"}),
+		newApiWithTags(true, []string{"a", "b"}),
+		newApiWithTags(true, []string{"a"}),
+	})
+
+	assert.Len(t, data.Message, 5)
+
+	// Test NodeIsSegmented=true
+	{
+		enabled := true
+		assert.Len(t, data.filter(enabled), 0)
+		assert.Len(t, data.filter(enabled, "a"), 3)
+		assert.Len(t, data.filter(enabled, "b"), 2)
+		assert.Len(t, data.filter(enabled, "c"), 1)
+	}
+
+	// Test NodeIsSegmented=false
+	{
+		enabled := false
+		assert.Len(t, data.filter(enabled), 5)
+		assert.Len(t, data.filter(enabled, "a"), 5)
+		assert.Len(t, data.filter(enabled, "b"), 5)
+		assert.Len(t, data.filter(enabled, "c"), 5)
+	}
 }
 
 func TestBlacklist(t *testing.T) {
@@ -480,6 +521,7 @@ func TestIgnored(t *testing.T) {
 		}...)
 
 		t.Run("ignore-case globally", func(t *testing.T) {
+			spec.Name = "ignore endpoint case globally"
 			globalConf := ts.Gw.GetConfig()
 			globalConf.IgnoreEndpointCase = true
 			ts.Gw.SetConfig(globalConf)
@@ -503,6 +545,7 @@ func TestIgnored(t *testing.T) {
 			v.IgnoreEndpointCase = true
 			spec.VersionData.Versions["v1"] = v
 
+			spec.Name = "ignore endpoint in api level"
 			ts.Gw.LoadAPI(spec)
 
 			_, _ = ts.Run(t, []test.TestCase{
@@ -554,6 +597,8 @@ func TestIgnored(t *testing.T) {
 }
 
 func TestOldMockResponse(t *testing.T) {
+	test.Racy(t) // TODO: TT-5225
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -971,7 +1016,6 @@ func TestGetVersionFromRequest(t *testing.T) {
 	t.Run("Header location", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer func() {
-			time.Sleep(1 * time.Second)
 			ts.Close()
 		}()
 
@@ -979,11 +1023,11 @@ func TestGetVersionFromRequest(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = apidef.HeaderLocation
-			spec.VersionDefinition.Key = "X-API-Version"
+			spec.VersionDefinition.Key = apidef.DefaultAPIVersionKey
 			spec.VersionData.Versions["v1"] = versionInfo
 		})[0]
 
-		headers := map[string]string{"X-API-Version": "v1"}
+		headers := map[string]string{apidef.DefaultAPIVersionKey: "v1"}
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/foo", Code: http.StatusOK, Headers: headers, BodyMatch: `"X-Api-Version":"v1"`},
@@ -1063,11 +1107,11 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = apidef.HeaderLocation
-			spec.VersionDefinition.Key = "X-API-Version"
+			spec.VersionDefinition.Key = apidef.DefaultAPIVersionKey
 			spec.VersionData.Versions["v1"] = versionInfo
 		})
 
-		headers := map[string]string{"X-API-Version": "v1"}
+		headers := map[string]string{apidef.DefaultAPIVersionKey: "v1"}
 
 		for i := 0; i < b.N; i++ {
 			ts.Run(b, []test.TestCase{
@@ -1185,7 +1229,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 }
 
-func TestAPIDefinitionLoader_Template(t *testing.T) {
+func TestAPIDefinitionLoader(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -1207,6 +1251,18 @@ func TestAPIDefinitionLoader_Template(t *testing.T) {
 		assert.Equal(t, "value-1", res["value2"])
 		assert.Equal(t, "value-2", res["value1"])
 	}
+
+	t.Run("processRPCDefinitions invalid", func(t *testing.T) {
+		specs, err := l.processRPCDefinitions("{invalid json}", ts.Gw)
+		assert.Len(t, specs, 0)
+		assert.Error(t, err)
+	})
+
+	t.Run("processRPCDefinitions zero", func(t *testing.T) {
+		specs, err := l.processRPCDefinitions("[]", ts.Gw)
+		assert.Len(t, specs, 0)
+		assert.NoError(t, err)
+	})
 
 	t.Run("loadFileTemplate", func(t *testing.T) {
 		temp, err := l.loadFileTemplate(testTemplatePath)
@@ -1261,13 +1317,20 @@ func TestAPIExpiration(t *testing.T) {
 }
 
 func TestStripListenPath(t *testing.T) {
-	assert.Equal(t, "/get", stripListenPath("/listen", "/listen/get", nil))
-	assert.Equal(t, "/get", stripListenPath("/listen/", "/listen/get", nil))
-	assert.Equal(t, "/get", stripListenPath("listen", "listen/get", nil))
-	assert.Equal(t, "/get", stripListenPath("listen/", "listen/get", nil))
-	assert.Equal(t, "/", stripListenPath("/listen/", "/listen/", nil))
-	assert.Equal(t, "/", stripListenPath("/listen", "/listen", nil))
-	assert.Equal(t, "/", stripListenPath("listen/", "", nil))
+	assert.Equal(t, "/get", stripListenPath("/listen", "/listen/get"))
+	assert.Equal(t, "/get", stripListenPath("/listen/", "/listen/get"))
+	assert.Equal(t, "/get", stripListenPath("listen", "listen/get"))
+	assert.Equal(t, "/get", stripListenPath("listen/", "listen/get"))
+	assert.Equal(t, "/", stripListenPath("/listen/", "/listen/"))
+	assert.Equal(t, "/", stripListenPath("/listen", "/listen"))
+	assert.Equal(t, "/", stripListenPath("listen/", ""))
+
+	assert.Equal(t, "/get", stripListenPath("/{_:.*}/post/", "/listen/post/get"))
+	assert.Equal(t, "/get", stripListenPath("/{_:.*}/", "/listen/get"))
+	assert.Equal(t, "/get", stripListenPath("/pre/{_:.*}/", "/pre/listen/get"))
+	assert.Equal(t, "/", stripListenPath("/{_:.*}", "/listen"))
+	assert.Equal(t, "/get", stripListenPath("/{myPattern:foo|bar}", "/foo/get"))
+	assert.Equal(t, "/anything/get", stripListenPath("/{myPattern:foo|bar}", "/anything/get"))
 }
 
 func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
@@ -1295,6 +1358,8 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 }
 
 func TestEnforcedTimeout(t *testing.T) {
+	test.Flaky(t) // TODO TT-5222
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -1329,10 +1394,33 @@ func TestEnforcedTimeout(t *testing.T) {
 		UpdateAPIVersion(api, "", func(version *apidef.VersionInfo) {
 			version.ExtendedPaths.HardTimeouts[0].Disabled = true
 		})
+
 		ts.Gw.LoadAPI(api)
 
 		_, _ = ts.Run(t, test.TestCase{
 			Method: http.MethodGet, Path: "/get", Code: http.StatusOK,
 		})
+	})
+}
+
+func TestAPISpec_GetSessionLifetimeRespectsKeyExpiration(t *testing.T) {
+	a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+	t.Run("GetSessionLifetimeRespectsKeyExpiration=false", func(t *testing.T) {
+		a.GlobalConfig.SessionLifetimeRespectsKeyExpiration = false
+		a.SessionLifetimeRespectsKeyExpiration = false
+		assert.False(t, a.GetSessionLifetimeRespectsKeyExpiration())
+
+		a.SessionLifetimeRespectsKeyExpiration = true
+		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
+	})
+
+	t.Run("GetSessionLifetimeRespectsKeyExpiration=true", func(t *testing.T) {
+		a.GlobalConfig.SessionLifetimeRespectsKeyExpiration = true
+		a.SessionLifetimeRespectsKeyExpiration = false
+		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
+
+		a.SessionLifetimeRespectsKeyExpiration = true
+		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
 	})
 }

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
 	zipkin "github.com/openzipkin/zipkin-go"
@@ -14,6 +13,8 @@ import (
 	"github.com/openzipkin/zipkin-go/propagation/b3"
 	"github.com/openzipkin/zipkin-go/reporter"
 	"github.com/openzipkin/zipkin-go/reporter/http"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 var _ opentracing.Tracer = (*zipkinTracer)(nil)

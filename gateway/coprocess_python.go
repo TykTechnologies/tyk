@@ -1,3 +1,4 @@
+//go:build cgo
 // +build cgo
 
 package gateway
@@ -17,8 +18,9 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 
-	python "github.com/TykTechnologies/tyk/dlpython"
 	"github.com/golang/protobuf/proto"
+
+	python "github.com/TykTechnologies/tyk/dlpython"
 )
 import (
 	"os"

@@ -27,6 +27,9 @@ const Schema = `{
 		"expiration": {
             "type": "string"
         },
+        "tags_disabled": {
+            "type": "boolean"
+        },
         "enable_ip_whitelisting": {
             "type": "boolean"
         },
@@ -159,9 +162,15 @@ const Schema = `{
         "upstream_certificates": {
             "type": ["object", "null"]
         },
+		"upstream_certificates_disabled": {
+			"type": "boolean"
+		},
         "pinned_public_keys": {
             "type": ["object", "null"]
         },
+		"certificate_pinning_disabled": {
+			"type": "boolean"
+		},
         "allowed_ips": {
             "type": ["array", "null"]
         },
@@ -181,6 +190,9 @@ const Schema = `{
             "type": "boolean"
         },
         "oauth_meta": {
+            "type":["object", "null"]
+        },
+		"external_oauth": {
             "type":["object", "null"]
         },
         "cache_options": {
@@ -247,6 +259,9 @@ const Schema = `{
                 }
             }
         },
+        "session_lifetime_respects_key_expiration": {
+            "type": "boolean"
+        },
         "session_lifetime": {
             "type": "number"
         },
@@ -311,6 +326,9 @@ const Schema = `{
         },
         "domain": {
             "type": "string"
+        },
+        "domain_disabled": {
+             "type": "boolean"
         },
         "listen_port": {
             "type": "number"
@@ -662,7 +680,24 @@ const Schema = `{
             "required": [
                 "enabled"
             ]
-        }
+        },
+        "analytics_plugin": {
+            "type": ["object", "null"],
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "plugin_path": {
+                    "type": "string"
+                },
+                "func_name": {
+                    "type": "string"
+                }
+            }
+        },
+		"is_oas": {
+			"type": "boolean"
+		}
     },
     "required": [
         "name",

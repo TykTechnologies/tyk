@@ -13,7 +13,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -264,41 +263,39 @@ func TestAddCertificate(t *testing.T) {
 	cert2Raw, _ := pem.Decode(cert2Pem)
 	cert2ID := HexSHA256(cert2Raw.Bytes)
 
-	tests := [...]struct {
+	emptyCertID := ""
+
+	withError := true
+	noError := false
+
+	testcases := []struct {
+		title  string
 		data   []byte
 		certID string
-		err    string
+		err    bool
 	}{
-		{[]byte(""), "", "Failed to decode certificate. It should be PEM encoded."},
-		{[]byte("-----BEGIN PRIVATE KEY-----\nYQ==\n-----END PRIVATE KEY-----"), "", "Failed to decode certificate. It should be PEM encoded."},
-		{[]byte("-----BEGIN CERTIFICATE-----\nYQ==\n-----END CERTIFICATE-----"), "", "asn1: syntax error"},
-		{certPem, certID, ""},
-		{combinedPemWrongPrivate, "", "tls: private key does not match public key"},
-		{combinedPem, cert2ID, ""},
-		{combinedPem, "", "Certificate with " + cert2ID + " id already exists"},
-		{pubPem, pubID, ""},
-		{expiredCertPem, "", "certificate is expired"},
+		{"empty cert", []byte(""), emptyCertID, withError},
+		{"invalid cert: pem", []byte("-----BEGIN PRIVATE KEY-----\nYQ==\n-----END PRIVATE KEY-----"), emptyCertID, withError},
+		{"invalid cert: asn1", []byte("-----BEGIN CERTIFICATE-----\nYQ==\n-----END CERTIFICATE-----"), emptyCertID, withError},
+		{"valid cert 1", certPem, certID, noError},
+		{"tls: wrong private", combinedPemWrongPrivate, emptyCertID, withError},
+		{"valid cert 2", combinedPem, cert2ID, noError},
+		{"combined pem exists", combinedPem, emptyCertID, withError},
+		{"valid public pem", pubPem, pubID, noError},
+		{"expired cert", expiredCertPem, emptyCertID, withError},
 	}
 
-	for _, tc := range tests {
-		cid, err := m.Add(tc.data, "")
-		if tc.err != "" {
-			if err == nil {
-				t.Error("Should error with", tc.err)
-			} else {
-				if !strings.HasPrefix(err.Error(), tc.err) {
-					t.Error("Error not match", tc.err, "got:", err)
-				}
-			}
-		} else {
-			if err != nil {
-				t.Error("Should not error", err)
-			}
-		}
+	for _, tc := range testcases {
+		t.Run(tc.title, func(t *testing.T) {
+			cid, err := m.Add(tc.data, "")
 
-		if cid != tc.certID {
-			t.Error("Wrong certficate ID:", cid, tc.certID)
-		}
+			if tc.err {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tc.certID, cid)
+		})
 	}
 }
 

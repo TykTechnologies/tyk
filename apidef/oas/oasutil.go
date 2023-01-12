@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"math"
 	"reflect"
 )
@@ -53,4 +54,23 @@ func IsZero(v reflect.Value) bool {
 		// later, as a default value doesn't makes sense here.
 		panic(&reflect.ValueError{Method: "oas.IsZero", Kind: v.Kind()})
 	}
+}
+
+func toStructIfMap(input interface{}, val interface{}) bool {
+	mapInput, ok := input.(map[string]interface{})
+	if !ok {
+		return false
+	}
+
+	inBytes, err := json.Marshal(mapInput)
+	if err != nil {
+		log.Debug("Map input couldn't be marshalled")
+	}
+
+	err = json.Unmarshal(inBytes, val)
+	if err != nil {
+		log.Debug("Unmarshalling to struct couldn't succeed")
+	}
+
+	return true
 }

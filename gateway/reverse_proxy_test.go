@@ -20,9 +20,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -132,7 +133,7 @@ type configTestReverseProxyDnsCache struct {
 	dnsConfig   config.DnsCacheConfig
 }
 
-func (s *Test) SetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
+func (s *Test) flakySetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
 	pullDomains := s.MockHandle.PushDomains(cfg.etcHostsMap, nil)
 	s.Gw.dnsCacheManager.InitDNSCaching(
 		time.Duration(cfg.dnsConfig.TTL)*time.Second, time.Duration(cfg.dnsConfig.CheckInterval)*time.Second)
@@ -152,6 +153,8 @@ func (s *Test) SetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache
 }
 
 func TestReverseProxyDnsCache(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5251
+
 	const (
 		host   = "orig-host.com."
 		host2  = "orig-host2.com."
@@ -179,9 +182,13 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	)
 
 	ts := StartTest(nil)
+	ts.MockHandle, _ = test.InitDNSMock(etcHostsMap, nil)
 	defer ts.Close()
+	defer func() {
+		_ = ts.MockHandle.ShutdownDnsMock()
+	}()
 
-	tearDown := ts.SetupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
+	tearDown := ts.flakySetupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
 		config.DnsCacheConfig{
 			Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval,
 			MultipleIPsHandleStrategy: config.NoCacheStrategy}})
@@ -406,6 +413,134 @@ func TestCircuitBreaker5xxs(t *testing.T) {
 	})
 }
 
+func TestCircuitBreakerEvents(t *testing.T) {
+	// Use this channel to capture webhook events:
+	triggeredEvent := make(chan apidef.TykEvent)
+
+	// Establish a simple HTTP server that takes webhook input and passes the event to above channel:
+	webHookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rawBody, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Unmarshal webhook input, we're only interested in event's name:
+		var eventData map[string]interface{}
+		if err := json.Unmarshal(rawBody, &eventData); err != nil {
+			t.Fatal(err)
+		}
+		eventName, ok := eventData["event"].(string)
+		if !ok {
+			t.Fatal("invalid webhook input")
+		}
+		triggeredEvent <- apidef.TykEvent(eventName)
+	}))
+
+	// Establish another HTTP server to trigger CB behavior
+	// Uses a counter to send an error response on the 1st sample:
+	var sampleCount int
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if sampleCount == 1 {
+			w.WriteHeader(500)
+			sampleCount++
+			return
+		}
+		w.WriteHeader(200)
+		sampleCount++
+	}))
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Events to capture on this API, we use default webhook template:
+	events := map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{
+		EventBreakerTripped: {
+			{
+				Handler: EH_WebHook,
+				HandlerMeta: map[string]interface{}{
+					"method":        http.MethodPost,
+					"target_path":   webHookServer.URL,
+					"template_path": "templates/default_webhook.json",
+					"event_timeout": 10,
+				},
+			},
+		},
+		EventBreakerReset: {
+			{
+				Handler: EH_WebHook,
+				HandlerMeta: map[string]interface{}{
+					"method":        http.MethodPost,
+					"target_path":   webHookServer.URL,
+					"template_path": "templates/default_webhook.json",
+					"event_timeout": 10,
+				},
+			},
+		},
+	}
+
+	// Setup an API definition with CB settings and attach above event handlers:
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.TargetURL = upstreamServer.URL
+		spec.Proxy.ListenPath = "/circuitbreaker/"
+		spec.CircuitBreakerEnabled = true
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			err := json.Unmarshal([]byte(`[
+					{
+						"path": "test",
+						"method": "GET",
+						"threshold_percent": 0.1,
+						"samples": 1,
+						"return_to_service_after": 1
+					}
+				   ]`), &v.ExtendedPaths.CircuitBreaker)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+		spec.EventHandlers.Events = events
+	})
+
+	// Run the first series of requests, 1st sample should trigger the CB:
+	_, err := ts.Run(t, []test.TestCase{
+		{Path: "/circuitbreaker/test", Code: http.StatusOK},
+		{Path: "/circuitbreaker/test", Code: http.StatusInternalServerError},
+	}...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Validate if the first event is the expected one:
+	e := <-triggeredEvent
+	if e != EventBreakerTripped {
+		t.Fatalf("invalid event, got '%s', expecting '%s'", e, EventBreakerTripped)
+	}
+
+	// Run the third request which should already be an HTTP 503 from CB:
+	_, err = ts.Run(t, []test.TestCase{
+		{Path: "/circuitbreaker/test", Code: http.StatusServiceUnavailable},
+	}...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait as long as "return_to_service_after" specifies before retrying again
+	// This request will be an HTTP 200:
+	time.Sleep(1000 * time.Millisecond)
+
+	_, err = ts.Run(t, []test.TestCase{
+		{Path: "/circuitbreaker/test", Code: http.StatusOK},
+	}...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Validate if the last emitted event is a breaker reset:
+	e = <-triggeredEvent
+	if e != EventBreakerReset {
+		t.Fatalf("invalid event, got '%s', expecting '%s'", e, EventBreakerReset)
+	}
+}
+
 func TestSingleJoiningSlash(t *testing.T) {
 	testsFalse := []struct {
 		a, b, want string
@@ -429,6 +564,8 @@ func TestSingleJoiningSlash(t *testing.T) {
 		a, b, want string
 	}{
 		{"foo/", "", "foo/"},
+		{"foo/", "/name", "foo/name"},
+		{"foo/", "/", "foo/"},
 		{"foo", "", "foo"},
 	}
 	for _, tc := range testsTrue {
@@ -629,7 +766,7 @@ func TestNopCloseRequestBody(t *testing.T) {
 	// try to pass not nil body and check that it was replaced with nopCloser
 	req = httptest.NewRequest(http.MethodGet, "/test", strings.NewReader("abcxyz"))
 	nopCloseRequestBody(req)
-	if body, ok := req.Body.(nopCloser); !ok {
+	if body, ok := req.Body.(*nopCloserBuffer); !ok {
 		t.Error("Request's body was not replaced with nopCloser")
 	} else {
 		// try to read body 1st time
@@ -674,7 +811,7 @@ func TestNopCloseResponseBody(t *testing.T) {
 	resp = &http.Response{}
 	resp.Body = ioutil.NopCloser(strings.NewReader("abcxyz"))
 	nopCloseResponseBody(resp)
-	if body, ok := resp.Body.(nopCloser); !ok {
+	if body, ok := resp.Body.(*nopCloserBuffer); !ok {
 		t.Error("Response's body was not replaced with nopCloser")
 	} else {
 		// try to read body 1st time
@@ -740,6 +877,81 @@ func TestGraphQL_HeadersInjection(t *testing.T) {
 			},
 		},
 	}...)
+}
+
+func TestGraphql_Headers(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	defaultSpec := BuildAPI(func(spec *APISpec) {
+		spec.Name = "tyk-api"
+		spec.APIID = "tyk-api"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+		spec.GraphQL.Schema = gqlCountriesSchema
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		spec.Proxy.TargetURL = TestHttpAny + "/dynamic"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	headerCheck := func(key, value string, headers map[string][]string) bool {
+		val, ok := headers[key]
+		return ok && len(val) > 0 && val[0] == value
+	}
+
+	t.Run("test introspection header", func(t *testing.T) {
+		spec := defaultSpec
+		spec.GraphQL.Proxy.AuthHeaders = map[string]string{
+			"Test-Header": "test-value",
+		}
+		spec.GraphQL.Proxy.RequestHeaders = map[string]string{
+			"Test-Request": "test-value",
+		}
+		g.Gw.LoadAPI(spec)
+		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+			if !headerCheck("Test-Request", "test-value", r.Header) {
+				t.Error("request header missing")
+			}
+			if headerCheck("Test-Header", "test-value", r.Header) {
+				t.Error("auth header missing")
+			}
+		})
+		_, err := g.Run(t,
+			test.TestCase{
+				Path:   "/",
+				Method: http.MethodPost,
+				Data: graphql.Request{
+					Query: gqlContinentQuery,
+				},
+			},
+		)
+		assert.NoError(t, err)
+	})
+
+	t.Run("test context variable request headers", func(t *testing.T) {
+		spec := defaultSpec
+		spec.GraphQL.Proxy.RequestHeaders = map[string]string{
+			"Test-Request-Header": "$tyk_context.headers_Test_Header",
+		}
+		spec.EnableContextVars = true
+		g.Gw.LoadAPI(spec)
+		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+			if !headerCheck("Test-Request-Header", "test-value", r.Header) {
+				t.Error("context variable header missing/incorrect")
+			}
+		})
+		_, err := g.Run(t, test.TestCase{
+			Path: "/",
+			Headers: map[string]string{
+				"Test-Header": "test-value",
+			},
+			Method: http.MethodPost,
+			Data: graphql.Request{
+				Query: gqlContinentQuery,
+			},
+		})
+		assert.NoError(t, err)
+	})
 }
 
 func TestGraphQL_InternalDataSource(t *testing.T) {
@@ -895,6 +1107,148 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 			// REST Data Source
 			{Data: people, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
 		}...)
+	})
+}
+
+func TestGraphQL_SubgraphBatchRequest(t *testing.T) {
+	g := StartTest(nil)
+	t.Cleanup(func() {
+		g.Close()
+	})
+
+	bankAccountSubgraphPath := "/subgraph-bank-accounts"
+	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
+		spec.Name = "subgraph-accounts-modified"
+		spec.APIID = "subgraph-accounts-modified"
+		spec.Proxy.TargetURL = testSubgraphAccountsModified
+		spec.Proxy.ListenPath = "/tyk-subgraph-accounts-modified"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaAccounts,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLAccounts,
+			},
+		}
+	})[0]
+	tykSubgraphBankAccounts := BuildAPI(func(spec *APISpec) {
+		spec.Name = "subgraph-bank-accounts"
+		spec.APIID = "subgraph-bank-accounts"
+		spec.Proxy.TargetURL = TestHttpAny + bankAccountSubgraphPath
+		spec.Proxy.ListenPath = "/subgraph-bank-accounts"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaBankAccounts,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLBankAccounts,
+			},
+		}
+	})[0]
+
+	t.Run("should batch requests", func(t *testing.T) {
+		supergraph := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/batched-supergraph"
+			spec.APIID = "batched-supergraph"
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				Version:       apidef.GraphQLConfigVersion2,
+				ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
+				Supergraph: apidef.GraphQLSupergraphConfig{
+					Subgraphs: []apidef.GraphQLSubgraphEntity{
+						{
+							APIID: "subgraph-accounts-modified",
+							URL:   "tyk://" + tykSubgraphAccounts.Name,
+							SDL:   gqlSubgraphSDLAccounts,
+						},
+						{
+							APIID: "subgraph-bank-accounts",
+							URL:   "tyk://" + tykSubgraphBankAccounts.Name,
+							SDL:   gqlSubgraphSDLBankAccounts,
+						},
+					},
+					MergedSDL: gqlMergedSupergraphSDL,
+				},
+				Schema: gqlMergedSupergraphSDL,
+			}
+		})[0]
+		g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphBankAccounts, supergraph)
+		handlerCtx, cancel := context.WithCancel(context.Background())
+		g.AddDynamicHandler(bankAccountSubgraphPath, func(writer http.ResponseWriter, r *http.Request) {
+			select {
+			case <-handlerCtx.Done():
+				assert.Fail(t, "Called twice time")
+			default:
+			}
+			cancel()
+		})
+
+		q := graphql.Request{
+			Query: `query Query { allUsers { id username account { number } } }`,
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			{
+				Data: q, Path: "/batched-supergraph",
+			},
+		}...)
+	})
+
+	t.Run("shouldn't batch requests", func(t *testing.T) {
+		supergraph := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/unbatched-supergraph"
+			spec.APIID = "unbatched-supergraph"
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				Version:       apidef.GraphQLConfigVersion2,
+				ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
+				Supergraph: apidef.GraphQLSupergraphConfig{
+					DisableQueryBatching: true,
+					Subgraphs: []apidef.GraphQLSubgraphEntity{
+						{
+							APIID: "subgraph-accounts-modified",
+							URL:   "tyk://" + tykSubgraphAccounts.Name,
+							SDL:   gqlSubgraphSDLAccounts,
+						},
+						{
+							APIID: "subgraph-bank-accounts",
+							URL:   "tyk://" + tykSubgraphBankAccounts.Name,
+							SDL:   gqlSubgraphSDLBankAccounts,
+						},
+					},
+					MergedSDL: gqlMergedSupergraphSDL,
+				},
+				Schema: gqlMergedSupergraphSDL,
+			}
+		})[0]
+		g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphBankAccounts, supergraph)
+		timesHit := 0
+		lock := sync.Mutex{}
+		g.AddDynamicHandler(bankAccountSubgraphPath, func(writer http.ResponseWriter, r *http.Request) {
+			lock.Lock()
+			timesHit++
+			lock.Unlock()
+		})
+
+		q := graphql.Request{
+			Query: `query Query { allUsers { id username account { number } } }`,
+		}
+		// run this in a goroutine to prevent blocking, we don't actually need the test to match body or response
+		go func() {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Data: q, Path: "/unbatched-supergraph",
+				},
+			}...)
+		}()
+
+		assert.Eventually(t, func() bool {
+			lock.Lock()
+			defer lock.Unlock()
+			return timesHit == 2
+		}, time.Second*5, time.Millisecond*100)
 	})
 }
 
@@ -1126,9 +1480,12 @@ func BenchmarkWrappedServeHTTP(b *testing.B) {
 }
 
 func BenchmarkCopyRequestResponse(b *testing.B) {
+
+	// stress test this with 20mb payload
+	str := strings.Repeat("x!", 10000000)
+
 	b.ReportAllocs()
 
-	str := strings.Repeat("very long body line that is repeated", 128)
 	req := &http.Request{}
 	res := &http.Response{}
 	for i := 0; i < b.N; i++ {
@@ -1208,7 +1565,7 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 				return
 			}
 			bufrw.Flush()
-			time.Sleep(time.Second)
+			time.Sleep(20 * time.Millisecond)
 		}
 		if _, err := bufrw.WriteString(terminalMsg); err != nil {
 			select {
@@ -1291,6 +1648,8 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 }
 
 func TestSSE(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5250
+
 	// send and receive should be in order
 	var wg sync.WaitGroup
 
