@@ -360,37 +360,35 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: OpenID")
 		}
 
-		coprocessAuth := mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
-		ottoAuth := !coprocessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
-		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver && spec.UseGoPluginAuth
-		if coprocessAuth {
-			// TODO: check if mwAuthCheckFunc is available/valid
-			coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
+		customPluginAuthEnabled := spec.CustomPluginAuthEnabled || spec.UseGoPluginAuth || spec.EnableCoProcessAuth
 
-			newExtractor(spec, baseMid)
-			gw.mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
-		}
+		if customPluginAuthEnabled {
+			switch spec.CustomMiddleware.Driver {
+			case apidef.OttoDriver:
+				logger.Info("----> Checking security policy: JS Plugin")
+				authArray = append(authArray, gw.createMiddleware(&DynamicMiddleware{
+					BaseMiddleware:      baseMid,
+					MiddlewareClassName: mwAuthCheckFunc.Name,
+					Pre:                 true,
+					Auth:                true,
+				}))
+			case apidef.GoPluginDriver:
+				gw.mwAppendEnabled(
+					&authArray,
+					&GoPluginMiddleware{
+						BaseMiddleware: baseMid,
+						Path:           mwAuthCheckFunc.Path,
+						SymbolName:     mwAuthCheckFunc.Name,
+						APILevel:       true,
+					},
+				)
+			default:
+				// TODO: check if mwAuthCheckFunc is available/valid
+				coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
-		if ottoAuth {
-			logger.Info("----> Checking security policy: JS Plugin")
-			authArray = append(authArray, gw.createMiddleware(&DynamicMiddleware{
-				BaseMiddleware:      baseMid,
-				MiddlewareClassName: mwAuthCheckFunc.Name,
-				Pre:                 true,
-				Auth:                true,
-			}))
-		}
-
-		if gopluginAuth {
-			gw.mwAppendEnabled(
-				&authArray,
-				&GoPluginMiddleware{
-					BaseMiddleware: baseMid,
-					Path:           mwAuthCheckFunc.Path,
-					SymbolName:     mwAuthCheckFunc.Name,
-					APILevel:       true,
-				},
-			)
+				newExtractor(spec, baseMid)
+				gw.mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
+			}
 		}
 
 		if spec.UseStandardAuth || len(authArray) == 0 {

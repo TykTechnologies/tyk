@@ -592,8 +592,9 @@ type APIDefinition struct {
 
 	EnableJWT                            bool                   `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth                      bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
-	UseGoPluginAuth                      bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`
-	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
+	UseGoPluginAuth                      bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`       // Deprecated. Use CustomPluginAuthEnabled instead.
+	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
+	CustomPluginAuthEnabled              bool                   `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
 	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
 	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
 	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
