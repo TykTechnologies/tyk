@@ -28,7 +28,7 @@ for pkg in ${PKGS}; do
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
 
     echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
-    TYK_LOGELEVEL=debug go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
+    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
 done
 
 # run rpc tests separately
