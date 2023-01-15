@@ -15,7 +15,7 @@ type MockStorage struct {
 	files []string
 }
 
-func (ms MockStorage) fileExist(path string) bool {
+func (ms MockStorage) FileExist(path string) bool {
 	for _, v := range ms.files {
 		// clean path as some of them has ./ as prefix
 		path := strings.TrimPrefix(path, "./")
@@ -73,11 +73,11 @@ func TestGetPluginFileNameToLoad(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			pluginStorage = MockStorage{
+			PluginStorage = MockStorage{
 				files: testCase.files,
 			}
 			defer func() {
-				pluginStorage = FileSystemStorage{}
+				PluginStorage = FileSystemStorage{}
 			}()
 
 			filenameToLoad, _ := GetPluginFileNameToLoad(testCase.pluginName, testCase.version)

@@ -10,18 +10,18 @@ import (
 var log = logger.Get()
 
 func init() {
-	pluginStorage = FileSystemStorage{}
+	PluginStorage = FileSystemStorage{}
 }
 
-// interface so we can test which plugin should be loaded
-type storage interface {
-	fileExist(string) bool
+// Storage interface so we can test which plugin should be loaded
+type Storage interface {
+	FileExist(string) bool
 }
 
 // FileSystemStorage implements storage interface, it uses the filesystem as store
 type FileSystemStorage struct{}
 
-func (FileSystemStorage) fileExist(path string) bool {
+func (FileSystemStorage) FileExist(path string) bool {
 	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 		log.Warningf("plugin file %v doesn't exist", path)
 		return false

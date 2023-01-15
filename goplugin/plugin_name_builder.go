@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// pluginStorage defaults to FileSystemStorage
-var pluginStorage storage
+// PluginStorage defaults to FileSystemStorage
+var PluginStorage Storage
 
 // GetPluginFileNameToLoad check which file to load based on name, tyk version, os and architecture
 // but it also takes care of returning the name of the file that exists
@@ -18,7 +18,7 @@ func GetPluginFileNameToLoad(path string, version string) (string, error) {
 	newNamingFormat := getPluginNameFromTykVersion(prefixedGwVersion, path)
 
 	// 1. attempt to load a plugin that follow the new standard
-	if pluginStorage.fileExist(newNamingFormat) {
+	if PluginStorage.FileExist(newNamingFormat) {
 		return newNamingFormat, nil
 	}
 
@@ -26,13 +26,13 @@ func GetPluginFileNameToLoad(path string, version string) (string, error) {
 	if !strings.HasPrefix(version, "v") {
 		newNamingFormat = getPluginNameFromTykVersion(version, path)
 
-		if pluginStorage.fileExist(newNamingFormat) {
+		if PluginStorage.FileExist(newNamingFormat) {
 			return newNamingFormat, nil
 		}
 	}
 
 	// 3. attempt to load the exact name provided
-	if !pluginStorage.fileExist(path) {
+	if !PluginStorage.FileExist(path) {
 		return "", errors.New("plugin file not found")
 	}
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/gateway"
+	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -25,6 +26,7 @@ func TestGoPluginMWs(t *testing.T) {
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
 
+	goplugin.PluginStorage = goplugin.FileSystemStorage{}
 	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.APIID = "plugin_api"
 		spec.Proxy.ListenPath = "/goplugin"
