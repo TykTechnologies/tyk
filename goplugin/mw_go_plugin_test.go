@@ -21,7 +21,6 @@ import (
 
 // run go build -buildmode=plugin -o goplugins.so in ./test/goplugins directory prior to running tests
 func TestGoPluginMWs(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5263
 
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
@@ -166,7 +165,6 @@ func TestGoPluginMWs(t *testing.T) {
 }
 
 func TestGoPluginResponseHook(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5263
 
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
@@ -209,7 +207,6 @@ func TestGoPluginResponseHook(t *testing.T) {
 }
 
 func TestGoPluginPerPathSingleFile(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5263
 
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
@@ -286,7 +283,6 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 }
 
 func TestGoPluginAPIandPerPath(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5263
 
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
