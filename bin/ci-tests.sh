@@ -17,7 +17,7 @@ set -e
 
 # build Go-plugin used in tests
 echo "Building go plugin"
-go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
+go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin github.com/TykTechnologies/tyk/test/goplugins
 
 for pkg in ${PKGS}; do
     tags=""
