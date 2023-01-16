@@ -21,14 +21,16 @@ go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugi
 
 for pkg in ${PKGS}; do
     tags=""
+    coverpkg=""
     if [[ ${pkg} == *"goplugin" ]]; then
         tags="-tags 'goplugin'"
+        coverpkg="-coverpkg=github.com/TykTechnologies/tyk/gateway"
     fi
 
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
 
-    echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
-    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
+    echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags} ${coverpkg}
+    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags} ${coverpkg}
 done
 
 # run rpc tests separately
