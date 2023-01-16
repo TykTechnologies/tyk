@@ -23,7 +23,7 @@ for pkg in ${PKGS}; do
     tags=""
     if [[ ${pkg} == *"goplugin" ]]; then
         tags="-tags 'goplugin'"
-        OPTS=OPTS+" -count=100"
+        OPTS="${OPTS} -count=100"
     fi
 
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
