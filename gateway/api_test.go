@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/go-redis/redis/v8"
 	uuid "github.com/satori/go.uuid"
 
@@ -1697,10 +1699,10 @@ func TestRotateClientSecretHandler(t *testing.T) {
 }
 
 func TestOrgKeyHandler_LastUpdated(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.Gw.BuildAndLoadAPI()
+	BuildAndLoadAPI()
 	session := CreateStandardSession()
 	var prevLastUpdated string
 
