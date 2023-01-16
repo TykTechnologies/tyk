@@ -7,7 +7,7 @@ PKGS="$(go list ./...)"
 # Support passing custom flags (-json, etc.)
 OPTS="$@"
 if [[ -z "$OPTS" ]]; then
-	OPTS="-race -count=1 -failfast -v"
+	OPTS="-race -failfast -v"
 fi
 
 export PKG_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
@@ -23,6 +23,7 @@ for pkg in ${PKGS}; do
     tags=""
     if [[ ${pkg} == *"goplugin" ]]; then
         tags="-tags 'goplugin'"
+        OPTS=OPTS+" -count=100"
     fi
 
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
