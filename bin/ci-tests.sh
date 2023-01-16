@@ -7,7 +7,7 @@ PKGS="$(go list ./...)"
 # Support passing custom flags (-json, etc.)
 OPTS="$@"
 if [[ -z "$OPTS" ]]; then
-	OPTS="-race -count=1 -failfast -v -coverpkg=./..."
+	OPTS="-race -count=1 -failfast -v -coverpkg=github.com/TykTechnologies/tyk/..."
 fi
 
 export PKG_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
