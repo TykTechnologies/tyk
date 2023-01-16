@@ -9,10 +9,6 @@ import (
 
 var log = logger.Get()
 
-func init() {
-	PluginStorage = FileSystemStorage{}
-}
-
 // Storage interface so we can test which plugin should be loaded
 type Storage interface {
 	FileExist(string) bool

@@ -73,14 +73,7 @@ func TestGetPluginFileNameToLoad(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			PluginStorage = MockStorage{
-				files: testCase.files,
-			}
-			defer func() {
-				PluginStorage = FileSystemStorage{}
-			}()
-
-			filenameToLoad, _ := GetPluginFileNameToLoad(testCase.pluginName, testCase.version)
+			filenameToLoad, _ := GetPluginFileNameToLoad(MockStorage{files: testCase.files}, testCase.pluginName, testCase.version)
 			assert.Equal(t, testCase.expectedFileName, filenameToLoad)
 		})
 	}
