@@ -21,9 +21,13 @@ go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugi
 
 for pkg in ${PKGS}; do
     tags=""
+    log_level=""
     if [[ ${pkg} == *"goplugin" ]]; then
         tags="-tags 'goplugin'"
+        log_level="info"
     fi
+
+    export TYK_LOGLEVEL=$log_level
 
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
 
