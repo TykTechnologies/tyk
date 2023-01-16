@@ -7,7 +7,7 @@ PKGS="$(go list ./...)"
 # Support passing custom flags (-json, etc.)
 OPTS="$@"
 if [[ -z "$OPTS" ]]; then
-	OPTS="-race -count=1 -failfast -v"
+	OPTS="-race -count=1 -failfast -v -coverpkg=./..."
 fi
 
 export PKG_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
@@ -21,16 +21,14 @@ go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugi
 
 for pkg in ${PKGS}; do
     tags=""
-    coverpkg=""
     if [[ ${pkg} == *"goplugin" ]]; then
         tags="-tags 'goplugin'"
-        coverpkg="-coverpkg=github.com/TykTechnologies/tyk/gateway"
     fi
 
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
 
-    echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags} ${coverpkg}
-    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags} ${coverpkg}
+    echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
+    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
 done
 
 # run rpc tests separately
