@@ -39,7 +39,7 @@ func TestFileExist(t *testing.T) {
 				defer os.Remove(f.Name())
 			}
 
-			fileFound := storage.FileExist(tc.fileName)
+			fileFound := storage.fileExist(tc.fileName)
 
 			assert.Equal(t, tc.fileFound, fileFound)
 		})

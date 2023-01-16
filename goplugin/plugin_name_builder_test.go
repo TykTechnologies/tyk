@@ -15,7 +15,7 @@ type MockStorage struct {
 	files []string
 }
 
-func (ms MockStorage) FileExist(path string) bool {
+func (ms MockStorage) fileExist(path string) bool {
 	for _, v := range ms.files {
 		// clean path as some of them has ./ as prefix
 		path := strings.TrimPrefix(path, "./")
