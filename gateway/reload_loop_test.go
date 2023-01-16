@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -28,7 +30,7 @@ func TestReloadLoop_basic(t *testing.T) {
 
 	ts.Gw.reloadURLStructure(add)
 	ts.Gw.reloadURLStructure(add)
-	ts.Gw.ReloadTestCase.TickOk(t)
+	assert.NoError(t, ts.Gw.ReloadTestCase.TickOk())
 	x := n.Load().(int)
 	if x != 1 {
 		t.Errorf("expected 1 got %d", x)
@@ -53,7 +55,7 @@ func TestReloadLoop_handler(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/reload", nil)
 	h(w, r)
-	ts.Gw.ReloadTestCase.TickOk(t)
+	assert.NoError(t, ts.Gw.ReloadTestCase.TickOk())
 	x := n.Load().(int)
 	if x != 1 {
 		t.Errorf("expected 1 got %d", x)
@@ -83,7 +85,7 @@ func TestReloadLoop_handlerWithBlock(t *testing.T) {
 		signal <- struct{}{}
 	}()
 	<-signal
-	ts.Gw.ReloadTestCase.TickOk(t)
+	assert.NoError(t, ts.Gw.ReloadTestCase.TickOk())
 	select {
 	case <-signal:
 	case <-time.After(10 * time.Millisecond):

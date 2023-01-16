@@ -1740,7 +1740,7 @@ func TestHotReloadSingle(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	ts.Gw.reloadURLStructure(wg.Done)
-	ts.Gw.ReloadTestCase.TickOk(t)
+	assert.NoError(t, ts.Gw.ReloadTestCase.TickOk())
 	wg.Wait()
 	if ts.mainRouter() == oldRouter {
 		t.Fatal("router wasn't swapped")
