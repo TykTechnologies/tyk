@@ -1116,6 +1116,7 @@ func handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
 		DefaultQuotaStore.RemoveSession(orgID, rawKey, false)
 	}
 
+	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	err := sessionManager.UpdateSession(orgID, newSession, 0, false)
 	if err != nil {
 		return apiError("Error writing to key store " + err.Error()), http.StatusInternalServerError
