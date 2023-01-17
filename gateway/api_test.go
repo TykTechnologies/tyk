@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/go-redis/redis/v8"
 	uuid "github.com/satori/go.uuid"
 
@@ -1694,4 +1696,39 @@ func TestRotateClientSecretHandler(t *testing.T) {
 			ts.Run(t, testCase)
 		})
 	}
+}
+
+func TestOrgKeyHandler_LastUpdated(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI()
+	session := CreateStandardSession()
+	var prevLastUpdated string
+
+	orgHandlerEndpoint := "/tyk/org/keys/default"
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Method: http.MethodPost, Path: orgHandlerEndpoint, Data: session, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodGet, Path: orgHandlerEndpoint, BodyMatchFunc: func(i []byte) bool {
+			var s user.SessionState
+			err := json.Unmarshal(i, &s)
+			assert.NoError(t, err)
+
+			prevLastUpdated = s.LastUpdated
+			assert.NotEmpty(t, prevLastUpdated)
+
+			return true
+		}, Delay: time.Second},
+		{AdminAuth: true, Method: http.MethodPut, Path: orgHandlerEndpoint, Data: session, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodGet, Path: orgHandlerEndpoint, BodyMatchFunc: func(i []byte) bool {
+			var s user.SessionState
+			err := json.Unmarshal(i, &s)
+			assert.NoError(t, err)
+
+			assert.Greater(t, s.LastUpdated, prevLastUpdated)
+
+			return true
+		}},
+	}...)
 }
