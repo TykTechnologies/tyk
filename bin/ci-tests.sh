@@ -28,18 +28,21 @@ show go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/go
 
 for pkg in ${PKGS}; do
     tags=""
-    log_level=""
+    coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
     if [[ ${pkg} == *"goplugin" ]]; then
         tags="-tags 'goplugin'"
-        log_level="info"
+        show TYK_LOGLEVEL=info go test ${OPTS} -timeout ${TEST_TIMEOUT}  \
+                  -coverprofile=${coveragefile}.cov ${tags} github.com/TykTechnologies/tyk/...
+    else
+      show go test ${OPTS} -timeout ${TEST_TIMEOUT}  \
+          -coverprofile=${coveragefile}.cov ${pkg} ${tags}
     fi
 
-    export TYK_LOGLEVEL=$log_level
 
-    coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
 
-    show go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverpkg $(go list github.com/TykTechnologies/tyk/...) \
-    -coverprofile=${coveragefile}.cov ${pkg} ${tags}
+
+
+
 done
 
 # run rpc tests separately

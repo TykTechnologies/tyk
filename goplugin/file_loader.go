@@ -1,3 +1,6 @@
+//go:build goplugin
+// +build goplugin
+
 package goplugin
 
 import (
