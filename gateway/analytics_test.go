@@ -16,7 +16,7 @@ import (
 )
 
 func TestAnalytics_Write(t *testing.T) {
-	test.Flaky(t)
+
 	tcs := []struct {
 		TestName            string
 		analyticsSerializer string
