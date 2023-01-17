@@ -39,7 +39,7 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 // Global holds configuration applies globally: CORS and caching.
 type Global struct {
 	// PluginConfig contains the configuration related custom plugin bundles/driver.
-	PluginConfig *PluginConfig `bson:"pluginConfig" json:"pluginConfig"`
+	PluginConfig *PluginConfig `bson:"pluginConfig,omitempty" json:"pluginConfig,omitempty"`
 
 	// CORS contains the configuration related to cross origin resource sharing.
 	// Tyk native API definition: `CORS`.
@@ -107,7 +107,7 @@ type PluginConfig struct {
 	// - `goplugin`.
 	//
 	// Tyk native API definition: `custom_middleware.driver`.
-	Driver apidef.MiddlewareDriver `bson:"driver" json:"driver"`
+	Driver apidef.MiddlewareDriver `bson:"driver,omitempty" json:"driver,omitempty"`
 }
 
 // Fill fills pluginConfig from apidef.
