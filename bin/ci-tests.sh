@@ -38,7 +38,7 @@ for pkg in ${PKGS}; do
 
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
 
-    show go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverpkg $(go list github.com/TykTechnologies/tyk/...) \
+    show go test ${OPTS} -timeout ${TEST_TIMEOUT} \
     -coverprofile=${coveragefile}.cov ${pkg} ${tags}
 done
 
