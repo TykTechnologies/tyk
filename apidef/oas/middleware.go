@@ -100,11 +100,11 @@ type PluginConfig struct {
 	// Driver configures which custom plugin to be used.
 	// It's value should be set to one of the following:
 	//
-	// - `otto`,
-	// - `python`,
-	// - `lua`,
-	// - `grpc`,
-	// - `goplugin`.
+	// - `otto`
+	// - `python`
+	// - `lua`
+	// - `grpc`
+	// - `goplugin`
 	//
 	// Tyk native API definition: `custom_middleware.driver`.
 	Driver apidef.MiddlewareDriver `bson:"driver,omitempty" json:"driver,omitempty"`
