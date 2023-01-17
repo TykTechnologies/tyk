@@ -206,6 +206,14 @@
         }
       }
     },
+    "X-Tyk-PluginConfig": {
+      "type": "object",
+      "properties": {
+        "driver": {
+          "type": "string"
+        }
+      }
+    },
     "X-Tyk-CORS": {
       "type": "object",
       "properties": {
@@ -301,6 +309,9 @@
     "X-Tyk-Global": {
       "type": "object",
       "properties": {
+        "pluginConfig": {
+          "$ref": "#/definitions/X-Tyk-PluginConfig"
+        },
         "cors": {
           "$ref": "#/definitions/X-Tyk-CORS"
         },
