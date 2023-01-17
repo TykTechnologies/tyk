@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# print a command and execute it
-show() {
- echo "$@" >&2
- eval "$@"
-}
-
-
 TEST_TIMEOUT=15m
 
 PKGS="$(go list ./...)"
@@ -24,7 +17,7 @@ set -e
 
 # build Go-plugin used in tests
 echo "Building go plugin"
-show go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
+go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
 
 for pkg in ${PKGS}; do
     tags=""
@@ -34,9 +27,10 @@ for pkg in ${PKGS}; do
 
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
 
-    show go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
+    echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
+    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
 done
 
 # run rpc tests separately
 rpc_tests='SyncAPISpecsRPC|OrgSessionWithRPCDown'
-show go test -count=1 -timeout ${TEST_TIMEOUT} -v -coverprofile=gateway-rpc.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"'
+go test -count=1 -timeout ${TEST_TIMEOUT} -v -coverprofile=gateway-rpc.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"'
