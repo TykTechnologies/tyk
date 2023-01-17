@@ -38,6 +38,9 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 
 // Global holds configuration applies globally: CORS and caching.
 type Global struct {
+	// PluginConfig contains the configuration related custom plugin bundles/driver.
+	PluginConfig *PluginConfig `bson:"pluginConfig,omitempty" json:"pluginConfig,omitempty"`
+
 	// CORS contains the configuration related to cross origin resource sharing.
 	// Tyk native API definition: `CORS`.
 	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
@@ -49,6 +52,15 @@ type Global struct {
 
 // Fill fills *Global from apidef.APIDefinition.
 func (g *Global) Fill(api apidef.APIDefinition) {
+	if g.PluginConfig == nil {
+		g.PluginConfig = &PluginConfig{}
+	}
+
+	g.PluginConfig.Fill(api)
+	if ShouldOmit(g.PluginConfig) {
+		g.PluginConfig = nil
+	}
+
 	if g.CORS == nil {
 		g.CORS = &CORS{}
 	}
@@ -70,6 +82,10 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *Global into *apidef.APIDefinition.
 func (g *Global) ExtractTo(api *apidef.APIDefinition) {
+	if g.PluginConfig != nil {
+		g.PluginConfig.ExtractTo(api)
+	}
+
 	if g.CORS != nil {
 		g.CORS.ExtractTo(&api.CORS)
 	}
@@ -77,6 +93,31 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	if g.Cache != nil {
 		g.Cache.ExtractTo(&api.CacheOptions)
 	}
+}
+
+// PluginConfig holds configuration for custom plugins.
+type PluginConfig struct {
+	// Driver configures which custom plugin to be used.
+	// It's value should be set to one of the following:
+	//
+	// - `otto`,
+	// - `python`,
+	// - `lua`,
+	// - `grpc`,
+	// - `goplugin`.
+	//
+	// Tyk native API definition: `custom_middleware.driver`.
+	Driver apidef.MiddlewareDriver `bson:"driver,omitempty" json:"driver,omitempty"`
+}
+
+// Fill fills pluginConfig from apidef.
+func (p *PluginConfig) Fill(api apidef.APIDefinition) {
+	p.Driver = api.CustomMiddleware.Driver
+}
+
+// ExtractTo extracts *PluginConfig into *apidef.
+func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomMiddleware.Driver = p.Driver
 }
 
 // CORS holds configuration for cross-origin resource sharing.
