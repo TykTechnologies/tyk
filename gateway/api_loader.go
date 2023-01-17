@@ -383,7 +383,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 					},
 				)
 			default:
-				// TODO: check if mwAuthCheckFunc is available/valid
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
 				newExtractor(spec, baseMid)
