@@ -38,7 +38,7 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 
 // Global holds configuration applies globally: CORS and caching.
 type Global struct {
-	// PluginConfig contains the configuration related custom plugin bundles/driver.
+	// PluginConfig contains the configuration related to custom plugin bundles/driver.
 	PluginConfig *PluginConfig `bson:"pluginConfig,omitempty" json:"pluginConfig,omitempty"`
 
 	// CORS contains the configuration related to cross origin resource sharing.
@@ -97,7 +97,7 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 // PluginConfig holds configuration for custom plugins.
 type PluginConfig struct {
-	// Driver configures which custom plugin to be used.
+	// Driver configures which custom plugin to use.
 	// It's value should be set to one of the following:
 	//
 	// - `otto`,

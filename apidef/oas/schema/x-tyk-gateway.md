@@ -662,7 +662,7 @@ Operations configuration.
 
 **Field: `pluginConfig` ([PluginConfig](#pluginconfig))**
 
-PluginConfig contains the configuration related custom plugin bundles/driver.
+PluginConfig contains the configuration related to custom plugin bundles/driver.
 
 **Field: `cors` ([CORS](#cors))**
 
@@ -681,7 +681,7 @@ Tyk native API definition: `cache_options`.
 
 **Field: `driver` (`object`)**
 
-Driver configures which custom plugin to be used.
+Driver configures which custom plugin to use.
 It's value should be set to one of the following:
 
 - `otto`,
