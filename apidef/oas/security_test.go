@@ -541,7 +541,7 @@ func TestOAS_CustomPlugin(t *testing.T) {
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					CustomPlugin: &customPlugin,
+					Custom: &customPlugin,
 				},
 			},
 		},

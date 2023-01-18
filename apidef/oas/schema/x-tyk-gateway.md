@@ -397,9 +397,9 @@ Tyk native API definition: `auth_configs["oidc"]`.
 
 GoPlugin contains the configurations related to GoPlugin authentication mode.
 
-**Field: `customPlugin` ([CustomPlugin](#customplugin))**
+**Field: `customPlugin` ([Custom](#customplugin))**
 
-CustomPlugin contains the configurations related to CustomPlugin authentication mode.
+Custom contains the configurations related to Custom authentication mode.
 
 Tyk native API definition: `auth_configs["coprocess"]`.
 
@@ -587,11 +587,11 @@ Enabled enables the GoPlugin authentication mode.
 Tyk native API definition: `use_go_plugin_auth`.
 
 
-### **CustomPlugin**
+### **Custom**
 
 **Field: `enabled` (`boolean`)**
 
-Enabled enables the CustomPlugin authentication mode.
+Enabled enables the Custom authentication mode.
 
 Tyk native API definition: `enable_coprocess_auth`.
 
