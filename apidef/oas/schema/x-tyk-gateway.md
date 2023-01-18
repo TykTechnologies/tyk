@@ -393,11 +393,7 @@ OIDC contains the configurations related to OIDC authentication mode.
 
 Tyk native API definition: `auth_configs["oidc"]`.
 
-**Field: `goPlugin` ([GoPlugin](#goplugin))**
-
-GoPlugin contains the configurations related to GoPlugin authentication mode.
-
-**Field: `customPlugin` ([Custom](#customplugin))**
+**Field: `custom` ([CustomPlugin](#customplugin))**
 
 Custom contains the configurations related to Custom authentication mode.
 
@@ -578,20 +574,11 @@ Scope contains the scope name.
 PolicyID contains the Policy ID.
 
 
-### **GoPlugin**
+### **CustomPlugin**
 
 **Field: `enabled` (`boolean`)**
 
-Enabled enables the GoPlugin authentication mode.
-
-Tyk native API definition: `use_go_plugin_auth`.
-
-
-### **Custom**
-
-**Field: `enabled` (`boolean`)**
-
-Enabled enables the Custom authentication mode.
+Enabled enables the CustomPlugin authentication mode.
 
 Tyk native API definition: `enable_coprocess_auth`.
 
