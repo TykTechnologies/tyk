@@ -314,7 +314,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	authToken, _ := m.getAuthToken(apidef.CoprocessType, r)
 
 	var extractor IdExtractor
-	if m.Spec.EnableCoProcessAuth && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
+	customPluginAuthEnabled := m.Spec.EnableCoProcessAuth || m.Spec.CustomPluginAuthEnabled
+	if customPluginAuthEnabled && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
 		extractor = m.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 	}
 
@@ -441,7 +442,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Is this a CP authentication middleware?
-	if m.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
+	if customPluginAuthEnabled && m.HookType == coprocess.HookType_CustomKeyCheck {
 		if extractor == nil {
 			sessionID = token
 		}
