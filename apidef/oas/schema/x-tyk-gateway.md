@@ -393,7 +393,7 @@ OIDC contains the configurations related to OIDC authentication mode.
 
 Tyk native API definition: `auth_configs["oidc"]`.
 
-**Field: `custom` ([CustomPlugin](#customplugin))**
+**Field: `custom` ([CustomPluginAuthentication](#customplugin))**
 
 Custom contains the configurations related to Custom authentication mode.
 
@@ -574,11 +574,11 @@ Scope contains the scope name.
 PolicyID contains the Policy ID.
 
 
-### **CustomPlugin**
+### **CustomPluginAuthentication**
 
 **Field: `enabled` (`boolean`)**
 
-Enabled enables the CustomPlugin authentication mode.
+Enabled enables the CustomPluginAuthentication authentication mode.
 
 Tyk native API definition: `enable_coprocess_auth`.
 

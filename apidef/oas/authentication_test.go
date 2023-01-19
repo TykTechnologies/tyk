@@ -107,12 +107,12 @@ func TestOIDC(t *testing.T) {
 }
 
 func TestCustomPlugin(t *testing.T) {
-	var emptyCustomPlugin CustomPlugin
+	var emptyCustomPlugin CustomPluginAuthentication
 
 	var convertedAPI apidef.APIDefinition
 	emptyCustomPlugin.ExtractTo(&convertedAPI)
 
-	var resultCustomPlugin CustomPlugin
+	var resultCustomPlugin CustomPluginAuthentication
 	resultCustomPlugin.Fill(convertedAPI)
 
 	assert.Equal(t, emptyCustomPlugin, resultCustomPlugin)

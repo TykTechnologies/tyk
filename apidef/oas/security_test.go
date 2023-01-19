@@ -535,7 +535,7 @@ func TestOAS_OIDC(t *testing.T) {
 
 func TestOAS_CustomPlugin(t *testing.T) {
 	var oas OAS
-	var customPlugin CustomPlugin
+	var customPlugin CustomPluginAuthentication
 	Fill(t, &customPlugin, 0)
 	oas.Extensions = map[string]interface{}{
 		ExtensionTykAPIGateway: &XTykAPIGateway{

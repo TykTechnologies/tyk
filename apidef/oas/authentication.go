@@ -47,7 +47,7 @@ type Authentication struct {
 	// Custom contains the configurations related to Custom authentication mode.
 	//
 	// Tyk native API definition: `auth_configs["coprocess"]`
-	Custom *CustomPlugin `bson:"custom,omitempty" json:"custom,omitempty"`
+	Custom *CustomPluginAuthentication `bson:"custom,omitempty" json:"custom,omitempty"`
 
 	// SecuritySchemes contains security schemes definitions.
 	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
@@ -77,7 +77,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 
 	if _, ok := api.AuthConfigs[apidef.CoprocessType]; ok {
 		if a.Custom == nil {
-			a.Custom = &CustomPlugin{}
+			a.Custom = &CustomPluginAuthentication{}
 		}
 
 		a.Custom.Fill(api)
@@ -579,9 +579,9 @@ type ClientToPolicy struct {
 	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
-// CustomPlugin holds configuration for custom plugins.
-type CustomPlugin struct {
-	// Enabled enables the CustomPlugin authentication mode.
+// CustomPluginAuthentication holds configuration for custom plugins.
+type CustomPluginAuthentication struct {
+	// Enabled enables the CustomPluginAuthentication authentication mode.
 	//
 	// Tyk native API definition: `enable_coprocess_auth`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -590,15 +590,15 @@ type CustomPlugin struct {
 	AuthSources `bson:",inline" json:",inline"`
 }
 
-// Fill fills *CustomPlugin from apidef.AuthConfig.
-func (c *CustomPlugin) Fill(api apidef.APIDefinition) {
+// Fill fills *CustomPluginAuthentication from apidef.AuthConfig.
+func (c *CustomPluginAuthentication) Fill(api apidef.APIDefinition) {
 	c.Enabled = api.CustomPluginAuthEnabled
 
 	c.AuthSources.Fill(api.AuthConfigs[apidef.CoprocessType])
 }
 
-// ExtractTo extracts *CustomPlugin to *apidef.APIDefinition.
-func (c *CustomPlugin) ExtractTo(api *apidef.APIDefinition) {
+// ExtractTo extracts *CustomPluginAuthentication to *apidef.APIDefinition.
+func (c *CustomPluginAuthentication) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomPluginAuthEnabled = c.Enabled
 
 	authConfig := apidef.AuthConfig{}
