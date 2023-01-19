@@ -214,13 +214,14 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 		return nil, err
 	}
 
-	versions = append(versions, *a)
+	a.MigrateEndpointMeta()
+	a.MigrateCachePlugin()
 	for i := 0; i < len(versions); i++ {
 		versions[i].MigrateEndpointMeta()
 		versions[i].MigrateCachePlugin()
 	}
 
-	return versions[:len(versions)-1], nil
+	return versions, nil
 }
 
 func (a *APIDefinition) MigrateCachePlugin() {
