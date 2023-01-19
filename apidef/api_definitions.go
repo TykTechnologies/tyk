@@ -456,6 +456,7 @@ type EventHandlerMetaConfig struct {
 }
 
 type MiddlewareDefinition struct {
+	Disabled       bool   `bson:"disabled" json:"disabled"`
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
