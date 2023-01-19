@@ -63,6 +63,9 @@ const Schema = `{
         "enable_coprocess_auth": {
             "type": "boolean"
         },
+		"custom_plugin_auth_enabled": {
+            "type": "boolean"
+        },
         "jwt_skip_kid": {
             "type": "boolean"
         },

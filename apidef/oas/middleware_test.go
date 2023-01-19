@@ -32,6 +32,44 @@ func TestGlobal(t *testing.T) {
 	assert.Equal(t, emptyGlobal, resultGlobal)
 }
 
+func TestPluginConfig(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyPluginConfig PluginConfig
+
+		var convertedAPI apidef.APIDefinition
+		emptyPluginConfig.ExtractTo(&convertedAPI)
+
+		var resultPluginConfig PluginConfig
+		resultPluginConfig.Fill(convertedAPI)
+
+		assert.Equal(t, emptyPluginConfig, resultPluginConfig)
+	})
+
+	t.Run("enum values", func(t *testing.T) {
+		validDrivers := []apidef.MiddlewareDriver{
+			apidef.OttoDriver,
+			apidef.PythonDriver,
+			apidef.LuaDriver,
+			apidef.GrpcDriver,
+			apidef.GoPluginDriver,
+		}
+
+		for _, validDriver := range validDrivers {
+			pluginConfig := PluginConfig{
+				Driver: validDriver,
+			}
+
+			api := apidef.APIDefinition{}
+			pluginConfig.ExtractTo(&api)
+			assert.Equal(t, validDriver, api.CustomMiddleware.Driver)
+
+			newPluginConfig := PluginConfig{}
+			newPluginConfig.Fill(api)
+			assert.Equal(t, pluginConfig, newPluginConfig)
+		}
+	})
+}
+
 func TestCORS(t *testing.T) {
 	var emptyCORS CORS
 
