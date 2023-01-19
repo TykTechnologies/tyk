@@ -393,7 +393,7 @@ OIDC contains the configurations related to OIDC authentication mode.
 
 Tyk native API definition: `auth_configs["oidc"]`.
 
-**Field: `custom` ([CustomPluginAuthentication](#customplugin))**
+**Field: `custom` ([CustomPluginAuthentication](#custompluginauthentication))**
 
 Custom contains the configurations related to Custom authentication mode.
 
