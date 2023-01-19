@@ -1066,22 +1066,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			graphql.WithAfterFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.AfterFetchHook),
 		}
 
-		// if this context vars are enabled and this is a supergraph, inject the sub request id header
-		upstreamHeaders := http.Header{}
-		if p.TykAPISpec.EnableContextVars && p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph {
-			ctxData := ctxGetData(outreq)
-			if reqID, exists := ctxData["request_id"]; !exists {
-				log.Warn("context variables enabled but request_id missing")
-			} else if requestID, ok := reqID.(string); ok {
-				upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
-			}
-		}
-
-		// append the request headers if any
-		for h, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeaders {
-			val := p.Gw.replaceTykVariables(outreq, value, false)
-			upstreamHeaders.Set(h, val)
-		}
+		upstreamHeaders := p.generateHeaders(outreq)
 		execOptions = append(execOptions, graphql.WithUpstreamHeaders(upstreamHeaders))
 
 		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
@@ -1111,6 +1096,38 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 	}
 
 	return nil, false, errors.New("graphql configuration is invalid")
+}
+
+func (p *ReverseProxy) generateHeaders(req *http.Request) http.Header {
+	headers := http.Header{}
+	if p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph {
+		if p.TykAPISpec.EnableContextVars {
+			// if this context vars are enabled and this is a supergraph, inject the sub request id header
+			ctxData := ctxGetData(req)
+			if reqID, exists := ctxData["request_id"]; !exists {
+				log.Warn("context variables enabled but request_id missing")
+			} else if requestID, ok := reqID.(string); ok {
+				headers.Set("X-Tyk-Parent-Request-Id", requestID)
+			}
+
+			// parse context variables for supergraph
+			for h, val := range p.TykAPISpec.GraphQL.Supergraph.GlobalHeaders {
+				replacedVal := p.Gw.replaceTykVariables(req, val, false)
+				headers.Set(h, replacedVal)
+			}
+		} else {
+			for h, val := range p.TykAPISpec.GraphQL.Supergraph.GlobalHeaders {
+				headers.Set(h, val)
+			}
+		}
+	}
+
+	// append the request headers if any
+	for h, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeaders {
+		val := p.Gw.replaceTykVariables(req, value, false)
+		headers.Set(h, val)
+	}
+	return headers
 }
 
 func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn, req *http.Request) {

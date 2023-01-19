@@ -879,6 +879,11 @@ func TestGraphQL_HeadersInjection(t *testing.T) {
 	}...)
 }
 
+func headerCheck(key, value string, headers map[string][]string) bool {
+	val, ok := headers[key]
+	return ok && len(val) > 0 && val[0] == value
+}
+
 func TestGraphql_Headers(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
@@ -893,11 +898,6 @@ func TestGraphql_Headers(t *testing.T) {
 		spec.Proxy.TargetURL = TestHttpAny + "/dynamic"
 		spec.Proxy.ListenPath = "/"
 	})[0]
-
-	headerCheck := func(key, value string, headers map[string][]string) bool {
-		val, ok := headers[key]
-		return ok && len(val) > 0 && val[0] == value
-	}
 
 	t.Run("test introspection header", func(t *testing.T) {
 		spec := defaultSpec
@@ -952,6 +952,202 @@ func TestGraphql_Headers(t *testing.T) {
 		})
 		assert.NoError(t, err)
 	})
+}
+
+func TestGraphQL_SubgraphHeaders(t *testing.T) {
+	t.Run("test supergraph global headers", func(t *testing.T) {
+		g := StartTest(nil)
+		defer g.Close()
+
+		dynamicHandler := "/dynamicHandler"
+		g.AddDynamicHandler(dynamicHandler, func(writer http.ResponseWriter, r *http.Request) {
+			checkHeaders := map[string]string{
+				"Test-Header":    "test-value",
+				"Context-Header": "header-value",
+			}
+			for key, val := range checkHeaders {
+				if !headerCheck(key, val, r.Header) {
+					t.Errorf("%s header missing with value %s", key, val)
+				}
+			}
+		})
+
+		tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
+			spec.Name = "subgraph-accounts"
+			spec.APIID = "subgraph1"
+			spec.Proxy.TargetURL = testSubgraphAccounts
+			spec.Proxy.ListenPath = "/tyk-subgraph-accounts"
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+				Version:       apidef.GraphQLConfigVersion2,
+				Schema:        gqlSubgraphSchemaAccounts,
+				Subgraph: apidef.GraphQLSubgraphConfig{
+					SDL: gqlSubgraphSDLAccounts,
+				},
+			}
+		})[0]
+
+		tykSubgraphReviews := BuildAPI(func(spec *APISpec) {
+			spec.Name = "subgraph-reviews"
+			spec.APIID = "subgraph2"
+			spec.Proxy.TargetURL = TestHttpAny + dynamicHandler
+			spec.Proxy.ListenPath = "/tyk-subgraph-reviews"
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+				Version:       apidef.GraphQLConfigVersion2,
+				Schema:        gqlSubgraphSchemaReviews,
+				Subgraph: apidef.GraphQLSubgraphConfig{
+					SDL: gqlSubgraphSDLReviews,
+				},
+			}
+		})[0]
+
+		supergraph := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.APIID = "supergraph"
+			spec.EnableContextVars = true
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				Version:       apidef.GraphQLConfigVersion2,
+				ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
+				Supergraph: apidef.GraphQLSupergraphConfig{
+					Subgraphs: []apidef.GraphQLSubgraphEntity{
+						{
+							APIID: "subgraph1",
+							URL:   "tyk://" + tykSubgraphAccounts.Name,
+							SDL:   gqlSubgraphSDLAccounts,
+						},
+						{
+							APIID: "subgraph2",
+							URL:   "tyk://" + tykSubgraphReviews.Name,
+							SDL:   gqlSubgraphSDLReviews,
+						},
+					},
+					MergedSDL: gqlMergedSupergraphSDL,
+					GlobalHeaders: map[string]string{
+						"Test-Header":    "test-value",
+						"Context-Header": "$tyk_context.headers_Second_Header",
+					},
+				},
+				Schema: gqlMergedSupergraphSDL,
+			}
+		})[0]
+
+		g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
+		reviews := graphql.Request{
+			Query: `query Query { me { id username reviews { body } } }`,
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			{
+				Data: reviews,
+				Headers: map[string]string{
+					"Second-Header": "header-value",
+				},
+			},
+		}...)
+	})
+
+	t.Run("test subgraph headers", func(t *testing.T) {
+		g := StartTest(nil)
+		defer g.Close()
+
+		dynamicHandler, dynamicHandlerSecond := "/dynamicHandler", "/dynamicHandlerSecond"
+
+		g.AddDynamicHandler(dynamicHandler, func(writer http.ResponseWriter, r *http.Request) {
+			if !headerCheck("Context-Header", "test value", r.Header) {
+				t.Error(`Header "Context-Header with value test value missing in request"`)
+			}
+		})
+
+		g.AddDynamicHandler(dynamicHandlerSecond, func(writer http.ResponseWriter, r *http.Request) {
+			if headerCheck("Context-Header", "test value", r.Header) {
+				t.Error(`Header "Context-Header with value test value should not be inrequest"`)
+			}
+		})
+
+		tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
+			spec.Name = "subgraph-accounts"
+			spec.APIID = "subgraph1"
+			spec.Proxy.TargetURL = TestHttpAny + dynamicHandler
+			spec.Proxy.ListenPath = "/tyk-subgraph-accounts"
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+				Version:       apidef.GraphQLConfigVersion2,
+				Schema:        gqlSubgraphSchemaAccounts,
+				Subgraph: apidef.GraphQLSubgraphConfig{
+					SDL: gqlSubgraphSDLAccounts,
+				},
+			}
+		})[0]
+
+		tykSubgraphReviews := BuildAPI(func(spec *APISpec) {
+			spec.Name = "subgraph-reviews"
+			spec.APIID = "subgraph2"
+			spec.Proxy.TargetURL = TestHttpAny + dynamicHandlerSecond
+			spec.Proxy.ListenPath = "/tyk-subgraph-reviews"
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+				Version:       apidef.GraphQLConfigVersion2,
+				Schema:        gqlSubgraphSchemaReviews,
+				Subgraph: apidef.GraphQLSubgraphConfig{
+					SDL: gqlSubgraphSDLReviews,
+				},
+			}
+		})[0]
+
+		supergraph := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.APIID = "supergraph"
+			spec.EnableContextVars = true
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				Version:       apidef.GraphQLConfigVersion2,
+				ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
+				Supergraph: apidef.GraphQLSupergraphConfig{
+					Subgraphs: []apidef.GraphQLSubgraphEntity{
+						{
+							APIID: "subgraph1",
+							URL:   "tyk://" + tykSubgraphAccounts.Name,
+							SDL:   gqlSubgraphSDLAccounts,
+							Headers: map[string]string{
+								"Context-Header": "test value",
+							},
+						},
+						{
+							APIID: "subgraph2",
+							URL:   "tyk://" + tykSubgraphReviews.Name,
+							SDL:   gqlSubgraphSDLReviews,
+						},
+					},
+					MergedSDL: gqlMergedSupergraphSDL,
+					GlobalHeaders: map[string]string{
+						"Test-Header": "test-value",
+					},
+				},
+				Schema: gqlMergedSupergraphSDL,
+			}
+		})[0]
+
+		g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
+		reviews := graphql.Request{
+			Query: `query Query { me { id username reviews { body } } }`,
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			{
+				Data: reviews,
+				Headers: map[string]string{
+					"Second-Header": "header-value",
+				},
+			},
+		}...)
+	})
+
 }
 
 func TestGraphQL_InternalDataSource(t *testing.T) {
