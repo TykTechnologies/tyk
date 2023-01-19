@@ -207,6 +207,8 @@ func (a *APIDefinition) migrateEndpointMetaByType(typ int) {
 }
 
 func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
+	a.MigrateAuthentication()
+
 	versions, err = a.MigrateVersioning()
 	if err != nil {
 		return nil, err
@@ -214,15 +216,9 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 
 	a.MigrateEndpointMeta()
 	a.MigrateCachePlugin()
-
-	for k, v := range a.AuthConfigs {
-		v.Name = k
-		a.AuthConfigs[k] = v
-	}
-
 	for i := 0; i < len(versions); i++ {
 		versions[i].MigrateEndpointMeta()
-		a.MigrateCachePlugin()
+		versions[i].MigrateCachePlugin()
 	}
 
 	return versions, nil
@@ -256,4 +252,58 @@ func (a *APIDefinition) MigrateCachePlugin() {
 	}
 
 	a.VersionData.Versions[""] = vInfo
+}
+
+func (a *APIDefinition) MigrateAuthentication() {
+	a.deleteAuthConfigsNotUsed()
+	for k, v := range a.AuthConfigs {
+		v.Name = k
+		a.AuthConfigs[k] = v
+	}
+}
+
+func (a *APIDefinition) deleteAuthConfigsNotUsed() {
+	if !a.isAuthTokenEnabled() {
+		delete(a.AuthConfigs, AuthTokenType)
+	}
+
+	if !a.EnableJWT {
+		delete(a.AuthConfigs, JWTType)
+	}
+
+	if !a.EnableSignatureChecking {
+		delete(a.AuthConfigs, HMACType)
+	}
+
+	if !a.UseBasicAuth {
+		delete(a.AuthConfigs, BasicType)
+	}
+
+	if !a.EnableCoProcessAuth {
+		delete(a.AuthConfigs, CoprocessType)
+	}
+
+	if !a.UseOauth2 {
+		delete(a.AuthConfigs, OAuthType)
+	}
+
+	if !a.ExternalOAuth.Enabled {
+		delete(a.AuthConfigs, ExternalOAuthType)
+	}
+
+	if !a.UseOpenID {
+		delete(a.AuthConfigs, OIDCType)
+	}
+}
+
+func (a *APIDefinition) isAuthTokenEnabled() bool {
+	return a.UseStandardAuth ||
+		(!a.UseKeylessAccess &&
+			!a.EnableJWT &&
+			!a.EnableSignatureChecking &&
+			!a.UseBasicAuth &&
+			!a.EnableCoProcessAuth &&
+			!a.UseOauth2 &&
+			!a.ExternalOAuth.Enabled &&
+			!a.UseOpenID)
 }
