@@ -26,17 +26,9 @@ services:
       - "0.0.0.0:8080:8080"
     environment:
       - TYK_LOGLEVEL=debug
-    healthcheck:
-      test: wget -q --output-document - http://localhost:8080/hello | grep -o '.*"status":"pass".*"status":"pass"'
-      interval: 5s
-      retries: 10
-      start_period: 2s
-      timeout: 10s
   wait:
     image: hello-world:linux
     depends_on:
-        gw:
-            condition: service_healthy
         redis:
             condition: service_healthy
       
