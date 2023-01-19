@@ -764,7 +764,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	mwDriver := apidef.MiddlewareDriver("")
 
 	// Set AuthCheck hook
-	if spec.CustomMiddleware.AuthCheck.Name != "" {
+	if !spec.CustomMiddleware.AuthCheck.Disabled && spec.CustomMiddleware.AuthCheck.Name != "" {
 		mwAuthCheckFunc = spec.CustomMiddleware.AuthCheck
 		if spec.CustomMiddleware.AuthCheck.Path != "" {
 			// Feed a JS file to Otto
@@ -774,14 +774,18 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 	// Load from the configuration
 	for _, mwObj := range spec.CustomMiddleware.Pre {
-		mwPaths = append(mwPaths, mwObj.Path)
-		mwPreFuncs = append(mwPreFuncs, mwObj)
-		mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
+		if !mwObj.Disabled {
+			mwPaths = append(mwPaths, mwObj.Path)
+			mwPreFuncs = append(mwPreFuncs, mwObj)
+			mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
+		}
 	}
 	for _, mwObj := range spec.CustomMiddleware.Post {
-		mwPaths = append(mwPaths, mwObj.Path)
-		mwPostFuncs = append(mwPostFuncs, mwObj)
-		mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
+		if !mwObj.Disabled {
+			mwPaths = append(mwPaths, mwObj.Path)
+			mwPostFuncs = append(mwPostFuncs, mwObj)
+			mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
+		}
 	}
 
 	// Load from folders
@@ -830,16 +834,20 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 	// Load PostAuthCheck hooks
 	for _, mwObj := range spec.CustomMiddleware.PostKeyAuth {
-		if mwObj.Path != "" {
-			// Otto files are specified here
-			mwPaths = append(mwPaths, mwObj.Path)
+		if !mwObj.Disabled {
+			if mwObj.Path != "" {
+				// Otto files are specified here
+				mwPaths = append(mwPaths, mwObj.Path)
+			}
+			mwPostKeyAuthFuncs = append(mwPostKeyAuthFuncs, mwObj)
 		}
-		mwPostKeyAuthFuncs = append(mwPostKeyAuthFuncs, mwObj)
 	}
 
 	// Load response hooks
 	for _, mw := range spec.CustomMiddleware.Response {
-		mwResponseFuncs = append(mwResponseFuncs, mw)
+		if !mw.Disabled {
+			mwResponseFuncs = append(mwResponseFuncs, mw)
+		}
 	}
 
 	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwResponseFuncs, mwDriver
