@@ -362,7 +362,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 		customPluginAuthEnabled := spec.CustomPluginAuthEnabled || spec.UseGoPluginAuth || spec.EnableCoProcessAuth
 
-		if customPluginAuthEnabled {
+		if customPluginAuthEnabled && !mwAuthCheckFunc.Disabled {
 			switch spec.CustomMiddleware.Driver {
 			case apidef.OttoDriver:
 				logger.Info("----> Checking security policy: JS Plugin")
