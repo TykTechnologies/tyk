@@ -770,8 +770,6 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			// Feed a JS file to Otto
 			mwPaths = append(mwPaths, spec.CustomMiddleware.AuthCheck.Path)
 		}
-	} else {
-		mwAuthCheckFunc.Disabled = true
 	}
 
 	// Load from the configuration
