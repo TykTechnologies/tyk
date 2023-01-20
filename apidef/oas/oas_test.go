@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -491,4 +492,28 @@ func TestOAS_MarshalJSON(t *testing.T) {
 			assert.Contains(t, string(data), `"x-abcd":[{"key":"value"},{"key":"value"}]`)
 		})
 	})
+}
+
+func TestMigrateAndFillOAS(t *testing.T) {
+	var api apidef.APIDefinition
+	api.Name = "Furkan"
+	api.VersionData.DefaultVersion = "Default"
+	api.VersionData.Versions = map[string]apidef.VersionInfo{
+		"Default": {},
+		"v2":      {},
+	}
+
+	baseAPIDef, versionAPIDefs, err := MigrateAndFillOAS(&api)
+	assert.NoError(t, err)
+	assert.Len(t, versionAPIDefs, 1)
+	assert.True(t, baseAPIDef.Classic.IsOAS)
+	assert.Equal(t, DefaultOpenAPI, baseAPIDef.OAS.OpenAPI)
+	assert.Equal(t, "Furkan", baseAPIDef.OAS.Info.Title)
+
+	assert.True(t, versionAPIDefs[0].Classic.IsOAS)
+	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[0].OAS.OpenAPI)
+	assert.Equal(t, "Furkan-v2", versionAPIDefs[0].OAS.Info.Title)
+
+	err = baseAPIDef.OAS.Validate(context.Background())
+	assert.NoError(t, err)
 }
