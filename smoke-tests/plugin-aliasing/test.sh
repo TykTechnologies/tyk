@@ -29,7 +29,7 @@ docker run --rm -v `pwd`/helloworld-plugin:/plugin-source tykio/tyk-plugin-compi
 # This ensures correct paths when running by hand
 TYK_GW_PATH=$(readlink -f $(dirname $(readlink -f $0))/../../..)
 # Get version from source code (will not include rc tags - same as ci/images/plugin-compiler build.sh)
-TYK_GW_VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' $TYK_GW_PATH/gateway/version.go)
+TYK_GW_VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' ./../../gateway/version.go)
 
 # if params were not sent, then attempt to get them from env vars
 if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
