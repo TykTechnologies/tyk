@@ -45,6 +45,10 @@ type Global struct {
 	// Tyk native API definition: `CORS`.
 	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
 
+	// AuthenticationPlugin contains configuration related to custom authentication plugin.
+	// Tyk native API definition: `custom_middleware.auth_check`.
+	AuthenticationPlugin *AuthenticationPlugin `bson:"authenticationPlugin,omitempty" json:"authenticationPlugin,omitempty"`
+
 	// Cache contains the configurations related to caching.
 	// Tyk native API definition: `cache_options`.
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
@@ -70,6 +74,15 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 		g.CORS = nil
 	}
 
+	if g.AuthenticationPlugin == nil {
+		g.AuthenticationPlugin = &AuthenticationPlugin{}
+	}
+
+	g.AuthenticationPlugin.Fill(api)
+	if ShouldOmit(g.AuthenticationPlugin) {
+		g.AuthenticationPlugin = nil
+	}
+
 	if g.Cache == nil {
 		g.Cache = &Cache{}
 	}
@@ -88,6 +101,10 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	if g.CORS != nil {
 		g.CORS.ExtractTo(&api.CORS)
+	}
+
+	if g.AuthenticationPlugin != nil {
+		g.AuthenticationPlugin.ExtractTo(api)
 	}
 
 	if g.Cache != nil {
@@ -719,4 +736,51 @@ func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	meta.Disabled = !et.Enabled
 	meta.TimeOut = et.Value
+}
+
+type CustomPluginMiddleware struct {
+	// FunctionName is the name of authentication method.
+	FunctionName string `bson:"functionName" json:"functionName"` // required.
+	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
+	Path string `bson:"path" json:"path"` // required.
+	// RawBodyOnly if set to true, do not fill body in request or response object.
+	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+}
+
+// AuthenticationPlugin holds the configuration for custom authentication plugin.
+type AuthenticationPlugin struct {
+	// Enabled enables custom authentication plugin.
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	// CustomPluginMiddleware holds configuration for custom middleware.
+	*CustomPluginMiddleware `bson:",inline" json:",inline"`
+}
+
+func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
+	if ap.CustomPluginMiddleware == nil {
+		ap.CustomPluginMiddleware = &CustomPluginMiddleware{}
+	}
+
+	ap.FunctionName = api.CustomMiddleware.AuthCheck.Name
+	ap.Path = api.CustomMiddleware.AuthCheck.Path
+	ap.RawBodyOnly = api.CustomMiddleware.AuthCheck.RawBodyOnly
+
+	if ShouldOmit(ap.CustomPluginMiddleware) {
+		ap.CustomPluginMiddleware = nil
+		// nothing was configured.
+		return
+	}
+
+	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
+}
+
+func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
+	if ap.CustomPluginMiddleware == nil && !ap.Enabled {
+		// nothing is configured.
+		return
+	}
+
+	api.CustomMiddleware.AuthCheck.Disabled = !ap.Enabled
+	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
+	api.CustomMiddleware.AuthCheck.Path = ap.Path
+	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
 }
