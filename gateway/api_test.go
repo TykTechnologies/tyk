@@ -2136,7 +2136,6 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 	v2 := BuildAPI(func(a *APISpec) {
 		a.Name = "v2"
 		a.APIID = v2APIID
-		a.CertificatePinningDisabled = true
 		a.VersionDefinition.Location = ""
 		a.VersionDefinition.Key = ""
 
@@ -2264,7 +2263,6 @@ func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 	v1 := BuildAPI(func(a *APISpec) {
 		a.Name = "v1"
 		a.APIID = "v1"
-		a.CertificatePinningDisabled = true
 		a.VersionDefinition.Location = ""
 		a.VersionDefinition.Key = ""
 
@@ -2275,7 +2273,6 @@ func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 	v2 := BuildAPI(func(a *APISpec) {
 		a.Name = "v2"
 		a.APIID = "v2"
-		a.CertificatePinningDisabled = true
 		a.VersionDefinition.Location = ""
 		a.VersionDefinition.Key = ""
 
@@ -2286,7 +2283,6 @@ func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 	baseAPI := BuildAPI(func(a *APISpec) {
 		a.Name = "base"
 		a.APIID = "base"
-		a.CertificatePinningDisabled = true
 		a.VersionDefinition.Versions = map[string]string{
 			v1VersionName: v1.APIID,
 			v2VersionName: v2.APIID,
