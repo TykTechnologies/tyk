@@ -140,7 +140,7 @@ func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
 type PluginBundle struct {
 	// Enabled enables the custom plugin bundles.
 	//
-	// Tyk native API definition: `custom_middleware_bundle_disabled`
+	// Tyk classic API definition: `custom_middleware_bundle_disabled`
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// Path is the path suffix to construct the URL to fetch plugin bundle from.
 	// Path will be suffixed to `bundle_base_url` in gateway config.

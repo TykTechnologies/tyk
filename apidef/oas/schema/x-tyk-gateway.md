@@ -585,8 +585,7 @@ Bundle configures custom plugin bundles.
 
 **Field: `enabled` (`boolean`)**
 Enabled enables the custom plugin bundles.
-
-Tyk native API definition: `custom_middleware_bundle_disabled`.
+Tyk classic API definition: `custom_middleware_bundle_disabled`.
 
 **Field: `path` (`string`)**
 Path is the path suffix to construct the URL to fetch plugin bundle from.
