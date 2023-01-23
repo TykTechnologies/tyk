@@ -740,9 +740,9 @@ func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 
 type CustomPluginMiddleware struct {
 	// FunctionName is the name of authentication method.
-	FunctionName string `bson:"functionName,omitempty" json:"functionName,omitempty"`
+	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
-	Path string `bson:"path,omitempty" json:"path,omitempty"`
+	Path string `bson:"path" json:"path"` // required.
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
 }
