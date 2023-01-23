@@ -617,17 +617,6 @@
         "enabled"
       ]
     },
-    "X-Tyk-GoPlugin": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
     "X-Tyk-Authentication": {
       "type": "object",
       "properties": {
@@ -655,10 +644,7 @@
         "oidc": {
           "$ref": "#/definitions/X-Tyk-OIDC"
         },
-        "goPlugin": {
-          "$ref": "#/definitions/X-Tyk-GoPlugin"
-        },
-        "customPlugin": {
+        "custom": {
           "$ref": "#/definitions/X-Tyk-CustomPlugin"
         },
         "securitySchemes": {
