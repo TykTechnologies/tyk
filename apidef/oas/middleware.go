@@ -149,12 +149,22 @@ type PluginBundle struct {
 
 // Fill fills PluginBundle from apidef.
 func (p *PluginBundle) Fill(api apidef.APIDefinition) {
+	if !api.CustomMiddlewareBundleDisabled && api.CustomMiddlewareBundle == "" {
+		// nothing was configured.
+		return
+	}
+
 	p.Enabled = !api.CustomMiddlewareBundleDisabled
 	p.Path = api.CustomMiddlewareBundle
 }
 
 // ExtractTo extracts *PluginBundle into *apidef.
 func (p *PluginBundle) ExtractTo(api *apidef.APIDefinition) {
+	if !p.Enabled && p.Path == "" {
+		// nothing was configured
+		return
+	}
+
 	api.CustomMiddlewareBundleDisabled = !p.Enabled
 	api.CustomMiddlewareBundle = p.Path
 }
