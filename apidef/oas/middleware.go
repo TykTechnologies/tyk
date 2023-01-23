@@ -750,7 +750,7 @@ type CustomPluginMiddleware struct {
 // AuthenticationPlugin holds the configuration for custom authentication plugin.
 type AuthenticationPlugin struct {
 	// Enabled enables custom authentication plugin.
-	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"` // required.
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// CustomPluginMiddleware holds configuration for custom middleware.
 	CustomPluginMiddleware `bson:",inline" json:",inline"`
 }
