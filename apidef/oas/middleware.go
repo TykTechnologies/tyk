@@ -138,7 +138,7 @@ func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
 
 // PluginBundle holds configuration for custom plugins.
 type PluginBundle struct {
-	// Enabled enables the CustomPluginAuthentication authentication mode.
+	// Enabled enables the custom plugin bundles.
 	//
 	// Tyk native API definition: `custom_middleware_bundle_disabled`
 	Enabled bool `bson:"enabled" json:"enabled"` // required.

@@ -584,7 +584,7 @@ Bundle configures custom plugin bundles.
 ### **PluginBundle**
 
 **Field: `enabled` (`boolean`)**
-Enabled enables the CustomPluginAuthentication authentication mode.
+Enabled enables the custom plugin bundles.
 
 Tyk native API definition: `custom_middleware_bundle_disabled`.
 
