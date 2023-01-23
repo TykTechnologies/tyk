@@ -20,7 +20,7 @@ RUN apt update \
     && pip3 install --only-binary ":all:" grpcio protobuf==3.20.1
 
 # Remove some things to decrease CVE surface
-RUN  apt remove -y --allow-remove-essential libtiff5 ncurses-base \
+RUN apt remove -y --auto-remove --allow-remove-essential curl libtiff5 ncurses-base \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 # Clean up caches, unwanted .a and .o files
