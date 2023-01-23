@@ -766,6 +766,7 @@ func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
 
 	if ShouldOmit(ap.CustomPluginMiddleware) {
 		ap.CustomPluginMiddleware = nil
+		// nothing was configured.
 		return
 	}
 
@@ -773,10 +774,13 @@ func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
 }
 
 func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
-	api.CustomMiddleware.AuthCheck.Disabled = !ap.Enabled
-	if ap.CustomPluginMiddleware != nil {
-		api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
-		api.CustomMiddleware.AuthCheck.Path = ap.Path
-		api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
+	if ap.CustomPluginMiddleware == nil && !ap.Enabled {
+		// nothing is configured.
+		return
 	}
+
+	api.CustomMiddleware.AuthCheck.Disabled = !ap.Enabled
+	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
+	api.CustomMiddleware.AuthCheck.Path = ap.Path
+	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
 }
