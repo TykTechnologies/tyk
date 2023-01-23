@@ -1115,7 +1115,7 @@ func TestGraphQL_SubgraphHeaders(t *testing.T) {
 							URL:   "tyk://" + tykSubgraphAccounts.Name,
 							SDL:   gqlSubgraphSDLAccounts,
 							Headers: map[string]string{
-								"Context-Header": "test value",
+								"Context-Header": "$tyk_context.headers_Test_Header",
 							},
 						},
 						{
@@ -1142,7 +1142,7 @@ func TestGraphQL_SubgraphHeaders(t *testing.T) {
 			{
 				Data: reviews,
 				Headers: map[string]string{
-					"Second-Header": "header-value",
+					"Test-Header": "test value",
 				},
 			},
 		}...)
