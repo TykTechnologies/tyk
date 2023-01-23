@@ -640,8 +640,8 @@ post.NewProcessRequest(function(request, session) {
 			})
 
 			ts.Run(t, []test.TestCase{
-				{Path: "/test", Code: 200, BodyNotMatch: `"Pre":"foobar"`},
-				{Path: "/test", Code: 200, BodyNotMatch: `"Post":"foobar"`},
+				{Path: "/test", Code: http.StatusOK, BodyNotMatch: `"Pre":"foobar"`},
+				{Path: "/test", Code: http.StatusOK, BodyNotMatch: `"Post":"foobar"`},
 			}...)
 		})
 	})
