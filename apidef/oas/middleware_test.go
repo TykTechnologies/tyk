@@ -229,3 +229,41 @@ func TestTransformRequestBody(t *testing.T) {
 		assert.Equal(t, expectedTransformReqBody, newTransformReqBody)
 	})
 }
+
+func TestAuthenticationPlugin(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var (
+			emptyAuthenticationPlugin AuthenticationPlugin
+			convertedAPI              apidef.APIDefinition
+		)
+
+		emptyAuthenticationPlugin.ExtractTo(&convertedAPI)
+
+		var resultAuthenticationPlugin AuthenticationPlugin
+		resultAuthenticationPlugin.Fill(convertedAPI)
+
+		assert.Equal(t, emptyAuthenticationPlugin, resultAuthenticationPlugin)
+	})
+
+	t.Run("with values", func(t *testing.T) {
+		authenticationPlugin := AuthenticationPlugin{
+			Enabled: true,
+			CustomPluginMiddleware: &CustomPluginMiddleware{
+				FunctionName: "authenticate",
+				Path:         "/path/to/plugin",
+				RawBodyOnly:  true,
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		authenticationPlugin.ExtractTo(&api)
+		assert.Equal(t, "authenticate", api.CustomMiddleware.AuthCheck.Name)
+		assert.Equal(t, "/path/to/plugin", api.CustomMiddleware.AuthCheck.Path)
+		assert.True(t, api.CustomMiddleware.AuthCheck.RawBodyOnly)
+		assert.False(t, api.CustomMiddleware.AuthCheck.Disabled)
+
+		newAuthenticationPlugin := AuthenticationPlugin{}
+		newAuthenticationPlugin.Fill(api)
+		assert.Equal(t, authenticationPlugin, newAuthenticationPlugin)
+	})
+}
