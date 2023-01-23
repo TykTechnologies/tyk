@@ -630,6 +630,20 @@ post.NewProcessRequest(function(request, session) {
 			{Path: "/test", Code: 200, BodyMatch: `"Pre":"foobar"`},
 			{Path: "/test", Code: 200, BodyMatch: `"Post":"foobar"`},
 		}...)
+
+		t.Run("bundles disabled", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/test"
+				spec.CustomMiddlewareBundle = bundle
+				spec.CustomMiddlewareBundleDisabled = true
+				spec.CustomMiddleware.Driver = apidef.OttoDriver
+			})
+
+			ts.Run(t, []test.TestCase{
+				{Path: "/test", Code: 200, BodyNotMatch: `"Pre":"foobar"`},
+				{Path: "/test", Code: 200, BodyNotMatch: `"Post":"foobar"`},
+			}...)
+		})
 	})
 
 	t.Run("Files", func(t *testing.T) {
