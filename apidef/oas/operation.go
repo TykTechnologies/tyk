@@ -385,7 +385,9 @@ func (s *OAS) getOperationID(inPath, method string) string {
 		operation := p.GetOperation(method)
 
 		if operation == nil {
-			operation = &openapi3.Operation{}
+			operation = &openapi3.Operation{
+				Responses: openapi3.NewResponses(),
+			}
 			p.SetOperation(method, operation)
 		}
 
