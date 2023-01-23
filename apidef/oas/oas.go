@@ -366,8 +366,7 @@ type APIDef struct {
 // MigrateAndFillOAS migrates classic APIs to OAS-compatible forms. Then, it fills an OAS with it. To be able to make it
 // a valid OAS, it adds some required fields. It returns base API and its versions if any.
 func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
-	var baseOAS OAS
-	baseAPIDef := APIDef{OAS: &baseOAS, Classic: api}
+	baseAPIDef := APIDef{Classic: api}
 
 	versions, err := api.Migrate()
 	if err != nil {
@@ -376,19 +375,20 @@ func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
 
 	versionAPIDefs := make([]APIDef, len(versions))
 	for i, v := range versions {
-		v.IsOAS = true
-		var versionOAS OAS
-		versionOAS.Fill(v)
-		versionOAS.setRequiredFields(v.Name)
-
-		versionAPIDefs[i] = APIDef{OAS: &versionOAS, Classic: &v}
+		versionAPIDefs[i] = APIDef{OAS: newOASFromClassicAPIDefinition(&v), Classic: &v}
 	}
 
-	api.IsOAS = true
-	baseOAS.Fill(*api)
-	baseOAS.setRequiredFields(api.Name)
+	baseAPIDef.OAS = newOASFromClassicAPIDefinition(api)
 
 	return baseAPIDef, versionAPIDefs, nil
+}
+
+func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) *OAS {
+	api.IsOAS = true
+	var oas OAS
+	oas.Fill(*api)
+	oas.setRequiredFields(api.Name)
+	return &oas
 }
 
 // setRequiredFields sets some required fields to make OAS object a valid one.
@@ -396,6 +396,6 @@ func (s *OAS) setRequiredFields(name string) {
 	s.OpenAPI = DefaultOpenAPI
 	s.Info = &openapi3.Info{
 		Title:   name,
-		Version: "1", // TODO: version name can be set here
+		Version: "1",
 	}
 }
