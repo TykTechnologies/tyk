@@ -71,6 +71,7 @@ func TestOAS(t *testing.T) {
 			"/user": {
 				Get: &openapi3.Operation{
 					OperationID: operationID,
+					Responses:   openapi3.NewResponses(),
 				},
 			},
 		}
