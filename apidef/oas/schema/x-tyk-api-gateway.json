@@ -770,8 +770,7 @@
           "pattern": "\\S+"
         },
         "default": {
-          "type": "string",
-          "pattern": "\\S+"
+          "type": "string"
         },
         "location": {
           "type": "string",

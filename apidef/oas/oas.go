@@ -8,11 +8,16 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-// ExtensionTykAPIGateway is the OAS schema key for the Tyk extension.
-const ExtensionTykAPIGateway = "x-tyk-api-gateway"
+const (
+	// ExtensionTykAPIGateway is the OAS schema key for the Tyk extension.
+	ExtensionTykAPIGateway = "x-tyk-api-gateway"
 
-// Main holds the default version value (empty).
-const Main = ""
+	// Main holds the default version value (empty).
+	Main = ""
+
+	// DefaultOpenAPI is the default open API version which is set to migrated APIs.
+	DefaultOpenAPI = "3.0.6"
+)
 
 // OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
 type OAS struct {
@@ -350,4 +355,47 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 	}
 
 	s.Servers = append(newServers, userAddedServers...)
+}
+
+// APIDef is struct to hold both OAS and Classic forms of an API definition.
+type APIDef struct {
+	OAS     *OAS
+	Classic *apidef.APIDefinition
+}
+
+// MigrateAndFillOAS migrates classic APIs to OAS-compatible forms. Then, it fills an OAS with it. To be able to make it
+// a valid OAS, it adds some required fields. It returns base API and its versions if any.
+func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
+	baseAPIDef := APIDef{Classic: api}
+
+	versions, err := api.Migrate()
+	if err != nil {
+		return baseAPIDef, nil, err
+	}
+
+	versionAPIDefs := make([]APIDef, len(versions))
+	for i, v := range versions {
+		versionAPIDefs[i] = APIDef{OAS: newOASFromClassicAPIDefinition(&v), Classic: &v}
+	}
+
+	baseAPIDef.OAS = newOASFromClassicAPIDefinition(api)
+
+	return baseAPIDef, versionAPIDefs, nil
+}
+
+func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) *OAS {
+	api.IsOAS = true
+	var oas OAS
+	oas.Fill(*api)
+	oas.setRequiredFields(api.Name)
+	return &oas
+}
+
+// setRequiredFields sets some required fields to make OAS object a valid one.
+func (s *OAS) setRequiredFields(name string) {
+	s.OpenAPI = DefaultOpenAPI
+	s.Info = &openapi3.Info{
+		Title:   name,
+		Version: "1",
+	}
 }
