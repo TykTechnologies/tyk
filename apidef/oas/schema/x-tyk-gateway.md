@@ -557,7 +557,6 @@ CORS contains the configuration related to cross origin resource sharing.
 Tyk native API definition: `CORS`.
 
 **Field: `authenticationPlugin` ([AuthenticationPlugin](#authenticationplugin))**
-
 AuthenticationPlugin contains configuration related to custom authentication plugin.
 
 Tyk native API definition: `custom_middleware.auth_check`.
@@ -636,34 +635,27 @@ Tyk native API definition: `CORS.allowed_methods`.
 ### **AuthenticationPlugin**
 
 **Field: `enabled` (`boolean`)**
-
 Enabled enables custom authentication plugin.
 
 **Field: `functionName` (`string`)**
-
 FunctionName is the name of authentication method.
 
 **Field: `path` (`string`)**
-
 Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
 
 **Field: `rawBodyOnly` (`boolean`)**
-
 RawBodyOnly if set to true, do not fill body in request or response object.
 
 
 ### **CustomPluginMiddleware**
 
 **Field: `functionName` (`string`)**
-
 FunctionName is the name of authentication method.
 
 **Field: `path` (`string`)**
-
 Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
 
 **Field: `rawBodyOnly` (`boolean`)**
-
 RawBodyOnly if set to true, do not fill body in request or response object.
 
 
