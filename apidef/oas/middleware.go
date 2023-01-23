@@ -752,19 +752,31 @@ type AuthenticationPlugin struct {
 	// Enabled enables custom authentication plugin.
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// CustomPluginMiddleware holds configuration for custom middleware.
-	CustomPluginMiddleware `bson:",inline" json:",inline"`
+	*CustomPluginMiddleware `bson:",inline" json:",inline"`
 }
 
 func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
-	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
+	if ap.CustomPluginMiddleware == nil {
+		ap.CustomPluginMiddleware = &CustomPluginMiddleware{}
+	}
+
 	ap.FunctionName = api.CustomMiddleware.AuthCheck.Name
 	ap.Path = api.CustomMiddleware.AuthCheck.Path
 	ap.RawBodyOnly = api.CustomMiddleware.AuthCheck.RawBodyOnly
+
+	if ShouldOmit(ap.CustomPluginMiddleware) {
+		ap.CustomPluginMiddleware = nil
+		return
+	}
+
+	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
 }
 
 func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.AuthCheck.Disabled = !ap.Enabled
-	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
-	api.CustomMiddleware.AuthCheck.Path = ap.Path
-	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
+	if ap.CustomPluginMiddleware != nil {
+		api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
+		api.CustomMiddleware.AuthCheck.Path = ap.Path
+		api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
+	}
 }
