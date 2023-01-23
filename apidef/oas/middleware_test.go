@@ -45,7 +45,7 @@ func TestPluginConfig(t *testing.T) {
 		assert.Equal(t, emptyPluginConfig, resultPluginConfig)
 	})
 
-	t.Run("enum values", func(t *testing.T) {
+	t.Run("driver", func(t *testing.T) {
 		validDrivers := []apidef.MiddlewareDriver{
 			apidef.OttoDriver,
 			apidef.PythonDriver,
@@ -67,6 +67,27 @@ func TestPluginConfig(t *testing.T) {
 			newPluginConfig.Fill(api)
 			assert.Equal(t, pluginConfig, newPluginConfig)
 		}
+	})
+
+	t.Run("bundle", func(t *testing.T) {
+		pluginPath := "/path/to/plugin"
+		pluginConfig := PluginConfig{
+			Driver: apidef.GoPluginDriver,
+			Bundle: &PluginBundle{
+				Enabled: true,
+				Path:    pluginPath,
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		pluginConfig.ExtractTo(&api)
+		assert.Equal(t, apidef.GoPluginDriver, api.CustomMiddleware.Driver)
+		assert.False(t, api.CustomMiddlewareBundleDisabled)
+		assert.Equal(t, pluginPath, api.CustomMiddlewareBundle)
+
+		newPluginConfig := PluginConfig{}
+		newPluginConfig.Fill(api)
+		assert.Equal(t, pluginConfig, newPluginConfig)
 	})
 }
 
