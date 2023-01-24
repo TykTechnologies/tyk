@@ -12,7 +12,7 @@ func TestUpstream(t *testing.T) {
 	var emptyUpstream Upstream
 
 	var convertedAPI apidef.APIDefinition
-	setDisabledFlags(&convertedAPI)
+	convertedAPI.SetDisabledFlags()
 	emptyUpstream.ExtractTo(&convertedAPI)
 
 	var resultUpstream Upstream

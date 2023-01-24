@@ -15,7 +15,7 @@ func TestServer(t *testing.T) {
 	var emptyServer Server
 
 	var convertedAPI apidef.APIDefinition
-	setDisabledFlags(&convertedAPI)
+	convertedAPI.SetDisabledFlags()
 	emptyServer.ExtractTo(&convertedAPI)
 
 	var resultServer Server
