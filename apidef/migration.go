@@ -10,9 +10,13 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+var (
+	ErrMigrationNewVersioningEnabled = errors.New("not migratable - new versioning is already enabled")
+)
+
 func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error) {
 	if a.VersionDefinition.Enabled || len(a.VersionDefinition.Versions) != 0 {
-		return nil, errors.New("not migratable - new versioning is enabled")
+		return nil, ErrMigrationNewVersioningEnabled
 	}
 
 	if a.VersionData.NotVersioned && len(a.VersionData.Versions) > 1 {
@@ -46,6 +50,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 	}
 
 	delete(a.VersionData.Versions, base)
+	a.VersionName = base
 
 	if a.VersionDefinition.Enabled {
 		a.VersionDefinition.Name = base
@@ -62,6 +67,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 			newAPI.Internal = true
 			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
 			newAPI.VersionDefinition = VersionDefinition{}
+			newAPI.VersionName = vName
 
 			// Version API Expires migration
 			newAPI.Expiration = vInfo.Expires
@@ -306,4 +312,13 @@ func (a *APIDefinition) isAuthTokenEnabled() bool {
 			!a.UseOauth2 &&
 			!a.ExternalOAuth.Enabled &&
 			!a.UseOpenID)
+}
+
+// SetDisabledFlags set disabled flags to true, since by default they are not enabled in OAS API definition.
+func (a *APIDefinition) SetDisabledFlags() {
+	a.CustomMiddleware.AuthCheck.Disabled = true
+	a.TagsDisabled = true
+	a.UpstreamCertificatesDisabled = true
+	a.CertificatePinningDisabled = true
+	a.DomainDisabled = true
 }

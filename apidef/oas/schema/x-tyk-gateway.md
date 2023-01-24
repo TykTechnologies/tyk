@@ -661,18 +661,6 @@ Path is the path to shared object file in case of gopluign mode or path to js co
 RawBodyOnly if set to true, do not fill body in request or response object.
 
 
-### **CustomPluginMiddleware**
-
-**Field: `functionName` (`string`)**
-FunctionName is the name of authentication method.
-
-**Field: `path` (`string`)**
-Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
-
-**Field: `rawBodyOnly` (`boolean`)**
-RawBodyOnly if set to true, do not fill body in request or response object.
-
-
 ### **Cache**
 
 **Field: `enabled` (`boolean`)**

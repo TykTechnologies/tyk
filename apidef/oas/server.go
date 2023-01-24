@@ -66,10 +66,8 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 	if s.GatewayTags != nil {
 		s.GatewayTags.ExtractTo(api)
-	} else {
-		api.TagsDisabled = true
-		api.Tags = []string{}
 	}
+
 	if s.CustomDomain != nil {
 		s.CustomDomain.ExtractTo(api)
 	}
@@ -152,20 +150,12 @@ type Domain struct {
 
 // ExtractTo extracts *Domain into *apidef.APIDefinition.
 func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {
-	if !cd.Enabled && cd.Name == "" {
-		// nothing was configured
-		return
-	}
 	api.DomainDisabled = !cd.Enabled
 	api.Domain = cd.Name
 }
 
 // Fill fills *Domain from apidef.APIDefinition.
 func (cd *Domain) Fill(api apidef.APIDefinition) {
-	if !api.DomainDisabled && api.Domain == "" {
-		// nothing was configured.
-		return
-	}
 	cd.Enabled = !api.DomainDisabled
 	cd.Name = api.Domain
 }

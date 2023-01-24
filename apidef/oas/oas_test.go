@@ -3,6 +3,7 @@ package oas
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -498,6 +499,9 @@ func TestOAS_MarshalJSON(t *testing.T) {
 func TestMigrateAndFillOAS(t *testing.T) {
 	var api apidef.APIDefinition
 	api.Name = "Furkan"
+	api.Proxy.ListenPath = "/furkan"
+	api.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+	api.VersionDefinition.Location = apidef.HeaderLocation
 	api.VersionData.DefaultVersion = "Default"
 	api.VersionData.Versions = map[string]apidef.VersionInfo{
 		"Default": {},
@@ -510,11 +514,51 @@ func TestMigrateAndFillOAS(t *testing.T) {
 	assert.True(t, baseAPIDef.Classic.IsOAS)
 	assert.Equal(t, DefaultOpenAPI, baseAPIDef.OAS.OpenAPI)
 	assert.Equal(t, "Furkan", baseAPIDef.OAS.Info.Title)
+	assert.Equal(t, "Default", baseAPIDef.OAS.Info.Version)
 
 	assert.True(t, versionAPIDefs[0].Classic.IsOAS)
 	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[0].OAS.OpenAPI)
 	assert.Equal(t, "Furkan-v2", versionAPIDefs[0].OAS.Info.Title)
+	assert.Equal(t, "v2", versionAPIDefs[0].OAS.Info.Version)
 
 	err = baseAPIDef.OAS.Validate(context.Background())
 	assert.NoError(t, err)
+
+	t.Run("migration fails", func(t *testing.T) {
+		_, _, err = MigrateAndFillOAS(&api)
+		assert.ErrorIs(t, err, apidef.ErrMigrationNewVersioningEnabled)
+	})
+
+	t.Run("migrated base API validation fails", func(t *testing.T) {
+		api = apidef.APIDefinition{Name: "Furkan"}
+		_, _, err = MigrateAndFillOAS(&api)
+		assert.ErrorContains(t, err, "base API Furkan migrated OAS is not valid")
+	})
+
+	t.Run("migrate versionAPI validation fails", func(t *testing.T) {
+		api = apidef.APIDefinition{}
+		api.Name = "Furkan"
+		api.Proxy.ListenPath = "/furkan"
+		api.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+		api.VersionDefinition.Location = apidef.HeaderLocation
+		api.VersionData.DefaultVersion = "Default"
+		api.VersionData.Versions = map[string]apidef.VersionInfo{
+			"Default": {},
+			"v2": {
+				UseExtendedPaths: true,
+				ExtendedPaths: apidef.ExtendedPathsSet{
+					WhiteList: []apidef.EndPointMeta{
+						{
+							Disabled: false,
+							Path:     "123",
+							MethodActions: map[string]apidef.EndpointMethodMeta{
+								http.MethodGet: {},
+							},
+						},
+					},
+				}},
+		}
+		_, _, err = MigrateAndFillOAS(&api)
+		assert.ErrorContains(t, err, "version API Furkan-v2 migrated OAS is not valid")
+	})
 }
