@@ -33,6 +33,8 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	if m.Global != nil {
 		m.Global.ExtractTo(api)
+	} else {
+		api.CustomMiddlewareBundleDisabled = true
 	}
 }
 
@@ -97,6 +99,8 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	if g.PluginConfig != nil {
 		g.PluginConfig.ExtractTo(api)
+	} else {
+		api.CustomMiddlewareBundleDisabled = true
 	}
 
 	if g.CORS != nil {
@@ -150,6 +154,8 @@ func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
 
 	if p.Bundle != nil {
 		p.Bundle.ExtractTo(api)
+	} else {
+		api.CustomMiddlewareBundleDisabled = true
 	}
 }
 
@@ -166,22 +172,12 @@ type PluginBundle struct {
 
 // Fill fills PluginBundle from apidef.
 func (p *PluginBundle) Fill(api apidef.APIDefinition) {
-	if !api.CustomMiddlewareBundleDisabled && api.CustomMiddlewareBundle == "" {
-		// nothing was configured.
-		return
-	}
-
 	p.Enabled = !api.CustomMiddlewareBundleDisabled
 	p.Path = api.CustomMiddlewareBundle
 }
 
 // ExtractTo extracts *PluginBundle into *apidef.
 func (p *PluginBundle) ExtractTo(api *apidef.APIDefinition) {
-	if !p.Enabled && p.Path == "" {
-		// nothing was configured
-		return
-	}
-
 	api.CustomMiddlewareBundleDisabled = !p.Enabled
 	api.CustomMiddlewareBundle = p.Path
 }
