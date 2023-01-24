@@ -738,21 +738,16 @@ func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	meta.TimeOut = et.Value
 }
 
-type CustomPluginMiddleware struct {
+// AuthenticationPlugin holds the configuration for custom authentication plugin.
+type AuthenticationPlugin struct {
+	// Enabled enables custom authentication plugin.
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// FunctionName is the name of authentication method.
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
 	Path string `bson:"path" json:"path"` // required.
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
-}
-
-// AuthenticationPlugin holds the configuration for custom authentication plugin.
-type AuthenticationPlugin struct {
-	// Enabled enables custom authentication plugin.
-	Enabled bool `bson:"enabled" json:"enabled"` // required.
-	// CustomPluginMiddleware holds configuration for custom middleware.
-	CustomPluginMiddleware `bson:",inline" json:",inline"`
 }
 
 func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {

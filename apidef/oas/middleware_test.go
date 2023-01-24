@@ -228,12 +228,10 @@ func TestAuthenticationPlugin(t *testing.T) {
 
 	t.Run("with values", func(t *testing.T) {
 		authenticationPlugin := AuthenticationPlugin{
-			Enabled: true,
-			CustomPluginMiddleware: CustomPluginMiddleware{
-				FunctionName: "authenticate",
-				Path:         "/path/to/plugin",
-				RawBodyOnly:  true,
-			},
+			Enabled:      true,
+			FunctionName: "authenticate",
+			Path:         "/path/to/plugin",
+			RawBodyOnly:  true,
 		}
 
 		api := apidef.APIDefinition{}
