@@ -33,6 +33,8 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	if m.Global != nil {
 		m.Global.ExtractTo(api)
+	} else {
+		api.CustomMiddleware.AuthCheck.Disabled = true
 	}
 }
 
@@ -105,6 +107,8 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	if g.AuthenticationPlugin != nil {
 		g.AuthenticationPlugin.ExtractTo(api)
+	} else {
+		api.CustomMiddleware.AuthCheck.Disabled = true
 	}
 
 	if g.Cache != nil {
@@ -759,22 +763,10 @@ func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
 	ap.FunctionName = api.CustomMiddleware.AuthCheck.Name
 	ap.Path = api.CustomMiddleware.AuthCheck.Path
 	ap.RawBodyOnly = api.CustomMiddleware.AuthCheck.RawBodyOnly
-
-	if ShouldOmit(ap.CustomPluginMiddleware) {
-
-		// nothing was configured.
-		return
-	}
-
 	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
 }
 
 func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
-	if ap.CustomPluginMiddleware.FunctionName == "" && !ap.Enabled {
-		// nothing is configured.
-		return
-	}
-
 	api.CustomMiddleware.AuthCheck.Disabled = !ap.Enabled
 	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
 	api.CustomMiddleware.AuthCheck.Path = ap.Path
