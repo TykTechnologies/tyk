@@ -224,7 +224,8 @@
           "type": "boolean"
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "pattern": "\\S+"
         }
       },
       "required": [
