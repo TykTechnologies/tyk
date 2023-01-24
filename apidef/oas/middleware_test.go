@@ -41,6 +41,7 @@ func TestPluginConfig(t *testing.T) {
 		var emptyPluginConfig PluginConfig
 
 		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
 		emptyPluginConfig.ExtractTo(&convertedAPI)
 
 		var resultPluginConfig PluginConfig
@@ -65,6 +66,7 @@ func TestPluginConfig(t *testing.T) {
 			}
 
 			api := apidef.APIDefinition{}
+			api.SetDisabledFlags()
 			pluginConfig.ExtractTo(&api)
 			assert.Equal(t, validDriver, api.CustomMiddleware.Driver)
 
