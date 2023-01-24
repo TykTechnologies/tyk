@@ -10,9 +10,13 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+var (
+	ErrMigrationNewVersioningEnabled = errors.New("not migratable - new versioning is already enabled")
+)
+
 func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error) {
 	if a.VersionDefinition.Enabled || len(a.VersionDefinition.Versions) != 0 {
-		return nil, errors.New("not migratable - new versioning is enabled")
+		return nil, ErrMigrationNewVersioningEnabled
 	}
 
 	if a.VersionData.NotVersioned && len(a.VersionData.Versions) > 1 {
