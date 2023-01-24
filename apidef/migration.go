@@ -123,6 +123,11 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 		},
 	}
 
+	// If versioning is not enabled and versions list are empty at this point, ignore key and location and drop them too.
+	if !a.VersionDefinition.Enabled && len(versions) == 0 {
+		a.VersionDefinition = VersionDefinition{}
+	}
+
 	return
 }
 
