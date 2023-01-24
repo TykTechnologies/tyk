@@ -222,6 +222,7 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migratePluginBundle()
 	a.migrateMutualTLS()
 	a.migrateCertificatePinning()
+	a.migrateGatewayTags()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -253,6 +254,12 @@ func (a *APIDefinition) migrateMutualTLS() {
 func (a *APIDefinition) migrateCertificatePinning() {
 	if !a.CertificatePinningDisabled && len(a.PinnedPublicKeys) == 0 {
 		a.CertificatePinningDisabled = true
+	}
+}
+
+func (a *APIDefinition) migrateGatewayTags() {
+	if !a.TagsDisabled && len(a.Tags) == 0 {
+		a.TagsDisabled = true
 	}
 }
 

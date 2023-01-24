@@ -48,12 +48,12 @@ func TestGatewayTags(t *testing.T) {
 	}{
 		{
 			input: GatewayTags{},
-			want:  GatewayTags{Tags: []string{}},
+			want:  GatewayTags{},
 			omit:  true,
 		},
 		{
 			input: GatewayTags{Enabled: true},
-			want:  GatewayTags{Enabled: true, Tags: []string{}},
+			want:  GatewayTags{Enabled: true},
 		},
 		{
 			input: GatewayTags{Enabled: true, Tags: []string{}},
@@ -74,9 +74,6 @@ func TestGatewayTags(t *testing.T) {
 	}
 
 	t.Run("Fill GatewayTags from APIDef", func(t *testing.T) {
-		// We currently don't match APIDef direct fill with OAS
-		t.Skip() // TODO: TT-5720
-
 		t.Parallel()
 
 		for idx, tc := range testcases {
@@ -239,7 +236,7 @@ func TestTagsExportServer(t *testing.T) {
 			apidef.APIDefinition{},
 			&GatewayTags{
 				Enabled: true,
-				Tags:    []string{},
+				Tags:    nil,
 			},
 		},
 	}
