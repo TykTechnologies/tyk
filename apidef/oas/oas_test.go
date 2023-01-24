@@ -594,4 +594,8 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	t.Run("certificatePinning", func(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Upstream.CertificatePinning)
 	})
+
+	t.Run("gatewayTags", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Server.GatewayTags)
+	})
 }

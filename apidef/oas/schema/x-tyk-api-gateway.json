@@ -773,7 +773,11 @@
             }
           ]
         }
-      }
+      },
+      "required": [
+        "enabled",
+        "tags"
+      ]
     },
     "X-Tyk-Upstream": {
       "type": "object",
