@@ -33,8 +33,6 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	if m.Global != nil {
 		m.Global.ExtractTo(api)
-	} else {
-		api.CustomMiddleware.AuthCheck.Disabled = true
 	}
 }
 
@@ -107,8 +105,6 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	if g.AuthenticationPlugin != nil {
 		g.AuthenticationPlugin.ExtractTo(api)
-	} else {
-		api.CustomMiddleware.AuthCheck.Disabled = true
 	}
 
 	if g.Cache != nil {

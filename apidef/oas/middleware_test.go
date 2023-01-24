@@ -12,6 +12,7 @@ func TestMiddleware(t *testing.T) {
 	var emptyMiddleware Middleware
 
 	var convertedAPI apidef.APIDefinition
+	setDisabledFlags(&convertedAPI)
 	emptyMiddleware.ExtractTo(&convertedAPI)
 
 	var resultMiddleware Middleware
@@ -24,6 +25,7 @@ func TestGlobal(t *testing.T) {
 	var emptyGlobal Global
 
 	var convertedAPI apidef.APIDefinition
+	setDisabledFlags(&convertedAPI)
 	emptyGlobal.ExtractTo(&convertedAPI)
 
 	var resultGlobal Global
