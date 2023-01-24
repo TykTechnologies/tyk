@@ -602,4 +602,8 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	t.Run("authenticationPlugin", func(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware)
 	})
+
+	t.Run("customDomain", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Server.CustomDomain)
+	})
 }

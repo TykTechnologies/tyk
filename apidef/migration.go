@@ -225,6 +225,7 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateCertificatePinning()
 	a.migrateGatewayTags()
 	a.migrateAuthenticationPlugin()
+	a.migrateCustomDomain()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -268,6 +269,12 @@ func (a *APIDefinition) migrateGatewayTags() {
 func (a *APIDefinition) migrateAuthenticationPlugin() {
 	if reflect.DeepEqual(a.CustomMiddleware.AuthCheck, MiddlewareDefinition{}) {
 		a.CustomMiddleware.AuthCheck.Disabled = true
+	}
+}
+
+func (a *APIDefinition) migrateCustomDomain() {
+	if !a.DomainDisabled && a.Domain == "" {
+		a.DomainDisabled = true
 	}
 }
 
