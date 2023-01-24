@@ -34,19 +34,6 @@ func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	}
 }
 
-// setDisabledFlags set disabled flags to true, since by default they are not enabled in OAS API definition.
-func setDisabledFlags(api *apidef.APIDefinition) {
-	api.CustomMiddleware.AuthCheck.Disabled = true
-	api.TagsDisabled = true
-	api.Tags = []string{}
-	api.UpstreamCertificatesDisabled = true
-	api.UpstreamCertificates = nil
-	api.CertificatePinningDisabled = true
-	api.PinnedPublicKeys = nil
-	api.DomainDisabled = true
-	api.Domain = ""
-}
-
 // ExtractTo extracts *XTykAPIGateway into *apidef.APIDefinition.
 func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	setDisabledFlags(api)
@@ -215,4 +202,17 @@ type VersionToID struct {
 	Name string `bson:"name" json:"name"`
 	// ID is the API ID for the version set in Name.
 	ID string `bson:"id" json:"id"`
+}
+
+// setDisabledFlags set disabled flags to true, since by default they are not enabled in OAS API definition.
+func setDisabledFlags(api *apidef.APIDefinition) {
+	api.CustomMiddleware.AuthCheck.Disabled = true
+	api.TagsDisabled = true
+	api.Tags = []string{}
+	api.UpstreamCertificatesDisabled = true
+	api.UpstreamCertificates = nil
+	api.CertificatePinningDisabled = true
+	api.PinnedPublicKeys = nil
+	api.DomainDisabled = true
+	api.Domain = ""
 }
