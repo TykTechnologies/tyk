@@ -659,7 +659,8 @@ type APIDefinition struct {
 	Tags         []string `bson:"tags" json:"tags"`
 
 	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
-	IsOAS bool `bson:"is_oas" json:"is_oas,omitempty"`
+	IsOAS       bool   `bson:"is_oas" json:"is_oas,omitempty"`
+	VersionName string `bson:"-" json:"-"`
 }
 
 type AnalyticsPluginConfig struct {

@@ -50,6 +50,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 	}
 
 	delete(a.VersionData.Versions, base)
+	a.VersionName = base
 
 	if a.VersionDefinition.Enabled {
 		a.VersionDefinition.Name = base
@@ -66,6 +67,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 			newAPI.Internal = true
 			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
 			newAPI.VersionDefinition = VersionDefinition{}
+			newAPI.VersionName = vName
 
 			// Version API Expires migration
 			newAPI.Expiration = vInfo.Expires
