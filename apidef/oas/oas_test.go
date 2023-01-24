@@ -568,16 +568,20 @@ func TestMigrateAndFillOAS(t *testing.T) {
 func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	api := apidef.APIDefinition{Name: "Furkan"}
 	api.Proxy.ListenPath = "/furkan"
+
 	api.VersionDefinition.Location = apidef.HeaderLocation
 	api.VersionDefinition.Key = apidef.DefaultAPIVersionKey
-	api.VersionData.NotVersioned = false
+	api.VersionData.NotVersioned = true
 	api.VersionData.Versions = map[string]apidef.VersionInfo{
 		"Default": {},
-		"v2":      {},
 	}
 
 	baseAPI, _, err := MigrateAndFillOAS(&api)
 	assert.NoError(t, err)
+
+	t.Run("empty versioning", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Info.Versioning)
+	})
 
 	t.Run("empty plugin bundle", func(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig)
