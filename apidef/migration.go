@@ -313,3 +313,12 @@ func (a *APIDefinition) isAuthTokenEnabled() bool {
 			!a.ExternalOAuth.Enabled &&
 			!a.UseOpenID)
 }
+
+// SetDisabledFlags set disabled flags to true, since by default they are not enabled in OAS API definition.
+func (a *APIDefinition) SetDisabledFlags() {
+	a.CustomMiddleware.AuthCheck.Disabled = true
+	a.TagsDisabled = true
+	a.UpstreamCertificatesDisabled = true
+	a.CertificatePinningDisabled = true
+	a.DomainDisabled = true
+}

@@ -12,6 +12,7 @@ func TestMiddleware(t *testing.T) {
 	var emptyMiddleware Middleware
 
 	var convertedAPI apidef.APIDefinition
+	convertedAPI.SetDisabledFlags()
 	emptyMiddleware.ExtractTo(&convertedAPI)
 
 	var resultMiddleware Middleware
@@ -24,6 +25,7 @@ func TestGlobal(t *testing.T) {
 	var emptyGlobal Global
 
 	var convertedAPI apidef.APIDefinition
+	convertedAPI.SetDisabledFlags()
 	emptyGlobal.ExtractTo(&convertedAPI)
 
 	var resultGlobal Global
@@ -33,7 +35,9 @@ func TestGlobal(t *testing.T) {
 }
 
 func TestPluginConfig(t *testing.T) {
+	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
 		var emptyPluginConfig PluginConfig
 
 		var convertedAPI apidef.APIDefinition
@@ -46,6 +50,7 @@ func TestPluginConfig(t *testing.T) {
 	})
 
 	t.Run("enum values", func(t *testing.T) {
+		t.Parallel()
 		validDrivers := []apidef.MiddlewareDriver{
 			apidef.OttoDriver,
 			apidef.PythonDriver,
@@ -210,7 +215,9 @@ func TestTransformRequestBody(t *testing.T) {
 }
 
 func TestAuthenticationPlugin(t *testing.T) {
+	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
 		var (
 			emptyAuthenticationPlugin AuthenticationPlugin
 			convertedAPI              apidef.APIDefinition
@@ -225,13 +232,12 @@ func TestAuthenticationPlugin(t *testing.T) {
 	})
 
 	t.Run("with values", func(t *testing.T) {
+		t.Parallel()
 		authenticationPlugin := AuthenticationPlugin{
-			Enabled: true,
-			CustomPluginMiddleware: &CustomPluginMiddleware{
-				FunctionName: "authenticate",
-				Path:         "/path/to/plugin",
-				RawBodyOnly:  true,
-			},
+			Enabled:      true,
+			FunctionName: "authenticate",
+			Path:         "/path/to/plugin",
+			RawBodyOnly:  true,
 		}
 
 		api := apidef.APIDefinition{}

@@ -738,7 +738,10 @@ func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	meta.TimeOut = et.Value
 }
 
-type CustomPluginMiddleware struct {
+// AuthenticationPlugin holds the configuration for custom authentication plugin.
+type AuthenticationPlugin struct {
+	// Enabled enables custom authentication plugin.
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// FunctionName is the name of authentication method.
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
@@ -747,38 +750,14 @@ type CustomPluginMiddleware struct {
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
 }
 
-// AuthenticationPlugin holds the configuration for custom authentication plugin.
-type AuthenticationPlugin struct {
-	// Enabled enables custom authentication plugin.
-	Enabled bool `bson:"enabled" json:"enabled"` // required.
-	// CustomPluginMiddleware holds configuration for custom middleware.
-	*CustomPluginMiddleware `bson:",inline" json:",inline"`
-}
-
 func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
-	if ap.CustomPluginMiddleware == nil {
-		ap.CustomPluginMiddleware = &CustomPluginMiddleware{}
-	}
-
 	ap.FunctionName = api.CustomMiddleware.AuthCheck.Name
 	ap.Path = api.CustomMiddleware.AuthCheck.Path
 	ap.RawBodyOnly = api.CustomMiddleware.AuthCheck.RawBodyOnly
-
-	if ShouldOmit(ap.CustomPluginMiddleware) {
-		ap.CustomPluginMiddleware = nil
-		// nothing was configured.
-		return
-	}
-
 	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
 }
 
 func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
-	if ap.CustomPluginMiddleware == nil && !ap.Enabled {
-		// nothing is configured.
-		return
-	}
-
 	api.CustomMiddleware.AuthCheck.Disabled = !ap.Enabled
 	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
 	api.CustomMiddleware.AuthCheck.Path = ap.Path

@@ -82,16 +82,10 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	if u.MutualTLS != nil {
 		u.MutualTLS.ExtractTo(api)
-	} else {
-		api.UpstreamCertificatesDisabled = true
-		api.UpstreamCertificates = nil
 	}
 
 	if u.CertificatePinning != nil {
 		u.CertificatePinning.ExtractTo(api)
-	} else {
-		api.CertificatePinningDisabled = true
-		api.PinnedPublicKeys = nil
 	}
 }
 
