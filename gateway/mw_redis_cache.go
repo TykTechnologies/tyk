@@ -233,17 +233,18 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		newRes.Header.Del(h)
 	}
 
-	copyHeader(w.Header(), newRes.Header, m.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 	session := ctxGetSession(r)
 
 	// Only add ratelimit data to keyed sessions
 	if session != nil {
 		quotaMax, quotaRemaining, _, quotaRenews := session.GetQuotaLimitByAPIID(m.Spec.APIID)
-		w.Header().Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		w.Header().Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		w.Header().Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+		newRes.Header.Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		newRes.Header.Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		newRes.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
-	w.Header().Set(cachedResponseHeader, "1")
+	newRes.Header.Set(cachedResponseHeader, "1")
+
+	copyHeader(w.Header(), newRes.Header, m.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 
 	if reqEtag := r.Header.Get("If-None-Match"); reqEtag != "" {
 		if respEtag := newRes.Header.Get("Etag"); respEtag != "" {
