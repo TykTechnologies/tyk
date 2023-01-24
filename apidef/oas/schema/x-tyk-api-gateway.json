@@ -210,7 +210,14 @@
       "type": "object",
       "properties": {
         "driver": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "otto",
+            "python",
+            "lua",
+            "grpc",
+            "goplugin"
+          ]
         }
       }
     },
