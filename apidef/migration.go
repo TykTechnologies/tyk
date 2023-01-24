@@ -214,6 +214,7 @@ func (a *APIDefinition) migrateEndpointMetaByType(typ int) {
 
 func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.MigrateAuthentication()
+	a.migratePluginBundle()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -228,6 +229,12 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	}
 
 	return versions, nil
+}
+
+func (a *APIDefinition) migratePluginBundle() {
+	if !a.CustomMiddlewareBundleDisabled && a.CustomMiddlewareBundle == "" {
+		a.CustomMiddlewareBundleDisabled = true
+	}
 }
 
 func (a *APIDefinition) MigrateCachePlugin() {
