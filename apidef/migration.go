@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -223,6 +224,7 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateMutualTLS()
 	a.migrateCertificatePinning()
 	a.migrateGatewayTags()
+	a.migrateAuthenticationPlugin()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -260,6 +262,12 @@ func (a *APIDefinition) migrateCertificatePinning() {
 func (a *APIDefinition) migrateGatewayTags() {
 	if !a.TagsDisabled && len(a.Tags) == 0 {
 		a.TagsDisabled = true
+	}
+}
+
+func (a *APIDefinition) migrateAuthenticationPlugin() {
+	if reflect.DeepEqual(a.CustomMiddleware.AuthCheck, MiddlewareDefinition{}) {
+		a.CustomMiddleware.AuthCheck.Disabled = true
 	}
 }
 
