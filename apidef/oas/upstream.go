@@ -267,6 +267,10 @@ func (m *MutualTLS) Fill(api apidef.APIDefinition) {
 		m.DomainToCertificates[i] = DomainToCertificate{Domain: domain, Certificate: cert}
 		i++
 	}
+
+	if ShouldOmit(m.DomainToCertificates) {
+		api.UpstreamCertificates = nil
+	}
 }
 
 // ExtractTo extracts *MutualTLS into *apidef.APIDefinition.
