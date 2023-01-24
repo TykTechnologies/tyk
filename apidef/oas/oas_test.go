@@ -579,15 +579,19 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	baseAPI, _, err := MigrateAndFillOAS(&api)
 	assert.NoError(t, err)
 
-	t.Run("empty versioning", func(t *testing.T) {
+	t.Run("versioning", func(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Info.Versioning)
 	})
 
-	t.Run("empty plugin bundle", func(t *testing.T) {
+	t.Run("plugin bundle", func(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig)
 	})
 
-	t.Run("empty mutual tls", func(t *testing.T) {
+	t.Run("mutualTLS", func(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Upstream.MutualTLS)
+	})
+
+	t.Run("certificatePinning", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Upstream.CertificatePinning)
 	})
 }
