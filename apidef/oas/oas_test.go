@@ -584,7 +584,7 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	})
 
 	t.Run("plugin bundle", func(t *testing.T) {
-		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig)
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware)
 	})
 
 	t.Run("mutualTLS", func(t *testing.T) {
@@ -597,5 +597,9 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 
 	t.Run("gatewayTags", func(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Server.GatewayTags)
+	})
+
+	t.Run("authenticationPlugin", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware)
 	})
 }
