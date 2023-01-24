@@ -154,8 +154,6 @@ func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
 
 	if p.Bundle != nil {
 		p.Bundle.ExtractTo(api)
-	} else {
-		api.CustomMiddlewareBundleDisabled = true
 	}
 }
 

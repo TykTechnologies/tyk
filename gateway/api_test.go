@@ -2123,6 +2123,7 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 	}
 
 	baseAPI := ts.Gw.BuildAndLoadAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
 		a.APIID = "base-api-id"
 		a.VersionDefinition.Enabled = false
 		a.VersionDefinition.Key = ""
@@ -2134,6 +2135,7 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 	})[0]
 
 	v2 := BuildAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
 		a.Name = "v2"
 		a.APIID = v2APIID
 		a.VersionDefinition.Location = ""
