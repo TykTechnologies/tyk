@@ -172,11 +172,7 @@ func TestAPIDefinition_MigrateVersioning_Disabled(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, versions)
 
-		expectedBaseDefinition := VersionDefinition{
-			Location:            URLLocation,
-			Key:                 key,
-			StripVersioningData: true,
-		}
+		expectedBaseDefinition := VersionDefinition{}
 
 		assert.Equal(t, expectedBaseDefinition, base.VersionDefinition)
 
