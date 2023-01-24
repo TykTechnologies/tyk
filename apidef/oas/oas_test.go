@@ -498,6 +498,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 
 func TestMigrateAndFillOAS(t *testing.T) {
 	var api apidef.APIDefinition
+	api.SetDisabledFlags()
 	api.Name = "Furkan"
 	api.Proxy.ListenPath = "/furkan"
 	api.VersionDefinition.Key = apidef.DefaultAPIVersionKey
@@ -537,6 +538,7 @@ func TestMigrateAndFillOAS(t *testing.T) {
 
 	t.Run("migrate versionAPI validation fails", func(t *testing.T) {
 		api = apidef.APIDefinition{}
+		api.SetDisabledFlags()
 		api.Name = "Furkan"
 		api.Proxy.ListenPath = "/furkan"
 		api.VersionDefinition.Key = apidef.DefaultAPIVersionKey
