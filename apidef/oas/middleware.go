@@ -33,6 +33,8 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	if m.Global != nil {
 		m.Global.ExtractTo(api)
+	} else {
+		api.CustomMiddlewareBundleDisabled = true
 	}
 }
 
@@ -97,6 +99,8 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	if g.PluginConfig != nil {
 		g.PluginConfig.ExtractTo(api)
+	} else {
+		api.CustomMiddlewareBundleDisabled = true
 	}
 
 	if g.CORS != nil {
@@ -125,16 +129,55 @@ type PluginConfig struct {
 	//
 	// Tyk native API definition: `custom_middleware.driver`.
 	Driver apidef.MiddlewareDriver `bson:"driver,omitempty" json:"driver,omitempty"`
+
+	// Bundle configures custom plugin bundles.
+	Bundle *PluginBundle `bson:"bundle,omitempty" json:"bundle,omitempty"`
 }
 
-// Fill fills pluginConfig from apidef.
+// Fill fills PluginConfig from apidef.
 func (p *PluginConfig) Fill(api apidef.APIDefinition) {
 	p.Driver = api.CustomMiddleware.Driver
+
+	if p.Bundle == nil {
+		p.Bundle = &PluginBundle{}
+	}
+
+	p.Bundle.Fill(api)
+	if ShouldOmit(p.Bundle) {
+		p.Bundle = nil
+	}
 }
 
 // ExtractTo extracts *PluginConfig into *apidef.
 func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.Driver = p.Driver
+
+	if p.Bundle != nil {
+		p.Bundle.ExtractTo(api)
+	}
+}
+
+// PluginBundle holds configuration for custom plugins.
+type PluginBundle struct {
+	// Enabled enables the custom plugin bundles.
+	//
+	// Tyk classic API definition: `custom_middleware_bundle_disabled`
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	// Path is the path suffix to construct the URL to fetch plugin bundle from.
+	// Path will be suffixed to `bundle_base_url` in gateway config.
+	Path string `bson:"path" json:"path"` // required.
+}
+
+// Fill fills PluginBundle from apidef.
+func (p *PluginBundle) Fill(api apidef.APIDefinition) {
+	p.Enabled = !api.CustomMiddlewareBundleDisabled
+	p.Path = api.CustomMiddlewareBundle
+}
+
+// ExtractTo extracts *PluginBundle into *apidef.
+func (p *PluginBundle) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomMiddlewareBundleDisabled = !p.Enabled
+	api.CustomMiddlewareBundle = p.Path
 }
 
 // CORS holds configuration for cross-origin resource sharing.

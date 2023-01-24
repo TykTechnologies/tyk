@@ -41,6 +41,7 @@ func TestPluginConfig(t *testing.T) {
 		var emptyPluginConfig PluginConfig
 
 		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
 		emptyPluginConfig.ExtractTo(&convertedAPI)
 
 		var resultPluginConfig PluginConfig
@@ -49,7 +50,7 @@ func TestPluginConfig(t *testing.T) {
 		assert.Equal(t, emptyPluginConfig, resultPluginConfig)
 	})
 
-	t.Run("enum values", func(t *testing.T) {
+	t.Run("driver", func(t *testing.T) {
 		t.Parallel()
 		validDrivers := []apidef.MiddlewareDriver{
 			apidef.OttoDriver,
@@ -65,6 +66,7 @@ func TestPluginConfig(t *testing.T) {
 			}
 
 			api := apidef.APIDefinition{}
+			api.SetDisabledFlags()
 			pluginConfig.ExtractTo(&api)
 			assert.Equal(t, validDriver, api.CustomMiddleware.Driver)
 
@@ -72,6 +74,60 @@ func TestPluginConfig(t *testing.T) {
 			newPluginConfig.Fill(api)
 			assert.Equal(t, pluginConfig, newPluginConfig)
 		}
+	})
+
+	t.Run("bundle", func(t *testing.T) {
+		pluginPath := "/path/to/plugin"
+		pluginConfig := PluginConfig{
+			Driver: apidef.GoPluginDriver,
+			Bundle: &PluginBundle{
+				Enabled: true,
+				Path:    pluginPath,
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		pluginConfig.ExtractTo(&api)
+		assert.Equal(t, apidef.GoPluginDriver, api.CustomMiddleware.Driver)
+		assert.False(t, api.CustomMiddlewareBundleDisabled)
+		assert.Equal(t, pluginPath, api.CustomMiddlewareBundle)
+
+		newPluginConfig := PluginConfig{}
+		newPluginConfig.Fill(api)
+		assert.Equal(t, pluginConfig, newPluginConfig)
+	})
+}
+
+func TestPluginBundle(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty", func(t *testing.T) {
+		var emptyPluginBundle PluginBundle
+
+		var convertedAPI apidef.APIDefinition
+		emptyPluginBundle.ExtractTo(&convertedAPI)
+
+		var resultPluginBundle PluginBundle
+		resultPluginBundle.Fill(convertedAPI)
+
+		assert.Equal(t, emptyPluginBundle, resultPluginBundle)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		pluginPath := "/path/to/plugin"
+		pluginBundle := PluginBundle{
+			Enabled: true,
+			Path:    pluginPath,
+		}
+
+		api := apidef.APIDefinition{}
+		pluginBundle.ExtractTo(&api)
+		assert.False(t, api.CustomMiddlewareBundleDisabled)
+		assert.Equal(t, pluginPath, api.CustomMiddlewareBundle)
+
+		newPluginBundle := PluginBundle{}
+		newPluginBundle.Fill(api)
+		assert.Equal(t, pluginBundle, newPluginBundle)
 	})
 }
 

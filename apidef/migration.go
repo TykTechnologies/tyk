@@ -321,4 +321,5 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.UpstreamCertificatesDisabled = true
 	a.CertificatePinningDisabled = true
 	a.DomainDisabled = true
+	a.CustomMiddlewareBundleDisabled = true
 }

@@ -218,6 +218,9 @@
             "grpc",
             "goplugin"
           ]
+        },
+        "bundle": {
+          "$ref": "#/definitions/X-Tyk-PluginBundle"
         }
       }
     },
@@ -240,6 +243,22 @@
       "required": [
         "enabled",
         "functionName",
+        "path"
+      ]
+    },
+    "X-Tyk-PluginBundle": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "\\S+"
+        }
+      },
+      "required": [
+        "enabled",
         "path"
       ]
     },

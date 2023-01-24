@@ -582,6 +582,20 @@ It's value should be set to one of the following:
 
 Tyk native API definition: `custom_middleware.driver`.
 
+**Field: `bundle` ([PluginBundle](#pluginbundle))**
+Bundle configures custom plugin bundles.
+
+
+### **PluginBundle**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables the custom plugin bundles.
+Tyk classic API definition: `custom_middleware_bundle_disabled`.
+
+**Field: `path` (`string`)**
+Path is the path suffix to construct the URL to fetch plugin bundle from.
+Path will be suffixed to `bundle_base_url` in gateway config.
+
 
 ### **CORS**
 

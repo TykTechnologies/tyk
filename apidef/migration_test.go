@@ -554,3 +554,21 @@ func TestAPIDefinition_deleteAuthConfigsNotUsed(t *testing.T) {
 	api.deleteAuthConfigsNotUsed()
 	assert.Len(t, api.AuthConfigs, 0)
 }
+
+func TestSetDisabledFlags(t *testing.T) {
+	apiDef := APIDefinition{}
+	expectedAPIDef := APIDefinition{
+		CustomMiddleware: MiddlewareSection{
+			AuthCheck: MiddlewareDefinition{
+				Disabled: true,
+			},
+		},
+		TagsDisabled:                   true,
+		UpstreamCertificatesDisabled:   true,
+		CertificatePinningDisabled:     true,
+		DomainDisabled:                 true,
+		CustomMiddlewareBundleDisabled: true,
+	}
+	apiDef.SetDisabledFlags()
+	assert.Equal(t, expectedAPIDef, apiDef)
+}
