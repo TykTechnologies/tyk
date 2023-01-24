@@ -210,9 +210,38 @@
       "type": "object",
       "properties": {
         "driver": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "otto",
+            "python",
+            "lua",
+            "grpc",
+            "goplugin"
+          ]
         }
       }
+    },
+    "X-Tyk-AuthenticationPlugin": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "rawBodyOnly": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "functionName",
+        "path"
+      ]
     },
     "X-Tyk-CORS": {
       "type": "object",
@@ -314,6 +343,9 @@
         },
         "cors": {
           "$ref": "#/definitions/X-Tyk-CORS"
+        },
+        "authenticationPlugin": {
+          "$ref": "#/definitions/X-Tyk-AuthenticationPlugin"
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-Cache"
