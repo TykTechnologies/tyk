@@ -33,8 +33,6 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	if m.Global != nil {
 		m.Global.ExtractTo(api)
-	} else {
-		api.CustomMiddlewareBundleDisabled = true
 	}
 }
 
@@ -99,8 +97,6 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	if g.PluginConfig != nil {
 		g.PluginConfig.ExtractTo(api)
-	} else {
-		api.CustomMiddlewareBundleDisabled = true
 	}
 
 	if g.CORS != nil {

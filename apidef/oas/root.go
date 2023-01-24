@@ -44,8 +44,6 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 
 	if x.Middleware != nil {
 		x.Middleware.ExtractTo(api)
-	} else {
-		api.CustomMiddlewareBundleDisabled = true
 	}
 }
 
