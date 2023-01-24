@@ -586,4 +586,8 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	t.Run("empty plugin bundle", func(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig)
 	})
+
+	t.Run("empty mutual tls", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Upstream.MutualTLS)
+	})
 }

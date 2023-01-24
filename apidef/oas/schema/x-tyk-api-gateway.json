@@ -87,7 +87,11 @@
             }
           ]
         }
-      }
+      },
+      "required": [
+        "enabled",
+        "domainToCertificateMapping"
+      ]
     },
     "X-Tyk-DomainToCertificate": {
       "type": "object",

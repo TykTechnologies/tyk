@@ -220,6 +220,7 @@ func (a *APIDefinition) migrateEndpointMetaByType(typ int) {
 func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.MigrateAuthentication()
 	a.migratePluginBundle()
+	a.migrateMutualTLS()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -239,6 +240,12 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 func (a *APIDefinition) migratePluginBundle() {
 	if !a.CustomMiddlewareBundleDisabled && a.CustomMiddlewareBundle == "" {
 		a.CustomMiddlewareBundleDisabled = true
+	}
+}
+
+func (a *APIDefinition) migrateMutualTLS() {
+	if !a.UpstreamCertificatesDisabled && len(a.UpstreamCertificates) == 0 {
+		a.UpstreamCertificatesDisabled = true
 	}
 }
 
