@@ -137,6 +137,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 	expectedVersion.Id = ""
 	expectedVersion.APIID = versions[0].APIID
 	expectedVersion.Name += "-" + v2
+	expectedVersion.VersionName = v2
 	expectedVersion.Internal = true
 	expectedVersion.Expiration = exp2
 	expectedVersion.Proxy.ListenPath += "-" + v2 + "/"

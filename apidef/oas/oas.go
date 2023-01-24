@@ -396,7 +396,7 @@ func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 	api.IsOAS = true
 	var oas OAS
 	oas.Fill(*api)
-	oas.setRequiredFields(api.Name)
+	oas.setRequiredFields(api.Name, api.VersionName)
 
 	err := oas.Validate(context.Background())
 	if err != nil {
@@ -412,10 +412,10 @@ func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 }
 
 // setRequiredFields sets some required fields to make OAS object a valid one.
-func (s *OAS) setRequiredFields(name string) {
+func (s *OAS) setRequiredFields(name string, versionName string) {
 	s.OpenAPI = DefaultOpenAPI
 	s.Info = &openapi3.Info{
 		Title:   name,
-		Version: "1",
+		Version: versionName,
 	}
 }
