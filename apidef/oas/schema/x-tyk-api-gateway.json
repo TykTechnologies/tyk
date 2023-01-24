@@ -111,7 +111,7 @@
           "type": "boolean"
         },
         "domainToPublicKeysMapping": {
-          "type": "array",
+          "type": ["array", "null"],
           "items": [
             {
               "$ref": "#/definitions/X-Tyk-PinnedPublicKeys"
@@ -794,7 +794,6 @@
       },
       "required": [
         "enabled",
-        "default",
         "location",
         "key",
         "versions"
