@@ -33,6 +33,8 @@ func TestGlobal(t *testing.T) {
 }
 
 func TestPluginConfig(t *testing.T) {
+	t.Parallel()
+
 	t.Run("empty", func(t *testing.T) {
 		var emptyPluginConfig PluginConfig
 
@@ -88,6 +90,39 @@ func TestPluginConfig(t *testing.T) {
 		newPluginConfig := PluginConfig{}
 		newPluginConfig.Fill(api)
 		assert.Equal(t, pluginConfig, newPluginConfig)
+	})
+}
+
+func TestPluginBundle(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty", func(t *testing.T) {
+		var emptyPluginBundle PluginBundle
+
+		var convertedAPI apidef.APIDefinition
+		emptyPluginBundle.ExtractTo(&convertedAPI)
+
+		var resultPluginBundle PluginBundle
+		resultPluginBundle.Fill(convertedAPI)
+
+		assert.Equal(t, emptyPluginBundle, resultPluginBundle)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		pluginPath := "/path/to/plugin"
+		pluginBundle := PluginBundle{
+			Enabled: true,
+			Path:    pluginPath,
+		}
+
+		api := apidef.APIDefinition{}
+		pluginBundle.ExtractTo(&api)
+		assert.False(t, api.CustomMiddlewareBundleDisabled)
+		assert.Equal(t, pluginPath, api.CustomMiddlewareBundle)
+
+		newPluginBundle := PluginBundle{}
+		newPluginBundle.Fill(api)
+		assert.Equal(t, pluginBundle, newPluginBundle)
 	})
 }
 
