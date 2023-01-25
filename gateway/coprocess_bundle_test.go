@@ -85,6 +85,26 @@ func TestBundleLoader(t *testing.T) {
 			t.Fatalf("Driver doesn't match: got %s, expected %s\n", spec.CustomMiddleware.Driver, "grpc")
 		}
 	})
+
+	t.Run("bundle disabled with bundle value", func(t *testing.T) {
+		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.CustomMiddlewareBundle = "bundle.zip"
+			spec.CustomMiddlewareBundleDisabled = true
+		})[0]
+		err := ts.Gw.loadBundle(spec)
+		assert.Empty(t, spec.CustomMiddleware)
+		assert.NoError(t, err)
+	})
+
+	t.Run("bundle enabled with empty bundle value", func(t *testing.T) {
+		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.CustomMiddlewareBundle = ""
+			spec.CustomMiddlewareBundleDisabled = false
+		})[0]
+		err := ts.Gw.loadBundle(spec)
+		assert.Empty(t, spec.CustomMiddleware)
+		assert.NoError(t, err)
+	})
 }
 
 func TestBundleFetcher(t *testing.T) {
