@@ -548,8 +548,8 @@ Operations configuration.
 
 ### **Global**
 
-**Field: `pluginConfig` ([PluginConfig](#pluginconfig))**
-PluginConfig contains the configuration related custom plugin bundles/driver.
+**Field: `pluginConfig` ([PluginsConfig](#pluginsconfig))**
+PluginsConfig contains the configuration related custom plugin bundles/driver.
 
 **Field: `cors` ([CORS](#cors))**
 CORS contains the configuration related to cross origin resource sharing.
@@ -567,7 +567,7 @@ Cache contains the configurations related to caching.
 Tyk native API definition: `cache_options`.
 
 
-### **PluginConfig**
+### **PluginsConfig**
 
 **Field: `driver` (`object`)**
 Driver configures which custom plugin to be used.

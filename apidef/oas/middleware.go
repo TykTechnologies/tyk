@@ -38,8 +38,8 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 
 // Global holds configuration applies globally: CORS and caching.
 type Global struct {
-	// PluginConfig contains the configuration related custom plugin bundles/driver.
-	PluginConfig *PluginConfig `bson:"pluginConfig,omitempty" json:"pluginConfig,omitempty"`
+	// PluginsConfig contains the configuration related custom plugin bundles/driver.
+	PluginsConfig *PluginsConfig `bson:"pluginsConfig,omitempty" json:"pluginConfig,omitempty"`
 
 	// CORS contains the configuration related to cross origin resource sharing.
 	// Tyk native API definition: `CORS`.
@@ -56,13 +56,13 @@ type Global struct {
 
 // Fill fills *Global from apidef.APIDefinition.
 func (g *Global) Fill(api apidef.APIDefinition) {
-	if g.PluginConfig == nil {
-		g.PluginConfig = &PluginConfig{}
+	if g.PluginsConfig == nil {
+		g.PluginsConfig = &PluginsConfig{}
 	}
 
-	g.PluginConfig.Fill(api)
-	if ShouldOmit(g.PluginConfig) {
-		g.PluginConfig = nil
+	g.PluginsConfig.Fill(api)
+	if ShouldOmit(g.PluginsConfig) {
+		g.PluginsConfig = nil
 	}
 
 	if g.CORS == nil {
@@ -95,8 +95,8 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *Global into *apidef.APIDefinition.
 func (g *Global) ExtractTo(api *apidef.APIDefinition) {
-	if g.PluginConfig != nil {
-		g.PluginConfig.ExtractTo(api)
+	if g.PluginsConfig != nil {
+		g.PluginsConfig.ExtractTo(api)
 	}
 
 	if g.CORS != nil {
@@ -112,8 +112,8 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
-// PluginConfig holds configuration for custom plugins.
-type PluginConfig struct {
+// PluginsConfig holds configuration for custom plugins.
+type PluginsConfig struct {
 	// Driver configures which custom plugin to be used.
 	// It's value should be set to one of the following:
 	//
@@ -130,8 +130,8 @@ type PluginConfig struct {
 	Bundle *PluginBundle `bson:"bundle,omitempty" json:"bundle,omitempty"`
 }
 
-// Fill fills PluginConfig from apidef.
-func (p *PluginConfig) Fill(api apidef.APIDefinition) {
+// Fill fills PluginsConfig from apidef.
+func (p *PluginsConfig) Fill(api apidef.APIDefinition) {
 	p.Driver = api.CustomMiddleware.Driver
 
 	if p.Bundle == nil {
@@ -144,8 +144,8 @@ func (p *PluginConfig) Fill(api apidef.APIDefinition) {
 	}
 }
 
-// ExtractTo extracts *PluginConfig into *apidef.
-func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
+// ExtractTo extracts *PluginsConfig into *apidef.
+func (p *PluginsConfig) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.Driver = p.Driver
 
 	if p.Bundle != nil {

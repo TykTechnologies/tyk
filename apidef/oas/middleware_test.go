@@ -38,13 +38,13 @@ func TestPluginConfig(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
-		var emptyPluginConfig PluginConfig
+		var emptyPluginConfig PluginsConfig
 
 		var convertedAPI apidef.APIDefinition
 		convertedAPI.SetDisabledFlags()
 		emptyPluginConfig.ExtractTo(&convertedAPI)
 
-		var resultPluginConfig PluginConfig
+		var resultPluginConfig PluginsConfig
 		resultPluginConfig.Fill(convertedAPI)
 
 		assert.Equal(t, emptyPluginConfig, resultPluginConfig)
@@ -61,7 +61,7 @@ func TestPluginConfig(t *testing.T) {
 		}
 
 		for _, validDriver := range validDrivers {
-			pluginConfig := PluginConfig{
+			pluginConfig := PluginsConfig{
 				Driver: validDriver,
 			}
 
@@ -70,7 +70,7 @@ func TestPluginConfig(t *testing.T) {
 			pluginConfig.ExtractTo(&api)
 			assert.Equal(t, validDriver, api.CustomMiddleware.Driver)
 
-			newPluginConfig := PluginConfig{}
+			newPluginConfig := PluginsConfig{}
 			newPluginConfig.Fill(api)
 			assert.Equal(t, pluginConfig, newPluginConfig)
 		}
@@ -78,7 +78,7 @@ func TestPluginConfig(t *testing.T) {
 
 	t.Run("bundle", func(t *testing.T) {
 		pluginPath := "/path/to/plugin"
-		pluginConfig := PluginConfig{
+		pluginConfig := PluginsConfig{
 			Driver: apidef.GoPluginDriver,
 			Bundle: &PluginBundle{
 				Enabled: true,
@@ -92,7 +92,7 @@ func TestPluginConfig(t *testing.T) {
 		assert.False(t, api.CustomMiddlewareBundleDisabled)
 		assert.Equal(t, pluginPath, api.CustomMiddlewareBundle)
 
-		newPluginConfig := PluginConfig{}
+		newPluginConfig := PluginsConfig{}
 		newPluginConfig.Fill(api)
 		assert.Equal(t, pluginConfig, newPluginConfig)
 	})
