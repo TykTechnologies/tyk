@@ -15,7 +15,10 @@
 name: Release
 
 on:
-  pull_request:
+  workflow_dispatch:
+  paths:
+    - '.github/workflows/release.yml'
+    - 'ci/**'
   push:
     branches:
       - master
