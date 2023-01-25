@@ -221,6 +221,7 @@ func (a *APIDefinition) migrateEndpointMetaByType(typ int) {
 func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.MigrateAuthentication()
 	a.migratePluginBundle()
+	a.migrateCustomPluginAuth()
 	a.migrateMutualTLS()
 	a.migrateCertificatePinning()
 	a.migrateGatewayTags()
@@ -245,6 +246,15 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 func (a *APIDefinition) migratePluginBundle() {
 	if !a.CustomMiddlewareBundleDisabled && a.CustomMiddlewareBundle == "" {
 		a.CustomMiddlewareBundleDisabled = true
+	}
+}
+
+// migrateCustomPluginAuth deprecates UseGoPluginAuth and EnableCoProcessAuth in favour of CustomPluginAuthEnabled.
+func (a *APIDefinition) migrateCustomPluginAuth() {
+	if a.UseGoPluginAuth || a.EnableCoProcessAuth {
+		a.CustomPluginAuthEnabled = true
+		a.UseGoPluginAuth = false
+		a.EnableCoProcessAuth = false
 	}
 }
 

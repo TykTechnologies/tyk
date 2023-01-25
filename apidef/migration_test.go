@@ -551,6 +551,40 @@ func TestAPIDefinition_deleteAuthConfigsNotUsed(t *testing.T) {
 	assert.Len(t, api.AuthConfigs, 0)
 }
 
+func TestAPIDefinition_migrateCustomPluginAuth(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name           string
+		apiDef         APIDefinition
+		expectedAPIDef APIDefinition
+	}{
+		{
+			name:   "goplugin",
+			apiDef: APIDefinition{UseGoPluginAuth: true},
+			expectedAPIDef: APIDefinition{
+				UseGoPluginAuth:         false,
+				CustomPluginAuthEnabled: true,
+			},
+		},
+		{
+			name:   "coprocess",
+			apiDef: APIDefinition{EnableCoProcessAuth: true},
+			expectedAPIDef: APIDefinition{
+				EnableCoProcessAuth:     false,
+				CustomPluginAuthEnabled: true,
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tc.apiDef.migrateCustomPluginAuth()
+			assert.Equal(t, tc.expectedAPIDef, tc.apiDef)
+		})
+	}
+}
+
 func TestSetDisabledFlags(t *testing.T) {
 	apiDef := APIDefinition{}
 	expectedAPIDef := APIDefinition{
