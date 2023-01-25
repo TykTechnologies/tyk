@@ -15,16 +15,17 @@
 name: Release
 
 on:
-  workflow_dispatch:
-  paths:
-    - '.github/workflows/release.yml'
-    - 'ci/**'
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'ci/**'
   push:
     branches:
       - master
       - release-**
     tags:
       - 'v*'
+  workflow_dispatch:
 
 env:
   SLACK_CLI_TOKEN: ${{ secrets.BENDER_TOKEN }}
