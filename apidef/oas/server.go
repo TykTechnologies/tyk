@@ -51,8 +51,13 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 		s.GatewayTags = nil
 	}
 
-	if s.CustomDomain != nil {
-		s.CustomDomain.Fill(api)
+	if s.CustomDomain == nil {
+		s.CustomDomain = &Domain{}
+	}
+
+	s.CustomDomain.Fill(api)
+	if ShouldOmit(s.CustomDomain) {
+		s.CustomDomain = nil
 	}
 }
 
