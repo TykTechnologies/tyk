@@ -16,16 +16,12 @@ name: Release
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/release.yml'
-      - 'ci/**'
   push:
     branches:
       - master
       - release-**
     tags:
       - 'v*'
-  workflow_dispatch:
 
 env:
   SLACK_CLI_TOKEN: ${{ secrets.BENDER_TOKEN }}
