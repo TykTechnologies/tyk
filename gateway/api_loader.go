@@ -299,7 +299,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	var chainArray []alice.Constructor
 	var authArray []alice.Constructor
 
-	if spec.UseKeylessAccess {
+	if !spec.IsProtected() {
 		chainDef.Open = true
 		logger.Info("Checking security policy: Open")
 	}
@@ -334,7 +334,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
 
-	if !spec.UseKeylessAccess {
+	if spec.IsProtected() {
 		// Select the keying method to use for setting session states
 		if gw.mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid}) {
 			logger.Info("Checking security policy: OAuth")
@@ -390,7 +390,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			}
 		}
 
-		if spec.UseStandardAuth || len(authArray) == 0 {
+		if (spec.UseStandardAuth || len(authArray) == 0) && !spec.AuthenticationDisabled {
 			logger.Info("Checking security policy: Token")
 			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid}))
 		}
@@ -423,7 +423,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
-	if !spec.UseKeylessAccess {
+	if spec.IsProtected() {
 		gw.mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid})
 		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
 	}
@@ -465,7 +465,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
 
-	if !spec.UseKeylessAccess {
+	if spec.IsProtected() {
 		var simpleArray []alice.Constructor
 		gw.mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
 		gw.mwAppendEnabled(&simpleArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})

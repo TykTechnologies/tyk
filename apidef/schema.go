@@ -156,6 +156,9 @@ const Schema = `{
         "use_keyless": {
             "type": "boolean"
         },
+		"authentication_disabled": {
+            "type": "boolean"
+        },
         "use_basic_auth": {
             "type": "boolean"
         },

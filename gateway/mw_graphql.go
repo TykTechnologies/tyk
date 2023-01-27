@@ -292,7 +292,7 @@ func (m *GraphQLMiddleware) loadSupergraphMergedSDLAsSchema() {
 
 // OnBeforeStart - is a graphql.WebsocketBeforeStartHook which allows to perform security checks for all operations over websocket connections
 func (m *GraphQLMiddleware) OnBeforeStart(reqCtx context.Context, operation *gql.Request) error {
-	if m.Spec.UseKeylessAccess {
+	if !m.Spec.IsProtected() {
 		return nil
 	}
 
