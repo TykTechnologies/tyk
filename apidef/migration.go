@@ -95,6 +95,10 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 
 			versions = append(versions, newAPI)
 		}
+
+		sort.Slice(versions, func(i, j int) bool {
+			return versions[i].VersionName < versions[j].VersionName
+		})
 	}
 
 	// Base API StripPath migration
