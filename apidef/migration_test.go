@@ -580,7 +580,6 @@ func TestAPIDefinition_migrateCustomPluginAuth(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
 			tc.apiDef.migrateCustomPluginAuth()
 			assert.Equal(t, tc.expectedAPIDef, tc.apiDef)
 		})
