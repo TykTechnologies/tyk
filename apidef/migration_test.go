@@ -141,7 +141,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 	expectedVersion.Internal = true
 	expectedVersion.Expiration = exp2
 	expectedVersion.Proxy.ListenPath += "-" + v2 + "/"
-	expectedVersion.VersionDefinition = VersionDefinition{}
+	expectedVersion.VersionDefinition = VersionDefinition{BaseID: apiID}
 	expectedVersion.VersionData = VersionData{
 		NotVersioned: true,
 		Versions: map[string]VersionInfo{
@@ -223,6 +223,8 @@ func TestAPIDefinition_MigrateVersioning_DefaultEmpty(t *testing.T) {
 	assert.Equal(t, expectedBaseData, base.VersionData)
 
 	// v2
+	assert.Equal(t, apiID, versions[0].VersionDefinition.BaseID)
+	versions[0].VersionDefinition.BaseID = ""
 	assert.Empty(t, versions[0].VersionDefinition)
 
 	expectedV2Data := VersionData{
