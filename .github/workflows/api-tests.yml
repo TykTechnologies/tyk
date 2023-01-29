@@ -13,7 +13,7 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.16.x]
+        go-version: [1.19.x]
         platform: [ubuntu-latest]
         arch: [amd64]
         node-version: [15.x]
