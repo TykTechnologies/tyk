@@ -1,0 +1,16 @@
+---
+version: '3'
+
+tasks:
+  default:
+    desc: Run all code generation steps
+    deps:
+      - jsonnet
+
+  jsonnet:
+    desc: Generate github actions with jsonnet
+    preconditions:
+      - sh: type jsonnet
+        msg: "jsonnet is not installed. Run 'task deps:jsonnet'"
+    cmds:
+      - "find -name '*.jsonnet' | xargs -n1 jsonnet -c -m . -S -J ."

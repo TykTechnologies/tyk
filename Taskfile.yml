@@ -1,0 +1,7 @@
+---
+version: '3'
+
+includes:
+  deps: ./.taskfiles/deps.yml
+  codegen: ./.taskfiles/codegen.yml
+  integration: ./.taskfiles/integration.yml

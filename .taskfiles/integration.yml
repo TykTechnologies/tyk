@@ -1,0 +1,37 @@
+---
+version: '3'
+
+vars:
+  COMPOSE_FILE: ci/integration/docker-compose.yml
+
+tasks:
+  default:
+    desc: Run all integration tests
+    cmds:
+      - task: docker-compose-up
+      - task: redis
+      - task: docker-compose-down
+    silent: true
+
+  redis:
+    silent: true
+    desc: Run integration tests against redis drivers
+    dir: storage/internal
+    cmds:
+      - go test -tags=integration -v -race -coverprofile=coverage.out -cover -coverpkg=./... ./...
+
+  docker-compose-up:
+    silent: true
+    desc: Run integration test services
+    preconditions:
+      - sh: docker compose version --short | grep '^2'
+        msg: 'docker compose v2 is expected to be installed'
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} up -d --wait
+
+  docker-compose-down:
+    silent: true
+    desc: Shutdown integration test services
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} stop -t 0
+      - docker compose -f {{.COMPOSE_FILE}} down --remove-orphans

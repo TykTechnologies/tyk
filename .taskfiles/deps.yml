@@ -1,0 +1,44 @@
+---
+version: '3'
+
+tasks:
+  default:
+    desc: 'Install all developer dependencies'
+    cmds:
+      - task: goimports
+      - task: golangci-lint
+      - task: faillint
+      - task: jsonnet
+    silent: true
+
+  goimports:
+    desc: 'Install goimports'
+    status:
+      - type goimports
+    cmds:
+      - go install golang.org/x/tools/cmd/goimports@latest
+
+  golangci-lint:
+    desc: 'Install golangci-lint'
+    status:
+      - type golangci-lint
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.0
+
+  faillint:
+    desc: 'Install fatih/faillint'
+    status:
+      - type faillint
+    cmds:
+      - go install github.com/fatih/faillint@latest
+
+  jsonnet:
+    desc: 'Install jsonnet'
+    status:
+      - type jsonnet
+      - type jsonnet-lint
+      - type jsonnetfmt
+    cmds:
+      - go install github.com/google/go-jsonnet/cmd/jsonnet@latest
+      - go install github.com/google/go-jsonnet/cmd/jsonnet-lint@latest
+      - go install github.com/google/go-jsonnet/cmd/jsonnetfmt@latest
