@@ -1,4 +1,4 @@
-FROM debian:bullseye as assets
+FROM debian:bullseye AS assets
 
 # This Dockerfile facilitates bleeding edge development docker image builds
 # directly from source. To build a development image, run `make docker`.
