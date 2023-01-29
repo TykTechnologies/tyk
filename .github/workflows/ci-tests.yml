@@ -14,7 +14,7 @@ env:
 
 jobs:
   test:
-    name: Go ${{ matrix.go }} Redis ${{ matrix.redis-version }}
+    name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
