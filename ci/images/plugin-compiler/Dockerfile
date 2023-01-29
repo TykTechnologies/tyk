@@ -21,7 +21,7 @@ RUN  apt-get remove -y --allow-remove-essential --auto-remove mercurial \
 
 
 COPY . $TYK_GW_PATH
-RUN cd $TYK_GW_PATH && go mod vendor
+RUN cd $TYK_GW_PATH && go mod tidy && go mod vendor
 
 ENTRYPOINT ["/build.sh"]
 
