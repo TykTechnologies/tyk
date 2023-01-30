@@ -394,3 +394,48 @@ func TestCustomPlugins(t *testing.T) {
 		assert.Equal(t, customPlugins, newPrePlugin)
 	})
 }
+
+func TestPostAuthenticationPlugin(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var (
+			emptyPostAuthPlugin PostAuthenticationPlugin
+			convertedAPI        apidef.APIDefinition
+		)
+
+		convertedAPI.SetDisabledFlags()
+		emptyPostAuthPlugin.ExtractTo(&convertedAPI)
+
+		var resultPostAuthPlugin PostAuthenticationPlugin
+		resultPostAuthPlugin.Fill(convertedAPI)
+
+		assert.Equal(t, emptyPostAuthPlugin, resultPostAuthPlugin)
+	})
+
+	t.Run("with values", func(t *testing.T) {
+		t.Parallel()
+		postAuthPlugin := PostAuthenticationPlugin{
+			Plugins: []CustomPlugin{
+				{
+					Enabled:      true,
+					FunctionName: "pre",
+					Path:         "/path/to/plugin",
+					RawBodyOnly:  true,
+				},
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
+		postAuthPlugin.ExtractTo(&api)
+		assert.Equal(t, "pre", api.CustomMiddleware.PostKeyAuth[0].Name)
+		assert.Equal(t, "/path/to/plugin", api.CustomMiddleware.PostKeyAuth[0].Path)
+		assert.True(t, api.CustomMiddleware.PostKeyAuth[0].RawBodyOnly)
+		assert.False(t, api.CustomMiddleware.PostKeyAuth[0].Disabled)
+
+		newPostAuthPlugin := PostAuthenticationPlugin{}
+		newPostAuthPlugin.Fill(api)
+		assert.Equal(t, postAuthPlugin, newPostAuthPlugin)
+	})
+}
