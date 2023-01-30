@@ -834,6 +834,9 @@ type CustomPlugin struct {
 	Path string `bson:"path" json:"path"` // required.
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+	// RequireSession if set to true passes down the session information for plugins post authentication.
+	// RequireSession is used only with JSVM custom middleware.
+	RequireSession bool `bson:"requireSession" json:"requireSession"`
 }
 
 // CustomPlugins is a list of CustomPlugin.
@@ -843,10 +846,11 @@ type CustomPlugins []CustomPlugin
 func (c CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
 	for i, mwDef := range mwDefs {
 		c[i] = CustomPlugin{
-			Enabled:      !mwDef.Disabled,
-			Path:         mwDef.Path,
-			FunctionName: mwDef.Name,
-			RawBodyOnly:  mwDef.RawBodyOnly,
+			Enabled:        !mwDef.Disabled,
+			Path:           mwDef.Path,
+			FunctionName:   mwDef.Name,
+			RawBodyOnly:    mwDef.RawBodyOnly,
+			RequireSession: mwDef.RequireSession,
 		}
 	}
 }
@@ -855,10 +859,11 @@ func (c CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
 func (c CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
 	for i, plugin := range c {
 		mwDefs[i] = apidef.MiddlewareDefinition{
-			Disabled:    !plugin.Enabled,
-			Name:        plugin.FunctionName,
-			Path:        plugin.Path,
-			RawBodyOnly: plugin.RawBodyOnly,
+			Disabled:       !plugin.Enabled,
+			Name:           plugin.FunctionName,
+			Path:           plugin.Path,
+			RawBodyOnly:    plugin.RawBodyOnly,
+			RequireSession: plugin.RequireSession,
 		}
 	}
 }
