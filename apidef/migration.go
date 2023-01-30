@@ -387,4 +387,10 @@ func (a *APIDefinition) SetDisabledFlags() {
 	for i := 0; i < len(a.CustomMiddleware.Pre); i++ {
 		a.CustomMiddleware.Pre[i].Disabled = true
 	}
+
+	if len(a.CustomMiddleware.PostKeyAuth) > 0 {
+		for i := 0; i < len(a.CustomMiddleware.PostKeyAuth); i++ {
+			a.CustomMiddleware.PostKeyAuth[i].Disabled = true
+		}
+	}
 }

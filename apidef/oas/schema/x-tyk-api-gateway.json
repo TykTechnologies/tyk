@@ -411,6 +411,9 @@
         "authenticationPlugin": {
           "$ref": "#/definitions/X-Tyk-AuthenticationPlugin"
         },
+        "postAuthenticationPlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+        },
         "cache": {
           "$ref": "#/definitions/X-Tyk-Cache"
         }
