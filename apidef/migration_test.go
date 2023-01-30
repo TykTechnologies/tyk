@@ -587,11 +587,20 @@ func TestAPIDefinition_migrateCustomPluginAuth(t *testing.T) {
 }
 
 func TestSetDisabledFlags(t *testing.T) {
-	apiDef := APIDefinition{}
+	apiDef := APIDefinition{
+		CustomMiddleware: MiddlewareSection{
+			Pre: make([]MiddlewareDefinition, 1),
+		},
+	}
 	expectedAPIDef := APIDefinition{
 		CustomMiddleware: MiddlewareSection{
 			AuthCheck: MiddlewareDefinition{
 				Disabled: true,
+			},
+			Pre: []MiddlewareDefinition{
+				{
+					Disabled: true,
+				},
 			},
 		},
 		TagsDisabled:                   true,
