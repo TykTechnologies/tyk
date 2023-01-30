@@ -615,3 +615,51 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Server.CustomDomain)
 	})
 }
+
+func TestMigrateAndFillOAS_ValidateRequest(t *testing.T) {
+	newValidateJSONAPI := func(schema map[string]interface{}) *apidef.APIDefinition {
+		return &apidef.APIDefinition{
+			Name:  "my-api",
+			Proxy: apidef.ProxyConfig{ListenPath: "/listen"},
+			VersionData: apidef.VersionData{
+				NotVersioned: true,
+				Versions: map[string]apidef.VersionInfo{
+					"Default": {
+						UseExtendedPaths: true,
+						ExtendedPaths: apidef.ExtendedPathsSet{
+							ValidateJSON: []apidef.ValidatePathMeta{
+								{
+									Method:            http.MethodPost,
+									Path:              "/post",
+									Schema:            schema,
+									ErrorResponseCode: http.StatusTeapot,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	migratedAPI, _, err := MigrateAndFillOAS(newValidateJSONAPI(map[string]interface{}{"title": "Furkan"}))
+	assert.NoError(t, err)
+
+	pathItem := migratedAPI.OAS.Paths.Find("/post")
+	assert.NotNil(t, pathItem)
+	operation := pathItem.GetOperation(http.MethodPost)
+	assert.NotNil(t, operation)
+	assert.Equal(t, operation.RequestBody.Value.Content.Get("application/json").Schema.Value.Title, "Furkan")
+
+	expectedValidateRequest := &ValidateRequest{
+		Enabled:           true,
+		ErrorResponseCode: http.StatusTeapot,
+	}
+	assert.Equal(t, expectedValidateRequest, migratedAPI.OAS.GetTykExtension().Middleware.Operations[operation.OperationID].ValidateRequest)
+	assert.Nil(t, migratedAPI.Classic.VersionData.Versions[Main].ExtendedPaths.ValidateJSON)
+
+	t.Run("fail", func(t *testing.T) {
+		migratedAPI, _, err = MigrateAndFillOAS(newValidateJSONAPI(map[string]interface{}{"minLength": -1}))
+		assert.Error(t, err)
+	})
+}

@@ -397,6 +397,7 @@ func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 	var oas OAS
 	oas.Fill(*api)
 	oas.setRequiredFields(api.Name, api.VersionName)
+	clearClassicAPIForSomeFeatures(api)
 
 	err := oas.Validate(context.Background())
 	if err != nil {
@@ -418,4 +419,14 @@ func (s *OAS) setRequiredFields(name string, versionName string) {
 		Title:   name,
 		Version: versionName,
 	}
+}
+
+// clearClassicAPIForSomeFeatures clears some features that will be OAS-only.
+// For example, the new validate request will just be valid for OAS APIs so after migrating from classic API definition
+// the existing feature should be cleared to prevent ValidateJSON middleware interference.
+func clearClassicAPIForSomeFeatures(api *apidef.APIDefinition) {
+	// clear ValidateJSON after migration to OAS-only ValidateRequest
+	vInfo := api.VersionData.Versions[Main]
+	vInfo.ExtendedPaths.ValidateJSON = nil
+	api.VersionData.Versions[Main] = vInfo
 }
