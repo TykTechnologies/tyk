@@ -901,11 +901,13 @@ type PostAuthenticationPlugin struct {
 
 // Fill fills PostAuthenticationPlugin from supplied Tyk classic api definition.
 func (p *PostAuthenticationPlugin) Fill(api apidef.APIDefinition) {
+	if len(api.CustomMiddleware.PostKeyAuth) == 0 {
+		p.Plugins = nil
+		return
+	}
+
 	p.Plugins = make(CustomPlugins, len(api.CustomMiddleware.PostKeyAuth))
 	p.Plugins.Fill(api.CustomMiddleware.PostKeyAuth)
-	if ShouldOmit(p.Plugins) {
-		p.Plugins = nil
-	}
 }
 
 // ExtractTo extracts PostAuthenticationPlugin into Tyk classic api definition.
