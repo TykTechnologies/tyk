@@ -403,4 +403,10 @@ func (a *APIDefinition) SetDisabledFlags() {
 			a.CustomMiddleware.Post[i].Disabled = true
 		}
 	}
+
+	if len(a.CustomMiddleware.Response) > 0 {
+		for i := 0; i < len(a.CustomMiddleware.Response); i++ {
+			a.CustomMiddleware.Response[i].Disabled = true
+		}
+	}
 }

@@ -484,3 +484,48 @@ func TestPostPlugin(t *testing.T) {
 		assert.Equal(t, postPlugin, newPostPlugin)
 	})
 }
+
+func TestResponsePlugin(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var (
+			emptyResponsePlugin ResponsePlugin
+			convertedAPI        apidef.APIDefinition
+		)
+
+		convertedAPI.SetDisabledFlags()
+		emptyResponsePlugin.ExtractTo(&convertedAPI)
+
+		var resultResponsePlugin ResponsePlugin
+		resultResponsePlugin.Fill(convertedAPI)
+
+		assert.Equal(t, emptyResponsePlugin, resultResponsePlugin)
+	})
+
+	t.Run("with values", func(t *testing.T) {
+		t.Parallel()
+		responsePlugin := ResponsePlugin{
+			Plugins: CustomPlugins{
+				{
+					Enabled:      true,
+					FunctionName: "pre",
+					Path:         "/path/to/plugin",
+					RawBodyOnly:  true,
+				},
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
+		responsePlugin.ExtractTo(&api)
+		assert.Equal(t, "pre", api.CustomMiddleware.Response[0].Name)
+		assert.Equal(t, "/path/to/plugin", api.CustomMiddleware.Response[0].Path)
+		assert.True(t, api.CustomMiddleware.Response[0].RawBodyOnly)
+		assert.False(t, api.CustomMiddleware.Response[0].Disabled)
+
+		newResponsePlugin := ResponsePlugin{}
+		newResponsePlugin.Fill(api)
+		assert.Equal(t, responsePlugin, newResponsePlugin)
+	})
+}
