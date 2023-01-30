@@ -330,7 +330,7 @@ func TestPrePlugin(t *testing.T) {
 	t.Run("with values", func(t *testing.T) {
 		t.Parallel()
 		prePlugin := PrePlugin{
-			Plugins: []CustomPlugin{
+			Plugins: CustomPlugins{
 				{
 					Enabled:      true,
 					FunctionName: "pre",
