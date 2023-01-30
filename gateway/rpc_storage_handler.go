@@ -115,10 +115,6 @@ type RPCStorageHandler struct {
 func (r *RPCStorageHandler) Connect() bool {
 	slaveOptions := r.Gw.GetConfig().SlaveOptions
 
-	if slaveOptions.GroupID == "" {
-		slaveOptions.GroupID = "ungrouped"
-	}
-
 	rpcConfig := rpc.Config{
 		UseSSL:                slaveOptions.UseSSL,
 		SSLInsecureSkipVerify: slaveOptions.SSLInsecureSkipVerify,
