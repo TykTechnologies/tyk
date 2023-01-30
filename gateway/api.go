@@ -111,6 +111,20 @@ type paginatedOAuthClientTokens struct {
 	Tokens     []OAuthClientToken
 }
 
+type VersionMetas struct {
+	Status string        `json:"status"`
+	Metas  []VersionMeta `json:"apis"`
+}
+
+type VersionMeta struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	VersionName      string `json:"versionName"`
+	Internal         bool   `json:"internal"`
+	ExpirationDate   string `json:"expirationDate"`
+	IsDefaultVersion bool   `json:"isDefaultVersion"`
+}
+
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(code)
@@ -1780,6 +1794,7 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 		gw.DefaultQuotaStore.RemoveSession(orgID, rawKey, false)
 	}
 
+	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	err := sessionManager.UpdateSession(orgID, newSession, 0, false)
 	if err != nil {
 		return apiError("Error writing to key store " + err.Error()), http.StatusInternalServerError

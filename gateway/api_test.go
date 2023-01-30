@@ -2123,6 +2123,7 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 	}
 
 	baseAPI := ts.Gw.BuildAndLoadAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
 		a.APIID = "base-api-id"
 		a.VersionDefinition.Enabled = false
 		a.VersionDefinition.Key = ""
@@ -2134,9 +2135,9 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 	})[0]
 
 	v2 := BuildAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
 		a.Name = "v2"
 		a.APIID = v2APIID
-		a.CertificatePinningDisabled = true
 		a.VersionDefinition.Location = ""
 		a.VersionDefinition.Key = ""
 
@@ -2262,9 +2263,9 @@ func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 	}
 
 	v1 := BuildAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
 		a.Name = "v1"
 		a.APIID = "v1"
-		a.CertificatePinningDisabled = true
 		a.VersionDefinition.Location = ""
 		a.VersionDefinition.Key = ""
 
@@ -2273,9 +2274,9 @@ func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 		a.OAS.Fill(*a.APIDefinition)
 	})[0]
 	v2 := BuildAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
 		a.Name = "v2"
 		a.APIID = "v2"
-		a.CertificatePinningDisabled = true
 		a.VersionDefinition.Location = ""
 		a.VersionDefinition.Key = ""
 
@@ -2284,9 +2285,9 @@ func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 		a.OAS.Fill(*a.APIDefinition)
 	})[0]
 	baseAPI := BuildAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
 		a.Name = "base"
 		a.APIID = "base"
-		a.CertificatePinningDisabled = true
 		a.VersionDefinition.Versions = map[string]string{
 			v1VersionName: v1.APIID,
 			v2VersionName: v2.APIID,
@@ -2598,6 +2599,7 @@ func TestOAS(t *testing.T) {
 			t.Run("with oas - should fail", func(t *testing.T) {
 
 				var oldAPIInOAS oas.OAS
+				oldAPI.APIDefinition.SetDisabledFlags()
 				oldAPIInOAS.Fill(*oldAPI.APIDefinition)
 				oldAPIInOAS.OpenAPI = "3.0.3"
 				oldAPIInOAS.Info = &openapi3.Info{
@@ -3180,6 +3182,7 @@ func TestOAS(t *testing.T) {
 			})
 
 			t.Run("fail when non OAS API tried to patch", func(t *testing.T) {
+				oldAPI.APIDefinition.SetDisabledFlags()
 				oldAPI.OAS.Fill(*oldAPI.APIDefinition)
 				apiInOAS := oldAPI.OAS
 				fillPaths(&apiInOAS)
@@ -3750,4 +3753,39 @@ func TestApplyLifetime(t *testing.T) {
 			assert.Equal(t, tc.expectedLifetime, ts.Gw.ApplyLifetime(&session, nil))
 		})
 	}
+}
+
+func TestOrgKeyHandler_LastUpdated(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI()
+	session := CreateStandardSession()
+	var prevLastUpdated string
+
+	orgHandlerEndpoint := "/tyk/org/keys/default"
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Method: http.MethodPost, Path: orgHandlerEndpoint, Data: session, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodGet, Path: orgHandlerEndpoint, BodyMatchFunc: func(i []byte) bool {
+			var s user.SessionState
+			err := json.Unmarshal(i, &s)
+			assert.NoError(t, err)
+
+			prevLastUpdated = s.LastUpdated
+			assert.NotEmpty(t, prevLastUpdated)
+
+			return true
+		}, Delay: time.Second},
+		{AdminAuth: true, Method: http.MethodPut, Path: orgHandlerEndpoint, Data: session, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodGet, Path: orgHandlerEndpoint, BodyMatchFunc: func(i []byte) bool {
+			var s user.SessionState
+			err := json.Unmarshal(i, &s)
+			assert.NoError(t, err)
+
+			assert.Greater(t, s.LastUpdated, prevLastUpdated)
+
+			return true
+		}},
+	}...)
 }

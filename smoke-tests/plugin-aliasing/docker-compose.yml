@@ -6,8 +6,8 @@ services:
   gw:
     image: tykio/tyk-gateway:${tag}
     volumes:
-      - ./foobar-plugin/foobar-plugin.so:/opt/tyk-gateway/middleware/foobar-plugin.so
-      - ./helloworld-plugin/helloworld-plugin.so:/opt/tyk-gateway/middleware/helloworld-plugin.so
+      - ./foobar-plugin/foobar-plugin_${plugin_version}_${plugin_os}_${plugin_arch}.so:/opt/tyk-gateway/middleware/foobar-plugin.so
+      - ./helloworld-plugin/helloworld-plugin_${plugin_version}_${plugin_os}_${plugin_arch}.so:/opt/tyk-gateway/middleware/helloworld-plugin.so
       - ./helloworld-plugin/helloworld-plugin-1.json:/opt/tyk-gateway/apps/helloworld-plugin-1.json
       - ./helloworld-plugin/helloworld-plugin-2.json:/opt/tyk-gateway/apps/helloworld-plugin-2.json
       - ./foobar-plugin/foobar-plugin-1.json:/opt/tyk-gateway/apps/foorbar-plugin-1.json

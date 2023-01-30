@@ -18,18 +18,6 @@ func TestAuthentication(t *testing.T) {
 	resultAuthentication.Fill(convertedAPI)
 
 	assert.Equal(t, emptyAuthentication, resultAuthentication)
-
-	t.Run("Fill just GoPlugin", func(t *testing.T) {
-		// GoPlugin is different from others, it is not set inside AuthConfigs.
-
-		goPluginAuth := Authentication{GoPlugin: &GoPlugin{Enabled: true}}
-
-		goPluginAuth.ExtractTo(&convertedAPI)
-
-		resultAuthentication.Fill(convertedAPI)
-
-		assert.Equal(t, goPluginAuth, resultAuthentication)
-	})
 }
 
 func TestScopes(t *testing.T) {
@@ -118,25 +106,13 @@ func TestOIDC(t *testing.T) {
 	assert.Equal(t, emptyOIDC, resultOIDC)
 }
 
-func TestGoPlugin(t *testing.T) {
-	var emptyGoPlugin GoPlugin
-
-	var convertedAPI apidef.APIDefinition
-	emptyGoPlugin.ExtractTo(&convertedAPI)
-
-	var resultGoPlugin GoPlugin
-	resultGoPlugin.Fill(convertedAPI)
-
-	assert.Equal(t, emptyGoPlugin, resultGoPlugin)
-}
-
 func TestCustomPlugin(t *testing.T) {
-	var emptyCustomPlugin CustomPlugin
+	var emptyCustomPlugin CustomPluginAuthentication
 
 	var convertedAPI apidef.APIDefinition
 	emptyCustomPlugin.ExtractTo(&convertedAPI)
 
-	var resultCustomPlugin CustomPlugin
+	var resultCustomPlugin CustomPluginAuthentication
 	resultCustomPlugin.Fill(convertedAPI)
 
 	assert.Equal(t, emptyCustomPlugin, resultCustomPlugin)
