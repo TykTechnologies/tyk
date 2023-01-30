@@ -258,6 +258,9 @@
         },
         "rawBodyOnly": {
           "type": "boolean"
+        },
+        "requireSession": {
+          "type": "boolean"
         }
       },
       "required": [
