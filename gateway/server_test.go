@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestGateway_afterConfSetup(t *testing.T) {
