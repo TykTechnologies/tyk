@@ -881,11 +881,13 @@ type PrePlugin struct {
 
 // Fill fills PrePlugin from supplied Tyk classic api definition.
 func (p *PrePlugin) Fill(api apidef.APIDefinition) {
+	if len(api.CustomMiddleware.Pre) == 0 {
+		p.Plugins = nil
+		return
+	}
+
 	p.Plugins = make(CustomPlugins, len(api.CustomMiddleware.Pre))
 	p.Plugins.Fill(api.CustomMiddleware.Pre)
-	if ShouldOmit(p.Plugins) {
-		p.Plugins = nil
-	}
 }
 
 // ExtractTo extracts PrePlugin into Tyk classic api definition.
