@@ -836,13 +836,13 @@ type CustomPlugin struct {
 type CustomPlugins []CustomPlugin
 
 // Fill fills CustomPlugins from supplied Middleware definitions.
-func (c CustomPlugins) Fill(mwDef []apidef.MiddlewareDefinition) {
-	for i, pre := range mwDef {
+func (c CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
+	for i, mwDef := range mwDefs {
 		c[i] = CustomPlugin{
-			Enabled:      !pre.Disabled,
-			Path:         pre.Path,
-			FunctionName: pre.Name,
-			RawBodyOnly:  pre.RawBodyOnly,
+			Enabled:      !mwDef.Disabled,
+			Path:         mwDef.Path,
+			FunctionName: mwDef.Name,
+			RawBodyOnly:  mwDef.RawBodyOnly,
 		}
 	}
 }
