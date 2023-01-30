@@ -460,7 +460,7 @@ func TestPostPlugin(t *testing.T) {
 
 	t.Run("with values", func(t *testing.T) {
 		t.Parallel()
-		postAuthPlugin := PostPlugin{
+		postPlugin := PostPlugin{
 			Plugins: CustomPlugins{
 				{
 					Enabled:      true,
@@ -473,7 +473,7 @@ func TestPostPlugin(t *testing.T) {
 
 		api := apidef.APIDefinition{}
 		api.SetDisabledFlags()
-		postAuthPlugin.ExtractTo(&api)
+		postPlugin.ExtractTo(&api)
 		assert.Equal(t, "pre", api.CustomMiddleware.Post[0].Name)
 		assert.Equal(t, "/path/to/plugin", api.CustomMiddleware.Post[0].Path)
 		assert.True(t, api.CustomMiddleware.Post[0].RawBodyOnly)
@@ -481,6 +481,6 @@ func TestPostPlugin(t *testing.T) {
 
 		newPostPlugin := PostPlugin{}
 		newPostPlugin.Fill(api)
-		assert.Equal(t, postAuthPlugin, newPostPlugin)
+		assert.Equal(t, postPlugin, newPostPlugin)
 	})
 }
