@@ -67,7 +67,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 			newAPI.Name += "-" + url.QueryEscape(vName)
 			newAPI.Internal = true
 			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
-			newAPI.VersionDefinition = VersionDefinition{}
+			newAPI.VersionDefinition = VersionDefinition{BaseID: a.APIID}
 			newAPI.VersionName = vName
 
 			// Version API Expires migration
@@ -95,6 +95,10 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 
 			versions = append(versions, newAPI)
 		}
+
+		sort.Slice(versions, func(i, j int) bool {
+			return versions[i].VersionName < versions[j].VersionName
+		})
 	}
 
 	// Base API StripPath migration
@@ -380,4 +384,7 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.CertificatePinningDisabled = true
 	a.DomainDisabled = true
 	a.CustomMiddlewareBundleDisabled = true
+	for i := 0; i < len(a.CustomMiddleware.Pre); i++ {
+		a.CustomMiddleware.Pre[i].Disabled = true
+	}
 }

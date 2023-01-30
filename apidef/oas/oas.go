@@ -381,12 +381,12 @@ func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
 	}
 
 	versionAPIDefs := make([]APIDef, len(versions))
-	for i, v := range versions {
-		versionOAS, err := newOASFromClassicAPIDefinition(&v)
+	for i := 0; i < len(versions); i++ {
+		versionOAS, err := newOASFromClassicAPIDefinition(&versions[i])
 		if err != nil {
-			return baseAPIDef, nil, fmt.Errorf("version API %s migrated OAS is not valid: %w", v.Name, err)
+			return baseAPIDef, nil, fmt.Errorf("version API %s migrated OAS is not valid: %w", versions[i].Name, err)
 		}
-		versionAPIDefs[i] = APIDef{versionOAS, &v}
+		versionAPIDefs[i] = APIDef{versionOAS, &versions[i]}
 	}
 
 	return baseAPIDef, versionAPIDefs, err

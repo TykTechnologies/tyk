@@ -141,7 +141,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 	expectedVersion.Internal = true
 	expectedVersion.Expiration = exp2
 	expectedVersion.Proxy.ListenPath += "-" + v2 + "/"
-	expectedVersion.VersionDefinition = VersionDefinition{}
+	expectedVersion.VersionDefinition = VersionDefinition{BaseID: apiID}
 	expectedVersion.VersionData = VersionData{
 		NotVersioned: true,
 		Versions: map[string]VersionInfo{
@@ -223,6 +223,8 @@ func TestAPIDefinition_MigrateVersioning_DefaultEmpty(t *testing.T) {
 	assert.Equal(t, expectedBaseData, base.VersionData)
 
 	// v2
+	assert.Equal(t, apiID, versions[0].VersionDefinition.BaseID)
+	versions[0].VersionDefinition.BaseID = ""
 	assert.Empty(t, versions[0].VersionDefinition)
 
 	expectedV2Data := VersionData{
@@ -578,7 +580,6 @@ func TestAPIDefinition_migrateCustomPluginAuth(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
 			tc.apiDef.migrateCustomPluginAuth()
 			assert.Equal(t, tc.expectedAPIDef, tc.apiDef)
 		})
@@ -586,11 +587,20 @@ func TestAPIDefinition_migrateCustomPluginAuth(t *testing.T) {
 }
 
 func TestSetDisabledFlags(t *testing.T) {
-	apiDef := APIDefinition{}
+	apiDef := APIDefinition{
+		CustomMiddleware: MiddlewareSection{
+			Pre: make([]MiddlewareDefinition, 1),
+		},
+	}
 	expectedAPIDef := APIDefinition{
 		CustomMiddleware: MiddlewareSection{
 			AuthCheck: MiddlewareDefinition{
 				Disabled: true,
+			},
+			Pre: []MiddlewareDefinition{
+				{
+					Disabled: true,
+				},
 			},
 		},
 		TagsDisabled:                   true,
