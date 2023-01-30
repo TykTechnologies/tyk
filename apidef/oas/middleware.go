@@ -835,26 +835,7 @@ type CustomPlugin struct {
 // CustomPlugins is a list of CustomPlugin.
 type CustomPlugins []CustomPlugin
 
-// PrePlugin configures pre stage plugins.
-type PrePlugin struct {
-	// Plugins configures custom plugins to be run on pre authentication stage.
-	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomPlugins `bson:"plugins" json:"plugins"`
-}
-
-func (p *PrePlugin) Fill(api apidef.APIDefinition) {
-	p.Plugins = make(CustomPlugins, len(api.CustomMiddleware.Pre))
-	p.Plugins.Fill(api.CustomMiddleware.Pre)
-	if ShouldOmit(p.Plugins) {
-		p.Plugins = nil
-	}
-}
-
-func (p *PrePlugin) ExtractTo(api *apidef.APIDefinition) {
-	api.CustomMiddleware.Pre = make([]apidef.MiddlewareDefinition, len(p.Plugins))
-	p.Plugins.ExtractTo(api.CustomMiddleware.Pre)
-}
-
+// Fill fills CustomPlugins from supplied Middleware definitions.
 func (c CustomPlugins) Fill(mwDef []apidef.MiddlewareDefinition) {
 	for i, pre := range mwDef {
 		c[i] = CustomPlugin{
@@ -866,6 +847,7 @@ func (c CustomPlugins) Fill(mwDef []apidef.MiddlewareDefinition) {
 	}
 }
 
+// ExtractTo extracts CustomPlugins into supplied Middleware definitions.
 func (c CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
 	for i, plugin := range c {
 		mwDefs[i] = apidef.MiddlewareDefinition{
@@ -875,4 +857,26 @@ func (c CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
 			RawBodyOnly: plugin.RawBodyOnly,
 		}
 	}
+}
+
+// PrePlugin configures pre stage plugins.
+type PrePlugin struct {
+	// Plugins configures custom plugins to be run on pre authentication stage.
+	// The plugins would be executed in the order of configuration in the list.
+	Plugins CustomPlugins `bson:"plugins" json:"plugins"`
+}
+
+// Fill fills PrePlugin from supplied Tyk classic api definition.
+func (p *PrePlugin) Fill(api apidef.APIDefinition) {
+	p.Plugins = make(CustomPlugins, len(api.CustomMiddleware.Pre))
+	p.Plugins.Fill(api.CustomMiddleware.Pre)
+	if ShouldOmit(p.Plugins) {
+		p.Plugins = nil
+	}
+}
+
+// ExtractTo extracts PrePlugin into Tyk classic api definition.
+func (p *PrePlugin) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomMiddleware.Pre = make([]apidef.MiddlewareDefinition, len(p.Plugins))
+	p.Plugins.ExtractTo(api.CustomMiddleware.Pre)
 }
