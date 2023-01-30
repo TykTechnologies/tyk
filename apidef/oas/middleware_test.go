@@ -308,3 +308,89 @@ func TestAuthenticationPlugin(t *testing.T) {
 		assert.Equal(t, authenticationPlugin, newAuthenticationPlugin)
 	})
 }
+
+func TestPrePlugin(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var (
+			emptyPrePlugin PrePlugin
+			convertedAPI   apidef.APIDefinition
+		)
+
+		convertedAPI.SetDisabledFlags()
+		emptyPrePlugin.ExtractTo(&convertedAPI)
+
+		var resultPrePlugin PrePlugin
+		resultPrePlugin.Fill(convertedAPI)
+
+		assert.Equal(t, emptyPrePlugin, resultPrePlugin)
+	})
+
+	t.Run("with values", func(t *testing.T) {
+		t.Parallel()
+		prePlugin := PrePlugin{
+			Plugins: CustomPlugins{
+				{
+					Enabled:      true,
+					FunctionName: "pre",
+					Path:         "/path/to/plugin",
+					RawBodyOnly:  true,
+				},
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
+		prePlugin.ExtractTo(&api)
+		assert.Equal(t, "pre", api.CustomMiddleware.Pre[0].Name)
+		assert.Equal(t, "/path/to/plugin", api.CustomMiddleware.Pre[0].Path)
+		assert.True(t, api.CustomMiddleware.Pre[0].RawBodyOnly)
+		assert.False(t, api.CustomMiddleware.Pre[0].Disabled)
+
+		newPrePlugin := PrePlugin{}
+		newPrePlugin.Fill(api)
+		assert.Equal(t, prePlugin, newPrePlugin)
+	})
+}
+
+func TestCustomPlugins(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var (
+			emptyCustomPlugins CustomPlugins
+			convertedMWDefs    []apidef.MiddlewareDefinition
+		)
+
+		emptyCustomPlugins.ExtractTo(convertedMWDefs)
+
+		var resultCustomPlugins CustomPlugins
+		resultCustomPlugins.Fill(convertedMWDefs)
+
+		assert.Equal(t, emptyCustomPlugins, resultCustomPlugins)
+	})
+
+	t.Run("with values", func(t *testing.T) {
+		t.Parallel()
+		customPlugins := CustomPlugins{
+			{
+				Enabled:      true,
+				FunctionName: "pre",
+				Path:         "/path/to/plugin",
+				RawBodyOnly:  true,
+			},
+		}
+
+		mwDefs := make([]apidef.MiddlewareDefinition, 1)
+		customPlugins.ExtractTo(mwDefs)
+		assert.Equal(t, "pre", mwDefs[0].Name)
+		assert.Equal(t, "/path/to/plugin", mwDefs[0].Path)
+		assert.True(t, mwDefs[0].RawBodyOnly)
+		assert.False(t, mwDefs[0].Disabled)
+
+		newPrePlugin := make(CustomPlugins, 1)
+		newPrePlugin.Fill(mwDefs)
+		assert.Equal(t, customPlugins, newPrePlugin)
+	})
+}
