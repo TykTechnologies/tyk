@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/request"
+	"github.com/getkin/kin-openapi/routers"
 )
 
 const XTykAPIExpires = "x-tyk-api-expires"
@@ -35,6 +37,26 @@ func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta apidef.MockRespon
 	w.Write(responseMessage)
 }
 
+type Operation struct {
+	*oas.Operation
+	route      *routers.Route
+	pathParams map[string]string
+}
+
+func findRouteAndOperation(spec *APISpec, r *http.Request) {
+	route, pathParams, err := spec.OASRouter.FindRoute(r)
+	if err != nil {
+		return
+	}
+
+	operation, ok := spec.OAS.GetTykExtension().Middleware.Operations[route.Operation.OperationID]
+	if !ok {
+		return
+	}
+
+	ctxSetOperation(r, &Operation{Operation: operation, route: route, pathParams: pathParams})
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	targetVersion := v.Spec.getVersionFromRequest(r)
@@ -57,6 +79,11 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 
 		handler.ServeHTTP(w, r)
 		return nil, mwStatusRespond
+	}
+
+	// For OAS route matching
+	if v.Spec.HasMock || v.Spec.HasValidateRequest {
+		findRouteAndOperation(v.Spec, r)
 	}
 
 	// Check versioning, blacklist, whitelist and ignored status
