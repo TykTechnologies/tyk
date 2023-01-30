@@ -45,6 +45,10 @@ type Global struct {
 	// Tyk native API definition: `CORS`.
 	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
 
+	// PrePlugin contains configuration related to custom pre-authentication plugin.
+	// Tyk native API definition: `custom_middleware.pre`.
+	PrePlugin *PrePlugin `bson:"prePlugin,omitempty" json:"prePlugin,omitempty"`
+
 	// AuthenticationPlugin contains configuration related to custom authentication plugin.
 	// Tyk native API definition: `custom_middleware.auth_check`.
 	AuthenticationPlugin *AuthenticationPlugin `bson:"authenticationPlugin,omitempty" json:"authenticationPlugin,omitempty"`
@@ -74,6 +78,15 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 		g.CORS = nil
 	}
 
+	if g.PrePlugin == nil {
+		g.PrePlugin = &PrePlugin{}
+	}
+
+	g.PrePlugin.Fill(api)
+	if ShouldOmit(g.PrePlugin) {
+		g.PrePlugin = nil
+	}
+
 	if g.AuthenticationPlugin == nil {
 		g.AuthenticationPlugin = &AuthenticationPlugin{}
 	}
@@ -101,6 +114,10 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	if g.CORS != nil {
 		g.CORS.ExtractTo(&api.CORS)
+	}
+
+	if g.PrePlugin != nil {
+		g.PrePlugin.ExtractTo(api)
 	}
 
 	if g.AuthenticationPlugin != nil {
@@ -801,4 +818,67 @@ func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
 	api.CustomMiddleware.AuthCheck.Path = ap.Path
 	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
+}
+
+// CustomPlugin configures custom plugin.
+type CustomPlugin struct {
+	// Enabled enables the custom pre plugin.
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	// FunctionName is the name of authentication method.
+	FunctionName string `bson:"functionName" json:"functionName"` // required.
+	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
+	Path string `bson:"path" json:"path"` // required.
+	// RawBodyOnly if set to true, do not fill body in request or response object.
+	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+}
+
+// CustomPlugins is a list of CustomPlugin.
+type CustomPlugins []CustomPlugin
+
+// Fill fills CustomPlugins from supplied Middleware definitions.
+func (c CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
+	for i, mwDef := range mwDefs {
+		c[i] = CustomPlugin{
+			Enabled:      !mwDef.Disabled,
+			Path:         mwDef.Path,
+			FunctionName: mwDef.Name,
+			RawBodyOnly:  mwDef.RawBodyOnly,
+		}
+	}
+}
+
+// ExtractTo extracts CustomPlugins into supplied Middleware definitions.
+func (c CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
+	for i, plugin := range c {
+		mwDefs[i] = apidef.MiddlewareDefinition{
+			Disabled:    !plugin.Enabled,
+			Name:        plugin.FunctionName,
+			Path:        plugin.Path,
+			RawBodyOnly: plugin.RawBodyOnly,
+		}
+	}
+}
+
+// PrePlugin configures pre stage plugins.
+type PrePlugin struct {
+	// Plugins configures custom plugins to be run on pre authentication stage.
+	// The plugins would be executed in the order of configuration in the list.
+	Plugins CustomPlugins `bson:"plugins" json:"plugins"`
+}
+
+// Fill fills PrePlugin from supplied Tyk classic api definition.
+func (p *PrePlugin) Fill(api apidef.APIDefinition) {
+	if len(api.CustomMiddleware.Pre) == 0 {
+		p.Plugins = nil
+		return
+	}
+
+	p.Plugins = make(CustomPlugins, len(api.CustomMiddleware.Pre))
+	p.Plugins.Fill(api.CustomMiddleware.Pre)
+}
+
+// ExtractTo extracts PrePlugin into Tyk classic api definition.
+func (p *PrePlugin) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomMiddleware.Pre = make([]apidef.MiddlewareDefinition, len(p.Plugins))
+	p.Plugins.ExtractTo(api.CustomMiddleware.Pre)
 }
