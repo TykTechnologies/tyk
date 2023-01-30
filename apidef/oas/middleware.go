@@ -844,7 +844,7 @@ type CustomPlugin struct {
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
 	// RequireSession if set to true passes down the session information for plugins post authentication.
 	// RequireSession is used only with JSVM custom middleware.
-	RequireSession bool `bson:"requireSession" json:"requireSession"`
+	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
 
 // CustomPlugins is a list of CustomPlugin.
