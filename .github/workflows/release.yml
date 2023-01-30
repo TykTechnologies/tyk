@@ -35,19 +35,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        golang_cross: [ 1.16, 1.16-el7, 1.19-bullseye ]
+        golang_cross: [ 1.19-bullseye ]
         include:
-          - golang_cross: 1.16-el7
-            goreleaser: 'ci/goreleaser/goreleaser-el7.yml'
-            rpmvers: 'el/7'
-            debvers: 'ubuntu/xenial ubuntu/bionic debian/jessie'
-          - golang_cross: 1.16
-            goreleaser: 'ci/goreleaser/goreleaser-buster.yml'
-            rpmvers: 'el/8'
-            debvers: 'ubuntu/focal debian/buster debian/bullseye'
           - golang_cross: 1.19-bullseye
             goreleaser: 'ci/goreleaser/goreleaser.yml'
-            rpmvers: 'el/8'
+            rpmvers: 'el/9'
             debvers: 'ubuntu/focal debian/buster debian/bullseye'
     outputs:
       tag: ${{ steps.targets.outputs.tag }}
