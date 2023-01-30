@@ -232,6 +232,40 @@
         }
       }
     },
+    "X-Tyk-CustomPluginConfig": {
+      "type": "object",
+      "properties": {
+        "plugins": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-CustomPluginDefinition"
+            }
+          ]
+        }
+      }
+    },
+    "X-Tyk-CustomPluginDefinition": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "rawBodyOnly": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "functionName",
+        "path"
+      ]
+    },
     "X-Tyk-AuthenticationPlugin": {
       "type": "object",
       "properties": {
@@ -370,6 +404,9 @@
         },
         "cors": {
           "$ref": "#/definitions/X-Tyk-CORS"
+        },
+        "prePlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
         },
         "authenticationPlugin": {
           "$ref": "#/definitions/X-Tyk-AuthenticationPlugin"
