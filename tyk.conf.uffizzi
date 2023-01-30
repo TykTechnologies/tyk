@@ -1,0 +1,54 @@
+{
+  "listen_address": "",
+  "listen_port": 8080,
+  "secret": "352d20ee67be67f6340b4c0605b044b7",
+  "node_secret": "352d20ee67be67f6340b4c0605b044b7",
+  "template_path": "/opt/tyk-gateway/templates",
+  "use_db_app_configs": false,
+  "app_path": "/opt/tyk-gateway/apps",
+  "middleware_path": "/opt/tyk-gateway/middleware",
+  "storage": {
+    "type": "redis",
+    "host": "localhost",
+    "port": 6379,
+    "username": "",
+    "password": "",
+    "database": 0,
+    "timeout":15,
+    "optimisation_max_idle": 2000,
+    "optimisation_max_active": 4000
+  },
+  "http_server_options": {
+    "enable_http2": true,
+    "enable_websockets": true
+  },
+  "use_db_app_configs": true,
+  "db_app_conf_options": {
+        "connection_string": "http://localhost:3000",
+        "node_is_segmented": false,
+        "tags": null
+  },
+  "disable_dashboard_zeroconf": false,
+  "app_path": "/opt/tyk-gateway/apps",
+  "middleware_path": "/opt/tyk-gateway/middleware",
+  "enable_analytics": false,
+  "analytics_config": {
+    "type": "",
+    "ignored_ips": []
+  },
+  "dns_cache": {
+    "enabled": false,
+    "ttl": 3600,
+    "check_interval": 60
+  },
+  "allow_master_keys": false,
+  "allow_insecure_configs": true,
+  "policies": {
+    "policy_source": "file"
+  },
+  "hash_keys": true,
+  "hash_key_function": "murmur64",
+  "suppress_redis_signal_reload": false,
+  "force_global_session_lifetime": false,
+  "max_idle_connections_per_host": 500
+}

@@ -1,0 +1,87 @@
+version: '3.9'
+
+x-uffizzi:
+  ingress:
+    service: tyk-dashboard
+    port: 3000
+
+services:
+  
+  tyk-dashboard:
+    image: tykio/tyk-dashboard:v4.3
+    environment:
+      - TYK_DB_STORAGE_MAIN_TYPE=postgres
+      - TYK_DB_STORAGE_MAIN_CONNECTIONSTRING=user=postgres password=password database='tyk_analytics' host=localhost port=5432
+      - TYK_DB_LISTENPORT=3000
+      - TYK_DB_ADMINSECRET=12345
+      - TYK_DB_TYKAPI_HOST=http://localhost
+      - TYK_DB_TYKAPI_PORT=8080
+      - TYK_DB_TYKAPI_SECRET=352d20ee67be67f6340b4c0605b044b7
+      - TYK_DB_NODESECRET=352d20ee67be67f6340b4c0605b044b7
+      - TYK_DB_REDISHOST=127.0.0.1
+      - TYK_DB_REDISPORT=6379
+      - TYK_DB_REDISPASSWORD=
+      - TYK_DB_ENABLECLUSTER=false
+      - TYK_DB_REDISDATABASE=0
+      - TYK_DB_ENABLEHASHEDKEYSLISTING=true
+      - TYK_DB_ENABLEUPDATEKEYBYHASH=true
+      - TYK_DB_ENABLEAGGREGATELOOKUPS=true
+      - TYK_DB_MONGOURL=mongodb://admin:password@localhost:27017/tyk_analytics?authSource=admin
+      - TYK_DB_MONGOUSESSL=false
+    ports:
+      - "3000:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 2000M  
+
+  tyk-gateway:
+    image: "${TYK_IMAGE}"
+    ports:
+      - "8080:8080"
+    environment:
+      - TYK_GW_LISTENPORT=8080
+      - TYK_GW_SECRET=352d20ee67be67f6340b4c0605b044b7
+      - TYK_GW_NODESECRET=352d20ee67be67f6340b4c0605b044b7  
+      - TYK_GW_ENABLEHASHEDKEYSLISTING=true
+      - TYK_GW_USEREDISLOG=true
+    deploy:
+      resources:
+        limits:
+          memory: 2000M  
+
+  tyk-redis:
+    image: redis
+    ports:
+      - "6379:6379"
+    deploy:
+      resources:
+        limits:
+          memory: 500M    
+
+  tyk-postgres:
+    image: postgres:latest
+    container_name: tyk-postgres
+    environment:
+      - POSTGRES_DB=tyk_analytics
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - PGDATA=/tmp
+    ports:
+      - "5432:5432" 
+    deploy:
+      resources:
+        limits:
+          memory: 500M   
+  
+  tyk-mongo:
+    image: mongo:4.0.25
+    ports:
+      - "27019:27019"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password   
+    deploy:
+      resources:
+        limits:
+          memory: 1000M
