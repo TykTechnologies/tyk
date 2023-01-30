@@ -57,6 +57,10 @@ type Global struct {
 	// Tyk native API definition: `custom_middleware.post_key_auth`.
 	PostAuthenticationPlugin *PostAuthenticationPlugin `bson:"postAuthenticationPlugin,omitempty" json:"postAuthenticationPlugin,omitempty"`
 
+	// PostPlugin contains configuration related to custom post plugin.
+	// Tyk native API definition: `custom_middleware.post`.
+	PostPlugin *PostPlugin `bson:"postPlugin,omitempty" json:"postPlugin,omitempty"`
+
 	// Cache contains the configurations related to caching.
 	// Tyk native API definition: `cache_options`.
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
@@ -910,4 +914,26 @@ func (p *PostAuthenticationPlugin) Fill(api apidef.APIDefinition) {
 func (p *PostAuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.PostKeyAuth = make([]apidef.MiddlewareDefinition, len(p.Plugins))
 	p.Plugins.ExtractTo(api.CustomMiddleware.PostKeyAuth)
+}
+
+// PostPlugin configures post plugins.
+type PostPlugin struct {
+	// Plugins configures custom plugins to be run on post stage.
+	// The plugins would be executed in the order of configuration in the list.
+	Plugins CustomPlugins `bson:"plugins" json:"plugins"`
+}
+
+// Fill fills PostPlugin from supplied Tyk classic api definition.
+func (p *PostPlugin) Fill(api apidef.APIDefinition) {
+	p.Plugins = make(CustomPlugins, len(api.CustomMiddleware.Post))
+	p.Plugins.Fill(api.CustomMiddleware.Post)
+	if ShouldOmit(p.Plugins) {
+		p.Plugins = nil
+	}
+}
+
+// ExtractTo extracts PostPlugin into Tyk classic api definition.
+func (p *PostPlugin) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomMiddleware.Post = make([]apidef.MiddlewareDefinition, len(p.Plugins))
+	p.Plugins.ExtractTo(api.CustomMiddleware.Post)
 }
