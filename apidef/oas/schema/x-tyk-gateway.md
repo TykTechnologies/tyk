@@ -683,7 +683,7 @@ Path is the path to shared object file in case of gopluign mode or path to js co
 RawBodyOnly if set to true, do not fill body in request or response object.
 
 **Field: `requireSession` (`boolean`)**
-RequireSession if set to true passes down the session information for plugins post authentication.
+RequireSession if set to true passes down the session information for plugins after authentication.
 RequireSession is used only with JSVM custom middleware.
 
 
