@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/getkin/kin-openapi/routers"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/request"
-	"github.com/getkin/kin-openapi/routers"
 )
 
 const XTykAPIExpires = "x-tyk-api-expires"
