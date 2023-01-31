@@ -186,7 +186,7 @@ func TestGraphqlPersist_Variables(t *testing.T) {
 			if err := json.Unmarshal([]byte(testResp.Body), &q); err != nil {
 				return false
 			}
-			return q.Query == testGQLQueryCountry && string(q.Variables) == `{"code":"NG"}` && testResp.URI == "/"
+			return q.Query == testGQLQueryCountry && string(q.Variables) == `{"code":"NG"}` && testResp.Url == "/"
 		}},
 		test.TestCase{Path: "/continent", Method: "GET",
 			Headers: map[string]string{
@@ -202,7 +202,7 @@ func TestGraphqlPersist_Variables(t *testing.T) {
 				if err := json.Unmarshal([]byte(testResp.Body), &q); err != nil {
 					return false
 				}
-				return q.Query == testQueryContinentCode && string(q.Variables) == `{"code":"AF"}` && testResp.URI == "/"
+				return q.Query == testQueryContinentCode && string(q.Variables) == `{"code":"AF"}` && testResp.Url == "/"
 			},
 		},
 		test.TestCase{Path: "/continent", Method: "GET", BodyMatchFunc: func(bytes []byte) bool {
@@ -215,7 +215,7 @@ func TestGraphqlPersist_Variables(t *testing.T) {
 			if err := json.Unmarshal([]byte(testResp.Body), &q); err != nil {
 				return false
 			}
-			return q.Query == testQueryContinentCode && string(q.Variables) == `{"code":""}` && testResp.URI == "/"
+			return q.Query == testQueryContinentCode && string(q.Variables) == `{"code":""}` && testResp.Url == "/"
 		}},
 		test.TestCase{Path: "/continent/AF", Method: "GET", BodyMatchFunc: func(bytes []byte) bool {
 			var testResp TestHttpResponse
@@ -227,7 +227,7 @@ func TestGraphqlPersist_Variables(t *testing.T) {
 			if err := json.Unmarshal([]byte(testResp.Body), &q); err != nil {
 				return false
 			}
-			return q.Query == testQueryContinentCode && string(q.Variables) == `{"code":"AF"}` && testResp.URI == "/"
+			return q.Query == testQueryContinentCode && string(q.Variables) == `{"code":"AF"}` && testResp.Url == "/"
 		}},
 	)
 	assert.NoError(t, err)

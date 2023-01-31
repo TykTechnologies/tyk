@@ -90,7 +90,7 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 	nopCloseRequestBody(r)
 
 	r.Header.Set("Content-Type", "application/json")
-	r.RequestURI = "/"
+	r.URL.Path = "/"
 
 	return nil, http.StatusOK
 }
