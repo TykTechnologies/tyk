@@ -63,4 +63,4 @@ else
     CC=$(go env CC)
 fi
 
-CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH CC=$CC  go build -buildmode=plugin -o $plugin_name
+CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH CC=$CC  go build -trimpath -buildmode=plugin -o $plugin_name
