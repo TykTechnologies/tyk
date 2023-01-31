@@ -36,6 +36,7 @@ fi
 echo "Building plugin: $plugin_name"
 
 cd $TYK_GW_PATH
+go mod tidy
 go mod download
 go list -m -f '{{ if not .Main }}{{ .Path }} {{ .Version }}{{ end }}' all > dependencies.txt
 
@@ -55,7 +56,7 @@ go mod edit -replace github.com/TykTechnologies/tyk=$TYK_GW_PATH
 # Run a final go mod tidy to make sure that the go.sum entries are correct for
 # all replaced dependencies.
 go mod tidy
-go mod vendor
+#go mod vendor
 
 # set appropriate X-build gcc binary for arm64.
 if [[ $GOARCH == "arm64" ]] && [[ $GOOS == "linux" ]] ; then
@@ -64,4 +65,4 @@ else
     CC=$(go env CC)
 fi
 
-CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH CC=$CC  go build -buildmode=plugin -gcflags="all=-N -l" -o $plugin_name
+CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH CC=$CC  go build -trimpath -buildmode=plugin -gcflags="all=-N -l" -o $plugin_name
