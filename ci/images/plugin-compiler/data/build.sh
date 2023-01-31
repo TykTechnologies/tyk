@@ -20,7 +20,7 @@ if [ -z "$plugin_name" ]; then
     exit 1
 fi
 
-# if GOOS and GOENV is not set from docker env, derive it from the host
+# if GOOS and GOARCH is not set from docker env, derive it from the host
 # golang-X image.
 if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
   GOOS=$(go env GOOS)
@@ -56,11 +56,11 @@ go mod edit -replace github.com/TykTechnologies/tyk=$TYK_GW_PATH
 # all replaced dependencies.
 go mod tidy
 
+CC=$(go env CC)
 # set appropriate X-build gcc binary for arm64.
 if [[ $GOARCH == "arm64" ]] && [[ $GOOS == "linux" ]] ; then
     CC=aarch64-linux-gnu-gcc
-else
-    CC=$(go env CC)
 fi
 
 CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH CC=$CC  go build -buildmode=plugin -o $plugin_name
+
