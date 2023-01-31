@@ -249,9 +249,9 @@ jobs:
           - amd64
           - arm64
         distro:
-          - ubuntu:xenial
           - ubuntu:bionic
           - ubuntu:focal
+          - ubuntu:jammy
           - debian:bullseye
 
     steps:
