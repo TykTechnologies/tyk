@@ -132,7 +132,6 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTransformRequestBodyTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
-					tykOp.extractOASValidateRequestTo(ep, path, method)
 					break found
 				}
 			}
@@ -297,16 +296,6 @@ func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path st
 	ep.HardTimeouts = append(ep.HardTimeouts, meta)
 }
 
-func (o *Operation) extractOASValidateRequestTo(ep *apidef.ExtendedPathsSet, path string, method string) {
-	if o.ValidateRequest == nil {
-		return
-	}
-
-	meta := apidef.ValidateRequestMeta{Path: path, Method: method}
-	o.ValidateRequest.ExtractTo(&meta)
-	ep.ValidateRequest = append(ep.ValidateRequest, meta)
-}
-
 // detect possible regex pattern:
 // - character match ([a-z])
 // - greedy match (*)
@@ -467,12 +456,6 @@ type ValidateRequest struct {
 func (v *ValidateRequest) Fill(meta apidef.ValidateRequestMeta) {
 	v.Enabled = meta.Enabled
 	v.ErrorResponseCode = meta.ErrorResponseCode
-}
-
-// ExtractTo extracts *ValidateRequest into *apidef.ValidateRequestMeta.
-func (v *ValidateRequest) ExtractTo(meta *apidef.ValidateRequestMeta) {
-	meta.Enabled = v.Enabled
-	meta.ErrorResponseCode = v.ErrorResponseCode
 }
 
 func (*ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operation) bool {
