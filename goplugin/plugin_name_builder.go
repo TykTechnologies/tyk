@@ -7,12 +7,9 @@ import (
 	"strings"
 )
 
-// pluginStorage defaults to FileSystemStorage
-var pluginStorage storage
-
 // GetPluginFileNameToLoad check which file to load based on name, tyk version, os and architecture
 // but it also takes care of returning the name of the file that exists
-func GetPluginFileNameToLoad(path string, version string) (string, error) {
+func GetPluginFileNameToLoad(pluginStorage storage, path string, version string) (string, error) {
 
 	prefixedGwVersion := getPrefixedVersion(version)
 	newNamingFormat := getPluginNameFromTykVersion(prefixedGwVersion, path)

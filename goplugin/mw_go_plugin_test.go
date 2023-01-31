@@ -21,7 +21,6 @@ import (
 
 // run go build -buildmode=plugin -o goplugins.so in ./test/goplugins directory prior to running tests
 func TestGoPluginMWs(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5263
 
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
@@ -61,12 +60,129 @@ func TestGoPluginMWs(t *testing.T) {
 			"my-context-data": "my-plugin-config",
 		}
 		spec.ConfigData = configData
-	})
+	}, func(spec *gateway.APISpec) {
+		spec.APIID = "plugin_api_with_use_custom_plugin_auth"
+		spec.Proxy.ListenPath = "/goplugin-custom-plugin-auth"
+		spec.UseKeylessAccess = false
+		spec.UseStandardAuth = false
+		spec.CustomPluginAuthEnabled = true
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+			Pre: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPluginPre",
+					Path: "../test/goplugins/goplugins.so",
+				},
+			},
+			AuthCheck: apidef.MiddlewareDefinition{
+				Name: "MyPluginAuthCheck",
+				Path: "../test/goplugins/goplugins.so",
+			},
+			PostKeyAuth: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPluginPostKeyAuth",
+					Path: "../test/goplugins/goplugins.so",
+				},
+			},
+			Post: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPluginPost",
+					Path: "../test/goplugins/goplugins.so",
+				},
+			},
+		}
+		configData := map[string]interface{}{
+			"my-context-data": "my-plugin-config",
+		}
+		spec.ConfigData = configData
+	}, func(spec *gateway.APISpec) {
+		spec.APIID = "disabled_plugins"
+		spec.Proxy.ListenPath = "/disabled-goplugins"
+		spec.UseKeylessAccess = true
+		spec.UseStandardAuth = false
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+			Pre: []apidef.MiddlewareDefinition{
+				{
+					Disabled: true,
+					Name:     "MyPluginPre",
+					Path:     "../test/goplugins/goplugins.so",
+				},
+			},
+			PostKeyAuth: []apidef.MiddlewareDefinition{
+				{
+					Disabled: true,
+					Name:     "MyPluginPostKeyAuth",
+					Path:     "../test/goplugins/goplugins.so",
+				},
+			},
+			Post: []apidef.MiddlewareDefinition{
+				{
+					Disabled: true,
+					Name:     "MyPluginPost",
+					Path:     "../test/goplugins/goplugins.so",
+				},
+			},
+		}
+		configData := map[string]interface{}{
+			"my-context-data": "my-plugin-config",
+		}
+		spec.ConfigData = configData
+	},
+		func(spec *gateway.APISpec) {
+			spec.APIID = "disabled_auth_plugin"
+			spec.Proxy.ListenPath = "/disabled-auth-goplugins"
+			spec.UseKeylessAccess = false
+			spec.UseStandardAuth = false
+			spec.CustomPluginAuthEnabled = true
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Pre: []apidef.MiddlewareDefinition{
+					{
+						Disabled: true,
+						Name:     "MyPluginPre",
+						Path:     "../test/goplugins/goplugins.so",
+					},
+				},
+				AuthCheck: apidef.MiddlewareDefinition{
+					Disabled: true,
+					Name:     "MyPluginAuthCheck",
+					Path:     "../test/goplugins/goplugins.so",
+				},
+				PostKeyAuth: []apidef.MiddlewareDefinition{
+					{
+						Disabled: true,
+						Name:     "MyPluginPostKeyAuth",
+						Path:     "../test/goplugins/goplugins.so",
+					},
+				},
+				Post: []apidef.MiddlewareDefinition{
+					{
+						Disabled: true,
+						Name:     "MyPluginPost",
+						Path:     "../test/goplugins/goplugins.so",
+					},
+				},
+			}
+			configData := map[string]interface{}{
+				"my-context-data": "my-plugin-config",
+			}
+			spec.ConfigData = configData
+		})
 
 	t.Run("Run Go-plugin auth failed", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{
 				Path:    "/goplugin/plugin_hit",
+				Headers: map[string]string{"Authorization": "invalid_token"},
+				HeadersMatch: map[string]string{
+					"X-Auth-Result": "failed",
+				},
+				Code:      http.StatusForbidden,
+				BodyMatch: "auth failed",
+			},
+			{
+				Path:    "/goplugin-custom-plugin-auth/plugin_hit",
 				Headers: map[string]string{"Authorization": "invalid_token"},
 				HeadersMatch: map[string]string{
 					"X-Auth-Result": "failed",
@@ -96,13 +212,61 @@ func TestGoPluginMWs(t *testing.T) {
 				Path:      "/tyk/keys/abc",
 				AdminAuth: true,
 				Code:      http.StatusOK,
-				BodyMatch: `"action":"deleted"`},
+				BodyMatch: `"action":"deleted"`,
+			},
+			{
+				Path:    "/goplugin-custom-plugin-auth/plugin_hit",
+				Headers: map[string]string{"Authorization": "abc"},
+				Code:    http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-Initial-URI":   "/goplugin-custom-plugin-auth/plugin_hit",
+					"X-Auth-Result":   "OK",
+					"X-Session-Alias": "abc-session",
+					"X-Plugin-Data":   "my-plugin-config",
+				},
+				BodyMatch: `"message":"post message"`,
+			},
+			{
+				Method:    "DELETE",
+				Path:      "/tyk/keys/abc",
+				AdminAuth: true,
+				Code:      http.StatusOK,
+				BodyMatch: `"action":"deleted"`,
+			},
+		}...)
+	})
+
+	t.Run("do not run all middlewares", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Path:    "/disabled-goplugins/plugin_hit",
+				Headers: map[string]string{"Authorization": "abc"},
+				Code:    http.StatusOK,
+				HeadersNotMatch: map[string]string{
+					"X-Initial-URI":   "/goplugin/plugin_hit",
+					"X-Auth-Result":   "OK",
+					"X-Session-Alias": "abc-session",
+					"X-Plugin-Data":   "my-plugin-config",
+				},
+				BodyNotMatch: `"message":"post message"`,
+				BodyMatch:    `"Authorization":"abc"`,
+			},
+		}...)
+	})
+
+	t.Run("auth check middleware disabled - should error", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Path:      "/disabled-auth-goplugins/plugin_hit",
+				Headers:   map[string]string{"Authorization": "abc"},
+				Code:      http.StatusForbidden,
+				BodyMatch: `Access to this API has been disallowed`,
+			},
 		}...)
 	})
 }
 
 func TestGoPluginResponseHook(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5263
 
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
@@ -145,7 +309,6 @@ func TestGoPluginResponseHook(t *testing.T) {
 }
 
 func TestGoPluginPerPathSingleFile(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5263
 
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
@@ -222,7 +385,6 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 }
 
 func TestGoPluginAPIandPerPath(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5263
 
 	ts := gateway.StartTest(nil)
 	defer ts.Close()

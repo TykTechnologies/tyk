@@ -3,24 +3,24 @@
 // The code below describes the Tyk Gateway API
 // Version: 2.8.0
 //
-//     Schemes: https, http
-//     Host: localhost
-//     BasePath: /tyk/
+//	Schemes: https, http
+//	Host: localhost
+//	BasePath: /tyk/
 //
-//     Consumes:
-//     - application/json
+//	Consumes:
+//	- application/json
 //
-//     Produces:
-//     - application/json
+//	Produces:
+//	- application/json
 //
-//     Security:
-//     - api_key:
+//	Security:
+//	- api_key:
 //
-//     SecurityDefinitions:
-//     api_key:
-//          type: apiKey
-//          name: X-Tyk-Authorization
-//          in: header
+//	SecurityDefinitions:
+//	api_key:
+//	     type: apiKey
+//	     name: X-Tyk-Authorization
+//	     in: header
 //
 // swagger:meta
 package gateway
@@ -399,7 +399,6 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 // remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
 // need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
 
-//
 func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
 	basicAuthHashAlgo := gw.basicAuthHashAlgo()
 
@@ -1794,6 +1793,7 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 		gw.DefaultQuotaStore.RemoveSession(orgID, rawKey, false)
 	}
 
+	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	err := sessionManager.UpdateSession(orgID, newSession, 0, false)
 	if err != nil {
 		return apiError("Error writing to key store " + err.Error()), http.StatusInternalServerError

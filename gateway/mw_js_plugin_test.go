@@ -630,6 +630,20 @@ post.NewProcessRequest(function(request, session) {
 			{Path: "/test", Code: 200, BodyMatch: `"Pre":"foobar"`},
 			{Path: "/test", Code: 200, BodyMatch: `"Post":"foobar"`},
 		}...)
+
+		t.Run("bundles disabled", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/test"
+				spec.CustomMiddlewareBundle = bundle
+				spec.CustomMiddlewareBundleDisabled = true
+				spec.CustomMiddleware.Driver = apidef.OttoDriver
+			})
+
+			ts.Run(t, []test.TestCase{
+				{Path: "/test", Code: http.StatusOK, BodyNotMatch: `"Pre":"foobar"`},
+				{Path: "/test", Code: http.StatusOK, BodyNotMatch: `"Post":"foobar"`},
+			}...)
+		})
 	})
 
 	t.Run("Files", func(t *testing.T) {
@@ -783,18 +797,40 @@ func TestJSVM_Auth(t *testing.T) {
 		spec.CustomMiddlewareBundle = bundle
 		spec.EnableCoProcessAuth = true
 		spec.UseKeylessAccess = false
+	}, func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/sample-with-customplugin-auth-enabled"
+		spec.ConfigData = map[string]interface{}{
+			"base_url": ts.URL,
+		}
+		spec.CustomMiddlewareBundle = bundle
+		spec.CustomPluginAuthEnabled = true
+		spec.UseKeylessAccess = false
 	})
-	ts.Run(t,
-		test.TestCase{Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
 			return strings.Contains(string(b), "Header missing (JS middleware)")
-		}},
-		test.TestCase{Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
+		},
+		},
+		{Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
 			return strings.Contains(string(b), "Not authorized (JS middleware)")
 		},
 			Headers: map[string]string{"Authorization": "foo"},
 		},
-		test.TestCase{Path: "/sample", Code: http.StatusOK, Headers: map[string]string{
+		{Path: "/sample", Code: http.StatusOK, Headers: map[string]string{
 			"Authorization": "foobar",
 		}},
-	)
+
+		{Path: "/sample-with-customplugin-auth-enabled", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
+			return strings.Contains(string(b), "Header missing (JS middleware)")
+		},
+		},
+		{Path: "/sample-with-customplugin-auth-enabled", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
+			return strings.Contains(string(b), "Not authorized (JS middleware)")
+		},
+			Headers: map[string]string{"Authorization": "foo"},
+		},
+		{Path: "/sample-with-customplugin-auth-enabled", Code: http.StatusOK, Headers: map[string]string{
+			"Authorization": "foobar",
+		}},
+	}...)
 }

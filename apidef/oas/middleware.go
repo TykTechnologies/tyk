@@ -38,9 +38,20 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 
 // Global holds configuration applies globally: CORS and caching.
 type Global struct {
+	// PluginConfig contains the configuration related custom plugin bundles/driver.
+	PluginConfig *PluginConfig `bson:"pluginConfig,omitempty" json:"pluginConfig,omitempty"`
+
 	// CORS contains the configuration related to cross origin resource sharing.
 	// Tyk native API definition: `CORS`.
 	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
+
+	// PrePlugin contains configuration related to custom pre-authentication plugin.
+	// Tyk native API definition: `custom_middleware.pre`.
+	PrePlugin *PrePlugin `bson:"prePlugin,omitempty" json:"prePlugin,omitempty"`
+
+	// AuthenticationPlugin contains configuration related to custom authentication plugin.
+	// Tyk native API definition: `custom_middleware.auth_check`.
+	AuthenticationPlugin *AuthenticationPlugin `bson:"authenticationPlugin,omitempty" json:"authenticationPlugin,omitempty"`
 
 	// Cache contains the configurations related to caching.
 	// Tyk native API definition: `cache_options`.
@@ -49,6 +60,15 @@ type Global struct {
 
 // Fill fills *Global from apidef.APIDefinition.
 func (g *Global) Fill(api apidef.APIDefinition) {
+	if g.PluginConfig == nil {
+		g.PluginConfig = &PluginConfig{}
+	}
+
+	g.PluginConfig.Fill(api)
+	if ShouldOmit(g.PluginConfig) {
+		g.PluginConfig = nil
+	}
+
 	if g.CORS == nil {
 		g.CORS = &CORS{}
 	}
@@ -56,6 +76,24 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.CORS.Fill(api.CORS)
 	if ShouldOmit(g.CORS) {
 		g.CORS = nil
+	}
+
+	if g.PrePlugin == nil {
+		g.PrePlugin = &PrePlugin{}
+	}
+
+	g.PrePlugin.Fill(api)
+	if ShouldOmit(g.PrePlugin) {
+		g.PrePlugin = nil
+	}
+
+	if g.AuthenticationPlugin == nil {
+		g.AuthenticationPlugin = &AuthenticationPlugin{}
+	}
+
+	g.AuthenticationPlugin.Fill(api)
+	if ShouldOmit(g.AuthenticationPlugin) {
+		g.AuthenticationPlugin = nil
 	}
 
 	if g.Cache == nil {
@@ -70,13 +108,89 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *Global into *apidef.APIDefinition.
 func (g *Global) ExtractTo(api *apidef.APIDefinition) {
+	if g.PluginConfig != nil {
+		g.PluginConfig.ExtractTo(api)
+	}
+
 	if g.CORS != nil {
 		g.CORS.ExtractTo(&api.CORS)
+	}
+
+	if g.PrePlugin != nil {
+		g.PrePlugin.ExtractTo(api)
+	}
+
+	if g.AuthenticationPlugin != nil {
+		g.AuthenticationPlugin.ExtractTo(api)
 	}
 
 	if g.Cache != nil {
 		g.Cache.ExtractTo(&api.CacheOptions)
 	}
+}
+
+// PluginConfig holds configuration for custom plugins.
+type PluginConfig struct {
+	// Driver configures which custom plugin to be used.
+	// It's value should be set to one of the following:
+	//
+	// - `otto`,
+	// - `python`,
+	// - `lua`,
+	// - `grpc`,
+	// - `goplugin`.
+	//
+	// Tyk native API definition: `custom_middleware.driver`.
+	Driver apidef.MiddlewareDriver `bson:"driver,omitempty" json:"driver,omitempty"`
+
+	// Bundle configures custom plugin bundles.
+	Bundle *PluginBundle `bson:"bundle,omitempty" json:"bundle,omitempty"`
+}
+
+// Fill fills PluginConfig from apidef.
+func (p *PluginConfig) Fill(api apidef.APIDefinition) {
+	p.Driver = api.CustomMiddleware.Driver
+
+	if p.Bundle == nil {
+		p.Bundle = &PluginBundle{}
+	}
+
+	p.Bundle.Fill(api)
+	if ShouldOmit(p.Bundle) {
+		p.Bundle = nil
+	}
+}
+
+// ExtractTo extracts *PluginConfig into *apidef.
+func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomMiddleware.Driver = p.Driver
+
+	if p.Bundle != nil {
+		p.Bundle.ExtractTo(api)
+	}
+}
+
+// PluginBundle holds configuration for custom plugins.
+type PluginBundle struct {
+	// Enabled enables the custom plugin bundles.
+	//
+	// Tyk classic API definition: `custom_middleware_bundle_disabled`
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	// Path is the path suffix to construct the URL to fetch plugin bundle from.
+	// Path will be suffixed to `bundle_base_url` in gateway config.
+	Path string `bson:"path" json:"path"` // required.
+}
+
+// Fill fills PluginBundle from apidef.
+func (p *PluginBundle) Fill(api apidef.APIDefinition) {
+	p.Enabled = !api.CustomMiddlewareBundleDisabled
+	p.Path = api.CustomMiddlewareBundle
+}
+
+// ExtractTo extracts *PluginBundle into *apidef.
+func (p *PluginBundle) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomMiddlewareBundleDisabled = !p.Enabled
+	api.CustomMiddlewareBundle = p.Path
 }
 
 // CORS holds configuration for cross-origin resource sharing.
@@ -678,4 +792,93 @@ func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	meta.Disabled = !et.Enabled
 	meta.TimeOut = et.Value
+}
+
+// AuthenticationPlugin holds the configuration for custom authentication plugin.
+type AuthenticationPlugin struct {
+	// Enabled enables custom authentication plugin.
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	// FunctionName is the name of authentication method.
+	FunctionName string `bson:"functionName" json:"functionName"` // required.
+	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
+	Path string `bson:"path" json:"path"` // required.
+	// RawBodyOnly if set to true, do not fill body in request or response object.
+	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+}
+
+func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
+	ap.FunctionName = api.CustomMiddleware.AuthCheck.Name
+	ap.Path = api.CustomMiddleware.AuthCheck.Path
+	ap.RawBodyOnly = api.CustomMiddleware.AuthCheck.RawBodyOnly
+	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
+}
+
+func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomMiddleware.AuthCheck.Disabled = !ap.Enabled
+	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
+	api.CustomMiddleware.AuthCheck.Path = ap.Path
+	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
+}
+
+// CustomPlugin configures custom plugin.
+type CustomPlugin struct {
+	// Enabled enables the custom pre plugin.
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	// FunctionName is the name of authentication method.
+	FunctionName string `bson:"functionName" json:"functionName"` // required.
+	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
+	Path string `bson:"path" json:"path"` // required.
+	// RawBodyOnly if set to true, do not fill body in request or response object.
+	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+}
+
+// CustomPlugins is a list of CustomPlugin.
+type CustomPlugins []CustomPlugin
+
+// Fill fills CustomPlugins from supplied Middleware definitions.
+func (c CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
+	for i, mwDef := range mwDefs {
+		c[i] = CustomPlugin{
+			Enabled:      !mwDef.Disabled,
+			Path:         mwDef.Path,
+			FunctionName: mwDef.Name,
+			RawBodyOnly:  mwDef.RawBodyOnly,
+		}
+	}
+}
+
+// ExtractTo extracts CustomPlugins into supplied Middleware definitions.
+func (c CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
+	for i, plugin := range c {
+		mwDefs[i] = apidef.MiddlewareDefinition{
+			Disabled:    !plugin.Enabled,
+			Name:        plugin.FunctionName,
+			Path:        plugin.Path,
+			RawBodyOnly: plugin.RawBodyOnly,
+		}
+	}
+}
+
+// PrePlugin configures pre stage plugins.
+type PrePlugin struct {
+	// Plugins configures custom plugins to be run on pre authentication stage.
+	// The plugins would be executed in the order of configuration in the list.
+	Plugins CustomPlugins `bson:"plugins" json:"plugins"`
+}
+
+// Fill fills PrePlugin from supplied Tyk classic api definition.
+func (p *PrePlugin) Fill(api apidef.APIDefinition) {
+	if len(api.CustomMiddleware.Pre) == 0 {
+		p.Plugins = nil
+		return
+	}
+
+	p.Plugins = make(CustomPlugins, len(api.CustomMiddleware.Pre))
+	p.Plugins.Fill(api.CustomMiddleware.Pre)
+}
+
+// ExtractTo extracts PrePlugin into Tyk classic api definition.
+func (p *PrePlugin) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomMiddleware.Pre = make([]apidef.MiddlewareDefinition, len(p.Plugins))
+	p.Plugins.ExtractTo(api.CustomMiddleware.Pre)
 }

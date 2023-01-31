@@ -36,11 +36,12 @@ var testV2ExtendedPaths = ExtendedPathsSet{
 
 func oldTestAPI() APIDefinition {
 	return APIDefinition{
-		Id:     dbID,
-		APIID:  apiID,
-		Name:   baseAPIName,
-		Active: true,
-		Proxy:  ProxyConfig{TargetURL: baseTarget, ListenPath: listenPath},
+		Id:        dbID,
+		APIID:     apiID,
+		Name:      baseAPIName,
+		Active:    true,
+		UseOauth2: true,
+		Proxy:     ProxyConfig{TargetURL: baseTarget, ListenPath: listenPath},
 		VersionDefinition: VersionDefinition{
 			Location:  URLLocation,
 			Key:       key,
@@ -63,28 +64,35 @@ func oldTestAPI() APIDefinition {
 			},
 		},
 		AuthConfigs: map[string]AuthConfig{
-			"authToken": {
+			AuthTokenType: {
 				AuthHeaderName: "Authorization",
 				UseParam:       true,
 				ParamName:      "Authorization",
 				UseCookie:      true,
 				CookieName:     "Authorization",
 			},
-			"jwt": {
+			OAuthType: {
 				AuthHeaderName: "Authorization",
 				UseParam:       true,
 				ParamName:      "Authorization",
 				UseCookie:      true,
 				CookieName:     "Authorization",
 			},
-			"oidc": {
+			JWTType: {
 				AuthHeaderName: "Authorization",
 				UseParam:       true,
 				ParamName:      "Authorization",
 				UseCookie:      true,
 				CookieName:     "Authorization",
 			},
-			"hmac": {
+			OIDCType: {
+				AuthHeaderName: "Authorization",
+				UseParam:       true,
+				ParamName:      "Authorization",
+				UseCookie:      true,
+				CookieName:     "Authorization",
+			},
+			HMACType: {
 				AuthHeaderName: "Authorization",
 				UseParam:       true,
 				ParamName:      "Authorization",
@@ -129,10 +137,11 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 	expectedVersion.Id = ""
 	expectedVersion.APIID = versions[0].APIID
 	expectedVersion.Name += "-" + v2
+	expectedVersion.VersionName = v2
 	expectedVersion.Internal = true
 	expectedVersion.Expiration = exp2
 	expectedVersion.Proxy.ListenPath += "-" + v2 + "/"
-	expectedVersion.VersionDefinition = VersionDefinition{}
+	expectedVersion.VersionDefinition = VersionDefinition{BaseID: apiID}
 	expectedVersion.VersionData = VersionData{
 		NotVersioned: true,
 		Versions: map[string]VersionInfo{
@@ -163,11 +172,7 @@ func TestAPIDefinition_MigrateVersioning_Disabled(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, versions)
 
-		expectedBaseDefinition := VersionDefinition{
-			Location:            URLLocation,
-			Key:                 key,
-			StripVersioningData: true,
-		}
+		expectedBaseDefinition := VersionDefinition{}
 
 		assert.Equal(t, expectedBaseDefinition, base.VersionDefinition)
 
@@ -218,6 +223,8 @@ func TestAPIDefinition_MigrateVersioning_DefaultEmpty(t *testing.T) {
 	assert.Equal(t, expectedBaseData, base.VersionData)
 
 	// v2
+	assert.Equal(t, apiID, versions[0].VersionDefinition.BaseID)
+	versions[0].VersionDefinition.BaseID = ""
 	assert.Empty(t, versions[0].VersionDefinition)
 
 	expectedV2Data := VersionData{
@@ -503,4 +510,105 @@ func TestAPIDefinition_MigrateAuthConfigNames(t *testing.T) {
 	for k, v := range base.AuthConfigs {
 		assert.Equal(t, k, v.Name)
 	}
+}
+
+func TestAPIDefinition_MigrateAuthentication(t *testing.T) {
+	base := oldTestAPI()
+	_, err := base.Migrate()
+	assert.NoError(t, err)
+
+	assert.Len(t, base.AuthConfigs, 1)
+	assert.Contains(t, base.AuthConfigs, OAuthType)
+}
+
+func TestAPIDefinition_isAuthTokenEnabled(t *testing.T) {
+	api := APIDefinition{UseKeylessAccess: false}
+	assert.True(t, api.isAuthTokenEnabled())
+
+	api.EnableJWT = true
+	assert.False(t, api.isAuthTokenEnabled())
+
+	api.UseKeylessAccess = true
+	api.EnableJWT = false
+	api.UseStandardAuth = true
+	assert.True(t, api.isAuthTokenEnabled())
+}
+
+func TestAPIDefinition_deleteAuthConfigsNotUsed(t *testing.T) {
+	api := APIDefinition{
+		UseKeylessAccess: true,
+		AuthConfigs: map[string]AuthConfig{
+			AuthTokenType:     {},
+			JWTType:           {},
+			HMACType:          {},
+			BasicType:         {},
+			CoprocessType:     {},
+			OAuthType:         {},
+			ExternalOAuthType: {},
+			OIDCType:          {},
+		},
+	}
+
+	api.deleteAuthConfigsNotUsed()
+	assert.Len(t, api.AuthConfigs, 0)
+}
+
+func TestAPIDefinition_migrateCustomPluginAuth(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name           string
+		apiDef         APIDefinition
+		expectedAPIDef APIDefinition
+	}{
+		{
+			name:   "goplugin",
+			apiDef: APIDefinition{UseGoPluginAuth: true},
+			expectedAPIDef: APIDefinition{
+				UseGoPluginAuth:         false,
+				CustomPluginAuthEnabled: true,
+			},
+		},
+		{
+			name:   "coprocess",
+			apiDef: APIDefinition{EnableCoProcessAuth: true},
+			expectedAPIDef: APIDefinition{
+				EnableCoProcessAuth:     false,
+				CustomPluginAuthEnabled: true,
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.apiDef.migrateCustomPluginAuth()
+			assert.Equal(t, tc.expectedAPIDef, tc.apiDef)
+		})
+	}
+}
+
+func TestSetDisabledFlags(t *testing.T) {
+	apiDef := APIDefinition{
+		CustomMiddleware: MiddlewareSection{
+			Pre: make([]MiddlewareDefinition, 1),
+		},
+	}
+	expectedAPIDef := APIDefinition{
+		CustomMiddleware: MiddlewareSection{
+			AuthCheck: MiddlewareDefinition{
+				Disabled: true,
+			},
+			Pre: []MiddlewareDefinition{
+				{
+					Disabled: true,
+				},
+			},
+		},
+		TagsDisabled:                   true,
+		UpstreamCertificatesDisabled:   true,
+		CertificatePinningDisabled:     true,
+		DomainDisabled:                 true,
+		CustomMiddlewareBundleDisabled: true,
+	}
+	apiDef.SetDisabledFlags()
+	assert.Equal(t, expectedAPIDef, apiDef)
 }

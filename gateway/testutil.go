@@ -1042,9 +1042,9 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 	return gw
 }
 
-func (t *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
+func (s *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
 	path = strings.Trim(path, "/")
-	t.dynamicHandlers[path] = handlerFunc
+	s.dynamicHandlers[path] = handlerFunc
 }
 
 func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {

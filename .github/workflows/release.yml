@@ -35,16 +35,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        golang_cross: [ 1.16, 1.16-el7 ]
+        golang_cross: [ 1.19-bullseye ]
         include:
-          - golang_cross: 1.16-el7
-            goreleaser: 'ci/goreleaser/goreleaser-el7.yml'
-            rpmvers: 'el/7'
-            debvers: 'ubuntu/xenial ubuntu/bionic debian/jessie'
-          - golang_cross: 1.16
+          - golang_cross: 1.19-bullseye
             goreleaser: 'ci/goreleaser/goreleaser.yml'
-            rpmvers: 'el/8'
-            debvers: 'ubuntu/focal debian/buster debian/bullseye'
+            rpmvers: 'el/8 el/9'
+            debvers: 'ubuntu/bionic ubuntu/focal ubuntu/jammy debian/buster debian/bullseye'
     outputs:
       tag: ${{ steps.targets.outputs.tag }}
 
@@ -62,6 +58,9 @@ jobs:
       - uses: docker/setup-qemu-action@v2
 
       - uses: docker/setup-buildx-action@v2
+
+      - name: "Add Git safe.directory" # Go 1.18+ started embedding repo info in the build
+        run: git config --global --add safe.directory /__w/tyk/tyk
 
       - name: Login to DockerHub
         if: startsWith(github.ref, 'refs/tags')
@@ -247,9 +246,9 @@ jobs:
           - amd64
           - arm64
         distro:
-          - ubuntu:xenial
           - ubuntu:bionic
           - ubuntu:focal
+          - ubuntu:jammy
           - debian:bullseye
 
     steps:
@@ -302,7 +301,7 @@ jobs:
       fail-fast: false
       matrix:
         distro:
-          - ubi7/ubi
+          - ubi9/ubi
           - ubi8/ubi
 
     steps:

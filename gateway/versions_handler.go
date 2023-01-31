@@ -46,23 +46,7 @@ func (h *VersionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var (
-		versionMetas VersionMetas
-		meta         VersionMeta
-	)
-
-	if canInclude(baseAPI, baseAPI.VersionDefinition.Name) {
-		meta = VersionMeta{
-			ID:               baseAPI.APIID,
-			Name:             baseAPI.Name,
-			VersionName:      baseAPI.VersionDefinition.Name,
-			Internal:         baseAPI.Internal,
-			ExpirationDate:   baseAPI.Expiration,
-			IsDefaultVersion: baseAPI.VersionDefinition.Default == baseAPI.VersionDefinition.Name,
-		}
-
-		versionMetas.Metas = append(versionMetas.Metas, meta)
-	}
+	var versionMetas VersionMetas
 
 	for name, id := range baseAPI.VersionDefinition.Versions {
 		currentAPI, err := h.getApiDef(id)
@@ -76,22 +60,32 @@ func (h *VersionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		meta = VersionMeta{
+		versionMetas.Metas = append(versionMetas.Metas, VersionMeta{
 			ID:               id,
 			Name:             currentAPI.Name,
 			VersionName:      name,
 			Internal:         currentAPI.Internal,
 			ExpirationDate:   currentAPI.Expiration,
 			IsDefaultVersion: baseAPI.VersionDefinition.Default == name,
-		}
-
-		versionMetas.Metas = append(versionMetas.Metas, meta)
+		})
 	}
 
 	sort.Slice(versionMetas.Metas, func(i, j int) bool {
 		return versionMetas.Metas[i].VersionName < versionMetas.Metas[j].VersionName
 	})
 
+	if canInclude(baseAPI, baseAPI.VersionDefinition.Name) {
+		versionMetas.Metas = append([]VersionMeta{{
+			ID:               baseAPI.APIID,
+			Name:             baseAPI.Name,
+			VersionName:      baseAPI.VersionDefinition.Name,
+			Internal:         baseAPI.Internal,
+			ExpirationDate:   baseAPI.Expiration,
+			IsDefaultVersion: baseAPI.VersionDefinition.Default == baseAPI.VersionDefinition.Name,
+		}}, versionMetas.Metas...)
+	}
+
 	versionMetas.Status = "success"
+
 	doJSONWrite(w, http.StatusOK, versionMetas)
 }

@@ -63,6 +63,9 @@ const Schema = `{
         "enable_coprocess_auth": {
             "type": "boolean"
         },
+		"custom_plugin_auth_enabled": {
+            "type": "boolean"
+        },
         "jwt_skip_kid": {
             "type": "boolean"
         },
@@ -77,6 +80,9 @@ const Schema = `{
         },
         "custom_middleware_bundle": {
             "type": "string"
+        },
+		"custom_middleware_bundle_disabled": {
+           	"type": "boolean"
         },
         "jwt_policy_field_name": {
             "type": "string"

@@ -87,7 +87,6 @@ const (
 	RequestTracked
 	RequestNotTracked
 	ValidateJSONRequest
-	ValidateRequestWithOAS
 	Internal
 	GoPlugin
 	PersistGraphQL
@@ -156,7 +155,6 @@ type URLSpec struct {
 	TrackEndpoint             apidef.TrackEndpointMeta
 	DoNotTrackEndpoint        apidef.TrackEndpointMeta
 	ValidatePathMeta          apidef.ValidatePathMeta
-	ValidateRequest           apidef.ValidateRequestMeta
 	Internal                  apidef.InternalMeta
 	GoPluginMeta              GoPluginMiddleware
 	PersistGraphQL            apidef.PersistGraphQLMeta
@@ -1181,25 +1179,6 @@ func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.Val
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileValidateRequestSpec(paths []apidef.ValidateRequestMeta, stat URLStatus, conf config.Config) []URLSpec {
-	var urlSpec []URLSpec
-
-	for _, stringSpec := range paths {
-		if !stringSpec.Enabled {
-			continue
-		}
-
-		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
-		// Extend with method actions
-
-		newSpec.ValidateRequest = stringSpec
-		urlSpec = append(urlSpec, newSpec)
-	}
-
-	return urlSpec
-}
-
 func (a APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := []URLSpec{}
 
@@ -1251,7 +1230,6 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	trackedPaths := a.compileTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked, conf)
 	unTrackedPaths := a.compileUnTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked, conf)
 	validateJSON := a.compileValidateJSONPathspathSpec(apiVersionDef.ExtendedPaths.ValidateJSON, ValidateJSONRequest, conf)
-	validateRequest := a.compileValidateRequestSpec(apiVersionDef.ExtendedPaths.ValidateRequest, ValidateRequestWithOAS, conf)
 	internalPaths := a.compileInternalPathspathSpec(apiVersionDef.ExtendedPaths.Internal, Internal, conf)
 	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
 	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
@@ -1279,7 +1257,6 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, trackedPaths...)
 	combinedPath = append(combinedPath, unTrackedPaths...)
 	combinedPath = append(combinedPath, validateJSON...)
-	combinedPath = append(combinedPath, validateRequest...)
 	combinedPath = append(combinedPath, internalPaths...)
 
 	return combinedPath, len(whiteListPaths) > 0
@@ -1335,8 +1312,6 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusRequestNotTracked
 	case ValidateJSONRequest:
 		return StatusValidateJSON
-	case ValidateRequestWithOAS:
-		return StatusValidateRequest
 	case Internal:
 		return StatusInternal
 	case GoPlugin:
@@ -1555,10 +1530,6 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		case ValidateJSONRequest:
 			if method == rxPaths[i].ValidatePathMeta.Method {
 				return true, &rxPaths[i].ValidatePathMeta
-			}
-		case ValidateRequestWithOAS:
-			if method == rxPaths[i].ValidateRequest.Method {
-				return true, &rxPaths[i].ValidateRequest
 			}
 		case Internal:
 			if method == rxPaths[i].Internal.Method {

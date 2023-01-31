@@ -1,7 +1,9 @@
 package oas
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -70,6 +72,7 @@ func TestOAS(t *testing.T) {
 			"/user": {
 				Get: &openapi3.Operation{
 					OperationID: operationID,
+					Responses:   openapi3.NewResponses(),
 				},
 			},
 		}
@@ -490,5 +493,125 @@ func TestOAS_MarshalJSON(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Contains(t, string(data), `"x-abcd":[{"key":"value"},{"key":"value"}]`)
 		})
+	})
+}
+
+func TestMigrateAndFillOAS(t *testing.T) {
+	var api apidef.APIDefinition
+	api.SetDisabledFlags()
+	api.Name = "Furkan"
+	api.Proxy.ListenPath = "/furkan"
+	api.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+	api.VersionDefinition.Location = apidef.HeaderLocation
+	api.VersionData.DefaultVersion = "Default"
+	api.VersionData.Versions = map[string]apidef.VersionInfo{
+		"Default": {},
+		"v1":      {},
+		"v2":      {},
+	}
+
+	baseAPIDef, versionAPIDefs, err := MigrateAndFillOAS(&api)
+	assert.NoError(t, err)
+	assert.Len(t, versionAPIDefs, 2)
+	assert.True(t, baseAPIDef.Classic.IsOAS)
+	assert.Equal(t, DefaultOpenAPI, baseAPIDef.OAS.OpenAPI)
+	assert.Equal(t, "Furkan", baseAPIDef.OAS.Info.Title)
+	assert.Equal(t, "Default", baseAPIDef.OAS.Info.Version)
+
+	assert.True(t, versionAPIDefs[0].Classic.IsOAS)
+	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[0].OAS.OpenAPI)
+	assert.Equal(t, "Furkan-v1", versionAPIDefs[0].OAS.Info.Title)
+	assert.Equal(t, "v1", versionAPIDefs[0].OAS.Info.Version)
+
+	assert.True(t, versionAPIDefs[1].Classic.IsOAS)
+	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[1].OAS.OpenAPI)
+	assert.Equal(t, "Furkan-v2", versionAPIDefs[1].OAS.Info.Title)
+	assert.Equal(t, "v2", versionAPIDefs[1].OAS.Info.Version)
+
+	assert.NotEqual(t, versionAPIDefs[0].Classic.APIID, versionAPIDefs[1].Classic.APIID)
+
+	err = baseAPIDef.OAS.Validate(context.Background())
+	assert.NoError(t, err)
+
+	t.Run("migration fails", func(t *testing.T) {
+		_, _, err = MigrateAndFillOAS(&api)
+		assert.ErrorIs(t, err, apidef.ErrMigrationNewVersioningEnabled)
+	})
+
+	t.Run("migrated base API validation fails", func(t *testing.T) {
+		api = apidef.APIDefinition{Name: "Furkan"}
+		_, _, err = MigrateAndFillOAS(&api)
+		assert.ErrorContains(t, err, "base API Furkan migrated OAS is not valid")
+	})
+
+	t.Run("migrate versionAPI validation fails", func(t *testing.T) {
+		api = apidef.APIDefinition{}
+		api.SetDisabledFlags()
+		api.Name = "Furkan"
+		api.Proxy.ListenPath = "/furkan"
+		api.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+		api.VersionDefinition.Location = apidef.HeaderLocation
+		api.VersionData.DefaultVersion = "Default"
+		api.VersionData.Versions = map[string]apidef.VersionInfo{
+			"Default": {},
+			"v2": {
+				UseExtendedPaths: true,
+				ExtendedPaths: apidef.ExtendedPathsSet{
+					WhiteList: []apidef.EndPointMeta{
+						{
+							Disabled: false,
+							Path:     "123",
+							MethodActions: map[string]apidef.EndpointMethodMeta{
+								http.MethodGet: {},
+							},
+						},
+					},
+				}},
+		}
+		_, _, err = MigrateAndFillOAS(&api)
+		assert.ErrorContains(t, err, "version API Furkan-v2 migrated OAS is not valid")
+	})
+}
+
+func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
+	api := apidef.APIDefinition{Name: "Furkan"}
+	api.Proxy.ListenPath = "/furkan"
+
+	api.VersionDefinition.Location = apidef.HeaderLocation
+	api.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+	api.VersionData.NotVersioned = true
+	api.VersionData.Versions = map[string]apidef.VersionInfo{
+		"Default": {},
+	}
+
+	baseAPI, _, err := MigrateAndFillOAS(&api)
+	assert.NoError(t, err)
+
+	t.Run("versioning", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Info.Versioning)
+	})
+
+	t.Run("plugin bundle", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware)
+	})
+
+	t.Run("mutualTLS", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Upstream.MutualTLS)
+	})
+
+	t.Run("certificatePinning", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Upstream.CertificatePinning)
+	})
+
+	t.Run("gatewayTags", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Server.GatewayTags)
+	})
+
+	t.Run("authenticationPlugin", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware)
+	})
+
+	t.Run("customDomain", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().Server.CustomDomain)
 	})
 }

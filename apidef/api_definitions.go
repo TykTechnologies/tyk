@@ -456,6 +456,7 @@ type EventHandlerMetaConfig struct {
 }
 
 type MiddlewareDefinition struct {
+	Disabled       bool   `bson:"disabled" json:"disabled"`
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
@@ -592,8 +593,9 @@ type APIDefinition struct {
 
 	EnableJWT                            bool                   `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth                      bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
-	UseGoPluginAuth                      bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`
-	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
+	UseGoPluginAuth                      bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`       // Deprecated. Use CustomPluginAuthEnabled instead.
+	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
+	CustomPluginAuthEnabled              bool                   `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
 	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
 	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
 	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
@@ -621,6 +623,7 @@ type APIDefinition struct {
 	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
 	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
 	CustomMiddlewareBundle               string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
+	CustomMiddlewareBundleDisabled       bool                   `bson:"custom_middleware_bundle_disabled" json:"custom_middleware_bundle_disabled"`
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
 	SessionLifetimeRespectsKeyExpiration bool                   `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration,omitempty"`
 	SessionLifetime                      int64                  `bson:"session_lifetime" json:"session_lifetime"`
@@ -656,7 +659,8 @@ type APIDefinition struct {
 	Tags         []string `bson:"tags" json:"tags"`
 
 	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
-	IsOAS bool `bson:"is_oas" json:"is_oas,omitempty"`
+	IsOAS       bool   `bson:"is_oas" json:"is_oas,omitempty"`
+	VersionName string `bson:"-" json:"-"`
 }
 
 type AnalyticsPluginConfig struct {
@@ -790,6 +794,7 @@ const (
 type GraphQLProxyConfig struct {
 	AuthHeaders      map[string]string `bson:"auth_headers" json:"auth_headers"`
 	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
+	RequestHeaders   map[string]string `bson:"request_headers" json:"request_headers"`
 }
 
 type GraphQLSubgraphConfig struct {
