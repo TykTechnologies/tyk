@@ -9,7 +9,6 @@ builds:
   - id: std-linux
     flags:
       - -tags=goplugin
-      - -trimpath
     gcflags:
       - all=-N
       - -l
@@ -23,7 +22,6 @@ builds:
   - id: std-arm64
     flags:
       - -tags=goplugin
-      - -trimpath
     gcflags:
       - all=-N
       - -l
