@@ -47,7 +47,7 @@ go list -m -f '{{ if not .Main }}{{ .Path }} {{ .Version }}{{ end }}' all > depe
 
 # for any shared dependency, pin the version to Tyk gateway version
 awk 'NR==FNR{seen[$1]=$2; next} seen[$1] && seen[$1] != $2' $PLUGIN_SOURCE_PATH/dependencies.txt $TYK_GW_PATH/dependencies.txt | while read PKG VER; do
-  go mod edit -replace $PKG=$PKG@$VER
+  go get $PKG@$VER
 done
 
 go mod edit -replace github.com/TykTechnologies/tyk=$TYK_GW_PATH
