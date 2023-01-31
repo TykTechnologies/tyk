@@ -842,7 +842,7 @@ type CustomPlugin struct {
 	Path string `bson:"path" json:"path"` // required.
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
-	// RequireSession if set to true passes down the session information for plugins post authentication.
+	// RequireSession if set to true passes down the session information for plugins after authentication.
 	// RequireSession is used only with JSVM custom middleware.
 	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
@@ -880,7 +880,7 @@ func (c CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
 type PrePlugin struct {
 	// Plugins configures custom plugins to be run on pre authentication stage.
 	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomPlugins `bson:"plugins" json:"plugins"`
+	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
 }
 
 // Fill fills PrePlugin from supplied Tyk classic api definition.
@@ -896,6 +896,11 @@ func (p *PrePlugin) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts PrePlugin into Tyk classic api definition.
 func (p *PrePlugin) ExtractTo(api *apidef.APIDefinition) {
+	if len(p.Plugins) == 0 {
+		api.CustomMiddleware.Pre = nil
+		return
+	}
+
 	api.CustomMiddleware.Pre = make([]apidef.MiddlewareDefinition, len(p.Plugins))
 	p.Plugins.ExtractTo(api.CustomMiddleware.Pre)
 }
@@ -904,7 +909,7 @@ func (p *PrePlugin) ExtractTo(api *apidef.APIDefinition) {
 type PostAuthenticationPlugin struct {
 	// Plugins configures custom plugins to be run on pre authentication stage.
 	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomPlugins `bson:"plugins" json:"plugins"`
+	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
 }
 
 // Fill fills PostAuthenticationPlugin from supplied Tyk classic api definition.
@@ -920,6 +925,11 @@ func (p *PostAuthenticationPlugin) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts PostAuthenticationPlugin into Tyk classic api definition.
 func (p *PostAuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
+	if len(p.Plugins) == 0 {
+		api.CustomMiddleware.PostKeyAuth = nil
+		return
+	}
+
 	api.CustomMiddleware.PostKeyAuth = make([]apidef.MiddlewareDefinition, len(p.Plugins))
 	p.Plugins.ExtractTo(api.CustomMiddleware.PostKeyAuth)
 }
@@ -928,7 +938,7 @@ func (p *PostAuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 type PostPlugin struct {
 	// Plugins configures custom plugins to be run on post stage.
 	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomPlugins `bson:"plugins" json:"plugins"`
+	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
 }
 
 // Fill fills PostPlugin from supplied Tyk classic api definition.
@@ -944,6 +954,11 @@ func (p *PostPlugin) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts PostPlugin into Tyk classic api definition.
 func (p *PostPlugin) ExtractTo(api *apidef.APIDefinition) {
+	if len(p.Plugins) == 0 {
+		api.CustomMiddleware.Post = nil
+		return
+	}
+
 	api.CustomMiddleware.Post = make([]apidef.MiddlewareDefinition, len(p.Plugins))
 	p.Plugins.ExtractTo(api.CustomMiddleware.Post)
 }
@@ -952,7 +967,7 @@ func (p *PostPlugin) ExtractTo(api *apidef.APIDefinition) {
 type ResponsePlugin struct {
 	// Plugins configures custom plugins to be run on post stage.
 	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomPlugins `bson:"plugins" json:"plugins"`
+	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
 }
 
 // Fill fills ResponsePlugin from supplied Tyk classic api definition.
@@ -968,6 +983,11 @@ func (p *ResponsePlugin) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts PostPlugin into Tyk classic api definition.
 func (p *ResponsePlugin) ExtractTo(api *apidef.APIDefinition) {
+	if len(p.Plugins) == 0 {
+		api.CustomMiddleware.Response = nil
+		return
+	}
+
 	api.CustomMiddleware.Response = make([]apidef.MiddlewareDefinition, len(p.Plugins))
 	p.Plugins.ExtractTo(api.CustomMiddleware.Response)
 }

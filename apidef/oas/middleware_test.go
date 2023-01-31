@@ -289,7 +289,7 @@ func TestAuthenticationPlugin(t *testing.T) {
 
 	t.Run("with values", func(t *testing.T) {
 		t.Parallel()
-		authenticationPlugin := AuthenticationPlugin{
+		expectedAuthenticationPlugin := AuthenticationPlugin{
 			Enabled:      true,
 			FunctionName: "authenticate",
 			Path:         "/path/to/plugin",
@@ -297,15 +297,11 @@ func TestAuthenticationPlugin(t *testing.T) {
 		}
 
 		api := apidef.APIDefinition{}
-		authenticationPlugin.ExtractTo(&api)
-		assert.Equal(t, "authenticate", api.CustomMiddleware.AuthCheck.Name)
-		assert.Equal(t, "/path/to/plugin", api.CustomMiddleware.AuthCheck.Path)
-		assert.True(t, api.CustomMiddleware.AuthCheck.RawBodyOnly)
-		assert.False(t, api.CustomMiddleware.AuthCheck.Disabled)
+		expectedAuthenticationPlugin.ExtractTo(&api)
 
-		newAuthenticationPlugin := AuthenticationPlugin{}
-		newAuthenticationPlugin.Fill(api)
-		assert.Equal(t, authenticationPlugin, newAuthenticationPlugin)
+		actualAuthenticationPlugin := AuthenticationPlugin{}
+		actualAuthenticationPlugin.Fill(api)
+		assert.Equal(t, expectedAuthenticationPlugin, actualAuthenticationPlugin)
 	})
 }
 
@@ -329,7 +325,7 @@ func TestPrePlugin(t *testing.T) {
 
 	t.Run("with values", func(t *testing.T) {
 		t.Parallel()
-		prePlugin := PrePlugin{
+		expectedPrePlugin := PrePlugin{
 			Plugins: CustomPlugins{
 				{
 					Enabled:      true,
@@ -342,15 +338,11 @@ func TestPrePlugin(t *testing.T) {
 
 		api := apidef.APIDefinition{}
 		api.SetDisabledFlags()
-		prePlugin.ExtractTo(&api)
-		assert.Equal(t, "pre", api.CustomMiddleware.Pre[0].Name)
-		assert.Equal(t, "/path/to/plugin", api.CustomMiddleware.Pre[0].Path)
-		assert.True(t, api.CustomMiddleware.Pre[0].RawBodyOnly)
-		assert.False(t, api.CustomMiddleware.Pre[0].Disabled)
+		expectedPrePlugin.ExtractTo(&api)
 
-		newPrePlugin := PrePlugin{}
-		newPrePlugin.Fill(api)
-		assert.Equal(t, prePlugin, newPrePlugin)
+		actualPrePlugin := PrePlugin{}
+		actualPrePlugin.Fill(api)
+		assert.Equal(t, expectedPrePlugin, actualPrePlugin)
 	})
 }
 
@@ -415,11 +407,11 @@ func TestPostAuthenticationPlugin(t *testing.T) {
 
 	t.Run("with values", func(t *testing.T) {
 		t.Parallel()
-		postAuthPlugin := PostAuthenticationPlugin{
+		expectedPostAuthPlugin := PostAuthenticationPlugin{
 			Plugins: []CustomPlugin{
 				{
 					Enabled:      true,
-					FunctionName: "pre",
+					FunctionName: "postAuth",
 					Path:         "/path/to/plugin",
 					RawBodyOnly:  true,
 				},
@@ -428,15 +420,11 @@ func TestPostAuthenticationPlugin(t *testing.T) {
 
 		api := apidef.APIDefinition{}
 		api.SetDisabledFlags()
-		postAuthPlugin.ExtractTo(&api)
-		assert.Equal(t, "pre", api.CustomMiddleware.PostKeyAuth[0].Name)
-		assert.Equal(t, "/path/to/plugin", api.CustomMiddleware.PostKeyAuth[0].Path)
-		assert.True(t, api.CustomMiddleware.PostKeyAuth[0].RawBodyOnly)
-		assert.False(t, api.CustomMiddleware.PostKeyAuth[0].Disabled)
+		expectedPostAuthPlugin.ExtractTo(&api)
 
-		newPostAuthPlugin := PostAuthenticationPlugin{}
-		newPostAuthPlugin.Fill(api)
-		assert.Equal(t, postAuthPlugin, newPostAuthPlugin)
+		actualPostAuthPlugin := PostAuthenticationPlugin{}
+		actualPostAuthPlugin.Fill(api)
+		assert.Equal(t, expectedPostAuthPlugin, actualPostAuthPlugin)
 	})
 }
 
@@ -460,11 +448,11 @@ func TestPostPlugin(t *testing.T) {
 
 	t.Run("with values", func(t *testing.T) {
 		t.Parallel()
-		postPlugin := PostPlugin{
+		expectedPostPlugin := PostPlugin{
 			Plugins: CustomPlugins{
 				{
 					Enabled:      true,
-					FunctionName: "pre",
+					FunctionName: "post",
 					Path:         "/path/to/plugin",
 					RawBodyOnly:  true,
 				},
@@ -473,15 +461,11 @@ func TestPostPlugin(t *testing.T) {
 
 		api := apidef.APIDefinition{}
 		api.SetDisabledFlags()
-		postPlugin.ExtractTo(&api)
-		assert.Equal(t, "pre", api.CustomMiddleware.Post[0].Name)
-		assert.Equal(t, "/path/to/plugin", api.CustomMiddleware.Post[0].Path)
-		assert.True(t, api.CustomMiddleware.Post[0].RawBodyOnly)
-		assert.False(t, api.CustomMiddleware.Post[0].Disabled)
+		expectedPostPlugin.ExtractTo(&api)
 
-		newPostPlugin := PostPlugin{}
-		newPostPlugin.Fill(api)
-		assert.Equal(t, postPlugin, newPostPlugin)
+		actualPostPlugin := PostPlugin{}
+		actualPostPlugin.Fill(api)
+		assert.Equal(t, expectedPostPlugin, actualPostPlugin)
 	})
 }
 
@@ -505,11 +489,11 @@ func TestResponsePlugin(t *testing.T) {
 
 	t.Run("with values", func(t *testing.T) {
 		t.Parallel()
-		responsePlugin := ResponsePlugin{
+		expectedResponsePlugin := ResponsePlugin{
 			Plugins: CustomPlugins{
 				{
 					Enabled:      true,
-					FunctionName: "pre",
+					FunctionName: "response",
 					Path:         "/path/to/plugin",
 					RawBodyOnly:  true,
 				},
@@ -518,14 +502,10 @@ func TestResponsePlugin(t *testing.T) {
 
 		api := apidef.APIDefinition{}
 		api.SetDisabledFlags()
-		responsePlugin.ExtractTo(&api)
-		assert.Equal(t, "pre", api.CustomMiddleware.Response[0].Name)
-		assert.Equal(t, "/path/to/plugin", api.CustomMiddleware.Response[0].Path)
-		assert.True(t, api.CustomMiddleware.Response[0].RawBodyOnly)
-		assert.False(t, api.CustomMiddleware.Response[0].Disabled)
+		expectedResponsePlugin.ExtractTo(&api)
 
-		newResponsePlugin := ResponsePlugin{}
-		newResponsePlugin.Fill(api)
-		assert.Equal(t, responsePlugin, newResponsePlugin)
+		actualResponsePlugin := ResponsePlugin{}
+		actualResponsePlugin.Fill(api)
+		assert.Equal(t, expectedResponsePlugin, actualResponsePlugin)
 	})
 }
