@@ -39,8 +39,8 @@ jobs:
         include:
           - golang_cross: 1.19-bullseye
             goreleaser: 'ci/goreleaser/goreleaser.yml'
-            rpmvers: 'el/9'
-            debvers: 'ubuntu/focal debian/buster debian/bullseye'
+            rpmvers: 'el/8 el/9'
+            debvers: 'ubuntu/bionic ubuntu/focal ubuntu/jammy debian/buster debian/bullseye'
     outputs:
       tag: ${{ steps.targets.outputs.tag }}
 
@@ -300,7 +300,7 @@ jobs:
       fail-fast: false
       matrix:
         distro:
-          - ubi7/ubi
+          - ubi9/ubi
           - ubi8/ubi
 
     steps:
