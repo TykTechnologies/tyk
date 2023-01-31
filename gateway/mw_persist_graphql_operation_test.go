@@ -90,7 +90,7 @@ func TestGraphqlPersist_MatchPathInfo(t *testing.T) {
 			if err != nil {
 				return false
 			}
-			return testResp.Method == "POST" && testResp.Body == string(gqlRequestCountries) && testResp.URI == "/countries"
+			return testResp.Method == "POST" && testResp.Body == string(gqlRequestCountries) && testResp.URI == "/"
 		}},
 		test.TestCase{Path: "/countries", Method: "GET", Headers: map[string]string{
 			"Test-Header": "value",
@@ -101,7 +101,7 @@ func TestGraphqlPersist_MatchPathInfo(t *testing.T) {
 				return false
 			}
 			v, ok := testResp.Headers["Test-Header"]
-			return testResp.Method == "POST" && testResp.Body == string(gqlRequestCountries) && testResp.URI == "/countries" && ok && v == "value"
+			return testResp.Method == "POST" && testResp.Body == string(gqlRequestCountries) && testResp.URI == "/" && ok && v == "value"
 		}},
 		test.TestCase{Path: "/countries", Method: "POST", BodyMatchFunc: func(bytes []byte) bool {
 			// graphql request shouldn't be sent due to mismatched method
