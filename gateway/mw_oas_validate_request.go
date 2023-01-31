@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -65,9 +66,14 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		Request:    r,
 		PathParams: operation.pathParams,
 		Route:      operation.route,
+		Options: &openapi3filter.Options{
+			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+				return nil
+			},
+		},
 	}
 
-	err := openapi3filter.ValidateRequestBody(r.Context(), requestValidationInput, operation.route.Operation.RequestBody.Value)
+	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
 		return fmt.Errorf("request validation error: %v", err), errResponseCode
 	}
