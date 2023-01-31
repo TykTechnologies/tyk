@@ -3374,6 +3374,17 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	return
 }
 
+func ctxSetOperation(r *http.Request, op *Operation) {
+	setCtxValue(r, ctx.OASOperation, op)
+}
+
+func ctxGetOperation(r *http.Request) (op *Operation) {
+	if v := r.Context().Value(ctx.OASOperation); v != nil {
+		op = v.(*Operation)
+	}
+	return
+}
+
 var createOauthClientSecret = func() string {
 	secret := uuid.NewV4()
 	return base64.StdEncoding.EncodeToString([]byte(secret.String()))
