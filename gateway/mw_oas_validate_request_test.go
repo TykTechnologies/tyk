@@ -54,6 +54,15 @@ const testOASForValidateRequest = `{
     "/post": {
       "post": {
         "operationId": "postpost",
+        "parameters": [{
+          "name": "id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          },
+          "description": "description"
+        }],
         "requestBody": {
           "content": {
             "application/json": {
@@ -141,6 +150,8 @@ func TestValidateRequest(t *testing.T) {
 				{Data: `{"name": "my-product"}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
 				{Data: `{"name": "my-product", "owner": {"name": 123}}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost,
 					Headers: headers, Path: "/product/post"},
+				{Data: `{"name": "my-product", "owner": {"name": "Furkan"}}`, Code: http.StatusUnprocessableEntity, BodyMatch: "query has an error", Method: http.MethodPost,
+					Headers: headers, Path: "/product/post?id=ten"},
 				{Data: `{"name": "my-product", "owner": {"name": "Furkan"}}`, Code: http.StatusOK, Method: http.MethodPost,
 					Headers: headers, Path: "/product/post"},
 				{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": 123}}}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost,

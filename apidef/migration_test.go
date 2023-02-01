@@ -589,7 +589,9 @@ func TestAPIDefinition_migrateCustomPluginAuth(t *testing.T) {
 func TestSetDisabledFlags(t *testing.T) {
 	apiDef := APIDefinition{
 		CustomMiddleware: MiddlewareSection{
-			Pre: make([]MiddlewareDefinition, 1),
+			Pre:         make([]MiddlewareDefinition, 1),
+			PostKeyAuth: make([]MiddlewareDefinition, 1),
+			Post:        make([]MiddlewareDefinition, 1),
 		},
 	}
 	expectedAPIDef := APIDefinition{
@@ -598,6 +600,16 @@ func TestSetDisabledFlags(t *testing.T) {
 				Disabled: true,
 			},
 			Pre: []MiddlewareDefinition{
+				{
+					Disabled: true,
+				},
+			},
+			PostKeyAuth: []MiddlewareDefinition{
+				{
+					Disabled: true,
+				},
+			},
+			Post: []MiddlewareDefinition{
 				{
 					Disabled: true,
 				},

@@ -289,7 +289,7 @@ func TestAuthenticationPlugin(t *testing.T) {
 
 	t.Run("with values", func(t *testing.T) {
 		t.Parallel()
-		authenticationPlugin := AuthenticationPlugin{
+		expectedAuthenticationPlugin := AuthenticationPlugin{
 			Enabled:      true,
 			FunctionName: "authenticate",
 			Path:         "/path/to/plugin",
@@ -297,15 +297,11 @@ func TestAuthenticationPlugin(t *testing.T) {
 		}
 
 		api := apidef.APIDefinition{}
-		authenticationPlugin.ExtractTo(&api)
-		assert.Equal(t, "authenticate", api.CustomMiddleware.AuthCheck.Name)
-		assert.Equal(t, "/path/to/plugin", api.CustomMiddleware.AuthCheck.Path)
-		assert.True(t, api.CustomMiddleware.AuthCheck.RawBodyOnly)
-		assert.False(t, api.CustomMiddleware.AuthCheck.Disabled)
+		expectedAuthenticationPlugin.ExtractTo(&api)
 
-		newAuthenticationPlugin := AuthenticationPlugin{}
-		newAuthenticationPlugin.Fill(api)
-		assert.Equal(t, authenticationPlugin, newAuthenticationPlugin)
+		actualAuthenticationPlugin := AuthenticationPlugin{}
+		actualAuthenticationPlugin.Fill(api)
+		assert.Equal(t, expectedAuthenticationPlugin, actualAuthenticationPlugin)
 	})
 }
 
@@ -329,7 +325,7 @@ func TestPrePlugin(t *testing.T) {
 
 	t.Run("with values", func(t *testing.T) {
 		t.Parallel()
-		prePlugin := PrePlugin{
+		expectedPrePlugin := PrePlugin{
 			Plugins: CustomPlugins{
 				{
 					Enabled:      true,
@@ -342,15 +338,11 @@ func TestPrePlugin(t *testing.T) {
 
 		api := apidef.APIDefinition{}
 		api.SetDisabledFlags()
-		prePlugin.ExtractTo(&api)
-		assert.Equal(t, "pre", api.CustomMiddleware.Pre[0].Name)
-		assert.Equal(t, "/path/to/plugin", api.CustomMiddleware.Pre[0].Path)
-		assert.True(t, api.CustomMiddleware.Pre[0].RawBodyOnly)
-		assert.False(t, api.CustomMiddleware.Pre[0].Disabled)
+		expectedPrePlugin.ExtractTo(&api)
 
-		newPrePlugin := PrePlugin{}
-		newPrePlugin.Fill(api)
-		assert.Equal(t, prePlugin, newPrePlugin)
+		actualPrePlugin := PrePlugin{}
+		actualPrePlugin.Fill(api)
+		assert.Equal(t, expectedPrePlugin, actualPrePlugin)
 	})
 }
 
@@ -392,5 +384,87 @@ func TestCustomPlugins(t *testing.T) {
 		newPrePlugin := make(CustomPlugins, 1)
 		newPrePlugin.Fill(mwDefs)
 		assert.Equal(t, customPlugins, newPrePlugin)
+	})
+}
+
+func TestPostAuthenticationPlugin(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var (
+			emptyPostAuthPlugin PostAuthenticationPlugin
+			convertedAPI        apidef.APIDefinition
+		)
+
+		convertedAPI.SetDisabledFlags()
+		emptyPostAuthPlugin.ExtractTo(&convertedAPI)
+
+		var resultPostAuthPlugin PostAuthenticationPlugin
+		resultPostAuthPlugin.Fill(convertedAPI)
+
+		assert.Equal(t, emptyPostAuthPlugin, resultPostAuthPlugin)
+	})
+
+	t.Run("with values", func(t *testing.T) {
+		t.Parallel()
+		expectedPostAuthPlugin := PostAuthenticationPlugin{
+			Plugins: []CustomPlugin{
+				{
+					Enabled:      true,
+					FunctionName: "postAuth",
+					Path:         "/path/to/plugin",
+					RawBodyOnly:  true,
+				},
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
+		expectedPostAuthPlugin.ExtractTo(&api)
+
+		actualPostAuthPlugin := PostAuthenticationPlugin{}
+		actualPostAuthPlugin.Fill(api)
+		assert.Equal(t, expectedPostAuthPlugin, actualPostAuthPlugin)
+	})
+}
+
+func TestPostPlugin(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var (
+			emptyPostPlugin PostPlugin
+			convertedAPI    apidef.APIDefinition
+		)
+
+		convertedAPI.SetDisabledFlags()
+		emptyPostPlugin.ExtractTo(&convertedAPI)
+
+		var resultPostPlugin PostPlugin
+		resultPostPlugin.Fill(convertedAPI)
+
+		assert.Equal(t, emptyPostPlugin, resultPostPlugin)
+	})
+
+	t.Run("with values", func(t *testing.T) {
+		t.Parallel()
+		expectedPostPlugin := PostPlugin{
+			Plugins: CustomPlugins{
+				{
+					Enabled:      true,
+					FunctionName: "post",
+					Path:         "/path/to/plugin",
+					RawBodyOnly:  true,
+				},
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
+		expectedPostPlugin.ExtractTo(&api)
+
+		actualPostPlugin := PostPlugin{}
+		actualPostPlugin.Fill(api)
+		assert.Equal(t, expectedPostPlugin, actualPostPlugin)
 	})
 }
