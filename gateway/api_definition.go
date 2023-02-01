@@ -228,8 +228,9 @@ type APISpec struct {
 		Schema          *graphql.Schema
 	} `json:"-"`
 
-	hasMock   bool
-	OASRouter routers.Router
+	HasMock            bool
+	HasValidateRequest bool
+	OASRouter          routers.Router
 }
 
 // GetSessionLifetimeRespectsKeyExpiration returns a boolean to tell whether session lifetime should respect to key expiration or not.
@@ -422,14 +423,9 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		spec.OAS = *def.OAS
 	}
 
-	serverURL := spec.Proxy.ListenPath
-	if spec.Proxy.StripListenPath {
-		serverURL = "/"
-	}
-
 	oasSpec := spec.OAS.T
 	oasSpec.Servers = openapi3.Servers{
-		{URL: serverURL},
+		{URL: spec.Proxy.ListenPath},
 	}
 
 	spec.OASRouter, err = gorillamux.NewRouter(&oasSpec)
@@ -1723,24 +1719,20 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	log.Debug("Upstream path is: ", r.URL.Path)
 }
 
-func (a *APISpec) HasMock() bool {
-	return a.hasMock
-}
-
 func (a *APISpec) setHasMock() {
 	if !a.IsOAS {
-		a.hasMock = false
+		a.HasMock = false
 		return
 	}
 
 	middleware := a.OAS.GetTykExtension().Middleware
 	if middleware == nil {
-		a.hasMock = false
+		a.HasMock = false
 		return
 	}
 
 	if len(middleware.Operations) == 0 {
-		a.hasMock = false
+		a.HasMock = false
 		return
 	}
 
@@ -1750,12 +1742,12 @@ func (a *APISpec) setHasMock() {
 		}
 
 		if operation.MockResponse.Enabled {
-			a.hasMock = true
+			a.HasMock = true
 			return
 		}
 	}
 
-	a.hasMock = false
+	a.HasMock = false
 }
 
 type RoundRobin struct {

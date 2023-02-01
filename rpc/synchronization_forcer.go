@@ -11,7 +11,7 @@ type SyncronizerForcer struct {
 	store *storage.RedisCluster
 }
 
-//NewSyncForcer returns a new syncforcer with a connected redis with a key prefix synchronizer-group- for group synchronization control.
+// NewSyncForcer returns a new syncforcer with a connected redis with a key prefix synchronizer-group- for group synchronization control.
 func NewSyncForcer(redisController *storage.RedisController) *SyncronizerForcer {
 	sf := &SyncronizerForcer{}
 

@@ -35,6 +35,7 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 		}
 
 		if operation.ValidateRequest.Enabled {
+			k.Spec.HasValidateRequest = true
 			return true
 		}
 	}
@@ -44,13 +45,8 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	route, pathParams, err := k.Spec.OASRouter.FindRoute(r)
-	if err != nil {
-		return nil, http.StatusOK
-	}
-
-	operation, ok := k.Spec.OAS.GetTykExtension().Middleware.Operations[route.Operation.OperationID]
-	if !ok {
+	operation := ctxGetOperation(r)
+	if operation == nil {
 		return nil, http.StatusOK
 	}
 
@@ -67,11 +63,11 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// Validate request
 	requestValidationInput := &openapi3filter.RequestValidationInput{
 		Request:    r,
-		PathParams: pathParams,
-		Route:      route,
+		PathParams: operation.pathParams,
+		Route:      operation.route,
 	}
 
-	err = openapi3filter.ValidateRequestBody(r.Context(), requestValidationInput, route.Operation.RequestBody.Value)
+	err := openapi3filter.ValidateRequestBody(r.Context(), requestValidationInput, operation.route.Operation.RequestBody.Value)
 	if err != nil {
 		return fmt.Errorf("request validation error: %v", err), errResponseCode
 	}
