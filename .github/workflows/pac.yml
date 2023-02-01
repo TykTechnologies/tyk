@@ -3,7 +3,7 @@ name: Policy as Code
 on:
   pull_request:
     paths:
-      - ci/repo-policy
+      - ci/repo-policy/**.tf
 
 env:
   TERRAFORM_DIR: "./ci/repo-policy"
