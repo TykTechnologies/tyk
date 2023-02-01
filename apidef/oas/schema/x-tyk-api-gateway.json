@@ -420,6 +420,9 @@
         "postPlugin": {
           "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
         },
+        "responsePlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+        },
         "cache": {
           "$ref": "#/definitions/X-Tyk-Cache"
         }
