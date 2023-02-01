@@ -53,6 +53,10 @@ type Global struct {
 	// Tyk native API definition: `custom_middleware.auth_check`.
 	AuthenticationPlugin *AuthenticationPlugin `bson:"authenticationPlugin,omitempty" json:"authenticationPlugin,omitempty"`
 
+	// PostAuthenticationPlugin contains configuration related to custom post authentication plugin.
+	// Tyk native API definition: `custom_middleware.post_key_auth`.
+	PostAuthenticationPlugin *PostAuthenticationPlugin `bson:"postAuthenticationPlugin,omitempty" json:"postAuthenticationPlugin,omitempty"`
+
 	// Cache contains the configurations related to caching.
 	// Tyk native API definition: `cache_options`.
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
@@ -830,6 +834,9 @@ type CustomPlugin struct {
 	Path string `bson:"path" json:"path"` // required.
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+	// RequireSession if set to true passes down the session information for plugins after authentication.
+	// RequireSession is used only with JSVM custom middleware.
+	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
 
 // CustomPlugins is a list of CustomPlugin.
@@ -839,10 +846,11 @@ type CustomPlugins []CustomPlugin
 func (c CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
 	for i, mwDef := range mwDefs {
 		c[i] = CustomPlugin{
-			Enabled:      !mwDef.Disabled,
-			Path:         mwDef.Path,
-			FunctionName: mwDef.Name,
-			RawBodyOnly:  mwDef.RawBodyOnly,
+			Enabled:        !mwDef.Disabled,
+			Path:           mwDef.Path,
+			FunctionName:   mwDef.Name,
+			RawBodyOnly:    mwDef.RawBodyOnly,
+			RequireSession: mwDef.RequireSession,
 		}
 	}
 }
@@ -851,10 +859,11 @@ func (c CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
 func (c CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
 	for i, plugin := range c {
 		mwDefs[i] = apidef.MiddlewareDefinition{
-			Disabled:    !plugin.Enabled,
-			Name:        plugin.FunctionName,
-			Path:        plugin.Path,
-			RawBodyOnly: plugin.RawBodyOnly,
+			Disabled:       !plugin.Enabled,
+			Name:           plugin.FunctionName,
+			Path:           plugin.Path,
+			RawBodyOnly:    plugin.RawBodyOnly,
+			RequireSession: plugin.RequireSession,
 		}
 	}
 }
@@ -863,7 +872,7 @@ func (c CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
 type PrePlugin struct {
 	// Plugins configures custom plugins to be run on pre authentication stage.
 	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomPlugins `bson:"plugins" json:"plugins"`
+	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
 }
 
 // Fill fills PrePlugin from supplied Tyk classic api definition.
@@ -879,6 +888,40 @@ func (p *PrePlugin) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts PrePlugin into Tyk classic api definition.
 func (p *PrePlugin) ExtractTo(api *apidef.APIDefinition) {
+	if len(p.Plugins) == 0 {
+		api.CustomMiddleware.Pre = nil
+		return
+	}
+
 	api.CustomMiddleware.Pre = make([]apidef.MiddlewareDefinition, len(p.Plugins))
 	p.Plugins.ExtractTo(api.CustomMiddleware.Pre)
+}
+
+// PostAuthenticationPlugin configures post authentication plugins.
+type PostAuthenticationPlugin struct {
+	// Plugins configures custom plugins to be run on pre authentication stage.
+	// The plugins would be executed in the order of configuration in the list.
+	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
+}
+
+// Fill fills PostAuthenticationPlugin from supplied Tyk classic api definition.
+func (p *PostAuthenticationPlugin) Fill(api apidef.APIDefinition) {
+	if len(api.CustomMiddleware.PostKeyAuth) == 0 {
+		p.Plugins = nil
+		return
+	}
+
+	p.Plugins = make(CustomPlugins, len(api.CustomMiddleware.PostKeyAuth))
+	p.Plugins.Fill(api.CustomMiddleware.PostKeyAuth)
+}
+
+// ExtractTo extracts PostAuthenticationPlugin into Tyk classic api definition.
+func (p *PostAuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
+	if len(p.Plugins) == 0 {
+		api.CustomMiddleware.PostKeyAuth = nil
+		return
+	}
+
+	api.CustomMiddleware.PostKeyAuth = make([]apidef.MiddlewareDefinition, len(p.Plugins))
+	p.Plugins.ExtractTo(api.CustomMiddleware.PostKeyAuth)
 }

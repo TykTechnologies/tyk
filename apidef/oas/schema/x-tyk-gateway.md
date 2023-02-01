@@ -566,6 +566,11 @@ AuthenticationPlugin contains configuration related to custom authentication plu
 
 Tyk native API definition: `custom_middleware.auth_check`.
 
+**Field: `postAuthenticationPlugin` ([PostAuthenticationPlugin](#postauthenticationplugin))**
+PostAuthenticationPlugin contains configuration related to custom post authentication plugin.
+
+Tyk native API definition: `custom_middleware.post_key_auth`.
+
 **Field: `cache` ([Cache](#cache))**
 Cache contains the configurations related to caching.
 
@@ -672,6 +677,10 @@ Path is the path to shared object file in case of gopluign mode or path to js co
 **Field: `rawBodyOnly` (`boolean`)**
 RawBodyOnly if set to true, do not fill body in request or response object.
 
+**Field: `requireSession` (`boolean`)**
+RequireSession if set to true passes down the session information for plugins after authentication.
+RequireSession is used only with JSVM custom middleware.
+
 
 ### **AuthenticationPlugin**
 
@@ -686,6 +695,13 @@ Path is the path to shared object file in case of gopluign mode or path to js co
 
 **Field: `rawBodyOnly` (`boolean`)**
 RawBodyOnly if set to true, do not fill body in request or response object.
+
+
+### **PostAuthenticationPlugin**
+
+**Field: `plugins` (`[]`[CustomPlugin](#customplugin))**
+Plugins configures custom plugins to be run on pre authentication stage.
+The plugins would be executed in the order of configuration in the list.
 
 
 ### **Cache**
