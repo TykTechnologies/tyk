@@ -108,7 +108,7 @@ func TestValidateRequest(t *testing.T) {
 	err = oasAPI.Validate(context.Background())
 	assert.NoError(t, err)
 
-	ts.Gw.BuildAndLoadAPI(
+	apis := ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.VersionData = def.VersionData
 			spec.Name = "without regexp"
@@ -134,25 +134,39 @@ func TestValidateRequest(t *testing.T) {
 	headers := map[string]string{"Content-Type": "application/json"}
 
 	t.Run("default error response code", func(t *testing.T) {
-		_, _ = ts.Run(t, []test.TestCase{
-			{Data: `{"name": 123}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product/push"},
-			{Data: `{"name": 123}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
-			{Data: `{"name": "my-product"}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
-			{Data: `{"name": "my-product", "owner": {"name": 123}}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost,
-				Headers: headers, Path: "/product/post"},
-			{Data: `{"name": "my-product", "owner": {"name": "Furkan"}}`, Code: http.StatusOK, Method: http.MethodPost,
-				Headers: headers, Path: "/product/post"},
-			{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": 123}}}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost,
-				Headers: headers, Path: "/product/post"},
-			{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Code: http.StatusOK, Method: http.MethodPost,
-				Headers: headers, Path: "/product/post"},
-			{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": 123}}}`, Domain: "custom-domain",
-				Code: http.StatusUnprocessableEntity, Method: http.MethodPost, Headers: headers, Path: "/product-regexp1/something/post", Client: test.NewClientLocal()},
-			{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Domain: "custom-domain",
-				Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product-regexp1/something/post", Client: test.NewClientLocal()},
-			{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Domain: "custom-domain",
-				Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product-regexp2/something/suffix/post", Client: test.NewClientLocal()},
-		}...)
+		check := func(t *testing.T) {
+			_, _ = ts.Run(t, []test.TestCase{
+				{Data: `{"name": 123}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product/push"},
+				{Data: `{"name": 123}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
+				{Data: `{"name": "my-product"}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
+				{Data: `{"name": "my-product", "owner": {"name": 123}}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost,
+					Headers: headers, Path: "/product/post"},
+				{Data: `{"name": "my-product", "owner": {"name": "Furkan"}}`, Code: http.StatusOK, Method: http.MethodPost,
+					Headers: headers, Path: "/product/post"},
+				{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": 123}}}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost,
+					Headers: headers, Path: "/product/post"},
+				{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Code: http.StatusOK, Method: http.MethodPost,
+					Headers: headers, Path: "/product/post"},
+				{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": 123}}}`, Domain: "custom-domain",
+					Code: http.StatusUnprocessableEntity, Method: http.MethodPost, Headers: headers, Path: "/product-regexp1/something/post", Client: test.NewClientLocal()},
+				{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Domain: "custom-domain",
+					Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product-regexp1/something/post", Client: test.NewClientLocal()},
+				{Data: `{"name": "my-product", "owner": {"name": "Furkan", "country": {"name": "Türkiye"}}}`, Domain: "custom-domain",
+					Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product-regexp2/something/suffix/post", Client: test.NewClientLocal()},
+			}...)
+		}
+
+		t.Run("stripListenPath=false", func(t *testing.T) {
+			check(t)
+		})
+
+		t.Run("stripListenPath=true", func(t *testing.T) {
+			apis[0].Proxy.StripListenPath = true
+			apis[1].Proxy.StripListenPath = true
+			apis[2].Proxy.StripListenPath = true
+			ts.Gw.LoadAPI(apis...)
+			check(t)
+		})
 	})
 
 	t.Run("custom error response code", func(t *testing.T) {
@@ -170,5 +184,4 @@ func TestValidateRequest(t *testing.T) {
 			{Data: `{"name": 123}`, Code: http.StatusTeapot, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
 		}...)
 	})
-
 }
