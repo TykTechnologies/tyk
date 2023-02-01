@@ -20,13 +20,13 @@ const acceptCode = "X-Tyk-Accept-Example-Code"
 const acceptExampleName = "X-Tyk-Accept-Example-Name"
 
 func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {
-	route, _, err := p.TykAPISpec.OASRouter.FindRoute(r)
-	if route == nil || err != nil {
+	operation := ctxGetOperation(r)
+	if operation == nil {
 		return nil, nil
 	}
 
-	operation := p.TykAPISpec.OAS.GetTykExtension().Middleware.Operations[route.Operation.OperationID]
-	if operation == nil || !operation.MockResponse.Enabled {
+	mockResponse := operation.MockResponse
+	if mockResponse == nil || !mockResponse.Enabled {
 		return nil, nil
 	}
 
@@ -36,18 +36,17 @@ func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {
 	var contentType string
 	var body []byte
 	var headers map[string]string
+	var err error
 
-	tykExampleRespOp := p.TykAPISpec.OAS.GetTykExtension().Middleware.Operations[route.Operation.OperationID].MockResponse
-
-	if tykExampleRespOp.FromOASExamples != nil && tykExampleRespOp.FromOASExamples.Enabled {
-		code, contentType, body, headers, err = mockFromOAS(r, route.Operation, tykExampleRespOp.FromOASExamples)
+	if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
+		code, contentType, body, headers, err = mockFromOAS(r, operation.route.Operation, mockResponse.FromOASExamples)
 		res.StatusCode = code
 		if err != nil {
 			err = fmt.Errorf("mock: %s", err)
 			return res, err
 		}
 	} else {
-		code, body, headers = mockFromConfig(tykExampleRespOp)
+		code, body, headers = mockFromConfig(mockResponse)
 	}
 
 	for key, val := range headers {

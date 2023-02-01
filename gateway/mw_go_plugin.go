@@ -118,7 +118,7 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 }
 
 // loadPlugin loads the plugin file from m.Path, it will try
-//converting it to the tyk version aware format: {plugin_name}_{tyk_version}_{os}_{arch}.so
+// converting it to the tyk version aware format: {plugin_name}_{tyk_version}_{os}_{arch}.so
 // if the file doesn't exist then it will again but with a gw version that is not prefixed by 'v'
 // later, it will try with m.path which can be {plugin_name}.so
 func (m *GoPluginMiddleware) loadPlugin() bool {

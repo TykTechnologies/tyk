@@ -55,33 +55,36 @@ type traceResponse struct {
 // Used to test API definition by sending sample request,
 // and analysisng output of both response and logs
 //
-//---
+// ---
 // requestBody:
-//   content:
-//     application/json:
-//       schema:
-//         "$ref": "#/definitions/traceRequest"
-//       examples:
-//         request:
-//           method: GET
-//           path: /get
-//           headers:
-//              Authorization: key
-//         spec:
-//           api_name: "Test"
+//
+//	content:
+//	  application/json:
+//	    schema:
+//	      "$ref": "#/definitions/traceRequest"
+//	    examples:
+//	      request:
+//	        method: GET
+//	        path: /get
+//	        headers:
+//	           Authorization: key
+//	      spec:
+//	        api_name: "Test"
+//
 // responses:
-//   200:
-//     description: Success tracing request
-//     schema:
-//       "$ref": "#/definitions/traceResponse"
-//     examples:
-//       message: "ok"
-//       response:
-//         code: 200
-//         headers:
-//           Header: value
-//         body: body-value
-//       logs: {...}\n{...}
+//
+//	200:
+//	  description: Success tracing request
+//	  schema:
+//	    "$ref": "#/definitions/traceResponse"
+//	  examples:
+//	    message: "ok"
+//	    response:
+//	      code: 200
+//	      headers:
+//	        Header: value
+//	      body: body-value
+//	    logs: {...}\n{...}
 func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	var traceReq traceRequest
 	if err := json.NewDecoder(r.Body).Decode(&traceReq); err != nil {

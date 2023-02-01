@@ -172,7 +172,7 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(
 	rc.statusCheck(ctx, conf, c)
 }
 
-//statusCheck will check the Redis status each second. If we transition from a disconnected to connected state, it will send a msg to the reconnect chan.
+// statusCheck will check the Redis status each second. If we transition from a disconnected to connected state, it will send a msg to the reconnect chan.
 // This method will be constantly modifying the redisUp control flag.
 func (rc *RedisController) statusCheck(ctx context.Context, conf *config.Config, clusters []RedisCluster) {
 	tick := time.NewTicker(time.Second)
