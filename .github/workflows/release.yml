@@ -105,9 +105,9 @@ jobs:
             *.txt
       - name: Fix vendor
         run: |
-          export GOPATH=/go
-          mkdir -p /go/src || true
-          whereis go
+          #          export GOPATH=/go
+          #mkdir -p /go/src || true
+          #whereis go
           #          go mod tidy
           #          go mod vendor
           #echo "Moving vendor"
