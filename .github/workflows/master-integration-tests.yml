@@ -25,7 +25,7 @@ jobs:
           cache: true
 
       - name: "Install task"
-        run: "go install github.com/go-task/task/cmd/task@latest"
+        run: "go install github.com/go-task/task/v3/cmd/task@latest"
 
       - name: "Test environment up"
         run: "task integration:redis:up"
