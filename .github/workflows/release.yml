@@ -108,8 +108,8 @@ jobs:
           #          export GOPATH=/go
           #mkdir -p /go/src || true
           #whereis go
-          #          go mod tidy
-          #          go mod vendor
+          go mod tidy
+          go mod vendor
           #echo "Moving vendor"
           #          cp -r -f vendor/* $GOPATH/src
           #          rm -rf vendor
