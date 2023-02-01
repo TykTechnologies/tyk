@@ -25,8 +25,11 @@ func TestMockResponse(t *testing.T) {
 		Enabled: true,
 		Code:    http.StatusTeapot,
 		Body:    body,
-		Headers: map[string]string{
-			headerKey: headerValue,
+		Headers: []oas.Header{
+			{
+				Name:  headerKey,
+				Value: headerValue,
+			},
 		},
 		FromOASExamples: &oas.FromOASExamples{},
 	}
@@ -134,8 +137,11 @@ func TestMockResponse(t *testing.T) {
 func Test_mockFromConfig(t *testing.T) {
 	const body = "my-mock-response-body"
 
-	expectedHeaders := map[string]string{
-		"key": "value",
+	expectedHeaders := []oas.Header{
+		{
+			Name:  "key",
+			Value: "value",
+		},
 	}
 
 	tykMockRespOp := &oas.MockResponse{
@@ -258,9 +264,9 @@ func Test_mockFromOAS(t *testing.T) {
 			assert.Equal(t, "application/json", contentType)
 			assert.Equal(t, `"Furkan"`, string(body))
 
-			expectedHeaders := map[string]string{
-				"Test-header-1": "test-header-value-1",
-				"Test-header-2": "test-header-value-2",
+			expectedHeaders := []oas.Header{
+				{Name: "Test-header-1", Value: "test-header-value-1"},
+				{Name: "Test-header-2", Value: "test-header-value-2"},
 			}
 			assert.Equal(t, expectedHeaders, headers)
 		})
