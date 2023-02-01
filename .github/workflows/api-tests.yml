@@ -91,7 +91,7 @@ jobs:
     - name: start docker compose
       run: docker-compose -f tyk-automated-tests/ci/ci_testing_env.yml up -d
       env:
-        GOLANG_VERSION: 1.17
+        GO_VERSION: 1.17
         TYK_DB_LICENSEKEY: ${{secrets.DASH_LICENSE}}
         DASH_REPO_PATH: /home/runner/work/tyk/tyk/tyk-analytics
         GW_REPO_PATH: /home/runner/work/tyk/tyk/tyk
