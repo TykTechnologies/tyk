@@ -541,7 +541,7 @@ type MockResponse struct {
 	// Body is the HTTP response body that will be returned.
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 	// Headers are the HTTP response headers that will be returned.
-	Headers map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
+	Headers []Header `bson:"headers,omitempty" json:"headers,omitempty"`
 	// FromOASExamples is the configuration to extract a mock response from OAS documentation.
 	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }

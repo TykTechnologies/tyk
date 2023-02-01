@@ -696,7 +696,9 @@ func (a *Allowance) Import(enabled bool) {
 
 // Header holds a header name and value pair.
 type Header struct {
-	Name  string `bson:"name" json:"name"`
+	// Name is the name of the header.
+	Name string `bson:"name" json:"name"`
+	// Value is the value of the header.
 	Value string `bson:"value" json:"value"`
 }
 

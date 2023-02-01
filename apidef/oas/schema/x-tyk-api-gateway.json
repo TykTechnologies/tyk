@@ -546,7 +546,12 @@
           "type": "string"
         },
         "headers": {
-          "type": "object"
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-Header"
+            }
+          ]
         },
         "fromOASExamples": {
           "properties": {
@@ -1186,6 +1191,21 @@
           "type": "boolean"
         }
       }
+    },
+    "X-Tyk-Header": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ]
     }
   }
 }
