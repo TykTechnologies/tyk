@@ -115,6 +115,7 @@ jobs:
           rm -rf vendor
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
+          rm -rf go.mod go.sum
 
       - uses: goreleaser/goreleaser-action@v3
         with:
