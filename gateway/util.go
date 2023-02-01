@@ -148,3 +148,49 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 
 	return result.String()
 }
+
+func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
+	specChanged := existingSpec != nil && existingSpec.Checksum != newSpec.Checksum
+	if specChanged {
+		return true
+	}
+
+	if mwEnabled(newSpec.CustomMiddleware.AuthCheck) {
+		return true
+	}
+
+	customPlugin := mwsEnabled(newSpec.CustomMiddleware.Pre)
+	if customPlugin {
+		return true
+	}
+
+	customPlugin = mwsEnabled(newSpec.CustomMiddleware.PostKeyAuth)
+	if customPlugin {
+		return true
+	}
+
+	customPlugin = mwsEnabled(newSpec.CustomMiddleware.Post)
+	if customPlugin {
+		return true
+	}
+
+	customPlugin = mwsEnabled(newSpec.CustomMiddleware.Response)
+	if customPlugin {
+		return true
+	}
+
+	return false
+}
+
+func mwsEnabled(mwDefs []apidef.MiddlewareDefinition) bool {
+	for _, mwDef := range mwDefs {
+		if mwEnabled(mwDef) {
+			return true
+		}
+	}
+	return false
+}
+
+func mwEnabled(mwDef apidef.MiddlewareDefinition) bool {
+	return !mwDef.Disabled && mwDef.Path != "" && mwDef.Name != ""
+}

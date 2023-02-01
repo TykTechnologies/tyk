@@ -236,3 +236,104 @@ func Test_getAPIURL(t *testing.T) {
 		})
 	}
 }
+
+func Test_shouldReloadSpec(t *testing.T) {
+	t.Run("checksum mismatch", func(t *testing.T) {
+		existingSpec, newSpec := &APISpec{Checksum: "1"}, &APISpec{Checksum: "2"}
+		assert.True(t, shouldReloadSpec(existingSpec, newSpec))
+	})
+
+	t.Run("mw enabled", func(t *testing.T) {
+		tcs := []struct {
+			spec         *APISpec
+			shouldReload bool
+		}{
+			{
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddleware: apidef.MiddlewareSection{
+							AuthCheck: apidef.MiddlewareDefinition{
+								Disabled: false,
+								Name:     "auth",
+								Path:     "path",
+							},
+						},
+					},
+				},
+				shouldReload: true,
+			},
+			{
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddleware: apidef.MiddlewareSection{
+							Pre: []apidef.MiddlewareDefinition{
+								{
+									Disabled: false,
+									Name:     "pre",
+									Path:     "path",
+								},
+							},
+						},
+					},
+				},
+				shouldReload: true,
+			},
+			{
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddleware: apidef.MiddlewareSection{
+							Pre: []apidef.MiddlewareDefinition{
+								{
+									Disabled: false,
+									Name:     "postAuth",
+									Path:     "path",
+								},
+							},
+						},
+					},
+				},
+				shouldReload: true,
+			},
+			{
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddleware: apidef.MiddlewareSection{
+							Pre: []apidef.MiddlewareDefinition{
+								{
+									Disabled: false,
+									Name:     "post",
+									Path:     "path",
+								},
+							},
+						},
+					},
+				},
+				shouldReload: true,
+			},
+			{
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddleware: apidef.MiddlewareSection{
+							Pre: []apidef.MiddlewareDefinition{
+								{
+									Disabled: false,
+									Name:     "response",
+									Path:     "path",
+								},
+							},
+						},
+					},
+				},
+				shouldReload: true,
+			},
+			{
+				spec:         &APISpec{APIDefinition: &apidef.APIDefinition{}},
+				shouldReload: false,
+			},
+		}
+
+		for _, tc := range tcs {
+			assert.Equal(t, tc.shouldReload, shouldReloadSpec(nil, tc.spec))
+		}
+	})
+}
