@@ -62,7 +62,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.6.0
 	github.com/square/go-jose v2.4.1+incompatible
-	github.com/uber/jaeger-client-go v2.20.0+incompatible
+	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/xeipuuv/gojsonschema v1.2.0
@@ -79,9 +79,11 @@ require (
 )
 
 require (
+	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // test
 	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e // test
 	github.com/stretchr/testify v1.7.1 // test
+	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/valyala/fasthttp v1.43.0 // test
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
 )
