@@ -118,7 +118,11 @@ jobs:
 
     - name: Waiting for dashboard
       run: |
-        while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:3000/hello/)" != "200" ]]; do sleep 60 && echo "waiting for dashboard '$(date +"%T")'"; done
+        while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:3000/hello/)" != "200" ]]; do
+          echo "waiting for dashboard '$(date +"%T")'"
+          sleep 60
+          docker-compose -f tyk-automated-tests/ci/ci_testing_env.yml ps
+        done
       timeout-minutes: 15    
     
     - name: Test with pytest
