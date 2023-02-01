@@ -5,7 +5,7 @@ tasks:
   default:
     desc: Run all code generation steps
     cmds:
-      - task: jsonnet
+      - echo "No steps yet"
 
   jsonnet:
     desc: Generate github actions with jsonnet
