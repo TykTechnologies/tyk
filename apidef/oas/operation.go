@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -111,7 +112,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTransformRequestBody(ep.Transform)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
-	s.fillOASValidateRequest(ep.ValidateRequest)
+	s.fillOASValidateRequest(ep.ValidateJSON)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -453,8 +454,8 @@ type ValidateRequest struct {
 }
 
 // Fill fills *ValidateRequest receiver from apidef.ValidateRequestMeta.
-func (v *ValidateRequest) Fill(meta apidef.ValidateRequestMeta) {
-	v.Enabled = meta.Enabled
+func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
+	v.Enabled = !meta.Disabled
 	v.ErrorResponseCode = meta.ErrorResponseCode
 }
 
@@ -480,9 +481,43 @@ func (v *ValidateRequest) Import(enabled bool) {
 	v.ErrorResponseCode = http.StatusUnprocessableEntity
 }
 
-func (s *OAS) fillOASValidateRequest(metas []apidef.ValidateRequestMeta) {
+func convertSchema(mapSchema map[string]interface{}) (*openapi3.Schema, error) {
+	bytes, err := json.Marshal(mapSchema)
+	if err != nil {
+		return nil, err
+	}
+
+	schema := openapi3.NewSchema()
+	err = schema.UnmarshalJSON(bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return schema, nil
+}
+
+func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
+
+		operation := s.Paths.Find(meta.Path).GetOperation(meta.Method)
+		requestBodyRef := operation.RequestBody
+		if operation.RequestBody == nil {
+			requestBodyRef = &openapi3.RequestBodyRef{}
+			operation.RequestBody = requestBodyRef
+		}
+
+		if requestBodyRef.Value == nil {
+			requestBodyRef.Value = openapi3.NewRequestBody()
+		}
+
+		schema, err := convertSchema(meta.Schema)
+		if err != nil {
+			log.WithError(err).Error("Couldn't convert classic API validate JSON schema to OAS")
+		} else {
+			requestBodyRef.Value.WithJSONSchema(schema)
+		}
+
 		tykOp := s.GetTykExtension().getOperation(operationID)
 
 		if tykOp.ValidateRequest == nil {

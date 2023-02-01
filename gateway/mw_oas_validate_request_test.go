@@ -196,3 +196,43 @@ func TestValidateRequest(t *testing.T) {
 		}...)
 	})
 }
+
+func TestValidateRequest_AfterMigration(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/listen/"
+		spec.Proxy.StripListenPath = true
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.ExtendedPaths.ValidateJSON = []apidef.ValidatePathMeta{
+				{
+					Method: http.MethodPost,
+					Path:   "/post",
+					Schema: map[string]interface{}{
+
+						"required": []string{"name"},
+					},
+					ErrorResponseCode: http.StatusTeapot,
+				},
+			}
+		})
+	})[0]
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Method: http.MethodPost, Path: "/listen/without_validation", Data: "{not_valid}", Code: http.StatusOK},
+		{Method: http.MethodPost, Path: "/listen/post", Data: `{"age":27}`, Code: http.StatusTeapot},
+		{Method: http.MethodPost, Path: "/listen/post", Data: `{"name":"Furkan"}`, Code: http.StatusOK},
+	}...)
+
+	migratedAPI, _, err := oas.MigrateAndFillOAS(api.APIDefinition)
+	assert.NoError(t, err)
+
+	ts.Gw.LoadAPI(&APISpec{APIDefinition: migratedAPI.Classic, OAS: *migratedAPI.OAS})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Method: http.MethodPost, Path: "/listen/without_validation", Data: "{not_valid}", Code: http.StatusOK},
+		{Method: http.MethodPost, Path: "/listen/post", Data: `{"age":27}`, Code: http.StatusTeapot},
+		{Method: http.MethodPost, Path: "/listen/post", Data: `{"name":"Furkan"}`, Code: http.StatusOK},
+	}...)
+}
