@@ -8,6 +8,7 @@ on:
 
 env:
   GOPRIVATE: github.com/TykTechnologies
+  DOCKER_BUILDKIT: 1
 
 jobs:
   test:
@@ -61,7 +62,7 @@ jobs:
         token: ${{ secrets.ORG_GH_TOKEN }}
         path: tyk-automated-tests
 # TODO: remove after merged to master
-        ref: 6c41b3907d3a154dc1b90a8d5c54fba230dd506d
+        ref: c8e20488eb8240d86a6324ea164a787edbb2548b
 #        ref: ${{ steps.check_test_branch.outputs.branch	 }}
 
     - name: Check if dashboard branch exists
