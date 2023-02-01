@@ -571,6 +571,11 @@ PostAuthenticationPlugin contains configuration related to custom post authentic
 
 Tyk native API definition: `custom_middleware.post_key_auth`.
 
+**Field: `postPlugin` ([PostPlugin](#postplugin))**
+PostPlugin contains configuration related to custom post plugin.
+
+Tyk native API definition: `custom_middleware.post`.
+
 **Field: `cache` ([Cache](#cache))**
 Cache contains the configurations related to caching.
 
@@ -701,6 +706,13 @@ RawBodyOnly if set to true, do not fill body in request or response object.
 
 **Field: `plugins` (`[]`[CustomPlugin](#customplugin))**
 Plugins configures custom plugins to be run on pre authentication stage.
+The plugins would be executed in the order of configuration in the list.
+
+
+### **PostPlugin**
+
+**Field: `plugins` (`[]`[CustomPlugin](#customplugin))**
+Plugins configures custom plugins to be run on post stage.
 The plugins would be executed in the order of configuration in the list.
 
 

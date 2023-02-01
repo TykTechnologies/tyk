@@ -427,3 +427,44 @@ func TestPostAuthenticationPlugin(t *testing.T) {
 		assert.Equal(t, expectedPostAuthPlugin, actualPostAuthPlugin)
 	})
 }
+
+func TestPostPlugin(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var (
+			emptyPostPlugin PostPlugin
+			convertedAPI    apidef.APIDefinition
+		)
+
+		convertedAPI.SetDisabledFlags()
+		emptyPostPlugin.ExtractTo(&convertedAPI)
+
+		var resultPostPlugin PostPlugin
+		resultPostPlugin.Fill(convertedAPI)
+
+		assert.Equal(t, emptyPostPlugin, resultPostPlugin)
+	})
+
+	t.Run("with values", func(t *testing.T) {
+		t.Parallel()
+		expectedPostPlugin := PostPlugin{
+			Plugins: CustomPlugins{
+				{
+					Enabled:      true,
+					FunctionName: "post",
+					Path:         "/path/to/plugin",
+					RawBodyOnly:  true,
+				},
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
+		expectedPostPlugin.ExtractTo(&api)
+
+		actualPostPlugin := PostPlugin{}
+		actualPostPlugin.Fill(api)
+		assert.Equal(t, expectedPostPlugin, actualPostPlugin)
+	})
+}

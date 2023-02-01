@@ -591,6 +591,7 @@ func TestSetDisabledFlags(t *testing.T) {
 		CustomMiddleware: MiddlewareSection{
 			Pre:         make([]MiddlewareDefinition, 1),
 			PostKeyAuth: make([]MiddlewareDefinition, 1),
+			Post:        make([]MiddlewareDefinition, 1),
 		},
 	}
 	expectedAPIDef := APIDefinition{
@@ -604,6 +605,11 @@ func TestSetDisabledFlags(t *testing.T) {
 				},
 			},
 			PostKeyAuth: []MiddlewareDefinition{
+				{
+					Disabled: true,
+				},
+			},
+			Post: []MiddlewareDefinition{
 				{
 					Disabled: true,
 				},
