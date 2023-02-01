@@ -576,6 +576,11 @@ PostPlugin contains configuration related to custom post plugin.
 
 Tyk native API definition: `custom_middleware.post`.
 
+**Field: `responsePlugin` ([ResponsePlugin](#responseplugin))**
+ResponsePlugin contains configuration related to custom post plugin.
+
+Tyk native API definition: `custom_middleware.post`.
+
 **Field: `cache` ([Cache](#cache))**
 Cache contains the configurations related to caching.
 
@@ -710,6 +715,13 @@ The plugins would be executed in the order of configuration in the list.
 
 
 ### **PostPlugin**
+
+**Field: `plugins` (`[]`[CustomPlugin](#customplugin))**
+Plugins configures custom plugins to be run on post stage.
+The plugins would be executed in the order of configuration in the list.
+
+
+### **ResponsePlugin**
 
 **Field: `plugins` (`[]`[CustomPlugin](#customplugin))**
 Plugins configures custom plugins to be run on post stage.

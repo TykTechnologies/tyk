@@ -61,6 +61,10 @@ type Global struct {
 	// Tyk native API definition: `custom_middleware.post`.
 	PostPlugin *PostPlugin `bson:"postPlugin,omitempty" json:"postPlugin,omitempty"`
 
+	// ResponsePlugin contains configuration related to custom post plugin.
+	// Tyk native API definition: `custom_middleware.post`.
+	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty"`
+
 	// Cache contains the configurations related to caching.
 	// Tyk native API definition: `cache_options`.
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
@@ -957,4 +961,33 @@ func (p *PostPlugin) ExtractTo(api *apidef.APIDefinition) {
 
 	api.CustomMiddleware.Post = make([]apidef.MiddlewareDefinition, len(p.Plugins))
 	p.Plugins.ExtractTo(api.CustomMiddleware.Post)
+}
+
+// ResponsePlugin configures response plugins.
+type ResponsePlugin struct {
+	// Plugins configures custom plugins to be run on post stage.
+	// The plugins would be executed in the order of configuration in the list.
+	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
+}
+
+// Fill fills ResponsePlugin from supplied Tyk classic api definition.
+func (p *ResponsePlugin) Fill(api apidef.APIDefinition) {
+	if len(api.CustomMiddleware.Response) == 0 {
+		p.Plugins = nil
+		return
+	}
+
+	p.Plugins = make(CustomPlugins, len(api.CustomMiddleware.Response))
+	p.Plugins.Fill(api.CustomMiddleware.Response)
+}
+
+// ExtractTo extracts PostPlugin into Tyk classic api definition.
+func (p *ResponsePlugin) ExtractTo(api *apidef.APIDefinition) {
+	if len(p.Plugins) == 0 {
+		api.CustomMiddleware.Response = nil
+		return
+	}
+
+	api.CustomMiddleware.Response = make([]apidef.MiddlewareDefinition, len(p.Plugins))
+	p.Plugins.ExtractTo(api.CustomMiddleware.Response)
 }
