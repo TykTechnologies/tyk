@@ -596,11 +596,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 					if keyFound {
 						session.MetaData["tyk_developer_id"] = developerID
 					}
-					
+
 					// pteam-<id>, porg-<id>
-					clientTags, keyFound := data["tags"].([]string)
-					if keyFound {
-						session.Tags = append(session.Tags, clientTags...)
+					clientTags, ok := data["tags"].([]interface{})
+					if ok {
+						for _, tag := range clientTags {
+							session.Tags = append(session.Tags, tag.(string))
+						}
 					}
 				}
 			}
