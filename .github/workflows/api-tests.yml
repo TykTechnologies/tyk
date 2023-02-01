@@ -60,7 +60,8 @@ jobs:
         repository: TykTechnologies/tyk-automated-tests
         token: ${{ secrets.ORG_GH_TOKEN }}
         path: tyk-automated-tests
-        ref: ${{ steps.check_test_branch.outputs.branch	 }}
+        ref: fix/dashboard-build-go_version-and-go-install
+#        ref: ${{ steps.check_test_branch.outputs.branch	 }}
 
     - name: Check if dashboard branch exists
       id: check_dashboard_branch
@@ -85,7 +86,6 @@ jobs:
         token: ${{ secrets.ORG_GH_TOKEN }}
         submodules: true
         path: tyk-analytics
-        ref: fix/dashboard-build-go_version-and-go-install
         ref: ${{ steps.check_dashboard_branch.outputs.branch	 }}
 
     - name: start docker compose
