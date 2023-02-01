@@ -62,7 +62,7 @@ jobs:
         token: ${{ secrets.ORG_GH_TOKEN }}
         path: tyk-automated-tests
 # TODO: remove after merged to master
-        ref: c8e20488eb8240d86a6324ea164a787edbb2548b
+        ref: ce034fd740f17f03eb6a845343faed78dab810fb
 #        ref: ${{ steps.check_test_branch.outputs.branch	 }}
 
     - name: Check if dashboard branch exists
