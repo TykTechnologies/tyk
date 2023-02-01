@@ -120,7 +120,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v3
         with:
           version: latest
-          args: release --rm-dist -f ${{ matrix.goreleaser }}
+          args: release --rm-dist -f ${{ matrix.goreleaser }} --skip-validate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
