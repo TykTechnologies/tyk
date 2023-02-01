@@ -13,30 +13,24 @@ jobs:
     name: "Redis integration tests"
     runs-on: "ubuntu-latest"
 
-    services:
-      redis:
-        image: "redis:6.0-alpine"
-        ports:
-        - 6379:6379
-
-      redis7:
-        image: "redis:7.0-alpine"
-        ports:
-        - 6380:6379
-
     steps:
-    - name: "Checkout tyk"
-      uses: "actions/checkout@v3"
+    - uses: "actions/checkout@v3"
       with:
         fetch-depth: 1
 
-    - name: "Setup Go"
-      uses: "actions/setup-go@v2"
+    - uses: "actions/setup-go@v3"
       with:
         go-version: 1.17
+        cache: true
 
     - name: "Install task"
       run: "go install github.com/go-task/task/cmd/task@latest"
 
-    - name: "Run integration tests for redis"
-      run: "task integration:redis"
+    - name: "Test environment up"
+      run: "task integration:redis:up"
+
+    - name: "Run integration tests"
+      run: "task integration:redis:test"
+
+    - name: "Test environment down"
+      run: "task integration:redis:down"
