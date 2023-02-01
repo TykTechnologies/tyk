@@ -258,6 +258,9 @@
         },
         "rawBodyOnly": {
           "type": "boolean"
+        },
+        "requireSession": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -410,6 +413,12 @@
         },
         "authenticationPlugin": {
           "$ref": "#/definitions/X-Tyk-AuthenticationPlugin"
+        },
+        "postAuthenticationPlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+        },
+        "postPlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-Cache"
