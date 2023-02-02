@@ -59,8 +59,8 @@ done < $PLUGIN_SOURCE_PATH/dependencies.txt
 
 go mod edit -replace github.com/TykTechnologies/tyk=$TYK_GW_PATH
 
-# Do a final verification - this updates all the go.sum entries to current.
-go mod verify
+# Do a final verification.
+go mod tidy && go mod verify
 
 rm $PLUGIN_SOURCE_PATH/dependencies.txt
 rm $TYK_GW_PATH/dependencies.txt
