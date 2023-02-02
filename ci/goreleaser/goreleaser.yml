@@ -142,6 +142,7 @@ dockers:
   extra_files:
     - ci/images/plugin-compiler
     - go.mod
+    - go.sum
     - apidef
     - certs
     - checkup
