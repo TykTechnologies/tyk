@@ -3,7 +3,7 @@ name: Policy as Code
 on:
   pull_request:
     paths:
-      - ci/repo-policy/**.tf
+      - ci/repo-policy/**
 
 env:
   TERRAFORM_DIR: "./ci/repo-policy"
@@ -38,4 +38,6 @@ jobs:
         working-directory: ${{ env.TERRAFORM_DIR }}
         id: plan
         run: |
+          echo "::group::Terraform Plan"
           terraform validate && terraform plan
+          echo "::endgroup::"
