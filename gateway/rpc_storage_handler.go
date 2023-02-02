@@ -132,17 +132,26 @@ func (r *RPCStorageHandler) Connect() bool {
 		rpcConfig,
 		r.SuppressRegister,
 		dispatcherFuncs,
-		func(userKey string, groupID string) interface{} {
-			return apidef.GroupLoginRequest{
-				UserKey: userKey,
-				GroupID: groupID,
-			}
-		},
+		r.getGroupLoginCallback(r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled),
 		func() {
 			r.Gw.reloadURLStructure(nil)
 		},
 		r.DoReload,
 	)
+}
+
+func (r *RPCStorageHandler) getGroupLoginCallback(synchroniserEnabled bool) func(userKey string, groupID string) interface{} {
+	groupLoginCallbackFn := func(userKey string, groupID string) interface{} {
+		return apidef.GroupLoginRequest{
+			UserKey: userKey,
+			GroupID: groupID,
+		}
+	}
+	if synchroniserEnabled {
+		forcer := rpc.NewSyncForcer(r.Gw.RedisController)
+		groupLoginCallbackFn = forcer.GroupLoginCallback
+	}
+	return groupLoginCallbackFn
 }
 
 func (r *RPCStorageHandler) hashKey(in string) string {
@@ -909,7 +918,7 @@ func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, ev
 	}
 }
 
-// ProcessOauthClientsOps performs the appropiate action for the received clients
+// ProcessOauthClientsOps performs the appropriate action for the received clients
 // it can be any of the Create,Update and Delete operations
 func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 	for clientInfo, action := range clients {

@@ -57,10 +57,8 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
-					URL: "http://localhost:8080",
-					Header: http.Header{
-						"Authorization": []string{"123abc"},
-					},
+					URL:    "http://localhost:8080",
+					Header: map[string][]string{},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
 					URL:    "http://localhost:8080",
@@ -125,7 +123,6 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 				Fetch: graphqlDataSource.FetchConfiguration{
 					URL: "http://api-name",
 					Header: http.Header{
-						"Authorization":  []string{"123abc"},
 						"X-Tyk-Internal": []string{"true"},
 					},
 				},
@@ -295,10 +292,8 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
-					URL: "http://localhost:8080",
-					Header: http.Header{
-						"Authorization": []string{"123abc"},
-					},
+					URL:    "http://localhost:8080",
+					Header: http.Header{},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
 					URL:    "http://localhost:8080",

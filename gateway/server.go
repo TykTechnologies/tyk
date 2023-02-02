@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -284,6 +285,15 @@ func (gw *Gateway) getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
+func (gw *Gateway) getAPIDefinition(apiID string) (*apidef.APIDefinition, error) {
+	apiSpec := gw.getApiSpec(apiID)
+	if apiSpec == nil {
+		return nil, errors.New("API not found")
+	}
+
+	return apiSpec.APIDefinition, nil
+}
+
 func (gw *Gateway) getPolicy(polID string) user.Policy {
 	gw.policiesMu.RLock()
 	pol := gw.policiesByID[polID]
@@ -480,14 +490,12 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 		}
 	}
 	var filter []*APISpec
-	var tmpCheckSum = make(map[string]struct{})
 	for _, v := range s {
 		if err := v.Validate(); err != nil {
 			mainLog.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")
 			continue
 		}
 		filter = append(filter, v)
-		tmpCheckSum[v.Checksum] = struct{}{}
 	}
 
 	gw.apisMu.Lock()
@@ -618,6 +626,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/reload", gw.resetHandler(nil)).Methods("GET")
 
 	if !gw.isRPCMode() {
+		versionsHandler := NewVersionHandler(gw.getAPIDefinition)
 		r.HandleFunc("/org/keys", gw.orgHandler).Methods("GET")
 		r.HandleFunc("/org/keys/{keyName:[^/]*}", gw.orgHandler).Methods("POST", "PUT", "GET", "DELETE")
 		r.HandleFunc("/keys/policy/{keyName}", gw.policyUpdateHandler).Methods("POST")
@@ -630,12 +639,14 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/apis/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodPost)
 		r.HandleFunc("/apis/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodPut)
 		r.HandleFunc("/apis/{apiID}", gw.apiHandler).Methods(http.MethodDelete)
+		r.HandleFunc("/apis/{apiID}/versions", versionsHandler.ServeHTTP).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/export", gw.apiOASExportHandler).Methods("GET")
 		r.HandleFunc("/apis/oas/import", gw.blockInDashboardMode(gw.validateOAS(gw.makeImportedOASTykAPI(gw.apiOASPostHandler)))).Methods(http.MethodPost)
 		r.HandleFunc("/apis/oas/{apiID}", gw.apiOASGetHandler).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.validateOAS(gw.apiOASPutHandler))).Methods(http.MethodPut)
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.validateOAS(gw.apiOASPatchHandler))).Methods(http.MethodPatch)
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodDelete)
+		r.HandleFunc("/apis/oas/{apiID}/versions", versionsHandler.ServeHTTP).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/{apiID}/export", gw.apiOASExportHandler).Methods("GET")
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
@@ -753,7 +764,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	mwDriver := apidef.MiddlewareDriver("")
 
 	// Set AuthCheck hook
-	if spec.CustomMiddleware.AuthCheck.Name != "" {
+	if !spec.CustomMiddleware.AuthCheck.Disabled && spec.CustomMiddleware.AuthCheck.Name != "" {
 		mwAuthCheckFunc = spec.CustomMiddleware.AuthCheck
 		if spec.CustomMiddleware.AuthCheck.Path != "" {
 			// Feed a JS file to Otto
@@ -763,11 +774,19 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 	// Load from the configuration
 	for _, mwObj := range spec.CustomMiddleware.Pre {
+		if mwObj.Disabled {
+			continue
+		}
+
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPreFuncs = append(mwPreFuncs, mwObj)
 		mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
 	for _, mwObj := range spec.CustomMiddleware.Post {
+		if mwObj.Disabled {
+			continue
+		}
+
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPostFuncs = append(mwPostFuncs, mwObj)
 		mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
@@ -819,6 +838,10 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 	// Load PostAuthCheck hooks
 	for _, mwObj := range spec.CustomMiddleware.PostKeyAuth {
+		if mwObj.Disabled {
+			continue
+		}
+
 		if mwObj.Path != "" {
 			// Otto files are specified here
 			mwPaths = append(mwPaths, mwObj.Path)
@@ -828,6 +851,10 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 	// Load response hooks
 	for _, mw := range spec.CustomMiddleware.Response {
+		if mw.Disabled {
+			continue
+		}
+
 		mwResponseFuncs = append(mwResponseFuncs, mw)
 	}
 

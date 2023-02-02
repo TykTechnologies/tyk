@@ -24,6 +24,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
+
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -127,7 +131,7 @@ func (r *ReloadMachinery) OnReload() {
 	}
 }
 
-// Reloaded returns true if a read has occured since r was enabled
+// Reloaded returns true if a read has occurred since r was enabled
 func (r *ReloadMachinery) Reloaded() bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -215,7 +219,7 @@ func (r *ReloadMachinery) Tick() {
 	r.reloadTick <- time.Time{}
 }
 
-// TickOk triggers a reload and ensures a queue happend and a reload cycle
+// TickOk triggers a reload and ensures a queue happened and a reload cycle
 // happens. This will block until all the cases are met.
 func (r *ReloadMachinery) TickOk(t *testing.T) {
 	r.EnsureQueued(t)
@@ -1038,9 +1042,9 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 	return gw
 }
 
-func (t *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
+func (s *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
 	path = strings.Trim(path, "/")
-	t.dynamicHandlers[path] = handlerFunc
+	s.dynamicHandlers[path] = handlerFunc
 }
 
 func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
@@ -1605,6 +1609,55 @@ func UpdateAPIVersion(spec *APISpec, name string, verGen func(version *apidef.Ve
 func jsonMarshalString(i interface{}) (out string) {
 	b, _ := json.Marshal(i)
 	return string(b)
+}
+
+func BuildOASAPI(oasGens ...func(oasDef *oas.OAS)) (specs []*APISpec) {
+	for _, gen := range oasGens {
+		oasAPI := getSampleOASAPI()
+		gen(&oasAPI)
+
+		var nativeAPIDefinition apidef.APIDefinition
+		oasAPI.ExtractTo(&nativeAPIDefinition)
+		nativeAPIDefinition.IsOAS = true
+		spec := &APISpec{APIDefinition: &nativeAPIDefinition, OAS: oasAPI}
+		specs = append(specs, spec)
+	}
+
+	return specs
+}
+
+func getSampleOASAPI() oas.OAS {
+	tykExtension := &oas.XTykAPIGateway{
+		Info: oas.Info{
+			Name: randStringBytes(8),
+			ID:   randStringBytes(8),
+			State: oas.State{
+				Active: false,
+			},
+		},
+		Upstream: oas.Upstream{
+			URL: TestHttpAny,
+		},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{
+				Value: "/oas-api/",
+				Strip: false,
+			},
+		},
+	}
+
+	oasAPI := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "oas doc",
+				Version: "1",
+			},
+			Paths: make(openapi3.Paths),
+		}}
+
+	oasAPI.SetTykExtension(tykExtension)
+	return oasAPI
 }
 
 func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {

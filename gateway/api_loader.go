@@ -236,7 +236,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	var mwDriver apidef.MiddlewareDriver
 
 	var prefix string
-	if spec.CustomMiddlewareBundle != "" {
+	if !spec.CustomMiddlewareBundleDisabled && spec.CustomMiddlewareBundle != "" {
 		prefix = gw.getBundleDestPath(spec)
 	}
 
@@ -360,37 +360,34 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: OpenID")
 		}
 
-		coprocessAuth := mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
-		ottoAuth := !coprocessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
-		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver && spec.UseGoPluginAuth
-		if coprocessAuth {
-			// TODO: check if mwAuthCheckFunc is available/valid
-			coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
+		customPluginAuthEnabled := spec.CustomPluginAuthEnabled || spec.UseGoPluginAuth || spec.EnableCoProcessAuth
 
-			newExtractor(spec, baseMid)
-			gw.mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
-		}
+		if customPluginAuthEnabled && !mwAuthCheckFunc.Disabled {
+			switch spec.CustomMiddleware.Driver {
+			case apidef.OttoDriver:
+				logger.Info("----> Checking security policy: JS Plugin")
+				authArray = append(authArray, gw.createMiddleware(&DynamicMiddleware{
+					BaseMiddleware:      baseMid,
+					MiddlewareClassName: mwAuthCheckFunc.Name,
+					Pre:                 true,
+					Auth:                true,
+				}))
+			case apidef.GoPluginDriver:
+				gw.mwAppendEnabled(
+					&authArray,
+					&GoPluginMiddleware{
+						BaseMiddleware: baseMid,
+						Path:           mwAuthCheckFunc.Path,
+						SymbolName:     mwAuthCheckFunc.Name,
+						APILevel:       true,
+					},
+				)
+			default:
+				coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
-		if ottoAuth {
-			logger.Info("----> Checking security policy: JS Plugin")
-			authArray = append(authArray, gw.createMiddleware(&DynamicMiddleware{
-				BaseMiddleware:      baseMid,
-				MiddlewareClassName: mwAuthCheckFunc.Name,
-				Pre:                 true,
-				Auth:                true,
-			}))
-		}
-
-		if gopluginAuth {
-			gw.mwAppendEnabled(
-				&authArray,
-				&GoPluginMiddleware{
-					BaseMiddleware: baseMid,
-					Path:           mwAuthCheckFunc.Path,
-					SymbolName:     mwAuthCheckFunc.Name,
-					APILevel:       true,
-				},
-			)
+				newExtractor(spec, baseMid)
+				gw.mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
+			}
 		}
 
 		if spec.UseStandardAuth || len(authArray) == 0 {
@@ -908,7 +905,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	for _, spec := range specs {
 		func() {
 			defer func() {
-				// recover from panic if one occured. Set err to nil otherwise.
+				// recover from panic if one occurred. Set err to nil otherwise.
 				if err := recover(); err != nil {
 					log.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
 				}
@@ -943,6 +940,9 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			case "tcp", "tls":
 				gw.loadTCPService(spec, &gs, muxer)
 			}
+
+			// Set versions free to update links below
+			spec.VersionDefinition.BaseID = ""
 		}()
 	}
 
@@ -954,6 +954,13 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		curSpec, ok := gw.apisByID[spec.APIID]
 		if ok && curSpec.Checksum != spec.Checksum {
 			curSpec.Release()
+		}
+
+		// Bind versions to base APIs again
+		for _, vID := range spec.VersionDefinition.Versions {
+			if versionAPI, ok := tmpSpecRegister[vID]; ok {
+				versionAPI.VersionDefinition.BaseID = spec.APIID
+			}
 		}
 	}
 

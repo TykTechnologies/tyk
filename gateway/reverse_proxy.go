@@ -923,7 +923,7 @@ func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outr
 		latency = time.Since(begin)
 	}()
 
-	if p.TykAPISpec.HasMock() {
+	if p.TykAPISpec.HasMock {
 		if res, err = p.mockResponse(outreq); res != nil {
 			return
 		}
@@ -1067,16 +1067,22 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		}
 
 		// if this context vars are enabled and this is a supergraph, inject the sub request id header
+		upstreamHeaders := http.Header{}
 		if p.TykAPISpec.EnableContextVars && p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph {
 			ctxData := ctxGetData(outreq)
 			if reqID, exists := ctxData["request_id"]; !exists {
 				log.Warn("context variables enabled but request_id missing")
 			} else if requestID, ok := reqID.(string); ok {
-				execOptions = append(execOptions, graphql.WithUpstreamHeaders(http.Header{
-					"X-Tyk-Parent-Request-Id": {requestID},
-				}))
+				upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
 			}
 		}
+
+		// append the request headers if any
+		for h, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeaders {
+			val := p.Gw.replaceTykVariables(outreq, value, false)
+			upstreamHeaders.Set(h, val)
+		}
+		execOptions = append(execOptions, graphql.WithUpstreamHeaders(upstreamHeaders))
 
 		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
 		if err != nil {
@@ -1193,6 +1199,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		outreq.Body = nil // Issue 16036: nil Body for http.Transport retries
 	}
 	outreq = outreq.WithContext(reqCtx)
+	setContext(logreq, outreq.Context())
 
 	outreq.Header = cloneHeader(req.Header)
 	if trace.IsEnabled() {
@@ -1321,7 +1328,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if err != nil {
-
 		token := ctxGetAuthToken(req)
 
 		var alias string

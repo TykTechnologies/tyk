@@ -87,7 +87,11 @@
             }
           ]
         }
-      }
+      },
+      "required": [
+        "enabled",
+        "domainToCertificateMapping"
+      ]
     },
     "X-Tyk-DomainToCertificate": {
       "type": "object",
@@ -118,7 +122,11 @@
             }
           ]
         }
-      }
+      },
+      "required": [
+        "enabled",
+        "domainToPublicKeysMapping"
+      ]
     },
     "X-Tyk-PinnedPublicKeys": {
       "type": "object",
@@ -205,6 +213,99 @@
           ]
         }
       }
+    },
+    "X-Tyk-PluginConfig": {
+      "type": "object",
+      "properties": {
+        "driver": {
+          "type": "string",
+          "enum": [
+            "otto",
+            "python",
+            "lua",
+            "grpc",
+            "goplugin"
+          ]
+        },
+        "bundle": {
+          "$ref": "#/definitions/X-Tyk-PluginBundle"
+        }
+      }
+    },
+    "X-Tyk-CustomPluginConfig": {
+      "type": "object",
+      "properties": {
+        "plugins": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-CustomPluginDefinition"
+            }
+          ]
+        }
+      }
+    },
+    "X-Tyk-CustomPluginDefinition": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "rawBodyOnly": {
+          "type": "boolean"
+        },
+        "requireSession": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "functionName",
+        "path"
+      ]
+    },
+    "X-Tyk-AuthenticationPlugin": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "rawBodyOnly": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "functionName",
+        "path"
+      ]
+    },
+    "X-Tyk-PluginBundle": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "\\S+"
+        }
+      },
+      "required": [
+        "enabled",
+        "path"
+      ]
     },
     "X-Tyk-CORS": {
       "type": "object",
@@ -301,8 +402,26 @@
     "X-Tyk-Global": {
       "type": "object",
       "properties": {
+        "pluginConfig": {
+          "$ref": "#/definitions/X-Tyk-PluginConfig"
+        },
         "cors": {
           "$ref": "#/definitions/X-Tyk-CORS"
+        },
+        "prePlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+        },
+        "authenticationPlugin": {
+          "$ref": "#/definitions/X-Tyk-AuthenticationPlugin"
+        },
+        "postAuthenticationPlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+        },
+        "postPlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+        },
+        "responsePlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-Cache"
@@ -427,7 +546,12 @@
           "type": "string"
         },
         "headers": {
-          "type": "object"
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-Header"
+            }
+          ]
         },
         "fromOASExamples": {
           "properties": {
@@ -606,17 +730,6 @@
         "enabled"
       ]
     },
-    "X-Tyk-GoPlugin": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
     "X-Tyk-Authentication": {
       "type": "object",
       "properties": {
@@ -644,10 +757,7 @@
         "oidc": {
           "$ref": "#/definitions/X-Tyk-OIDC"
         },
-        "goPlugin": {
-          "$ref": "#/definitions/X-Tyk-GoPlugin"
-        },
-        "customPlugin": {
+        "custom": {
           "$ref": "#/definitions/X-Tyk-CustomPlugin"
         },
         "securitySchemes": {
@@ -717,7 +827,11 @@
             }
           ]
         }
-      }
+      },
+      "required": [
+        "enabled",
+        "tags"
+      ]
     },
     "X-Tyk-Upstream": {
       "type": "object",
@@ -773,8 +887,7 @@
           "pattern": "\\S+"
         },
         "default": {
-          "type": "string",
-          "pattern": "\\S+"
+          "type": "string"
         },
         "location": {
           "type": "string",
@@ -798,7 +911,6 @@
       },
       "required": [
         "enabled",
-        "default",
         "location",
         "key",
         "versions"
@@ -1079,6 +1191,21 @@
           "type": "boolean"
         }
       }
+    },
+    "X-Tyk-Header": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ]
     }
   }
 }

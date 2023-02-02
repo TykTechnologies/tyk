@@ -1,6 +1,9 @@
 package apidef
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -102,6 +105,36 @@ func TestDecodeFromDB(t *testing.T) {
 			ScopeToPolicy:  scopeToPolicyMap,
 		}
 		assert.Equal(t, expectedOICScope, spec.Scopes.OIDC)
+	})
+
+	t.Run("json schema validation middleware", func(t *testing.T) {
+		apiDef := DummyAPI()
+		var (
+			bodySchema map[string]interface{}
+			v1         = "v1"
+			v1B64      = base64.StdEncoding.EncodeToString([]byte(v1))
+		)
+		err := json.Unmarshal([]byte(`{"$schema":"http://json-schema.org/draft-04/schema#","properties":{"id":{"type":"integer"}},"required":["id"],"type":"object"}`),
+			&bodySchema)
+		assert.NoError(t, err)
+		apiDef.VersionData.Versions[v1] = VersionInfo{
+			ExtendedPaths: ExtendedPathsSet{
+				ValidateJSON: []ValidatePathMeta{
+					{
+						Path:   "/",
+						Method: http.MethodPost,
+						Schema: bodySchema,
+					},
+				},
+			},
+		}
+		apiDef.EncodeForDB()
+		copyAPIDef := apiDef
+		copyAPIDef.DecodeFromDB()
+
+		assert.Equal(t, apiDef.VersionData.Versions[v1B64].ExtendedPaths.ValidateJSON[0].Schema,
+			copyAPIDef.VersionData.Versions[v1].ExtendedPaths.ValidateJSON[0].Schema)
+		assert.Empty(t, copyAPIDef.VersionData.Versions[v1].ExtendedPaths.ValidateJSON[0].SchemaB64)
 	})
 }
 

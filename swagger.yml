@@ -278,6 +278,31 @@ paths:
       tags:
         - APIs
       operationId: createApi
+      parameters:
+        - name: base_api_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The base API which the new version will be linked to.
+        - name: base_api_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name.
+        - name: new_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the created version.
+        - name: set_default
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: If true, the new version is set as default version.
       requestBody:
         content:
           application/json:
@@ -314,7 +339,7 @@ paths:
       description: |-
          List all OAS format APIs, when used without the Tyk Dashboard.
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: listApisOAS
       parameters:
         - description: |- 
@@ -339,8 +364,33 @@ paths:
         Create API with OAS format
          A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: createApiOAS
+      parameters:
+        - name: base_api_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The base API which the new version will be linked to.
+        - name: base_api_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name.
+        - name: new_version_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The version name of the created version.
+        - name: set_default
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: If true, the new version is set as default version.
       requestBody:
         content:
           application/json:
@@ -395,6 +445,11 @@ paths:
                 active: true
                 proxy:
                   listen_path: "/test"
+          headers:
+            x-tyk-base-api-id:
+              schema:
+                type: string
+              description: ID of the base API if the requested API is a version.
     put:
       description: |
         Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
@@ -462,6 +517,35 @@ paths:
                 message: API ID not specified
                 status: error
 
+  /tyk/apis/{apiID}/versions:
+    parameters:
+      - description: The API ID
+        name: apiID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      description: |-
+        Listing versions of an OAS API
+      tags:
+        - APIs
+      operationId: listApiVersions
+      parameters:
+        - $ref: '#/components/parameters/SearchText'
+        - $ref: '#/components/parameters/AccessType'
+      responses:
+        '200':
+          description: API version metas
+          content:
+            application/json:
+              schema:
+                properties:
+                  apis:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/APIVersionMeta'
+
   '/tyk/apis/oas/{apiID}':
     parameters:
       - description: The API ID
@@ -475,7 +559,7 @@ paths:
         Get API definition in OAS format
         Only if used without the Tyk Dashboard
       tags:
-        - OASAPIs
+        - OAS APIs
       parameters:
         - description: |-
             Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. 
@@ -493,6 +577,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OASSchemaResponse"
+          headers:
+            x-tyk-base-api-id:
+              schema:
+                type: string
+              description: ID of the base API if the requested API is a version.
     put:
       description: |
         Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
@@ -500,7 +589,7 @@ paths:
 
         Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: updateApiOAS
       requestBody:
         content:
@@ -533,7 +622,7 @@ paths:
         Update API with OAS format. You can use this endpoint to update OAS part of the tyk API definition.
         This endpoint allows you to configure tyk OAS extension based on query params provided(similar to import)
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: patchApiOAS
       parameters:
         - $ref: '#/components/parameters/UpstreamURL'
@@ -541,6 +630,7 @@ paths:
         - $ref: '#/components/parameters/CustomDomain'
         - $ref: '#/components/parameters/ValidateRequest'
         - $ref: '#/components/parameters/AllowList'
+        - $ref: '#/components/parameters/MockResponse'
         - $ref: '#/components/parameters/Authentication'
       requestBody:
         content:
@@ -600,7 +690,7 @@ paths:
       description: |-
         Deleting an API definition will remove the file from the file store, the API definition will NOT be unloaded, a separate reload request will need to be made to disable the API endpoint.
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: deleteOASApi
       responses:
         '200':
@@ -622,6 +712,36 @@ paths:
                 message: API ID not specified
                 status: error
 
+  /tyk/apis/oas/{apiID}/versions:
+    parameters:
+      - description: The API ID
+        name: apiID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      description: |-
+        Listing versions of an OAS API
+      tags:
+        - OASAPIs
+      operationId: listOASApiVersions
+      parameters:
+        - $ref: '#/components/parameters/SearchText'
+        - $ref: '#/components/parameters/AccessType'
+      responses:
+        '200':
+          description: API version metas
+          content:
+            application/json:
+              schema:
+                properties:
+                  apis:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/APIVersionMeta'
+
+
   '/tyk/apis/oas/{apiID}/export':
     parameters:
       - description: The API ID
@@ -634,7 +754,7 @@ paths:
       description: |-
         Download all OAS format APIs, when used without the Tyk Dashboard.
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: downloadApiOASPublic
       parameters:
         - description: |-
@@ -657,7 +777,7 @@ paths:
       description: |-
         Download all OAS format APIs, when used without the Tyk Dashboard.
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: downloadApisOASPublic
       parameters:
         - description: |-
@@ -683,7 +803,7 @@ paths:
         Create a new OAS format API, without x-tyk-gateway.
         For use with an existing OAS API that you want to expose via your Tyk Gateway. (New)
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: importOAS
       parameters:
         - $ref: '#/components/parameters/UpstreamURL'
@@ -691,6 +811,7 @@ paths:
         - $ref: '#/components/parameters/CustomDomain'
         - $ref: '#/components/parameters/ApiID'
         - $ref: '#/components/parameters/AllowList'
+        - $ref: '#/components/parameters/MockResponse'
         - $ref: '#/components/parameters/ValidateRequest'
         - $ref: '#/components/parameters/Authentication'
       requestBody:
@@ -3661,6 +3782,22 @@ components:
       type: string
       enum: [ true, false ]
       example: true
+    APIVersionMeta:
+      description: API version meta
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        versionName:
+          type: string
+        internal:
+          type: boolean
+        expirationDate:
+          type: string
+        isDefaultVersion:
+          type: boolean
   parameters:
     UpstreamURL:
       name: upstreamURL
@@ -3704,12 +3841,34 @@ components:
       required: false
       schema:
         $ref: '#/components/schemas/BooleanQueryParam'
+    MockResponse:
+      name: mockResponse
+      in: query
+      description: Enable mockResponse middleware for all endpoints having responses configured.
+      required: false
+      schema:
+        $ref: '#/components/schemas/BooleanQueryParam'
     Authentication:
       name: authentication
       in: query
       description: Enable or disable authentication in your Tyk Gateway as per your OAS document.
       schema:
         $ref: '#/components/schemas/BooleanQueryParam'
+    SearchText:
+      name: searchText
+      schema:
+        type: string
+      description: Search for API version name
+      in: query
+      required: false
+    AccessType:
+      name: accessType
+      schema:
+        type: string
+        enum: [ "internal", "external" ]
+      description: Filter for internal or external API versions
+      in: query
+      required: false
   securitySchemes:
     api_key:
       in: header

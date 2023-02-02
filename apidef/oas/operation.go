@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -56,34 +57,44 @@ const (
 )
 
 // Import takes the arguments and populates the receiver *Operation values.
-func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validateRequest *bool) {
-	if allowList != nil {
+func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykExtensionConfigParams) {
+	if overRideValues.AllowList != nil {
 		allow := o.Allow
 		if allow == nil {
 			allow = &Allowance{}
 		}
 
-		allow.Import(*allowList)
+		allow.Import(*overRideValues.AllowList)
 
-		if block := o.Block; block != nil && block.Enabled && *allowList {
+		if block := o.Block; block != nil && block.Enabled && *overRideValues.AllowList {
 			block.Enabled = false
 		}
 
 		o.Allow = allow
 	}
 
-	if validateRequest != nil {
+	if overRideValues.ValidateRequest != nil {
 		validate := o.ValidateRequest
 		if validate == nil {
 			validate = &ValidateRequest{}
 		}
 
-		if shouldImport := validate.shouldImportValidateRequest(oasOperation); !shouldImport {
-			return
+		if shouldImport := validate.shouldImportValidateRequest(oasOperation); shouldImport {
+			validate.Import(*overRideValues.ValidateRequest)
+			o.ValidateRequest = validate
+		}
+	}
+
+	if overRideValues.MockResponse != nil {
+		mock := o.MockResponse
+		if mock == nil {
+			mock = &MockResponse{}
 		}
 
-		validate.Import(*validateRequest)
-		o.ValidateRequest = validate
+		if shouldImport := mock.shouldImport(oasOperation); shouldImport {
+			mock.Import(*overRideValues.MockResponse)
+			o.MockResponse = mock
+		}
 	}
 }
 
@@ -101,7 +112,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTransformRequestBody(ep.Transform)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
-	s.fillOASValidateRequest(ep.ValidateRequest)
+	s.fillOASValidateRequest(ep.ValidateJSON)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -122,7 +133,6 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTransformRequestBodyTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
-					tykOp.extractOASValidateRequestTo(ep, path, method)
 					break found
 				}
 			}
@@ -287,16 +297,6 @@ func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path st
 	ep.HardTimeouts = append(ep.HardTimeouts, meta)
 }
 
-func (o *Operation) extractOASValidateRequestTo(ep *apidef.ExtendedPathsSet, path string, method string) {
-	if o.ValidateRequest == nil {
-		return
-	}
-
-	meta := apidef.ValidateRequestMeta{Path: path, Method: method}
-	o.ValidateRequest.ExtractTo(&meta)
-	ep.ValidateRequest = append(ep.ValidateRequest, meta)
-}
-
 // detect possible regex pattern:
 // - character match ([a-z])
 // - greedy match (*)
@@ -375,7 +375,9 @@ func (s *OAS) getOperationID(inPath, method string) string {
 		operation := p.GetOperation(method)
 
 		if operation == nil {
-			operation = &openapi3.Operation{}
+			operation = &openapi3.Operation{
+				Responses: openapi3.NewResponses(),
+			}
 			p.SetOperation(method, operation)
 		}
 
@@ -452,15 +454,9 @@ type ValidateRequest struct {
 }
 
 // Fill fills *ValidateRequest receiver from apidef.ValidateRequestMeta.
-func (v *ValidateRequest) Fill(meta apidef.ValidateRequestMeta) {
-	v.Enabled = meta.Enabled
+func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
+	v.Enabled = !meta.Disabled
 	v.ErrorResponseCode = meta.ErrorResponseCode
-}
-
-// ExtractTo extracts *ValidateRequest into *apidef.ValidateRequestMeta.
-func (v *ValidateRequest) ExtractTo(meta *apidef.ValidateRequestMeta) {
-	meta.Enabled = v.Enabled
-	meta.ErrorResponseCode = v.ErrorResponseCode
 }
 
 func (*ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operation) bool {
@@ -485,9 +481,43 @@ func (v *ValidateRequest) Import(enabled bool) {
 	v.ErrorResponseCode = http.StatusUnprocessableEntity
 }
 
-func (s *OAS) fillOASValidateRequest(metas []apidef.ValidateRequestMeta) {
+func convertSchema(mapSchema map[string]interface{}) (*openapi3.Schema, error) {
+	bytes, err := json.Marshal(mapSchema)
+	if err != nil {
+		return nil, err
+	}
+
+	schema := openapi3.NewSchema()
+	err = schema.UnmarshalJSON(bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return schema, nil
+}
+
+func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
+
+		operation := s.Paths.Find(meta.Path).GetOperation(meta.Method)
+		requestBodyRef := operation.RequestBody
+		if operation.RequestBody == nil {
+			requestBodyRef = &openapi3.RequestBodyRef{}
+			operation.RequestBody = requestBodyRef
+		}
+
+		if requestBodyRef.Value == nil {
+			requestBodyRef.Value = openapi3.NewRequestBody()
+		}
+
+		schema, err := convertSchema(meta.Schema)
+		if err != nil {
+			log.WithError(err).Error("Couldn't convert classic API validate JSON schema to OAS")
+		} else {
+			requestBodyRef.Value.WithJSONSchema(schema)
+		}
+
 		tykOp := s.GetTykExtension().getOperation(operationID)
 
 		if tykOp.ValidateRequest == nil {
@@ -511,7 +541,7 @@ type MockResponse struct {
 	// Body is the HTTP response body that will be returned.
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 	// Headers are the HTTP response headers that will be returned.
-	Headers map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
+	Headers []Header `bson:"headers,omitempty" json:"headers,omitempty"`
 	// FromOASExamples is the configuration to extract a mock response from OAS documentation.
 	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }
@@ -526,4 +556,30 @@ type FromOASExamples struct {
 	ContentType string `bson:"contentType,omitempty" json:"contentType,omitempty"`
 	// ExampleName is the default example name among multiple path response examples documented in OAS.
 	ExampleName string `bson:"exampleName,omitempty" json:"exampleName,omitempty"`
+}
+
+func (m *MockResponse) shouldImport(operation *openapi3.Operation) bool {
+	for _, response := range operation.Responses {
+		for _, content := range response.Value.Content {
+			if content.Example != nil || content.Schema != nil {
+				return true
+			}
+
+			for _, example := range content.Examples {
+				if example.Value != nil {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// Import populates *MockResponse with enabled argument for FromOASExamples.
+func (m *MockResponse) Import(enabled bool) {
+	m.Enabled = enabled
+	m.FromOASExamples = &FromOASExamples{
+		Enabled: enabled,
+	}
 }

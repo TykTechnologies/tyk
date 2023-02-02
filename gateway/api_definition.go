@@ -87,7 +87,6 @@ const (
 	RequestTracked
 	RequestNotTracked
 	ValidateJSONRequest
-	ValidateRequestWithOAS
 	Internal
 	GoPlugin
 	PersistGraphQL
@@ -156,7 +155,6 @@ type URLSpec struct {
 	TrackEndpoint             apidef.TrackEndpointMeta
 	DoNotTrackEndpoint        apidef.TrackEndpointMeta
 	ValidatePathMeta          apidef.ValidatePathMeta
-	ValidateRequest           apidef.ValidateRequestMeta
 	Internal                  apidef.InternalMeta
 	GoPluginMeta              GoPluginMiddleware
 	PersistGraphQL            apidef.PersistGraphQLMeta
@@ -230,8 +228,9 @@ type APISpec struct {
 		Schema          *graphql.Schema
 	} `json:"-"`
 
-	hasMock   bool
-	OASRouter routers.Router
+	HasMock            bool
+	HasValidateRequest bool
+	OASRouter          routers.Router
 }
 
 // GetSessionLifetimeRespectsKeyExpiration returns a boolean to tell whether session lifetime should respect to key expiration or not.
@@ -424,14 +423,9 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		spec.OAS = *def.OAS
 	}
 
-	serverURL := spec.Proxy.ListenPath
-	if spec.Proxy.StripListenPath {
-		serverURL = "/"
-	}
-
 	oasSpec := spec.OAS.T
 	oasSpec.Servers = openapi3.Servers{
-		{URL: serverURL},
+		{URL: spec.Proxy.ListenPath},
 	}
 
 	spec.OASRouter, err = gorillamux.NewRouter(&oasSpec)
@@ -539,11 +533,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
-	var specs []*APISpec
-	for _, def := range apiDefs {
-		spec := a.MakeSpec(&def, nil)
-		specs = append(specs, spec)
-	}
+	specs := a.prepareSpecs(apiDefs, gwConfig, false)
 
 	// Set the nonce
 	a.Gw.ServiceNonceMutex.Lock()
@@ -605,25 +595,34 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 	// Extract tagged entries only
 	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
+	specs := a.prepareSpecs(apiDefs, gwConfig, true)
+
+	return specs, nil
+}
+
+func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfig config.Config, fromRPC bool) []*APISpec {
 	var specs []*APISpec
+
 	for _, def := range apiDefs {
-		def.DecodeFromDB()
+		if fromRPC {
+			def.DecodeFromDB()
 
-		if gwConfig.SlaveOptions.BindToSlugsInsteadOfListenPaths {
-			newListenPath := "/" + def.Slug //+ "/"
-			log.Warning("Binding to ",
-				newListenPath,
-				" instead of ",
-				def.Proxy.ListenPath)
+			if gwConfig.SlaveOptions.BindToSlugsInsteadOfListenPaths {
+				newListenPath := "/" + def.Slug //+ "/"
+				log.Warning("Binding to ",
+					newListenPath,
+					" instead of ",
+					def.Proxy.ListenPath)
 
-			def.Proxy.ListenPath = newListenPath
+				def.Proxy.ListenPath = newListenPath
+			}
 		}
 
 		spec := a.MakeSpec(&def, nil)
 		specs = append(specs, spec)
 	}
 
-	return specs, nil
+	return specs
 }
 
 func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinition) {
@@ -672,7 +671,9 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 	f, err := os.Open(filePath)
 	defer func() {
 		err = f.Close()
-		log.Error("error while closing file ", filePath)
+		if err != nil {
+			log.WithError(err).Error("error while closing file ", filePath)
+		}
 	}()
 
 	if err != nil {
@@ -1174,25 +1175,6 @@ func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.Val
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileValidateRequestSpec(paths []apidef.ValidateRequestMeta, stat URLStatus, conf config.Config) []URLSpec {
-	var urlSpec []URLSpec
-
-	for _, stringSpec := range paths {
-		if !stringSpec.Enabled {
-			continue
-		}
-
-		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
-		// Extend with method actions
-
-		newSpec.ValidateRequest = stringSpec
-		urlSpec = append(urlSpec, newSpec)
-	}
-
-	return urlSpec
-}
-
 func (a APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := []URLSpec{}
 
@@ -1244,7 +1226,6 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	trackedPaths := a.compileTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked, conf)
 	unTrackedPaths := a.compileUnTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked, conf)
 	validateJSON := a.compileValidateJSONPathspathSpec(apiVersionDef.ExtendedPaths.ValidateJSON, ValidateJSONRequest, conf)
-	validateRequest := a.compileValidateRequestSpec(apiVersionDef.ExtendedPaths.ValidateRequest, ValidateRequestWithOAS, conf)
 	internalPaths := a.compileInternalPathspathSpec(apiVersionDef.ExtendedPaths.Internal, Internal, conf)
 	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
 	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
@@ -1272,7 +1253,6 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, trackedPaths...)
 	combinedPath = append(combinedPath, unTrackedPaths...)
 	combinedPath = append(combinedPath, validateJSON...)
-	combinedPath = append(combinedPath, validateRequest...)
 	combinedPath = append(combinedPath, internalPaths...)
 
 	return combinedPath, len(whiteListPaths) > 0
@@ -1328,8 +1308,6 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusRequestNotTracked
 	case ValidateJSONRequest:
 		return StatusValidateJSON
-	case ValidateRequestWithOAS:
-		return StatusValidateRequest
 	case Internal:
 		return StatusInternal
 	case GoPlugin:
@@ -1549,10 +1527,6 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 			if method == rxPaths[i].ValidatePathMeta.Method {
 				return true, &rxPaths[i].ValidatePathMeta
 			}
-		case ValidateRequestWithOAS:
-			if method == rxPaths[i].ValidateRequest.Method {
-				return true, &rxPaths[i].ValidateRequest
-			}
 		case Internal:
 			if method == rxPaths[i].Internal.Method {
 				return true, &rxPaths[i].Internal
@@ -1745,24 +1719,20 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	log.Debug("Upstream path is: ", r.URL.Path)
 }
 
-func (a *APISpec) HasMock() bool {
-	return a.hasMock
-}
-
 func (a *APISpec) setHasMock() {
 	if !a.IsOAS {
-		a.hasMock = false
+		a.HasMock = false
 		return
 	}
 
 	middleware := a.OAS.GetTykExtension().Middleware
 	if middleware == nil {
-		a.hasMock = false
+		a.HasMock = false
 		return
 	}
 
 	if len(middleware.Operations) == 0 {
-		a.hasMock = false
+		a.HasMock = false
 		return
 	}
 
@@ -1772,12 +1742,12 @@ func (a *APISpec) setHasMock() {
 		}
 
 		if operation.MockResponse.Enabled {
-			a.hasMock = true
+			a.HasMock = true
 			return
 		}
 	}
 
-	a.hasMock = false
+	a.HasMock = false
 }
 
 type RoundRobin struct {
