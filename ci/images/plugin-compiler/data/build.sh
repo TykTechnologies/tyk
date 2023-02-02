@@ -59,7 +59,8 @@ awk 'NR==FNR{seen[$1]=$2; next} seen[$1] && seen[$1] != $2' $PLUGIN_SOURCE_PATH/
   go mod edit -replace $PKG=$PKG@$VER
 done
 
-go mod vendor
+#go mod vendor
+rm -rf ./vendor
 
 
 echo $GOARCH $GOOS
@@ -71,4 +72,4 @@ else
     CC=$(go env CC)
 fi
 
-CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH CC=$CC  go build -trimpath -buildmode=plugin -mod=vendor -gcflags="all=-N -l" -o $plugin_name
+CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH CC=$CC  go build -trimpath -buildmode=plugin -gcflags="all=-N -l" -o $plugin_name

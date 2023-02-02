@@ -10,7 +10,7 @@ builds:
     flags:
       - -tags=goplugin
       - -trimpath
-      - -mod=vendor
+        #      - -mod=vendor
     gcflags:
       - all=-N -l
     ldflags:
@@ -24,7 +24,7 @@ builds:
     flags:
       - -tags=goplugin
       - -trimpath
-      - -mod=vendor
+        #      - -mod=vendor
     gcflags:
       - all=-N -l
     ldflags:
