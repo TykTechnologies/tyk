@@ -143,7 +143,7 @@ dockers:
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
     - "--label=org.opencontainers.image.version={{.Version}}"
     - "--build-arg=TYK_GW_TAG={{ .Tag }}"
-    - "--build-arg=TYK_COMMIT={{ .FullCommit }}"
+    - "--build-arg=TYK_GW_COMMIT={{ .FullCommit }}"
     - "--build-arg=GOLANG_CROSS={{ .Env.GOLANG_CROSS }}"
   goarch: amd64
   goos: linux

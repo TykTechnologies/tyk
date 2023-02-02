@@ -47,8 +47,8 @@ go get
 go list -m -f '{{ if not .Main }}{{ .Path }} {{ .Version }}{{ end }}' all > dependencies.txt
 
 
-echo $GIT_TAG
-go mod edit -replace github.com/TykTechnologies/tyk=github.com/TykTechnologies/tyk@$GIT_TAG
+echo $GIT_COMMIT
+go mod edit -replace github.com/TykTechnologies/tyk=github.com/TykTechnologies/tyk@$GIT_COMMIT
 
 # Run a final go mod tidy to make sure that the go.sum entries are correct for
 # all replaced dependencies.
