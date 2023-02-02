@@ -150,8 +150,11 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 }
 
 func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
-	specChanged := existingSpec != nil && existingSpec.Checksum != newSpec.Checksum
-	if specChanged {
+	if existingSpec == nil {
+		return true
+	}
+
+	if existingSpec.Checksum != newSpec.Checksum {
 		return true
 	}
 
@@ -175,11 +178,8 @@ func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
 	}
 
 	customPlugin = mwsEnabled(newSpec.CustomMiddleware.Response)
-	if customPlugin {
-		return true
-	}
 
-	return false
+	return customPlugin
 }
 
 func mwsEnabled(mwDefs []apidef.MiddlewareDefinition) bool {

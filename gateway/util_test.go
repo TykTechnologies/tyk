@@ -238,6 +238,10 @@ func Test_getAPIURL(t *testing.T) {
 }
 
 func Test_shouldReloadSpec(t *testing.T) {
+	t.Run("empty curr spec", func(t *testing.T) {
+		assert.True(t, shouldReloadSpec(nil, &APISpec{}))
+	})
+
 	t.Run("checksum mismatch", func(t *testing.T) {
 		existingSpec, newSpec := &APISpec{Checksum: "1"}, &APISpec{Checksum: "2"}
 		assert.True(t, shouldReloadSpec(existingSpec, newSpec))
@@ -333,7 +337,7 @@ func Test_shouldReloadSpec(t *testing.T) {
 		}
 
 		for _, tc := range tcs {
-			assert.Equal(t, tc.shouldReload, shouldReloadSpec(nil, tc.spec))
+			assert.Equal(t, tc.shouldReload, shouldReloadSpec(&APISpec{}, tc.spec))
 		}
 	})
 }
