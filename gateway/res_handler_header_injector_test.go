@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/build"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -88,7 +89,7 @@ func TestResponseHeaderInjection(t *testing.T) {
 		"X-Tyk-Test": "1",
 	}
 
-	userAgent := "\"User-Agent\":\"Tyk/1.0.0\""
+	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%s\"", build.VERSION)
 
 	_, _ = ts.Run(t, []test.TestCase{
 		// Create base auth based key
@@ -124,7 +125,7 @@ func BenchmarkResponseHeaderInjection(b *testing.B) {
 		"X-Tyk-Test": "1",
 	}
 
-	userAgent := "\"User-Agent\":\"Tyk/1.0.0\""
+	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%s\"", build.VERSION)
 
 	for i := 0; i < b.N; i++ {
 		_, _ = ts.Run(b, []test.TestCase{
