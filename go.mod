@@ -84,6 +84,7 @@ require (
 	github.com/stretchr/testify v1.7.1 // test
 	github.com/valyala/fasthttp v1.43.0 // test
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
+	gorm.io/gorm v1.21.10 // indirect; external - keep in sync with tyk-pump.
 )
 
 replace gorm.io/gorm => github.com/TykTechnologies/gorm v1.20.7-0.20210409171139-b5c340f85ed0
