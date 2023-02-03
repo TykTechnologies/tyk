@@ -5,6 +5,9 @@
 temp/
 testapps/
 
+/build
+/build_tools
+
 /vendor
 
 /*.conf
