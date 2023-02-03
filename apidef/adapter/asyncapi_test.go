@@ -3,8 +3,9 @@ package adapter
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const streetlightsKafkaAsyncAPI = `asyncapi: '2.4.0'
