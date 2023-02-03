@@ -663,3 +663,93 @@ func TestMigrateAndFillOAS_ValidateRequest(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
+	t.Run("goplugin", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			Name: "Custom plugin Auth",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/",
+			},
+			UseGoPluginAuth: true,
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				AuthCheck: apidef.MiddlewareDefinition{
+					Name: "AuthFunc",
+					Path: "/path/to/plugin",
+				},
+			},
+			VersionData: apidef.VersionData{
+				NotVersioned: true,
+				Versions:     map[string]apidef.VersionInfo{},
+			},
+		}
+		migratedAPI, _, err := MigrateAndFillOAS(&api)
+		assert.NoError(t, err)
+
+		expectedAuthentication := Authentication{
+			Enabled: true,
+			Custom: &CustomPluginAuthentication{
+				Enabled: true,
+			},
+		}
+
+		expectedAuthenticationPlugin := AuthenticationPlugin{
+			Enabled:      true,
+			FunctionName: "AuthFunc",
+			Path:         "/path/to/plugin",
+		}
+		assert.Equal(t, expectedAuthentication, *migratedAPI.OAS.GetTykExtension().Server.Authentication)
+		assert.Equal(t, expectedAuthenticationPlugin, *migratedAPI.OAS.GetTykExtension().Middleware.Global.AuthenticationPlugin)
+		assert.Equal(t, apidef.GoPluginDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
+	})
+	t.Run("coprocess", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			Name: "Custom plugin Auth",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/",
+			},
+			EnableCoProcessAuth: true,
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver: apidef.PythonDriver,
+				AuthCheck: apidef.MiddlewareDefinition{
+					Name: "AuthFunc",
+					Path: "/path/to/plugin",
+				},
+			},
+			VersionData: apidef.VersionData{
+				NotVersioned: true,
+				Versions:     map[string]apidef.VersionInfo{},
+			},
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.CoprocessType: {
+					AuthHeaderName: "Authorization",
+				},
+			},
+		}
+		migratedAPI, _, err := MigrateAndFillOAS(&api)
+		assert.NoError(t, err)
+
+		expectedAuthentication := Authentication{
+			Enabled: true,
+			Custom: &CustomPluginAuthentication{
+				Enabled: true,
+				AuthSources: AuthSources{
+					Header: &AuthSource{
+						Enabled: true,
+						Name:    "Authorization",
+					},
+				},
+			},
+		}
+
+		expectedAuthenticationPlugin := AuthenticationPlugin{
+			Enabled:      true,
+			FunctionName: "AuthFunc",
+			Path:         "/path/to/plugin",
+		}
+		assert.Equal(t, expectedAuthentication, *migratedAPI.OAS.GetTykExtension().Server.Authentication)
+		assert.Equal(t, expectedAuthenticationPlugin, *migratedAPI.OAS.GetTykExtension().Middleware.Global.AuthenticationPlugin)
+		assert.Equal(t, apidef.PythonDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
+	})
+}
