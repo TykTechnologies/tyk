@@ -1,7 +1,7 @@
 #!/bin/bash
 set -xe
 
-CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' $TYK_GW_PATH/gateway/version.go)
+CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' $TYK_GW_PATH/internal/build/version.go)
 plugin_name=$1
 plugin_id=$2
 # GOOS and GOARCH can be send to override the name of the plugin
