@@ -554,8 +554,6 @@ func TestAPIDefinition_deleteAuthConfigsNotUsed(t *testing.T) {
 }
 
 func TestAPIDefinition_migrateCustomPluginAuth(t *testing.T) {
-	t.Parallel()
-
 	testCases := []struct {
 		name           string
 		apiDef         APIDefinition

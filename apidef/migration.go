@@ -223,9 +223,9 @@ func (a *APIDefinition) migrateEndpointMetaByType(typ int) {
 }
 
 func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
+	a.migrateCustomPluginAuth()
 	a.MigrateAuthentication()
 	a.migratePluginBundle()
-	a.migrateCustomPluginAuth()
 	a.migrateMutualTLS()
 	a.migrateCertificatePinning()
 	a.migrateGatewayTags()
@@ -347,7 +347,7 @@ func (a *APIDefinition) deleteAuthConfigsNotUsed() {
 		delete(a.AuthConfigs, BasicType)
 	}
 
-	if !a.EnableCoProcessAuth {
+	if !a.CustomPluginAuthEnabled || (a.CustomPluginAuthEnabled && a.CustomMiddleware.Driver == GoPluginDriver) {
 		delete(a.AuthConfigs, CoprocessType)
 	}
 
@@ -370,7 +370,7 @@ func (a *APIDefinition) isAuthTokenEnabled() bool {
 			!a.EnableJWT &&
 			!a.EnableSignatureChecking &&
 			!a.UseBasicAuth &&
-			!a.EnableCoProcessAuth &&
+			!a.CustomPluginAuthEnabled &&
 			!a.UseOauth2 &&
 			!a.ExternalOAuth.Enabled &&
 			!a.UseOpenID)
