@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
