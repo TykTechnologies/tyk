@@ -12,9 +12,9 @@ builds:
       - -tags=goplugin
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.VERSION={{.Version}}
-      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
+        -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
+        -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
+        -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
     goos:
       - linux
     goarch:
@@ -25,9 +25,9 @@ builds:
       - -tags=goplugin
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.VERSION={{.Version}}
-      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
-      - -X github.com/TykTechnologies/tyk/internal/build.buildDate={{.Date}}
-      - -X github.com/TykTechnologies/tyk/internal/build.builtBy=goreleaser
+        -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
+        -X github.com/TykTechnologies/tyk/internal/build.buildDate={{.Date}}
+        -X github.com/TykTechnologies/tyk/internal/build.builtBy=goreleaser
     env:
       - CC=aarch64-linux-gnu-gcc
     goos:
