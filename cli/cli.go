@@ -13,6 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/cli/importer"
 	"github.com/TykTechnologies/tyk/cli/linter"
 	"github.com/TykTechnologies/tyk/cli/plugin"
+	"github.com/TykTechnologies/tyk/internal/build"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -105,6 +106,13 @@ func Init(version string, confPaths []string) {
 
 	// Add plugin commands:
 	plugin.AddTo(app)
+
+	// Print gateway version
+	versionCmd := app.Command("version", "Print tyk version")
+	versionCmd.Action(func(*kingpin.ParseContext) error {
+		fmt.Println(build.VERSION)
+		return nil
+	})
 }
 
 // Parse parses the command-line arguments.

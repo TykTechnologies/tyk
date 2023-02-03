@@ -46,12 +46,13 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/build"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
-var defaultUserAgent = "Tyk/" + VERSION
+var defaultUserAgent = "Tyk/" + build.VERSION
 
 var corsHeaders = []string{
 	"Access-Control-Allow-Origin",

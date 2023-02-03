@@ -54,6 +54,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/build"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -345,7 +346,7 @@ func (gw *Gateway) setupGlobals() {
 
 	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", RedisController: gw.RedisController}
 	versionStore.Connect()
-	err := versionStore.SetKey("gateway", VERSION, 0)
+	err := versionStore.SetKey("gateway", build.VERSION, 0)
 
 	if err != nil {
 		mainLog.WithError(err).Error("Could not set version in versionStore")
@@ -1176,7 +1177,7 @@ func (gw *Gateway) initialiseSystem() error {
 		mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
-	mainLog.Infof("Tyk API Gateway %s", VERSION)
+	mainLog.Infof("Tyk API Gateway %s", build.VERSION)
 
 	if !gw.isRunningTests() {
 		gwConfig := config.Config{}
@@ -1506,7 +1507,7 @@ func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cli.Init(VERSION, confPaths)
+	cli.Init(build.VERSION, confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
 	if !cli.DefaultMode {
@@ -1777,7 +1778,7 @@ func (gw *Gateway) startServer() {
 	// at this point NodeID is ready to use by DRL
 	gw.drlOnce.Do(gw.startDRL)
 
-	mainLog.Infof("Tyk Gateway started (%s)", VERSION)
+	mainLog.Infof("Tyk Gateway started (%s)", build.VERSION)
 	address := gw.GetConfig().ListenAddress
 	if gw.GetConfig().ListenAddress == "" {
 		address = "(open interface)"

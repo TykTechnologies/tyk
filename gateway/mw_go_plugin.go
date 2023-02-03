@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
+	"github.com/TykTechnologies/tyk/internal/build"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -135,7 +135,7 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 	// try to load plugin
 	var err error
 
-	newPath, err := goplugin.GetPluginFileNameToLoad(goplugin.FileSystemStorage{}, m.Path, VERSION)
+	newPath, err := goplugin.GetPluginFileNameToLoad(goplugin.FileSystemStorage{}, m.Path, build.VERSION)
 	if err != nil {
 		m.logger.WithError(err).Error("plugin file not found")
 		return false

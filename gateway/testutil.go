@@ -43,6 +43,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/build"
 	"github.com/TykTechnologies/tyk/storage"
 	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
 	"github.com/TykTechnologies/tyk/test"
@@ -1129,7 +1130,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	defaultTestConfig = gwConfig
 	gw.SetConfig(gwConfig)
 
-	cli.Init(VERSION, confPaths)
+	cli.Init(build.VERSION, confPaths)
 
 	err = gw.initialiseSystem()
 	if err != nil {

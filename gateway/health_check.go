@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/build"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -196,7 +196,7 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 
 	res := HealthCheckResponse{
 		Status:      Pass,
-		Version:     VERSION,
+		Version:     build.VERSION,
 		Description: "Tyk GW",
 		Details:     checks,
 	}

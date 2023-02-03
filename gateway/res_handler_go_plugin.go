@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
+	"github.com/TykTechnologies/tyk/internal/build"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -41,7 +42,7 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 		return nil
 	}
 
-	newPath, err := goplugin.GetPluginFileNameToLoad(goplugin.FileSystemStorage{}, h.Path, VERSION)
+	newPath, err := goplugin.GetPluginFileNameToLoad(goplugin.FileSystemStorage{}, h.Path, build.VERSION)
 	if err != nil {
 		h.logger.WithError(err).Error("Could not load Go-plugin. File was not found")
 		return err
