@@ -104,18 +104,6 @@ jobs:
             *.tar.gz
             *.txt.sig
             *.txt
-      - name: Fix vendor
-        run: |
-          export GOPATH=/go
-          mkdir -p /go/src || true
-          whereis go
-          go mod tidy
-          go mod vendor
-          echo "Moving vendor"
-          cp -r -f vendor/* $GOPATH/src
-          rm -rf vendor
-          mkdir -p /go/src/github.com/TykTechnologies/tyk
-          cp -r ./* /go/src/github.com/TykTechnologies/tyk
 
       - uses: goreleaser/goreleaser-action@v3
         with:
