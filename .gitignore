@@ -3,20 +3,9 @@
 .vagrant/
 .vscode/
 temp/
-/middleware/bundles
-/middleware/e1d21f942ec746ed416ab97fe1bf07e8/
-/middleware/e1d21f942ec746ed416ab97fe1bf07e8_IGNORED/
 testapps/
 
 /vendor
-
-/utils/release_live.sh
-/utils/release_rc.sh
-/utils/build_hybrid.sh
-/utils/cloud_release.sh
-
-build_tools/
-build/
 
 /*.conf
 /*.json
@@ -45,8 +34,6 @@ petstore.json
 *.log
 !testdata/*.mmdb
 *.pid
-coprocess_gen_test.go
-session_state_gen_test.go
 __pycache__/
 tyk.test
 tyk-gateway.pid
