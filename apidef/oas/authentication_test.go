@@ -107,13 +107,54 @@ func TestOIDC(t *testing.T) {
 }
 
 func TestCustomPlugin(t *testing.T) {
-	var emptyCustomPlugin CustomPluginAuthentication
+	t.Run("empty", func(t *testing.T) {
+		var emptyCustomPlugin CustomPluginAuthentication
 
-	var convertedAPI apidef.APIDefinition
-	emptyCustomPlugin.ExtractTo(&convertedAPI)
+		var convertedAPI apidef.APIDefinition
+		emptyCustomPlugin.ExtractTo(&convertedAPI)
 
-	var resultCustomPlugin CustomPluginAuthentication
-	resultCustomPlugin.Fill(convertedAPI)
+		var resultCustomPlugin CustomPluginAuthentication
+		resultCustomPlugin.Fill(convertedAPI)
 
-	assert.Equal(t, emptyCustomPlugin, resultCustomPlugin)
+		assert.Equal(t, emptyCustomPlugin, resultCustomPlugin)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		t.Run("goplugin", func(t *testing.T) {
+			var expectedCustomPluginAuth = CustomPluginAuthentication{
+				Enabled: true,
+			}
+
+			var convertedAPI apidef.APIDefinition
+			expectedCustomPluginAuth.ExtractTo(&convertedAPI)
+
+			var actualCustomPluginAuth CustomPluginAuthentication
+			actualCustomPluginAuth.Fill(convertedAPI)
+
+			assert.Equal(t, expectedCustomPluginAuth, actualCustomPluginAuth)
+			assert.Empty(t, actualCustomPluginAuth.AuthSources)
+		})
+
+		t.Run("coprocess", func(t *testing.T) {
+			var expectedCustomPluginAuth = CustomPluginAuthentication{
+				Enabled: true,
+				AuthSources: AuthSources{
+					Header: &AuthSource{
+						Enabled: true,
+						Name:    "Authorization",
+					},
+				},
+			}
+
+			var convertedAPI apidef.APIDefinition
+			expectedCustomPluginAuth.ExtractTo(&convertedAPI)
+
+			var actualCustomPluginAuth CustomPluginAuthentication
+			actualCustomPluginAuth.Fill(convertedAPI)
+
+			assert.Equal(t, expectedCustomPluginAuth, actualCustomPluginAuth)
+			assert.NotEmpty(t, actualCustomPluginAuth.AuthSources)
+		})
+	})
+
 }
