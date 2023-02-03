@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -89,7 +88,7 @@ func TestResponseHeaderInjection(t *testing.T) {
 		"X-Tyk-Test": "1",
 	}
 
-	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%v\"", VERSION)
+	userAgent := "\"User-Agent\":\"Tyk/1.0.0\""
 
 	_, _ = ts.Run(t, []test.TestCase{
 		// Create base auth based key
@@ -125,7 +124,7 @@ func BenchmarkResponseHeaderInjection(b *testing.B) {
 		"X-Tyk-Test": "1",
 	}
 
-	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%v\"", VERSION)
+	userAgent := "\"User-Agent\":\"Tyk/1.0.0\""
 
 	for i := 0; i < b.N; i++ {
 		_, _ = ts.Run(b, []test.TestCase{
