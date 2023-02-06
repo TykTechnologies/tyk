@@ -3,7 +3,7 @@ ARG GOLANG_CROSS=1.16
 FROM tykio/golang-cross:${GOLANG_CROSS}
 LABEL description="Image for plugin development"
 
-ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
+ENV TYK_GW_PATH=/tyk
 
 ENV GO111MODULE=on
 
