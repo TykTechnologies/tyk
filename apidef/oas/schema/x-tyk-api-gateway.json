@@ -232,6 +232,43 @@
         }
       }
     },
+    "X-Tyk-CustomPluginConfig": {
+      "type": "object",
+      "properties": {
+        "plugins": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-CustomPluginDefinition"
+            }
+          ]
+        }
+      }
+    },
+    "X-Tyk-CustomPluginDefinition": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "rawBodyOnly": {
+          "type": "boolean"
+        },
+        "requireSession": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "functionName",
+        "path"
+      ]
+    },
     "X-Tyk-AuthenticationPlugin": {
       "type": "object",
       "properties": {
@@ -371,8 +408,20 @@
         "cors": {
           "$ref": "#/definitions/X-Tyk-CORS"
         },
+        "prePlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+        },
         "authenticationPlugin": {
           "$ref": "#/definitions/X-Tyk-AuthenticationPlugin"
+        },
+        "postAuthenticationPlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+        },
+        "postPlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+        },
+        "responsePlugin": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-Cache"
@@ -497,7 +546,12 @@
           "type": "string"
         },
         "headers": {
-          "type": "object"
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-Header"
+            }
+          ]
         },
         "fromOASExamples": {
           "properties": {
@@ -1137,6 +1191,21 @@
           "type": "boolean"
         }
       }
+    },
+    "X-Tyk-Header": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ]
     }
   }
 }

@@ -506,12 +506,13 @@ func TestMigrateAndFillOAS(t *testing.T) {
 	api.VersionData.DefaultVersion = "Default"
 	api.VersionData.Versions = map[string]apidef.VersionInfo{
 		"Default": {},
+		"v1":      {},
 		"v2":      {},
 	}
 
 	baseAPIDef, versionAPIDefs, err := MigrateAndFillOAS(&api)
 	assert.NoError(t, err)
-	assert.Len(t, versionAPIDefs, 1)
+	assert.Len(t, versionAPIDefs, 2)
 	assert.True(t, baseAPIDef.Classic.IsOAS)
 	assert.Equal(t, DefaultOpenAPI, baseAPIDef.OAS.OpenAPI)
 	assert.Equal(t, "Furkan", baseAPIDef.OAS.Info.Title)
@@ -519,8 +520,15 @@ func TestMigrateAndFillOAS(t *testing.T) {
 
 	assert.True(t, versionAPIDefs[0].Classic.IsOAS)
 	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[0].OAS.OpenAPI)
-	assert.Equal(t, "Furkan-v2", versionAPIDefs[0].OAS.Info.Title)
-	assert.Equal(t, "v2", versionAPIDefs[0].OAS.Info.Version)
+	assert.Equal(t, "Furkan-v1", versionAPIDefs[0].OAS.Info.Title)
+	assert.Equal(t, "v1", versionAPIDefs[0].OAS.Info.Version)
+
+	assert.True(t, versionAPIDefs[1].Classic.IsOAS)
+	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[1].OAS.OpenAPI)
+	assert.Equal(t, "Furkan-v2", versionAPIDefs[1].OAS.Info.Title)
+	assert.Equal(t, "v2", versionAPIDefs[1].OAS.Info.Version)
+
+	assert.NotEqual(t, versionAPIDefs[0].Classic.APIID, versionAPIDefs[1].Classic.APIID)
 
 	err = baseAPIDef.OAS.Validate(context.Background())
 	assert.NoError(t, err)
@@ -605,5 +613,143 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 
 	t.Run("customDomain", func(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Server.CustomDomain)
+	})
+}
+
+func TestMigrateAndFillOAS_ValidateRequest(t *testing.T) {
+	newValidateJSONAPI := func(schema map[string]interface{}) *apidef.APIDefinition {
+		return &apidef.APIDefinition{
+			Name:  "my-api",
+			Proxy: apidef.ProxyConfig{ListenPath: "/listen"},
+			VersionData: apidef.VersionData{
+				NotVersioned: true,
+				Versions: map[string]apidef.VersionInfo{
+					"Default": {
+						UseExtendedPaths: true,
+						ExtendedPaths: apidef.ExtendedPathsSet{
+							ValidateJSON: []apidef.ValidatePathMeta{
+								{
+									Method:            http.MethodPost,
+									Path:              "/post",
+									Schema:            schema,
+									ErrorResponseCode: http.StatusTeapot,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	migratedAPI, _, err := MigrateAndFillOAS(newValidateJSONAPI(map[string]interface{}{"title": "Furkan"}))
+	assert.NoError(t, err)
+
+	pathItem := migratedAPI.OAS.Paths.Find("/post")
+	assert.NotNil(t, pathItem)
+	operation := pathItem.GetOperation(http.MethodPost)
+	assert.NotNil(t, operation)
+	assert.Equal(t, operation.RequestBody.Value.Content.Get("application/json").Schema.Value.Title, "Furkan")
+
+	expectedValidateRequest := &ValidateRequest{
+		Enabled:           true,
+		ErrorResponseCode: http.StatusTeapot,
+	}
+	assert.Equal(t, expectedValidateRequest, migratedAPI.OAS.GetTykExtension().Middleware.Operations[operation.OperationID].ValidateRequest)
+	assert.Nil(t, migratedAPI.Classic.VersionData.Versions[Main].ExtendedPaths.ValidateJSON)
+
+	t.Run("fail", func(t *testing.T) {
+		migratedAPI, _, err = MigrateAndFillOAS(newValidateJSONAPI(map[string]interface{}{"minLength": -1}))
+		assert.Error(t, err)
+	})
+}
+
+func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
+	t.Run("goplugin", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			Name: "Custom plugin Auth",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/",
+			},
+			UseGoPluginAuth: true,
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				AuthCheck: apidef.MiddlewareDefinition{
+					Name: "AuthFunc",
+					Path: "/path/to/plugin",
+				},
+			},
+			VersionData: apidef.VersionData{
+				NotVersioned: true,
+				Versions:     map[string]apidef.VersionInfo{},
+			},
+		}
+		migratedAPI, _, err := MigrateAndFillOAS(&api)
+		assert.NoError(t, err)
+
+		expectedAuthentication := Authentication{
+			Enabled: true,
+			Custom: &CustomPluginAuthentication{
+				Enabled: true,
+			},
+		}
+
+		expectedAuthenticationPlugin := AuthenticationPlugin{
+			Enabled:      true,
+			FunctionName: "AuthFunc",
+			Path:         "/path/to/plugin",
+		}
+		assert.Equal(t, expectedAuthentication, *migratedAPI.OAS.GetTykExtension().Server.Authentication)
+		assert.Equal(t, expectedAuthenticationPlugin, *migratedAPI.OAS.GetTykExtension().Middleware.Global.AuthenticationPlugin)
+		assert.Equal(t, apidef.GoPluginDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
+	})
+	t.Run("coprocess", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			Name: "Custom plugin Auth",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/",
+			},
+			EnableCoProcessAuth: true,
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver: apidef.PythonDriver,
+				AuthCheck: apidef.MiddlewareDefinition{
+					Name: "AuthFunc",
+					Path: "/path/to/plugin",
+				},
+			},
+			VersionData: apidef.VersionData{
+				NotVersioned: true,
+				Versions:     map[string]apidef.VersionInfo{},
+			},
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.CoprocessType: {
+					AuthHeaderName: "Authorization",
+				},
+			},
+		}
+		migratedAPI, _, err := MigrateAndFillOAS(&api)
+		assert.NoError(t, err)
+
+		expectedAuthentication := Authentication{
+			Enabled: true,
+			Custom: &CustomPluginAuthentication{
+				Enabled: true,
+				AuthSources: AuthSources{
+					Header: &AuthSource{
+						Enabled: true,
+						Name:    "Authorization",
+					},
+				},
+			},
+		}
+
+		expectedAuthenticationPlugin := AuthenticationPlugin{
+			Enabled:      true,
+			FunctionName: "AuthFunc",
+			Path:         "/path/to/plugin",
+		}
+		assert.Equal(t, expectedAuthentication, *migratedAPI.OAS.GetTykExtension().Server.Authentication)
+		assert.Equal(t, expectedAuthenticationPlugin, *migratedAPI.OAS.GetTykExtension().Middleware.Global.AuthenticationPlugin)
+		assert.Equal(t, apidef.PythonDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
 	})
 }

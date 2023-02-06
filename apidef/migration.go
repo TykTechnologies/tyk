@@ -67,7 +67,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 			newAPI.Name += "-" + url.QueryEscape(vName)
 			newAPI.Internal = true
 			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
-			newAPI.VersionDefinition = VersionDefinition{}
+			newAPI.VersionDefinition = VersionDefinition{BaseID: a.APIID}
 			newAPI.VersionName = vName
 
 			// Version API Expires migration
@@ -95,6 +95,10 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 
 			versions = append(versions, newAPI)
 		}
+
+		sort.Slice(versions, func(i, j int) bool {
+			return versions[i].VersionName < versions[j].VersionName
+		})
 	}
 
 	// Base API StripPath migration
@@ -219,9 +223,9 @@ func (a *APIDefinition) migrateEndpointMetaByType(typ int) {
 }
 
 func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
+	a.migrateCustomPluginAuth()
 	a.MigrateAuthentication()
 	a.migratePluginBundle()
-	a.migrateCustomPluginAuth()
 	a.migrateMutualTLS()
 	a.migrateCertificatePinning()
 	a.migrateGatewayTags()
@@ -343,7 +347,7 @@ func (a *APIDefinition) deleteAuthConfigsNotUsed() {
 		delete(a.AuthConfigs, BasicType)
 	}
 
-	if !a.EnableCoProcessAuth {
+	if !a.CustomPluginAuthEnabled || (a.CustomPluginAuthEnabled && a.CustomMiddleware.Driver == GoPluginDriver) {
 		delete(a.AuthConfigs, CoprocessType)
 	}
 
@@ -366,7 +370,7 @@ func (a *APIDefinition) isAuthTokenEnabled() bool {
 			!a.EnableJWT &&
 			!a.EnableSignatureChecking &&
 			!a.UseBasicAuth &&
-			!a.EnableCoProcessAuth &&
+			!a.CustomPluginAuthEnabled &&
 			!a.UseOauth2 &&
 			!a.ExternalOAuth.Enabled &&
 			!a.UseOpenID)
@@ -380,4 +384,23 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.CertificatePinningDisabled = true
 	a.DomainDisabled = true
 	a.CustomMiddlewareBundleDisabled = true
+	for i := 0; i < len(a.CustomMiddleware.Pre); i++ {
+		a.CustomMiddleware.Pre[i].Disabled = true
+	}
+
+	for i := 0; i < len(a.CustomMiddleware.PostKeyAuth); i++ {
+		a.CustomMiddleware.PostKeyAuth[i].Disabled = true
+	}
+
+	for i := 0; i < len(a.CustomMiddleware.PostKeyAuth); i++ {
+		a.CustomMiddleware.PostKeyAuth[i].Disabled = true
+	}
+
+	for i := 0; i < len(a.CustomMiddleware.Post); i++ {
+		a.CustomMiddleware.Post[i].Disabled = true
+	}
+
+	for i := 0; i < len(a.CustomMiddleware.Response); i++ {
+		a.CustomMiddleware.Response[i].Disabled = true
+	}
 }

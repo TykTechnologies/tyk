@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -20,13 +21,13 @@ const acceptCode = "X-Tyk-Accept-Example-Code"
 const acceptExampleName = "X-Tyk-Accept-Example-Name"
 
 func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {
-	route, _, err := p.TykAPISpec.OASRouter.FindRoute(r)
-	if route == nil || err != nil {
+	operation := ctxGetOperation(r)
+	if operation == nil {
 		return nil, nil
 	}
 
-	operation := p.TykAPISpec.OAS.GetTykExtension().Middleware.Operations[route.Operation.OperationID]
-	if operation == nil || !operation.MockResponse.Enabled {
+	mockResponse := operation.MockResponse
+	if mockResponse == nil || !mockResponse.Enabled {
 		return nil, nil
 	}
 
@@ -35,23 +36,22 @@ func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {
 	var code int
 	var contentType string
 	var body []byte
-	var headers map[string]string
+	var headers []oas.Header
+	var err error
 
-	tykExampleRespOp := p.TykAPISpec.OAS.GetTykExtension().Middleware.Operations[route.Operation.OperationID].MockResponse
-
-	if tykExampleRespOp.FromOASExamples != nil && tykExampleRespOp.FromOASExamples.Enabled {
-		code, contentType, body, headers, err = mockFromOAS(r, route.Operation, tykExampleRespOp.FromOASExamples)
+	if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
+		code, contentType, body, headers, err = mockFromOAS(r, operation.route.Operation, mockResponse.FromOASExamples)
 		res.StatusCode = code
 		if err != nil {
 			err = fmt.Errorf("mock: %s", err)
 			return res, err
 		}
 	} else {
-		code, body, headers = mockFromConfig(tykExampleRespOp)
+		code, body, headers = mockFromConfig(mockResponse)
 	}
 
-	for key, val := range headers {
-		res.Header.Set(key, val)
+	for _, h := range headers {
+		res.Header.Set(h.Name, h.Value)
 	}
 
 	if contentType != "" {
@@ -65,7 +65,7 @@ func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {
 	return res, nil
 }
 
-func mockFromConfig(tykMockRespOp *oas.MockResponse) (int, []byte, map[string]string) {
+func mockFromConfig(tykMockRespOp *oas.MockResponse) (int, []byte, []oas.Header) {
 	code := tykMockRespOp.Code
 	if code == 0 {
 		code = http.StatusOK
@@ -77,7 +77,7 @@ func mockFromConfig(tykMockRespOp *oas.MockResponse) (int, []byte, map[string]st
 	return code, body, headers
 }
 
-func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples *oas.FromOASExamples) (int, string, []byte, map[string]string, error) {
+func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples *oas.FromOASExamples) (int, string, []byte, []oas.Header, error) {
 	exampleName := fromOASExamples.ExampleName
 	if headerExampleName := r.Header.Get(acceptExampleName); headerExampleName != "" {
 		exampleName = headerExampleName
@@ -114,10 +114,16 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		return http.StatusNotFound, "", nil, nil, errors.New("there is no example response for the content type: " + contentType)
 	}
 
-	headers := make(map[string]string)
+	headers := make([]oas.Header, len(response.Value.Headers))
+	i := 0
 	for key, val := range response.Value.Headers {
-		headers[key] = fmt.Sprintf("%v", oas.ExampleExtractor(val.Value.Schema))
+		headers[i] = oas.Header{Name: key, Value: fmt.Sprintf("%v", oas.ExampleExtractor(val.Value.Schema))}
+		i++
 	}
+
+	sort.Slice(headers, func(i, j int) bool {
+		return headers[i].Name < headers[j].Name
+	})
 
 	var example interface{}
 	if media.Example != nil {
