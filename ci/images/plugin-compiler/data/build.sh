@@ -71,4 +71,4 @@ if [[ $GOARCH == "arm64" ]] && [[ $GOOS == "linux" ]] ; then
     CC=aarch64-linux-gnu-gcc
 fi
 
-CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH CC=$CC go build -buildmode=plugin -o $plugin_name
+CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH CC=$CC GOPATH=/go go build -buildmode=plugin -o $plugin_name
