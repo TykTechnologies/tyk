@@ -1066,22 +1066,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			graphql.WithAfterFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.AfterFetchHook),
 		}
 
-		// if this context vars are enabled and this is a supergraph, inject the sub request id header
-		upstreamHeaders := http.Header{}
-		if p.TykAPISpec.EnableContextVars && p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph {
-			ctxData := ctxGetData(outreq)
-			if reqID, exists := ctxData["request_id"]; !exists {
-				log.Warn("context variables enabled but request_id missing")
-			} else if requestID, ok := reqID.(string); ok {
-				upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
-			}
-		}
-
-		// append the request headers if any
-		for h, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeaders {
-			val := p.Gw.replaceTykVariables(outreq, value, false)
-			upstreamHeaders.Set(h, val)
-		}
+		upstreamHeaders := p.generateHeaders(outreq)
 		execOptions = append(execOptions, graphql.WithUpstreamHeaders(upstreamHeaders))
 
 		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
@@ -1111,6 +1096,59 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 	}
 
 	return nil, false, errors.New("graphql configuration is invalid")
+}
+
+func removeDuplicateHeaders(headers ...map[string]string) map[string]string {
+	hdr := make(map[string]string)
+	// headers priority depends on the order of arguments
+	for _, header := range headers {
+		for k, v := range header {
+			keyCanonical := http.CanonicalHeaderKey(k)
+			if _, ok := hdr[keyCanonical]; ok {
+				// skip because header is present
+				continue
+			}
+			hdr[keyCanonical] = v
+		}
+	}
+	return hdr
+}
+func (p *ReverseProxy) generateHeaders(req *http.Request) http.Header {
+	headers := http.Header{}
+	if p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph {
+		hdrs := make(map[string]string)
+		for _, sub := range p.TykAPISpec.GraphQL.Supergraph.Subgraphs {
+			for k, v := range removeDuplicateHeaders(sub.Headers, p.TykAPISpec.GraphQL.Supergraph.GlobalHeaders) {
+				hdrs[k] = v
+			}
+		}
+		if p.TykAPISpec.EnableContextVars {
+			// if this context vars are enabled and this is a supergraph, inject the sub request id header
+			ctxData := ctxGetData(req)
+			if reqID, exists := ctxData["request_id"]; !exists {
+				log.Warn("context variables enabled but request_id missing")
+			} else if requestID, ok := reqID.(string); ok {
+				headers.Set("X-Tyk-Parent-Request-Id", requestID)
+			}
+
+			// parse context variables for supergraphs
+			for k, v := range hdrs {
+				replacedVal := p.Gw.replaceTykVariables(req, v, false)
+				headers.Set(k, replacedVal)
+			}
+		} else {
+			for h, val := range hdrs {
+				headers.Set(h, val)
+			}
+		}
+	}
+
+	// append the request headers if any
+	for h, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeaders {
+		val := p.Gw.replaceTykVariables(req, value, false)
+		headers.Set(h, val)
+	}
+	return headers
 }
 
 func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn, req *http.Request) {
