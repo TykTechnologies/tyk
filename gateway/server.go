@@ -1307,25 +1307,32 @@ func readPIDFromFile(file string) (int, error) {
 // timeouts) and sets up a few globals that depend on the config.
 func (gw *Gateway) afterConfSetup() {
 	conf := gw.GetConfig()
-	if conf.SlaveOptions.CallTimeout == 0 {
-		conf.SlaveOptions.CallTimeout = 30
-	}
 
-	if conf.SlaveOptions.PingTimeout == 0 {
-		conf.SlaveOptions.PingTimeout = 60
-	}
+	if conf.SlaveOptions.UseRPC {
+		if conf.SlaveOptions.GroupID == "" {
+			conf.SlaveOptions.GroupID = "ungrouped"
+		}
 
-	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
-		conf.SlaveOptions.KeySpaceSyncInterval = 10
-	}
+		if conf.SlaveOptions.CallTimeout == 0 {
+			conf.SlaveOptions.CallTimeout = 30
+		}
 
-	if conf.SlaveOptions.RPCCertCacheExpiration == 0 {
-		// defaults to 1 hr
-		conf.SlaveOptions.RPCCertCacheExpiration = 3600
-	}
+		if conf.SlaveOptions.PingTimeout == 0 {
+			conf.SlaveOptions.PingTimeout = 60
+		}
 
-	if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
-		conf.SlaveOptions.RPCGlobalCacheExpiration = 30
+		if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
+			conf.SlaveOptions.KeySpaceSyncInterval = 10
+		}
+
+		if conf.SlaveOptions.RPCCertCacheExpiration == 0 {
+			// defaults to 1 hr
+			conf.SlaveOptions.RPCCertCacheExpiration = 3600
+		}
+
+		if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
+			conf.SlaveOptions.RPCGlobalCacheExpiration = 30
+		}
 	}
 
 	if conf.AnalyticsConfig.PurgeInterval == 0 {
