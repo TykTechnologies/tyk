@@ -114,6 +114,7 @@ type RPCStorageHandler struct {
 // Connect will establish a connection to the RPC
 func (r *RPCStorageHandler) Connect() bool {
 	slaveOptions := r.Gw.GetConfig().SlaveOptions
+
 	rpcConfig := rpc.Config{
 		UseSSL:                slaveOptions.UseSSL,
 		SSLInsecureSkipVerify: slaveOptions.SSLInsecureSkipVerify,
