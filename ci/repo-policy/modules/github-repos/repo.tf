@@ -27,7 +27,6 @@ resource "github_repository" "repository" {
   topics                      = var.topics
 }
 
-
 resource "github_branch" "default" {
   repository = github_repository.repository.name
   branch     = var.default_branch
