@@ -82,7 +82,7 @@ func (r *RedisAnalyticsHandler) Init() {
 	r.Start()
 }
 
-//Start initialize the records channel and spawn the record workers
+// Start initialize the records channel and spawn the record workers
 func (r *RedisAnalyticsHandler) Start() {
 	r.recordsChan = make(chan *analytics.AnalyticsRecord, r.globalConf.AnalyticsConfig.RecordsBufferSize)
 	atomic.SwapUint32(&r.shouldStop, 0)
@@ -92,7 +92,7 @@ func (r *RedisAnalyticsHandler) Start() {
 	}
 }
 
-//Stop stops the analytics processing
+// Stop stops the analytics processing
 func (r *RedisAnalyticsHandler) Stop() {
 	// flag to stop sending records into channel
 	atomic.SwapUint32(&r.shouldStop, 1)
@@ -106,7 +106,7 @@ func (r *RedisAnalyticsHandler) Stop() {
 	r.poolWg.Wait()
 }
 
-//Flush will stop the analytics processing and empty the analytics buffer and then re-init the workers again
+// Flush will stop the analytics processing and empty the analytics buffer and then re-init the workers again
 func (r *RedisAnalyticsHandler) Flush() {
 	r.Stop()
 

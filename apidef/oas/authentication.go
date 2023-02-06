@@ -59,6 +59,18 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.StripAuthorizationData = api.StripAuthData
 	a.BaseIdentityProvider = api.BaseIdentityProvidedBy
 
+	if api.CustomPluginAuthEnabled {
+		if a.Custom == nil {
+			a.Custom = &CustomPluginAuthentication{}
+		}
+
+		a.Custom.Fill(api)
+	}
+
+	if ShouldOmit(a.Custom) {
+		a.Custom = nil
+	}
+
 	if api.AuthConfigs == nil || len(api.AuthConfigs) == 0 {
 		return
 	}
@@ -73,18 +85,6 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 
 	if ShouldOmit(a.HMAC) {
 		a.HMAC = nil
-	}
-
-	if _, ok := api.AuthConfigs[apidef.CoprocessType]; ok {
-		if a.Custom == nil {
-			a.Custom = &CustomPluginAuthentication{}
-		}
-
-		a.Custom.Fill(api)
-	}
-
-	if ShouldOmit(a.Custom) {
-		a.Custom = nil
 	}
 
 	if _, ok := api.AuthConfigs[apidef.OIDCType]; ok {
@@ -594,6 +594,10 @@ type CustomPluginAuthentication struct {
 func (c *CustomPluginAuthentication) Fill(api apidef.APIDefinition) {
 	c.Enabled = api.CustomPluginAuthEnabled
 
+	if ShouldOmit(api.AuthConfigs[apidef.CoprocessType]) {
+		return
+	}
+
 	c.AuthSources.Fill(api.AuthConfigs[apidef.CoprocessType])
 }
 
@@ -603,6 +607,10 @@ func (c *CustomPluginAuthentication) ExtractTo(api *apidef.APIDefinition) {
 
 	authConfig := apidef.AuthConfig{}
 	c.AuthSources.ExtractTo(&authConfig)
+
+	if ShouldOmit(authConfig) {
+		return
+	}
 
 	if api.AuthConfigs == nil {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)

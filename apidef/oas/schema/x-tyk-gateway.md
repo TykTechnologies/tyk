@@ -556,10 +556,30 @@ CORS contains the configuration related to cross origin resource sharing.
 
 Tyk native API definition: `CORS`.
 
+**Field: `prePlugin` ([PrePlugin](#preplugin))**
+PrePlugin contains configuration related to custom pre-authentication plugin.
+
+Tyk native API definition: `custom_middleware.pre`.
+
 **Field: `authenticationPlugin` ([AuthenticationPlugin](#authenticationplugin))**
 AuthenticationPlugin contains configuration related to custom authentication plugin.
 
 Tyk native API definition: `custom_middleware.auth_check`.
+
+**Field: `postAuthenticationPlugin` ([PostAuthenticationPlugin](#postauthenticationplugin))**
+PostAuthenticationPlugin contains configuration related to custom post authentication plugin.
+
+Tyk native API definition: `custom_middleware.post_key_auth`.
+
+**Field: `postPlugin` ([PostPlugin](#postplugin))**
+PostPlugin contains configuration related to custom post plugin.
+
+Tyk native API definition: `custom_middleware.post`.
+
+**Field: `responsePlugin` ([ResponsePlugin](#responseplugin))**
+ResponsePlugin contains configuration related to custom post plugin.
+
+Tyk native API definition: `custom_middleware.post`.
 
 **Field: `cache` ([Cache](#cache))**
 Cache contains the configurations related to caching.
@@ -581,6 +601,20 @@ It's value should be set to one of the following:
 
 
 Tyk native API definition: `custom_middleware.driver`.
+
+**Field: `bundle` ([PluginBundle](#pluginbundle))**
+Bundle configures custom plugin bundles.
+
+
+### **PluginBundle**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables the custom plugin bundles.
+Tyk classic API definition: `custom_middleware_bundle_disabled`.
+
+**Field: `path` (`string`)**
+Path is the path suffix to construct the URL to fetch plugin bundle from.
+Path will be suffixed to `bundle_base_url` in gateway config.
 
 
 ### **CORS**
@@ -632,6 +666,32 @@ AllowedMethods holds a list of methods to allow access via.
 Tyk native API definition: `CORS.allowed_methods`.
 
 
+### **PrePlugin**
+
+**Field: `plugins` (`[]`[CustomPlugin](#customplugin))**
+Plugins configures custom plugins to be run on pre authentication stage.
+The plugins would be executed in the order of configuration in the list.
+
+
+### **CustomPlugin**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables the custom pre plugin.
+
+**Field: `functionName` (`string`)**
+FunctionName is the name of authentication method.
+
+**Field: `path` (`string`)**
+Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
+
+**Field: `rawBodyOnly` (`boolean`)**
+RawBodyOnly if set to true, do not fill body in request or response object.
+
+**Field: `requireSession` (`boolean`)**
+RequireSession if set to true passes down the session information for plugins after authentication.
+RequireSession is used only with JSVM custom middleware.
+
+
 ### **AuthenticationPlugin**
 
 **Field: `enabled` (`boolean`)**
@@ -647,16 +707,25 @@ Path is the path to shared object file in case of gopluign mode or path to js co
 RawBodyOnly if set to true, do not fill body in request or response object.
 
 
-### **CustomPluginMiddleware**
+### **PostAuthenticationPlugin**
 
-**Field: `functionName` (`string`)**
-FunctionName is the name of authentication method.
+**Field: `plugins` (`[]`[CustomPlugin](#customplugin))**
+Plugins configures custom plugins to be run on pre authentication stage.
+The plugins would be executed in the order of configuration in the list.
 
-**Field: `path` (`string`)**
-Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
 
-**Field: `rawBodyOnly` (`boolean`)**
-RawBodyOnly if set to true, do not fill body in request or response object.
+### **PostPlugin**
+
+**Field: `plugins` (`[]`[CustomPlugin](#customplugin))**
+Plugins configures custom plugins to be run on post stage.
+The plugins would be executed in the order of configuration in the list.
+
+
+### **ResponsePlugin**
+
+**Field: `plugins` (`[]`[CustomPlugin](#customplugin))**
+Plugins configures custom plugins to be run on post stage.
+The plugins would be executed in the order of configuration in the list.
 
 
 ### **Cache**
@@ -804,11 +873,20 @@ Code is the HTTP response code that will be returned.
 **Field: `body` (`string`)**
 Body is the HTTP response body that will be returned.
 
-**Field: `headers` (`string`)**
+**Field: `headers` (`[]`[Header](#header))**
 Headers are the HTTP response headers that will be returned.
 
 **Field: `fromOASExamples` ([FromOASExamples](#fromoasexamples))**
 FromOASExamples is the configuration to extract a mock response from OAS documentation.
+
+
+### **Header**
+
+**Field: `name` (`string`)**
+Name is the name of the header.
+
+**Field: `value` (`string`)**
+Value is the value of the header.
 
 
 ### **FromOASExamples**

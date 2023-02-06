@@ -1,7 +1,9 @@
 package oas
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -373,29 +375,58 @@ func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
 		return baseAPIDef, nil, err
 	}
 
-	versionAPIDefs := make([]APIDef, len(versions))
-	for i, v := range versions {
-		versionAPIDefs[i] = APIDef{OAS: newOASFromClassicAPIDefinition(&v), Classic: &v}
+	baseAPIDef.OAS, err = newOASFromClassicAPIDefinition(api)
+	if err != nil {
+		return baseAPIDef, nil, fmt.Errorf("base API %s migrated OAS is not valid: %w", api.Name, err)
 	}
 
-	baseAPIDef.OAS = newOASFromClassicAPIDefinition(api)
+	versionAPIDefs := make([]APIDef, len(versions))
+	for i := 0; i < len(versions); i++ {
+		versionOAS, err := newOASFromClassicAPIDefinition(&versions[i])
+		if err != nil {
+			return baseAPIDef, nil, fmt.Errorf("version API %s migrated OAS is not valid: %w", versions[i].Name, err)
+		}
+		versionAPIDefs[i] = APIDef{versionOAS, &versions[i]}
+	}
 
-	return baseAPIDef, versionAPIDefs, nil
+	return baseAPIDef, versionAPIDefs, err
 }
 
-func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) *OAS {
+func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 	api.IsOAS = true
 	var oas OAS
 	oas.Fill(*api)
-	oas.setRequiredFields(api.Name)
-	return &oas
+	oas.setRequiredFields(api.Name, api.VersionName)
+	clearClassicAPIForSomeFeatures(api)
+
+	err := oas.Validate(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := oas.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	return &oas, ValidateOASObject(bytes, oas.OpenAPI)
 }
 
 // setRequiredFields sets some required fields to make OAS object a valid one.
-func (s *OAS) setRequiredFields(name string) {
+func (s *OAS) setRequiredFields(name string, versionName string) {
 	s.OpenAPI = DefaultOpenAPI
 	s.Info = &openapi3.Info{
 		Title:   name,
-		Version: "1",
+		Version: versionName,
 	}
+}
+
+// clearClassicAPIForSomeFeatures clears some features that will be OAS-only.
+// For example, the new validate request will just be valid for OAS APIs so after migrating from classic API definition
+// the existing feature should be cleared to prevent ValidateJSON middleware interference.
+func clearClassicAPIForSomeFeatures(api *apidef.APIDefinition) {
+	// clear ValidateJSON after migration to OAS-only ValidateRequest
+	vInfo := api.VersionData.Versions[Main]
+	vInfo.ExtendedPaths.ValidateJSON = nil
+	api.VersionData.Versions[Main] = vInfo
 }

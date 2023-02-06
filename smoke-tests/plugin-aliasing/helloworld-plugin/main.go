@@ -17,6 +17,7 @@ import (
 var logger = log.Get()
 
 // AddHelloWorldHeader adds custom "Foo: Bar" header to the request
+//
 //nolint:deadcode
 func AddHelloWorldHeader(rw http.ResponseWriter, r *http.Request) {
 	r.Header.Add("Hello", "World")

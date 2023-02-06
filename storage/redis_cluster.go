@@ -760,7 +760,7 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 	}
 }
 
-//Exists check if keyName exists
+// Exists check if keyName exists
 func (r *RedisCluster) Exists(keyName string) (bool, error) {
 	fixedKey := r.fixKey(keyName)
 	log.WithField("keyName", fixedKey).Debug("Checking if exists")

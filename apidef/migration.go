@@ -4,15 +4,20 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"reflect"
 	"sort"
 	"strings"
 
 	uuid "github.com/satori/go.uuid"
 )
 
+var (
+	ErrMigrationNewVersioningEnabled = errors.New("not migratable - new versioning is already enabled")
+)
+
 func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error) {
 	if a.VersionDefinition.Enabled || len(a.VersionDefinition.Versions) != 0 {
-		return nil, errors.New("not migratable - new versioning is enabled")
+		return nil, ErrMigrationNewVersioningEnabled
 	}
 
 	if a.VersionData.NotVersioned && len(a.VersionData.Versions) > 1 {
@@ -46,6 +51,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 	}
 
 	delete(a.VersionData.Versions, base)
+	a.VersionName = base
 
 	if a.VersionDefinition.Enabled {
 		a.VersionDefinition.Name = base
@@ -61,7 +67,8 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 			newAPI.Name += "-" + url.QueryEscape(vName)
 			newAPI.Internal = true
 			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
-			newAPI.VersionDefinition = VersionDefinition{}
+			newAPI.VersionDefinition = VersionDefinition{BaseID: a.APIID}
+			newAPI.VersionName = vName
 
 			// Version API Expires migration
 			newAPI.Expiration = vInfo.Expires
@@ -88,6 +95,10 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 
 			versions = append(versions, newAPI)
 		}
+
+		sort.Slice(versions, func(i, j int) bool {
+			return versions[i].VersionName < versions[j].VersionName
+		})
 	}
 
 	// Base API StripPath migration
@@ -115,6 +126,11 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 		Versions: map[string]VersionInfo{
 			"": baseVInfo,
 		},
+	}
+
+	// If versioning is not enabled and versions list are empty at this point, ignore key and location and drop them too.
+	if !a.VersionDefinition.Enabled && len(versions) == 0 {
+		a.VersionDefinition = VersionDefinition{}
 	}
 
 	return
@@ -207,7 +223,14 @@ func (a *APIDefinition) migrateEndpointMetaByType(typ int) {
 }
 
 func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
+	a.migrateCustomPluginAuth()
 	a.MigrateAuthentication()
+	a.migratePluginBundle()
+	a.migrateMutualTLS()
+	a.migrateCertificatePinning()
+	a.migrateGatewayTags()
+	a.migrateAuthenticationPlugin()
+	a.migrateCustomDomain()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -222,6 +245,51 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	}
 
 	return versions, nil
+}
+
+func (a *APIDefinition) migratePluginBundle() {
+	if !a.CustomMiddlewareBundleDisabled && a.CustomMiddlewareBundle == "" {
+		a.CustomMiddlewareBundleDisabled = true
+	}
+}
+
+// migrateCustomPluginAuth deprecates UseGoPluginAuth and EnableCoProcessAuth in favour of CustomPluginAuthEnabled.
+func (a *APIDefinition) migrateCustomPluginAuth() {
+	if a.UseGoPluginAuth || a.EnableCoProcessAuth {
+		a.CustomPluginAuthEnabled = true
+		a.UseGoPluginAuth = false
+		a.EnableCoProcessAuth = false
+	}
+}
+
+func (a *APIDefinition) migrateMutualTLS() {
+	if !a.UpstreamCertificatesDisabled && len(a.UpstreamCertificates) == 0 {
+		a.UpstreamCertificatesDisabled = true
+	}
+}
+
+func (a *APIDefinition) migrateCertificatePinning() {
+	if !a.CertificatePinningDisabled && len(a.PinnedPublicKeys) == 0 {
+		a.CertificatePinningDisabled = true
+	}
+}
+
+func (a *APIDefinition) migrateGatewayTags() {
+	if !a.TagsDisabled && len(a.Tags) == 0 {
+		a.TagsDisabled = true
+	}
+}
+
+func (a *APIDefinition) migrateAuthenticationPlugin() {
+	if reflect.DeepEqual(a.CustomMiddleware.AuthCheck, MiddlewareDefinition{}) {
+		a.CustomMiddleware.AuthCheck.Disabled = true
+	}
+}
+
+func (a *APIDefinition) migrateCustomDomain() {
+	if !a.DomainDisabled && a.Domain == "" {
+		a.DomainDisabled = true
+	}
 }
 
 func (a *APIDefinition) MigrateCachePlugin() {
@@ -279,7 +347,7 @@ func (a *APIDefinition) deleteAuthConfigsNotUsed() {
 		delete(a.AuthConfigs, BasicType)
 	}
 
-	if !a.EnableCoProcessAuth {
+	if !a.CustomPluginAuthEnabled || (a.CustomPluginAuthEnabled && a.CustomMiddleware.Driver == GoPluginDriver) {
 		delete(a.AuthConfigs, CoprocessType)
 	}
 
@@ -302,8 +370,37 @@ func (a *APIDefinition) isAuthTokenEnabled() bool {
 			!a.EnableJWT &&
 			!a.EnableSignatureChecking &&
 			!a.UseBasicAuth &&
-			!a.EnableCoProcessAuth &&
+			!a.CustomPluginAuthEnabled &&
 			!a.UseOauth2 &&
 			!a.ExternalOAuth.Enabled &&
 			!a.UseOpenID)
+}
+
+// SetDisabledFlags set disabled flags to true, since by default they are not enabled in OAS API definition.
+func (a *APIDefinition) SetDisabledFlags() {
+	a.CustomMiddleware.AuthCheck.Disabled = true
+	a.TagsDisabled = true
+	a.UpstreamCertificatesDisabled = true
+	a.CertificatePinningDisabled = true
+	a.DomainDisabled = true
+	a.CustomMiddlewareBundleDisabled = true
+	for i := 0; i < len(a.CustomMiddleware.Pre); i++ {
+		a.CustomMiddleware.Pre[i].Disabled = true
+	}
+
+	for i := 0; i < len(a.CustomMiddleware.PostKeyAuth); i++ {
+		a.CustomMiddleware.PostKeyAuth[i].Disabled = true
+	}
+
+	for i := 0; i < len(a.CustomMiddleware.PostKeyAuth); i++ {
+		a.CustomMiddleware.PostKeyAuth[i].Disabled = true
+	}
+
+	for i := 0; i < len(a.CustomMiddleware.Post); i++ {
+		a.CustomMiddleware.Post[i].Disabled = true
+	}
+
+	for i := 0; i < len(a.CustomMiddleware.Response); i++ {
+		a.CustomMiddleware.Response[i].Disabled = true
+	}
 }
