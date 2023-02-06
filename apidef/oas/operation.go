@@ -299,11 +299,12 @@ func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path st
 
 // detect possible regex pattern:
 // - character match ([a-z])
-// - greedy match (*)
-// - ungreedy match (+)
-// - any char (.)
+// - greedy match (.*)
+// - ungreedy match (.+)
 // - end of string ($).
-const regexPatterns = "[].+*$"
+var regexPatterns = []string{
+	".+", ".*", "[", "]", "$",
+}
 
 type pathPart struct {
 	name    string
@@ -319,6 +320,16 @@ func (p pathPart) String() string {
 	return p.value
 }
 
+// isRegex checks if value has expected regular expression patterns.
+func isRegex(value string) bool {
+	for _, pattern := range regexPatterns {
+		if strings.Contains(value, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
 // splitPath splits url into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
 	// Each url fragment can contain a regex, but the whole
@@ -329,7 +340,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 
 	for k, value := range parts {
 		name := value
-		isRegex := strings.ContainsAny(value, regexPatterns)
+		isRegex := isRegex(value)
 		if isRegex {
 			found++
 			name = fmt.Sprintf("customRegex%d", found)
@@ -393,6 +404,7 @@ func (s *OAS) getOperationID(inPath, method string) string {
 
 	if hasRegex {
 		newPath := buildPath(parts, strings.HasSuffix(inPath, "/"))
+
 		p = createOrGetPathItem(newPath)
 		p.Parameters = []*openapi3.ParameterRef{}
 
