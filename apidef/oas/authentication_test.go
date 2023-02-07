@@ -111,6 +111,7 @@ func TestCustomPlugin(t *testing.T) {
 		var emptyCustomPlugin CustomPluginAuthentication
 
 		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
 		emptyCustomPlugin.ExtractTo(&convertedAPI)
 
 		var resultCustomPlugin CustomPluginAuthentication
@@ -123,9 +124,15 @@ func TestCustomPlugin(t *testing.T) {
 		t.Run("goplugin", func(t *testing.T) {
 			var expectedCustomPluginAuth = CustomPluginAuthentication{
 				Enabled: true,
+				Config: &AuthenticationPlugin{
+					Enabled:      true,
+					FunctionName: "Auth",
+					Path:         "/path/to/plugin",
+				},
 			}
 
 			var convertedAPI apidef.APIDefinition
+			convertedAPI.SetDisabledFlags()
 			expectedCustomPluginAuth.ExtractTo(&convertedAPI)
 
 			var actualCustomPluginAuth CustomPluginAuthentication
@@ -138,6 +145,11 @@ func TestCustomPlugin(t *testing.T) {
 		t.Run("coprocess", func(t *testing.T) {
 			var expectedCustomPluginAuth = CustomPluginAuthentication{
 				Enabled: true,
+				Config: &AuthenticationPlugin{
+					Enabled:      true,
+					FunctionName: "Auth",
+					Path:         "/path/to/plugin",
+				},
 				AuthSources: AuthSources{
 					Header: &AuthSource{
 						Enabled: true,
@@ -147,6 +159,7 @@ func TestCustomPlugin(t *testing.T) {
 			}
 
 			var convertedAPI apidef.APIDefinition
+			convertedAPI.SetDisabledFlags()
 			expectedCustomPluginAuth.ExtractTo(&convertedAPI)
 
 			var actualCustomPluginAuth CustomPluginAuthentication
