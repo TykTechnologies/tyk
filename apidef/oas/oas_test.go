@@ -753,3 +753,154 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 		assert.Equal(t, apidef.PythonDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
 	})
 }
+
+func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
+	t.Parallel()
+	t.Run("pre", func(t *testing.T) {
+		t.Parallel()
+		api := apidef.APIDefinition{
+			Name: "Custom plugin-pre",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/",
+			},
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Pre: []apidef.MiddlewareDefinition{
+					{
+						Name: "Pre",
+						Path: "/path/to/plugin",
+					},
+				},
+			},
+			VersionData: apidef.VersionData{
+				NotVersioned: true,
+				Versions:     map[string]apidef.VersionInfo{},
+			},
+		}
+		migratedAPI, _, err := MigrateAndFillOAS(&api)
+		assert.NoError(t, err)
+
+		expectedPrePlugin := PrePlugin{
+			Plugins: CustomPlugins{
+				{
+					Enabled:      true,
+					FunctionName: "Pre",
+					Path:         "/path/to/plugin",
+				},
+			},
+		}
+		assert.Equal(t, expectedPrePlugin, *migratedAPI.OAS.GetTykExtension().Middleware.Global.PrePlugin)
+		assert.Equal(t, apidef.GoPluginDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
+	})
+
+	t.Run("postAuth", func(t *testing.T) {
+		t.Parallel()
+		api := apidef.APIDefinition{
+			Name: "Custom plugin - post auth",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/",
+			},
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				PostKeyAuth: []apidef.MiddlewareDefinition{
+					{
+						Name: "PostAuth",
+						Path: "/path/to/plugin",
+					},
+				},
+			},
+			VersionData: apidef.VersionData{
+				NotVersioned: true,
+				Versions:     map[string]apidef.VersionInfo{},
+			},
+		}
+		migratedAPI, _, err := MigrateAndFillOAS(&api)
+		assert.NoError(t, err)
+
+		expectedPrePlugin := PostAuthenticationPlugin{
+			Plugins: CustomPlugins{
+				{
+					Enabled:      true,
+					FunctionName: "PostAuth",
+					Path:         "/path/to/plugin",
+				},
+			},
+		}
+		assert.Equal(t, expectedPrePlugin, *migratedAPI.OAS.GetTykExtension().Middleware.Global.PostAuthenticationPlugin)
+		assert.Equal(t, apidef.GoPluginDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
+	})
+
+	t.Run("post", func(t *testing.T) {
+		t.Parallel()
+		api := apidef.APIDefinition{
+			Name: "Custom plugin - post",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/",
+			},
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Post: []apidef.MiddlewareDefinition{
+					{
+						Name: "Post",
+						Path: "/path/to/plugin",
+					},
+				},
+			},
+			VersionData: apidef.VersionData{
+				NotVersioned: true,
+				Versions:     map[string]apidef.VersionInfo{},
+			},
+		}
+		migratedAPI, _, err := MigrateAndFillOAS(&api)
+		assert.NoError(t, err)
+
+		expectedPrePlugin := PostPlugin{
+			Plugins: CustomPlugins{
+				{
+					Enabled:      true,
+					FunctionName: "Post",
+					Path:         "/path/to/plugin",
+				},
+			},
+		}
+		assert.Equal(t, expectedPrePlugin, *migratedAPI.OAS.GetTykExtension().Middleware.Global.PostPlugin)
+		assert.Equal(t, apidef.GoPluginDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
+	})
+
+	t.Run("response", func(t *testing.T) {
+		t.Parallel()
+		api := apidef.APIDefinition{
+			Name: "Custom plugin - response",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/",
+			},
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Response: []apidef.MiddlewareDefinition{
+					{
+						Name: "Response",
+						Path: "/path/to/plugin",
+					},
+				},
+			},
+			VersionData: apidef.VersionData{
+				NotVersioned: true,
+				Versions:     map[string]apidef.VersionInfo{},
+			},
+		}
+		migratedAPI, _, err := MigrateAndFillOAS(&api)
+		assert.NoError(t, err)
+
+		expectedPrePlugin := ResponsePlugin{
+			Plugins: CustomPlugins{
+				{
+					Enabled:      true,
+					FunctionName: "Response",
+					Path:         "/path/to/plugin",
+				},
+			},
+		}
+		assert.Equal(t, expectedPrePlugin, *migratedAPI.OAS.GetTykExtension().Middleware.Global.ResponsePlugin)
+		assert.Equal(t, apidef.GoPluginDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
+	})
+}
