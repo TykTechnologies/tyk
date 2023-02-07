@@ -315,7 +315,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	var extractor IdExtractor
 	customPluginAuthEnabled := m.Spec.EnableCoProcessAuth || m.Spec.CustomPluginAuthEnabled
-	if customPluginAuthEnabled && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
+	if customPluginAuthEnabled && !m.Spec.CustomMiddleware.IdExtractor.Disabled && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
 		extractor = m.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 	}
 
