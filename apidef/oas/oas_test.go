@@ -829,6 +829,7 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 		assert.Equal(t, expectedPrePlugin, *migratedAPI.OAS.GetTykExtension().Middleware.Global.PostAuthenticationPlugin)
 		assert.Equal(t, apidef.GoPluginDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
 	})
+
 	t.Run("post", func(t *testing.T) {
 		t.Parallel()
 		api := apidef.APIDefinition{
@@ -865,6 +866,7 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 		assert.Equal(t, expectedPrePlugin, *migratedAPI.OAS.GetTykExtension().Middleware.Global.PostPlugin)
 		assert.Equal(t, apidef.GoPluginDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
 	})
+
 	t.Run("response", func(t *testing.T) {
 		t.Parallel()
 		api := apidef.APIDefinition{
