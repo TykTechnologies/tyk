@@ -81,6 +81,9 @@ const Schema = `{
         "custom_middleware_bundle": {
             "type": "string"
         },
+		"custom_middleware_bundle_disabled": {
+           	"type": "boolean"
+        },
         "jwt_policy_field_name": {
             "type": "string"
         },

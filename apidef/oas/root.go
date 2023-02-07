@@ -36,6 +36,8 @@ func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *XTykAPIGateway into *apidef.APIDefinition.
 func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
+	api.SetDisabledFlags()
+
 	x.Info.ExtractTo(api)
 	x.Upstream.ExtractTo(api)
 	x.Server.ExtractTo(api)

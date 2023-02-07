@@ -340,7 +340,7 @@ type ValidatePathMeta struct {
 	Path        string                  `bson:"path" json:"path"`
 	Method      string                  `bson:"method" json:"method"`
 	Schema      map[string]interface{}  `bson:"-" json:"schema"`
-	SchemaB64   string                  `bson:"schema_b64" json:"-"`
+	SchemaB64   string                  `bson:"schema_b64" json:"schema_b64,omitempty"`
 	SchemaCache gojsonschema.JSONLoader `bson:"-" json:"-"`
 	// Allows override of default 422 Unprocessible Entity response code for validation errors.
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
@@ -623,6 +623,7 @@ type APIDefinition struct {
 	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
 	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
 	CustomMiddlewareBundle               string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
+	CustomMiddlewareBundleDisabled       bool                   `bson:"custom_middleware_bundle_disabled" json:"custom_middleware_bundle_disabled"`
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
 	SessionLifetimeRespectsKeyExpiration bool                   `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration,omitempty"`
 	SessionLifetime                      int64                  `bson:"session_lifetime" json:"session_lifetime"`
@@ -658,7 +659,8 @@ type APIDefinition struct {
 	Tags         []string `bson:"tags" json:"tags"`
 
 	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
-	IsOAS bool `bson:"is_oas" json:"is_oas,omitempty"`
+	IsOAS       bool   `bson:"is_oas" json:"is_oas,omitempty"`
+	VersionName string `bson:"-" json:"-"`
 }
 
 type AnalyticsPluginConfig struct {

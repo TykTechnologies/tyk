@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -111,7 +112,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTransformRequestBody(ep.Transform)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
-	s.fillOASValidateRequest(ep.ValidateRequest)
+	s.fillOASValidateRequest(ep.ValidateJSON)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -132,7 +133,6 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTransformRequestBodyTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
-					tykOp.extractOASValidateRequestTo(ep, path, method)
 					break found
 				}
 			}
@@ -297,16 +297,6 @@ func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path st
 	ep.HardTimeouts = append(ep.HardTimeouts, meta)
 }
 
-func (o *Operation) extractOASValidateRequestTo(ep *apidef.ExtendedPathsSet, path string, method string) {
-	if o.ValidateRequest == nil {
-		return
-	}
-
-	meta := apidef.ValidateRequestMeta{Path: path, Method: method}
-	o.ValidateRequest.ExtractTo(&meta)
-	ep.ValidateRequest = append(ep.ValidateRequest, meta)
-}
-
 // detect possible regex pattern:
 // - character match ([a-z])
 // - greedy match (*)
@@ -385,7 +375,9 @@ func (s *OAS) getOperationID(inPath, method string) string {
 		operation := p.GetOperation(method)
 
 		if operation == nil {
-			operation = &openapi3.Operation{}
+			operation = &openapi3.Operation{
+				Responses: openapi3.NewResponses(),
+			}
 			p.SetOperation(method, operation)
 		}
 
@@ -462,15 +454,9 @@ type ValidateRequest struct {
 }
 
 // Fill fills *ValidateRequest receiver from apidef.ValidateRequestMeta.
-func (v *ValidateRequest) Fill(meta apidef.ValidateRequestMeta) {
-	v.Enabled = meta.Enabled
+func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
+	v.Enabled = !meta.Disabled
 	v.ErrorResponseCode = meta.ErrorResponseCode
-}
-
-// ExtractTo extracts *ValidateRequest into *apidef.ValidateRequestMeta.
-func (v *ValidateRequest) ExtractTo(meta *apidef.ValidateRequestMeta) {
-	meta.Enabled = v.Enabled
-	meta.ErrorResponseCode = v.ErrorResponseCode
 }
 
 func (*ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operation) bool {
@@ -495,9 +481,43 @@ func (v *ValidateRequest) Import(enabled bool) {
 	v.ErrorResponseCode = http.StatusUnprocessableEntity
 }
 
-func (s *OAS) fillOASValidateRequest(metas []apidef.ValidateRequestMeta) {
+func convertSchema(mapSchema map[string]interface{}) (*openapi3.Schema, error) {
+	bytes, err := json.Marshal(mapSchema)
+	if err != nil {
+		return nil, err
+	}
+
+	schema := openapi3.NewSchema()
+	err = schema.UnmarshalJSON(bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return schema, nil
+}
+
+func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
+
+		operation := s.Paths.Find(meta.Path).GetOperation(meta.Method)
+		requestBodyRef := operation.RequestBody
+		if operation.RequestBody == nil {
+			requestBodyRef = &openapi3.RequestBodyRef{}
+			operation.RequestBody = requestBodyRef
+		}
+
+		if requestBodyRef.Value == nil {
+			requestBodyRef.Value = openapi3.NewRequestBody()
+		}
+
+		schema, err := convertSchema(meta.Schema)
+		if err != nil {
+			log.WithError(err).Error("Couldn't convert classic API validate JSON schema to OAS")
+		} else {
+			requestBodyRef.Value.WithJSONSchema(schema)
+		}
+
 		tykOp := s.GetTykExtension().getOperation(operationID)
 
 		if tykOp.ValidateRequest == nil {
@@ -521,7 +541,7 @@ type MockResponse struct {
 	// Body is the HTTP response body that will be returned.
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 	// Headers are the HTTP response headers that will be returned.
-	Headers map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
+	Headers []Header `bson:"headers,omitempty" json:"headers,omitempty"`
 	// FromOASExamples is the configuration to extract a mock response from OAS documentation.
 	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }

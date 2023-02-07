@@ -466,7 +466,7 @@ func goTypeToJSON(globals map[string]ast.Expr, typeName string) string {
 }
 
 const xTykDocMarkdownTitle = `
-## TYK OAS API Object
+## TYK OAS API Definition Object
 
 `
 
@@ -486,7 +486,7 @@ func xTykDocToMarkdown(xtykDoc XTykDoc) string {
 }
 
 func fieldInfoToMarkdown(field *FieldInfo, docWriter *strings.Builder) {
-	docWriter.WriteString(fmt.Sprintf("**Field: `%s` (%s)**\n\n", field.JSONName, fieldTypeToMarkdown(field)))
+	docWriter.WriteString(fmt.Sprintf("**Field: `%s` (%s)**\n", field.JSONName, fieldTypeToMarkdown(field)))
 	docWriter.WriteString(strings.TrimSpace(field.Doc) + "\n\n")
 }
 

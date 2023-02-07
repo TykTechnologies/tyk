@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -9,6 +10,18 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
+
+func minimumValidOAS() OAS {
+	return OAS{
+		T: openapi3.T{
+			Info: &openapi3.Info{
+				Title:   "title",
+				Version: "version",
+			},
+			OpenAPI: DefaultOpenAPI,
+		},
+	}
+}
 
 func TestOAS_PathsAndOperations(t *testing.T) {
 	t.Parallel()
@@ -44,11 +57,12 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	var ep apidef.ExtendedPathsSet
 	oas.extractPathsAndOperations(&ep)
 
-	var convertedOAS OAS
+	convertedOAS := minimumValidOAS()
 	convertedOAS.Paths = openapi3.Paths{
 		"/user": {
 			Post: &openapi3.Operation{
 				OperationID: existingOperationId,
+				Responses:   openapi3.NewResponses(),
 			},
 		},
 	}
@@ -61,14 +75,21 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 		"/user": {
 			Post: &openapi3.Operation{
 				OperationID: existingOperationId,
+				Responses:   openapi3.NewResponses(),
 			},
 			Get: &openapi3.Operation{
 				OperationID: operationId,
+				Responses:   openapi3.NewResponses(),
 			},
 		},
 	}
 
 	assert.Equal(t, expCombinedPaths, convertedOAS.Paths)
+
+	t.Run("oas validation", func(t *testing.T) {
+		err := convertedOAS.Validate(context.Background())
+		assert.NoError(t, err)
+	})
 }
 
 func TestOAS_PathsAndOperationsRegex(t *testing.T) {
@@ -86,6 +107,7 @@ func TestOAS_PathsAndOperationsRegex(t *testing.T) {
 		expectedPath: &openapi3.PathItem{
 			Get: &openapi3.Operation{
 				OperationID: expectedOperationID,
+				Responses:   openapi3.NewResponses(),
 			},
 			Parameters: []*openapi3.ParameterRef{
 				{

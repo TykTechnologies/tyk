@@ -51,8 +51,13 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 		s.GatewayTags = nil
 	}
 
-	if s.CustomDomain != nil {
-		s.CustomDomain.Fill(api)
+	if s.CustomDomain == nil {
+		s.CustomDomain = &Domain{}
+	}
+
+	s.CustomDomain.Fill(api)
+	if ShouldOmit(s.CustomDomain) {
+		s.CustomDomain = nil
 	}
 }
 
@@ -66,10 +71,8 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 	if s.GatewayTags != nil {
 		s.GatewayTags.ExtractTo(api)
-	} else {
-		api.TagsDisabled = true
-		api.Tags = []string{}
 	}
+
 	if s.CustomDomain != nil {
 		s.CustomDomain.ExtractTo(api)
 	}
@@ -131,9 +134,6 @@ type GatewayTags struct {
 func (gt *GatewayTags) Fill(api apidef.APIDefinition) {
 	gt.Enabled = !api.TagsDisabled
 	gt.Tags = api.Tags
-	if gt.Tags == nil {
-		gt.Tags = []string{}
-	}
 }
 
 // ExtractTo extracts *GatewayTags into *apidef.APIDefinition.
@@ -152,20 +152,12 @@ type Domain struct {
 
 // ExtractTo extracts *Domain into *apidef.APIDefinition.
 func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {
-	if !cd.Enabled && cd.Name == "" {
-		// nothing was configured
-		return
-	}
 	api.DomainDisabled = !cd.Enabled
 	api.Domain = cd.Name
 }
 
 // Fill fills *Domain from apidef.APIDefinition.
 func (cd *Domain) Fill(api apidef.APIDefinition) {
-	if !api.DomainDisabled && api.Domain == "" {
-		// nothing was configured.
-		return
-	}
 	cd.Enabled = !api.DomainDisabled
 	cd.Name = api.Domain
 }

@@ -44,13 +44,10 @@ type Authentication struct {
 	// Tyk native API definition: `auth_configs["oidc"]`
 	OIDC *OIDC `bson:"oidc,omitempty" json:"oidc,omitempty"`
 
-	// GoPlugin contains the configurations related to GoPlugin authentication mode.
-	GoPlugin *GoPlugin `bson:"goPlugin,omitempty" json:"goPlugin,omitempty"`
-
-	// CustomPlugin contains the configurations related to CustomPlugin authentication mode.
+	// Custom contains the configurations related to Custom authentication mode.
 	//
 	// Tyk native API definition: `auth_configs["coprocess"]`
-	CustomPlugin *CustomPlugin `bson:"customPlugin,omitempty" json:"customPlugin,omitempty"`
+	Custom *CustomPluginAuthentication `bson:"custom,omitempty" json:"custom,omitempty"`
 
 	// SecuritySchemes contains security schemes definitions.
 	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
@@ -62,15 +59,16 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.StripAuthorizationData = api.StripAuthData
 	a.BaseIdentityProvider = api.BaseIdentityProvidedBy
 
-	// GoPlugin is at the beginning because it is not dependent to AuthConfigs map.
-	if a.GoPlugin == nil {
-		a.GoPlugin = &GoPlugin{}
+	if api.CustomPluginAuthEnabled {
+		if a.Custom == nil {
+			a.Custom = &CustomPluginAuthentication{}
+		}
+
+		a.Custom.Fill(api)
 	}
 
-	a.GoPlugin.Fill(api)
-
-	if ShouldOmit(a.GoPlugin) {
-		a.GoPlugin = nil
+	if ShouldOmit(a.Custom) {
+		a.Custom = nil
 	}
 
 	if api.AuthConfigs == nil || len(api.AuthConfigs) == 0 {
@@ -87,18 +85,6 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 
 	if ShouldOmit(a.HMAC) {
 		a.HMAC = nil
-	}
-
-	if _, ok := api.AuthConfigs[apidef.CoprocessType]; ok {
-		if a.CustomPlugin == nil {
-			a.CustomPlugin = &CustomPlugin{}
-		}
-
-		a.CustomPlugin.Fill(api)
-	}
-
-	if ShouldOmit(a.CustomPlugin) {
-		a.CustomPlugin = nil
 	}
 
 	if _, ok := api.AuthConfigs[apidef.OIDCType]; ok {
@@ -128,12 +114,8 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 		a.OIDC.ExtractTo(api)
 	}
 
-	if a.GoPlugin != nil {
-		a.GoPlugin.ExtractTo(api)
-	}
-
-	if a.CustomPlugin != nil {
-		a.CustomPlugin.ExtractTo(api)
+	if a.Custom != nil {
+		a.Custom.ExtractTo(api)
 	}
 }
 
@@ -597,27 +579,9 @@ type ClientToPolicy struct {
 	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
-// GoPlugin holds confugration related to the Go Plugin authentication mode.
-type GoPlugin struct {
-	// Enabled enables the GoPlugin authentication mode.
-	//
-	// Tyk native API definition: `use_go_plugin_auth`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
-}
-
-// Fill fills *GoPlugin from apidef.AuthConfig.
-func (g *GoPlugin) Fill(api apidef.APIDefinition) {
-	g.Enabled = api.UseGoPluginAuth
-}
-
-// ExtractTo extracts *GoPlugin into *apidef.APIDefinition.
-func (g *GoPlugin) ExtractTo(api *apidef.APIDefinition) {
-	api.UseGoPluginAuth = g.Enabled
-}
-
-// CustomPlugin holds configuration for custom plugins.
-type CustomPlugin struct {
-	// Enabled enables the CustomPlugin authentication mode.
+// CustomPluginAuthentication holds configuration for custom plugins.
+type CustomPluginAuthentication struct {
+	// Enabled enables the CustomPluginAuthentication authentication mode.
 	//
 	// Tyk native API definition: `enable_coprocess_auth`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -626,23 +590,31 @@ type CustomPlugin struct {
 	AuthSources `bson:",inline" json:",inline"`
 }
 
-// Fill fills *CustomPlugin from apidef.AuthConfig.
-func (c *CustomPlugin) Fill(api apidef.APIDefinition) {
-	c.Enabled = api.EnableCoProcessAuth
+// Fill fills *CustomPluginAuthentication from apidef.AuthConfig.
+func (c *CustomPluginAuthentication) Fill(api apidef.APIDefinition) {
+	c.Enabled = api.CustomPluginAuthEnabled
 
-	c.AuthSources.Fill(api.AuthConfigs["coprocess"])
+	if ShouldOmit(api.AuthConfigs[apidef.CoprocessType]) {
+		return
+	}
+
+	c.AuthSources.Fill(api.AuthConfigs[apidef.CoprocessType])
 }
 
-// ExtractTo extracts *CustomPlugin to *apidef.APIDefinition.
-func (c *CustomPlugin) ExtractTo(api *apidef.APIDefinition) {
-	api.EnableCoProcessAuth = c.Enabled
+// ExtractTo extracts *CustomPluginAuthentication to *apidef.APIDefinition.
+func (c *CustomPluginAuthentication) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomPluginAuthEnabled = c.Enabled
 
 	authConfig := apidef.AuthConfig{}
 	c.AuthSources.ExtractTo(&authConfig)
+
+	if ShouldOmit(authConfig) {
+		return
+	}
 
 	if api.AuthConfigs == nil {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	api.AuthConfigs["coprocess"] = authConfig
+	api.AuthConfigs[apidef.CoprocessType] = authConfig
 }
