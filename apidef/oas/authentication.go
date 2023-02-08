@@ -583,10 +583,11 @@ type ClientToPolicy struct {
 type CustomPluginAuthentication struct {
 	// Enabled enables the CustomPluginAuthentication authentication mode.
 	//
-	// Tyk native API definition: `enable_coprocess_auth`
+	// Tyk native API definition: `enable_coprocess_auth`/`use_go_plugin_auth`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// Authentication token sources (header, cookie, query).
+	// valid only when driver is coprocess.
 	AuthSources `bson:",inline" json:",inline"`
 }
 

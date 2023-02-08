@@ -492,7 +492,7 @@ PolicyID contains the Policy ID.
 **Field: `enabled` (`boolean`)**
 Enabled enables the CustomPluginAuthentication authentication mode.
 
-Tyk native API definition: `enable_coprocess_auth`.
+Tyk native API definition: `enable_coprocess_auth`/`use_go_plugin_auth`.
 
 **Field: `header` ([AuthSource](#authsource))**
 Header contains configurations for the header value auth source, it is enabled by default.
@@ -579,7 +579,7 @@ Tyk native API definition: `custom_middleware.post`.
 **Field: `responsePlugin` ([ResponsePlugin](#responseplugin))**
 ResponsePlugin contains configuration related to custom post plugin.
 
-Tyk native API definition: `custom_middleware.post`.
+Tyk native API definition: `custom_middleware.response`.
 
 **Field: `cache` ([Cache](#cache))**
 Cache contains the configurations related to caching.
