@@ -62,7 +62,7 @@ type Global struct {
 	PostPlugin *PostPlugin `bson:"postPlugin,omitempty" json:"postPlugin,omitempty"`
 
 	// ResponsePlugin contains configuration related to custom post plugin.
-	// Tyk native API definition: `custom_middleware.post`.
+	// Tyk native API definition: `custom_middleware.response`.
 	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty"`
 
 	// Cache contains the configurations related to caching.
