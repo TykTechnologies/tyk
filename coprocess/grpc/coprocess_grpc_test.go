@@ -338,7 +338,7 @@ func loadTestGRPCAPIs(s *gateway.Test) {
 			}
 		},
 		func(spec *gateway.APISpec) {
-			spec.APIID = "6"
+			spec.APIID = "7"
 			spec.OrgID = "default"
 			spec.Auth = apidef.AuthConfig{
 				AuthHeaderName: "Authorization",
