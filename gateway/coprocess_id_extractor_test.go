@@ -491,3 +491,88 @@ func TestIDExtractorDisabled(t *testing.T) {
 	}, true)
 	assert.Nil(t, extractor)
 }
+
+func Test_getIDExtractor(t *testing.T) {
+	testCases := []struct {
+		name        string
+		spec        *APISpec
+		idExtractor IdExtractor
+	}{
+		{
+			name: "coprocess auth disabled",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+			},
+			idExtractor: nil,
+		},
+		{
+			name: "id extractor disabled",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					CustomPluginAuthEnabled: true,
+					CustomMiddleware: apidef.MiddlewareSection{
+						AuthCheck: apidef.MiddlewareDefinition{
+							Name: "func name",
+							Path: "path",
+						},
+						IdExtractor: apidef.MiddlewareIdExtractor{
+							Disabled:    true,
+							ExtractWith: apidef.ValueExtractor,
+							ExtractFrom: apidef.HeaderSource,
+						},
+					},
+				},
+			},
+			idExtractor: nil,
+		},
+		{
+			name: "invalid id extractor",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					CustomPluginAuthEnabled: true,
+					CustomMiddleware: apidef.MiddlewareSection{
+						AuthCheck: apidef.MiddlewareDefinition{
+							Name: "func name",
+							Path: "path",
+						},
+						IdExtractor: apidef.MiddlewareIdExtractor{
+							Disabled:    false,
+							ExtractWith: apidef.ValueExtractor,
+							ExtractFrom: apidef.HeaderSource,
+							Extractor:   struct{}{},
+						},
+					},
+				},
+			},
+			idExtractor: nil,
+		},
+		{
+			name: "valid id extractor",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					CustomPluginAuthEnabled: true,
+					CustomMiddleware: apidef.MiddlewareSection{
+						AuthCheck: apidef.MiddlewareDefinition{
+							Name: "func name",
+							Path: "path",
+						},
+						IdExtractor: apidef.MiddlewareIdExtractor{
+							Disabled:    false,
+							ExtractWith: apidef.ValueExtractor,
+							ExtractFrom: apidef.HeaderSource,
+							Extractor:   &ValueExtractor{},
+						},
+					},
+				},
+			},
+			idExtractor: &ValueExtractor{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.idExtractor, getIDExtractor(tc.spec))
+		})
+	}
+}
