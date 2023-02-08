@@ -379,6 +379,7 @@ func (s *Test) getMainRouter(m *proxyMux) *mux.Router {
 type TestHttpResponse struct {
 	Method  string
 	URI     string
+	Path    string
 	Url     string
 	Body    string
 	Headers map[string]string
@@ -472,6 +473,7 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 		err := json.NewEncoder(w).Encode(TestHttpResponse{
 			Method:  r.Method,
 			URI:     r.RequestURI,
+			Path:    r.URL.Path,
 			Url:     r.URL.String(),
 			Headers: firstVals(r.Header),
 			Form:    firstVals(r.Form),
