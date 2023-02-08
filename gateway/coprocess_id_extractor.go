@@ -299,6 +299,10 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 // newExtractor is called from the CP middleware for every API that specifies extractor settings.
 func newExtractor(referenceSpec *APISpec, mw BaseMiddleware) {
+	if referenceSpec.CustomMiddleware.IdExtractor.Disabled {
+		return
+	}
+
 	var extractor IdExtractor
 
 	baseExtractor := BaseExtractor{&referenceSpec.CustomMiddleware.IdExtractor, mw, referenceSpec}
