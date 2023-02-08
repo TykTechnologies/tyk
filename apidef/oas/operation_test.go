@@ -186,6 +186,8 @@ func TestOAS_RegexPaths(t *testing.T) {
 	}
 
 	tests := []test{
+		{"/v1.Service", "/v1.Service", 0},
+		{"/v1.Service/stats.Service", "/v1.Service/stats.Service", 0},
 		{"/.+", "/{customRegex1}", 1},
 		{"/.*", "/{customRegex1}", 1},
 		{"/[^a]*", "/{customRegex1}", 1},
@@ -199,12 +201,17 @@ func TestOAS_RegexPaths(t *testing.T) {
 
 	for i, tc := range tests {
 		var oas OAS
-		oas.Paths = openapi3.Paths{
-			tc.input: {
-				Get: &openapi3.Operation{},
-			},
-		}
+		oas.Paths = openapi3.Paths{}
 		_ = oas.getOperationID(tc.input, "GET")
+
+		pathKeys := make([]string, 0, len(oas.Paths))
+		for k, _ := range oas.Paths {
+			pathKeys = append(pathKeys, k)
+		}
+
+		assert.Lenf(t, oas.Paths, 1, "Expected one path key being created, got %#v", pathKeys)
+		_, ok := oas.Paths[tc.want]
+		assert.True(t, ok)
 
 		p, ok := oas.Paths[tc.want]
 		assert.Truef(t, ok, "test %d: path doesn't exist in OAS: %v", i, tc.want)
