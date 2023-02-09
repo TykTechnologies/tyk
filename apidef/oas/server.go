@@ -11,7 +11,7 @@ type Server struct {
 	ListenPath ListenPath `bson:"listenPath" json:"listenPath"` // required
 
 	// Slug is the Tyk Cloud equivalent of listen path.
-	// Tyk native API definition: `slug`
+	// Tyk classic API definition: `slug`
 	Slug string `bson:"slug,omitempty" json:"slug,omitempty"`
 
 	// Authentication contains the configurations related to authentication to the API.
@@ -25,7 +25,7 @@ type Server struct {
 
 	// CustomDomain is the domain to bind this API to.
 	//
-	// Tyk native API definition: `domain`
+	// Tyk classic API definition: `domain`
 	CustomDomain *Domain `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
 }
 
@@ -81,12 +81,12 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 // ListenPath represents the path the server should listen on.
 type ListenPath struct {
 	// Value is the value of the listen path e.g. `/api/` or `/` or `/httpbin/`.
-	// Tyk native API definition: `proxy.listen_path`
+	// Tyk classic API definition: `proxy.listen_path`
 	Value string `bson:"value" json:"value"` // required
 	// Strip removes the inbound listen path in the outgoing request. e.g. `http://acme.com/httpbin/get` where `httpbin`
 	// is the listen path. The `httpbin` listen path which is used to identify the API loaded in Tyk is removed,
 	// and the outbound request would be `http://httpbin.org/get`.
-	// Tyk native API definition: `proxy.strip_listen_path`
+	// Tyk classic API definition: `proxy.strip_listen_path`
 	Strip bool `bson:"strip,omitempty" json:"strip,omitempty"`
 }
 

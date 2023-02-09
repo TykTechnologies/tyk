@@ -68,7 +68,7 @@ func TestXTykAPIGateway(t *testing.T) {
 	})
 
 	t.Run("filled old", func(t *testing.T) {
-		t.SkipNow() // when we don't need to skip this, it means OAS and Tyk native API definition match
+		t.SkipNow() // when we don't need to skip this, it means OAS and Tyk classic API definition match
 		initialAPI := apidef.APIDefinition{}
 		Fill(t, &initialAPI, 0)
 

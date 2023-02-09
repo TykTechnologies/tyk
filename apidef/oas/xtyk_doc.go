@@ -336,12 +336,12 @@ func cleanDocs(docs ...*ast.CommentGroup) string {
 				s.WriteString("\n")
 			}
 
-			// Prepend empty line if line starts with `Tyk native API definition`
-			if strings.HasPrefix(lineComment, "Tyk native API definition") {
+			// Prepend empty line if line starts with `Tyk classic API definition`
+			if strings.HasPrefix(lineComment, "Tyk classic API definition") {
 				s.WriteString("\n")
 			}
 
-			// Append dot after Tyk native API definition, consistency.
+			// Append dot after Tyk classic API definition, consistency.
 			if lineComment == "" && lastCh == "`" {
 				s.WriteString(".\n")
 				lastCh = ""
