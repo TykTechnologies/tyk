@@ -42,27 +42,27 @@ type Global struct {
 	PluginConfig *PluginConfig `bson:"pluginConfig,omitempty" json:"pluginConfig,omitempty"`
 
 	// CORS contains the configuration related to cross origin resource sharing.
-	// Tyk native API definition: `CORS`.
+	// Tyk classic API definition: `CORS`.
 	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
 
 	// PrePlugin contains configuration related to custom pre-authentication plugin.
-	// Tyk native API definition: `custom_middleware.pre`.
+	// Tyk classic API definition: `custom_middleware.pre`.
 	PrePlugin *PrePlugin `bson:"prePlugin,omitempty" json:"prePlugin,omitempty"`
 
 	// PostAuthenticationPlugin contains configuration related to custom post authentication plugin.
-	// Tyk native API definition: `custom_middleware.post_key_auth`.
+	// Tyk classic API definition: `custom_middleware.post_key_auth`.
 	PostAuthenticationPlugin *PostAuthenticationPlugin `bson:"postAuthenticationPlugin,omitempty" json:"postAuthenticationPlugin,omitempty"`
 
 	// PostPlugin contains configuration related to custom post plugin.
-	// Tyk native API definition: `custom_middleware.post`.
+	// Tyk classic API definition: `custom_middleware.post`.
 	PostPlugin *PostPlugin `bson:"postPlugin,omitempty" json:"postPlugin,omitempty"`
 
 	// ResponsePlugin contains configuration related to custom post plugin.
-	// Tyk native API definition: `custom_middleware.response`.
+	// Tyk classic API definition: `custom_middleware.response`.
 	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty"`
 
 	// Cache contains the configurations related to caching.
-	// Tyk native API definition: `cache_options`.
+	// Tyk classic API definition: `cache_options`.
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
 }
 
@@ -174,7 +174,7 @@ type PluginConfig struct {
 	// - `grpc`,
 	// - `goplugin`.
 	//
-	// Tyk native API definition: `custom_middleware.driver`.
+	// Tyk classic API definition: `custom_middleware.driver`.
 	Driver apidef.MiddlewareDriver `bson:"driver,omitempty" json:"driver,omitempty"`
 
 	// Bundle configures custom plugin bundles.
@@ -231,28 +231,28 @@ func (p *PluginBundle) ExtractTo(api *apidef.APIDefinition) {
 type CORS struct {
 	// Enabled is a boolean flag, if set to `true`, this option enables CORS processing.
 	//
-	// Tyk native API definition: `CORS.enable`.
+	// Tyk classic API definition: `CORS.enable`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// MaxAge indicates how long (in seconds) the results of a preflight request can be cached. The default is 0 which stands for no max age.
 	//
-	// Tyk native API definition: `CORS.max_age`.
+	// Tyk classic API definition: `CORS.max_age`.
 	MaxAge int `bson:"maxAge,omitempty" json:"maxAge,omitempty"`
 
 	// AllowCredentials indicates whether the request can include user credentials like cookies,
 	// HTTP authentication or client side SSL certificates.
 	//
-	// Tyk native API definition: `CORS.allow_credentials`.
+	// Tyk classic API definition: `CORS.allow_credentials`.
 	AllowCredentials bool `bson:"allowCredentials,omitempty" json:"allowCredentials,omitempty"`
 
 	// ExposedHeaders indicates which headers are safe to expose to the API of a CORS API specification.
 	//
-	// Tyk native API definition: `CORS.exposed_headers`.
+	// Tyk classic API definition: `CORS.exposed_headers`.
 	ExposedHeaders []string `bson:"exposedHeaders,omitempty" json:"exposedHeaders,omitempty"`
 
 	// AllowedHeaders holds a list of non simple headers the client is allowed to use with cross-domain requests.
 	//
-	// Tyk native API definition: `CORS.allowed_headers`.
+	// Tyk classic API definition: `CORS.allowed_headers`.
 	AllowedHeaders []string `bson:"allowedHeaders,omitempty" json:"allowedHeaders,omitempty"`
 
 	// OptionsPassthrough is a boolean flag. If set to `true`, it will proxy the CORS OPTIONS pre-flight
@@ -262,22 +262,22 @@ type CORS struct {
 	//
 	// If your service handles CORS natively, then enable this option.
 	//
-	// Tyk native API definition: `CORS.options_passthrough`.
+	// Tyk classic API definition: `CORS.options_passthrough`.
 	OptionsPassthrough bool `bson:"optionsPassthrough,omitempty" json:"optionsPassthrough,omitempty"`
 
 	// Debug is a boolean flag, If set to `true`, this option produces log files for the CORS middleware.
 	//
-	// Tyk native API definition: `CORS.debug`.
+	// Tyk classic API definition: `CORS.debug`.
 	Debug bool `bson:"debug,omitempty" json:"debug,omitempty"`
 
 	// AllowedOrigins holds a list of origin domains to allow access from. Wildcards are also supported, e.g. `http://*.foo.com`
 	//
-	// Tyk native API definition: `CORS.allowed_origins`.
+	// Tyk classic API definition: `CORS.allowed_origins`.
 	AllowedOrigins []string `bson:"allowedOrigins,omitempty" json:"allowedOrigins,omitempty"`
 
 	// AllowedMethods holds a list of methods to allow access via.
 	//
-	// Tyk native API definition: `CORS.allowed_methods`.
+	// Tyk classic API definition: `CORS.allowed_methods`.
 	AllowedMethods []string `bson:"allowedMethods,omitempty" json:"allowedMethods,omitempty"`
 }
 
@@ -312,38 +312,38 @@ type Cache struct {
 	// Enabled turns global cache middleware on or off. It is still possible to enable caching on a per-path basis
 	// by explicitly setting the endpoint cache middleware.
 	//
-	// Tyk native API definition: `cache_options.enable_cache`
+	// Tyk classic API definition: `cache_options.enable_cache`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// Timeout is the TTL for a cached object in seconds.
 	//
-	// Tyk native API definition: `cache_options.cache_timeout`
+	// Tyk classic API definition: `cache_options.cache_timeout`
 	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty"`
 
 	// CacheAllSafeRequests caches responses to (`GET`, `HEAD`, `OPTIONS`) requests overrides per-path cache settings in versions,
 	// applies across versions.
 	//
-	// Tyk native API definition: `cache_options.cache_all_safe_requests`
+	// Tyk classic API definition: `cache_options.cache_all_safe_requests`
 	CacheAllSafeRequests bool `bson:"cacheAllSafeRequests,omitempty" json:"cacheAllSafeRequests,omitempty"`
 
 	// CacheResponseCodes is an array of response codes which are safe to cache e.g. `404`.
 	//
-	// Tyk native API definition: `cache_options.cache_response_codes`
+	// Tyk classic API definition: `cache_options.cache_response_codes`
 	CacheResponseCodes []int `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
 
 	// CacheByHeaders allows header values to be used as part of the cache key.
 	//
-	// Tyk native API definition: `cache_options.cache_by_headers`
+	// Tyk classic API definition: `cache_options.cache_by_headers`
 	CacheByHeaders []string `bson:"cacheByHeaders,omitempty" json:"cacheByHeaders,omitempty"`
 
 	// EnableUpstreamCacheControl instructs Tyk Cache to respect upstream cache control headers.
 	//
-	// Tyk native API definition: `cache_options.enable_upstream_cache_control`
+	// Tyk classic API definition: `cache_options.enable_upstream_cache_control`
 	EnableUpstreamCacheControl bool `bson:"enableUpstreamCacheControl,omitempty" json:"enableUpstreamCacheControl,omitempty"`
 
 	// ControlTTLHeaderName is the response header which tells Tyk how long it is safe to cache the response for.
 	//
-	// Tyk native API definition: `cache_options.cache_control_ttl_header`
+	// Tyk classic API definition: `cache_options.cache_control_ttl_header`
 	ControlTTLHeaderName string `bson:"controlTTLHeaderName,omitempty" json:"controlTTLHeaderName,omitempty"`
 }
 

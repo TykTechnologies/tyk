@@ -50,16 +50,16 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 // Info contains the main metadata about the API definition.
 type Info struct {
 	// ID is the unique ID of the API.
-	// Tyk native API definition: `api_id`
+	// Tyk classic API definition: `api_id`
 	ID string `bson:"id" json:"id,omitempty"`
 	// DBID is the unique database ID of the API.
-	// Tyk native API definition: `id`
+	// Tyk classic API definition: `id`
 	DBID apidef.ObjectId `bson:"dbId" json:"dbId,omitempty"`
 	// OrgID is the ID of the organisation which the API belongs to.
-	// Tyk native API definition: `org_id`
+	// Tyk classic API definition: `org_id`
 	OrgID string `bson:"orgId" json:"orgId,omitempty"`
 	// Name is the name of the API.
-	// Tyk native API definition: `name`
+	// Tyk classic API definition: `name`
 	Name string `bson:"name" json:"name"` // required
 	// Expiration date.
 	Expiration string `bson:"expiration,omitempty" json:"expiration,omitempty"`
@@ -112,10 +112,10 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 // State holds configuration about API definition states (active, internal).
 type State struct {
 	// Active enables the API.
-	// Tyk native API definition: `active`
+	// Tyk classic API definition: `active`
 	Active bool `bson:"active" json:"active"` // required
 	// Internal makes the API accessible only internally.
-	// Tyk native API definition: `internal`
+	// Tyk classic API definition: `internal`
 	Internal bool `bson:"internal,omitempty" json:"internal,omitempty"`
 }
 
@@ -133,7 +133,7 @@ func (s *State) ExtractTo(api *apidef.APIDefinition) {
 
 // Versioning holds configuration for API versioning.
 //
-// Tyk native API definition: `version_data`.
+// Tyk classic API definition: `version_data`.
 type Versioning struct {
 	// Enabled is a boolean flag, if set to `true` it will enable versioning of an API.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
