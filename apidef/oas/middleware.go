@@ -49,10 +49,6 @@ type Global struct {
 	// Tyk native API definition: `custom_middleware.pre`.
 	PrePlugin *PrePlugin `bson:"prePlugin,omitempty" json:"prePlugin,omitempty"`
 
-	// AuthenticationPlugin contains configuration related to custom authentication plugin.
-	// Tyk native API definition: `custom_middleware.auth_check`.
-	AuthenticationPlugin *AuthenticationPlugin `bson:"authenticationPlugin,omitempty" json:"authenticationPlugin,omitempty"`
-
 	// PostAuthenticationPlugin contains configuration related to custom post authentication plugin.
 	// Tyk native API definition: `custom_middleware.post_key_auth`.
 	PostAuthenticationPlugin *PostAuthenticationPlugin `bson:"postAuthenticationPlugin,omitempty" json:"postAuthenticationPlugin,omitempty"`
@@ -97,15 +93,6 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.PrePlugin.Fill(api)
 	if ShouldOmit(g.PrePlugin) {
 		g.PrePlugin = nil
-	}
-
-	if g.AuthenticationPlugin == nil {
-		g.AuthenticationPlugin = &AuthenticationPlugin{}
-	}
-
-	g.AuthenticationPlugin.Fill(api)
-	if ShouldOmit(g.AuthenticationPlugin) {
-		g.AuthenticationPlugin = nil
 	}
 
 	if g.PostAuthenticationPlugin == nil {
@@ -157,10 +144,6 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	if g.PrePlugin != nil {
 		g.PrePlugin.ExtractTo(api)
-	}
-
-	if g.AuthenticationPlugin != nil {
-		g.AuthenticationPlugin.ExtractTo(api)
 	}
 
 	if g.PostAuthenticationPlugin != nil {
@@ -845,32 +828,6 @@ func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	meta.Disabled = !et.Enabled
 	meta.TimeOut = et.Value
-}
-
-// AuthenticationPlugin holds the configuration for custom authentication plugin.
-type AuthenticationPlugin struct {
-	// Enabled enables custom authentication plugin.
-	Enabled bool `bson:"enabled" json:"enabled"` // required.
-	// FunctionName is the name of authentication method.
-	FunctionName string `bson:"functionName" json:"functionName"` // required.
-	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
-	Path string `bson:"path" json:"path"` // required.
-	// RawBodyOnly if set to true, do not fill body in request or response object.
-	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
-}
-
-func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
-	ap.FunctionName = api.CustomMiddleware.AuthCheck.Name
-	ap.Path = api.CustomMiddleware.AuthCheck.Path
-	ap.RawBodyOnly = api.CustomMiddleware.AuthCheck.RawBodyOnly
-	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
-}
-
-func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
-	api.CustomMiddleware.AuthCheck.Disabled = !ap.Enabled
-	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
-	api.CustomMiddleware.AuthCheck.Path = ap.Path
-	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
 }
 
 // CustomPlugin configures custom plugin.
