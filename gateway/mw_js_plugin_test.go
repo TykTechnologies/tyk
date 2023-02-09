@@ -20,7 +20,6 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/sirupsen/logrus"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -34,7 +33,6 @@ func TestJSVMLogs(t *testing.T) {
 	var buf bytes.Buffer
 	log := logrus.New()
 	log.Out = &buf
-	log.Formatter = new(prefixed.TextFormatter)
 
 	jsvm := JSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
@@ -52,7 +50,7 @@ rawlog('{"x": "y"}')
 
 	want := []string{
 		`time=TIME level=info msg=foo prefix=jsvm type=log-msg`,
-		`time=TIME level=info msg="{"x": "y"}" prefix=jsvm type=log-msg`,
+		`time=TIME level=info msg="{\"x\": \"y\"}" prefix=jsvm type=log-msg`,
 		`foo`,
 		`{"x": "y"}`,
 	}
