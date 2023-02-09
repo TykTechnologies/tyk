@@ -586,6 +586,10 @@ type CustomPluginAuthentication struct {
 	// Tyk native API definition: `enable_coprocess_auth`/`use_go_plugin_auth`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
+	// Config contains configuration related to custom authentication plugin.
+	// Tyk native API definition: `custom_middleware.auth_check`.
+	Config *AuthenticationPlugin `bson:"config,omitempty" json:"config,omitempty"`
+
 	// Authentication token sources (header, cookie, query).
 	// valid only when driver is coprocess.
 	AuthSources `bson:",inline" json:",inline"`
@@ -594,6 +598,15 @@ type CustomPluginAuthentication struct {
 // Fill fills *CustomPluginAuthentication from apidef.AuthConfig.
 func (c *CustomPluginAuthentication) Fill(api apidef.APIDefinition) {
 	c.Enabled = api.CustomPluginAuthEnabled
+
+	if c.Config == nil {
+		c.Config = &AuthenticationPlugin{}
+	}
+
+	c.Config.Fill(api)
+	if ShouldOmit(c.Config) {
+		c.Config = nil
+	}
 
 	if ShouldOmit(api.AuthConfigs[apidef.CoprocessType]) {
 		return
@@ -605,6 +618,10 @@ func (c *CustomPluginAuthentication) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *CustomPluginAuthentication to *apidef.APIDefinition.
 func (c *CustomPluginAuthentication) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomPluginAuthEnabled = c.Enabled
+
+	if c.Config != nil {
+		c.Config.ExtractTo(api)
+	}
 
 	authConfig := apidef.AuthConfig{}
 	c.AuthSources.ExtractTo(&authConfig)
@@ -618,4 +635,30 @@ func (c *CustomPluginAuthentication) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	api.AuthConfigs[apidef.CoprocessType] = authConfig
+}
+
+// AuthenticationPlugin holds the configuration for custom authentication plugin.
+type AuthenticationPlugin struct {
+	// Enabled enables custom authentication plugin.
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	// FunctionName is the name of authentication method.
+	FunctionName string `bson:"functionName" json:"functionName"` // required.
+	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
+	Path string `bson:"path" json:"path"` // required.
+	// RawBodyOnly if set to true, do not fill body in request or response object.
+	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+}
+
+func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
+	ap.FunctionName = api.CustomMiddleware.AuthCheck.Name
+	ap.Path = api.CustomMiddleware.AuthCheck.Path
+	ap.RawBodyOnly = api.CustomMiddleware.AuthCheck.RawBodyOnly
+	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
+}
+
+func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomMiddleware.AuthCheck.Disabled = !ap.Enabled
+	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
+	api.CustomMiddleware.AuthCheck.Path = ap.Path
+	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
 }

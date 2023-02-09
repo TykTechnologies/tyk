@@ -494,6 +494,11 @@ Enabled enables the CustomPluginAuthentication authentication mode.
 
 Tyk native API definition: `enable_coprocess_auth`/`use_go_plugin_auth`.
 
+**Field: `config` ([AuthenticationPlugin](#authenticationplugin))**
+Config contains configuration related to custom authentication plugin.
+
+Tyk native API definition: `custom_middleware.auth_check`.
+
 **Field: `header` ([AuthSource](#authsource))**
 Header contains configurations for the header value auth source, it is enabled by default.
 
@@ -508,6 +513,21 @@ Tyk native API definition: `auth_configs[x].cookie`.
 Query contains configurations for the query parameters auth source.
 
 Tyk native API definition: `auth_configs[x].query`.
+
+
+### **AuthenticationPlugin**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables custom authentication plugin.
+
+**Field: `functionName` (`string`)**
+FunctionName is the name of authentication method.
+
+**Field: `path` (`string`)**
+Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
+
+**Field: `rawBodyOnly` (`boolean`)**
+RawBodyOnly if set to true, do not fill body in request or response object.
 
 
 ### **ClientCertificates**
@@ -560,11 +580,6 @@ Tyk native API definition: `CORS`.
 PrePlugin contains configuration related to custom pre-authentication plugin.
 
 Tyk native API definition: `custom_middleware.pre`.
-
-**Field: `authenticationPlugin` ([AuthenticationPlugin](#authenticationplugin))**
-AuthenticationPlugin contains configuration related to custom authentication plugin.
-
-Tyk native API definition: `custom_middleware.auth_check`.
 
 **Field: `postAuthenticationPlugin` ([PostAuthenticationPlugin](#postauthenticationplugin))**
 PostAuthenticationPlugin contains configuration related to custom post authentication plugin.
@@ -690,21 +705,6 @@ RawBodyOnly if set to true, do not fill body in request or response object.
 **Field: `requireSession` (`boolean`)**
 RequireSession if set to true passes down the session information for plugins after authentication.
 RequireSession is used only with JSVM custom middleware.
-
-
-### **AuthenticationPlugin**
-
-**Field: `enabled` (`boolean`)**
-Enabled enables custom authentication plugin.
-
-**Field: `functionName` (`string`)**
-FunctionName is the name of authentication method.
-
-**Field: `path` (`string`)**
-Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
-
-**Field: `rawBodyOnly` (`boolean`)**
-RawBodyOnly if set to true, do not fill body in request or response object.
 
 
 ### **PostAuthenticationPlugin**
