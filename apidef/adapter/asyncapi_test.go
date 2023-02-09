@@ -1,6 +1,8 @@
 package adapter
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -185,4 +187,8 @@ func TestGraphQLConfigAdapter_AsyncAPI(t *testing.T) {
 	require.True(t, actualApiDefinition.Active)
 	require.Equal(t, apidef.GraphQLExecutionModeExecutionEngine, actualApiDefinition.GraphQL.ExecutionMode)
 	require.Equal(t, expectedSchema, actualApiDefinition.GraphQL.Schema)
+
+	data, err := json.Marshal(actualApiDefinition)
+	require.NoError(t, err)
+	fmt.Println(string(data))
 }
