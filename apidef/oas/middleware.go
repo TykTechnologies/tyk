@@ -62,7 +62,7 @@ type Global struct {
 	PostPlugin *PostPlugin `bson:"postPlugin,omitempty" json:"postPlugin,omitempty"`
 
 	// ResponsePlugin contains configuration related to custom post plugin.
-	// Tyk native API definition: `custom_middleware.post`.
+	// Tyk native API definition: `custom_middleware.response`.
 	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty"`
 
 	// Cache contains the configurations related to caching.
@@ -108,6 +108,24 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 		g.AuthenticationPlugin = nil
 	}
 
+	if g.PostAuthenticationPlugin == nil {
+		g.PostAuthenticationPlugin = &PostAuthenticationPlugin{}
+	}
+
+	g.PostAuthenticationPlugin.Fill(api)
+	if ShouldOmit(g.PostAuthenticationPlugin) {
+		g.PostAuthenticationPlugin = nil
+	}
+
+	if g.PostPlugin == nil {
+		g.PostPlugin = &PostPlugin{}
+	}
+
+	g.PostPlugin.Fill(api)
+	if ShouldOmit(g.PostPlugin) {
+		g.PostPlugin = nil
+	}
+
 	if g.Cache == nil {
 		g.Cache = &Cache{}
 	}
@@ -115,6 +133,15 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.Cache.Fill(api.CacheOptions)
 	if ShouldOmit(g.Cache) {
 		g.Cache = nil
+	}
+
+	if g.ResponsePlugin == nil {
+		g.ResponsePlugin = &ResponsePlugin{}
+	}
+
+	g.ResponsePlugin.Fill(api)
+	if ShouldOmit(g.ResponsePlugin) {
+		g.ResponsePlugin = nil
 	}
 }
 
@@ -136,8 +163,20 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 		g.AuthenticationPlugin.ExtractTo(api)
 	}
 
+	if g.PostAuthenticationPlugin != nil {
+		g.PostAuthenticationPlugin.ExtractTo(api)
+	}
+
+	if g.PostPlugin != nil {
+		g.PostPlugin.ExtractTo(api)
+	}
+
 	if g.Cache != nil {
 		g.Cache.ExtractTo(&api.CacheOptions)
+	}
+
+	if g.ResponsePlugin != nil {
+		g.ResponsePlugin.ExtractTo(api)
 	}
 }
 

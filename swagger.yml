@@ -1940,7 +1940,11 @@ paths:
       operationId: batch
       responses:
         '200':
-          $ref: '#/components/schemas/apiStatusMessage'
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
   '/tyk/schema':
     get:
       description: |-

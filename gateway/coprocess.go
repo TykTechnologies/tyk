@@ -313,11 +313,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	originalURL := r.URL
 	authToken, _ := m.getAuthToken(apidef.CoprocessType, r)
 
-	var extractor IdExtractor
-	customPluginAuthEnabled := m.Spec.EnableCoProcessAuth || m.Spec.CustomPluginAuthEnabled
-	if customPluginAuthEnabled && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
-		extractor = m.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
-	}
+	extractor := getIDExtractor(m.Spec)
 
 	var returnOverrides ReturnOverrides
 	var sessionID string
@@ -442,7 +438,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Is this a CP authentication middleware?
-	if customPluginAuthEnabled && m.HookType == coprocess.HookType_CustomKeyCheck {
+	if coprocessAuthEnabled(m.Spec) && m.HookType == coprocess.HookType_CustomKeyCheck {
 		if extractor == nil {
 			sessionID = token
 		}
@@ -590,4 +586,24 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 		return nil, err
 	}
 	return newObject, nil
+}
+
+func coprocessAuthEnabled(spec *APISpec) bool {
+	return spec.EnableCoProcessAuth || spec.CustomPluginAuthEnabled
+}
+
+func getIDExtractor(spec *APISpec) IdExtractor {
+	if !coprocessAuthEnabled(spec) {
+		return nil
+	}
+
+	if spec.CustomMiddleware.IdExtractor.Disabled {
+		return nil
+	}
+
+	if extractor, ok := spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor); ok {
+		return extractor
+	}
+
+	return nil
 }

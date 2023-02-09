@@ -464,6 +464,7 @@ type MiddlewareDefinition struct {
 }
 
 type MiddlewareIdExtractor struct {
+	Disabled        bool                   `bson:"disabled" json:"disabled"`
 	ExtractFrom     IdExtractorSource      `bson:"extract_from" json:"extract_from"`
 	ExtractWith     IdExtractorType        `bson:"extract_with" json:"extract_with"`
 	ExtractorConfig map[string]interface{} `bson:"extractor_config" json:"extractor_config"`
