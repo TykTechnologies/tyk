@@ -647,7 +647,7 @@ type AuthenticationPlugin struct {
 	Path string `bson:"path" json:"path"` // required.
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
-	// IDExtractor  configures ID extractor with coprocess custom authentication.
+	// IDExtractor configures ID extractor with coprocess custom authentication.
 	IDExtractor *IDExtractor `bson:"idExtractor,omitempty" json:"idExtractor,omitempty"`
 }
 

@@ -530,7 +530,7 @@ Path is the path to shared object file in case of gopluign mode or path to js co
 RawBodyOnly if set to true, do not fill body in request or response object.
 
 **Field: `idExtractor` ([IDExtractor](#idextractor))**
-IDExtractor  configures ID extractor with coprocess custom authentication.
+IDExtractor configures ID extractor with coprocess custom authentication.
 
 
 ### **IDExtractor**
