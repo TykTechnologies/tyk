@@ -294,8 +294,8 @@ func loadTestGRPCAPIs(s *gateway.Test) {
 			IdExtractor: apidef.MiddlewareIdExtractor{
 				ExtractFrom: apidef.HeaderSource,
 				ExtractWith: apidef.ValueExtractor,
-				ExtractorConfig: map[string]interface{}{
-					"header_name": "Authorization",
+				ExtractorConfig: apidef.IDExtractorConfig{
+					HeaderName: "Authorization",
 				},
 			},
 		}
@@ -327,10 +327,12 @@ func loadTestGRPCAPIs(s *gateway.Test) {
 				Name: "testAuthHook1",
 			},
 			IdExtractor: apidef.MiddlewareIdExtractor{
-				Disabled:        false,
-				ExtractFrom:     apidef.HeaderSource,
-				ExtractWith:     apidef.ValueExtractor,
-				ExtractorConfig: map[string]interface{}{"header_name": "Authorization"},
+				Disabled:    false,
+				ExtractFrom: apidef.HeaderSource,
+				ExtractWith: apidef.ValueExtractor,
+				ExtractorConfig: apidef.IDExtractorConfig{
+					HeaderName: "Authorization",
+				},
 			},
 		}
 	}, func(spec *gateway.APISpec) {
@@ -361,10 +363,12 @@ func loadTestGRPCAPIs(s *gateway.Test) {
 				Name: "testAuthHook1",
 			},
 			IdExtractor: apidef.MiddlewareIdExtractor{
-				Disabled:        true,
-				ExtractFrom:     apidef.HeaderSource,
-				ExtractWith:     apidef.ValueExtractor,
-				ExtractorConfig: map[string]interface{}{"header_name": "Authorization"},
+				Disabled:    true,
+				ExtractFrom: apidef.HeaderSource,
+				ExtractWith: apidef.ValueExtractor,
+				ExtractorConfig: apidef.IDExtractorConfig{
+					HeaderName: "Authorization",
+				},
 			},
 		}
 	},
