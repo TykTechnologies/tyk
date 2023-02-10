@@ -529,6 +529,42 @@ Path is the path to shared object file in case of gopluign mode or path to js co
 **Field: `rawBodyOnly` (`boolean`)**
 RawBodyOnly if set to true, do not fill body in request or response object.
 
+**Field: `idExtractor` ([IDExtractor](#idextractor))**
+IDExtractor configures ID extractor with coprocess custom authentication.
+
+
+### **IDExtractor**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables ID extractor with coprocess authentication.
+
+**Field: `source` (`object`)**
+Source is the source from which ID to be extracted from.
+
+**Field: `with` (`object`)**
+With is the type of ID extractor to be used.
+
+**Field: `config` ([IDExtractorConfig](#idextractorconfig))**
+Config holds the configuration specific to ID extractor type mentioned via With.
+
+
+### **IDExtractorConfig**
+
+**Field: `headerName` (`string`)**
+HeaderName is the header name to extract ID from.
+
+**Field: `formParamName` (`string`)**
+FormParamName is the form parameter name to extract ID from.
+
+**Field: `regexp` (`string`)**
+Regexp is the regular expression to match ID.
+
+**Field: `regexpMatchIndex` (`int`)**
+RegexpMatchIndex is the index from which ID to be extracted after a match.
+
+**Field: `xPathExp` (`string`)**
+XPathExp is the xpath expression to match ID.
+
 
 ### **ClientCertificates**
 
