@@ -279,6 +279,7 @@ func TestAuthenticationPlugin(t *testing.T) {
 			convertedAPI              apidef.APIDefinition
 		)
 
+		convertedAPI.SetDisabledFlags()
 		emptyAuthenticationPlugin.ExtractTo(&convertedAPI)
 
 		var resultAuthenticationPlugin AuthenticationPlugin
@@ -297,6 +298,7 @@ func TestAuthenticationPlugin(t *testing.T) {
 		}
 
 		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
 		expectedAuthenticationPlugin.ExtractTo(&api)
 
 		actualAuthenticationPlugin := AuthenticationPlugin{}

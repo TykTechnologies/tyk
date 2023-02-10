@@ -647,6 +647,8 @@ type AuthenticationPlugin struct {
 	Path string `bson:"path" json:"path"` // required.
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+	// IDExtractor  configures ID extractor with coprocess custom authentication.
+	IDExtractor *IDExtractor `bson:"idExtractor,omitempty" json:"idExtractor,omitempty"`
 }
 
 func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
@@ -654,6 +656,14 @@ func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
 	ap.Path = api.CustomMiddleware.AuthCheck.Path
 	ap.RawBodyOnly = api.CustomMiddleware.AuthCheck.RawBodyOnly
 	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
+	if ap.IDExtractor == nil {
+		ap.IDExtractor = &IDExtractor{}
+	}
+
+	ap.IDExtractor.Fill(api)
+	if ShouldOmit(ap.IDExtractor) {
+		ap.IDExtractor = nil
+	}
 }
 
 func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
@@ -661,4 +671,118 @@ func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
 	api.CustomMiddleware.AuthCheck.Path = ap.Path
 	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
+
+	if ap.IDExtractor != nil {
+		ap.IDExtractor.ExtractTo(api)
+	}
+}
+
+type IDExtractorConfig struct {
+	// HeaderName is the header name to extract ID from.
+	HeaderName string `bson:"headerName,omitempty" json:"headerName,omitempty"`
+	// FormParamName is the form parameter name to extract ID from.
+	FormParamName string `bson:"formParamName,omitempty" json:"formParamName,omitempty"`
+	// Regexp is the regular expression to match ID.
+	Regexp string `bson:"regexp,omitempty" json:"regexp,omitempty"`
+	// RegexpMatchIndex is the index from which ID to be extracted after a match.
+	RegexpMatchIndex int `bson:"regexpMatchIndex,omitempty" json:"regexpMatchIndex,omitempty"`
+	// XPathExp is the xpath expression to match ID.
+	XPathExp string `bson:"xPathExp,omitempty" json:"xPathExp"`
+}
+
+func (id *IDExtractorConfig) Fill(api apidef.APIDefinition) {
+	if extractorConfig := api.CustomMiddleware.IdExtractor.ExtractorConfig; extractorConfig != nil {
+		for k, v := range extractorConfig {
+			switch k {
+			case "header_name":
+				if val, ok := v.(string); ok {
+					id.HeaderName = val
+				}
+			case "param_name":
+				if val, ok := v.(string); ok {
+					id.FormParamName = val
+				}
+			case "regex_expression":
+				if val, ok := v.(string); ok {
+					id.Regexp = val
+				}
+			case "regex_match_index":
+				if val, ok := v.(int); ok {
+					id.RegexpMatchIndex = val
+				}
+			case "xpath_expression":
+				if val, ok := v.(string); ok {
+					id.XPathExp = val
+				}
+			}
+		}
+	}
+}
+
+func (id *IDExtractorConfig) ExtractTo(api *apidef.APIDefinition) {
+	if api.CustomMiddleware.IdExtractor.ExtractorConfig == nil {
+		api.CustomMiddleware.IdExtractor.ExtractorConfig = map[string]interface{}{}
+	}
+
+	extractorConfig := api.CustomMiddleware.IdExtractor.ExtractorConfig
+
+	if id.HeaderName != "" {
+		extractorConfig["header_name"] = id.HeaderName
+	}
+
+	if id.FormParamName != "" {
+		extractorConfig["param_name"] = id.FormParamName
+	}
+
+	if id.Regexp != "" {
+		extractorConfig["regex_expression"] = id.Regexp
+	}
+
+	if id.XPathExp != "" {
+		extractorConfig["xpath_expression"] = id.XPathExp
+	}
+
+	extractorConfig["regex_match_index"] = id.RegexpMatchIndex
+
+	if ShouldOmit(extractorConfig) {
+		api.CustomMiddleware.IdExtractor.ExtractorConfig = nil
+	}
+
+	api.CustomMiddleware.IdExtractor.ExtractorConfig = extractorConfig
+}
+
+type IDExtractor struct {
+	// Enabled enables ID extractor with coprocess authentication.
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+	// Source is the source from which ID to be extracted from.
+	Source apidef.IdExtractorSource `bson:"source" json:"source"` // required
+	// With is the type of ID extractor to be used.
+	With apidef.IdExtractorType `bson:"with" json:"with"` // required
+	// Config holds the configuration specific to ID extractor type mentioned via With.
+	Config *IDExtractorConfig `bson:"config" json:"config"` // required
+}
+
+func (id *IDExtractor) Fill(api apidef.APIDefinition) {
+	id.Enabled = !api.CustomMiddleware.IdExtractor.Disabled
+	id.Source = api.CustomMiddleware.IdExtractor.ExtractFrom
+	id.With = api.CustomMiddleware.IdExtractor.ExtractWith
+
+	if id.Config == nil {
+		id.Config = &IDExtractorConfig{}
+	}
+
+	id.Config.Fill(api)
+	if ShouldOmit(id.Config) {
+		id.Config = nil
+	}
+}
+
+func (id *IDExtractor) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomMiddleware.IdExtractor.Disabled = !id.Enabled
+	api.CustomMiddleware.IdExtractor.ExtractFrom = id.Source
+	api.CustomMiddleware.IdExtractor.ExtractWith = id.With
+
+	if id.Config != nil {
+		id.Config.ExtractTo(api)
+	}
 }

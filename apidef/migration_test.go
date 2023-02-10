@@ -618,6 +618,9 @@ func TestSetDisabledFlags(t *testing.T) {
 					Disabled: true,
 				},
 			},
+			IdExtractor: MiddlewareIdExtractor{
+				Disabled: true,
+			},
 		},
 		TagsDisabled:                   true,
 		UpstreamCertificatesDisabled:   true,

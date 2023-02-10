@@ -171,3 +171,82 @@ func TestCustomPlugin(t *testing.T) {
 	})
 
 }
+
+func TestIDExtractorConfig(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var emptyIDExtractorConfig IDExtractorConfig
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		emptyIDExtractorConfig.ExtractTo(&convertedAPI)
+
+		var resultIDExtractorConfig IDExtractorConfig
+		resultIDExtractorConfig.Fill(convertedAPI)
+
+		assert.Equal(t, emptyIDExtractorConfig, resultIDExtractorConfig)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		t.Parallel()
+		var expectedIDExtractorConfig = IDExtractorConfig{
+			HeaderName:       "Authorization",
+			FormParamName:    "Authorization",
+			RegexpMatchIndex: 1,
+			Regexp:           "regexp",
+			XPathExp:         "xpathexp",
+		}
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		expectedIDExtractorConfig.ExtractTo(&convertedAPI)
+
+		var actualIDExtractorConfig IDExtractorConfig
+		actualIDExtractorConfig.Fill(convertedAPI)
+
+		assert.Equal(t, expectedIDExtractorConfig, actualIDExtractorConfig)
+	})
+}
+
+func TestIDExtractor(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var emptyIDExtractor IDExtractor
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		emptyIDExtractor.ExtractTo(&convertedAPI)
+
+		var resultIDExtractor IDExtractor
+		resultIDExtractor.Fill(convertedAPI)
+
+		assert.Equal(t, emptyIDExtractor, resultIDExtractor)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		t.Parallel()
+		var expectedIDExtractor = IDExtractor{
+			Enabled: true,
+			Source:  apidef.HeaderSource,
+			With:    apidef.ValueExtractor,
+			Config: &IDExtractorConfig{
+				HeaderName:       "Authorization",
+				FormParamName:    "Authorization",
+				RegexpMatchIndex: 1,
+				Regexp:           "regexp",
+				XPathExp:         "xpathexp",
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		expectedIDExtractor.ExtractTo(&convertedAPI)
+
+		var actualIDExtractor IDExtractor
+		actualIDExtractor.Fill(convertedAPI)
+
+		assert.Equal(t, expectedIDExtractor, actualIDExtractor)
+	})
+}

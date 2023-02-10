@@ -399,4 +399,6 @@ func (a *APIDefinition) SetDisabledFlags() {
 	for i := 0; i < len(a.CustomMiddleware.Response); i++ {
 		a.CustomMiddleware.Response[i].Disabled = true
 	}
+
+	a.CustomMiddleware.IdExtractor.Disabled = true
 }
