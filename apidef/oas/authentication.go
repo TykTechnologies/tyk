@@ -691,64 +691,19 @@ type IDExtractorConfig struct {
 }
 
 func (id *IDExtractorConfig) Fill(api apidef.APIDefinition) {
-	if extractorConfig := api.CustomMiddleware.IdExtractor.ExtractorConfig; extractorConfig != nil {
-		for k, v := range extractorConfig {
-			switch k {
-			case "header_name":
-				if val, ok := v.(string); ok {
-					id.HeaderName = val
-				}
-			case "param_name":
-				if val, ok := v.(string); ok {
-					id.FormParamName = val
-				}
-			case "regex_expression":
-				if val, ok := v.(string); ok {
-					id.Regexp = val
-				}
-			case "regex_match_index":
-				if val, ok := v.(int); ok {
-					id.RegexpMatchIndex = val
-				}
-			case "xpath_expression":
-				if val, ok := v.(string); ok {
-					id.XPathExp = val
-				}
-			}
-		}
-	}
+	id.HeaderName = api.CustomMiddleware.IdExtractor.ExtractorConfig.HeaderName
+	id.FormParamName = api.CustomMiddleware.IdExtractor.ExtractorConfig.FormParamName
+	id.Regexp = api.CustomMiddleware.IdExtractor.ExtractorConfig.RegexExpression
+	id.RegexpMatchIndex = api.CustomMiddleware.IdExtractor.ExtractorConfig.RegexMatchIndex
+	id.XPathExp = api.CustomMiddleware.IdExtractor.ExtractorConfig.XPathExpression
 }
 
 func (id *IDExtractorConfig) ExtractTo(api *apidef.APIDefinition) {
-	if api.CustomMiddleware.IdExtractor.ExtractorConfig == nil {
-		api.CustomMiddleware.IdExtractor.ExtractorConfig = map[string]interface{}{}
-	}
-
-	extractorConfig := api.CustomMiddleware.IdExtractor.ExtractorConfig
-
-	if id.HeaderName != "" {
-		extractorConfig["header_name"] = id.HeaderName
-	}
-
-	if id.FormParamName != "" {
-		extractorConfig["param_name"] = id.FormParamName
-	}
-
-	if id.Regexp != "" {
-		extractorConfig["regex_expression"] = id.Regexp
-	}
-
-	if id.XPathExp != "" {
-		extractorConfig["xpath_expression"] = id.XPathExp
-	}
-
-	extractorConfig["regex_match_index"] = id.RegexpMatchIndex
-
-	if ShouldOmit(extractorConfig) {
-		api.CustomMiddleware.IdExtractor.ExtractorConfig = nil
-	}
-
-	api.CustomMiddleware.IdExtractor.ExtractorConfig = extractorConfig
+	api.CustomMiddleware.IdExtractor.ExtractorConfig.HeaderName = id.HeaderName
+	api.CustomMiddleware.IdExtractor.ExtractorConfig.FormParamName = id.FormParamName
+	api.CustomMiddleware.IdExtractor.ExtractorConfig.RegexExpression = id.Regexp
+	api.CustomMiddleware.IdExtractor.ExtractorConfig.RegexMatchIndex = id.RegexpMatchIndex
+	api.CustomMiddleware.IdExtractor.ExtractorConfig.XPathExpression = id.XPathExp
 }
 
 type IDExtractor struct {

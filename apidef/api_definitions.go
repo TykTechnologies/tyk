@@ -44,6 +44,8 @@ type RoutingTriggerOnType string
 
 type SubscriptionType string
 
+type IDExtractor interface{}
+
 const (
 	NoAction EndpointMethodAction = "no_action"
 	Reply    EndpointMethodAction = "reply"
@@ -463,12 +465,20 @@ type MiddlewareDefinition struct {
 	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
 }
 
+type IDExtractorConfig struct {
+	HeaderName      string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
+	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
+	RegexMatchIndex int    `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
+	FormParamName   string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
+	XPathExpression string `mapstructure:"xpath_expression" bson:"xpath_expression" json:"xpath_expression"`
+}
+
 type MiddlewareIdExtractor struct {
-	Disabled        bool                   `bson:"disabled" json:"disabled"`
-	ExtractFrom     IdExtractorSource      `bson:"extract_from" json:"extract_from"`
-	ExtractWith     IdExtractorType        `bson:"extract_with" json:"extract_with"`
-	ExtractorConfig map[string]interface{} `bson:"extractor_config" json:"extractor_config"`
-	Extractor       interface{}            `bson:"-" json:"-"`
+	Disabled        bool              `bson:"disabled" json:"disabled"`
+	ExtractFrom     IdExtractorSource `bson:"extract_from" json:"extract_from"`
+	ExtractWith     IdExtractorType   `bson:"extract_with" json:"extract_with"`
+	ExtractorConfig IDExtractorConfig `bson:"extractor_config" json:"extractor_config"`
+	Extractor       IDExtractor       `bson:"-" json:"-"`
 }
 
 type MiddlewareSection struct {
@@ -1263,7 +1273,7 @@ func DummyAPI() APIDefinition {
 			PostKeyAuth: []MiddlewareDefinition{},
 			AuthCheck:   MiddlewareDefinition{},
 			IdExtractor: MiddlewareIdExtractor{
-				ExtractorConfig: map[string]interface{}{},
+				ExtractorConfig: IDExtractorConfig{},
 			},
 		},
 		Proxy: ProxyConfig{
