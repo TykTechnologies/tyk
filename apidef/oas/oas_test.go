@@ -678,6 +678,7 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 					Name: "AuthFunc",
 					Path: "/path/to/plugin",
 				},
+				IdExtractor: apidef.MiddlewareIdExtractor{Disabled: true},
 			},
 			VersionData: apidef.VersionData{
 				NotVersioned: true,
@@ -715,6 +716,7 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 					Name: "AuthFunc",
 					Path: "/path/to/plugin",
 				},
+				IdExtractor: apidef.MiddlewareIdExtractor{Disabled: true},
 			},
 			VersionData: apidef.VersionData{
 				NotVersioned: true,

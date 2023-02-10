@@ -269,6 +269,59 @@
         "path"
       ]
     },
+    "X-Tyk-IDExtractorConfig": {
+      "type": "object",
+      "properties": {
+        "headerName": {
+          "type": "string"
+        },
+        "formParamName": {
+          "type": "string"
+        },
+        "regexp": {
+          "type": "string"
+        },
+        "regexpMatchIndex": {
+          "type": "string"
+        },
+        "xPathExp": {
+          "type": "string"
+        }
+      }
+    },
+    "X-Tyk-IDExtractor": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "body",
+            "header",
+            "form"
+          ]
+        },
+        "with": {
+          "type": "string",
+          "enum": [
+            "value",
+            "xpath",
+            "regex"
+          ]
+        },
+        "config": {
+          "$ref": "#/definitions/X-Tyk-IDExtractorConfig"
+        }
+      },
+      "required": [
+        "enabled",
+        "source",
+        "with",
+        "config"
+      ]
+    },
     "X-Tyk-AuthenticationPlugin": {
       "type": "object",
       "properties": {
@@ -283,6 +336,9 @@
         },
         "rawBodyOnly": {
           "type": "boolean"
+        },
+        "idExtractor": {
+          "$ref": "#/definitions/X-Tyk-IDExtractor"
         }
       },
       "required": [
@@ -410,9 +466,6 @@
         },
         "prePlugin": {
           "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
-        },
-        "authenticationPlugin": {
-          "$ref": "#/definitions/X-Tyk-AuthenticationPlugin"
         },
         "postAuthenticationPlugin": {
           "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
@@ -710,11 +763,14 @@
         "enabled"
       ]
     },
-    "X-Tyk-CustomPlugin": {
+    "X-Tyk-CustomPluginAuthentication": {
       "type": "object",
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "config": {
+          "$ref": "#/definitions/X-Tyk-AuthenticationPlugin"
         },
         "header": {
           "$ref": "#/definitions/X-Tyk-AuthSource"
@@ -758,7 +814,7 @@
           "$ref": "#/definitions/X-Tyk-OIDC"
         },
         "custom": {
-          "$ref": "#/definitions/X-Tyk-CustomPlugin"
+          "$ref": "#/definitions/X-Tyk-CustomPluginAuthentication"
         },
         "securitySchemes": {
           "type": "object",
