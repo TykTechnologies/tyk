@@ -693,12 +693,13 @@ type IDExtractorConfig struct {
 
 // Fill fills IDExtractorConfig from supplied classic APIDefinition.
 func (id *IDExtractorConfig) Fill(api apidef.APIDefinition) {
+	config := api.CustomMiddleware.IdExtractor.ExtractorConfig
 	*id = IDExtractorConfig{
-		HeaderName:       api.CustomMiddleware.IdExtractor.ExtractorConfig.HeaderName,
-		FormParamName:    api.CustomMiddleware.IdExtractor.ExtractorConfig.FormParamName,
-		Regexp:           api.CustomMiddleware.IdExtractor.ExtractorConfig.RegexExpression,
-		RegexpMatchIndex: api.CustomMiddleware.IdExtractor.ExtractorConfig.RegexMatchIndex,
-		XPathExp:         api.CustomMiddleware.IdExtractor.ExtractorConfig.XPathExpression,
+		HeaderName:       config.HeaderName,
+		FormParamName:    config.FormParamName,
+		Regexp:           config.RegexExpression,
+		RegexpMatchIndex: config.RegexMatchIndex,
+		XPathExp:         config.XPathExpression,
 	}
 }
 
