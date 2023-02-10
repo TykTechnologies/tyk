@@ -4,11 +4,41 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astprinter"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/asyncapi"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/tyk/apidef"
 )
+
+func prepareServerConfig(parsed *asyncapi.AsyncAPI) (map[string]apidef.GraphQLEngineDataSourceConfigKafka, error) {
+	serverConfig := make(map[string]apidef.GraphQLEngineDataSourceConfigKafka)
+	for name, server := range parsed.Servers {
+		c := apidef.GraphQLEngineDataSourceConfigKafka{}
+		switch server.Protocol {
+		case "kafka", "kafka-secure":
+		default:
+			return nil, fmt.Errorf("invalid server protocol: %s", server.Protocol)
+		}
+
+		if server.ProtocolVersion != "" {
+			c.KafkaVersion = server.ProtocolVersion
+		}
+
+		if server.URL == "" {
+			return nil, fmt.Errorf("server.URL cannot be empty")
+		}
+		c.BrokerAddresses = append(c.BrokerAddresses, server.URL)
+		serverConfig[name] = c
+	}
+	return serverConfig, nil
+}
+
+func marshalDataSourceConfig(cfg apidef.GraphQLEngineDataSourceConfigKafka, topic string) ([]byte, error) {
+	localConfig := cfg
+	localConfig.Topics = append(localConfig.Topics, topic)
+	return json.Marshal(localConfig)
+}
 
 func ImportAsyncAPIDocument(input []byte) (apidef.APIDefinition, error) {
 	def := apidef.DummyAPI()
@@ -36,24 +66,9 @@ func ImportAsyncAPIDocument(input []byte) (apidef.APIDefinition, error) {
 	def.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 	def.GraphQL.Schema = w.String()
 
-	serverConfig := make(map[string]apidef.GraphQLEngineDataSourceConfigKafka)
-	for name, server := range parsed.Servers {
-		c := apidef.GraphQLEngineDataSourceConfigKafka{}
-		switch server.Protocol {
-		case "kafka", "kafka-secure":
-		default:
-			return def, fmt.Errorf("invalid server protocol: %s", server.Protocol)
-		}
-
-		if server.ProtocolVersion != "" {
-			c.KafkaVersion = server.ProtocolVersion
-		}
-
-		if server.URL == "" {
-			return def, fmt.Errorf("server.URL cannot be empty")
-		}
-		c.BrokerAddresses = append(c.BrokerAddresses, server.URL)
-		serverConfig[name] = c
+	serverConfig, err := prepareServerConfig(parsed)
+	if err != nil {
+		return def, err
 	}
 
 	for channelName, channelItem := range parsed.Channels {
@@ -78,29 +93,24 @@ func ImportAsyncAPIDocument(input []byte) (apidef.APIDefinition, error) {
 			RootFields: rootFields,
 		}
 
+		// TODO: We only support one data source per field, right?
 		if len(channelItem.Servers) == 0 {
 			for _, cfg := range serverConfig {
-				localConfig := cfg
-				localConfig.Topics = append(localConfig.Topics, channelName)
-				encodedConfig, err := json.Marshal(localConfig)
+				marshalConfig, err := marshalDataSourceConfig(cfg, channelName)
 				if err != nil {
 					return def, err
 				}
-				dataSourceConfig.Config = encodedConfig
-				// TODO: We only support one data source per field, right?
+				dataSourceConfig.Config = marshalConfig
 				break
 			}
 		} else {
 			for _, server := range channelItem.Servers {
 				if cfg, ok := serverConfig[server]; ok {
-					localConfig := cfg
-					localConfig.Topics = append(localConfig.Topics, channelName)
-					encodedConfig, err := json.Marshal(localConfig)
+					marshalConfig, err := marshalDataSourceConfig(cfg, channelName)
 					if err != nil {
 						return def, err
 					}
-					dataSourceConfig.Config = encodedConfig
-					// TODO: We only support one data source per field, right?
+					dataSourceConfig.Config = marshalConfig
 					break
 				}
 			}
