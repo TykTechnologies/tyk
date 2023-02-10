@@ -693,23 +693,27 @@ type IDExtractorConfig struct {
 
 // Fill fills IDExtractorConfig from supplied classic APIDefinition.
 func (id *IDExtractorConfig) Fill(api apidef.APIDefinition) {
-	id.HeaderName = api.CustomMiddleware.IdExtractor.ExtractorConfig.HeaderName
-	id.FormParamName = api.CustomMiddleware.IdExtractor.ExtractorConfig.FormParamName
-	id.Regexp = api.CustomMiddleware.IdExtractor.ExtractorConfig.RegexExpression
-	id.RegexpMatchIndex = api.CustomMiddleware.IdExtractor.ExtractorConfig.RegexMatchIndex
-	id.XPathExp = api.CustomMiddleware.IdExtractor.ExtractorConfig.XPathExpression
+	*id = IDExtractorConfig{
+		HeaderName:       api.CustomMiddleware.IdExtractor.ExtractorConfig.HeaderName,
+		FormParamName:    api.CustomMiddleware.IdExtractor.ExtractorConfig.FormParamName,
+		Regexp:           api.CustomMiddleware.IdExtractor.ExtractorConfig.RegexExpression,
+		RegexpMatchIndex: api.CustomMiddleware.IdExtractor.ExtractorConfig.RegexMatchIndex,
+		XPathExp:         api.CustomMiddleware.IdExtractor.ExtractorConfig.XPathExpression,
+	}
 }
 
 // ExtractTo extracts IDExtractorConfig into supplied classic API definition.
 func (id *IDExtractorConfig) ExtractTo(api *apidef.APIDefinition) {
-	api.CustomMiddleware.IdExtractor.ExtractorConfig.HeaderName = id.HeaderName
-	api.CustomMiddleware.IdExtractor.ExtractorConfig.FormParamName = id.FormParamName
-	api.CustomMiddleware.IdExtractor.ExtractorConfig.RegexExpression = id.Regexp
-	api.CustomMiddleware.IdExtractor.ExtractorConfig.RegexMatchIndex = id.RegexpMatchIndex
-	api.CustomMiddleware.IdExtractor.ExtractorConfig.XPathExpression = id.XPathExp
+	api.CustomMiddleware.IdExtractor.ExtractorConfig = apidef.IDExtractorConfig{
+		HeaderName:      id.HeaderName,
+		FormParamName:   id.FormParamName,
+		RegexExpression: id.Regexp,
+		RegexMatchIndex: id.RegexpMatchIndex,
+		XPathExpression: id.XPathExp,
+	}
 }
 
-// IDExtractor configures IDExtractor.
+// IDExtractor configures ID Extractor.
 type IDExtractor struct {
 	// Enabled enables ID extractor with coprocess authentication.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
