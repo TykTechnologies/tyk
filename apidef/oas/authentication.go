@@ -677,6 +677,7 @@ func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// IDExtractorConfig specifies the configuration for ID extractor.
 type IDExtractorConfig struct {
 	// HeaderName is the header name to extract ID from.
 	HeaderName string `bson:"headerName,omitempty" json:"headerName,omitempty"`
@@ -690,6 +691,7 @@ type IDExtractorConfig struct {
 	XPathExp string `bson:"xPathExp,omitempty" json:"xPathExp"`
 }
 
+// Fill fills IDExtractorConfig from supplied classic APIDefinition.
 func (id *IDExtractorConfig) Fill(api apidef.APIDefinition) {
 	id.HeaderName = api.CustomMiddleware.IdExtractor.ExtractorConfig.HeaderName
 	id.FormParamName = api.CustomMiddleware.IdExtractor.ExtractorConfig.FormParamName
@@ -698,6 +700,7 @@ func (id *IDExtractorConfig) Fill(api apidef.APIDefinition) {
 	id.XPathExp = api.CustomMiddleware.IdExtractor.ExtractorConfig.XPathExpression
 }
 
+// ExtractTo extracts IDExtractorConfig into supplied classic API definition.
 func (id *IDExtractorConfig) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.IdExtractor.ExtractorConfig.HeaderName = id.HeaderName
 	api.CustomMiddleware.IdExtractor.ExtractorConfig.FormParamName = id.FormParamName
@@ -706,6 +709,7 @@ func (id *IDExtractorConfig) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.IdExtractor.ExtractorConfig.XPathExpression = id.XPathExp
 }
 
+// IDExtractor configures IDExtractor.
 type IDExtractor struct {
 	// Enabled enables ID extractor with coprocess authentication.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -717,6 +721,7 @@ type IDExtractor struct {
 	Config *IDExtractorConfig `bson:"config" json:"config"` // required
 }
 
+// Fill fills IDExtractor from supplied classic APIDefinition.
 func (id *IDExtractor) Fill(api apidef.APIDefinition) {
 	id.Enabled = !api.CustomMiddleware.IdExtractor.Disabled
 	id.Source = api.CustomMiddleware.IdExtractor.ExtractFrom
@@ -732,6 +737,7 @@ func (id *IDExtractor) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// ExtractTo extracts IDExtractor into supplied classic API definition.
 func (id *IDExtractor) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.IdExtractor.Disabled = !id.Enabled
 	api.CustomMiddleware.IdExtractor.ExtractFrom = id.Source
