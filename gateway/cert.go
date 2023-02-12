@@ -279,7 +279,9 @@ func getClientValidator(helloInfo *tls.ClientHelloInfo, certPool *x509.CertPool)
 		}
 
 		cert, certErr := x509.ParseCertificate(rawCerts[0])
-		log.Error("CERT ERRT: ", certErr)
+		if certErr != nil {
+			return certErr
+		}
 
 		opts := x509.VerifyOptions{
 			Roots:         certPool,
