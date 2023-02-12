@@ -276,7 +276,19 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	})
 }
 
-func TestAPIMutualTLS(t *testing.T) {
+// Run 2 times to ensure that both methods backward compatible
+func TestAPIMutualTLSHelper(t *testing.T) {
+	t.Run("Skip ClientCA announce", func(t *testing.T) {
+		testAPIMutualTLSHelper(t, true)
+	})
+
+	t.Run("Announce ClientCA", func(t *testing.T) {
+		testAPIMutualTLSHelper(t, false)
+	})
+}
+
+func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
+	t.Helper()
 
 	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
@@ -285,6 +297,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		globalConf.EnableCustomDomains = true
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf.HttpServerOptions.SkipClientCAAnnouncement = skipCAAnnounce
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
