@@ -281,6 +281,28 @@ var tlsConfigCache = cache.New(60*time.Second, 60*time.Minute)
 
 var tlsConfigMu sync.Mutex
 
+func getClientValidator(helloInfo *tls.ClientHelloInfo, certPool *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
+	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		if len(rawCerts) == 0 {
+			return errors.New("x509: missing client certificate")
+		}
+
+		cert, certErr := x509.ParseCertificate(rawCerts[0])
+		log.Error("CERT ERRT: ", certErr)
+
+		opts := x509.VerifyOptions{
+			Roots:         certPool,
+			CurrentTime:   time.Now(),
+			Intermediates: x509.NewCertPool(),
+			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}
+
+		_, err := cert.Verify(opts)
+
+		return err
+	}
+}
+
 func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	gwConfig := gw.GetConfig()
 	// Supporting legacy certificate configuration
@@ -328,7 +350,14 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 	return func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 		if config, found := tlsConfigCache.Get(hello.ServerName + listenPortStr); found {
-			return config.(*tls.Config).Clone(), nil
+			newConfig := config.(*tls.Config).Clone()
+
+			if gwConfig.HttpServerOptions.SkipClientCAAnnouncement && newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+				newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
+				newConfig.ClientCAs = x509.NewCertPool()
+				newConfig.ClientAuth = tls.RequestClientCert
+			}
+			return newConfig, nil
 		}
 
 		newConfig := baseConfig.Clone()
@@ -448,6 +477,13 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
+
+		if gwConfig.HttpServerOptions.SkipClientCAAnnouncement && newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+			newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
+			newConfig.ClientCAs = x509.NewCertPool()
+			newConfig.ClientAuth = tls.RequestClientCert
+		}
+
 		return newConfig, nil
 	}
 }
