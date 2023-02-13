@@ -146,39 +146,39 @@ func (j *ObjectId) Scan(value interface{}) error {
 	return nil
 }
 
-func (j ObjectId) Value() (driver.Value, error) {
-	return bson.ObjectId(j).Hex(), nil
+func (j *ObjectId) Value() (driver.Value, error) {
+	return bson.ObjectId(*j).Hex(), nil
 }
 
-func (j ObjectId) Hex() string {
-	return bson.ObjectId(j).Hex()
+func (j *ObjectId) Hex() string {
+	return bson.ObjectId(*j).Hex()
 }
 
-func (j ObjectId) Time() time.Time {
-	return bson.ObjectId(j).Time()
+func (j *ObjectId) Time() time.Time {
+	return bson.ObjectId(*j).Time()
 }
 
-func (j ObjectId) Valid() bool {
-	return bson.ObjectId(j).Valid()
+func (j *ObjectId) Valid() bool {
+	return bson.ObjectId(*j).Valid()
 }
 
-func (j ObjectId) String() string {
+func (j *ObjectId) String() string {
 	return j.Hex()
 }
 
-func (j ObjectId) GetBSON() (interface{}, error) {
-	return bson.ObjectId(j), nil
+func (j *ObjectId) GetBSON() (interface{}, error) {
+	return bson.ObjectId(*j), nil
 }
 
-func (j ObjectId) Timestamp() time.Time {
+func (j *ObjectId) Timestamp() time.Time {
 	return j.Time()
 }
 
-func (j ObjectId) MarshalText() ([]byte, error) {
+func (j *ObjectId) MarshalText() ([]byte, error) {
 	panic("not implemented")
 }
 
-func (j ObjectId) UnmarshalText([]byte) error {
+func (j *ObjectId) UnmarshalText([]byte) error {
 	panic("not implemented")
 }
 
@@ -194,11 +194,11 @@ func IsObjectIdHex(hex string) bool {
 	return bson.IsObjectIdHex(hex)
 }
 
-func (j ObjectId) MarshalJSON() ([]byte, error) {
-	return bson.ObjectId(j).MarshalJSON()
+func (j *ObjectId) MarshalJSON() ([]byte, error) {
+	return bson.ObjectId(*j).MarshalJSON()
 }
 
-func (j ObjectId) UnmarshalJSON(buf []byte) error {
+func (j *ObjectId) UnmarshalJSON(buf []byte) error {
 	var b bson.ObjectId
 	b.UnmarshalJSON(buf)
 	*j = ObjectId(string(b))
