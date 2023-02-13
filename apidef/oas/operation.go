@@ -79,7 +79,7 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykE
 			validate = &ValidateRequest{}
 		}
 
-		if shouldImport := validate.shouldImportValidateRequest(oasOperation); shouldImport {
+		if ok := validate.shouldImport(oasOperation); ok {
 			validate.Import(*overRideValues.ValidateRequest)
 			o.ValidateRequest = validate
 		}
@@ -91,7 +91,7 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykE
 			mock = &MockResponse{}
 		}
 
-		if shouldImport := mock.shouldImport(oasOperation); shouldImport {
+		if ok := mock.shouldImport(oasOperation); ok {
 			mock.Import(*overRideValues.MockResponse)
 			o.MockResponse = mock
 		}
@@ -471,7 +471,11 @@ func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
 	v.ErrorResponseCode = meta.ErrorResponseCode
 }
 
-func (*ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operation) bool {
+func (*ValidateRequest) shouldImport(operation *openapi3.Operation) bool {
+	if len(operation.Parameters) > 0 {
+		return true
+	}
+
 	reqBody := operation.RequestBody
 	if reqBody == nil {
 		return false
@@ -570,7 +574,7 @@ type FromOASExamples struct {
 	ExampleName string `bson:"exampleName,omitempty" json:"exampleName,omitempty"`
 }
 
-func (m *MockResponse) shouldImport(operation *openapi3.Operation) bool {
+func (*MockResponse) shouldImport(operation *openapi3.Operation) bool {
 	for _, response := range operation.Responses {
 		for _, content := range response.Value.Content {
 			if content.Example != nil || content.Schema != nil {

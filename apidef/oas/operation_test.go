@@ -232,7 +232,3 @@ func TestOAS_RegexPaths(t *testing.T) {
 		assert.Equalf(t, tc.input, got, "test %d: rebuilt link, expected %v, got %v", i, tc.input, got)
 	}
 }
-
-func TestValidateRequest(t *testing.T) {
-
-}
