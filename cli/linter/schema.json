@@ -563,6 +563,9 @@
         "override_defaults": {
           "type": "boolean"
         },
+        "skip_client_ca_announcement": {
+          "type": "boolean"
+        },
         "read_timeout": {
           "type": "integer"
         },
