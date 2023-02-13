@@ -102,13 +102,7 @@ func (d *VirtualEndpoint) EnabledForSpec() bool {
 		return false
 	}
 
-	for _, version := range d.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.Virtual) > 0 {
-			return true
-		}
-	}
-
-	return false
+	return d.Spec.hasVirtualEndpoint()
 }
 
 func (d *VirtualEndpoint) getMetaFromRequest(r *http.Request) *apidef.VirtualMeta {

@@ -321,6 +321,7 @@ type URLRewriteMeta struct {
 }
 
 type VirtualMeta struct {
+	Disabled             bool   `bson:"disabled" json:"disabled"`
 	ResponseFunctionName string `bson:"response_function_name" json:"response_function_name"`
 	FunctionSourceType   string `bson:"function_source_type" json:"function_source_type"`
 	FunctionSourceURI    string `bson:"function_source_uri" json:"function_source_uri"`
