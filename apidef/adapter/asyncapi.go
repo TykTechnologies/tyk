@@ -7,14 +7,16 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astprinter"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/asyncapi"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/buger/jsonparser"
 )
 
-func prepareServerConfig(parsed *asyncapi.AsyncAPI) (map[string]apidef.GraphQLEngineDataSourceConfigKafka, error) {
-	serverConfig := make(map[string]apidef.GraphQLEngineDataSourceConfigKafka)
+func prepareKafkaDataSourceConfig(parsed *asyncapi.AsyncAPI) (map[string]kafka_datasource.GraphQLSubscriptionOptions, error) {
+	serverConfig := make(map[string]kafka_datasource.GraphQLSubscriptionOptions)
 	for name, server := range parsed.Servers {
-		c := apidef.GraphQLEngineDataSourceConfigKafka{}
+		c := kafka_datasource.GraphQLSubscriptionOptions{}
 		switch server.Protocol {
 		case "kafka", "kafka-secure":
 		default:
@@ -29,14 +31,37 @@ func prepareServerConfig(parsed *asyncapi.AsyncAPI) (map[string]apidef.GraphQLEn
 			return nil, fmt.Errorf("server.URL cannot be empty")
 		}
 		c.BrokerAddresses = append(c.BrokerAddresses, server.URL)
+
+		// https://github.com/asyncapi/bindings/blob/master/kafka/README.md#operation-binding-object
+		kafkaBindings, hasKafkaBindings := server.Bindings[asyncapi.KafkaKey]
+		if hasKafkaBindings {
+			groupIdBinding, hasGroupId := kafkaBindings["groupId"]
+			if hasGroupId {
+				if groupIdBinding.ValueType == jsonparser.String {
+					c.GroupID = string(groupIdBinding.Value)
+				}
+			}
+
+			clientIdBinding, hasClientId := kafkaBindings["clientId"]
+			if hasClientId {
+				if clientIdBinding.ValueType == jsonparser.String {
+					c.ClientID = string(clientIdBinding.Value)
+				}
+			}
+		}
 		serverConfig[name] = c
 	}
 	return serverConfig, nil
 }
 
-func marshalDataSourceConfig(cfg apidef.GraphQLEngineDataSourceConfigKafka, topic string) ([]byte, error) {
+func encodeKafkaDataSourceConfig(cfg kafka_datasource.GraphQLSubscriptionOptions, topic string) ([]byte, error) {
 	localConfig := cfg
 	localConfig.Topics = append(localConfig.Topics, topic)
+
+	localConfig.Sanitize()
+	if err := localConfig.Validate(); err != nil {
+		return nil, err
+	}
 	return json.Marshal(localConfig)
 }
 
@@ -66,7 +91,7 @@ func ImportAsyncAPIDocument(input []byte) (apidef.APIDefinition, error) {
 	def.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 	def.GraphQL.Schema = w.String()
 
-	serverConfig, err := prepareServerConfig(parsed)
+	serverConfig, err := prepareKafkaDataSourceConfig(parsed)
 	if err != nil {
 		return def, err
 	}
@@ -96,7 +121,7 @@ func ImportAsyncAPIDocument(input []byte) (apidef.APIDefinition, error) {
 		// TODO: We only support one data source per field, right?
 		if len(channelItem.Servers) == 0 {
 			for _, cfg := range serverConfig {
-				marshalConfig, err := marshalDataSourceConfig(cfg, channelName)
+				marshalConfig, err := encodeKafkaDataSourceConfig(cfg, channelName)
 				if err != nil {
 					return def, err
 				}
@@ -106,11 +131,11 @@ func ImportAsyncAPIDocument(input []byte) (apidef.APIDefinition, error) {
 		} else {
 			for _, server := range channelItem.Servers {
 				if cfg, ok := serverConfig[server]; ok {
-					marshalConfig, err := marshalDataSourceConfig(cfg, channelName)
+					encodedConfig, err := encodeKafkaDataSourceConfig(cfg, channelName)
 					if err != nil {
 						return def, err
 					}
-					dataSourceConfig.Config = marshalConfig
+					dataSourceConfig.Config = encodedConfig
 					break
 				}
 			}
