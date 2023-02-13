@@ -170,15 +170,15 @@ func (j ObjectId) GetBSON() (interface{}, error) {
 	return bson.ObjectId(j), nil
 }
 
-func (j ObjectId) TimeStamp() time.Time {
+func (j ObjectId) Timestamp() time.Time {
 	return j.Time()
 }
 
-func (j *ObjectId) MarshalText() ([]byte, error) {
+func (j ObjectId) MarshalText() ([]byte, error) {
 	panic("not implemented")
 }
 
-func (j *ObjectId) UnmarshalText([]byte) error {
+func (j ObjectId) UnmarshalText([]byte) error {
 	panic("not implemented")
 }
 
