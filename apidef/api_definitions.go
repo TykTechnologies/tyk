@@ -664,6 +664,7 @@ type APIDefinition struct {
 	DoNotTrack                           bool                   `bson:"do_not_track" json:"do_not_track"`
 	EnableContextVars                    bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
 	ConfigData                           map[string]interface{} `bson:"config_data" json:"config_data"`
+	ConfigDataDisabled                   bool                   `bson:"config_data_disabled" json:"config_data_disabled"`
 	TagHeaders                           []string               `bson:"tag_headers" json:"tag_headers"`
 	GlobalRateLimit                      GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
 	StripAuthData                        bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
