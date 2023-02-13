@@ -1,8 +1,9 @@
 package adapter
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
+	"github.com/buger/jsonparser"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -31,6 +32,10 @@ servers:
     url: test.mykafkacluster.org:8092
     protocol: kafka-secure
     description: Test broker
+    bindings:
+      kafka:
+        clientId: my-app-id
+        groupId: my-group-id
     security:
       - saslScram: []
 
@@ -178,6 +183,157 @@ components:
 
 const expectedSchema = "schema {\n    query: Query\n    subscription: Subscription\n}\n\ntype Query {\n    _: Boolean\n}\n\ntype Subscription {\n    dimLight(streetlightId: String): DimLight\n    turnOff(streetlightId: String): TurnOnOff\n    turnOn(streetlightId: String): TurnOnOff\n}\n\nenum Command {\n    ON\n    OFF\n}\n\n\"\"\"\nDim light\nCommand a particular streetlight to dim the lights.\n\"\"\"\ntype DimLight {\n    \"Percentage to which the light should be dimmed to.\"\n    percentage: Int\n    \"Date and time when the message was sent.\"\n    sentAt: String\n}\n\n\"\"\"\nTurn on/off\nCommand a particular streetlight to turn the lights on or off.\n\"\"\"\ntype TurnOnOff {\n    \"Whether to turn on or off the light.\"\n    command: Command\n    \"Date and time when the message was sent.\"\n    sentAt: String\n}"
 
+const expectedGraphqlConfig = `{
+    "enabled": true,
+    "execution_mode": "executionEngine",
+    "version": "2",
+    "schema": "schema {\n    query: Query\n    subscription: Subscription\n}\n\ntype Query {\n    _: Boolean\n}\n\ntype Subscription {\n    dimLight(streetlightId: String): DimLight\n    turnOff(streetlightId: String): TurnOnOff\n    turnOn(streetlightId: String): TurnOnOff\n}\n\nenum Command {\n    ON\n    OFF\n}\n\n\"\"\"\nDim light\nCommand a particular streetlight to dim the lights.\n\"\"\"\ntype DimLight {\n    \"Percentage to which the light should be dimmed to.\"\n    percentage: Int\n    \"Date and time when the message was sent.\"\n    sentAt: String\n}\n\n\"\"\"\nTurn on/off\nCommand a particular streetlight to turn the lights on or off.\n\"\"\"\ntype TurnOnOff {\n    \"Whether to turn on or off the light.\"\n    command: Command\n    \"Date and time when the message was sent.\"\n    sentAt: String\n}",
+    "type_field_configurations": null,
+    "playground": {
+        "enabled": false,
+        "path": ""
+    },
+    "engine": {
+        "field_configs": [
+            {
+                "type_name": "Subscription",
+                "field_name": "dimLight",
+                "disable_default_mapping": false,
+                "path": [
+                    "dimLight"
+                ]
+            },
+            {
+                "type_name": "Subscription",
+                "field_name": "turnOff",
+                "disable_default_mapping": false,
+                "path": [
+                    "turnOff"
+                ]
+            },
+            {
+                "type_name": "Subscription",
+                "field_name": "turnOn",
+                "disable_default_mapping": false,
+                "path": [
+                    "turnOn"
+                ]
+            }
+        ],
+        "data_sources": [
+            {
+                "kind": "Kafka",
+                "name": "consumer-group:dimLight",
+                "internal": false,
+                "root_fields": [
+                    {
+                        "type": "Subscription",
+                        "fields": [
+                            "dimLight"
+                        ]
+                    }
+                ],
+                "config": {
+                    "broker_addresses": [
+                        "test.mykafkacluster.org:8092"
+                    ],
+                    "topics": [
+                        "smartylighting.streetlights.1.0.action.{{.arguments.streetlightId}}.dim"
+                    ],
+                    "group_id": "my-group-id",
+                    "client_id": "my-app-id",
+                    "kafka_version": "V1_0_0_0",
+                    "start_consuming_latest": false,
+                    "balance_strategy": "BalanceStrategyRange",
+                    "isolation_level": "ReadUncommitted",
+                    "sasl": {
+                        "enable": false,
+                        "user": "",
+                        "password": ""
+                    }
+                }
+            },
+            {
+                "kind": "Kafka",
+                "name": "consumer-group:turnOff",
+                "internal": false,
+                "root_fields": [
+                    {
+                        "type": "Subscription",
+                        "fields": [
+                            "turnOff"
+                        ]
+                    }
+                ],
+                "config": {
+                    "broker_addresses": [
+                        "test.mykafkacluster.org:8092"
+                    ],
+                    "topics": [
+                        "smartylighting.streetlights.1.0.action.{{.arguments.streetlightId}}.turn.off"
+                    ],
+                    "group_id": "my-group-id",
+                    "client_id": "my-app-id",
+                    "kafka_version": "V1_0_0_0",
+                    "start_consuming_latest": false,
+                    "balance_strategy": "BalanceStrategyRange",
+                    "isolation_level": "ReadUncommitted",
+                    "sasl": {
+                        "enable": false,
+                        "user": "",
+                        "password": ""
+                    }
+                }
+            },
+            {
+                "kind": "Kafka",
+                "name": "consumer-group:turnOn",
+                "internal": false,
+                "root_fields": [
+                    {
+                        "type": "Subscription",
+                        "fields": [
+                            "turnOn"
+                        ]
+                    }
+                ],
+                "config": {
+                    "broker_addresses": [
+                        "test.mykafkacluster.org:8092"
+                    ],
+                    "topics": [
+                        "smartylighting.streetlights.1.0.action.{{.arguments.streetlightId}}.turn.on"
+                    ],
+                    "group_id": "my-group-id",
+                    "client_id": "my-app-id",
+                    "kafka_version": "V1_0_0_0",
+                    "start_consuming_latest": false,
+                    "balance_strategy": "BalanceStrategyRange",
+                    "isolation_level": "ReadUncommitted",
+                    "sasl": {
+                        "enable": false,
+                        "user": "",
+                        "password": ""
+                    }
+                }
+            }
+        ]
+    },
+    "proxy": {
+        "auth_headers": {},
+        "request_headers": null
+    },
+    "subgraph": {
+        "sdl": ""
+    },
+    "supergraph": {
+        "subgraphs": null,
+        "merged_sdl": "",
+        "global_headers": null,
+        "disable_query_batching": false
+    }
+}`
+
 func TestGraphQLConfigAdapter_AsyncAPI(t *testing.T) {
 	actualApiDefinition, err := ImportAsyncAPIDocument([]byte(streetlightsKafkaAsyncAPI))
 	require.NoError(t, err)
@@ -190,5 +346,12 @@ func TestGraphQLConfigAdapter_AsyncAPI(t *testing.T) {
 
 	data, err := json.Marshal(actualApiDefinition)
 	require.NoError(t, err)
-	fmt.Println(string(data))
+
+	actualGraphqlConfig, _, _, err := jsonparser.Get(data, "graphql")
+	require.NoError(t, err)
+
+	dst := bytes.NewBuffer(nil)
+	err = json.Indent(dst, actualGraphqlConfig, "", "    ")
+	require.NoError(t, err)
+	require.Equal(t, expectedGraphqlConfig, dst.String())
 }

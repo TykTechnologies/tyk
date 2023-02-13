@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"sort"
+	"strings"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astprinter"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/asyncapi"
@@ -12,6 +15,28 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/buger/jsonparser"
 )
+
+func removeCurlyBraces(argument string) string {
+	return strings.Map(
+		func(r rune) rune {
+			if r != '{' && r != '}' {
+				return r
+			}
+			return -1
+		},
+		argument,
+	)
+}
+func processArgumentSection(input string) string {
+	sampleRegexp := regexp.MustCompile("{(.*?)}")
+	matches := sampleRegexp.FindAll([]byte(input), -1)
+	for _, match := range matches {
+		oldArgument := string(match)
+		newArgument := fmt.Sprintf("{{.arguments.%s}}", removeCurlyBraces(oldArgument))
+		input = strings.ReplaceAll(input, oldArgument, newArgument)
+	}
+	return input
+}
 
 func prepareKafkaDataSourceConfig(parsed *asyncapi.AsyncAPI) (map[string]kafka_datasource.GraphQLSubscriptionOptions, error) {
 	serverConfig := make(map[string]kafka_datasource.GraphQLSubscriptionOptions)
@@ -38,14 +63,14 @@ func prepareKafkaDataSourceConfig(parsed *asyncapi.AsyncAPI) (map[string]kafka_d
 			groupIdBinding, hasGroupId := kafkaBindings["groupId"]
 			if hasGroupId {
 				if groupIdBinding.ValueType == jsonparser.String {
-					c.GroupID = string(groupIdBinding.Value)
+					c.GroupID = processArgumentSection(string(groupIdBinding.Value))
 				}
 			}
 
 			clientIdBinding, hasClientId := kafkaBindings["clientId"]
 			if hasClientId {
 				if clientIdBinding.ValueType == jsonparser.String {
-					c.ClientID = string(clientIdBinding.Value)
+					c.ClientID = processArgumentSection(string(clientIdBinding.Value))
 				}
 			}
 		}
@@ -97,6 +122,7 @@ func ImportAsyncAPIDocument(input []byte) (apidef.APIDefinition, error) {
 	}
 
 	for channelName, channelItem := range parsed.Channels {
+		channelName = processArgumentSection(channelName)
 		fieldConfig := apidef.GraphQLFieldConfig{
 			TypeName:  "Subscription",
 			FieldName: channelItem.OperationID,
@@ -143,6 +169,18 @@ func ImportAsyncAPIDocument(input []byte) (apidef.APIDefinition, error) {
 
 		def.GraphQL.Engine.DataSources = append(def.GraphQL.Engine.DataSources, dataSourceConfig)
 	}
+
+	// We iterate over the maps to create a new API definition. This leads to the random placement of
+	// items in various arrays in the resulting JSON document. In order to test the AsyncAPI converter
+	// with fixtures and prevent randomness, we sort various data structures here.
+
+	sort.Slice(def.GraphQL.Engine.FieldConfigs, func(i, j int) bool {
+		return def.GraphQL.Engine.FieldConfigs[i].FieldName < def.GraphQL.Engine.FieldConfigs[j].FieldName
+	})
+
+	sort.Slice(def.GraphQL.Engine.DataSources, func(i, j int) bool {
+		return def.GraphQL.Engine.DataSources[i].Name < def.GraphQL.Engine.DataSources[j].Name
+	})
 
 	return def, nil
 }
