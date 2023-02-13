@@ -26,8 +26,8 @@ builds:
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.VERSION={{.Version}}
         -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
-        -X github.com/TykTechnologies/tyk/internal/build.buildDate={{.Date}}
-        -X github.com/TykTechnologies/tyk/internal/build.builtBy=goreleaser
+        -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
+        -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
     env:
       - CC=aarch64-linux-gnu-gcc
     goos:
@@ -148,6 +148,7 @@ dockers:
     - config
     - coprocess
     - ctx
+    - internal
     - dlpython
     - dnscache
     - gateway

@@ -155,6 +155,7 @@ dockers:
     - config
     - coprocess
     - ctx
+    - internal
     - dlpython
     - dnscache
     - gateway
