@@ -243,10 +243,8 @@ func TestJSVMConfigData(t *testing.T) {
 		dynMid.Spec.JSVM = jsvm
 
 		r := TestReq(t, "GET", "/v1/test-data", nil)
-		dynMid.ProcessRequest(nil, r, nil)
-		if want, got := "bar", r.Header.Get("data-foo"); want != got {
-			t.Fatalf("wanted header to be %q, got %q", want, got)
-		}
+		_, _ = dynMid.ProcessRequest(nil, r, nil)
+		assert.Equal(t, "bar", r.Header.Get("data-foo"))
 	})
 
 	t.Run("config data disabled", func(t *testing.T) {
@@ -269,7 +267,7 @@ func TestJSVMConfigData(t *testing.T) {
 		dynMid.Spec.JSVM = jsvm
 
 		r := TestReq(t, "GET", "/v1/test-data", nil)
-		dynMid.ProcessRequest(nil, r, nil)
+		_, _ = dynMid.ProcessRequest(nil, r, nil)
 		assert.Empty(t, r.Header.Get("data-foo"))
 	})
 
