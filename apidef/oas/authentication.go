@@ -1,10 +1,12 @@
 package oas
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/mitchellh/mapstructure"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -693,25 +695,44 @@ type IDExtractorConfig struct {
 
 // Fill fills IDExtractorConfig from supplied classic APIDefinition.
 func (id *IDExtractorConfig) Fill(api apidef.APIDefinition) {
-	config := api.CustomMiddleware.IdExtractor.ExtractorConfig
+	var classicIDExtractorConfig apidef.IDExtractorConfig
+	err := mapstructure.Decode(api.CustomMiddleware.IdExtractor.ExtractorConfig, &classicIDExtractorConfig)
+	if err != nil {
+		log.WithError(err).Error("error while decoding IDExtractorConfig")
+		return
+	}
+
 	*id = IDExtractorConfig{
-		HeaderName:       config.HeaderName,
-		FormParamName:    config.FormParamName,
-		Regexp:           config.RegexExpression,
-		RegexpMatchIndex: config.RegexMatchIndex,
-		XPathExp:         config.XPathExpression,
+		HeaderName:       classicIDExtractorConfig.HeaderName,
+		FormParamName:    classicIDExtractorConfig.FormParamName,
+		Regexp:           classicIDExtractorConfig.RegexExpression,
+		RegexpMatchIndex: classicIDExtractorConfig.RegexMatchIndex,
+		XPathExp:         classicIDExtractorConfig.XPathExpression,
 	}
 }
 
 // ExtractTo extracts IDExtractorConfig into supplied classic API definition.
 func (id *IDExtractorConfig) ExtractTo(api *apidef.APIDefinition) {
-	api.CustomMiddleware.IdExtractor.ExtractorConfig = apidef.IDExtractorConfig{
+	classicIDExtractorConfig := apidef.IDExtractorConfig{
 		HeaderName:      id.HeaderName,
 		FormParamName:   id.FormParamName,
 		RegexExpression: id.Regexp,
 		RegexMatchIndex: id.RegexpMatchIndex,
 		XPathExpression: id.XPathExp,
 	}
+
+	configData, err := json.Marshal(&classicIDExtractorConfig)
+	if err != nil {
+		log.WithError(err).Error("error while marshalling IDExtractorConfig")
+		return
+	}
+	var extractorConfigMap map[string]interface{}
+	err = json.Unmarshal(configData, &extractorConfigMap)
+	if err != nil {
+		log.WithError(err).Error("error while encoding IDExtractorConfig")
+		return
+	}
+	api.CustomMiddleware.IdExtractor.ExtractorConfig = extractorConfigMap
 }
 
 // IDExtractor configures ID Extractor.
