@@ -627,6 +627,7 @@ func TestSetDisabledFlags(t *testing.T) {
 		CertificatePinningDisabled:     true,
 		DomainDisabled:                 true,
 		CustomMiddlewareBundleDisabled: true,
+		ConfigDataDisabled:             true,
 	}
 	apiDef.SetDisabledFlags()
 	assert.Equal(t, expectedAPIDef, apiDef)

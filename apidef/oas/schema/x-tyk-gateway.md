@@ -656,6 +656,9 @@ Tyk classic API definition: `custom_middleware.driver`.
 **Field: `bundle` ([PluginBundle](#pluginbundle))**
 Bundle configures custom plugin bundles.
 
+**Field: `data` ([PluginConfigData](#pluginconfigdata))**
+Data configures custom plugin data.
+
 
 ### **PluginBundle**
 
@@ -667,6 +670,15 @@ Tyk classic API definition: `custom_middleware_bundle_disabled`.
 **Field: `path` (`string`)**
 Path is the path suffix to construct the URL to fetch plugin bundle from.
 Path will be suffixed to `bundle_base_url` in gateway config.
+
+
+### **PluginConfigData**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables custom plugin config data.
+
+**Field: `value` (`any`)**
+Value is the value of custom plugin config data.
 
 
 ### **CORS**

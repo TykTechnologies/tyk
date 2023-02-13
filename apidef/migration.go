@@ -384,6 +384,9 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.CertificatePinningDisabled = true
 	a.DomainDisabled = true
 	a.CustomMiddlewareBundleDisabled = true
+	a.CustomMiddleware.IdExtractor.Disabled = true
+	a.ConfigDataDisabled = true
+
 	for i := 0; i < len(a.CustomMiddleware.Pre); i++ {
 		a.CustomMiddleware.Pre[i].Disabled = true
 	}
@@ -399,6 +402,4 @@ func (a *APIDefinition) SetDisabledFlags() {
 	for i := 0; i < len(a.CustomMiddleware.Response); i++ {
 		a.CustomMiddleware.Response[i].Disabled = true
 	}
-
-	a.CustomMiddleware.IdExtractor.Disabled = true
 }

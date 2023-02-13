@@ -87,6 +87,7 @@ func TestPluginConfig(t *testing.T) {
 		}
 
 		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
 		pluginConfig.ExtractTo(&api)
 		assert.Equal(t, apidef.GoPluginDriver, api.CustomMiddleware.Driver)
 		assert.False(t, api.CustomMiddlewareBundleDisabled)
@@ -509,5 +510,42 @@ func TestResponsePlugin(t *testing.T) {
 		actualResponsePlugin := ResponsePlugin{}
 		actualResponsePlugin.Fill(api)
 		assert.Equal(t, expectedResponsePlugin, actualResponsePlugin)
+	})
+}
+
+func TestPluginConfigData(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var (
+			emptyPluginConfigData PluginConfigData
+			convertedAPI          apidef.APIDefinition
+		)
+
+		convertedAPI.SetDisabledFlags()
+		emptyPluginConfigData.ExtractTo(&convertedAPI)
+
+		var resultPluginConfigData PluginConfigData
+		resultPluginConfigData.Fill(convertedAPI)
+
+		assert.Equal(t, emptyPluginConfigData, resultPluginConfigData)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		t.Parallel()
+		expectedPluginConfigData := PluginConfigData{
+			Enabled: true,
+			Value: map[string]interface{}{
+				"foo": "bar",
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
+		expectedPluginConfigData.ExtractTo(&api)
+
+		actualPluginConfigData := PluginConfigData{}
+		actualPluginConfigData.Fill(api)
+		assert.Equal(t, expectedPluginConfigData, actualPluginConfigData)
 	})
 }

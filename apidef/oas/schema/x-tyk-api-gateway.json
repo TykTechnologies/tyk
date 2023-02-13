@@ -229,8 +229,26 @@
         },
         "bundle": {
           "$ref": "#/definitions/X-Tyk-PluginBundle"
+        },
+        "data": {
+          "$ref": "#/definitions/X-Tyk-PluginConfigData"
         }
       }
+    },
+    "X-Tyk-PluginConfigData": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
+      ]
     },
     "X-Tyk-CustomPluginConfig": {
       "type": "object",
