@@ -163,6 +163,27 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// PluginConfigData configures config data for custom plugins.
+type PluginConfigData struct {
+	// Enabled enables custom plugin config data.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Value is the value of custom plugin config data.
+	Value map[string]interface{} `bson:"value" json:"value"`
+}
+
+// Fill fills PluginConfigData from apidef.
+func (p *PluginConfigData) Fill(api apidef.APIDefinition) {
+	p.Enabled = !api.ConfigDataDisabled
+	p.Value = api.ConfigData
+}
+
+// ExtractTo extracts *PluginConfigData into *apidef.
+func (p *PluginConfigData) ExtractTo(api *apidef.APIDefinition) {
+	api.ConfigDataDisabled = !p.Enabled
+	api.ConfigData = p.Value
+}
+
 // PluginConfig holds configuration for custom plugins.
 type PluginConfig struct {
 	// Driver configures which custom plugin to be used.
@@ -179,6 +200,9 @@ type PluginConfig struct {
 
 	// Bundle configures custom plugin bundles.
 	Bundle *PluginBundle `bson:"bundle,omitempty" json:"bundle,omitempty"`
+
+	// Data configures custom plugin data.
+	Data *PluginConfigData `bson:"data,omitempty" json:"data,omitempty"`
 }
 
 // Fill fills PluginConfig from apidef.
@@ -193,6 +217,15 @@ func (p *PluginConfig) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(p.Bundle) {
 		p.Bundle = nil
 	}
+
+	if p.Data == nil {
+		p.Data = &PluginConfigData{}
+	}
+
+	p.Data.Fill(api)
+	if ShouldOmit(p.Data) {
+		p.Data = nil
+	}
 }
 
 // ExtractTo extracts *PluginConfig into *apidef.
@@ -201,6 +234,10 @@ func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
 
 	if p.Bundle != nil {
 		p.Bundle.ExtractTo(api)
+	}
+
+	if p.Data != nil {
+		p.Data.ExtractTo(api)
 	}
 }
 
