@@ -468,23 +468,23 @@ type MiddlewareDefinition struct {
 // IDExtractorConfig specifies the configuration for ID extractor
 type IDExtractorConfig struct {
 	// HeaderName is the header name to extract ID from.
-	HeaderName string `bson:"header_name" json:"header_name"`
+	HeaderName string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
 	// FormParamName is the form parameter name to extract ID from.
-	FormParamName string `bson:"param_name" json:"param_name"`
+	FormParamName string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 	// RegexExpression is the regular expression to match ID.
-	RegexExpression string `bson:"regex_expression" json:"regex_expression"`
+	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
 	// RegexMatchIndex is the index from which ID to be extracted after a match.
-	RegexMatchIndex int `bson:"regex_match_index" json:"regex_match_index"`
+	RegexMatchIndex int `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
 	// XPathExp is the xpath expression to match ID.
-	XPathExpression string `bson:"xpath_expression" json:"xpath_expression"`
+	XPathExpression string `mapstructure:"xpath_expression" bson:"xpath_expression" json:"xpath_expression"`
 }
 
 type MiddlewareIdExtractor struct {
-	Disabled        bool              `bson:"disabled" json:"disabled"`
-	ExtractFrom     IdExtractorSource `bson:"extract_from" json:"extract_from"`
-	ExtractWith     IdExtractorType   `bson:"extract_with" json:"extract_with"`
-	ExtractorConfig IDExtractorConfig `bson:"extractor_config" json:"extractor_config"`
-	Extractor       IDExtractor       `bson:"-" json:"-"`
+	Disabled        bool                   `bson:"disabled" json:"disabled"`
+	ExtractFrom     IdExtractorSource      `bson:"extract_from" json:"extract_from"`
+	ExtractWith     IdExtractorType        `bson:"extract_with" json:"extract_with"`
+	ExtractorConfig map[string]interface{} `bson:"extractor_config" json:"extractor_config"`
+	Extractor       IDExtractor            `bson:"-" json:"-"`
 }
 
 type MiddlewareSection struct {
@@ -1279,7 +1279,7 @@ func DummyAPI() APIDefinition {
 			PostKeyAuth: []MiddlewareDefinition{},
 			AuthCheck:   MiddlewareDefinition{},
 			IdExtractor: MiddlewareIdExtractor{
-				ExtractorConfig: IDExtractorConfig{},
+				ExtractorConfig: map[string]interface{}{},
 			},
 		},
 		Proxy: ProxyConfig{
