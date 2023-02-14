@@ -43,6 +43,9 @@ type Operation struct {
 
 	// MockResponse contains the mock response configuration.
 	MockResponse *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
+
+	// VirtualEndpoint contains virtual endpoint configuration.
+	VirtualEndpoint *VirtualEndpoint `bson:"virtualEndpoint,omitempty" json:"virtualEndpoint,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -113,6 +116,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillOASValidateRequest(ep.ValidateJSON)
+	s.fillVirtualEndpoint(ep.Virtual)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -133,6 +137,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTransformRequestBodyTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
+					tykOp.extractVirtualEndpointTo(ep, path, method)
 					break found
 				}
 			}
@@ -598,4 +603,29 @@ func (m *MockResponse) Import(enabled bool) {
 	m.FromOASExamples = &FromOASExamples{
 		Enabled: enabled,
 	}
+}
+
+func (s *OAS) fillVirtualEndpoint(endpointMetas []apidef.VirtualMeta) {
+	for _, em := range endpointMetas {
+		operationID := s.getOperationID(em.Path, em.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.VirtualEndpoint == nil {
+			operation.VirtualEndpoint = &VirtualEndpoint{}
+		}
+
+		operation.VirtualEndpoint.Fill(em)
+		if ShouldOmit(operation.VirtualEndpoint) {
+			operation.VirtualEndpoint = nil
+		}
+	}
+}
+
+func (o *Operation) extractVirtualEndpointTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.VirtualEndpoint == nil {
+		return
+	}
+
+	meta := apidef.VirtualMeta{Path: path, Method: method}
+	o.VirtualEndpoint.ExtractTo(&meta)
+	ep.Virtual = append(ep.Virtual, meta)
 }
