@@ -596,7 +596,8 @@ func TestSetDisabledFlags(t *testing.T) {
 			Versions: map[string]VersionInfo{
 				"": {
 					ExtendedPaths: ExtendedPathsSet{
-						Virtual: make([]VirtualMeta, 1),
+						Virtual:  make([]VirtualMeta, 1),
+						GoPlugin: make([]GoPluginMeta, 1),
 					},
 				},
 			},
@@ -642,6 +643,11 @@ func TestSetDisabledFlags(t *testing.T) {
 				"": {
 					ExtendedPaths: ExtendedPathsSet{
 						Virtual: []VirtualMeta{
+							{
+								Disabled: true,
+							},
+						},
+						GoPlugin: []GoPluginMeta{
 							{
 								Disabled: true,
 							},

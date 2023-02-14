@@ -406,6 +406,7 @@ func (a *APIDefinition) SetDisabledFlags() {
 	for version := range a.VersionData.Versions {
 		for i := 0; i < len(a.VersionData.Versions[version].ExtendedPaths.Virtual); i++ {
 			a.VersionData.Versions[version].ExtendedPaths.Virtual[i].Disabled = true
+			a.VersionData.Versions[version].ExtendedPaths.GoPlugin[i].Disabled = true
 		}
 	}
 }
