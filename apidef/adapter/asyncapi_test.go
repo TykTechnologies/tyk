@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/buger/jsonparser"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const streetlightsKafkaAsyncAPI = `asyncapi: '2.4.0'

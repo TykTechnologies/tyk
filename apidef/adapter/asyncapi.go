@@ -8,12 +8,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/buger/jsonparser"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astprinter"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/asyncapi"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/buger/jsonparser"
 )
 
 const (
