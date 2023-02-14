@@ -29,7 +29,7 @@ module "tyk" {
   topics                      = ["api","api-gateway","api-management","cloudnative","go","graphql","grpc","k8s","kubernetes","microservices","reverse-proxy","tyk"]
   visibility                  = "public"
   wiki                        = false
-  vulnerability_alerts        = true
+  vulnerability_alerts        = false
   squash_merge_commit_message = "PR_BODY"
   squash_merge_commit_title   = "PR_TITLE"
   release_branches     = [
