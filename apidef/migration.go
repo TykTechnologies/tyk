@@ -384,6 +384,9 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.CertificatePinningDisabled = true
 	a.DomainDisabled = true
 	a.CustomMiddlewareBundleDisabled = true
+	a.CustomMiddleware.IdExtractor.Disabled = true
+	a.ConfigDataDisabled = true
+
 	for i := 0; i < len(a.CustomMiddleware.Pre); i++ {
 		a.CustomMiddleware.Pre[i].Disabled = true
 	}
@@ -398,5 +401,12 @@ func (a *APIDefinition) SetDisabledFlags() {
 
 	for i := 0; i < len(a.CustomMiddleware.Response); i++ {
 		a.CustomMiddleware.Response[i].Disabled = true
+	}
+
+	for version := range a.VersionData.Versions {
+		for i := 0; i < len(a.VersionData.Versions[version].ExtendedPaths.Virtual); i++ {
+			a.VersionData.Versions[version].ExtendedPaths.Virtual[i].Disabled = true
+			a.VersionData.Versions[version].ExtendedPaths.GoPlugin[i].Disabled = true
+		}
 	}
 }

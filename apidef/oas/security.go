@@ -26,7 +26,7 @@ const (
 type Token struct {
 	// Enabled enables the token based authentication mode.
 	//
-	// Tyk native API definition: `auth_configs["authToken"].use_standard_auth`
+	// Tyk classic API definition: `auth_configs["authToken"].use_standard_auth`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// AuthSources contains the configuration for authentication sources.
@@ -34,12 +34,12 @@ type Token struct {
 
 	// EnableClientCertificate allows to create dynamic keys based on certificates.
 	//
-	// Tyk native API definition: `auth_configs["authToken"].use_certificate`
+	// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
 	EnableClientCertificate bool `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty"`
 
 	// Signature holds the configuration for verifying the signature of the token.
 	//
-	// Tyk native API definition: `auth_configs["authToken"].use_certificate`
+	// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
 	Signature *Signature `bson:"signatureValidation,omitempty" json:"signatureValidation,omitempty"`
 }
 
@@ -202,14 +202,14 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 // Basic type holds configuration values related to http basic authentication.
 type Basic struct {
 	// Enabled enables the basic authentication mode.
-	// Tyk native API definition: `use_basic_auth`
+	// Tyk classic API definition: `use_basic_auth`
 	Enabled     bool `bson:"enabled" json:"enabled"` // required
 	AuthSources `bson:",inline" json:",inline"`
 	// DisableCaching disables the caching of basic authentication key.
-	// Tyk native API definition: `basic_auth.disable_caching`
+	// Tyk classic API definition: `basic_auth.disable_caching`
 	DisableCaching bool `bson:"disableCaching,omitempty" json:"disableCaching,omitempty"`
 	// CacheTTL is the TTL for a cached basic authentication key in seconds.
-	// Tyk native API definition: `basic_auth.cache_ttl`
+	// Tyk classic API definition: `basic_auth.cache_ttl`
 	CacheTTL int `bson:"cacheTTL,omitempty" json:"cacheTTL,omitempty"`
 	// ExtractCredentialsFromBody helps to extract username and password from body. In some cases, like dealing with SOAP,
 	// user credentials can be passed via request body.
@@ -291,13 +291,13 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 // ExtractCredentialsFromBody configures extracting credentials from the request body.
 type ExtractCredentialsFromBody struct {
 	// Enabled enables extracting credentials from body.
-	// Tyk native API definition: `basic_auth.extract_from_body`
+	// Tyk classic API definition: `basic_auth.extract_from_body`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// UserRegexp is the regex for username e.g. `<User>(.*)</User>`.
-	// Tyk native API definition: `basic_auth.userRegexp`
+	// Tyk classic API definition: `basic_auth.userRegexp`
 	UserRegexp string `bson:"userRegexp,omitempty" json:"userRegexp,omitempty"`
 	// PasswordRegexp is the regex for password e.g. `<Password>(.*)</Password>`.
-	// Tyk native API definition: `basic_auth.passwordRegexp`
+	// Tyk classic API definition: `basic_auth.passwordRegexp`
 	PasswordRegexp string `bson:"passwordRegexp,omitempty" json:"passwordRegexp,omitempty"`
 }
 

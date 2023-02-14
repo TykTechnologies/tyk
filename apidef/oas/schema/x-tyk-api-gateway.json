@@ -229,8 +229,26 @@
         },
         "bundle": {
           "$ref": "#/definitions/X-Tyk-PluginBundle"
+        },
+        "data": {
+          "$ref": "#/definitions/X-Tyk-PluginConfigData"
         }
       }
+    },
+    "X-Tyk-PluginConfigData": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
+      ]
     },
     "X-Tyk-CustomPluginConfig": {
       "type": "object",
@@ -269,6 +287,59 @@
         "path"
       ]
     },
+    "X-Tyk-IDExtractorConfig": {
+      "type": "object",
+      "properties": {
+        "headerName": {
+          "type": "string"
+        },
+        "formParamName": {
+          "type": "string"
+        },
+        "regexp": {
+          "type": "string"
+        },
+        "regexpMatchIndex": {
+          "type": "string"
+        },
+        "xPathExp": {
+          "type": "string"
+        }
+      }
+    },
+    "X-Tyk-IDExtractor": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "body",
+            "header",
+            "form"
+          ]
+        },
+        "with": {
+          "type": "string",
+          "enum": [
+            "value",
+            "xpath",
+            "regex"
+          ]
+        },
+        "config": {
+          "$ref": "#/definitions/X-Tyk-IDExtractorConfig"
+        }
+      },
+      "required": [
+        "enabled",
+        "source",
+        "with",
+        "config"
+      ]
+    },
     "X-Tyk-AuthenticationPlugin": {
       "type": "object",
       "properties": {
@@ -283,6 +354,9 @@
         },
         "rawBodyOnly": {
           "type": "boolean"
+        },
+        "idExtractor": {
+          "$ref": "#/definitions/X-Tyk-IDExtractor"
         }
       },
       "required": [
@@ -410,9 +484,6 @@
         },
         "prePlugin": {
           "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
-        },
-        "authenticationPlugin": {
-          "$ref": "#/definitions/X-Tyk-AuthenticationPlugin"
         },
         "postAuthenticationPlugin": {
           "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
@@ -577,6 +648,52 @@
         "enabled"
       ]
     },
+    "X-Tyk-VirtualEndpoint": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "proxyOnError": {
+          "type": "boolean"
+        },
+        "requireSession": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "name"
+      ]
+    },
+    "X-Tyk-EndpointPostPlugin": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "name",
+        "path"
+      ]
+    },
     "X-Tyk-Operation": {
       "type": "object",
       "properties": {
@@ -594,6 +711,17 @@
         },
         "transformRequestBody": {
           "$ref": "#/definitions/X-Tyk-TransformRequestBody"
+        },
+        "virtualEndpoint": {
+          "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
+        },
+        "postPlugins": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-EndpointPostPlugin"
+            }
+          ]
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-CachePlugin"
@@ -710,11 +838,14 @@
         "enabled"
       ]
     },
-    "X-Tyk-CustomPlugin": {
+    "X-Tyk-CustomPluginAuthentication": {
       "type": "object",
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "config": {
+          "$ref": "#/definitions/X-Tyk-AuthenticationPlugin"
         },
         "header": {
           "$ref": "#/definitions/X-Tyk-AuthSource"
@@ -758,7 +889,7 @@
           "$ref": "#/definitions/X-Tyk-OIDC"
         },
         "custom": {
-          "$ref": "#/definitions/X-Tyk-CustomPlugin"
+          "$ref": "#/definitions/X-Tyk-CustomPluginAuthentication"
         },
         "securitySchemes": {
           "type": "object",

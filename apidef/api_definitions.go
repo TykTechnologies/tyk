@@ -34,7 +34,7 @@ type TykEvent string            // A type so we can ENUM event types easily, e.g
 type TykEventHandlerName string // A type for handler codes in API definitions
 
 type EndpointMethodAction string
-type TemplateMode string
+type SourceMode string
 
 type MiddlewareDriver string
 type IdExtractorSource string
@@ -44,12 +44,14 @@ type RoutingTriggerOnType string
 
 type SubscriptionType string
 
+type IDExtractor interface{}
+
 const (
 	NoAction EndpointMethodAction = "no_action"
 	Reply    EndpointMethodAction = "reply"
 
-	UseBlob TemplateMode = "blob"
-	UseFile TemplateMode = "file"
+	UseBlob SourceMode = "blob"
+	UseFile SourceMode = "file"
 
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
@@ -113,9 +115,9 @@ const (
 )
 
 var (
-	ErrAPIMigrated                = errors.New("the supplied API definition is in Tyk native format, please use OAS format for this API")
-	ErrAPINotMigrated             = errors.New("the supplied API definition is in OAS format, please use the Tyk native format for this API")
-	ErrOASGetForOldAPI            = errors.New("the requested API definition is in Tyk native format, please use old api endpoint")
+	ErrAPIMigrated                = errors.New("the supplied API definition is in Tyk classic format, please use OAS format for this API")
+	ErrAPINotMigrated             = errors.New("the supplied API definition is in OAS format, please use the Tyk classic format for this API")
+	ErrOASGetForOldAPI            = errors.New("the requested API definition is in Tyk classic format, please use old api endpoint")
 	ErrImportWithTykExtension     = errors.New("the import payload should not contain x-tyk-api-gateway")
 	ErrPayloadWithoutTykExtension = errors.New("the payload should contain x-tyk-api-gateway")
 	ErrAPINotFound                = errors.New("API not found")
@@ -230,7 +232,7 @@ type RequestInputType string
 
 type TemplateData struct {
 	Input          RequestInputType `bson:"input_type" json:"input_type"`
-	Mode           TemplateMode     `bson:"template_mode" json:"template_mode"`
+	Mode           SourceMode       `bson:"template_mode" json:"template_mode"`
 	EnableSession  bool             `bson:"enable_session" json:"enable_session"`
 	TemplateSource string           `bson:"template_source" json:"template_source"`
 }
@@ -319,13 +321,14 @@ type URLRewriteMeta struct {
 }
 
 type VirtualMeta struct {
-	ResponseFunctionName string `bson:"response_function_name" json:"response_function_name"`
-	FunctionSourceType   string `bson:"function_source_type" json:"function_source_type"`
-	FunctionSourceURI    string `bson:"function_source_uri" json:"function_source_uri"`
-	Path                 string `bson:"path" json:"path"`
-	Method               string `bson:"method" json:"method"`
-	UseSession           bool   `bson:"use_session" json:"use_session"`
-	ProxyOnError         bool   `bson:"proxy_on_error" json:"proxy_on_error"`
+	Disabled             bool       `bson:"disabled" json:"disabled"`
+	ResponseFunctionName string     `bson:"response_function_name" json:"response_function_name"`
+	FunctionSourceType   SourceMode `bson:"function_source_type" json:"function_source_type"`
+	FunctionSourceURI    string     `bson:"function_source_uri" json:"function_source_uri"`
+	Path                 string     `bson:"path" json:"path"`
+	Method               string     `bson:"method" json:"method"`
+	UseSession           bool       `bson:"use_session" json:"use_session"`
+	ProxyOnError         bool       `bson:"proxy_on_error" json:"proxy_on_error"`
 }
 
 type MethodTransformMeta struct {
@@ -362,6 +365,7 @@ type PersistGraphQLMeta struct {
 }
 
 type GoPluginMeta struct {
+	Disabled   bool   `bson:"disabled" json:"disabled"`
 	Path       string `bson:"path" json:"path"`
 	Method     string `bson:"method" json:"method"`
 	PluginPath string `bson:"plugin_path" json:"plugin_path"`
@@ -463,12 +467,26 @@ type MiddlewareDefinition struct {
 	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
 }
 
+// IDExtractorConfig specifies the configuration for ID extractor
+type IDExtractorConfig struct {
+	// HeaderName is the header name to extract ID from.
+	HeaderName string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
+	// FormParamName is the form parameter name to extract ID from.
+	FormParamName string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
+	// RegexExpression is the regular expression to match ID.
+	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
+	// RegexMatchIndex is the index from which ID to be extracted after a match.
+	RegexMatchIndex int `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
+	// XPathExp is the xpath expression to match ID.
+	XPathExpression string `mapstructure:"xpath_expression" bson:"xpath_expression" json:"xpath_expression"`
+}
+
 type MiddlewareIdExtractor struct {
 	Disabled        bool                   `bson:"disabled" json:"disabled"`
 	ExtractFrom     IdExtractorSource      `bson:"extract_from" json:"extract_from"`
 	ExtractWith     IdExtractorType        `bson:"extract_with" json:"extract_with"`
 	ExtractorConfig map[string]interface{} `bson:"extractor_config" json:"extractor_config"`
-	Extractor       interface{}            `bson:"-" json:"-"`
+	Extractor       IDExtractor            `bson:"-" json:"-"`
 }
 
 type MiddlewareSection struct {
@@ -648,6 +666,7 @@ type APIDefinition struct {
 	DoNotTrack                           bool                   `bson:"do_not_track" json:"do_not_track"`
 	EnableContextVars                    bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
 	ConfigData                           map[string]interface{} `bson:"config_data" json:"config_data"`
+	ConfigDataDisabled                   bool                   `bson:"config_data_disabled" json:"config_data_disabled"`
 	TagHeaders                           []string               `bson:"tag_headers" json:"tag_headers"`
 	GlobalRateLimit                      GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
 	StripAuthData                        bool                   `bson:"strip_auth_data" json:"strip_auth_data"`

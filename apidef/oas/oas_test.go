@@ -583,6 +583,7 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	api.VersionData.Versions = map[string]apidef.VersionInfo{
 		"Default": {},
 	}
+	api.ConfigDataDisabled = true
 
 	baseAPI, _, err := MigrateAndFillOAS(&api)
 	assert.NoError(t, err)
@@ -605,10 +606,6 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 
 	t.Run("gatewayTags", func(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Server.GatewayTags)
-	})
-
-	t.Run("authenticationPlugin", func(t *testing.T) {
-		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware)
 	})
 
 	t.Run("customDomain", func(t *testing.T) {
@@ -639,6 +636,7 @@ func TestMigrateAndFillOAS_ValidateRequest(t *testing.T) {
 					},
 				},
 			},
+			ConfigDataDisabled: true,
 		}
 	}
 
@@ -678,11 +676,13 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 					Name: "AuthFunc",
 					Path: "/path/to/plugin",
 				},
+				IdExtractor: apidef.MiddlewareIdExtractor{Disabled: true},
 			},
 			VersionData: apidef.VersionData{
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
+			ConfigDataDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -715,6 +715,7 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 					Name: "AuthFunc",
 					Path: "/path/to/plugin",
 				},
+				IdExtractor: apidef.MiddlewareIdExtractor{Disabled: true},
 			},
 			VersionData: apidef.VersionData{
 				NotVersioned: true,
@@ -725,6 +726,7 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 					AuthHeaderName: "Authorization",
 				},
 			},
+			ConfigDataDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -774,6 +776,7 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
+			ConfigDataDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -811,6 +814,7 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
+			ConfigDataDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -848,6 +852,7 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
+			ConfigDataDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -885,6 +890,7 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
+			ConfigDataDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)

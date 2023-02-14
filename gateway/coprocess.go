@@ -124,7 +124,7 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 	// Append spec data:
 	if c.Middleware != nil {
 		configDataAsJSON := []byte("{}")
-		if len(c.Middleware.Spec.ConfigData) > 0 {
+		if shouldAddConfigData(c.Middleware.Spec) {
 			var err error
 			configDataAsJSON, err = json.Marshal(c.Middleware.Spec.ConfigData)
 			if err != nil {
@@ -140,8 +140,11 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 		object.Spec = map[string]string{
 			"OrgID":       c.Middleware.Spec.OrgID,
 			"APIID":       c.Middleware.Spec.APIID,
-			"config_data": string(configDataAsJSON),
 			"bundle_hash": bundleHash,
+		}
+
+		if shouldAddConfigData(c.Middleware.Spec) {
+			object.Spec["config_data"] = string(configDataAsJSON)
 		}
 	}
 
@@ -606,4 +609,8 @@ func getIDExtractor(spec *APISpec) IdExtractor {
 	}
 
 	return nil
+}
+
+func shouldAddConfigData(spec *APISpec) bool {
+	return !spec.ConfigDataDisabled && len(spec.ConfigData) > 0
 }

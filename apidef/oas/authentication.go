@@ -1,10 +1,12 @@
 package oas
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/mitchellh/mapstructure"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -13,12 +15,12 @@ import (
 type Authentication struct {
 	// Enabled makes the API protected when one of the authentication modes is enabled.
 	//
-	// Tyk native API definition: `!use_keyless`.
+	// Tyk classic API definition: `!use_keyless`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// StripAuthorizationData ensures that any security tokens used for accessing APIs are stripped and not leaked to the upstream.
 	//
-	// Tyk native API definition: `strip_auth_data`.
+	// Tyk classic API definition: `strip_auth_data`.
 	StripAuthorizationData bool `bson:"stripAuthorizationData,omitempty" json:"stripAuthorizationData,omitempty"`
 
 	// BaseIdentityProvider enables multi authentication mechanism and provides the session object that determines rate limits, ACL rules and quotas.
@@ -31,22 +33,22 @@ type Authentication struct {
 	// - `oidc_user`,
 	// - `oauth_key`.
 	//
-	// Tyk native API definition: `base_identity_provided_by`.
+	// Tyk classic API definition: `base_identity_provided_by`.
 	BaseIdentityProvider apidef.AuthTypeEnum `bson:"baseIdentityProvider,omitempty" json:"baseIdentityProvider,omitempty"`
 
 	// HMAC contains the configurations related to HMAC authentication mode.
 	//
-	// Tyk native API definition: `auth_configs["hmac"]`
+	// Tyk classic API definition: `auth_configs["hmac"]`
 	HMAC *HMAC `bson:"hmac,omitempty" json:"hmac,omitempty"`
 
 	// OIDC contains the configurations related to OIDC authentication mode.
 	//
-	// Tyk native API definition: `auth_configs["oidc"]`
+	// Tyk classic API definition: `auth_configs["oidc"]`
 	OIDC *OIDC `bson:"oidc,omitempty" json:"oidc,omitempty"`
 
 	// Custom contains the configurations related to Custom authentication mode.
 	//
-	// Tyk native API definition: `auth_configs["coprocess"]`
+	// Tyk classic API definition: `auth_configs["coprocess"]`
 	Custom *CustomPluginAuthentication `bson:"custom,omitempty" json:"custom,omitempty"`
 
 	// SecuritySchemes contains security schemes definitions.
@@ -233,21 +235,21 @@ func (ss SecuritySchemes) GetBaseIdentityProvider() (res apidef.AuthTypeEnum) {
 
 // AuthSources defines authentication source configuration: headers, cookies and query parameters.
 //
-// Tyk native API definition: `auth_configs{}`.
+// Tyk classic API definition: `auth_configs{}`.
 type AuthSources struct {
 	// Header contains configurations for the header value auth source, it is enabled by default.
 	//
-	// Tyk native API definition: `auth_configs[x].header`
+	// Tyk classic API definition: `auth_configs[x].header`
 	Header *AuthSource `bson:"header,omitempty" json:"header,omitempty"`
 
 	// Cookie contains configurations for the cookie value auth source.
 	//
-	// Tyk native API definition: `auth_configs[x].cookie`
+	// Tyk classic API definition: `auth_configs[x].cookie`
 	Cookie *AuthSource `bson:"cookie,omitempty" json:"cookie,omitempty"`
 
 	// Query contains configurations for the query parameters auth source.
 	//
-	// Tyk native API definition: `auth_configs[x].query`
+	// Tyk classic API definition: `auth_configs[x].query`
 	Query *AuthSource `bson:"query,omitempty" json:"query,omitempty"`
 }
 
@@ -306,10 +308,10 @@ func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
 // AuthSource defines an authentication source.
 type AuthSource struct {
 	// Enabled enables the auth source.
-	// Tyk native API definition: `auth_configs[X].use_param/use_cookie`
+	// Tyk classic API definition: `auth_configs[X].use_param/use_cookie`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// Name is the name of the auth source.
-	// Tyk native API definition: `auth_configs[X].param_name/cookie_name`
+	// Tyk classic API definition: `auth_configs[X].param_name/cookie_name`
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
 }
 
@@ -417,7 +419,7 @@ type ScopeToPolicy struct {
 // HMAC holds the configuration for the HMAC authentication mode.
 type HMAC struct {
 	// Enabled enables the HMAC authentication mode.
-	// Tyk native API definition: `enable_signature_checking`
+	// Tyk classic API definition: `enable_signature_checking`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// AuthSources contains authentication token source configuration (header, cookie, query).
@@ -432,12 +434,12 @@ type HMAC struct {
 	//
 	// and reads the value from algorithm header.
 	//
-	// Tyk native API definition: `hmac_allowed_algorithms`
+	// Tyk classic API definition: `hmac_allowed_algorithms`
 	AllowedAlgorithms []string `bson:"allowedAlgorithms,omitempty" json:"allowedAlgorithms,omitempty"`
 
 	// AllowedClockSkew is the amount of milliseconds that will be tolerated for clock skew. It is used against replay attacks.
 	// The default value is `0`, which deactivates clock skew checks.
-	// Tyk native API definition: `hmac_allowed_clock_skew`
+	// Tyk classic API definition: `hmac_allowed_clock_skew`
 	AllowedClockSkew float64 `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
 }
 
@@ -472,7 +474,7 @@ func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 type OIDC struct {
 	// Enabled enables the OIDC authentication mode.
 	//
-	// Tyk native API definition: `use_openid`
+	// Tyk classic API definition: `use_openid`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// AuthSources contains authentication token source configuration (header, cookie, query).
@@ -480,12 +482,12 @@ type OIDC struct {
 
 	// SegregateByClientId is a boolean flag. If set to `true, the policies will be applied to a combination of Client ID and User ID.
 	//
-	// Tyk native API definition: `openid_options.segregate_by_client`.
+	// Tyk classic API definition: `openid_options.segregate_by_client`.
 	SegregateByClientId bool `bson:"segregateByClientId,omitempty" json:"segregateByClientId,omitempty"`
 
 	// Providers contains a list of authorised providers and their Client IDs, and matched policies.
 	//
-	// Tyk native API definition: `openid_options.providers`.
+	// Tyk classic API definition: `openid_options.providers`.
 	Providers []Provider `bson:"providers,omitempty" json:"providers,omitempty"`
 
 	// Scopes contains the defined scope claims.
@@ -583,11 +585,11 @@ type ClientToPolicy struct {
 type CustomPluginAuthentication struct {
 	// Enabled enables the CustomPluginAuthentication authentication mode.
 	//
-	// Tyk native API definition: `enable_coprocess_auth`/`use_go_plugin_auth`.
+	// Tyk classic API definition: `enable_coprocess_auth`/`use_go_plugin_auth`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// Config contains configuration related to custom authentication plugin.
-	// Tyk native API definition: `custom_middleware.auth_check`.
+	// Tyk classic API definition: `custom_middleware.auth_check`.
 	Config *AuthenticationPlugin `bson:"config,omitempty" json:"config,omitempty"`
 
 	// Authentication token sources (header, cookie, query).
@@ -647,6 +649,8 @@ type AuthenticationPlugin struct {
 	Path string `bson:"path" json:"path"` // required.
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+	// IDExtractor configures ID extractor with coprocess custom authentication.
+	IDExtractor *IDExtractor `bson:"idExtractor,omitempty" json:"idExtractor,omitempty"`
 }
 
 func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
@@ -654,6 +658,14 @@ func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
 	ap.Path = api.CustomMiddleware.AuthCheck.Path
 	ap.RawBodyOnly = api.CustomMiddleware.AuthCheck.RawBodyOnly
 	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
+	if ap.IDExtractor == nil {
+		ap.IDExtractor = &IDExtractor{}
+	}
+
+	ap.IDExtractor.Fill(api)
+	if ShouldOmit(ap.IDExtractor) {
+		ap.IDExtractor = nil
+	}
 }
 
 func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
@@ -661,4 +673,103 @@ func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
 	api.CustomMiddleware.AuthCheck.Path = ap.Path
 	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
+
+	if ap.IDExtractor != nil {
+		ap.IDExtractor.ExtractTo(api)
+	}
+}
+
+// IDExtractorConfig specifies the configuration for ID extractor.
+type IDExtractorConfig struct {
+	// HeaderName is the header name to extract ID from.
+	HeaderName string `bson:"headerName,omitempty" json:"headerName,omitempty"`
+	// FormParamName is the form parameter name to extract ID from.
+	FormParamName string `bson:"formParamName,omitempty" json:"formParamName,omitempty"`
+	// Regexp is the regular expression to match ID.
+	Regexp string `bson:"regexp,omitempty" json:"regexp,omitempty"`
+	// RegexpMatchIndex is the index from which ID to be extracted after a match.
+	RegexpMatchIndex int `bson:"regexpMatchIndex,omitempty" json:"regexpMatchIndex,omitempty"`
+	// XPathExp is the xpath expression to match ID.
+	XPathExp string `bson:"xPathExp,omitempty" json:"xPathExp"`
+}
+
+// Fill fills IDExtractorConfig from supplied classic APIDefinition.
+func (id *IDExtractorConfig) Fill(api apidef.APIDefinition) {
+	var classicIDExtractorConfig apidef.IDExtractorConfig
+	err := mapstructure.Decode(api.CustomMiddleware.IdExtractor.ExtractorConfig, &classicIDExtractorConfig)
+	if err != nil {
+		log.WithError(err).Error("error while decoding IDExtractorConfig")
+		return
+	}
+
+	*id = IDExtractorConfig{
+		HeaderName:       classicIDExtractorConfig.HeaderName,
+		FormParamName:    classicIDExtractorConfig.FormParamName,
+		Regexp:           classicIDExtractorConfig.RegexExpression,
+		RegexpMatchIndex: classicIDExtractorConfig.RegexMatchIndex,
+		XPathExp:         classicIDExtractorConfig.XPathExpression,
+	}
+}
+
+// ExtractTo extracts IDExtractorConfig into supplied classic API definition.
+func (id *IDExtractorConfig) ExtractTo(api *apidef.APIDefinition) {
+	classicIDExtractorConfig := apidef.IDExtractorConfig{
+		HeaderName:      id.HeaderName,
+		FormParamName:   id.FormParamName,
+		RegexExpression: id.Regexp,
+		RegexMatchIndex: id.RegexpMatchIndex,
+		XPathExpression: id.XPathExp,
+	}
+
+	configData, err := json.Marshal(&classicIDExtractorConfig)
+	if err != nil {
+		log.WithError(err).Error("error while marshalling IDExtractorConfig")
+		return
+	}
+	var extractorConfigMap map[string]interface{}
+	err = json.Unmarshal(configData, &extractorConfigMap)
+	if err != nil {
+		log.WithError(err).Error("error while encoding IDExtractorConfig")
+		return
+	}
+	api.CustomMiddleware.IdExtractor.ExtractorConfig = extractorConfigMap
+}
+
+// IDExtractor configures ID Extractor.
+type IDExtractor struct {
+	// Enabled enables ID extractor with coprocess authentication.
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+	// Source is the source from which ID to be extracted from.
+	Source apidef.IdExtractorSource `bson:"source" json:"source"` // required
+	// With is the type of ID extractor to be used.
+	With apidef.IdExtractorType `bson:"with" json:"with"` // required
+	// Config holds the configuration specific to ID extractor type mentioned via With.
+	Config *IDExtractorConfig `bson:"config" json:"config"` // required
+}
+
+// Fill fills IDExtractor from supplied classic APIDefinition.
+func (id *IDExtractor) Fill(api apidef.APIDefinition) {
+	id.Enabled = !api.CustomMiddleware.IdExtractor.Disabled
+	id.Source = api.CustomMiddleware.IdExtractor.ExtractFrom
+	id.With = api.CustomMiddleware.IdExtractor.ExtractWith
+
+	if id.Config == nil {
+		id.Config = &IDExtractorConfig{}
+	}
+
+	id.Config.Fill(api)
+	if ShouldOmit(id.Config) {
+		id.Config = nil
+	}
+}
+
+// ExtractTo extracts IDExtractor into supplied classic API definition.
+func (id *IDExtractor) ExtractTo(api *apidef.APIDefinition) {
+	api.CustomMiddleware.IdExtractor.Disabled = !id.Enabled
+	api.CustomMiddleware.IdExtractor.ExtractFrom = id.Source
+	api.CustomMiddleware.IdExtractor.ExtractWith = id.With
+
+	if id.Config != nil {
+		id.Config.ExtractTo(api)
+	}
 }

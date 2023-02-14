@@ -64,7 +64,6 @@ require (
 	github.com/square/go-jose v2.4.1+incompatible
 	github.com/uber/jaeger-client-go v2.20.0+incompatible
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
-	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/xeipuuv/gojsonschema v1.2.0
 	golang.org/x/crypto v0.0.0-20220513210258-46612604a0f9
 	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c

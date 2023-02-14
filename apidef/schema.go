@@ -456,6 +456,9 @@ const Schema = `{
         "config_data": {
             "type": ["object", "null"]
         },
+		"config_data_disabled": {
+			"type": "boolean"	
+		},
         "global_rate_limit": {
           "type": ["object", "null"],
            "properties": {
