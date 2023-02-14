@@ -1,4 +1,3 @@
-
 terraform {
 
   #Being used until TFCloud can be used
