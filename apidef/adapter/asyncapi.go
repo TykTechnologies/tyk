@@ -16,6 +16,11 @@ import (
 	"github.com/buger/jsonparser"
 )
 
+const (
+	KafkaGroupIdKey  = "groupId"
+	KafkaClientIdKey = "clientId"
+)
+
 func removeCurlyBraces(argument string) string {
 	return strings.Map(
 		func(r rune) rune {
@@ -60,14 +65,14 @@ func prepareKafkaDataSourceConfig(parsed *asyncapi.AsyncAPI) (map[string]kafka_d
 		// https://github.com/asyncapi/bindings/blob/master/kafka/README.md#operation-binding-object
 		kafkaBindings, hasKafkaBindings := server.Bindings[asyncapi.KafkaKey]
 		if hasKafkaBindings {
-			groupIdBinding, hasGroupId := kafkaBindings["groupId"]
+			groupIdBinding, hasGroupId := kafkaBindings[KafkaGroupIdKey]
 			if hasGroupId {
 				if groupIdBinding.ValueType == jsonparser.String {
 					c.GroupID = processArgumentSection(string(groupIdBinding.Value))
 				}
 			}
 
-			clientIdBinding, hasClientId := kafkaBindings["clientId"]
+			clientIdBinding, hasClientId := kafkaBindings[KafkaClientIdKey]
 			if hasClientId {
 				if clientIdBinding.ValueType == jsonparser.String {
 					c.ClientID = processArgumentSection(string(clientIdBinding.Value))
