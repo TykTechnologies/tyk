@@ -16,6 +16,7 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    container: tykio/gromit:latest
 
     strategy:
       fail-fast: false
@@ -51,6 +52,17 @@ jobs:
           git push origin $prbranch
           echo "prbranch=$prbranch" >> $GITHUB_OUTPUT
           echo "::debug::Commit ${{ github.sha }} syncd for ${{matrix.branch}}"
+          exit 0
+
+      - name: Generate releng bundle using latest gromit templates for ${{matrix.branch}}
+        id: gromit-bundle-gen
+        run: |
+          # get the tarball for the latest gromit master - it will have the latest version of
+          # the templates.
+          mkdir /tmp/gromit-src && gh api -H "Accept: application/vnd.github+json"  /repos/TykTechnologies/gromit/tarball/master | tar --strip-components 1 -C /tmp/gromit-src -xzf -
+          gromit bundle gen --branch ${{matrix.branch}} --bundle /tmp/gromit-src/policy/templates/releng  --repo tyk .
+          git add -A && git commit -m "[CI]: Automated releng bundle sync by sync-automation"
+          git push origin ${{ steps.sync-changes.outputs.prbranch }}
           exit 0
 
       - name: Create PR from the branch.
