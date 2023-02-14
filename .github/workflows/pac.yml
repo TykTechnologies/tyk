@@ -7,7 +7,6 @@ on:
 
 env:
   TERRAFORM_DIR: "./ci/repo-policy"
-  GITHUB_TOKEN: ${{ secrets.ITS_GH_TOKEN }}}
 
 jobs:
   terraform:
