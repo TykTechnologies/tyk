@@ -1070,3 +1070,39 @@ func (v *VirtualEndpoint) ExtractTo(meta *apidef.VirtualMeta) {
 		meta.FunctionSourceURI = v.Path
 	}
 }
+
+type EndpointPostPlugins []EndpointPostPlugin
+
+// EndpointPostPlugin contains endpoint level post plugin configuration.
+type EndpointPostPlugin struct {
+	// Enabled enables post plugin.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Name is the name of plugin function to be executed.
+	Name string `bson:"name" json:"name"`
+	// Path is the path to plugin.
+	Path string `bson:"path" json:"path"`
+}
+
+// Fill fills *EndpointPostPlugin from apidef.GoPluginMeta.
+func (e EndpointPostPlugins) Fill(meta apidef.GoPluginMeta) {
+	if len(e) == 0 {
+		return
+	}
+
+	e[0] = EndpointPostPlugin{
+		Enabled: !meta.Disabled,
+		Name:    meta.SymbolName,
+		Path:    meta.PluginPath,
+	}
+}
+
+// ExtractTo extracts *EndpointPostPlugin to *apidef.GoPluginMeta.
+func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
+	if len(e) == 0 {
+		return
+	}
+
+	meta.Disabled = !e[0].Enabled
+	meta.PluginPath = e[0].Path
+	meta.SymbolName = e[0].Name
+}

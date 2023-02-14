@@ -675,6 +675,25 @@
         "name"
       ]
     },
+    "X-Tyk-EndpointPostPlugin": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "name",
+        "path"
+      ]
+    },
     "X-Tyk-Operation": {
       "type": "object",
       "properties": {
@@ -695,6 +714,14 @@
         },
         "virtualEndpoint": {
           "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
+        },
+        "postPlugins": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-EndpointPostPlugin"
+            }
+          ]
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-CachePlugin"
