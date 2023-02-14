@@ -402,4 +402,10 @@ func (a *APIDefinition) SetDisabledFlags() {
 	for i := 0; i < len(a.CustomMiddleware.Response); i++ {
 		a.CustomMiddleware.Response[i].Disabled = true
 	}
+
+	for version := range a.VersionData.Versions {
+		for i := 0; i < len(a.VersionData.Versions[version].ExtendedPaths.Virtual); i++ {
+			a.VersionData.Versions[version].ExtendedPaths.Virtual[i].Disabled = true
+		}
+	}
 }

@@ -845,6 +845,9 @@ ValidateRequest contains the request validation configuration.
 **Field: `mockResponse` ([MockResponse](#mockresponse))**
 MockResponse contains the mock response configuration.
 
+**Field: `virtualEndpoint` ([VirtualEndpoint](#virtualendpoint))**
+VirtualEndpoint contains virtual endpoint configuration.
+
 
 ### **Allowance**
 
@@ -951,5 +954,26 @@ ContentType is the default HTTP response body type that the gateway reads from t
 
 **Field: `exampleName` (`string`)**
 ExampleName is the default example name among multiple path response examples documented in OAS.
+
+
+### **VirtualEndpoint**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables virtual endpoint.
+
+**Field: `name` (`string`)**
+Name is the name of js function.
+
+**Field: `path` (`string`)**
+Path is the path to js file.
+
+**Field: `body` (`string`)**
+Body is the js function to execute encoded in base64 format.
+
+**Field: `proxyOnError` (`boolean`)**
+ProxyOnError proxies if virtual endpoint errors out.
+
+**Field: `requireSession` (`boolean`)**
+RequireSession if enabled passes session to virtual endpoint.
 
 

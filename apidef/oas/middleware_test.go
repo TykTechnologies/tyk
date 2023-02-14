@@ -219,7 +219,7 @@ func TestTransformRequestBody(t *testing.T) {
 		assert.Equal(t, transformReqBody, newTransformReqBody)
 	})
 
-	t.Run("blob", func(t *testing.T) {
+	t.Run("path", func(t *testing.T) {
 		transformReqBody := TransformRequestBody{
 			Path:    "/opt/tyk-gateway/template.tmpl",
 			Format:  apidef.RequestJSON,
@@ -547,5 +547,100 @@ func TestPluginConfigData(t *testing.T) {
 		actualPluginConfigData := PluginConfigData{}
 		actualPluginConfigData.Fill(api)
 		assert.Equal(t, expectedPluginConfigData, actualPluginConfigData)
+	})
+}
+
+func TestVirtualEndpoint(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyVirtualEndpoint VirtualEndpoint
+
+		var convertedVirtualEndpoint apidef.VirtualMeta
+		emptyVirtualEndpoint.ExtractTo(&convertedVirtualEndpoint)
+
+		var resultVirtualEndpoint VirtualEndpoint
+		resultVirtualEndpoint.Fill(convertedVirtualEndpoint)
+
+		assert.Equal(t, emptyVirtualEndpoint, resultVirtualEndpoint)
+	})
+	t.Run("blob", func(t *testing.T) {
+		expectedVirtualEndpoint := VirtualEndpoint{
+			Enabled:        true,
+			Name:           "virtualFunc",
+			Body:           "test body",
+			ProxyOnError:   true,
+			RequireSession: true,
+		}
+
+		meta := apidef.VirtualMeta{}
+		expectedVirtualEndpoint.ExtractTo(&meta)
+
+		// assert that FunctionSourceType is correctly updated.
+		assert.Equal(t, apidef.VirtualMeta{
+			Disabled:             false,
+			FunctionSourceType:   apidef.UseBlob,
+			FunctionSourceURI:    "test body",
+			ResponseFunctionName: "virtualFunc",
+			UseSession:           true,
+			ProxyOnError:         true,
+		}, meta)
+
+		newVirtualEndpoint := VirtualEndpoint{}
+		newVirtualEndpoint.Fill(meta)
+		assert.Equal(t, expectedVirtualEndpoint, newVirtualEndpoint)
+	})
+
+	t.Run("path", func(t *testing.T) {
+		expectedVirtualEndpoint := VirtualEndpoint{
+			Enabled:        true,
+			Name:           "virtualFunc",
+			Path:           "/path/to/js",
+			ProxyOnError:   true,
+			RequireSession: true,
+		}
+
+		meta := apidef.VirtualMeta{}
+		expectedVirtualEndpoint.ExtractTo(&meta)
+
+		// assert that FunctionSourceType is correctly updated.
+		assert.Equal(t, apidef.VirtualMeta{
+			Disabled:             false,
+			FunctionSourceType:   apidef.UseFile,
+			FunctionSourceURI:    "/path/to/js",
+			ResponseFunctionName: "virtualFunc",
+			UseSession:           true,
+			ProxyOnError:         true,
+		}, meta)
+
+		newVirtualEndpoint := VirtualEndpoint{}
+		newVirtualEndpoint.Fill(meta)
+		assert.Equal(t, expectedVirtualEndpoint, newVirtualEndpoint)
+	})
+
+	t.Run("blob should have precedence", func(t *testing.T) {
+		virtualEndpoint := VirtualEndpoint{
+			Enabled:        true,
+			Path:           "/path/to/js",
+			Body:           "test body",
+			Name:           "virtualFunc",
+			ProxyOnError:   true,
+			RequireSession: true,
+		}
+
+		meta := apidef.VirtualMeta{}
+		virtualEndpoint.ExtractTo(&meta)
+		assert.Equal(t, apidef.VirtualMeta{
+			Disabled:             false,
+			ResponseFunctionName: "virtualFunc",
+			FunctionSourceURI:    "test body",
+			FunctionSourceType:   apidef.UseBlob,
+			ProxyOnError:         true,
+			UseSession:           true,
+		}, meta)
+
+		actualVirtualEndpoint := VirtualEndpoint{}
+		actualVirtualEndpoint.Fill(meta)
+		expectedVirtualEndpoint := virtualEndpoint
+		expectedVirtualEndpoint.Path = ""
+		assert.Equal(t, expectedVirtualEndpoint, actualVirtualEndpoint)
 	})
 }

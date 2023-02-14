@@ -1026,3 +1026,47 @@ func (p *ResponsePlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.Response = make([]apidef.MiddlewareDefinition, len(p.Plugins))
 	p.Plugins.ExtractTo(api.CustomMiddleware.Response)
 }
+
+// VirtualEndpoint contains virtual endpoint configuration.
+type VirtualEndpoint struct {
+	// Enabled enables virtual endpoint.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Name is the name of js function.
+	Name string `bson:"name" json:"name"`
+	// Path is the path to js file.
+	Path string `bson:"path" json:"path"`
+	// Body is the js function to execute encoded in base64 format.
+	Body string `bson:"body" json:"body"`
+	// ProxyOnError proxies if virtual endpoint errors out.
+	ProxyOnError bool `bson:"proxyOnError" json:"proxyOnError"`
+	// RequireSession if enabled passes session to virtual endpoint.
+	RequireSession bool `bson:"requireSession" json:"requireSession"`
+}
+
+// Fill fills *VirtualEndpoint from apidef.VirtualMeta.
+func (v *VirtualEndpoint) Fill(meta apidef.VirtualMeta) {
+	v.Enabled = !meta.Disabled
+	v.Name = meta.ResponseFunctionName
+	v.RequireSession = meta.UseSession
+	v.ProxyOnError = meta.ProxyOnError
+	if meta.FunctionSourceType == apidef.UseBlob {
+		v.Body = meta.FunctionSourceURI
+	} else {
+		v.Path = meta.FunctionSourceURI
+	}
+}
+
+// ExtractTo extracts *VirtualEndpoint to *apidef.VirtualMeta.
+func (v *VirtualEndpoint) ExtractTo(meta *apidef.VirtualMeta) {
+	meta.Disabled = !v.Enabled
+	meta.ResponseFunctionName = v.Name
+	meta.UseSession = v.RequireSession
+	meta.ProxyOnError = v.ProxyOnError
+	if v.Body != "" {
+		meta.FunctionSourceType = apidef.UseBlob
+		meta.FunctionSourceURI = v.Body
+	} else {
+		meta.FunctionSourceType = apidef.UseFile
+		meta.FunctionSourceURI = v.Path
+	}
+}

@@ -47,7 +47,7 @@ func (ts *Test) testPrepareVirtualEndpoint(js, method, path string, proxyOnError
 		virtualMeta := apidef.VirtualMeta{
 			Disabled:             disabled,
 			ResponseFunctionName: "testVirtData",
-			FunctionSourceType:   "blob",
+			FunctionSourceType:   apidef.UseBlob,
 			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
 			Path:                 path,
 			Method:               method,

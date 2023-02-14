@@ -63,7 +63,7 @@ func (gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	// nil.
 	var src interface{}
 	switch meta.FunctionSourceType {
-	case "file":
+	case apidef.UseFile:
 		j.Log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
 		f, err := os.Open(meta.FunctionSourceURI)
 		if err != nil {
@@ -71,7 +71,7 @@ func (gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 			return
 		}
 		src = f
-	case "blob":
+	case apidef.UseBlob:
 		if gw.GetConfig().DisableVirtualPathBlobs {
 			j.Log.Error("[JSVM] Blobs not allowed on this node")
 			return

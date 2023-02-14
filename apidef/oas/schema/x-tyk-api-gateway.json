@@ -648,6 +648,33 @@
         "enabled"
       ]
     },
+    "X-Tyk-VirtualEndpoint": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "proxyOnError": {
+          "type": "boolean"
+        },
+        "requireSession": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "name"
+      ]
+    },
     "X-Tyk-Operation": {
       "type": "object",
       "properties": {
@@ -665,6 +692,9 @@
         },
         "transformRequestBody": {
           "$ref": "#/definitions/X-Tyk-TransformRequestBody"
+        },
+        "virtualEndpoint": {
+          "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-CachePlugin"
