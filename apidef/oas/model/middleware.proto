@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package model;
+
+option go_package = "github.com/TykTechnologies/tyk/apidef/oas/model";
+
+// ValidateRequest holds configuration required for validating requests.
+message ValidateRequest {
+	// Enabled is a boolean flag, if set to `true`, it enables request validation.
+	bool enabled = 1;
+
+	// ErrorResponseCode is the error code emitted when the request fails validation.
+	// If unset or zero, the response will returned with http status 422 Unprocessable Entity.
+	int32 errorResponseCode = 2;
+}

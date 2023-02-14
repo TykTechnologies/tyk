@@ -1,0 +1,13 @@
+---
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task: codegen
+
+  codegen:
+    desc: 'Use protoc to generate .go from .proto'
+    cmds:
+      - protoc --proto_path=. --go_out=paths=source_relative:. *.proto
+      - gomodifytags -add-tags bson -add-options bson=omitempty -transform camelcase -file middleware.pb.go -all -skip-unexported -w -quiet
