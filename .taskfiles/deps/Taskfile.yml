@@ -1,0 +1,70 @@
+---
+version: '3'
+
+tasks:
+  default:
+    desc: 'Install all developer dependencies'
+    deps:
+      - gomodifytags
+      - protoc
+      - protoc-gen-go
+      - protoc-gen-go-grpc
+      - golangci-lint
+      - goimports
+      - faillint
+
+  gomodifytags:
+    internal: true
+    desc: 'Install gomodifytags'
+    status:
+      - type gomodifytags
+    cmds:
+      - go install github.com/fatih/gomodifytags@latest
+
+  protoc:
+    internal: true
+    desc: 'Install protobuf compiler'
+    status:
+      - type protoc
+    cmds:
+      - apt install protobuf-compiler
+
+  protoc-gen-go:
+    internal: true
+    desc: 'Install protoc-gen-go'
+    status:
+      - type protoc-gen-go
+    cmds:
+      - go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+
+  protoc-gen-go-grpc:
+    internal: true
+    desc: 'Install protoc-gen-go-grpc'
+    status:
+      - type protoc-gen-go-grpc
+    cmds:
+      - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+  goimports:
+    internal: true
+    desc: 'Install goimports'
+    status:
+      - type goimports
+    cmds:
+      - go install golang.org/x/tools/cmd/goimports@latest
+
+  golangci-lint:
+    internal: true
+    desc: 'Install golangci-lint'
+    status:
+      - type golangci-lint
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.0
+
+  faillint:
+    internal: true
+    desc: 'Install fatih/faillint'
+    status:
+      - type faillint
+    cmds:
+      - go install github.com/fatih/faillint@latest

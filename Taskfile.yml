@@ -1,0 +1,13 @@
+---
+version: '3'
+
+includes:
+  deps:
+    taskfile: ./.taskfiles/deps/Taskfile.yml
+    dir: ./.taskfiles/deps/
+
+tasks:
+  default:
+    silent: true
+    cmds:
+      - task --list-all
