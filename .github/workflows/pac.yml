@@ -38,14 +38,14 @@ jobs:
 
       - name: Terraform Validate
         id: validate
-        run: terraform validate
+        run: terraform validate -no-color
 
       - name: Terraform Plan
         working-directory: ${{ env.TERRAFORM_DIR }}
         id: plan
         run: |
           echo "::group::Terraform Plan"
-          terraform plan -input=false
+          terraform plan -no-color -input=false
           echo "::endgroup::"
         continue-on-error: true
 
