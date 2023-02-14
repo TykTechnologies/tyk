@@ -592,6 +592,15 @@ func TestSetDisabledFlags(t *testing.T) {
 			Post:        make([]MiddlewareDefinition, 1),
 			Response:    make([]MiddlewareDefinition, 1),
 		},
+		VersionData: VersionData{
+			Versions: map[string]VersionInfo{
+				"": {
+					ExtendedPaths: ExtendedPathsSet{
+						Virtual: make([]VirtualMeta, 1),
+					},
+				},
+			},
+		},
 	}
 	expectedAPIDef := APIDefinition{
 		CustomMiddleware: MiddlewareSection{
@@ -628,6 +637,19 @@ func TestSetDisabledFlags(t *testing.T) {
 		DomainDisabled:                 true,
 		CustomMiddlewareBundleDisabled: true,
 		ConfigDataDisabled:             true,
+		VersionData: VersionData{
+			Versions: map[string]VersionInfo{
+				"": {
+					ExtendedPaths: ExtendedPathsSet{
+						Virtual: []VirtualMeta{
+							{
+								Disabled: true,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	apiDef.SetDisabledFlags()
 	assert.Equal(t, expectedAPIDef, apiDef)
