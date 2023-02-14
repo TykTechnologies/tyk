@@ -365,6 +365,7 @@ type PersistGraphQLMeta struct {
 }
 
 type GoPluginMeta struct {
+	Disabled   bool   `bson:"disabled" json:"disabled"`
 	Path       string `bson:"path" json:"path"`
 	Method     string `bson:"method" json:"method"`
 	PluginPath string `bson:"plugin_path" json:"plugin_path"`
