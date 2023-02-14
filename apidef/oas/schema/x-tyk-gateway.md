@@ -848,6 +848,9 @@ MockResponse contains the mock response configuration.
 **Field: `virtualEndpoint` ([VirtualEndpoint](#virtualendpoint))**
 VirtualEndpoint contains virtual endpoint configuration.
 
+**Field: `postPlugins` (`[]`[EndpointPostPlugin](#endpointpostplugin))**
+PostPlugins contains endpoint level post plugins configuration.
+
 
 ### **Allowance**
 
@@ -975,5 +978,17 @@ ProxyOnError proxies if virtual endpoint errors out.
 
 **Field: `requireSession` (`boolean`)**
 RequireSession if enabled passes session to virtual endpoint.
+
+
+### **EndpointPostPlugin**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables post plugin.
+
+**Field: `name` (`string`)**
+Name is the name of plugin function to be executed.
+
+**Field: `path` (`string`)**
+Path is the path to plugin.
 
 

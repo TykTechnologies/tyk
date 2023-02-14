@@ -551,7 +551,9 @@ func TestPluginConfigData(t *testing.T) {
 }
 
 func TestVirtualEndpoint(t *testing.T) {
+	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
 		var emptyVirtualEndpoint VirtualEndpoint
 
 		var convertedVirtualEndpoint apidef.VirtualMeta
@@ -562,7 +564,9 @@ func TestVirtualEndpoint(t *testing.T) {
 
 		assert.Equal(t, emptyVirtualEndpoint, resultVirtualEndpoint)
 	})
+
 	t.Run("blob", func(t *testing.T) {
+		t.Parallel()
 		expectedVirtualEndpoint := VirtualEndpoint{
 			Enabled:        true,
 			Name:           "virtualFunc",
@@ -590,6 +594,7 @@ func TestVirtualEndpoint(t *testing.T) {
 	})
 
 	t.Run("path", func(t *testing.T) {
+		t.Parallel()
 		expectedVirtualEndpoint := VirtualEndpoint{
 			Enabled:        true,
 			Name:           "virtualFunc",
@@ -617,6 +622,7 @@ func TestVirtualEndpoint(t *testing.T) {
 	})
 
 	t.Run("blob should have precedence", func(t *testing.T) {
+		t.Parallel()
 		virtualEndpoint := VirtualEndpoint{
 			Enabled:        true,
 			Path:           "/path/to/js",
@@ -642,5 +648,53 @@ func TestVirtualEndpoint(t *testing.T) {
 		expectedVirtualEndpoint := virtualEndpoint
 		expectedVirtualEndpoint.Path = ""
 		assert.Equal(t, expectedVirtualEndpoint, actualVirtualEndpoint)
+	})
+}
+
+func TestEndpointPostPlugins(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var emptyPostPlugins EndpointPostPlugins
+
+		var convertedGoPlugin apidef.GoPluginMeta
+		emptyPostPlugins.ExtractTo(&convertedGoPlugin)
+
+		var resultEmptyPostPlugins EndpointPostPlugins
+		resultEmptyPostPlugins.Fill(convertedGoPlugin)
+
+		assert.Equal(t, emptyPostPlugins, resultEmptyPostPlugins)
+	})
+
+	t.Run("single empty post plugin", func(t *testing.T) {
+		t.Parallel()
+		var emptyPostPlugins = make(EndpointPostPlugins, 1)
+
+		var convertedGoPlugin apidef.GoPluginMeta
+		emptyPostPlugins.ExtractTo(&convertedGoPlugin)
+
+		var resultEmptyPostPlugins = make(EndpointPostPlugins, 1)
+		resultEmptyPostPlugins.Fill(convertedGoPlugin)
+
+		assert.Equal(t, emptyPostPlugins, resultEmptyPostPlugins)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		t.Parallel()
+		expectedEndpointPostPlugins := EndpointPostPlugins{
+			{
+				Enabled: true,
+				Name:    "symbolFunc",
+				Path:    "/path/to/so",
+			},
+		}
+
+		meta := apidef.GoPluginMeta{}
+		expectedEndpointPostPlugins.ExtractTo(&meta)
+
+		actualEndpointPostPlugins := make(EndpointPostPlugins, 1)
+		actualEndpointPostPlugins.Fill(meta)
+
+		assert.Equal(t, expectedEndpointPostPlugins, actualEndpointPostPlugins)
 	})
 }

@@ -46,6 +46,9 @@ type Operation struct {
 
 	// VirtualEndpoint contains virtual endpoint configuration.
 	VirtualEndpoint *VirtualEndpoint `bson:"virtualEndpoint,omitempty" json:"virtualEndpoint,omitempty"`
+
+	// PostPlugins contains endpoint level post plugins configuration.
+	PostPlugins EndpointPostPlugins `bson:"postPlugins,omitempty" json:"postPlugins,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -117,6 +120,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillOASValidateRequest(ep.ValidateJSON)
 	s.fillVirtualEndpoint(ep.Virtual)
+	s.fillEndpointPostPlugins(ep.GoPlugin)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -138,6 +142,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
 					tykOp.extractVirtualEndpointTo(ep, path, method)
+					tykOp.extractEndpointPostPluginTo(ep, path, method)
 					break found
 				}
 			}
@@ -628,4 +633,29 @@ func (o *Operation) extractVirtualEndpointTo(ep *apidef.ExtendedPathsSet, path s
 	meta := apidef.VirtualMeta{Path: path, Method: method}
 	o.VirtualEndpoint.ExtractTo(&meta)
 	ep.Virtual = append(ep.Virtual, meta)
+}
+
+func (s *OAS) fillEndpointPostPlugins(endpointMetas []apidef.GoPluginMeta) {
+	for _, em := range endpointMetas {
+		operationID := s.getOperationID(em.Path, em.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.PostPlugins == nil {
+			operation.PostPlugins = make(EndpointPostPlugins, 1)
+		}
+
+		operation.PostPlugins.Fill(em)
+		if ShouldOmit(operation.PostPlugins) {
+			operation.PostPlugins = nil
+		}
+	}
+}
+
+func (o *Operation) extractEndpointPostPluginTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.VirtualEndpoint == nil {
+		return
+	}
+
+	meta := apidef.GoPluginMeta{Path: path, Method: method}
+	o.PostPlugins.ExtractTo(&meta)
+	ep.GoPlugin = append(ep.GoPlugin, meta)
 }
