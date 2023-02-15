@@ -62,6 +62,8 @@ jobs:
           pip install setuptools
           pip install google
           pip install protobuf
+          
+          go install golang.org/x/tools/cmd/goimports@latest
 
           make lint
           
