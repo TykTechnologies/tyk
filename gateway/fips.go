@@ -1,6 +1,6 @@
 //go:build boringcrypto
 // +build boringcrypto
 
-package main
+package gateway
 
 import _ "crypto/tls/fipsonly"
