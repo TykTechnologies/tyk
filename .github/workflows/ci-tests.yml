@@ -46,6 +46,8 @@ jobs:
           curdir=$(pwd)
           tar -xzf go.tgz
           rm go.tgz
+          echo "GOPATH=$(pwd)" >> $GITHUB_ENV
+          echo "$(pwd)/bin" >> $GITHUB_PATH
           echo "$curdir/go/bin" >> $GITHUB_PATH
 
       - name: Setup Python
