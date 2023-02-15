@@ -46,7 +46,7 @@ jobs:
             rpmvers: 'el/8'
             debvers: 'ubuntu/focal debian/buster debian/bullseye'
           - golang_cross: 1.16-fips
-            goreleaser: 'ci/goreleaser/goreleaser.yml'
+            goreleaser: 'ci/goreleaser/goreleaser-fips.yml'
             rpmvers: 'el/8'
             debvers: 'ubuntu/focal debian/buster debian/bullseye'
     outputs:
