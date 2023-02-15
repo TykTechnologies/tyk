@@ -30,9 +30,21 @@ jobs:
           fetch-depth: 2
 
       - name: Setup Golang
+        if: ${{ !contains(matrix.go, "fips") }}
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go }}
+
+      - name: Setup Golang FIPS
+        if: ${{ contains(matrix.go, "fips") }}
+        run: |
+          url="https://go-boringcrypto.storage.googleapis.com/go1.16.7b7.linux-amd64.tar.gz";
+          wget -O go.tgz "$url"
+          echo "d4ca2906640edd9299d12d8204aae0d848b497b79b92424d8705ae748e16f3c5 go.tgz" | sha256sum -c -
+          tar -C /usr/local -xzf go.tgz
+          rm go.tgz
+          export PATH="/usr/local/go/bin:$PATH"
+          go version
 
       - name: Setup Python
         uses: actions/setup-python@v4
