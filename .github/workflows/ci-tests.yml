@@ -46,8 +46,7 @@ jobs:
           curdir=$(pwd)
           tar -xzf go.tgz
           rm go.tgz
-          export PATH="$curdir/go/bin:$PATH"
-          go version
+          echo "$curdir/go/bin" >> $GITHUB_PATH
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -98,6 +97,7 @@ jobs:
       - name: Run Gateway Tests
         id: ci-tests
         run: |
+          go version 
           ./bin/ci-tests.sh 2>&1 | tee test.log
           result_code=${PIPESTATUS[0]}
           echo "log=$(sed -ze 's/%/%25/g;s/\n/%0A/g' test.log)" >> $GITHUB_OUTPUT
