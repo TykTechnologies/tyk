@@ -4,11 +4,12 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"reflect"
 	"sort"
 	"strings"
 
 	uuid "github.com/satori/go.uuid"
+
+	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
 var (
@@ -282,13 +283,13 @@ func (a *APIDefinition) migrateGatewayTags() {
 }
 
 func (a *APIDefinition) migrateAuthenticationPlugin() {
-	if reflect.DeepEqual(a.CustomMiddleware.AuthCheck, MiddlewareDefinition{}) {
+	if reflect.IsEmpty(a.CustomMiddleware.AuthCheck) {
 		a.CustomMiddleware.AuthCheck.Disabled = true
 	}
 }
 
 func (a *APIDefinition) migrateIDExtractor() {
-	if reflect.DeepEqual(a.CustomMiddleware.IdExtractor, MiddlewareIdExtractor{}) {
+	if reflect.IsEmpty(a.CustomMiddleware.IdExtractor) {
 		a.CustomMiddleware.IdExtractor.Disabled = true
 	}
 }
