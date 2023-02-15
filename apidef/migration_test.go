@@ -660,3 +660,11 @@ func TestSetDisabledFlags(t *testing.T) {
 	apiDef.SetDisabledFlags()
 	assert.Equal(t, expectedAPIDef, apiDef)
 }
+
+func TestAPIDefinition_migrateIDExtractor(t *testing.T) {
+	base := oldTestAPI()
+	_, err := base.Migrate()
+	assert.NoError(t, err)
+
+	assert.True(t, base.CustomMiddleware.IdExtractor.Disabled)
+}
