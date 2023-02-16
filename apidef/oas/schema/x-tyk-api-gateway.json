@@ -233,7 +233,10 @@
         "data": {
           "$ref": "#/definitions/X-Tyk-PluginConfigData"
         }
-      }
+      },
+      "required": [
+        "driver"
+      ]
     },
     "X-Tyk-PluginConfigData": {
       "type": "object",
