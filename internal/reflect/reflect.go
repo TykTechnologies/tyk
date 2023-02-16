@@ -3,12 +3,6 @@ package reflect
 import (
 	"math"
 	"reflect"
-
-	logger "github.com/TykTechnologies/tyk/log"
-)
-
-var (
-	log = logger.Get()
 )
 
 // IsEmpty checks whether a field should be set to empty and omitted from OAS JSON.
