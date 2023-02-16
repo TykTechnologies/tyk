@@ -346,8 +346,10 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		if config, found := tlsConfigCache.Get(hello.ServerName + listenPortStr); found {
 			newConfig := config.(*tls.Config).Clone()
 
-			if gwConfig.HttpServerOptions.SkipClientCAAnnouncement && newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
-				newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
+			if gwConfig.HttpServerOptions.SkipClientCAAnnouncement {
+				if newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+					newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
+				}
 				newConfig.ClientCAs = x509.NewCertPool()
 				newConfig.ClientAuth = tls.RequestClientCert
 			}
@@ -472,8 +474,10 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
 
-		if gwConfig.HttpServerOptions.SkipClientCAAnnouncement && newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
-			newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
+		if gwConfig.HttpServerOptions.SkipClientCAAnnouncement {
+			if newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+				newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
+			}
 			newConfig.ClientCAs = x509.NewCertPool()
 			newConfig.ClientAuth = tls.RequestClientCert
 		}
