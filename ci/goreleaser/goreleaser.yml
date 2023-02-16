@@ -219,7 +219,10 @@ dockers:
     - trace
     - user
     - internal
+<<<<<<< HEAD
 
+=======
+>>>>>>> e667b05e... [TT-8045] add migrate id extractor in migration. (#4779)
 
 docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}
