@@ -17,7 +17,7 @@ type subStruct struct {
 	SubMap map[string]string
 }
 
-func TestShouldOmit(t *testing.T) {
+func Test_IsEmpty(t *testing.T) {
 	v1 := testStruct{}
 	v2 := testStruct{Array: make([]string, 0), Map: make(map[string]string), SubStruct: &subStruct{}}
 	v3 := testStruct{Array: make([]string, 0), Map: make(map[string]string), SubStruct: &subStruct{SubMap: make(map[string]string)}}
