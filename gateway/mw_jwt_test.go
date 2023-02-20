@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/dgrijalva/jwt-go"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
