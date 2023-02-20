@@ -688,6 +688,7 @@ type IDExtractorConfig struct {
 	// Regexp is the regular expression to match ID.
 	Regexp string `bson:"regexp,omitempty" json:"regexp,omitempty"`
 	// RegexpMatchIndex is the index from which ID to be extracted after a match.
+	// Default value is 0, ie if regexpMatchIndex is not provided ID is matched from index 0.
 	RegexpMatchIndex int `bson:"regexpMatchIndex,omitempty" json:"regexpMatchIndex,omitempty"`
 	// XPathExp is the xpath expression to match ID.
 	XPathExp string `bson:"xPathExp,omitempty" json:"xPathExp,omitempty"`

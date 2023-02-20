@@ -303,7 +303,7 @@
           "type": "string"
         },
         "regexpMatchIndex": {
-          "type": "string"
+          "type": "integer"
         },
         "xPathExp": {
           "type": "string"
