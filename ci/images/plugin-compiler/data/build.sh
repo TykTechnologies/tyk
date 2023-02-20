@@ -1,7 +1,6 @@
 #!/bin/bash
 set -xe
 
-CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' $TYK_GW_PATH/gateway/version.go)
 plugin_name=$1
 plugin_id=$2
 
@@ -30,7 +29,7 @@ fi
 
 # if arch and os present then update the name of file with those params
 if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
-  plugin_name="${plugin_name%.*}_${CURRENTVERS}_${GOOS}_${GOARCH}.so"
+  plugin_name="${plugin_name%.*}_${TYK_GW_VER}_${GOOS}_${GOARCH}.so"
 fi
 
 echo "Building plugin: $plugin_name"

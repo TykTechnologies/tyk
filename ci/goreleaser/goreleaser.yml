@@ -5,9 +5,13 @@
 # This project needs CGO_ENABLED=1 and the cross-compiler toolchains for
 # - arm64
 # - amd64
+snapshot:
+  name_template: v0.0.0
+  
 builds:
   - id: std-linux
     flags:
+      - -buildvcs=false
       - -tags=goplugin
     ldflags:
       - -X github.com/TykTechnologies/tyk/gateway.VERSION={{.Version}} -X github.com/TykTechnologies/tyk/gateway.Commit={{.FullCommit}} -X github.com/TykTechnologies/tyk/gateway.buildDate={{.Date}} -X github.com/TykTechnologies/tyk/gateway.builtBy=goreleaser
@@ -18,6 +22,7 @@ builds:
     binary: tyk
   - id: std-arm64
     flags:
+      - -buildvcs=false
       - -tags=goplugin
     ldflags:
       - -X github.com/TykTechnologies/tyk/gateway.VERSION={{.Version}} -X github.com/TykTechnologies/tyk/gateway.Commit={{.FullCommit}} -X github.com/TykTechnologies/tyk/gateway.buildDate={{.Date}} -X github.com/TykTechnologies/tyk/gateway.builtBy=goreleaser
@@ -134,7 +139,7 @@ dockers:
     - "--label=org.opencontainers.image.title=tyk-plugin-compiler"
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
     - "--label=org.opencontainers.image.version={{.Version}}"
-    - "--build-arg=TYK_GW_TAG={{ .Tag }}"
+    - "--build-arg=VERSION={{ .Tag }}"
     - "--build-arg=GOLANG_CROSS={{ .Env.GOLANG_CROSS }}"
   goarch: amd64
   goos: linux
@@ -262,26 +267,6 @@ publishers:
       - RPMVERS={{ .Env.RPMVERS }}
       - DEBVERS={{ .Env.DEBVERS }}
     cmd: /pc.sh {{ .ArtifactPath }}
-
-archives:
-- id: std-linux
-  builds:
-    - std-linux
-    - std-arm64
-  files:
-    - README.md
-    - "ci/install/*"
-    - "LICENSE.md"
-    - "apps/app_sample.json"
-    - "templates/*.json"
-    - "templates/playground/index.html"
-    - "templates/playground/playground.js"
-    - "middleware/*.js"
-    - "event_handlers/sample/*.js"
-    - "policies/*.json"
-    - "coprocess/*"
-    - tyk.conf.example
-
 
 checksum:
   disable: true
