@@ -227,6 +227,7 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateCustomPluginAuth()
 	a.MigrateAuthentication()
 	a.migratePluginBundle()
+	a.migratePluginConfigData()
 	a.migrateMutualTLS()
 	a.migrateCertificatePinning()
 	a.migrateGatewayTags()
@@ -252,6 +253,12 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 func (a *APIDefinition) migratePluginBundle() {
 	if !a.CustomMiddlewareBundleDisabled && a.CustomMiddlewareBundle == "" {
 		a.CustomMiddlewareBundleDisabled = true
+	}
+}
+
+func (a *APIDefinition) migratePluginConfigData() {
+	if reflect.IsEmpty(a.ConfigData) {
+		a.ConfigDataDisabled = true
 	}
 }
 
