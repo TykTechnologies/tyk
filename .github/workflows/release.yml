@@ -120,26 +120,6 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Push to ecr
-        shell: bash
-        run: |
-          ecr=${{ steps.login-ecr.outputs.registry }}
-          # Anything after the last /
-          ref=${GITHUB_REF_NAME##*/}
-          # Remove any char that is invalid in a tag, including \.
-          ref=${ref//[^[:alnum:]_]/}
-          docker tag tykio/tyk-gateway:v0.0.0-amd64 ${ecr}/tyk:${ref}-amd64
-          docker tag tykio/tyk-gateway:v0.0.0-arm64 ${ecr}/tyk:${ref}-arm64
-          docker push -a ${ecr}/tyk
-          docker manifest create ${ecr}/tyk:${ref} ${ecr}/tyk:${ref}-amd64 ${ecr}/tyk:${ref}-arm64
-          docker manifest push --purge ${ecr}/tyk:${ref}
-          docker tag ${ecr}/tyk:${ref} ${ecr}/tyk:${GITHUB_SHA}
-          docker push ${ecr}/tyk:${GITHUB_SHA}
-          docker tag tykio/tyk-plugin-compiler:v0.0.0 ${ecr}/tyk-plugin-compiler:${ref}
-          docker tag tykio/tyk-plugin-compiler:v0.0.0 ${ecr}/tyk-plugin-compiler:${GITHUB_SHA}
-          docker push -a ${ecr}/tyk-plugin-compiler
-          echo "::notice file=.github/workflows/release.yml::Pushed tags $ref and $GITHUB_SHA to ECR"
           
       - uses: actions/upload-artifact@v3
         with:
@@ -156,6 +136,30 @@ jobs:
           path: |
             dist/*.rpm
             !dist/*PAYG*.rpm
+
+      - name: Push to ecr
+        shell: bash
+        run: |
+          ecr=${{ steps.login-ecr.outputs.registry }}
+          # Anything after the last /
+          ref=${GITHUB_REF_NAME##*/}
+          # Remove any char that is invalid in a tag, including \.
+          ref=${ref//[^[:alnum:]_]/}
+          docker tag tykio/tyk-gateway:v0.0.0-amd64 ${ecr}/tyk:${ref}-amd64
+          docker tag tykio/tyk-gateway:v0.0.0-arm64 ${ecr}/tyk:${ref}-arm64
+          docker push -a ${ecr}/tyk || ec=$?
+          docker manifest create ${ecr}/tyk:${ref} ${ecr}/tyk:${ref}-amd64 ${ecr}/tyk:${ref}-arm64
+          docker manifest push --purge ${ecr}/tyk:${ref} || ec=$?
+          docker tag ${ecr}/tyk:${ref} ${ecr}/tyk:${GITHUB_SHA}
+          docker push ${ecr}/tyk:${GITHUB_SHA} || ec=$?
+          docker tag tykio/tyk-plugin-compiler:v0.0.0 ${ecr}/tyk-plugin-compiler:${ref}
+          docker tag tykio/tyk-plugin-compiler:v0.0.0 ${ecr}/tyk-plugin-compiler:${GITHUB_SHA}
+          docker push -a ${ecr}/tyk-plugin-compiler || ec=$?
+          if (( $ec > 0 )); then
+          echo "::error file=.github/workflows/release.yml::Errors pushing tags $ref and $GITHUB_SHA to ECR"
+          else
+          echo "::notice file=.github/workflows/release.yml::Pushed tags $ref and $GITHUB_SHA to ECR"
+          fi
 
   upgrade-deb:
     if: startsWith(github.ref, 'refs/tags') && !github.event.pull_request.draft
