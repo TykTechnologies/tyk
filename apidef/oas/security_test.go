@@ -186,7 +186,7 @@ func TestOAS_Token(t *testing.T) {
 	oas.extractTokenTo(&api, securityName)
 
 	var convertedOAS OAS
-	oas.Components = &openapi3.Components{
+	convertedOAS.Components = &openapi3.Components{
 		SecuritySchemes: oas.Components.SecuritySchemes,
 	}
 

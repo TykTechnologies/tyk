@@ -678,6 +678,10 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 }
 
 func (s *OAS) fillAPIKeyScheme(ac *apidef.AuthConfig) {
+	if s.Components == nil {
+		s.Components = &openapi3.Components{}
+	}
+
 	ss := s.Components.SecuritySchemes
 	if ss == nil {
 		ss = make(map[string]*openapi3.SecuritySchemeRef)
