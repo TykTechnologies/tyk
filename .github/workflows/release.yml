@@ -121,12 +121,16 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: push to ecr
+      - name: Push to ecr
         run: |
-          docker tag tykio/tyk-gateway:v0.0.0 ${{ steps.login-ecr.outputs.registry }}/tyk:${GITHUB_REF_NAME}
+          # Anything after the last /
+          ref=${GITHUB_REF_NAME##*/}
+          # Remove any char that is invalid in a tag, including \.
+          ref=${ref//[^[:alnum:]_]/}
+          docker tag tykio/tyk-gateway:v0.0.0 ${{ steps.login-ecr.outputs.registry }}/tyk:${ref}
           docker tag tykio/tyk-gateway:v0.0.0 ${{ steps.login-ecr.outputs.registry }}/tyk:${GITHUB_SHA}
           docker push -a ${{ steps.login-ecr.outputs.registry }}/tyk
-          docker tag tykio/tyk-plugin-compiler:v0.0.0 ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:${GITHUB_REF_NAME}
+          docker tag tykio/tyk-plugin-compiler:v0.0.0 ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:${ref}
           docker tag tykio/tyk-plugin-compiler:v0.0.0 ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:${GITHUB_SHA}
           docker push -a ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler
           
