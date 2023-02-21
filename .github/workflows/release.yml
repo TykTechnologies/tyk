@@ -140,6 +140,7 @@ jobs:
       - name: Push to ecr
         shell: bash
         run: |
+          set -x
           ecr=${{ steps.login-ecr.outputs.registry }}
           # Anything after the last /
           ref=${GITHUB_REF_NAME##*/}
@@ -149,9 +150,10 @@ jobs:
           docker tag tykio/tyk-gateway:v0.0.0-arm64 ${ecr}/tyk:${ref}-arm64
           docker push -a ${ecr}/tyk || ec=$?
           docker manifest create ${ecr}/tyk:${ref} ${ecr}/tyk:${ref}-amd64 ${ecr}/tyk:${ref}-arm64
-          docker manifest push --purge ${ecr}/tyk:${ref} || ec=$?
-          docker tag ${ecr}/tyk:${ref} ${ecr}/tyk:${GITHUB_SHA}
-          docker push ${ecr}/tyk:${GITHUB_SHA} || ec=$?
+          # Tag manifest with commit id
+          docker buildx imagetools create ${ecr}/tyk:${ref} --tag ${ecr}/tyk:${GITHUB_SHA}
+          docker --log-level debug manifest push ${ecr}/tyk:${ref} || ec=$?
+          # Plugin compiler is not multi-arch
           docker tag tykio/tyk-plugin-compiler:v0.0.0 ${ecr}/tyk-plugin-compiler:${ref}
           docker tag tykio/tyk-plugin-compiler:v0.0.0 ${ecr}/tyk-plugin-compiler:${GITHUB_SHA}
           docker push -a ${ecr}/tyk-plugin-compiler || ec=$?
