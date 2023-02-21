@@ -20,6 +20,7 @@ func TestOAS(t *testing.T) {
 		t.Parallel()
 
 		var emptyOASPaths OAS
+		emptyOASPaths.Components = &openapi3.Components{}
 		emptyOASPaths.Paths = make(openapi3.Paths)
 		emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
 
@@ -38,6 +39,7 @@ func TestOAS(t *testing.T) {
 		t.Parallel()
 
 		var nilOASPaths OAS
+		nilOASPaths.Components = &openapi3.Components{}
 		nilOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 		var convertedAPI apidef.APIDefinition
@@ -57,6 +59,7 @@ func TestOAS(t *testing.T) {
 		t.Parallel()
 
 		var oasWithPaths OAS
+		oasWithPaths.Components = &openapi3.Components{}
 		oasWithPaths.SetTykExtension(&XTykAPIGateway{
 			Middleware: &Middleware{
 				Operations: Operations{

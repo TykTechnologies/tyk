@@ -49,6 +49,10 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 	}
 
 	check := func(in, name string, ac apidef.AuthConfig, s OAS) {
+		if s.Components == nil {
+			s.Components = &openapi3.Components{}
+		}
+
 		s.fillAPIKeyScheme(&ac)
 
 		expectedAC := ac
@@ -334,6 +338,7 @@ func TestOAS_JWT(t *testing.T) {
 	oas.extractJWTTo(&api, securityName)
 
 	var convertedOAS OAS
+	convertedOAS.Components = &openapi3.Components{}
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
 	convertedOAS.fillJWT(api)
 
@@ -380,6 +385,7 @@ func TestOAS_Basic(t *testing.T) {
 	oas.extractBasicTo(&api, securityName)
 
 	var convertedOAS OAS
+	convertedOAS.Components = &openapi3.Components{}
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
 	convertedOAS.fillBasic(api)
 
@@ -578,6 +584,7 @@ func TestOAS_TykAuthentication_NoOASSecurity(t *testing.T) {
 	Fill(t, &hmac, 0)
 
 	var oas OAS
+	oas.Components = &openapi3.Components{}
 	oas.Paths = make(openapi3.Paths)
 	oas.Extensions = map[string]interface{}{
 		ExtensionTykAPIGateway: &XTykAPIGateway{
