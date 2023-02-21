@@ -141,6 +141,7 @@ jobs:
         shell: bash
         run: |
           set -x
+          ec=0
           ecr=${{ steps.login-ecr.outputs.registry }}
           # Anything after the last /
           ref=${GITHUB_REF_NAME##*/}
@@ -157,7 +158,7 @@ jobs:
           docker tag tykio/tyk-plugin-compiler:v0.0.0 ${ecr}/tyk-plugin-compiler:${ref}
           docker tag tykio/tyk-plugin-compiler:v0.0.0 ${ecr}/tyk-plugin-compiler:${GITHUB_SHA}
           docker push -a ${ecr}/tyk-plugin-compiler || ec=$?
-          if (( $ec > 0 )); then
+          if (( $ec != 0 )); then
           echo "::error file=.github/workflows/release.yml::Errors pushing tags $ref and $GITHUB_SHA to ECR"
           else
           echo "::notice file=.github/workflows/release.yml::Pushed tags $ref and $GITHUB_SHA to ECR"
