@@ -33,4 +33,4 @@ done
 
 # run rpc tests separately
 rpc_tests='SyncAPISpecsRPC|OrgSessionWithRPCDown'
-go test -count=1 -timeout ${TEST_TIMEOUT} -v -coverprofile=gateway-rpc.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"'
+TYK_LOGLEVEL=debug go test -count=1 -timeout ${TEST_TIMEOUT} -v -coverprofile=gateway-rpc.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"'
