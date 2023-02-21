@@ -125,6 +125,10 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 		return
 	}
 
+	if s.Components == nil {
+		s.Components = &openapi3.Components{}
+	}
+
 	ss := s.Components.SecuritySchemes
 	if ss == nil {
 		ss = make(map[string]*openapi3.SecuritySchemeRef)
@@ -229,6 +233,10 @@ func (s *OAS) fillBasic(api apidef.APIDefinition) {
 	ac, ok := api.AuthConfigs[apidef.BasicType]
 	if !ok || ac.Name == "" {
 		return
+	}
+
+	if s.Components == nil {
+		s.Components = &openapi3.Components{}
 	}
 
 	ss := s.Components.SecuritySchemes
@@ -640,7 +648,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	if len(s.Security) == 0 || len(s.Components.SecuritySchemes) == 0 {
+	if len(s.Security) == 0 || s.Components == nil || len(s.Components.SecuritySchemes) == 0 {
 		return
 	}
 
@@ -678,6 +686,10 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 }
 
 func (s *OAS) fillAPIKeyScheme(ac *apidef.AuthConfig) {
+	if s.Components == nil {
+		s.Components = &openapi3.Components{}
+	}
+
 	if s.Components == nil {
 		s.Components = &openapi3.Components{}
 	}
@@ -739,6 +751,10 @@ func (s *OAS) extractAPIKeySchemeTo(ac *apidef.AuthConfig, name string) {
 }
 
 func (s *OAS) fillOAuthScheme(accessTypes []osin.AccessRequestType, name string) {
+	if s.Components == nil {
+		s.Components = &openapi3.Components{}
+	}
+
 	ss := s.Components.SecuritySchemes
 	if ss == nil {
 		ss = make(map[string]*openapi3.SecuritySchemeRef)
@@ -798,6 +814,10 @@ func (s *OAS) fillOAuthScheme(accessTypes []osin.AccessRequestType, name string)
 }
 
 func (s *OAS) fillOAuthSchemeForExternal(name string) {
+	if s.Components == nil {
+		s.Components = &openapi3.Components{}
+	}
+
 	ss := s.Components.SecuritySchemes
 	if ss == nil {
 		ss = make(map[string]*openapi3.SecuritySchemeRef)
