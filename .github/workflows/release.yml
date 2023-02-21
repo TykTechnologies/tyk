@@ -29,6 +29,8 @@ env:
   
 jobs:
   goreleaser:
+    permissions:
+      id-token: write
     name: Go 1.20 (bullseye)
     runs-on: ubuntu-latest
     container: 'tykio/golang-cross:1.20-bullseye'
@@ -95,7 +97,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v4
         with:
           version: latest
-          args: release --debug --clean -f ci/goreleaser/goreleaser.yml ${{ !startsWith(github.ref, 'refs/tags/') && '--snapshot' || '' }}
+          args: release --clean -f ci/goreleaser/goreleaser.yml ${{ !startsWith(github.ref, 'refs/tags/') && '--snapshot' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
