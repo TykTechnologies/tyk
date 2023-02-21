@@ -124,16 +124,22 @@ jobs:
       - name: Push to ecr
         shell: bash
         run: |
+          ecr=${{ steps.login-ecr.outputs.registry }}
           # Anything after the last /
           ref=${GITHUB_REF_NAME##*/}
           # Remove any char that is invalid in a tag, including \.
           ref=${ref//[^[:alnum:]_]/}
-          docker tag tykio/tyk-gateway:v0.0.0 ${{ steps.login-ecr.outputs.registry }}/tyk:${ref}
-          docker tag tykio/tyk-gateway:v0.0.0 ${{ steps.login-ecr.outputs.registry }}/tyk:${GITHUB_SHA}
-          docker push -a ${{ steps.login-ecr.outputs.registry }}/tyk
-          docker tag tykio/tyk-plugin-compiler:v0.0.0 ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:${ref}
-          docker tag tykio/tyk-plugin-compiler:v0.0.0 ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:${GITHUB_SHA}
-          docker push -a ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler
+          docker tag tykio/tyk-gateway:v0.0.0-amd64 ${ecr}/tyk:${ref}-amd64
+          docker tag tykio/tyk-gateway:v0.0.0-arm64 ${ecr}/tyk:${ref}-arm64
+          docker push -a ${ecr}/tyk
+          docker manifest create ${ecr}/tyk:${ref} ${ecr}/tyk:${ref}-amd64 ${ecr}/tyk:${ref}-arm64
+          docker manifest push --purge ${ecr}/tyk:${ref}
+          docker tag ${ecr}/tyk:${ref} ${ecr}/tyk:${GITHUB_SHA}
+          docker push ${ecr}/tyk:${GITHUB_SHA}
+          docker tag tykio/tyk-plugin-compiler:v0.0.0 ${ecr}/tyk-plugin-compiler:${ref}
+          docker tag tykio/tyk-plugin-compiler:v0.0.0 ${ecr}/tyk-plugin-compiler:${GITHUB_SHA}
+          docker push -a ${ecr}/tyk-plugin-compiler
+          echo "::notice file=.github/workflows/release.yml::Pushed tags $ref and $GITHUB_SHA to ECR"
           
       - uses: actions/upload-artifact@v3
         with:
