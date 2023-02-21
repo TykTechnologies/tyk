@@ -364,8 +364,7 @@
       },
       "required": [
         "enabled",
-        "functionName",
-        "path"
+        "functionName"
       ]
     },
     "X-Tyk-PluginBundle": {
