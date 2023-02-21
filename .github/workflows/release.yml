@@ -122,6 +122,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Push to ecr
+        shell: bash
         run: |
           # Anything after the last /
           ref=${GITHUB_REF_NAME##*/}
