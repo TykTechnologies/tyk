@@ -2792,12 +2792,12 @@ func TestOAS(t *testing.T) {
 		// copy OAS API, we need to manipulate tyk extension here
 		copyOAS := func(oasAPI openapi3.T) oas.OAS {
 			apiInOAS := oas.OAS{T: oasAPI}
-			oasExt := oasAPI.ExtensionProps.Extensions
+			oasExt := oasAPI.Extensions
 			copyExt := make(map[string]interface{})
 			for k, v := range oasExt {
 				copyExt[k] = v
 			}
-			apiInOAS.T.ExtensionProps.Extensions = copyExt
+			apiInOAS.T.Extensions = copyExt
 			return apiInOAS
 		}
 
@@ -2892,7 +2892,7 @@ func TestOAS(t *testing.T) {
 			fillPaths(&apiInOAS)
 
 			tykExt := apiInOAS.GetTykExtension()
-			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 			apiInOAS.T.Info.Title = "patched-oas-doc"
 			testPatchOAS(t, ts, apiInOAS, nil, apiID)
@@ -2911,7 +2911,7 @@ func TestOAS(t *testing.T) {
 			fillReqBody(&apiInOAS, "/pets", http.MethodPost)
 
 			expectedTykExt := apiInOAS.GetTykExtension()
-			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 			listenPath, upstreamURL, customDomain := "/listen-api/", "https://new-upstream.org", "custom-upstream.com"
 
@@ -3033,7 +3033,7 @@ func TestOAS(t *testing.T) {
 				fillPaths(&apiInOAS)
 
 				tykExt := apiInOAS.GetTykExtension()
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				apiInOAS.T.Info.Title = "patched-oas-doc"
 
@@ -3060,7 +3060,7 @@ func TestOAS(t *testing.T) {
 				fillPaths(&apiInOAS)
 
 				tykExt := apiInOAS.GetTykExtension()
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				apiInOAS.T.Info.Title = "patched-oas-doc"
 
@@ -3093,7 +3093,7 @@ func TestOAS(t *testing.T) {
 		t.Run("error on invalid upstreamURL", func(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
 			fillPaths(&apiInOAS)
-			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 			upstreamURL := "new-upstream.org"
 
@@ -3115,7 +3115,7 @@ func TestOAS(t *testing.T) {
 			t.Run("empty apiID", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				patchPath := fmt.Sprintf("/tyk/apis/oas/%s", " ")
 
@@ -3128,7 +3128,7 @@ func TestOAS(t *testing.T) {
 			t.Run("malformed body", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				_, _ = ts.Run(t, []test.TestCase{
 					{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: `oas-body`,
@@ -3140,7 +3140,7 @@ func TestOAS(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
 
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				nonExistingAPIID := "non-existing-api-id"
 				patchPath := fmt.Sprintf("/tyk/apis/oas/%s", nonExistingAPIID)
@@ -3172,7 +3172,7 @@ func TestOAS(t *testing.T) {
 					ts.Gw.SetConfig(conf)
 				}()
 
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				_, _ = ts.Run(t, []test.TestCase{
 					{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &apiInOAS,
@@ -3210,7 +3210,7 @@ func TestOAS(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
 			fillPaths(&apiInOAS)
 
-			delete(apiInOAS.T.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			delete(apiInOAS.T.Extensions, oas.ExtensionTykAPIGateway)
 			apiInOAS.Paths = nil
 
 			patchPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
