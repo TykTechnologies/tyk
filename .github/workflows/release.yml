@@ -162,6 +162,7 @@ jobs:
           else
           echo "::notice file=.github/workflows/release.yml::Pushed tags $ref and $GITHUB_SHA to ECR"
           fi
+          exit $ec
 
   upgrade-deb:
     if: startsWith(github.ref, 'refs/tags') && !github.event.pull_request.draft
