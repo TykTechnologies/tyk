@@ -95,7 +95,7 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 	upstreamConfig := graphql.ProxyUpstreamConfig{
 		URL:              url,
 		StaticHeaders:    staticHeaders,
-		SubscriptionType: g.graphqlSubscriptionType(g.apiDefinition.GraphQL.Proxy.SubscriptionType),
+		SubscriptionType: graphqlSubscriptionType(g.apiDefinition.GraphQL.Proxy.SubscriptionType),
 	}
 
 	if g.schema == nil {
@@ -523,17 +523,4 @@ func (g *GraphQLConfigAdapter) graphqlDataSourceWebSocketProtocol(subscriptionTy
 		wsProtocol = graphqlDataSource.ProtocolGraphQLTWS
 	}
 	return wsProtocol
-}
-
-func (g *GraphQLConfigAdapter) graphqlSubscriptionType(subscriptionType apidef.SubscriptionType) graphql.SubscriptionType {
-	switch subscriptionType {
-	case apidef.GQLSubscriptionWS:
-		return graphql.SubscriptionTypeGraphQLWS
-	case apidef.GQLSubscriptionTransportWS:
-		return graphql.SubscriptionTypeGraphQLTransportWS
-	case apidef.GQLSubscriptionSSE:
-		return graphql.SubscriptionTypeSSE
-	default:
-		return graphql.SubscriptionTypeUnknown
-	}
 }

@@ -3,6 +3,8 @@ package adapter
 import (
 	"net/http"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -13,6 +15,19 @@ func isSupergraphAPIDefinition(apiDefinition *apidef.APIDefinition) bool {
 func isProxyOnlyAPIDefinition(apiDefinition *apidef.APIDefinition) bool {
 	return apiDefinition.GraphQL.Enabled &&
 		(apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly || apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph)
+}
+
+func graphqlSubscriptionType(subscriptionType apidef.SubscriptionType) graphql.SubscriptionType {
+	switch subscriptionType {
+	case apidef.GQLSubscriptionWS:
+		return graphql.SubscriptionTypeGraphQLWS
+	case apidef.GQLSubscriptionTransportWS:
+		return graphql.SubscriptionTypeGraphQLTransportWS
+	case apidef.GQLSubscriptionSSE:
+		return graphql.SubscriptionTypeSSE
+	default:
+		return graphql.SubscriptionTypeUnknown
+	}
 }
 
 func convertApiDefinitionHeadersToHttpHeaders(apiDefHeaders map[string]string) http.Header {

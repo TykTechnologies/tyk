@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -119,6 +120,31 @@ func TestIsProxyOnlyAPIDefinition(t *testing.T) {
 			expectedResult: true,
 		},
 	))
+}
+
+func TestGraphqlSubscriptionType(t *testing.T) {
+	run := func(subscriptionType apidef.SubscriptionType, expectedGraphQLSubscriptionType graphql.SubscriptionType) func(t *testing.T) {
+		return func(t *testing.T) {
+			actualSubscriptionType := graphqlSubscriptionType(subscriptionType)
+			assert.Equal(t, expectedGraphQLSubscriptionType, actualSubscriptionType)
+		}
+	}
+
+	t.Run("should return 'Unknown' for undefined subscription type",
+		run(apidef.GQLSubscriptionUndefined, graphql.SubscriptionTypeUnknown),
+	)
+
+	t.Run("should return 'SSE' for sse subscription type as websocket protocol is irrelevant in that case",
+		run(apidef.GQLSubscriptionSSE, graphql.SubscriptionTypeSSE),
+	)
+
+	t.Run("should return 'GraphQLWS' for graphql-ws subscription type",
+		run(apidef.GQLSubscriptionWS, graphql.SubscriptionTypeGraphQLWS),
+	)
+
+	t.Run("should return 'GraphQLTransportWS' for graphql-transport-ws subscription type",
+		run(apidef.GQLSubscriptionTransportWS, graphql.SubscriptionTypeGraphQLTransportWS),
+	)
 }
 
 func TestConvertApiDefinitionHeadersToHttpHeaders(t *testing.T) {
