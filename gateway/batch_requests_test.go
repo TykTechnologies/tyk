@@ -160,7 +160,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "batchTest",
-			FunctionSourceType:   "blob",
+			FunctionSourceType:   apidef.UseBlob,
 			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
 			Path:                 "/virt",
 			Method:               "GET",
@@ -227,7 +227,7 @@ func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "batchTest",
-			FunctionSourceType:   "blob",
+			FunctionSourceType:   apidef.UseBlob,
 			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
 			Path:                 "/virt",
 			Method:               "GET",

@@ -20,6 +20,7 @@ func TestOAS(t *testing.T) {
 		t.Parallel()
 
 		var emptyOASPaths OAS
+		emptyOASPaths.Components = &openapi3.Components{}
 		emptyOASPaths.Paths = make(openapi3.Paths)
 		emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
 
@@ -38,6 +39,7 @@ func TestOAS(t *testing.T) {
 		t.Parallel()
 
 		var nilOASPaths OAS
+		nilOASPaths.Components = &openapi3.Components{}
 		nilOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 		var convertedAPI apidef.APIDefinition
@@ -57,6 +59,7 @@ func TestOAS(t *testing.T) {
 		t.Parallel()
 
 		var oasWithPaths OAS
+		oasWithPaths.Components = &openapi3.Components{}
 		oasWithPaths.SetTykExtension(&XTykAPIGateway{
 			Middleware: &Middleware{
 				Operations: Operations{
@@ -413,12 +416,10 @@ func TestOAS_MarshalJSON(t *testing.T) {
 				Info: &openapi3.Info{
 					Title: "OAS Doc",
 				},
-				ExtensionProps: openapi3.ExtensionProps{
-					Extensions: map[string]interface{}{
-						ExtensionTykAPIGateway: XTykAPIGateway{
-							Info: Info{
-								Name: "OAS API",
-							},
+				Extensions: map[string]interface{}{
+					ExtensionTykAPIGateway: XTykAPIGateway{
+						Info: Info{
+							Name: "OAS API",
 						},
 					},
 				},
@@ -429,7 +430,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 			copyOAS := s
 			intVal := 9
 			byteRep, _ := json.Marshal(intVal)
-			copyOAS.ExtensionProps.Extensions["x-abcd"] = byteRep
+			copyOAS.Extensions["x-abcd"] = byteRep
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -440,7 +441,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 			copyOAS := s
 			floatVal := 9.5
 			byteRep, _ := json.Marshal(floatVal)
-			copyOAS.ExtensionProps.Extensions["x-abcd"] = byteRep
+			copyOAS.Extensions["x-abcd"] = byteRep
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -451,7 +452,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 			copyOAS := s
 			boolVal := false
 			byteRep, _ := json.Marshal(boolVal)
-			copyOAS.ExtensionProps.Extensions["x-abcd"] = byteRep
+			copyOAS.Extensions["x-abcd"] = byteRep
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -460,7 +461,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 
 		t.Run("nil", func(t *testing.T) {
 			copyOAS := s
-			copyOAS.ExtensionProps.Extensions["x-abcd"] = nil
+			copyOAS.Extensions["x-abcd"] = nil
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -469,7 +470,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 
 		t.Run("string", func(t *testing.T) {
 			copyOAS := s
-			copyOAS.ExtensionProps.Extensions["x-abcd"] = []byte(`"hello"`)
+			copyOAS.Extensions["x-abcd"] = []byte(`"hello"`)
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -478,7 +479,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 
 		t.Run("map", func(t *testing.T) {
 			copyOAS := s
-			copyOAS.ExtensionProps.Extensions["x-abcd"] = []byte(`{"key":"value"}`)
+			copyOAS.Extensions["x-abcd"] = []byte(`{"key":"value"}`)
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -487,7 +488,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 
 		t.Run("array", func(t *testing.T) {
 			copyOAS := s
-			copyOAS.ExtensionProps.Extensions["x-abcd"] = []byte(`[{"key":"value"},{"key":"value"}]`)
+			copyOAS.Extensions["x-abcd"] = []byte(`[{"key":"value"},{"key":"value"}]`)
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -583,6 +584,7 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	api.VersionData.Versions = map[string]apidef.VersionInfo{
 		"Default": {},
 	}
+	api.ConfigDataDisabled = true
 
 	baseAPI, _, err := MigrateAndFillOAS(&api)
 	assert.NoError(t, err)
@@ -605,10 +607,6 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 
 	t.Run("gatewayTags", func(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Server.GatewayTags)
-	})
-
-	t.Run("authenticationPlugin", func(t *testing.T) {
-		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware)
 	})
 
 	t.Run("customDomain", func(t *testing.T) {
@@ -639,6 +637,7 @@ func TestMigrateAndFillOAS_ValidateRequest(t *testing.T) {
 					},
 				},
 			},
+			ConfigDataDisabled: true,
 		}
 	}
 
@@ -684,6 +683,7 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
+			ConfigDataDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -727,6 +727,7 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 					AuthHeaderName: "Authorization",
 				},
 			},
+			ConfigDataDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -776,6 +777,7 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
+			ConfigDataDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -813,6 +815,7 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
+			ConfigDataDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -850,6 +853,7 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
+			ConfigDataDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -887,6 +891,7 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
+			ConfigDataDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -903,4 +908,33 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 		assert.Equal(t, expectedPrePlugin, *migratedAPI.OAS.GetTykExtension().Middleware.Global.ResponsePlugin)
 		assert.Equal(t, apidef.GoPluginDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
 	})
+}
+
+func TestMigrateAndFillOAS_PluginConfigData(t *testing.T) {
+	configData := map[string]interface{}{
+		"key": "value",
+	}
+
+	api := apidef.APIDefinition{
+		Name: "config data",
+		Proxy: apidef.ProxyConfig{
+			ListenPath: "/",
+		},
+		CustomMiddleware: apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+		},
+		VersionData: apidef.VersionData{
+			NotVersioned: true,
+			Versions:     map[string]apidef.VersionInfo{},
+		},
+		ConfigData: configData,
+	}
+	migratedAPI, _, err := MigrateAndFillOAS(&api)
+	assert.NoError(t, err)
+
+	expectedPluginConfigData := &PluginConfigData{
+		Enabled: true,
+		Value:   configData,
+	}
+	assert.Equal(t, expectedPluginConfigData, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Data)
 }

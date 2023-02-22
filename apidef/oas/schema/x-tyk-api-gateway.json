@@ -229,8 +229,29 @@
         },
         "bundle": {
           "$ref": "#/definitions/X-Tyk-PluginBundle"
+        },
+        "data": {
+          "$ref": "#/definitions/X-Tyk-PluginConfigData"
         }
-      }
+      },
+      "required": [
+        "driver"
+      ]
+    },
+    "X-Tyk-PluginConfigData": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
+      ]
     },
     "X-Tyk-CustomPluginConfig": {
       "type": "object",
@@ -265,8 +286,7 @@
       },
       "required": [
         "enabled",
-        "functionName",
-        "path"
+        "functionName"
       ]
     },
     "X-Tyk-IDExtractorConfig": {
@@ -282,7 +302,7 @@
           "type": "string"
         },
         "regexpMatchIndex": {
-          "type": "string"
+          "type": "integer"
         },
         "xPathExp": {
           "type": "string"
@@ -343,8 +363,7 @@
       },
       "required": [
         "enabled",
-        "functionName",
-        "path"
+        "functionName"
       ]
     },
     "X-Tyk-PluginBundle": {
@@ -630,6 +649,52 @@
         "enabled"
       ]
     },
+    "X-Tyk-VirtualEndpoint": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "proxyOnError": {
+          "type": "boolean"
+        },
+        "requireSession": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "name"
+      ]
+    },
+    "X-Tyk-EndpointPostPlugin": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "name",
+        "path"
+      ]
+    },
     "X-Tyk-Operation": {
       "type": "object",
       "properties": {
@@ -647,6 +712,17 @@
         },
         "transformRequestBody": {
           "$ref": "#/definitions/X-Tyk-TransformRequestBody"
+        },
+        "virtualEndpoint": {
+          "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
+        },
+        "postPlugins": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-EndpointPostPlugin"
+            }
+          ]
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-CachePlugin"
@@ -1246,7 +1322,11 @@
         "enabled": {
           "type": "boolean"
         }
-      }
+      },
+      "required": [
+        "enabled",
+        "name"
+      ]
     },
     "X-Tyk-Header": {
       "type": "object",

@@ -340,6 +340,14 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 			SymbolName: "MyPluginPerPathResp",
 		}
 
+		goPluginMetaDisabled := apidef.GoPluginMeta{
+			Disabled:   true,
+			Path:       "/disabled",
+			Method:     "GET",
+			PluginPath: "../test/goplugins/goplugins.so",
+			SymbolName: "MyPluginPerPathResp",
+		}
+
 		v := spec.VersionData.Versions["v1"]
 
 		v.UseExtendedPaths = true
@@ -348,6 +356,7 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 				goPluginMetaFoo,
 				goPluginMetaBar,
 				goPluginMetaResp,
+				goPluginMetaDisabled,
 			},
 		}
 		spec.VersionData.Versions["v1"] = v
@@ -378,6 +387,15 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 				},
 				Code:      http.StatusOK,
 				BodyMatch: `{"current_time":"now"}`,
+			},
+			{
+				Path:   "/goplugin/disabled",
+				Method: http.MethodGet,
+				HeadersNotMatch: map[string]string{
+					"Content-Type": "application/json",
+				},
+				Code:         http.StatusOK,
+				BodyNotMatch: `{"current_time":"now"}`,
 			},
 		}...)
 	})
