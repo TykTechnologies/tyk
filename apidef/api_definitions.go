@@ -34,7 +34,7 @@ type TykEvent string            // A type so we can ENUM event types easily, e.g
 type TykEventHandlerName string // A type for handler codes in API definitions
 
 type EndpointMethodAction string
-type TemplateMode string
+type SourceMode string
 
 type MiddlewareDriver string
 type IdExtractorSource string
@@ -50,8 +50,8 @@ const (
 	NoAction EndpointMethodAction = "no_action"
 	Reply    EndpointMethodAction = "reply"
 
-	UseBlob TemplateMode = "blob"
-	UseFile TemplateMode = "file"
+	UseBlob SourceMode = "blob"
+	UseFile SourceMode = "file"
 
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
@@ -232,7 +232,7 @@ type RequestInputType string
 
 type TemplateData struct {
 	Input          RequestInputType `bson:"input_type" json:"input_type"`
-	Mode           TemplateMode     `bson:"template_mode" json:"template_mode"`
+	Mode           SourceMode       `bson:"template_mode" json:"template_mode"`
 	EnableSession  bool             `bson:"enable_session" json:"enable_session"`
 	TemplateSource string           `bson:"template_source" json:"template_source"`
 }
@@ -321,13 +321,14 @@ type URLRewriteMeta struct {
 }
 
 type VirtualMeta struct {
-	ResponseFunctionName string `bson:"response_function_name" json:"response_function_name"`
-	FunctionSourceType   string `bson:"function_source_type" json:"function_source_type"`
-	FunctionSourceURI    string `bson:"function_source_uri" json:"function_source_uri"`
-	Path                 string `bson:"path" json:"path"`
-	Method               string `bson:"method" json:"method"`
-	UseSession           bool   `bson:"use_session" json:"use_session"`
-	ProxyOnError         bool   `bson:"proxy_on_error" json:"proxy_on_error"`
+	Disabled             bool       `bson:"disabled" json:"disabled"`
+	ResponseFunctionName string     `bson:"response_function_name" json:"response_function_name"`
+	FunctionSourceType   SourceMode `bson:"function_source_type" json:"function_source_type"`
+	FunctionSourceURI    string     `bson:"function_source_uri" json:"function_source_uri"`
+	Path                 string     `bson:"path" json:"path"`
+	Method               string     `bson:"method" json:"method"`
+	UseSession           bool       `bson:"use_session" json:"use_session"`
+	ProxyOnError         bool       `bson:"proxy_on_error" json:"proxy_on_error"`
 }
 
 type MethodTransformMeta struct {
@@ -364,6 +365,7 @@ type PersistGraphQLMeta struct {
 }
 
 type GoPluginMeta struct {
+	Disabled   bool   `bson:"disabled" json:"disabled"`
 	Path       string `bson:"path" json:"path"`
 	Method     string `bson:"method" json:"method"`
 	PluginPath string `bson:"plugin_path" json:"plugin_path"`
@@ -664,6 +666,7 @@ type APIDefinition struct {
 	DoNotTrack                           bool                   `bson:"do_not_track" json:"do_not_track"`
 	EnableContextVars                    bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
 	ConfigData                           map[string]interface{} `bson:"config_data" json:"config_data"`
+	ConfigDataDisabled                   bool                   `bson:"config_data_disabled" json:"config_data_disabled"`
 	TagHeaders                           []string               `bson:"tag_headers" json:"tag_headers"`
 	GlobalRateLimit                      GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
 	StripAuthData                        bool                   `bson:"strip_auth_data" json:"strip_auth_data"`

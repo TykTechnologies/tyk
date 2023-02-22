@@ -4,11 +4,12 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"reflect"
 	"sort"
 	"strings"
 
 	uuid "github.com/satori/go.uuid"
+
+	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
 var (
@@ -226,10 +227,12 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateCustomPluginAuth()
 	a.MigrateAuthentication()
 	a.migratePluginBundle()
+	a.migratePluginConfigData()
 	a.migrateMutualTLS()
 	a.migrateCertificatePinning()
 	a.migrateGatewayTags()
 	a.migrateAuthenticationPlugin()
+	a.migrateIDExtractor()
 	a.migrateCustomDomain()
 
 	versions, err = a.MigrateVersioning()
@@ -250,6 +253,12 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 func (a *APIDefinition) migratePluginBundle() {
 	if !a.CustomMiddlewareBundleDisabled && a.CustomMiddlewareBundle == "" {
 		a.CustomMiddlewareBundleDisabled = true
+	}
+}
+
+func (a *APIDefinition) migratePluginConfigData() {
+	if reflect.IsEmpty(a.ConfigData) {
+		a.ConfigDataDisabled = true
 	}
 }
 
@@ -281,8 +290,14 @@ func (a *APIDefinition) migrateGatewayTags() {
 }
 
 func (a *APIDefinition) migrateAuthenticationPlugin() {
-	if reflect.DeepEqual(a.CustomMiddleware.AuthCheck, MiddlewareDefinition{}) {
+	if reflect.IsEmpty(a.CustomMiddleware.AuthCheck) {
 		a.CustomMiddleware.AuthCheck.Disabled = true
+	}
+}
+
+func (a *APIDefinition) migrateIDExtractor() {
+	if reflect.IsEmpty(a.CustomMiddleware.IdExtractor) {
+		a.CustomMiddleware.IdExtractor.Disabled = true
 	}
 }
 
@@ -384,6 +399,9 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.CertificatePinningDisabled = true
 	a.DomainDisabled = true
 	a.CustomMiddlewareBundleDisabled = true
+	a.CustomMiddleware.IdExtractor.Disabled = true
+	a.ConfigDataDisabled = true
+
 	for i := 0; i < len(a.CustomMiddleware.Pre); i++ {
 		a.CustomMiddleware.Pre[i].Disabled = true
 	}
@@ -400,5 +418,10 @@ func (a *APIDefinition) SetDisabledFlags() {
 		a.CustomMiddleware.Response[i].Disabled = true
 	}
 
-	a.CustomMiddleware.IdExtractor.Disabled = true
+	for version := range a.VersionData.Versions {
+		for i := 0; i < len(a.VersionData.Versions[version].ExtendedPaths.Virtual); i++ {
+			a.VersionData.Versions[version].ExtendedPaths.Virtual[i].Disabled = true
+			a.VersionData.Versions[version].ExtendedPaths.GoPlugin[i].Disabled = true
+		}
+	}
 }

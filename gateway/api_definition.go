@@ -685,6 +685,8 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 	nestDef := nestedApiDefinition{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
+		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.
+		loader.ReadFromURIFunc = openapi3.ReadFromFile
 		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(filePath))
 		if err == nil {
 			nestDef.OAS = &oas.OAS{T: *oasDoc}
@@ -1077,6 +1079,10 @@ func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualM
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
@@ -1097,6 +1103,10 @@ func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPlugi
 	var urlSpec []URLSpec
 
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
@@ -1786,8 +1796,10 @@ func stripListenPath(listenPath, path string) (res string) {
 
 func (s *APISpec) hasVirtualEndpoint() bool {
 	for _, version := range s.VersionData.Versions {
-		if len(version.ExtendedPaths.Virtual) > 0 {
-			return true
+		for _, virtual := range version.ExtendedPaths.Virtual {
+			if !virtual.Disabled {
+				return true
+			}
 		}
 	}
 

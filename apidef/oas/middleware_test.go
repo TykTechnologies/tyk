@@ -87,6 +87,7 @@ func TestPluginConfig(t *testing.T) {
 		}
 
 		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
 		pluginConfig.ExtractTo(&api)
 		assert.Equal(t, apidef.GoPluginDriver, api.CustomMiddleware.Driver)
 		assert.False(t, api.CustomMiddlewareBundleDisabled)
@@ -218,7 +219,7 @@ func TestTransformRequestBody(t *testing.T) {
 		assert.Equal(t, transformReqBody, newTransformReqBody)
 	})
 
-	t.Run("blob", func(t *testing.T) {
+	t.Run("path", func(t *testing.T) {
 		transformReqBody := TransformRequestBody{
 			Path:    "/opt/tyk-gateway/template.tmpl",
 			Format:  apidef.RequestJSON,
@@ -509,5 +510,191 @@ func TestResponsePlugin(t *testing.T) {
 		actualResponsePlugin := ResponsePlugin{}
 		actualResponsePlugin.Fill(api)
 		assert.Equal(t, expectedResponsePlugin, actualResponsePlugin)
+	})
+}
+
+func TestPluginConfigData(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var (
+			emptyPluginConfigData PluginConfigData
+			convertedAPI          apidef.APIDefinition
+		)
+
+		convertedAPI.SetDisabledFlags()
+		emptyPluginConfigData.ExtractTo(&convertedAPI)
+
+		var resultPluginConfigData PluginConfigData
+		resultPluginConfigData.Fill(convertedAPI)
+
+		assert.Equal(t, emptyPluginConfigData, resultPluginConfigData)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		t.Parallel()
+		expectedPluginConfigData := PluginConfigData{
+			Enabled: true,
+			Value: map[string]interface{}{
+				"foo": "bar",
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
+		expectedPluginConfigData.ExtractTo(&api)
+
+		actualPluginConfigData := PluginConfigData{}
+		actualPluginConfigData.Fill(api)
+		assert.Equal(t, expectedPluginConfigData, actualPluginConfigData)
+	})
+}
+
+func TestVirtualEndpoint(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var emptyVirtualEndpoint VirtualEndpoint
+
+		var convertedVirtualEndpoint apidef.VirtualMeta
+		emptyVirtualEndpoint.ExtractTo(&convertedVirtualEndpoint)
+
+		var resultVirtualEndpoint VirtualEndpoint
+		resultVirtualEndpoint.Fill(convertedVirtualEndpoint)
+
+		assert.Equal(t, emptyVirtualEndpoint, resultVirtualEndpoint)
+	})
+
+	t.Run("blob", func(t *testing.T) {
+		t.Parallel()
+		expectedVirtualEndpoint := VirtualEndpoint{
+			Enabled:        true,
+			Name:           "virtualFunc",
+			Body:           "test body",
+			ProxyOnError:   true,
+			RequireSession: true,
+		}
+
+		meta := apidef.VirtualMeta{}
+		expectedVirtualEndpoint.ExtractTo(&meta)
+
+		// assert that FunctionSourceType is correctly updated.
+		assert.Equal(t, apidef.VirtualMeta{
+			Disabled:             false,
+			FunctionSourceType:   apidef.UseBlob,
+			FunctionSourceURI:    "test body",
+			ResponseFunctionName: "virtualFunc",
+			UseSession:           true,
+			ProxyOnError:         true,
+		}, meta)
+
+		newVirtualEndpoint := VirtualEndpoint{}
+		newVirtualEndpoint.Fill(meta)
+		assert.Equal(t, expectedVirtualEndpoint, newVirtualEndpoint)
+	})
+
+	t.Run("path", func(t *testing.T) {
+		t.Parallel()
+		expectedVirtualEndpoint := VirtualEndpoint{
+			Enabled:        true,
+			Name:           "virtualFunc",
+			Path:           "/path/to/js",
+			ProxyOnError:   true,
+			RequireSession: true,
+		}
+
+		meta := apidef.VirtualMeta{}
+		expectedVirtualEndpoint.ExtractTo(&meta)
+
+		// assert that FunctionSourceType is correctly updated.
+		assert.Equal(t, apidef.VirtualMeta{
+			Disabled:             false,
+			FunctionSourceType:   apidef.UseFile,
+			FunctionSourceURI:    "/path/to/js",
+			ResponseFunctionName: "virtualFunc",
+			UseSession:           true,
+			ProxyOnError:         true,
+		}, meta)
+
+		newVirtualEndpoint := VirtualEndpoint{}
+		newVirtualEndpoint.Fill(meta)
+		assert.Equal(t, expectedVirtualEndpoint, newVirtualEndpoint)
+	})
+
+	t.Run("blob should have precedence", func(t *testing.T) {
+		t.Parallel()
+		virtualEndpoint := VirtualEndpoint{
+			Enabled:        true,
+			Path:           "/path/to/js",
+			Body:           "test body",
+			Name:           "virtualFunc",
+			ProxyOnError:   true,
+			RequireSession: true,
+		}
+
+		meta := apidef.VirtualMeta{}
+		virtualEndpoint.ExtractTo(&meta)
+		assert.Equal(t, apidef.VirtualMeta{
+			Disabled:             false,
+			ResponseFunctionName: "virtualFunc",
+			FunctionSourceURI:    "test body",
+			FunctionSourceType:   apidef.UseBlob,
+			ProxyOnError:         true,
+			UseSession:           true,
+		}, meta)
+
+		actualVirtualEndpoint := VirtualEndpoint{}
+		actualVirtualEndpoint.Fill(meta)
+		expectedVirtualEndpoint := virtualEndpoint
+		expectedVirtualEndpoint.Path = ""
+		assert.Equal(t, expectedVirtualEndpoint, actualVirtualEndpoint)
+	})
+}
+
+func TestEndpointPostPlugins(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var emptyPostPlugins EndpointPostPlugins
+
+		var convertedGoPlugin apidef.GoPluginMeta
+		emptyPostPlugins.ExtractTo(&convertedGoPlugin)
+
+		var resultEmptyPostPlugins EndpointPostPlugins
+		resultEmptyPostPlugins.Fill(convertedGoPlugin)
+
+		assert.Equal(t, emptyPostPlugins, resultEmptyPostPlugins)
+	})
+
+	t.Run("single empty post plugin", func(t *testing.T) {
+		t.Parallel()
+		var emptyPostPlugins = make(EndpointPostPlugins, 1)
+
+		var convertedGoPlugin apidef.GoPluginMeta
+		emptyPostPlugins.ExtractTo(&convertedGoPlugin)
+
+		var resultEmptyPostPlugins = make(EndpointPostPlugins, 1)
+		resultEmptyPostPlugins.Fill(convertedGoPlugin)
+
+		assert.Equal(t, emptyPostPlugins, resultEmptyPostPlugins)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		t.Parallel()
+		expectedEndpointPostPlugins := EndpointPostPlugins{
+			{
+				Enabled: true,
+				Name:    "symbolFunc",
+				Path:    "/path/to/so",
+			},
+		}
+
+		meta := apidef.GoPluginMeta{}
+		expectedEndpointPostPlugins.ExtractTo(&meta)
+
+		actualEndpointPostPlugins := make(EndpointPostPlugins, 1)
+		actualEndpointPostPlugins.Fill(meta)
+
+		assert.Equal(t, expectedEndpointPostPlugins, actualEndpointPostPlugins)
 	})
 }

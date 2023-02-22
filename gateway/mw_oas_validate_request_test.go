@@ -204,6 +204,7 @@ func TestValidateRequest_AfterMigration(t *testing.T) {
 	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/listen/"
 		spec.Proxy.StripListenPath = true
+		spec.ConfigDataDisabled = true
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 			v.ExtendedPaths.ValidateJSON = []apidef.ValidatePathMeta{
 				{

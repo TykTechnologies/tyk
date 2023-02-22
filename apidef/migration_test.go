@@ -592,6 +592,16 @@ func TestSetDisabledFlags(t *testing.T) {
 			Post:        make([]MiddlewareDefinition, 1),
 			Response:    make([]MiddlewareDefinition, 1),
 		},
+		VersionData: VersionData{
+			Versions: map[string]VersionInfo{
+				"": {
+					ExtendedPaths: ExtendedPathsSet{
+						Virtual:  make([]VirtualMeta, 1),
+						GoPlugin: make([]GoPluginMeta, 1),
+					},
+				},
+			},
+		},
 	}
 	expectedAPIDef := APIDefinition{
 		CustomMiddleware: MiddlewareSection{
@@ -627,7 +637,42 @@ func TestSetDisabledFlags(t *testing.T) {
 		CertificatePinningDisabled:     true,
 		DomainDisabled:                 true,
 		CustomMiddlewareBundleDisabled: true,
+		ConfigDataDisabled:             true,
+		VersionData: VersionData{
+			Versions: map[string]VersionInfo{
+				"": {
+					ExtendedPaths: ExtendedPathsSet{
+						Virtual: []VirtualMeta{
+							{
+								Disabled: true,
+							},
+						},
+						GoPlugin: []GoPluginMeta{
+							{
+								Disabled: true,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	apiDef.SetDisabledFlags()
 	assert.Equal(t, expectedAPIDef, apiDef)
+}
+
+func TestAPIDefinition_migrateIDExtractor(t *testing.T) {
+	base := oldTestAPI()
+	_, err := base.Migrate()
+	assert.NoError(t, err)
+
+	assert.True(t, base.CustomMiddleware.IdExtractor.Disabled)
+}
+
+func TestAPIDefinition_migratePluginConfigData(t *testing.T) {
+	base := oldTestAPI()
+	_, err := base.Migrate()
+	assert.NoError(t, err)
+
+	assert.True(t, base.ConfigDataDisabled)
 }

@@ -217,35 +217,60 @@ leakMid.NewProcessRequest(function(request, session) {
 func TestJSVMConfigData(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-
-	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
-	spec.ConfigData = map[string]interface{}{
-		"foo": "bar",
-	}
 	const js = `
-var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({})
+		var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({})
+		
+		testJSVMData.NewProcessRequest(function(request, session, spec) {
+			request.SetHeaders["data-foo"] = spec.config_data.foo
+			return testJSVMData.ReturnData(request, {})
+		});`
 
-testJSVMData.NewProcessRequest(function(request, session, spec) {
-	request.SetHeaders["data-foo"] = spec.config_data.foo
-	return testJSVMData.ReturnData(request, {})
-});`
-	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
-		MiddlewareClassName: "testJSVMData",
-		Pre:                 true,
-	}
-	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
-	if _, err := jsvm.VM.Run(js); err != nil {
-		t.Fatalf("failed to set up js plugin: %v", err)
-	}
-	dynMid.Spec.JSVM = jsvm
+	t.Run("config data enabled", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.ConfigData = map[string]interface{}{
+			"foo": "bar",
+		}
+		dynMid := &DynamicMiddleware{
+			BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+			MiddlewareClassName: "testJSVMData",
+			Pre:                 true,
+		}
+		jsvm := JSVM{}
+		jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+		if _, err := jsvm.VM.Run(js); err != nil {
+			t.Fatalf("failed to set up js plugin: %v", err)
+		}
+		dynMid.Spec.JSVM = jsvm
 
-	r := TestReq(t, "GET", "/v1/test-data", nil)
-	dynMid.ProcessRequest(nil, r, nil)
-	if want, got := "bar", r.Header.Get("data-foo"); want != got {
-		t.Fatalf("wanted header to be %q, got %q", want, got)
-	}
+		r := TestReq(t, "GET", "/v1/test-data", nil)
+		_, _ = dynMid.ProcessRequest(nil, r, nil)
+		assert.Equal(t, "bar", r.Header.Get("data-foo"))
+	})
+
+	t.Run("config data disabled", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.ConfigData = map[string]interface{}{
+			"foo": "bar",
+		}
+		spec.ConfigDataDisabled = true
+
+		dynMid := &DynamicMiddleware{
+			BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+			MiddlewareClassName: "testJSVMData",
+			Pre:                 true,
+		}
+		jsvm := JSVM{}
+		jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+		if _, err := jsvm.VM.Run(js); err != nil {
+			t.Fatalf("failed to set up js plugin: %v", err)
+		}
+		dynMid.Spec.JSVM = jsvm
+
+		r := TestReq(t, "GET", "/v1/test-data", nil)
+		_, _ = dynMid.ProcessRequest(nil, r, nil)
+		assert.Empty(t, r.Header.Get("data-foo"))
+	})
+
 }
 func TestJSVM_IgnoreCanonicalHeader(t *testing.T) {
 	ts := StartTest(nil)

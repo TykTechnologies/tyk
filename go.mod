@@ -13,7 +13,7 @@ require (
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
 	github.com/TykTechnologies/gorpc v0.0.0-20190515174534-b9c10befc5f4
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230203111401-2236fa135781
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230214130715-aa076c16772f
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
 	github.com/TykTechnologies/openid2go v0.1.2
@@ -26,7 +26,7 @@ require (
 	github.com/clbanning/mxj v1.8.4
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
-	github.com/getkin/kin-openapi v0.89.0
+	github.com/getkin/kin-openapi v0.114.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/golang-jwt/jwt/v4 v4.4.2
@@ -80,7 +80,7 @@ require (
 require (
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // test
 	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e // test
-	github.com/stretchr/testify v1.8.0 // test
+	github.com/stretchr/testify v1.8.1 // test
 	github.com/valyala/fasthttp v1.43.0 // test
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
 )

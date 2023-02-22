@@ -163,6 +163,27 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// PluginConfigData configures config data for custom plugins.
+type PluginConfigData struct {
+	// Enabled enables custom plugin config data.
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
+
+	// Value is the value of custom plugin config data.
+	Value map[string]interface{} `bson:"value" json:"value"` // required.
+}
+
+// Fill fills PluginConfigData from apidef.
+func (p *PluginConfigData) Fill(api apidef.APIDefinition) {
+	p.Enabled = !api.ConfigDataDisabled
+	p.Value = api.ConfigData
+}
+
+// ExtractTo extracts *PluginConfigData into *apidef.
+func (p *PluginConfigData) ExtractTo(api *apidef.APIDefinition) {
+	api.ConfigDataDisabled = !p.Enabled
+	api.ConfigData = p.Value
+}
+
 // PluginConfig holds configuration for custom plugins.
 type PluginConfig struct {
 	// Driver configures which custom plugin to be used.
@@ -179,6 +200,9 @@ type PluginConfig struct {
 
 	// Bundle configures custom plugin bundles.
 	Bundle *PluginBundle `bson:"bundle,omitempty" json:"bundle,omitempty"`
+
+	// Data configures custom plugin data.
+	Data *PluginConfigData `bson:"data,omitempty" json:"data,omitempty"`
 }
 
 // Fill fills PluginConfig from apidef.
@@ -193,6 +217,15 @@ func (p *PluginConfig) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(p.Bundle) {
 		p.Bundle = nil
 	}
+
+	if p.Data == nil {
+		p.Data = &PluginConfigData{}
+	}
+
+	p.Data.Fill(api)
+	if ShouldOmit(p.Data) {
+		p.Data = nil
+	}
 }
 
 // ExtractTo extracts *PluginConfig into *apidef.
@@ -201,6 +234,10 @@ func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
 
 	if p.Bundle != nil {
 		p.Bundle.ExtractTo(api)
+	}
+
+	if p.Data != nil {
+		p.Data.ExtractTo(api)
 	}
 }
 
@@ -837,7 +874,7 @@ type CustomPlugin struct {
 	// FunctionName is the name of authentication method.
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
-	Path string `bson:"path" json:"path"` // required.
+	Path string `bson:"path" json:"path"`
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
 	// RequireSession if set to true passes down the session information for plugins after authentication.
@@ -988,4 +1025,84 @@ func (p *ResponsePlugin) ExtractTo(api *apidef.APIDefinition) {
 
 	api.CustomMiddleware.Response = make([]apidef.MiddlewareDefinition, len(p.Plugins))
 	p.Plugins.ExtractTo(api.CustomMiddleware.Response)
+}
+
+// VirtualEndpoint contains virtual endpoint configuration.
+type VirtualEndpoint struct {
+	// Enabled enables virtual endpoint.
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	// Name is the name of js function.
+	Name string `bson:"name" json:"name"` // required.
+	// Path is the path to js file.
+	Path string `bson:"path,omitempty" json:"path,omitempty"`
+	// Body is the js function to execute encoded in base64 format.
+	Body string `bson:"body,omitempty" json:"body,omitempty"`
+	// ProxyOnError proxies if virtual endpoint errors out.
+	ProxyOnError bool `bson:"proxyOnError,omitempty" json:"proxyOnError,omitempty"`
+	// RequireSession if enabled passes session to virtual endpoint.
+	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
+}
+
+// Fill fills *VirtualEndpoint from apidef.VirtualMeta.
+func (v *VirtualEndpoint) Fill(meta apidef.VirtualMeta) {
+	v.Enabled = !meta.Disabled
+	v.Name = meta.ResponseFunctionName
+	v.RequireSession = meta.UseSession
+	v.ProxyOnError = meta.ProxyOnError
+	if meta.FunctionSourceType == apidef.UseBlob {
+		v.Body = meta.FunctionSourceURI
+	} else {
+		v.Path = meta.FunctionSourceURI
+	}
+}
+
+// ExtractTo extracts *VirtualEndpoint to *apidef.VirtualMeta.
+func (v *VirtualEndpoint) ExtractTo(meta *apidef.VirtualMeta) {
+	meta.Disabled = !v.Enabled
+	meta.ResponseFunctionName = v.Name
+	meta.UseSession = v.RequireSession
+	meta.ProxyOnError = v.ProxyOnError
+	if v.Body != "" {
+		meta.FunctionSourceType = apidef.UseBlob
+		meta.FunctionSourceURI = v.Body
+	} else {
+		meta.FunctionSourceType = apidef.UseFile
+		meta.FunctionSourceURI = v.Path
+	}
+}
+
+type EndpointPostPlugins []EndpointPostPlugin
+
+// EndpointPostPlugin contains endpoint level post plugin configuration.
+type EndpointPostPlugin struct {
+	// Enabled enables post plugin.
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	// Name is the name of plugin function to be executed.
+	Name string `bson:"name" json:"name"` // required.
+	// Path is the path to plugin.
+	Path string `bson:"path" json:"path"` // required.
+}
+
+// Fill fills *EndpointPostPlugin from apidef.GoPluginMeta.
+func (e EndpointPostPlugins) Fill(meta apidef.GoPluginMeta) {
+	if len(e) == 0 {
+		return
+	}
+
+	e[0] = EndpointPostPlugin{
+		Enabled: !meta.Disabled,
+		Name:    meta.SymbolName,
+		Path:    meta.PluginPath,
+	}
+}
+
+// ExtractTo extracts *EndpointPostPlugin to *apidef.GoPluginMeta.
+func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
+	if len(e) == 0 {
+		return
+	}
+
+	meta.Disabled = !e[0].Enabled
+	meta.PluginPath = e[0].Path
+	meta.SymbolName = e[0].Name
 }

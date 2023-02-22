@@ -40,10 +40,11 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 
 	var operation Operation
 	Fill(t, &operation, 0)
-	operation.ValidateRequest = nil          // This one also fills native part, let's skip it for this test.
-	operation.MockResponse = nil             // This one also fills native part, let's skip it for this test.
-	operation.TransformRequestBody.Path = "" // if `path` and `body` are present, `body` would take precedence, detailed tests can be found in middleware_test.go
-
+	operation.ValidateRequest = nil                   // This one also fills native part, let's skip it for this test.
+	operation.MockResponse = nil                      // This one also fills native part, let's skip it for this test.
+	operation.TransformRequestBody.Path = ""          // if `path` and `body` are present, `body` would take precedence, detailed tests can be found in middleware_test.go
+	operation.VirtualEndpoint.Path = ""               // if `path` and `body` are present, `body` would take precedence, detailed tests can be found in middleware_test.go
+	operation.PostPlugins = operation.PostPlugins[:1] // only 1 post plugin is considered at this point, ignore others.
 	xTykAPIGateway := &XTykAPIGateway{
 		Middleware: &Middleware{
 			Operations: Operations{
@@ -231,8 +232,4 @@ func TestOAS_RegexPaths(t *testing.T) {
 
 		assert.Equalf(t, tc.input, got, "test %d: rebuilt link, expected %v, got %v", i, tc.input, got)
 	}
-}
-
-func TestValidateRequest(t *testing.T) {
-
 }

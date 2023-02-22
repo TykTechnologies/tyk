@@ -43,6 +43,12 @@ type Operation struct {
 
 	// MockResponse contains the mock response configuration.
 	MockResponse *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
+
+	// VirtualEndpoint contains virtual endpoint configuration.
+	VirtualEndpoint *VirtualEndpoint `bson:"virtualEndpoint,omitempty" json:"virtualEndpoint,omitempty"`
+
+	// PostPlugins contains endpoint level post plugins configuration.
+	PostPlugins EndpointPostPlugins `bson:"postPlugins,omitempty" json:"postPlugins,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -79,7 +85,7 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykE
 			validate = &ValidateRequest{}
 		}
 
-		if shouldImport := validate.shouldImportValidateRequest(oasOperation); shouldImport {
+		if ok := validate.shouldImport(oasOperation); ok {
 			validate.Import(*overRideValues.ValidateRequest)
 			o.ValidateRequest = validate
 		}
@@ -91,7 +97,7 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykE
 			mock = &MockResponse{}
 		}
 
-		if shouldImport := mock.shouldImport(oasOperation); shouldImport {
+		if ok := mock.shouldImport(oasOperation); ok {
 			mock.Import(*overRideValues.MockResponse)
 			o.MockResponse = mock
 		}
@@ -113,6 +119,8 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillOASValidateRequest(ep.ValidateJSON)
+	s.fillVirtualEndpoint(ep.Virtual)
+	s.fillEndpointPostPlugins(ep.GoPlugin)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -133,6 +141,8 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTransformRequestBodyTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
+					tykOp.extractVirtualEndpointTo(ep, path, method)
+					tykOp.extractEndpointPostPluginTo(ep, path, method)
 					break found
 				}
 			}
@@ -471,7 +481,11 @@ func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
 	v.ErrorResponseCode = meta.ErrorResponseCode
 }
 
-func (*ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operation) bool {
+func (*ValidateRequest) shouldImport(operation *openapi3.Operation) bool {
+	if len(operation.Parameters) > 0 {
+		return true
+	}
+
 	reqBody := operation.RequestBody
 	if reqBody == nil {
 		return false
@@ -570,7 +584,7 @@ type FromOASExamples struct {
 	ExampleName string `bson:"exampleName,omitempty" json:"exampleName,omitempty"`
 }
 
-func (m *MockResponse) shouldImport(operation *openapi3.Operation) bool {
+func (*MockResponse) shouldImport(operation *openapi3.Operation) bool {
 	for _, response := range operation.Responses {
 		for _, content := range response.Value.Content {
 			if content.Example != nil || content.Schema != nil {
@@ -594,4 +608,54 @@ func (m *MockResponse) Import(enabled bool) {
 	m.FromOASExamples = &FromOASExamples{
 		Enabled: enabled,
 	}
+}
+
+func (s *OAS) fillVirtualEndpoint(endpointMetas []apidef.VirtualMeta) {
+	for _, em := range endpointMetas {
+		operationID := s.getOperationID(em.Path, em.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.VirtualEndpoint == nil {
+			operation.VirtualEndpoint = &VirtualEndpoint{}
+		}
+
+		operation.VirtualEndpoint.Fill(em)
+		if ShouldOmit(operation.VirtualEndpoint) {
+			operation.VirtualEndpoint = nil
+		}
+	}
+}
+
+func (o *Operation) extractVirtualEndpointTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.VirtualEndpoint == nil {
+		return
+	}
+
+	meta := apidef.VirtualMeta{Path: path, Method: method}
+	o.VirtualEndpoint.ExtractTo(&meta)
+	ep.Virtual = append(ep.Virtual, meta)
+}
+
+func (s *OAS) fillEndpointPostPlugins(endpointMetas []apidef.GoPluginMeta) {
+	for _, em := range endpointMetas {
+		operationID := s.getOperationID(em.Path, em.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.PostPlugins == nil {
+			operation.PostPlugins = make(EndpointPostPlugins, 1)
+		}
+
+		operation.PostPlugins.Fill(em)
+		if ShouldOmit(operation.PostPlugins) {
+			operation.PostPlugins = nil
+		}
+	}
+}
+
+func (o *Operation) extractEndpointPostPluginTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.PostPlugins == nil {
+		return
+	}
+
+	meta := apidef.GoPluginMeta{Path: path, Method: method}
+	o.PostPlugins.ExtractTo(&meta)
+	ep.GoPlugin = append(ep.GoPlugin, meta)
 }

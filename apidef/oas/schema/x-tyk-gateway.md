@@ -561,6 +561,7 @@ Regexp is the regular expression to match ID.
 
 **Field: `regexpMatchIndex` (`int`)**
 RegexpMatchIndex is the index from which ID to be extracted after a match.
+Default value is 0, ie if regexpMatchIndex is not provided ID is matched from index 0.
 
 **Field: `xPathExp` (`string`)**
 XPathExp is the xpath expression to match ID.
@@ -656,6 +657,9 @@ Tyk classic API definition: `custom_middleware.driver`.
 **Field: `bundle` ([PluginBundle](#pluginbundle))**
 Bundle configures custom plugin bundles.
 
+**Field: `data` ([PluginConfigData](#pluginconfigdata))**
+Data configures custom plugin data.
+
 
 ### **PluginBundle**
 
@@ -667,6 +671,15 @@ Tyk classic API definition: `custom_middleware_bundle_disabled`.
 **Field: `path` (`string`)**
 Path is the path suffix to construct the URL to fetch plugin bundle from.
 Path will be suffixed to `bundle_base_url` in gateway config.
+
+
+### **PluginConfigData**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables custom plugin config data.
+
+**Field: `value` (`any`)**
+Value is the value of custom plugin config data.
 
 
 ### **CORS**
@@ -833,6 +846,12 @@ ValidateRequest contains the request validation configuration.
 **Field: `mockResponse` ([MockResponse](#mockresponse))**
 MockResponse contains the mock response configuration.
 
+**Field: `virtualEndpoint` ([VirtualEndpoint](#virtualendpoint))**
+VirtualEndpoint contains virtual endpoint configuration.
+
+**Field: `postPlugins` (`[]`[EndpointPostPlugin](#endpointpostplugin))**
+PostPlugins contains endpoint level post plugins configuration.
+
 
 ### **Allowance**
 
@@ -939,5 +958,38 @@ ContentType is the default HTTP response body type that the gateway reads from t
 
 **Field: `exampleName` (`string`)**
 ExampleName is the default example name among multiple path response examples documented in OAS.
+
+
+### **VirtualEndpoint**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables virtual endpoint.
+
+**Field: `name` (`string`)**
+Name is the name of js function.
+
+**Field: `path` (`string`)**
+Path is the path to js file.
+
+**Field: `body` (`string`)**
+Body is the js function to execute encoded in base64 format.
+
+**Field: `proxyOnError` (`boolean`)**
+ProxyOnError proxies if virtual endpoint errors out.
+
+**Field: `requireSession` (`boolean`)**
+RequireSession if enabled passes session to virtual endpoint.
+
+
+### **EndpointPostPlugin**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables post plugin.
+
+**Field: `name` (`string`)**
+Name is the name of plugin function to be executed.
+
+**Field: `path` (`string`)**
+Path is the path to plugin.
 
 
