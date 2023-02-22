@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/stretchr/testify/assert"
 
@@ -120,6 +121,31 @@ func TestIsProxyOnlyAPIDefinition(t *testing.T) {
 			expectedResult: true,
 		},
 	))
+}
+
+func TestGraphqlDataSourceWebSocketProtocol(t *testing.T) {
+	run := func(subscriptionType apidef.SubscriptionType, expectedWebSocketProtocol string) func(t *testing.T) {
+		return func(t *testing.T) {
+			actualProtocol := graphqlDataSourceWebSocketProtocol(subscriptionType)
+			assert.Equal(t, expectedWebSocketProtocol, actualProtocol)
+		}
+	}
+
+	t.Run("should return 'graphql-ws' for undefined subscription type",
+		run(apidef.GQLSubscriptionUndefined, graphqlDataSource.ProtocolGraphQLWS),
+	)
+
+	t.Run("should return 'graphql-ws' for graphql-ws subscription type",
+		run(apidef.GQLSubscriptionWS, graphqlDataSource.ProtocolGraphQLWS),
+	)
+
+	t.Run("should return 'graphql-ws' for sse subscription type as websocket protocol is irrelevant in that case",
+		run(apidef.GQLSubscriptionSSE, graphqlDataSource.ProtocolGraphQLWS),
+	)
+
+	t.Run("should return 'graphql-transport-ws' for graphql-transport-ws subscription type",
+		run(apidef.GQLSubscriptionTransportWS, graphqlDataSource.ProtocolGraphQLTWS),
+	)
 }
 
 func TestGraphqlSubscriptionType(t *testing.T) {

@@ -501,7 +501,7 @@ func (g *GraphQLConfigAdapter) createGraphQLDataSourceFactory(graphqlConfig apid
 		StreamingClient: g.getStreamingClient(),
 	}
 
-	wsProtocol := g.graphqlDataSourceWebSocketProtocol(graphqlConfig.SubscriptionType)
+	wsProtocol := graphqlDataSourceWebSocketProtocol(graphqlConfig.SubscriptionType)
 	graphqlSubscriptionClient := g.subscriptionClientFactory.NewSubscriptionClient(
 		g.getHttpClient(),
 		g.getStreamingClient(),
@@ -515,12 +515,4 @@ func (g *GraphQLConfigAdapter) createGraphQLDataSourceFactory(graphqlConfig apid
 	}
 	factory.SubscriptionClient = subscriptionClient
 	return factory, nil
-}
-
-func (g *GraphQLConfigAdapter) graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType) string {
-	wsProtocol := graphqlDataSource.ProtocolGraphQLWS
-	if subscriptionType == apidef.GQLSubscriptionTransportWS {
-		wsProtocol = graphqlDataSource.ProtocolGraphQLTWS
-	}
-	return wsProtocol
 }

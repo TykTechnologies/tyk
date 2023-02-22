@@ -824,32 +824,6 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 	//assert.ElementsMatch(t, expectedDataSources, actualDataSources)
 }
 
-func TestGraphQLConfigAdapter_GraphqlDataSourceWebSocketProtocol(t *testing.T) {
-	run := func(subscriptionType apidef.SubscriptionType, expectedWebSocketProtocol string) func(t *testing.T) {
-		return func(t *testing.T) {
-			adapter := NewGraphQLConfigAdapter(nil)
-			actualProtocol := adapter.graphqlDataSourceWebSocketProtocol(subscriptionType)
-			assert.Equal(t, expectedWebSocketProtocol, actualProtocol)
-		}
-	}
-
-	t.Run("should return 'graphql-ws' for undefined subscription type",
-		run(apidef.GQLSubscriptionUndefined, graphqlDataSource.ProtocolGraphQLWS),
-	)
-
-	t.Run("should return 'graphql-ws' for graphql-ws subscription type",
-		run(apidef.GQLSubscriptionWS, graphqlDataSource.ProtocolGraphQLWS),
-	)
-
-	t.Run("should return 'graphql-ws' for sse subscription type as websocket protocol is irrelevant in that case",
-		run(apidef.GQLSubscriptionSSE, graphqlDataSource.ProtocolGraphQLWS),
-	)
-
-	t.Run("should return 'graphql-transport-ws' for graphql-transport-ws subscription type",
-		run(apidef.GQLSubscriptionTransportWS, graphqlDataSource.ProtocolGraphQLTWS),
-	)
-}
-
 var mockSubscriptionClient = &graphqlDataSource.SubscriptionClient{}
 
 type MockSubscriptionClientFactory struct{}
