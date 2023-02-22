@@ -282,7 +282,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 }
 
 // Run 2 times to ensure that both methods backward compatible
-func TestAPIMutualTLSHelper(t *testing.T) {
+func TestAPIMutualTLS(t *testing.T) {
 	t.Run("Skip ClientCA announce", func(t *testing.T) {
 		testAPIMutualTLSHelper(t, true)
 	})
@@ -327,7 +327,8 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 
 		transport := &http.Transport{TLSClientConfig: tlsConfig}
 		httpClient := &http.Client{Transport: transport}
-		clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		clientCertID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		assert.NoError(t, err)
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Domain = "localhost"
