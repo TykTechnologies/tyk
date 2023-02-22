@@ -72,11 +72,11 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 		return nil, ErrUnsupportedGraphQLConfigVersion
 	}
 
-	if g.isProxyOnlyAPIDefinition() {
+	if isProxyOnlyAPIDefinition(g.apiDefinition) {
 		return g.createV2ConfigForProxyOnlyExecutionMode()
 	}
 
-	if g.isSupergraphAPIDefinition() {
+	if isSupergraphAPIDefinition(g.apiDefinition) {
 		return g.createV2ConfigForSupergraphExecutionMode()
 	}
 
@@ -476,15 +476,6 @@ func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSo
 		}
 	}
 	return nil
-}
-
-func (g *GraphQLConfigAdapter) isSupergraphAPIDefinition() bool {
-	return g.apiDefinition.GraphQL.Enabled && g.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
-}
-
-func (g *GraphQLConfigAdapter) isProxyOnlyAPIDefinition() bool {
-	return g.apiDefinition.GraphQL.Enabled &&
-		(g.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly || g.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph)
 }
 
 func (g *GraphQLConfigAdapter) getHttpClient() *http.Client {
