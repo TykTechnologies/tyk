@@ -9,6 +9,24 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+func parseSchema(schemaAsString string) (parsedSchema *graphql.Schema, err error) {
+	parsedSchema, err = graphql.NewSchemaFromString(schemaAsString)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizationResult, err := parsedSchema.Normalize()
+	if err != nil {
+		return nil, err
+	}
+
+	if !normalizationResult.Successful && normalizationResult.Errors != nil {
+		return nil, normalizationResult.Errors
+	}
+
+	return parsedSchema, nil
+}
+
 func isSupergraphAPIDefinition(apiDefinition *apidef.APIDefinition) bool {
 	return apiDefinition.GraphQL.Enabled && apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
 }

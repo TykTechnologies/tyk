@@ -159,7 +159,9 @@ func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*grap
 }
 
 func (g *GraphQLConfigAdapter) createV2ConfigForEngineExecutionMode() (*graphql.EngineV2Configuration, error) {
-	if err := g.parseSchema(); err != nil {
+	var err error
+	g.schema, err = parseSchema(g.apiDefinition.GraphQL.Schema)
+	if err != nil {
 		return nil, err
 	}
 
@@ -176,28 +178,6 @@ func (g *GraphQLConfigAdapter) createV2ConfigForEngineExecutionMode() (*graphql.
 	conf.SetDataSources(datsSources)
 
 	return &conf, nil
-}
-
-func (g *GraphQLConfigAdapter) parseSchema() (err error) {
-	if g.schema != nil {
-		return nil
-	}
-
-	g.schema, err = graphql.NewSchemaFromString(g.apiDefinition.GraphQL.Schema)
-	if err != nil {
-		return err
-	}
-
-	normalizationResult, err := g.schema.Normalize()
-	if err != nil {
-		return err
-	}
-
-	if !normalizationResult.Successful && normalizationResult.Errors != nil {
-		return normalizationResult.Errors
-	}
-
-	return nil
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations) {

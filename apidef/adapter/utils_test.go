@@ -11,6 +11,19 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+func TestParseSchema(t *testing.T) {
+	inputSchema := `
+		type Query {
+			hello: String!
+		}`
+
+	// We are pretty confident that the schema parsing works, as it is tested in the library already.
+	// We just want to make sure that there is no weird error happening.
+	parsedSchema, err := parseSchema(inputSchema)
+	assert.NotNil(t, parsedSchema)
+	assert.NoError(t, err)
+}
+
 func TestIsSupergraphAPIDefinition(t *testing.T) {
 	type testInput struct {
 		graphQLEnabled bool

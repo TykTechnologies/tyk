@@ -494,7 +494,10 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 	}
 
 	adapter := NewGraphQLConfigAdapter(apiDef)
-	require.NoError(t, adapter.parseSchema())
+
+	var err error
+	adapter.schema, err = parseSchema(gqlConfig.Schema)
+	require.NoError(t, err)
 
 	actualFieldCfgs := adapter.engineConfigV2FieldConfigs()
 	assert.ElementsMatch(t, expectedFieldCfgs, actualFieldCfgs)
@@ -816,7 +819,10 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 		WithStreamingClient(streamingClient),
 		withGraphQLSubscriptionClientFactory(&MockSubscriptionClientFactory{}),
 	)
-	require.NoError(t, adapter.parseSchema())
+
+	var err error
+	adapter.schema, err = parseSchema(gqlConfig.Schema)
+	require.NoError(t, err)
 
 	actualDataSources, err := adapter.engineConfigV2DataSources()
 	assert.NoError(t, err)
