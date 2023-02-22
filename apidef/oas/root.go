@@ -54,7 +54,7 @@ type Info struct {
 	ID string `bson:"id" json:"id,omitempty"`
 	// DBID is the unique database ID of the API.
 	// Tyk classic API definition: `id`
-	DBID apidef.ObjectId `bson:"dbId" json:"dbId,omitempty"`
+	DBID apidef.ObjectIdModified `bson:"dbId" json:"dbId,omitempty"`
 	// OrgID is the ID of the organisation which the API belongs to.
 	// Tyk classic API definition: `org_id`
 	OrgID string `bson:"orgId" json:"orgId,omitempty"`
