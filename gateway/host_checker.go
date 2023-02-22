@@ -133,7 +133,7 @@ func (h *HostUptimeChecker) execCheck() {
 	}
 	h.resetListMu.Unlock()
 	for _, host := range h.HostList {
-		err := h.pool.Process(host)
+		_, err := h.pool.ProcessCtx(h.Gw.ctx, host)
 		if err != nil && err != tunny.ErrPoolNotRunning {
 			log.Warnf("[HOST CHECKER] could not send work, error: %v", err)
 		}
