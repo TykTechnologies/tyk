@@ -477,7 +477,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			newConfig.ClientCAs = x509.NewCertPool()
 			newConfig.ClientAuth = tls.RequestClientCert
 		}
-		
+
 		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
 
