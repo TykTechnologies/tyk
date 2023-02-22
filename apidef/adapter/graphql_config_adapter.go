@@ -320,7 +320,7 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 		if len(apiDefSubgraphConf.SDL) == 0 {
 			continue
 		}
-		hdr := g.removeDuplicateHeaders(apiDefSubgraphConf.Headers, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
+		hdr := removeDuplicateApiDefinitionHeaders(apiDefSubgraphConf.Headers, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
 		conf := g.graphqlDataSourceConfiguration(
 			apiDefSubgraphConf.URL,
 			http.MethodPost,
@@ -453,22 +453,6 @@ func (g *GraphQLConfigAdapter) convertApiDefQueriesConfigIntoEngineV2Queries(eng
 
 		*engineV2Queries = append(*engineV2Queries, engineV2Query)
 	}
-}
-
-func (g *GraphQLConfigAdapter) removeDuplicateHeaders(headers ...map[string]string) map[string]string {
-	hdr := make(map[string]string)
-	// headers priority depends on the order of arguments
-	for _, header := range headers {
-		for k, v := range header {
-			keyCanonical := http.CanonicalHeaderKey(k)
-			if _, ok := hdr[keyCanonical]; ok {
-				// skip because header is present
-				continue
-			}
-			hdr[keyCanonical] = v
-		}
-	}
-	return hdr
 }
 
 func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {

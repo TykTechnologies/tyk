@@ -27,3 +27,21 @@ func TestConvertApiDefinitionHeadersToHttpHeaders(t *testing.T) {
 		assert.Equal(t, expectedHttpHeaders, actualHttpHeaders)
 	})
 }
+
+func TestRemoveDuplicateApiDefinitionHeaders(t *testing.T) {
+	apiDefinitionHeadersFirstArgument := map[string]string{
+		"duplicate-header": "value",
+	}
+	apiDefinitionHeadersSecondArgument := map[string]string{
+		"Duplicate-Header":     "value",
+		"Non-Duplicate-Header": "another_value",
+	}
+
+	expectedDeduplicatedHeaders := map[string]string{
+		"Duplicate-Header":     "value",
+		"Non-Duplicate-Header": "another_value",
+	}
+
+	actualDeduplicatedHeaders := removeDuplicateApiDefinitionHeaders(apiDefinitionHeadersFirstArgument, apiDefinitionHeadersSecondArgument)
+	assert.Equal(t, expectedDeduplicatedHeaders, actualDeduplicatedHeaders)
+}
