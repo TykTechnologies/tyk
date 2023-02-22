@@ -257,7 +257,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 					Method: restConfig.Method,
 					Body:   restConfig.Body,
 					Query:  queryConfigs,
-					Header: g.convertHeadersToHttpHeaders(restConfig.Headers),
+					Header: convertApiDefinitionHeadersToHttpHeaders(restConfig.Headers),
 				},
 			})
 
@@ -352,7 +352,7 @@ func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method
 		Fetch: graphqlDataSource.FetchConfiguration{
 			URL:    url,
 			Method: method,
-			Header: g.convertHeadersToHttpHeaders(dataSourceHeaders),
+			Header: convertApiDefinitionHeadersToHttpHeaders(dataSourceHeaders),
 		},
 		Subscription: graphqlDataSource.SubscriptionConfiguration{
 			URL:    url,
@@ -453,19 +453,6 @@ func (g *GraphQLConfigAdapter) convertApiDefQueriesConfigIntoEngineV2Queries(eng
 
 		*engineV2Queries = append(*engineV2Queries, engineV2Query)
 	}
-}
-
-func (g *GraphQLConfigAdapter) convertHeadersToHttpHeaders(apiDefHeaders map[string]string) http.Header {
-	if len(apiDefHeaders) == 0 {
-		return nil
-	}
-
-	engineV2Headers := make(http.Header)
-	for apiDefHeaderKey, apiDefHeaderValue := range apiDefHeaders {
-		engineV2Headers.Add(apiDefHeaderKey, apiDefHeaderValue)
-	}
-
-	return engineV2Headers
 }
 
 func (g *GraphQLConfigAdapter) removeDuplicateHeaders(headers ...map[string]string) map[string]string {
