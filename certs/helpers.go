@@ -21,6 +21,8 @@ func GenCertificate(template *x509.Certificate, setLeaf bool) ([]byte, []byte, [
 	template.BasicConstraintsValid = true
 	template.NotBefore = time.Now()
 	template.NotAfter = template.NotBefore.Add(time.Hour)
+	template.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth}
+	template.KeyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign
 
 	derBytes, _ := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
 
