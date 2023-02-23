@@ -4,7 +4,7 @@ services:
     image: redis
       
   gw:
-    image: tykio/tyk-gateway:${tag}
+    image: ${registry}/${image}:${tag}
     volumes:
       - ./testplugin/testplugin_${tag}_${plugin_os}_${plugin_arch}.so:/opt/tyk-gateway/middleware/testplugin.so
       - ./testplugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json

@@ -14,17 +14,13 @@ EOF
     exit 1
 }
 
-compose='docker-compose'
-# composev2 is a client plugin
-[[ $(docker version --format='{{ .Client.Version }}') =~ "20.10" ]] && compose='docker compose'
-
 [[ -z $1 ]] && usage $0
 export tag=$1
 
 trap "$compose down" EXIT
 
 rm -fv testplugin/*.so || true
-docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${tag} testplugin.so
+docker run --rm -v `pwd`/testplugin:/plugin-source ${reg-tykio}/tyk-plugin-compiler:${tag} testplugin.so
 
 # This ensures correct paths when running by hand
 TYK_GW_PATH=$(readlink -f $(dirname $(readlink -f $0))/../../..)
@@ -39,7 +35,7 @@ fi
 export plugin_os=${GOOS}
 export plugin_arch=${GOARCH}
 
-$compose up -d
+registry=${reg-tykio} image=${i-tyk-gateway} docker compose up -d
 
 sleep 5 # Wait for init
 curl -vvv http://localhost:8080/goplugin/headers || { $compose logs gw; exit 1; }

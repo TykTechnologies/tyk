@@ -36,6 +36,7 @@ jobs:
     container: 'tykio/golang-cross:1.20-bullseye'
     outputs:
       tag: ${{ steps.targets.outputs.tag }}
+      reg: ${{ steps.login-ecr.outputs.registry }}
 
     steps:
       - name: Fix private module deps
@@ -289,6 +290,11 @@ jobs:
       - name: Run tests
         shell: bash
         run: |
+          if [[ ! startsWith(github.ref, 'refs/tags') ]]; then
+          registry=${{ needs.goreleaser.outputs.reg }}
+          image=tyk
+          tag=$GITHUB_SHA
+          fi
           set -eaxo pipefail
           if [ ! -d smoke-tests ]; then
              echo "::warning No repo specific smoke tests defined"
@@ -302,7 +308,7 @@ jobs:
               echo Attempting to test $d
               if [ -d $d ] && [ -e $d/test.sh ]; then
                   cd $d
-                  ./test.sh ${{ needs.goreleaser.outputs.tag }}
+                  reg=$registry i=$image ./test.sh ${tag-${{ needs.goreleaser.outputs.tag }}}
                   cd -
               fi
           done
