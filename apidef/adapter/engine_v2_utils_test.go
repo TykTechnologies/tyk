@@ -250,3 +250,32 @@ func TestAppendApiDefQueriesConfigToEngineV2Queries(t *testing.T) {
 	appendApiDefQueriesConfigToEngineV2Queries(existingEngineV2Queries, apiDefQueryVariables)
 	assert.Equal(t, expectedEngineV2Queries, existingEngineV2Queries)
 }
+
+func TestCreateGraphQLDataSourceFactory(t *testing.T) {
+	inputParams := createGraphQLDataSourceFactoryParams{
+		graphqlConfig: apidef.GraphQLEngineDataSourceConfigGraphQL{
+			SubscriptionType: apidef.GQLSubscriptionSSE,
+		},
+		subscriptionClientFactory: &MockSubscriptionClientFactory{},
+		httpClient: &http.Client{
+			Timeout: 0,
+		},
+		streamingClient: &http.Client{
+			Timeout: 1,
+		},
+	}
+
+	expectedGraphQLDataSourceFactory := &graphqlDataSource.Factory{
+		HTTPClient: &http.Client{
+			Timeout: 0,
+		},
+		StreamingClient: &http.Client{
+			Timeout: 1,
+		},
+		SubscriptionClient: mockSubscriptionClient,
+	}
+
+	actualGraphQLDataSourceFactory, err := createGraphQLDataSourceFactory(inputParams)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedGraphQLDataSourceFactory, actualGraphQLDataSourceFactory)
+}

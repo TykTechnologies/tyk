@@ -1,6 +1,8 @@
 package adapter
 
 import (
+	"errors"
+	"net/http"
 	neturl "net/url"
 	"sort"
 	"strings"
@@ -11,6 +13,13 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
+
+type createGraphQLDataSourceFactoryParams struct {
+	graphqlConfig             apidef.GraphQLEngineDataSourceConfigGraphQL
+	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
+	httpClient                *http.Client
+	streamingClient           *http.Client
+}
 
 func graphqlDataSourceConfiguration(url string, method string, headers map[string]string, subscriptionType apidef.SubscriptionType) graphqlDataSource.Configuration {
 	dataSourceHeaders := make(map[string]string)
@@ -103,4 +112,26 @@ func appendApiDefQueriesConfigToEngineV2Queries(engineV2Queries *[]restDataSourc
 
 		*engineV2Queries = append(*engineV2Queries, engineV2Query)
 	}
+}
+
+func createGraphQLDataSourceFactory(params createGraphQLDataSourceFactoryParams) (*graphqlDataSource.Factory, error) {
+	factory := &graphqlDataSource.Factory{
+		HTTPClient:      params.httpClient,
+		StreamingClient: params.streamingClient,
+	}
+
+	wsProtocol := graphqlDataSourceWebSocketProtocol(params.graphqlConfig.SubscriptionType)
+	graphqlSubscriptionClient := params.subscriptionClientFactory.NewSubscriptionClient(
+		params.httpClient,
+		params.streamingClient,
+		nil,
+		graphqlDataSource.WithWSSubProtocol(wsProtocol),
+	)
+
+	subscriptionClient, ok := graphqlSubscriptionClient.(*graphqlDataSource.SubscriptionClient)
+	if !ok {
+		return nil, errors.New("incorrect SubscriptionClient has been created")
+	}
+	factory.SubscriptionClient = subscriptionClient
+	return factory, nil
 }

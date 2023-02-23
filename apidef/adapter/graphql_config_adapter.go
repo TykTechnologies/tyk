@@ -246,7 +246,12 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			planDataSource.Factory, err = g.createGraphQLDataSourceFactory(graphqlConfig)
+			planDataSource.Factory, err = createGraphQLDataSourceFactory(createGraphQLDataSourceFactoryParams{
+				graphqlConfig:             graphqlConfig,
+				subscriptionClientFactory: g.subscriptionClientFactory,
+				httpClient:                g.getHttpClient(),
+				streamingClient:           g.getStreamingClient(),
+			})
 			if err != nil {
 				return nil, err
 			}
@@ -378,26 +383,4 @@ func (g *GraphQLConfigAdapter) getStreamingClient() *http.Client {
 	}
 
 	return g.streamingClient
-}
-
-func (g *GraphQLConfigAdapter) createGraphQLDataSourceFactory(graphqlConfig apidef.GraphQLEngineDataSourceConfigGraphQL) (*graphqlDataSource.Factory, error) {
-	factory := &graphqlDataSource.Factory{
-		HTTPClient:      g.getHttpClient(),
-		StreamingClient: g.getStreamingClient(),
-	}
-
-	wsProtocol := graphqlDataSourceWebSocketProtocol(graphqlConfig.SubscriptionType)
-	graphqlSubscriptionClient := g.subscriptionClientFactory.NewSubscriptionClient(
-		g.getHttpClient(),
-		g.getStreamingClient(),
-		nil,
-		graphqlDataSource.WithWSSubProtocol(wsProtocol),
-	)
-
-	subscriptionClient, ok := graphqlSubscriptionClient.(*graphqlDataSource.SubscriptionClient)
-	if !ok {
-		return nil, errors.New("incorrect SubscriptionClient has been created")
-	}
-	factory.SubscriptionClient = subscriptionClient
-	return factory, nil
 }
