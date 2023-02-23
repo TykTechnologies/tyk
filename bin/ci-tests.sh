@@ -17,7 +17,13 @@ set -e
 
 # build Go-plugin used in tests
 echo "Building go plugin"
-go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
+
+tags=""
+if [[ $FIPS == "1" ]]; then
+    tags="-tags 'boringcrypto'"
+fi
+
+go build ${tags} -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
 
 for pkg in ${PKGS}; do
     tags=""
