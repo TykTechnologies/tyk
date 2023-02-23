@@ -49,6 +49,7 @@ jobs:
           echo "GOPATH=$(pwd)" >> $GITHUB_ENV
           echo "$(pwd)/bin" >> $GITHUB_PATH
           echo "$curdir/go/bin" >> $GITHUB_PATH
+          echo "FIPS=1" >> $GITHUB_ENV
 
       - name: Setup Python
         uses: actions/setup-python@v4
