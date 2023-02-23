@@ -21,6 +21,9 @@ go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugi
 
 for pkg in ${PKGS}; do
     tags=""
+    if [[ $FIPS == "1" ]]; then
+        tags="-tags 'boringcrypto'"
+    fi
     if [[ ${pkg} == *"goplugin" ]]; then
         tags="-tags 'goplugin'"
     fi
