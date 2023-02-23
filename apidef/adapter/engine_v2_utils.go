@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -32,4 +33,18 @@ func graphqlDataSourceConfiguration(url string, method string, headers map[strin
 	}
 
 	return cfg
+}
+
+func createArgumentConfigurationsForArgumentNames(argumentNames ...string) plan.ArgumentsConfigurations {
+	argConfs := plan.ArgumentsConfigurations{}
+	for _, argName := range argumentNames {
+		argConf := plan.ArgumentConfiguration{
+			Name:       argName,
+			SourceType: plan.FieldArgumentSource,
+		}
+
+		argConfs = append(argConfs, argConf)
+	}
+
+	return argConfs
 }

@@ -329,7 +329,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldCon
 			continue
 		}
 
-		(*fieldConfs)[i].Arguments = g.createArgumentConfigurationsForArgumentNames(currentArgs.ArgumentNames)
+		(*fieldConfs)[i].Arguments = createArgumentConfigurationsForArgumentNames(currentArgs.ArgumentNames...)
 		delete(generatedArgs, lookupKey)
 	}
 
@@ -337,23 +337,9 @@ func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldCon
 		*fieldConfs = append(*fieldConfs, plan.FieldConfiguration{
 			TypeName:  genArgs.TypeName,
 			FieldName: genArgs.FieldName,
-			Arguments: g.createArgumentConfigurationsForArgumentNames(genArgs.ArgumentNames),
+			Arguments: createArgumentConfigurationsForArgumentNames(genArgs.ArgumentNames...),
 		})
 	}
-}
-
-func (g *GraphQLConfigAdapter) createArgumentConfigurationsForArgumentNames(argumentNames []string) plan.ArgumentsConfigurations {
-	argConfs := plan.ArgumentsConfigurations{}
-	for _, argName := range argumentNames {
-		argConf := plan.ArgumentConfiguration{
-			Name:       argName,
-			SourceType: plan.FieldArgumentSource,
-		}
-
-		argConfs = append(argConfs, argConf)
-	}
-
-	return argConfs
 }
 
 func (g *GraphQLConfigAdapter) extractURLQueryParamsForEngineV2(url string, providedApiDefQueries []apidef.QueryVariable) (urlWithoutParams string, engineV2Queries []restDataSource.QueryConfiguration, err error) {

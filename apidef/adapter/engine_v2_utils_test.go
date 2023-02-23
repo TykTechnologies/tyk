@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -93,4 +94,20 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 		assert.Equal(t, expectedGraphqlDataSourceConfiguration, actualGraphqlDataSourceConfiguration)
 	})
 
+}
+
+func TestCreateArgumentConfigurationsForArgumentNames(t *testing.T) {
+	expectedArgumentConfigurations := plan.ArgumentsConfigurations{
+		{
+			Name:       "argument1",
+			SourceType: plan.FieldArgumentSource,
+		},
+		{
+			Name:       "argument2",
+			SourceType: plan.FieldArgumentSource,
+		},
+	}
+
+	actualArgumentConfigurations := createArgumentConfigurationsForArgumentNames("argument1", "argument2")
+	assert.Equal(t, expectedArgumentConfigurations, actualArgumentConfigurations)
 }
