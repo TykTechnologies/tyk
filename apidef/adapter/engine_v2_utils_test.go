@@ -114,6 +114,73 @@ func TestCreateArgumentConfigurationsForArgumentNames(t *testing.T) {
 	assert.Equal(t, expectedArgumentConfigurations, actualArgumentConfigurations)
 }
 
+func TestExtractURLQueryParamsForEngineV2(t *testing.T) {
+	type expectedOutput struct {
+		urlWithoutParams string
+		engineV2Queries  []restDataSource.QueryConfiguration
+		err              error
+	}
+
+	providedApiDefQueries := []apidef.QueryVariable{
+		{
+			Name:  "providedQueryName1",
+			Value: "providedQueryValue1",
+		},
+		{
+			Name:  "providedQueryName2",
+			Value: "providedQueryValue2",
+		},
+	}
+
+	t.Run("without query params in url", func(t *testing.T) {
+		inputUrl := "http://rest-data-source.fake"
+		expected := expectedOutput{
+			urlWithoutParams: "http://rest-data-source.fake",
+			engineV2Queries: []restDataSource.QueryConfiguration{
+				{
+					Name:  "providedQueryName1",
+					Value: "providedQueryValue1",
+				},
+				{
+					Name:  "providedQueryName2",
+					Value: "providedQueryValue2",
+				},
+			},
+			err: nil,
+		}
+		actualUrlWithoutParams, actualEngineV2Queries, actualErr := extractURLQueryParamsForEngineV2(inputUrl, providedApiDefQueries)
+		assert.Equal(t, expected.urlWithoutParams, actualUrlWithoutParams)
+		assert.Equal(t, expected.engineV2Queries, actualEngineV2Queries)
+		assert.Equal(t, expected.err, actualErr)
+	})
+
+	t.Run("with query params in url", func(t *testing.T) {
+		inputUrl := "http://rest-data-source.fake?urlParam=urlParamValue"
+		expected := expectedOutput{
+			urlWithoutParams: "http://rest-data-source.fake",
+			engineV2Queries: []restDataSource.QueryConfiguration{
+				{
+					Name:  "urlParam",
+					Value: "urlParamValue",
+				},
+				{
+					Name:  "providedQueryName1",
+					Value: "providedQueryValue1",
+				},
+				{
+					Name:  "providedQueryName2",
+					Value: "providedQueryValue2",
+				},
+			},
+			err: nil,
+		}
+		actualUrlWithoutParams, actualEngineV2Queries, actualErr := extractURLQueryParamsForEngineV2(inputUrl, providedApiDefQueries)
+		assert.Equal(t, expected.urlWithoutParams, actualUrlWithoutParams)
+		assert.Equal(t, expected.engineV2Queries, actualEngineV2Queries)
+		assert.Equal(t, expected.err, actualErr)
+	})
+}
+
 func TestAppendURLQueryParamsToEngineV2Queries(t *testing.T) {
 	existingEngineV2Queries := &[]restDataSource.QueryConfiguration{
 		{

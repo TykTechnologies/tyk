@@ -52,6 +52,31 @@ func createArgumentConfigurationsForArgumentNames(argumentNames ...string) plan.
 	return argConfs
 }
 
+func extractURLQueryParamsForEngineV2(url string, providedApiDefQueries []apidef.QueryVariable) (urlWithoutParams string, engineV2Queries []restDataSource.QueryConfiguration, err error) {
+	urlParts := strings.Split(url, "?")
+	urlWithoutParams = urlParts[0]
+
+	queryPart := ""
+	if len(urlParts) == 2 {
+		queryPart = urlParts[1]
+	}
+	// Parse only query part as URL could contain templating {{.argument.id}} which should not be escaped
+	values, err := neturl.ParseQuery(queryPart)
+	if err != nil {
+		return "", nil, err
+	}
+
+	engineV2Queries = make([]restDataSource.QueryConfiguration, 0)
+	appendURLQueryParamsToEngineV2Queries(&engineV2Queries, values)
+	appendApiDefQueriesConfigToEngineV2Queries(&engineV2Queries, providedApiDefQueries)
+
+	if len(engineV2Queries) == 0 {
+		return urlWithoutParams, nil, nil
+	}
+
+	return urlWithoutParams, engineV2Queries, nil
+}
+
 func appendURLQueryParamsToEngineV2Queries(engineV2Queries *[]restDataSource.QueryConfiguration, queryValues neturl.Values) {
 	for queryKey, queryValue := range queryValues {
 		*engineV2Queries = append(*engineV2Queries, restDataSource.QueryConfiguration{
