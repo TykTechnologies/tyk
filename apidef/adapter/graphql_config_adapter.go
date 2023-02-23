@@ -253,7 +253,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			planDataSource.Custom = graphqlDataSource.ConfigJson(g.graphqlDataSourceConfiguration(
+			planDataSource.Custom = graphqlDataSource.ConfigJson(graphqlDataSourceConfiguration(
 				graphqlConfig.URL,
 				graphqlConfig.Method,
 				graphqlConfig.Headers,
@@ -301,7 +301,7 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 			continue
 		}
 		hdr := removeDuplicateApiDefinitionHeaders(apiDefSubgraphConf.Headers, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
-		conf := g.graphqlDataSourceConfiguration(
+		conf := graphqlDataSourceConfiguration(
 			apiDefSubgraphConf.URL,
 			http.MethodPost,
 			hdr,
@@ -315,32 +315,6 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 	}
 
 	return confs
-}
-
-func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method string, headers map[string]string, subscriptionType apidef.SubscriptionType) graphqlDataSource.Configuration {
-	dataSourceHeaders := make(map[string]string)
-	for name, value := range headers {
-		dataSourceHeaders[name] = value
-	}
-
-	if strings.HasPrefix(url, "tyk://") {
-		url = strings.ReplaceAll(url, "tyk://", "http://")
-		dataSourceHeaders[apidef.TykInternalApiHeader] = "true"
-	}
-
-	cfg := graphqlDataSource.Configuration{
-		Fetch: graphqlDataSource.FetchConfiguration{
-			URL:    url,
-			Method: method,
-			Header: convertApiDefinitionHeadersToHttpHeaders(dataSourceHeaders),
-		},
-		Subscription: graphqlDataSource.SubscriptionConfiguration{
-			URL:    url,
-			UseSSE: subscriptionType == apidef.GQLSubscriptionSSE,
-		},
-	}
-
-	return cfg
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
