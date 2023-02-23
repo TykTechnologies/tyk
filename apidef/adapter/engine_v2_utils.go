@@ -1,9 +1,12 @@
 package adapter
 
 import (
+	neturl "net/url"
+	"sort"
 	"strings"
 
 	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -47,4 +50,32 @@ func createArgumentConfigurationsForArgumentNames(argumentNames ...string) plan.
 	}
 
 	return argConfs
+}
+
+func appendURLQueryParamsToEngineV2Queries(engineV2Queries *[]restDataSource.QueryConfiguration, queryValues neturl.Values) {
+	for queryKey, queryValue := range queryValues {
+		*engineV2Queries = append(*engineV2Queries, restDataSource.QueryConfiguration{
+			Name:  queryKey,
+			Value: strings.Join(queryValue, ","),
+		})
+	}
+
+	sort.Slice(*engineV2Queries, func(i, j int) bool {
+		return (*engineV2Queries)[i].Name < (*engineV2Queries)[j].Name
+	})
+}
+
+func appendApiDefQueriesConfigToEngineV2Queries(engineV2Queries *[]restDataSource.QueryConfiguration, apiDefQueries []apidef.QueryVariable) {
+	if len(apiDefQueries) == 0 {
+		return
+	}
+
+	for _, apiDefQueryVar := range apiDefQueries {
+		engineV2Query := restDataSource.QueryConfiguration{
+			Name:  apiDefQueryVar.Name,
+			Value: apiDefQueryVar.Value,
+		}
+
+		*engineV2Queries = append(*engineV2Queries, engineV2Query)
+	}
 }

@@ -2,9 +2,11 @@ package adapter
 
 import (
 	"net/http"
+	neturl "net/url"
 	"testing"
 
 	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 	"github.com/stretchr/testify/assert"
 
@@ -110,4 +112,74 @@ func TestCreateArgumentConfigurationsForArgumentNames(t *testing.T) {
 
 	actualArgumentConfigurations := createArgumentConfigurationsForArgumentNames("argument1", "argument2")
 	assert.Equal(t, expectedArgumentConfigurations, actualArgumentConfigurations)
+}
+
+func TestAppendURLQueryParamsToEngineV2Queries(t *testing.T) {
+	existingEngineV2Queries := &[]restDataSource.QueryConfiguration{
+		{
+			Name:  "existingName",
+			Value: "existingValue",
+		},
+	}
+
+	queryValues := neturl.Values{
+		"newKey1": {"newKey1Value1"},
+		"newKey2": {"newKey2Value1", "newKey2Value2"},
+	}
+
+	expectedEngineV2Queries := &[]restDataSource.QueryConfiguration{
+		{
+			Name:  "existingName",
+			Value: "existingValue",
+		},
+		{
+			Name:  "newKey1",
+			Value: "newKey1Value1",
+		},
+		{
+			Name:  "newKey2",
+			Value: "newKey2Value1,newKey2Value2",
+		},
+	}
+
+	appendURLQueryParamsToEngineV2Queries(existingEngineV2Queries, queryValues)
+	assert.Equal(t, expectedEngineV2Queries, existingEngineV2Queries)
+}
+
+func TestAppendApiDefQueriesConfigToEngineV2Queries(t *testing.T) {
+	existingEngineV2Queries := &[]restDataSource.QueryConfiguration{
+		{
+			Name:  "existingName",
+			Value: "existingValue",
+		},
+	}
+
+	apiDefQueryVariables := []apidef.QueryVariable{
+		{
+			Name:  "newName1",
+			Value: "newValue2",
+		},
+		{
+			Name:  "newName2",
+			Value: "newValue2",
+		},
+	}
+
+	expectedEngineV2Queries := &[]restDataSource.QueryConfiguration{
+		{
+			Name:  "existingName",
+			Value: "existingValue",
+		},
+		{
+			Name:  "newName1",
+			Value: "newValue2",
+		},
+		{
+			Name:  "newName2",
+			Value: "newValue2",
+		},
+	}
+
+	appendApiDefQueriesConfigToEngineV2Queries(existingEngineV2Queries, apiDefQueryVariables)
+	assert.Equal(t, expectedEngineV2Queries, existingEngineV2Queries)
 }
