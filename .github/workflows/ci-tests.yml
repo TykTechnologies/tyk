@@ -99,9 +99,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
             
-      - name: Setup upterm session
-        if: ${{ contains(matrix.go, 'fips') }}
-        uses: lhotari/action-upterm@v1
+#      - name: Setup upterm session
+#        if: ${{ contains(matrix.go, 'fips') }}
+#        uses: lhotari/action-upterm@v1
 
       - name: Run Gateway Tests
         id: ci-tests
