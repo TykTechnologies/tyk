@@ -126,7 +126,11 @@ func TestVirtualEndpointBatch(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
+	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		KeyUsage:    x509.KeyUsageCertSign,
+	}, false)
+
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
