@@ -32,6 +32,11 @@ for pkg in ${PKGS}; do
     fi
     if [[ ${pkg} == *"goplugin" ]]; then
         tags="-tags 'goplugin'"
+
+        if [[ $FIPS == "1" ]]; then
+            tags="-tags 'goplugin,boringcrypto'"
+        fi
+
     fi
 
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
