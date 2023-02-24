@@ -65,7 +65,7 @@ require (
 	github.com/uber/jaeger-client-go v2.20.0+incompatible
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/crypto v0.0.0-20220513210258-46612604a0f9
+	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	google.golang.org/grpc v1.36.0
@@ -78,9 +78,10 @@ require (
 )
 
 require (
+	github.com/TykTechnologies/storage v0.0.0-20230224213141-5b4f6a33a28e // indirect
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // test
 	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e // test
-	github.com/stretchr/testify v1.8.0 // test
+	github.com/stretchr/testify v1.8.1 // test
 	github.com/valyala/fasthttp v1.43.0 // test
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
 )

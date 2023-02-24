@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/storage/persistent/id"
 	"net/http"
 	"strings"
 	"text/template"
@@ -567,7 +568,7 @@ type Scopes struct {
 //
 // swagger:model
 type APIDefinition struct {
-	Id                  ObjectId      `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
+	Id                  id.OID        `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
 	Name                string        `bson:"name" json:"name"`
 	Expiration          string        `bson:"expiration" json:"expiration,omitempty"`
 	ExpirationTs        time.Time     `bson:"-" json:"-"`
