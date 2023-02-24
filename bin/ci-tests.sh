@@ -34,7 +34,7 @@ for pkg in ${PKGS}; do
         tags="-tags 'goplugin'"
 
         if [[ $FIPS == "1" ]]; then
-            tags="-tags 'goplugin boringcrypto'"
+            tags='-tags "goplugin boringcrypto"'
         fi
 
     fi
