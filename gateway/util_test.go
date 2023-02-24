@@ -247,6 +247,56 @@ func Test_shouldReloadSpec(t *testing.T) {
 		assert.True(t, shouldReloadSpec(existingSpec, newSpec))
 	})
 
+	t.Run("virtual endpoint", func(t *testing.T) {
+		tcs := []struct {
+			spec         *APISpec
+			shouldReload bool
+		}{
+			{
+				spec: &APISpec{APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						Versions: map[string]apidef.VersionInfo{
+							"": {
+								ExtendedPaths: apidef.ExtendedPathsSet{
+									Virtual: []apidef.VirtualMeta{
+										{
+											Disabled: false,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				},
+				shouldReload: true,
+			},
+			{
+				spec: &APISpec{APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						Versions: map[string]apidef.VersionInfo{
+							"": {
+								ExtendedPaths: apidef.ExtendedPathsSet{
+									Virtual: []apidef.VirtualMeta{
+										{
+											Disabled: true,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				},
+				shouldReload: false,
+			},
+		}
+
+		for _, tc := range tcs {
+			assert.Equal(t, tc.shouldReload, shouldReloadSpec(&APISpec{}, tc.spec))
+		}
+	})
+
 	t.Run("mw enabled", func(t *testing.T) {
 		tcs := []struct {
 			spec         *APISpec

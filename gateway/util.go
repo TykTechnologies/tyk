@@ -7,6 +7,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 )
 
 // appendIfMissing ensures dest slice is unique with new items.
@@ -158,39 +159,29 @@ func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
 		return true
 	}
 
-	if mwEnabled(newSpec.CustomMiddleware.AuthCheck) {
+	if newSpec.hasVirtualEndpoint() {
 		return true
 	}
 
-	customPlugin := mwsEnabled(newSpec.CustomMiddleware.Pre)
-	if customPlugin {
+	if middleware.Enabled(newSpec.CustomMiddleware.AuthCheck) {
 		return true
 	}
 
-	customPlugin = mwsEnabled(newSpec.CustomMiddleware.PostKeyAuth)
-	if customPlugin {
+	if middleware.Enabled(newSpec.CustomMiddleware.Pre...) {
 		return true
 	}
 
-	customPlugin = mwsEnabled(newSpec.CustomMiddleware.Post)
-	if customPlugin {
+	if middleware.Enabled(newSpec.CustomMiddleware.PostKeyAuth...) {
 		return true
 	}
 
-	customPlugin = mwsEnabled(newSpec.CustomMiddleware.Response)
-
-	return customPlugin
-}
-
-func mwsEnabled(mwDefs []apidef.MiddlewareDefinition) bool {
-	for _, mwDef := range mwDefs {
-		if mwEnabled(mwDef) {
-			return true
-		}
+	if middleware.Enabled(newSpec.CustomMiddleware.Post...) {
+		return true
 	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Response...) {
+		return true
+	}
+
 	return false
-}
-
-func mwEnabled(mwDef apidef.MiddlewareDefinition) bool {
-	return !mwDef.Disabled && mwDef.Path != "" && mwDef.Name != ""
 }

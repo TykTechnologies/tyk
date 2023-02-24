@@ -321,7 +321,7 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 	spec.APIDefinition = def.APIDefinition
 
 	if currSpec := a.Gw.getApiSpec(def.APIID); !shouldReloadSpec(currSpec, spec) {
-		return a.Gw.getApiSpec(def.APIID)
+		return currSpec
 	}
 
 	if logger == nil {
