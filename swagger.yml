@@ -940,28 +940,6 @@ paths:
               schema:
                 type: string
               example: "Hello Tiki"
-  '/tyk/{listenPath}/hello':
-    parameters:
-      - in: path
-        name: listenPath
-        required: true
-        description: "Listen path of loaded API"
-        schema:
-          type: string
-    get:
-      summary: Check the Health of the API
-      description: Should point to API domain if it has its own
-      tags:
-        - Health Checking
-      operationId: helloAPI
-      responses:
-        '200':
-          description: Success
-          content:
-            text/html:
-              schema:
-                type: string
-              example: "Hello Tiki"
   '/tyk/certs':
     get:
       parameters:
