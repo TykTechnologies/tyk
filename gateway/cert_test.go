@@ -276,7 +276,19 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	})
 }
 
+// Run 2 times to ensure that both methods backward compatible
 func TestAPIMutualTLS(t *testing.T) {
+	t.Run("Skip ClientCA announce", func(t *testing.T) {
+		testAPIMutualTLSHelper(t, true)
+	})
+
+	t.Run("Announce ClientCA", func(t *testing.T) {
+		testAPIMutualTLSHelper(t, false)
+	})
+}
+
+func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
+	t.Helper()
 
 	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
@@ -285,6 +297,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		globalConf.EnableCustomDomains = true
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf.HttpServerOptions.SkipClientCAAnnouncement = skipCAAnnounce
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -299,6 +312,34 @@ func TestAPIMutualTLS(t *testing.T) {
 	// Initialize client certificates
 	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
 	clientCertPem2, _, _, clientCert2 := certs.GenCertificate(&x509.Certificate{})
+
+	t.Run("acceptable CAs from server", func(t *testing.T) {
+		tlsConfig := GetTLSConfig(&clientCert, serverCertPem)
+		tlsConfig.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			assert.Equal(t, skipCAAnnounce, len(info.AcceptableCAs) == 0)
+			return &clientCert, nil
+		}
+
+		transport := &http.Transport{TLSClientConfig: tlsConfig}
+		httpClient := &http.Client{Transport: transport}
+		clientCertID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		assert.NoError(t, err)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Domain = "localhost"
+			spec.Proxy.ListenPath = "/"
+			spec.UseMutualTLSAuth = true
+			spec.ClientCertificates = []string{clientCertID}
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Code: 200, Client: httpClient, Domain: "localhost",
+		})
+
+		ts.Gw.CertificateManager.Delete(clientCertID, "")
+		ts.Gw.CertificateManager.FlushCache()
+		tlsConfigCache.Flush()
+	})
 
 	t.Run("SNI and domain per API", func(t *testing.T) {
 		t.Run("API without mutual TLS", func(t *testing.T) {

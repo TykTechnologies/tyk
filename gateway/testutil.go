@@ -1235,8 +1235,7 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 }
 
-func GetTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
-	// Setup HTTPS client
+func GetTLSConfig(cert *tls.Certificate, caCert []byte) *tls.Config {
 	tlsConfig := &tls.Config{}
 
 	if cert != nil {
@@ -1251,6 +1250,13 @@ func GetTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
 	} else {
 		tlsConfig.InsecureSkipVerify = true
 	}
+
+	return tlsConfig
+}
+
+func GetTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
+	// Setup HTTPS client
+	tlsConfig := GetTLSConfig(cert, caCert)
 
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 
