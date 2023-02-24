@@ -2,10 +2,10 @@ package middleware
 
 import "github.com/TykTechnologies/tyk/apidef"
 
+// Enabled returns whether middlewares are enabled or not.
 func Enabled(defs ...apidef.MiddlewareDefinition) bool {
 	for _, def := range defs {
-		// gRPC coprocess won't return true since def.path would be empty.
-		if !def.Disabled && def.Path != "" && def.Name != "" {
+		if !def.Disabled && def.Name != "" {
 			return true
 		}
 	}

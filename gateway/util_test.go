@@ -238,21 +238,27 @@ func Test_getAPIURL(t *testing.T) {
 }
 
 func Test_shouldReloadSpec(t *testing.T) {
+	t.Parallel()
 	t.Run("empty curr spec", func(t *testing.T) {
+		t.Parallel()
 		assert.True(t, shouldReloadSpec(nil, &APISpec{}))
 	})
 
 	t.Run("checksum mismatch", func(t *testing.T) {
+		t.Parallel()
 		existingSpec, newSpec := &APISpec{Checksum: "1"}, &APISpec{Checksum: "2"}
 		assert.True(t, shouldReloadSpec(existingSpec, newSpec))
 	})
 
 	t.Run("virtual endpoint", func(t *testing.T) {
+		t.Parallel()
 		tcs := []struct {
-			spec         *APISpec
-			shouldReload bool
+			name string
+			spec *APISpec
+			want bool
 		}{
 			{
+				name: "disabled",
 				spec: &APISpec{APIDefinition: &apidef.APIDefinition{
 					VersionData: apidef.VersionData{
 						Versions: map[string]apidef.VersionInfo{
@@ -269,9 +275,10 @@ func Test_shouldReloadSpec(t *testing.T) {
 					},
 				},
 				},
-				shouldReload: true,
+				want: true,
 			},
 			{
+				name: "enabled",
 				spec: &APISpec{APIDefinition: &apidef.APIDefinition{
 					VersionData: apidef.VersionData{
 						Versions: map[string]apidef.VersionInfo{
@@ -288,21 +295,82 @@ func Test_shouldReloadSpec(t *testing.T) {
 					},
 				},
 				},
-				shouldReload: false,
+				want: false,
 			},
 		}
 
 		for _, tc := range tcs {
-			assert.Equal(t, tc.shouldReload, shouldReloadSpec(&APISpec{}, tc.spec))
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				if got := shouldReloadSpec(&APISpec{}, tc.spec); got != tc.want {
+					t.Errorf("shouldReloadSpec() = %v, want %v", got, tc.want)
+				}
+			})
+		}
+	})
+
+	t.Run("driver", func(t *testing.T) {
+		t.Parallel()
+		tcs := []struct {
+			name string
+			spec *APISpec
+			want bool
+		}{
+			{
+				name: "grpc",
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddleware: apidef.MiddlewareSection{
+							Driver: apidef.GrpcDriver,
+							Pre: []apidef.MiddlewareDefinition{
+								{
+									Disabled: false,
+									Name:     "funcName",
+								},
+							},
+						},
+					},
+				},
+				want: false,
+			},
+			{
+				name: "goplugin",
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddleware: apidef.MiddlewareSection{
+							Driver: apidef.GoPluginDriver,
+							Pre: []apidef.MiddlewareDefinition{
+								{
+									Disabled: false,
+									Name:     "funcName",
+								},
+							},
+						},
+					},
+				},
+				want: true,
+			},
+		}
+
+		for _, tc := range tcs {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				if got := shouldReloadSpec(&APISpec{}, tc.spec); got != tc.want {
+					t.Errorf("shouldReloadSpec() = %v, want %v", got, tc.want)
+				}
+			})
 		}
 	})
 
 	t.Run("mw enabled", func(t *testing.T) {
+		t.Parallel()
 		tcs := []struct {
-			spec         *APISpec
-			shouldReload bool
+			name string
+			spec *APISpec
+			want bool
 		}{
 			{
+				name: "auth",
 				spec: &APISpec{
 					APIDefinition: &apidef.APIDefinition{
 						CustomMiddleware: apidef.MiddlewareSection{
@@ -314,9 +382,10 @@ func Test_shouldReloadSpec(t *testing.T) {
 						},
 					},
 				},
-				shouldReload: true,
+				want: true,
 			},
 			{
+				name: "pre",
 				spec: &APISpec{
 					APIDefinition: &apidef.APIDefinition{
 						CustomMiddleware: apidef.MiddlewareSection{
@@ -330,13 +399,14 @@ func Test_shouldReloadSpec(t *testing.T) {
 						},
 					},
 				},
-				shouldReload: true,
+				want: true,
 			},
 			{
+				name: "postKeyAuth",
 				spec: &APISpec{
 					APIDefinition: &apidef.APIDefinition{
 						CustomMiddleware: apidef.MiddlewareSection{
-							Pre: []apidef.MiddlewareDefinition{
+							PostKeyAuth: []apidef.MiddlewareDefinition{
 								{
 									Disabled: false,
 									Name:     "postAuth",
@@ -346,13 +416,14 @@ func Test_shouldReloadSpec(t *testing.T) {
 						},
 					},
 				},
-				shouldReload: true,
+				want: true,
 			},
 			{
+				name: "post",
 				spec: &APISpec{
 					APIDefinition: &apidef.APIDefinition{
 						CustomMiddleware: apidef.MiddlewareSection{
-							Pre: []apidef.MiddlewareDefinition{
+							Post: []apidef.MiddlewareDefinition{
 								{
 									Disabled: false,
 									Name:     "post",
@@ -362,13 +433,14 @@ func Test_shouldReloadSpec(t *testing.T) {
 						},
 					},
 				},
-				shouldReload: true,
+				want: true,
 			},
 			{
+				name: "response",
 				spec: &APISpec{
 					APIDefinition: &apidef.APIDefinition{
 						CustomMiddleware: apidef.MiddlewareSection{
-							Pre: []apidef.MiddlewareDefinition{
+							Response: []apidef.MiddlewareDefinition{
 								{
 									Disabled: false,
 									Name:     "response",
@@ -378,16 +450,17 @@ func Test_shouldReloadSpec(t *testing.T) {
 						},
 					},
 				},
-				shouldReload: true,
-			},
-			{
-				spec:         &APISpec{APIDefinition: &apidef.APIDefinition{}},
-				shouldReload: false,
+				want: true,
 			},
 		}
 
 		for _, tc := range tcs {
-			assert.Equal(t, tc.shouldReload, shouldReloadSpec(&APISpec{}, tc.spec))
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				if got := shouldReloadSpec(&APISpec{}, tc.spec); got != tc.want {
+					t.Errorf("shouldReloadSpec() = %v, want %v", got, tc.want)
+				}
+			})
 		}
 	})
 }

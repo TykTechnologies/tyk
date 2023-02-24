@@ -47,7 +47,6 @@ func TestEnabled(t *testing.T) {
 				{
 					Disabled: false,
 					Name:     "mwFunc",
-					Path:     "/path/to/plugin",
 				},
 			},
 			want: true,

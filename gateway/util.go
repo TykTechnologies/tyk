@@ -163,6 +163,10 @@ func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
 		return true
 	}
 
+	if newSpec.CustomMiddleware.Driver == apidef.GrpcDriver {
+		return false
+	}
+
 	if middleware.Enabled(newSpec.CustomMiddleware.AuthCheck) {
 		return true
 	}
