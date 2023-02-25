@@ -67,6 +67,7 @@ type Logger = log.Logger
 var (
 	gatewayLog = log.New()
 
+	drlLog              = log.WithPrefix("drl")
 	rpcLog              = log.WithPrefix("rpc")
 	mainLog             = log.WithPrefix("main")
 	testLog             = log.WithPrefix("test")
@@ -75,6 +76,7 @@ var (
 	policyLog           = log.WithPrefix("policy")
 	pubSubLog           = log.WithPrefix("pub-sub")
 	webhooksLog         = log.WithPrefix("webhooks")
+	coprocessLog        = log.WithPrefix("coprocess")
 	analyticsLog        = log.WithPrefix("analytics")
 	hostcheckLog        = log.WithPrefix("host-check")
 	hostcheckManagerLog = log.WithPrefix("host-check-mgr")
@@ -363,6 +365,7 @@ func (gw *Gateway) setupGlobals() {
 
 	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", RedisController: gw.RedisController}
 	versionStore.Connect()
+
 	err := versionStore.SetKey("gateway", VERSION, 0)
 
 	if err != nil {
@@ -1188,7 +1191,7 @@ func (gw *Gateway) setupLogger() {
 	rawLog.ReplaceHooks(hooks)
 }
 
-func (gw *Gateway) initialiseSystem() error {
+func (gw *Gateway) initLogging() {
 	logger := gw.Logger()
 
 	if gw.isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
@@ -1196,11 +1199,37 @@ func (gw *Gateway) initialiseSystem() error {
 		// output
 		logger.SetLevel(log.ErrorLevel)
 		logger.SetOutput(ioutil.Discard)
+
+		var loggers = []Logger{
+			drlLog,
+			rpcLog,
+			mainLog,
+			testLog,
+			oauthLog,
+			proxyLog,
+			policyLog,
+			pubSubLog,
+			webhooksLog,
+			coprocessLog,
+			analyticsLog,
+			hostcheckLog,
+			hostcheckManagerLog,
+			letsencryptLog,
+			mdcbLog,
+		}
+		for _, l := range loggers {
+			l.SetOutput(ioutil.Discard)
+		}
+
 		gorpc.SetErrorLogger(func(string, ...interface{}) {})
 	} else if *cli.DebugMode {
 		logger.SetLevel(log.DebugLevel)
 		logger.Debug("Enabling debug-level output")
 	}
+}
+
+func (gw *Gateway) initialiseSystem() error {
+	logger := gw.Logger()
 
 	if *cli.Conf != "" {
 		logger.Debugf("Using %s for configuration", *cli.Conf)
@@ -1243,6 +1272,9 @@ func (gw *Gateway) initialiseSystem() error {
 		}
 	}
 
+	// Enable all the loggers
+	gw.setupLogger()
+
 	if gwConfig.Storage.Type != "redis" {
 		logger.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
 	}
@@ -1263,10 +1295,7 @@ func (gw *Gateway) initialiseSystem() error {
 		}
 	}
 
-	// Enable all the loggers
-	gw.setupLogger()
 	logger.Info("PIDFile location set to: ", gwConfig.PIDFileLocation)
-
 	if err := writePIDFile(gw.GetConfig().PIDFileLocation); err != nil {
 		logger.Error("Failed to write PIDFile: ", err)
 	}
@@ -1547,6 +1576,7 @@ func Start() {
 
 	// ToDo:Config replace for get default conf
 	gw := NewGateway(config.Default, ctx)
+	gw.initLogging()
 	gw.SetNodeID("solo-" + uuid.NewV4().String())
 
 	gw.SessionID = uuid.NewV4().String()

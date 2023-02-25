@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -988,7 +989,10 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 	// init and create gw
 	ctx, cancel := context.WithCancel(context.Background())
 
-	testLog.Info("starting test")
+	// Use defer to ensure testLog is initialized.
+	defer func() {
+		testLog.Info("starting test")
+	}()
 
 	s.ctx = ctx
 	s.cancel = func() {
@@ -1070,6 +1074,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	gw := NewGateway(gwConfig, s.ctx)
 	gw.setTestMode(true)
+	gw.initLogging()
 
 	s.MockHandle = MockHandle
 
@@ -1910,4 +1915,11 @@ func randStringBytes(n int) string {
 	}
 
 	return string(b)
+}
+
+// findTestPath makes tests work with any working dir.
+func findTestPath(filename string) string {
+	_, testFilename, _, _ := runtime.Caller(0)
+	testDir := path.Dir(testFilename)
+	return path.Join(testDir, filename)
 }

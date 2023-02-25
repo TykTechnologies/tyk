@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 )
@@ -15,7 +17,7 @@ func (ts *Test) createGetHandler() *WebHookHandler {
 		TargetPath:   TestHttpGet,
 		Method:       "GET",
 		EventTimeout: 10,
-		TemplatePath: "../templates/default_webhook.json",
+		TemplatePath: findTestPath("../templates/default_webhook.json"),
 		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
 	}
 	ev := &WebHookHandler{Gw: ts.Gw}
@@ -151,20 +153,23 @@ func TestCreateBody(t *testing.T) {
 	defer ts.Close()
 
 	em := config.EventMessage{
-		Type:      EventQuotaExceeded,
+		Type: EventQuotaExceeded,
+		Meta: map[string]interface{}{
+			"Message": "message",
+			"Path":    "--",
+			"Origin":  "--",
+			"Key":     "key",
+		},
 		TimeStamp: "0",
 	}
 
 	hook := ts.createGetHandler()
 	body, err := hook.CreateBody(em)
-	if err != nil {
-		t.Error("Create body failed with error! ", err)
-	}
+
+	assert.NoError(t, err)
 
 	expectedBody := `"event": "QuotaExceeded"`
-	if !strings.Contains(body, expectedBody) {
-		t.Error("Body incorrect, is: ", body)
-	}
+	assert.True(t, strings.Contains(body, expectedBody), "Body incorrect")
 }
 
 func TestGet(t *testing.T) {

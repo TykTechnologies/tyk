@@ -6,10 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/log"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/log"
 )
 
 var (

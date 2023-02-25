@@ -8,8 +8,6 @@ import (
 	"github.com/TykTechnologies/tyk/log"
 )
 
-var drlLog = log.New().WithField("prefix", "drl")
-
 func (gw *Gateway) setupDRL() {
 	drlManager := &drl.DRL{}
 	drlManager.Init(gw.ctx)

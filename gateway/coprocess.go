@@ -16,11 +16,8 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
 )
-
-var coprocessLog = log.New().WithField("prefix", "coprocess")
 
 var (
 	supportedDrivers = []apidef.MiddlewareDriver{apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver}

@@ -43,6 +43,8 @@ func TestGateway_afterConfSetup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gw := NewGateway(tt.initialConfig, context.Background())
+			gw.initLogging()
+
 			gw.afterConfSetup()
 
 			assert.Equal(t, tt.expectedConfig, gw.GetConfig())
