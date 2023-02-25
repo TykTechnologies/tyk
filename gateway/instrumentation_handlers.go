@@ -28,21 +28,21 @@ func (gw *Gateway) setupInstrumentation() {
 
 	gwConfig := gw.GetConfig()
 	if gwConfig.StatsdConnectionString == "" {
-		log.Error("Instrumentation is enabled, but no connectionstring set for statsd")
+		mainLog.Error("Instrumentation is enabled, but no connectionstring set for statsd")
 		return
 	}
 
 	instrumentationEnabled = true
 
-	log.Info("Sending stats to: ", gwConfig.StatsdConnectionString, " with prefix: ", gwConfig.StatsdPrefix)
+	mainLog.Info("Sending stats to: ", gwConfig.StatsdConnectionString, " with prefix: ", gwConfig.StatsdPrefix)
 	statsdSink, err := NewStatsDSink(gwConfig.StatsdConnectionString,
 		&StatsDSinkOptions{Prefix: gwConfig.StatsdPrefix})
 
 	if err != nil {
-		log.Fatal("Failed to start StatsD check: ", err)
+		mainLog.Fatal("Failed to start StatsD check: ", err)
 	}
 
-	log.Info("StatsD instrumentation sink started")
+	mainLog.Info("StatsD instrumentation sink started")
 	instrument.AddSink(statsdSink)
 
 	gw.MonitorApplicationInstrumentation()
@@ -66,7 +66,7 @@ func InstrumentationMW(next http.Handler) http.Handler {
 }
 
 func (gw *Gateway) MonitorApplicationInstrumentation() {
-	log.Info("Starting application monitoring...")
+	mainLog.Info("Starting application monitoring...")
 	go func() {
 		job := instrument.NewJob("GCActivity")
 		job_rl := instrument.NewJob("Load")

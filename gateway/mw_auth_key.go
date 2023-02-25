@@ -95,7 +95,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	if key != "" {
 		key = stripBearer(key)
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		log.Debug("Trying to find key by client certificate")
+		k.Logger().Debug("Trying to find key by client certificate")
 		certHash = k.Spec.OrgID + certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
 	} else {
@@ -106,6 +106,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
 	key = session.KeyID
 	if !keyExists {
+
 		// fallback to search by cert
 		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
 		if !keyExists {

@@ -98,7 +98,7 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 
 func (h *HostUptimeChecker) HostCheckLoop(ctx context.Context) {
 	defer func() {
-		log.Info("[HOST CHECKER] Checker stopped")
+		hostcheckLog.Info("[HOST CHECKER] Checker stopped")
 	}()
 	if h.Gw.isRunningTests() {
 		for {
@@ -129,13 +129,13 @@ func (h *HostUptimeChecker) execCheck() {
 		h.HostList = h.newList
 		h.newList = nil
 		h.doResetList = false
-		log.Debug("[HOST CHECKER] Host list reset")
+		hostcheckLog.Debug("[HOST CHECKER] Host list reset")
 	}
 	h.resetListMu.Unlock()
 	for _, host := range h.HostList {
 		_, err := h.pool.SendWork(host)
 		if err != nil && err != tunny.ErrPoolNotRunning {
-			log.Warnf("[HOST CHECKER] could not send work, error: %v", err)
+			hostcheckLog.Warnf("[HOST CHECKER] could not send work, error: %v", err)
 		}
 	}
 }
@@ -146,7 +146,7 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 		case <-ctx.Done():
 			if !h.getStopLoop() {
 				h.Stop()
-				log.Debug("[HOST CHECKER] Received cancel signal")
+				hostcheckLog.Debug("[HOST CHECKER] Received cancel signal")
 			}
 			return
 		case okHost := <-h.okChan:
@@ -161,12 +161,12 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 						//if the count-1 is equals to zero, it means that the host is fully up.
 
 						h.samples.Delete(okHost.CheckURL)
-						log.Warning("[HOST CHECKER] [HOST UP]: ", okHost.CheckURL)
+						hostcheckLog.Warning("[HOST CHECKER] [HOST UP]: ", okHost.CheckURL)
 						go h.cb.Up(ctx, okHost)
 					} else {
 						//in another case, we are one step closer. We just update the count number
 						sample.count = newCount
-						log.Warning("[HOST CHECKER] [HOST UP BUT NOT REACHED LIMIT]: ", okHost.CheckURL)
+						hostcheckLog.Warning("[HOST CHECKER] [HOST UP BUT NOT REACHED LIMIT]: ", okHost.CheckURL)
 						h.samples.Store(okHost.CheckURL, sample)
 					}
 				}
@@ -189,7 +189,7 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 
 			if sample.count >= h.sampleTriggerLimit {
 				// if it reached the h.sampleTriggerLimit, it means the host is down for us. We update the reachedLimit flag and store it in the sample map
-				log.Warning("[HOST CHECKER] [HOST DOWN]: ", failedHost.CheckURL)
+				hostcheckLog.Warning("[HOST CHECKER] [HOST DOWN]: ", failedHost.CheckURL)
 
 				//if this is the first time it reached the h.sampleTriggerLimit, the value of the reachedLimit flag is stored with the new count
 				if sample.reachedLimit == false {
@@ -202,7 +202,7 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 
 			} else {
 				//if it failed but not reached the h.sampleTriggerLimit yet, we just add the counter to the map.
-				log.Warning("[HOST CHECKER] [HOST DOWN BUT NOT REACHED LIMIT]: ", failedHost.CheckURL)
+				hostcheckLog.Warning("[HOST CHECKER] [HOST DOWN BUT NOT REACHED LIMIT]: ", failedHost.CheckURL)
 				h.samples.Store(failedHost.CheckURL, sample)
 			}
 
@@ -214,7 +214,7 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 }
 
 func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
-	log.Debug("[HOST CHECKER] Checking: ", toCheck.CheckURL)
+	hostcheckLog.Debug("[HOST CHECKER] Checking: ", toCheck.CheckURL)
 
 	t1 := time.Now()
 	report := HostHealthReport{
@@ -229,7 +229,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		}
 		u, err := url.Parse(host)
 		if err != nil {
-			log.Error("Could not parse host: ", err)
+			hostcheckLog.Error("Could not parse host: ", err)
 			return
 		}
 		var ls net.Conn
@@ -241,22 +241,22 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			ls, err = d.Dial("tcp", u.Host)
 		}
 		if err != nil {
-			log.Error("Could not connect to host: ", err)
+			hostcheckLog.Error("Could not connect to host: ", err)
 			report.IsTCPError = true
 			break
 		}
 		if toCheck.EnableProxyProtocol {
-			log.Debug("using proxy protocol")
+			hostcheckLog.Debug("using proxy protocol")
 			ls = proxyproto.NewConn(ls, 0)
 		}
 		defer ls.Close()
 		for _, cmd := range toCheck.Commands {
 			switch cmd.Name {
 			case "send":
-				log.Debugf("%s: sending %s", host, cmd.Message)
+				hostcheckLog.Debugf("%s: sending %s", host, cmd.Message)
 				_, err = ls.Write([]byte(cmd.Message))
 				if err != nil {
-					log.Errorf("Failed to send %s :%v", cmd.Message, err)
+					hostcheckLog.Errorf("Failed to send %s :%v", cmd.Message, err)
 					report.IsTCPError = true
 					break
 				}
@@ -264,17 +264,17 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 				buf := make([]byte, len(cmd.Message))
 				_, err = ls.Read(buf)
 				if err != nil {
-					log.Errorf("Failed to read %s :%v", cmd.Message, err)
+					hostcheckLog.Errorf("Failed to read %s :%v", cmd.Message, err)
 					report.IsTCPError = true
 					break
 				}
 				g := string(buf)
 				if g != cmd.Message {
-					log.Errorf("Failed expectation  expected %s got %s", cmd.Message, g)
+					hostcheckLog.Errorf("Failed expectation  expected %s got %s", cmd.Message, g)
 					report.IsTCPError = true
 					break
 				}
-				log.Debugf("%s: received %s", host, cmd.Message)
+				hostcheckLog.Debugf("%s: received %s", host, cmd.Message)
 			}
 		}
 		report.ResponseCode = http.StatusOK
@@ -285,7 +285,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		}
 		req, err := http.NewRequest(useMethod, toCheck.CheckURL, strings.NewReader(toCheck.Body))
 		if err != nil {
-			log.Error("Could not create request: ", err)
+			hostcheckLog.Error("Could not create request: ", err)
 			return
 		}
 		ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
@@ -364,9 +364,9 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 		h.checkTimeout = defaultTimeout
 	}
 
-	log.Debug("[HOST CHECKER] Config:TriggerLimit: ", h.sampleTriggerLimit)
-	log.Debug("[HOST CHECKER] Config:Timeout: ~", h.checkTimeout)
-	log.Debug("[HOST CHECKER] Config:WorkerPool: ", h.workerPoolSize)
+	hostcheckLog.Debug("[HOST CHECKER] Config:TriggerLimit: ", h.sampleTriggerLimit)
+	hostcheckLog.Debug("[HOST CHECKER] Config:Timeout: ~", h.checkTimeout)
+	hostcheckLog.Debug("[HOST CHECKER] Config:WorkerPool: ", h.workerPoolSize)
 
 	var err error
 	h.pool, err = tunny.CreatePool(h.workerPoolSize, func(hostData interface{}) interface{} {
@@ -375,21 +375,21 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 		return nil
 	}).Open()
 
-	log.Debug("[HOST CHECKER] Init complete")
+	hostcheckLog.Debug("[HOST CHECKER] Init complete")
 
 	if err != nil {
-		log.Errorf("[HOST CHECKER POOL] Error: %v\n", err)
+		hostcheckLog.Errorf("[HOST CHECKER POOL] Error: %v\n", err)
 	}
 }
 
 func (h *HostUptimeChecker) Start(ctx context.Context) {
 	// Start the loop that checks for bum hosts
 	h.setStopLoop(false)
-	log.Debug("[HOST CHECKER] Starting...")
+	hostcheckLog.Debug("[HOST CHECKER] Starting...")
 	go h.HostCheckLoop(ctx)
-	log.Debug("[HOST CHECKER] Check loop started...")
+	hostcheckLog.Debug("[HOST CHECKER] Check loop started...")
 	go h.HostReporter(ctx)
-	log.Debug("[HOST CHECKER] Host reporter started...")
+	hostcheckLog.Debug("[HOST CHECKER] Host reporter started...")
 }
 
 // eraseSyncMap uses native sync.Map functions to clear the map
@@ -407,7 +407,7 @@ func (h *HostUptimeChecker) Stop() {
 
 		eraseSyncMap(h.samples)
 
-		log.Info("[HOST CHECKER] Stopping poller")
+		hostcheckLog.Info("[HOST CHECKER] Stopping poller")
 		h.pool.Close()
 	}
 }
@@ -417,5 +417,5 @@ func (h *HostUptimeChecker) ResetList(hostList map[string]HostData) {
 	h.doResetList = true
 	h.newList = hostList
 	h.resetListMu.Unlock()
-	log.Debug("[HOST CHECKER] Checker reset queued!")
+	hostcheckLog.Debug("[HOST CHECKER] Checker reset queued!")
 }

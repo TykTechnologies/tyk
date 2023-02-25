@@ -3,17 +3,15 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
+	"github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -62,23 +60,18 @@ func (d *DBPolicy) ToRegularPolicy() user.Policy {
 	return policy
 }
 
-func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
+func LoadPoliciesFromFile(filePath string) (map[string]user.Policy, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "policy",
-		}).Error("Couldn't open policy file: ", err)
-		return nil
+		return nil, err
 	}
 	defer f.Close()
 
 	var policies map[string]user.Policy
 	if err := json.NewDecoder(f).Decode(&policies); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "policy",
-		}).Error("Couldn't unmarshal policies: ", err)
+		return nil, err
 	}
-	return policies
+	return policies, nil
 }
 
 func LoadPoliciesFromDir(dir string) map[string]user.Policy {
@@ -86,15 +79,15 @@ func LoadPoliciesFromDir(dir string) map[string]user.Policy {
 	// Grab json files from directory
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
-		log.Info("Loading policy from dir ", path)
+		policyLog.Info("Loading policy from dir ", path)
 		f, err := os.Open(path)
 		if err != nil {
-			log.Error("Couldn't open policy file from dir: ", err)
+			policyLog.Error("Couldn't open policy file from dir: ", err)
 			continue
 		}
 		pol := &user.Policy{}
 		if err := json.NewDecoder(f).Decode(pol); err != nil {
-			log.Errorf("Couldn't unmarshal policy configuration from dir: %v : %v", path, err)
+			policyLog.Errorf("Couldn't unmarshal policy configuration from dir: %v : %v", path, err)
 		}
 		f.Close()
 		policies[pol.ID] = *pol
@@ -103,12 +96,12 @@ func LoadPoliciesFromDir(dir string) map[string]user.Policy {
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
+func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) (map[string]user.Policy, error) {
 
 	// Get the definitions
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
-		log.Error("Failed to create request: ", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	newRequest.Header.Set("authorization", secret)
@@ -118,26 +111,30 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	newRequest.Header.Set("x-tyk-nonce", gw.ServiceNonce)
 	gw.ServiceNonceMutex.RUnlock()
 
-	log.WithFields(logrus.Fields{
+	policyLog.WithFields(log.Fields{
 		"prefix": "policy",
 	}).Info("Mutex lock acquired... calling")
 	c := gw.initialiseClient()
 
-	log.WithFields(logrus.Fields{
+	policyLog.WithFields(log.Fields{
 		"prefix": "policy",
 	}).Info("Calling dashboard service for policy list")
 	resp, err := c.Do(newRequest)
 	if err != nil {
-		log.Error("Policy request failed: ", err)
-		return nil
+		policyLog.Error("Policy request failed: ", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
-		log.Error("Policy request login failure, Response was: ", string(body))
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		policyLog.WithField("response", string(body)).Error("Policy request login failure")
 		gw.reLogin()
-		return nil
+		return nil, err
 	}
 
 	// Extract Policies
@@ -146,20 +143,18 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 		Nonce   string
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		log.Error("Failed to decode policy body: ", err)
-		return nil
+		policyLog.Error("Failed to decode policy body: ", err)
+		return nil, err
 	}
 
 	gw.ServiceNonceMutex.Lock()
 	gw.ServiceNonce = list.Nonce
 	gw.ServiceNonceMutex.Unlock()
-	log.Debug("Loading Policies Finished: Nonce Set: ", list.Nonce)
+	policyLog.Debug("Loading Policies Finished: Nonce Set: ", list.Nonce)
 
 	policies := make(map[string]user.Policy, len(list.Message))
 
-	log.WithFields(logrus.Fields{
-		"prefix": "policy",
-	}).Info("Processing policy list")
+	policyLog.Info("Processing policy list")
 	for _, p := range list.Message {
 		id := p.MID.Hex()
 		if allowExplicit && p.ID != "" {
@@ -167,8 +162,7 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 		}
 		p.ID = id
 		if _, ok := policies[id]; ok {
-			log.WithFields(logrus.Fields{
-				"prefix":   "policy",
+			policyLog.WithFields(log.Fields{
 				"policyID": p.ID,
 				"OrgID":    p.OrgID,
 			}).Warning("--> Skipping policy, new item has a duplicate ID!")
@@ -177,7 +171,7 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 		policies[id] = p.ToRegularPolicy()
 	}
 
-	return policies
+	return policies, nil
 }
 
 func parsePoliciesFromRPC(list string, allowExplicit bool) (map[string]user.Policy, error) {
@@ -216,14 +210,11 @@ func (gw *Gateway) LoadPoliciesFromRPC(orgId string, allowExplicit bool) (map[st
 	policies, err := parsePoliciesFromRPC(rpcPolicies, allowExplicit)
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "policy",
-		}).Error("Failed decode: ", err, rpcPolicies)
 		return nil, err
 	}
 
 	if err := gw.saveRPCPoliciesBackup(rpcPolicies); err != nil {
-		log.Error(err)
+		policyLog.WithError(err).Error("error saving policies backup")
 	}
 
 	return policies, nil

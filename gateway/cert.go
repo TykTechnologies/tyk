@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/gorilla/mux"
 	"github.com/pmylund/go-cache"
@@ -64,7 +64,7 @@ var cipherSuites = map[string]uint16{
 	"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305":  0xcca9,
 }
 
-var certLog = log.WithField("prefix", "certs")
+var certLog = log.New().WithField("prefix", "certs")
 
 func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
 	var certID string
@@ -311,10 +311,12 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 	serverCerts := []tls.Certificate{}
 	certNameMap := map[string]*tls.Certificate{}
 
+	logger := log.New()
+
 	for _, certData := range gwConfig.HttpServerOptions.Certificates {
 		cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
 		if err != nil {
-			log.Errorf("Server error: loadkeys: %s", err)
+			logger.Errorf("Server error: loadkeys: %s", err)
 			continue
 		}
 		serverCerts = append(serverCerts, cert)
@@ -330,7 +332,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			}
 
 			waitingRedisLog.Do(func() {
-				log.Warning("Redis is not ready. Waiting for a living connection")
+				logger.Warning("Redis is not ready. Waiting for a living connection")
 			})
 			time.Sleep(10 * time.Millisecond)
 		}

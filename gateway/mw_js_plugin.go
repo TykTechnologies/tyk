@@ -20,7 +20,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/user"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 )
 
 // Lets the user override and return a response from middleware
@@ -104,7 +104,7 @@ func specToJson(spec *APISpec) string {
 
 	bs, err := json.Marshal(m)
 	if err != nil {
-		log.Error("Failed to encode configuration data: ", err)
+		log.WithError(err).Error("Failed to encode configuration data")
 		return ""
 	}
 	return string(bs)
@@ -322,16 +322,16 @@ type JSVM struct {
 	Spec    *APISpec
 	VM      *otto.Otto `json:"-"`
 	Timeout time.Duration
-	Log     *logrus.Entry  `json:"-"` // logger used by the JS code
-	RawLog  *logrus.Logger `json:"-"` // logger used by `rawlog` func to avoid formatting
-	Gw      *Gateway       `json:"-"`
+	Log     Logger   `json:"-"` // logger used by the JS code
+	RawLog  Logger   `json:"-"` // logger used by `rawlog` func to avoid formatting
+	Gw      *Gateway `json:"-"`
 }
 
 const defaultJSVMTimeout = 5
 
 // Init creates the JSVM with the core library and sets up a default
 // timeout.
-func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
+func (j *JSVM) Init(spec *APISpec, logger Logger, gw *Gateway) {
 	vm := otto.New()
 	j.Gw = gw
 	logger = logger.WithField("prefix", "jsvm")
@@ -427,7 +427,7 @@ type TykJSHttpResponse struct {
 func (j *JSVM) LoadTykJSApi() {
 	// Enable a log
 	j.VM.Set("log", func(call otto.FunctionCall) otto.Value {
-		j.Log.WithFields(logrus.Fields{
+		j.Log.WithFields(log.Fields{
 			"type": "log-msg",
 		}).Info(call.Argument(0).String())
 		return otto.Value{}

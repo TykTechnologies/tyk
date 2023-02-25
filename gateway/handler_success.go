@@ -175,10 +175,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			if responseCopy != nil {
 				contents, err := ioutil.ReadAll(responseCopy.Body)
 				if err != nil {
-					log.Error("Couldn't read response body", err)
+					mainLog.WithError(err).Error("Couldn't read response body")
 				}
 
-				responseCopy.Body = respBodyReader(r, responseCopy)
+				responseCopy.Body = respBodyReader(r, responseCopy, mainLog)
 
 				// Get the wire format representation
 				var wireFormatRes bytes.Buffer
@@ -266,9 +266,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		}
 
 		err := s.Gw.Analytics.RecordHit(&record)
-
 		if err != nil {
-			log.WithError(err).Error("could not store analytic record")
+			analyticsLog.WithError(err).Error("could not store analytic record")
 		}
 	}
 
@@ -315,7 +314,6 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored
 func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
-	log.Debug("Started proxy")
 	defer s.Base().UpdateRequestSession(r)
 
 	// Make sure we get the correct target URL
@@ -327,7 +325,6 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	resp := s.Proxy.ServeHTTP(w, r)
 
 	millisec := DurationToMillisecond(time.Since(t1))
-	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
 		latency := analytics.Latency{
@@ -336,7 +333,6 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response)
 	}
-	log.Debug("Done proxy")
 	return nil
 }
 
@@ -353,8 +349,6 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	millisec := DurationToMillisecond(time.Since(t1))
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
-
-	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {
 		latency := analytics.Latency{

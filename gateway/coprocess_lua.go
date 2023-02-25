@@ -73,7 +73,7 @@ import (
 	"path/filepath"
 	"unsafe"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -90,11 +90,11 @@ func init() {
 	var err error
 	loadedDrivers[apidef.LuaDriver], err = NewLuaDispatcher()
 	if err == nil {
-		log.WithFields(logrus.Fields{
+		coprocessLog.WithFields(log.Fields{
 			"prefix": "coprocess",
 		}).Info("Lua dispatcher was initialized")
 	} else {
-		log.WithFields(logrus.Fields{
+		coprocessLog.WithFields(log.Fields{
 			"prefix": "coprocess",
 		}).WithError(err).Error("Couldn't load Lua dispatcher")
 	}
@@ -174,7 +174,7 @@ func (d *LuaDispatcher) Reload() {
 		middlewarePath := filepath.Join(MiddlewareBasePath, f.Name())
 		contents, err := ioutil.ReadFile(middlewarePath)
 		if err != nil {
-			log.WithFields(logrus.Fields{
+			coprocessLog.WithFields(log.Fields{
 				"prefix": "coprocess",
 			}).Error("Failed to read middleware file: ", err)
 		}
@@ -190,7 +190,7 @@ func (d *LuaDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath
 		if err == nil {
 			d.ModuleCache[f] = string(contents)
 		} else {
-			log.WithFields(logrus.Fields{
+			coprocessLog.WithFields(log.Fields{
 				"prefix": "coprocess",
 			}).Error("Failed to read bundle file: ", err)
 		}
@@ -198,7 +198,7 @@ func (d *LuaDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath
 }
 
 func (d *LuaDispatcher) LoadModules() {
-	log.WithFields(logrus.Fields{
+	coprocessLog.WithFields(log.Fields{
 		"prefix": "coprocess",
 	}).Info("Loading Tyk/Lua modules.")
 
@@ -213,7 +213,7 @@ func (d *LuaDispatcher) LoadModules() {
 	if err == nil {
 		d.ModuleCache["bundle.lua"] = string(contents)
 	} else {
-		log.WithFields(logrus.Fields{
+		coprocessLog.WithFields(log.Fields{
 			"prefix": "coprocess",
 		}).Error("Failed to read bundle file: ", err)
 	}

@@ -4,7 +4,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 )
 
 func TestGetLogEntryForRequest(t *testing.T) {
@@ -17,14 +17,14 @@ func TestGetLogEntryForRequest(t *testing.T) {
 		EnableKeyLogging bool
 		Key              string
 		Data             map[string]interface{}
-		Result           *logrus.Entry
+		Result           Logger
 	}{
 		// enable_key_logging is set, key passed, no additional data fields
 		{
 			EnableKeyLogging: true,
 			Key:              "abc",
 			Data:             nil,
-			Result: logrus.WithFields(logrus.Fields{
+			Result: log.WithFields(log.Fields{
 				"path":   "/test",
 				"origin": "127.0.0.1",
 				"key":    "abc",
@@ -35,7 +35,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			EnableKeyLogging: true,
 			Key:              "",
 			Data:             nil,
-			Result: logrus.WithFields(logrus.Fields{
+			Result: log.WithFields(log.Fields{
 				"path":   "/test",
 				"origin": "127.0.0.1",
 			}),
@@ -45,7 +45,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			EnableKeyLogging: true,
 			Key:              "abc",
 			Data:             map[string]interface{}{"a": 1, "b": "test"},
-			Result: logrus.WithFields(logrus.Fields{
+			Result: log.WithFields(log.Fields{
 				"path":   "/test",
 				"origin": "127.0.0.1",
 				"key":    "abc",
@@ -58,7 +58,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			EnableKeyLogging: true,
 			Key:              "",
 			Data:             map[string]interface{}{"a": 1, "b": "test"},
-			Result: logrus.WithFields(logrus.Fields{
+			Result: log.WithFields(log.Fields{
 				"path":   "/test",
 				"origin": "127.0.0.1",
 				"a":      1,
@@ -70,7 +70,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			EnableKeyLogging: false,
 			Key:              "abc",
 			Data:             nil,
-			Result: logrus.WithFields(logrus.Fields{
+			Result: log.WithFields(log.Fields{
 				"path":   "/test",
 				"origin": "127.0.0.1",
 				"key":    ts.Gw.obfuscateKey("abs"),
@@ -81,7 +81,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			EnableKeyLogging: false,
 			Key:              "",
 			Data:             nil,
-			Result: logrus.WithFields(logrus.Fields{
+			Result: log.WithFields(log.Fields{
 				"path":   "/test",
 				"origin": "127.0.0.1",
 			}),
@@ -91,7 +91,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			EnableKeyLogging: false,
 			Key:              "abc",
 			Data:             map[string]interface{}{"a": 1, "b": "test"},
-			Result: logrus.WithFields(logrus.Fields{
+			Result: log.WithFields(log.Fields{
 				"path":   "/test",
 				"origin": "127.0.0.1",
 				"a":      1,
@@ -104,7 +104,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			EnableKeyLogging: false,
 			Key:              "",
 			Data:             map[string]interface{}{"a": 1, "b": "test"},
-			Result: logrus.WithFields(logrus.Fields{
+			Result: log.WithFields(log.Fields{
 				"path":   "/test",
 				"origin": "127.0.0.1",
 				"a":      1,

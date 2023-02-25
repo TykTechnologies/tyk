@@ -34,7 +34,7 @@ func (l *JSVMEventHandler) Init(handlerConf interface{}) error {
 
 	gValAsJSON, err := json.Marshal(globalVals)
 	if err != nil {
-		log.Error("Failed to marshal globals! ", err)
+		mainLog.Error("Failed to marshal globals! ", err)
 	}
 
 	l.SpecJSON = string(gValAsJSON)
@@ -46,13 +46,13 @@ func (l *JSVMEventHandler) HandleEvent(em config.EventMessage) {
 	// JSON-encode the event data object
 	msgAsJSON, err := json.Marshal(em)
 	if err != nil {
-		log.Error("Failed to encode event data: ", err)
+		mainLog.Error("Failed to encode event data: ", err)
 		return
 	}
 
 	// Execute the method name with the JSON object
 	_, err = l.Gw.GlobalEventsJSVM.VM.Run(l.methodName + `.DoProcessEvent(` + string(msgAsJSON) + `,` + l.SpecJSON + `);`)
 	if err != nil {
-		log.WithError(err).Error("executing JSVM method")
+		mainLog.WithError(err).Error("executing JSVM method")
 	}
 }

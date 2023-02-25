@@ -9,7 +9,8 @@ import (
 	"sync"
 
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/openid2go/openid"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -74,7 +75,7 @@ func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 		p, err := openid.NewProvider(iss, providerClientArray)
 
 		if err != nil {
-			k.Logger().WithError(err).WithFields(logrus.Fields{
+			k.Logger().WithError(err).WithFields(log.Fields{
 				"provider": iss,
 			}).Error("Failed to create provider")
 		} else {
@@ -240,7 +241,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 }
 
 func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
-	k.Logger().WithFields(logrus.Fields{
+	k.Logger().WithFields(log.Fields{
 		"key": k.Gw.obfuscateKey(tykId),
 	}).Warning("Attempted access with invalid key.")
 

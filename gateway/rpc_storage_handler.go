@@ -6,16 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	cache "github.com/pmylund/go-cache"
 
-	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/go-redis/redis/v8"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -166,7 +163,7 @@ func (r *RPCStorageHandler) hashKey(in string) string {
 func (r *RPCStorageHandler) fixKey(keyName string) string {
 	setKeyName := r.KeyPrefix + r.hashKey(keyName)
 
-	log.Debug("Input key was: ", setKeyName)
+	rpcLog.Debug("Input key was: ", setKeyName)
 
 	return setKeyName
 }
@@ -179,12 +176,12 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 // GetKey will retrieve a key from the database
 func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	start := time.Now() // get current time
-	//	log.Debug("[STORE] Getting WAS: ", keyName)
-	//  log.Debug("[STORE] Getting: ", r.fixKey(keyName))
+	//	rpcLog.Debug("[STORE] Getting WAS: ", keyName)
+	//  rpcLog.Debug("[STORE] Getting: ", r.fixKey(keyName))
 	value, err := r.GetRawKey(r.fixKey(keyName))
 
 	elapsed := time.Since(start)
-	log.Debug("GetKey took ", elapsed)
+	rpcLog.Debug("GetKey took ", elapsed)
 
 	return value, err
 }
@@ -193,7 +190,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
 
 	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
-		log.Debug("Using cache for: ", keyName)
+		rpcLog.Debug("Using cache for: ", keyName)
 
 		cacheStore := r.Gw.RPCGlobalCache
 		if strings.Contains(keyName, "cert-") {
@@ -201,7 +198,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		}
 
 		cachedVal, found := cacheStore.Get(keyName)
-		log.Debug("--> Found? ", found)
+		rpcLog.Debug("--> Found? ", found)
 		if found {
 			return cachedVal.(string), nil
 		}
@@ -222,7 +219,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 				return r.GetRawKey(keyName)
 			}
 		}
-		log.Debug("Error trying to get value:", err)
+		rpcLog.Debug("Error trying to get value:", err)
 		return "", storage.ErrKeyNotFound
 	}
 	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
@@ -252,7 +249,7 @@ func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
 }
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
-	log.Debug("GetExp called")
+	rpcLog.Debug("GetExp called")
 	value, err := rpc.FuncClientSingleton("GetExp", r.fixKey(keyName))
 	if err != nil {
 		rpc.EmitErrorEventKv(
@@ -269,14 +266,14 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 				return r.GetExp(keyName)
 			}
 		}
-		log.Error("Error trying to get TTL: ", err)
+		rpcLog.Error("Error trying to get TTL: ", err)
 		return 0, storage.ErrKeyNotFound
 	}
 	return value.(int64), nil
 }
 
 func (r *RPCStorageHandler) SetExp(keyName string, timeout int64) error {
-	log.Error("RPCStorageHandler.SetExp - Not Implemented")
+	rpcLog.Error("RPCStorageHandler.SetExp - Not Implemented")
 	return nil
 }
 
@@ -307,12 +304,12 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 			}
 		}
 
-		log.Debug("Error trying to set value:", err)
+		rpcLog.Debug("Error trying to set value:", err)
 		return err
 	}
 
 	elapsed := time.Since(start)
-	log.Debug("SetKey took ", elapsed)
+	rpcLog.Debug("SetKey took ", elapsed)
 	return nil
 
 }
@@ -323,7 +320,7 @@ func (r *RPCStorageHandler) SetRawKey(keyName, session string, timeout int64) er
 
 // Decrement will decrement a key in redis
 func (r *RPCStorageHandler) Decrement(keyName string) {
-	log.Warning("Decrement called")
+	rpcLog.Warning("Decrement called")
 	_, err := rpc.FuncClientSingleton("Decrement", keyName)
 	if err != nil {
 		rpc.EmitErrorEventKv(
@@ -369,7 +366,7 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 	}
 
 	if val == nil {
-		log.Warning("RPC increment returned nil value, returning 0")
+		rpcLog.Warning("RPC increment returned nil value, returning 0")
 		return 0
 	}
 
@@ -379,7 +376,7 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
 func (r *RPCStorageHandler) GetKeys(filter string) []string {
-	log.Error("RPCStorageHandler.GetKeys - Not Implemented")
+	rpcLog.Error("RPCStorageHandler.GetKeys - Not Implemented")
 	return nil
 }
 
@@ -387,7 +384,7 @@ func (r *RPCStorageHandler) GetKeys(filter string) []string {
 func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string]string {
 
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
-	log.Debug("[STORE] Getting list by: ", searchStr)
+	rpcLog.Debug("[STORE] Getting list by: ", searchStr)
 
 	kvPair, err := rpc.FuncClientSingleton("GetKeysAndValuesWithFilter", searchStr)
 	if err != nil {
@@ -448,8 +445,8 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 // DeleteKey will remove a key from the database
 func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
-	log.Debug("DEL Key was: ", keyName)
-	log.Debug("DEL Key became: ", r.fixKey(keyName))
+	rpcLog.Debug("DEL Key was: ", keyName)
+	rpcLog.Debug("DEL Key became: ", r.fixKey(keyName))
 	ok, err := rpc.FuncClientSingleton("DeleteKey", r.fixKey(keyName))
 	if err != nil {
 		rpc.EmitErrorEventKv(
@@ -473,7 +470,7 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 }
 
 func (r *RPCStorageHandler) DeleteAllKeys() bool {
-	log.Warning("Not implementated")
+	rpcLog.Warning("Not implementated")
 	return false
 }
 
@@ -508,7 +505,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 			asInterface[i] = r.fixKey(v)
 		}
 
-		log.Debug("Deleting: ", asInterface)
+		rpcLog.Debug("Deleting: ", asInterface)
 		ok, err := rpc.FuncClientSingleton("DeleteKeys", asInterface)
 		if err != nil {
 			rpc.EmitErrorEventKv(
@@ -530,23 +527,21 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 
 		return ok == true
 	}
-	log.Debug("RPCStorageHandler called DEL - Nothing to delete")
+	rpcLog.Debug("RPCStorageHandler called DEL - Nothing to delete")
 	return true
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
 func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(*redis.Message)) error {
-	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }
 
 func (r *RPCStorageHandler) Publish(channel, message string) error {
-	log.Warning("RPCStorageHandler.Publish - NO PUBSUB DEFINED")
 	return nil
 }
 
 func (r *RPCStorageHandler) GetAndDeleteSet(keyName string) []interface{} {
-	log.Error("RPCStorageHandler.GetAndDeleteSet - Not implemented, please disable your purger")
+	rpcLog.Error("RPCStorageHandler.GetAndDeleteSet - Not implemented, please disable your purger")
 	return nil
 }
 
@@ -603,10 +598,10 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 	}
 
 	elapsed := time.Since(start)
-	log.Debug("SetRollingWindow took ", elapsed)
+	rpcLog.Debug("SetRollingWindow took ", elapsed)
 
 	if intVal == nil {
-		log.Warning("RPC Handler: SetRollingWindow() returned nil, returning 0")
+		rpcLog.Warning("RPC Handler: SetRollingWindow() returned nil, returning 0")
 		return 0, nil
 	}
 
@@ -615,21 +610,21 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 }
 
 func (r *RPCStorageHandler) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
-	log.Warning("Not Implemented!")
+	rpcLog.Warning("Not Implemented!")
 	return 0, nil
 }
 
 func (r RPCStorageHandler) GetSet(keyName string) (map[string]string, error) {
-	log.Error("RPCStorageHandler.GetSet - Not implemented")
+	rpcLog.Error("RPCStorageHandler.GetSet - Not implemented")
 	return nil, nil
 }
 
 func (r RPCStorageHandler) AddToSet(keyName, value string) {
-	log.Error("RPCStorageHandler.AddToSet - Not implemented")
+	rpcLog.Error("RPCStorageHandler.AddToSet - Not implemented")
 }
 
 func (r RPCStorageHandler) RemoveFromSet(keyName, value string) {
-	log.Error("RPCStorageHandler.RemoveFromSet - Not implemented")
+	rpcLog.Error("RPCStorageHandler.RemoveFromSet - Not implemented")
 }
 
 func (r RPCStorageHandler) IsRetriableError(err error) bool {
@@ -667,10 +662,10 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 
 		return ""
 	}
-	log.Debug("API Definitions retrieved")
+	rpcLog.Debug("API Definitions retrieved")
 
 	if defString == nil {
-		log.Warning("RPC Handler: GetApiDefinitions() returned nil, returning empty string")
+		rpcLog.Warning("RPC Handler: GetApiDefinitions() returned nil, returning empty string")
 		return ""
 	}
 	return defString.(string)
@@ -712,7 +707,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
 	default:
 	}
 
-	log.Debug("[RPC STORE] Check Reload called...")
+	rpcLog.Debug("[RPC STORE] Check Reload called...")
 	reload, err := rpc.FuncClientSingleton("CheckReload", orgId)
 	if err != nil {
 		rpc.EmitErrorEventKv(
@@ -724,18 +719,18 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
 			},
 		)
 		if r.IsRetriableError(err) {
-			log.Warning("[RPC STORE] CheckReload: Not logged in")
+			rpcLog.Warning("[RPC STORE] CheckReload: Not logged in")
 			if rpc.Login() {
 				r.CheckForReload(orgId)
 			}
 		} else if !strings.Contains(err.Error(), "Cannot obtain response during") {
-			log.Warning("[RPC STORE] RPC Reload Checker encountered unexpected error: ", err)
+			rpcLog.Warning("[RPC STORE] RPC Reload Checker encountered unexpected error: ", err)
 		}
 
 		time.Sleep(1 * time.Second)
 	} else if reload == true {
 		// Do the reload!
-		log.Warning("[RPC STORE] Received Reload instruction!")
+		rpcLog.Warning("[RPC STORE] Received Reload instruction!")
 		go func() {
 			r.Gw.MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: r.Gw})
 		}()
@@ -748,7 +743,7 @@ func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
 		return
 	}
 
-	log.Info("[RPC] Starting keyspace poller")
+	rpcLog.Info("[RPC] Starting keyspace poller")
 
 	for {
 		seconds := r.Gw.GetConfig().SlaveOptions.KeySpaceSyncInterval
@@ -758,7 +753,7 @@ func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
 }
 
 func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
-	log.WithFields(logrus.Fields{
+	rpcLog.WithFields(log.Fields{
 		"prefix": "RPC Conn Mgr",
 	}).Info("[RPC Conn Mgr] Starting keepalive watcher...")
 	for {
@@ -770,7 +765,7 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 		}
 
 		if err := r.SetKey("0000", "0000", 10); err != nil {
-			log.WithError(err).WithFields(logrus.Fields{
+			rpcLog.WithError(err).WithFields(log.Fields{
 				"prefix": "RPC Conn Mgr",
 			}).Warning("Can't connect to RPC layer")
 
@@ -791,7 +786,7 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 
 // CheckForKeyspaceChanges will poll for keysace changes
 func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
-	log.Debug("Checking for keyspace changes...")
+	rpcLog.Debug("Checking for keyspace changes...")
 
 	var keys interface{}
 	var err error
@@ -826,23 +821,22 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 				r.CheckForKeyspaceChanges(orgId)
 			}
 		}
-		log.Warning("Keyspace warning: ", err)
+		rpcLog.Warning("Keyspace warning: ", err)
 		return
 	}
 
 	if keys == nil {
-		log.Info("Keys returned nil object, skipping check")
+		rpcLog.Info("Keys returned nil object, skipping check")
 		return
 	}
 
 	if len(keys.([]string)) > 0 {
-		log.Info("Keyspace changes detected, updating local cache")
+		rpcLog.Info("Keyspace changes detected, updating local cache")
 		go r.ProcessKeySpaceChanges(keys.([]string), orgId)
 	}
 }
 
 func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isHashed bool, orgId string) {
-
 	key := keyName
 	// avoid double hashing
 	if !isHashed {
@@ -851,16 +845,17 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 
 	sessionString, err := r.GetRawKey("apikey-" + key)
 	if err != nil {
-		log.Error("Key not found in master - skipping")
-	} else {
-		gw.handleAddKey(key, sessionString, orgId)
+		rpcLog.WithError(err).Error("error retrieving key - skipping")
+		return
 	}
+
+	gw.handleAddKey(key, sessionString, orgId)
 }
 
 func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, event string) {
 	store, _, err := gw.GetStorageForApi(apiId)
 	if err != nil {
-		log.Error("Could not get oauth storage for api")
+		rpcLog.Error("Could not get oauth storage for api")
 		return
 	}
 
@@ -869,53 +864,53 @@ func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, ev
 		// on add: pull from rpc and save it in local redis
 		client, err := store.GetClient(oauthClientId)
 		if err != nil {
-			log.WithError(err).Error("Could not retrieve new oauth client information")
+			rpcLog.WithError(err).Error("Could not retrieve new oauth client information")
 			return
 		}
 
 		err = store.SetClient(oauthClientId, orgID, client, false)
 		if err != nil {
-			log.WithError(err).Error("Could not save oauth client.")
+			rpcLog.WithError(err).Error("Could not save oauth client.")
 			return
 		}
 
-		log.Info("oauth client created successfully")
+		rpcLog.Info("oauth client created successfully")
 	case OauthClientRemoved:
 		// on remove: remove from local redis
 		err := store.DeleteClient(oauthClientId, orgID, false)
 		if err != nil {
-			log.Errorf("Could not delete oauth client with id: %v", oauthClientId)
+			rpcLog.Errorf("Could not delete oauth client with id: %v", oauthClientId)
 			return
 		}
-		log.Infof("Oauth Client deleted successfully")
+		rpcLog.Infof("Oauth Client deleted successfully")
 	case OauthClientUpdated:
 		// on update: delete from local redis and pull again from rpc
 		_, err := store.GetClient(oauthClientId)
 		if err != nil {
-			log.WithError(err).Error("Could not retrieve oauth client information")
+			rpcLog.WithError(err).Error("Could not retrieve oauth client information")
 			return
 		}
 
 		err = store.DeleteClient(oauthClientId, orgID, false)
 		if err != nil {
-			log.WithError(err).Error("Could not delete oauth client")
+			rpcLog.WithError(err).Error("Could not delete oauth client")
 			return
 		}
 
 		client, err := store.GetClient(oauthClientId)
 		if err != nil {
-			log.WithError(err).Error("Could not retrieve oauth client information")
+			rpcLog.WithError(err).Error("Could not retrieve oauth client information")
 			return
 		}
 
 		err = store.SetClient(oauthClientId, orgID, client, false)
 		if err != nil {
-			log.WithError(err).Error("Could not save oauth client.")
+			rpcLog.WithError(err).Error("Could not save oauth client.")
 			return
 		}
-		log.Info("oauth client updated successfully")
+		rpcLog.Info("oauth client updated successfully")
 	default:
-		log.Warningf("Oauth client event not supported:%v", event)
+		rpcLog.Warningf("Oauth client event not supported:%v", event)
 	}
 }
 
@@ -968,7 +963,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				OauthClients[splitKeys[0]] = action
 				notRegularKeys[key] = true
 			default:
-				log.Debug("ignoring processing of action:", action)
+				rpcLog.Debug("ignoring processing of action:", action)
 			}
 		}
 	}
@@ -1016,17 +1011,17 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 	// remove certs
 	for _, certId := range CertificatesToRemove {
-		log.Debugf("Removing certificate: %v", certId)
+		rpcLog.Debugf("Removing certificate: %v", certId)
 		r.Gw.CertificateManager.Delete(certId, orgId)
 		r.Gw.RPCCertCache.Delete("cert-raw-" + certId)
 	}
 
 	for _, certId := range CertificatesToAdd {
-		log.Debugf("Adding certificate: %v", certId)
+		rpcLog.Debugf("Adding certificate: %v", certId)
 		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally
 		content, err := r.Gw.CertificateManager.GetRaw(certId)
 		if content == "" && err != nil {
-			log.Debugf("Error getting certificate content")
+			rpcLog.Debugf("Error getting certificate content")
 		}
 	}
 
@@ -1040,11 +1035,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
 			var status int
 			if isHashed {
-				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+				rpcLog.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				key = splitKeys[0]
 				_, status = r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
 			} else {
-				log.Info("--> removing cached key: ", key)
+				rpcLog.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
@@ -1072,12 +1067,10 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 }
 
 func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
-	log.Error("RPCStorageHandler.DeleteScanMatch - Not implemented")
 	return false
 }
 
 func (r *RPCStorageHandler) GetKeyPrefix() string {
-	log.Error("RPCStorageHandler.GetKeyPrefix - Not implemented")
 	return ""
 }
 
@@ -1094,16 +1087,13 @@ func (r *RPCStorageHandler) RemoveSortedSetRange(keyName, scoreFrom, scoreTo str
 }
 
 func (r *RPCStorageHandler) RemoveFromList(keyName, value string) error {
-	log.Error("Not implemented")
 	return nil
 }
 
 func (r *RPCStorageHandler) GetListRange(keyName string, from, to int64) ([]string, error) {
-	log.Error("Not implemented")
 	return nil, nil
 }
 
 func (r *RPCStorageHandler) Exists(keyName string) (bool, error) {
-	log.Error("Not implemented")
 	return false, nil
 }

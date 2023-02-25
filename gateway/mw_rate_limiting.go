@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -118,7 +118,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 					true,
 				)
 
-				log.WithFields(logrus.Fields{
+				log.WithFields(log.Fields{
 					"middleware": "RateLimitAndQuotaCheck",
 					"func":       "ProcessRequest",
 				}).Debugf("after dry-run (reason: '%s')", reason)

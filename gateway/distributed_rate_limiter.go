@@ -4,16 +4,17 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/drl"
+	"github.com/TykTechnologies/tyk/log"
 )
+
+var drlLog = log.New().WithField("prefix", "drl")
 
 func (gw *Gateway) setupDRL() {
 	drlManager := &drl.DRL{}
 	drlManager.Init(gw.ctx)
 	drlManager.ThisServerID = gw.GetNodeID() + "|" + gw.hostDetails.Hostname
-	log.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
+	drlLog.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
 	gw.DRLManager = drlManager
 }
 
@@ -24,7 +25,7 @@ func (gw *Gateway) startRateLimitNotifications() {
 	}
 
 	go func() {
-		log.Info("Starting gateway rate limiter notifications...")
+		drlLog.Info("DRL: Starting gateway rate limiter notifications")
 		for {
 			select {
 			case <-gw.ctx.Done():
@@ -33,7 +34,7 @@ func (gw *Gateway) startRateLimitNotifications() {
 				if gw.GetNodeID() != "" {
 					gw.NotifyCurrentServerStatus()
 				} else {
-					log.Warning("Node not registered yet, skipping DRL Notification")
+					drlLog.Warning("Node not registered yet, skipping DRL Notification")
 				}
 
 				time.Sleep(time.Duration(notificationFreq) * time.Second)
@@ -70,7 +71,7 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 
 	asJson, err := json.Marshal(server)
 	if err != nil {
-		log.Error("Failed to encode payload: ", err)
+		drlLog.Error("Failed to encode payload: ", err)
 		return
 	}
 
@@ -85,22 +86,21 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 
 func (gw *Gateway) onServerStatusReceivedHandler(payload string) {
 	if gw.DRLManager == nil || !gw.DRLManager.Ready() {
-		log.Warning("DRL not ready, skipping this notification")
+		drlLog.Warning("DRL not ready, skipping this notification")
 
 		return
 	}
 
 	serverData := drl.Server{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix":  "pub-sub",
+		drlLog.WithError(err).WithFields(log.Fields{
 			"payload": string(payload),
-		}).Error("Failed unmarshal server data: ", err)
+		}).Error("DRL: Failed to unmarshal server data")
 		return
 	}
 
 	if err := gw.DRLManager.AddOrUpdateServer(serverData); err != nil {
-		log.WithError(err).
+		drlLog.WithError(err).
 			WithField("serverData", serverData).
 			Debug("AddOrUpdateServer error. Seems like you running multiple segmented Tyk groups in same Redis.")
 		return

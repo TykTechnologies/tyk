@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
@@ -16,7 +16,7 @@ import (
 type ResponseGoPluginMiddleware struct {
 	Path       string // path to .so file
 	SymbolName string // function symbol to look up
-	logger     *logrus.Entry
+	logger     Logger
 	Spec       *APISpec
 	ResHandler func(rw http.ResponseWriter, res *http.Response, req *http.Request)
 }
@@ -30,7 +30,7 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 	h.Path = c.(apidef.MiddlewareDefinition).Path
 	h.SymbolName = c.(apidef.MiddlewareDefinition).Name
 
-	h.logger = log.WithFields(logrus.Fields{
+	h.logger = log.WithFields(log.Fields{
 		"mwPath":       h.Path,
 		"mwSymbolName": h.SymbolName,
 	})

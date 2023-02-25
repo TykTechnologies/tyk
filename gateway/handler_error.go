@@ -348,7 +348,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		err := e.Gw.Analytics.RecordHit(&record)
 
 		if err != nil {
-			log.WithError(err).Error("could not store analytic record")
+			analyticsLog.WithError(err).Error("could not store analytic record")
 		}
 	}
 	// Report in health check

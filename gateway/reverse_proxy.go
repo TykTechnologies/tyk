@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/jensneuse/abstractlogger"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
@@ -39,9 +38,10 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/pmylund/go-cache"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
+
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
@@ -67,11 +67,13 @@ var sdMu sync.RWMutex
 func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 
 	doCacheRefresh := func() (*apidef.HostList, error) {
-		log.Debug("--> Refreshing")
+		proxyLog.Debug("--> Refreshing")
 		spec.ServiceRefreshInProgress = true
 		defer func() { spec.ServiceRefreshInProgress = false }()
+
 		sd := ServiceDiscovery{}
-		sd.Init(&spec.Proxy.ServiceDiscovery)
+		sd.Init(&spec.Proxy.ServiceDiscovery, proxyLog)
+
 		data, err := sd.Target(spec.Proxy.ServiceDiscovery.QueryEndpoint)
 		if err != nil {
 			return nil, err
@@ -81,10 +83,10 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 		sdMu.Unlock()
 		// Set the cached value
 		if data.Len() == 0 {
-			log.Warning("[PROXY][SD] Service Discovery returned empty host list! Returning last good set.")
+			proxyLog.Warning("[PROXY][SD] Service Discovery returned empty host list! Returning last good set.")
 
 			if spec.LastGoodHostList == nil {
-				log.Warning("[PROXY][SD] Last good host list is nil, returning empty set.")
+				proxyLog.Warning("[PROXY][SD] Last good host list is nil, returning empty set.")
 				spec.LastGoodHostList = apidef.NewHostList()
 			}
 
@@ -101,7 +103,7 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 	sdMu.RUnlock()
 	// First time? Refresh the cache and return that
 	if !hasRun {
-		log.Debug("First run! Setting cache")
+		proxyLog.Debug("First run! Setting cache")
 		return doCacheRefresh()
 	}
 
@@ -110,15 +112,15 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 	if !found {
 		if spec.ServiceRefreshInProgress {
 			// Are we already refreshing the cache? skip and return last good conf
-			log.Debug("Cache expired! But service refresh in progress")
+			proxyLog.Debug("Cache expired! But service refresh in progress")
 			return spec.LastGoodHostList, nil
 		}
 		// Refresh the spec
-		log.Debug("Cache expired! Refreshing...")
+		proxyLog.Debug("Cache expired! Refreshing...")
 		return doCacheRefresh()
 	}
 
-	log.Debug("Returning from cache.")
+	proxyLog.Debug("Returning from cache.")
 	return cachedServiceData.(*apidef.HostList), nil
 }
 
@@ -146,7 +148,7 @@ func EnsureTransport(host, protocol string) string {
 
 func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 	if spec.Proxy.EnableLoadBalancing {
-		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
+		proxyLog.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a HostList
 		startPos := spec.RoundRobin.WithLen(targetData.Len())
 		pos := startPos
@@ -175,8 +177,9 @@ func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (strin
 		}
 
 	}
+
 	// Use standard target - might still be service data
-	log.Debug("TARGET DATA:", targetData)
+	proxyLog.Debug("TARGET DATA: %#v", targetData)
 
 	gotHost, err := targetData.GetIndex(0)
 	if err != nil {
@@ -197,7 +200,7 @@ var (
 // the target request will be for /base/dir. This version modifies the
 // stdlib version by also setting the host to the target, this allows
 // us to work with heroku and other such providers
-func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger *logrus.Entry) *ReverseProxy {
+func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger Logger) *ReverseProxy {
 	onceStartAllHostsDown.Do(func() {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "all hosts are down", http.StatusServiceUnavailable)
@@ -218,9 +221,9 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		}()
 	})
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-		log.Debug("[PROXY] Service discovery enabled")
+		proxyLog.Debug("[PROXY] Service discovery enabled")
 		if ServiceCache == nil {
-			log.Debug("[PROXY] Service cache initialising")
+			proxyLog.Debug("[PROXY] Service cache initialising")
 			expiry := 120
 			if spec.Proxy.ServiceDiscovery.CacheTimeout > 0 {
 				expiry = int(spec.Proxy.ServiceDiscovery.CacheTimeout)
@@ -239,19 +242,19 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			var err error
 			hostList, err = urlFromService(spec)
 			if err != nil {
-				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
+				proxyLog.WithError(err).Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 				break
 			}
 			fallthrough // implies load balancing, with replaced host list
 		case spec.Proxy.EnableLoadBalancing:
 			host, err := gw.nextTarget(hostList, spec)
 			if err != nil {
-				log.Error("[PROXY] [LOAD BALANCING] ", err)
+				proxyLog.WithError(err).Error("[PROXY] [LOAD BALANCING] ", err)
 				host = allHostsDownURL
 			}
 			lbRemote, err := url.Parse(host)
 			if err != nil {
-				log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
+				proxyLog.WithError(err).Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
 			} else {
 				// Only replace target if everything is OK
 				target = lbRemote
@@ -262,10 +265,10 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		targetToUse := target
 
 		if spec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
-			log.Debug("Detected host rewrite, overriding target")
+			proxyLog.Debug("Detected host rewrite, overriding target")
 			tmpTarget, err := url.Parse(req.URL.String())
 			if err != nil {
-				log.Error("Failed to parse URL! Err: ", err)
+				proxyLog.WithError(err).Error("Failed to parse URL! Err: ", err)
 			} else {
 				// Specifically override with a URL rewrite
 				targetToUse = tmpTarget
@@ -321,7 +324,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 	}
 
 	if logger == nil {
-		logger = logrus.NewEntry(log)
+		logger = proxyLog
 	}
 
 	logger = logger.WithField("mw", "ReverseProxy")
@@ -381,7 +384,7 @@ type ReverseProxy struct {
 	TykAPISpec   *APISpec
 	ErrorHandler ErrorHandler
 
-	logger *logrus.Entry
+	logger Logger
 	sp     sync.Pool
 	Gw     *Gateway `json:"-"`
 }
@@ -389,7 +392,7 @@ type ReverseProxy struct {
 func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	timeout := 30.0
 	if dialerTimeout > 0 {
-		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
+		proxyLog.Debug("Setting timeout for outbound request to: ", dialerTimeout)
 		timeout = dialerTimeout
 	}
 
@@ -760,7 +763,7 @@ func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config,
 type TykRoundTripper struct {
 	transport    *http.Transport
 	h2ctransport *http2.Transport
-	logger       *logrus.Entry
+	logger       Logger
 	Gw           *Gateway `json:"-"`
 }
 
@@ -1071,7 +1074,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		if p.TykAPISpec.EnableContextVars && p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph {
 			ctxData := ctxGetData(outreq)
 			if reqID, exists := ctxData["request_id"]; !exists {
-				log.Warn("context variables enabled but request_id missing")
+				proxyLog.Warn("context variables enabled but request_id missing")
 			} else if requestID, ok := reqID.(string); ok {
 				upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
 			}
@@ -1113,10 +1116,12 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 	return nil, false, errors.New("graphql configuration is invalid")
 }
 
+var errNoExecutionEngine = errors.New("execution engine is nil")
+
 func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn, req *http.Request) {
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
 
-	absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
+	absLogger := log.NewAbstractLogger()
 	done := make(chan bool)
 	errChan := make(chan error)
 
@@ -1126,13 +1131,13 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 		fallthrough
 	case apidef.GraphQLConfigVersion1:
 		if p.TykAPISpec.GraphQLExecutor.Engine == nil {
-			log.Error("could not start graphql websocket handler: execution engine is nil")
+			proxyLog.WithError(errNoExecutionEngine).Error("could not start graphql websocket handler")
 			return
 		}
 		executorPool = subscription.NewExecutorV1Pool(p.TykAPISpec.GraphQLExecutor.Engine.NewExecutionHandler())
 	case apidef.GraphQLConfigVersion2:
 		if p.TykAPISpec.GraphQLExecutor.EngineV2 == nil {
-			log.Error("could not start graphql websocket handler: execution engine is nil")
+			proxyLog.WithError(errNoExecutionEngine).Error("could not start graphql websocket handler")
 			return
 		}
 		initialRequestContext := subscription.NewInitialHttpRequestContext(req)
@@ -1142,7 +1147,7 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 	go gqlhttp.HandleWebsocket(done, errChan, conn, executorPool, absLogger)
 	select {
 	case err := <-errChan:
-		log.Error("could not start graphql websocket handler: ", err)
+		proxyLog.WithError(err).Error("could not start graphql websocket handler")
 	case <-done:
 	}
 }
@@ -1335,8 +1340,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			alias = session.Alias
 		}
 
-		p.logger.WithFields(logrus.Fields{
-			"prefix":      "proxy",
+		p.logger.WithFields(log.Fields{
 			"user_ip":     addrs,
 			"server_name": outreq.Host,
 			"user_id":     p.Gw.obfuscateKey(token),
@@ -1547,7 +1551,6 @@ func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval 
 }
 
 func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
-
 	buf := p.sp.Get().(*[]byte)
 	defer p.sp.Put(buf)
 
@@ -1555,8 +1558,7 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
 	for {
 		nr, rerr := src.Read(*buf)
 		if rerr != nil && rerr != io.EOF && rerr != context.Canceled {
-			p.logger.WithFields(logrus.Fields{
-				"prefix": "proxy",
+			p.logger.WithFields(log.Fields{
 				"org_id": p.TykAPISpec.OrgID,
 				"api_id": p.TykAPISpec.APIID,
 			}).Error("http: proxy error during body copy: ", rerr)

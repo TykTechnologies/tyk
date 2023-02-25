@@ -7,14 +7,12 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -39,15 +37,15 @@ var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
 func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
-	path := r.URL.String()
-	log.Debug("Inbound path: ", path)
-	newpath := path
+	input := r.URL.String()
+
+	output := input
 
 	if meta.MatchRegexp == nil {
 		var err error
 		meta.MatchRegexp, err = regexp.Compile(meta.MatchPattern)
 		if err != nil {
-			return path, fmt.Errorf("URLRewrite regexp error %s", meta.MatchPattern)
+			return input, fmt.Errorf("URLRewrite regexp error %s", meta.MatchPattern)
 		}
 	}
 
@@ -103,6 +101,7 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 			}
 
 			// Check session meta
+
 			if session := ctxGetSession(r); session != nil {
 				if len(triggerOpts.Options.SessionMetaMatches) > 0 {
 					if checkSessionTrigger(r, session, triggerOpts.Options.SessionMetaMatches, checkAny, tn) {
@@ -116,6 +115,7 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 			}
 
 			// Request context meta
+
 			if len(triggerOpts.Options.RequestContextMatches) > 0 {
 				if checkContextTrigger(r, triggerOpts.Options.RequestContextMatches, checkAny, tn) {
 					setCount += 1
@@ -165,17 +165,13 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 		}
 	}
 
-	matchGroups := meta.MatchRegexp.FindAllStringSubmatch(path, -1)
+	matchGroups := meta.MatchRegexp.FindAllStringSubmatch(input, -1)
 
 	// Make sure it matches the string
-	log.Debug("Rewriter checking matches, len is: ", len(matchGroups))
 	if len(matchGroups) > 0 {
-		newpath = rewriteToPath
+		output = rewriteToPath
 		// get the indices for the replacements:
 		replaceGroups := dollarMatch.FindAllStringSubmatch(rewriteToPath, -1)
-
-		log.Debug(matchGroups)
-		log.Debug(replaceGroups)
 
 		groupReplace := make(map[string]string)
 		for mI, replacementVal := range matchGroups[0] {
@@ -184,19 +180,21 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 		}
 
 		for _, v := range replaceGroups {
-			newpath = strings.Replace(newpath, v[0], groupReplace[v[0]], -1)
+			output = strings.Replace(output, v[0], groupReplace[v[0]], -1)
 		}
 
-		log.Debug("URL Re-written from: ", path)
-		log.Debug("URL Re-written to: ", newpath)
+		gw.Logger().WithFields(log.Fields{
+			"from": input,
+			"to":   output,
+		}).Debug("URL Re-written")
 
 		// put url_rewrite path to context to be used in ResponseTransformMiddleware
 		ctxSetUrlRewritePath(r, meta.Path)
 	}
 
-	newpath = gw.replaceTykVariables(r, newpath, true)
+	output = gw.replaceTykVariables(r, output, true)
 
-	return newpath, nil
+	return output, nil
 }
 
 func (gw *Gateway) replaceTykVariables(r *http.Request, in string, escape bool) string {
@@ -248,7 +246,7 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 
 	emptyStringFn := func(key, in, val string) string {
 		in = strings.Replace(in, val, "", -1)
-		log.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"key":       key,
 			"value":     val,
 			"in string": in,
@@ -365,7 +363,7 @@ func valToStr(v interface{}) string {
 		}
 		s = strings.Join(tmpSlice, ",")
 	default:
-		log.Error("Context variable type is not supported: ", reflect.TypeOf(v))
+		mainLog.Errorf("Context variable type is not supported: %T", v)
 	}
 	return s
 }
@@ -476,13 +474,10 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	//To get host and query parameters
 	ctxSetOrigRequestURL(r, r.URL)
 
-	log.Debug("Rewriter active")
 	umeta := meta.(*apidef.URLRewriteMeta)
-	log.Debug(r.URL)
 	oldPath := r.URL.String()
 	p, err := m.Gw.urlRewrite(umeta, r)
 	if err != nil {
-		log.Error(err)
 		return err, http.StatusInternalServerError
 	}
 
@@ -499,7 +494,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	newURL, err := url.Parse(p)
 	if err != nil {
-		log.Error("URL Rewrite failed, could not parse: ", p)
+		log.WithError(err).Error("URL Rewrite failed, parse error for %q", p)
 	} else {
 		//Setting new path here breaks request middleware
 		//New path is set in DummyProxyHandler/Cache middleware

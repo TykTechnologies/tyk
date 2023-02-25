@@ -10,7 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
@@ -90,7 +90,7 @@ type GoPluginMiddleware struct {
 	Path           string // path to .so file
 	SymbolName     string // function symbol to look up
 	handler        http.HandlerFunc
-	logger         *logrus.Entry
+	logger         Logger
 	successHandler *SuccessHandler // to record analytics
 	Meta           apidef.GoPluginMeta
 	APILevel       bool
@@ -122,7 +122,7 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 // if the file doesn't exist then it will again but with a gw version that is not prefixed by 'v'
 // later, it will try with m.path which can be {plugin_name}.so
 func (m *GoPluginMiddleware) loadPlugin() bool {
-	m.logger = log.WithFields(logrus.Fields{
+	m.logger = log.WithFields(log.Fields{
 		"mwPath":       m.Path,
 		"mwSymbolName": m.SymbolName,
 	})

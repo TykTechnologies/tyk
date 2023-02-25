@@ -7,11 +7,13 @@ import (
 	"time"
 
 	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+var authLog = log.New().WithField("prefix", "auth-mgr")
 
 // SessionHandler handles all update/create/access session functions and deals exclusively with
 // user.SessionState objects, not identity
@@ -57,8 +59,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	}
 
 	rawKey := QuotaKeyPrefix + keyName
-	log.WithFields(logrus.Fields{
-		"prefix":      "auth-mgr",
+	authLog.WithFields(log.Fields{
 		"inbound-key": b.Gw.obfuscateKey(origKeyName),
 		"key":         rawKey,
 	}).Info("Reset quota for key.")
@@ -101,7 +102,7 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 
 	v, err := json.Marshal(session)
 	if err != nil {
-		log.Error("Error marshalling session for sync update")
+		authLog.Error("Error marshalling session for sync update")
 		return err
 	}
 
@@ -166,8 +167,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	}
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix":      "auth-mgr",
+		authLog.WithFields(log.Fields{
 			"inbound-key": b.Gw.obfuscateKey(keyName),
 			"err":         err,
 		}).Debug("Could not get session detail, key not found")
@@ -175,7 +175,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	}
 	session := &user.SessionState{}
 	if err := json.Unmarshal([]byte(jsonKeyVal), &session); err != nil {
-		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
+		authLog.Error("Couldn't unmarshal session object (may be cache miss): ", err)
 		return user.SessionState{}, false
 	}
 	session.KeyID = keyId
@@ -203,9 +203,8 @@ func (gw *Gateway) generateToken(orgID, keyID string, customHashKeyFunction ...s
 
 	token, err := storage.GenerateToken(orgID, keyID, hashKeyFunction)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "auth-mgr",
-			"orgID":  orgID,
+		authLog.WithFields(log.Fields{
+			"orgID": orgID,
 		}).WithError(err).Warning("Issue during token generation")
 	}
 

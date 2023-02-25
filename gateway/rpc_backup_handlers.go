@@ -10,8 +10,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -35,7 +33,7 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 
 	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, RedisController: gw.RedisController}
 	connected := store.Connect()
-	log.Info("[RPC] --> Loading API definitions from backup")
+	rpcLog.Info("[RPC] --> Loading API definitions from backup")
 
 	if !connected {
 		return nil, errors.New("[RPC] --> RPC Backup recovery failed: redis connection failed")
@@ -58,15 +56,15 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
 	}
 
-	log.Info("Storing RPC Definitions backup")
+	rpcLog.Info("Storing RPC Definitions backup")
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 
-	log.Info("--> Connecting to DB")
+	rpcLog.Info("--> Connecting to DB")
 
 	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, RedisController: gw.RedisController}
 	connected := store.Connect()
 
-	log.Info("--> Connected to DB")
+	rpcLog.Info("--> Connected to DB")
 
 	if !connected {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
@@ -89,7 +87,7 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, RedisController: gw.RedisController}
 
 	connected := store.Connect()
-	log.Info("[RPC] Loading Policies from backup")
+	rpcLog.Info("[RPC] Loading Policies from backup")
 
 	if !connected {
 		return nil, errors.New("[RPC] --> RPC Policy Backup recovery failed: redis connection failed")
@@ -104,9 +102,7 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	}
 
 	if policies, err := parsePoliciesFromRPC(listAsString, gw.GetConfig().Policies.AllowExplicitPolicyID); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "policy",
-		}).Error("Failed decode: ", err)
+		policyLog.WithError(err).Error("Failed parsing policies")
 		return nil, err
 	} else {
 		return policies, nil
@@ -118,15 +114,15 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
 	}
 
-	log.Info("Storing RPC policies backup")
+	rpcLog.Info("Storing RPC policies backup")
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 
-	log.Info("--> Connecting to DB")
+	rpcLog.Info("--> Connecting to DB")
 
 	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, RedisController: gw.RedisController}
 	connected := store.Connect()
 
-	log.Info("--> Connected to DB")
+	rpcLog.Info("--> Connected to DB")
 
 	if !connected {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
@@ -148,7 +144,7 @@ func encrypt(key []byte, text string) string {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		log.Error(err)
+		rpcLog.WithError(err).Error("error creating block cipher")
 		return ""
 	}
 
@@ -157,7 +153,7 @@ func encrypt(key []byte, text string) string {
 	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
 	iv := ciphertext[:aes.BlockSize]
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		log.Error(err)
+		rpcLog.Error(err.Error())
 		return ""
 	}
 
@@ -174,14 +170,14 @@ func decrypt(key []byte, cryptoText string) string {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		log.Error(err)
+		rpcLog.Error(err.Error())
 		return ""
 	}
 
 	// The IV needs to be unique, but not secure. Therefore it's common to
 	// include it at the beginning of the ciphertext.
 	if len(ciphertext) < aes.BlockSize {
-		log.Error("ciphertext too short")
+		rpcLog.Error("ciphertext too short")
 		return ""
 	}
 	iv := ciphertext[:aes.BlockSize]

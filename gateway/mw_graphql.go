@@ -8,19 +8,17 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
-	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
+	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter"
-
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
-
-	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 )
 
 const (
@@ -55,23 +53,23 @@ func (m *GraphQLMiddleware) EnabledForSpec() bool {
 func (m *GraphQLMiddleware) Init() {
 	schema, err := gql.NewSchemaFromString(m.Spec.GraphQL.Schema)
 	if err != nil {
-		log.Errorf("Error while creating schema from API definition: %v", err)
+		m.Logger().Errorf("Error while creating schema from API definition: %v", err)
 		return
 	}
 
 	normalizationResult, err := schema.Normalize()
 	if err != nil {
-		log.Errorf("Error while normalizing schema from API definition: %v", err)
+		m.Logger().Errorf("Error while normalizing schema from API definition: %v", err)
 	}
 
 	if !normalizationResult.Successful {
-		log.Errorf("Schema normalization was not successful. Reason: %v", normalizationResult.Errors)
+		m.Logger().Errorf("Schema normalization was not successful. Reason: %v", normalizationResult.Errors)
 	}
 
 	m.Spec.GraphQLExecutor.Schema = schema
 
 	if needsGraphQLExecutionEngine(m.Spec) {
-		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
+		absLogger := log.NewAbstractLogger()
 		m.Spec.GraphQLExecutor.Client = &http.Client{
 			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec)},
 		}
@@ -85,7 +83,7 @@ func (m *GraphQLMiddleware) Init() {
 		} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion2 {
 			m.initGraphQLEngineV2(absLogger)
 		} else {
-			log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
+			m.Logger().Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
 		}
 	}
 }
@@ -112,7 +110,7 @@ func (m *GraphQLMiddleware) initGraphQLEngineV1(logger *abstractlogger.LogrusLog
 
 	engine, err := gql.NewExecutionEngine(logger, m.Spec.GraphQLExecutor.Schema, plannerConfig)
 	if err != nil {
-		log.Errorf("GraphQL execution engine couldn't created: %v", err)
+		m.Logger().Errorf("GraphQL execution engine couldn't created: %v", err)
 		return
 	}
 
@@ -335,7 +333,7 @@ func (m *GraphQLMiddleware) OnBeforeStart(reqCtx context.Context, operation *gql
 func (m *GraphQLMiddleware) OnBeforeFetch(ctx resolve.HookContext, input []byte) {
 	m.BaseMiddleware.Logger().
 		WithFields(
-			logrus.Fields{
+			log.Fields{
 				"path": ctx.CurrentPath,
 			},
 		).Debugf("%s (beforeFetchHook): %s", ctx.CurrentPath, string(input))
@@ -344,7 +342,7 @@ func (m *GraphQLMiddleware) OnBeforeFetch(ctx resolve.HookContext, input []byte)
 func (m *GraphQLMiddleware) OnData(ctx resolve.HookContext, output []byte, singleFlight bool) {
 	m.BaseMiddleware.Logger().
 		WithFields(
-			logrus.Fields{
+			log.Fields{
 				"path":          ctx.CurrentPath,
 				"single_flight": singleFlight,
 			},
@@ -354,7 +352,7 @@ func (m *GraphQLMiddleware) OnData(ctx resolve.HookContext, output []byte, singl
 func (m *GraphQLMiddleware) OnError(ctx resolve.HookContext, output []byte, singleFlight bool) {
 	m.BaseMiddleware.Logger().
 		WithFields(
-			logrus.Fields{
+			log.Fields{
 				"path":          ctx.CurrentPath,
 				"single_flight": singleFlight,
 			},
@@ -393,18 +391,6 @@ func isGraphQLProxyOnly(apiSpec *APISpec) bool {
 		(apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly || apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph)
 }
 
-func absLoggerLevel(level logrus.Level) abstractlogger.Level {
-	switch level {
-	case logrus.ErrorLevel:
-		return abstractlogger.ErrorLevel
-	case logrus.WarnLevel:
-		return abstractlogger.WarnLevel
-	case logrus.DebugLevel:
-		return abstractlogger.DebugLevel
-	}
-	return abstractlogger.InfoLevel
-}
-
 type preSendHttpHook struct {
 	m *GraphQLMiddleware
 }
@@ -412,7 +398,7 @@ type preSendHttpHook struct {
 func (p preSendHttpHook) Execute(ctx datasource.HookContext, req *http.Request) {
 	p.m.BaseMiddleware.Logger().
 		WithFields(
-			logrus.Fields{
+			log.Fields{
 				"typename":     ctx.TypeName,
 				"fieldname":    ctx.FieldName,
 				"upstream_url": req.URL.String(),
@@ -427,7 +413,7 @@ type postReceiveHttpHook struct {
 func (p postReceiveHttpHook) Execute(ctx datasource.HookContext, resp *http.Response, body []byte) {
 	p.m.BaseMiddleware.Logger().
 		WithFields(
-			logrus.Fields{
+			log.Fields{
 				"typename":      ctx.TypeName,
 				"fieldname":     ctx.FieldName,
 				"response_body": string(body),

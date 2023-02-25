@@ -51,12 +51,10 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 
 	// Manage global response header options with versionInfo
 	for _, key := range vInfo.GlobalResponseHeadersRemove {
-		log.Debug("Removing: ", key)
 		res.Header.Del(key)
 	}
 
 	for key, val := range vInfo.GlobalResponseHeaders {
-		log.Debug("Adding: ", key)
 		setCustomHeader(res.Header, key, h.Gw.replaceTykVariables(req, val, false), ignoreCanonical)
 	}
 

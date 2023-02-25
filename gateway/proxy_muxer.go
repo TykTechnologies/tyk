@@ -24,8 +24,9 @@ import (
 	"github.com/TykTechnologies/tyk/tcp"
 
 	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
+
+	"github.com/TykTechnologies/tyk/log"
 )
 
 // handleWrapper's only purpose is to allow router to be dynamically replaced
@@ -150,7 +151,7 @@ func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router, conf
 		m.proxies = append(m.proxies, p)
 	} else {
 		if p.protocol != protocol {
-			mainLog.WithFields(logrus.Fields{
+			mainLog.WithFields(log.Fields{
 				"port":     port,
 				"protocol": protocol,
 			}).Warningf("Can't update router. Already found service with another protocol %s", p.protocol)
@@ -181,7 +182,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, gw *Gate
 	}
 
 	if spec.ListenPort == spec.GlobalConfig.ListenPort {
-		mainLog.WithFields(logrus.Fields{
+		mainLog.WithFields(log.Fields{
 			"prefix":   "gateway",
 			"org_id":   spec.OrgID,
 			"api_id":   spec.APIID,
@@ -302,25 +303,25 @@ func (gw *Gateway) dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 			var err error
 			hostList, err = urlFromService(spec)
 			if err != nil {
-				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
+				proxyLog.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 				break
 			}
-			log.Debug("[PROXY] [SERVICE DISCOVERY] received host list ", hostList.All())
+			proxyLog.Debug("[PROXY] [SERVICE DISCOVERY] received host list: %#v", hostList.All())
 			fallthrough // implies load balancing, with replaced host list
 		case spec.Proxy.EnableLoadBalancing:
 			host, err := gw.nextTarget(hostList, spec)
 			if err != nil {
-				log.Error("[PROXY] [LOAD BALANCING] ", err)
+				proxyLog.WithError(err).Error("[PROXY] [LOAD BALANCING]")
 				host = allHostsDownURL
 			}
 			lbRemote, err := url.Parse(host)
 			if err != nil {
-				log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
+				proxyLog.WithError(err).Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL")
 			} else {
 				if lbRemote.Scheme == network {
 					target = lbRemote.Host
 				} else {
-					log.Errorf("[PROXY] [LOAD BALANCING] mis match scheme want:%s got: %s", network, lbRemote.Scheme)
+					proxyLog.Errorf("[PROXY] [LOAD BALANCING] mis match scheme want:%s got: %s", network, lbRemote.Scheme)
 				}
 			}
 		}

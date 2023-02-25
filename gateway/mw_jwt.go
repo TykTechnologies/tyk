@@ -335,9 +335,9 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	for _, scopeItem := range scope {
 		if policyID, ok := mapping[scopeItem]; ok {
 			policiesToApply[policyID] = true
-			log.Debugf("Found a matching policy for scope item: %s", scopeItem)
+			mainLog.Debugf("Found a matching policy for scope item: %s", scopeItem)
 		} else {
-			log.Errorf("Couldn't find a matching policy for scope item: %s", scopeItem)
+			mainLog.Errorf("Couldn't find a matching policy for scope item: %s", scopeItem)
 		}
 	}
 	for id := range policiesToApply {
@@ -668,9 +668,9 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		// No header value, fail
 		logger.Info("Attempted access with malformed header, no JWT auth header found.")
 
-		log.Debug("Looked in: ", config.AuthHeaderName)
-		log.Debug("Raw data was: ", rawJWT)
-		log.Debug("Headers are: ", r.Header)
+		logger.Debug("Looked in: ", config.AuthHeaderName)
+		logger.Debug("Raw data was: ", rawJWT)
+		logger.Debug("Headers are: ", r.Header)
 
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Authorization field missing"), http.StatusBadRequest
@@ -790,7 +790,7 @@ func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg 
 
 	if enforceOrg {
 		if policy.OrgID != orgID {
-			log.Error("Attempting to apply policy from different organisation to key, skipping")
+			mainLog.Error("Attempting to apply policy from different organisation to key, skipping")
 			return session.Clone(), errors.New("Key not authorized: no matching policy")
 		}
 	} else {
@@ -840,7 +840,7 @@ func assertSigningMethod(signingMethod string, token *jwt.Token) error {
 			return fmt.Errorf("%v: %v and not ECDSA signature", UnexpectedSigningMethod, token.Header["alg"])
 		}
 	default:
-		log.Warning("No signing method found in API Definition, defaulting to HMAC signature")
+		mainLog.Warning("No signing method found in API Definition, defaulting to HMAC signature")
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return fmt.Errorf("%v: %v", UnexpectedSigningMethod, token.Header["alg"])
 		}
@@ -857,7 +857,7 @@ func parseJWTKey(signingMethod string, secret interface{}) (interface{}, error) 
 		case []byte:
 			key, err := ParseRSAPublicKey(e)
 			if err != nil {
-				log.WithError(err).Error("Failed to decode JWT key")
+				mainLog.WithError(err).Error("Failed to decode JWT key")
 				return nil, errors.New("Failed to decode JWT key")
 			}
 			return key, nil
@@ -881,10 +881,9 @@ func getJWK(url string, jwtSSLInsecureSkipVerify bool) (*jose.JSONWebKeySet, err
 	}
 
 	// Get the JWK
-	log.Debug("Pulling JWK")
 	resp, err := client.Get(url)
 	if err != nil {
-		log.WithError(err).Error("Failed to get resource URL")
+		mainLog.WithError(err).Error("Failed to get resource URL")
 		return nil, err
 	}
 
@@ -894,7 +893,7 @@ func getJWK(url string, jwtSSLInsecureSkipVerify bool) (*jose.JSONWebKeySet, err
 
 	buf, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.WithError(err).Error("Failed to get read response body")
+		mainLog.WithError(err).Error("Failed to get read response body")
 		return nil, err
 	}
 
@@ -944,30 +943,30 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string) (string,
 	if identityBaseField != "" {
 		if userID, found = claims[identityBaseField].(string); found {
 			if len(userID) > 0 {
-				log.WithField("userId", userID).Debug("Found User Id in Base Field")
+				mainLog.WithField("userId", userID).Debug("Found User Id in Base Field")
 				return userID, nil
 			}
 
 			message := "found an empty user ID in predefined base field claim " + identityBaseField
-			log.Error(message)
+			mainLog.Error(message)
 			return "", errors.New(message)
 		}
 
 		if !found {
-			log.WithField("Base Field", identityBaseField).Warning("Base Field claim not found, trying to find user ID in 'sub' claim.")
+			mainLog.WithField("Base Field", identityBaseField).Warning("Base Field claim not found, trying to find user ID in 'sub' claim.")
 		}
 	}
 
 	if userID, found = claims[SUB].(string); found {
 		if len(userID) > 0 {
-			log.WithField("userId", userID).Debug("Found User Id in 'sub' claim")
+			mainLog.WithField("userId", userID).Debug("Found User Id in 'sub' claim")
 			return userID, nil
 		}
 
-		log.Error(ErrEmptyUserIDInSubClaim)
+		mainLog.Error(ErrEmptyUserIDInSubClaim)
 		return "", ErrEmptyUserIDInSubClaim
 	}
 
-	log.Error(ErrNoSuitableUserIDClaimFound)
+	mainLog.Error(ErrNoSuitableUserIDClaimFound)
 	return "", ErrNoSuitableUserIDClaimFound
 }

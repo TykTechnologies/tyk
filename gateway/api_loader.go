@@ -17,10 +17,10 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
-	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 )
@@ -47,7 +47,7 @@ func (gw *Gateway) prepareStorage() generalStores {
 	return gs
 }
 
-func (gw *Gateway) skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
+func (gw *Gateway) skipSpecBecauseInvalid(spec *APISpec, logger Logger) bool {
 
 	switch spec.Protocol {
 	case "", "http", "https":
@@ -88,7 +88,7 @@ func countApisByListenHash(specs []*APISpec) map[string]int {
 			if dN == "" {
 				dN = "(no host)"
 			}
-			mainLog.WithFields(logrus.Fields{
+			mainLog.WithFields(log.Fields{
 				"api_name": spec.Name,
 				"domain":   dN,
 			}).Info("Tracking hostname")
@@ -104,7 +104,7 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
-func (gw *Gateway) generateSubRoutes(spec *APISpec, subRouter *mux.Router, logger *logrus.Entry) {
+func (gw *Gateway) generateSubRoutes(spec *APISpec, subRouter *mux.Router, logger Logger) {
 	if spec.GraphQL.GraphQLPlayground.Enabled {
 		gw.loadGraphQLPlayground(spec, subRouter)
 	}
@@ -124,18 +124,14 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, subRouter *mux.Router, logge
 }
 
 func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
-	gs *generalStores, logger *logrus.Entry) *ChainObject {
+	gs *generalStores, logger Logger) *ChainObject {
 
 	var chainDef ChainObject
 
-	logger = logger.WithFields(logrus.Fields{
+	logger = logger.WithFields(log.Fields{
 		"org_id":   spec.OrgID,
 		"api_id":   spec.APIID,
 		"api_name": spec.Name,
-	})
-
-	var coprocessLog = logger.WithFields(logrus.Fields{
-		"prefix": "coprocess",
 	})
 
 	if spec.Proxy.Transport.SSLMaxVersion > 0 {
@@ -503,7 +499,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 	}
 
-	logger.WithFields(logrus.Fields{
+	logger.WithFields(log.Fields{
 		"prefix":      "gateway",
 		"user_ip":     "--",
 		"server_name": "--",
@@ -565,7 +561,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if chain, ok := h.(*ChainObject); ok {
 					handler = chain.ThisHandler
 				} else {
-					log.WithFields(logrus.Fields{"api_id": d.SH.Spec.APIID}).Debug("failed to cast stored api handles to *ChainObject")
+					apiLog.WithFields(log.Fields{"api_id": d.SH.Spec.APIID}).Debug("failed to cast stored api handles to *ChainObject")
 				}
 			}
 		} else {
@@ -576,7 +572,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					if chain, ok := h.(*ChainObject); ok {
 						handler = chain.ThisHandler
 					} else {
-						log.WithFields(logrus.Fields{"api_id": d.SH.Spec.APIID}).Debug("failed to cast stored api handles to *ChainObject")
+						apiLog.WithFields(log.Fields{"api_id": d.SH.Spec.APIID}).Debug("failed to cast stored api handles to *ChainObject")
 					}
 				}
 			} else {
@@ -745,10 +741,10 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 			chainObj = chain.(*ChainObject)
 		}
 	} else {
-		chainObj = gw.processSpec(spec, apisByListen, gs, logrus.NewEntry(log))
+		chainObj = gw.processSpec(spec, apisByListen, gs, log.New())
 	}
 
-	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(log))
+	gw.generateSubRoutes(spec, subrouter, log.New())
 	handleCORS(subrouter, spec)
 
 	if chainObj.Skip {
@@ -805,7 +801,7 @@ func (gw *Gateway) readGraphqlPlaygroundTemplate() {
 	playgroundPath := filepath.Join(gw.GetConfig().TemplatePath, "playground")
 	files, err := ioutil.ReadDir(playgroundPath)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		apiLog.WithFields(log.Fields{
 			"prefix": "playground",
 		}).Error("Could not load the default playground templates: ", err)
 	}
@@ -817,7 +813,7 @@ func (gw *Gateway) readGraphqlPlaygroundTemplate() {
 
 	playgroundTemplate, err = template.ParseFiles(paths...)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		apiLog.WithFields(log.Fields{
 			"prefix": "playground",
 		}).Error("Could not parse the default playground templates: ", err)
 	}
@@ -907,7 +903,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			defer func() {
 				// recover from panic if one occurred. Set err to nil otherwise.
 				if err := recover(); err != nil {
-					log.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
+					apiLog.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
 				}
 			}()
 

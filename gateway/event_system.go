@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -139,16 +139,13 @@ func (gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConf
 }
 
 func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
-	log.Debug("EVENT FIRED: ", name)
 	if handlers, e := handlers[name]; e {
-		log.Debugf("FOUND %d EVENT HANDLERS", len(handlers))
 		eventMessage := config.EventMessage{
 			Meta:      meta,
 			Type:      name,
 			TimeStamp: time.Now().Local().String(),
 		}
 		for _, handler := range handlers {
-			log.Debug("FIRING HANDLER: ", handler)
 			go handler.HandleEvent(eventMessage)
 		}
 	}
@@ -165,7 +162,7 @@ func (gw *Gateway) FireSystemEvent(name apidef.TykEvent, meta interface{}) {
 // LogMessageEventHandler is a sample Event Handler
 type LogMessageEventHandler struct {
 	prefix string
-	logger *logrus.Logger
+	logger Logger
 	Gw     *Gateway `json:"-"`
 }
 
@@ -173,11 +170,11 @@ type LogMessageEventHandler struct {
 func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
 	conf := handlerConf.(map[string]interface{})
 	l.prefix = conf["prefix"].(string)
-	l.logger = log
+	l.logger = log.New().WithField("prefix", "events")
 	if l.Gw.isRunningTests() {
 		logger, ok := conf["logger"]
 		if ok {
-			l.logger = logger.(*logrus.Logger)
+			l.logger = logger.(Logger)
 		}
 	}
 	return nil
@@ -205,15 +202,16 @@ func (gw *Gateway) initGenericEventHandlers() {
 	conf := gw.GetConfig()
 	handlers := make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range conf.EventHandlers.Events {
-		log.Debug("FOUND EVENTS TO INIT")
-		for _, handlerConf := range eventHandlerConfs {
-			log.Debug("CREATING EVENT HANDLERS")
-			eventHandlerInstance, err := gw.EventHandlerByName(handlerConf, nil)
+		mainLog.WithFields(log.Fields{
+			"name":     eventName,
+			"handlers": len(eventHandlerConfs),
+		}).Debug("Init Event Handler")
 
+		for _, handlerConf := range eventHandlerConfs {
+			eventHandlerInstance, err := gw.EventHandlerByName(handlerConf, nil)
 			if err != nil {
-				log.Error("Failed to init event handler: ", err)
+				mainLog.WithError(err).Error("Failed to init event handler")
 			} else {
-				log.Debug("Init Event Handler: ", eventName)
 				handlers[eventName] = append(handlers[eventName], eventHandlerInstance)
 			}
 

@@ -24,8 +24,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/sirupsen/logrus"
 )
 
 // RequestObject is marshalled to JSON string and passed into JSON middleware
@@ -246,7 +244,7 @@ func (gw *Gateway) forceResponse(
 	spec *APISpec,
 	session *user.SessionState,
 	isPre bool,
-	logger *logrus.Entry,
+	logger Logger,
 ) *http.Response {
 	responseMessage := []byte(newResponseData.Response.Body)
 

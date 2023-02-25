@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -51,7 +51,7 @@ func (m *ResponseCacheMiddleware) encodePayload(payload string, timestamp int64)
 	return sEnc + "|" + fmt.Sprint(timestamp)
 }
 
-func (m *ResponseCacheMiddleware) Logger() *logrus.Entry {
+func (m *ResponseCacheMiddleware) Logger() Logger {
 	return log.WithField("mw", m.Name())
 }
 

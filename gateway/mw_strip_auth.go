@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -25,7 +25,7 @@ func (sa *StripAuth) EnabledForSpec() bool {
 func (sa *StripAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
 	strip := func(typ string, config *apidef.AuthConfig) {
-		log.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"prefix": sa.Name(),
 		}).Debugf("%s: %+v\n", typ, config)
 

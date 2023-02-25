@@ -15,7 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/justinas/alice"
-	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
@@ -27,7 +28,7 @@ var algoList = [4]string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512
 func (ts *Test) getMiddlewareChain(spec *APISpec) http.Handler {
 
 	remote, _ := url.Parse(TestHttpAny)
-	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, logrus.New().WithFields(logrus.Fields{}))
+	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, log.New())
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(

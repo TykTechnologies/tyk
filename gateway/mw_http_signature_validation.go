@@ -18,7 +18,7 @@ import (
 	"text/scanner"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -103,7 +103,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 
 		certificateId, session, err = hm.getRSACertificateIdAndSessionForKeyID(r, fieldValues.KeyID)
 		if err != nil {
-			logger.WithError(err).WithFields(logrus.Fields{
+			logger.WithError(err).WithFields(log.Fields{
 				"keyID": fieldValues.KeyID,
 			}).Error("Failed to fetch session/public key")
 			return hm.authorizationError(r)
@@ -111,20 +111,20 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 
 		publicKey := hm.Gw.CertificateManager.ListRawPublicKey(certificateId)
 		if publicKey == nil {
-			log.Error("Certificate not found")
+			logger.Error("Certificate not found")
 			return errors.New("Certificate not found"), http.StatusInternalServerError
 		}
 		var ok bool
 		rsaKey, ok = publicKey.(*rsa.PublicKey)
 		if !ok {
-			log.Error("Certificate doesn't contain RSA Public key")
+			logger.Error("Certificate doesn't contain RSA Public key")
 			return errors.New("Certificate doesn't contain RSA Public key"), http.StatusInternalServerError
 		}
 	} else {
 		// Get a session for the Key ID
 		secret, session, err = hm.getSecretAndSessionForKeyID(r, fieldValues.KeyID)
 		if err != nil {
-			logger.WithError(err).WithFields(logrus.Fields{
+			logger.WithError(err).WithFields(log.Fields{
 				"keyID": fieldValues.KeyID,
 			}).Error("No HMAC secret for this key")
 			return hm.authorizationError(r)
@@ -151,7 +151,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 		}
 
 		if !matchPass {
-			logger.WithFields(logrus.Fields{
+			logger.WithFields(log.Fields{
 				"got": fieldValues.Signature,
 			}).Error("Signature string does not match!")
 			return hm.authorizationError(r)
@@ -160,7 +160,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 		// Create a signed string with the secret
 		encodedSignature, err := generateHMACEncodedSignature(signatureString, secret, fieldValues.Algorthm)
 		if err != nil {
-			logger.WithFields(logrus.Fields{
+			logger.WithFields(log.Fields{
 				"error": err,
 			}).Error("Failed to validate signature")
 			return hm.authorizationError(r)
@@ -183,7 +183,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 		}
 
 		if !matchPass {
-			logger.WithFields(logrus.Fields{
+			logger.WithFields(log.Fields{
 				"expected": encodedSignature,
 				"got":      fieldValues.Signature,
 			}).Error("Signature string does not match!")
@@ -325,20 +325,18 @@ func (hm *HTTPSignatureValidationMiddleware) getRSACertificateIdAndSessionForKey
 }
 
 func getDateHeader(r *http.Request) (string, string) {
+	logger := log.New().WithField("prefix", "hmac")
+
 	auxHeaderVal := r.Header.Get(altHeaderSpec)
 	// Prefer aux if present
 	if auxHeaderVal != "" {
-		log.WithFields(logrus.Fields{
-			"prefix": "hmac",
-		}).Warning("Using auxiliary header for this request")
+		logger.Warning("Using auxiliary header for this request")
 		return strings.ToLower(altHeaderSpec), auxHeaderVal
 	}
 
 	dateHeaderVal := r.Header.Get(dateHeaderSpec)
 	if dateHeaderVal != "" {
-		log.WithFields(logrus.Fields{
-			"prefix": "hmac",
-		}).Debug("Got date header")
+		logger.Debug("Got date header")
 		return strings.ToLower(dateHeaderSpec), dateHeaderVal
 	}
 
@@ -404,7 +402,7 @@ func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 		case "signature":
 			set.Signature = value
 		default:
-			log.WithFields(logrus.Fields{
+			mainLog.WithFields(log.Fields{
 				"prefix": "hmac",
 				"field":  key,
 			}).Warning("Invalid header field found")
@@ -442,7 +440,7 @@ func generateHMACSignatureStringFromRequest(r *http.Request, headers []string, p
 			signatureString += "\n"
 		}
 	}
-	log.Debug("Generated sig string: ", signatureString)
+	mainLog.Debug("Generated sig string: ", signatureString)
 	return signatureString, nil
 }
 
@@ -489,12 +487,12 @@ func validateRSAEncodedSignature(signatureString string, publicKey *rsa.PublicKe
 
 	decodedSignature, err := base64.StdEncoding.DecodeString(signature)
 	if err != nil {
-		log.Error("Error while base64 decoding signature:", err)
+		mainLog.Error("Error while base64 decoding signature:", err)
 		return false, err
 	}
 	err = rsa.VerifyPKCS1v15(publicKey, hashType, hashed, decodedSignature)
 	if err != nil {
-		log.Error("Signature match failed:", err)
+		mainLog.Error("Signature match failed:", err)
 		return false, err
 	}
 

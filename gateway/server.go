@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
-	stdlog "log"
 	"log/syslog"
 	"net"
 	"net/http"
@@ -36,7 +35,6 @@ import (
 	"github.com/pmylund/go-cache"
 	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
 	"rsc.io/letsencrypt"
 
@@ -54,7 +52,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
-	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -63,11 +61,27 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+// Logger aliases log.Logger.
+type Logger = log.Logger
+
 var (
-	log       = logger.Get()
-	mainLog   = log.WithField("prefix", "main")
-	pubSubLog = log.WithField("prefix", "pub-sub")
-	rawLog    = logger.GetRaw()
+	gatewayLog = log.New()
+
+	rpcLog              = log.WithPrefix("rpc")
+	mainLog             = log.WithPrefix("main")
+	testLog             = log.WithPrefix("test")
+	oauthLog            = log.WithPrefix("oauth")
+	proxyLog            = log.WithPrefix("proxy")
+	policyLog           = log.WithPrefix("policy")
+	pubSubLog           = log.WithPrefix("pub-sub")
+	webhooksLog         = log.WithPrefix("webhooks")
+	analyticsLog        = log.WithPrefix("analytics")
+	hostcheckLog        = log.WithPrefix("host-check")
+	hostcheckManagerLog = log.WithPrefix("host-check-mgr")
+	letsencryptLog      = log.WithPrefix("letsencrypt-mgr")
+	mdcbLog             = log.WithPrefix("mdcb-storage-handler")
+
+	rawLog = log.GetRaw()
 
 	memProfFile         *os.File
 	NewRelicApplication newrelic.Application
@@ -190,6 +204,10 @@ type Gateway struct {
 	healthCheckInfo atomic.Value
 
 	dialCtxFn test.DialContext
+}
+
+func (gw *Gateway) Logger() Logger {
+	return gatewayLog
 }
 
 type hostDetails struct {
@@ -417,14 +435,14 @@ func (gw *Gateway) setupGlobals() {
 	}
 
 	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, RedisController: gw.RedisController}
-	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
+	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log.New(), !gw.GetConfig().Cloud)
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		rpcStore := &RPCStorageHandler{
 			KeyPrefix: "cert-",
 			HashKeys:  false,
 			Gw:        gw,
 		}
-		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
+		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log.New(), !gw.GetConfig().Cloud)
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
@@ -450,6 +468,7 @@ func (gw *Gateway) buildDashboardConnStr(resource string) string {
 }
 
 func (gw *Gateway) syncAPISpecs() (int, error) {
+	logger := gw.Logger()
 	loader := APIDefinitionLoader{Gw: gw}
 
 	var s []*APISpec
@@ -457,15 +476,15 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 		connStr := gw.buildDashboardConnStr("/system/apis")
 		tmpSpecs, err := loader.FromDashboardService(connStr)
 		if err != nil {
-			log.Error("failed to load API specs: ", err)
+			logger.WithError(err).Error("failed to load API specs")
 			return 0, err
 		}
 
 		s = tmpSpecs
 
-		mainLog.Debug("Downloading API Configurations from Dashboard Service")
+		logger.Debug("Downloading API Configurations from Dashboard Service")
 	} else if gw.GetConfig().SlaveOptions.UseRPC {
-		mainLog.Debug("Using RPC Configuration")
+		logger.Debug("Using RPC Configuration")
 
 		var err error
 		s, err = loader.FromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw)
@@ -476,7 +495,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 		s = loader.FromDir(gw.GetConfig().AppPath)
 	}
 
-	mainLog.Printf("Detected %v APIs", len(s))
+	logger.Printf("Detected %v APIs", len(s))
 
 	if gw.GetConfig().AuthOverride.ForceAuthProvider {
 		for i := range s {
@@ -492,7 +511,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	var filter []*APISpec
 	for _, v := range s {
 		if err := v.Validate(); err != nil {
-			mainLog.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")
+			logger.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")
 			continue
 		}
 		filter = append(filter, v)
@@ -510,39 +529,38 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 func (gw *Gateway) syncPolicies() (count int, err error) {
 	var pols map[string]user.Policy
 
-	mainLog.Info("Loading policies")
+	logger := gw.Logger()
+	logger.Info("Loading policies")
 
 	switch gw.GetConfig().Policies.PolicySource {
 	case "service":
 		if gw.GetConfig().Policies.PolicyConnectionString == "" {
-			mainLog.Fatal("No connection string or node ID present. Failing.")
+			logger.Fatal("No connection string or node ID present. Failing.")
 		}
 		connStr := gw.GetConfig().Policies.PolicyConnectionString
 		connStr = connStr + "/system/policies"
 
-		mainLog.Info("Using Policies from Dashboard Service")
-
-		pols = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
+		logger.Info("Using Policies from Dashboard Service")
+		pols, err = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
-		mainLog.Debug("Using Policies from RPC")
+		logger.Debug("Using Policies from RPC")
 		pols, err = gw.LoadPoliciesFromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	default:
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
 			pols = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
-
 		} else if gw.GetConfig().Policies.PolicyRecordName == "" {
 			// old way of doing things before REST Api added
 			// this is the only case now where we need a policy record name
-			mainLog.Debug("No policy record name defined, skipping...")
+			logger.Debug("No policy record name defined, skipping...")
 			return 0, nil
 		} else {
-			pols = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
+			pols, err = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
 		}
 	}
-	mainLog.Infof("Policies found (%d total):", len(pols))
+	logger.Infof("Policies found (%d total):", len(pols))
 	for id := range pols {
-		mainLog.Debugf(" - %s", id)
+		logger.Debugf(" - %s", id)
 	}
 
 	gw.policiesMu.Lock()
@@ -584,6 +602,8 @@ func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.
 
 // loadControlAPIEndpoints loads the endpoints used for controlling the Gateway.
 func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
+	logger := gw.Logger()
+
 	hostname := gw.GetConfig().HostName
 	if gw.GetConfig().ControlAPIHostname != "" {
 		hostname = gw.GetConfig().ControlAPIHostname
@@ -609,7 +629,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
-		mainLog.Info("Control API hostname set: ", hostname)
+		logger.Info("Control API hostname set: ", hostname)
 	}
 
 	if *cli.HTTPProfile || gw.GetConfig().HTTPProfile {
@@ -619,7 +639,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 
 	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
 
-	mainLog.Info("Initialising Tyk REST API Endpoints")
+	logger.Info("Initialising Tyk REST API Endpoints")
 
 	// set up main API handlers
 	r.HandleFunc("/reload/group", gw.groupResetHandler).Methods("GET")
@@ -660,7 +680,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/oauth/revoke_all", gw.RevokeAllTokensHandler).Methods("POST")
 
 	} else {
-		mainLog.Info("Node is slaved, REST API minimised")
+		logger.Info("Node is slaved, REST API minimised")
 	}
 
 	r.HandleFunc("/debug", gw.traceHandler).Methods("POST")
@@ -676,7 +696,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 
 	r.HandleFunc("/schema", gw.schemaHandler).Methods(http.MethodGet)
 
-	mainLog.Debug("Loaded API Endpoints")
+	logger.Debug("Loaded API Endpoints")
 }
 
 // checkIsAPIOwner will ensure that the accessor of the tyk API has the
@@ -689,7 +709,7 @@ func (gw *Gateway) checkIsAPIOwner(next http.Handler) http.Handler {
 		tykAuthKey := r.Header.Get(header.XTykAuthorization)
 		if tykAuthKey != secret {
 			// Error
-			mainLog.Warning("Attempted administrative access with invalid or missing key!")
+			gw.Logger().Warning("Attempted administrative access with invalid or missing key!")
 
 			doJSONWrite(w, http.StatusForbidden, apiError("Attempted administrative access with invalid or missing key!"))
 			return
@@ -749,12 +769,14 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 }
 
 func (gw *Gateway) addBatchEndpoint(spec *APISpec, subrouter *mux.Router) {
-	mainLog.Debug("Batch requests enabled for API")
+	gw.Logger().Debug("Batch requests enabled for API")
 	batchHandler := BatchRequestHandler{API: spec, Gw: gw}
 	subrouter.HandleFunc("/tyk/batch/", batchHandler.HandleBatchRequest)
 }
 
 func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
+	logger := gw.Logger()
+
 	mwPaths := []string{}
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
 	mwPreFuncs := []apidef.MiddlewareDefinition{}
@@ -780,7 +802,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPreFuncs = append(mwPreFuncs, mwObj)
-		mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
+		logger.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
 	for _, mwObj := range spec.CustomMiddleware.Post {
 		if mwObj.Disabled {
@@ -789,7 +811,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPostFuncs = append(mwPostFuncs, mwObj)
-		mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
+		logger.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
 	}
 
 	// Load from folders
@@ -806,20 +828,20 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 		globPath := filepath.Join(gw.GetConfig().MiddlewarePath, spec.APIID, folder.name, "*.js")
 		paths, _ := filepath.Glob(globPath)
 		for _, path := range paths {
-			mainLog.Debug("Loading file middleware from ", path)
+			logger.Debug("Loading file middleware from ", path)
 
 			mwDef := apidef.MiddlewareDefinition{
 				Name: strings.Split(filepath.Base(path), ".")[0],
 				Path: path,
 			}
-			mainLog.Debug("-- Middleware name ", mwDef.Name)
+			logger.Debug("-- Middleware name ", mwDef.Name)
 			mwDef.RequireSession = strings.HasSuffix(mwDef.Name, "_with_session")
 			if mwDef.RequireSession {
 				switch folder.name {
 				case "post_auth", "post":
-					mainLog.Debug("-- Middleware requires session")
+					logger.Debug("-- Middleware requires session")
 				default:
-					mainLog.Warning("Middleware requires session, but isn't post-auth: ", mwDef.Name)
+					logger.Warning("Middleware requires session, but isn't post-auth: ", mwDef.Name)
 				}
 			}
 			mwPaths = append(mwPaths, path)
@@ -864,6 +886,8 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 // Create the response processor chain
 func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
+	logger := gw.Logger()
+
 	// Prealloc size
 	chainLen := len(spec.ResponseProcessors)
 	// Append capacity
@@ -874,13 +898,13 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	for i, processorDetail := range spec.ResponseProcessors {
 		processor := gw.responseProcessorByName(processorDetail.Name)
 		if processor == nil {
-			mainLog.Error("No such processor: ", processorDetail.Name)
+			logger.Error("No such processor: ", processorDetail.Name)
 			return
 		}
 		if err := processor.Init(processorDetail.Options, spec); err != nil {
-			mainLog.Debug("Failed to init processor: ", err)
+			logger.Debug("Failed to init processor: ", err)
 		}
-		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
+		logger.Debug("Loading Response processor: ", processorDetail.Name)
 		responseChain[i] = processor
 	}
 
@@ -895,12 +919,12 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 
 		// TODO: perhaps error when plugin support is disabled?
 		if processor == nil {
-			mainLog.Error("Couldn't find custom middleware processor")
+			logger.Error("Couldn't find custom middleware processor")
 			return
 		}
 
 		if err := processor.Init(mw, spec); err != nil {
-			mainLog.WithError(err).Debug("Failed to init processor")
+			logger.WithError(err).Debug("Failed to init processor")
 		}
 		responseChain = append(responseChain, processor)
 	}
@@ -912,7 +936,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	// Add cache writer as the final step of the response middleware chain
 	processor := &ResponseCacheMiddleware{store: cacheStore}
 	if err := processor.Init(nil, spec); err != nil {
-		mainLog.WithError(err).Debug("Failed to init processor")
+		logger.WithError(err).Debug("Failed to init processor")
 	}
 
 	responseChain = append(responseChain, processor)
@@ -921,7 +945,6 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 }
 
 func handleCORS(router *mux.Router, spec *APISpec) {
-
 	if spec.CORS.Enable {
 		mainLog.Debug("CORS ENABLED")
 		c := cors.New(cors.Options{
@@ -956,34 +979,36 @@ func (gw *Gateway) DoReload() {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
+	logger := gw.Logger()
+
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
 		gw.GlobalEventsJSVM.DeInit()
-		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
+		gw.GlobalEventsJSVM.Init(nil, log.New(), gw)
 	}
 
 	// Load the API Policies
 	if _, err := gw.syncPolicies(); err != nil {
-		mainLog.Error("Error during syncing policies:", err.Error())
+		logger.Error("Error during syncing policies:", err.Error())
 		return
 	}
 
 	// load the specs
 	if count, err := gw.syncAPISpecs(); err != nil {
-		mainLog.Error("Error during syncing apis:", err.Error())
+		logger.Error("Error during syncing apis:", err.Error())
 		return
 	} else {
 		// skip re-loading only if dashboard service reported 0 APIs
 		// and current registry had 0 APIs
 		if count == 0 && gw.apisByIDLen() == 0 {
-			mainLog.Warning("No API Definitions found, not reloading")
+			logger.Warning("No API Definitions found, not reloading")
 			return
 		}
 	}
 
 	gw.loadGlobalApps()
 
-	mainLog.Info("API reload complete")
+	logger.Info("API reload complete")
 }
 
 // shouldReload returns true if we should perform any reload. Reloads happens if
@@ -1067,71 +1092,78 @@ func (gw *Gateway) reloadURLStructure(done func()) {
 
 func (gw *Gateway) setupLogger() {
 	gwConfig := gw.GetConfig()
-	if gwConfig.UseSentry {
-		mainLog.Debug("Enabling Sentry support")
+	logger := gw.Logger()
 
-		logLevel := []logrus.Level{}
+	hooks := make(log.LevelHooks)
+
+	if gwConfig.UseSentry {
+		logger.Debug("Enabling Sentry support")
+
+		logLevel := []log.Level{}
 
 		if gwConfig.SentryLogLevel == "" {
-			logLevel = []logrus.Level{
-				logrus.PanicLevel,
-				logrus.FatalLevel,
-				logrus.ErrorLevel,
+			logLevel = []log.Level{
+				log.PanicLevel,
+				log.FatalLevel,
+				log.ErrorLevel,
 			}
 		} else if gwConfig.SentryLogLevel == "panic" {
-			logLevel = []logrus.Level{
-				logrus.PanicLevel,
-				logrus.FatalLevel,
+			logLevel = []log.Level{
+				log.PanicLevel,
+				log.FatalLevel,
 			}
 		}
 
 		hook, err := logrus_sentry.NewSentryHook(gwConfig.SentryCode, logLevel)
 
-		if err == nil {
+		if err != nil {
+			logger.WithError(err).Errorf("Error creating hook for sentry")
+		} else {
 			hook.Timeout = 0
-			log.Hooks.Add(hook)
-			rawLog.Hooks.Add(hook)
+			hooks.Add(hook)
+			logger.Debug("Sentry hook active")
 		}
-		mainLog.Debug("Sentry hook active")
 	}
 
 	if gwConfig.UseSyslog {
-		mainLog.Debug("Enabling Syslog support")
+		logger.Debug("Enabling Syslog support")
 		hook, err := logrus_syslog.NewSyslogHook(gwConfig.SyslogTransport,
 			gwConfig.SyslogNetworkAddr,
 			syslog.LOG_INFO, "")
 
 		if err == nil {
-			log.Hooks.Add(hook)
-			rawLog.Hooks.Add(hook)
+			hooks.Add(hook)
 		}
-		mainLog.Debug("Syslog hook active")
+		logger.Debug("Syslog hook active")
 	}
 
 	if gwConfig.UseGraylog {
-		mainLog.Debug("Enabling Graylog support")
-		hook := graylogHook.NewGraylogHook(gwConfig.GraylogNetworkAddr,
-			map[string]interface{}{"tyk-module": "gateway"})
+		logger.Debug("Enabling Graylog support")
+		hook := graylogHook.NewGraylogHook(
+			gwConfig.GraylogNetworkAddr,
+			map[string]interface{}{
+				"tyk-module": "gateway",
+			},
+		)
 
-		log.Hooks.Add(hook)
-		rawLog.Hooks.Add(hook)
+		hooks.Add(hook)
 
-		mainLog.Debug("Graylog hook active")
+		logger.Debug("Graylog hook active")
 	}
 
 	if gwConfig.UseLogstash {
-		mainLog.Debug("Enabling Logstash support")
+		logger.Debug("Enabling Logstash support")
 
 		var hook *logstashHook.Hook
 		var err error
 		var conn net.Conn
 		if gwConfig.LogstashTransport == "udp" {
-			mainLog.Debug("Connecting to Logstash with udp")
+			logger.Debug("Connecting to Logstash with udp")
 			hook, err = logstashHook.NewHook(gwConfig.LogstashTransport,
 				gwConfig.LogstashNetworkAddr,
 				appName)
 		} else {
-			mainLog.Debugf("Connecting to Logstash with %s", gwConfig.LogstashTransport)
+			logger.Debugf("Connecting to Logstash with %s", gwConfig.LogstashTransport)
 			conn, err = gas.Dial(gwConfig.LogstashTransport, gwConfig.LogstashNetworkAddr)
 			if err == nil {
 				hook, err = logstashHook.NewHookWithConn(conn, appName)
@@ -1139,44 +1171,45 @@ func (gw *Gateway) setupLogger() {
 		}
 
 		if err != nil {
-			log.Errorf("Error making connection for logstash: %v", err)
+			logger.WithError(err).Errorf("Error creating hook for logstash")
 		} else {
-			log.Hooks.Add(hook)
-			rawLog.Hooks.Add(hook)
-			mainLog.Debug("Logstash hook active")
+			hooks.Add(hook)
+			logger.Debug("Logstash hook active")
 		}
 	}
 
 	if gwConfig.UseRedisLog {
-		hook := gw.newRedisHook()
-		log.Hooks.Add(hook)
-		rawLog.Hooks.Add(hook)
+		logger.Debug("Redis log hook active")
 
-		mainLog.Debug("Redis log hook active")
+		hooks.Add(gw.newRedisHook())
 	}
+
+	logger.ReplaceHooks(hooks)
+	rawLog.ReplaceHooks(hooks)
 }
 
 func (gw *Gateway) initialiseSystem() error {
+	logger := gw.Logger()
+
 	if gw.isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output
-		log.SetLevel(logrus.ErrorLevel)
-		log.SetOutput(ioutil.Discard)
+		logger.SetLevel(log.ErrorLevel)
+		logger.SetOutput(ioutil.Discard)
 		gorpc.SetErrorLogger(func(string, ...interface{}) {})
-		stdlog.SetOutput(ioutil.Discard)
 	} else if *cli.DebugMode {
-		log.Level = logrus.DebugLevel
-		mainLog.Debug("Enabling debug-level output")
+		logger.SetLevel(log.DebugLevel)
+		logger.Debug("Enabling debug-level output")
 	}
 
 	if *cli.Conf != "" {
-		mainLog.Debugf("Using %s for configuration", *cli.Conf)
+		logger.Debugf("Using %s for configuration", *cli.Conf)
 		confPaths = []string{*cli.Conf}
 	} else {
-		mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
+		logger.Debug("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
-	mainLog.Infof("Tyk API Gateway %s", VERSION)
+	logger.Infof("Tyk API Gateway %s", VERSION)
 
 	if !gw.isRunningTests() {
 		gwConfig := config.Config{}
@@ -1200,22 +1233,22 @@ func (gw *Gateway) initialiseSystem() error {
 		case "", "info":
 			// default, do nothing
 		case "error":
-			log.Level = logrus.ErrorLevel
+			logger.SetLevel(log.ErrorLevel)
 		case "warn":
-			log.Level = logrus.WarnLevel
+			logger.SetLevel(log.WarnLevel)
 		case "debug":
-			log.Level = logrus.DebugLevel
+			logger.SetLevel(log.DebugLevel)
 		default:
-			mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
+			logger.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
 		}
 	}
 
 	if gwConfig.Storage.Type != "redis" {
-		mainLog.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
+		logger.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
 	}
 
 	// suply rpc client globals to join it main loging and instrumentation sub systems
-	rpc.Log = log
+	rpc.Log = logger
 	rpc.Instrument = instrument
 
 	gw.setupGlobals()
@@ -1223,7 +1256,7 @@ func (gw *Gateway) initialiseSystem() error {
 	if *cli.Port != "" {
 		portNum, err := strconv.Atoi(*cli.Port)
 		if err != nil {
-			mainLog.Error("Port specified in flags must be a number: ", err)
+			logger.Error("Port specified in flags must be a number: ", err)
 		} else {
 			gwConfig.ListenPort = portNum
 			gw.SetConfig(gwConfig)
@@ -1232,10 +1265,10 @@ func (gw *Gateway) initialiseSystem() error {
 
 	// Enable all the loggers
 	gw.setupLogger()
-	mainLog.Info("PIDFile location set to: ", gwConfig.PIDFileLocation)
+	logger.Info("PIDFile location set to: ", gwConfig.PIDFileLocation)
 
 	if err := writePIDFile(gw.GetConfig().PIDFileLocation); err != nil {
-		mainLog.Error("Failed to write PIDFile: ", err)
+		logger.Error("Failed to write PIDFile: ", err)
 	}
 
 	if gw.GetConfig().UseDBAppConfigs && gw.GetConfig().Policies.PolicySource != config.DefaultDashPolicySource {
@@ -1307,6 +1340,7 @@ func readPIDFromFile(file string) (int, error) {
 // timeouts) and sets up a few globals that depend on the config.
 func (gw *Gateway) afterConfSetup() {
 	conf := gw.GetConfig()
+	logger := gw.Logger()
 
 	if conf.SlaveOptions.UseRPC {
 		if conf.SlaveOptions.GroupID == "" {
@@ -1353,40 +1387,40 @@ func (gw *Gateway) afterConfSetup() {
 
 	conf.Secret, err = gw.kvStore(conf.Secret)
 	if err != nil {
-		log.Fatalf("could not retrieve the secret key.. %v", err)
+		logger.Fatalf("could not retrieve the secret key.. %v", err)
 	}
 
 	conf.NodeSecret, err = gw.kvStore(conf.NodeSecret)
 	if err != nil {
-		log.Fatalf("could not retrieve the NodeSecret key.. %v", err)
+		logger.Fatalf("could not retrieve the NodeSecret key.. %v", err)
 	}
 
 	conf.Storage.Password, err = gw.kvStore(conf.Storage.Password)
 	if err != nil {
-		log.Fatalf("Could not retrieve redis password... %v", err)
+		logger.Fatalf("Could not retrieve redis password... %v", err)
 	}
 
 	conf.CacheStorage.Password, err = gw.kvStore(conf.CacheStorage.Password)
 	if err != nil {
-		log.Fatalf("Could not retrieve cache storage password... %v", err)
+		logger.Fatalf("Could not retrieve cache storage password... %v", err)
 	}
 
 	conf.Security.PrivateCertificateEncodingSecret, err = gw.kvStore(conf.Security.PrivateCertificateEncodingSecret)
 	if err != nil {
-		log.Fatalf("Could not retrieve the private certificate encoding secret... %v", err)
+		logger.Fatalf("Could not retrieve the private certificate encoding secret... %v", err)
 	}
 
 	if conf.UseDBAppConfigs {
 		conf.DBAppConfOptions.ConnectionString, err = gw.kvStore(conf.DBAppConfOptions.ConnectionString)
 		if err != nil {
-			log.Fatalf("Could not fetch dashboard connection string.. %v", err)
+			logger.Fatalf("Could not fetch dashboard connection string.. %v", err)
 		}
 	}
 
 	if conf.Policies.PolicySource == "service" {
 		conf.Policies.PolicyConnectionString, err = gw.kvStore(conf.Policies.PolicyConnectionString)
 		if err != nil {
-			log.Fatalf("Could not fetch policy connection string... %v", err)
+			logger.Fatalf("Could not fetch policy connection string... %v", err)
 		}
 	}
 
@@ -1394,10 +1428,11 @@ func (gw *Gateway) afterConfSetup() {
 }
 
 func (gw *Gateway) kvStore(value string) (string, error) {
+	logger := gw.Logger()
 
 	if strings.HasPrefix(value, "secrets://") {
 		key := strings.TrimPrefix(value, "secrets://")
-		log.Debugf("Retrieving %s from secret store in config", key)
+		logger.Debugf("Retrieving %s from secret store in config", key)
 		val, ok := gw.GetConfig().Secrets[key]
 		if !ok {
 			return "", fmt.Errorf("secrets does not exist in config.. %s not found", key)
@@ -1408,15 +1443,15 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 
 	if strings.HasPrefix(value, "env://") {
 		key := strings.TrimPrefix(value, "env://")
-		log.Debugf("Retrieving %s from environment", key)
+		logger.Debugf("Retrieving %s from environment", key)
 		return os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key))), nil
 	}
 
 	if strings.HasPrefix(value, "consul://") {
 		key := strings.TrimPrefix(value, "consul://")
-		log.Debugf("Retrieving %s from consul", key)
+		logger.Debugf("Retrieving %s from consul", key)
 		if err := gw.setUpConsul(); err != nil {
-			log.Error("Failed to setup consul: ", err)
+			logger.Error("Failed to setup consul: ", err)
 
 			// Return value as is. If consul cannot be set up
 			return value, nil
@@ -1427,9 +1462,9 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 
 	if strings.HasPrefix(value, "vault://") {
 		key := strings.TrimPrefix(value, "vault://")
-		log.Debugf("Retrieving %s from vault", key)
+		logger.Debugf("Retrieving %s from vault", key)
 		if err := gw.setUpVault(); err != nil {
-			log.Error("Failed to setup vault: ", err)
+			logger.Error("Failed to setup vault: ", err)
 			// Return value as is If vault cannot be set up
 			return value, nil
 		}
@@ -1446,12 +1481,7 @@ func (gw *Gateway) setUpVault() error {
 	}
 
 	var err error
-
 	gw.vaultKVStore, err = kv.NewVault(gw.GetConfig().KV.Vault)
-	if err != nil {
-		log.Debugf("an error occurred while setting up vault... %v", err)
-	}
-
 	return err
 }
 
@@ -1461,28 +1491,23 @@ func (gw *Gateway) setUpConsul() error {
 	}
 
 	var err error
-
 	gw.consulKVStore, err = kv.NewConsul(gw.GetConfig().KV.Consul)
-	if err != nil {
-		log.Debugf("an error occurred while setting up consul.. %v", err)
-	}
-
 	return err
 }
 
 func (gw *Gateway) getHostDetails(file string) {
 	var err error
+	logger := gw.Logger()
 	if gw.hostDetails.PID, err = readPIDFromFile(file); err != nil {
-		mainLog.Error("Failed ot get host pid: ", err)
+		logger.Error("Failed ot get host pid: ", err)
 	}
 	if gw.hostDetails.Hostname, err = os.Hostname(); err != nil {
-		mainLog.Error("Failed to get hostname: ", err)
+		logger.Error("Failed to get hostname: ", err)
 	}
 }
 
 func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, RedisController: gw.RedisController}
-	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		return storage.NewMdcbStorage(
@@ -1492,7 +1517,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 				HashKeys:  hashKeys,
 				Gw:        gw,
 			},
-			logger,
+			mdcbLog,
 		)
 	}
 	return localStorage

@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/sirupsen/logrus"
 	xmlpath "gopkg.in/xmlpath.v2"
+
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -33,7 +34,7 @@ type BaseExtractor struct {
 
 // ExtractAndCheck is called from the CP middleware, if ID extractor is enabled for the current API.
 func (e *BaseExtractor) ExtractAndCheck(_ *http.Request) (sessionID string, returnOverrides ReturnOverrides) {
-	log.WithFields(logrus.Fields{
+	coprocessLog.WithFields(log.Fields{
 		"prefix": "idextractor",
 	}).Error("This extractor doesn't implement an extraction method, rejecting.")
 	return "", ReturnOverrides{ResponseCode: 403, ResponseError: "Key not authorised"}
@@ -265,7 +266,7 @@ func newExtractor(referenceSpec *APISpec, mw BaseMiddleware) {
 
 	err := mapstructure.Decode(referenceSpec.CustomMiddleware.IdExtractor.ExtractorConfig, &idExtractorConfig)
 	if err != nil {
-		log.WithError(err).Error("error while decoding id extractor config")
+		coprocessLog.WithError(err).Error("error while decoding id extractor config")
 		return
 	}
 

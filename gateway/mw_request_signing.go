@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/log"
 )
 
 type RequestSigning struct {
@@ -90,6 +91,8 @@ func (s *RequestSigning) getRequestPath(r *http.Request) string {
 }
 
 func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	logger := s.Logger()
+
 	if (s.Spec.RequestSigning.Secret == "" && s.Spec.RequestSigning.CertificateId == "") || s.Spec.RequestSigning.KeyId == "" || s.Spec.RequestSigning.Algorithm == "" {
 		log.Error("Fields required for signing the request are missing")
 		return errors.New("Fields required for signing the request are missing"), http.StatusInternalServerError
@@ -110,7 +113,7 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 		}
 	}
 	if !algorithmAllowed {
-		log.WithField("algorithm", s.Spec.RequestSigning.Algorithm).Error("Algorithm not supported")
+		logger.WithField("algorithm", s.Spec.RequestSigning.Algorithm).Error("Algorithm not supported")
 		return errors.New("Request signing algorithm is not supported"), http.StatusInternalServerError
 	}
 
@@ -120,7 +123,7 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 
 	signatureString, err := generateHMACSignatureStringFromRequest(r, headers, path)
 	if err != nil {
-		log.Error(err)
+		logger.WithError(err).Error("error generating hmac signature string")
 		return err, http.StatusInternalServerError
 	}
 	strHeaders := strings.Join(headers, " ")
@@ -129,24 +132,21 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 
 	if strings.HasPrefix(s.Spec.RequestSigning.Algorithm, "rsa") {
 		if s.Spec.RequestSigning.CertificateId == "" {
-			log.Error("CertificateID is empty")
 			return errors.New("CertificateID is empty"), http.StatusInternalServerError
 		}
 
 		certList := s.Gw.CertificateManager.List([]string{s.Spec.RequestSigning.CertificateId}, certs.CertificatePrivate)
 		if len(certList) == 0 || certList[0] == nil {
-			log.Error("Certificate not found")
 			return errors.New("Certificate not found"), http.StatusInternalServerError
 		}
 		cert := certList[0]
 		rsaKey, ok := cert.PrivateKey.(*rsa.PrivateKey)
 		if !ok {
-			log.Error("Certificate does not contain RSA private key")
 			return errors.New("Certificate does not contain RSA private key"), http.StatusInternalServerError
 		}
 		encodedSignature, err = generateRSAEncodedSignature(signatureString, rsaKey, s.Spec.RequestSigning.Algorithm)
 		if err != nil {
-			log.Error("Error while generating signature:", err)
+			logger.WithError(err).Error("error generating rsa signature")
 			return err, http.StatusInternalServerError
 		}
 	} else {
@@ -170,10 +170,10 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 
 	if s.Spec.RequestSigning.SignatureHeader != "" {
 		r.Header.Set(s.Spec.RequestSigning.SignatureHeader, authHeader)
-		log.Debugf("Setting %s headers as =%s", s.Spec.RequestSigning.SignatureHeader, authHeader)
+		logger.Debugf("Setting %s headers as = %s", s.Spec.RequestSigning.SignatureHeader, authHeader)
 	} else {
 		r.Header.Set("Authorization", authHeader)
-		log.Debug("Setting Authorization headers as =", authHeader)
+		logger.Debugf("Setting Authorization headers as = %s", authHeader)
 	}
 
 	return nil, http.StatusOK

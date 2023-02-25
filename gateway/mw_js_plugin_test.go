@@ -19,7 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/user"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -31,13 +31,13 @@ func TestJSVMLogs(t *testing.T) {
 	defer ts.Close()
 
 	var buf bytes.Buffer
-	log := logrus.New()
+	log := log.New()
 	log.Out = &buf
 
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, log.New, ts.Gw)
 
-	jsvm.RawLog = logrus.New()
+	jsvm.RawLog = log.New()
 	jsvm.RawLog.Out = &buf
 	jsvm.RawLog.Formatter = new(logger.RawFormatter)
 
@@ -93,7 +93,7 @@ func TestJSVMBody(t *testing.T) {
 	body := "foô \uffff \u0000 \xff bàr"
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader(body))
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, log.New, ts.Gw)
 
 	const js = `
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
@@ -134,7 +134,7 @@ func TestJSVMSessionMetadataUpdate(t *testing.T) {
 	}
 	req := httptest.NewRequest("GET", "/foo", nil)
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, log.New, ts.Gw)
 
 	s := &user.SessionState{
 		MetaData: make(map[string]interface{})}
@@ -184,7 +184,7 @@ func TestJSVMProcessTimeout(t *testing.T) {
 	}
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader("body"))
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, log.New, ts.Gw)
 	jsvm.Timeout = time.Millisecond
 
 	// this js plugin just loops forever, keeping Otto at 100% CPU
@@ -236,7 +236,7 @@ func TestJSVMConfigData(t *testing.T) {
 			Pre:                 true,
 		}
 		jsvm := JSVM{}
-		jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+		jsvm.Init(nil, log.New, ts.Gw)
 		if _, err := jsvm.VM.Run(js); err != nil {
 			t.Fatalf("failed to set up js plugin: %v", err)
 		}
@@ -260,7 +260,7 @@ func TestJSVMConfigData(t *testing.T) {
 			Pre:                 true,
 		}
 		jsvm := JSVM{}
-		jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+		jsvm.Init(nil, log.New, ts.Gw)
 		if _, err := jsvm.VM.Run(js); err != nil {
 			t.Fatalf("failed to set up js plugin: %v", err)
 		}
@@ -290,7 +290,7 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, log.New, ts.Gw)
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -349,7 +349,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 		ts.Gw.SetConfig(globalConf)
 	}()
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, log.New, ts.Gw)
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -377,7 +377,7 @@ func TestJSVMRequestScheme(t *testing.T) {
 	}
 	req := httptest.NewRequest("GET", "/foo", nil)
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, log.New, ts.Gw)
 
 	const js = `
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
@@ -528,7 +528,7 @@ func TestJSVMBase64(t *testing.T) {
 	defer ts.Close()
 
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, log.New, ts.Gw)
 
 	inputString := "teststring"
 	inputB64 := "dGVzdHN0cmluZw=="

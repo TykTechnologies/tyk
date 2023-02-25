@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -19,7 +19,7 @@ var (
 	}
 )
 
-func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
+func (ts *Test) prepareSpecWithEvents(logger Logger) (spec *APISpec) {
 
 	if logger == nil {
 		logger = log
@@ -123,7 +123,7 @@ func TestLogMessageEventHandler(t *testing.T) {
 	defer ts.Close()
 
 	buf := &bytes.Buffer{}
-	testLogger := logrus.New()
+	testLogger := log.New()
 	testLogger.Out = buf
 	spec := ts.prepareSpecWithEvents(testLogger)
 	handler := spec.EventPaths[EventAuthFailure][0]

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	cache "github.com/pmylund/go-cache"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/sync/singleflight"
 
@@ -215,7 +214,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 var errUnauthorized = errors.New("Unauthorized")
 
-func (k *BasicAuthKeyIsValid) checkPassword(session *user.SessionState, plainPassword string, logger *logrus.Entry) error {
+func (k *BasicAuthKeyIsValid) checkPassword(session *user.SessionState, plainPassword string, logger Logger) error {
 	switch session.BasicAuthData.Hash {
 	case user.HashPlainText:
 		if session.BasicAuthData.Password != plainPassword {
@@ -265,7 +264,7 @@ func (k *BasicAuthKeyIsValid) doBcryptWithCache(cacheDuration time.Duration, has
 	return nil
 }
 
-func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password string, logEntry *logrus.Entry) error {
+func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password string, logEntry Logger) error {
 	passwordBytes := []byte(password)
 	hashBytes := []byte(hash)
 

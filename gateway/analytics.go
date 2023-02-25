@@ -31,7 +31,7 @@ func (gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns
 
 	for _, pattern := range gw.GetConfig().AnalyticsConfig.NormaliseUrls.Custom {
 		if patRe, err := regexp.Compile(pattern); err != nil {
-			log.Error("failed to compile custom pattern: ", err)
+			analyticsLog.Error("failed to compile custom pattern: ", err)
 		} else {
 			pats.Custom = append(pats.Custom, patRe)
 		}
@@ -64,7 +64,7 @@ func (r *RedisAnalyticsHandler) Init() {
 	r.globalConf = r.Gw.GetConfig()
 	if r.globalConf.AnalyticsConfig.EnableGeoIP {
 		if db, err := maxminddb.Open(r.globalConf.AnalyticsConfig.GeoIPDBLocation); err != nil {
-			log.Error("Failed to init GeoIP Database: ", err)
+			analyticsLog.Error("Failed to init GeoIP Database: ", err)
 		} else {
 			r.GeoIPDB = db
 		}
@@ -75,7 +75,7 @@ func (r *RedisAnalyticsHandler) Init() {
 	recordsBufferSize := r.globalConf.AnalyticsConfig.RecordsBufferSize
 
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
-	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
+	analyticsLog.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
 	r.enableMultipleAnalyticsKeys = r.globalConf.AnalyticsConfig.EnableMultipleAnalyticsKeys
 	r.analyticsSerializer = serializer.NewAnalyticsSerializer(r.globalConf.AnalyticsConfig.SerializerType)
 
@@ -206,7 +206,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			}
 
 			if encoded, err := r.analyticsSerializer.Encode(record); err != nil {
-				log.WithError(err).Error("Error encoding analytics data")
+				analyticsLog.WithError(err).Error("Error encoding analytics data")
 			} else {
 				recordsBuffer = append(recordsBuffer, encoded)
 			}

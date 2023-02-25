@@ -5,21 +5,20 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/goplugin"
+	"github.com/TykTechnologies/tyk/log"
 )
 
 type GoAnalyticsPlugin struct {
 	Path     string // path to .so file
 	FuncName string // function symbol to look up
 	handler  func(record *analytics.AnalyticsRecord)
-	logger   *logrus.Entry
+	logger   Logger
 }
 
 func (m *GoAnalyticsPlugin) loadAnalyticsPlugin() bool {
-	m.logger = log.WithFields(logrus.Fields{
+	m.logger = analyticsLog.WithFields(log.Fields{
 		"mwPath":       m.Path,
 		"mwSymbolName": m.FuncName,
 	})

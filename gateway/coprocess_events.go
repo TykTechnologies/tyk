@@ -55,7 +55,7 @@ func (l *CoProcessEventHandler) HandleEvent(em config.EventMessage) {
 	// JSON-encode the event data object
 	msgAsJSON, err := json.Marshal(eventWrapper)
 	if err != nil {
-		log.Error("Failed to encode event data: ", err)
+		coprocessLog.Error("Failed to encode event data: ", err)
 		return
 	}
 	dispatcher.DispatchEvent(msgAsJSON)

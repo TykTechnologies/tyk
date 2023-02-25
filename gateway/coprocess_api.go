@@ -5,7 +5,7 @@ import "C"
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -25,7 +25,7 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, RedisController: rc}
 	err := store.SetKey(key, value, ttl)
 	if err != nil {
-		log.WithError(err).Error("could not set key")
+		coprocessLog.WithError(err).Error("could not set key")
 	}
 }
 
@@ -64,19 +64,19 @@ func CoProcessLog(CMessage, CLogLevel *C.char) {
 	logLevel := C.GoString(CLogLevel)
 	switch logLevel {
 	case "debug":
-		log.WithFields(logrus.Fields{
+		coprocessLog.WithFields(log.Fields{
 			"prefix": "python",
 		}).Debug(message)
 	case "error":
-		log.WithFields(logrus.Fields{
+		coprocessLog.WithFields(log.Fields{
 			"prefix": "python",
 		}).Error(message)
 	case "warning":
-		log.WithFields(logrus.Fields{
+		coprocessLog.WithFields(log.Fields{
 			"prefix": "python",
 		}).Warning(message)
 	default:
-		log.WithFields(logrus.Fields{
+		coprocessLog.WithFields(log.Fields{
 			"prefix": "python",
 		}).Info(message)
 	}

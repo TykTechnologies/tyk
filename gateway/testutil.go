@@ -290,17 +290,17 @@ func (s *Test) RegisterJSFileMiddleware(apiid string, files map[string]string) {
 	gwConfig := s.Gw.GetConfig()
 	err := os.MkdirAll(gwConfig.MiddlewarePath+"/"+apiid+"/post", 0755)
 	if err != nil {
-		log.WithError(err).Error("creating directory in middleware post path")
+		testLog.WithError(err).Error("creating directory in middleware post path")
 	}
 	err = os.MkdirAll(gwConfig.MiddlewarePath+"/"+apiid+"/pre", 0755)
 	if err != nil {
-		log.WithError(err).Error("creating directory in middleware pre path")
+		testLog.WithError(err).Error("creating directory in middleware pre path")
 	}
 
 	for file, content := range files {
 		err = ioutil.WriteFile(gwConfig.MiddlewarePath+"/"+apiid+"/"+file, []byte(content), 0755)
 		if err != nil {
-			log.WithError(err).Error("writing in file")
+			testLog.WithError(err).Error("writing in file")
 		}
 	}
 }
@@ -312,7 +312,7 @@ func (s *Test) BundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 	bundleName := strings.Replace(r.URL.Path, "/bundles/", "", -1)
 	bundle, exists := s.Gw.TestBundles[bundleName]
 	if !exists {
-		log.Warning(s.Gw.TestBundles)
+		testLog.Warning(s.Gw.TestBundles)
 		http.Error(w, "Bundle not found", http.StatusNotFound)
 		return
 	}
@@ -780,7 +780,7 @@ func CreateSession(gw *Gateway, sGen ...func(s *user.SessionState)) string {
 	hashedKey := storage.HashKey(key, hashKeys)
 	err := gw.GlobalSessionManager.UpdateSession(hashedKey, session, 60, hashKeys)
 	if err != nil {
-		log.WithError(err).Error("updating session.")
+		testLog.WithError(err).Error("updating session.")
 	}
 	return key
 }
@@ -988,12 +988,12 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 	// init and create gw
 	ctx, cancel := context.WithCancel(context.Background())
 
-	log.Info("starting test")
+	testLog.Info("starting test")
 
 	s.ctx = ctx
 	s.cancel = func() {
 		cancel()
-		log.Info("Cancelling test context")
+		testLog.Info("Cancelling test context")
 	}
 
 	gw := s.newGateway(genConf)
@@ -1120,7 +1120,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	go func() {
 		if err := s.HttpHandler.ListenAndServe(); err != http.ErrServerClosed {
-			log.Warn("testServer.ListenAndServe() err: ", err.Error())
+			testLog.Warn("testServer.ListenAndServe() err: ", err.Error())
 		}
 	}()
 
@@ -1230,9 +1230,9 @@ func (s *Test) Close() {
 
 	err := s.HttpHandler.Shutdown(ctxShutDown)
 	if err != nil {
-		log.WithError(err).Error("shutting down the http handler")
+		testLog.WithError(err).Error("shutting down the http handler")
 	} else {
-		log.Info("server exited properly")
+		testLog.Info("server exited properly")
 	}
 
 	s.Gw.Analytics.Stop()
@@ -1241,7 +1241,7 @@ func (s *Test) Close() {
 
 	err = s.RemoveApis()
 	if err != nil {
-		log.Error("could not remove apis")
+		testLog.Error("could not remove apis")
 	}
 }
 
@@ -1254,7 +1254,7 @@ func (s *Test) RemoveApis() error {
 
 	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
 	if err != nil {
-		log.WithError(err).Error("removing apis from gw")
+		testLog.WithError(err).Error("removing apis from gw")
 	}
 
 	return err
@@ -1334,14 +1334,14 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 	})
 
 	if err != nil {
-		log.Fatal("Error while creating session:", err)
+		testLog.Fatal("Error while creating session:", err)
 		return nil, ""
 	}
 
 	keySuccess := apiModifyKeySuccess{}
 	err = json.NewDecoder(resp.Body).Decode(&keySuccess)
 	if err != nil {
-		log.Fatal("Error while decoding session response:", err)
+		testLog.Fatal("Error while decoding session response:", err)
 		return nil, ""
 	}
 
@@ -1707,7 +1707,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 
 		specBytes, err := json.Marshal(spec.APIDefinition)
 		if err != nil {
-			log.WithError(err).Errorf("API Spec Marshal failed: %+v", spec)
+			testLog.WithError(err).Errorf("API Spec Marshal failed: %+v", spec)
 			panic(err)
 		}
 
@@ -1718,7 +1718,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 
 		oasSpecBytes, err := json.Marshal(&spec.OAS)
 		if err != nil {
-			log.WithError(err).Errorf("OAS Marshal failed: %+v", spec)
+			testLog.WithError(err).Errorf("OAS Marshal failed: %+v", spec)
 			panic(err)
 		}
 
@@ -1829,11 +1829,11 @@ func initProxy(proto string, tlsConfig *tls.Config) *httpProxyHandler {
 	case "https":
 		proxy.listener, err = tls.Listen("tcp", ":0", tlsConfig)
 	default:
-		log.Fatal("Unsupported proto scheme", proto)
+		testLog.Fatal("Unsupported proto scheme", proto)
 	}
 
 	if err != nil {
-		log.Fatal(err)
+		testLog.Fatal(err)
 	}
 
 	proxy.URL = proto + "://" + proxy.listener.Addr().String()

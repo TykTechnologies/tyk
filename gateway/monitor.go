@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -58,28 +59,30 @@ func (m Monitor) checkLimit(sessionData *user.SessionState, key string, quotaMax
 
 	remainder := quotaMax - quotaRemaining
 	usagePerc := (float64(remainder) / float64(quotaMax)) * 100.0
-
-	log.Debug("Perc is: ", usagePerc)
 	renewalDate := time.Unix(quotaRenews, 0)
 
-	log.Debug("Now is: ", time.Now())
-	log.Debug("Renewal is: ", renewalDate)
+	logger := mainLog.WithFields(log.Fields{
+		"percent": usagePerc,
+		"now":     time.Now(),
+		"renew":   renewalDate,
+	})
+
 	if time.Now().After(renewalDate) {
 		// Make sure that renewal is still in the future, If renewal is in the past,
 		// then the quota can expire and will auto-renew
-		log.Debug("Renewal date is in the past, skipping")
+		logger.Debug("Renewal date is in the past, skipping")
 		return false
 	}
 
 	if m.Gw.GetConfig().Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= m.Gw.GetConfig().Monitor.GlobalTriggerLimit {
-		log.Info("Firing...")
+		logger.Info("Firing...")
 		m.Fire(sessionData, key, m.Gw.GetConfig().Monitor.GlobalTriggerLimit, usagePerc)
 		return true
 	}
 
 	for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
 		if usagePerc >= triggerLimit && triggerLimit != m.Gw.GetConfig().Monitor.GlobalTriggerLimit {
-			log.Info("Firing...")
+			logger.Info("Firing...")
 			m.Fire(sessionData, key, triggerLimit, usagePerc)
 			return true
 		}

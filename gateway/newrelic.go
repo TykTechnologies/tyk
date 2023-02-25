@@ -8,13 +8,14 @@ import (
 	"github.com/gorilla/mux"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/newrelic/go-agent/_integrations/nrgorilla/v1"
-	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/log"
 )
 
 // SetupNewRelic creates new newrelic.Application instance
 func (gw *Gateway) SetupNewRelic() (app newrelic.Application) {
 	var err error
-	logger := log.WithFields(logrus.Fields{"prefix": "newrelic"})
+	logger := log.WithFields(log.Fields{"prefix": "newrelic"})
 
 	logger.Info("Initializing NewRelic...")
 
@@ -42,7 +43,7 @@ func AddNewRelicInstrumentation(app newrelic.Application, r *mux.Router) {
 	}
 }
 
-type newRelicLogger struct{ *logrus.Entry }
+type newRelicLogger struct{ Logger }
 
 func (l *newRelicLogger) Error(msg string, c map[string]interface{}) {
 	l.WithFields(c).Error(msg)
@@ -57,7 +58,7 @@ func (l *newRelicLogger) Debug(msg string, c map[string]interface{}) {
 	l.WithFields(c).Debug(msg)
 }
 func (l *newRelicLogger) DebugEnabled() bool {
-	return l.Level >= logrus.DebugLevel
+	return l.Level() >= log.DebugLevel
 }
 
 type newRelicSink struct {

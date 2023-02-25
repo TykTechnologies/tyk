@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/log"
 )
 
 type traceHttpRequest struct {
@@ -87,40 +87,42 @@ type traceResponse struct {
 //	    logs: {...}\n{...}
 func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	var traceReq traceRequest
-	if err := json.NewDecoder(r.Body).Decode(&traceReq); err != nil {
-		log.Error("Couldn't decode trace request: ", err)
 
+	if err := json.NewDecoder(r.Body).Decode(&traceReq); err != nil {
+		gw.Logger().WithError(err).Error("Couldn't decode trace request")
 		doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
 		return
 	}
 
 	if traceReq.Spec == nil {
-		log.Error("Spec field is missing")
+		gw.Logger().Error("Spec field is missing")
 		doJSONWrite(w, http.StatusBadRequest, apiError("Spec field is missing"))
 		return
 	}
 
 	if traceReq.Request == nil {
-		log.Error("Request field is missing")
+		gw.Logger().Error("Request field is missing")
 		doJSONWrite(w, http.StatusBadRequest, apiError("Request field is missing"))
 		return
 	}
 
 	var logStorage bytes.Buffer
-	logger := logrus.New()
-	logger.Formatter = &logrus.JSONFormatter{}
-	logger.Level = logrus.DebugLevel
-	logger.Out = &logStorage
+
+	logger := log.New()
+	logger.SetFormatter(&log.JSONFormatter{})
+	logger.SetLevel(log.DebugLevel)
+	logger.SetOutput(&logStorage)
 
 	gs := gw.prepareStorage()
 	subrouter := mux.NewRouter()
 
 	loader := &APIDefinitionLoader{Gw: gw}
-	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: traceReq.Spec}, logrus.NewEntry(logger))
+	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: traceReq.Spec}, log.New())
 
-	chainObj := gw.processSpec(spec, nil, &gs, logrus.NewEntry(logger))
-	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(logger))
+	chainObj := gw.processSpec(spec, nil, &gs, log.New())
+	gw.generateSubRoutes(spec, subrouter, log.New())
 	handleCORS(subrouter, spec)
+
 	spec.middlewareChain = chainObj
 
 	if chainObj.ThisHandler == nil {

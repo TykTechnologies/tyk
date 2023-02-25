@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -52,10 +53,7 @@ func (w *WebHookHandler) createConfigObject(handlerConf interface{}) (config.Web
 
 	asJSON, _ := json.Marshal(handlerConf)
 	if err := json.Unmarshal(asJSON, &newConf); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error("Format of webhook configuration is incorrect: ", err)
-		return newConf, err
+		return newConf, fmt.Errorf("error decoding webhook config: %w", err)
 	}
 
 	return newConf, nil
@@ -66,10 +64,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	var err error
 	w.conf, err = w.createConfigObject(handlerConf)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error("Problem getting configuration, skipping. ", err)
-		return err
+		return fmt.Errorf("Problem getting configuration: %w", err)
 	}
 
 	w.store = &storage.RedisCluster{KeyPrefix: "webhook.cache.", RedisController: w.Gw.RedisController}
@@ -79,10 +74,9 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	if w.conf.TemplatePath != "" {
 		w.template, err = template.ParseFiles(w.conf.TemplatePath)
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "webhooks",
+			webhooksLog.WithError(err).WithFields(log.Fields{
 				"target": w.conf.TargetPath,
-			}).Warning("Custom template load failure, using default: ", err)
+			}).Warning("Custom template load failure, using default")
 		}
 
 		if strings.HasSuffix(w.conf.TemplatePath, ".json") {
@@ -93,29 +87,21 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	// We use the default if TemplatePath was empty or if we failed
 	// to load it.
 	if w.template == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
+		webhooksLog.WithFields(log.Fields{
 			"target": w.conf.TargetPath,
 		}).Info("Loading default template.")
 		defaultPath := filepath.Join(w.Gw.GetConfig().TemplatePath, "default_webhook.json")
 		w.template, err = template.ParseFiles(defaultPath)
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "webhooks",
-			}).Error("Could not load the default template: ", err)
 			return err
 		}
 		w.contentType = header.ApplicationJSON
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "webhooks",
-	}).Debug("Timeout set to: ", w.conf.EventTimeout)
+	webhooksLog.Debug("Timeout set to: ", w.conf.EventTimeout)
 
 	if !w.checkURL(w.conf.TargetPath) {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error("Init failed for this webhook, invalid URL, URL must be absolute")
+		webhooksLog.Error("Init failed for this webhook, invalid URL, URL must be absolute")
 	}
 
 	if w.Gw.GetConfig().UseDBAppConfigs {
@@ -130,9 +116,6 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 func (w *WebHookHandler) WasHookFired(checksum string) bool {
 	if _, err := w.store.GetKey(checksum); err != nil {
 		// Key not found, so hook is in limit
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Debug("Event can fire, no duplicates found")
 		return false
 	}
 
@@ -140,14 +123,9 @@ func (w *WebHookHandler) WasHookFired(checksum string) bool {
 }
 
 // setHookFired will create an expiring key for the checksum of the event
-func (w *WebHookHandler) setHookFired(checksum string) {
-	log.WithFields(logrus.Fields{
-		"prefix": "webhooks",
-	}).Debug("Setting Webhook Checksum: ", checksum)
-	err := w.store.SetKey(checksum, "1", w.conf.EventTimeout)
-	if err != nil {
-		log.WithError(err).Error("could not set key")
-	}
+func (w *WebHookHandler) setHookFired(checksum string) error {
+	webhooksLog.WithField("checksum", checksum).Debug("Setting Webhook Checksum")
+	return w.store.SetKey(checksum, "1", w.conf.EventTimeout)
 }
 
 func (w *WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
@@ -156,7 +134,7 @@ func (w *WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
 	case WH_GET, WH_PUT, WH_POST, WH_DELETE, WH_PATCH:
 		return upper
 	default:
-		log.WithFields(logrus.Fields{
+		webhooksLog.WithFields(log.Fields{
 			"prefix": "webhooks",
 		}).Warning("Method must be one of GET, PUT, POST, DELETE or PATCH, defaulting to GET")
 		return WH_GET
@@ -164,11 +142,11 @@ func (w *WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
 }
 
 func (w *WebHookHandler) checkURL(r string) bool {
-	log.WithFields(logrus.Fields{
+	webhooksLog.WithFields(log.Fields{
 		"prefix": "webhooks",
 	}).Debug("Checking URL: ", r)
 	if _, err := url.ParseRequestURI(r); err != nil {
-		log.WithFields(logrus.Fields{
+		webhooksLog.WithFields(log.Fields{
 			"prefix": "webhooks",
 		}).Error("Failed to parse URL! ", err, r)
 		return false
@@ -187,7 +165,7 @@ func (w *WebHookHandler) Checksum(reqBody string) (string, error) {
 func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 	req, err := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		webhooksLog.WithFields(log.Fields{
 			"prefix": "webhooks",
 		}).Error("Failed to create request object: ", err)
 		return nil, err
@@ -209,16 +187,18 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 
 func (w *WebHookHandler) CreateBody(em config.EventMessage) (string, error) {
 	var reqBody bytes.Buffer
-	w.template.Execute(&reqBody, em)
-
-	return reqBody.String(), nil
+	err := w.template.Execute(&reqBody, em)
+	return reqBody.String(), err
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 
 	// Inject event message into template, render to string
-	reqBody, _ := w.CreateBody(em)
+	reqBody, err := w.CreateBody(em)
+	if err != nil {
+		return
+	}
 
 	// Construct request (method, body, params)
 	req, err := w.BuildRequest(reqBody)
@@ -238,27 +218,18 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 
 	resp, err := cli.Do(req)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error("Webhook request failed: ", err)
+		webhooksLog.WithError(err).Error("Webhook request failed")
 	} else {
 		defer resp.Body.Close()
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			content, err := ioutil.ReadAll(resp.Body)
-			if err == nil {
-				log.WithFields(logrus.Fields{
-					"prefix":       "webhooks",
-					"responseCode": resp.StatusCode,
-				}).Debug(string(content))
-			} else {
-				log.WithFields(logrus.Fields{
-					"prefix": "webhooks",
-				}).Error(err)
-			}
+
+			webhooksLog.WithError(err).WithFields(log.Fields{
+				"responseCode": resp.StatusCode,
+			}).Debug(string(content))
 
 		} else {
-			log.WithFields(logrus.Fields{
-				"prefix":       "webhooks",
+			webhooksLog.WithFields(log.Fields{
 				"responseCode": resp.StatusCode,
 			}).Error("Request to webhook failed")
 		}
@@ -268,5 +239,7 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 		w.dashboardService.NotifyDashboardOfEvent(em.Meta)
 	}
 
-	w.setHookFired(reqChecksum)
+	if err := w.setHookFired(reqChecksum); err != nil {
+		webhooksLog.WithError(err).Error("error setting hook fired")
+	}
 }

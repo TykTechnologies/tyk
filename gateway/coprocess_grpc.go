@@ -6,9 +6,10 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -27,7 +28,7 @@ type GRPCDispatcher struct {
 func (gw *Gateway) dialer(addr string, timeout time.Duration) (net.Conn, error) {
 	grpcURL, err := url.Parse(gw.GetConfig().CoProcessOptions.CoProcessGRPCServer)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		coprocessLog.WithFields(log.Fields{
 			"prefix": "coprocess",
 		}).Error(err)
 		return nil, err
@@ -35,7 +36,7 @@ func (gw *Gateway) dialer(addr string, timeout time.Duration) (net.Conn, error) 
 
 	if grpcURL == nil || gw.GetConfig().CoProcessOptions.CoProcessGRPCServer == "" {
 		errString := "No gRPC URL is set!"
-		log.WithFields(logrus.Fields{
+		coprocessLog.WithFields(log.Fields{
 			"prefix": "coprocess",
 		}).Error(errString)
 		return nil, errors.New(errString)
@@ -59,7 +60,7 @@ func (d *GRPCDispatcher) DispatchEvent(eventJSON []byte) {
 	_, err := grpcClient.DispatchEvent(context.Background(), eventObject)
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		coprocessLog.WithFields(log.Fields{
 			"prefix": "coprocess",
 		}).Error(err)
 	}
@@ -95,14 +96,9 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 		grpc.WithInsecure(),
 		grpc.WithDialer(gw.dialer),
 	)
-
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 
 	if err != nil {
-
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Error(err)
 		return nil, err
 	}
 	return &GRPCDispatcher{}, nil

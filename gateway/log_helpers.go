@@ -3,8 +3,7 @@ package gateway
 import (
 	"net/http"
 
-	"github.com/sirupsen/logrus"
-
+	"github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -22,33 +21,13 @@ func (gw *Gateway) obfuscateKey(keyName string) string {
 	return "--"
 }
 
-func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, key string, data map[string]interface{}) *logrus.Entry {
-	if logger == nil {
-		logger = logrus.NewEntry(log)
-	}
-
-	// populate http request fields
-	fields := logrus.Fields{
-		"path":   r.URL.Path,
-		"origin": request.RealIP(r),
-	}
-	// add key to log if configured to do so
-	if key != "" {
-		fields["key"] = key
-		if !gw.GetConfig().EnableKeyLogging {
-			fields["key"] = gw.obfuscateKey(key)
-		}
-	}
-	// add to log additional fields if any passed
-	for key, val := range data {
-		fields[key] = val
-	}
-	return logger.WithFields(fields)
+func (gw *Gateway) getLogEntryForRequest(logger Logger, r *http.Request, key string, data map[string]interface{}) Logger {
+	return gw.getExplicitLogEntryForRequest(logger, r.URL.Path, request.RealIP(r), key, data)
 }
 
-func (gw *Gateway) getExplicitLogEntryForRequest(logger *logrus.Entry, path string, IP string, key string, data map[string]interface{}) *logrus.Entry {
+func (gw *Gateway) getExplicitLogEntryForRequest(logger Logger, path string, IP string, key string, data map[string]interface{}) Logger {
 	// populate http request fields
-	fields := logrus.Fields{
+	fields := log.Fields{
 		"path":   path,
 		"origin": IP,
 	}

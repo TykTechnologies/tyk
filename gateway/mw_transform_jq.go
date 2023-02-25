@@ -11,7 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -56,7 +56,7 @@ func (t *TransformJQMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 
 	err := t.transformJQBody(r, meta.(*TransformJQSpec))
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"prefix":      "inbound-transform-jq",
 			"server_name": t.Spec.Proxy.TargetURL,
 			"api_id":      t.Spec.APIID,

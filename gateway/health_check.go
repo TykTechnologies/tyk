@@ -10,7 +10,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
@@ -74,7 +74,7 @@ func (gw *Gateway) initHealthCheck(ctx context.Context) {
 			case <-ctx.Done():
 
 				ticker.Stop()
-				mainLog.WithFields(logrus.Fields{
+				mainLog.WithFields(log.Fields{
 					"prefix": "health-check",
 				}).Debug("Stopping Health checks for all components")
 				return

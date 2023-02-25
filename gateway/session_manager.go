@@ -38,6 +38,10 @@ type SessionLimiter struct {
 	Gw          *Gateway `json:"-"`
 }
 
+func (l *SessionLimiter) Logger() Logger {
+	return l.Gw.Logger()
+}
+
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
 	currentSession *user.SessionState,
 	store storage.Handler,
@@ -54,8 +58,8 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		rate = currentSession.Rate
 	}
 
-	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
-	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
+	l.Logger().Debug("[RATELIMIT] Inbound raw key is: ", key)
+	l.Logger().Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	pipeline := globalConf.EnableNonTransactionalRateLimiter
 
 	var ratePerPeriodNow int
@@ -65,7 +69,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
 	}
 
-	//log.Info("Num Requests: ", ratePerPeriodNow)
+	//l.Logger().Info("Num Requests: ", ratePerPeriodNow)
 
 	// Subtract by 1 because of the delayed add in the window
 	subtractor := 1
@@ -75,7 +79,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	}
 	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
 	// will only work with ththese two lines here
-	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
+	//l.Logger().Info("break: ", (int(currentSession.Rate) - subtractor))
 	if ratePerPeriodNow > int(rate)-subtractor {
 		// Set a sentinel value with expire
 		if globalConf.EnableSentinelRateLimiter || globalConf.DRLEnableSentinelRateLimiter {
@@ -149,7 +153,7 @@ func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string,
 	}
 	userBucket, err := l.bucketStore.Create(bucketKey, rate, time.Duration(per)*time.Second)
 	if err != nil {
-		log.Error("Failed to create bucket!")
+		l.Logger().Error("Failed to create bucket!")
 		return true
 	}
 
@@ -188,7 +192,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 	// check for limit on API level (set to session by ApplyPolicies)
 	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(currentSession, api)
 	if err != nil {
-		log.WithField("apiID", api.APIID).Debugf("[RATE] %s", err.Error())
+		l.Logger().WithField("apiID", api.APIID).Debugf("[RATE] %s", err.Error())
 		return sessionFailRateLimit
 	}
 	if l.Gw == nil {
@@ -271,26 +275,27 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	quotaRenews := limit.QuotaRenews
 	quotaMax := limit.QuotaMax
 
-	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
-	log.Debug("Renewing with TTL: ", quotaRenewalRate)
+	l.Logger().Debug("[QUOTA] Quota limiter key is: ", rawKey)
+	l.Logger().Debug("Renewing with TTL: ", quotaRenewalRate)
 	// INCR the key (If it equals 1 - set EXPIRE)
 	qInt := store.IncrememntWithExpire(rawKey, quotaRenewalRate)
 	// if the returned val is >= quota: block
 	if qInt-1 >= quotaMax {
 		renewalDate := time.Unix(quotaRenews, 0)
-		log.Debug("Renewal Date is: ", renewalDate)
-		log.Debug("As epoch: ", quotaRenews)
-		log.Debug("Session: ", currentSession)
-		log.Debug("Now:", time.Now())
+		l.Logger().Debug("Renewal Date is: ", renewalDate)
+		l.Logger().Debug("As epoch: ", quotaRenews)
+		l.Logger().Debug("Session: ", currentSession)
+		l.Logger().Debug("Now:", time.Now())
 		if time.Now().After(renewalDate) {
-			//for renew quota = never, once we get the quota max we must not allow using it again
-
+			// for renew quota = never, once we get the quota max we must not allow using it again
 			if quotaRenewalRate <= 0 {
 				return true
 			}
+
 			// The renewal date is in the past, we should update the quota!
 			// Also, this fixes legacy issues where there is no TTL on quota buckets
-			log.Debug("Incorrect key expiry setting detected, correcting")
+			l.Logger().Debug("Incorrect key expiry setting detected, correcting")
+
 			go store.DeleteRawKey(rawKey)
 			qInt = 1
 		} else {

@@ -30,6 +30,9 @@ type BatchReplyUnit struct {
 	Code        int         `json:"code"`
 	Headers     http.Header `json:"headers"`
 	Body        string      `json:"body"`
+
+	// Err contains the error from a request, if any
+	Err error `json:"-"`
 }
 
 // BatchRequestHandler handles batch requests on /tyk/batch for any API Definition that has the feature enabled
@@ -39,7 +42,7 @@ type BatchRequestHandler struct {
 }
 
 // doRequest will make the same request but return a BatchReplyUnit
-func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchReplyUnit {
+func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) (BatchReplyUnit, error) {
 	tr := &http.Transport{TLSClientConfig: &tls.Config{}}
 
 	if cert := b.Gw.getUpstreamCertificate(req.Host, b.API); cert != nil {
@@ -57,22 +60,20 @@ func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchR
 	}
 
 	tr.DialTLS = b.Gw.customDialTLSCheck(b.API, tr.TLSClientConfig)
-
 	tr.Proxy = proxyFromAPI(b.API)
 
 	client := &http.Client{Transport: tr}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error("Webhook request failed: ", err)
-		return BatchReplyUnit{}
+		return BatchReplyUnit{}, err
 	}
 
 	defer resp.Body.Close()
+
 	content, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Warning("Body read failure! ", err)
-		return BatchReplyUnit{}
+		return BatchReplyUnit{}, err
 	}
 
 	return BatchReplyUnit{
@@ -80,7 +81,7 @@ func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchR
 		Code:        resp.StatusCode,
 		Headers:     resp.Header,
 		Body:        string(content),
-	}
+	}, nil
 }
 
 func (b *BatchRequestHandler) DecodeBatchRequest(r *http.Request) (BatchRequestStructure, error) {
@@ -106,7 +107,7 @@ func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructu
 
 		request, err := http.NewRequest(requestDef.Method, absURL, strings.NewReader(requestDef.Body))
 		if err != nil {
-			log.Error("Failure generating batch request for request spec index: ", i)
+			mainLog.Error("Failure generating batch request for request spec index: ", i)
 			return nil, err
 		}
 
@@ -124,14 +125,17 @@ func (b *BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, r
 	replySet := []BatchReplyUnit{}
 
 	if len(batchRequest.Requests) != len(requestSet) {
-		log.Error("Something went wrong creating requests, they are of mismatched lengths!", len(batchRequest.Requests), len(requestSet))
+		mainLog.Error("Something went wrong creating requests, they are of mismatched lengths!", len(batchRequest.Requests), len(requestSet))
 	}
 
 	if !batchRequest.SuppressParallelExecution {
 		replies := make(chan BatchReplyUnit)
 		for i, req := range requestSet {
 			go func(i int, req *http.Request) {
-				reply := b.doRequest(req, batchRequest.Requests[i].RelativeURL)
+				reply, err := b.doRequest(req, batchRequest.Requests[i].RelativeURL)
+				if err != nil {
+					mainLog.WithError(err).Error("Error issuing request")
+				}
 				replies <- reply
 			}(i, req)
 		}
@@ -141,7 +145,10 @@ func (b *BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, r
 		}
 	} else {
 		for i, req := range requestSet {
-			reply := b.doRequest(req, batchRequest.Requests[i].RelativeURL)
+			reply, err := b.doRequest(req, batchRequest.Requests[i].RelativeURL)
+			if err != nil {
+				mainLog.WithError(err).Error("Error issuing request")
+			}
 			replySet = append(replySet, reply)
 		}
 	}
@@ -158,7 +165,7 @@ func (b *BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.
 	// Decode request
 	batchRequest, err := b.DecodeBatchRequest(r)
 	if err != nil {
-		log.Error("Could not decode batch request, decoding failed: ", err)
+		mainLog.Error("Could not decode batch request, decoding failed: ", err)
 		doJSONWrite(w, http.StatusBadRequest, apiError("Batch request malformed"))
 		return
 	}

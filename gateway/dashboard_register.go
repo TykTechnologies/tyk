@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/log"
 )
 
-var dashLog = log.WithField("prefix", "dashboard")
+var dashLog = log.New().WithField("prefix", "dashboard")
 
 type NodeResponseOK struct {
 	Status  string
@@ -116,13 +117,13 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 
 	var b bytes.Buffer
 	if err := json.NewEncoder(&b).Encode(meta); err != nil {
-		log.Errorf("Could not decode event metadata :%v", err)
+		dashLog.Errorf("Could not decode event metadata :%v", err)
 		return err
 	}
 
 	req, err := http.NewRequest(http.MethodPost, h.KeyQuotaTriggerEndpoint, &b)
 	if err != nil {
-		log.Errorf("Could not create request.. %v", err)
+		dashLog.Errorf("Could not create request.. %v", err)
 		return err
 	}
 
@@ -136,7 +137,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 
 	resp, err := c.Do(req)
 	if err != nil {
-		log.Errorf("Request failed with error %v", err)
+		dashLog.Errorf("Request failed with error %v", err)
 		return err
 	}
 
@@ -144,7 +145,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 
 	if resp.StatusCode != http.StatusOK {
 		err := fmt.Errorf("Unexpected status code while trying to notify dashboard of a key limit quota trigger.. Got %d", resp.StatusCode)
-		log.Error(err)
+		dashLog.Error(err)
 		return err
 	}
 
@@ -275,7 +276,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	h.Gw.ServiceNonceMutex.Lock()
 	h.Gw.ServiceNonce = val.Nonce
 	h.Gw.ServiceNonceMutex.Unlock()
-	//log.Debug("Heartbeat Finished: Nonce Set: ", h.Gw.ServiceNonce)
+	//dashLog.Debug("Heartbeat Finished: Nonce Set: ", h.Gw.ServiceNonce)
 
 	return nil
 }

@@ -230,7 +230,7 @@ func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, strin
 	}
 
 	if !cached {
-		log.WithError(err).Debug("Doing OAuth introspection call")
+		k.Logger().WithError(err).Debug("Doing OAuth introspection call")
 		claims, err = introspect(opts, accessToken)
 		if err != nil {
 			return false, "", fmt.Errorf("introspection err: %s", err)
@@ -239,11 +239,11 @@ func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, strin
 		if opts.Cache.Enabled {
 			err = externalOAuthIntrospectionCache.SetRes(accessToken, claims, opts.Cache.Timeout)
 			if err != nil {
-				log.WithError(err).Debug("OAuth introspection caching is enabled but the result couldn't be cached in redis")
+				k.Logger().WithError(err).Debug("OAuth introspection caching is enabled but the result couldn't be cached in redis")
 			}
 		}
 	} else {
-		log.WithError(err).Debug("Found OAuth introspection result in the redis cache")
+		k.Logger().WithError(err).Debug("Found OAuth introspection result in the redis cache")
 
 		if isExpired(claims) {
 			return false, "", jwt.ErrTokenExpired

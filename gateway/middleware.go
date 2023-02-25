@@ -20,8 +20,9 @@ import (
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
 	"github.com/pmylund/go-cache"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
+
+	"github.com/TykTechnologies/tyk/log"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/request"
@@ -45,7 +46,7 @@ type TykMiddleware interface {
 	Base() *BaseMiddleware
 	SetName(string)
 	SetRequestLogger(*http.Request)
-	Logger() *logrus.Entry
+	Logger() Logger
 	Config() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	EnabledForSpec() bool
@@ -195,15 +196,15 @@ func (gw *Gateway) mwList(mws ...TykMiddleware) []alice.Constructor {
 type BaseMiddleware struct {
 	Spec   *APISpec
 	Proxy  ReturningHttpHandler
-	logger *logrus.Entry
+	logger Logger
 	Gw     *Gateway `json:"-"`
 }
 
 func (t BaseMiddleware) Base() *BaseMiddleware { return &t }
 
-func (t BaseMiddleware) Logger() (logger *logrus.Entry) {
+func (t BaseMiddleware) Logger() (logger Logger) {
 	if t.logger == nil {
-		t.logger = logrus.NewEntry(log)
+		t.logger = log.New()
 	}
 
 	return t.logger
@@ -337,7 +338,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		if policy.Partitions.PerAPI &&
 			(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity) {
 			err := fmt.Errorf("cannot apply policy %s which has per_api and any of partitions set", policy.ID)
-			log.Error(err)
+			t.Logger().Error(err)
 			return err
 		}
 
@@ -346,7 +347,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				// new logic when you can specify quota or rate in more than one policy but for different APIs
 				if didQuota[apiID] || didRateLimit[apiID] || didACL[apiID] || didComplexity[apiID] { // no other partitions allowed
 					err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
-					log.Error(err)
+					t.Logger().Error(err)
 					return err
 				}
 

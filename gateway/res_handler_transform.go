@@ -11,10 +11,10 @@ import (
 	"strconv"
 
 	"github.com/clbanning/mxj"
-	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -26,13 +26,16 @@ func (ResponseTransformMiddleware) Name() string {
 	return "ResponseTransformMiddleware"
 }
 
+func (ResponseTransformMiddleware) Logger() Logger {
+	return mainLog.WithField("prefix", "outbound-transform")
+}
+
 func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
 	h.Spec = spec
 	return nil
 }
 
-func respBodyReader(req *http.Request, resp *http.Response) io.ReadCloser {
-
+func respBodyReader(req *http.Request, resp *http.Response, logger Logger) io.ReadCloser {
 	if req.Header.Get(header.AcceptEncoding) == "" {
 		return resp.Body
 	}
@@ -41,7 +44,7 @@ func respBodyReader(req *http.Request, resp *http.Response) io.ReadCloser {
 	case "gzip":
 		reader, err := gzip.NewReader(resp.Body)
 		if err != nil {
-			log.Error("Body decompression error:", err)
+			logger.WithError(err).Error("Body decompression error")
 			return ioutil.NopCloser(bytes.NewReader(nil))
 		}
 
@@ -81,8 +84,7 @@ func (h *ResponseTransformMiddleware) HandleError(rw http.ResponseWriter, req *h
 
 func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 
-	logger := log.WithFields(logrus.Fields{
-		"prefix":      "outbound-transform",
+	logger := h.Logger().WithFields(log.Fields{
 		"server_name": h.Spec.Proxy.TargetURL,
 		"api_id":      h.Spec.APIID,
 		"path":        req.URL.Path,
@@ -96,8 +98,13 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	}
 	tmeta := meta.(*TransformSpec)
 
-	respBody := respBodyReader(req, res)
-	body, _ := ioutil.ReadAll(respBody)
+	respBody := respBodyReader(req, res, logger)
+
+	body, err := ioutil.ReadAll(respBody)
+	if err != nil {
+		return err
+	}
+
 	defer respBody.Close()
 
 	// Put into an interface:

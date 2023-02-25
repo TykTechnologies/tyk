@@ -3,8 +3,6 @@ package gateway
 import (
 	"net/http"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/user"
@@ -60,7 +58,7 @@ func (m *GraphQLComplexityMiddleware) handleComplexityFailReason(failReason Comp
 }
 
 type GraphqlComplexityChecker struct {
-	logger *logrus.Entry
+	logger Logger
 }
 
 func (c *GraphqlComplexityChecker) DepthLimitEnabled(accessDef *user.AccessDefinition) bool {
