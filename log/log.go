@@ -3,15 +3,25 @@ package log
 import (
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	log          = logrus.New()
-	rawLog       = logrus.New()
-	translations = make(map[string]string)
-)
+// Wrap global vars with `global.` prefix - avoids common package
+// and variable name conflicts.
+var global = struct {
+	Logger       *logrus.Logger
+	RawLog       *logrus.Logger
+	Translations map[string]string
+}{
+	Logger:       logrus.New(),
+	RawLog:       logrus.New(),
+	Translations: make(map[string]string),
+}
+
+// Manage concurrent read/write access to globals.
+var globalMu sync.RWMutex
 
 // LoadTranslations takes a map[string]interface and flattens it to map[string]string
 // Because translations have been loaded - we internally override log the formatter
@@ -19,12 +29,11 @@ var (
 // example:   `{"foo": {"bar": "baz"}}`
 // flattened: `foo.bar: baz`
 func LoadTranslations(thing map[string]interface{}) {
-	formatter := new(logrus.TextFormatter)
-	formatter.TimestampFormat = `Jan 02 15:04:05`
-	formatter.FullTimestamp = true
-	formatter.DisableColors = true
-	log.Formatter = &TranslationFormatter{formatter}
-	translations, _ = Flatten(thing)
+	globalMu.Lock()
+	defer globalMu.Unlock()
+
+	global.Logger.Formatter = &TranslationFormatter{newLogrusTextFormatter()}
+	global.Translations, _ = Flatten(thing)
 }
 
 type TranslationFormatter struct {
@@ -32,11 +41,17 @@ type TranslationFormatter struct {
 }
 
 func (t *TranslationFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	if code, ok := entry.Data["code"]; ok {
-		if translation, ok := translations[code.(string)]; ok {
-			entry.Message = translation
-		}
+	code, ok := entry.Data["code"].(string)
+	if !ok {
+		return t.TextFormatter.Format(entry)
 	}
+
+	globalMu.RLock()
+	if v, ok := global.Translations[code]; ok {
+		entry.Message = v
+	}
+	globalMu.RUnlock()
+
 	return t.TextFormatter.Format(entry)
 }
 
@@ -47,31 +62,102 @@ func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 func init() {
-	formatter := new(logrus.TextFormatter)
-	formatter.TimestampFormat = `Jan 02 15:04:05`
-	formatter.FullTimestamp = true
-	formatter.DisableColors = true
+	global.RawLog.Formatter = new(RawFormatter)
+	global.Logger.Formatter = newLogrusTextFormatter()
+	global.Logger.Level = getLevel()
 
-	log.Formatter = formatter
+}
 
+func getLevel() Level {
 	switch strings.ToLower(os.Getenv("TYK_LOGLEVEL")) {
 	case "error":
-		log.Level = logrus.ErrorLevel
+		return logrus.ErrorLevel
 	case "warn":
-		log.Level = logrus.WarnLevel
+		return logrus.WarnLevel
 	case "debug":
-		log.Level = logrus.DebugLevel
+		return logrus.DebugLevel
 	default:
-		log.Level = logrus.InfoLevel
+		return logrus.InfoLevel
 	}
-
-	rawLog.Formatter = new(RawFormatter)
 }
 
-func Get() *logrus.Logger {
-	return log
+func Get() Logger {
+	globalMu.RLock()
+	defer globalMu.RUnlock()
+
+	return fromLogrusLogger(global.Logger)
 }
 
-func GetRaw() *logrus.Logger {
-	return rawLog
+func GetRaw() Logger {
+	globalMu.RLock()
+	defer globalMu.RUnlock()
+
+	return fromLogrusLogger(global.RawLog)
+}
+
+func New() Logger {
+	return fromLogrusLogger(logrus.New())
+}
+
+func NewEntry() Logger {
+	return New()
+}
+
+func WithField(key string, value interface{}) Logger {
+	globalMu.RLock()
+	defer globalMu.RUnlock()
+
+	return fromLogrusLogger(global.Logger).WithField(key, value)
+}
+
+func WithFields(f Fields) Logger {
+	globalMu.RLock()
+	defer globalMu.RUnlock()
+
+	return fromLogrusLogger(global.Logger).WithFields(f)
+}
+
+func WithError(err error) Logger {
+	return fromLogrusLogger(global.Logger).WithError(err)
+}
+
+func WithPrefix(prefix string) Logger {
+	return fromLogrusLogger(global.Logger).WithField("prefix", prefix)
+}
+
+func Error(message string) {
+	globalMu.RLock()
+	defer globalMu.RUnlock()
+
+	fromLogrusLogger(global.Logger).Error(message)
+}
+
+func Fatal(message string) {
+	globalMu.RLock()
+	defer globalMu.RUnlock()
+
+	fromLogrusLogger(global.Logger).Fatal(message)
+}
+
+func Warning(message string) {
+	globalMu.RLock()
+	defer globalMu.RUnlock()
+
+	fromLogrusLogger(global.Logger).Warning(message)
+}
+
+var Warn = Warning
+
+func Info(message string) {
+	globalMu.RLock()
+	defer globalMu.RUnlock()
+
+	fromLogrusLogger(global.Logger).Info(message)
+}
+
+func Debug(message string) {
+	globalMu.RLock()
+	defer globalMu.RUnlock()
+
+	fromLogrusLogger(global.Logger).Error(message)
 }
