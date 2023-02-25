@@ -45,7 +45,7 @@ func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.Un
 	} else if isAnalytics && conf.EnableAnalytics && conf.EnableSeperateAnalyticsStore {
 		cfg = conf.AnalyticsStorage
 	}
-	log.Debug("Creating new Redis connection pool")
+	storageLog.Debug("Creating new Redis connection pool")
 
 	// poolSize applies per cluster node and not for the whole cluster.
 	poolSize := 500
@@ -84,13 +84,13 @@ func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.Un
 	}
 
 	if opts.MasterName != "" {
-		log.Info("--> [REDIS] Creating sentinel-backed failover client")
+		storageLog.Info("--> [REDIS] Creating sentinel-backed failover client")
 		client = redis.NewFailoverClient(opts.Failover())
 	} else if cfg.EnableCluster {
-		log.Info("--> [REDIS] Creating cluster client")
+		storageLog.Info("--> [REDIS] Creating cluster client")
 		client = redis.NewClusterClient(opts.Cluster())
 	} else {
-		log.Info("--> [REDIS] Creating single-node client")
+		storageLog.Info("--> [REDIS] Creating single-node client")
 		client = redis.NewClient(opts.Simple())
 	}
 
@@ -171,7 +171,7 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 
 	value, err := cluster.Get(r.RedisController.ctx, r.fixKey(keyName)).Result()
 	if err != nil {
-		log.Debug("Error trying to get value:", err)
+		storageLog.Debug("Error trying to get value:", err)
 		return "", ErrKeyNotFound
 	}
 
@@ -202,7 +202,7 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 			}
 			_, err := pipe.Exec(r.RedisController.ctx)
 			if err != nil && err != redis.Nil {
-				log.WithError(err).Debug("Error trying to get value")
+				storageLog.WithError(err).Debug("Error trying to get value")
 				return nil, ErrKeyNotFound
 			}
 			for _, cmd := range getCmds {
@@ -213,7 +213,7 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 		{
 			values, err := cluster.MGet(r.RedisController.ctx, keyNames...).Result()
 			if err != nil {
-				log.WithError(err).Debug("Error trying to get value")
+				storageLog.WithError(err).Debug("Error trying to get value")
 				return nil, ErrKeyNotFound
 			}
 			for _, val := range values {
@@ -249,7 +249,7 @@ func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 	}
 	value, err := r.singleton().Get(r.RedisController.ctx, keyName).Result()
 	if err != nil {
-		log.Debug("Error trying to get value:", err)
+		storageLog.Debug("Error trying to get value:", err)
 		return "", ErrKeyNotFound
 	}
 
@@ -257,14 +257,14 @@ func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 }
 
 func (r *RedisCluster) GetExp(keyName string) (int64, error) {
-	//	log.Debug("Getting exp for key: ", r.fixKey(keyName))
+	//	storageLog.Debug("Getting exp for key: ", r.fixKey(keyName))
 	if err := r.up(); err != nil {
 		return 0, err
 	}
 
 	value, err := r.singleton().TTL(r.RedisController.ctx, r.fixKey(keyName)).Result()
 	if err != nil {
-		log.Error("Error trying to get TTL: ", err)
+		storageLog.Error("Error trying to get TTL: ", err)
 		return 0, ErrKeyNotFound
 	}
 	//since redis-go v8.3.1, if there's no expiration or the key doesn't exists, the ttl returned is measured in nanoseconds
@@ -281,22 +281,22 @@ func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
 	}
 	err := r.singleton().Expire(r.RedisController.ctx, r.fixKey(keyName), time.Duration(timeout)*time.Second).Err()
 	if err != nil {
-		log.Error("Could not EXPIRE key: ", err)
+		storageLog.Error("Could not EXPIRE key: ", err)
 	}
 	return err
 }
 
 // SetKey will create (or update) a key value in the store
 func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
-	//log.Debug("[STORE] SET Raw key is: ", keyName)
-	//log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
+	//storageLog.Debug("[STORE] SET Raw key is: ", keyName)
+	//storageLog.Debug("[STORE] Setting key: ", r.fixKey(keyName))
 
 	if err := r.up(); err != nil {
 		return err
 	}
 	err := r.singleton().Set(r.RedisController.ctx, r.fixKey(keyName), session, time.Duration(timeout)*time.Second).Err()
 	if err != nil {
-		log.Error("Error trying to set value: ", err)
+		storageLog.Error("Error trying to set value: ", err)
 		return err
 	}
 	return nil
@@ -308,7 +308,7 @@ func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 	}
 	err := r.singleton().Set(r.RedisController.ctx, keyName, session, time.Duration(timeout)*time.Second).Err()
 	if err != nil {
-		log.Error("Error trying to set value: ", err)
+		storageLog.Error("Error trying to set value: ", err)
 		return err
 	}
 	return nil
@@ -317,22 +317,22 @@ func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 // Decrement will decrement a key in redis
 func (r *RedisCluster) Decrement(keyName string) {
 	keyName = r.fixKey(keyName)
-	// log.Debug("Decrementing key: ", keyName)
+	// storageLog.Debug("Decrementing key: ", keyName)
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err.Error())
 		return
 	}
 	err := r.singleton().Decr(r.RedisController.ctx, keyName).Err()
 	if err != nil {
-		log.Error("Error trying to decrement value:", err)
+		storageLog.Error("Error trying to decrement value:", err)
 	}
 }
 
 // IncrementWithExpire will increment a key in redis
 func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
-	// log.Debug("Incrementing raw key: ", keyName)
+	// storageLog.Debug("Incrementing raw key: ", keyName)
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return 0
 	}
 	// This function uses a raw key, so we shouldn't call fixKey
@@ -340,13 +340,13 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 	val, err := r.singleton().Incr(r.RedisController.ctx, fixedKey).Result()
 
 	if err != nil {
-		log.Error("Error trying to increment value:", err)
+		storageLog.Error("Error trying to increment value:", err)
 	} else {
-		log.Debug("Incremented key: ", fixedKey, ", val is: ", val)
+		storageLog.Debug("Incremented key: ", fixedKey, ", val is: ", val)
 	}
 
 	if val == 1 && expire > 0 {
-		log.Debug("--> Setting Expire")
+		storageLog.Debug("--> Setting Expire")
 		r.singleton().Expire(r.RedisController.ctx, fixedKey, time.Duration(expire)*time.Second)
 	}
 
@@ -356,7 +356,7 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
 func (r *RedisCluster) GetKeys(filter string) []string {
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return nil
 	}
 	client := r.singleton()
@@ -366,7 +366,7 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 		filterHash = r.hashKey(filter)
 	}
 	searchStr := r.KeyPrefix + filterHash + "*"
-	log.Debug("[STORE] Getting list by: ", searchStr)
+	storageLog.Debug("[STORE] Getting list by: ", searchStr)
 
 	fnFetchKeys := func(client *redis.Client) ([]string, error) {
 		values := make([]string, 0)
@@ -411,7 +411,7 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 	}
 
 	if err != nil {
-		log.Error("Error while fetching keys:", err)
+		storageLog.Error("Error while fetching keys:", err)
 		return nil
 	}
 
@@ -425,12 +425,12 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
 func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]string {
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return nil
 	}
 	keys := r.GetKeys(filter)
 	if keys == nil {
-		log.Error("Error trying to get filtered client keys")
+		storageLog.Error("Error trying to get filtered client keys")
 		return nil
 	}
 
@@ -455,7 +455,7 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 			}
 			_, err := pipe.Exec(r.RedisController.ctx)
 			if err != nil && err != redis.Nil {
-				log.Error("Error trying to get client keys: ", err)
+				storageLog.Error("Error trying to get client keys: ", err)
 				return nil
 			}
 
@@ -467,7 +467,7 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 		{
 			result, err := v.MGet(r.RedisController.ctx, keys...).Result()
 			if err != nil {
-				log.Error("Error trying to get client keys: ", err)
+				storageLog.Error("Error trying to get client keys: ", err)
 				return nil
 			}
 
@@ -498,14 +498,14 @@ func (r *RedisCluster) GetKeysAndValues() map[string]string {
 // DeleteKey will remove a key from the database
 func (r *RedisCluster) DeleteKey(keyName string) bool {
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return false
 	}
-	log.Debug("DEL Key was: ", keyName)
-	log.Debug("DEL Key became: ", r.fixKey(keyName))
+	storageLog.Debug("DEL Key was: ", keyName)
+	storageLog.Debug("DEL Key became: ", r.fixKey(keyName))
 	n, err := r.singleton().Del(r.RedisController.ctx, r.fixKey(keyName)).Result()
 	if err != nil {
-		log.WithError(err).Error("Error trying to delete key")
+		storageLog.WithError(err).Error("Error trying to delete key")
 	}
 
 	return n > 0
@@ -514,12 +514,12 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 // DeleteAllKeys will remove all keys from the database.
 func (r *RedisCluster) DeleteAllKeys() bool {
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return false
 	}
 	n, err := r.singleton().FlushAll(r.RedisController.ctx).Result()
 	if err != nil {
-		log.WithError(err).Error("Error trying to delete keys")
+		storageLog.WithError(err).Error("Error trying to delete keys")
 	}
 
 	if n == "OK" {
@@ -532,12 +532,12 @@ func (r *RedisCluster) DeleteAllKeys() bool {
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
 func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return false
 	}
 	n, err := r.singleton().Del(r.RedisController.ctx, keyName).Result()
 	if err != nil {
-		log.WithError(err).Error("Error trying to delete key")
+		storageLog.WithError(err).Error("Error trying to delete key")
 	}
 
 	return n > 0
@@ -546,11 +546,11 @@ func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 // DeleteKeys will remove a group of keys in bulk
 func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return false
 	}
 	client := r.singleton()
-	log.Debug("Deleting: ", pattern)
+	storageLog.Debug("Deleting: ", pattern)
 
 	fnScan := func(client *redis.Client) ([]string, error) {
 		values := make([]string, 0)
@@ -594,21 +594,21 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	}
 
 	if err != nil {
-		log.Error("SCAN command field with err:", err)
+		storageLog.Error("SCAN command field with err:", err)
 		return false
 	}
 
 	if len(keys) > 0 {
 		for _, name := range keys {
-			log.Info("Deleting: ", name)
+			storageLog.Info("Deleting: ", name)
 			err := client.Del(r.RedisController.ctx, name).Err()
 			if err != nil {
-				log.Error("Error trying to delete key: ", name, " - ", err)
+				storageLog.Error("Error trying to delete key: ", name, " - ", err)
 			}
 		}
-		log.Info("Deleted: ", len(keys), " records")
+		storageLog.Info("Deleted: ", len(keys), " records")
 	} else {
-		log.Debug("RedisCluster called DEL - Nothing to delete")
+		storageLog.Debug("RedisCluster called DEL - Nothing to delete")
 	}
 
 	return true
@@ -617,7 +617,7 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 // DeleteKeys will remove a group of keys in bulk
 func (r *RedisCluster) DeleteKeys(keys []string) bool {
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return false
 	}
 	if len(keys) > 0 {
@@ -625,7 +625,7 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 			keys[i] = r.fixKey(v)
 		}
 
-		log.Debug("Deleting: ", keys)
+		storageLog.Debug("Deleting: ", keys)
 		client := r.singleton()
 		switch v := client.(type) {
 		case *redis.ClusterClient:
@@ -635,16 +635,16 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 			}
 
 			if _, err := pipe.Exec(r.RedisController.ctx); err != nil {
-				log.Error("Error trying to delete keys:", err)
+				storageLog.Error("Error trying to delete keys:", err)
 			}
 		case *redis.Client:
 			_, err := v.Del(r.RedisController.ctx, keys...).Result()
 			if err != nil {
-				log.Error("Error trying to delete keys: ", err)
+				storageLog.Error("Error trying to delete keys: ", err)
 			}
 		}
 	} else {
-		log.Debug("RedisCluster called DEL - Nothing to delete")
+		storageLog.Debug("RedisCluster called DEL - Nothing to delete")
 	}
 
 	return true
@@ -686,7 +686,7 @@ func (r *RedisCluster) handleMessage(msg interface{}, err error, callback func(i
 		return err
 	}
 
-	log.Error("Error while receiving pubsub message:", err)
+	storageLog.Error("Error while receiving pubsub message:", err)
 
 	// This error occurs when we cancel the context for pubsub.
 	// To enable handling the error, it is coalesced to ErrClosed.
@@ -703,21 +703,21 @@ func (r *RedisCluster) Publish(channel, message string) error {
 	}
 	err := r.singleton().Publish(r.RedisController.ctx, channel, message).Err()
 	if err != nil {
-		log.Error("Error trying to publish message: ", err)
+		storageLog.Error("Error trying to publish message: ", err)
 		return err
 	}
 	return nil
 }
 
 func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
-	log.Debug("Getting raw key set: ", keyName)
+	storageLog.Debug("Getting raw key set: ", keyName)
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return nil
 	}
-	log.Debug("keyName is: ", keyName)
+	storageLog.Debug("keyName is: ", keyName)
 	fixedKey := r.fixKey(keyName)
-	log.Debug("Fixed keyname is: ", fixedKey)
+	storageLog.Debug("Fixed keyname is: ", fixedKey)
 
 	client := r.singleton()
 
@@ -728,17 +728,17 @@ func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 		return nil
 	})
 	if err != nil {
-		log.Error("Multi command failed: ", err)
+		storageLog.Error("Multi command failed: ", err)
 		return nil
 	}
 
 	vals := lrange.Val()
-	log.Debug("Analytics returned: ", len(vals))
+	storageLog.Debug("Analytics returned: ", len(vals))
 	if len(vals) == 0 {
 		return nil
 	}
 
-	log.Debug("Unpacked vals: ", len(vals))
+	storageLog.Debug("Unpacked vals: ", len(vals))
 	result := make([]interface{}, len(vals))
 	for i, v := range vals {
 		result[i] = v
@@ -749,25 +749,25 @@ func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 
 func (r *RedisCluster) AppendToSet(keyName, value string) {
 	fixedKey := r.fixKey(keyName)
-	log.WithField("keyName", keyName).Debug("Pushing to raw key list")
-	log.WithField("fixedKey", fixedKey).Debug("Appending to fixed key list")
+	storageLog.WithField("keyName", keyName).Debug("Pushing to raw key list")
+	storageLog.WithField("fixedKey", fixedKey).Debug("Appending to fixed key list")
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return
 	}
 	if err := r.singleton().RPush(r.RedisController.ctx, fixedKey, value).Err(); err != nil {
-		log.WithError(err).Error("Error trying to append to set keys")
+		storageLog.WithError(err).Error("Error trying to append to set keys")
 	}
 }
 
 // Exists check if keyName exists
 func (r *RedisCluster) Exists(keyName string) (bool, error) {
 	fixedKey := r.fixKey(keyName)
-	log.WithField("keyName", fixedKey).Debug("Checking if exists")
+	storageLog.WithField("keyName", fixedKey).Debug("Checking if exists")
 
 	exists, err := r.singleton().Exists(r.RedisController.ctx, fixedKey).Result()
 	if err != nil {
-		log.Error("Error trying to check if key exists: ", err)
+		storageLog.Error("Error trying to check if key exists: ", err)
 		return false, err
 	}
 	if exists == 1 {
@@ -784,10 +784,10 @@ func (r *RedisCluster) RemoveFromList(keyName, value string) error {
 		"fixedKey": fixedKey,
 		"value":    value,
 	}
-	log.WithFields(logEntry).Debug("Removing value from list")
+	storageLog.WithFields(logEntry).Debug("Removing value from list")
 
 	if err := r.singleton().LRem(r.RedisController.ctx, fixedKey, 0, value).Err(); err != nil {
-		log.WithFields(logEntry).WithError(err).Error("LREM command failed")
+		storageLog.WithFields(logEntry).WithError(err).Error("LREM command failed")
 		return err
 	}
 
@@ -803,11 +803,11 @@ func (r *RedisCluster) GetListRange(keyName string, from, to int64) ([]string, e
 		"from":     from,
 		"to":       to,
 	}
-	log.WithFields(logEntry).Debug("Getting list range")
+	storageLog.WithFields(logEntry).Debug("Getting list range")
 
 	elements, err := r.singleton().LRange(r.RedisController.ctx, fixedKey, from, to).Result()
 	if err != nil {
-		log.WithFields(logEntry).WithError(err).Error("LRANGE command failed")
+		storageLog.WithFields(logEntry).WithError(err).Error("LRANGE command failed")
 		return nil, err
 	}
 
@@ -821,7 +821,7 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 
 	fixedKey := r.fixKey(key)
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return
 	}
 	client := r.singleton()
@@ -832,19 +832,19 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 	}
 
 	if _, err := pipe.Exec(r.RedisController.ctx); err != nil {
-		log.WithError(err).Error("Error trying to append to set keys")
+		storageLog.WithError(err).Error("Error trying to append to set keys")
 	}
 }
 
 func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
-	log.Debug("Getting from key set: ", keyName)
-	log.Debug("Getting from fixed key set: ", r.fixKey(keyName))
+	storageLog.Debug("Getting from key set: ", keyName)
+	storageLog.Debug("Getting from fixed key set: ", r.fixKey(keyName))
 	if err := r.up(); err != nil {
 		return nil, err
 	}
 	val, err := r.singleton().SMembers(r.RedisController.ctx, r.fixKey(keyName)).Result()
 	if err != nil {
-		log.Error("Error trying to get key set:", err)
+		storageLog.Error("Error trying to get key set:", err)
 		return nil, err
 	}
 
@@ -857,60 +857,60 @@ func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
 }
 
 func (r *RedisCluster) AddToSet(keyName, value string) {
-	log.Debug("Pushing to raw key set: ", keyName)
-	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
+	storageLog.Debug("Pushing to raw key set: ", keyName)
+	storageLog.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return
 	}
 	err := r.singleton().SAdd(r.RedisController.ctx, r.fixKey(keyName), value).Err()
 	if err != nil {
-		log.Error("Error trying to append keys: ", err)
+		storageLog.Error("Error trying to append keys: ", err)
 	}
 }
 
 func (r *RedisCluster) RemoveFromSet(keyName, value string) {
-	log.Debug("Removing from raw key set: ", keyName)
-	log.Debug("Removing from fixed key set: ", r.fixKey(keyName))
+	storageLog.Debug("Removing from raw key set: ", keyName)
+	storageLog.Debug("Removing from fixed key set: ", r.fixKey(keyName))
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return
 	}
 	err := r.singleton().SRem(r.RedisController.ctx, r.fixKey(keyName), value).Err()
 	if err != nil {
-		log.Error("Error trying to remove keys: ", err)
+		storageLog.Error("Error trying to remove keys: ", err)
 	}
 }
 
 func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return false
 	}
 	val, err := r.singleton().SIsMember(r.RedisController.ctx, r.fixKey(keyName), value).Result()
 
 	if err != nil {
-		log.Error("Error trying to check set member: ", err)
+		storageLog.Error("Error trying to check set member: ", err)
 		return false
 	}
 
-	log.Debug("SISMEMBER", keyName, value, val, err)
+	storageLog.Debug("SISMEMBER", keyName, value, val, err)
 
 	return val == true
 }
 
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values
 func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_override string, pipeline bool) (int, []interface{}) {
-	log.Debug("Incrementing raw key: ", keyName)
+	storageLog.Debug("Incrementing raw key: ", keyName)
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return 0, nil
 	}
-	log.Debug("keyName is: ", keyName)
+	storageLog.Debug("keyName is: ", keyName)
 	now := time.Now()
-	log.Debug("Now is:", now)
+	storageLog.Debug("Now is:", now)
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
-	log.Debug("Then is: ", onePeriodAgo)
+	storageLog.Debug("Then is: ", onePeriodAgo)
 
 	client := r.singleton()
 	var zrange *redis.StringSliceCmd
@@ -943,7 +943,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 	}
 
 	if err != nil {
-		log.Error("Multi command failed: ", err)
+		storageLog.Error("Multi command failed: ", err)
 		return 0, nil
 	}
 
@@ -961,14 +961,14 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 		result[i] = v
 	}
 
-	log.Debug("Returned: ", intVal)
+	storageLog.Debug("Returned: ", intVal)
 
 	return intVal, result
 }
 
 func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return 0, nil
 	}
 	now := time.Now()
@@ -991,7 +991,7 @@ func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool)
 		_, err = client.TxPipelined(r.RedisController.ctx, pipeFn)
 	}
 	if err != nil {
-		log.Error("Multi command failed: ", err)
+		storageLog.Error("Multi command failed: ", err)
 		return 0, nil
 	}
 
@@ -1008,7 +1008,7 @@ func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool)
 		result[i] = v
 	}
 
-	log.Debug("Returned: ", intVal)
+	storageLog.Debug("Returned: ", intVal)
 
 	return intVal, result
 }
@@ -1025,15 +1025,15 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 		"keyName":  keyName,
 		"fixedKey": fixedKey,
 	}
-	log.WithFields(logEntry).Debug("Pushing raw key to sorted set")
+	storageLog.WithFields(logEntry).Debug("Pushing raw key to sorted set")
 
 	if err := r.up(); err != nil {
-		log.Debug(err)
+		storageLog.Debug(err)
 		return
 	}
 	member := redis.Z{Score: score, Member: value}
 	if err := r.singleton().ZAdd(r.RedisController.ctx, fixedKey, &member).Err(); err != nil {
-		log.WithFields(logEntry).WithError(err).Error("ZADD command failed")
+		storageLog.WithFields(logEntry).WithError(err).Error("ZADD command failed")
 	}
 }
 
@@ -1046,12 +1046,12 @@ func (r *RedisCluster) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]
 		"scoreFrom": scoreFrom,
 		"scoreTo":   scoreTo,
 	}
-	log.WithFields(logEntry).Debug("Getting sorted set range")
+	storageLog.WithFields(logEntry).Debug("Getting sorted set range")
 
 	args := redis.ZRangeBy{Min: scoreFrom, Max: scoreTo}
 	values, err := r.singleton().ZRangeByScoreWithScores(r.RedisController.ctx, fixedKey, &args).Result()
 	if err != nil {
-		log.WithFields(logEntry).WithError(err).Error("ZRANGEBYSCORE command failed")
+		storageLog.WithFields(logEntry).WithError(err).Error("ZRANGEBYSCORE command failed")
 		return nil, nil, err
 	}
 
@@ -1079,10 +1079,10 @@ func (r *RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) 
 		"scoreFrom": scoreFrom,
 		"scoreTo":   scoreTo,
 	}
-	log.WithFields(logEntry).Debug("Removing sorted set range")
+	storageLog.WithFields(logEntry).Debug("Removing sorted set range")
 
 	if err := r.singleton().ZRemRangeByScore(r.RedisController.ctx, fixedKey, scoreFrom, scoreTo).Err(); err != nil {
-		log.WithFields(logEntry).WithError(err).Error("ZREMRANGEBYSCORE command failed")
+		storageLog.WithFields(logEntry).WithError(err).Error("ZREMRANGEBYSCORE command failed")
 		return err
 	}
 

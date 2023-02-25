@@ -13,10 +13,10 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/murmur3"
-	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/log"
 )
 
-var log = logger.Get()
+var storageLog = log.WithPrefix("storage")
 
 // ErrKeyNotFound is a standard error for when a key is not found in the storage engine
 var ErrKeyNotFound = errors.New("key not found")

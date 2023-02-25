@@ -3,21 +3,22 @@ package storage
 import (
 	"errors"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/log"
 )
 
 type MdcbStorage struct {
-	local                 Handler
-	rpc                   Handler
-	logger                *logrus.Entry
+	local  Handler
+	rpc    Handler
+	logger log.Logger
+
 	CallbackonPullfromRPC *func(key string, val string) error
 }
 
-func NewMdcbStorage(local, rpc Handler, log *logrus.Entry) *MdcbStorage {
+func NewMdcbStorage(local, rpc Handler, logger log.Logger) *MdcbStorage {
 	return &MdcbStorage{
 		local:  local,
 		rpc:    rpc,
-		logger: log,
+		logger: logger,
 	}
 }
 
