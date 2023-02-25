@@ -11,7 +11,7 @@ type MdcbStorage struct {
 	rpc    Handler
 	logger log.Logger
 
-	CallbackonPullfromRPC *func(key string, val string) error
+	CallbackOnPullFromRPC func(key string, val string) error
 }
 
 func NewMdcbStorage(local, rpc Handler, logger log.Logger) *MdcbStorage {
@@ -40,8 +40,8 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 			return val, err
 		}
 
-		if m.CallbackonPullfromRPC != nil {
-			err := (*m.CallbackonPullfromRPC)(key, val)
+		if m.CallbackOnPullFromRPC != nil {
+			err := m.CallbackOnPullFromRPC(key, val)
 			if err != nil {
 				m.logger.Error(err)
 			}

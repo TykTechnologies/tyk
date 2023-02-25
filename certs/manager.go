@@ -18,30 +18,30 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/storage"
-
 	cache "github.com/pmylund/go-cache"
-	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 var CertManagerLogPrefix = "cert_storage"
 
 type CertificateManager struct {
 	storage         storage.Handler
-	logger          *logrus.Entry
+	logger          log.Logger
 	cache           *cache.Cache
 	secret          string
 	migrateCertList bool
 }
 
-func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
+func NewCertificateManager(storage storage.Handler, secret string, logger log.Logger, migrateCertList bool) *CertificateManager {
 	if logger == nil {
-		logger = logrus.New()
+		logger = log.New()
 	}
 
 	return &CertificateManager{
 		storage:         storage,
-		logger:          logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
+		logger:          logger.WithPrefix(CertManagerLogPrefix),
 		cache:           cache.New(5*time.Minute, 10*time.Minute),
 		secret:          secret,
 		migrateCertList: migrateCertList,
@@ -54,20 +54,13 @@ func getOrgFromKeyID(key, certID string) string {
 	return orgId
 }
 
-func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
-	if logger == nil {
-		logger = logrus.New()
-	}
-	log := logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix})
+func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger log.Logger, migrateCertList bool) *CertificateManager {
 
-	cm := &CertificateManager{
-		logger:          log,
-		cache:           cache.New(5*time.Minute, 10*time.Minute),
-		secret:          secret,
-		migrateCertList: migrateCertList,
-	}
+	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log.WithPrefix("slave-cert-mgr"))
 
-	callbackOnPullCertFromRPC := func(key, val string) error {
+	cm := NewCertificateManager(mdcbStorage, secret, logger, migrateCertList)
+
+	mdcbStorage.CallbackOnPullFromRPC = func(key, val string) error {
 		// calculate the orgId from the keyId
 		certID, _, _ := GetCertIDAndChainPEM([]byte(val), "")
 		orgID := getOrgFromKeyID(key, certID)
@@ -76,10 +69,6 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 		return err
 	}
 
-	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log)
-	mdcbStorage.CallbackonPullfromRPC = &callbackOnPullCertFromRPC
-
-	cm.storage = mdcbStorage
 	return cm
 }
 
