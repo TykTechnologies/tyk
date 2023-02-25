@@ -10,21 +10,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/serializer"
-
 	"github.com/cenkalti/backoff/v4"
 	"github.com/gocraft/health"
 	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/gorpc"
+	"github.com/TykTechnologies/tyk-pump/serializer"
+	"github.com/TykTechnologies/tyk/log"
 )
 
 var (
 	GlobalRPCCallTimeout = 30 * time.Second
 	GlobalRPCPingTimeout = 60 * time.Second
-	Log                  = &logrus.Logger{}
+	Log                  = log.New()
 	Instrument           *health.Stream
 
 	clientSingleton     *gorpc.Client
@@ -178,7 +177,7 @@ func EmitErrorEvent(jobName string, funcName string, err error) {
 
 	job := Instrument.NewJob(jobName)
 	if emitErr := job.EventErr(funcName, err); emitErr != nil {
-		Log.WithError(emitErr).WithFields(logrus.Fields{
+		Log.WithError(emitErr).WithFields(log.Fields{
 			"jobName":  jobName,
 			"funcName": funcName,
 		})
@@ -192,7 +191,7 @@ func EmitErrorEventKv(jobName string, funcName string, err error, kv map[string]
 
 	job := Instrument.NewJob(jobName)
 	if emitErr := job.EventErrKv(funcName, err, kv); emitErr != nil {
-		Log.WithError(emitErr).WithFields(logrus.Fields{
+		Log.WithError(emitErr).WithFields(log.Fields{
 			"jobName":  jobName,
 			"funcName": funcName,
 			"kv":       kv,
@@ -245,7 +244,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		clientSingleton = gorpc.NewTCPClient(values.Config().ConnectionString)
 	}
 
-	if Log.Level != logrus.DebugLevel {
+	if Log.Level() != log.DebugLevel {
 		clientSingleton.LogError = gorpc.NilErrorLogger
 	}
 
