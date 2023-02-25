@@ -56,7 +56,7 @@ func getOrgFromKeyID(key, certID string) string {
 
 func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger log.Logger, migrateCertList bool) *CertificateManager {
 
-	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log.WithPrefix("slave-cert-mgr"))
+	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, logger)
 
 	cm := NewCertificateManager(mdcbStorage, secret, logger, migrateCertList)
 
