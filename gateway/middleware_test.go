@@ -11,10 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	headers2 "github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/test"
-
 	"github.com/TykTechnologies/tyk/config"
+	header "github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -304,7 +303,7 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	})
 
 	headers := map[string]string{
-		headers2.Authorization: key,
+		header.Authorization: key,
 	}
 
 	// Check allowance scope is equal to api id because per api is enabled for api1 and api2

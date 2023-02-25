@@ -25,12 +25,17 @@ func (gw *Gateway) getLogEntryForRequest(logger Logger, r *http.Request, key str
 	return gw.getExplicitLogEntryForRequest(logger, r.URL.Path, request.RealIP(r), key, data)
 }
 
-func (gw *Gateway) getExplicitLogEntryForRequest(logger Logger, path string, IP string, key string, data map[string]interface{}) Logger {
+func (gw *Gateway) getExplicitLogEntryForRequest(logger Logger, requestPath string, requestIP string, key string, data map[string]interface{}) Logger {
+	return logger.WithFields(gw.getLogEntryFields(requestPath, requestIP, key, data))
+}
+
+func (gw *Gateway) getLogEntryFields(requestPath string, requestIP string, key string, data map[string]interface{}) log.Fields {
 	// populate http request fields
 	fields := log.Fields{
-		"path":   path,
-		"origin": IP,
+		"path":   requestPath,
+		"origin": requestIP,
 	}
+
 	// add key to log if configured to do so
 	if key != "" {
 		fields["key"] = key
@@ -38,9 +43,11 @@ func (gw *Gateway) getExplicitLogEntryForRequest(logger Logger, path string, IP 
 			fields["key"] = logHiddenValue
 		}
 	}
+
 	// add to log additional fields if any passed
 	for key, val := range data {
 		fields[key] = val
 	}
-	return logger.WithFields(fields)
+
+	return fields
 }

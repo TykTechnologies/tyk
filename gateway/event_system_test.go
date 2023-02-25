@@ -22,8 +22,9 @@ var (
 func (ts *Test) prepareSpecWithEvents(logger Logger) (spec *APISpec) {
 
 	if logger == nil {
-		logger = log
+		logger = testLog
 	}
+
 	def := &apidef.APIDefinition{
 		EventHandlers: apidef.EventHandlerMetaConfig{
 			Events: map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{
@@ -48,7 +49,7 @@ func (ts *Test) prepareSpecWithEvents(logger Logger) (spec *APISpec) {
 			eventHandlerInstance, err := ts.Gw.EventHandlerByName(handlerConf, spec)
 
 			if err != nil {
-				log.Error("Failed to init event handler: ", err)
+				logger.WithError(err).Error("Failed to init event handler")
 			} else {
 				spec.EventPaths[eventName] = append(spec.EventPaths[eventName], eventHandlerInstance)
 			}
@@ -68,7 +69,7 @@ func prepareEventsConf() (conf *config.Config) {
 						Handler: EH_LogHandler,
 						HandlerMeta: map[string]interface{}{
 							"prefix": "testprefix1",
-							"logger": log,
+							"logger": testLog,
 						},
 					},
 				},
@@ -77,7 +78,7 @@ func prepareEventsConf() (conf *config.Config) {
 						Handler: EH_LogHandler,
 						HandlerMeta: map[string]interface{}{
 							"prefix": "testprefix2",
-							"logger": log,
+							"logger": testLog,
 						},
 					},
 				},
@@ -92,7 +93,7 @@ func prepareEventHandlerConfig(handler apidef.TykEventHandlerName) (config apide
 	case EH_LogHandler:
 		config.HandlerMeta = map[string]interface{}{
 			"prefix": "testprefix",
-			"logger": log,
+			"logger": testLog,
 		}
 	case EH_WebHook:
 		config.HandlerMeta = map[string]interface{}{}
@@ -123,8 +124,10 @@ func TestLogMessageEventHandler(t *testing.T) {
 	defer ts.Close()
 
 	buf := &bytes.Buffer{}
+
 	testLogger := log.New()
-	testLogger.Out = buf
+	testLogger.SetOutput(buf)
+
 	spec := ts.prepareSpecWithEvents(testLogger)
 	handler := spec.EventPaths[EventAuthFailure][0]
 	em := config.EventMessage{

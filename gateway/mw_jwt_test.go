@@ -89,7 +89,7 @@ func (ts *Test) prepareGenericJWTSession(testName string, method string, claimNa
 	var sessionFunc JwtCreator
 	switch method {
 	default:
-		log.Warningf("Signing method '%s' is not recognised, defaulting to HMAC signature", method)
+		testLog.Warningf("Signing method '%s' is not recognised, defaulting to HMAC signature", method)
 		method = HMACSign
 		fallthrough
 	case HMACSign:
@@ -149,7 +149,7 @@ func (ts *Test) prepareGenericJWTSession(testName string, method string, claimNa
 	})[0]
 	err := ts.Gw.GlobalSessionManager.UpdateSession(tokenKID, sessionFunc(), 60, false)
 	if err != nil {
-		log.WithError(err).Error("could not update session in Session Manager.")
+		testLog.WithError(err).Error("could not update session in Session Manager.")
 	}
 
 	return spec, jwtToken
@@ -496,7 +496,7 @@ func (ts *Test) prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) st
 	ts.Gw.GlobalSessionManager.ResetQuota(tokenID, session, false)
 	err := ts.Gw.GlobalSessionManager.UpdateSession(tokenID, session, 60, false)
 	if err != nil {
-		log.WithError(err).Error("could not update session in Session Manager.")
+		testLog.WithError(err).Error("could not update session in Session Manager.")
 	}
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
