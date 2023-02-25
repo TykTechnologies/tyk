@@ -83,6 +83,8 @@ github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksr
 github.com/TykTechnologies/openid2go v0.1.2/go.mod h1:gYfkqeWa+lY3Xz/Z2xYtIzmYXynlgKZaBIbPCqdcdMA=
 github.com/TykTechnologies/storage v0.0.0-20230224213141-5b4f6a33a28e h1:GRLTh41Hlr2IZt+KuSNLOaGlO3Bk914KxdoNwGHXscE=
 github.com/TykTechnologies/storage v0.0.0-20230224213141-5b4f6a33a28e/go.mod h1:npPn2zAMWRpM6JoRJLyKyNz0iMdXzNomlq4CvuhK04U=
+github.com/TykTechnologies/storage v0.0.0-20230225000702-f884152e0172 h1:XwNJ8AfsoRnXnaWiUsVFsfQNYSvySY3UBnFglam6EYU=
+github.com/TykTechnologies/storage v0.0.0-20230225000702-f884152e0172/go.mod h1:npPn2zAMWRpM6JoRJLyKyNz0iMdXzNomlq4CvuhK04U=
 github.com/TykTechnologies/tyk v0.0.0-20200207055804-cf1d1ad81206/go.mod h1:+WNQ0t1t4ZCh0Z+mDnnyNAQZc5hVJ490iqLOWKPLIMI=
 github.com/TykTechnologies/tyk-pump v1.7.0-rc1 h1:8MPqBmqVe48Uu8wQSm8gdDXUzJMfy01Miu6hCwVDo/8=
 github.com/TykTechnologies/tyk-pump v1.7.0-rc1/go.mod h1:4GScGRFI2t5iZj9+LlFKEOmnTY0UZ1e/FO5+4gPbKVI=

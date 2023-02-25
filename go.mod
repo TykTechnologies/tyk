@@ -78,7 +78,7 @@ require (
 )
 
 require (
-	github.com/TykTechnologies/storage v0.0.0-20230224213141-5b4f6a33a28e // indirect
+	github.com/TykTechnologies/storage v0.0.0-20230225000702-f884152e0172 // indirect
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // test
 	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e // test
 	github.com/stretchr/testify v1.8.1 // test
