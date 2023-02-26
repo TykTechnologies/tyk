@@ -39,8 +39,8 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
 	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
 
-	assert.Error(t, err)
 	assert.Nil(t, policyMap)
+	assert.Error(t, err)
 }
 
 type dummySessionManager struct {

@@ -111,14 +111,11 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	newRequest.Header.Set("x-tyk-nonce", gw.ServiceNonce)
 	gw.ServiceNonceMutex.RUnlock()
 
-	policyLog.WithFields(log.Fields{
-		"prefix": "policy",
-	}).Info("Mutex lock acquired... calling")
+	policyLog.Info("Mutex lock acquired... calling")
 	c := gw.initialiseClient()
 
-	policyLog.WithFields(log.Fields{
-		"prefix": "policy",
-	}).Info("Calling dashboard service for policy list")
+	policyLog.Info("Calling dashboard service for policy list")
+
 	resp, err := c.Do(newRequest)
 	if err != nil {
 		policyLog.Error("Policy request failed: ", err)
@@ -134,7 +131,7 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 
 		policyLog.WithField("response", string(body)).Error("Policy request login failure")
 		gw.reLogin()
-		return nil, err
+		return nil, errors.New(http.StatusText(resp.StatusCode))
 	}
 
 	// Extract Policies
