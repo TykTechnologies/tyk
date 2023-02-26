@@ -52,18 +52,30 @@ func (l *logger) WithError(err error) Logger {
 }
 
 func (l *logger) ReplaceHooks(hooks LevelHooks) LevelHooks {
+	globalMu.Lock()
+	defer globalMu.Unlock()
+
 	return l.Entry.Logger.ReplaceHooks(hooks)
 }
 
 func (l *logger) SetLevel(level Level) {
+	globalMu.Lock()
+	defer globalMu.Unlock()
+
 	l.Entry.Logger.Level = level
 }
 
 func (l *logger) SetFormatter(formatter Formatter) {
+	globalMu.Lock()
+	defer globalMu.Unlock()
+
 	l.Entry.Logger.Formatter = formatter
 }
 
 func (l *logger) SetOutput(w io.Writer) {
+	globalMu.Lock()
+	defer globalMu.Unlock()
+
 	l.Entry.Logger.SetOutput(w)
 }
 

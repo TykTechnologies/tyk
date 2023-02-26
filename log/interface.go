@@ -14,8 +14,10 @@ type Logger interface {
 	WithPrefix(prefix string) Logger
 
 	ReplaceHooks(h LevelHooks) LevelHooks
+
 	SetLevel(level Level)
 	SetFormatter(formatter Formatter)
+
 	SetOutput(w io.Writer)
 
 	Debugf(format string, args ...interface{})

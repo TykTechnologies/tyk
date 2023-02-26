@@ -106,21 +106,16 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var logStorage bytes.Buffer
-
-	logger := log.Get()
-	logger.SetFormatter(&log.JSONFormatter{})
-	logger.SetLevel(log.DebugLevel)
-	logger.SetOutput(&logStorage)
+	logStorage := new(bytes.Buffer)
+	logger := log.NewJSONLogger(logStorage, log.DebugLevel)
 
 	gs := gw.prepareStorage()
 	subrouter := mux.NewRouter()
 
 	loader := &APIDefinitionLoader{Gw: gw}
-	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: traceReq.Spec}, gw.Logger())
-
-	chainObj := gw.processSpec(spec, nil, &gs, gw.Logger())
-	gw.generateSubRoutes(spec, subrouter, gw.Logger())
+	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: traceReq.Spec}, logger)
+	chainObj := gw.processSpec(spec, nil, &gs, logger)
+	gw.generateSubRoutes(spec, subrouter, logger)
 	handleCORS(subrouter, spec)
 
 	spec.middlewareChain = chainObj

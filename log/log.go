@@ -1,6 +1,7 @@
 package log
 
 import (
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -81,6 +82,15 @@ func getLevel() Level {
 	}
 }
 
+func NewJSONLogger(w io.Writer, level Level) Logger {
+	logger := logrus.New()
+	logger.SetFormatter(&logrus.JSONFormatter{})
+	logger.SetLevel(level)
+	logger.SetOutput(w)
+
+	return fromLogrusLogger(logger)
+}
+
 func Get() Logger {
 	globalMu.RLock()
 	defer globalMu.RUnlock()
@@ -96,60 +106,39 @@ func GetRaw() Logger {
 }
 
 func WithField(key string, value interface{}) Logger {
-	globalMu.RLock()
-	defer globalMu.RUnlock()
-
-	return fromLogrusLogger(global.Logger).WithField(key, value)
+	return Get().WithField(key, value)
 }
 
 func WithFields(f Fields) Logger {
-	globalMu.RLock()
-	defer globalMu.RUnlock()
-
-	return fromLogrusLogger(global.Logger).WithFields(f)
+	return Get().WithFields(f)
 }
 
 func WithError(err error) Logger {
-	return fromLogrusLogger(global.Logger).WithError(err)
+	return Get().WithError(err)
 }
 
 func WithPrefix(prefix string) Logger {
-	return fromLogrusLogger(global.Logger).WithField("prefix", prefix)
+	return WithField("prefix", prefix)
 }
 
 func Error(message string) {
-	globalMu.RLock()
-	defer globalMu.RUnlock()
-
-	fromLogrusLogger(global.Logger).Error(message)
+	Get().Error(message)
 }
 
 func Fatal(message string) {
-	globalMu.RLock()
-	defer globalMu.RUnlock()
-
-	fromLogrusLogger(global.Logger).Fatal(message)
+	Get().Fatal(message)
 }
 
 func Warning(message string) {
-	globalMu.RLock()
-	defer globalMu.RUnlock()
-
-	fromLogrusLogger(global.Logger).Warning(message)
+	Get().Warning(message)
 }
 
 var Warn = Warning
 
 func Info(message string) {
-	globalMu.RLock()
-	defer globalMu.RUnlock()
-
-	fromLogrusLogger(global.Logger).Info(message)
+	Get().Info(message)
 }
 
 func Debug(message string) {
-	globalMu.RLock()
-	defer globalMu.RUnlock()
-
-	fromLogrusLogger(global.Logger).Error(message)
+	Get().Error(message)
 }
