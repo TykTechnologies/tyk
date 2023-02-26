@@ -62,14 +62,14 @@ func (l *logger) SetLevel(level Level) {
 	globalMu.Lock()
 	defer globalMu.Unlock()
 
-	l.Entry.Logger.Level = level
+	l.Entry.Logger.SetLevel(level)
 }
 
 func (l *logger) SetFormatter(formatter Formatter) {
 	globalMu.Lock()
 	defer globalMu.Unlock()
 
-	l.Entry.Logger.Formatter = formatter
+	l.Entry.Logger.SetFormatter(formatter)
 }
 
 func (l *logger) SetOutput(w io.Writer) {
