@@ -26,17 +26,18 @@ func TestJSVMLogs(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	var buf bytes.Buffer
+	var (
+		buf    = new(bytes.Buffer)
+		bufRaw = new(bytes.Buffer)
+	)
 
-	logger := log.Get()
-	logger.SetOutput(&buf)
+	logger := log.NewLogger(buf, log.DebugLevel)
+	loggerRaw := log.NewRawLogger(bufRaw, log.DebugLevel)
 
 	jsvm := JSVM{}
 	jsvm.Init(nil, logger, ts.Gw)
 
-	jsvm.RawLog = log.Get()
-	jsvm.RawLog.SetOutput(&buf)
-	jsvm.RawLog.SetFormatter(new(log.RawFormatter))
+	jsvm.RawLog = loggerRaw
 
 	const in = `
 log("foo")

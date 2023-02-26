@@ -86,6 +86,16 @@ func NewLogger(w io.Writer, level Level) Logger {
 	logger := logrus.New()
 	logger.SetLevel(level)
 	logger.SetOutput(w)
+
+	return fromLogrusLogger(logger)
+}
+
+func NewRawLogger(w io.Writer, level Level) Logger {
+	logger := logrus.New()
+	logger.SetFormatter(&RawFormatter{})
+	logger.SetLevel(level)
+	logger.SetOutput(w)
+
 	return fromLogrusLogger(logger)
 }
 
