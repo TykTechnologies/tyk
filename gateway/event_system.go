@@ -170,7 +170,7 @@ type LogMessageEventHandler struct {
 func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
 	conf := handlerConf.(map[string]interface{})
 	l.prefix = conf["prefix"].(string)
-	l.logger = log.New().WithField("prefix", "events")
+	l.logger = log.Get().WithField("prefix", "events")
 	if l.Gw.isRunningTests() {
 		logger, ok := conf["logger"]
 		if ok {

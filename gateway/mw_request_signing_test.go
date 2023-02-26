@@ -28,7 +28,7 @@ var algoList = [4]string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512
 func (ts *Test) getMiddlewareChain(spec *APISpec) http.Handler {
 
 	remote, _ := url.Parse(TestHttpAny)
-	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, log.New())
+	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, log.Get())
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(

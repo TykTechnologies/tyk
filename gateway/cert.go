@@ -64,8 +64,6 @@ var cipherSuites = map[string]uint16{
 	"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305":  0xcca9,
 }
 
-var certLog = log.New().WithField("prefix", "certs")
-
 func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
 	var certID string
 
@@ -311,7 +309,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 	serverCerts := []tls.Certificate{}
 	certNameMap := map[string]*tls.Certificate{}
 
-	logger := log.New()
+	logger := log.Get()
 
 	for _, certData := range gwConfig.HttpServerOptions.Certificates {
 		cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)

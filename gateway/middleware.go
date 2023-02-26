@@ -204,7 +204,7 @@ func (t BaseMiddleware) Base() *BaseMiddleware { return &t }
 
 func (t BaseMiddleware) Logger() (logger Logger) {
 	if t.logger == nil {
-		t.logger = log.New()
+		t.logger = log.Get()
 	}
 
 	return t.logger

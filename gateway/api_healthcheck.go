@@ -5,11 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 )
-
-var healthLog = log.New().WithField("prefix", "healthcheck")
 
 type HealthPrefix string
 

@@ -95,14 +95,6 @@ func GetRaw() Logger {
 	return fromLogrusLogger(global.RawLog)
 }
 
-func New() Logger {
-	return fromLogrusLogger(logrus.New())
-}
-
-func NewEntry() Logger {
-	return New()
-}
-
 func WithField(key string, value interface{}) Logger {
 	globalMu.RLock()
 	defer globalMu.RUnlock()

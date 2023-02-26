@@ -10,10 +10,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/log"
 )
-
-var dashLog = log.New().WithField("prefix", "dashboard")
 
 type NodeResponseOK struct {
 	Status  string

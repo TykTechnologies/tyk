@@ -65,23 +65,28 @@ import (
 type Logger = log.Logger
 
 var (
-	gatewayLog = log.New()
+	gatewayLog = log.Get()
 
-	drlLog              = log.WithPrefix("drl")
-	rpcLog              = log.WithPrefix("rpc")
-	mainLog             = log.WithPrefix("main")
-	testLog             = log.WithPrefix("test")
-	oauthLog            = log.WithPrefix("oauth")
-	proxyLog            = log.WithPrefix("proxy")
-	policyLog           = log.WithPrefix("policy")
-	pubSubLog           = log.WithPrefix("pub-sub")
-	webhooksLog         = log.WithPrefix("webhooks")
-	coprocessLog        = log.WithPrefix("coprocess")
-	analyticsLog        = log.WithPrefix("analytics")
-	hostcheckLog        = log.WithPrefix("host-check")
-	hostcheckManagerLog = log.WithPrefix("host-check-mgr")
-	letsencryptLog      = log.WithPrefix("letsencrypt-mgr")
-	mdcbLog             = log.WithPrefix("mdcb-storage-handler")
+	apiLog              = gatewayLog.WithPrefix("api")
+	drlLog              = gatewayLog.WithPrefix("drl")
+	rpcLog              = gatewayLog.WithPrefix("rpc")
+	mainLog             = gatewayLog.WithPrefix("main")
+	testLog             = gatewayLog.WithPrefix("test")
+	authLog             = gatewayLog.WithPrefix("auth-mgr")
+	certLog             = gatewayLog.WithPrefix("certs")
+	dashLog             = gatewayLog.WithPrefix("dashboard")
+	oauthLog            = gatewayLog.WithPrefix("oauth")
+	proxyLog            = gatewayLog.WithPrefix("proxy")
+	healthLog           = gatewayLog.WithPrefix("healthcheck")
+	policyLog           = gatewayLog.WithPrefix("policy")
+	pubSubLog           = gatewayLog.WithPrefix("pub-sub")
+	webhooksLog         = gatewayLog.WithPrefix("webhooks")
+	coprocessLog        = gatewayLog.WithPrefix("coprocess")
+	analyticsLog        = gatewayLog.WithPrefix("analytics")
+	hostcheckLog        = gatewayLog.WithPrefix("host-check")
+	hostcheckManagerLog = gatewayLog.WithPrefix("host-check-mgr")
+	letsencryptLog      = gatewayLog.WithPrefix("letsencrypt-mgr")
+	mdcbLog             = gatewayLog.WithPrefix("mdcb-storage-handler")
 
 	rawLog = log.GetRaw()
 
@@ -438,14 +443,14 @@ func (gw *Gateway) setupGlobals() {
 	}
 
 	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, RedisController: gw.RedisController}
-	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log.New(), !gw.GetConfig().Cloud)
+	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log.Get(), !gw.GetConfig().Cloud)
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		rpcStore := &RPCStorageHandler{
 			KeyPrefix: "cert-",
 			HashKeys:  false,
 			Gw:        gw,
 		}
-		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log.New(), !gw.GetConfig().Cloud)
+		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log.Get(), !gw.GetConfig().Cloud)
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
@@ -987,7 +992,7 @@ func (gw *Gateway) DoReload() {
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
 		gw.GlobalEventsJSVM.DeInit()
-		gw.GlobalEventsJSVM.Init(nil, log.New(), gw)
+		gw.GlobalEventsJSVM.Init(nil, log.Get(), gw)
 	}
 
 	// Load the API Policies
@@ -1195,18 +1200,23 @@ func (gw *Gateway) initLogging() {
 	logger := gw.Logger()
 
 	if gw.isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
-		// `go test` without TYK_LOGLEVEL set defaults to no log
-		// output
+		// `go test` without TYK_LOGLEVEL - no log output
 		logger.SetLevel(log.ErrorLevel)
 		logger.SetOutput(ioutil.Discard)
 
+		// Add a new logger here if required
 		var loggers = []Logger{
+			apiLog,
 			drlLog,
 			rpcLog,
 			mainLog,
 			testLog,
+			authLog,
+			certLog,
+			dashLog,
 			oauthLog,
 			proxyLog,
+			healthLog,
 			policyLog,
 			pubSubLog,
 			webhooksLog,
@@ -1222,7 +1232,8 @@ func (gw *Gateway) initLogging() {
 		}
 
 		gorpc.SetErrorLogger(func(string, ...interface{}) {})
-	} else if *cli.DebugMode {
+	}
+	if cli.DebugMode != nil && *cli.DebugMode {
 		logger.SetLevel(log.DebugLevel)
 		logger.Debug("Enabling debug-level output")
 	}

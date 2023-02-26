@@ -61,8 +61,6 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-var apiLog = log.New().WithField("prefix", "api")
-
 var (
 	ErrRequestMalformed = errors.New("request malformed")
 )

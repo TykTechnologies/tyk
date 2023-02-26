@@ -124,7 +124,7 @@ func TestLogMessageEventHandler(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 
-	testLogger := log.New()
+	testLogger := log.Get()
 	testLogger.SetOutput(buf)
 
 	spec := ts.prepareSpecWithEvents(testLogger)

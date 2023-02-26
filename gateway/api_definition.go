@@ -323,7 +323,7 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger Logger) *
 	}
 
 	if logger == nil {
-		logger = log.New()
+		logger = log.Get()
 	}
 
 	// new expiration feature

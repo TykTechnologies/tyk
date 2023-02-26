@@ -325,7 +325,7 @@ func (hm *HTTPSignatureValidationMiddleware) getRSACertificateIdAndSessionForKey
 }
 
 func getDateHeader(r *http.Request) (string, string) {
-	logger := log.New().WithField("prefix", "hmac")
+	logger := log.Get().WithField("prefix", "hmac")
 
 	auxHeaderVal := r.Header.Get(altHeaderSpec)
 	// Prefer aux if present

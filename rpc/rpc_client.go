@@ -23,7 +23,7 @@ import (
 var (
 	GlobalRPCCallTimeout = 30 * time.Second
 	GlobalRPCPingTimeout = 60 * time.Second
-	Log                  = log.New()
+	Log                  = log.Get()
 	Instrument           *health.Stream
 
 	clientSingleton     *gorpc.Client

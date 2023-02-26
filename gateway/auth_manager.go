@@ -13,8 +13,6 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-var authLog = log.New().WithField("prefix", "auth-mgr")
-
 // SessionHandler handles all update/create/access session functions and deals exclusively with
 // user.SessionState objects, not identity
 type SessionHandler interface {

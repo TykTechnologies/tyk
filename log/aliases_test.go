@@ -11,6 +11,6 @@ func TestAliases(t *testing.T) {
 		_ log.Level = log.ErrorLevel
 	)
 
-	logger := log.New()
+	logger := log.Get()
 	logger.Info("Hello from test")
 }

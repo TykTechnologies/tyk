@@ -712,6 +712,8 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux,
 // - return a raw http.Handler for tyk://ID urls.
 func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) *ChainObject {
 	gwConfig := gw.GetConfig()
+	logger := gw.Logger()
+
 	port := gwConfig.ListenPort
 	if spec.ListenPort != 0 {
 		port = spec.ListenPort
@@ -741,10 +743,10 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 			chainObj = chain.(*ChainObject)
 		}
 	} else {
-		chainObj = gw.processSpec(spec, apisByListen, gs, log.New())
+		chainObj = gw.processSpec(spec, apisByListen, gs, logger)
 	}
 
-	gw.generateSubRoutes(spec, subrouter, log.New())
+	gw.generateSubRoutes(spec, subrouter, logger)
 	handleCORS(subrouter, spec)
 
 	if chainObj.Skip {

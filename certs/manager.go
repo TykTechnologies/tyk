@@ -36,7 +36,7 @@ type CertificateManager struct {
 
 func NewCertificateManager(storage storage.Handler, secret string, logger log.Logger, migrateCertList bool) *CertificateManager {
 	if logger == nil {
-		logger = log.New()
+		logger = log.Get()
 	}
 
 	return &CertificateManager{
