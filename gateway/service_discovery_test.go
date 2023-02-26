@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"testing"
+
+	"github.com/TykTechnologies/tyk/log"
 )
 
 const consul = `
@@ -211,8 +213,15 @@ func configureService(name string, sd *ServiceDiscovery) string {
 	return ""
 }
 
+func newServiceDiscovery() ServiceDiscovery {
+	return ServiceDiscovery{
+		logger: log.Get(),
+	}
+}
+
 func TestServiceDiscovery_EUREKA(t *testing.T) {
-	sd := ServiceDiscovery{}
+	sd := newServiceDiscovery()
+
 	rawData := configureService("eureka", &sd)
 	data, err := sd.ProcessRawData(rawData)
 
@@ -236,7 +245,7 @@ func TestServiceDiscovery_EUREKA(t *testing.T) {
 }
 
 func TestServiceDiscovery_CONSUL(t *testing.T) {
-	sd := ServiceDiscovery{}
+	sd := newServiceDiscovery()
 	rawData := configureService("consul", &sd)
 	data, err := sd.ProcessRawData(rawData)
 
@@ -260,7 +269,7 @@ func TestServiceDiscovery_CONSUL(t *testing.T) {
 }
 
 func TestServiceDiscovery_NESTED_CONSUL(t *testing.T) {
-	sd := ServiceDiscovery{}
+	sd := newServiceDiscovery()
 	rawData := configureService("nested_consul", &sd)
 	data, err := sd.ProcessRawData(rawData)
 
@@ -284,7 +293,7 @@ func TestServiceDiscovery_NESTED_CONSUL(t *testing.T) {
 }
 
 func TestServiceDiscovery_ETCD_NESTED_LIST(t *testing.T) {
-	sd := ServiceDiscovery{}
+	sd := newServiceDiscovery()
 	rawData := configureService("nested_list", &sd)
 	data, err := sd.ProcessRawData(rawData)
 
@@ -308,7 +317,7 @@ func TestServiceDiscovery_ETCD_NESTED_LIST(t *testing.T) {
 }
 
 func TestServiceDiscovery_ETCD_NESTED_NOLIST(t *testing.T) {
-	sd := ServiceDiscovery{}
+	sd := newServiceDiscovery()
 	rawData := configureService("nested", &sd)
 	data, err := sd.ProcessRawData(rawData)
 
@@ -328,7 +337,7 @@ func TestServiceDiscovery_ETCD_NESTED_NOLIST(t *testing.T) {
 }
 
 func TestServiceDiscovery_ETCD_NOLIST(t *testing.T) {
-	sd := ServiceDiscovery{}
+	sd := newServiceDiscovery()
 	rawData := configureService("etcd", &sd)
 	data, err := sd.ProcessRawData(rawData)
 
@@ -348,7 +357,7 @@ func TestServiceDiscovery_ETCD_NOLIST(t *testing.T) {
 }
 
 func TestServiceDiscovery_MESOSPHERE(t *testing.T) {
-	sd := ServiceDiscovery{}
+	sd := newServiceDiscovery()
 	rawData := configureService("mesosphere", &sd)
 	data, err := sd.ProcessRawData(rawData)
 
