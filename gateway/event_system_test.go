@@ -124,8 +124,7 @@ func TestLogMessageEventHandler(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 
-	testLogger := log.Get()
-	testLogger.SetOutput(buf)
+	testLogger := log.NewLogger(buf, log.DebugLevel)
 
 	spec := ts.prepareSpecWithEvents(testLogger)
 	handler := spec.EventPaths[EventAuthFailure][0]

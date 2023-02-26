@@ -82,6 +82,13 @@ func getLevel() Level {
 	}
 }
 
+func NewLogger(w io.Writer, level Level) Logger {
+	logger := logrus.New()
+	logger.SetLevel(level)
+	logger.SetOutput(w)
+	return fromLogrusLogger(logger)
+}
+
 func NewJSONLogger(w io.Writer, level Level) Logger {
 	logger := logrus.New()
 	logger.SetFormatter(&logrus.JSONFormatter{})
