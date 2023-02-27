@@ -146,7 +146,7 @@ dockers:
     - dnscache
     - gateway
     - goplugin
-    - headers
+    - header
     - log
     - regexp
     - request
@@ -159,6 +159,7 @@ dockers:
     - testdata
     - trace
     - user
+    - internal
 
 checksum:
   disable: true
