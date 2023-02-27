@@ -159,6 +159,7 @@ dockers:
     - testdata
     - trace
     - user
+    - internal
 
 checksum:
   disable: true
