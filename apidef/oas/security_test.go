@@ -49,10 +49,6 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 	}
 
 	check := func(in, name string, ac apidef.AuthConfig, s OAS) {
-		if s.Components == nil {
-			s.Components = &openapi3.Components{}
-		}
-
 		s.fillAPIKeyScheme(&ac)
 
 		expectedAC := ac
@@ -115,17 +111,16 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 	})
 
 	testOAS := func(in, name string) (oas OAS) {
-		oas.Components = &openapi3.Components{
-			SecuritySchemes: openapi3.SecuritySchemes{
-				authName: &openapi3.SecuritySchemeRef{
-					Value: &openapi3.SecurityScheme{
-						Type: typeAPIKey,
-						In:   in,
-						Name: name,
-					},
+		oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+			authName: &openapi3.SecuritySchemeRef{
+				Value: &openapi3.SecurityScheme{
+					Type: typeAPIKey,
+					In:   in,
+					Name: name,
 				},
 			},
 		}
+
 		return
 	}
 
@@ -158,14 +153,12 @@ func TestOAS_Token(t *testing.T) {
 		},
 	}
 
-	oas.Components = &openapi3.Components{
-		SecuritySchemes: openapi3.SecuritySchemes{
-			securityName: {
-				Value: &openapi3.SecurityScheme{
-					Type: typeAPIKey,
-					Name: "x-query",
-					In:   query,
-				},
+	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+		securityName: {
+			Value: &openapi3.SecurityScheme{
+				Type: typeAPIKey,
+				Name: "x-query",
+				In:   query,
 			},
 		},
 	}
@@ -190,9 +183,7 @@ func TestOAS_Token(t *testing.T) {
 	oas.extractTokenTo(&api, securityName)
 
 	var convertedOAS OAS
-	convertedOAS.Components = &openapi3.Components{
-		SecuritySchemes: oas.Components.SecuritySchemes,
-	}
+	convertedOAS.Components.SecuritySchemes = oas.Components.SecuritySchemes
 
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
 	convertedOAS.fillToken(api)
@@ -212,21 +203,19 @@ func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
 		},
 	}
 
-	oas.Components = &openapi3.Components{
-		SecuritySchemes: openapi3.SecuritySchemes{
-			securityName: {
-				Value: &openapi3.SecurityScheme{
-					Type: typeAPIKey,
-					Name: "x-query",
-					In:   query,
-				},
+	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+		securityName: {
+			Value: &openapi3.SecurityScheme{
+				Type: typeAPIKey,
+				Name: "x-query",
+				In:   query,
 			},
-			securityName2: {
-				Value: &openapi3.SecurityScheme{
-					Type: typeAPIKey,
-					Name: "x-header",
-					In:   header,
-				},
+		},
+		securityName2: {
+			Value: &openapi3.SecurityScheme{
+				Type: typeAPIKey,
+				Name: "x-header",
+				In:   header,
 			},
 		},
 	}
@@ -307,14 +296,12 @@ func TestOAS_JWT(t *testing.T) {
 		},
 	}
 
-	oas.Components = &openapi3.Components{
-		SecuritySchemes: openapi3.SecuritySchemes{
-			securityName: {
-				Value: &openapi3.SecurityScheme{
-					Type:         typeHTTP,
-					Scheme:       schemeBearer,
-					BearerFormat: bearerFormatJWT,
-				},
+	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+		securityName: {
+			Value: &openapi3.SecurityScheme{
+				Type:         typeHTTP,
+				Scheme:       schemeBearer,
+				BearerFormat: bearerFormatJWT,
 			},
 		},
 	}
@@ -338,7 +325,6 @@ func TestOAS_JWT(t *testing.T) {
 	oas.extractJWTTo(&api, securityName)
 
 	var convertedOAS OAS
-	convertedOAS.Components = &openapi3.Components{}
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
 	convertedOAS.fillJWT(api)
 
@@ -355,13 +341,11 @@ func TestOAS_Basic(t *testing.T) {
 		},
 	}
 
-	oas.Components = &openapi3.Components{
-		SecuritySchemes: openapi3.SecuritySchemes{
-			securityName: {
-				Value: &openapi3.SecurityScheme{
-					Type:   typeHTTP,
-					Scheme: schemeBasic,
-				},
+	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+		securityName: {
+			Value: &openapi3.SecurityScheme{
+				Type:   typeHTTP,
+				Scheme: schemeBasic,
 			},
 		},
 	}
@@ -385,7 +369,6 @@ func TestOAS_Basic(t *testing.T) {
 	oas.extractBasicTo(&api, securityName)
 
 	var convertedOAS OAS
-	convertedOAS.Components = &openapi3.Components{}
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
 	convertedOAS.fillBasic(api)
 
@@ -407,20 +390,18 @@ func TestOAS_OAuth(t *testing.T) {
 		},
 	}
 
-	oas.Components = &openapi3.Components{
-		SecuritySchemes: openapi3.SecuritySchemes{
-			securityName: {
-				Value: &openapi3.SecurityScheme{
-					Type: typeOAuth2,
-					Flows: &openapi3.OAuthFlows{
-						AuthorizationCode: &openapi3.OAuthFlow{
-							AuthorizationURL: "{api-url}/oauth/authorize",
-							TokenURL:         "{api-url}/oauth/token",
-							Scopes:           scopes,
-						},
-						ClientCredentials: &openapi3.OAuthFlow{
-							Scopes: scopes,
-						},
+	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+		securityName: {
+			Value: &openapi3.SecurityScheme{
+				Type: typeOAuth2,
+				Flows: &openapi3.OAuthFlows{
+					AuthorizationCode: &openapi3.OAuthFlow{
+						AuthorizationURL: "{api-url}/oauth/authorize",
+						TokenURL:         "{api-url}/oauth/token",
+						Scopes:           scopes,
+					},
+					ClientCredentials: &openapi3.OAuthFlow{
+						Scopes: scopes,
 					},
 				},
 			},
@@ -445,7 +426,7 @@ func TestOAS_OAuth(t *testing.T) {
 	oas.ExtractTo(&api)
 
 	var convertedOAS OAS
-	convertedOAS.Components = &openapi3.Components{SecuritySchemes: oas.Components.SecuritySchemes}
+	convertedOAS.Components.SecuritySchemes = oas.Components.SecuritySchemes
 	convertedOAS.Fill(api)
 	flows := convertedOAS.Components.SecuritySchemes[securityName].Value.Flows
 
@@ -471,20 +452,18 @@ func TestOAS_ExternalOAuth(t *testing.T) {
 		},
 	}
 
-	oas.Components = &openapi3.Components{
-		SecuritySchemes: openapi3.SecuritySchemes{
-			securityName: {
-				Value: &openapi3.SecurityScheme{
-					Type: typeOAuth2,
-					Flows: &openapi3.OAuthFlows{
-						AuthorizationCode: &openapi3.OAuthFlow{
-							AuthorizationURL: "{api-url}/oauth/authorize",
-							TokenURL:         "{api-url}/oauth/token",
-							Scopes:           scopes,
-						},
-						ClientCredentials: &openapi3.OAuthFlow{
-							Scopes: scopes,
-						},
+	oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+		securityName: {
+			Value: &openapi3.SecurityScheme{
+				Type: typeOAuth2,
+				Flows: &openapi3.OAuthFlows{
+					AuthorizationCode: &openapi3.OAuthFlow{
+						AuthorizationURL: "{api-url}/oauth/authorize",
+						TokenURL:         "{api-url}/oauth/token",
+						Scopes:           scopes,
+					},
+					ClientCredentials: &openapi3.OAuthFlow{
+						Scopes: scopes,
 					},
 				},
 			},
@@ -509,7 +488,7 @@ func TestOAS_ExternalOAuth(t *testing.T) {
 	oas.ExtractTo(&api)
 
 	var convertedOAS OAS
-	convertedOAS.Components = &openapi3.Components{SecuritySchemes: oas.Components.SecuritySchemes}
+	convertedOAS.Components.SecuritySchemes = oas.Components.SecuritySchemes
 	convertedOAS.Fill(api)
 	flows := convertedOAS.Components.SecuritySchemes[securityName].Value.Flows
 
@@ -584,7 +563,6 @@ func TestOAS_TykAuthentication_NoOASSecurity(t *testing.T) {
 	Fill(t, &hmac, 0)
 
 	var oas OAS
-	oas.Components = &openapi3.Components{}
 	oas.Paths = make(openapi3.Paths)
 	oas.Extensions = map[string]interface{}{
 		ExtensionTykAPIGateway: &XTykAPIGateway{
