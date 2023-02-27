@@ -50,7 +50,7 @@ require (
 	github.com/miekg/dns v1.0.14
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.1
-	github.com/nats-io/nats-server/v2 v2.3.4 // indirect
+	github.com/nats-io/nats-server/v2 v2.7.4 // indirect
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e // test
 	github.com/opentracing/opentracing-go v1.2.0
