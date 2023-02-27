@@ -250,13 +250,29 @@ func Test_shouldReloadSpec(t *testing.T) {
 		assert.True(t, shouldReloadSpec(existingSpec, newSpec))
 	})
 
+	type testCase struct {
+		name string
+		spec *APISpec
+		want bool
+	}
+
+	assertionHelper := func(t *testing.T, tcs []testCase) {
+		t.Helper()
+		for _, tc := range tcs {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				func(spec *APISpec, want bool) {
+					if got := shouldReloadSpec(&APISpec{}, spec); got != want {
+						t.Errorf("shouldReloadSpec() = %v, want %v", got, want)
+					}
+				}(tc.spec, tc.want)
+			})
+		}
+	}
+
 	t.Run("virtual endpoint", func(t *testing.T) {
 		t.Parallel()
-		tcs := []struct {
-			name string
-			spec *APISpec
-			want bool
-		}{
+		tcs := []testCase{
 			{
 				name: "disabled",
 				spec: &APISpec{APIDefinition: &apidef.APIDefinition{
@@ -299,23 +315,12 @@ func Test_shouldReloadSpec(t *testing.T) {
 			},
 		}
 
-		for _, tc := range tcs {
-			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-				if got := shouldReloadSpec(&APISpec{}, tc.spec); got != tc.want {
-					t.Errorf("shouldReloadSpec() = %v, want %v", got, tc.want)
-				}
-			})
-		}
+		assertionHelper(t, tcs)
 	})
 
 	t.Run("driver", func(t *testing.T) {
 		t.Parallel()
-		tcs := []struct {
-			name string
-			spec *APISpec
-			want bool
-		}{
+		tcs := []testCase{
 			{
 				name: "grpc",
 				spec: &APISpec{
@@ -352,23 +357,12 @@ func Test_shouldReloadSpec(t *testing.T) {
 			},
 		}
 
-		for _, tc := range tcs {
-			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-				if got := shouldReloadSpec(&APISpec{}, tc.spec); got != tc.want {
-					t.Errorf("shouldReloadSpec() = %v, want %v", got, tc.want)
-				}
-			})
-		}
+		assertionHelper(t, tcs)
 	})
 
 	t.Run("mw enabled", func(t *testing.T) {
 		t.Parallel()
-		tcs := []struct {
-			name string
-			spec *APISpec
-			want bool
-		}{
+		tcs := []testCase{
 			{
 				name: "auth",
 				spec: &APISpec{
@@ -454,13 +448,6 @@ func Test_shouldReloadSpec(t *testing.T) {
 			},
 		}
 
-		for _, tc := range tcs {
-			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-				if got := shouldReloadSpec(&APISpec{}, tc.spec); got != tc.want {
-					t.Errorf("shouldReloadSpec() = %v, want %v", got, tc.want)
-				}
-			})
-		}
+		assertionHelper(t, tcs)
 	})
 }
