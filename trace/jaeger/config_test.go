@@ -27,6 +27,9 @@ func TestLoad(t *testing.T) {
 		Reporter: &config.ReporterConfig{
 			LogSpans:           true,
 			LocalAgentHostPort: "jaeger:6831",
+			HTTPHeaders: map[string]string{
+				"test": "1",
+			},
 		},
 	}
 
@@ -49,4 +52,5 @@ func TestLoad(t *testing.T) {
 			t.Errorf("%v: expected %#v got %#v", v.field, v.expect, v.got)
 		}
 	}
+
 }
