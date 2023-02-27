@@ -56,7 +56,7 @@ type HostUptimeChecker struct {
 	checkTimeout       int
 	HostList           map[string]HostData
 	unHealthyList      map[string]bool
-	pool               *tunny.WorkPool
+	pool               *tunny.Pool
 
 	errorChan  chan HostHealthReport
 	okChan     chan HostHealthReport
@@ -133,7 +133,7 @@ func (h *HostUptimeChecker) execCheck() {
 	}
 	h.resetListMu.Unlock()
 	for _, host := range h.HostList {
-		_, err := h.pool.SendWork(host)
+		_, err := h.pool.ProcessCtx(h.Gw.ctx, host)
 		if err != nil && err != tunny.ErrPoolNotRunning {
 			log.Warnf("[HOST CHECKER] could not send work, error: %v", err)
 		}
@@ -369,11 +369,11 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 	log.Debug("[HOST CHECKER] Config:WorkerPool: ", h.workerPoolSize)
 
 	var err error
-	h.pool, err = tunny.CreatePool(h.workerPoolSize, func(hostData interface{}) interface{} {
+	h.pool = tunny.NewFunc(h.workerPoolSize, func(hostData interface{}) interface{} {
 		input, _ := hostData.(HostData)
 		h.CheckHost(input)
 		return nil
-	}).Open()
+	})
 
 	log.Debug("[HOST CHECKER] Init complete")
 
