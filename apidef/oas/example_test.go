@@ -46,13 +46,9 @@ func Test_exampleExtractor(t *testing.T) {
 					"example": "bird"
 				  }
 				},
-				"example": {
-					"name": "duck"
-				}
+				"example": "duck"
 			}`,
-			map[string]interface{}{
-				"name": "duck",
-			},
+			"duck",
 		},
 		{
 			"boolean",
@@ -97,7 +93,7 @@ func Test_exampleExtractor(t *testing.T) {
 			`{
 				"type": "string",
 				"example": "bird",
-				"enum": ["duck", "bird"]	
+				"enum": ["duck"]	
 			}`,
 			"bird",
 		},
@@ -148,9 +144,9 @@ func Test_exampleExtractor(t *testing.T) {
 					"type": "string",
 					"example": "bird"
 				},
-				"example": ["duck"]
+				"example": "duck"
 			}`,
-			[]interface{}{"duck"},
+			"duck",
 		},
 	}
 
@@ -159,8 +155,7 @@ func Test_exampleExtractor(t *testing.T) {
 		err := schemaRef.UnmarshalJSON([]byte(c.schema))
 		assert.NoError(t, err)
 
-		err = schemaRef.Validate(context.Background())
-		assert.NoError(t, err)
+		assert.NoError(t, schemaRef.Validate(context.Background()))
 
 		actualRes := ExampleExtractor(schemaRef)
 
