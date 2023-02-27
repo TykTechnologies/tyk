@@ -258,14 +258,13 @@ func Test_shouldReloadSpec(t *testing.T) {
 
 	assertionHelper := func(t *testing.T, tcs []testCase) {
 		t.Helper()
-		for _, tc := range tcs {
+		for i := 0; i < len(tcs); i++ {
+			tc := tcs[i]
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-				func(spec *APISpec, want bool) {
-					if got := shouldReloadSpec(&APISpec{}, spec); got != want {
-						t.Errorf("shouldReloadSpec() = %v, want %v", got, want)
-					}
-				}(tc.spec, tc.want)
+				if got := shouldReloadSpec(&APISpec{}, tc.spec); got != tc.want {
+					t.Errorf("shouldReloadSpec() = %v, want %v", got, tc.want)
+				}
 			})
 		}
 	}
