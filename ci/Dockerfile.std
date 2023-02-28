@@ -12,12 +12,13 @@ RUN apt-get update \
     
 # Install curl and python3
 RUN apt-get install -y curl python3-setuptools libpython3.9 python3.9-dev  \
+    && apt-get install -y build-essential gcc \
     && curl https://bootstrap.pypa.io/get-pip.py | python3 \
     && GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1 pip3 install grpcio protobuf==3.20.1
 
 
 # Remove some things to decrease CVE surface
-RUN  apt-get remove -y --auto-remove --allow-remove-essential curl libtiff5 ncurses-base \
+RUN  apt-get remove -y --auto-remove --allow-remove-essential build-essential gcc curl libtiff5 ncurses-base \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 # Clean up caches, unwanted .a and .o files
