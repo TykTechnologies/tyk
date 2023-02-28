@@ -7,6 +7,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 )
 
 // appendIfMissing ensures dest slice is unique with new items.
@@ -147,4 +148,44 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 	result.Host = net.JoinHostPort(result.Host, strconv.Itoa(gwConfig.ListenPort))
 
 	return result.String()
+}
+
+func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
+	if existingSpec == nil {
+		return true
+	}
+
+	if existingSpec.Checksum != newSpec.Checksum {
+		return true
+	}
+
+	if newSpec.hasVirtualEndpoint() {
+		return true
+	}
+
+	if newSpec.CustomMiddleware.Driver == apidef.GrpcDriver {
+		return false
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.AuthCheck) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Pre...) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.PostKeyAuth...) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Post...) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Response...) {
+		return true
+	}
+
+	return false
 }
