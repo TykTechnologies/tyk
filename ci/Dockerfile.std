@@ -15,7 +15,7 @@ RUN if [ "$TARGETPLATFORM" != "linux/s390x" ]; then \
       apt-get install -y curl python3-setuptools libpython3.9 python3.9-dev \
       && curl https://bootstrap.pypa.io/get-pip.py | python3 \
       && pip3 install --only-binary ":all:" grpcio protobuf==3.20.1 \
-    fi
+    ; fi
 
 
 # Remove some things to decrease CVE surface
