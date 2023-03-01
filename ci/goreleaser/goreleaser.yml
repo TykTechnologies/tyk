@@ -232,17 +232,14 @@ docker_manifests:
     image_templates:
     - tykio/tyk-gateway:{{ .Tag }}-amd64
     - tykio/tyk-gateway:{{ .Tag }}-arm64
-    - tykio/tyk-gateway:{{ .Tag }}-s390x
   - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
     image_templates:
     - tykio/tyk-gateway:{{ .Tag }}-amd64
     - tykio/tyk-gateway:{{ .Tag }}-arm64
-    - tykio/tyk-gateway:{{ .Tag }}-s390x
   - name_template: tykio/tyk-hybrid-docker:{{ .Tag }}
     image_templates:
     - tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
     - tykio/tyk-hybrid-docker:{{ .Tag }}-arm64
-    - tykio/tyk-hybrid-docker:{{ .Tag }}-s390x
 
 nfpms:
   - id: std
