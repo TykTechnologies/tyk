@@ -166,22 +166,22 @@ dockers:
     - "ci/images/hybrid/"
     
 # Build gateway hybrid container s390x
-- ids:
-    - std
-  image_templates:
-    - "tykio/tyk-hybrid-docker:{{ .Tag }}-s390x"
-  build_flag_templates:
-    - "--platform=linux/s390x"
-    - "--label=org.opencontainers.image.created={{.Date}}"
-    - "--label=org.opencontainers.image.title={{.ProjectName}}-hybrid"
-    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-    - "--label=org.opencontainers.image.version={{.Version}}"
-  use: buildx
-  goarch: s390x
-  goos: linux
-  dockerfile: ci/images/hybrid/Dockerfile
-  extra_files:
-    - "ci/images/hybrid/"
+#- ids:
+#    - std
+#  image_templates:
+#    - "tykio/tyk-hybrid-docker:{{ .Tag }}-s390x"
+#  build_flag_templates:
+#    - "--platform=linux/s390x"
+#    - "--label=org.opencontainers.image.created={{.Date}}"
+#    - "--label=org.opencontainers.image.title={{.ProjectName}}-hybrid"
+#    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+#    - "--label=org.opencontainers.image.version={{.Version}}"
+#  use: buildx
+#  goarch: s390x
+#  goos: linux
+#  dockerfile: ci/images/hybrid/Dockerfile
+#  extra_files:
+#    - "ci/images/hybrid/"
 
 # Build plugin-compiler
 - ids:
