@@ -20,7 +20,7 @@ RUN if [ "$TARGETPLATFORM" != "linux/s390x" ]; then \
 
 # Remove some things to decrease CVE surface
 RUN apt-get remove -y --auto-remove --allow-remove-essential curl libtiff5 ncurses-base \
-	&& rm /usr/bin/passwd && rm /usr/sbin/adduser; fi
+	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 # Clean up caches, unwanted .a and .o files
 RUN rm -rf /root/.cache \
