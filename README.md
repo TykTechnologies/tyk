@@ -1,17 +1,32 @@
-# Tyk API Gateway
+# Tyk Open Source API Gateway
 
 <!-- [![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=master)](https://travis-ci.org/TykTechnologies/tyk) -->
 [![Go Report Card](https://goreportcard.com/badge/github.com/TykTechnologies/tyk)](https://goreportcard.com/report/github.com/TykTechnologies/tyk)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_shield)
 --
 
-Tyk is an open source Enterprise API Gateway. This README will describe the API gateway itself. To get to our commercial offering please use the following links
+The Tyk open source API gateway is a core component of the [Tyk API Management stack](https://tyk.io/docs/tyk-stack/). 
 
-[<img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-cloud.png" width="9%" >](https://tyk.io/docs/tyk-cloud/)
+Tyk offers three routes to get started:
 
-[<img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-selfmanaged.png" width="10%" >](https://tyk.io/docs/tyk-self-managed/install/)
+
+<table>
+<tr>
+<th><a href="https://tyk.io/sign-up/#cloud"><img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-cloud.png" height="50" /></a></th>
+<th><a href="https://tyk.io/sign-up/#self"><img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-selfmanaged.png" height="50" /></a></th>
+<th><a href="#tyk-gateway"><img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-opensource.png" width="50" /></a></th>
+</tr>
+<tr>
+<td width="33%" valign="top">Get up and running in minutes with <a href="https://tyk.io/sign-up/#cloud">Tyk Cloud</a>. Experience the full Tyk Platform, no installation necessary.</td>
+<td width="33%" valign="top"><a href="https://tyk.io/sign-up/#self">Request a trial</a> and install <a href="https://tyk.io/docs/tyk-self-managed/install/">Tyk Self-Managed</a>. Includes dashboard for easy configuration and management.</td>
+<td width="33%" valign="top">Continue reading about the <a href="#tyk-open-source-api-gateway">open source gateway</a>.</td>
+</tr>
+</table>
+<br />
 
 ---
+
+# Tyk Gateway
 
 Tyk is an open source Enterprise API Gateway, supporting REST, GraphQL, TCP and gRPC protocols.
 
@@ -22,8 +37,6 @@ Tyk Technologies uses the same API Gateway for all it’s applications. Protecti
 Built from the ground up to be the fastest API gateway on the planet. It does not depend on a legacy proxy underneath. It has no 3rd party dependencies aside from [Redis](https://github.com/redis/redis) for distributed rate-limiting and token storage. Tyk Gateway can also be deployed as part of a larger Full Lifecycle API Management platform [Tyk Self-Managed](https://tyk.io/features/dashboard/) which also includes Management Control Plane, Dashboard GUI and Developer Portal.
 
 ![image](https://user-images.githubusercontent.com/14009/109156132-8ae9d980-7781-11eb-88d7-0b77c753a9ca.png)
-
-
 
 # Open Source API Gateway Features
 
