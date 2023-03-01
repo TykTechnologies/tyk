@@ -3,7 +3,6 @@
 
 # Check the documentation at http://goreleaser.com
 # This project needs CGO_ENABLED=1 and the cross-compiler toolchains for
-# - arm64
 # - amd64
 builds:
   - id: std-linux
@@ -15,18 +14,6 @@ builds:
       - linux
     goarch:
       - amd64
-    binary: tyk
-  - id: std-arm64
-    flags:
-      - -tags=goplugin
-    ldflags:
-      - -X github.com/TykTechnologies/tyk/gateway.VERSION={{.Version}} -X github.com/TykTechnologies/tyk/gateway.Commit={{.FullCommit}} -X github.com/TykTechnologies/tyk/gateway.buildDate={{.Date}} -X github.com/TykTechnologies/tyk/gateway.builtBy=goreleaser
-    env:
-      - CC=aarch64-linux-gnu-gcc
-    goos:
-      - linux
-    goarch:
-      - arm64
     binary: tyk
 
 dockers:
@@ -72,52 +59,6 @@ dockers:
     - "--label=org.opencontainers.image.version={{.Version}}"
   use: buildx
   goarch: amd64
-  goos: linux
-  dockerfile: ci/images/hybrid/Dockerfile
-  extra_files:
-    - "ci/images/hybrid/"
-# Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway (arm64)
-- ids:
-    - std
-  image_templates:
-    - "tykio/tyk-gateway:{{ .Tag }}-arm64"
-    - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-arm64"
-  build_flag_templates:
-    - "--build-arg=PORTS=8080"
-    - "--platform=linux/arm64"
-    - "--label=org.opencontainers.image.created={{.Date}}"
-    - "--label=org.opencontainers.image.title={{.ProjectName}}"
-    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-    - "--label=org.opencontainers.image.version={{.Version}}"
-  use: buildx
-  goarch: arm64
-  goos: linux
-  dockerfile: ci/Dockerfile.std
-  extra_files:
-    - "ci/install/"
-    - "README.md"
-    - "LICENSE.md"
-    - "apps/app_sample.json"
-    - "templates"
-    - "middleware"
-    - "event_handlers/sample"
-    - "policies"
-    - "coprocess"
-    - "tyk.conf.example"
-
-# Build gateway hybrid container arm64
-- ids:
-    - std
-  image_templates:
-    - "tykio/tyk-hybrid-docker:{{ .Tag }}-arm64"
-  build_flag_templates:
-    - "--platform=linux/arm64"
-    - "--label=org.opencontainers.image.created={{.Date}}"
-    - "--label=org.opencontainers.image.title={{.ProjectName}}-hybrid"
-    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-    - "--label=org.opencontainers.image.version={{.Version}}"
-  use: buildx
-  goarch: arm64
   goos: linux
   dockerfile: ci/images/hybrid/Dockerfile
   extra_files:
@@ -171,16 +112,13 @@ dockers:
 docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}
     image_templates:
-    - tykio/tyk-gateway:{{ .Tag }}-amd64
-    - tykio/tyk-gateway:{{ .Tag }}-arm64
+    - tykio/tyk-gateway:{{ .Tag }}-fips-amd64
   - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
     image_templates:
     - tykio/tyk-gateway:{{ .Tag }}-amd64
-    - tykio/tyk-gateway:{{ .Tag }}-arm64
   - name_template: tykio/tyk-hybrid-docker:{{ .Tag }}
     image_templates:
-    - tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
-    - tykio/tyk-hybrid-docker:{{ .Tag }}-arm64
+    - tykio/tyk-hybrid-docker:{{ .Tag }}-fips-amd64
 
 nfpms:
   - id: std
@@ -192,7 +130,6 @@ nfpms:
     package_name: tyk-gateway
     builds:
       - std-linux
-      - std-arm64
     formats:
       - deb
       - rpm
@@ -237,12 +174,8 @@ nfpms:
         file_name_template: '{{ .PackageName }}-{{ replace .Version "-" "~" }}-1.{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}'
         replacements:
           amd64: x86_64
-          arm: aarch64
-          arm64: aarch64
       deb:
         file_name_template: '{{ .PackageName }}_{{ replace .Version "-" "~" }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}'
-        replacements:
-          arm: arm64
     rpm:
       scripts:
         posttrans: ci/install/post_trans.sh
@@ -266,7 +199,6 @@ archives:
 - id: std-linux
   builds:
     - std-linux
-    - std-arm64
   files:
     - README.md
     - "ci/install/*"
