@@ -34,7 +34,7 @@ builds:
     ldflags:
       - -X github.com/TykTechnologies/tyk/gateway.VERSION={{.Version}} -X github.com/TykTechnologies/tyk/gateway.Commit={{.FullCommit}} -X github.com/TykTechnologies/tyk/gateway.buildDate={{.Date}} -X github.com/TykTechnologies/tyk/gateway.builtBy=goreleaser
     env:
-     - CC=s390x-linux-gnu-gcc
+     - CC=gcc
     goos:
       - linux
     goarch:
