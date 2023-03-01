@@ -34,7 +34,7 @@ RUN rm -rf /root/.cache \
     && find /usr/lib -type f -name '*.o' -delete
 # Print included pip/python versions
 RUN if [ "$TARGETPLATFORM" != "linux/s390x" ]; then \
-      pip3 --version && python3 --version
+      pip3 --version && python3 --version \
     ; fi
 
 # Comment this to test in dev
