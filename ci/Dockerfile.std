@@ -4,6 +4,7 @@
 
 FROM debian:bullseye-slim
 ARG TARGETARCH
+ARg TARGETPLATFORM
 
 ENV DEBIAN_FRONTEND=noninteractive
 
