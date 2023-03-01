@@ -4,13 +4,15 @@
 
 FROM debian:bullseye-slim
 ARG TARGETARCH
-ARg TARGETPLATFORM
+ARG TARGETPLATFORM
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
     && apt-get dist-upgrade -y ca-certificates
-    
+
+RUN echo "TARGETPLATFORM=$TARGETPLATFORM"
+
 # Install curl and python3
 RUN if [ "$TARGETPLATFORM" != "linux/s390x" ]; then \
       apt-get install -y curl python3-setuptools libpython3.9 python3.9-dev \
