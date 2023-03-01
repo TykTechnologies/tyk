@@ -276,8 +276,10 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	// Unique API content ID, to check if we already have if it changed from previous sync
 	spec.Checksum = base64.URLEncoding.EncodeToString(sha256hash[:])
 
-	if currSpec := a.Gw.getApiSpec(def.APIID); currSpec != nil && currSpec.Checksum == spec.Checksum {
-		return a.Gw.getApiSpec(def.APIID)
+	spec.APIDefinition = def
+
+	if currSpec := a.Gw.getApiSpec(def.APIID); !shouldReloadSpec(currSpec, spec) {
+		return currSpec
 	}
 
 	if logger == nil {
@@ -297,8 +299,6 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 			def.VersionData.Versions[key] = ver
 		}
 	}
-
-	spec.APIDefinition = def
 
 	// We'll push the default HealthChecker:
 	spec.Health = &DefaultHealthChecker{

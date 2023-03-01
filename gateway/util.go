@@ -3,6 +3,9 @@ package gateway
 import (
 	"errors"
 	"os"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 )
 
 // appendIfMissing ensures dest slice is unique with new items.
@@ -114,4 +117,44 @@ func FileExist(filepath string) bool {
 		return false
 	}
 	return true
+}
+
+func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
+	if existingSpec == nil {
+		return true
+	}
+
+	if existingSpec.Checksum != newSpec.Checksum {
+		return true
+	}
+
+	if newSpec.hasVirtualEndpoint() {
+		return true
+	}
+
+	if newSpec.CustomMiddleware.Driver == apidef.GrpcDriver {
+		return false
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.AuthCheck) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Pre...) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.PostKeyAuth...) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Post...) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Response...) {
+		return true
+	}
+
+	return false
 }
