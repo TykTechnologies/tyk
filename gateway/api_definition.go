@@ -276,7 +276,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	// Unique API content ID, to check if we already have if it changed from previous sync
 	spec.Checksum = base64.URLEncoding.EncodeToString(sha256hash[:])
 
-	spec.APIDefinition = def.APIDefinition
+	spec.APIDefinition = def
 
 	if currSpec := a.Gw.getApiSpec(def.APIID); !shouldReloadSpec(currSpec, spec) {
 		return currSpec
@@ -300,11 +300,6 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		}
 	}
 
-<<<<<<< HEAD
-	spec.APIDefinition = def
-
-=======
->>>>>>> bea03b12... [TT-7661] reload all APIs having a plugin defined in API definition (#4731)
 	// We'll push the default HealthChecker:
 	spec.Health = &DefaultHealthChecker{
 		Gw:    a.Gw,

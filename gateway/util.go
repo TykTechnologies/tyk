@@ -1,18 +1,11 @@
 package gateway
 
 import (
-<<<<<<< HEAD
 	"errors"
 	"os"
-=======
-	"net"
-	"net/url"
-	"strconv"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/middleware"
->>>>>>> bea03b12... [TT-7661] reload all APIs having a plugin defined in API definition (#4731)
 )
 
 // appendIfMissing ensures dest slice is unique with new items.
