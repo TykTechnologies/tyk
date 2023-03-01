@@ -283,8 +283,7 @@
       },
       "required": [
         "enabled",
-        "functionName",
-        "path"
+        "functionName"
       ]
     },
     "X-Tyk-IDExtractorConfig": {
@@ -300,7 +299,7 @@
           "type": "string"
         },
         "regexpMatchIndex": {
-          "type": "string"
+          "type": "integer"
         },
         "xPathExp": {
           "type": "string"
@@ -361,8 +360,7 @@
       },
       "required": [
         "enabled",
-        "functionName",
-        "path"
+        "functionName"
       ]
     },
     "X-Tyk-PluginBundle": {
@@ -1321,7 +1319,11 @@
         "enabled": {
           "type": "boolean"
         }
-      }
+      },
+      "required": [
+        "enabled",
+        "name"
+      ]
     },
     "X-Tyk-Header": {
       "type": "object",

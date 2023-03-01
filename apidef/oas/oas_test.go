@@ -908,3 +908,32 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 		assert.Equal(t, apidef.GoPluginDriver, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Driver)
 	})
 }
+
+func TestMigrateAndFillOAS_PluginConfigData(t *testing.T) {
+	configData := map[string]interface{}{
+		"key": "value",
+	}
+
+	api := apidef.APIDefinition{
+		Name: "config data",
+		Proxy: apidef.ProxyConfig{
+			ListenPath: "/",
+		},
+		CustomMiddleware: apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+		},
+		VersionData: apidef.VersionData{
+			NotVersioned: true,
+			Versions:     map[string]apidef.VersionInfo{},
+		},
+		ConfigData: configData,
+	}
+	migratedAPI, _, err := MigrateAndFillOAS(&api)
+	assert.NoError(t, err)
+
+	expectedPluginConfigData := &PluginConfigData{
+		Enabled: true,
+		Value:   configData,
+	}
+	assert.Equal(t, expectedPluginConfigData, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Data)
+}
