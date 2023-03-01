@@ -164,6 +164,24 @@ dockers:
   dockerfile: ci/images/hybrid/Dockerfile
   extra_files:
     - "ci/images/hybrid/"
+    
+# Build gateway hybrid container s390x
+- ids:
+    - std
+  image_templates:
+    - "tykio/tyk-hybrid-docker:{{ .Tag }}-arm64"
+  build_flag_templates:
+    - "--platform=linux/arm64"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.title={{.ProjectName}}-hybrid"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+  use: buildx
+  goarch: s390x
+  goos: linux
+  dockerfile: ci/images/hybrid/Dockerfile
+  extra_files:
+    - "ci/images/hybrid/"
 
 # Build plugin-compiler
 - ids:
@@ -214,14 +232,17 @@ docker_manifests:
     image_templates:
     - tykio/tyk-gateway:{{ .Tag }}-amd64
     - tykio/tyk-gateway:{{ .Tag }}-arm64
+    - tykio/tyk-gateway:{{ .Tag }}-s390x
   - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
     image_templates:
     - tykio/tyk-gateway:{{ .Tag }}-amd64
     - tykio/tyk-gateway:{{ .Tag }}-arm64
+    - tykio/tyk-gateway:{{ .Tag }}-s390x
   - name_template: tykio/tyk-hybrid-docker:{{ .Tag }}
     image_templates:
     - tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
     - tykio/tyk-hybrid-docker:{{ .Tag }}-arm64
+    - tykio/tyk-hybrid-docker:{{ .Tag }}-s390x
 
 nfpms:
   - id: std
@@ -234,6 +255,7 @@ nfpms:
     builds:
       - std-linux
       - std-arm64
+      - std-s390x
     formats:
       - deb
       - rpm
@@ -280,6 +302,7 @@ nfpms:
           amd64: x86_64
           arm: aarch64
           arm64: aarch64
+          s390x: s390x
       deb:
         file_name_template: '{{ .PackageName }}_{{ replace .Version "-" "~" }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}'
         replacements:
