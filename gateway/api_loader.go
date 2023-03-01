@@ -740,7 +740,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 	var chainObj *ChainObject
 
-	if curSpec := gw.getApiSpec(spec.APIID); curSpec != nil && curSpec.Checksum == spec.Checksum {
+	if curSpec := gw.getApiSpec(spec.APIID); !shouldReloadSpec(curSpec, spec) {
 		if chain, found := gw.apisHandlesByID.Load(spec.APIID); found {
 			chainObj = chain.(*ChainObject)
 		}
@@ -919,7 +919,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				spec.Proxy.ListenPath = converted
 			}
 
-			if currSpec := gw.getApiSpec(spec.APIID); currSpec != nil && spec.Checksum == currSpec.Checksum {
+			if currSpec := gw.getApiSpec(spec.APIID); !shouldReloadSpec(currSpec, spec) {
 				tmpSpecRegister[spec.APIID] = currSpec
 			} else {
 				tmpSpecRegister[spec.APIID] = spec
