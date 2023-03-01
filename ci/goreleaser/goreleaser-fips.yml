@@ -21,8 +21,8 @@ dockers:
 - ids:
     - std
   image_templates:
-    - "tykio/tyk-gateway:{{ .Tag }}-amd64"
-    - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}"
+    - "tykio/tyk-gateway:{{ .Tag }}-fips-amd64"
+    - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-fips"
   build_flag_templates:
     - "--build-arg=PORTS=8080"
     - "--platform=linux/amd64"
@@ -50,7 +50,7 @@ dockers:
 - ids:
     - std
   image_templates:
-    - "tykio/tyk-hybrid-docker:{{ .Tag }}-amd64"
+    - "tykio/tyk-hybrid-docker:{{ .Tag }}-fips-amd64"
   build_flag_templates:
     - "--platform=linux/amd64"
     - "--label=org.opencontainers.image.created={{.Date}}"
@@ -68,8 +68,8 @@ dockers:
 - ids:
     - std
   image_templates:
-    - tykio/tyk-plugin-compiler:{{ .Tag }}
-    - tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
+    - tykio/tyk-plugin-compiler:{{ .Tag }}-fips
+    - tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-fips
   build_flag_templates:
     - "--label=org.opencontainers.image.created={{.Date}}"
     - "--label=org.opencontainers.image.title=tyk-plugin-compiler"
@@ -115,7 +115,7 @@ docker_manifests:
     - tykio/tyk-gateway:{{ .Tag }}-fips-amd64
   - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
     image_templates:
-    - tykio/tyk-gateway:{{ .Tag }}-amd64
+    - tykio/tyk-gateway:{{ .Tag }}-fips-amd64
   - name_template: tykio/tyk-hybrid-docker:{{ .Tag }}
     image_templates:
     - tykio/tyk-hybrid-docker:{{ .Tag }}-fips-amd64
