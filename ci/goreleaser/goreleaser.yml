@@ -169,7 +169,7 @@ dockers:
 - ids:
     - std
   image_templates:
-    - "tykio/tyk-hybrid-docker:{{ .Tag }}-arm64"
+    - "tykio/tyk-hybrid-docker:{{ .Tag }}-s390x"
   build_flag_templates:
     - "--platform=linux/arm64"
     - "--label=org.opencontainers.image.created={{.Date}}"
