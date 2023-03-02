@@ -1,0 +1,202 @@
+package adapter
+
+import (
+	"encoding/json"
+	"net/http"
+
+	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	kafkaDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
+	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk/apidef"
+)
+
+type udgGraphQLEngineAdapter struct {
+	apiDefinition   *apidef.APIDefinition
+	schema          *graphql.Schema
+	httpClient      *http.Client
+	streamingClient *http.Client
+
+	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
+}
+
+func (u *udgGraphQLEngineAdapter) EngineConfig() (*graphql.EngineV2Configuration, error) {
+	conf := graphql.NewEngineV2Configuration(u.schema)
+	conf.EnableSingleFlight(true)
+
+	fieldConfigs := u.engineConfigV2FieldConfigs()
+	datsSources, err := u.engineConfigV2DataSources()
+	if err != nil {
+		return nil, err
+	}
+
+	conf.SetFieldConfigurations(fieldConfigs)
+	conf.SetDataSources(datsSources)
+
+	return &conf, nil
+}
+
+func (u *udgGraphQLEngineAdapter) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations) {
+	for _, fc := range u.apiDefinition.GraphQL.Engine.FieldConfigs {
+		planFieldConfig := plan.FieldConfiguration{
+			TypeName:              fc.TypeName,
+			FieldName:             fc.FieldName,
+			DisableDefaultMapping: fc.DisableDefaultMapping,
+			Path:                  fc.Path,
+		}
+
+		planFieldConfigs = append(planFieldConfigs, planFieldConfig)
+	}
+
+	generatedArgs := u.schema.GetAllFieldArguments(graphql.NewSkipReservedNamesFunc())
+	generatedArgsAsLookupMap := graphql.CreateTypeFieldArgumentsLookupMap(generatedArgs)
+	u.engineConfigV2Arguments(&planFieldConfigs, generatedArgsAsLookupMap)
+
+	return planFieldConfigs
+}
+
+func (u *udgGraphQLEngineAdapter) engineConfigV2DataSources() (planDataSources []plan.DataSourceConfiguration, err error) {
+	for _, ds := range u.apiDefinition.GraphQL.Engine.DataSources {
+		planDataSource := plan.DataSourceConfiguration{
+			RootNodes: []plan.TypeField{},
+		}
+
+		for _, typeField := range ds.RootFields {
+			planTypeField := plan.TypeField{
+				TypeName:   typeField.Type,
+				FieldNames: typeField.Fields,
+			}
+
+			planDataSource.RootNodes = append(planDataSource.RootNodes, planTypeField)
+		}
+
+		switch ds.Kind {
+		case apidef.GraphQLEngineDataSourceKindREST:
+			var restConfig apidef.GraphQLEngineDataSourceConfigREST
+			err = json.Unmarshal(ds.Config, &restConfig)
+			if err != nil {
+				return nil, err
+			}
+
+			planDataSource.Factory = &restDataSource.Factory{
+				Client: u.httpClient,
+			}
+
+			urlWithoutQueryParams, queryConfigs, err := extractURLQueryParamsForEngineV2(restConfig.URL, restConfig.Query)
+			if err != nil {
+				return nil, err
+			}
+
+			planDataSource.Custom = restDataSource.ConfigJSON(restDataSource.Configuration{
+				Fetch: restDataSource.FetchConfiguration{
+					URL:    urlWithoutQueryParams,
+					Method: restConfig.Method,
+					Body:   restConfig.Body,
+					Query:  queryConfigs,
+					Header: convertApiDefinitionHeadersToHttpHeaders(restConfig.Headers),
+				},
+			})
+
+		case apidef.GraphQLEngineDataSourceKindGraphQL:
+			var graphqlConfig apidef.GraphQLEngineDataSourceConfigGraphQL
+			err = json.Unmarshal(ds.Config, &graphqlConfig)
+			if err != nil {
+				return nil, err
+			}
+
+			planDataSource.Factory, err = createGraphQLDataSourceFactory(createGraphQLDataSourceFactoryParams{
+				graphqlConfig:             graphqlConfig,
+				subscriptionClientFactory: u.subscriptionClientFactory,
+				httpClient:                u.httpClient,
+				streamingClient:           u.streamingClient,
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			planDataSource.Custom = graphqlDataSource.ConfigJson(graphqlDataSourceConfiguration(
+				graphqlConfig.URL,
+				graphqlConfig.Method,
+				graphqlConfig.Headers,
+				graphqlConfig.SubscriptionType,
+			))
+
+		case apidef.GraphQLEngineDataSourceKindKafka:
+			var kafkaConfig apidef.GraphQLEngineDataSourceConfigKafka
+			err = json.Unmarshal(ds.Config, &kafkaConfig)
+			if err != nil {
+				return nil, err
+			}
+
+			planDataSource.Factory = &kafkaDataSource.Factory{}
+			planDataSource.Custom = kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
+				Subscription: kafkaDataSource.SubscriptionConfiguration{
+					BrokerAddresses:      kafkaConfig.BrokerAddresses,
+					Topics:               kafkaConfig.Topics,
+					GroupID:              kafkaConfig.GroupID,
+					ClientID:             kafkaConfig.ClientID,
+					KafkaVersion:         kafkaConfig.KafkaVersion,
+					StartConsumingLatest: kafkaConfig.StartConsumingLatest,
+					BalanceStrategy:      kafkaConfig.BalanceStrategy,
+					IsolationLevel:       kafkaConfig.IsolationLevel,
+					SASL:                 kafkaConfig.SASL,
+				},
+			})
+		}
+
+		planDataSources = append(planDataSources, planDataSource)
+	}
+
+	err = u.determineChildNodes(planDataSources)
+	return planDataSources, err
+}
+
+func (u *udgGraphQLEngineAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
+	for i := range *fieldConfs {
+		if len(generatedArgs) == 0 {
+			return
+		}
+
+		lookupKey := graphql.CreateTypeFieldLookupKey((*fieldConfs)[i].TypeName, (*fieldConfs)[i].FieldName)
+		currentArgs, ok := generatedArgs[lookupKey]
+		if !ok {
+			continue
+		}
+
+		(*fieldConfs)[i].Arguments = createArgumentConfigurationsForArgumentNames(currentArgs.ArgumentNames...)
+		delete(generatedArgs, lookupKey)
+	}
+
+	for _, genArgs := range generatedArgs {
+		*fieldConfs = append(*fieldConfs, plan.FieldConfiguration{
+			TypeName:  genArgs.TypeName,
+			FieldName: genArgs.FieldName,
+			Arguments: createArgumentConfigurationsForArgumentNames(genArgs.ArgumentNames...),
+		})
+	}
+}
+
+func (u *udgGraphQLEngineAdapter) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
+	for i := range planDataSources {
+		for j := range planDataSources[i].RootNodes {
+			typeName := planDataSources[i].RootNodes[j].TypeName
+			for k := range planDataSources[i].RootNodes[j].FieldNames {
+				fieldName := planDataSources[i].RootNodes[j].FieldNames[k]
+				typeFields := u.schema.GetAllNestedFieldChildrenFromTypeField(typeName, fieldName, graphql.NewIsDataSourceConfigV2RootFieldSkipFunc(planDataSources))
+
+				children := make([]plan.TypeField, 0)
+				for _, tf := range typeFields {
+					childNode := plan.TypeField{
+						TypeName:   tf.TypeName,
+						FieldNames: tf.FieldNames,
+					}
+					children = append(children, childNode)
+				}
+				planDataSources[i].ChildNodes = append(planDataSources[i].ChildNodes, children...)
+			}
+		}
+	}
+	return nil
+}
