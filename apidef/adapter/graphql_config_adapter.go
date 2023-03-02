@@ -20,6 +20,10 @@ var ErrUnsupportedGraphQLConfigVersion = errors.New("provided version of GraphQL
 
 type GraphQLConfigAdapterOption func(adapter *GraphQLConfigAdapter)
 
+type graphQLEngineAdapter interface {
+	EngineConfig() (*graphql.EngineV2Configuration, error)
+}
+
 func WithSchema(schema *graphql.Schema) GraphQLConfigAdapterOption {
 	return func(adapter *GraphQLConfigAdapter) {
 		adapter.schema = schema
