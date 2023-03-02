@@ -1035,7 +1035,7 @@ type VirtualEndpoint struct {
 	Name string `bson:"name" json:"name"` // required.
 	// Path is the path to js file.
 	Path string `bson:"path,omitempty" json:"path,omitempty"`
-	// Body is the js function to execute encoded in base64 format.
+	// Body represents the js function body content. It is stored in base64 format.
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 	// ProxyOnError proxies if virtual endpoint errors out.
 	ProxyOnError bool `bson:"proxyOnError,omitempty" json:"proxyOnError,omitempty"`

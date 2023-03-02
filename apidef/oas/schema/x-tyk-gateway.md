@@ -972,7 +972,7 @@ Name is the name of js function.
 Path is the path to js file.
 
 **Field: `body` (`string`)**
-Body is the js function to execute encoded in base64 format.
+Body represents the js function body content. It is stored in base64 format.
 
 **Field: `proxyOnError` (`boolean`)**
 ProxyOnError proxies if virtual endpoint errors out.
