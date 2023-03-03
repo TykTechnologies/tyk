@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
@@ -2119,4 +2121,22 @@ func TestJWTExpOverride(t *testing.T) {
 		}...)
 	})
 
+}
+
+func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
+	const jwkURL = "https://jwk.com"
+
+	m := JWTMiddleware{}
+	api := &apidef.APIDefinition{JWTSource: jwkURL}
+	m.Spec = &APISpec{APIDefinition: api}
+
+	token := &jwt.Token{Header: make(map[string]interface{})}
+	_, err := m.getSecretToVerifySignature(nil, token)
+	assert.ErrorIs(t, err, ErrKIDNotAString)
+
+	t.Run("base64 encoded JWK URL", func(t *testing.T) {
+		api.JWTSource = base64.StdEncoding.EncodeToString([]byte(api.JWTSource))
+		_, err := m.getSecretToVerifySignature(nil, token)
+		assert.ErrorIs(t, err, ErrKIDNotAString)
+	})
 }
