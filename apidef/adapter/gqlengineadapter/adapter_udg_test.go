@@ -139,7 +139,7 @@ func TestUniversalDataGraph_engineConfigV2FieldConfigs(t *testing.T) {
 	}
 
 	var err error
-	adapter.schema, err = parseSchema(gqlConfig.Schema)
+	adapter.Schema, err = parseSchema(gqlConfig.Schema)
 	require.NoError(t, err)
 
 	actualFieldCfgs := adapter.engineConfigV2FieldConfigs()
@@ -465,7 +465,7 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 	}
 
 	var err error
-	adapter.schema, err = parseSchema(gqlConfig.Schema)
+	adapter.Schema, err = parseSchema(gqlConfig.Schema)
 	require.NoError(t, err)
 
 	actualDataSources, err := adapter.engineConfigV2DataSources()

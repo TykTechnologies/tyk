@@ -14,16 +14,18 @@ type ProxyOnly struct {
 	ApiDefinition   *apidef.APIDefinition
 	HttpClient      *http.Client
 	StreamingClient *http.Client
+	Schema          *graphql.Schema
 
-	schema                    *graphql.Schema
 	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
 }
 
 func (p *ProxyOnly) EngineConfig() (*graphql.EngineV2Configuration, error) {
 	var err error
-	p.schema, err = parseSchema(p.ApiDefinition.GraphQL.Schema)
-	if err != nil {
-		return nil, err
+	if p.Schema == nil {
+		p.Schema, err = parseSchema(p.ApiDefinition.GraphQL.Schema)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	staticHeaders := make(http.Header)
@@ -41,7 +43,7 @@ func (p *ProxyOnly) EngineConfig() (*graphql.EngineV2Configuration, error) {
 	}
 
 	v2Config, err := graphql.NewProxyEngineConfigFactory(
-		p.schema,
+		p.Schema,
 		upstreamConfig,
 		graphqlDataSource.NewBatchFactory(),
 		graphql.WithProxyHttpClient(p.HttpClient),

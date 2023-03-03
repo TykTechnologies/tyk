@@ -69,6 +69,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 			ApiDefinition:   g.apiDefinition,
 			HttpClient:      g.getHttpClient(),
 			StreamingClient: g.getStreamingClient(),
+			Schema:          g.schema,
 		}
 	case GraphQLEngineAdapterTypeSupergraph:
 		engineAdapter = &gqlengineadapter.Supergraph{
@@ -81,6 +82,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 			ApiDefinition:   g.apiDefinition,
 			HttpClient:      g.getHttpClient(),
 			StreamingClient: g.getStreamingClient(),
+			Schema:          g.schema,
 		}
 	default:
 		return nil, ErrUnsupportedGraphQLExecutionMode

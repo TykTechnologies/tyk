@@ -17,19 +17,21 @@ type UniversalDataGraph struct {
 	ApiDefinition   *apidef.APIDefinition
 	HttpClient      *http.Client
 	StreamingClient *http.Client
+	Schema          *graphql.Schema
 
-	schema                    *graphql.Schema
 	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
 }
 
 func (u *UniversalDataGraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
 	var err error
-	u.schema, err = parseSchema(u.ApiDefinition.GraphQL.Schema)
-	if err != nil {
-		return nil, err
+	if u.Schema == nil {
+		u.Schema, err = parseSchema(u.ApiDefinition.GraphQL.Schema)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	conf := graphql.NewEngineV2Configuration(u.schema)
+	conf := graphql.NewEngineV2Configuration(u.Schema)
 	conf.EnableSingleFlight(true)
 
 	fieldConfigs := u.engineConfigV2FieldConfigs()
@@ -56,7 +58,7 @@ func (u *UniversalDataGraph) engineConfigV2FieldConfigs() (planFieldConfigs plan
 		planFieldConfigs = append(planFieldConfigs, planFieldConfig)
 	}
 
-	generatedArgs := u.schema.GetAllFieldArguments(graphql.NewSkipReservedNamesFunc())
+	generatedArgs := u.Schema.GetAllFieldArguments(graphql.NewSkipReservedNamesFunc())
 	generatedArgsAsLookupMap := graphql.CreateTypeFieldArgumentsLookupMap(generatedArgs)
 	u.engineConfigV2Arguments(&planFieldConfigs, generatedArgsAsLookupMap)
 
@@ -114,7 +116,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 
 			planDataSource.Factory, err = createGraphQLDataSourceFactory(createGraphQLDataSourceFactoryParams{
 				graphqlConfig:             graphqlConfig,
-				subscriptionClientFactory: u.subscriptionClientFactory,
+				subscriptionClientFactory: subscriptionClientFactoryOrDefault(u.subscriptionClientFactory),
 				httpClient:                u.HttpClient,
 				streamingClient:           u.StreamingClient,
 			})
@@ -190,7 +192,7 @@ func (u *UniversalDataGraph) determineChildNodes(planDataSources []plan.DataSour
 			typeName := planDataSources[i].RootNodes[j].TypeName
 			for k := range planDataSources[i].RootNodes[j].FieldNames {
 				fieldName := planDataSources[i].RootNodes[j].FieldNames[k]
-				typeFields := u.schema.GetAllNestedFieldChildrenFromTypeField(typeName, fieldName, graphql.NewIsDataSourceConfigV2RootFieldSkipFunc(planDataSources))
+				typeFields := u.Schema.GetAllNestedFieldChildrenFromTypeField(typeName, fieldName, graphql.NewIsDataSourceConfigV2RootFieldSkipFunc(planDataSources))
 
 				children := make([]plan.TypeField, 0)
 				for _, tf := range typeFields {
