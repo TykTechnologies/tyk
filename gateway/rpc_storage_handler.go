@@ -86,6 +86,9 @@ var (
 		"Ping": func() bool {
 			return false
 		},
+		"Disconnect": func(clientAddr string, groupData *apidef.GroupLoginRequest) error {
+			return nil
+		},
 	}
 )
 
@@ -141,11 +144,33 @@ func (r *RPCStorageHandler) Connect() bool {
 	)
 }
 
+func (r *RPCStorageHandler) buildNodeInfo() apidef.NodeData {
+	node := apidef.NodeData{
+		NodeID:      r.Gw.GetNodeID(),
+		NodeVersion: VERSION,
+		Tags:        r.Gw.GetConfig().DBAppConfOptions.Tags,
+		Health:      r.Gw.getHealthCheckInfo(),
+	}
+
+	return node
+}
+
+func (r *RPCStorageHandler) Disconnect() error {
+	data := apidef.GroupLoginRequest{
+		UserKey: r.Gw.GetConfig().SlaveOptions.APIKey,
+		GroupID: r.Gw.GetConfig().SlaveOptions.GroupID,
+		Node:    r.buildNodeInfo(),
+	}
+	_, err := rpc.FuncClientSingleton("Disconnect", data)
+	return err
+}
+
 func (r *RPCStorageHandler) getGroupLoginCallback(synchroniserEnabled bool) func(userKey string, groupID string) interface{} {
 	groupLoginCallbackFn := func(userKey string, groupID string) interface{} {
 		return apidef.GroupLoginRequest{
 			UserKey: userKey,
 			GroupID: groupID,
+			Node:    r.buildNodeInfo(),
 		}
 	}
 	if synchroniserEnabled {

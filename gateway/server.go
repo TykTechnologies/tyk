@@ -1635,6 +1635,17 @@ func Start() {
 			mainLog.WithError(err).Error("deregistering in dashboard")
 		}
 	}
+	if gwConfig.SlaveOptions.UseRPC {
+		store := RPCStorageHandler{
+			DoReload: gw.DoReload,
+			Gw:       gw,
+		}
+
+		err := store.Disconnect()
+		if err != nil {
+			mainLog.WithError(err).Error("deregistering in MDCB")
+		}
+	}
 
 	mainLog.Info("Terminating.")
 

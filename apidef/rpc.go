@@ -19,6 +19,14 @@ type GroupLoginRequest struct {
 	UserKey   string
 	GroupID   string
 	ForceSync bool
+	Node      NodeData
+}
+
+type NodeData struct {
+	NodeID      string
+	NodeVersion string
+	Tags        []string
+	Health      map[string]HealthCheckItem
 }
 
 type GroupKeySpaceRequest struct {
