@@ -26,7 +26,7 @@ func (s *Supergraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
 			nil,
 			graphql.WithFederationHttpClient(s.HttpClient),
 			graphql.WithFederationStreamingClient(s.StreamingClient),
-			graphql.WithFederationSubscriptionClientFactory(s.subscriptionClientFactory),
+			graphql.WithFederationSubscriptionClientFactory(subscriptionClientFactoryOrDefault(s.subscriptionClientFactory)),
 		)
 	} else {
 		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(
@@ -34,7 +34,7 @@ func (s *Supergraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
 			graphqlDataSource.NewBatchFactory(),
 			graphql.WithFederationHttpClient(s.HttpClient),
 			graphql.WithFederationStreamingClient(s.StreamingClient),
-			graphql.WithFederationSubscriptionClientFactory(s.subscriptionClientFactory),
+			graphql.WithFederationSubscriptionClientFactory(subscriptionClientFactoryOrDefault(s.subscriptionClientFactory)),
 		)
 	}
 

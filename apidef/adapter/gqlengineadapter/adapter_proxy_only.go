@@ -46,7 +46,7 @@ func (p *ProxyOnly) EngineConfig() (*graphql.EngineV2Configuration, error) {
 		graphqlDataSource.NewBatchFactory(),
 		graphql.WithProxyHttpClient(p.HttpClient),
 		graphql.WithProxyStreamingClient(p.StreamingClient),
-		graphql.WithProxySubscriptionClientFactory(p.subscriptionClientFactory),
+		graphql.WithProxySubscriptionClientFactory(subscriptionClientFactoryOrDefault(p.subscriptionClientFactory)),
 	).EngineV2Configuration()
 
 	v2Config.EnableSingleFlight(true)

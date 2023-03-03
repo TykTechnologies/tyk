@@ -12,6 +12,7 @@ import (
 )
 
 var ErrUnsupportedGraphQLConfigVersion = errors.New("provided version of GraphQL config is not supported for this operation")
+var ErrUnsupportedGraphQLExecutionMode = errors.New("provided execution mode of GraphQL config is not supported for this operation")
 
 type GraphQLEngineAdapter interface {
 	EngineConfig() (*graphql.EngineV2Configuration, error)
@@ -61,24 +62,28 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 	}
 
 	var engineAdapter GraphQLEngineAdapter
-	if isProxyOnlyAPIDefinition(g.apiDefinition) {
+	adapterType := graphqlEngineAdapterTypeFromApiDefinition(g.apiDefinition)
+	switch adapterType {
+	case GraphQLEngineAdapterTypeProxyOnly:
 		engineAdapter = &gqlengineadapter.ProxyOnly{
 			ApiDefinition:   g.apiDefinition,
 			HttpClient:      g.getHttpClient(),
 			StreamingClient: g.getStreamingClient(),
 		}
-	} else if isSupergraphAPIDefinition(g.apiDefinition) {
+	case GraphQLEngineAdapterTypeSupergraph:
 		engineAdapter = &gqlengineadapter.Supergraph{
 			ApiDefinition:   g.apiDefinition,
 			HttpClient:      g.getHttpClient(),
 			StreamingClient: g.getStreamingClient(),
 		}
-	} else {
+	case GraphQLEngineAdapterTypeUniversalDataGraph:
 		engineAdapter = &gqlengineadapter.UniversalDataGraph{
 			ApiDefinition:   g.apiDefinition,
 			HttpClient:      g.getHttpClient(),
 			StreamingClient: g.getStreamingClient(),
 		}
+	default:
+		return nil, ErrUnsupportedGraphQLExecutionMode
 	}
 
 	return engineAdapter.EngineConfig()

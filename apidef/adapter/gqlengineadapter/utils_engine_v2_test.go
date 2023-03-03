@@ -280,3 +280,15 @@ func TestCreateGraphQLDataSourceFactory(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, expectedGraphQLDataSourceFactory, actualGraphQLDataSourceFactory)
 }
+
+func TestSubscriptionClientFactoryOrDefault(t *testing.T) {
+	t.Run("should return the provided subscriptionClientFactory if not nil", func(t *testing.T) {
+		factory := &MockSubscriptionClientFactory{}
+		actualFactory := subscriptionClientFactoryOrDefault(factory)
+		assert.Equal(t, factory, actualFactory)
+	})
+	t.Run("should return default subscriptionClientFactory if provided one is nil", func(t *testing.T) {
+		actualFactory := subscriptionClientFactoryOrDefault(nil)
+		assert.Equal(t, &graphqlDataSource.DefaultSubscriptionClientFactory{}, actualFactory)
+	})
+}

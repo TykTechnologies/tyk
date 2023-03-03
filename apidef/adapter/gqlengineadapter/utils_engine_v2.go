@@ -135,3 +135,10 @@ func createGraphQLDataSourceFactory(params createGraphQLDataSourceFactoryParams)
 	factory.SubscriptionClient = subscriptionClient
 	return factory, nil
 }
+
+func subscriptionClientFactoryOrDefault(providedSubscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory) graphqlDataSource.GraphQLSubscriptionClientFactory {
+	if providedSubscriptionClientFactory != nil {
+		return providedSubscriptionClientFactory
+	}
+	return &graphqlDataSource.DefaultSubscriptionClientFactory{}
+}
