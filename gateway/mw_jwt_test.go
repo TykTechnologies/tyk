@@ -2291,3 +2291,21 @@ func TestGetUserIDFromClaim(t *testing.T) {
 		assert.Equal(t, fmt.Sprintf("found an empty user ID in predefined base field claim %s", userIDKey), err.Error())
 	})
 }
+
+func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
+	const jwkURL = "https://jwk.com"
+
+	m := JWTMiddleware{}
+	api := &apidef.APIDefinition{JWTSource: jwkURL}
+	m.Spec = &APISpec{APIDefinition: api}
+
+	token := &jwt.Token{Header: make(map[string]interface{})}
+	_, err := m.getSecretToVerifySignature(nil, token)
+	assert.ErrorIs(t, err, ErrKIDNotAString)
+
+	t.Run("base64 encoded JWK URL", func(t *testing.T) {
+		api.JWTSource = base64.StdEncoding.EncodeToString([]byte(api.JWTSource))
+		_, err := m.getSecretToVerifySignature(nil, token)
+		assert.ErrorIs(t, err, ErrKIDNotAString)
+	})
+}
