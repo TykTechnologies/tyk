@@ -48,6 +48,8 @@ var (
 		"cid",       // OKTA
 		"client_id", // Gluu
 	}
+
+	ErrKIDNotAString = errors.New("kid is not a string")
 )
 
 func (k *JWTMiddleware) Name() string {
@@ -137,7 +139,12 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 	return nil, errors.New("No matching KID could be found")
 }
 
-func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{}, error) {
+func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType string) (interface{}, error) {
+	kid, ok := kidVal.(string)
+	if !ok {
+		return nil, ErrKIDNotAString
+	}
+
 	// Implement a cache
 	if JWKCache == nil {
 		k.Logger().Debug("Creating JWK Cache")
@@ -209,7 +216,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 	if config.JWTSource != "" {
 		// Is it a URL?
 		if httpScheme.MatchString(config.JWTSource) {
-			return k.getSecretFromURL(config.JWTSource, token.Header[KID].(string), k.Spec.JWTSigningMethod)
+			return k.getSecretFromURL(config.JWTSource, token.Header[KID], k.Spec.JWTSigningMethod)
 		}
 
 		// If not, return the actual value
@@ -220,7 +227,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 
 		// Is decoded url too?
 		if httpScheme.MatchString(string(decodedCert)) {
-			secret, err := k.getSecretFromURL(string(decodedCert), token.Header[KID].(string), k.Spec.JWTSigningMethod)
+			secret, err := k.getSecretFromURL(string(decodedCert), token.Header[KID], k.Spec.JWTSigningMethod)
 			if err != nil {
 				return nil, err
 			}
