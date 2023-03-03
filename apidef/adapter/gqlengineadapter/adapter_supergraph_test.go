@@ -1,4 +1,4 @@
-package adapter
+package gqlengineadapter
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-func TestSupergraphGraphQLEngineAdapter_EngineConfig(t *testing.T) {
+func TestSupergraph_EngineConfig(t *testing.T) {
 	t.Run("should create v2 config for supergraph execution mode without error", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
@@ -24,10 +24,10 @@ func TestSupergraphGraphQLEngineAdapter_EngineConfig(t *testing.T) {
 		}
 
 		httpClient := &http.Client{}
-		adapter := supergraphGraphQLEngineAdapter{
-			apiDefinition:             apiDef,
-			httpClient:                httpClient,
-			streamingClient:           nil,
+		adapter := Supergraph{
+			ApiDefinition:             apiDef,
+			HttpClient:                httpClient,
+			StreamingClient:           nil,
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
@@ -45,10 +45,10 @@ func TestSupergraphGraphQLEngineAdapter_EngineConfig(t *testing.T) {
 
 		httpClient := &http.Client{}
 		streamingClient := &http.Client{}
-		adapter := supergraphGraphQLEngineAdapter{
-			apiDefinition:             apiDef,
-			httpClient:                httpClient,
-			streamingClient:           streamingClient,
+		adapter := Supergraph{
+			ApiDefinition:             apiDef,
+			HttpClient:                httpClient,
+			StreamingClient:           streamingClient,
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
@@ -102,7 +102,7 @@ func TestSupergraphGraphQLEngineAdapter_EngineConfig(t *testing.T) {
 	})
 }
 
-func TestSupergraphGraphQLEngineAdapter_supergraphDataSourceConfigs(t *testing.T) {
+func TestSupergraph_supergraphDataSourceConfigs(t *testing.T) {
 	expectedDataSourceConfigs := []graphqlDataSource.Configuration{
 		{
 			Fetch: graphqlDataSource.FetchConfiguration{
@@ -168,7 +168,10 @@ func TestSupergraphGraphQLEngineAdapter_supergraphDataSourceConfigs(t *testing.T
 		GraphQL: gqlConfig,
 	}
 
-	adapter := NewGraphQLConfigAdapter(apiDef)
+	adapter := Supergraph{
+		ApiDefinition:             apiDef,
+		subscriptionClientFactory: &MockSubscriptionClientFactory{},
+	}
 	actualGraphQLConfigs := adapter.subgraphDataSourceConfigs()
 	assert.Equal(t, expectedDataSourceConfigs, actualGraphQLConfigs)
 }

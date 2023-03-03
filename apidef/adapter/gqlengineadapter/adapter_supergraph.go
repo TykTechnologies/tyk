@@ -1,4 +1,4 @@
-package adapter
+package gqlengineadapter
 
 import (
 	"net/http"
@@ -9,36 +9,36 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-type supergraphGraphQLEngineAdapter struct {
-	apiDefinition   *apidef.APIDefinition
-	httpClient      *http.Client
-	streamingClient *http.Client
+type Supergraph struct {
+	ApiDefinition   *apidef.APIDefinition
+	HttpClient      *http.Client
+	StreamingClient *http.Client
 
 	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
 }
 
-func (s *supergraphGraphQLEngineAdapter) EngineConfig() (*graphql.EngineV2Configuration, error) {
+func (s *Supergraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
 	dataSourceConfs := s.subgraphDataSourceConfigs()
 	var federationConfigV2Factory *graphql.FederationEngineConfigFactory
-	if s.apiDefinition.GraphQL.Supergraph.DisableQueryBatching {
+	if s.ApiDefinition.GraphQL.Supergraph.DisableQueryBatching {
 		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(
 			dataSourceConfs,
 			nil,
-			graphql.WithFederationHttpClient(s.httpClient),
-			graphql.WithFederationStreamingClient(s.streamingClient),
+			graphql.WithFederationHttpClient(s.HttpClient),
+			graphql.WithFederationStreamingClient(s.StreamingClient),
 			graphql.WithFederationSubscriptionClientFactory(s.subscriptionClientFactory),
 		)
 	} else {
 		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(
 			dataSourceConfs,
 			graphqlDataSource.NewBatchFactory(),
-			graphql.WithFederationHttpClient(s.httpClient),
-			graphql.WithFederationStreamingClient(s.streamingClient),
+			graphql.WithFederationHttpClient(s.HttpClient),
+			graphql.WithFederationStreamingClient(s.StreamingClient),
 			graphql.WithFederationSubscriptionClientFactory(s.subscriptionClientFactory),
 		)
 	}
 
-	err := federationConfigV2Factory.SetMergedSchemaFromString(s.apiDefinition.GraphQL.Supergraph.MergedSDL)
+	err := federationConfigV2Factory.SetMergedSchemaFromString(s.ApiDefinition.GraphQL.Supergraph.MergedSDL)
 	if err != nil {
 		return nil, err
 	}
@@ -49,24 +49,24 @@ func (s *supergraphGraphQLEngineAdapter) EngineConfig() (*graphql.EngineV2Config
 	}
 
 	conf.EnableSingleFlight(true)
-	if !s.apiDefinition.GraphQL.Supergraph.DisableQueryBatching {
+	if !s.ApiDefinition.GraphQL.Supergraph.DisableQueryBatching {
 		conf.EnableDataLoader(true)
 	}
 
 	return &conf, nil
 }
 
-func (s *supergraphGraphQLEngineAdapter) subgraphDataSourceConfigs() []graphqlDataSource.Configuration {
+func (s *Supergraph) subgraphDataSourceConfigs() []graphqlDataSource.Configuration {
 	confs := make([]graphqlDataSource.Configuration, 0)
-	if len(s.apiDefinition.GraphQL.Supergraph.Subgraphs) == 0 {
+	if len(s.ApiDefinition.GraphQL.Supergraph.Subgraphs) == 0 {
 		return confs
 	}
 
-	for _, apiDefSubgraphConf := range s.apiDefinition.GraphQL.Supergraph.Subgraphs {
+	for _, apiDefSubgraphConf := range s.ApiDefinition.GraphQL.Supergraph.Subgraphs {
 		if len(apiDefSubgraphConf.SDL) == 0 {
 			continue
 		}
-		hdr := removeDuplicateApiDefinitionHeaders(apiDefSubgraphConf.Headers, s.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
+		hdr := removeDuplicateApiDefinitionHeaders(apiDefSubgraphConf.Headers, s.ApiDefinition.GraphQL.Supergraph.GlobalHeaders)
 		conf := graphqlDataSourceConfiguration(
 			apiDefSubgraphConf.URL,
 			http.MethodPost,

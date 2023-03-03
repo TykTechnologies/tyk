@@ -1,4 +1,4 @@
-package adapter
+package gqlengineadapter
 
 import (
 	"encoding/json"
@@ -13,16 +13,22 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-type udgGraphQLEngineAdapter struct {
-	apiDefinition   *apidef.APIDefinition
-	schema          *graphql.Schema
-	httpClient      *http.Client
-	streamingClient *http.Client
+type UniversalDataGraph struct {
+	ApiDefinition   *apidef.APIDefinition
+	HttpClient      *http.Client
+	StreamingClient *http.Client
 
+	schema                    *graphql.Schema
 	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
 }
 
-func (u *udgGraphQLEngineAdapter) EngineConfig() (*graphql.EngineV2Configuration, error) {
+func (u *UniversalDataGraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
+	var err error
+	u.schema, err = parseSchema(u.ApiDefinition.GraphQL.Schema)
+	if err != nil {
+		return nil, err
+	}
+
 	conf := graphql.NewEngineV2Configuration(u.schema)
 	conf.EnableSingleFlight(true)
 
@@ -38,8 +44,8 @@ func (u *udgGraphQLEngineAdapter) EngineConfig() (*graphql.EngineV2Configuration
 	return &conf, nil
 }
 
-func (u *udgGraphQLEngineAdapter) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations) {
-	for _, fc := range u.apiDefinition.GraphQL.Engine.FieldConfigs {
+func (u *UniversalDataGraph) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations) {
+	for _, fc := range u.ApiDefinition.GraphQL.Engine.FieldConfigs {
 		planFieldConfig := plan.FieldConfiguration{
 			TypeName:              fc.TypeName,
 			FieldName:             fc.FieldName,
@@ -57,8 +63,8 @@ func (u *udgGraphQLEngineAdapter) engineConfigV2FieldConfigs() (planFieldConfigs
 	return planFieldConfigs
 }
 
-func (u *udgGraphQLEngineAdapter) engineConfigV2DataSources() (planDataSources []plan.DataSourceConfiguration, err error) {
-	for _, ds := range u.apiDefinition.GraphQL.Engine.DataSources {
+func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan.DataSourceConfiguration, err error) {
+	for _, ds := range u.ApiDefinition.GraphQL.Engine.DataSources {
 		planDataSource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{},
 		}
@@ -81,7 +87,7 @@ func (u *udgGraphQLEngineAdapter) engineConfigV2DataSources() (planDataSources [
 			}
 
 			planDataSource.Factory = &restDataSource.Factory{
-				Client: u.httpClient,
+				Client: u.HttpClient,
 			}
 
 			urlWithoutQueryParams, queryConfigs, err := extractURLQueryParamsForEngineV2(restConfig.URL, restConfig.Query)
@@ -109,8 +115,8 @@ func (u *udgGraphQLEngineAdapter) engineConfigV2DataSources() (planDataSources [
 			planDataSource.Factory, err = createGraphQLDataSourceFactory(createGraphQLDataSourceFactoryParams{
 				graphqlConfig:             graphqlConfig,
 				subscriptionClientFactory: u.subscriptionClientFactory,
-				httpClient:                u.httpClient,
-				streamingClient:           u.streamingClient,
+				httpClient:                u.HttpClient,
+				streamingClient:           u.StreamingClient,
 			})
 			if err != nil {
 				return nil, err
@@ -153,7 +159,7 @@ func (u *udgGraphQLEngineAdapter) engineConfigV2DataSources() (planDataSources [
 	return planDataSources, err
 }
 
-func (u *udgGraphQLEngineAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
+func (u *UniversalDataGraph) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
 	for i := range *fieldConfs {
 		if len(generatedArgs) == 0 {
 			return
@@ -178,7 +184,7 @@ func (u *udgGraphQLEngineAdapter) engineConfigV2Arguments(fieldConfs *plan.Field
 	}
 }
 
-func (u *udgGraphQLEngineAdapter) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
+func (u *UniversalDataGraph) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
 	for i := range planDataSources {
 		for j := range planDataSources[i].RootNodes {
 			typeName := planDataSources[i].RootNodes[j].TypeName

@@ -1,4 +1,4 @@
-package adapter
+package gqlengineadapter
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-func TestProxyOnlyGraphQLEngineAdapter_EngineConfig(t *testing.T) {
+func TestProxyOnly_EngineConfig(t *testing.T) {
 	t.Run("should create v2 config for proxy-only mode", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlProxyOnlyConfig), &gqlConfig))
@@ -28,16 +28,12 @@ func TestProxyOnlyGraphQLEngineAdapter_EngineConfig(t *testing.T) {
 
 		httpClient := &http.Client{}
 		streamingClient := &http.Client{}
-		adapter := proxyOnlyGraphQLEngineAdapter{
-			apiDefinition:             apiDef,
-			httpClient:                httpClient,
-			streamingClient:           streamingClient,
+		adapter := ProxyOnly{
+			ApiDefinition:             apiDef,
+			HttpClient:                httpClient,
+			StreamingClient:           streamingClient,
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
-
-		var err error
-		adapter.schema, err = parseSchema(gqlConfig.Schema)
-		require.NoError(t, err)
 
 		engineV2Config, err := adapter.EngineConfig()
 		assert.NoError(t, err)
@@ -96,16 +92,12 @@ func TestProxyOnlyGraphQLEngineAdapter_EngineConfig(t *testing.T) {
 
 		httpClient := &http.Client{}
 		streamingClient := &http.Client{}
-		adapter := proxyOnlyGraphQLEngineAdapter{
-			apiDefinition:             apiDef,
-			httpClient:                httpClient,
-			streamingClient:           streamingClient,
+		adapter := ProxyOnly{
+			ApiDefinition:             apiDef,
+			HttpClient:                httpClient,
+			StreamingClient:           streamingClient,
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
-
-		var err error
-		adapter.schema, err = parseSchema(gqlConfig.Schema)
-		require.NoError(t, err)
 
 		engineV2Config, err := adapter.EngineConfig()
 		assert.NoError(t, err)
@@ -166,16 +158,12 @@ func TestProxyOnlyGraphQLEngineAdapter_EngineConfig(t *testing.T) {
 
 		httpClient := &http.Client{}
 		streamingClient := &http.Client{}
-		adapter := proxyOnlyGraphQLEngineAdapter{
-			apiDefinition:             apiDef,
-			httpClient:                httpClient,
-			streamingClient:           streamingClient,
+		adapter := ProxyOnly{
+			ApiDefinition:             apiDef,
+			HttpClient:                httpClient,
+			StreamingClient:           streamingClient,
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
-
-		var err error
-		adapter.schema, err = parseSchema(gqlConfig.Schema)
-		require.NoError(t, err)
 
 		engineV2Config, err := adapter.EngineConfig()
 		assert.NoError(t, err)

@@ -1,4 +1,4 @@
-package adapter
+package gqlengineadapter
 
 import (
 	"encoding/json"
@@ -16,7 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-func TestUdgGraphQLEngineAdapter_EngineConfig(t *testing.T) {
+func TestUniversalDataGraph_EngineConfig(t *testing.T) {
 	t.Run("should create v2 config for engine execution mode without error", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
@@ -27,23 +27,19 @@ func TestUdgGraphQLEngineAdapter_EngineConfig(t *testing.T) {
 
 		httpClient := &http.Client{}
 		streamingClient := &http.Client{}
-		adapter := udgGraphQLEngineAdapter{
-			apiDefinition:             apiDef,
-			httpClient:                httpClient,
-			streamingClient:           streamingClient,
+		adapter := UniversalDataGraph{
+			ApiDefinition:             apiDef,
+			HttpClient:                httpClient,
+			StreamingClient:           streamingClient,
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		var err error
-		adapter.schema, err = parseSchema(gqlConfig.Schema)
-		require.NoError(t, err)
-
-		_, err = adapter.EngineConfig()
+		_, err := adapter.EngineConfig()
 		assert.NoError(t, err)
 	})
 }
 
-func TestUdgGraphQLEngineAdapter_engineConfigV2FieldConfigs(t *testing.T) {
+func TestUniversalDataGraph_engineConfigV2FieldConfigs(t *testing.T) {
 	expectedFieldCfgs := plan.FieldConfigurations{
 		{
 			TypeName:              "Query",
@@ -132,7 +128,14 @@ func TestUdgGraphQLEngineAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 		GraphQL: gqlConfig,
 	}
 
-	adapter := NewGraphQLConfigAdapter(apiDef)
+	httpClient := &http.Client{}
+	streamingClient := &http.Client{}
+	adapter := UniversalDataGraph{
+		ApiDefinition:             apiDef,
+		HttpClient:                httpClient,
+		StreamingClient:           streamingClient,
+		subscriptionClientFactory: &MockSubscriptionClientFactory{},
+	}
 
 	var err error
 	adapter.schema, err = parseSchema(gqlConfig.Schema)
@@ -142,7 +145,7 @@ func TestUdgGraphQLEngineAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 	assert.ElementsMatch(t, expectedFieldCfgs, actualFieldCfgs)
 }
 
-func TestUdgGraphQLEngineAdapter_engineConfigV2DataSources(t *testing.T) {
+func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 	httpClient := &http.Client{}
 	streamingClient := &http.Client{}
 
@@ -453,11 +456,12 @@ func TestUdgGraphQLEngineAdapter_engineConfigV2DataSources(t *testing.T) {
 		GraphQL: gqlConfig,
 	}
 
-	adapter := NewGraphQLConfigAdapter(
-		apiDef, WithHttpClient(httpClient),
-		WithStreamingClient(streamingClient),
-		withGraphQLSubscriptionClientFactory(&MockSubscriptionClientFactory{}),
-	)
+	adapter := UniversalDataGraph{
+		ApiDefinition:             apiDef,
+		HttpClient:                httpClient,
+		StreamingClient:           streamingClient,
+		subscriptionClientFactory: &MockSubscriptionClientFactory{},
+	}
 
 	var err error
 	adapter.schema, err = parseSchema(gqlConfig.Schema)
