@@ -19,7 +19,7 @@ type GroupLoginRequest struct {
 	UserKey   string
 	GroupID   string
 	ForceSync bool
-	Node      NodeData
+	Node      []byte
 }
 
 type NodeData struct {

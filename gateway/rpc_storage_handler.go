@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -144,7 +145,7 @@ func (r *RPCStorageHandler) Connect() bool {
 	)
 }
 
-func (r *RPCStorageHandler) buildNodeInfo() apidef.NodeData {
+func (r *RPCStorageHandler) buildNodeInfo() []byte {
 	node := apidef.NodeData{
 		NodeID:      r.Gw.GetNodeID(),
 		NodeVersion: VERSION,
@@ -152,16 +153,17 @@ func (r *RPCStorageHandler) buildNodeInfo() apidef.NodeData {
 		Health:      r.Gw.getHealthCheckInfo(),
 	}
 
-	return node
+	data, _ := json.Marshal(node)
+	return data
 }
 
 func (r *RPCStorageHandler) Disconnect() error {
-	data := apidef.GroupLoginRequest{
+	request := apidef.GroupLoginRequest{
 		UserKey: r.Gw.GetConfig().SlaveOptions.APIKey,
-		GroupID: r.Gw.GetConfig().SlaveOptions.GroupID,
+		GroupID: r.Gw.GetConfig().SlaveOptions.APIKey,
 		Node:    r.buildNodeInfo(),
 	}
-	_, err := rpc.FuncClientSingleton("Disconnect", data)
+	_, err := rpc.FuncClientSingleton("Disconnect", request)
 	return err
 }
 
