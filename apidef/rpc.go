@@ -24,9 +24,17 @@ type GroupLoginRequest struct {
 
 type NodeData struct {
 	NodeID      string
+	GroupName   string
 	NodeVersion string
+	TTL         int64
 	Tags        []string
 	Health      map[string]HealthCheckItem
+	Stats       GWStats
+}
+
+type GWStats struct {
+	APIsCount     int
+	PoliciesCount int
 }
 
 type GroupKeySpaceRequest struct {

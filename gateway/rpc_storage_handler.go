@@ -148,9 +148,15 @@ func (r *RPCStorageHandler) Connect() bool {
 func (r *RPCStorageHandler) buildNodeInfo() []byte {
 	node := apidef.NodeData{
 		NodeID:      r.Gw.GetNodeID(),
+		GroupName:   r.Gw.GetConfig().SlaveOptions.GroupID,
 		NodeVersion: VERSION,
+		TTL:         int64(r.Gw.GetConfig().LivenessCheck.CheckDuration),
 		Tags:        r.Gw.GetConfig().DBAppConfOptions.Tags,
 		Health:      r.Gw.getHealthCheckInfo(),
+		Stats: apidef.GWStats{
+			APIsCount:     len(r.Gw.apisByID),
+			PoliciesCount: len(r.Gw.policiesByID),
+		},
 	}
 
 	data, _ := json.Marshal(node)
