@@ -3008,7 +3008,7 @@ components:
           type: number
           x-go-name: MaxQueryDepth
         access_rights:
-          type: string
+          type: object
           x-go-name: AccessRights
           additionalProperties:
               $ref: '#/components/schemas/AccessDefinition'
