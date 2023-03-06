@@ -369,10 +369,13 @@ func TestOldVersioning_StripPath(t *testing.T) {
 			}
 			spec.VersionDefinition.Location = apidef.URLLocation
 			spec.VersionDefinition.StripPath = false
+			spec.Proxy.DisableStripSlash = true
 		})[0]
 	}
 
 	check := func(t *testing.T, api *APISpec, tc test.TestCase) {
+		t.Helper()
+
 		ts.Gw.LoadAPI(api)
 		_, _ = ts.Run(t, tc)
 
