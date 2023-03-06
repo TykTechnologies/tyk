@@ -3008,9 +3008,10 @@ components:
           type: number
           x-go-name: MaxQueryDepth
         access_rights:
-          $ref: '#/components/schemas/AccessDefinition'
-          type: object
+          type: string
           x-go-name: AccessRights
+          additionalProperties:
+              $ref: '#/components/schemas/AccessDefinition'
         hmac_enabled:
           type: boolean
           x-go-name: HMACEnabled
