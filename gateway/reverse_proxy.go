@@ -418,16 +418,24 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	return transport
 }
 
+<<<<<<< HEAD
 func singleJoiningSlash(a, b string, disableStripSlash bool) string {
 	if disableStripSlash && len(b) == 0 {
 		return a
+=======
+func singleJoiningSlash(targetPath, subPath string, disableStripSlash bool) string {
+	if disableStripSlash && (len(subPath) == 0 || subPath == "/") {
+		return targetPath
+>>>>>>> 7fa4a7ef... Improve path joining tests with disable strip slash (#4813)
 	}
-	a = strings.TrimRight(a, "/")
-	b = strings.TrimLeft(b, "/")
-	if len(b) > 0 {
-		return a + "/" + b
+
+	targetPath = strings.TrimRight(targetPath, "/")
+	subPath = strings.TrimLeft(subPath, "/")
+
+	if len(subPath) > 0 {
+		return targetPath + "/" + subPath
 	}
-	return a
+	return targetPath
 }
 
 func removeDuplicateCORSHeader(dst, src http.Header) {
