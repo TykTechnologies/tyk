@@ -408,7 +408,10 @@ func (h *HostUptimeChecker) Stop() {
 		eraseSyncMap(h.samples)
 
 		log.Info("[HOST CHECKER] Stopping poller")
-		h.pool.Close()
+
+		if h.pool != nil && h.pool.GetSize() > 0 {
+			h.pool.Close()
+		}
 	}
 }
 
