@@ -542,35 +542,49 @@ func TestSingleJoiningSlash(t *testing.T) {
 	testsFalse := []struct {
 		a, b, want string
 	}{
+		{"", "", ""},
+		{"/", "", ""},
+		{"", "/", ""},
+		{"/", "/", ""},
 		{"foo", "", "foo"},
+		{"foo", "/", "foo"},
 		{"foo", "bar", "foo/bar"},
 		{"foo/", "bar", "foo/bar"},
 		{"foo", "/bar", "foo/bar"},
 		{"foo/", "/bar", "foo/bar"},
 		{"foo//", "//bar", "foo/bar"},
+		{"foo", "bar/", "foo/bar/"},
+		{"foo/", "bar/", "foo/bar/"},
+		{"foo", "/bar/", "foo/bar/"},
+		{"foo/", "/bar/", "foo/bar/"},
+		{"foo//", "//bar/", "foo/bar/"},
 	}
-	for _, tc := range testsFalse {
-		t.Run(fmt.Sprintf("%s+%s", tc.a, tc.b), func(t *testing.T) {
+	for i, tc := range testsFalse {
+		t.Run(fmt.Sprintf("enabled StripSlashes #%d", i), func(t *testing.T) {
 			got := singleJoiningSlash(tc.a, tc.b, false)
-			if got != tc.want {
-				t.Fatalf("want %s, got %s", tc.want, got)
-			}
+			assert.Equal(t, tc.want, got)
 		})
 	}
 	testsTrue := []struct {
 		a, b, want string
 	}{
-		{"foo/", "", "foo/"},
-		{"foo/", "/name", "foo/name"},
-		{"foo/", "/", "foo/"},
+		{"", "", ""},
+		{"/", "", "/"},
+		{"", "/", ""},
+		{"/", "/", "/"},
 		{"foo", "", "foo"},
+		{"foo", "/", "foo"},
+		{"foo/", "", "foo/"},
+		{"foo/", "/", "foo/"},
+		{"foo/", "/name", "foo/name"},
+		{"foo/", "/name/", "foo/name/"},
+		{"foo/", "//name", "foo/name"},
+		{"foo/", "//name/", "foo/name/"},
 	}
-	for _, tc := range testsTrue {
-		t.Run(fmt.Sprintf("%s+%s", tc.a, tc.b), func(t *testing.T) {
+	for i, tc := range testsTrue {
+		t.Run(fmt.Sprintf("disabled StripSlashes #%d", i), func(t *testing.T) {
 			got := singleJoiningSlash(tc.a, tc.b, true)
-			if got != tc.want {
-				t.Fatalf("want %s, got %s", tc.want, got)
-			}
+			assert.Equal(t, tc.want, got, fmt.Sprintf("a: %s, b: %s, out: %s, expected %s", tc.a, tc.b, got, tc.want))
 		})
 	}
 }
