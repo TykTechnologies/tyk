@@ -418,26 +418,18 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	return transport
 }
 
-func singleJoiningSlash(targetPath, subPath string, disabledStripSlash bool) string {
-	// if targetPath is empty, use subPath
-	if targetPath == "" {
-		targetPath, subPath = subPath, ""
-	}
-	if subPath == "/" && !strings.HasSuffix(targetPath, "/") {
-		targetPath += "/"
-		subPath = ""
-	}
-	if targetPath == "" {
-		targetPath = "/"
-	}
-
-	trimSubPath := strings.TrimLeft(subPath, "/")
-	if trimSubPath == "" {
+func singleJoiningSlash(targetPath, subPath string, disableStripSlash bool) string {
+	if disableStripSlash && (len(subPath) == 0 || subPath == "/") {
 		return targetPath
 	}
 
-	trimTargetPath := strings.TrimRight(targetPath, "/")
-	return trimTargetPath + "/" + trimSubPath
+	targetPath = strings.TrimRight(targetPath, "/")
+	subPath = strings.TrimLeft(subPath, "/")
+
+	if len(subPath) > 0 {
+		return targetPath + "/" + subPath
+	}
+	return targetPath
 }
 
 func removeDuplicateCORSHeader(dst, src http.Header) {

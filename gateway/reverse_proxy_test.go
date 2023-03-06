@@ -545,12 +545,12 @@ func TestSingleJoiningSlash(t *testing.T) {
 	testsFalse := []struct {
 		a, b, want string
 	}{
-		{"", "", "/"},
-		{"/", "", "/"},
-		{"", "/", "/"},
-		{"/", "/", "/"},
+		{"", "", ""},
+		{"/", "", ""},
+		{"", "/", ""},
+		{"/", "/", ""},
 		{"foo", "", "foo"},
-		{"foo", "/", "foo/"},
+		{"foo", "/", "foo"},
 		{"foo", "bar", "foo/bar"},
 		{"foo/", "bar", "foo/bar"},
 		{"foo", "/bar", "foo/bar"},
@@ -571,12 +571,12 @@ func TestSingleJoiningSlash(t *testing.T) {
 	testsTrue := []struct {
 		a, b, want string
 	}{
-		{"", "", "/"},
+		{"", "", ""},
 		{"/", "", "/"},
-		{"", "/", "/"},
+		{"", "/", ""},
 		{"/", "/", "/"},
 		{"foo", "", "foo"},
-		{"foo", "/", "foo/"},
+		{"foo", "/", "foo"},
 		{"foo/", "", "foo/"},
 		{"foo/", "/", "foo/"},
 		{"foo/", "/name", "foo/name"},
