@@ -545,22 +545,22 @@ func TestSingleJoiningSlash(t *testing.T) {
 	testsFalse := []struct {
 		a, b, want string
 	}{
-		{"", "", ""},
-		{"/", "", ""},
-		{"", "/", ""},
-		{"/", "/", ""},
+		{"", "", "/"},
+		{"/", "", "/"},
+		{"", "/", "/"},
+		{"/", "/", "/"},
 		{"foo", "", "foo"},
-		{"foo", "/", "foo"},
+		{"foo", "/", "foo/"},
 		{"foo", "bar", "foo/bar"},
 		{"foo/", "bar", "foo/bar"},
 		{"foo", "/bar", "foo/bar"},
 		{"foo/", "/bar", "foo/bar"},
 		{"foo//", "//bar", "foo/bar"},
-		{"foo", "bar/", "foo/bar"},
-		{"foo/", "bar/", "foo/bar"},
-		{"foo", "/bar/", "foo/bar"},
-		{"foo/", "/bar/", "foo/bar"},
-		{"foo//", "//bar/", "foo/bar"},
+		{"foo", "bar/", "foo/bar/"},
+		{"foo/", "bar/", "foo/bar/"},
+		{"foo", "/bar/", "foo/bar/"},
+		{"foo/", "/bar/", "foo/bar/"},
+		{"foo//", "//bar/", "foo/bar/"},
 	}
 	for i, tc := range testsFalse {
 		t.Run(fmt.Sprintf("enabled StripSlashes #%d", i), func(t *testing.T) {
@@ -575,7 +575,7 @@ func TestSingleJoiningSlash(t *testing.T) {
 		{"/", "", "/"},
 		{"", "/", "/"},
 		{"/", "/", "/"},
-		{"foo", "", "foo/"},
+		{"foo", "", "foo"},
 		{"foo", "/", "foo/"},
 		{"foo/", "", "foo/"},
 		{"foo/", "/", "foo/"},
