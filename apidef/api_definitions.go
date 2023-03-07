@@ -1283,6 +1283,7 @@ func DummyAPI() APIDefinition {
 				ExtractorConfig: map[string]interface{}{},
 			},
 		},
+		OverwriteCustomMiddlewareBundle: false,
 		Proxy: ProxyConfig{
 			DisableStripSlash: true,
 		},
