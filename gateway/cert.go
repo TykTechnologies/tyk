@@ -387,6 +387,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		for _, spec := range gw.apiSpecs {
 			if spec.UseMutualTLSAuth && spec.Domain == hello.ServerName {
 				directMTLSDomainMatch = true
+				break
 			}
 		}
 
