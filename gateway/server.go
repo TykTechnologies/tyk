@@ -34,10 +34,14 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
+<<<<<<< HEAD
 
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/rs/cors"
+=======
+	"github.com/pmylund/go-cache"
+>>>>>>> 8b8a9f44... [TT-7920] additional routes with APIID (Oauth) (#4796)
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
@@ -846,25 +850,6 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	responseChain = append(responseChain, processor)
 
 	spec.ResponseChain = responseChain
-}
-
-func handleCORS(router *mux.Router, spec *APISpec) {
-
-	if spec.CORS.Enable {
-		mainLog.Debug("CORS ENABLED")
-		c := cors.New(cors.Options{
-			AllowedOrigins:     spec.CORS.AllowedOrigins,
-			AllowedMethods:     spec.CORS.AllowedMethods,
-			AllowedHeaders:     spec.CORS.AllowedHeaders,
-			ExposedHeaders:     spec.CORS.ExposedHeaders,
-			AllowCredentials:   spec.CORS.AllowCredentials,
-			MaxAge:             spec.CORS.MaxAge,
-			OptionsPassthrough: spec.CORS.OptionsPassthrough,
-			Debug:              spec.CORS.Debug,
-		})
-
-		router.Use(c.Handler)
-	}
 }
 
 func (gw *Gateway) isRPCMode() bool {
