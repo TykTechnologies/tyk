@@ -34,14 +34,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
-<<<<<<< HEAD
-
 	cache "github.com/pmylund/go-cache"
 
-	"github.com/rs/cors"
-=======
-	"github.com/pmylund/go-cache"
->>>>>>> 8b8a9f44... [TT-7920] additional routes with APIID (Oauth) (#4796)
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"

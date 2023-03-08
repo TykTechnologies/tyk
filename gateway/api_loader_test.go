@@ -9,14 +9,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-<<<<<<< HEAD
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/trace"
-	"github.com/stretchr/testify/assert"
-=======
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
@@ -24,7 +16,6 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
->>>>>>> 8b8a9f44... [TT-7920] additional routes with APIID (Oauth) (#4796)
 )
 
 func TestOpenTracing(t *testing.T) {
