@@ -84,8 +84,7 @@ jobs:
       - name: Run Gateway Tests
         id: ci-tests
         run: |
-          ./bin/ci-tests.sh 2>&1 | tee test.log
-          exit $?
+          ./bin/ci-tests.sh 2>&1
 
       - name: Notify status
         if: ${{ failure() && github.event.pull_request.number }}
