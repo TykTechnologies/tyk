@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -33,11 +33,11 @@ func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
 
 func respBodyReader(req *http.Request, resp *http.Response) io.ReadCloser {
 
-	if req.Header.Get(headers.AcceptEncoding) == "" {
+	if req.Header.Get(header.AcceptEncoding) == "" {
 		return resp.Body
 	}
 
-	switch resp.Header.Get(headers.ContentEncoding) {
+	switch resp.Header.Get(header.ContentEncoding) {
 	case "gzip":
 		reader, err := gzip.NewReader(resp.Body)
 		if err != nil {

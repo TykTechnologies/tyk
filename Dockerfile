@@ -5,7 +5,7 @@ FROM debian:bullseye as assets
 # If you need to tweak the environment for testing, you can override the
 # `GO_VERSION` and `PYTHON_VERSION` as docker build arguments.
 
-ARG GO_VERSION=1.15.15
+ARG GO_VERSION=1.16
 ARG PYTHON_VERSION=3.7.13
 
 WORKDIR /assets
@@ -16,7 +16,7 @@ RUN	apt update && apt install wget -y && \
 
 FROM debian:bullseye
 
-ARG GO_VERSION=1.15.15
+ARG GO_VERSION=1.16
 ARG PYTHON_VERSION=3.7.13
 
 COPY --from=assets /assets/ /tmp/

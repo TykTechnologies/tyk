@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/test"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -21,16 +21,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/TykTechnologies/tyk/test"
+
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/again"
-	"github.com/TykTechnologies/drl"
-	gas "github.com/TykTechnologies/goautosocket"
-	"github.com/TykTechnologies/gorpc"
-	"github.com/TykTechnologies/goverify"
-	"github.com/TykTechnologies/tyk-pump/serializer"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
@@ -38,11 +34,17 @@ import (
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/pmylund/go-cache"
-	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
 	"rsc.io/letsencrypt"
+
+	"github.com/TykTechnologies/again"
+	"github.com/TykTechnologies/drl"
+	gas "github.com/TykTechnologies/goautosocket"
+	"github.com/TykTechnologies/gorpc"
+	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk-pump/serializer"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
@@ -50,7 +52,7 @@ import (
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -282,6 +284,15 @@ func (gw *Gateway) getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
+func (gw *Gateway) getAPIDefinition(apiID string) (*apidef.APIDefinition, error) {
+	apiSpec := gw.getApiSpec(apiID)
+	if apiSpec == nil {
+		return nil, errors.New("API not found")
+	}
+
+	return apiSpec.APIDefinition, nil
+}
+
 func (gw *Gateway) getPolicy(polID string) user.Policy {
 	gw.policiesMu.RLock()
 	pol := gw.policiesByID[polID]
@@ -438,7 +449,7 @@ func (gw *Gateway) buildDashboardConnStr(resource string) string {
 }
 
 func (gw *Gateway) syncAPISpecs() (int, error) {
-	loader := APIDefinitionLoader{gw}
+	loader := APIDefinitionLoader{Gw: gw}
 
 	var s []*APISpec
 	if gw.GetConfig().UseDBAppConfigs {
@@ -614,6 +625,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/reload", gw.resetHandler(nil)).Methods("GET")
 
 	if !gw.isRPCMode() {
+		versionsHandler := NewVersionHandler(gw.getAPIDefinition)
 		r.HandleFunc("/org/keys", gw.orgHandler).Methods("GET")
 		r.HandleFunc("/org/keys/{keyName:[^/]*}", gw.orgHandler).Methods("POST", "PUT", "GET", "DELETE")
 		r.HandleFunc("/keys/policy/{keyName}", gw.policyUpdateHandler).Methods("POST")
@@ -626,12 +638,14 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/apis/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodPost)
 		r.HandleFunc("/apis/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodPut)
 		r.HandleFunc("/apis/{apiID}", gw.apiHandler).Methods(http.MethodDelete)
+		r.HandleFunc("/apis/{apiID}/versions", versionsHandler.ServeHTTP).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/export", gw.apiOASExportHandler).Methods("GET")
 		r.HandleFunc("/apis/oas/import", gw.blockInDashboardMode(gw.validateOAS(gw.makeImportedOASTykAPI(gw.apiOASPostHandler)))).Methods(http.MethodPost)
 		r.HandleFunc("/apis/oas/{apiID}", gw.apiOASGetHandler).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.validateOAS(gw.apiOASPutHandler))).Methods(http.MethodPut)
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.validateOAS(gw.apiOASPatchHandler))).Methods(http.MethodPatch)
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodDelete)
+		r.HandleFunc("/apis/oas/{apiID}/versions", versionsHandler.ServeHTTP).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/{apiID}/export", gw.apiOASExportHandler).Methods("GET")
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
@@ -671,7 +685,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 func (gw *Gateway) checkIsAPIOwner(next http.Handler) http.Handler {
 	secret := gw.GetConfig().Secret
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tykAuthKey := r.Header.Get(headers.XTykAuthorization)
+		tykAuthKey := r.Header.Get(header.XTykAuthorization)
 		if tykAuthKey != secret {
 			// Error
 			mainLog.Warning("Attempted administrative access with invalid or missing key!")
@@ -746,10 +760,10 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	mwPostFuncs := []apidef.MiddlewareDefinition{}
 	mwPostKeyAuthFuncs := []apidef.MiddlewareDefinition{}
 	mwResponseFuncs := []apidef.MiddlewareDefinition{}
-	mwDriver := apidef.OttoDriver
+	mwDriver := apidef.MiddlewareDriver("")
 
 	// Set AuthCheck hook
-	if spec.CustomMiddleware.AuthCheck.Name != "" {
+	if !spec.CustomMiddleware.AuthCheck.Disabled && spec.CustomMiddleware.AuthCheck.Name != "" {
 		mwAuthCheckFunc = spec.CustomMiddleware.AuthCheck
 		if spec.CustomMiddleware.AuthCheck.Path != "" {
 			// Feed a JS file to Otto
@@ -759,11 +773,19 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 	// Load from the configuration
 	for _, mwObj := range spec.CustomMiddleware.Pre {
+		if mwObj.Disabled {
+			continue
+		}
+
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPreFuncs = append(mwPreFuncs, mwObj)
 		mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
 	for _, mwObj := range spec.CustomMiddleware.Post {
+		if mwObj.Disabled {
+			continue
+		}
+
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPostFuncs = append(mwPostFuncs, mwObj)
 		mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
@@ -815,6 +837,10 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 	// Load PostAuthCheck hooks
 	for _, mwObj := range spec.CustomMiddleware.PostKeyAuth {
+		if mwObj.Disabled {
+			continue
+		}
+
 		if mwObj.Path != "" {
 			// Otto files are specified here
 			mwPaths = append(mwPaths, mwObj.Path)
@@ -824,6 +850,10 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 	// Load response hooks
 	for _, mw := range spec.CustomMiddleware.Response {
+		if mw.Disabled {
+			continue
+		}
+
 		mwResponseFuncs = append(mwResponseFuncs, mw)
 	}
 
@@ -831,10 +861,15 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 }
 
+// Create the response processor chain
 func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
-	// Create the response processors
+	// Prealloc size
+	chainLen := len(spec.ResponseProcessors)
+	// Append capacity
+	chainCapacity := chainLen + 1 + len(responseFuncs)
 
-	responseChain := make([]TykResponseHandler, len(spec.ResponseProcessors))
+	responseChain := make([]TykResponseHandler, chainLen, chainCapacity)
+
 	for i, processorDetail := range spec.ResponseProcessors {
 		processor := gw.responseProcessorByName(processorDetail.Name)
 		if processor == nil {
@@ -864,31 +899,24 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		}
 
 		if err := processor.Init(mw, spec); err != nil {
-			mainLog.Debug("Failed to init processor: ", err)
+			mainLog.WithError(err).Debug("Failed to init processor")
 		}
 		responseChain = append(responseChain, processor)
 	}
 
-	spec.ResponseChain = responseChain
-}
+	keyPrefix := "cache-" + spec.APIID
+	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, RedisController: gw.RedisController}
+	cacheStore.Connect()
 
-func handleCORS(router *mux.Router, spec *APISpec) {
-
-	if spec.CORS.Enable {
-		mainLog.Debug("CORS ENABLED")
-		c := cors.New(cors.Options{
-			AllowedOrigins:     spec.CORS.AllowedOrigins,
-			AllowedMethods:     spec.CORS.AllowedMethods,
-			AllowedHeaders:     spec.CORS.AllowedHeaders,
-			ExposedHeaders:     spec.CORS.ExposedHeaders,
-			AllowCredentials:   spec.CORS.AllowCredentials,
-			MaxAge:             spec.CORS.MaxAge,
-			OptionsPassthrough: spec.CORS.OptionsPassthrough,
-			Debug:              spec.CORS.Debug,
-		})
-
-		router.Use(c.Handler)
+	// Add cache writer as the final step of the response middleware chain
+	processor := &ResponseCacheMiddleware{store: cacheStore}
+	if err := processor.Init(nil, spec); err != nil {
+		mainLog.WithError(err).Debug("Failed to init processor")
 	}
+
+	responseChain = append(responseChain, processor)
+
+	spec.ResponseChain = responseChain
 }
 
 func (gw *Gateway) isRPCMode() bool {
@@ -910,6 +938,7 @@ func (gw *Gateway) DoReload() {
 
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
+		gw.GlobalEventsJSVM.DeInit()
 		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
 	}
 
@@ -931,6 +960,7 @@ func (gw *Gateway) DoReload() {
 			return
 		}
 	}
+
 	gw.loadGlobalApps()
 
 	mainLog.Info("API reload complete")
@@ -1037,9 +1067,8 @@ func (gw *Gateway) setupLogger() {
 
 		hook, err := logrus_sentry.NewSentryHook(gwConfig.SentryCode, logLevel)
 
-		hook.Timeout = 0
-
 		if err == nil {
+			hook.Timeout = 0
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
 		}
@@ -1258,25 +1287,32 @@ func readPIDFromFile(file string) (int, error) {
 // timeouts) and sets up a few globals that depend on the config.
 func (gw *Gateway) afterConfSetup() {
 	conf := gw.GetConfig()
-	if conf.SlaveOptions.CallTimeout == 0 {
-		conf.SlaveOptions.CallTimeout = 30
-	}
 
-	if conf.SlaveOptions.PingTimeout == 0 {
-		conf.SlaveOptions.PingTimeout = 60
-	}
+	if conf.SlaveOptions.UseRPC {
+		if conf.SlaveOptions.GroupID == "" {
+			conf.SlaveOptions.GroupID = "ungrouped"
+		}
 
-	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
-		conf.SlaveOptions.KeySpaceSyncInterval = 10
-	}
+		if conf.SlaveOptions.CallTimeout == 0 {
+			conf.SlaveOptions.CallTimeout = 30
+		}
 
-	if conf.SlaveOptions.RPCCertCacheExpiration == 0 {
-		// defaults to 1 hr
-		conf.SlaveOptions.RPCCertCacheExpiration = 3600
-	}
+		if conf.SlaveOptions.PingTimeout == 0 {
+			conf.SlaveOptions.PingTimeout = 60
+		}
 
-	if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
-		conf.SlaveOptions.RPCGlobalCacheExpiration = 30
+		if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
+			conf.SlaveOptions.KeySpaceSyncInterval = 10
+		}
+
+		if conf.SlaveOptions.RPCCertCacheExpiration == 0 {
+			// defaults to 1 hr
+			conf.SlaveOptions.RPCCertCacheExpiration = 3600
+		}
+
+		if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
+			conf.SlaveOptions.RPCGlobalCacheExpiration = 30
+		}
 	}
 
 	if conf.AnalyticsConfig.PurgeInterval == 0 {
@@ -1746,8 +1782,8 @@ func (gw *Gateway) GetConfig() config.Config {
 	return gw.config.Load().(config.Config)
 }
 
-func (gw *Gateway) SetConfig(conf config.Config) {
+func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
-	defer gw.configMu.Unlock()
 	gw.config.Store(conf)
+	gw.configMu.Unlock()
 }

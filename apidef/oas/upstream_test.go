@@ -3,14 +3,16 @@ package oas
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestUpstream(t *testing.T) {
 	var emptyUpstream Upstream
 
 	var convertedAPI apidef.APIDefinition
+	convertedAPI.SetDisabledFlags()
 	emptyUpstream.ExtractTo(&convertedAPI)
 
 	var resultUpstream Upstream

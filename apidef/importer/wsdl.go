@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	uuid "github.com/satori/go.uuid"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const WSDLSource APIImporterSource = "wsdl"

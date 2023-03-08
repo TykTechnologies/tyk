@@ -1,8 +1,9 @@
 package kv
 
 import (
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/hashicorp/consul/api"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // Consul is an implementation of a KV store which uses Consul as it's backend

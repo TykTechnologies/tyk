@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/vmihailenco/msgpack"
+
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 type AnalyticsRecord struct {

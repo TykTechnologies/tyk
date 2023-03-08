@@ -34,7 +34,7 @@ type TykEvent string            // A type so we can ENUM event types easily, e.g
 type TykEventHandlerName string // A type for handler codes in API definitions
 
 type EndpointMethodAction string
-type TemplateMode string
+type SourceMode string
 
 type MiddlewareDriver string
 type IdExtractorSource string
@@ -42,12 +42,16 @@ type IdExtractorType string
 type AuthTypeEnum string
 type RoutingTriggerOnType string
 
+type SubscriptionType string
+
+type IDExtractor interface{}
+
 const (
 	NoAction EndpointMethodAction = "no_action"
 	Reply    EndpointMethodAction = "reply"
 
-	UseBlob TemplateMode = "blob"
-	UseFile TemplateMode = "file"
+	UseBlob SourceMode = "blob"
+	UseFile SourceMode = "file"
 
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
@@ -82,6 +86,12 @@ const (
 	Any    RoutingTriggerOnType = "any"
 	Ignore RoutingTriggerOnType = ""
 
+	// Subscription Types
+	GQLSubscriptionUndefined   SubscriptionType = ""
+	GQLSubscriptionWS          SubscriptionType = "graphql-ws"
+	GQLSubscriptionTransportWS SubscriptionType = "graphql-transport-ws"
+	GQLSubscriptionSSE         SubscriptionType = "sse"
+
 	// TykInternalApiHeader - flags request as internal api looping request
 	TykInternalApiHeader = "x-tyk-internal"
 
@@ -90,21 +100,24 @@ const (
 	URLLocation          = "url"
 	ExpirationTimeFormat = "2006-01-02 15:04"
 
-	Self = "self"
+	Self                 = "self"
+	DefaultAPIVersionKey = "x-api-version"
+	HeaderBaseAPIID      = "x-tyk-base-api-id"
 
-	AuthTokenType = "authToken"
-	JWTType       = "jwt"
-	HMACType      = "hmac"
-	BasicType     = "basic"
-	CoprocessType = "coprocess"
-	OAuthType     = "oauth"
-	OIDCType      = "oidc"
+	AuthTokenType     = "authToken"
+	JWTType           = "jwt"
+	HMACType          = "hmac"
+	BasicType         = "basic"
+	CoprocessType     = "coprocess"
+	OAuthType         = "oauth"
+	ExternalOAuthType = "externalOAuth"
+	OIDCType          = "oidc"
 )
 
 var (
-	ErrAPIMigrated                = errors.New("the supplied API definition is in Tyk native format, please use OAS format for this API")
-	ErrAPINotMigrated             = errors.New("the supplied API definition is in OAS format, please use the Tyk native format for this API")
-	ErrOASGetForOldAPI            = errors.New("the requested API definition is in Tyk native format, please use old api endpoint")
+	ErrAPIMigrated                = errors.New("the supplied API definition is in Tyk classic format, please use OAS format for this API")
+	ErrAPINotMigrated             = errors.New("the supplied API definition is in OAS format, please use the Tyk classic format for this API")
+	ErrOASGetForOldAPI            = errors.New("the requested API definition is in Tyk classic format, please use old api endpoint")
 	ErrImportWithTykExtension     = errors.New("the import payload should not contain x-tyk-api-gateway")
 	ErrPayloadWithoutTykExtension = errors.New("the payload should contain x-tyk-api-gateway")
 	ErrAPINotFound                = errors.New("API not found")
@@ -219,7 +232,7 @@ type RequestInputType string
 
 type TemplateData struct {
 	Input          RequestInputType `bson:"input_type" json:"input_type"`
-	Mode           TemplateMode     `bson:"template_mode" json:"template_mode"`
+	Mode           SourceMode       `bson:"template_mode" json:"template_mode"`
 	EnableSession  bool             `bson:"enable_session" json:"enable_session"`
 	TemplateSource string           `bson:"template_source" json:"template_source"`
 }
@@ -308,13 +321,14 @@ type URLRewriteMeta struct {
 }
 
 type VirtualMeta struct {
-	ResponseFunctionName string `bson:"response_function_name" json:"response_function_name"`
-	FunctionSourceType   string `bson:"function_source_type" json:"function_source_type"`
-	FunctionSourceURI    string `bson:"function_source_uri" json:"function_source_uri"`
-	Path                 string `bson:"path" json:"path"`
-	Method               string `bson:"method" json:"method"`
-	UseSession           bool   `bson:"use_session" json:"use_session"`
-	ProxyOnError         bool   `bson:"proxy_on_error" json:"proxy_on_error"`
+	Disabled             bool       `bson:"disabled" json:"disabled"`
+	ResponseFunctionName string     `bson:"response_function_name" json:"response_function_name"`
+	FunctionSourceType   SourceMode `bson:"function_source_type" json:"function_source_type"`
+	FunctionSourceURI    string     `bson:"function_source_uri" json:"function_source_uri"`
+	Path                 string     `bson:"path" json:"path"`
+	Method               string     `bson:"method" json:"method"`
+	UseSession           bool       `bson:"use_session" json:"use_session"`
+	ProxyOnError         bool       `bson:"proxy_on_error" json:"proxy_on_error"`
 }
 
 type MethodTransformMeta struct {
@@ -329,7 +343,7 @@ type ValidatePathMeta struct {
 	Path        string                  `bson:"path" json:"path"`
 	Method      string                  `bson:"method" json:"method"`
 	Schema      map[string]interface{}  `bson:"-" json:"schema"`
-	SchemaB64   string                  `bson:"schema_b64" json:"-"`
+	SchemaB64   string                  `bson:"schema_b64" json:"schema_b64,omitempty"`
 	SchemaCache gojsonschema.JSONLoader `bson:"-" json:"-"`
 	// Allows override of default 422 Unprocessible Entity response code for validation errors.
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
@@ -343,7 +357,15 @@ type ValidateRequestMeta struct {
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
 }
 
+type PersistGraphQLMeta struct {
+	Path      string                 `bson:"path" json:"path"`
+	Method    string                 `bson:"method" json:"method"`
+	Operation string                 `bson:"operation" json:"operation"`
+	Variables map[string]interface{} `bson:"variables" json:"variables"`
+}
+
 type GoPluginMeta struct {
+	Disabled   bool   `bson:"disabled" json:"disabled"`
 	Path       string `bson:"path" json:"path"`
 	Method     string `bson:"method" json:"method"`
 	PluginPath string `bson:"plugin_path" json:"plugin_path"`
@@ -375,6 +397,7 @@ type ExtendedPathsSet struct {
 	ValidateRequest         []ValidateRequestMeta `bson:"validate_request" json:"validate_request,omitempty"`
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
+	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
 }
 
 type VersionDefinition struct {
@@ -386,6 +409,7 @@ type VersionDefinition struct {
 	StripPath           bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
 	StripVersioningData bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
 	Versions            map[string]string `bson:"versions" json:"versions"`
+	BaseID              string            `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
 type VersionData struct {
@@ -436,17 +460,33 @@ type EventHandlerMetaConfig struct {
 }
 
 type MiddlewareDefinition struct {
+	Disabled       bool   `bson:"disabled" json:"disabled"`
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
 	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
 }
 
+// IDExtractorConfig specifies the configuration for ID extractor
+type IDExtractorConfig struct {
+	// HeaderName is the header name to extract ID from.
+	HeaderName string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
+	// FormParamName is the form parameter name to extract ID from.
+	FormParamName string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
+	// RegexExpression is the regular expression to match ID.
+	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
+	// RegexMatchIndex is the index from which ID to be extracted after a match.
+	RegexMatchIndex int `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
+	// XPathExp is the xpath expression to match ID.
+	XPathExpression string `mapstructure:"xpath_expression" bson:"xpath_expression" json:"xpath_expression"`
+}
+
 type MiddlewareIdExtractor struct {
+	Disabled        bool                   `bson:"disabled" json:"disabled"`
 	ExtractFrom     IdExtractorSource      `bson:"extract_from" json:"extract_from"`
 	ExtractWith     IdExtractorType        `bson:"extract_with" json:"extract_with"`
 	ExtractorConfig map[string]interface{} `bson:"extractor_config" json:"extractor_config"`
-	Extractor       interface{}            `bson:"-" json:"-"`
+	Extractor       IDExtractor            `bson:"-" json:"-"`
 }
 
 type MiddlewareSection struct {
@@ -514,13 +554,13 @@ type OpenIDOptions struct {
 }
 
 type ScopeClaim struct {
-	ScopeClaimName string            `bson:"scope_claim_name" json:"scope_claim_name"`
-	ScopeToPolicy  map[string]string `json:"scope_to_policy"`
+	ScopeClaimName string            `bson:"scope_claim_name" json:"scope_claim_name,omitempty"`
+	ScopeToPolicy  map[string]string `json:"scope_to_policy,omitempty"`
 }
 
 type Scopes struct {
-	JWT  ScopeClaim `bson:"jwt" json:"jwt"`
-	OIDC ScopeClaim `bson:"oidc" json:"oidc"`
+	JWT  ScopeClaim `bson:"jwt" json:"jwt,omitempty"`
+	OIDC ScopeClaim `bson:"oidc" json:"oidc,omitempty"`
 }
 
 // APIDefinition represents the configuration for a single proxied API and it's versions.
@@ -529,7 +569,7 @@ type Scopes struct {
 type APIDefinition struct {
 	Id                  ObjectId      `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
 	Name                string        `bson:"name" json:"name"`
-	Expiration          string        `bson:"expiration" json:"expiration"`
+	Expiration          string        `bson:"expiration" json:"expiration,omitempty"`
 	ExpirationTs        time.Time     `bson:"-" json:"-"`
 	Slug                string        `bson:"slug" json:"slug"`
 	ListenPort          int           `bson:"listen_port" json:"listen_port"`
@@ -539,6 +579,7 @@ type APIDefinition struct {
 	OrgID               string        `bson:"org_id" json:"org_id"`
 	UseKeylessAccess    bool          `bson:"use_keyless" json:"use_keyless"`
 	UseOauth2           bool          `bson:"use_oauth2" json:"use_oauth2"`
+	ExternalOAuth       ExternalOAuth `bson:"external_oauth" json:"external_oauth"`
 	UseOpenID           bool          `bson:"use_openid" json:"use_openid"`
 	OpenIDOptions       OpenIDOptions `bson:"openid_options" json:"openid_options"`
 	Oauth2Meta          struct {
@@ -562,17 +603,18 @@ type APIDefinition struct {
 	// UpstreamCertificates stores the domain to certificate mapping for upstream mutualTLS
 	UpstreamCertificates map[string]string `bson:"upstream_certificates" json:"upstream_certificates"`
 	// UpstreamCertificatesDisabled disables upstream mutualTLS on the API
-	UpstreamCertificatesDisabled bool `bson:"upstream_certificates_disabled" json:"upstream_certificates_disabled"`
+	UpstreamCertificatesDisabled bool `bson:"upstream_certificates_disabled" json:"upstream_certificates_disabled,omitempty"`
 
 	// PinnedPublicKeys stores the public key pinning details
 	PinnedPublicKeys map[string]string `bson:"pinned_public_keys" json:"pinned_public_keys"`
 	// CertificatePinningDisabled disables public key pinning
-	CertificatePinningDisabled bool `bson:"certificate_pinning_disabled" json:"certificate_pinning_disabled"`
+	CertificatePinningDisabled bool `bson:"certificate_pinning_disabled" json:"certificate_pinning_disabled,omitempty"`
 
 	EnableJWT                            bool                   `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth                      bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
-	UseGoPluginAuth                      bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`
-	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
+	UseGoPluginAuth                      bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`       // Deprecated. Use CustomPluginAuthEnabled instead.
+	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
+	CustomPluginAuthEnabled              bool                   `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
 	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
 	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
 	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
@@ -583,7 +625,7 @@ type APIDefinition struct {
 	JWTExpiresAtValidationSkew           uint64                 `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
 	JWTNotBeforeValidationSkew           uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	JWTSkipKid                           bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
-	Scopes                               Scopes                 `bson:"scopes" json:"scopes"`
+	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
 	JWTScopeToPolicyMapping              map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
 	JWTScopeClaimName                    string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
 	NotificationsDetails                 NotificationsManager   `bson:"notifications" json:"notifications"`
@@ -600,8 +642,9 @@ type APIDefinition struct {
 	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
 	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
 	CustomMiddlewareBundle               string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
+	CustomMiddlewareBundleDisabled       bool                   `bson:"custom_middleware_bundle_disabled" json:"custom_middleware_bundle_disabled"`
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
-	SessionLifetimeRespectsKeyExpiration bool                   `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration"`
+	SessionLifetimeRespectsKeyExpiration bool                   `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration,omitempty"`
 	SessionLifetime                      int64                  `bson:"session_lifetime" json:"session_lifetime"`
 	Active                               bool                   `bson:"active" json:"active"`
 	Internal                             bool                   `bson:"internal" json:"internal"`
@@ -618,30 +661,32 @@ type APIDefinition struct {
 	ResponseProcessors                   []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
 	CORS                                 CORSConfig             `bson:"CORS" json:"CORS"`
 	Domain                               string                 `bson:"domain" json:"domain"`
-	DomainDisabled                       bool                   `bson:"domain_disabled" json:"domain_disabled"`
+	DomainDisabled                       bool                   `bson:"domain_disabled" json:"domain_disabled,omitempty"`
 	Certificates                         []string               `bson:"certificates" json:"certificates"`
 	DoNotTrack                           bool                   `bson:"do_not_track" json:"do_not_track"`
 	EnableContextVars                    bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
 	ConfigData                           map[string]interface{} `bson:"config_data" json:"config_data"`
+	ConfigDataDisabled                   bool                   `bson:"config_data_disabled" json:"config_data_disabled"`
 	TagHeaders                           []string               `bson:"tag_headers" json:"tag_headers"`
 	GlobalRateLimit                      GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
 	StripAuthData                        bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 	EnableDetailedRecording              bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 	GraphQL                              GraphQLConfig          `bson:"graphql" json:"graphql"`
-	AnalyticsPlugin                      AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin"`
+	AnalyticsPlugin                      AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin,omitempty"`
 
 	// Gateway segment tags
-	TagsDisabled bool     `bson:"tags_disabled" json:"tags_disabled"`
+	TagsDisabled bool     `bson:"tags_disabled" json:"tags_disabled,omitempty"`
 	Tags         []string `bson:"tags" json:"tags"`
 
 	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
-	IsOAS bool `json:"is_oas" bson:"is_oas"`
+	IsOAS       bool   `bson:"is_oas" json:"is_oas,omitempty"`
+	VersionName string `bson:"-" json:"-"`
 }
 
 type AnalyticsPluginConfig struct {
-	Enabled    bool   `bson:"enable" json:"enable"`
-	PluginPath string `bson:"plugin_path" json:"plugin_path"`
-	FuncName   string `bson:"func_name" json:"func_name"`
+	Enabled    bool   `bson:"enable" json:"enable,omitempty"`
+	PluginPath string `bson:"plugin_path" json:"plugin_path,omitempty"`
+	FuncName   string `bson:"func_name" json:"func_name,omitempty"`
 }
 
 type UptimeTests struct {
@@ -767,7 +812,9 @@ const (
 )
 
 type GraphQLProxyConfig struct {
-	AuthHeaders map[string]string `bson:"auth_headers" json:"auth_headers"`
+	AuthHeaders      map[string]string `bson:"auth_headers" json:"auth_headers"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
+	RequestHeaders   map[string]string `bson:"request_headers" json:"request_headers"`
 }
 
 type GraphQLSubgraphConfig struct {
@@ -784,11 +831,12 @@ type GraphQLSupergraphConfig struct {
 }
 
 type GraphQLSubgraphEntity struct {
-	APIID   string            `bson:"api_id" json:"api_id"`
-	Name    string            `bson:"name" json:"name"`
-	URL     string            `bson:"url" json:"url"`
-	SDL     string            `bson:"sdl" json:"sdl"`
-	Headers map[string]string `bson:"headers" json:"headers"`
+	APIID            string            `bson:"api_id" json:"api_id"`
+	Name             string            `bson:"name" json:"name"`
+	URL              string            `bson:"url" json:"url"`
+	SDL              string            `bson:"sdl" json:"sdl"`
+	Headers          map[string]string `bson:"headers" json:"headers"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
 }
 
 type GraphQLEngineConfig struct {
@@ -833,14 +881,15 @@ type GraphQLEngineDataSourceConfigREST struct {
 }
 
 type GraphQLEngineDataSourceConfigGraphQL struct {
-	URL     string            `bson:"url" json:"url"`
-	Method  string            `bson:"method" json:"method"`
-	Headers map[string]string `bson:"headers" json:"headers"`
+	URL              string            `bson:"url" json:"url"`
+	Method           string            `bson:"method" json:"method"`
+	Headers          map[string]string `bson:"headers" json:"headers"`
+	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
 	BrokerAddresses      []string              `bson:"broker_addresses" json:"broker_addresses"`
-	Topic                string                `bson:"topic" json:"topic"`
+	Topics               []string              `bson:"topics" json:"topics"`
 	GroupID              string                `bson:"group_id" json:"group_id"`
 	ClientID             string                `bson:"client_id" json:"client_id"`
 	KafkaVersion         string                `bson:"kafka_version" json:"kafka_version"`
@@ -1270,3 +1319,37 @@ var Template = template.New("").Funcs(map[string]interface{}{
 		return string(xmlValue), err
 	},
 })
+
+type ExternalOAuth struct {
+	Enabled   bool       `bson:"enabled" json:"enabled"`
+	Providers []Provider `bson:"providers" json:"providers"`
+}
+
+type Provider struct {
+	JWT           JWTValidation `bson:"jwt" json:"jwt"`
+	Introspection Introspection `bson:"introspection" json:"introspection"`
+}
+
+type JWTValidation struct {
+	Enabled                 bool   `bson:"enabled" json:"enabled"`
+	SigningMethod           string `bson:"signing_method" json:"signing_method"`
+	Source                  string `bson:"source" json:"source"`
+	IssuedAtValidationSkew  uint64 `bson:"issued_at_validation_skew" json:"issued_at_validation_skew"`
+	NotBeforeValidationSkew uint64 `bson:"not_before_validation_skew" json:"not_before_validation_skew"`
+	ExpiresAtValidationSkew uint64 `bson:"expires_at_validation_skew" json:"expires_at_validation_skew"`
+	IdentityBaseField       string `bson:"identity_base_field" json:"identity_base_field"`
+}
+
+type Introspection struct {
+	Enabled           bool               `bson:"enabled" json:"enabled"`
+	URL               string             `bson:"url" json:"url"`
+	ClientID          string             `bson:"client_id" json:"client_id"`
+	ClientSecret      string             `bson:"client_secret" json:"client_secret"`
+	IdentityBaseField string             `bson:"identity_base_field" json:"identity_base_field"`
+	Cache             IntrospectionCache `bson:"cache" json:"cache"`
+}
+
+type IntrospectionCache struct {
+	Enabled bool  `bson:"enabled" json:"enabled"`
+	Timeout int64 `bson:"timeout" json:"timeout"`
+}

@@ -272,7 +272,7 @@ func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.C
 	return gw.CertificateManager.ListPublicKeys(strings.Split(keyIDs, ","))
 }
 
-// dummyGetCertificate needed because TLSConfig require setting Certificates array or GetCertificate function from start, even if it get overriden by `getTLSConfigForClient`
+// dummyGetCertificate needed because TLSConfig require setting Certificates array or GetCertificate function from start, even if it get overridden by `getTLSConfigForClient`
 func dummyGetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return nil, nil
 }
@@ -280,6 +280,30 @@ func dummyGetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 var tlsConfigCache = cache.New(60*time.Second, 60*time.Minute)
 
 var tlsConfigMu sync.Mutex
+
+func getClientValidator(helloInfo *tls.ClientHelloInfo, certPool *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
+	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		if len(rawCerts) == 0 {
+			return errors.New("x509: missing client certificate")
+		}
+
+		cert, certErr := x509.ParseCertificate(rawCerts[0])
+		if certErr != nil {
+			return certErr
+		}
+
+		opts := x509.VerifyOptions{
+			Roots:         certPool,
+			CurrentTime:   time.Now(),
+			Intermediates: x509.NewCertPool(),
+			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}
+
+		_, err := cert.Verify(opts)
+
+		return err
+	}
+}
 
 func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	gwConfig := gw.GetConfig()
@@ -446,8 +470,17 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			newConfig.ClientAuth = domainRequireCert[""]
 		}
 
+		if gwConfig.HttpServerOptions.SkipClientCAAnnouncement {
+			if newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+				newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
+			}
+			newConfig.ClientCAs = x509.NewCertPool()
+			newConfig.ClientAuth = tls.RequestClientCert
+		}
+
 		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
+
 		return newConfig, nil
 	}
 }

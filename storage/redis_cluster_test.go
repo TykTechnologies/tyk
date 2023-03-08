@@ -8,8 +8,9 @@ import (
 
 	"github.com/go-redis/redis/v8"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 var rc *RedisController

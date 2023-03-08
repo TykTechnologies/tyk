@@ -596,8 +596,16 @@ func (c *CertificateManager) ValidateRequestCertificate(certIDs []string, r *htt
 
 	certID := HexSHA256(leaf.Raw)
 	for _, cert := range c.List(certIDs, CertificatePublic) {
+		// In case a cert can't be parsed or is invalid,
+		// it will be present in the cert list as 'nil'
+		if cert == nil {
+			// Invalid cert, continue to next one
+			continue
+		}
+
 		// Extensions[0] contains cache of certificate SHA256
-		if cert == nil || string(cert.Leaf.Extensions[0].Value) == certID {
+		if string(cert.Leaf.Extensions[0].Value) == certID {
+			// Happy flow, we matched a certificate
 			return nil
 		}
 	}

@@ -253,8 +253,8 @@ func TestRLClosed(t *testing.T) {
 	}
 }
 
-//TestJSVMStagesRequest
-//TestProcessRequestLiveQuotaLimit
+// TestJSVMStagesRequest
+// TestProcessRequestLiveQuotaLimit
 func TestRLOpenWithReload(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

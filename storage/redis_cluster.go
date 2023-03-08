@@ -760,7 +760,7 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 	}
 }
 
-//Exists check if keyName exists
+// Exists check if keyName exists
 func (r *RedisCluster) Exists(keyName string) (bool, error) {
 	fixedKey := r.fixKey(keyName)
 	log.WithField("keyName", fixedKey).Debug("Checking if exists")
@@ -890,7 +890,7 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 	val, err := r.singleton().SIsMember(r.RedisController.ctx, r.fixKey(keyName), value).Result()
 
 	if err != nil {
-		log.Error("Error trying to check set memeber: ", err)
+		log.Error("Error trying to check set member: ", err)
 		return false
 	}
 

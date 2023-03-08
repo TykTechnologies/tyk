@@ -161,6 +161,8 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 		req.Header.Add(k, v)
 	}
 
+	req.Header.Add("Content-Type", "application/json")
+
 	for _, c := range tc.Cookies {
 		req.AddCookie(c)
 	}

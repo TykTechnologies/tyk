@@ -9,22 +9,19 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
+
+	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/kelseyhightower/envconfig"
 )
 
 type IPsHandleStrategy string
 
 var (
-	log      = logger.Get()
-	global   atomic.Value
-	globalMu sync.Mutex
+	log = logger.Get()
 
 	Default = Config{
 		ListenPort:     8080,
@@ -224,7 +221,7 @@ type HealthCheckConfig struct {
 }
 
 type LivenessCheckConfig struct {
-	// Frequence of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
+	// Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
 	CheckDuration time.Duration `json:"check_duration"`
 }
 
@@ -326,6 +323,9 @@ type SlaveOptionsConfig struct {
 
 	// RPCKeysCacheExpiration defines the expiration time of the rpc cache that stores the keys, defined in seconds
 	RPCGlobalCacheExpiration float32 `json:"rpc_global_cache_expiration"`
+
+	// SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources
+	SynchroniserEnabled bool `json:"synchroniser_enabled"`
 }
 
 type LocalSessionCacheConf struct {
@@ -340,7 +340,8 @@ type CertsData []CertData
 func (certs *CertsData) Decode(value string) error {
 	err := json.Unmarshal([]byte(value), certs)
 	if err != nil {
-		log.Error("Error unmarshaling TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES")
+		log.Error("Error unmarshalling TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES: ", err)
+		return err
 	}
 	return nil
 }
@@ -349,10 +350,10 @@ type HttpServerOptionsConfig struct {
 	// No longer used
 	OverrideDefaults bool `json:"-"`
 
-	// User -> Gateway network read timeout
+	// API Consumer -> Gateway network read timeout. Not setting this config, or setting this to 0, defaults to 120 seconds
 	ReadTimeout int `json:"read_timeout"`
 
-	// User -> Gateway network write timeout
+	// API Consumer -> Gateway network write timeout. Not setting this config, or setting this to 0, defaults to 120 seconds
 	WriteTimeout int `json:"write_timeout"`
 
 	// Set to true to enable SSL connections
@@ -392,6 +393,11 @@ type HttpServerOptionsConfig struct {
 
 	// Maximum TLS version.
 	MaxVersion uint16 `json:"max_version"`
+
+	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
+	// This option is useful when you have a lot of ClientCAs and you want to reduce the handshake overhead, as some clients can hit TLS handshake limits.
+	// This option does not give any hints to the client, on which certificate to pick (but this is very rare situation when it is required)
+	SkipClientCAAnnouncement bool `json:"skip_client_ca_announcement"`
 
 	// Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.
 	// This option needed be set for streaming protocols like Server Side Events, or gRPC streaming.
@@ -542,6 +548,18 @@ func (r PortRange) Match(port int) bool {
 	return r.From <= port && r.To >= port
 }
 
+type PortsWhiteList map[string]PortWhiteList
+
+func (pwl *PortsWhiteList) Decode(value string) error {
+	err := json.Unmarshal([]byte(value), pwl)
+	if err != nil {
+		log.Error("Error unmarshalling TYK_GW_PORTWHITELIST: ", err)
+		return err
+	}
+
+	return nil
+}
+
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
 	// OriginalPath is the path to the config file that is read. If
@@ -549,10 +567,10 @@ type Config struct {
 	// was written.
 	OriginalPath string `json:"-"`
 
-	// Force your Gateway to work only on a specifc domain name. Can be overriden by API custom domain.
+	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
 	HostName string `json:"hostname"`
 
-	// If your machine has mulitple network devices or IPs you can force the Gateway to use the IP address you want.
+	// If your machine has multiple network devices or IPs you can force the Gateway to use the IP address you want.
 	ListenAddress string `json:"listen_address"`
 
 	// Setting this value will change the port that Tyk listens on. Default: 8080.
@@ -623,10 +641,10 @@ type Config struct {
 	// A policy can be defined in a file (Open Source installations) or from the same database as the Dashboard.
 	Policies PoliciesConfig `json:"policies"`
 
-	// Defines the ports that will be available for the API services to bind to.
+	// Defines the ports that will be available for the API services to bind to in the following format: `"{“":“”}"`. Remember to escape JSON strings.
 	// This is a map of protocol to PortWhiteList. This allows per protocol
 	// configurations.
-	PortWhiteList map[string]PortWhiteList `json:"ports_whitelist"`
+	PortWhiteList PortsWhiteList `json:"ports_whitelist"`
 
 	// Disable port whilisting, essentially allowing you to use any port for your API.
 	DisablePortWhiteList bool `json:"disable_ports_whitelist"`
@@ -675,7 +693,7 @@ type Config struct {
 	// The standard rate limiter offers similar performance as the sentinel-based limiter. This is disabled by default.
 	EnableSentinelRateLimiter bool `json:"enable_sentinel_rate_limiter"`
 
-	// An enchancment for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
+	// An enhancement for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
 	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
 
 	// How frequently a distributed rate limiter synchronises information between the Gateway nodes. Default: 2 seconds.
@@ -960,7 +978,7 @@ type Config struct {
 	// global session lifetime, in seconds.
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
-	// This section enables the use of the KV capabilites to substitute configuration values.
+	// This section enables the use of the KV capabilities to substitute configuration values.
 	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/
 	KV struct {
 		Consul ConsulConfig `json:"consul"`

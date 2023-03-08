@@ -56,7 +56,7 @@ type HostUptimeChecker struct {
 	checkTimeout       int
 	HostList           map[string]HostData
 	unHealthyList      map[string]bool
-	pool               *tunny.WorkPool
+	pool               *tunny.Pool
 
 	errorChan  chan HostHealthReport
 	okChan     chan HostHealthReport
@@ -133,7 +133,7 @@ func (h *HostUptimeChecker) execCheck() {
 	}
 	h.resetListMu.Unlock()
 	for _, host := range h.HostList {
-		_, err := h.pool.SendWork(host)
+		_, err := h.pool.ProcessCtx(h.Gw.ctx, host)
 		if err != nil && err != tunny.ErrPoolNotRunning {
 			log.Warnf("[HOST CHECKER] could not send work, error: %v", err)
 		}
@@ -369,11 +369,11 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 	log.Debug("[HOST CHECKER] Config:WorkerPool: ", h.workerPoolSize)
 
 	var err error
-	h.pool, err = tunny.CreatePool(h.workerPoolSize, func(hostData interface{}) interface{} {
+	h.pool = tunny.NewFunc(h.workerPoolSize, func(hostData interface{}) interface{} {
 		input, _ := hostData.(HostData)
 		h.CheckHost(input)
 		return nil
-	}).Open()
+	})
 
 	log.Debug("[HOST CHECKER] Init complete")
 
@@ -392,14 +392,26 @@ func (h *HostUptimeChecker) Start(ctx context.Context) {
 	log.Debug("[HOST CHECKER] Host reporter started...")
 }
 
+// eraseSyncMap uses native sync.Map functions to clear the map
+// without needing to unsafely modify the value to nil.
+func eraseSyncMap(m *sync.Map) {
+	m.Range(func(k, _ interface{}) bool {
+		m.Delete(k)
+		return true
+	})
+}
+
 func (h *HostUptimeChecker) Stop() {
 	if !h.getStopLoop() {
 		h.setStopLoop(true)
-		h.muStopLoop.Lock()
-		h.samples = new(sync.Map)
-		h.muStopLoop.Unlock()
+
+		eraseSyncMap(h.samples)
+
 		log.Info("[HOST CHECKER] Stopping poller")
-		h.pool.Close()
+
+		if h.pool != nil && h.pool.GetSize() > 0 {
+			h.pool.Close()
+		}
 	}
 }
 

@@ -16,8 +16,9 @@ type DefRequest struct {
 }
 
 type GroupLoginRequest struct {
-	UserKey string
-	GroupID string
+	UserKey   string
+	GroupID   string
+	ForceSync bool
 }
 
 type GroupKeySpaceRequest struct {

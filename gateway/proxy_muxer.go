@@ -16,11 +16,12 @@ import (
 
 	"golang.org/x/net/http2/h2c"
 
+	proxyproto "github.com/pires/go-proxyproto"
+	cache "github.com/pmylund/go-cache"
+
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/tcp"
-	proxyproto "github.com/pires/go-proxyproto"
-	cache "github.com/pmylund/go-cache"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -251,7 +252,7 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 	}
 }
 
-//nolint
+// nolint
 func (gw *Gateway) recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
 	if doNotTrack {
 		return nil

@@ -2,82 +2,169 @@ package gateway
 
 import (
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"hash"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func TestRedisCacheMiddleware_WithCompressedResponse(t *testing.T) {
-	const path = "/compressed"
+func TestRedisCacheMiddlewareUnit(t *testing.T) {
+	testcases := []struct {
+		Name string
+		Fn   func(t *testing.T)
+	}{
+		{
+			Name: "isTimeStampExpired",
+			Fn: func(t *testing.T) {
+				mw := &RedisCacheMiddleware{}
 
+				assert.True(t, mw.isTimeStampExpired("invalid"))
+				assert.True(t, mw.isTimeStampExpired("1"))
+				assert.True(t, mw.isTimeStampExpired(fmt.Sprint(time.Now().Unix()-60)))
+				assert.False(t, mw.isTimeStampExpired(fmt.Sprint(time.Now().Unix()+60)))
+			},
+		},
+		{
+			Name: "decodePayload",
+			Fn: func(t *testing.T) {
+				mw := &RedisCacheMiddleware{}
+
+				if data, expire, err := mw.decodePayload("dGVzdGluZwo=|123"); true {
+					assert.Equal(t, "testing\n", data)
+					assert.Equal(t, "123", expire)
+					assert.NoError(t, err)
+				}
+
+				if _, _, err := mw.decodePayload("payload|a|b|c"); true {
+					assert.Error(t, err)
+				}
+
+				if data, _, err := mw.decodePayload("payload"); true {
+					assert.Equal(t, "payload", data)
+					assert.NoError(t, err)
+				}
+			},
+		},
+		{
+			Name: "encodePayload",
+			Fn: func(t *testing.T) {
+				mw := &ResponseCacheMiddleware{}
+
+				result := mw.encodePayload("test", 123)
+
+				assert.True(t, strings.HasSuffix(result, "|123"))
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.Name, tc.Fn)
+	}
+}
+
+func TestRedisCacheMiddleware(t *testing.T) {
 	conf := func(globalConf *config.Config) {
 		globalConf.AnalyticsConfig.EnableDetailedRecording = true
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
 
+	ts.Gw.Analytics.mockEnabled = true
+	defer func() {
+		ts.Gw.Analytics.mockEnabled = false
+	}()
+
+	const compressed = "/compressed"
+	const chunked = "/chunked"
 	createAPI := func(withCache bool) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.CacheOptions.CacheTimeout = 60
 			spec.CacheOptions.EnableCache = withCache
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-				v.ExtendedPaths.Cached = []string{path}
+				v.ExtendedPaths.Cached = []string{compressed, chunked}
 			})
 		})
 	}
 
-	t.Run("without cache", func(t *testing.T) {
-		createAPI(false)
+	type params struct {
+		path             string
+		bodyMatch        string
+		uncompressed     bool
+		transferEncoding []string
+	}
 
-		ts.Run(t, []test.TestCase{
-			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},
-			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},
-		}...)
+	check := func(t *testing.T, p params) {
+		subCheck := func(t *testing.T, cachingActive bool, p params) {
+			headersMatch := make(map[string]string)
+			if cachingActive {
+				headersMatch["x-tyk-cached-response"] = "1"
+				p.transferEncoding = nil
+			}
+
+			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
+				response, err := base64.StdEncoding.DecodeString(record.RawResponse)
+				assert.NoError(t, err)
+
+				assert.Contains(t, string(response), p.bodyMatch)
+			}
+
+			resp, _ := ts.Run(t, []test.TestCase{
+				{Path: p.path, BodyMatch: p.bodyMatch, Code: http.StatusOK},
+				{Path: p.path, HeadersMatch: headersMatch, BodyMatch: p.bodyMatch, Code: http.StatusOK},
+			}...)
+
+			assert.Equal(t, p.transferEncoding, resp.TransferEncoding)
+			assert.Equal(t, p.uncompressed, resp.Uncompressed)
+		}
+
+		t.Run("without cache", func(t *testing.T) {
+			createAPI(false)
+			subCheck(t, false, p)
+		})
+
+		t.Run("with cache", func(t *testing.T) {
+			createAPI(true)
+			subCheck(t, true, p)
+		})
+
+		t.Run("with cache and dynamic redis", func(t *testing.T) {
+			createAPI(true)
+			ts.Gw.RedisController.DisableRedis(true)
+			subCheck(t, false, p)
+
+			ts.Gw.RedisController.DisableRedis(false)
+			subCheck(t, true, p)
+		})
+	}
+
+	t.Run("compressed", func(t *testing.T) {
+		check(t, params{
+			path:             compressed,
+			bodyMatch:        "This is a compressed response",
+			uncompressed:     true,
+			transferEncoding: nil,
+		})
 	})
 
-	t.Run("with cache", func(t *testing.T) {
-		createAPI(true)
-
-		ts.Run(t, []test.TestCase{
-			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},
-			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},
-		}...)
-	})
-
-	t.Run("with cache and  dynamic redis", func(t *testing.T) {
-		createAPI(true)
-		ts.Gw.RedisController.DisableRedis(true)
-		ts.Run(t, []test.TestCase{
-			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},
-			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},
-		}...)
-		ts.Gw.RedisController.DisableRedis(false)
-		ts.Run(t, []test.TestCase{
-			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},
-			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},
-		}...)
-	})
-
-	t.Run("with chunked gzip response body and dynamic redis", func(t *testing.T) {
-		createAPI(true)
-		ts.Gw.RedisController.DisableRedis(true)
-		_, _ = ts.Run(t, []test.TestCase{
-			{Path: "/chunked", Code: http.StatusOK, BodyMatch: "Mars"},
-			{Path: "/chunked", Code: http.StatusOK, BodyMatch: "Mars"},
-		}...)
-		ts.Gw.RedisController.DisableRedis(false)
-		_, _ = ts.Run(t, []test.TestCase{
-			{Path: "/chunked", Code: http.StatusOK, BodyMatch: "Mars"},
-			{Path: "/chunked", Code: http.StatusOK, BodyMatch: "Mars"},
-		}...)
+	t.Run("chunked", func(t *testing.T) {
+		check(t, params{
+			path:             chunked,
+			bodyMatch:        "This is a chunked response",
+			uncompressed:     false,
+			transferEncoding: []string{"chunked"},
+		})
 	})
 }
 
@@ -159,7 +246,7 @@ func Test_addBodyHash(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if addBodyHash(tt.args.req, tt.args.regex, tt.args.h); hex.EncodeToString(tt.args.h.Sum(nil)) != tt.expected {
-				t.Errorf("addBodyHash() recieved = %v, expected %v", hex.EncodeToString(tt.args.h.Sum(nil)), tt.expected)
+				t.Errorf("addBodyHash() received = %v, expected %v", hex.EncodeToString(tt.args.h.Sum(nil)), tt.expected)
 			}
 		})
 	}

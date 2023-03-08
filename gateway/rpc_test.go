@@ -135,7 +135,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	}()
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
-		// the firts time called is when we start the slave gateway
+		// the first time called is when we start the slave gateway
 		return a()
 	})
 	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {

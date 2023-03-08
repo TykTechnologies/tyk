@@ -49,7 +49,7 @@ func (k *OrganizationMonitor) setOrgHasNoSession(val bool) {
 	k.Spec.OrgHasNoSession = val
 }
 
-func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
+func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Skip rate limiting and quotas for looping
 	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
