@@ -381,8 +381,16 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		defer gw.apisMu.RUnlock()
 
 		newConfig.ClientCAs = x509.NewCertPool()
-
 		domainRequireCert := map[string]tls.ClientAuthType{}
+
+		directMTLSDomainMatch := false
+		for _, spec := range gw.apiSpecs {
+			if spec.UseMutualTLSAuth && spec.Domain == hello.ServerName {
+				directMTLSDomainMatch = true
+				break
+			}
+		}
+
 		for _, spec := range gw.apiSpecs {
 			switch {
 			case spec.UseMutualTLSAuth:
@@ -395,7 +403,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 				}
 
 				// If current domain match or empty, whitelist client certificates
-				if spec.Domain == "" || spec.Domain == hello.ServerName {
+				if (!directMTLSDomainMatch && spec.Domain == "") || spec.Domain == hello.ServerName {
 					certIDs := append(spec.ClientCertificates, gwConfig.Security.Certificates.API...)
 
 					for _, cert := range gw.CertificateManager.List(certIDs, certs.CertificatePublic) {

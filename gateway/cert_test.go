@@ -321,13 +321,19 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 	t.Run("acceptable CAs from server", func(t *testing.T) {
 		tlsConfig := GetTLSConfig(&clientCert, serverCertPem)
 		tlsConfig.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			assert.Equal(t, skipCAAnnounce, len(info.AcceptableCAs) == 0)
+			if skipCAAnnounce {
+				assert.Equal(t, 0, len(info.AcceptableCAs))
+			} else {
+				// Even if we are loading 2 mTLS APIs where one with empty domain, because we have direct domain match it should show only cert of matching API
+				assert.Equal(t, 1, len(info.AcceptableCAs))
+			}
 			return &clientCert, nil
 		}
 
 		transport := &http.Transport{TLSClientConfig: tlsConfig}
 		httpClient := &http.Client{Transport: transport}
 		clientCertID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		clientCertID2, err := ts.Gw.CertificateManager.Add(clientCertPem2, "")
 		assert.NoError(t, err)
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -335,13 +341,20 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 			spec.Proxy.ListenPath = "/"
 			spec.UseMutualTLSAuth = true
 			spec.ClientCertificates = []string{clientCertID}
-		})
+		},
+			func(spec *APISpec) {
+				spec.Domain = ""
+				spec.Proxy.ListenPath = "/test"
+				spec.UseMutualTLSAuth = true
+				spec.ClientCertificates = []string{clientCertID2}
+			})
 
 		_, _ = ts.Run(t, test.TestCase{
 			Code: 200, Client: httpClient, Domain: "localhost",
 		})
 
 		ts.Gw.CertificateManager.Delete(clientCertID, "")
+		ts.Gw.CertificateManager.Delete(clientCertID2, "")
 		ts.Gw.CertificateManager.FlushCache()
 		tlsConfigCache.Flush()
 	})
