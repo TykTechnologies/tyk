@@ -5,7 +5,7 @@ package main
 
 import (
 	"github.com/TykTechnologies/tyk/gateway"
-	"fmt"
+	_ "fmt"
 )
 
 func main() {
