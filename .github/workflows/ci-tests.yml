@@ -52,7 +52,10 @@ jobs:
           make lint
           
           git add --all
-          echo "git-state=$(git diff HEAD)" >> $GITHUB_OUTPUT
+
+          echo "git-state<<EOF" >> $GITHUB_OUTPUT
+          git diff HEAD >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
           git_state_count=$(wc -l < git-state.log)
           
