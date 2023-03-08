@@ -53,14 +53,16 @@ jobs:
           
           git add --all
 
-          echo "git-state<<EOF" >> $GITHUB_OUTPUT
-          git diff HEAD >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          git diff HEAD > git-state.log
 
           git_state_count=$(wc -l < git-state.log)
           
           if [[ $git_state_count -ne 0 ]]
           then 
+            echo "git-state<<EOF" >> $GITHUB_OUTPUT
+            cat git-state.log >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+
             echo "make lint made git state dirty, please run make lint locally and update PR"
             exit 1
           fi
