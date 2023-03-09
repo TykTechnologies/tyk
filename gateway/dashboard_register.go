@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -30,6 +31,18 @@ type DashboardServiceSender interface {
 	NotifyDashboardOfEvent(interface{}) error
 }
 
+// Constants for heartBeatStopSentinel indicators.
+//
+// Go 1.17 adds atomic.Value.Swap which is great, but 1.19
+// adds atomic.Bool and other types. This is a go <1.13 cludge.
+const (
+	// Zero value - the handlers started
+	STARTED = 0
+
+	// Stopped value - the handlers invoked shutdown
+	STOPPED = 1
+)
+
 type HTTPDashboardHandler struct {
 	RegistrationEndpoint    string
 	DeRegistrationEndpoint  string
@@ -38,8 +51,9 @@ type HTTPDashboardHandler struct {
 
 	Secret string
 
-	heartBeatStopSentinel bool
-	Gw                    *Gateway `json:"-"`
+	heartBeatStopSentinel int32
+
+	Gw *Gateway `json:"-"`
 }
 
 var dashClient *http.Client
@@ -213,13 +227,18 @@ func (h *HTTPDashboardHandler) Ping() error {
 		h.Gw.initialiseClient())
 }
 
+func (h *HTTPDashboardHandler) isStopped() bool {
+	return atomic.LoadInt32(&h.heartBeatStopSentinel) == STOPPED
+}
+
 func (h *HTTPDashboardHandler) StartBeating() error {
+	atomic.SwapInt32(&h.heartBeatStopSentinel, STARTED)
 
 	req := h.newRequest(http.MethodGet, h.HeartBeatEndpoint)
 
 	client := h.Gw.initialiseClient()
 
-	for !h.heartBeatStopSentinel {
+	for !h.isStopped() {
 		if err := h.sendHeartBeat(req, client); err != nil {
 			dashLog.Warning(err)
 		}
@@ -227,12 +246,11 @@ func (h *HTTPDashboardHandler) StartBeating() error {
 	}
 
 	dashLog.Info("Stopped Heartbeat")
-	h.heartBeatStopSentinel = false
 	return nil
 }
 
 func (h *HTTPDashboardHandler) StopBeating() {
-	h.heartBeatStopSentinel = true
+	atomic.SwapInt32(&h.heartBeatStopSentinel, STOPPED)
 }
 
 func (h *HTTPDashboardHandler) newRequest(method, endpoint string) *http.Request {
