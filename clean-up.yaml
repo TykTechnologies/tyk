@@ -1,0 +1,16 @@
+rules:
+  - id: remove.empty.withFields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "pub-sub"})'
+    fix: pubSubLog
+    languages:
+      - go
+    message: Remove empty withFields
+    severity: WARNING
+
+  - id: remove.prefix.pubSub
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "pub-sub",$X})'
+    fix: 'pubSubLog.WithFields(logrus.Fields{$X})'
+    languages:
+      - go
+    message: Removing pub-sub prefix from logrus.Fields
+    severity: WARNING
