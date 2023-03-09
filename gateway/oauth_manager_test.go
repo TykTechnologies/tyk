@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/config"
 
 	"fmt"
@@ -235,6 +237,69 @@ func TestOauthMultipleAPIs(t *testing.T) {
 			Code:    http.StatusOK,
 		},
 	)
+}
+
+func TestOAuthTokenExpiration(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.OauthTokenExpire = 1
+	globalConf.LocalSessionCache.DisableCacheSessionState = true // don't let cache to hide reality
+	ts.Gw.SetConfig(globalConf)
+
+	spec := buildTestOAuthSpec(func(spec *APISpec) {
+		spec.APIID = "oauth2"
+		spec.UseOauth2 = true
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/listen/"
+	})
+
+	apis := ts.Gw.LoadAPI(spec)
+	spec = apis[0]
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			"oauth2": {
+				APIID: "oauth2",
+			},
+		}
+	})
+
+	testClient := OAuthClient{
+		ClientID:          authClientID,
+		ClientSecret:      authClientSecret,
+		ClientRedirectURI: authRedirectUri,
+		PolicyID:          pID,
+	}
+	err := spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
+	assert.NoError(t, err)
+
+	param := make(url.Values)
+	param.Set("response_type", "token")
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
+	param.Set("key_rules", keyRules)
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+	resp, err := ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/listen/tyk/oauth/authorize-client/",
+		Data: param.Encode(), Headers: headers, BodyMatch: `"access_token"`, Code: http.StatusOK})
+	assert.NoError(t, err)
+
+	token := tokenData{}
+	json.NewDecoder(resp.Body).Decode(&token)
+	authHeader := map[string]string{
+		"Authorization": "Bearer " + token.AccessToken,
+	}
+
+	assert.True(t, globalConf.LocalSessionCache.DisableCacheSessionState) // to fixate that the cache is disabled
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/listen/get", Headers: authHeader, Method: http.MethodGet, Code: http.StatusOK, Delay: time.Second},
+		{Path: "/listen/get", Headers: authHeader, Method: http.MethodGet, BodyMatch: "Key has expired, please renew",
+			Code: http.StatusUnauthorized},
+	}...)
 }
 
 func TestAuthCodeRedirect(t *testing.T) {
