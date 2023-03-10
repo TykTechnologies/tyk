@@ -32,10 +32,11 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 
-	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/context"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"

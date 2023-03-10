@@ -10,9 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/sirupsen/logrus"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"

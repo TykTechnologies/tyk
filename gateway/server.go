@@ -27,7 +27,6 @@ import (
 	textTemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/uuid"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
@@ -38,6 +37,8 @@ import (
 	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
 	"rsc.io/letsencrypt"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/drl"

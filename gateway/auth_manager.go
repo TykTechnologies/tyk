@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"

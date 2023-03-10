@@ -20,8 +20,9 @@ import (
 
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/lonelycode/osin"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"

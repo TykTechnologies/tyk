@@ -16,9 +16,10 @@ import (
 
 	"github.com/TykTechnologies/tyk/request"
 
-	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/lonelycode/osin"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"strconv"
 
