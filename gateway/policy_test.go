@@ -12,17 +12,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
-	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {

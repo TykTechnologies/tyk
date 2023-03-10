@@ -8,13 +8,22 @@ import (
 	"sync/atomic"
 	"testing"
 
+<<<<<<< HEAD
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
 
+=======
+>>>>>>> 52591f5e... Remove lonelycode/go-uuid (test dependency) (#4797)
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
+<<<<<<< HEAD
+=======
+	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
+>>>>>>> 52591f5e... Remove lonelycode/go-uuid (test dependency) (#4797)
 )
 
 func TestOpenTracing(t *testing.T) {
