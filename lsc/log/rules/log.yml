@@ -12,7 +12,10 @@ rules:
 
   - id: log.mainLog.remove.prefix.from.Fields
     pattern: 'log.WithFields(logrus.Fields{"prefix": "main",$X})'
-    fix: 'mainLog.WithFields(logrus.Fields{$X})'
+    fix: |
+      mainLog.WithFields(logrus.Fields{
+      	$X,
+      })
     languages:
       - go
     message: Removing prefix from map
@@ -28,7 +31,10 @@ rules:
 
   - id: log.certLog.remove.prefix.from.Fields
     pattern: 'log.WithFields(logrus.Fields{"prefix": "certs",$X})'
-    fix: 'certLog.WithFields(logrus.Fields{$X})'
+    fix: |
+      certLog.WithFields(logrus.Fields{
+      	$X,
+      })
     languages:
       - go
     message: Removing prefix from map
@@ -44,7 +50,10 @@ rules:
 
   - id: log.pubSubLog.remove.prefix.from.Fields
     pattern: 'log.WithFields(logrus.Fields{"prefix": "pub-sub",$X})'
-    fix: 'pubSubLog.WithFields(logrus.Fields{$X})'
+    fix: |
+      pubSubLog.WithFields(logrus.Fields{
+      	$X,
+      })
     languages:
       - go
     message: Removing prefix from map
@@ -60,7 +69,105 @@ rules:
 
   - id: log.dashLog.remove.prefix.from.Fields
     pattern: 'log.WithFields(logrus.Fields{"prefix": "dashboard",$X})'
-    fix: 'dashLog.WithFields(logrus.Fields{$X})'
+    fix: |
+      dashLog.WithFields(logrus.Fields{
+      	$X,
+      })
+    languages:
+      - go
+    message: Removing prefix from map
+    severity: WARNING
+
+  - id: log.apiLog.remove.empty.withFields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "api"})'
+    fix: apiLog
+    languages:
+      - go
+    message: Removing prefix single field
+    severity: WARNING
+
+  - id: log.apiLog.remove.prefix.from.Fields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "api",$X})'
+    fix: |
+      apiLog.WithFields(logrus.Fields{
+      	$X,
+      })
+    languages:
+      - go
+    message: Removing prefix from map
+    severity: WARNING
+
+  - id: log.hostCheckLog.remove.empty.withFields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "host-check-mgr"})'
+    fix: hostCheckLog
+    languages:
+      - go
+    message: Removing prefix single field
+    severity: WARNING
+
+  - id: log.hostCheckLog.remove.prefix.from.Fields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "host-check-mgr",$X})'
+    fix: |
+      hostCheckLog.WithFields(logrus.Fields{
+      	$X,
+      })
+    languages:
+      - go
+    message: Removing prefix from map
+    severity: WARNING
+
+  - id: log.coprocessLog.remove.empty.withFields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "coprocess"})'
+    fix: coprocessLog
+    languages:
+      - go
+    message: Removing prefix single field
+    severity: WARNING
+
+  - id: log.coprocessLog.remove.prefix.from.Fields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "coprocess",$X})'
+    fix: |
+      coprocessLog.WithFields(logrus.Fields{
+      	$X,
+      })
+    languages:
+      - go
+    message: Removing prefix from map
+    severity: WARNING
+
+  - id: log.pythonLog.remove.empty.withFields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "python"})'
+    fix: pythonLog
+    languages:
+      - go
+    message: Removing prefix single field
+    severity: WARNING
+
+  - id: log.pythonLog.remove.prefix.from.Fields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "python",$X})'
+    fix: |
+      pythonLog.WithFields(logrus.Fields{
+      	$X,
+      })
+    languages:
+      - go
+    message: Removing prefix from map
+    severity: WARNING
+
+  - id: log.webhookLog.remove.empty.withFields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "webhooks"})'
+    fix: webhookLog
+    languages:
+      - go
+    message: Removing prefix single field
+    severity: WARNING
+
+  - id: log.webhookLog.remove.prefix.from.Fields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "webhooks",$X})'
+    fix: |
+      webhookLog.WithFields(logrus.Fields{
+      	$X,
+      })
     languages:
       - go
     message: Removing prefix from map

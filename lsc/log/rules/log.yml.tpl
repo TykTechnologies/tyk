@@ -8,7 +8,10 @@
 
   - id: log.:log:.remove.prefix.from.Fields
     pattern: 'log.WithFields(logrus.Fields{"prefix": ":prefix:",$X})'
-    fix: ':log:.WithFields(logrus.Fields{$X})'
+    fix: |
+      :log:.WithFields(logrus.Fields{
+      	$X,
+      })
     languages:
       - go
     message: Removing prefix from map

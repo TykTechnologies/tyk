@@ -21,6 +21,12 @@ function rewriteLogs() {
 	rewriteLog "certs" "certLog"
 	rewriteLog "pub-sub" "pubSubLog"
 	rewriteLog "dashboard" "dashLog"
+
+	rewriteLog "api" "apiLog"
+	rewriteLog "host-check-mgr" "hostCheckLog"
+	rewriteLog "coprocess" "coprocessLog"
+	rewriteLog "python" "pythonLog"
+	rewriteLog "webhooks" "webhookLog"
 }
 
 rewriteLogs > log.yml
