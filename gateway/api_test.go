@@ -19,9 +19,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-redis/redis/v8"
-	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1836,7 +1836,8 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 
 	for hp := range inputs {
 		apis = append(apis, BuildAPI(func(spec *APISpec) {
-			spec.APIID = uuid.NewV4().String()
+			spec.APIID = uuid.New()
+
 			spec.Domain = hp.host
 			spec.Proxy.ListenPath = "/" + hp.path
 		})[0])

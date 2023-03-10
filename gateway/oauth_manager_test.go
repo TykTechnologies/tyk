@@ -20,8 +20,8 @@ import (
 
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/lonelycode/osin"
-	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -637,7 +637,8 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 
 		spec := ts.LoadTestOAuthSpec()
 
-		clientID := uuid.NewV4().String()
+		clientID := uuid.New()
+
 		ts.createTestOAuthClient(spec, clientID)
 
 		tokensID := map[string]bool{}
@@ -763,7 +764,8 @@ func testGetClientTokens(t *testing.T, hashed bool) {
 
 	spec := ts.LoadTestOAuthSpec()
 
-	clientID := uuid.NewV4().String()
+	clientID := uuid.New()
+
 	ts.createTestOAuthClient(spec, clientID)
 
 	// make three tokens

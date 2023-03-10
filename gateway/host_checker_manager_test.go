@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"

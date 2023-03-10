@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/sirupsen/logrus"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
@@ -87,7 +87,7 @@ func (hc *HostCheckerManager) Start(ctx context.Context) {
 }
 
 func (hc *HostCheckerManager) GenerateCheckerId() {
-	hc.Id = uuid.NewV4().String()
+	hc.Id = uuid.New()
 }
 
 // CheckActivePollerLoop manages the state of the HostCheckerManager UptimeTest

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/storage"
@@ -219,7 +219,5 @@ func (d DefaultKeyGenerator) GenerateAuthKey(orgID string) string {
 
 // GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key
 func (DefaultKeyGenerator) GenerateHMACSecret() string {
-	u5 := uuid.NewV4()
-	cleanSting := strings.Replace(u5.String(), "-", "", -1)
-	return base64.StdEncoding.EncodeToString([]byte(cleanSting))
+	return base64.StdEncoding.EncodeToString([]byte(uuid.NewHex()))
 }

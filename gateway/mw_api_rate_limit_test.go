@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/justinas/alice"
-	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -224,7 +224,8 @@ func TestRLClosed(t *testing.T) {
 	req := TestReq(t, "GET", "/rl_closed_test/", nil)
 
 	session := createRLSession()
-	customToken := uuid.NewV4().String()
+	customToken := uuid.New()
+
 	// AuthKey sessions are stored by {token}
 	err := ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
 	if err != nil {
