@@ -36,6 +36,7 @@ require (
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/go-redis/redis/v8 v8.3.1
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
+	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang/protobuf v1.4.2
 	github.com/google/btree v1.0.0 // indirect
 	github.com/google/go-cmp v0.5.6 // indirect
@@ -53,10 +54,7 @@ require (
 	github.com/jensneuse/abstractlogger v0.0.4
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 	github.com/kelseyhightower/envconfig v1.4.0
-<<<<<<< HEAD
-	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93
-=======
->>>>>>> 52591f5e... Remove lonelycode/go-uuid (test dependency) (#4797)
+	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // indirect
 	github.com/lonelycode/osin v0.0.0-20160423095202-da239c9dacb6
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/mavricknz/asn1-ber v0.0.0-20151103223136-b9df1c2f4213 // indirect
