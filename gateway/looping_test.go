@@ -13,7 +13,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
-
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
