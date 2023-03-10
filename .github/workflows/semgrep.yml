@@ -1,6 +1,14 @@
 ---
+name: Semgrep
+
+on:
+  pull_request:
+    branches:
+      - "master"
+      - "release-**"
+
 jobs:
   semgrep-lsc-log:
     uses: TykTechnologies/github-actions/.github/workflows/semgrep.yaml@main
     with:
-      config: ./lsc/log/rules/log.yml
+      config: "./lsc/log/rules/log.yml"
