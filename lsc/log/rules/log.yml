@@ -1,0 +1,68 @@
+---
+# == Special thanks to Zaid Albirawi ==
+
+rules:
+  - id: log.mainLog.remove.empty.withFields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "main"})'
+    fix: mainLog
+    languages:
+      - go
+    message: Removing prefix single field
+    severity: WARNING
+
+  - id: log.mainLog.remove.prefix.from.Fields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "main",$X})'
+    fix: 'mainLog.WithFields(logrus.Fields{$X})'
+    languages:
+      - go
+    message: Removing prefix from map
+    severity: WARNING
+
+  - id: log.certLog.remove.empty.withFields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "certs"})'
+    fix: certLog
+    languages:
+      - go
+    message: Removing prefix single field
+    severity: WARNING
+
+  - id: log.certLog.remove.prefix.from.Fields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "certs",$X})'
+    fix: 'certLog.WithFields(logrus.Fields{$X})'
+    languages:
+      - go
+    message: Removing prefix from map
+    severity: WARNING
+
+  - id: log.pubSubLog.remove.empty.withFields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "pub-sub"})'
+    fix: pubSubLog
+    languages:
+      - go
+    message: Removing prefix single field
+    severity: WARNING
+
+  - id: log.pubSubLog.remove.prefix.from.Fields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "pub-sub",$X})'
+    fix: 'pubSubLog.WithFields(logrus.Fields{$X})'
+    languages:
+      - go
+    message: Removing prefix from map
+    severity: WARNING
+
+  - id: log.dashLog.remove.empty.withFields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "dashboard"})'
+    fix: dashLog
+    languages:
+      - go
+    message: Removing prefix single field
+    severity: WARNING
+
+  - id: log.dashLog.remove.prefix.from.Fields
+    pattern: 'log.WithFields(logrus.Fields{"prefix": "dashboard",$X})'
+    fix: 'dashLog.WithFields(logrus.Fields{$X})'
+    languages:
+      - go
+    message: Removing prefix from map
+    severity: WARNING
+

@@ -1,0 +1,11 @@
+---
+version: '3'
+
+tasks:
+  default:
+    desc: "Refactor logging usage"
+    vars:
+      rootPath:
+        sh: git rev-parse --show-toplevel
+    cmds:
+      - docker run --rm -v {{.rootPath}}:/src returntocorp/semgrep semgrep scan --verbose --metrics=off --config lsc/log/rules/log.yml --autofix
