@@ -30,6 +30,7 @@ require (
 	github.com/getkin/kin-openapi v0.89.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
+	github.com/gofrs/uuid v3.3.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.4.2
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0 // indirect
@@ -60,7 +61,6 @@ require (
 	github.com/pmylund/go-cache v2.1.0+incompatible
 	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d
 	github.com/rs/cors v1.7.0
-	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.6.0
 	github.com/square/go-jose v2.4.1+incompatible
