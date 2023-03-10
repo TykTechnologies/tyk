@@ -9,13 +9,12 @@ import (
 	"strings"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
-
 	redis "github.com/go-redis/redis/v8"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/config"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
@@ -116,9 +115,8 @@ func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
-
 	c := cluster.RedisController.singleton(cluster.IsCache, cluster.IsAnalytics)
-	testKey := "redis-test-" + uuid.NewV4().String()
+	testKey := "redis-test-" + uuid.New()
 	if err := c.Set(cluster.RedisController.ctx, testKey, "test", time.Second).Err(); err != nil {
 		return false
 	}

@@ -36,9 +36,16 @@ require (
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/go-redis/redis/v8 v8.3.1
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
+<<<<<<< HEAD
 	github.com/golang/protobuf v1.4.2
 	github.com/google/btree v1.0.0 // indirect
 	github.com/google/go-cmp v0.5.6 // indirect
+=======
+	github.com/gofrs/uuid v3.3.0+incompatible
+	github.com/golang-jwt/jwt/v4 v4.4.2
+	github.com/golang/protobuf v1.5.2
+	github.com/google/uuid v1.3.0 // indirect
+>>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/consul/api v1.3.0
@@ -77,8 +84,12 @@ require (
 	github.com/pmylund/go-cache v2.1.0+incompatible
 	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d
 	github.com/rs/cors v1.7.0
+<<<<<<< HEAD
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.4.2
+=======
+	github.com/sirupsen/logrus v1.8.1
+>>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 	github.com/spf13/afero v1.6.0
 	github.com/square/go-jose v2.4.1+incompatible
 	github.com/stretchr/testify v1.7.0

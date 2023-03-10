@@ -16,12 +16,15 @@ import (
 	"github.com/TykTechnologies/tyk/certs"
 
 	"github.com/go-redis/redis/v8"
-	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+<<<<<<< HEAD
 	"fmt"
+=======
+	"github.com/TykTechnologies/tyk/internal/uuid"
+>>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -1667,7 +1670,8 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 
 	for hp := range inputs {
 		apis = append(apis, BuildAPI(func(spec *APISpec) {
-			spec.APIID = uuid.NewV4().String()
+			spec.APIID = uuid.New()
+
 			spec.Domain = hp.host
 			spec.Proxy.ListenPath = "/" + hp.path
 		})[0])

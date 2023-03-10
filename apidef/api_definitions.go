@@ -10,18 +10,24 @@ import (
 	"text/template"
 	"time"
 
+<<<<<<< HEAD
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
+=======
+>>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 	"github.com/clbanning/mxj"
-
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
 	_ "gorm.io/gorm"
 	_ "gorm.io/gorm/schema"
 
-	"github.com/TykTechnologies/gojsonschema"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
+	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/regexp"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 type AuthProviderCode string
@@ -941,6 +947,20 @@ func (s *StringRegexMap) Init() error {
 	return nil
 }
 
+<<<<<<< HEAD
+=======
+func (a *APIDefinition) GenerateAPIID() {
+	a.APIID = uuid.NewHex()
+}
+
+func (a *APIDefinition) GetAPIDomain() string {
+	if a.DomainDisabled {
+		return ""
+	}
+	return a.Domain
+}
+
+>>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 func DummyAPI() APIDefinition {
 	endpointMeta := EndPointMeta{
 		Path: "abc",

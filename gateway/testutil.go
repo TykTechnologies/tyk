@@ -31,8 +31,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -284,7 +285,7 @@ func (s *Test) RegisterBundle(name string, files map[string]string) string {
 	s.Gw.TestBundleMu.Lock()
 	defer s.Gw.TestBundleMu.Unlock()
 
-	bundleID := name + "-" + uuid.NewV4().String() + ".zip"
+	bundleID := name + "-" + uuid.NewHex() + ".zip"
 	s.Gw.TestBundles[bundleID] = files
 
 	return bundleID

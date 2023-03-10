@@ -8,7 +8,12 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
+<<<<<<< HEAD
 	uuid "github.com/satori/go.uuid"
+=======
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
+>>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 )
 
 const WSDLSource APIImporterSource = "wsdl"
@@ -278,7 +283,7 @@ func (def *WSDLDef) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*a
 		Active:           true,
 		UseKeylessAccess: true,
 		OrgID:            orgId,
-		APIID:            uuid.NewV4().String(),
+		APIID:            uuid.NewHex(),
 	}
 
 	ad.VersionDefinition.Key = "version"

@@ -3,7 +3,10 @@ package gateway
 import (
 	"net/http"
 	"testing"
+<<<<<<< HEAD
 	"time"
+=======
+>>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -97,11 +100,6 @@ func TestGenerateCheckerId(t *testing.T) {
 	hc.GenerateCheckerId()
 	if hc.Id == "" {
 		t.Error("HostCheckerManager should generate an Id on GenerateCheckerId")
-	}
-
-	uuid, _ := uuid.FromString(hc.Id)
-	if uuid.Version() != 4 {
-		t.Error("HostCheckerManager should generate an uuid.v4 id")
 	}
 }
 
