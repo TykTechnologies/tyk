@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/justinas/alice"
-	"github.com/lonelycode/go-uuid/uuid"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/signature_validator"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestMurmur3CharBug(t *testing.T) {

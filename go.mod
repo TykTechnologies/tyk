@@ -53,7 +53,10 @@ require (
 	github.com/jensneuse/abstractlogger v0.0.4
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 	github.com/kelseyhightower/envconfig v1.4.0
+<<<<<<< HEAD
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93
+=======
+>>>>>>> 52591f5e... Remove lonelycode/go-uuid (test dependency) (#4797)
 	github.com/lonelycode/osin v0.0.0-20160423095202-da239c9dacb6
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/mavricknz/asn1-ber v0.0.0-20151103223136-b9df1c2f4213 // indirect

@@ -12,17 +12,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
-	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
+<<<<<<< HEAD
 	"github.com/TykTechnologies/tyk/headers"
+=======
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
+>>>>>>> 52591f5e... Remove lonelycode/go-uuid (test dependency) (#4797)
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {

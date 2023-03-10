@@ -9,6 +9,13 @@ import (
 	"sync"
 	"testing"
 
+<<<<<<< HEAD
+=======
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+>>>>>>> 52591f5e... Remove lonelycode/go-uuid (test dependency) (#4797)
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
