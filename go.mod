@@ -36,7 +36,6 @@ require (
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/go-redis/redis/v8 v8.3.1
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
-	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang/protobuf v1.4.2
 	github.com/google/btree v1.0.0 // indirect
 	github.com/google/go-cmp v0.5.6 // indirect
