@@ -1,0 +1,14 @@
+---
+version: '3'
+
+includes:
+  lsc-log:
+    taskfile: ./lsc/log/Taskfile.yml
+    dir: .
+
+tasks:
+  lsc:
+    desc: "Run large scale code changes"
+    cmds:
+      - task: lsc-log
+      - make lint
