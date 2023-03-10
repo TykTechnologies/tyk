@@ -33,7 +33,7 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 		"path_parts":   strings.Split(r.URL.Path, "/"), // Path parts
 		"path":         r.URL.Path,                     // path data
 		"remote_addr":  request.RealIP(r),              // IP
-		"request_id":   uuid.New,                       //Correlation ID
+		"request_id":   uuid.New(),                     //Correlation ID
 	}
 
 	for hname, vals := range r.Header {
