@@ -9,6 +9,6 @@ on:
 
 jobs:
   semgrep-lsc-log:
-    uses: TykTechnologies/github-actions/.github/workflows/semgrep.yaml@main
+    uses: TykTechnologies/github-actions/.github/workflows/semgrep.yaml@7ae95a15737fa09302630cf18b6e6c11078ef3de
     with:
       config: "./lsc/log/rules/log.yml"
