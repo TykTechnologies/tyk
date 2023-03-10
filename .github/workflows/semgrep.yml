@@ -1,0 +1,6 @@
+---
+jobs:
+  semgrep-lsc-log:
+    uses: TykTechnologies/github-actions/.github/workflows/semgrep.yaml@main
+    with:
+      config: ./lsc/log/rules/log.yml
