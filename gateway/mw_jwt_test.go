@@ -11,14 +11,8 @@ import (
 	"testing"
 	"time"
 
-<<<<<<< HEAD
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/dgrijalva/jwt-go"
-	"github.com/lonelycode/go-uuid/uuid"
-=======
 	"github.com/golang-jwt/jwt/v4"
->>>>>>> 52591f5e... Remove lonelycode/go-uuid (test dependency) (#4797)
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
