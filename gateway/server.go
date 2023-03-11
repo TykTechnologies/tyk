@@ -547,9 +547,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 
 	gw.policiesMu.Lock()
 	defer gw.policiesMu.Unlock()
-	if len(pols) > 0 {
-		gw.policiesByID = pols
-	}
+	gw.policiesByID = pols
 
 	return len(pols), err
 }
