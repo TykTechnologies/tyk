@@ -1274,6 +1274,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
+	} else {
+		// NOTE: Each TykAPISpec can have only one HTTPTransport therefore only one Timeout for all endpoints
+		// This code looks for timeout information based on endpoint and updates the timeout in HTTPTransport
+		// But this code adds overhead of looking for timeout information for each request
+		// TODO: need to refactor the code to avoid this overhead
+		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+		p.TykAPISpec.HTTPTransport.transport.ResponseHeaderTimeout = time.Duration(float64(timeout) * float64(time.Second))
 	}
 
 	roundTripper = p.TykAPISpec.HTTPTransport
