@@ -220,7 +220,6 @@ dockers:
     - user
     - internal
 
-
 docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}
     image_templates:

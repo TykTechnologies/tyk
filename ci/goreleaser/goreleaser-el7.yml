@@ -184,7 +184,6 @@ dockers:
     - user
     - internal
 
-
 checksum:
   disable: true
 
