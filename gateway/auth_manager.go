@@ -8,8 +8,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 // SessionHandler handles all update/create/access session functions and deals exclusively with
@@ -216,7 +217,5 @@ func (d DefaultKeyGenerator) GenerateAuthKey(orgID string) string {
 
 // GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key
 func (DefaultKeyGenerator) GenerateHMACSecret() string {
-	u5 := uuid.NewV4()
-	cleanSting := strings.Replace(u5.String(), "-", "", -1)
-	return base64.StdEncoding.EncodeToString([]byte(cleanSting))
+	return base64.StdEncoding.EncodeToString([]byte(uuid.NewHex()))
 }

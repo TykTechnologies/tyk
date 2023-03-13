@@ -12,11 +12,12 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/gocraft/health"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/gorpc"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 var (
@@ -222,7 +223,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	// Set up the cache
 	Log.Info("Setting new RPC connection!")
 
-	connID := uuid.NewV4().String()
+	connID := uuid.New()
 
 	// Length should fit into 1 byte. Protection if we decide change uuid in future.
 	if len(connID) > 255 {
@@ -487,7 +488,7 @@ func Disconnect() bool {
 }
 
 func register() {
-	id = uuid.NewV4().String()
+	id = uuid.New()
 	Log.Debug("RPC Client registered")
 }
 

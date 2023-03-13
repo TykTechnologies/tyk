@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -16,18 +17,17 @@ import (
 	"github.com/TykTechnologies/tyk/certs"
 
 	"github.com/go-redis/redis/v8"
-	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"fmt"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 const apiTestDef = `{
@@ -1667,7 +1667,8 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 
 	for hp := range inputs {
 		apis = append(apis, BuildAPI(func(spec *APISpec) {
-			spec.APIID = uuid.NewV4().String()
+			spec.APIID = uuid.New()
+
 			spec.Domain = hp.host
 			spec.Proxy.ListenPath = "/" + hp.path
 		})[0])

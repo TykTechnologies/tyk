@@ -6,9 +6,9 @@ import (
 	"io"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
-
 	"github.com/TykTechnologies/tyk/apidef"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 const SwaggerSource APIImporterSource = "swagger"
@@ -131,7 +131,7 @@ func (s *SwaggerAST) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*
 		Name:             s.Info.Title,
 		Active:           true,
 		UseKeylessAccess: true,
-		APIID:            uuid.NewV4().String(),
+		APIID:            uuid.NewHex(),
 		OrgID:            orgId,
 	}
 	ad.VersionDefinition.Key = "version"

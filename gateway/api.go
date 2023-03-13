@@ -44,7 +44,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"golang.org/x/crypto/bcrypt"
@@ -56,6 +55,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful
@@ -1540,11 +1541,10 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Allow the client ID to be set
-	cleanSting := newOauthClient.ClientID
+	clientID := newOauthClient.ClientID
 
 	if newOauthClient.ClientID == "" {
-		u5 := uuid.NewV4()
-		cleanSting = strings.Replace(u5.String(), "-", "", -1)
+		clientID = uuid.NewHex()
 	}
 
 	// Allow the secret to be set
@@ -1554,7 +1554,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newClient := OAuthClient{
-		ClientID:          cleanSting,
+		ClientID:          clientID,
 		ClientRedirectURI: newOauthClient.ClientRedirectURI,
 		ClientSecret:      secret,
 		PolicyID:          newOauthClient.PolicyID,
@@ -2685,8 +2685,8 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 }
 
 var createOauthClientSecret = func() string {
-	secret := uuid.NewV4()
-	return base64.StdEncoding.EncodeToString([]byte(secret.String()))
+	secret := uuid.New()
+	return base64.StdEncoding.EncodeToString([]byte(secret))
 }
 
 // invalidate tokens if we had a new policy

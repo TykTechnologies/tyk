@@ -10,18 +10,18 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
-
 	"github.com/clbanning/mxj"
-
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
 	_ "gorm.io/gorm"
 	_ "gorm.io/gorm/schema"
 
-	"github.com/TykTechnologies/gojsonschema"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
+	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/regexp"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 type AuthProviderCode string
@@ -939,6 +939,14 @@ func (s *StringRegexMap) Init() error {
 	}
 
 	return nil
+}
+
+func (a *APIDefinition) GenerateAPIID() {
+	a.APIID = uuid.NewHex()
+}
+
+func (a *APIDefinition) GetAPIDomain() string {
+	return a.Domain
 }
 
 func DummyAPI() APIDefinition {

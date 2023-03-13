@@ -7,7 +7,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
-	uuid "github.com/satori/go.uuid"
 )
 
 func TestHostCheckerManagerInit(t *testing.T) {
@@ -97,11 +96,6 @@ func TestGenerateCheckerId(t *testing.T) {
 	hc.GenerateCheckerId()
 	if hc.Id == "" {
 		t.Error("HostCheckerManager should generate an Id on GenerateCheckerId")
-	}
-
-	uuid, _ := uuid.FromString(hc.Id)
-	if uuid.Version() != 4 {
-		t.Error("HostCheckerManager should generate an uuid.v4 id")
 	}
 }
 
