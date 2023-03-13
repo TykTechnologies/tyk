@@ -8,12 +8,8 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
-<<<<<<< HEAD
-	uuid "github.com/satori/go.uuid"
-=======
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
->>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 )
 
 const WSDLSource APIImporterSource = "wsdl"
