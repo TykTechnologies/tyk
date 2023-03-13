@@ -34,10 +34,11 @@ import (
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/pmylund/go-cache"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
 	"rsc.io/letsencrypt"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/drl"
@@ -1502,9 +1503,10 @@ func Start() {
 
 	// ToDo:Config replace for get default conf
 	gw := NewGateway(config.Default, ctx)
-	gw.SetNodeID("solo-" + uuid.NewV4().String())
+	gw.SetNodeID("solo-" + uuid.New())
 
-	gw.SessionID = uuid.NewV4().String()
+	gw.SessionID = uuid.New()
+
 	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}

@@ -8,23 +8,20 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"text/template"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/clbanning/mxj"
+	"github.com/lonelycode/osin"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
-	"github.com/clbanning/mxj"
-
-	"github.com/lonelycode/osin"
-	"gopkg.in/mgo.v2/bson"
-
 	"github.com/TykTechnologies/gojsonschema"
-
 	"github.com/TykTechnologies/tyk/regexp"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 type AuthProviderCode string
@@ -1124,7 +1121,7 @@ func (s *StringRegexMap) Init() error {
 }
 
 func (a *APIDefinition) GenerateAPIID() {
-	a.APIID = strings.Replace(uuid.NewV4().String(), "-", "", -1)
+	a.APIID = uuid.NewHex()
 }
 
 func (a *APIDefinition) GetAPIDomain() string {
