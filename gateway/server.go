@@ -34,29 +34,12 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
-<<<<<<< HEAD
 	cache "github.com/pmylund/go-cache"
 
-	uuid "github.com/satori/go.uuid"
-=======
-	"github.com/pmylund/go-cache"
->>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
 	"rsc.io/letsencrypt"
 
-<<<<<<< HEAD
-=======
-	"github.com/TykTechnologies/tyk/internal/uuid"
-
-	"github.com/TykTechnologies/again"
-	"github.com/TykTechnologies/drl"
-	gas "github.com/TykTechnologies/goautosocket"
-	"github.com/TykTechnologies/gorpc"
-	"github.com/TykTechnologies/goverify"
-	"github.com/TykTechnologies/tyk-pump/serializer"
-
->>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/checkup"
@@ -71,6 +54,8 @@ import (
 	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 var (
@@ -1413,15 +1398,9 @@ func Start() {
 	}
 
 	// ToDo:Config replace for get default conf
-<<<<<<< HEAD
 	gw := NewGateway(config.Default, ctx, cancel)
-	gw.SetNodeID("solo-" + uuid.NewV4().String())
-=======
-	gw := NewGateway(config.Default, ctx)
 	gw.SetNodeID("solo-" + uuid.New())
-
 	gw.SessionID = uuid.New()
->>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 
 	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)

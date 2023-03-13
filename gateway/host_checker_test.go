@@ -14,21 +14,14 @@ import (
 	"text/template"
 	"time"
 
-<<<<<<< HEAD
-=======
 	proxyproto "github.com/pires/go-proxyproto"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/internal/uuid"
-
->>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 
-	proxyproto "github.com/pires/go-proxyproto"
-	uuid "github.com/satori/go.uuid"
-	"github.com/stretchr/testify/assert"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 const sampleUptimeTestAPI = `{

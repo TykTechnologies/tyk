@@ -6,17 +6,11 @@ import (
 	"strings"
 	"time"
 
-<<<<<<< HEAD
-=======
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
-
->>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/user"
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
 )
 
 // SessionHandler handles all update/create/access session functions and deals exclusively with

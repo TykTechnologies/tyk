@@ -16,7 +16,6 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/gorpc"
-	"github.com/TykTechnologies/tyk-pump/serializer"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )

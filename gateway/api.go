@@ -42,20 +42,8 @@ import (
 	"sync"
 	"time"
 
-<<<<<<< HEAD
-=======
-	"github.com/getkin/kin-openapi/openapi3"
-
-	"github.com/TykTechnologies/tyk/config"
-
-	"github.com/TykTechnologies/tyk/internal/uuid"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
->>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"golang.org/x/crypto/bcrypt"
@@ -67,6 +55,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful

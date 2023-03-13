@@ -3,14 +3,10 @@ package gateway
 import (
 	"net/http"
 	"testing"
-<<<<<<< HEAD
 	"time"
-=======
->>>>>>> 0e3ab5f5... [TT-8265] Drop satori go.uuid package (#4849)
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
-	uuid "github.com/satori/go.uuid"
 )
 
 func TestHostCheckerManagerInit(t *testing.T) {
