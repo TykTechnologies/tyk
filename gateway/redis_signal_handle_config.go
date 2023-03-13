@@ -7,8 +7,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -49,44 +47,32 @@ func (gw *Gateway) handleNewConfiguration(payload string) {
 
 	err := json.Unmarshal([]byte(payload), &configPayload)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Error("Failed to decode configuration payload: ", err)
+		pubSubLog.Error("Failed to decode configuration payload: ", err)
 		return
 	}
 
 	// Make sure payload matches nodeID and hostname
 	if configPayload.ForHostname != gw.hostDetails.Hostname && configPayload.ForNodeID != gw.GetNodeID() {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Info("Configuration update received, no NodeID/Hostname match found")
+		pubSubLog.Info("Configuration update received, no NodeID/Hostname match found")
 		return
 	}
 
 	if !gw.GetConfig().AllowRemoteConfig {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Warning("Ignoring new config: Remote configuration is not allowed for this node.")
+		pubSubLog.Warning("Ignoring new config: Remote configuration is not allowed for this node.")
 		return
 	}
 
 	if err := gw.backupConfiguration(); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Error("Failed to backup existing configuration: ", err)
+		pubSubLog.Error("Failed to backup existing configuration: ", err)
 		return
 	}
 
 	if err := writeNewConfiguration(configPayload); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Error("Failed to write new configuration: ", err)
+		pubSubLog.Error("Failed to write new configuration: ", err)
 		return
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "pub-sub",
-	}).Info("Initiating configuration reload")
+	pubSubLog.Info("Initiating configuration reload")
 
 	myPID := gw.hostDetails.PID
 	if myPID == 0 {
@@ -144,25 +130,19 @@ func (gw *Gateway) handleSendMiniConfig(payload string) {
 	configPayload := GetConfigPayload{}
 	err := json.Unmarshal([]byte(payload), &configPayload)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Error("Failed unmarshal request: ", err)
+		pubSubLog.Error("Failed unmarshal request: ", err)
 		return
 	}
 
 	// Make sure payload matches nodeID and hostname
 	if configPayload.FromHostname != gw.hostDetails.Hostname && configPayload.FromNodeID != gw.GetNodeID() {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Debug("Configuration request received, no NodeID/Hostname match found, ignoring")
+		pubSubLog.Debug("Configuration request received, no NodeID/Hostname match found, ignoring")
 		return
 	}
 
 	config, err := gw.getExistingConfig()
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Error("Failed to get existing configuration: ", err)
+		pubSubLog.Error("Failed to get existing configuration: ", err)
 		return
 	}
 
@@ -175,9 +155,7 @@ func (gw *Gateway) handleSendMiniConfig(payload string) {
 
 	payloadAsJSON, err := json.Marshal(returnPayload)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Error("Failed to get marshal configuration: ", err)
+		pubSubLog.Error("Failed to get marshal configuration: ", err)
 		return
 	}
 
@@ -188,8 +166,6 @@ func (gw *Gateway) handleSendMiniConfig(payload string) {
 	}
 
 	gw.MainNotifier.Notify(asNotification)
-	log.WithFields(logrus.Fields{
-		"prefix": "pub-sub",
-	}).Debug("Configuration request responded.")
+	pubSubLog.Debug("Configuration request responded.")
 
 }

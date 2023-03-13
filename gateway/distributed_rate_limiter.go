@@ -92,8 +92,7 @@ func (gw *Gateway) onServerStatusReceivedHandler(payload string) {
 
 	serverData := drl.Server{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix":  "pub-sub",
+		pubSubLog.WithFields(logrus.Fields{
 			"payload": string(payload),
 		}).Error("Failed unmarshal server data: ", err)
 		return

@@ -714,8 +714,7 @@ func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 
 	sessionsObj := apiAllKeys{fixedSessions}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
+	apiLog.WithFields(logrus.Fields{
 		"status": "ok",
 	}).Info("Retrieved key list.")
 
@@ -1021,9 +1020,8 @@ func (gw *Gateway) handleGetAPI(apiID string, oasEndpoint bool) (interface{}, in
 		return spec.APIDefinition, http.StatusOK
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"apiID":  fmt.Sprintf("%q", apiID),
+	apiLog.WithFields(logrus.Fields{
+		"apiID": fmt.Sprintf("%q", apiID),
 	}).Error("API doesn't exist.")
 
 	return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
@@ -1906,17 +1904,14 @@ func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
 }
 
 func (gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
+	apiLog.WithFields(logrus.Fields{
 		"status": "ok",
 	}).Info("Group reload accepted.")
 
 	// Signal to the group via redis
 	gw.MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: gw})
 
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-	}).Info("Reloaded URL Structure - Success")
+	apiLog.Info("Reloaded URL Structure - Success")
 
 	doJSONWrite(w, http.StatusOK, apiOk(""))
 }
@@ -1936,9 +1931,7 @@ func (gw *Gateway) resetHandler(fn func()) http.HandlerFunc {
 			gw.reloadURLStructure(fn)
 		}
 
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-		}).Info("Reload URL Structure - Scheduled")
+		apiLog.Info("Reload URL Structure - Scheduled")
 		wg.Wait()
 		doJSONWrite(w, http.StatusOK, apiOk(""))
 	}
@@ -2163,9 +2156,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	storageID := oauthClientStorageID(newClient.GetId())
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-	}).Debug("Created storage ID: ", storageID)
+	apiLog.Debug("Created storage ID: ", storageID)
 
 	if newOauthClient.APIID != "" {
 		// set client only for passed API ID
@@ -2428,9 +2419,8 @@ func (gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request
 	}
 	apiSpec := gw.getApiSpec(apiID)
 
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"apiID":  apiID,
+	apiLog.WithFields(logrus.Fields{
+		"apiID": apiID,
 	}).Debug("Looking for refresh token in API Register")
 
 	if apiSpec == nil {

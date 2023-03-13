@@ -42,9 +42,7 @@ type Bundle struct {
 
 // Verify performs a signature verification on the bundle file.
 func (b *Bundle) Verify() error {
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
+	mainLog.Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
 
 	var useSignature bool
 	bundleVerifier := b.Gw.NotificationVerifier
@@ -108,14 +106,10 @@ func (b *Bundle) AddToSpec() {
 		var err error
 		loadedDrivers[apidef.PythonDriver], err = NewPythonDispatcher(b.Gw.GetConfig())
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "coprocess",
-			}).WithError(err).Error("Couldn't load Python dispatcher")
+			coprocessLog.WithError(err).Error("Couldn't load Python dispatcher")
 			return
 		}
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Info("Python dispatcher was initialized")
+		coprocessLog.Info("Python dispatcher was initialized")
 	}
 	dispatcher := loadedDrivers[b.Spec.CustomMiddleware.Driver]
 	if dispatcher != nil {
@@ -223,9 +217,7 @@ func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
 	var err error
 
 	if !gw.GetConfig().EnableBundleDownloader {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Warning("Bundle downloader is disabled.")
+		mainLog.Warning("Bundle downloader is disabled.")
 		err = errors.New("Bundle downloader is disabled")
 		return bundle, err
 	}
@@ -305,9 +297,7 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) error {
 
 // loadBundleManifest will parse the manifest file and return the bundle parameters.
 func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) error {
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("----> Loading bundle: ", spec.CustomMiddlewareBundle)
+	mainLog.Info("----> Loading bundle: ", spec.CustomMiddlewareBundle)
 
 	manifestPath := filepath.Join(bundle.Path, "manifest.json")
 	f, err := os.Open(manifestPath)
@@ -317,9 +307,7 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) er
 	defer f.Close()
 
 	if err := json.NewDecoder(f).Decode(&bundle.Manifest); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("----> Couldn't unmarshal the manifest file for bundle: ", spec.CustomMiddlewareBundle)
+		mainLog.Info("----> Couldn't unmarshal the manifest file for bundle: ", spec.CustomMiddlewareBundle)
 		return err
 	}
 
@@ -328,9 +316,7 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) er
 	}
 
 	if err := bundle.Verify(); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("----> Bundle verification failed: ", spec.CustomMiddlewareBundle)
+		mainLog.Info("----> Bundle verification failed: ", spec.CustomMiddlewareBundle)
 	}
 	return nil
 }
@@ -368,9 +354,7 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 	// Skip if the bundle destination path already exists.
 	// The bundle exists, load and return:
 	if _, err := os.Stat(destPath); err == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Loading existing bundle: ", spec.CustomMiddlewareBundle)
+		mainLog.Info("Loading existing bundle: ", spec.CustomMiddlewareBundle)
 
 		bundle := Bundle{
 			Name: spec.CustomMiddlewareBundle,
@@ -381,23 +365,17 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 
 		err = loadBundleManifest(&bundle, spec, true)
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, " ", err)
+			mainLog.Info("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, " ", err)
 		}
 
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("----> Using bundle: ", spec.CustomMiddlewareBundle)
+		mainLog.Info("----> Using bundle: ", spec.CustomMiddlewareBundle)
 
 		bundle.AddToSpec()
 
 		return nil
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("----> Fetching Bundle: ", spec.CustomMiddlewareBundle)
+	mainLog.Info("----> Fetching Bundle: ", spec.CustomMiddlewareBundle)
 
 	bundle, err := gw.fetchBundle(spec)
 	if err != nil {
@@ -412,9 +390,7 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 		return bundleError(spec, err, "Couldn't save bundle")
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Debug("----> Saving Bundle: ", spec.CustomMiddlewareBundle)
+	mainLog.Debug("----> Saving Bundle: ", spec.CustomMiddlewareBundle)
 
 	// Set the destination path:
 	bundle.Path = destPath
@@ -428,9 +404,7 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 		return nil
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("----> Bundle is valid, adding to spec: ", spec.CustomMiddlewareBundle)
+	mainLog.Info("----> Bundle is valid, adding to spec: ", spec.CustomMiddlewareBundle)
 
 	bundle.AddToSpec()
 
