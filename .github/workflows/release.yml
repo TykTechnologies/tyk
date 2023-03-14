@@ -203,7 +203,7 @@ jobs:
           push: true
           context: "."
           file: ci/Dockerfile.std
-          platforms: linux/amd64,linux/arm64,linux/s390x
+          platforms: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/tyk:${{ needs.goreleaser.outputs.tag }}
             ${{ steps.login-ecr.outputs.registry }}/tyk:${{ github.sha }}
@@ -248,6 +248,7 @@ jobs:
           - amd64
           - arm64
           - s390x
+          - ppc64le
         distro:
           - ubuntu:xenial
           - ubuntu:bionic
