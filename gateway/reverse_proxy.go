@@ -655,6 +655,12 @@ func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, re
 		if transport.TLSClientConfig.VerifyPeerCertificate != nil {
 			p.logger.Debug("Certificate pinning check is enabled")
 		}
+
+		if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || p.Gw.GetConfig().SSLForceCommonNameCheck {
+			p.logger.Debug("Using forced SSL CN check")
+			host, _, _ := net.SplitHostPort(outReq.Host)
+			p.setCommonNameVerifyPeerCertificate(transport.TLSClientConfig, host)
+		}
 	} else {
 		transport.DialTLS = p.Gw.customDialTLSCheck(p.TykAPISpec, transport.TLSClientConfig)
 	}
@@ -1285,22 +1291,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	if outreq.URL.Scheme == "h2c" {
 		outreq.URL.Scheme = "http"
-	}
-
-	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || p.Gw.GetConfig().SSLForceCommonNameCheck {
-		// if proxy is enabled, add CommonName verification in verifyPeerCertificate
-		// DialTLS is not executed if proxy is used
-		httpTransport := roundTripper.transport
-
-		p.logger.Debug("Using forced SSL CN check")
-
-		if proxyURL, _ := httpTransport.Proxy(req); proxyURL != nil {
-			p.logger.Debug("Detected proxy: " + proxyURL.String())
-			tlsConfig := httpTransport.TLSClientConfig
-			host, _, _ := net.SplitHostPort(outreq.Host)
-			p.setCommonNameVerifyPeerCertificate(tlsConfig, host)
-		}
-
 	}
 
 	// do request round trip
