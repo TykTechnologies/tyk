@@ -14,7 +14,7 @@ RUN apt-get update \
 RUN echo "TARGETPLATFORM=$TARGETPLATFORM"
 
 # Install curl and python3
-RUN if [ "$TARGETPLATFORM" != "linux/s390x" ]; then \
+RUN if [ "$TARGETPLATFORM" != "linux/s390x" && "$TARGETPLATFORM" != "linux/ppc64le" ]; then \
       apt-get install -y curl python3-setuptools libpython3.9 python3.9-dev \
       && curl https://bootstrap.pypa.io/get-pip.py | python3 \
       && pip3 install --only-binary ":all:" grpcio protobuf==3.20.1 \
