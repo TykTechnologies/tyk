@@ -3,10 +3,10 @@ name: Policy as Code
 on:
   pull_request:
     paths:
-      - ci/repo-policy/**
+      - repo-policy/**
 
 env:
-  TERRAFORM_DIR: "./ci/repo-policy"
+  TERRAFORM_DIR: "./repo-policy"
 
 jobs:
   terraform:
