@@ -20,6 +20,7 @@ resource "github_repository" "repository" {
   allow_auto_merge            = true
   delete_branch_on_merge      = var.delete_branch_on_merge
   vulnerability_alerts        = var.vulnerability_alerts
+  allow_update_branch         = true
   has_downloads               = true
   has_issues                  = true
   has_wiki                    = var.wiki
