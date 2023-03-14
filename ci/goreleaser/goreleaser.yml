@@ -41,6 +41,19 @@ builds:
     goarch:
       - s390x
     binary: tyk
+  - id: std-ppc64le
+    flags:
+      - -tags=goplugin
+    ldflags:
+      - -X github.com/TykTechnologies/tyk/gateway.VERSION={{.Version}} -X github.com/TykTechnologies/tyk/gateway.Commit={{.FullCommit}} -X github.com/TykTechnologies/tyk/gateway.buildDate={{.Date}} -X github.com/TykTechnologies/tyk/gateway.builtBy=goreleaser
+    env:
+     - CC=gcc
+     - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - ppc64le
+    binary: tyk
 
 
 dockers:
@@ -146,6 +159,34 @@ dockers:
     - "policies"
     - "coprocess"
     - "tyk.conf.example"
+    
+- ids:
+    - std
+  image_templates:
+    - "tykio/tyk-gateway:{{ .Tag }}-ppc64le"
+    - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-ppc64le"
+  build_flag_templates:
+    - "--build-arg=PORTS=8080"
+    - "--platform=linux/ppc64le"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.title={{.ProjectName}}"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+  use: buildx
+  goarch: ppc64le
+  goos: linux
+  dockerfile: ci/Dockerfile.std
+  extra_files:
+    - "ci/install/"
+    - "README.md"
+    - "LICENSE.md"
+    - "apps/app_sample.json"
+    - "templates"
+    - "middleware"
+    - "event_handlers/sample"
+    - "policies"
+    - "coprocess"
+    - "tyk.conf.example"
 
 # Build gateway hybrid container arm64
 - ids:
@@ -164,24 +205,6 @@ dockers:
   dockerfile: ci/images/hybrid/Dockerfile
   extra_files:
     - "ci/images/hybrid/"
-    
-# Build gateway hybrid container s390x
-#- ids:
-#    - std
-#  image_templates:
-#    - "tykio/tyk-hybrid-docker:{{ .Tag }}-s390x"
-#  build_flag_templates:
-#    - "--platform=linux/s390x"
-#    - "--label=org.opencontainers.image.created={{.Date}}"
-#    - "--label=org.opencontainers.image.title={{.ProjectName}}-hybrid"
-#    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-#    - "--label=org.opencontainers.image.version={{.Version}}"
-#  use: buildx
-#  goarch: s390x
-#  goos: linux
-#  dockerfile: ci/images/hybrid/Dockerfile
-#  extra_files:
-#    - "ci/images/hybrid/"
 
 # Build plugin-compiler
 - ids:
@@ -253,6 +276,7 @@ nfpms:
       - std-linux
       - std-arm64
       - std-s390x
+      - std-ppc64le
     formats:
       - deb
       - rpm
@@ -300,6 +324,7 @@ nfpms:
           arm: aarch64
           arm64: aarch64
           s390x: s390x
+          ppc64le: ppc64le
       deb:
         file_name_template: '{{ .PackageName }}_{{ replace .Version "-" "~" }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}'
         replacements:
