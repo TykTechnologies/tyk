@@ -105,6 +105,19 @@ func TestBundleLoader(t *testing.T) {
 		assert.Empty(t, spec.CustomMiddleware)
 		assert.NoError(t, err)
 	})
+
+	t.Run("overwrite custom middleware bundle", func(t *testing.T) {
+		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.OverwriteCustomMiddlewareBundle = true
+			spec.CustomMiddlewareBundle = bundleID
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+			}
+		})[0]
+		err := ts.Gw.loadBundle(spec)
+		assert.NoError(t, err)
+		assert.Equal(t, apidef.GoPluginDriver, spec.CustomMiddleware.Driver)
+	})
 }
 
 func TestBundleFetcher(t *testing.T) {
