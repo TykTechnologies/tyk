@@ -234,7 +234,7 @@ type DnsCacheConfig struct {
 	TTL int64 `json:"ttl"`
 
 	CheckInterval int64 `json:"-" ignored:"true"`
-	//controls cache cleanup interval. By convention this shouldn't be exposed to a config or env_variable_setup
+	// controls cache cleanup interval. By convention this shouldn't be exposed to a config or env_variable_setup
 
 	// A strategy which will be used when a DNS query will reply with more than 1 IP Address per single host.
 	// As a DNS query response IP Addresses can have a changing order depending on DNS server balancing strategy (eg: round robin, geographically dependent origin-ip ordering, etc) this option allows you to not to limit the connection to the first host in a cached response list or prevent response caching.
@@ -1140,7 +1140,7 @@ func WriteConf(path string, conf *Config) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(path, bs, 0644)
+	return ioutil.WriteFile(path, bs, 0o644)
 }
 
 // writeDefault will set conf to the default config and write it to disk
