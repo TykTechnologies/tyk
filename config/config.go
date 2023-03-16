@@ -1231,7 +1231,7 @@ func (c *Config) StoreAnalytics(ip string) bool {
 // processCustom these are custom functions for loadign config values. They will
 // be called in the order they are passed. Any function that returns an error
 // then that error will be returned and no further processing will be
-// happenning.
+// happening.
 func processCustom(prefix string, c *Config, custom ...func(prefix string, c *Config) error) error {
 	for _, fn := range custom {
 		if err := fn(prefix, c); err != nil {
