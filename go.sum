@@ -81,8 +81,8 @@ github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632 h1:T5NWziF
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632/go.mod h1:UsPYgOFBpNzDXLEti7MKOwHLpVSqdzuNGkVFPspQmnQ=
 github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksrF4dY9KW8o8=
 github.com/TykTechnologies/openid2go v0.1.2/go.mod h1:gYfkqeWa+lY3Xz/Z2xYtIzmYXynlgKZaBIbPCqdcdMA=
-github.com/TykTechnologies/tyk-pump v1.7.0-rc1.0.20230315175435-fe8ab702689c h1:SK6a4vXPueBTyeLHxokYiN4YyB0gOMkmK8M0TJG6wiY=
-github.com/TykTechnologies/tyk-pump v1.7.0-rc1.0.20230315175435-fe8ab702689c/go.mod h1:CqJPNhQBWFS8TfucwPoExpuJZ0A7d9rqh/nbtCCXhaw=
+github.com/TykTechnologies/tyk-pump v1.8.0-rc1 h1:repb5JouKtxy/BSoZWwUoEgpjsL8a2z0jLsgUsauuHI=
+github.com/TykTechnologies/tyk-pump v1.8.0-rc1/go.mod h1:8N9R83u9SZoW0dimMp+nWlumakF+yino6ik035zJGCs=
 github.com/agnivade/levenshtein v1.0.1/go.mod h1:CURSv5d9Uaml+FovSIICkLbAUZ9S4RqaHDIsdSBg7lM=
 github.com/agnivade/levenshtein v1.1.0/go.mod h1:veldBMzWxcCG2ZvUTKD2kJNRdCk5hVbJomOvKkmgYbo=
 github.com/agnivade/levenshtein v1.1.1 h1:QY8M92nrzkmr798gCo3kmMyqXFzdQVpxLlGPRBij0P8=
