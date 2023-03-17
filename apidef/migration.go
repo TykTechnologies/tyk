@@ -7,9 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
-
 	"github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 var (
@@ -60,8 +59,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 		for vName, vInfo := range a.VersionData.Versions {
 			newAPI := *a
 
-			newID := uuid.NewV4()
-			apiID := strings.Replace(newID.String(), "-", "", -1)
+			apiID := uuid.NewHex()
 
 			newAPI.APIID = apiID
 			newAPI.Id = ""

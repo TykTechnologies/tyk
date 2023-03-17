@@ -17,6 +17,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
+	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -104,22 +105,33 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
-func (gw *Gateway) generateSubRoutes(spec *APISpec, subRouter *mux.Router, logger *logrus.Entry) {
+func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router, logger *logrus.Entry) {
 	if spec.GraphQL.GraphQLPlayground.Enabled {
-		gw.loadGraphQLPlayground(spec, subRouter)
+		gw.loadGraphQLPlayground(spec, router)
 	}
 
 	if spec.EnableBatchRequestSupport {
-		gw.addBatchEndpoint(spec, subRouter)
+		gw.addBatchEndpoint(spec, router)
 	}
 
 	if spec.UseOauth2 {
-		logger.Debug("Loading OAuth Manager")
-		oauthManager := gw.addOAuthHandlers(spec, subRouter)
-		logger.Debug("-- Added OAuth Handlers")
-
+		oauthManager := gw.addOAuthHandlers(spec, router)
 		spec.OAuthManager = oauthManager
-		logger.Debug("Done loading OAuth Manager")
+	}
+
+	if spec.CORS.Enable {
+		c := cors.New(cors.Options{
+			AllowedOrigins:     spec.CORS.AllowedOrigins,
+			AllowedMethods:     spec.CORS.AllowedMethods,
+			AllowedHeaders:     spec.CORS.AllowedHeaders,
+			ExposedHeaders:     spec.CORS.ExposedHeaders,
+			AllowCredentials:   spec.CORS.AllowCredentials,
+			MaxAge:             spec.CORS.MaxAge,
+			OptionsPassthrough: spec.CORS.OptionsPassthrough,
+			Debug:              spec.CORS.Debug,
+		})
+
+		router.Use(c.Handler)
 	}
 }
 
@@ -736,11 +748,8 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		router = router.Host(hostname).Subrouter()
 	}
 
-	subrouter := router.PathPrefix(spec.Proxy.ListenPath).Subrouter()
-
 	var chainObj *ChainObject
-
-	if curSpec := gw.getApiSpec(spec.APIID); curSpec != nil && curSpec.Checksum == spec.Checksum {
+	if curSpec := gw.getApiSpec(spec.APIID); !shouldReloadSpec(curSpec, spec) {
 		if chain, found := gw.apisHandlesByID.Load(spec.APIID); found {
 			chainObj = chain.(*ChainObject)
 		}
@@ -748,19 +757,33 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		chainObj = gw.processSpec(spec, apisByListen, gs, logrus.NewEntry(log))
 	}
 
-	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(log))
-	handleCORS(subrouter, spec)
-
 	if chainObj.Skip {
 		return chainObj
 	}
 
-	if !chainObj.Open {
-		subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
+	// Prefixes are multiple paths that the API endpoints are listening on.
+	prefixes := []string{
+		// API definition UUID
+		"/" + spec.APIID + "/",
+		// User defined listen path
+		spec.Proxy.ListenPath,
 	}
 
-	httpHandler := explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, gwConfig.HttpServerOptions.EnableStrictRoutes)
-	subrouter.NewRoute().Handler(httpHandler)
+	// Register routes for each prefixe
+	for _, prefix := range prefixes {
+		subrouter := router.PathPrefix(prefix).Subrouter()
+
+		gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(log))
+
+		if !chainObj.Open {
+			subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
+		}
+
+		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, muxer, gwConfig.HttpServerOptions.EnableStrictRoutes)
+
+		// Attach handlers
+		subrouter.NewRoute().Handler(httpHandler)
+	}
 
 	return chainObj
 }
@@ -919,7 +942,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				spec.Proxy.ListenPath = converted
 			}
 
-			if currSpec := gw.getApiSpec(spec.APIID); currSpec != nil && spec.Checksum == currSpec.Checksum {
+			if currSpec := gw.getApiSpec(spec.APIID); !shouldReloadSpec(currSpec, spec) {
 				tmpSpecRegister[spec.APIID] = currSpec
 			} else {
 				tmpSpecRegister[spec.APIID] = spec

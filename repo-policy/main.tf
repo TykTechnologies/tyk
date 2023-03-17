@@ -21,6 +21,7 @@ provider "github" {
   owner = "TykTechnologies"
 }
 
+
 module "tyk" {
   source               = "./modules/github-repos"
   repo                 = "tyk"
@@ -76,6 +77,16 @@ module "tyk" {
 	reviewers = "0",
 	convos    = "false",
 	source_branch  = "release-4.3",
+	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
+{ branch    = "release-5-lts",
+	reviewers = "0",
+	convos    = "false",
+	source_branch  = "master",
+	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
+{ branch    = "release-5.0",
+	reviewers = "0",
+	convos    = "false",
+	source_branch  = "master",
 	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
 ]
 }

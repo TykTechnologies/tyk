@@ -34,11 +34,11 @@ import (
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/pmylund/go-cache"
-	"github.com/rs/cors"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
 	"rsc.io/letsencrypt"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/drl"
@@ -920,25 +920,6 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	spec.ResponseChain = responseChain
 }
 
-func handleCORS(router *mux.Router, spec *APISpec) {
-
-	if spec.CORS.Enable {
-		mainLog.Debug("CORS ENABLED")
-		c := cors.New(cors.Options{
-			AllowedOrigins:     spec.CORS.AllowedOrigins,
-			AllowedMethods:     spec.CORS.AllowedMethods,
-			AllowedHeaders:     spec.CORS.AllowedHeaders,
-			ExposedHeaders:     spec.CORS.ExposedHeaders,
-			AllowCredentials:   spec.CORS.AllowCredentials,
-			MaxAge:             spec.CORS.MaxAge,
-			OptionsPassthrough: spec.CORS.OptionsPassthrough,
-			Debug:              spec.CORS.Debug,
-		})
-
-		router.Use(c.Handler)
-	}
-}
-
 func (gw *Gateway) isRPCMode() bool {
 	return gw.GetConfig().AuthOverride.ForceAuthProvider &&
 		gw.GetConfig().AuthOverride.AuthProvider.StorageEngine == RPCStorageEngine
@@ -1522,9 +1503,10 @@ func Start() {
 
 	// ToDo:Config replace for get default conf
 	gw := NewGateway(config.Default, ctx)
-	gw.SetNodeID("solo-" + uuid.NewV4().String())
+	gw.SetNodeID("solo-" + uuid.New())
 
-	gw.SessionID = uuid.NewV4().String()
+	gw.SessionID = uuid.New()
+
 	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
