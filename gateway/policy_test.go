@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/storage/persistent/id"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -1464,7 +1465,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 
 func TestParsePoliciesFromRPC(t *testing.T) {
 
-	objectID := apidef.NewObjectId()
+	objectID := id.NewObjectID()
 	explicitID := "explicit_pol_id"
 	tcs := []struct {
 		testName      string
