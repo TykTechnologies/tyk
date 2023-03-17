@@ -3,7 +3,6 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/storage/persistent/id"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/storage/persistent/id"
 
 	"github.com/stretchr/testify/assert"
 

@@ -2,12 +2,13 @@ package gateway
 
 import (
 	"fmt"
-	"github.com/TykTechnologies/storage/persistent/id"
 	"net/http"
 	"path"
 	_ "path"
 	"sync/atomic"
 	"testing"
+
+	"github.com/TykTechnologies/storage/persistent/id"
 
 	"github.com/stretchr/testify/assert"
 
