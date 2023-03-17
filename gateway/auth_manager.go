@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -66,15 +67,27 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 
 	rateLimiterSentinelKey := RateLimitKeyPrefix + keyName + ".BLOCKED"
 
+	deleteRawKey := func(wg *sync.WaitGroup, keyName string) {
+		defer wg.Done()
+		b.store.DeleteRawKey(keyName)
+	}
+
+	wg := &sync.WaitGroup{}
 	// Clear the rate limiter
-	b.store.DeleteRawKey(rateLimiterSentinelKey)
+	wg.Add(1)
+	go deleteRawKey(wg, rateLimiterSentinelKey)
+
 	// Fix the raw key
-	b.store.DeleteRawKey(rawKey)
+	wg.Add(1)
+	go deleteRawKey(wg, rawKey)
 
 	for _, acl := range session.AccessRights {
 		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
-		b.store.DeleteRawKey(rawKey)
+		wg.Add(1)
+		go deleteRawKey(wg, rawKey)
 	}
+
+	wg.Wait()
 }
 
 func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
