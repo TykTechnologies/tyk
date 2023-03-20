@@ -702,7 +702,7 @@ type Config struct {
 	// Default: 5
 	DRLThreshold float64 `json:"drl_threshold"`
 
-	// Controls which algorthm to use as a fallback when your distributed rate limiter can't be used.
+	// Controls which algorithm to use as a fallback when your distributed rate limiter can't be used.
 	DRLEnableSentinelRateLimiter bool `json:"drl_enable_sentinel_rate_limiter"`
 
 	// Allows you to dynamically configure analytics expiration on a per organisation level
