@@ -1,8 +1,9 @@
 package oas
 
 import (
-	"github.com/TykTechnologies/storage/persistent/id"
 	"sort"
+
+	"github.com/TykTechnologies/storage/persistent/id"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
