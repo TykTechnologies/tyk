@@ -82,8 +82,12 @@ linters:
     - dupl
     - nilerr
     - misspell
+    - goimports
 
 linters-settings:
+  goimports:
+    local-prefixes: github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal
+
   errcheck:
     check-type-assertions: true
     check-blank: true
