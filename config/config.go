@@ -359,7 +359,7 @@ type HttpServerOptionsConfig struct {
 	// Set to true to enable SSL connections
 	UseSSL bool `json:"use_ssl"`
 
-	// Enable Lets-Encrypt support
+	// Deprecated: UseLE_SSL - Enable Lets-Encrypt support.
 	UseLE_SSL bool `json:"use_ssl_le"`
 
 	// Enable HTTP2 protocol handling
