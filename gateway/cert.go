@@ -316,10 +316,8 @@ var tlsConfigMu sync.Mutex
 
 func getClientValidator(helloInfo *tls.ClientHelloInfo, certPool *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-		// don't return error if not cert provided, as request could be for URL which does
-		// not require a cert
 		if len(rawCerts) == 0 {
-			return nil
+			return errors.New("x509: missing client certificate")
 		}
 
 		cert, certErr := x509.ParseCertificate(rawCerts[0])
