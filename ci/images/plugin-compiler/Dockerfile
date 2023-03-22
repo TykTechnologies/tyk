@@ -16,6 +16,10 @@ RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
+# Remove some things to decrease CVE surface
+RUN  apt-get remove -y --allow-remove-essential --auto-remove curl libtiff5 ncurses-base git-core\
+	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
+
 COPY . $TYK_GW_PATH
 RUN cd $TYK_GW_PATH && go mod vendor
 
