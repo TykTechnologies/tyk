@@ -15,8 +15,6 @@ RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
-
-RUN echo "Starting image build for $(grep PRETTY_NAME /etc/os-release)" \
  && dpkg --add-architecture arm64                      \
  && apt-get update                                     \
  && apt-get dist-upgrade -y -q                         \
