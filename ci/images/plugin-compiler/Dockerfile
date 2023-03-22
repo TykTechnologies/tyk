@@ -14,40 +14,6 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
-RUN chmod +x /build.sh
- && dpkg --add-architecture arm64                      \
- && apt-get update                                     \
- && apt-get dist-upgrade -y -q                         \
-        autoconf                                       \
-        automake                                       \
-        autotools-dev                                  \
-        bc                                             \
-        binfmt-support                                 \
-        binutils-multiarch                             \
-        binutils-multiarch-dev                         \
-        build-essential                                \
-        clang                                          \
-        git-core                                       \
-        crossbuild-essential-arm64                     \
-        curl                                           \
-        libtool                                        \
-        multistrap                                     \
-        patch                                          \
-        wget                                           \
-        xz-utils                                       \
-        lsb-release                                    \
-        cmake                                          \
-        apt-transport-https                            \
-        qemu-user-static                               \
-        libxml2-dev                                    \
-        lzma-dev                                       \
-        openssl                                        \
-        libssl-dev                                     \
-        unzip                                          \
-        sudo                                           \
-        jq                                             \
-        rpm                                            \
-        ruby-dev
 
 # Remove some things to decrease CVE surface
 RUN  apt-get remove -y --allow-remove-essential --auto-remove curl\
@@ -57,4 +23,5 @@ COPY . $TYK_GW_PATH
 RUN cd $TYK_GW_PATH && go mod vendor
 
 ENTRYPOINT ["/build.sh"]
+
 
