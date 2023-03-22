@@ -36,6 +36,7 @@ dockers:
   image_templates:
     - "tykio/tyk-gateway:{{ .Tag }}-amd64"
     - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}"
+    - "docker.tyk.io/tyk-gateway/tyk-gateway::v{{ .Major }}.{{ .Minor }}{{.Prerelease}}"
   build_flag_templates:
     - "--build-arg=PORTS=8080"
     - "--platform=linux/amd64"
