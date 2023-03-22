@@ -1,11 +1,15 @@
 package gateway
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
 	"io/ioutil"
+	"math/big"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,7 +22,6 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/gorilla/mux"
-	"github.com/pmylund/go-cache"
 )
 
 type APICertificateStatusMessage struct {
@@ -57,6 +60,45 @@ var cipherSuites = map[string]uint16{
 }
 
 var certLog = log.WithField("prefix", "certs")
+
+var dummyCA *x509.Certificate
+
+func init() {
+	ca := &x509.Certificate{
+		SerialNumber: big.NewInt(2019),
+		Subject: pkix.Name{
+			Organization:  []string{"DUMMY"},
+			Country:       []string{"US"},
+			Province:      []string{""},
+			Locality:      []string{"DUMMY"},
+			StreetAddress: []string{"DUMMY"},
+			PostalCode:    []string{"DUMMY"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(10, 0, 0),
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+	}
+
+	caPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		certLog.WithError(err).Error("Failed to generate private key for dummy CA")
+		return
+	}
+
+	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
+	if err != nil {
+		certLog.WithError(err).Error("Failed to create cert for dummy CA")
+		return
+	}
+
+	dummyCA, err = x509.ParseCertificate(caBytes)
+	if err != nil {
+		certLog.WithError(err).Error("Failed to parse cert for dummy CA")
+	}
+}
 
 func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
 	var certID string
@@ -274,8 +316,10 @@ var tlsConfigMu sync.Mutex
 
 func getClientValidator(helloInfo *tls.ClientHelloInfo, certPool *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		// don't return error if not cert provided, as request could be for URL which does
+		// not require a cert
 		if len(rawCerts) == 0 {
-			return errors.New("x509: missing client certificate")
+			return nil
 		}
 
 		cert, certErr := x509.ParseCertificate(rawCerts[0])
@@ -470,10 +514,17 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 			if newConfig.ClientAuth >= tls.RequestClientCert {
 				newConfig.ClientCAs = x509.NewCertPool()
+				if dummyCA != nil {
+					// add a dummy CA as if CAs are not sent, browser popup appears prompting to select
+					// cert to authenticate. Peer will not have a cert signed by this dummy CA so popup
+					// will not appear. Peers can still connect with certs NOT signed by dummy CA so not
+					// breaking change
+					newConfig.ClientCAs.AddCert(dummyCA)
+				}
 				newConfig.ClientAuth = tls.RequestClientCert
 			}
 		}
-		
+
 		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
 
