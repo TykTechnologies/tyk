@@ -16,8 +16,43 @@ RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
+RUN echo "Starting image build for $(grep PRETTY_NAME /etc/os-release)" \
+ && dpkg --add-architecture arm64                      \
+ && apt-get update                                     \
+ && apt-get dist-upgrade -y -q                         \
+        autoconf                                       \
+        automake                                       \
+        autotools-dev                                  \
+        bc                                             \
+        binfmt-support                                 \
+        binutils-multiarch                             \
+        binutils-multiarch-dev                         \
+        build-essential                                \
+        clang                                          \
+        git-core                                       \
+        crossbuild-essential-arm64                     \
+        curl                                           \
+        libtool                                        \
+        multistrap                                     \
+        patch                                          \
+        wget                                           \
+        xz-utils                                       \
+        lsb-release                                    \
+        cmake                                          \
+        apt-transport-https                            \
+        qemu-user-static                               \
+        libxml2-dev                                    \
+        lzma-dev                                       \
+        openssl                                        \
+        libssl-dev                                     \
+        unzip                                          \
+        sudo                                           \
+        jq                                             \
+        rpm                                            \
+        ruby-dev
+
 # Remove some things to decrease CVE surface
-RUN  apt-get remove -y --allow-remove-essential --auto-remove curl git-core\
+RUN  apt-get remove -y --allow-remove-essential --auto-remove curl\
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 COPY . $TYK_GW_PATH
