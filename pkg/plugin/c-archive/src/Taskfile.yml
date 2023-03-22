@@ -1,0 +1,12 @@
+---
+version: "3"
+
+tasks:
+  default:
+    desc: "Build libplugin"
+    cmds:
+      - goimports -w .
+      - go build -buildmode=c-archive -o libplugin.a
+      - go build -buildmode=c-shared -o libplugin.so
+      - cp plugin.h ../lib
+      - mv libplugin.* ../lib

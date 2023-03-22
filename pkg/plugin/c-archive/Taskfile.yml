@@ -1,0 +1,9 @@
+---
+version: "3"
+
+tasks:
+  default:
+    desc: "Run tests"
+    cmds:
+      - goimports -w .
+      - go test -count=1 -v .

@@ -1,0 +1,8 @@
+---
+version: "3"
+
+tasks:
+  default:
+    desc: "Build libplugin"
+    cmds:
+      - go build -buildmode=plugin .
