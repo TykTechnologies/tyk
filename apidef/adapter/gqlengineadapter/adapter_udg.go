@@ -114,6 +114,17 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 				return nil, err
 			}
 
+			if graphqlConfig.HasOperation {
+				planDataSource.Factory = &restDataSource.Factory{
+					Client: u.HttpClient,
+				}
+				planDataSource.Custom, err = generateRestDataSourceFromGraphql(graphqlConfig)
+				if err != nil {
+					return nil, err
+				}
+				break
+			}
+
 			planDataSource.Factory, err = createGraphQLDataSourceFactory(createGraphQLDataSourceFactoryParams{
 				graphqlConfig:             graphqlConfig,
 				subscriptionClientFactory: subscriptionClientFactoryOrDefault(u.subscriptionClientFactory),
@@ -159,6 +170,31 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 
 	err = u.determineChildNodes(planDataSources)
 	return planDataSources, err
+}
+
+func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConfigGraphQL) (json.RawMessage, error) {
+	type reqStruct struct {
+		Query     string          `json:"query"`
+		Variables json.RawMessage `json:"variables"`
+	}
+
+	req := reqStruct{
+		Query:     config.Operation,
+		Variables: config.Variables,
+	}
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	customMessage := restDataSource.ConfigJSON(restDataSource.Configuration{
+		Fetch: restDataSource.FetchConfiguration{
+			URL:    config.URL,
+			Method: config.Method,
+			Body:   string(body),
+			Header: convertApiDefinitionHeadersToHttpHeaders(config.Headers),
+		},
+	})
+	return customMessage, nil
 }
 
 func (u *UniversalDataGraph) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
