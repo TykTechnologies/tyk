@@ -17,7 +17,7 @@ COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
 # Remove some things to decrease CVE surface
-RUN  apt-get remove -y --allow-remove-essential --auto-remove curl libtiff5 ncurses-base git-core\
+RUN  apt-get remove -y --allow-remove-essential --auto-remove curl git-core\
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 COPY . $TYK_GW_PATH
