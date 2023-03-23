@@ -13,12 +13,20 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 
 RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
+RUN apt-get update \
+    && apt-get dist-upgrade -y curl git-core 
+
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
 # Remove some things to decrease CVE surface
-RUN  apt-get remove -y --allow-remove-essential --auto-remove curl ncurses-base\
+RUN  apt-get remove -y --allow-remove-essential --auto-remove curl libtiff5 ncurses-base \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
+
+# Clean up caches, unwanted .a and .o files
+RUN rm -rf /root/.cache \
+    && apt-get -y autoremove \
+    && apt-get clean
 
 COPY . $TYK_GW_PATH
 RUN cd $TYK_GW_PATH && go mod vendor
