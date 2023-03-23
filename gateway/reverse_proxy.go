@@ -1034,10 +1034,12 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
 		reqCtx := context.Background()
 		if isProxyOnly {
-			reqCtx = NewGraphQLProxyOnlyContext(context.Background(), outreq)
+			reqCtx = NewGraphQLProxyOnlyContext(outreq.Context(), outreq)
 		}
 
 		resultWriter := graphql.NewEngineResultWriter()
+		gqlRequest.OpenTelemetryRootContext = outreq.Context()
+		gqlRequest.OpenTelemetryTracer = trace.Get("tyk-gateway")
 		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter,
 			graphql.WithBeforeFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.BeforeFetchHook),
 			graphql.WithAfterFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.AfterFetchHook),
