@@ -1,7 +1,7 @@
 ARG GOLANG_CROSS=1.16
-ARG DEB_VERSION=buster
+ARG DEB_VERSION
 
-FROM tykio/golang-cross:${GOLANG_CROSS}-${DEB_VERSION} 
+FROM tykio/golang-cross:${GOLANG_CROSS}${DEB_VERSION} 
 LABEL description="Image for plugin development"
 
 ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
