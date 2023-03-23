@@ -689,6 +689,7 @@ func TestAPIDefinition_migrateScopeToPolicy(t *testing.T) {
 	}
 
 	check := func(t *testing.T, jwtScopeClaimName string, jwtScopeToPolicyMapping map[string]string, scopeClaim ScopeClaim) {
+		t.Helper()
 		assert.Equal(t, expectedScopeClaim, scopeClaim)
 		assert.Empty(t, jwtScopeClaimName)
 		assert.Nil(t, jwtScopeToPolicyMapping)
