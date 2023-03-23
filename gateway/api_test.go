@@ -646,11 +646,6 @@ func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 						}}
 					})
 
-					withAccess := CreateStandardSession()
-					withAccess.AccessRights = map[string]user.AccessDefinition{testAPIID: {
-						APIID: testAPIID,
-					}}
-
 					authHeaders := map[string]string{
 						"authorization": key,
 					}

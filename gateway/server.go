@@ -36,7 +36,6 @@ import (
 	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
-	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
@@ -145,9 +144,6 @@ type Gateway struct {
 
 	consulKVStore kv.Store
 	vaultKVStore  kv.Store
-
-	LE_MANAGER  letsencrypt.Manager
-	LE_FIRSTRUN bool
 
 	NotificationVerifier goverify.Verifier
 
@@ -1256,10 +1252,6 @@ func (gw *Gateway) initialiseSystem() error {
 	gw.getHostDetails(gw.GetConfig().PIDFileLocation)
 	gw.InitializeRPCCache()
 	gw.setupInstrumentation()
-
-	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
-		go gw.StartPeriodicStateBackup(&gw.LE_MANAGER)
-	}
 
 	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
 	// instances periodically and deletes idle items, closes net.Listener instances to
