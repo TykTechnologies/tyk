@@ -23,7 +23,7 @@ RUN chmod +x /build.sh
 RUN  apt-get remove -y --allow-remove-essential --auto-remove curl libtiff5 ncurses-base \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
-# Clean up caches, unwanted .a and .o files
+# Clean up 
 RUN rm -rf /root/.cache \
     && apt-get -y autoremove \
     && apt-get clean
