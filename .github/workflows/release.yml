@@ -60,7 +60,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: "Add Git safe.directory" # Go 1.18+ started embedding repo info in the build
+      - name: "Add Git safe.directory"
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
 
       - uses: docker/setup-qemu-action@v2
