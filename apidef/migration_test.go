@@ -676,3 +676,45 @@ func TestAPIDefinition_migratePluginConfigData(t *testing.T) {
 
 	assert.True(t, base.ConfigDataDisabled)
 }
+
+func TestAPIDefinition_migrateScopeToPolicy(t *testing.T) {
+	var (
+		scopeName            = "scope"
+		scopeToPolicyMapping = map[string]string{"claim1": "pol1"}
+	)
+
+	expectedScopeClaim := ScopeClaim{
+		ScopeClaimName: scopeName,
+		ScopeToPolicy:  scopeToPolicyMapping,
+	}
+
+	check := func(t *testing.T, jwtScopeClaimName string, jwtScopeToPolicyMapping map[string]string, scopeClaim ScopeClaim) {
+		assert.Equal(t, expectedScopeClaim, scopeClaim)
+		assert.Empty(t, jwtScopeClaimName)
+		assert.Nil(t, jwtScopeToPolicyMapping)
+	}
+
+	t.Run("jwt", func(t *testing.T) {
+		apiDef := APIDefinition{
+			JWTScopeClaimName:       scopeName,
+			JWTScopeToPolicyMapping: scopeToPolicyMapping,
+		}
+
+		_, err := apiDef.Migrate()
+		assert.NoError(t, err)
+		check(t, apiDef.JWTScopeClaimName, apiDef.JWTScopeToPolicyMapping, apiDef.Scopes.JWT)
+	})
+
+	t.Run("oidc", func(t *testing.T) {
+		apiDef := APIDefinition{
+			UseOpenID:               true,
+			JWTScopeClaimName:       scopeName,
+			JWTScopeToPolicyMapping: scopeToPolicyMapping,
+		}
+
+		_, err := apiDef.Migrate()
+		assert.NoError(t, err)
+		check(t, apiDef.JWTScopeClaimName, apiDef.JWTScopeToPolicyMapping, apiDef.Scopes.OIDC)
+	})
+
+}

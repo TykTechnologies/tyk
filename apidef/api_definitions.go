@@ -1291,6 +1291,38 @@ func DummyAPI() APIDefinition {
 	}
 }
 
+func (a *APIDefinition) GetScopeClaimName() string {
+	if a.UseOpenID {
+		if a.Scopes.OIDC.ScopeClaimName != "" {
+			return a.Scopes.OIDC.ScopeClaimName
+		}
+
+		return a.JWTScopeClaimName
+	}
+
+	if a.Scopes.JWT.ScopeClaimName != "" {
+		return a.Scopes.JWT.ScopeClaimName
+	}
+
+	return a.JWTScopeClaimName
+}
+
+func (a *APIDefinition) GetScopeToPolicyMapping() map[string]string {
+	if a.UseOpenID {
+		if len(a.Scopes.OIDC.ScopeToPolicy) > 0 {
+			return a.Scopes.OIDC.ScopeToPolicy
+		}
+
+		return a.JWTScopeToPolicyMapping
+	}
+
+	if len(a.Scopes.JWT.ScopeToPolicy) > 0 {
+		return a.Scopes.JWT.ScopeToPolicy
+	}
+
+	return a.JWTScopeToPolicyMapping
+}
+
 var Template = template.New("").Funcs(map[string]interface{}{
 	"jsonMarshal": func(v interface{}) (string, error) {
 		bs, err := json.Marshal(v)
