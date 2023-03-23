@@ -116,6 +116,10 @@ jobs:
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
 
+      - name: Add safedir
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - uses: goreleaser/goreleaser-action@v3
         with:
           version: latest
