@@ -19,6 +19,7 @@ RUN chmod +x /build.sh
 RUN  apt-get remove -y --allow-remove-essential --auto-remove mercurial \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
+
 COPY . $TYK_GW_PATH
 RUN cd $TYK_GW_PATH && go mod vendor
 
