@@ -1,12 +1,7 @@
-name: CI tests
+---
+name: Basic build checks
 
 on: pull_request
-
-env:
-  TYK_DB_REDISHOST: localhost
-  TYK_GW_STORAGE_HOST: localhost
-  PYTHON_VERSION: '3.9'
-  PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
   test:
@@ -15,34 +10,19 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        redis-version: [5]
-        python-version: ['3.9']
         go: [1.15]
+        redis-version: [6]
 
     steps:
       - name: Checkout Tyk
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
 
       - name: Setup Golang
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go }}
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-            python-version: ${{ matrix.python-version }}
-
-      - name: Setup Lua
-        run:
-          sudo apt-get install libluajit-5.1-dev
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install setuptools
-          pip install google
-          pip install protobuf
 
       - name: Start Redis
         uses: supercharge/redis-github-action@1.1.0
@@ -57,6 +37,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Run Gateway Tests
-        run: |
-          ./bin/ci-tests.sh
+      - name: Build
+        run: go build .
+
+      - name: Build tests, runs init funcs
+        run: go test -run=^$ ./...

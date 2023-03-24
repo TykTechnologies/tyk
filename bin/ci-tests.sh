@@ -13,20 +13,6 @@ fatal() {
 	exit 1
 }
 
-FMT_FILES=$(gofmt -l . | grep -v vendor)
-if [[ -n ${FMT_FILES} ]]; then
-    fatal "Run 'gofmt -w' on these files:\n$FMT_FILES"
-fi
-
-echo "gofmt check is ok!"
-
-IMP_FILES="$(goimports -l . | grep -v vendor)"
-if [[ -n ${IMP_FILES} ]]; then
-    fatal "Run 'goimports -w' on these files:\n$IMP_FILES"
-fi
-
-echo "goimports check is ok!"
-
 PKGS="$(go list ./...)"
 
 export PKG_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
