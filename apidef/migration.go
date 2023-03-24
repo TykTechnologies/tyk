@@ -232,6 +232,7 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateAuthenticationPlugin()
 	a.migrateIDExtractor()
 	a.migrateCustomDomain()
+	a.migrateScopeToPolicy()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -422,4 +423,21 @@ func (a *APIDefinition) SetDisabledFlags() {
 			a.VersionData.Versions[version].ExtendedPaths.GoPlugin[i].Disabled = true
 		}
 	}
+}
+
+func (a *APIDefinition) migrateScopeToPolicy() {
+	scopeClaim := ScopeClaim{
+		ScopeClaimName: a.JWTScopeClaimName,
+		ScopeToPolicy:  a.JWTScopeToPolicyMapping,
+	}
+
+	a.JWTScopeToPolicyMapping = nil
+	a.JWTScopeClaimName = ""
+
+	if a.UseOpenID {
+		a.Scopes.OIDC = scopeClaim
+		return
+	}
+
+	a.Scopes.JWT = scopeClaim
 }
