@@ -11,6 +11,7 @@ jobs:
       fail-fast: true
       matrix:
         go: [1.15]
+        redis-version: [6]
 
     steps:
       - name: Checkout Tyk
@@ -23,6 +24,11 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
 
+      - name: Start Redis
+        uses: supercharge/redis-github-action@1.1.0
+        with:
+          redis-version: ${{ matrix.redis-version }}
+
       - name: Cache
         uses: actions/cache@v2
         with:
@@ -34,5 +40,5 @@ jobs:
       - name: Build
         run: go build .
 
-      - name: Build tests but run none
+      - name: Build tests, runs init funcs
         run: go test -run=^$ ./...
