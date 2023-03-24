@@ -15,6 +15,8 @@ import (
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/TykTechnologies/tyk/internal/reflect"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
@@ -965,14 +967,6 @@ func (a *APIDefinition) EncodeForDB() {
 	if a.Auth.AuthHeaderName == "" {
 		a.Auth = a.AuthConfigs["authToken"]
 	}
-	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
-	if !a.UseOpenID && a.Scopes.JWT.ScopeClaimName != "" {
-		a.JWTScopeToPolicyMapping = a.Scopes.JWT.ScopeToPolicy
-		a.JWTScopeClaimName = a.Scopes.JWT.ScopeClaimName
-	} else if a.UseOpenID && a.Scopes.OIDC.ScopeClaimName != "" {
-		a.JWTScopeToPolicyMapping = a.Scopes.OIDC.ScopeToPolicy
-		a.JWTScopeClaimName = a.Scopes.OIDC.ScopeClaimName
-	}
 }
 
 func (a *APIDefinition) DecodeFromDB() {
@@ -1039,14 +1033,6 @@ func (a *APIDefinition) DecodeFromDB() {
 
 	makeCompatible("authToken", a.UseStandardAuth)
 	makeCompatible("jwt", a.EnableJWT)
-	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
-	if !a.UseOpenID && a.JWTScopeClaimName != "" && a.Scopes.JWT.ScopeClaimName == "" {
-		a.Scopes.JWT.ScopeToPolicy = a.JWTScopeToPolicyMapping
-		a.Scopes.JWT.ScopeClaimName = a.JWTScopeClaimName
-	} else if a.UseOpenID && a.JWTScopeClaimName != "" && a.Scopes.OIDC.ScopeClaimName == "" {
-		a.Scopes.OIDC.ScopeToPolicy = a.JWTScopeToPolicyMapping
-		a.Scopes.OIDC.ScopeClaimName = a.JWTScopeClaimName
-	}
 }
 
 // Expired returns true if this Version has expired
@@ -1289,6 +1275,30 @@ func DummyAPI() APIDefinition {
 		Tags:    []string{},
 		GraphQL: graphql,
 	}
+}
+
+func (a *APIDefinition) GetScopeClaimName() string {
+	if reflect.IsEmpty(a.Scopes) {
+		return a.JWTScopeClaimName
+	}
+
+	if a.UseOpenID {
+		return a.Scopes.OIDC.ScopeClaimName
+	}
+
+	return a.Scopes.JWT.ScopeClaimName
+}
+
+func (a *APIDefinition) GetScopeToPolicyMapping() map[string]string {
+	if reflect.IsEmpty(a.Scopes) {
+		return a.JWTScopeToPolicyMapping
+	}
+
+	if a.UseOpenID {
+		return a.Scopes.OIDC.ScopeToPolicy
+	}
+
+	return a.Scopes.JWT.ScopeToPolicy
 }
 
 var Template = template.New("").Funcs(map[string]interface{}{
