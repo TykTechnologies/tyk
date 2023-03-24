@@ -11,10 +11,11 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
+
+	"github.com/TykTechnologies/tyk/internal/reflect"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
