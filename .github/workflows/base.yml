@@ -1,0 +1,38 @@
+---
+name: Basic build checks
+
+on: pull_request
+
+jobs:
+  test:
+    name: Go ${{ matrix.go }} Redis ${{ matrix.redis-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        go: [1.15]
+
+    steps:
+      - name: Checkout Tyk
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Setup Golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Cache
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build
+        run: go build .
+
+      - name: Build tests but run none
+        run: go test -run=^$ ./...
