@@ -186,10 +186,9 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			scopeClaimName = "scope"
 		}
 
-		scopeToPolicy := k.Spec.GetScopeToPolicyMapping()
 		if scope := getScopeFromClaim(token.Claims.(jwt.MapClaims), scopeClaimName); scope != nil {
 			// add all policies matched from scope-policy mapping
-			policiesToApply = mapScopeToPolicies(scopeToPolicy, scope)
+			policiesToApply = mapScopeToPolicies(k.Spec.GetScopeToPolicyMapping(), scope)
 		}
 	}
 

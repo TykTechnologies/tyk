@@ -278,8 +278,6 @@ func TestAPIDefinition_GetScopeClaimName(t *testing.T) {
 
 func TestAPIDefinition_GetScopeToPolicyMapping(t *testing.T) {
 	var (
-		scopeName = "scope"
-
 		scopeToPolicyMapping        = map[string]string{"jwtClaim": "pol1"}
 		newScopeToPolicyMapping     = map[string]string{"jwtClaim1": "pol1"}
 		oidcScopeToPolicyMapping    = map[string]string{"oidcClaim": "pol1"}
@@ -289,16 +287,13 @@ func TestAPIDefinition_GetScopeToPolicyMapping(t *testing.T) {
 	getAPIDef := func(deprecatedScopeToPolicy, jwtScopeToPolicy, oidcScopeToPolicy map[string]string, useOIDC bool) APIDefinition {
 		return APIDefinition{
 			UseOpenID:               useOIDC,
-			JWTScopeClaimName:       scopeName,
 			JWTScopeToPolicyMapping: deprecatedScopeToPolicy,
 			Scopes: Scopes{
 				JWT: ScopeClaim{
-					ScopeClaimName: scopeName,
-					ScopeToPolicy:  jwtScopeToPolicy,
+					ScopeToPolicy: jwtScopeToPolicy,
 				},
 				OIDC: ScopeClaim{
-					ScopeClaimName: scopeName,
-					ScopeToPolicy:  oidcScopeToPolicy,
+					ScopeToPolicy: oidcScopeToPolicy,
 				},
 			},
 		}
