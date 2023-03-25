@@ -566,8 +566,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	}
 
 	// apply policies from scope if scope-to-policy mapping is specified for this API
-	if len(k.Spec.JWTScopeToPolicyMapping) != 0 {
-		scopeClaimName := k.Spec.JWTScopeClaimName
+	if len(k.Spec.GetScopeToPolicyMapping()) != 0 {
+		scopeClaimName := k.Spec.GetScopeClaimName()
 		if scopeClaimName == "" {
 			scopeClaimName = "scope"
 		}
@@ -583,7 +583,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 
 			// add all policies matched from scope-policy mapping
-			mappedPolIDs := mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
+			mappedPolIDs := mapScopeToPolicies(k.Spec.GetScopeToPolicyMapping(), scope)
 			if len(mappedPolIDs) > 0 {
 				k.Logger().Debugf("Identified policy(s) to apply to this token from scope claim: %s", scopeClaimName)
 			} else {

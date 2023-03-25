@@ -1102,6 +1102,14 @@ func DummyAPI() APIDefinition {
 	}
 }
 
+func (a *APIDefinition) GetScopeClaimName() string {
+	return a.JWTScopeClaimName
+}
+
+func (a *APIDefinition) GetScopeToPolicyMapping() map[string]string {
+	return a.JWTScopeToPolicyMapping
+}
+
 var Template = template.New("").Funcs(map[string]interface{}{
 	"jsonMarshal": func(v interface{}) (string, error) {
 		bs, err := json.Marshal(v)
