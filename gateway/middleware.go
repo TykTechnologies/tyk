@@ -530,9 +530,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
-				if !usePartitions || policy.Partitions.Acl {
-					rights[k] = ar
-				}
+				rights[k] = ar
 			}
 
 			// Master policy case
@@ -608,6 +606,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 	// If some APIs had only ACL partitions, inherit rest from session level
 	for k, v := range rights {
+		if !didACL[k] {
+			delete(rights, k)
+			continue
+		}
+
 		if !didRateLimit[k] {
 			v.Limit.Rate = session.Rate
 			v.Limit.Per = session.Per
