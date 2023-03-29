@@ -28,3 +28,25 @@ func Test_BuildDashboardConnStr(t *testing.T) {
 
 	assert.Equal(t, connStr, "http://localhost/test")
 }
+
+func Test_DashboardLifecycle(t *testing.T) {
+	var handler HTTPDashboardHandler
+
+	handler = HTTPDashboardHandler{
+		heartBeatStopSentinel: STARTED,
+	}
+	assert.False(t, handler.isStopped())
+
+	handler = HTTPDashboardHandler{
+		heartBeatStopSentinel: STOPPED,
+	}
+
+	assert.True(t, handler.isStopped())
+
+	handler = HTTPDashboardHandler{
+		heartBeatStopSentinel: STARTED,
+	}
+
+	handler.StopBeating()
+	assert.True(t, handler.isStopped())
+}
