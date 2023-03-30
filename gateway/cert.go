@@ -22,6 +22,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/gorilla/mux"
+	"github.com/pmylund/go-cache"
 )
 
 type APICertificateStatusMessage struct {
