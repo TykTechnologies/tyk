@@ -400,6 +400,8 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.CustomMiddlewareBundleDisabled = true
 	a.CustomMiddleware.IdExtractor.Disabled = true
 	a.ConfigDataDisabled = true
+	a.Proxy.ServiceDiscovery.CacheDisabled = true
+	a.UptimeTests.Config.ServiceDiscovery.CacheDisabled = true
 
 	for i := 0; i < len(a.CustomMiddleware.Pre); i++ {
 		a.CustomMiddleware.Pre[i].Disabled = true
