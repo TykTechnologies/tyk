@@ -894,6 +894,8 @@ type Config struct {
 	// Configuration options for Python and gRPC plugins.
 	CoProcessOptions CoProcessConfig `json:"coprocess_options"`
 
+	DisableAPILoadOnPluginError bool `json:"disable_api_load_on_plugin_error"`
+
 	// Ignore the case of any endpoints for APIs managed by Tyk. Setting this to `true` will override any individual API and Ignore, Blacklist and Whitelist plugin endpoint settings.
 	IgnoreEndpointCase bool `json:"ignore_endpoint_case"`
 

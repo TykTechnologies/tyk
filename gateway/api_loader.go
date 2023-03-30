@@ -335,6 +335,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		} else {
 			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 		}
+
+		if chainDef.Skip {
+			return &chainDef
+		}
 	}
 
 	gw.mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
@@ -400,6 +404,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 				newExtractor(spec, baseMid)
 				gw.mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
 			}
+
+			if chainDef.Skip {
+				return &chainDef
+			}
 		}
 
 		if spec.UseStandardAuth || len(authArray) == 0 {
@@ -423,6 +431,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			} else {
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver, obj.RawBodyOnly, nil})
+			}
+
+			if chainDef.Skip {
+				return &chainDef
 			}
 		}
 
@@ -456,6 +468,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid})
 
+	if chainDef.Skip {
+		return &chainDef
+	}
+
 	for _, obj := range mwPostFuncs {
 		if mwDriver == apidef.GoPluginDriver {
 			gw.mwAppendEnabled(
@@ -472,6 +488,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
 			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
+		}
+
+		if chainDef.Skip {
+			return &chainDef
 		}
 	}
 
@@ -758,6 +778,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	}
 
 	if chainObj.Skip {
+		log.Warnf("Skip API with name:%s and id:%s load", spec.Name, spec.APIID)
 		return chainObj
 	}
 

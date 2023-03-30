@@ -193,10 +193,11 @@ func (gw *Gateway) mwList(mws ...TykMiddleware) []alice.Constructor {
 // BaseMiddleware wraps up the ApiSpec and Proxy objects to be included in a
 // middleware handler, this can probably be handled better.
 type BaseMiddleware struct {
-	Spec   *APISpec
-	Proxy  ReturningHttpHandler
-	logger *logrus.Entry
-	Gw     *Gateway `json:"-"`
+	Spec     *APISpec
+	Proxy    ReturningHttpHandler
+	logger   *logrus.Entry
+	Gw       *Gateway `json:"-"`
+	chainDef *ChainObject
 }
 
 func (t BaseMiddleware) Base() *BaseMiddleware { return &t }

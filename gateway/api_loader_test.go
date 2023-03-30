@@ -8,12 +8,11 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
@@ -370,4 +369,62 @@ func TestTykRateLimitsStatusOfAPI(t *testing.T) {
 		quotaMax, quotaRemaining, rate, per)
 
 	_, _ = g.Run(t, test.TestCase{Path: "/my-api/tyk/rate-limits/", Headers: authHeader, BodyMatch: bodyMatch, Code: http.StatusOK})
+}
+
+func TestSkippingAPILoadWhenPluginLoadFails(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	globalConf := g.Gw.GetConfig()
+	globalConf.CoProcessOptions.EnableCoProcess = false
+	globalConf.DisableAPILoadOnPluginError = true
+	g.Gw.SetConfig(globalConf)
+
+	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test"
+		spec.Proxy.ListenPath = "/my-api-with-plugin/"
+	})[0]
+
+	_, _ = g.Run(t, test.TestCase{Path: "/my-api-with-plugin/", Code: http.StatusOK})
+
+	api.UseKeylessAccess = false
+	api.CustomPluginAuthEnabled = true
+
+	g.Gw.LoadAPI(api)
+	_, _ = g.Run(t, test.TestCase{Path: "/my-api-with-plugin/", Code: http.StatusNotFound})
+
+	api.CustomPluginAuthEnabled = false
+
+	t.Run("Custom Middleware Pre", func(t *testing.T) {
+		api.CustomMiddleware.Pre = []apidef.MiddlewareDefinition{
+			{Path: "plugin.so", Name: "Plugin"},
+		}
+		g.Gw.LoadAPI(api)
+
+		_, _ = g.Run(t, test.TestCase{Path: "/my-api-with-plugin/", Code: http.StatusNotFound})
+
+		api.CustomMiddleware.Pre = nil
+	})
+
+	t.Run("Custom Middleware Post", func(t *testing.T) {
+		api.CustomMiddleware.Post = []apidef.MiddlewareDefinition{
+			{Path: "plugin.so", Name: "Plugin"},
+		}
+		g.Gw.LoadAPI(api)
+
+		_, _ = g.Run(t, test.TestCase{Path: "/my-api-with-plugin/", Code: http.StatusNotFound})
+
+		api.CustomMiddleware.Post = nil
+	})
+
+	t.Run("Custom Middleware Post Auth", func(t *testing.T) {
+		api.CustomMiddleware.PostKeyAuth = []apidef.MiddlewareDefinition{
+			{Path: "plugin.so", Name: "Plugin"},
+		}
+		g.Gw.LoadAPI(api)
+
+		_, _ = g.Run(t, test.TestCase{Path: "/my-api-with-plugin/", Code: http.StatusNotFound})
+
+		api.CustomMiddleware.PostKeyAuth = nil
+	})
 }

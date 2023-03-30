@@ -1,7 +1,10 @@
 package gateway
 
 import (
+	"context"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/stretchr/testify/assert"
 
@@ -136,4 +139,38 @@ func Test_shouldAddConfigData(t *testing.T) {
 			assert.Equal(t, tc.shouldAdd, shouldAddConfigData(tc.spec))
 		})
 	}
+}
+
+func TestCoProcessMiddleware_EnabledForSpec(t *testing.T) {
+	cfg := config.Config{}
+	cfg.DisableAPILoadOnPluginError = false
+	gw := NewGateway(cfg, context.Background())
+	cm := CoProcessMiddleware{BaseMiddleware: BaseMiddleware{chainDef: &ChainObject{}, Gw: gw}}
+	cm.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	assert.False(t, cm.EnabledForSpec())
+	assert.False(t, cm.chainDef.Skip)
+
+	cm.chainDef.Skip = false
+	cfg.DisableAPILoadOnPluginError = true
+	gw.SetConfig(cfg)
+	assert.False(t, cm.EnabledForSpec())
+	assert.True(t, cm.chainDef.Skip)
+
+	cm.chainDef.Skip = false
+	cfg.CoProcessOptions.EnableCoProcess = true
+	gw.SetConfig(cfg)
+	assert.False(t, cm.EnabledForSpec())
+	assert.True(t, cm.chainDef.Skip)
+
+	cm.chainDef.Skip = false
+	cm.Spec.CustomMiddleware.Driver = apidef.PythonDriver
+	loadedDrivers[apidef.PythonDriver] = nil
+	assert.False(t, cm.EnabledForSpec())
+	assert.True(t, cm.chainDef.Skip)
+
+	// Success
+	cm.chainDef.Skip = false
+	loadedDrivers[apidef.PythonDriver] = &PythonDispatcher{}
+	assert.True(t, cm.EnabledForSpec())
+	assert.False(t, cm.chainDef.Skip)
 }

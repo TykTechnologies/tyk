@@ -267,8 +267,10 @@ func (gw *Gateway) CoProcessInit() {
 
 // EnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) EnabledForSpec() bool {
+	canStopAPILoad := m.Gw.GetConfig().DisableAPILoadOnPluginError
 
 	if !m.Gw.GetConfig().CoProcessOptions.EnableCoProcess {
+		m.chainDef.Skip = canStopAPILoad
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Error("Your API specifies a CP custom middleware, either Tyk wasn't build with CP support or CP is not enabled in your Tyk configuration file!")
@@ -283,6 +285,7 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 	}
 
 	if !supported {
+		m.chainDef.Skip = canStopAPILoad
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Errorf("Unsupported driver '%s'", m.Spec.CustomMiddleware.Driver)
@@ -290,6 +293,7 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 	}
 
 	if d, _ := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
+		m.chainDef.Skip = canStopAPILoad
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
