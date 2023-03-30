@@ -127,6 +127,8 @@ jobs:
           rm -rf vendor
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
+          
+          git config --global --add safe.directory /__w/tyk/tyk
 
 
       - uses: goreleaser/goreleaser-action@v2
