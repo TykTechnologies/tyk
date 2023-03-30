@@ -36,11 +36,11 @@ type DashboardServiceSender interface {
 // Go 1.17 adds atomic.Value.Swap which is great, but 1.19
 // adds atomic.Bool and other types. This is a go <1.13 cludge.
 const (
-	// Zero value - the handlers started
-	STARTED = 0
+	// HeartBeatStarted Zero value - the handlers started
+	HeartBeatStarted = 0
 
-	// Stopped value - the handlers invoked shutdown
-	STOPPED = 1
+	// HeartBeatStopped value - the handlers invoked shutdown
+	HeartBeatStopped = 1
 )
 
 type HTTPDashboardHandler struct {
@@ -227,18 +227,18 @@ func (h *HTTPDashboardHandler) Ping() error {
 		h.Gw.initialiseClient())
 }
 
-func (h *HTTPDashboardHandler) isStopped() bool {
-	return atomic.LoadInt32(&h.heartBeatStopSentinel) == STOPPED
+func (h *HTTPDashboardHandler) isHeartBeatStopped() bool {
+	return atomic.LoadInt32(&h.heartBeatStopSentinel) == HeartBeatStopped
 }
 
 func (h *HTTPDashboardHandler) StartBeating() error {
-	atomic.SwapInt32(&h.heartBeatStopSentinel, STARTED)
+	atomic.SwapInt32(&h.heartBeatStopSentinel, HeartBeatStarted)
 
 	req := h.newRequest(http.MethodGet, h.HeartBeatEndpoint)
 
 	client := h.Gw.initialiseClient()
 
-	for !h.isStopped() {
+	for !h.isHeartBeatStopped() {
 		if err := h.sendHeartBeat(req, client); err != nil {
 			dashLog.Warning(err)
 		}
@@ -250,7 +250,7 @@ func (h *HTTPDashboardHandler) StartBeating() error {
 }
 
 func (h *HTTPDashboardHandler) StopBeating() {
-	atomic.SwapInt32(&h.heartBeatStopSentinel, STOPPED)
+	atomic.SwapInt32(&h.heartBeatStopSentinel, HeartBeatStopped)
 }
 
 func (h *HTTPDashboardHandler) newRequest(method, endpoint string) *http.Request {

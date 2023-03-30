@@ -33,20 +33,20 @@ func Test_DashboardLifecycle(t *testing.T) {
 	var handler HTTPDashboardHandler
 
 	handler = HTTPDashboardHandler{
-		heartBeatStopSentinel: STARTED,
+		heartBeatStopSentinel: HeartBeatStarted,
 	}
-	assert.False(t, handler.isStopped())
+	assert.False(t, handler.isHeartBeatStopped())
 
 	handler = HTTPDashboardHandler{
-		heartBeatStopSentinel: STOPPED,
+		heartBeatStopSentinel: HeartBeatStopped,
 	}
 
-	assert.True(t, handler.isStopped())
+	assert.True(t, handler.isHeartBeatStopped())
 
 	handler = HTTPDashboardHandler{
-		heartBeatStopSentinel: STARTED,
+		heartBeatStopSentinel: HeartBeatStarted,
 	}
 
 	handler.StopBeating()
-	assert.True(t, handler.isStopped())
+	assert.True(t, handler.isHeartBeatStopped())
 }
