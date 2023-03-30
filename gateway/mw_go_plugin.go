@@ -109,8 +109,10 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 
 	// per path go plugins
 	for _, version := range m.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.GoPlugin) > 0 {
-			return true
+		for _, p := range version.ExtendedPaths.GoPlugin {
+			if !p.Disabled {
+				return true
+			}
 		}
 	}
 
