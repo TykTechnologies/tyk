@@ -18,18 +18,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/storage"
-
-	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/storage"
 )
+
+const minute int64 = 60
 
 var CertManagerLogPrefix = "cert_storage"
 
 type CertificateManager struct {
 	storage         storage.Handler
 	logger          *logrus.Entry
-	cache           *cache.Cache
+	cache           cache.Repository
 	secret          string
 	migrateCertList bool
 }
@@ -42,7 +44,7 @@ func NewCertificateManager(storage storage.Handler, secret string, logger *logru
 	return &CertificateManager{
 		storage:         storage,
 		logger:          logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
-		cache:           cache.New(5*time.Minute, 10*time.Minute),
+		cache:           cache.New(5*minute, 10*minute),
 		secret:          secret,
 		migrateCertList: migrateCertList,
 	}
@@ -62,7 +64,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 
 	cm := &CertificateManager{
 		logger:          log,
-		cache:           cache.New(5*time.Minute, 10*time.Minute),
+		cache:           cache.New(5*minute, 10*minute),
 		secret:          secret,
 		migrateCertList: migrateCertList,
 	}

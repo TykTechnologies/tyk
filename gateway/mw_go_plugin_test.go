@@ -3,8 +3,6 @@ package gateway
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/stretchr/testify/assert"
 )
 
