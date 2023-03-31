@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -162,9 +163,14 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		if pluginMw, found := m.goPluginFromRequest(r); found {
 			logger = pluginMw.logger
 			handler = pluginMw.handler
+		} else {
+			return nil, http.StatusOK // next middleware
 		}
 	}
+
 	if handler == nil {
+		respCode = http.StatusInternalServerError
+		err = errors.New(http.StatusText(respCode))
 		return
 
 	}
