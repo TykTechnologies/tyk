@@ -452,3 +452,46 @@ func TestGoPluginAPIandPerPath(t *testing.T) {
 		}...)
 	})
 }
+
+func TestGoPluginMiddleware_ProcessRequest_ShouldFailWhenNotLoaded(t *testing.T) {
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = false
+		spec.CustomPluginAuthEnabled = true
+		spec.CustomMiddleware.Driver = apidef.GoPluginDriver
+		spec.CustomMiddleware.AuthCheck.Name = "my-auth"
+		spec.CustomMiddleware.AuthCheck.Path = "auth.so"
+	})[0]
+
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/get", Code: http.StatusInternalServerError, BodyMatch: http.StatusText(http.StatusInternalServerError),
+	})
+
+	t.Run("path level", func(t *testing.T) {
+		api.CustomPluginAuthEnabled = false
+		api.UseKeylessAccess = true
+
+		v := api.VersionData.Versions["v1"]
+		v.UseExtendedPaths = true
+		v.ExtendedPaths = apidef.ExtendedPathsSet{
+			GoPlugin: []apidef.GoPluginMeta{
+				apidef.GoPluginMeta{
+					Path:       "/my-plugin",
+					Method:     http.MethodGet,
+					PluginPath: "non-existing.so",
+					SymbolName: "NonExistingPlugin",
+				},
+			},
+		}
+		api.VersionData.Versions["v1"] = v
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/get", Code: http.StatusOK},
+			{Path: "/my-plugin", Code: http.StatusInternalServerError, BodyMatch: http.StatusText(http.StatusInternalServerError)},
+		}...)
+	})
+}
