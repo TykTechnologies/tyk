@@ -281,7 +281,7 @@ func TestGoPluginMiddleware_ProcessRequest_ShouldFailWhenNotLoaded(t *testing.T)
 	api := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
-		spec.CustomPluginAuthEnabled = true
+		spec.UseGoPluginAuth = true
 		spec.CustomMiddleware.Driver = apidef.GoPluginDriver
 		spec.CustomMiddleware.AuthCheck.Name = "my-auth"
 		spec.CustomMiddleware.AuthCheck.Path = "auth.so"
@@ -292,7 +292,7 @@ func TestGoPluginMiddleware_ProcessRequest_ShouldFailWhenNotLoaded(t *testing.T)
 	})
 
 	t.Run("path level", func(t *testing.T) {
-		api.CustomPluginAuthEnabled = false
+		api.UseGoPluginAuth = false
 		api.UseKeylessAccess = true
 
 		v := api.VersionData.Versions["v1"]
