@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        golang_cross: [ 1.19-ibm ]
+        golang_cross: [ 1.16-ibm ]
 
     outputs:
       tag: ${{ steps.targets.outputs.tag }}
