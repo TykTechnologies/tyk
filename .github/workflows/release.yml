@@ -37,7 +37,7 @@ jobs:
       matrix:
         golang_cross: [ 1.16-ibm ]
         include:
-           - golang_cross: 1.16
+           - golang_cross: 1.16-ibm
              goreleaser: 'ci/goreleaser/goreleaser.yml'
              rpmvers: 'el/8'
              debvers: 'ubuntu/focal debian/buster debian/bullseye'
