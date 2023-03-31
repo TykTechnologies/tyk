@@ -22,7 +22,13 @@ func (i *PersistGraphQLOperationMiddleware) Name() string {
 }
 
 func (i *PersistGraphQLOperationMiddleware) EnabledForSpec() bool {
-	return true
+	for _, v := range i.Spec.VersionData.Versions {
+		if len(v.ExtendedPaths.PersistGraphQL) > 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 type GraphQLRequest struct {
