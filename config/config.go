@@ -359,9 +359,6 @@ type HttpServerOptionsConfig struct {
 	// Set to true to enable SSL connections
 	UseSSL bool `json:"use_ssl"`
 
-	// Enable Lets-Encrypt support
-	UseLE_SSL bool `json:"use_ssl_le"`
-
 	// Enable HTTP2 protocol handling
 	EnableHttp2 bool `json:"enable_http2"`
 
@@ -393,6 +390,11 @@ type HttpServerOptionsConfig struct {
 
 	// Maximum TLS version.
 	MaxVersion uint16 `json:"max_version"`
+
+	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
+	// This option is useful when you have a lot of ClientCAs and you want to reduce the handshake overhead, as some clients can hit TLS handshake limits.
+	// This option does not give any hints to the client, on which certificate to pick (but this is very rare situation when it is required)
+	SkipClientCAAnnouncement bool `json:"skip_client_ca_announcement"`
 
 	// Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.
 	// This option needed be set for streaming protocols like Server Side Events, or gRPC streaming.
@@ -489,6 +491,8 @@ type NewRelicConfig struct {
 	AppName string `json:"app_name"`
 	// New Relic License key
 	LicenseKey string `json:"license_key"`
+	// Enable distributed tracing
+	EnableDistributedTracing bool `json:"enable_distributed_tracing"`
 }
 
 type Tracer struct {

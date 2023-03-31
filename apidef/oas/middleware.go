@@ -166,10 +166,10 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 // PluginConfigData configures config data for custom plugins.
 type PluginConfigData struct {
 	// Enabled enables custom plugin config data.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
 
 	// Value is the value of custom plugin config data.
-	Value map[string]interface{} `bson:"value" json:"value"`
+	Value map[string]interface{} `bson:"value" json:"value"` // required.
 }
 
 // Fill fills PluginConfigData from apidef.
@@ -874,7 +874,7 @@ type CustomPlugin struct {
 	// FunctionName is the name of authentication method.
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
-	Path string `bson:"path" json:"path"` // required.
+	Path string `bson:"path" json:"path"`
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
 	// RequireSession if set to true passes down the session information for plugins after authentication.
@@ -1030,17 +1030,17 @@ func (p *ResponsePlugin) ExtractTo(api *apidef.APIDefinition) {
 // VirtualEndpoint contains virtual endpoint configuration.
 type VirtualEndpoint struct {
 	// Enabled enables virtual endpoint.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// Name is the name of js function.
-	Name string `bson:"name" json:"name"`
+	Name string `bson:"name" json:"name"` // required.
 	// Path is the path to js file.
-	Path string `bson:"path" json:"path"`
+	Path string `bson:"path,omitempty" json:"path,omitempty"`
 	// Body is the js function to execute encoded in base64 format.
-	Body string `bson:"body" json:"body"`
+	Body string `bson:"body,omitempty" json:"body,omitempty"`
 	// ProxyOnError proxies if virtual endpoint errors out.
-	ProxyOnError bool `bson:"proxyOnError" json:"proxyOnError"`
+	ProxyOnError bool `bson:"proxyOnError,omitempty" json:"proxyOnError,omitempty"`
 	// RequireSession if enabled passes session to virtual endpoint.
-	RequireSession bool `bson:"requireSession" json:"requireSession"`
+	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
 
 // Fill fills *VirtualEndpoint from apidef.VirtualMeta.
@@ -1076,11 +1076,11 @@ type EndpointPostPlugins []EndpointPostPlugin
 // EndpointPostPlugin contains endpoint level post plugin configuration.
 type EndpointPostPlugin struct {
 	// Enabled enables post plugin.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// Name is the name of plugin function to be executed.
-	Name string `bson:"name" json:"name"`
+	Name string `bson:"name" json:"name"` // required.
 	// Path is the path to plugin.
-	Path string `bson:"path" json:"path"`
+	Path string `bson:"path" json:"path"` // required.
 }
 
 // Fill fills *EndpointPostPlugin from apidef.GoPluginMeta.

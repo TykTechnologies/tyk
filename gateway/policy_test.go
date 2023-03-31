@@ -12,17 +12,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
-	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
@@ -135,6 +134,21 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			Rate:       4,
 			Per:        4,
 		},
+		"rate-for-a": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+			Rate:         4,
+		},
+		"rate-for-b": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
+			Rate:         2,
+		},
+		"rate-for-a-b": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
+			Rate:         4,
+		},
 		"acl1": {
 			Partitions:   user.PolicyPartitions{Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
@@ -145,6 +159,10 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		},
 		"acl3": {
 			AccessRights: map[string]user.AccessDefinition{"c": {}},
+		},
+		"acl-for-a-b": {
+			Partitions:   user.PolicyPartitions{Acl: true},
+			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
 		},
 		"unlimitedComplexity": {
 			Partitions:    user.PolicyPartitions{Complexity: true},
@@ -570,6 +588,23 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			"AclPart", []string{"acl1", "acl2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}, "b": {Limit: user.APILimit{}}}
+				assert.Equal(t, want, s.AccessRights)
+			}, nil,
+		},
+		{
+			"Acl for a and rate for a,b", []string{"acl1", "rate-for-a-b"},
+			"", func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4}}}
+				assert.Equal(t, want, s.AccessRights)
+			}, nil,
+		},
+		{
+			"Acl for a,b and individual rate for a,b", []string{"acl-for-a-b", "rate-for-a", "rate-for-b"},
+			"", func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": {Limit: user.APILimit{Rate: 4}},
+					"b": {Limit: user.APILimit{Rate: 2}},
+				}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},

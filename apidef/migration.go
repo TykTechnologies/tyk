@@ -4,11 +4,11 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"reflect"
 	"sort"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 var (
@@ -59,8 +59,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 		for vName, vInfo := range a.VersionData.Versions {
 			newAPI := *a
 
-			newID := uuid.NewV4()
-			apiID := strings.Replace(newID.String(), "-", "", -1)
+			apiID := uuid.NewHex()
 
 			newAPI.APIID = apiID
 			newAPI.Id = ""
@@ -226,11 +225,14 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateCustomPluginAuth()
 	a.MigrateAuthentication()
 	a.migratePluginBundle()
+	a.migratePluginConfigData()
 	a.migrateMutualTLS()
 	a.migrateCertificatePinning()
 	a.migrateGatewayTags()
 	a.migrateAuthenticationPlugin()
+	a.migrateIDExtractor()
 	a.migrateCustomDomain()
+	a.migrateScopeToPolicy()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -250,6 +252,12 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 func (a *APIDefinition) migratePluginBundle() {
 	if !a.CustomMiddlewareBundleDisabled && a.CustomMiddlewareBundle == "" {
 		a.CustomMiddlewareBundleDisabled = true
+	}
+}
+
+func (a *APIDefinition) migratePluginConfigData() {
+	if reflect.IsEmpty(a.ConfigData) {
+		a.ConfigDataDisabled = true
 	}
 }
 
@@ -281,8 +289,14 @@ func (a *APIDefinition) migrateGatewayTags() {
 }
 
 func (a *APIDefinition) migrateAuthenticationPlugin() {
-	if reflect.DeepEqual(a.CustomMiddleware.AuthCheck, MiddlewareDefinition{}) {
+	if reflect.IsEmpty(a.CustomMiddleware.AuthCheck) {
 		a.CustomMiddleware.AuthCheck.Disabled = true
+	}
+}
+
+func (a *APIDefinition) migrateIDExtractor() {
+	if reflect.IsEmpty(a.CustomMiddleware.IdExtractor) {
+		a.CustomMiddleware.IdExtractor.Disabled = true
 	}
 }
 
@@ -409,4 +423,21 @@ func (a *APIDefinition) SetDisabledFlags() {
 			a.VersionData.Versions[version].ExtendedPaths.GoPlugin[i].Disabled = true
 		}
 	}
+}
+
+func (a *APIDefinition) migrateScopeToPolicy() {
+	scopeClaim := ScopeClaim{
+		ScopeClaimName: a.JWTScopeClaimName,
+		ScopeToPolicy:  a.JWTScopeToPolicyMapping,
+	}
+
+	a.JWTScopeToPolicyMapping = nil
+	a.JWTScopeClaimName = ""
+
+	if a.UseOpenID {
+		a.Scopes.OIDC = scopeClaim
+		return
+	}
+
+	a.Scopes.JWT = scopeClaim
 }

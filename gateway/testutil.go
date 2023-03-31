@@ -34,8 +34,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -280,7 +281,7 @@ func (s *Test) RegisterBundle(name string, files map[string]string) string {
 	s.Gw.TestBundleMu.Lock()
 	defer s.Gw.TestBundleMu.Unlock()
 
-	bundleID := name + "-" + uuid.NewV4().String() + ".zip"
+	bundleID := name + "-" + uuid.NewHex() + ".zip"
 	s.Gw.TestBundles[bundleID] = files
 
 	return bundleID
@@ -1289,8 +1290,7 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 }
 
-func GetTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
-	// Setup HTTPS client
+func GetTLSConfig(cert *tls.Certificate, caCert []byte) *tls.Config {
 	tlsConfig := &tls.Config{}
 
 	if cert != nil {
@@ -1305,6 +1305,13 @@ func GetTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
 	} else {
 		tlsConfig.InsecureSkipVerify = true
 	}
+
+	return tlsConfig
+}
+
+func GetTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
+	// Setup HTTPS client
+	tlsConfig := GetTLSConfig(cert, caCert)
 
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 

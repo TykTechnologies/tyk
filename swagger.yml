@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Tyk Gateway API
-  version: 4.3.0
+  version: 5.0.0
   description: |-
     The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway system. This API is very small, and has no granular permissions system. It is intended to be used purely for internal automation and integration.
 
@@ -940,28 +940,6 @@ paths:
               schema:
                 type: string
               example: "Hello Tiki"
-  '/tyk/{listenPath}/hello':
-    parameters:
-      - in: path
-        name: listenPath
-        required: true
-        description: "Listen path of loaded API"
-        schema:
-          type: string
-    get:
-      summary: Check the Health of the API
-      description: Should point to API domain if it has its own
-      tags:
-        - Health Checking
-      operationId: helloAPI
-      responses:
-        '200':
-          description: Success
-          content:
-            text/html:
-              schema:
-                type: string
-              example: "Hello Tiki"
   '/tyk/certs':
     get:
       parameters:
@@ -1134,6 +1112,12 @@ paths:
         required: true
         schema:
           type: string
+      - description: Use the hash of the key as input instead of the full key
+        name: hashed
+        in: query
+        required: false
+        schema:
+          type: boolean
     get:
       summary: Get a Key
       description: Get session info about the specified key. Should return up to date rate limit and quota usage numbers.
@@ -3024,9 +3008,10 @@ components:
           type: number
           x-go-name: MaxQueryDepth
         access_rights:
-          $ref: '#/components/schemas/AccessDefinition'
           type: object
           x-go-name: AccessRights
+          additionalProperties:
+              $ref: '#/components/schemas/AccessDefinition'
         hmac_enabled:
           type: boolean
           x-go-name: HMACEnabled

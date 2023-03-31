@@ -561,6 +561,7 @@ Regexp is the regular expression to match ID.
 
 **Field: `regexpMatchIndex` (`int`)**
 RegexpMatchIndex is the index from which ID to be extracted after a match.
+Default value is 0, ie if regexpMatchIndex is not provided ID is matched from index 0.
 
 **Field: `xPathExp` (`string`)**
 XPathExp is the xpath expression to match ID.

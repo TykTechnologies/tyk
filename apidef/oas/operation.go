@@ -651,7 +651,7 @@ func (s *OAS) fillEndpointPostPlugins(endpointMetas []apidef.GoPluginMeta) {
 }
 
 func (o *Operation) extractEndpointPostPluginTo(ep *apidef.ExtendedPathsSet, path string, method string) {
-	if o.VirtualEndpoint == nil {
+	if o.PostPlugins == nil {
 		return
 	}
 

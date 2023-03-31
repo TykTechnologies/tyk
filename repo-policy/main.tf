@@ -1,11 +1,12 @@
 terraform {
 
   #Being used until TFCloud can be used
-  backend "s3" {
-    bucket         = "terraform-state-devenv"
-    key            = "github-policy/tyk"
-    region         = "eu-central-1"
-    dynamodb_table = "terraform-state-locks"
+  backend "remote" {
+    hostname     = "app.terraform.io"
+    organization = "Tyk"
+    workspaces {
+      name = "repo-policy-tyk"
+    }
   }
 
   required_providers {
@@ -19,6 +20,7 @@ terraform {
 provider "github" {
   owner = "TykTechnologies"
 }
+
 
 module "tyk" {
   source               = "./modules/github-repos"
@@ -75,6 +77,16 @@ module "tyk" {
 	reviewers = "0",
 	convos    = "false",
 	source_branch  = "release-4.3",
+	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
+{ branch    = "release-5-lts",
+	reviewers = "0",
+	convos    = "false",
+	source_branch  = "master",
+	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
+{ branch    = "release-5.0",
+	reviewers = "0",
+	convos    = "false",
+	source_branch  = "master",
 	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
 ]
 }
