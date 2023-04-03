@@ -538,8 +538,14 @@ type ServiceDiscoveryConfiguration struct {
 	PortDataPath        string `bson:"port_data_path" json:"port_data_path"`
 	TargetPath          string `bson:"target_path" json:"target_path"`
 	UseTargetList       bool   `bson:"use_target_list" json:"use_target_list"`
+	CacheDisabled       bool   `bson:"cache_disabled" json:"cache_disabled"`
 	CacheTimeout        int64  `bson:"cache_timeout" json:"cache_timeout"`
 	EndpointReturnsList bool   `bson:"endpoint_returns_list" json:"endpoint_returns_list"`
+}
+
+// CacheOptions returns the timeout value in effect, and a bool if cache is enabled.
+func (sd *ServiceDiscoveryConfiguration) CacheOptions() (int64, bool) {
+	return sd.CacheTimeout, !sd.CacheDisabled
 }
 
 type OIDProviderConfig struct {
@@ -690,11 +696,13 @@ type AnalyticsPluginConfig struct {
 
 type UptimeTests struct {
 	CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
-	Config    struct {
-		ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
-		ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-		RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
-	} `bson:"config" json:"config"`
+	Config    UptimeTestsConfig `bson:"config" json:"config"`
+}
+
+type UptimeTestsConfig struct {
+	ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
+	ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
+	RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
 }
 
 type AuthConfig struct {
