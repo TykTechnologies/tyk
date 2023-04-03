@@ -4,17 +4,11 @@ import (
 	"net"
 	"net/url"
 	"strconv"
-	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
-
-// durationSeconds converts a duration to number of seconds, as integer.
-func durationSeconds(d time.Duration) int64 {
-	return int64(d.Seconds())
-}
 
 // appendIfMissing ensures dest slice is unique with new items.
 func appendIfMissing(src []string, in ...string) []string {
