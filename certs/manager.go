@@ -24,7 +24,10 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-const minute int64 = 60
+const (
+	cacheDefaultTTL = 300 // 5 minutes.
+	cacheCleanInterval = 600 // 10 minutes.
+)
 
 var CertManagerLogPrefix = "cert_storage"
 
@@ -44,7 +47,7 @@ func NewCertificateManager(storage storage.Handler, secret string, logger *logru
 	return &CertificateManager{
 		storage:         storage,
 		logger:          logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
-		cache:           cache.New(5*minute, 10*minute),
+		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
 		secret:          secret,
 		migrateCertList: migrateCertList,
 	}
@@ -64,7 +67,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 
 	cm := &CertificateManager{
 		logger:          log,
-		cache:           cache.New(5*minute, 10*minute),
+		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
 		secret:          secret,
 		migrateCertList: migrateCertList,
 	}
