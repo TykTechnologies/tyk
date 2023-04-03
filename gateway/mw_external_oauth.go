@@ -11,18 +11,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/pmylund/go-cache"
 	"github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 var (
-	externalOAuthJWKCache           *cache.Cache
+	externalOAuthJWKCache           cache.Repository = cache.New(240, 30)
 	externalOAuthIntrospectionCache *introspectionCache
 	ErrTokenValidationFailed        = errors.New("error happened during the access token validation")
 	ErrKIDNotAString                = errors.New("kid is not a string")
@@ -158,10 +158,6 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 	kidStr, ok := kid.(string)
 	if !ok {
 		return nil, ErrKIDNotAString
-	}
-
-	if externalOAuthJWKCache == nil {
-		externalOAuthJWKCache = cache.New(240*time.Second, 30*time.Second)
 	}
 
 	var (

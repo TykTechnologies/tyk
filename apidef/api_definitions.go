@@ -542,6 +542,11 @@ type ServiceDiscoveryConfiguration struct {
 	EndpointReturnsList bool   `bson:"endpoint_returns_list" json:"endpoint_returns_list"`
 }
 
+// CacheOptions returns the timeout value in effect, and a bool if cache is enabled.
+func (sd *ServiceDiscoveryConfiguration) CacheOptions() (int64, bool) {
+	return sd.CacheTimeout, sd.UseDiscoveryService && sd.CacheTimeout > 0
+}
+
 type OIDProviderConfig struct {
 	Issuer    string            `bson:"issuer" json:"issuer"`
 	ClientIDs map[string]string `bson:"client_ids" json:"client_ids"`

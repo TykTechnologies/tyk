@@ -6,8 +6,7 @@ import (
 	"strings"
 	"time"
 
-	cache "github.com/pmylund/go-cache"
-
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/go-redis/redis/v8"
