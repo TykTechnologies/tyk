@@ -7,9 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"time"
 
-	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/sync/singleflight"
@@ -20,11 +18,13 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
-const defaultBasicAuthTTL = time.Duration(60) * time.Second
+const defaultBasicAuthTTL int64 = 60
 
-var basicAuthCache = cache.New(60*time.Second, 60*time.Minute)
+var basicAuthCache = cache.New(60, 3600)
 
 var cacheGroup singleflight.Group
 
@@ -253,13 +253,14 @@ func (k *BasicAuthKeyIsValid) handleAuthFail(w http.ResponseWriter, r *http.Requ
 	return k.requestForBasicAuth(w, "User not authorised")
 }
 
-func (k *BasicAuthKeyIsValid) doBcryptWithCache(cacheDuration time.Duration, hashedPassword []byte, password []byte) error {
+func (k *BasicAuthKeyIsValid) doBcryptWithCache(cacheDuration int64, hashedPassword []byte, password []byte) error {
 	if err := bcrypt.CompareHashAndPassword(hashedPassword, password); err != nil {
 		return err
 	}
 
 	hasher := murmur3.New64()
 	hasher.Write(password)
+
 	basicAuthCache.Set(string(hashedPassword), string(hasher.Sum(nil)), cacheDuration)
 
 	return nil
@@ -276,7 +277,7 @@ func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password strin
 
 	cacheTTL := defaultBasicAuthTTL // set a default TTL, then override based on BasicAuth.CacheTTL
 	if k.Spec.BasicAuth.CacheTTL > 0 {
-		cacheTTL = time.Duration(k.Spec.BasicAuth.CacheTTL) * time.Second
+		cacheTTL = int64(k.Spec.BasicAuth.CacheTTL)
 	}
 
 	cachedPass, inCache := basicAuthCache.Get(hash)
