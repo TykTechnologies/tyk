@@ -21,7 +21,6 @@ provider "github" {
   owner = "TykTechnologies"
 }
 
-
 module "tyk" {
   source               = "./modules/github-repos"
   repo                 = "tyk"
@@ -35,7 +34,7 @@ module "tyk" {
   squash_merge_commit_title   = "PR_TITLE"
   release_branches     = [
 { branch    = "master",
-	reviewers = "2",
+	reviewers = "1",
 	convos    = "false",
 	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
 { branch    = "release-4.0.10",

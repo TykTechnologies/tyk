@@ -73,6 +73,7 @@ variable "release_branches" {
     reviewers      = number           # Min number of reviews needed
     required_tests = list(string)     # Workflows that need to pass before merging
     convos         = bool             # Should conversations be resolved before merging
+
   }))
   description = "List of branches managed by terraform"
 }
