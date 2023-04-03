@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/buger/jsonparser"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const petstoreExpandedOpenAPI3 = `openapi: "3.0.0"

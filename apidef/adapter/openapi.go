@@ -9,12 +9,13 @@ import (
 	"net/url"
 	"sort"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astprinter"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/openapi"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const defaultRequestBodyMimeType = "application/json"
