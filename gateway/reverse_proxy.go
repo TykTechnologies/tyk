@@ -89,12 +89,11 @@ func urlFromService(spec *APISpec, gw *Gateway) (*apidef.HostList, error) {
 			return spec.LastGoodHostList, nil
 		}
 
-		if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-			ttl, cacheEnabled := spec.Proxy.ServiceDiscovery.CacheOptions()
-			if cacheEnabled {
-				gw.ServiceCache.Set(spec.APIID, data, ttl)
-			}
+		ttl, cacheEnabled := spec.Proxy.ServiceDiscovery.CacheOptions()
+		if !cacheEnabled {
+			ttl = 0 // use gateway default cache time to live.
 		}
+		gw.ServiceCache.Set(spec.APIID, data, ttl)
 
 		// Stash it too
 		spec.LastGoodHostList = data
