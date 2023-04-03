@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	cacheDefaultTTL = 300 // 5 minutes.
+	cacheDefaultTTL    = 300 // 5 minutes.
 	cacheCleanInterval = 600 // 10 minutes.
 )
 
