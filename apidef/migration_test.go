@@ -638,6 +638,18 @@ func TestSetDisabledFlags(t *testing.T) {
 		DomainDisabled:                 true,
 		CustomMiddlewareBundleDisabled: true,
 		ConfigDataDisabled:             true,
+		Proxy: ProxyConfig{
+			ServiceDiscovery: ServiceDiscoveryConfiguration{
+				CacheDisabled: true,
+			},
+		},
+		UptimeTests: UptimeTests{
+			Config: UptimeTestsConfig{
+				ServiceDiscovery: ServiceDiscoveryConfiguration{
+					CacheDisabled: true,
+				},
+			},
+		},
 		VersionData: VersionData{
 			Versions: map[string]VersionInfo{
 				"": {
