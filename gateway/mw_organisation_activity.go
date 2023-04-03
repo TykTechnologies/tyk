@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/request"
@@ -120,7 +119,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, orgSession, sessionLifeTime, false); err == nil {
 		// update in-app cache if needed
 		if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			k.Gw.SessionCache.Set(k.Spec.OrgID, orgSession.Clone(), time.Second*time.Duration(sessionLifeTime))
+			k.Gw.SessionCache.Set(k.Spec.OrgID, orgSession.Clone(), sessionLifeTime)
 		}
 	} else {
 		logger.WithError(err).Error("Could not update org session")
@@ -251,7 +250,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, session, sessionLifeTime, false); err == nil {
 		// update in-app cache if needed
 		if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			k.Gw.SessionCache.Set(k.Spec.OrgID, session.Clone(), time.Second*time.Duration(sessionLifeTime))
+			k.Gw.SessionCache.Set(k.Spec.OrgID, session.Clone(), sessionLifeTime)
 		}
 	} else {
 		logEntry.WithError(err).WithField("orgID", k.Spec.OrgID).Error("Could not update org session")

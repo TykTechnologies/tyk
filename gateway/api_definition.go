@@ -1002,10 +1002,8 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 					}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)
 
 					if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-						if ServiceCache != nil {
-							log.Warning("[PROXY] [CIRCUIT BREAKER] Refreshing host list")
-							ServiceCache.Delete(spec.APIID)
-						}
+						log.Warning("[PROXY] [CIRCUIT BREAKER] Refreshing host list")
+						a.Gw.ServiceCache.Delete(spec.APIID)
 					}
 
 					spec.FireEvent(EventBreakerTriggered, EventCurcuitBreakerMeta{
