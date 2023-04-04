@@ -517,10 +517,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			if newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
 				newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
 			}
-<<<<<<< HEAD
-			newConfig.ClientCAs = x509.NewCertPool()
-			newConfig.ClientAuth = tls.RequestClientCert
-=======
 
 			if newConfig.ClientAuth >= tls.RequestClientCert {
 				newConfig.ClientCAs = x509.NewCertPool()
@@ -533,7 +529,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 				}
 				newConfig.ClientAuth = tls.RequestClientCert
 			}
->>>>>>> d827ed11... bug fix; cert mTLS popup (#4890)
 		}
 
 		// Cache the config
