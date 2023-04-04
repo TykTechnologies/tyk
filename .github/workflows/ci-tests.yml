@@ -48,6 +48,8 @@ jobs:
           pip install setuptools
           pip install google
           pip install protobuf
+          
+          git config --global --add safe.directory /__w/tyk/tyk
 
           make lint
           
