@@ -359,9 +359,6 @@ type HttpServerOptionsConfig struct {
 	// Set to true to enable SSL connections
 	UseSSL bool `json:"use_ssl"`
 
-	// Enable Lets-Encrypt support
-	UseLE_SSL bool `json:"use_ssl_le"`
-
 	// Enable HTTP2 protocol handling
 	EnableHttp2 bool `json:"enable_http2"`
 
@@ -494,6 +491,8 @@ type NewRelicConfig struct {
 	AppName string `json:"app_name"`
 	// New Relic License key
 	LicenseKey string `json:"license_key"`
+	// Enable distributed tracing
+	EnableDistributedTracing bool `json:"enable_distributed_tracing"`
 }
 
 type Tracer struct {

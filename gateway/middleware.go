@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -19,7 +20,6 @@ import (
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
-	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
@@ -133,12 +133,8 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
-				// GoPluginMiddleware are expected to send response in case of error
-				// but we still want to record error
-				_, isGoPlugin := actualMW.(*GoPluginMiddleware)
-
 				handler := ErrorHandler{*mw.Base()}
-				handler.HandleError(w, r, err.Error(), errCode, !isGoPlugin)
+				handler.HandleError(w, r, err.Error(), errCode, true)
 
 				meta["error"] = err.Error()
 
@@ -530,9 +526,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
-				if !usePartitions || policy.Partitions.Acl {
-					rights[k] = ar
-				}
+				rights[k] = ar
 			}
 
 			// Master policy case
@@ -608,6 +602,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 	// If some APIs had only ACL partitions, inherit rest from session level
 	for k, v := range rights {
+		if !didACL[k] {
+			delete(rights, k)
+			continue
+		}
+
 		if !didRateLimit[k] {
 			v.Limit.Rate = session.Rate
 			v.Limit.Per = session.Per

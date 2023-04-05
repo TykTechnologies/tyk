@@ -1120,6 +1120,9 @@
         },
         "license_key": {
           "type": "string"
+        },
+        "enable_distributed_tracing": {
+          "type": "boolean"
         }
       }
     },

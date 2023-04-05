@@ -14,6 +14,8 @@ import (
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
 
+	"github.com/TykTechnologies/tyk/internal/reflect"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
@@ -465,8 +467,14 @@ type ServiceDiscoveryConfiguration struct {
 	PortDataPath        string `bson:"port_data_path" json:"port_data_path"`
 	TargetPath          string `bson:"target_path" json:"target_path"`
 	UseTargetList       bool   `bson:"use_target_list" json:"use_target_list"`
+	CacheDisabled       bool   `bson:"cache_disabled" json:"cache_disabled"`
 	CacheTimeout        int64  `bson:"cache_timeout" json:"cache_timeout"`
 	EndpointReturnsList bool   `bson:"endpoint_returns_list" json:"endpoint_returns_list"`
+}
+
+// CacheOptions returns the timeout value in effect, and a bool if cache is enabled.
+func (sd *ServiceDiscoveryConfiguration) CacheOptions() (int64, bool) {
+	return sd.CacheTimeout, !sd.CacheDisabled
 }
 
 type OIDProviderConfig struct {
@@ -617,11 +625,13 @@ type AnalyticsPluginConfig struct {
 
 type UptimeTests struct {
 	CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
-	Config    struct {
-		ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
-		ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-		RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
-	} `bson:"config" json:"config"`
+	Config    UptimeTestsConfig `bson:"config" json:"config"`
+}
+
+type UptimeTestsConfig struct {
+	ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
+	ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
+	RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
 }
 
 type AuthConfig struct {
@@ -894,14 +904,6 @@ func (a *APIDefinition) EncodeForDB() {
 	if a.Auth.AuthHeaderName == "" {
 		a.Auth = a.AuthConfigs["authToken"]
 	}
-	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
-	if !a.UseOpenID && a.Scopes.JWT.ScopeClaimName != "" {
-		a.JWTScopeToPolicyMapping = a.Scopes.JWT.ScopeToPolicy
-		a.JWTScopeClaimName = a.Scopes.JWT.ScopeClaimName
-	} else if a.UseOpenID && a.Scopes.OIDC.ScopeClaimName != "" {
-		a.JWTScopeToPolicyMapping = a.Scopes.OIDC.ScopeToPolicy
-		a.JWTScopeClaimName = a.Scopes.OIDC.ScopeClaimName
-	}
 }
 
 func (a *APIDefinition) DecodeFromDB() {
@@ -968,14 +970,6 @@ func (a *APIDefinition) DecodeFromDB() {
 
 	makeCompatible("authToken", a.UseStandardAuth)
 	makeCompatible("jwt", a.EnableJWT)
-	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
-	if !a.UseOpenID && a.JWTScopeClaimName != "" && a.Scopes.JWT.ScopeClaimName == "" {
-		a.Scopes.JWT.ScopeToPolicy = a.JWTScopeToPolicyMapping
-		a.Scopes.JWT.ScopeClaimName = a.JWTScopeClaimName
-	} else if a.UseOpenID && a.JWTScopeClaimName != "" && a.Scopes.OIDC.ScopeClaimName == "" {
-		a.Scopes.OIDC.ScopeToPolicy = a.JWTScopeToPolicyMapping
-		a.Scopes.OIDC.ScopeClaimName = a.JWTScopeClaimName
-	}
 }
 
 // Expired returns true if this Version has expired
@@ -1218,6 +1212,30 @@ func DummyAPI() APIDefinition {
 		Tags:    []string{},
 		GraphQL: graphql,
 	}
+}
+
+func (a *APIDefinition) GetScopeClaimName() string {
+	if reflect.IsEmpty(a.Scopes) {
+		return a.JWTScopeClaimName
+	}
+
+	if a.UseOpenID {
+		return a.Scopes.OIDC.ScopeClaimName
+	}
+
+	return a.Scopes.JWT.ScopeClaimName
+}
+
+func (a *APIDefinition) GetScopeToPolicyMapping() map[string]string {
+	if reflect.IsEmpty(a.Scopes) {
+		return a.JWTScopeToPolicyMapping
+	}
+
+	if a.UseOpenID {
+		return a.Scopes.OIDC.ScopeToPolicy
+	}
+
+	return a.Scopes.JWT.ScopeToPolicy
 }
 
 var Template = template.New("").Funcs(map[string]interface{}{

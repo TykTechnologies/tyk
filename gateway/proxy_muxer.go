@@ -17,7 +17,6 @@ import (
 	"golang.org/x/net/http2/h2c"
 
 	proxyproto "github.com/pires/go-proxyproto"
-	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
@@ -281,26 +280,14 @@ func (gw *Gateway) dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 	if dial == nil {
 		return nil
 	}
-	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-		log.Debug("[PROXY] Service discovery enabled")
-		if ServiceCache == nil {
-			log.Debug("[PROXY] Service cache initialising")
-			expiry := 120
-			if spec.Proxy.ServiceDiscovery.CacheTimeout > 0 {
-				expiry = int(spec.Proxy.ServiceDiscovery.CacheTimeout)
-			} else if spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout > 0 {
-				expiry = spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout
-			}
-			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
-		}
-	}
+
 	return func(network, address string) (net.Conn, error) {
 		hostList := spec.Proxy.StructuredTargetList
 		target := address
 		switch {
 		case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
 			var err error
-			hostList, err = urlFromService(spec)
+			hostList, err = urlFromService(spec, gw)
 			if err != nil {
 				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 				break
