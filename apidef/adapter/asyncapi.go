@@ -154,6 +154,14 @@ func (a *asyncAPI) prepareGraphQLEngineConfig() error {
 }
 
 func (a *asyncAPI) Import() (*apidef.APIDefinition, error) {
+	document, err := asyncapi.ParseAsyncAPIDocument(a.input)
+	if err != nil {
+		return nil, err
+	}
+
+	a.document = document
+	a.apiDefinition = newApiDefinition(document.Info.Title, a.orgId)
+
 	if err := a.prepareGraphQLEngineConfig(); err != nil {
 		return nil, err
 	}
@@ -164,13 +172,13 @@ func (a *asyncAPI) Import() (*apidef.APIDefinition, error) {
 	sortFieldConfigsByName(a.apiDefinition)
 	sortDataSourcesByName(a.apiDefinition)
 
-	document := asyncapi.ImportParsedAsyncAPIDocument(a.document, a.report)
+	gqlDocument := asyncapi.ImportParsedAsyncAPIDocument(a.document, a.report)
 	if a.report.HasErrors() {
 		return nil, a.report
 	}
 
 	w := &bytes.Buffer{}
-	err := astprinter.PrintIndent(document, nil, []byte("  "), w)
+	err = astprinter.PrintIndent(gqlDocument, nil, []byte("  "), w)
 	if err != nil {
 		return nil, err
 	}
@@ -180,23 +188,19 @@ func (a *asyncAPI) Import() (*apidef.APIDefinition, error) {
 }
 
 type asyncAPI struct {
+	orgId         string
+	input         []byte
 	report        *operationreport.Report
 	apiDefinition *apidef.APIDefinition
 	document      *asyncapi.AsyncAPI
 }
 
-func NewAsyncAPIAdapter(orgId string, input []byte) (ImportAdapter, error) {
-	document, err := asyncapi.ParseAsyncAPIDocument(input)
-	if err != nil {
-		return nil, err
-	}
-
-	apiDefinition := newApiDefinition(document.Info.Title, orgId)
+func NewAsyncAPIAdapter(orgId string, input []byte) ImportAdapter {
 	return &asyncAPI{
-		report:        &operationreport.Report{},
-		apiDefinition: apiDefinition,
-		document:      document,
-	}, nil
+		orgId:  orgId,
+		input:  input,
+		report: &operationreport.Report{},
+	}
 }
 
 var _ ImportAdapter = (*asyncAPI)(nil)

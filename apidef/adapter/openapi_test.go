@@ -316,8 +316,7 @@ const expectedOpenAPIGraphQLConfig = `{
 }`
 
 func TestGraphQLConfigAdapter_OpenAPI(t *testing.T) {
-	adapter, err := NewOpenAPIAdapter("my-org-id", []byte(petstoreExpandedOpenAPI3))
-	require.NoError(t, err)
+	adapter := NewOpenAPIAdapter("my-org-id", []byte(petstoreExpandedOpenAPI3))
 
 	actualApiDefinition, err := adapter.Import()
 	require.NoError(t, err)

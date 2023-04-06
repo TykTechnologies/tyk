@@ -19,6 +19,8 @@ import (
 const defaultRequestBodyMimeType = "application/json"
 
 type openAPI struct {
+	orgId         string
+	input         []byte
 	report        *operationreport.Report
 	apiDefinition *apidef.APIDefinition
 	document      *openapi3.T
@@ -149,6 +151,14 @@ func (o *openAPI) prepareGraphQLEngineConfig() error {
 }
 
 func (o *openAPI) Import() (*apidef.APIDefinition, error) {
+	document, err := openapi.ParseOpenAPIDocument(o.input)
+	if err != nil {
+		return nil, err
+	}
+
+	o.document = document
+	o.apiDefinition = newApiDefinition(o.document.Info.Title, o.orgId)
+
 	if err := o.prepareGraphQLEngineConfig(); err != nil {
 		return nil, err
 	}
@@ -165,7 +175,7 @@ func (o *openAPI) Import() (*apidef.APIDefinition, error) {
 	}
 
 	w := &bytes.Buffer{}
-	err := astprinter.PrintIndent(graphqlDocument, nil, []byte("  "), w)
+	err = astprinter.PrintIndent(graphqlDocument, nil, []byte("  "), w)
 	if err != nil {
 		return nil, err
 	}
@@ -174,19 +184,13 @@ func (o *openAPI) Import() (*apidef.APIDefinition, error) {
 	return o.apiDefinition, nil
 }
 
-func NewOpenAPIAdapter(orgId string, input []byte) (ImportAdapter, error) {
+func NewOpenAPIAdapter(orgId string, input []byte) ImportAdapter {
 	report := operationreport.Report{}
-	document, err := openapi.ParseOpenAPIDocument(input)
-	if err != nil {
-		return nil, err
-	}
-
-	apiDefinition := newApiDefinition(document.Info.Title, orgId)
 	return &openAPI{
-		report:        &report,
-		apiDefinition: apiDefinition,
-		document:      document,
-	}, nil
+		report: &report,
+		input:  input,
+		orgId:  orgId,
+	}
 }
 
 var _ ImportAdapter = (*openAPI)(nil)

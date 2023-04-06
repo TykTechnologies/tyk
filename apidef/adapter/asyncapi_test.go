@@ -335,8 +335,7 @@ const expectedGraphqlConfig = `{
 }`
 
 func TestGraphQLConfigAdapter_AsyncAPI(t *testing.T) {
-	importer, err := NewAsyncAPIAdapter("my-org-id", []byte(streetlightsKafkaAsyncAPI))
-	require.NoError(t, err)
+	importer := NewAsyncAPIAdapter("my-org-id", []byte(streetlightsKafkaAsyncAPI))
 
 	actualApiDefinition, err := importer.Import()
 	require.NoError(t, err)
