@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sort"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -15,12 +14,12 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/openapi"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 const defaultRequestBodyMimeType = "application/json"
 
-type OpenAPI struct {
+type openAPI struct {
+	report        *operationreport.Report
 	apiDefinition *apidef.APIDefinition
 	document      *openapi3.T
 }
@@ -37,37 +36,7 @@ func extractRequestBody(mime string, operation *openapi3.Operation) (*openapi3.S
 	return nil, fmt.Errorf("no schema found for mime type %s", mime)
 }
 
-func newApiDefinition(document *openapi3.T, orgId string) *apidef.APIDefinition {
-	return &apidef.APIDefinition{
-		Name:   document.Info.Title,
-		Active: true,
-		OrgID:  orgId,
-		APIID:  uuid.NewHex(),
-		GraphQL: apidef.GraphQLConfig{
-			Enabled:       true,
-			Version:       apidef.GraphQLConfigVersion2,
-			ExecutionMode: apidef.GraphQLExecutionModeExecutionEngine,
-		},
-		VersionDefinition: apidef.VersionDefinition{
-			Enabled:  false,
-			Location: "header",
-		},
-		VersionData: apidef.VersionData{
-			NotVersioned: true,
-			Versions: map[string]apidef.VersionInfo{
-				"Default": {
-					Name:             "Default",
-					UseExtendedPaths: true,
-				},
-			},
-		},
-		Proxy: apidef.ProxyConfig{
-			StripListenPath: true,
-		},
-	}
-}
-
-func (o *OpenAPI) prepareGraphQLEngineConfig() error {
+func (o *openAPI) prepareGraphQLEngineConfig() error {
 	if o.document == nil {
 		return fmt.Errorf("document is nil")
 	}
@@ -179,52 +148,45 @@ func (o *OpenAPI) prepareGraphQLEngineConfig() error {
 	return nil
 }
 
-func (o *OpenAPI) sortFieldConfigsByName() {
-	sort.Slice(o.apiDefinition.GraphQL.Engine.FieldConfigs, func(i, j int) bool {
-		return o.apiDefinition.GraphQL.Engine.FieldConfigs[i].FieldName < o.apiDefinition.GraphQL.Engine.FieldConfigs[j].FieldName
-	})
-}
-
-func (o *OpenAPI) sortDataSourcesByName() {
-	sort.Slice(o.apiDefinition.GraphQL.Engine.DataSources, func(i, j int) bool {
-		return o.apiDefinition.GraphQL.Engine.DataSources[i].Name < o.apiDefinition.GraphQL.Engine.DataSources[j].Name
-	})
-}
-
-func ImportOpenAPIDocument(orgId string, input []byte) (*apidef.APIDefinition, error) {
-	report := operationreport.Report{}
-	document, err := openapi.ParseOpenAPIDocument(input)
-	if err != nil {
-		return nil, err
-	}
-
-	apiDefinition := newApiDefinition(document, orgId)
-
-	o := OpenAPI{
-		apiDefinition: apiDefinition,
-		document:      document,
-	}
-	if err = o.prepareGraphQLEngineConfig(); err != nil {
+func (o *openAPI) Import() (*apidef.APIDefinition, error) {
+	if err := o.prepareGraphQLEngineConfig(); err != nil {
 		return nil, err
 	}
 
 	// We iterate over the maps to create a new API definition. This leads to the random placement of
 	// items in various arrays in the resulting JSON document. In order to test the OpenAPI converter
 	// with fixtures and prevent randomness, we sort various data structures here.
-	o.sortFieldConfigsByName()
-	o.sortDataSourcesByName()
+	sortFieldConfigsByName(o.apiDefinition)
+	sortDataSourcesByName(o.apiDefinition)
 
-	graphqlDocument := openapi.ImportParsedOpenAPIv3Document(document, &report)
-	if report.HasErrors() {
-		return nil, report
+	graphqlDocument := openapi.ImportParsedOpenAPIv3Document(o.document, o.report)
+	if o.report.HasErrors() {
+		return nil, o.report
 	}
 
 	w := &bytes.Buffer{}
-	err = astprinter.PrintIndent(graphqlDocument, nil, []byte("  "), w)
+	err := astprinter.PrintIndent(graphqlDocument, nil, []byte("  "), w)
 	if err != nil {
 		return nil, err
 	}
-	apiDefinition.GraphQL.Schema = w.String()
+	o.apiDefinition.GraphQL.Schema = w.String()
 
-	return apiDefinition, nil
+	return o.apiDefinition, nil
 }
+
+func NewOpenAPIAdapter(orgId string, input []byte) (ImportAdapter, error) {
+	report := operationreport.Report{}
+	document, err := openapi.ParseOpenAPIDocument(input)
+	if err != nil {
+		return nil, err
+	}
+
+	apiDefinition := newApiDefinition(document.Info.Title, orgId)
+	return &openAPI{
+		report:        &report,
+		apiDefinition: apiDefinition,
+		document:      document,
+	}, nil
+}
+
+var _ ImportAdapter = (*openAPI)(nil)
