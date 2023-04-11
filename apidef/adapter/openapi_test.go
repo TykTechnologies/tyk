@@ -301,7 +301,7 @@ const expectedOpenAPIGraphQLConfig = `{
         ]
     },
     "proxy": {
-        "auth_headers": null,
+        "auth_headers": {},
         "request_headers": null
     },
     "subgraph": {
@@ -316,7 +316,9 @@ const expectedOpenAPIGraphQLConfig = `{
 }`
 
 func TestGraphQLConfigAdapter_OpenAPI(t *testing.T) {
-	actualApiDefinition, err := ImportOpenAPIDocument("my-org-id", []byte(petstoreExpandedOpenAPI3))
+	adapter := NewOpenAPIAdapter("my-org-id", []byte(petstoreExpandedOpenAPI3))
+
+	actualApiDefinition, err := adapter.Import()
 	require.NoError(t, err)
 
 	require.Equal(t, "Swagger Petstore", actualApiDefinition.Name)
