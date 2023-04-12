@@ -1,0 +1,68 @@
+# Introduction
+---
+Open source is at the heart of what we do. Anything that is API Gateway-related, lives in the Gateway, or is critical for the Gateway to work is open and freely available via our Github.
+Our commitment to open source also delivers a host of benefits for our users: signup for free with Tyk, receive securely packaged open source packages, getting started guides, access to our community and all of the latest open source information.
+
+- Tyk is an open source Enterprise API Gateway, supporting REST, GraphQL, TCP and gRPC protocols.
+
+
+- Tyk Gateway is provided ‘Batteries-included’, with no feature lockout. Enabling your organisation to control who accesses your APIs, when they access, and how they access it.
+
+
+## Project Summary
+| Website  | https://tyk.io/ |
+| ----------- | ----------- |
+| Organization/Foundation Name | Tyk Technologies Ltd|
+| License   | Mozilla Public License 2.0      |
+| Open/Proprietary   | Open Source|
+| Source Path(If open Source)    | https://github.com/TykTechnologies/tyk      |
+|Brief Description    |Tyk is an open source API gateway and management platform that allows developers and organizations to manage and secure their APIs effectively. It provides a range of features, including API gateway, management, developer portal, analytics, and reporting, to help developers design, develop, deploy, and monitor their APIs.|
+
+## Project Details
+- **Use any protocol** :-REST, SOAP, GraphQL, gRPC, and TCP.
+Industry Standard Authentication: OIDC, JWT, bearer Tokens, Basic Auth, Client Certificates and more.
+
+- **API Management**:- Tyk provides a range of management features to help developers design, develop, and deploy APIs. It includes API documentation, testing, versioning, and monitoring capabilities.
+
+- **Analytics and Reporting**:- Tyk provides real-time analytics and reporting features to help developers and organizations understand how their APIs are being used, and identify issues and opportunities for optimization.
+
+- **API Gateway**:- Tyk provides a scalable and secure gateway to manage, secure, and control access to APIs. It supports REST, GraphQL, and gRPC protocols, and provides a range of authentication and authorization options.
+
+- **Developer Portal**:- Tyk provides a customizable developer portal that allows developers to discover and consume APIs, and provides self-service registration and subscription management features.
+- **Scalability**:- Tyk Open Source is designed to be highly scalable, and it can handle a large number of API requests and users.
+
+## Architecture
+![Alt text](../Pictures/Camera%20Roll/oss-flow.png)
+
+## Current Usage
+API Management: Tyk is used to manage APIs by providing features like rate limiting, access control, API key management, and analytics.
+
+Microservices Architecture: Tyk is used to manage APIs in a microservices architecture by acting as a gateway to route requests to the appropriate service, and to manage the traffic between the services.
+
+Cloud-Native Applications: Tyk is used to manage APIs in cloud-native applications by providing features like load balancing, auto-scaling, and service discovery.
+
+Developer Portal: Tyk is used to create a developer portal that allows developers to discover and consume APIs, and to get access to documentation, code samples, and support.
+
+Security: Tyk is used to secure APIs by providing features like OAuth 2.0 authentication, SSL/TLS encryption, and IP whitelisting.
+
+Analytics: Tyk is used to collect and analyze data on API usage, performance, and errors. This data can be used to optimize API performance, improve user experience, and identify issues.
+
+## Technical Deails 
+1. API Gateway: Tyk Open Source acts as an API gateway, allowing you to control and manage access to your APIs. It provides features such as rate limiting, authentication, and authorization.
+
+2. Analytics: Tyk Open Source provides detailed analytics on API usage, including request count, response time, and error rate. It also supports custom analytics integrations.
+
+3. Plugins: Tyk Open Source supports plugins, allowing you to extend the functionality of the gateway by adding custom middleware or integration with third-party services.
+
+3. Multi-protocol Support: Tyk Open Source supports multiple protocols, including REST, WebSocket, GraphQL, and gRPC.
+
+4. Scalability: Tyk Open Source is designed to be highly scalable, allowing you to handle large volumes of traffic.
+Open Source: Tyk Open Source is released under the Mozilla Public License (MPL), which allows you to modify and distribute the software freely.
+
+## Reference Links 
+
+<https://www.google.com>
+
+<https://www.github.com>
+
+<https://www.tyk.com>
