@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
@@ -300,7 +302,11 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	if d.Auth {
 		newRequestData.Session.KeyID = newRequestData.AuthValue
-		ctxSetSession(r, &newRequestData.Session, true, d.Gw.GetConfig().HashKeys)
+
+		switch d.Spec.BaseIdentityProvidedBy {
+		case apidef.Coprocess, apidef.UnsetAuth:
+			ctxSetSession(r, &newRequestData.Session, true, d.Gw.GetConfig().HashKeys)
+		}
 	}
 
 	return nil, http.StatusOK

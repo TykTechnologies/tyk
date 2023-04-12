@@ -493,7 +493,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 
 		returnedSession.KeyID = sessionID
-		ctxSetSession(r, returnedSession, true, m.Gw.GetConfig().HashKeys)
+
+		switch m.Spec.BaseIdentityProvidedBy {
+		case apidef.Coprocess, apidef.UnsetAuth:
+			ctxSetSession(r, returnedSession, true, m.Gw.GetConfig().HashKeys)
+		}
 	}
 
 	return nil, http.StatusOK
