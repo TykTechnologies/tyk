@@ -109,7 +109,6 @@ jobs:
           version: latest
           args: release --rm-dist -f ${{ matrix.goreleaser }}
         env:
-          GO111MODULE: off
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
           NFPM_STD_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
