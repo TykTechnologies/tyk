@@ -1,4 +1,4 @@
-ARG GOLANG_CROSS=1.16
+ARG GOLANG_CROSS
 
 FROM tykio/golang-cross:${GOLANG_CROSS}
 LABEL description="Image for plugin development"
@@ -21,7 +21,7 @@ RUN  apt-get remove -y --allow-remove-essential --auto-remove mercurial \
 
 
 COPY . $TYK_GW_PATH
-RUN cd $TYK_GW_PATH && go mod vendor
+RUN cd $TYK_GW_PATH
 
 ENTRYPOINT ["/build.sh"]
 
