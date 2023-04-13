@@ -14,13 +14,13 @@ jobs:
     name: tyk-analytics
     runs-on: ubuntu-latest
     steps:
-      - uses: peter-evans/repository-dispatch@v1
+      - uses: peter-evans/repository-dispatch@v2
         with:
           token: ${{ secrets.ORG_GH_TOKEN }}
           repository: TykTechnologies/tyk-analytics
           event-type: new-tyk
           client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
-      - uses: peter-evans/repository-dispatch@v1
+      - uses: peter-evans/repository-dispatch@v2
         with:
           token: ${{ secrets.ORG_GH_TOKEN }}
           repository: TykTechnologies/tyk-sink
