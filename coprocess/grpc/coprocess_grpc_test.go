@@ -12,6 +12,9 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"google.golang.org/grpc"
 
@@ -107,6 +110,26 @@ func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*c
 		}
 	case "testResponseHook":
 		object.Response.RawBody = []byte("newbody")
+	case "testAuthHook1":
+		req := object.Request
+		token := req.Headers["Authorization"]
+		if object.Metadata == nil {
+			object.Metadata = map[string]string{}
+		}
+		object.Metadata["token"] = token
+		if token != "abc" {
+			return d.grpcError(object, "invalid token")
+		}
+
+		session := coprocess.SessionState{
+			Rate:                100,
+			IdExtractorDeadline: time.Now().Add(2 * time.Second).Unix(),
+			Metadata: map[string]string{
+				"sessionMetaKey": "customAuthSessionMetaValue",
+			},
+		}
+
+		object.Session = &session
 	}
 	return object, nil
 }
@@ -496,5 +519,80 @@ func TestGRPCIgnore(t *testing.T) {
 		Method:  http.MethodGet,
 		Code:    http.StatusOK,
 		Headers: headers,
+	})
+}
+
+func TestGRPC_MultiAuthentication(t *testing.T) {
+	ts, grpcServer := startTykWithGRPC()
+	defer ts.Close()
+	defer grpcServer.Stop()
+
+	const (
+		apiID          = "my-api-id"
+		sessionMetaKey = "sessionMetaKey"
+
+		customAuthSessionMetaValue = "customAuthSessionMetaValue"
+		customAuthSessionID        = "abc"
+		customAuthSessionRate      = 100
+
+		authTokenSessionMetaValue = "authTokenSessionMetaValue"
+		authTokenSessionRate      = 200
+	)
+
+	api := gateway.BuildAPI(func(spec *gateway.APISpec) {
+		spec.APIID = apiID
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = false
+		spec.EnableCoProcessAuth = true
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {
+				AuthHeaderName: "AuthToken",
+			},
+		}
+		spec.UseStandardAuth = true
+		spec.UseKeylessAccess = false
+		spec.VersionData.Versions["v1"] = apidef.VersionInfo{
+			GlobalResponseHeaders: map[string]string{
+				sessionMetaKey: "$tyk_meta." + sessionMetaKey,
+			},
+		}
+		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
+		spec.CustomMiddleware.Driver = apidef.GrpcDriver
+		spec.CustomMiddleware.AuthCheck.Name = "testAuthHook1"
+		spec.CustomMiddleware.IdExtractor.Extractor = nil
+	})[0]
+
+	_, authTokenSessionID := ts.CreateSession(func(s *user.SessionState) {
+		s.Rate = authTokenSessionRate
+		s.MetaData = map[string]interface{}{
+			sessionMetaKey: authTokenSessionMetaValue,
+		}
+		s.AccessRights = map[string]user.AccessDefinition{apiID: {
+			APIID: apiID, Versions: []string{"v1"},
+		}}
+	})
+
+	check := func(t *testing.T, baseIdentityProvidedBy apidef.AuthTypeEnum, keyName string, headerVal string, rate int) {
+		t.Helper()
+
+		api.BaseIdentityProvidedBy = baseIdentityProvidedBy
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Headers: map[string]string{"Authorization": customAuthSessionID, "AuthToken": authTokenSessionID},
+				HeadersMatch: map[string]string{sessionMetaKey: headerVal}, Code: http.StatusOK},
+		}...)
+
+		retSession, found := ts.Gw.GlobalSessionManager.SessionDetail(api.OrgID, keyName, false)
+		assert.Equal(t, float64(rate), retSession.Rate)
+		assert.True(t, found)
+	}
+
+	t.Run("custom base identity", func(t *testing.T) {
+		check(t, apidef.CustomAuth, customAuthSessionID, customAuthSessionMetaValue, customAuthSessionRate)
+	})
+
+	t.Run("auth token base identity", func(t *testing.T) {
+		check(t, apidef.AuthToken, authTokenSessionID, authTokenSessionMetaValue, authTokenSessionRate)
 	})
 }
