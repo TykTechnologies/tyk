@@ -66,6 +66,7 @@ const (
 
 	// For multi-type auth
 	AuthToken     AuthTypeEnum = "auth_token"
+	CustomAuth    AuthTypeEnum = "custom_auth"
 	HMACKey       AuthTypeEnum = "hmac_key"
 	BasicAuthUser AuthTypeEnum = "basic_auth_user"
 	JWTClaim      AuthTypeEnum = "jwt_claim"
