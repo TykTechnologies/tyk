@@ -569,16 +569,6 @@ type Scopes struct {
 	OIDC ScopeClaim `bson:"oidc" json:"oidc,omitempty"`
 }
 
-//func (a *APIDefinition) SetBSON(raw bson.Raw) error {
-//	var m bson.M
-//	err := raw.Unmarshal(&m)
-//	if err != nil {
-//		return err
-//	}
-//	fmt.Println(m)
-//	return nil
-//}
-
 // APIDefinition represents the configuration for a single proxied API and it's versions.
 //
 // swagger:model
