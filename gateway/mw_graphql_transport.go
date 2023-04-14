@@ -49,6 +49,8 @@ func (g *GraphQLProxyOnlyContext) Response() *http.Response {
 }
 
 type GraphQLEngineTransport struct {
+	// currentContext is a function that returns context of the latest OpenTelemetry Span.
+	currentContext    func() context.Context
 	originalTransport http.RoundTripper
 	transportType     GraphQLEngineTransportType
 }
@@ -60,7 +62,16 @@ func NewGraphQLEngineTransport(transportType GraphQLEngineTransportType, origina
 	}
 }
 
+func (g *GraphQLEngineTransport) SetContextFunc(f func() context.Context) {
+	g.currentContext = f
+}
+
 func (g *GraphQLEngineTransport) RoundTrip(request *http.Request) (res *http.Response, err error) {
+	if g.currentContext != nil {
+		// The only way to use the context is cloning the request.
+		request = request.Clone(g.currentContext())
+	}
+
 	switch g.transportType {
 	case GraphQLEngineTransportTypeProxyOnly:
 		proxyOnlyCtx, ok := request.Context().(*GraphQLProxyOnlyContext)

@@ -1026,8 +1026,6 @@ func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoun
 }
 
 func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
-	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
-
 	switch p.TykAPISpec.GraphQL.Version {
 	case apidef.GraphQLConfigVersionNone:
 		fallthrough
@@ -1054,7 +1052,8 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
 		reqCtx := context.Background()
 		if isProxyOnly {
-			reqCtx = NewGraphQLProxyOnlyContext(context.Background(), outreq)
+			// We need this to group GQL execution trace to the root trace of tyk-gateway service.
+			reqCtx = NewGraphQLProxyOnlyContext(outreq.Context(), outreq)
 		}
 
 		resultWriter := graphql.NewEngineResultWriter()
@@ -1081,7 +1080,24 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		}
 		execOptions = append(execOptions, graphql.WithUpstreamHeaders(upstreamHeaders))
 
-		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
+		// PoC starts here
+		//
+		// Create a new ExecutionEngineWithOTel instance here. It implements ObservableExecutionStages and ObservableExecutionEngine
+		// interfaces. It's actually just a wrapper around the default implementation of ObservableExecutionStages. It adds
+		// OpenTelemetry tracer and spans to the execution stages.
+		executionEngineWithOTel := NewExecutionEngineWithOTel(reqCtx, p.TykAPISpec.GraphQLExecutor.ObservableExecutionStages)
+
+		// Create a new GraphQLEngineTransport here and set ObservableExecutionEngine.Context as context function.
+		// We need to pass the OpenTelemetry context to the round-tripper to group the spans together. Otherwise,
+		// the upstream requests are grouped independently in the telemetry data.
+		gqlTransport := NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
+		gqlTransport.SetContextFunc(executionEngineWithOTel.Context)
+		p.TykAPISpec.GraphQLExecutor.Client.Transport = gqlTransport
+
+		// Execute the GQL query.
+		err = executionEngineWithOTel.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
+		//
+		// PoC ends here
 		if err != nil {
 			return
 		}

@@ -186,6 +186,15 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 		return
 	}
 
+	// PoC starts here.
+	//
+	// ObservableExecutionStages is a part of TT-8533.
+	// Create a new ObservableExecutionStages instance here. It's based on the execution engine v2.
+	// The default implementation is basically a wrapper around the enginev2.
+	m.Spec.GraphQLExecutor.ObservableExecutionStages = gql.NewObservableExecutionStagesV2(engine)
+	//
+	// PoC ends here.
+
 	m.Spec.GraphQLExecutor.EngineV2 = engine
 	m.Spec.GraphQLExecutor.CancelV2 = cancel
 	m.Spec.GraphQLExecutor.HooksV2.BeforeFetchHook = m

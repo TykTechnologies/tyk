@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"github.com/TykTechnologies/tyk/trace"
-	"go.opentelemetry.io/otel/attribute"
 	"io"
 	"net"
 	"net/url"
@@ -118,8 +117,8 @@ func (p *Proxy) Serve(l net.Listener) error {
 		go func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			if shouldTrace {
-				attr := []attribute.KeyValue{}
-				attr = append(attr, attribute.String("tyk.apidef.api_id", p.muxer))
+				//attr := []attribute.KeyValue{}
+				//attr = append(attr, attribute.String("tyk.apidef.api_id", p.muxer))
 
 				span, _ := trace.Span(ctx, "serving tcp")
 				span.SetAttributes()
