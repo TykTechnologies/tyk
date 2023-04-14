@@ -613,6 +613,10 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 	tykAuthentication.Fill(api)
 
+	if s.Components == nil {
+		s.Components = &openapi3.Components{}
+	}
+
 	s.fillToken(api)
 	s.fillJWT(api)
 	s.fillBasic(api)
@@ -640,7 +644,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	if len(s.Security) == 0 || len(s.Components.SecuritySchemes) == 0 {
+	if len(s.Security) == 0 || s.Components == nil || len(s.Components.SecuritySchemes) == 0 {
 		return
 	}
 
