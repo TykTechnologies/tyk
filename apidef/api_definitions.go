@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"github.com/TykTechnologies/storage/persistent/model"
 	"net/http"
 	"text/template"
 	"time"
-
-	"github.com/TykTechnologies/storage/persistent/id"
 
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
@@ -502,21 +501,21 @@ type Scopes struct {
 //
 // swagger:model
 type APIDefinition struct {
-	Id                  id.ObjectId   `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
-	Name                string        `bson:"name" json:"name"`
-	Expiration          string        `bson:"expiration" json:"expiration,omitempty"`
-	ExpirationTs        time.Time     `bson:"-" json:"-"`
-	Slug                string        `bson:"slug" json:"slug"`
-	ListenPort          int           `bson:"listen_port" json:"listen_port"`
-	Protocol            string        `bson:"protocol" json:"protocol"`
-	EnableProxyProtocol bool          `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
-	APIID               string        `bson:"api_id" json:"api_id"`
-	OrgID               string        `bson:"org_id" json:"org_id"`
-	UseKeylessAccess    bool          `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2           bool          `bson:"use_oauth2" json:"use_oauth2"`
-	ExternalOAuth       ExternalOAuth `bson:"external_oauth" json:"external_oauth"`
-	UseOpenID           bool          `bson:"use_openid" json:"use_openid"`
-	OpenIDOptions       OpenIDOptions `bson:"openid_options" json:"openid_options"`
+	Id                  model.ObjectID `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
+	Name                string         `bson:"name" json:"name"`
+	Expiration          string         `bson:"expiration" json:"expiration,omitempty"`
+	ExpirationTs        time.Time      `bson:"-" json:"-"`
+	Slug                string         `bson:"slug" json:"slug"`
+	ListenPort          int            `bson:"listen_port" json:"listen_port"`
+	Protocol            string         `bson:"protocol" json:"protocol"`
+	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	APIID               string         `bson:"api_id" json:"api_id"`
+	OrgID               string         `bson:"org_id" json:"org_id"`
+	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
+	UseOauth2           bool           `bson:"use_oauth2" json:"use_oauth2"`
+	ExternalOAuth       ExternalOAuth  `bson:"external_oauth" json:"external_oauth"`
+	UseOpenID           bool           `bson:"use_openid" json:"use_openid"`
+	OpenIDOptions       OpenIDOptions  `bson:"openid_options" json:"openid_options"`
 	Oauth2Meta          struct {
 		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`

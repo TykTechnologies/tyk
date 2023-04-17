@@ -1,7 +1,7 @@
 package user
 
 import (
-	"github.com/TykTechnologies/storage/persistent/id"
+	"github.com/TykTechnologies/storage/persistent/model"
 )
 
 type GraphAccessDefinition struct {
@@ -10,7 +10,7 @@ type GraphAccessDefinition struct {
 // Policy represents a user policy
 // swagger:model
 type Policy struct {
-	MID                           id.ObjectId                      `bson:"_id,omitempty" json:"_id" gorm:"primaryKey;column:_id"`
+	MID                           model.ObjectID                   `bson:"_id,omitempty" json:"_id" gorm:"primaryKey;column:_id"`
 	ID                            string                           `bson:"id,omitempty" json:"id"`
 	Name                          string                           `bson:"name" json:"name"`
 	OrgID                         string                           `bson:"org_id" json:"org_id"`

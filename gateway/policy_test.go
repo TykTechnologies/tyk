@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/storage/persistent/model"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -11,8 +12,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/TykTechnologies/storage/persistent/id"
 
 	"github.com/stretchr/testify/assert"
 
@@ -1502,7 +1501,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 
 func TestParsePoliciesFromRPC(t *testing.T) {
 
-	objectID := id.NewObjectID()
+	objectID := model.NewObjectID()
 	explicitID := "explicit_pol_id"
 	tcs := []struct {
 		testName      string
