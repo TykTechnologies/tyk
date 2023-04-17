@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
-	"github.com/TykTechnologies/storage/persistent/model"
 	"net/http"
 	"text/template"
 	"time"
+
+	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
