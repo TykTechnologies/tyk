@@ -30,6 +30,7 @@ const (
 	grpcListenAddr  = ":9999"
 	grpcListenPath  = "tcp://127.0.0.1:9999"
 	grpcTestMaxSize = 100000000
+	grpcAuthority   = "localhost"
 
 	testHeaderName  = "Testheader"
 	testHeaderValue = "testvalue"
@@ -148,7 +149,6 @@ func newTestGRPCServer() (s *grpc.Server) {
 }
 
 func loadTestGRPCAPIs(s *gateway.Test) {
-
 	s.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.APIID = "1"
 		spec.OrgID = gateway.MockOrgID
@@ -322,6 +322,7 @@ func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
 		CoProcessGRPCServer: grpcListenPath,
 		GRPCRecvMaxSize:     grpcTestMaxSize,
 		GRPCSendMaxSize:     grpcTestMaxSize,
+		GRPCAuthority:       grpcAuthority,
 	}
 	ts := gateway.StartTest(nil, gateway.TestConfig{CoprocessConfig: cfg})
 
