@@ -1,11 +1,12 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/test"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestRequestSizeLimitGlobalSizeLimit(t *testing.T) {
