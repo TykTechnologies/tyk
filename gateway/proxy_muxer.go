@@ -511,5 +511,6 @@ func (m *proxyMux) generateListener(listenPort int, protocol string, gw *Gateway
 }
 
 func requestEntityTooLarge(w http.ResponseWriter, _ *http.Request) {
-	http.Error(w, "413 Request Entity Too Large", http.StatusRequestEntityTooLarge)
+	status := http.StatusRequestEntityTooLarge
+	http.Error(w, http.StatusText(status), status)
 }

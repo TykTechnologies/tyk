@@ -410,7 +410,7 @@ type HttpServerOptionsConfig struct {
 	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
 	Ciphers []string `json:"ssl_ciphers"`
 
-	// Maximum accepted request body size in byte.
+	// Maximum accepted request body size in bytes.
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
 }
 
