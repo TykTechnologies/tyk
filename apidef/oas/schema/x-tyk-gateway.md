@@ -336,12 +336,13 @@ Tyk classic API definition: `strip_auth_data`.
 BaseIdentityProvider enables multi authentication mechanism and provides the session object that determines rate limits, ACL rules and quotas.
 It should be set to one of the following:
 
-- `auth_token`,
-- `hmac_key`,
-- `basic_auth_user`,
-- `jwt_claim`,
-- `oidc_user`,
-- `oauth_key`.
+- `auth_token`
+- `hmac_key`
+- `basic_auth_user`
+- `jwt_claim`
+- `oidc_user`
+- `oauth_key`
+- `custom_auth`
 
 
 Tyk classic API definition: `base_identity_provided_by`.
