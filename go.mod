@@ -14,7 +14,7 @@ require (
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
 	github.com/TykTechnologies/gorpc v0.0.0-20210624160652-fe65bda0ccb9
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230412102031-738c1d218c03
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230419101226-e3f46142fc08
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
@@ -78,9 +78,9 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/crypto v0.0.0-20220513210258-46612604a0f9
+	golang.org/x/crypto v0.1.0
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
-	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c
+	golang.org/x/net v0.1.0
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	google.golang.org/grpc v1.36.0
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
