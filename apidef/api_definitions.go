@@ -1,19 +1,18 @@
 package apidef
 
 import (
-	"database/sql/driver"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"net/http"
 	"text/template"
 	"time"
 
+	"github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
 
@@ -123,76 +122,6 @@ var (
 	ErrAPINotFound                = errors.New("API not found")
 	ErrMissingAPIID               = errors.New("missing API ID")
 )
-
-type ObjectId bson.ObjectId
-
-func (j *ObjectId) Scan(value interface{}) error {
-	var bytes []byte
-	switch v := value.(type) {
-	case []byte:
-		bytes = v
-	case string:
-		bytes = []byte(v)
-	default:
-		return fmt.Errorf("Failed to unmarshal JSON value: %v", value)
-	}
-
-	// reflect magic to update existing string without creating new one
-	if len(bytes) > 0 {
-		bs := ObjectId(bson.ObjectIdHex(string(bytes)))
-		*j = bs
-	}
-
-	return nil
-}
-
-func (j ObjectId) Value() (driver.Value, error) {
-	return bson.ObjectId(j).Hex(), nil
-}
-
-func (j ObjectId) Hex() string {
-	return bson.ObjectId(j).Hex()
-}
-
-func (j ObjectId) Time() time.Time {
-	return bson.ObjectId(j).Time()
-}
-
-func (j ObjectId) Valid() bool {
-	return bson.ObjectId(j).Valid()
-}
-
-func (j ObjectId) String() string {
-	return j.Hex()
-}
-
-func (j ObjectId) GetBSON() (interface{}, error) {
-	return bson.ObjectId(j), nil
-}
-
-func ObjectIdHex(hex string) ObjectId {
-	return ObjectId(bson.ObjectIdHex(hex))
-}
-
-func NewObjectId() ObjectId {
-	return ObjectId(bson.NewObjectId())
-}
-
-func IsObjectIdHex(hex string) bool {
-	return bson.IsObjectIdHex(hex)
-}
-
-func (j ObjectId) MarshalJSON() ([]byte, error) {
-	return bson.ObjectId(j).MarshalJSON()
-}
-
-func (j *ObjectId) UnmarshalJSON(buf []byte) error {
-	var b bson.ObjectId
-	b.UnmarshalJSON(buf)
-	*j = ObjectId(string(b))
-
-	return nil
-}
 
 type EndpointMethodMeta struct {
 	Action  EndpointMethodAction `bson:"action" json:"action"`
@@ -573,21 +502,21 @@ type Scopes struct {
 //
 // swagger:model
 type APIDefinition struct {
-	Id                  ObjectId      `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
-	Name                string        `bson:"name" json:"name"`
-	Expiration          string        `bson:"expiration" json:"expiration,omitempty"`
-	ExpirationTs        time.Time     `bson:"-" json:"-"`
-	Slug                string        `bson:"slug" json:"slug"`
-	ListenPort          int           `bson:"listen_port" json:"listen_port"`
-	Protocol            string        `bson:"protocol" json:"protocol"`
-	EnableProxyProtocol bool          `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
-	APIID               string        `bson:"api_id" json:"api_id"`
-	OrgID               string        `bson:"org_id" json:"org_id"`
-	UseKeylessAccess    bool          `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2           bool          `bson:"use_oauth2" json:"use_oauth2"`
-	ExternalOAuth       ExternalOAuth `bson:"external_oauth" json:"external_oauth"`
-	UseOpenID           bool          `bson:"use_openid" json:"use_openid"`
-	OpenIDOptions       OpenIDOptions `bson:"openid_options" json:"openid_options"`
+	Id                  model.ObjectID `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
+	Name                string         `bson:"name" json:"name"`
+	Expiration          string         `bson:"expiration" json:"expiration,omitempty"`
+	ExpirationTs        time.Time      `bson:"-" json:"-"`
+	Slug                string         `bson:"slug" json:"slug"`
+	ListenPort          int            `bson:"listen_port" json:"listen_port"`
+	Protocol            string         `bson:"protocol" json:"protocol"`
+	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	APIID               string         `bson:"api_id" json:"api_id"`
+	OrgID               string         `bson:"org_id" json:"org_id"`
+	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
+	UseOauth2           bool           `bson:"use_oauth2" json:"use_oauth2"`
+	ExternalOAuth       ExternalOAuth  `bson:"external_oauth" json:"external_oauth"`
+	UseOpenID           bool           `bson:"use_openid" json:"use_openid"`
+	OpenIDOptions       OpenIDOptions  `bson:"openid_options" json:"openid_options"`
 	Oauth2Meta          struct {
 		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
