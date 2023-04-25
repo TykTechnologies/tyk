@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -1500,7 +1502,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 
 func TestParsePoliciesFromRPC(t *testing.T) {
 
-	objectID := apidef.NewObjectId()
+	objectID := model.NewObjectID()
 	explicitID := "explicit_pol_id"
 	tcs := []struct {
 		testName      string
