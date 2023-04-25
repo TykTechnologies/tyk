@@ -2,9 +2,11 @@ package gqlengineadapter
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 
+	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/stretchr/testify/assert"
 
 	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
@@ -113,6 +115,53 @@ func TestRemoveDuplicateApiDefinitionHeaders(t *testing.T) {
 
 	actualDeduplicatedHeaders := removeDuplicateApiDefinitionHeaders(apiDefinitionHeadersFirstArgument, apiDefinitionHeadersSecondArgument)
 	assert.Equal(t, expectedDeduplicatedHeaders, actualDeduplicatedHeaders)
+}
+
+func TestGenerateRestDataSourceFromGraphql(t *testing.T) {
+	t.Run("should return error if generation is not possible", func(t *testing.T) {
+		gqlConfig := apidef.GraphQLEngineDataSourceConfigGraphQL{
+			URL:              "http://local.fake",
+			Method:           http.MethodPost,
+			Headers:          nil,
+			SubscriptionType: "",
+			HasOperation:     false,
+			Operation:        "{ invalidOperation }",
+			Variables:        nil,
+		}
+
+		restEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig)
+		assert.Equal(t, err, ErrGraphQLConfigIsMissingOperation)
+		assert.Nil(t, restEngineConfig)
+	})
+
+	t.Run("should convert GraphQL Data Source config to REST engine config", func(t *testing.T) {
+		gqlConfig := apidef.GraphQLEngineDataSourceConfigGraphQL{
+			URL:    "http://local.fake",
+			Method: http.MethodPost,
+			Headers: map[string]string{
+				"x-header": "header-value",
+			},
+			SubscriptionType: "",
+			HasOperation:     true,
+			Operation:        "mutation MyOp { myOperation }",
+			Variables:        json.RawMessage(`{"var":"val"}`),
+		}
+
+		expectedRestEngineConfig := restDataSource.ConfigJSON(restDataSource.Configuration{
+			Fetch: restDataSource.FetchConfiguration{
+				URL:    "http://local.fake",
+				Method: http.MethodPost,
+				Body:   `{"operationName":"","variables":{"var":"val"},"query":"mutation MyOp { myOperation }"}`,
+				Header: http.Header{
+					"X-Header": []string{"header-value"},
+				},
+			},
+		})
+
+		actualRestEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedRestEngineConfig, actualRestEngineConfig)
+	})
 }
 
 var mockSubscriptionClient = &graphqlDataSource.SubscriptionClient{}
