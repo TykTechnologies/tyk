@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
 	"github.com/stretchr/testify/assert"
