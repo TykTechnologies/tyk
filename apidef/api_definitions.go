@@ -822,6 +822,9 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 	Method           string            `bson:"method" json:"method"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
 	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
+	HasOperation     bool              `bson:"has_operation" json:"has_operation"`
+	Operation        string            `bson:"operation" json:"operation"`
+	Variables        json.RawMessage   `bson:"variables" json:"variables"`
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
