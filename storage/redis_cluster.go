@@ -3,13 +3,15 @@ package storage
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	redis "github.com/go-redis/redis/v8"
+	redis "github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -64,6 +66,36 @@ func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.Un
 		tlsConfig = &tls.Config{
 			InsecureSkipVerify: cfg.SSLInsecureSkipVerify,
 		}
+
+		if len(cfg.CertFile) > 0 && len(cfg.KeyFile) > 0 {
+			log.Info("Loading redis certificates")
+
+			tlsConfig.Certificates = make([]tls.Certificate, 0, 1)
+
+			certs, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
+			if err != nil {
+				log.WithError(err).Debug("Error while loading redis certificates")
+			}
+
+			tlsConfig.Certificates = append(tlsConfig.Certificates, certs)
+		}
+
+		if len(cfg.CACertFile) > 0 {
+			log.Info("Loading redis CA")
+
+			rootCertPool := x509.NewCertPool()
+
+			pem, err := os.ReadFile(cfg.CACertFile)
+			if err != nil {
+				log.WithError(err).Debug("Error while loading redis CA")
+			}
+
+			if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
+				log.WithError(errors.New("failed to append PEM")).Debug("Error while loading redis CA")
+			}
+
+			tlsConfig.RootCAs = rootCertPool
+		}
 	}
 
 	var client redis.UniversalClient
@@ -77,7 +109,6 @@ func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.Un
 		DialTimeout:      timeout,
 		ReadTimeout:      timeout,
 		WriteTimeout:     timeout,
-		IdleTimeout:      240 * timeout,
 		PoolSize:         poolSize,
 		TLSConfig:        tlsConfig,
 	}
@@ -92,6 +123,9 @@ func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.Un
 		log.Info("--> [REDIS] Creating single-node client")
 		client = redis.NewClient(opts.Simple())
 	}
+
+	pong := client.Ping(context.Background())
+	log.Info("[REDIS] Ping: ", pong)
 
 	return client
 }
@@ -927,7 +961,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 			element.Member = strconv.Itoa(int(now.UnixNano()))
 		}
 
-		pipe.ZAdd(r.RedisController.ctx, keyName, &element)
+		pipe.ZAdd(r.RedisController.ctx, keyName, element)
 		pipe.Expire(r.RedisController.ctx, keyName, time.Duration(per)*time.Second)
 
 		return nil
@@ -1030,7 +1064,7 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 		return
 	}
 	member := redis.Z{Score: score, Member: value}
-	if err := r.singleton().ZAdd(r.RedisController.ctx, fixedKey, &member).Err(); err != nil {
+	if err := r.singleton().ZAdd(r.RedisController.ctx, fixedKey, member).Err(); err != nil {
 		log.WithFields(logEntry).WithError(err).Error("ZADD command failed")
 	}
 }
