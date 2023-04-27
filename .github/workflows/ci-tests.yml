@@ -36,7 +36,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Setup Golang FIPS
-        if: ${{ contains(matrix.fips, 'fips') }}
+        if: ${{ contains(matrix.fips, '1') }}
         run: |
           echo "GOEXPERIMENT=boringcrypto" >> $GITHUB_ENV
 
