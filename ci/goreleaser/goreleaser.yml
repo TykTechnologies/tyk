@@ -16,6 +16,18 @@ builds:
     goarch:
       - amd64
     binary: tyk
+  - id: fips-linux
+    flags:
+      - -tags=goplugin,boringcrypto
+    ldflags:
+      - -X github.com/TykTechnologies/tyk/gateway.VERSION={{.Version}} -X github.com/TykTechnologies/tyk/gateway.Commit={{.FullCommit}} -X github.com/TykTechnologies/tyk/gateway.buildDate={{.Date}} -X github.com/TykTechnologies/tyk/gateway.builtBy=goreleaser
+    env:
+      - GOEXPERIMENT=boringcrypto
+    goos:
+      - linux
+    goarch:
+      - amd64
+    binary: tyk
   - id: std-arm64
     flags:
       - -tags=goplugin
@@ -76,6 +88,7 @@ dockers:
   dockerfile: ci/images/hybrid/Dockerfile
   extra_files:
     - "ci/images/hybrid/"
+    
 # Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway (arm64)
 - ids:
     - std
@@ -118,6 +131,53 @@ dockers:
     - "--label=org.opencontainers.image.version={{.Version}}"
   use: buildx
   goarch: arm64
+  goos: linux
+  dockerfile: ci/images/hybrid/Dockerfile
+  extra_files:
+    - "ci/images/hybrid/"
+
+# Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway (fips)
+- ids:
+    - std
+  image_templates:
+    - "tykio/tyk-gateway:{{ .Tag }}-fips-amd64"
+    - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-fips-amd64"
+  build_flag_templates:
+    - "--build-arg=PORTS=8080"
+    - "--platform=linux/amd64"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.title={{.ProjectName}}"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+  use: buildx
+  goarch: arm64
+  goos: linux
+  dockerfile: ci/Dockerfile.std
+  extra_files:
+    - "ci/install/"
+    - "README.md"
+    - "LICENSE.md"
+    - "apps/app_sample.json"
+    - "templates"
+    - "middleware"
+    - "event_handlers/sample"
+    - "policies"
+    - "coprocess"
+    - "tyk.conf.example"
+
+# Build gateway hybrid container fips
+- ids:
+    - std
+  image_templates:
+    - "tykio/tyk-hybrid-docker:{{ .Tag }}-fips-arm64"
+  build_flag_templates:
+    - "--platform=linux/amd64"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.title={{.ProjectName}}-hybrid"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+  use: buildx
+  goarch: amd64
   goos: linux
   dockerfile: ci/images/hybrid/Dockerfile
   extra_files:
@@ -167,19 +227,68 @@ dockers:
     - testdata
     - trace
     - user
+    
+# Build plugin-compiler (fips)
+- ids:
+    - fips
+  image_templates:
+    - tykio/tyk-plugin-compiler:{{ .Tag }}-fips
+    - tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-fips
+  build_flag_templates:
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.title=tyk-plugin-compiler"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+    - "--build-arg=TYK_GW_TAG={{ .Tag }}"
+    - "--build-arg=GOLANG_CROSS={{ .Env.GOLANG_CROSS }}"
+    - "--build-arg=GOEXPERIMENT=boringcrypto"
+  goarch: amd64
+  goos: linux
+  dockerfile: ci/images/plugin-compiler/Dockerfile
+  extra_files:
+    - ci/images/plugin-compiler
+    - go.mod
+    - apidef
+    - certs
+    - checkup
+    - cli
+    - config
+    - coprocess
+    - ctx
+    - dlpython
+    - dnscache
+    - gateway
+    - goplugin
+    - header
+    - internal
+    - log
+    - regexp
+    - request
+    - rpc
+    - signature_validator
+    - storage
+    - tcp
+    - templates
+    - test
+    - testdata
+    - trace
+    - user
 
 docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}
     image_templates:
     - tykio/tyk-gateway:{{ .Tag }}-amd64
+    - tykio/tyk-gateway:{{ .Tag }}-fips-amd64
     - tykio/tyk-gateway:{{ .Tag }}-arm64
   - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
     image_templates:
     - tykio/tyk-gateway:{{ .Tag }}-amd64
+    - tykio/tyk-gateway:{{ .Tag }}-fips-amd64
     - tykio/tyk-gateway:{{ .Tag }}-arm64
   - name_template: tykio/tyk-hybrid-docker:{{ .Tag }}
     image_templates:
     - tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
+    - tykio/tyk-hybrid-docker:{{ .Tag }}-fips-amd64
     - tykio/tyk-hybrid-docker:{{ .Tag }}-arm64
 
 nfpms:
@@ -191,6 +300,7 @@ nfpms:
     package_name: tyk-gateway
     builds:
       - std-linux
+      - fips-linux
       - std-arm64
     formats:
       - deb
