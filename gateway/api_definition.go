@@ -685,6 +685,8 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 	nestDef := nestedApiDefinition{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
+		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.
+		loader.ReadFromURIFunc = openapi3.ReadFromFile
 		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(filePath))
 		if err == nil {
 			nestDef.OAS = &oas.OAS{T: *oasDoc}
@@ -1002,10 +1004,8 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 					}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)
 
 					if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-						if ServiceCache != nil {
-							log.Warning("[PROXY] [CIRCUIT BREAKER] Refreshing host list")
-							ServiceCache.Delete(spec.APIID)
-						}
+						log.Warning("[PROXY] [CIRCUIT BREAKER] Refreshing host list")
+						a.Gw.ServiceCache.Delete(spec.APIID)
 					}
 
 					spec.FireEvent(EventBreakerTriggered, EventCurcuitBreakerMeta{

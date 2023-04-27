@@ -119,8 +119,9 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: traceReq.Spec}, logrus.NewEntry(logger))
 
 	chainObj := gw.processSpec(spec, nil, &gs, logrus.NewEntry(logger))
+
 	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(logger))
-	handleCORS(subrouter, spec)
+
 	spec.middlewareChain = chainObj
 
 	if chainObj.ThisHandler == nil {

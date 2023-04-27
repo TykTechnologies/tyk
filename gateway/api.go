@@ -47,7 +47,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
@@ -2140,11 +2140,10 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Allow the client ID to be set
-	cleanSting := newOauthClient.ClientID
+	clientID := newOauthClient.ClientID
 
 	if newOauthClient.ClientID == "" {
-		u5 := uuid.NewV4()
-		cleanSting = strings.Replace(u5.String(), "-", "", -1)
+		clientID = uuid.NewHex()
 	}
 
 	// Allow the secret to be set
@@ -2154,7 +2153,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newClient := OAuthClient{
-		ClientID:          cleanSting,
+		ClientID:          clientID,
 		ClientRedirectURI: newOauthClient.ClientRedirectURI,
 		ClientSecret:      secret,
 		PolicyID:          newOauthClient.PolicyID,
@@ -3386,8 +3385,8 @@ func ctxGetOperation(r *http.Request) (op *Operation) {
 }
 
 var createOauthClientSecret = func() string {
-	secret := uuid.NewV4()
-	return base64.StdEncoding.EncodeToString([]byte(secret.String()))
+	secret := uuid.New()
+	return base64.StdEncoding.EncodeToString([]byte(secret))
 }
 
 // invalidate tokens if we had a new policy

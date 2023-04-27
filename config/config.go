@@ -234,7 +234,7 @@ type DnsCacheConfig struct {
 	TTL int64 `json:"ttl"`
 
 	CheckInterval int64 `json:"-" ignored:"true"`
-	//controls cache cleanup interval. By convention this shouldn't be exposed to a config or env_variable_setup
+	// controls cache cleanup interval. By convention this shouldn't be exposed to a config or env_variable_setup
 
 	// A strategy which will be used when a DNS query will reply with more than 1 IP Address per single host.
 	// As a DNS query response IP Addresses can have a changing order depending on DNS server balancing strategy (eg: round robin, geographically dependent origin-ip ordering, etc) this option allows you to not to limit the connection to the first host in a cached response list or prevent response caching.
@@ -359,9 +359,6 @@ type HttpServerOptionsConfig struct {
 	// Set to true to enable SSL connections
 	UseSSL bool `json:"use_ssl"`
 
-	// Enable Lets-Encrypt support
-	UseLE_SSL bool `json:"use_ssl_le"`
-
 	// Enable HTTP2 protocol handling
 	EnableHttp2 bool `json:"enable_http2"`
 
@@ -412,6 +409,9 @@ type HttpServerOptionsConfig struct {
 
 	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
 	Ciphers []string `json:"ssl_ciphers"`
+
+	// Maximum accepted request body size in bytes.
+	MaxRequestBodySize int64 `json:"max_request_body_size"`
 }
 
 type AuthOverrideConf struct {
@@ -457,6 +457,9 @@ type CoProcessConfig struct {
 	// Maximum message which can be sent to gRPC server
 	GRPCSendMaxSize int `json:"grpc_send_max_size"`
 
+	// Authority used in GRPC connection
+	GRPCAuthority string `json:"grpc_authority"`
+
 	// Sets the path to built-in Tyk modules. This will be part of the Python module lookup path. The value used here is the default one for most installations.
 	PythonPathPrefix string `json:"python_path_prefix"`
 
@@ -494,6 +497,8 @@ type NewRelicConfig struct {
 	AppName string `json:"app_name"`
 	// New Relic License key
 	LicenseKey string `json:"license_key"`
+	// Enable distributed tracing
+	EnableDistributedTracing bool `json:"enable_distributed_tracing"`
 }
 
 type Tracer struct {

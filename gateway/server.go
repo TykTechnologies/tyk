@@ -33,12 +33,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
-	"github.com/pmylund/go-cache"
-	"github.com/rs/cors"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
-	"rsc.io/letsencrypt"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/drl"
@@ -61,6 +59,8 @@ import (
 	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 var (
@@ -119,15 +119,17 @@ type Gateway struct {
 	SessionMonitor Monitor
 
 	// RPCGlobalCache stores keys
-	RPCGlobalCache *cache.Cache
+	RPCGlobalCache cache.Repository
 	// RPCCertCache stores certificates
-	RPCCertCache *cache.Cache
+	RPCCertCache cache.Repository
 	// key session memory cache
-	SessionCache *cache.Cache
+	SessionCache cache.Repository
 	// org session memory cache
-	ExpiryCache *cache.Cache
+	ExpiryCache cache.Repository
 	// memory cache to store arbitrary items
-	UtilCache *cache.Cache
+	UtilCache cache.Repository
+	// ServiceCache is the service discovery cache
+	ServiceCache cache.Repository
 
 	// Nonce to use when interacting with the dashboard service
 	ServiceNonce      string
@@ -145,9 +147,6 @@ type Gateway struct {
 
 	consulKVStore kv.Store
 	vaultKVStore  kv.Store
-
-	LE_MANAGER  letsencrypt.Manager
-	LE_FIRSTRUN bool
 
 	NotificationVerifier goverify.Verifier
 
@@ -218,9 +217,16 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 		Timeout: 500 * time.Millisecond,
 	}
 
-	gw.SessionCache = cache.New(10*time.Second, 5*time.Second)
-	gw.ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
-	gw.UtilCache = cache.New(time.Hour, 10*time.Minute)
+	gw.SessionCache = cache.New(10, 5)
+	gw.ExpiryCache = cache.New(600, 10*60)
+	gw.UtilCache = cache.New(3600, 10*60)
+
+	var timeout = int64(config.ServiceDiscovery.DefaultCacheTimeout)
+	if timeout <= 0 {
+		timeout = 120 // 2 minutes
+	}
+
+	gw.ServiceCache = cache.New(timeout, 15)
 
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
@@ -247,8 +253,8 @@ func (gw *Gateway) MarshalJSON() ([]byte, error) {
 
 func (gw *Gateway) InitializeRPCCache() {
 	conf := gw.GetConfig()
-	gw.RPCGlobalCache = cache.New(time.Duration(conf.SlaveOptions.RPCGlobalCacheExpiration)*time.Second, 15*time.Second)
-	gw.RPCCertCache = cache.New(time.Duration(conf.SlaveOptions.RPCCertCacheExpiration)*time.Second, 15*time.Second)
+	gw.RPCGlobalCache = cache.New(int64(conf.SlaveOptions.RPCGlobalCacheExpiration), 15)
+	gw.RPCCertCache = cache.New(int64(conf.SlaveOptions.RPCCertCacheExpiration), 15)
 }
 
 // SetNodeID writes NodeID safely.
@@ -920,25 +926,6 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	spec.ResponseChain = responseChain
 }
 
-func handleCORS(router *mux.Router, spec *APISpec) {
-
-	if spec.CORS.Enable {
-		mainLog.Debug("CORS ENABLED")
-		c := cors.New(cors.Options{
-			AllowedOrigins:     spec.CORS.AllowedOrigins,
-			AllowedMethods:     spec.CORS.AllowedMethods,
-			AllowedHeaders:     spec.CORS.AllowedHeaders,
-			ExposedHeaders:     spec.CORS.ExposedHeaders,
-			AllowCredentials:   spec.CORS.AllowCredentials,
-			MaxAge:             spec.CORS.MaxAge,
-			OptionsPassthrough: spec.CORS.OptionsPassthrough,
-			Debug:              spec.CORS.Debug,
-		})
-
-		router.Use(c.Handler)
-	}
-}
-
 func (gw *Gateway) isRPCMode() bool {
 	return gw.GetConfig().AuthOverride.ForceAuthProvider &&
 		gw.GetConfig().AuthOverride.AuthProvider.StorageEngine == RPCStorageEngine
@@ -1276,10 +1263,6 @@ func (gw *Gateway) initialiseSystem() error {
 	gw.InitializeRPCCache()
 	gw.setupInstrumentation()
 
-	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
-		go gw.StartPeriodicStateBackup(&gw.LE_MANAGER)
-	}
-
 	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
@@ -1522,9 +1505,10 @@ func Start() {
 
 	// ToDo:Config replace for get default conf
 	gw := NewGateway(config.Default, ctx)
-	gw.SetNodeID("solo-" + uuid.NewV4().String())
+	gw.SetNodeID("solo-" + uuid.New())
 
-	gw.SessionID = uuid.NewV4().String()
+	gw.SessionID = uuid.New()
+
 	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}

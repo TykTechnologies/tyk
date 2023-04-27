@@ -14,14 +14,15 @@ env:
 
 jobs:
   test:
-    name: Go ${{ matrix.go }} Redis ${{ matrix.redis-version }}
+    name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         redis-version: [5]
         python-version: ['3.9']
-        go: [1.16,1.16-fips] 
+        go-version: [1.19.x]
+        fips: [0,1]
 
     steps:
       - name: Checkout Tyk
@@ -30,26 +31,14 @@ jobs:
           fetch-depth: 2
 
       - name: Setup Golang
-        if: ${{ !contains(matrix.go, 'fips') }}
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ matrix.go-version }}
 
       - name: Setup Golang FIPS
-        if: ${{ contains(matrix.go, 'fips') }}
+        if: ${{ contains(matrix.fips, 'fips') }}
         run: |
-          cd ..
-          url="https://go-boringcrypto.storage.googleapis.com/go1.16.7b7.linux-amd64.tar.gz";
-          wget -O go.tgz "$url"
-          echo "d4ca2906640edd9299d12d8204aae0d848b497b79b92424d8705ae748e16f3c5 go.tgz" | sha256sum -c -
-          mkdir go
-          curdir=$(pwd)
-          tar -xzf go.tgz
-          rm go.tgz
-          echo "GOPATH=$(pwd)" >> $GITHUB_ENV
-          echo "$(pwd)/bin" >> $GITHUB_PATH
-          echo "$curdir/go/bin" >> $GITHUB_PATH
-          echo "FIPS=1" >> $GITHUB_ENV
+          echo "GOEXPERIMENT=boringcrypto" >> $GITHUB_ENV
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -71,13 +60,17 @@ jobs:
           make lint
           
           git add --all
+
           git diff HEAD > git-state.log
-          echo "git-state=$(sed -ze 's/%/%25/g;s/\n/%0A/g' git-state.log)" >> $GITHUB_OUTPUT
 
           git_state_count=$(wc -l < git-state.log)
           
           if [[ $git_state_count -ne 0 ]]
           then 
+            echo "git-state<<EOF" >> $GITHUB_OUTPUT
+            cat git-state.log >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+
             echo "make lint made git state dirty, please run make lint locally and update PR"
             exit 1
           fi
@@ -89,7 +82,6 @@ jobs:
         uses: supercharge/redis-github-action@1.2.0
         with:
           redis-version: ${{ matrix.redis-version }}
-
 
       - name: Cache
         uses: actions/cache@v2
@@ -106,13 +98,7 @@ jobs:
       - name: Run Gateway Tests
         id: ci-tests
         run: |
-          go version 
-          TYK_LOGLEVEL=debug ./bin/ci-tests.sh 
-
-# 2>&1 | tee test.log
-#          result_code=${PIPESTATUS[0]}
-#          echo "log=$(sed -ze 's/%/%25/g;s/\n/%0A/g' test.log)" >> $GITHUB_OUTPUT
- #         exit $result_code
+          ./bin/ci-tests.sh 2>&1
 
       - name: Notify status
         if: ${{ failure() && github.event.pull_request.number }}

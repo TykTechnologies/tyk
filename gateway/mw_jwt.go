@@ -17,13 +17,13 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/osin"
-	cache "github.com/pmylund/go-cache"
 	jose "github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 type JWTMiddleware struct {
@@ -60,7 +60,7 @@ func (k *JWTMiddleware) EnabledForSpec() bool {
 	return k.Spec.EnableJWT
 }
 
-var JWKCache *cache.Cache
+var JWKCache cache.Repository = cache.New(240, 30)
 
 type JWK struct {
 	Alg string   `json:"alg"`
@@ -87,11 +87,6 @@ func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
 }
 
 func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
-	// Implement a cache
-	if JWKCache == nil {
-		JWKCache = cache.New(240*time.Second, 30*time.Second)
-	}
-
 	var client http.Client
 	client.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
@@ -139,11 +134,10 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 	return nil, errors.New("No matching KID could be found")
 }
 
-func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{}, error) {
-	// Implement a cache
-	if JWKCache == nil {
-		k.Logger().Debug("Creating JWK Cache")
-		JWKCache = cache.New(240*time.Second, 30*time.Second)
+func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType string) (interface{}, error) {
+	kid, ok := kidVal.(string)
+	if !ok {
+		return nil, ErrKIDNotAString
 	}
 
 	var (
@@ -197,7 +191,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 	if config.JWTSource != "" {
 		// Is it a URL?
 		if httpScheme.MatchString(config.JWTSource) {
-			return k.getSecretFromURL(config.JWTSource, token.Header[KID].(string), k.Spec.JWTSigningMethod)
+			return k.getSecretFromURL(config.JWTSource, token.Header[KID], k.Spec.JWTSigningMethod)
 		}
 
 		// If not, return the actual value
@@ -208,7 +202,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 
 		// Is decoded url too?
 		if httpScheme.MatchString(string(decodedCert)) {
-			secret, err := k.getSecretFromURL(string(decodedCert), token.Header[KID].(string), k.Spec.JWTSigningMethod)
+			secret, err := k.getSecretFromURL(string(decodedCert), token.Header[KID], k.Spec.JWTSigningMethod)
 			if err != nil {
 				return nil, err
 			}
@@ -516,8 +510,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	}
 
 	// apply policies from scope if scope-to-policy mapping is specified for this API
-	if len(k.Spec.Scopes.JWT.ScopeToPolicy) != 0 {
-		scopeClaimName := k.Spec.Scopes.JWT.ScopeClaimName
+	if len(k.Spec.GetScopeToPolicyMapping()) != 0 {
+		scopeClaimName := k.Spec.GetScopeClaimName()
 		if scopeClaimName == "" {
 			scopeClaimName = "scope"
 		}
@@ -533,7 +527,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 
 			// add all policies matched from scope-policy mapping
-			mappedPolIDs := mapScopeToPolicies(k.Spec.Scopes.JWT.ScopeToPolicy, scope)
+			mappedPolIDs := mapScopeToPolicies(k.Spec.GetScopeToPolicyMapping(), scope)
 			if len(mappedPolIDs) > 0 {
 				k.Logger().Debugf("Identified policy(s) to apply to this token from scope claim: %s", scopeClaimName)
 			} else {

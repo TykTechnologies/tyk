@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -130,9 +131,7 @@ func TestTCPDial_with_service_discovery(t *testing.T) {
 		return string(buf)
 	}
 	for i := 0; i < 4; i++ {
-		if ServiceCache != nil {
-			ServiceCache.Flush()
-		}
+		ts.Gw.ServiceCache.Flush()
 		result = append(result, dial())
 	}
 	expect := []string{"service2", "service1", "service2", "service1"}
@@ -369,5 +368,21 @@ func TestHandleSubroutes(t *testing.T) {
 		{Path: "/charlie/name/suffixfoo", Code: http.StatusOK},
 		{Path: "/charlie/name/name/suffix/foo", Code: http.StatusOK},
 		{Path: "/charlie/name/name/name/suffix/foo", Code: http.StatusOK},
+	}...)
+}
+
+func TestRequestBodyLimit(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.MaxRequestBodySize = 1024
+	})
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/sample/", Method: "POST", Data: strings.Repeat("a", 1024), Code: http.StatusOK},
+		{Path: "/sample/", Method: "POST", Data: strings.Repeat("a", 1025), Code: http.StatusRequestEntityTooLarge},
 	}...)
 }
