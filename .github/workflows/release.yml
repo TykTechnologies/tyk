@@ -37,11 +37,10 @@ jobs:
       matrix:
         golang_cross: [ 1.19-ibm ]
         include:
-           - golang_cross: 1.19-ibm
-             goreleaser: 'ci/goreleaser/goreleaser.yml'
-             rpmvers: 'el/8'
-             debvers: 'ubuntu/focal debian/buster debian/bullseye'
-
+          - golang_cross: 1.19-ibm
+            goreleaser: 'ci/goreleaser/goreleaser.yml'
+            rpmvers: 'el/8 el/9'
+            debvers: 'ubuntu/bionic ubuntu/focal ubuntu/jammy debian/buster debian/bullseye'
     outputs:
       tag: ${{ steps.targets.outputs.tag }}
 
@@ -104,18 +103,6 @@ jobs:
             *.tar.gz
             *.txt.sig
             *.txt
-      - name: Fix vendor
-        run: |
-          export GOPATH=/go
-          mkdir -p /go/src || true
-          whereis go
-          go mod tidy
-          go mod vendor
-          echo "Moving vendor"
-          cp -r -f vendor/* $GOPATH/src
-          rm -rf vendor
-          mkdir -p /go/src/github.com/TykTechnologies/tyk
-          cp -r ./* /go/src/github.com/TykTechnologies/tyk
 
       - uses: goreleaser/goreleaser-action@v3
         with:
@@ -124,7 +111,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
-          GO111MODULE: off
           NFPM_STD_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           NFPM_PAYG_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
@@ -250,9 +236,9 @@ jobs:
           - s390x
           - ppc64le
         distro:
-          - ubuntu:xenial
           - ubuntu:bionic
           - ubuntu:focal
+          - ubuntu:jammy
           - debian:bullseye
 
     steps:
@@ -306,7 +292,7 @@ jobs:
       fail-fast: false
       matrix:
         distro:
-          - ubi7/ubi
+          - ubi9/ubi
           - ubi8/ubi
 
     steps:

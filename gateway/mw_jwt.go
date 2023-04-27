@@ -17,13 +17,13 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/osin"
-	cache "github.com/pmylund/go-cache"
 	jose "github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 type JWTMiddleware struct {
@@ -60,7 +60,7 @@ func (k *JWTMiddleware) EnabledForSpec() bool {
 	return k.Spec.EnableJWT
 }
 
-var JWKCache *cache.Cache
+var JWKCache cache.Repository = cache.New(240, 30)
 
 type JWK struct {
 	Alg string   `json:"alg"`
@@ -87,11 +87,6 @@ func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
 }
 
 func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
-	// Implement a cache
-	if JWKCache == nil {
-		JWKCache = cache.New(240*time.Second, 30*time.Second)
-	}
-
 	var client http.Client
 	client.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
@@ -143,12 +138,6 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 	kid, ok := kidVal.(string)
 	if !ok {
 		return nil, ErrKIDNotAString
-	}
-
-	// Implement a cache
-	if JWKCache == nil {
-		k.Logger().Debug("Creating JWK Cache")
-		JWKCache = cache.New(240*time.Second, 30*time.Second)
 	}
 
 	var (

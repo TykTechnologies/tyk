@@ -14,13 +14,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/gorilla/mux"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/gorilla/mux"
-	"github.com/pmylund/go-cache"
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 const ListDetailed = "detailed"
@@ -277,7 +277,7 @@ func dummyGetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return nil, nil
 }
 
-var tlsConfigCache = cache.New(60*time.Second, 60*time.Minute)
+var tlsConfigCache = cache.New(60, 3600)
 
 var tlsConfigMu sync.Mutex
 

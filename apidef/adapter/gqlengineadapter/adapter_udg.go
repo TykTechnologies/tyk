@@ -114,6 +114,17 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 				return nil, err
 			}
 
+			if graphqlConfig.HasOperation {
+				planDataSource.Factory = &restDataSource.Factory{
+					Client: u.HttpClient,
+				}
+				planDataSource.Custom, err = generateRestDataSourceFromGraphql(graphqlConfig)
+				if err != nil {
+					return nil, err
+				}
+				break
+			}
+
 			planDataSource.Factory, err = createGraphQLDataSourceFactory(createGraphQLDataSourceFactoryParams{
 				graphqlConfig:             graphqlConfig,
 				subscriptionClientFactory: subscriptionClientFactoryOrDefault(u.subscriptionClientFactory),

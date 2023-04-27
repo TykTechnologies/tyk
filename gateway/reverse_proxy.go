@@ -38,7 +38,6 @@ import (
 	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
@@ -61,10 +60,9 @@ var corsHeaders = []string{
 	"Access-Control-Allow-Methods",
 	"Access-Control-Allow-Headers"}
 
-var ServiceCache *cache.Cache
 var sdMu sync.RWMutex
 
-func urlFromService(spec *APISpec) (*apidef.HostList, error) {
+func urlFromService(spec *APISpec, gw *Gateway) (*apidef.HostList, error) {
 
 	doCacheRefresh := func() (*apidef.HostList, error) {
 		log.Debug("--> Refreshing")
@@ -91,7 +89,12 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 			return spec.LastGoodHostList, nil
 		}
 
-		ServiceCache.Set(spec.APIID, data, cache.DefaultExpiration)
+		ttl, cacheEnabled := spec.Proxy.ServiceDiscovery.CacheOptions()
+		if !cacheEnabled {
+			ttl = 0 // use gateway default cache time to live.
+		}
+		gw.ServiceCache.Set(spec.APIID, data, ttl)
+
 		// Stash it too
 		spec.LastGoodHostList = data
 		return data, nil
@@ -106,7 +109,7 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 	}
 
 	// Not first run - check the cache
-	cachedServiceData, found := ServiceCache.Get(spec.APIID)
+	cachedServiceData, found := gw.ServiceCache.Get(spec.APIID)
 	if !found {
 		if spec.ServiceRefreshInProgress {
 			// Are we already refreshing the cache? skip and return last good conf
@@ -217,19 +220,6 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			panic(server.Serve(listener))
 		}()
 	})
-	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-		log.Debug("[PROXY] Service discovery enabled")
-		if ServiceCache == nil {
-			log.Debug("[PROXY] Service cache initialising")
-			expiry := 120
-			if spec.Proxy.ServiceDiscovery.CacheTimeout > 0 {
-				expiry = int(spec.Proxy.ServiceDiscovery.CacheTimeout)
-			} else if spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout > 0 {
-				expiry = spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout
-			}
-			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
-		}
-	}
 
 	targetQuery := target.RawQuery
 	director := func(req *http.Request) {
@@ -237,7 +227,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		switch {
 		case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
 			var err error
-			hostList, err = urlFromService(spec)
+			hostList, err = urlFromService(spec, gw)
 			if err != nil {
 				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 				break
@@ -1356,10 +1346,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", http.StatusGatewayTimeout, true)
 
 			if p.TykAPISpec.Proxy.ServiceDiscovery.UseDiscoveryService {
-				if ServiceCache != nil {
-					p.logger.Debug("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
-					ServiceCache.Delete(p.TykAPISpec.APIID)
-				}
+				p.logger.Debug("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
+				p.Gw.ServiceCache.Delete(p.TykAPISpec.APIID)
 			}
 			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
@@ -1384,7 +1372,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	upgrade, _ := p.IsUpgrade(req)
 	// Deal with 101 Switching Protocols responses: (WebSocket, h2c, etc)
-	if upgrade {
+	if upgrade && res.StatusCode == 101 {
 		if err := p.handleUpgradeResponse(rw, outreq, res); err != nil {
 			p.ErrorHandler.HandleError(rw, logreq, err.Error(), http.StatusInternalServerError, true)
 			return ProxyResponse{UpstreamLatency: upstreamLatency}
