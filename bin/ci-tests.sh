@@ -27,13 +27,13 @@ go build ${tags} -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test
 
 for pkg in ${PKGS}; do
     tags=""
-    if [[ "$GOEXPERIMENT" == "1" ]]; then
+    if [[ "$GOEXPERIMENT" == "boringcrypto" ]]; then
         tags="-tags 'boringcrypto'"
     fi
     if [[ ${pkg} == *"goplugin" ]]; then
         tags="-tags 'goplugin'"
 
-        if [[ "$GOEXPERIMENT" == "1" ]]; then
+        if [[ "$GOEXPERIMENT" == "boringcrypto" ]]; then
             tags='-tags "goplugin boringcrypto"'
         fi
 
