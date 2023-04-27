@@ -19,7 +19,7 @@ set -e
 echo "Building go plugin"
 
 tags=""
-if [[ $FIPS == "1" ]]; then
+if [[ "$GOEXPERIMENT" == "boringcrypto" ]]; then
     tags="-tags 'boringcrypto'"
 fi
 
@@ -27,13 +27,13 @@ go build ${tags} -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test
 
 for pkg in ${PKGS}; do
     tags=""
-    if [[ $FIPS == "1" ]]; then
+    if [[ "$GOEXPERIMENT" == "1" ]]; then
         tags="-tags 'boringcrypto'"
     fi
     if [[ ${pkg} == *"goplugin" ]]; then
         tags="-tags 'goplugin'"
 
-        if [[ $FIPS == "1" ]]; then
+        if [[ "$GOEXPERIMENT" == "1" ]]; then
             tags='-tags "goplugin boringcrypto"'
         fi
 
