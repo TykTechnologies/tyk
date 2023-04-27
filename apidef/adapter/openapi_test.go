@@ -187,7 +187,7 @@ const expectedOpenAPIGraphQLConfig = `{
             {
                 "type_name": "Mutation",
                 "field_name": "addPet",
-                "disable_default_mapping": false,
+                "disable_default_mapping": true,
                 "path": [
                     "addPet"
                 ]
@@ -195,7 +195,7 @@ const expectedOpenAPIGraphQLConfig = `{
             {
                 "type_name": "Mutation",
                 "field_name": "deletePet",
-                "disable_default_mapping": false,
+                "disable_default_mapping": true,
                 "path": [
                     "deletePet"
                 ]
@@ -203,7 +203,7 @@ const expectedOpenAPIGraphQLConfig = `{
             {
                 "type_name": "Query",
                 "field_name": "findPetById",
-                "disable_default_mapping": false,
+                "disable_default_mapping": true,
                 "path": [
                     "findPetById"
                 ]
@@ -211,7 +211,7 @@ const expectedOpenAPIGraphQLConfig = `{
             {
                 "type_name": "Query",
                 "field_name": "findPets",
-                "disable_default_mapping": false,
+                "disable_default_mapping": true,
                 "path": [
                     "findPets"
                 ]
@@ -231,7 +231,7 @@ const expectedOpenAPIGraphQLConfig = `{
                     }
                 ],
                 "config": {
-                    "url": "http://petstore.swagger.io/pets",
+                    "url": "http://petstore.swagger.io/api/pets",
                     "method": "POST",
                     "headers": {},
                     "query": [],
@@ -251,7 +251,7 @@ const expectedOpenAPIGraphQLConfig = `{
                     }
                 ],
                 "config": {
-                    "url": "http://petstore.swagger.io/pets/{{.arguments.id}}",
+                    "url": "http://petstore.swagger.io/api/pets/{{.arguments.id}}",
                     "method": "DELETE",
                     "headers": {},
                     "query": [],
@@ -271,7 +271,7 @@ const expectedOpenAPIGraphQLConfig = `{
                     }
                 ],
                 "config": {
-                    "url": "http://petstore.swagger.io/pets/{{.arguments.id}}",
+                    "url": "http://petstore.swagger.io/api/pets/{{.arguments.id}}",
                     "method": "GET",
                     "headers": {},
                     "query": [],
@@ -291,7 +291,7 @@ const expectedOpenAPIGraphQLConfig = `{
                     }
                 ],
                 "config": {
-                    "url": "http://petstore.swagger.io/pets?limit={{.arguments.limit}}\u0026tags={{.arguments.tags}}",
+                    "url": "http://petstore.swagger.io/api/pets?limit={{.arguments.limit}}\u0026tags={{.arguments.tags}}",
                     "method": "GET",
                     "headers": {},
                     "query": [],
