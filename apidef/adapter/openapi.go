@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -75,6 +76,7 @@ func (o *openAPI) prepareGraphQLEngineConfig() error {
 				}
 				parsedEndpoint.Scheme = server.Scheme
 				parsedEndpoint.Host = server.Host
+				parsedEndpoint.Path = path.Join(server.Path, parsedEndpoint.Path)
 
 				query := parsedEndpoint.Query()
 				for _, parameter := range operation.Parameters {
@@ -96,9 +98,10 @@ func (o *openAPI) prepareGraphQLEngineConfig() error {
 				}
 
 				fieldConfig := apidef.GraphQLFieldConfig{
-					TypeName:  graphqlType,
-					FieldName: fieldName,
-					Path:      []string{fieldName},
+					TypeName:              graphqlType,
+					FieldName:             fieldName,
+					DisableDefaultMapping: true, // See TT-TT-8728
+					Path:                  []string{fieldName},
 				}
 				o.apiDefinition.GraphQL.Engine.FieldConfigs = append(o.apiDefinition.GraphQL.Engine.FieldConfigs, fieldConfig)
 
