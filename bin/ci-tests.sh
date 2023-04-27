@@ -42,9 +42,9 @@ for pkg in ${PKGS}; do
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
 
     echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
-    TYK_LOGLEVEL=debug go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
+    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
 done
 
 # run rpc tests separately
 rpc_tests='SyncAPISpecsRPC|OrgSessionWithRPCDown'
-TYK_LOGLEVEL=debug go test -count=1 -timeout ${TEST_TIMEOUT} -v -coverprofile=gateway-rpc.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"'
+go test -count=1 -timeout ${TEST_TIMEOUT} -v -coverprofile=gateway-rpc.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"'
