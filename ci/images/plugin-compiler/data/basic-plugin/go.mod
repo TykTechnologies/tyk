@@ -74,8 +74,8 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.18.1 // indirect
 	golang.org/x/crypto v0.0.0-20220513210258-46612604a0f9 // indirect
-	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c // indirect
-	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
+	golang.org/x/net v0.7.0 // indirect
+	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
