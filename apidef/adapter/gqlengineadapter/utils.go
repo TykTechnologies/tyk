@@ -92,7 +92,7 @@ func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConf
 		Query:     config.Operation,
 		Variables: config.Variables,
 	}
-	body, err := json.Marshal(req)
+	body, err := graphql.MarshalRequestString(req)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConf
 		Fetch: restDataSource.FetchConfiguration{
 			URL:    config.URL,
 			Method: config.Method,
-			Body:   string(body),
+			Body:   body,
 			Header: convertApiDefinitionHeadersToHttpHeaders(config.Headers),
 		},
 	})
