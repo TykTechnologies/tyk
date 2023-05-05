@@ -607,6 +607,11 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 							session.Tags = append(session.Tags, tag.(string))
 						}
 					}
+					
+					policies, ok := data["policies"].(string)
+					if ok {
+						session["policies"] = policies
+					}
 				}
 			}
 		} else {
