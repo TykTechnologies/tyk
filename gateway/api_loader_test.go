@@ -8,13 +8,15 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/lonelycode/go-uuid/uuid"
+	"github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestOpenTracing(t *testing.T) {
@@ -92,7 +94,7 @@ func TestFuzzyFindAPI(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	objectId := apidef.NewObjectId()
+	objectId := model.NewObjectID()
 
 	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {

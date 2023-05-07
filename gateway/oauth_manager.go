@@ -17,8 +17,9 @@ import (
 	"github.com/TykTechnologies/tyk/request"
 
 	"github.com/lonelycode/osin"
-	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"strconv"
 
@@ -1140,8 +1141,7 @@ func (a accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefre
 
 	accesstoken = a.Gw.keyGen.GenerateAuthKey(newSession.OrgID)
 	if generaterefresh {
-		u6 := uuid.NewV4()
-		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))
+		refreshtoken = base64.StdEncoding.EncodeToString([]byte(uuid.New()))
 	}
 	return
 }
