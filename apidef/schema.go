@@ -24,6 +24,9 @@ const Schema = `{
         "api_id": {
             "type": "string"
         },
+		"last_updated": {
+            "type": "number"
+        },
 		"expiration": {
             "type": "string"
         },

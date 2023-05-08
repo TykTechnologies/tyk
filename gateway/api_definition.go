@@ -598,7 +598,6 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 		found := false
 		for index, oldapi := range gw.apiSpecs {
 			if oldapi.Id == newapi.Id {
-				fmt.Println("override uno")
 				gw.apiSpecs[index] = newapi
 				found = true
 			}
@@ -606,6 +605,8 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 		if !found {
 			gw.apiSpecs = append(gw.apiSpecs, newapi)
 		}
+		fmt.Printf("\noverride api con id: %v\n", newapi.Id)
+
 	}
 	//store.Disconnect()
 
