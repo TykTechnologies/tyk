@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -549,7 +550,9 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 	if rpc.IsEmergencyMode() {
 		return gw.LoadDefinitionsFromRPCBackup()
 	}
-
+	// take current data
+	// send it
+	//
 	store := RPCStorageHandler{
 		DoReload: gw.DoReload,
 		Gw:       a.Gw,
@@ -566,17 +569,65 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 		tags = gw.GetConfig().DBAppConfOptions.Tags
 	}
 
+	//=== we should move this code somewhere else
+	redisStore := &storage.RedisCluster{KeyPrefix: "", RedisController: gw.RedisController}
+	redisStore.Connect()
+	currentLastDate := 000000
+	val, err := redisStore.GetRawKey("last-sync")
+	if err != nil {
+		log.WithError(err).Error("getting last sync date")
+	} else {
+		currentLastDate, err = strconv.Atoi(val)
+		if err != nil {
+			log.WithError(err).Error("unvalid last sync timestamp")
+		}
+	}
+	fmt.Println(currentLastDate)
+	//========
 	apiCollection := store.GetApiDefinitions(orgId, tags)
+	fmt.Println(apiCollection)
+	updatedApis, err := a.processRPCDefinitions(apiCollection, gw)
+	if err != nil {
+		return updatedApis, err
+	}
 
+	// override
+
+	for _, newapi := range updatedApis {
+		found := false
+		for index, oldapi := range gw.apiSpecs {
+			if oldapi.Id == newapi.Id {
+				fmt.Println("override uno")
+				gw.apiSpecs[index] = newapi
+				found = true
+			}
+		}
+		if !found {
+			gw.apiSpecs = append(gw.apiSpecs, newapi)
+		}
+	}
 	//store.Disconnect()
 
 	if rpc.LoadCount() > 0 {
+		// update to save the new gw.apiSpecs as is the most updated object
 		if err := gw.saveRPCDefinitionsBackup(apiCollection); err != nil {
 			log.Error(err)
 		}
 	}
 
-	return a.processRPCDefinitions(apiCollection, gw)
+	//------Store last date---
+
+	// save initial last timestamp of sync
+	unixTime := time.Now().Unix()
+	unixTimeString := fmt.Sprintf("%d", unixTime)
+	err = store.SetKey("last-sync", unixTimeString, -1)
+	if err != nil {
+		log.WithError(err).Error("storing last date")
+	} else {
+		log.Info("stored key of last update")
+	}
+
+	return gw.apiSpecs, nil
 }
 
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {

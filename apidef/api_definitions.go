@@ -616,6 +616,8 @@ type APIDefinition struct {
 	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
 	IsOAS       bool   `bson:"is_oas" json:"is_oas,omitempty"`
 	VersionName string `bson:"-" json:"-"`
+
+	LastUpdated string `bson:"last_updated" json:"last_updated"`
 }
 
 type AnalyticsPluginConfig struct {
