@@ -661,7 +661,7 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string, lastS
 
 		if r.IsRetriableError(err) {
 			if rpc.Login() {
-				return r.GetApiDefinitions(orgId, tags)
+				return r.GetApiDefinitions(orgId, tags, lastSyncTimestamp)
 			}
 		}
 

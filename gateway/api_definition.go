@@ -584,10 +584,11 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 	}
 	fmt.Println(currentLastDate)
 	//========
-	apiCollection := store.GetApiDefinitions(orgId, tags)
+	apiCollection := store.GetApiDefinitions(orgId, tags, currentLastDate)
 	fmt.Println(apiCollection)
 	updatedApis, err := a.processRPCDefinitions(apiCollection, gw)
 	if err != nil {
+
 		return updatedApis, err
 	}
 

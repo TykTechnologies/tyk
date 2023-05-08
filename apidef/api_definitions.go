@@ -617,7 +617,7 @@ type APIDefinition struct {
 	IsOAS       bool   `bson:"is_oas" json:"is_oas,omitempty"`
 	VersionName string `bson:"-" json:"-"`
 
-	LastUpdated string `bson:"last_updated" json:"last_updated"`
+	LastUpdated int `bson:"last_updated" json:"last_updated"`
 }
 
 type AnalyticsPluginConfig struct {

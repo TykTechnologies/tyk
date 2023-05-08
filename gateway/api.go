@@ -1166,6 +1166,8 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
 	}
 
+	spec.LastUpdated = int(time.Now().Unix())
+
 	var (
 		newDef apidef.APIDefinition
 		oasObj oas.OAS
