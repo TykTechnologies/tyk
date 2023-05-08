@@ -1008,8 +1008,10 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		}
 	}
 
+	sessionLifetime := r.Gw.ApplyLifetime(newSession)
+
 	// Use the default session expiry here as this is OAuth
-	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, int64(accessData.ExpiresIn), false)
+	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, sessionLifetime, false)
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
