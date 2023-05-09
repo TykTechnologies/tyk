@@ -415,7 +415,7 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 						"Auth": []string{"123"},
 					},
 					Query: nil,
-					Body:  `{"operationName":"","variables":"","query":"{ fromNested }"}`,
+					Body:  `{"variables":"","query":"{ fromNested }"}`,
 				},
 			}),
 		},

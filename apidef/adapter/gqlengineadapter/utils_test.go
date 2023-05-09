@@ -152,7 +152,7 @@ func TestGenerateRestDataSourceFromGraphql(t *testing.T) {
 			Fetch: restDataSource.FetchConfiguration{
 				URL:    "http://local.fake",
 				Method: http.MethodPost,
-				Body:   `{"operationName":"","variables":{"var":"val"},"query":"mutation MyOp { myOperation }"}`,
+				Body:   `{"variables":{"var":"val"},"query":"mutation MyOp { myOperation }"}`,
 				Header: http.Header{
 					"X-Header": []string{"header-value"},
 				},
