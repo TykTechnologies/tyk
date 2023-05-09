@@ -431,6 +431,11 @@ func (gw *Gateway) setupGlobals() {
 			Gw:        gw,
 		}
 		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
+
+		redisStore := &storage.RedisCluster{KeyPrefix: "", RedisController: gw.RedisController}
+		redisStore.Connect()
+		currentLastDate := 0
+		redisStore.SetKey("last-sync", fmt.Sprintf("%s", currentLastDate), -1)
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {

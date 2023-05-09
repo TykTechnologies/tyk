@@ -585,14 +585,17 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 	fmt.Println(currentLastDate)
 	//========
 	apiCollection := store.GetApiDefinitions(orgId, tags, currentLastDate)
-	fmt.Println(apiCollection)
 	updatedApis, err := a.processRPCDefinitions(apiCollection, gw)
 	if err != nil {
-
 		return updatedApis, err
 	}
 
 	// override
+	fmt.Println(len(updatedApis))
+
+	for _, v := range updatedApis {
+		fmt.Println(v.Name)
+	}
 
 	for _, newapi := range updatedApis {
 		found := false
@@ -605,7 +608,6 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 		if !found {
 			gw.apiSpecs = append(gw.apiSpecs, newapi)
 		}
-		fmt.Printf("\noverride api con id: %v\n", newapi.Id)
 
 	}
 	//store.Disconnect()
@@ -622,7 +624,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 	// save initial last timestamp of sync
 	unixTime := time.Now().Unix()
 	unixTimeString := fmt.Sprintf("%d", unixTime)
-	err = store.SetKey("last-sync", unixTimeString, -1)
+	err = redisStore.SetKey("last-sync", unixTimeString, -1)
 	if err != nil {
 		log.WithError(err).Error("storing last date")
 	} else {
