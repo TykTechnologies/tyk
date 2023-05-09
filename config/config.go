@@ -135,8 +135,6 @@ type StorageOptionsConf struct {
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
 	// Path to certificate file
 	CertFile string `json:"cert_file"`
-	// Path to CA file
-	CACertFile string `json:"cacert_file"`
 	// Path to private key file
 	KeyFile string `json:"key_file"`
 }

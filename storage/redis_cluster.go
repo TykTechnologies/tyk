@@ -3,10 +3,8 @@ package storage
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -70,31 +68,12 @@ func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.Un
 		if len(cfg.CertFile) > 0 && len(cfg.KeyFile) > 0 {
 			log.Info("Loading redis certificates")
 
-			tlsConfig.Certificates = make([]tls.Certificate, 0, 1)
-
 			certs, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
 			if err != nil {
 				log.WithError(err).Debug("Error while loading redis certificates")
 			}
 
-			tlsConfig.Certificates = append(tlsConfig.Certificates, certs)
-		}
-
-		if len(cfg.CACertFile) > 0 {
-			log.Info("Loading redis CA")
-
-			rootCertPool := x509.NewCertPool()
-
-			pem, err := os.ReadFile(cfg.CACertFile)
-			if err != nil {
-				log.WithError(err).Debug("Error while loading redis CA")
-			}
-
-			if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
-				log.WithError(errors.New("failed to append PEM")).Debug("Error while loading redis CA")
-			}
-
-			tlsConfig.RootCAs = rootCertPool
+			tlsConfig.Certificates = []tls.Certificate{certs}
 		}
 	}
 
