@@ -136,6 +136,7 @@ dockers:
     - "--label=org.opencontainers.image.version={{.Version}}"
     - "--build-arg=TYK_GW_TAG={{ .Tag }}"
     - "--build-arg=GOLANG_CROSS={{ .Env.GOLANG_CROSS }}"
+    - "--build-arg=GITHUB_SHA={{ .Env.GITHUB_SHA }}"
   goarch: amd64
   goos: linux
   dockerfile: ci/images/plugin-compiler/Dockerfile
