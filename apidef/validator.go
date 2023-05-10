@@ -3,6 +3,7 @@ package apidef
 import (
 	"errors"
 	"fmt"
+	"net"
 	"sort"
 	"strings"
 )
@@ -136,4 +137,41 @@ func shouldValidateAuthSource(authType string, apiDef *APIDefinition) bool {
 	}
 
 	return false
+}
+
+var ErrInvalidIPCIDR = "invalid IP/CIDR %s"
+
+type RuleValidateIPList struct{}
+
+func (r *RuleValidateIPList) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	if apiDef.EnableIpWhiteListing {
+		if errs := r.validateIPAddr(apiDef.AllowedIPs); len(errs) > 0 {
+			validationResult.IsValid = false
+			validationResult.Errors = errs
+		}
+	}
+
+	if apiDef.EnableIpBlacklisting {
+		if errs := r.validateIPAddr(apiDef.BlacklistedIPs); len(errs) > 0 {
+			validationResult.IsValid = false
+			validationResult.Errors = append(validationResult.Errors, errs...)
+		}
+	}
+}
+
+func (r *RuleValidateIPList) validateIPAddr(ips []string) []error {
+	var errs []error
+	for _, ip := range ips {
+		_, _, err := net.ParseCIDR(ip)
+		if err == nil {
+			continue
+		}
+
+		allowedIP := net.ParseIP(ip)
+		if allowedIP == nil {
+			errs = append(errs, fmt.Errorf(ErrInvalidIPCIDR, ip))
+		}
+	}
+
+	return errs
 }

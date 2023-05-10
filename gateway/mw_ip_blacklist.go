@@ -40,8 +40,7 @@ func (i *IPBlackListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 		}
 
 		// We parse the IP to manage IPv4 and IPv6 easily
-		if blockedIP.Equal(remoteIP) {
-
+		if blockedIP != nil && remoteIP != nil && blockedIP.Equal(remoteIP) {
 			return i.handleError(r, remoteIP.String())
 		}
 	}
