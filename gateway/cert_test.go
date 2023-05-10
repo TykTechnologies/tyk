@@ -1395,7 +1395,7 @@ func TestCipherSuites(t *testing.T) {
 
 	conf := func(globalConf *config.Config) {
 		globalConf.HttpServerOptions.UseSSL = true
-		globalConf.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
+		globalConf.HttpServerOptions.Ciphers = []string{"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256"}
 		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
 	}
 	ts := StartTest(conf)
@@ -1413,7 +1413,7 @@ func TestCipherSuites(t *testing.T) {
 	t.Run("Cipher match", func(t *testing.T) {
 
 		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
-			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}),
+			CipherSuites:       getCipherAliases([]string{"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256"}),
 			InsecureSkipVerify: true,
 			MaxVersion:         tls.VersionTLS12,
 		}}}

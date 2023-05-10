@@ -17,11 +17,12 @@ jobs:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         redis-version: [5]
         python-version: ['3.9']
         go-version: [1.19.x]
+        fips: [0,1]
 
     steps:
       - name: Checkout Tyk
@@ -33,6 +34,11 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go-version }}
+
+      - name: Setup Golang FIPS
+        if: ${{ contains(matrix.fips, '1') }}
+        run: |
+          echo "GOEXPERIMENT=boringcrypto" >> $GITHUB_ENV
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -48,6 +54,8 @@ jobs:
           pip install setuptools
           pip install google
           pip install protobuf
+          
+          go install golang.org/x/tools/cmd/goimports@latest
 
           make lint
           
@@ -82,6 +90,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+            
+#      - name: Setup upterm session
+#        if: ${{ contains(matrix.go, 'fips') }}
+#        uses: lhotari/action-upterm@v1
 
       - name: Run Gateway Tests
         id: ci-tests

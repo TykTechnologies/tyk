@@ -7,7 +7,7 @@ PKGS="$(go list ./...)"
 # Support passing custom flags (-json, etc.)
 OPTS="$@"
 if [[ -z "$OPTS" ]]; then
-	OPTS="-race -count=1 -failfast -v"
+	OPTS="-race -count=1 -v"
 fi
 
 export PKG_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
@@ -17,12 +17,26 @@ set -e
 
 # build Go-plugin used in tests
 echo "Building go plugin"
-go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
+
+tags=""
+if [[ "$GOEXPERIMENT" == "boringcrypto" ]]; then
+    tags="-tags 'boringcrypto'"
+fi
+
+go build ${tags} -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
 
 for pkg in ${PKGS}; do
     tags=""
+    if [[ "$GOEXPERIMENT" == "boringcrypto" ]]; then
+        tags="-tags 'boringcrypto'"
+    fi
     if [[ ${pkg} == *"goplugin" ]]; then
         tags="-tags 'goplugin'"
+
+        if [[ "$GOEXPERIMENT" == "boringcrypto" ]]; then
+            tags='-tags "goplugin boringcrypto"'
+        fi
+
     fi
 
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
