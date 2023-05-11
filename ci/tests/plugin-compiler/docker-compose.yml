@@ -6,7 +6,7 @@ services:
   gw:
     image: tykio/tyk-gateway:${tag}
     volumes:
-      - ./testplugin/testplugin.so:/opt/tyk-gateway/middleware/testplugin.so
+      - ./testplugin/testplugin_${plugin_version}_${plugin_os}_${plugin_arch}.so:/opt/tyk-gateway/middleware/testplugin.so
       - ./testplugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
     ports:
       - "0.0.0.0:8080:8080"
