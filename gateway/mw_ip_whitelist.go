@@ -40,7 +40,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 		}
 
 		// We parse the IP to manage IPv4 and IPv6 easily
-		if allowedIP != nil && remoteIP != nil && allowedIP.Equal(remoteIP) {
+		if allowedIP.Equal(remoteIP) {
 			// matched, pass through
 			return nil, http.StatusOK
 		}
