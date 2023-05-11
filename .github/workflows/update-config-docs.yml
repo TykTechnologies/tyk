@@ -3,12 +3,18 @@
 name: Update Config docs
 
 on:
+  workflow_dispatch:
+    inputs:
+      ref_name:
+        default: 'master'
+        description: 'ref_name to trigger docs sync (release-5-lts, etc)'
+        required: true
   push:
     branches:
       - master
       - release-**
     paths:
-      - config/config.go
+      - cli/linter/schema.json
 
 jobs:
   sync:
@@ -20,4 +26,4 @@ jobs:
           token: ${{ secrets.ORG_GH_TOKEN }}
           repository: TykTechnologies/tyk-docs
           event-type: tyk-config-docs
-          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}","repo":"gateway","branch":"${{github.ref_name}}"}'
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}","repo":"gateway","branch":"${{ github.ref_name || github.event.inputs.ref_name }}"}'
