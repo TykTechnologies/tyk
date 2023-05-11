@@ -267,6 +267,9 @@
         "coprocess_grpc_server": {
           "type": "string"
         },
+        "grpc_authority": {
+          "type": "string"
+        },
         "enable_coprocess": {
           "type": "boolean"
         },
