@@ -139,7 +139,7 @@ func shouldValidateAuthSource(authType string, apiDef *APIDefinition) bool {
 	return false
 }
 
-var ErrInvalidIPCIDR = "invalid IP/CIDR %s"
+var ErrInvalidIPCIDR = "invalid IP/CIDR %q"
 
 type RuleValidateIPList struct{}
 
@@ -162,8 +162,12 @@ func (r *RuleValidateIPList) Validate(apiDef *APIDefinition, validationResult *V
 func (r *RuleValidateIPList) validateIPAddr(ips []string) []error {
 	var errs []error
 	for _, ip := range ips {
-		_, _, err := net.ParseCIDR(ip)
-		if err == nil {
+		if strings.Count(ip, "/") == 1 {
+			_, _, err := net.ParseCIDR(ip)
+			if err != nil {
+				errs = append(errs, fmt.Errorf(ErrInvalidIPCIDR, ip))
+			}
+
 			continue
 		}
 

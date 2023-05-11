@@ -243,6 +243,27 @@ func TestRuleValidateIPList_Validate(t *testing.T) {
 		},
 	))
 
+	t.Run("invalid CIDR", runValidationTest(
+		&APIDefinition{
+			EnableIpWhiteListing: true,
+			AllowedIPs: []string{
+				"192.168.2.1/bob",
+			},
+			EnableIpBlacklisting: true,
+			BlacklistedIPs: []string{
+				"192.168.3.1/blah",
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: false,
+			Errors: []error{
+				fmt.Errorf(ErrInvalidIPCIDR, "192.168.2.1/bob"),
+				fmt.Errorf(ErrInvalidIPCIDR, "192.168.3.1/blah"),
+			},
+		},
+	))
+
 	t.Run("invalid IP and CIDR", runValidationTest(
 		&APIDefinition{
 			EnableIpWhiteListing: true,
