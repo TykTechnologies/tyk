@@ -2,12 +2,8 @@ package apidef
 
 import (
 	"errors"
-<<<<<<< HEAD
-=======
 	"fmt"
 	"net"
-	"sort"
->>>>>>> 35e1d3f2... [TT-2949] add validation for allowedIPs and blacklisted IPs when enabled (#4998)
 	"strings"
 )
 
@@ -97,51 +93,6 @@ func (r *RuleUniqueDataSourceNames) Validate(apiDef *APIDefinition, validationRe
 		usedNames[trimmedName] = true
 	}
 }
-<<<<<<< HEAD
-=======
-
-var ErrAllAuthSourcesDisabled = "all auth sources are disabled for %s, at least one of header/cookie/query must be enabled"
-
-type RuleAtLeastEnableOneAuthSource struct{}
-
-func (r *RuleAtLeastEnableOneAuthSource) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
-	authConfigs := make([]string, len(apiDef.AuthConfigs))
-	i := 0
-	for name := range apiDef.AuthConfigs {
-		authConfigs[i] = name
-		i++
-	}
-
-	sort.Strings(authConfigs)
-
-	for _, name := range authConfigs {
-		if shouldValidateAuthSource(name, apiDef) &&
-			!(apiDef.AuthConfigs[name].UseParam || apiDef.AuthConfigs[name].UseCookie || !apiDef.AuthConfigs[name].DisableHeader) {
-			validationResult.IsValid = false
-			validationResult.AppendError(fmt.Errorf(ErrAllAuthSourcesDisabled, name))
-		}
-	}
-
-}
-
-func shouldValidateAuthSource(authType string, apiDef *APIDefinition) bool {
-	switch authType {
-	case "authToken":
-		return apiDef.UseStandardAuth
-	case "jwt":
-		return apiDef.EnableJWT
-	case "hmac":
-		return apiDef.EnableSignatureChecking
-	case "oauth":
-		return apiDef.UseOauth2
-	case "oidc":
-		return apiDef.UseOpenID
-	case "coprocess":
-		return apiDef.EnableCoProcessAuth
-	}
-
-	return false
-}
 
 var ErrInvalidIPCIDR = "invalid IP/CIDR %q"
 
@@ -183,4 +134,3 @@ func (r *RuleValidateIPList) validateIPAddr(ips []string) []error {
 
 	return errs
 }
->>>>>>> 35e1d3f2... [TT-2949] add validation for allowedIPs and blacklisted IPs when enabled (#4998)

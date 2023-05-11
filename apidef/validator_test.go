@@ -2,6 +2,7 @@ package apidef
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -119,104 +120,6 @@ func TestRuleUniqueDataSourceNames_Validate(t *testing.T) {
 	))
 
 }
-<<<<<<< HEAD
-=======
-
-func TestRuleAtLeastEnableOneAuthConfig_Validate(t *testing.T) {
-	ruleSet := ValidationRuleSet{
-		&RuleAtLeastEnableOneAuthSource{},
-	}
-	t.Run("should return invalid when all sources are disabled for enabled auth mechanisms", runValidationTest(
-		&APIDefinition{
-			UseStandardAuth: true,
-			UseOauth2:       true,
-			AuthConfigs: map[string]AuthConfig{
-				"authToken": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"oauth": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"jwt": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"oidc": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"hmac": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"coprocess": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-			},
-		},
-		ruleSet,
-		ValidationResult{
-			IsValid: false,
-			Errors: []error{
-				fmt.Errorf(ErrAllAuthSourcesDisabled, "authToken"),
-				fmt.Errorf(ErrAllAuthSourcesDisabled, "oauth"),
-			},
-		},
-	))
-
-	t.Run("should return valid when at least one source is enabled for enabled auth mechanisms", runValidationTest(
-		&APIDefinition{
-			UseStandardAuth: true,
-			UseOauth2:       true,
-			AuthConfigs: map[string]AuthConfig{
-				"authToken": {
-					UseParam:      true,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"oauth": {
-					UseParam:      false,
-					DisableHeader: false,
-					UseCookie:     false,
-				},
-				"jwt": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"oidc": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"hmac": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"coprocess": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-			},
-		},
-		ruleSet,
-		ValidationResult{
-			IsValid: true,
-			Errors:  nil,
-		},
-	))
-}
 
 func TestRuleValidateIPList_Validate(t *testing.T) {
 	ruleSet := ValidationRuleSet{
@@ -331,4 +234,3 @@ func TestRuleValidateIPList_Validate(t *testing.T) {
 		},
 	))
 }
->>>>>>> 35e1d3f2... [TT-2949] add validation for allowedIPs and blacklisted IPs when enabled (#4998)

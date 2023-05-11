@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/headers"
 )
 
 var testBlackListIPData = []struct {
@@ -39,7 +39,7 @@ func TestIPBlacklistMiddleware(t *testing.T) {
 		}
 
 		if tc.xRealIP != "" {
-			req.Header.Set(header.XRealIP, tc.xRealIP)
+			req.Header.Set(headers.XRealIP, tc.xRealIP)
 		}
 
 		mw := &IPBlackListMiddleware{}
@@ -71,7 +71,7 @@ func BenchmarkIPBlacklistMiddleware(b *testing.B) {
 			}
 
 			if tc.xRealIP != "" {
-				req.Header.Set(header.XRealIP, tc.xRealIP)
+				req.Header.Set(headers.XRealIP, tc.xRealIP)
 			}
 
 			_, code := mw.ProcessRequest(rec, req, nil)
