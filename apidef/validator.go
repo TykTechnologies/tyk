@@ -2,6 +2,12 @@ package apidef
 
 import (
 	"errors"
+<<<<<<< HEAD
+=======
+	"fmt"
+	"net"
+	"sort"
+>>>>>>> 35e1d3f2... [TT-2949] add validation for allowedIPs and blacklisted IPs when enabled (#4998)
 	"strings"
 )
 
@@ -91,3 +97,90 @@ func (r *RuleUniqueDataSourceNames) Validate(apiDef *APIDefinition, validationRe
 		usedNames[trimmedName] = true
 	}
 }
+<<<<<<< HEAD
+=======
+
+var ErrAllAuthSourcesDisabled = "all auth sources are disabled for %s, at least one of header/cookie/query must be enabled"
+
+type RuleAtLeastEnableOneAuthSource struct{}
+
+func (r *RuleAtLeastEnableOneAuthSource) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	authConfigs := make([]string, len(apiDef.AuthConfigs))
+	i := 0
+	for name := range apiDef.AuthConfigs {
+		authConfigs[i] = name
+		i++
+	}
+
+	sort.Strings(authConfigs)
+
+	for _, name := range authConfigs {
+		if shouldValidateAuthSource(name, apiDef) &&
+			!(apiDef.AuthConfigs[name].UseParam || apiDef.AuthConfigs[name].UseCookie || !apiDef.AuthConfigs[name].DisableHeader) {
+			validationResult.IsValid = false
+			validationResult.AppendError(fmt.Errorf(ErrAllAuthSourcesDisabled, name))
+		}
+	}
+
+}
+
+func shouldValidateAuthSource(authType string, apiDef *APIDefinition) bool {
+	switch authType {
+	case "authToken":
+		return apiDef.UseStandardAuth
+	case "jwt":
+		return apiDef.EnableJWT
+	case "hmac":
+		return apiDef.EnableSignatureChecking
+	case "oauth":
+		return apiDef.UseOauth2
+	case "oidc":
+		return apiDef.UseOpenID
+	case "coprocess":
+		return apiDef.EnableCoProcessAuth
+	}
+
+	return false
+}
+
+var ErrInvalidIPCIDR = "invalid IP/CIDR %q"
+
+type RuleValidateIPList struct{}
+
+func (r *RuleValidateIPList) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	if apiDef.EnableIpWhiteListing {
+		if errs := r.validateIPAddr(apiDef.AllowedIPs); len(errs) > 0 {
+			validationResult.IsValid = false
+			validationResult.Errors = errs
+		}
+	}
+
+	if apiDef.EnableIpBlacklisting {
+		if errs := r.validateIPAddr(apiDef.BlacklistedIPs); len(errs) > 0 {
+			validationResult.IsValid = false
+			validationResult.Errors = append(validationResult.Errors, errs...)
+		}
+	}
+}
+
+func (r *RuleValidateIPList) validateIPAddr(ips []string) []error {
+	var errs []error
+	for _, ip := range ips {
+		if strings.Count(ip, "/") == 1 {
+			_, _, err := net.ParseCIDR(ip)
+			if err != nil {
+				errs = append(errs, fmt.Errorf(ErrInvalidIPCIDR, ip))
+			}
+
+			continue
+		}
+
+		allowedIP := net.ParseIP(ip)
+		if allowedIP == nil {
+			errs = append(errs, fmt.Errorf(ErrInvalidIPCIDR, ip))
+		}
+	}
+
+	return errs
+}
+>>>>>>> 35e1d3f2... [TT-2949] add validation for allowedIPs and blacklisted IPs when enabled (#4998)
