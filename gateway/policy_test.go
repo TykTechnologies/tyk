@@ -583,6 +583,12 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			}, nil,
 		},
 		{
+			"RateParts with acl respected by session", []string{"rate4", "rate5"},
+			"", func(t *testing.T, s *user.SessionState) {
+				assert.Equal(t, float64(10), s.Rate)
+			}, &user.SessionState{Rate: 20},
+		},
+		{
 			"ComplexityPart with unlimited", []string{"unlimitedComplexity"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.MaxQueryDepth != -1 {
