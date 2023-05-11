@@ -14,6 +14,7 @@ on:
       - master
       - release-**
     paths:
+      - config/config.go
       - cli/linter/schema.json
 
 jobs:
