@@ -15,18 +15,21 @@ func RealIP(r *http.Request) string {
 		return contextIp.(string)
 	}
 
-	if realIP := r.Header.Get(headers.XRealIP); realIP != "" {
-		return realIP
+	if realIPVal := r.Header.Get(headers.XRealIP); realIPVal != "" {
+		if realIP := net.ParseIP(realIPVal); realIP != nil {
+			return realIP.String()
+		}
 	}
 
 	if fw := r.Header.Get(headers.XForwardFor); fw != "" {
 		// X-Forwarded-For has no port
 		if i := strings.IndexByte(fw, ','); i >= 0 {
-
-			return fw[:i]
+			fw = fw[:i]
 		}
 
-		return fw
+		if fwIP := net.ParseIP(fw); fwIP != nil {
+			return fwIP.String()
+		}
 	}
 
 	// From net/http.Request.RemoteAddr:
