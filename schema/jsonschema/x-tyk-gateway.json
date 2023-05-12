@@ -1,0 +1,1159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TykTechnologies/tyk/apidef/oas/x-tyk-api-gateway",
+  "$ref": "#/$defs/XTykAPIGateway",
+  "$defs": {
+    "Allowance": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "ignoreCase": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "AuthSource": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "Authentication": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "stripAuthorizationData": {
+          "type": "boolean"
+        },
+        "baseIdentityProvider": {
+          "type": "string"
+        },
+        "hmac": {
+          "$ref": "#/$defs/HMAC"
+        },
+        "oidc": {
+          "$ref": "#/$defs/OIDC"
+        },
+        "custom": {
+          "$ref": "#/$defs/CustomPluginAuthentication"
+        },
+        "securitySchemes": {
+          "$ref": "#/$defs/SecuritySchemes"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "AuthenticationPlugin": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "rawBodyOnly": {
+          "type": "boolean"
+        },
+        "idExtractor": {
+          "$ref": "#/$defs/IDExtractor"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "functionName",
+        "path"
+      ]
+    },
+    "CORS": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "maxAge": {
+          "type": "integer"
+        },
+        "allowCredentials": {
+          "type": "boolean"
+        },
+        "exposedHeaders": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "allowedHeaders": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "optionsPassthrough": {
+          "type": "boolean"
+        },
+        "debug": {
+          "type": "boolean"
+        },
+        "allowedOrigins": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "allowedMethods": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "Cache": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "type": "integer"
+        },
+        "cacheAllSafeRequests": {
+          "type": "boolean"
+        },
+        "cacheResponseCodes": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "cacheByHeaders": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enableUpstreamCacheControl": {
+          "type": "boolean"
+        },
+        "controlTTLHeaderName": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "CachePlugin": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "cacheByRegex": {
+          "type": "string"
+        },
+        "cacheResponseCodes": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "CertificatePinning": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "domainToPublicKeysMapping": {
+          "$ref": "#/$defs/PinnedPublicKeys"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "domainToPublicKeysMapping"
+      ]
+    },
+    "ClientCertificates": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allowlist": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "allowlist"
+      ]
+    },
+    "ClientToPolicy": {
+      "properties": {
+        "clientId": {
+          "type": "string"
+        },
+        "policyId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CustomPlugin": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "rawBodyOnly": {
+          "type": "boolean"
+        },
+        "requireSession": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "functionName",
+        "path"
+      ]
+    },
+    "CustomPluginAuthentication": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "config": {
+          "$ref": "#/$defs/AuthenticationPlugin"
+        },
+        "header": {
+          "$ref": "#/$defs/AuthSource"
+        },
+        "cookie": {
+          "$ref": "#/$defs/AuthSource"
+        },
+        "query": {
+          "$ref": "#/$defs/AuthSource"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "CustomPlugins": {
+      "items": {
+        "$ref": "#/$defs/CustomPlugin"
+      },
+      "type": "array"
+    },
+    "Domain": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "name"
+      ]
+    },
+    "DomainToCertificate": {
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "certificate": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "domain",
+        "certificate"
+      ]
+    },
+    "EndpointPostPlugin": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "name",
+        "path"
+      ]
+    },
+    "EndpointPostPlugins": {
+      "items": {
+        "$ref": "#/$defs/EndpointPostPlugin"
+      },
+      "type": "array"
+    },
+    "EnforceTimeout": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "value"
+      ]
+    },
+    "FromOASExamples": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "code": {
+          "type": "integer"
+        },
+        "contentType": {
+          "type": "string"
+        },
+        "exampleName": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "GatewayTags": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "tags"
+      ]
+    },
+    "Global": {
+      "properties": {
+        "pluginConfig": {
+          "$ref": "#/$defs/PluginConfig"
+        },
+        "cors": {
+          "$ref": "#/$defs/CORS"
+        },
+        "prePlugin": {
+          "$ref": "#/$defs/PrePlugin"
+        },
+        "postAuthenticationPlugin": {
+          "$ref": "#/$defs/PostAuthenticationPlugin"
+        },
+        "postPlugin": {
+          "$ref": "#/$defs/PostPlugin"
+        },
+        "responsePlugin": {
+          "$ref": "#/$defs/ResponsePlugin"
+        },
+        "cache": {
+          "$ref": "#/$defs/Cache"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "HMAC": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "header": {
+          "$ref": "#/$defs/AuthSource"
+        },
+        "cookie": {
+          "$ref": "#/$defs/AuthSource"
+        },
+        "query": {
+          "$ref": "#/$defs/AuthSource"
+        },
+        "allowedAlgorithms": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "allowedClockSkew": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "Header": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "value"
+      ]
+    },
+    "IDExtractor": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string"
+        },
+        "with": {
+          "type": "string"
+        },
+        "config": {
+          "$ref": "#/$defs/IDExtractorConfig"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "source",
+        "with",
+        "config"
+      ]
+    },
+    "IDExtractorConfig": {
+      "properties": {
+        "headerName": {
+          "type": "string"
+        },
+        "formParamName": {
+          "type": "string"
+        },
+        "regexp": {
+          "type": "string"
+        },
+        "regexpMatchIndex": {
+          "type": "integer"
+        },
+        "xPathExp": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Info": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "dbId": {
+          "type": "string"
+        },
+        "orgId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "expiration": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/State"
+        },
+        "versioning": {
+          "$ref": "#/$defs/Versioning"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "state"
+      ]
+    },
+    "ListenPath": {
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "strip": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "value"
+      ]
+    },
+    "Middleware": {
+      "properties": {
+        "global": {
+          "$ref": "#/$defs/Global"
+        },
+        "operations": {
+          "$ref": "#/$defs/Operations"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "MockResponse": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "code": {
+          "type": "integer"
+        },
+        "body": {
+          "type": "string"
+        },
+        "headers": {
+          "items": {
+            "$ref": "#/$defs/Header"
+          },
+          "type": "array"
+        },
+        "fromOASExamples": {
+          "$ref": "#/$defs/FromOASExamples"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "MutualTLS": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "domainToCertificateMapping": {
+          "items": {
+            "$ref": "#/$defs/DomainToCertificate"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "domainToCertificateMapping"
+      ]
+    },
+    "OIDC": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "header": {
+          "$ref": "#/$defs/AuthSource"
+        },
+        "cookie": {
+          "$ref": "#/$defs/AuthSource"
+        },
+        "query": {
+          "$ref": "#/$defs/AuthSource"
+        },
+        "segregateByClientId": {
+          "type": "boolean"
+        },
+        "providers": {
+          "items": {
+            "$ref": "#/$defs/Provider"
+          },
+          "type": "array"
+        },
+        "scopes": {
+          "$ref": "#/$defs/Scopes"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "Operation": {
+      "properties": {
+        "allow": {
+          "$ref": "#/$defs/Allowance"
+        },
+        "block": {
+          "$ref": "#/$defs/Allowance"
+        },
+        "ignoreAuthentication": {
+          "$ref": "#/$defs/Allowance"
+        },
+        "transformRequestMethod": {
+          "$ref": "#/$defs/TransformRequestMethod"
+        },
+        "transformRequestBody": {
+          "$ref": "#/$defs/TransformRequestBody"
+        },
+        "cache": {
+          "$ref": "#/$defs/CachePlugin"
+        },
+        "enforceTimeout": {
+          "$ref": "#/$defs/EnforceTimeout"
+        },
+        "validateRequest": {
+          "$ref": "#/$defs/ValidateRequest"
+        },
+        "mockResponse": {
+          "$ref": "#/$defs/MockResponse"
+        },
+        "virtualEndpoint": {
+          "$ref": "#/$defs/VirtualEndpoint"
+        },
+        "postPlugins": {
+          "$ref": "#/$defs/EndpointPostPlugins"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Operations": {
+      "patternProperties": {
+        ".*": {
+          "$ref": "#/$defs/Operation"
+        }
+      },
+      "type": "object"
+    },
+    "PinnedPublicKey": {
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "publicKeys": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "domain",
+        "publicKeys"
+      ]
+    },
+    "PinnedPublicKeys": {
+      "items": {
+        "$ref": "#/$defs/PinnedPublicKey"
+      },
+      "type": "array"
+    },
+    "PluginBundle": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "path"
+      ]
+    },
+    "PluginConfig": {
+      "properties": {
+        "driver": {
+          "type": "string"
+        },
+        "bundle": {
+          "$ref": "#/$defs/PluginBundle"
+        },
+        "data": {
+          "$ref": "#/$defs/PluginConfigData"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PluginConfigData": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "value"
+      ]
+    },
+    "PostAuthenticationPlugin": {
+      "properties": {
+        "plugins": {
+          "$ref": "#/$defs/CustomPlugins"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PostPlugin": {
+      "properties": {
+        "plugins": {
+          "$ref": "#/$defs/CustomPlugins"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PrePlugin": {
+      "properties": {
+        "plugins": {
+          "$ref": "#/$defs/CustomPlugins"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Provider": {
+      "properties": {
+        "issuer": {
+          "type": "string"
+        },
+        "clientToPolicyMapping": {
+          "items": {
+            "$ref": "#/$defs/ClientToPolicy"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ResponsePlugin": {
+      "properties": {
+        "plugins": {
+          "$ref": "#/$defs/CustomPlugins"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ScopeToPolicy": {
+      "properties": {
+        "scope": {
+          "type": "string"
+        },
+        "policyId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Scopes": {
+      "properties": {
+        "claimName": {
+          "type": "string"
+        },
+        "scopeToPolicyMapping": {
+          "items": {
+            "$ref": "#/$defs/ScopeToPolicy"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "SecuritySchemes": {
+      "type": "object"
+    },
+    "Server": {
+      "properties": {
+        "listenPath": {
+          "$ref": "#/$defs/ListenPath"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "authentication": {
+          "$ref": "#/$defs/Authentication"
+        },
+        "clientCertificates": {
+          "$ref": "#/$defs/ClientCertificates"
+        },
+        "gatewayTags": {
+          "$ref": "#/$defs/GatewayTags"
+        },
+        "customDomain": {
+          "$ref": "#/$defs/Domain"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "listenPath"
+      ]
+    },
+    "ServiceDiscovery": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "queryEndpoint": {
+          "type": "string"
+        },
+        "dataPath": {
+          "type": "string"
+        },
+        "useNestedQuery": {
+          "type": "boolean"
+        },
+        "parentDataPath": {
+          "type": "string"
+        },
+        "portDataPath": {
+          "type": "string"
+        },
+        "useTargetList": {
+          "type": "boolean"
+        },
+        "cacheTimeout": {
+          "type": "integer"
+        },
+        "cache": {
+          "$ref": "#/$defs/ServiceDiscoveryCache"
+        },
+        "targetPath": {
+          "type": "string"
+        },
+        "endpointReturnsList": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "ServiceDiscoveryCache": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "State": {
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "internal": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "active"
+      ]
+    },
+    "Test": {
+      "properties": {
+        "serviceDiscovery": {
+          "$ref": "#/$defs/ServiceDiscovery"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "TransformRequestBody": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "format": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "format"
+      ]
+    },
+    "TransformRequestMethod": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "toMethod": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "toMethod"
+      ]
+    },
+    "Upstream": {
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "serviceDiscovery": {
+          "$ref": "#/$defs/ServiceDiscovery"
+        },
+        "test": {
+          "$ref": "#/$defs/Test"
+        },
+        "mutualTLS": {
+          "$ref": "#/$defs/MutualTLS"
+        },
+        "certificatePinning": {
+          "$ref": "#/$defs/CertificatePinning"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "url"
+      ]
+    },
+    "ValidateRequest": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "errorResponseCode": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "VersionToID": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "id"
+      ]
+    },
+    "Versioning": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "default": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "versions": {
+          "items": {
+            "$ref": "#/$defs/VersionToID"
+          },
+          "type": "array"
+        },
+        "stripVersioningData": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "default",
+        "location",
+        "key",
+        "versions"
+      ]
+    },
+    "VirtualEndpoint": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "proxyOnError": {
+          "type": "boolean"
+        },
+        "requireSession": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "name"
+      ]
+    },
+    "XTykAPIGateway": {
+      "properties": {
+        "info": {
+          "$ref": "#/$defs/Info"
+        },
+        "upstream": {
+          "$ref": "#/$defs/Upstream"
+        },
+        "server": {
+          "$ref": "#/$defs/Server"
+        },
+        "middleware": {
+          "$ref": "#/$defs/Middleware"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "info",
+        "upstream",
+        "server"
+      ]
+    }
+  }
+}

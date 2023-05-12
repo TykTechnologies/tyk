@@ -1,0 +1,1564 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TykTechnologies/tyk/config/config",
+  "$ref": "#/$defs/Config",
+  "$defs": {
+    "AnalyticsConfigConfig": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "ignored_ips": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enable_detailed_recording": {
+          "type": "boolean"
+        },
+        "enable_geo_ip": {
+          "type": "boolean"
+        },
+        "geo_ip_db_path": {
+          "type": "string"
+        },
+        "normalise_urls": {
+          "$ref": "#/$defs/NormalisedURLConfig"
+        },
+        "pool_size": {
+          "type": "integer"
+        },
+        "records_buffer_size": {
+          "type": "integer"
+        },
+        "storage_expiration_time": {
+          "type": "integer"
+        },
+        "enable_multiple_analytics_keys": {
+          "type": "boolean"
+        },
+        "purge_interval": {
+          "type": "number"
+        },
+        "serializer_type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "ignored_ips",
+        "enable_detailed_recording",
+        "enable_geo_ip",
+        "geo_ip_db_path",
+        "normalise_urls",
+        "pool_size",
+        "records_buffer_size",
+        "storage_expiration_time",
+        "enable_multiple_analytics_keys",
+        "purge_interval",
+        "serializer_type"
+      ]
+    },
+    "AuthOverrideConf": {
+      "properties": {
+        "force_auth_provider": {
+          "type": "boolean"
+        },
+        "auth_provider": {
+          "$ref": "#/$defs/AuthProviderMeta"
+        },
+        "force_session_provider": {
+          "type": "boolean"
+        },
+        "session_provider": {
+          "$ref": "#/$defs/SessionProviderMeta"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "force_auth_provider",
+        "auth_provider",
+        "force_session_provider",
+        "session_provider"
+      ]
+    },
+    "AuthProviderMeta": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "storage_engine": {
+          "type": "string"
+        },
+        "meta": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "storage_engine",
+        "meta"
+      ]
+    },
+    "CertData": {
+      "properties": {
+        "domain_name": {
+          "type": "string"
+        },
+        "cert_file": {
+          "type": "string"
+        },
+        "key_file": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "domain_name",
+        "cert_file",
+        "key_file"
+      ]
+    },
+    "CertificatesConfig": {
+      "properties": {
+        "apis": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "upstream": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "control_api": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dashboard_api": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mdcb_api": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "apis",
+        "upstream",
+        "control_api",
+        "dashboard_api",
+        "mdcb_api"
+      ]
+    },
+    "CertsData": {
+      "items": {
+        "$ref": "#/$defs/CertData"
+      },
+      "type": "array"
+    },
+    "CoProcessConfig": {
+      "properties": {
+        "enable_coprocess": {
+          "type": "boolean"
+        },
+        "coprocess_grpc_server": {
+          "type": "string"
+        },
+        "grpc_recv_max_size": {
+          "type": "integer"
+        },
+        "grpc_send_max_size": {
+          "type": "integer"
+        },
+        "grpc_authority": {
+          "type": "string"
+        },
+        "python_path_prefix": {
+          "type": "string"
+        },
+        "python_version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enable_coprocess",
+        "coprocess_grpc_server",
+        "grpc_recv_max_size",
+        "grpc_send_max_size",
+        "grpc_authority",
+        "python_path_prefix",
+        "python_version"
+      ]
+    },
+    "Config": {
+      "properties": {
+        "hostname": {
+          "type": "string"
+        },
+        "listen_address": {
+          "type": "string"
+        },
+        "listen_port": {
+          "type": "integer"
+        },
+        "control_api_hostname": {
+          "type": "string"
+        },
+        "control_api_port": {
+          "type": "integer"
+        },
+        "secret": {
+          "type": "string"
+        },
+        "node_secret": {
+          "type": "string"
+        },
+        "pid_file_location": {
+          "type": "string"
+        },
+        "allow_insecure_configs": {
+          "type": "boolean"
+        },
+        "public_key_path": {
+          "type": "string"
+        },
+        "allow_remote_config": {
+          "type": "boolean"
+        },
+        "security": {
+          "$ref": "#/$defs/SecurityConfig"
+        },
+        "http_server_options": {
+          "$ref": "#/$defs/HttpServerOptionsConfig"
+        },
+        "version_header": {
+          "type": "string"
+        },
+        "suppress_redis_signal_reload": {
+          "type": "boolean"
+        },
+        "hash_keys": {
+          "type": "boolean"
+        },
+        "hash_key_function": {
+          "type": "string"
+        },
+        "basic_auth_hash_key_function": {
+          "type": "string"
+        },
+        "hash_key_function_fallback": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enable_hashed_keys_listing": {
+          "type": "boolean"
+        },
+        "min_token_length": {
+          "type": "integer"
+        },
+        "template_path": {
+          "type": "string"
+        },
+        "policies": {
+          "$ref": "#/$defs/PoliciesConfig"
+        },
+        "ports_whitelist": {
+          "$ref": "#/$defs/PortsWhiteList"
+        },
+        "disable_ports_whitelist": {
+          "type": "boolean"
+        },
+        "app_path": {
+          "type": "string"
+        },
+        "use_db_app_configs": {
+          "type": "boolean"
+        },
+        "db_app_conf_options": {
+          "$ref": "#/$defs/DBAppConfOptionsConfig"
+        },
+        "storage": {
+          "$ref": "#/$defs/StorageOptionsConf"
+        },
+        "disable_dashboard_zeroconf": {
+          "type": "boolean"
+        },
+        "slave_options": {
+          "$ref": "#/$defs/SlaveOptionsConfig"
+        },
+        "management_node": {
+          "type": "boolean"
+        },
+        "auth_override": {
+          "$ref": "#/$defs/AuthOverrideConf"
+        },
+        "enable_redis_rolling_limiter": {
+          "type": "boolean"
+        },
+        "enable_sentinel_rate_limiter": {
+          "type": "boolean"
+        },
+        "enable_non_transactional_rate_limiter": {
+          "type": "boolean"
+        },
+        "drl_notification_frequency": {
+          "type": "integer"
+        },
+        "drl_threshold": {
+          "type": "number"
+        },
+        "drl_enable_sentinel_rate_limiter": {
+          "type": "boolean"
+        },
+        "enforce_org_data_age": {
+          "type": "boolean"
+        },
+        "enforce_org_data_detail_logging": {
+          "type": "boolean"
+        },
+        "enforce_org_quotas": {
+          "type": "boolean"
+        },
+        "experimental_process_org_off_thread": {
+          "type": "boolean"
+        },
+        "monitor": {
+          "$ref": "#/$defs/MonitorConfig"
+        },
+        "max_idle_connections": {
+          "type": "integer"
+        },
+        "max_idle_connections_per_host": {
+          "type": "integer"
+        },
+        "max_conn_time": {
+          "type": "integer"
+        },
+        "close_connections": {
+          "type": "boolean"
+        },
+        "enable_custom_domains": {
+          "type": "boolean"
+        },
+        "allow_master_keys": {
+          "type": "boolean"
+        },
+        "service_discovery": {
+          "$ref": "#/$defs/ServiceDiscoveryConf"
+        },
+        "proxy_ssl_insecure_skip_verify": {
+          "type": "boolean"
+        },
+        "proxy_enable_http2": {
+          "type": "boolean"
+        },
+        "proxy_ssl_min_version": {
+          "type": "integer"
+        },
+        "proxy_ssl_max_version": {
+          "type": "integer"
+        },
+        "proxy_ssl_ciphers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "proxy_default_timeout": {
+          "type": "number"
+        },
+        "proxy_ssl_disable_renegotiation": {
+          "type": "boolean"
+        },
+        "proxy_close_connections": {
+          "type": "boolean"
+        },
+        "uptime_tests": {
+          "$ref": "#/$defs/UptimeTestsConfig"
+        },
+        "health_check": {
+          "$ref": "#/$defs/HealthCheckConfig"
+        },
+        "health_check_endpoint_name": {
+          "type": "string"
+        },
+        "oauth_refresh_token_expire": {
+          "type": "integer"
+        },
+        "oauth_token_expire": {
+          "type": "integer"
+        },
+        "oauth_token_expired_retain_period": {
+          "type": "integer"
+        },
+        "oauth_redirect_uri_separator": {
+          "type": "string"
+        },
+        "oauth_error_status_code": {
+          "type": "integer"
+        },
+        "enable_key_logging": {
+          "type": "boolean"
+        },
+        "ssl_force_common_name_check": {
+          "type": "boolean"
+        },
+        "enable_analytics": {
+          "type": "boolean"
+        },
+        "analytics_config": {
+          "$ref": "#/$defs/AnalyticsConfigConfig"
+        },
+        "enable_separate_analytics_store": {
+          "type": "boolean"
+        },
+        "analytics_storage": {
+          "$ref": "#/$defs/StorageOptionsConf"
+        },
+        "liveness_check": {
+          "$ref": "#/$defs/LivenessCheckConfig"
+        },
+        "dns_cache": {
+          "$ref": "#/$defs/DnsCacheConfig"
+        },
+        "disable_regexp_cache": {
+          "type": "boolean"
+        },
+        "regexp_cache_expire": {
+          "type": "integer"
+        },
+        "local_session_cache": {
+          "$ref": "#/$defs/LocalSessionCacheConf"
+        },
+        "enable_separate_cache_store": {
+          "type": "boolean"
+        },
+        "cache_storage": {
+          "$ref": "#/$defs/StorageOptionsConf"
+        },
+        "enable_bundle_downloader": {
+          "type": "boolean"
+        },
+        "bundle_base_url": {
+          "type": "string"
+        },
+        "bundle_insecure_skip_verify": {
+          "type": "boolean"
+        },
+        "enable_jsvm": {
+          "type": "boolean"
+        },
+        "jsvm_timeout": {
+          "type": "integer"
+        },
+        "disable_virtual_path_blobs": {
+          "type": "boolean"
+        },
+        "tyk_js_path": {
+          "type": "string"
+        },
+        "middleware_path": {
+          "type": "string"
+        },
+        "coprocess_options": {
+          "$ref": "#/$defs/CoProcessConfig"
+        },
+        "ignore_endpoint_case": {
+          "type": "boolean"
+        },
+        "ignore_canonical_mime_header_key": {
+          "type": "boolean"
+        },
+        "log_level": {
+          "type": "string"
+        },
+        "tracing": {
+          "$ref": "#/$defs/Tracer"
+        },
+        "newrelic": {
+          "$ref": "#/$defs/NewRelicConfig"
+        },
+        "enable_http_profiler": {
+          "type": "boolean"
+        },
+        "use_redis_log": {
+          "type": "boolean"
+        },
+        "use_sentry": {
+          "type": "boolean"
+        },
+        "sentry_code": {
+          "type": "string"
+        },
+        "sentry_log_level": {
+          "type": "string"
+        },
+        "use_syslog": {
+          "type": "boolean"
+        },
+        "syslog_transport": {
+          "type": "string"
+        },
+        "syslog_network_addr": {
+          "type": "string"
+        },
+        "use_graylog": {
+          "type": "boolean"
+        },
+        "graylog_network_addr": {
+          "type": "string"
+        },
+        "use_logstash": {
+          "type": "boolean"
+        },
+        "logstash_transport": {
+          "type": "string"
+        },
+        "logstash_network_addr": {
+          "type": "string"
+        },
+        "track_404_logs": {
+          "type": "boolean"
+        },
+        "statsd_connection_string": {
+          "type": "string"
+        },
+        "statsd_prefix": {
+          "type": "string"
+        },
+        "event_handlers": {
+          "$ref": "#/$defs/EventHandlerMetaConfig"
+        },
+        "event_trigers_defunct": {
+          "patternProperties": {
+            ".*": {
+              "items": true,
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "event_triggers_defunct": {
+          "patternProperties": {
+            ".*": {
+              "items": true,
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "hide_generator_header": {
+          "type": "boolean"
+        },
+        "suppress_default_org_store": {
+          "type": "boolean"
+        },
+        "legacy_enable_allowance_countdown": {
+          "type": "boolean"
+        },
+        "force_global_session_lifetime": {
+          "type": "boolean"
+        },
+        "session_lifetime_respects_key_expiration": {
+          "type": "boolean"
+        },
+        "global_session_lifetime": {
+          "type": "integer"
+        },
+        "kv": {
+          "properties": {
+            "consul": {
+              "$ref": "#/$defs/ConsulConfig"
+            },
+            "vault": {
+              "$ref": "#/$defs/VaultConfig"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "consul",
+            "vault"
+          ]
+        },
+        "secrets": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "override_messages": {
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/$defs/TykError"
+            }
+          },
+          "type": "object"
+        },
+        "cloud": {
+          "type": "boolean"
+        },
+        "jwt_ssl_insecure_skip_verify": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "hostname",
+        "listen_address",
+        "listen_port",
+        "control_api_hostname",
+        "control_api_port",
+        "secret",
+        "node_secret",
+        "pid_file_location",
+        "allow_insecure_configs",
+        "public_key_path",
+        "allow_remote_config",
+        "security",
+        "http_server_options",
+        "version_header",
+        "suppress_redis_signal_reload",
+        "hash_keys",
+        "hash_key_function",
+        "basic_auth_hash_key_function",
+        "hash_key_function_fallback",
+        "enable_hashed_keys_listing",
+        "min_token_length",
+        "template_path",
+        "policies",
+        "ports_whitelist",
+        "disable_ports_whitelist",
+        "app_path",
+        "use_db_app_configs",
+        "db_app_conf_options",
+        "storage",
+        "disable_dashboard_zeroconf",
+        "slave_options",
+        "management_node",
+        "auth_override",
+        "enable_redis_rolling_limiter",
+        "enable_sentinel_rate_limiter",
+        "enable_non_transactional_rate_limiter",
+        "drl_notification_frequency",
+        "drl_threshold",
+        "drl_enable_sentinel_rate_limiter",
+        "enforce_org_data_age",
+        "enforce_org_data_detail_logging",
+        "enforce_org_quotas",
+        "experimental_process_org_off_thread",
+        "monitor",
+        "max_idle_connections",
+        "max_idle_connections_per_host",
+        "max_conn_time",
+        "close_connections",
+        "enable_custom_domains",
+        "allow_master_keys",
+        "service_discovery",
+        "proxy_ssl_insecure_skip_verify",
+        "proxy_enable_http2",
+        "proxy_ssl_min_version",
+        "proxy_ssl_max_version",
+        "proxy_ssl_ciphers",
+        "proxy_default_timeout",
+        "proxy_ssl_disable_renegotiation",
+        "proxy_close_connections",
+        "uptime_tests",
+        "health_check",
+        "health_check_endpoint_name",
+        "oauth_refresh_token_expire",
+        "oauth_token_expire",
+        "oauth_token_expired_retain_period",
+        "oauth_redirect_uri_separator",
+        "oauth_error_status_code",
+        "enable_key_logging",
+        "ssl_force_common_name_check",
+        "enable_analytics",
+        "analytics_config",
+        "enable_separate_analytics_store",
+        "analytics_storage",
+        "liveness_check",
+        "dns_cache",
+        "disable_regexp_cache",
+        "regexp_cache_expire",
+        "local_session_cache",
+        "enable_separate_cache_store",
+        "cache_storage",
+        "enable_bundle_downloader",
+        "bundle_base_url",
+        "bundle_insecure_skip_verify",
+        "enable_jsvm",
+        "jsvm_timeout",
+        "disable_virtual_path_blobs",
+        "tyk_js_path",
+        "middleware_path",
+        "coprocess_options",
+        "ignore_endpoint_case",
+        "ignore_canonical_mime_header_key",
+        "log_level",
+        "tracing",
+        "newrelic",
+        "enable_http_profiler",
+        "use_redis_log",
+        "use_sentry",
+        "sentry_code",
+        "sentry_log_level",
+        "use_syslog",
+        "syslog_transport",
+        "syslog_network_addr",
+        "use_graylog",
+        "graylog_network_addr",
+        "use_logstash",
+        "logstash_transport",
+        "logstash_network_addr",
+        "track_404_logs",
+        "statsd_connection_string",
+        "statsd_prefix",
+        "event_handlers",
+        "event_trigers_defunct",
+        "event_triggers_defunct",
+        "hide_generator_header",
+        "suppress_default_org_store",
+        "legacy_enable_allowance_countdown",
+        "force_global_session_lifetime",
+        "session_lifetime_respects_key_expiration",
+        "global_session_lifetime",
+        "kv",
+        "secrets",
+        "override_messages",
+        "cloud",
+        "jwt_ssl_insecure_skip_verify"
+      ]
+    },
+    "ConsulConfig": {
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "scheme": {
+          "type": "string"
+        },
+        "datacenter": {
+          "type": "string"
+        },
+        "http_auth": {
+          "properties": {
+            "username": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "username",
+            "password"
+          ]
+        },
+        "wait_time": {
+          "type": "integer"
+        },
+        "token": {
+          "type": "string"
+        },
+        "tls_config": {
+          "properties": {
+            "address": {
+              "type": "string"
+            },
+            "ca_file": {
+              "type": "string"
+            },
+            "ca_path": {
+              "type": "string"
+            },
+            "cert_file": {
+              "type": "string"
+            },
+            "key_file": {
+              "type": "string"
+            },
+            "insecure_skip_verify": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "address",
+            "ca_file",
+            "ca_path",
+            "cert_file",
+            "key_file",
+            "insecure_skip_verify"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "address",
+        "scheme",
+        "datacenter",
+        "http_auth",
+        "wait_time",
+        "token",
+        "tls_config"
+      ]
+    },
+    "DBAppConfOptionsConfig": {
+      "properties": {
+        "connection_string": {
+          "type": "string"
+        },
+        "node_is_segmented": {
+          "type": "boolean"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "connection_string",
+        "node_is_segmented",
+        "tags"
+      ]
+    },
+    "DnsCacheConfig": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "ttl": {
+          "type": "integer"
+        },
+        "multiple_ips_handle_strategy": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "ttl",
+        "multiple_ips_handle_strategy"
+      ]
+    },
+    "EventHandlerMetaConfig": {
+      "properties": {
+        "events": {
+          "patternProperties": {
+            ".*": {
+              "items": {
+                "$ref": "#/$defs/EventHandlerTriggerConfig"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "events"
+      ]
+    },
+    "EventHandlerTriggerConfig": {
+      "properties": {
+        "handler_name": {
+          "type": "string"
+        },
+        "handler_meta": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "handler_name",
+        "handler_meta"
+      ]
+    },
+    "HealthCheckConfig": {
+      "properties": {
+        "enable_health_checks": {
+          "type": "boolean"
+        },
+        "health_check_value_timeouts": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enable_health_checks",
+        "health_check_value_timeouts"
+      ]
+    },
+    "HttpServerOptionsConfig": {
+      "properties": {
+        "read_timeout": {
+          "type": "integer"
+        },
+        "write_timeout": {
+          "type": "integer"
+        },
+        "use_ssl": {
+          "type": "boolean"
+        },
+        "enable_http2": {
+          "type": "boolean"
+        },
+        "enable_strict_routes": {
+          "type": "boolean"
+        },
+        "ssl_insecure_skip_verify": {
+          "type": "boolean"
+        },
+        "enable_websockets": {
+          "type": "boolean"
+        },
+        "certificates": {
+          "$ref": "#/$defs/CertsData"
+        },
+        "ssl_certificates": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "server_name": {
+          "type": "string"
+        },
+        "min_version": {
+          "type": "integer"
+        },
+        "max_version": {
+          "type": "integer"
+        },
+        "typename": {
+          "type": "string"
+        },
+        "skip_client_ca_announcement": {
+          "type": "boolean"
+        },
+        "flush_interval": {
+          "type": "integer"
+        },
+        "skip_url_cleaning": {
+          "type": "boolean"
+        },
+        "skip_target_path_escaping": {
+          "type": "boolean"
+        },
+        "ssl_ciphers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "max_request_body_size": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "read_timeout",
+        "write_timeout",
+        "use_ssl",
+        "enable_http2",
+        "enable_strict_routes",
+        "ssl_insecure_skip_verify",
+        "enable_websockets",
+        "certificates",
+        "ssl_certificates",
+        "server_name",
+        "min_version",
+        "max_version",
+        "typename",
+        "skip_client_ca_announcement",
+        "flush_interval",
+        "skip_url_cleaning",
+        "skip_target_path_escaping",
+        "ssl_ciphers",
+        "max_request_body_size"
+      ]
+    },
+    "LivenessCheckConfig": {
+      "properties": {
+        "check_duration": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "check_duration"
+      ]
+    },
+    "LocalSessionCacheConf": {
+      "properties": {
+        "disable_cached_session_state": {
+          "type": "boolean"
+        },
+        "cached_session_timeout": {
+          "type": "integer"
+        },
+        "cached_session_eviction": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disable_cached_session_state",
+        "cached_session_timeout",
+        "cached_session_eviction"
+      ]
+    },
+    "MonitorConfig": {
+      "properties": {
+        "enable_trigger_monitors": {
+          "type": "boolean"
+        },
+        "configuration": {
+          "$ref": "#/$defs/WebHookHandlerConf"
+        },
+        "global_trigger_limit": {
+          "type": "number"
+        },
+        "monitor_user_keys": {
+          "type": "boolean"
+        },
+        "monitor_org_keys": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enable_trigger_monitors",
+        "configuration",
+        "global_trigger_limit",
+        "monitor_user_keys",
+        "monitor_org_keys"
+      ]
+    },
+    "NewRelicConfig": {
+      "properties": {
+        "app_name": {
+          "type": "string"
+        },
+        "license_key": {
+          "type": "string"
+        },
+        "enable_distributed_tracing": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "app_name",
+        "license_key",
+        "enable_distributed_tracing"
+      ]
+    },
+    "NormalisedURLConfig": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "normalise_uuids": {
+          "type": "boolean"
+        },
+        "normalise_numbers": {
+          "type": "boolean"
+        },
+        "custom_patterns": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "normalise_uuids",
+        "normalise_numbers",
+        "custom_patterns"
+      ]
+    },
+    "PoliciesConfig": {
+      "properties": {
+        "policy_source": {
+          "type": "string"
+        },
+        "policy_connection_string": {
+          "type": "string"
+        },
+        "policy_record_name": {
+          "type": "string"
+        },
+        "allow_explicit_policy_id": {
+          "type": "boolean"
+        },
+        "policy_path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "policy_source",
+        "policy_connection_string",
+        "policy_record_name",
+        "allow_explicit_policy_id",
+        "policy_path"
+      ]
+    },
+    "PortRange": {
+      "properties": {
+        "from": {
+          "type": "integer"
+        },
+        "to": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "from",
+        "to"
+      ]
+    },
+    "PortWhiteList": {
+      "properties": {
+        "ranges": {
+          "items": {
+            "$ref": "#/$defs/PortRange"
+          },
+          "type": "array"
+        },
+        "ports": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PortsWhiteList": {
+      "patternProperties": {
+        ".*": {
+          "$ref": "#/$defs/PortWhiteList"
+        }
+      },
+      "type": "object"
+    },
+    "SecurityConfig": {
+      "properties": {
+        "private_certificate_encoding_secret": {
+          "type": "string"
+        },
+        "control_api_use_mutual_tls": {
+          "type": "boolean"
+        },
+        "pinned_public_keys": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "certificates": {
+          "$ref": "#/$defs/CertificatesConfig"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "private_certificate_encoding_secret",
+        "control_api_use_mutual_tls",
+        "pinned_public_keys",
+        "certificates"
+      ]
+    },
+    "ServiceDiscoveryConf": {
+      "properties": {
+        "default_cache_timeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "default_cache_timeout"
+      ]
+    },
+    "SessionProviderMeta": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "storage_engine": {
+          "type": "string"
+        },
+        "meta": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "storage_engine",
+        "meta"
+      ]
+    },
+    "SlaveOptionsConfig": {
+      "properties": {
+        "use_rpc": {
+          "type": "boolean"
+        },
+        "use_ssl": {
+          "type": "boolean"
+        },
+        "ssl_insecure_skip_verify": {
+          "type": "boolean"
+        },
+        "connection_string": {
+          "type": "string"
+        },
+        "rpc_key": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "enable_rpc_cache": {
+          "type": "boolean"
+        },
+        "bind_to_slugs": {
+          "type": "boolean"
+        },
+        "disable_keyspace_sync": {
+          "type": "boolean"
+        },
+        "group_id": {
+          "type": "string"
+        },
+        "call_timeout": {
+          "type": "integer"
+        },
+        "ping_timeout": {
+          "type": "integer"
+        },
+        "rpc_pool_size": {
+          "type": "integer"
+        },
+        "key_space_sync_interval": {
+          "type": "number"
+        },
+        "rpc_cert_cache_expiration": {
+          "type": "number"
+        },
+        "rpc_global_cache_expiration": {
+          "type": "number"
+        },
+        "synchroniser_enabled": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "use_rpc",
+        "use_ssl",
+        "ssl_insecure_skip_verify",
+        "connection_string",
+        "rpc_key",
+        "api_key",
+        "enable_rpc_cache",
+        "bind_to_slugs",
+        "disable_keyspace_sync",
+        "group_id",
+        "call_timeout",
+        "ping_timeout",
+        "rpc_pool_size",
+        "key_space_sync_interval",
+        "rpc_cert_cache_expiration",
+        "rpc_global_cache_expiration",
+        "synchroniser_enabled"
+      ]
+    },
+    "StorageOptionsConf": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "hosts": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "addrs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "master_name": {
+          "type": "string"
+        },
+        "sentinel_password": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "database": {
+          "type": "integer"
+        },
+        "optimisation_max_idle": {
+          "type": "integer"
+        },
+        "optimisation_max_active": {
+          "type": "integer"
+        },
+        "timeout": {
+          "type": "integer"
+        },
+        "enable_cluster": {
+          "type": "boolean"
+        },
+        "use_ssl": {
+          "type": "boolean"
+        },
+        "ssl_insecure_skip_verify": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "host",
+        "port",
+        "hosts",
+        "addrs",
+        "master_name",
+        "sentinel_password",
+        "username",
+        "password",
+        "database",
+        "optimisation_max_idle",
+        "optimisation_max_active",
+        "timeout",
+        "enable_cluster",
+        "use_ssl",
+        "ssl_insecure_skip_verify"
+      ]
+    },
+    "Tracer": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "options": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "enabled",
+        "options"
+      ]
+    },
+    "TykError": {
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "code": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "message",
+        "code"
+      ]
+    },
+    "UptimeTestsConfig": {
+      "properties": {
+        "disable": {
+          "type": "boolean"
+        },
+        "poller_group": {
+          "type": "string"
+        },
+        "config": {
+          "$ref": "#/$defs/UptimeTestsConfigDetail"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disable",
+        "poller_group",
+        "config"
+      ]
+    },
+    "UptimeTestsConfigDetail": {
+      "properties": {
+        "failure_trigger_sample_size": {
+          "type": "integer"
+        },
+        "time_wait": {
+          "type": "integer"
+        },
+        "checker_pool_size": {
+          "type": "integer"
+        },
+        "enable_uptime_analytics": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "failure_trigger_sample_size",
+        "time_wait",
+        "checker_pool_size",
+        "enable_uptime_analytics"
+      ]
+    },
+    "VaultConfig": {
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "agent_address": {
+          "type": "string"
+        },
+        "max_retries": {
+          "type": "integer"
+        },
+        "timeout": {
+          "type": "integer"
+        },
+        "token": {
+          "type": "string"
+        },
+        "kv_version": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "address",
+        "agent_address",
+        "max_retries",
+        "timeout",
+        "token",
+        "kv_version"
+      ]
+    },
+    "WebHookHandlerConf": {
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "target_path": {
+          "type": "string"
+        },
+        "template_path": {
+          "type": "string"
+        },
+        "header_map": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "event_timeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "method",
+        "target_path",
+        "template_path",
+        "header_map",
+        "event_timeout"
+      ]
+    }
+  }
+}

@@ -1,0 +1,2653 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TykTechnologies/tyk/apidef/api-definition",
+  "$ref": "#/$defs/APIDefinition",
+  "$defs": {
+    "APIDefinition": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "expiration": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "listen_port": {
+          "type": "integer"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "enable_proxy_protocol": {
+          "type": "boolean"
+        },
+        "api_id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "use_keyless": {
+          "type": "boolean"
+        },
+        "use_oauth2": {
+          "type": "boolean"
+        },
+        "external_oauth": {
+          "$ref": "#/$defs/ExternalOAuth"
+        },
+        "use_openid": {
+          "type": "boolean"
+        },
+        "openid_options": {
+          "$ref": "#/$defs/OpenIDOptions"
+        },
+        "oauth_meta": {
+          "properties": {
+            "allowed_access_types": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "allowed_authorize_types": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "auth_login_redirect": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "allowed_access_types",
+            "allowed_authorize_types",
+            "auth_login_redirect"
+          ]
+        },
+        "auth": {
+          "$ref": "#/$defs/AuthConfig"
+        },
+        "auth_configs": {
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/$defs/AuthConfig"
+            }
+          },
+          "type": "object"
+        },
+        "use_basic_auth": {
+          "type": "boolean"
+        },
+        "basic_auth": {
+          "properties": {
+            "disable_caching": {
+              "type": "boolean"
+            },
+            "cache_ttl": {
+              "type": "integer"
+            },
+            "extract_from_body": {
+              "type": "boolean"
+            },
+            "body_user_regexp": {
+              "type": "string"
+            },
+            "body_password_regexp": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "disable_caching",
+            "cache_ttl",
+            "extract_from_body",
+            "body_user_regexp",
+            "body_password_regexp"
+          ]
+        },
+        "use_mutual_tls_auth": {
+          "type": "boolean"
+        },
+        "client_certificates": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "upstream_certificates": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "upstream_certificates_disabled": {
+          "type": "boolean"
+        },
+        "pinned_public_keys": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "certificate_pinning_disabled": {
+          "type": "boolean"
+        },
+        "enable_jwt": {
+          "type": "boolean"
+        },
+        "use_standard_auth": {
+          "type": "boolean"
+        },
+        "use_go_plugin_auth": {
+          "type": "boolean"
+        },
+        "enable_coprocess_auth": {
+          "type": "boolean"
+        },
+        "custom_plugin_auth_enabled": {
+          "type": "boolean"
+        },
+        "jwt_signing_method": {
+          "type": "string"
+        },
+        "jwt_source": {
+          "type": "string"
+        },
+        "jwt_identity_base_field": {
+          "type": "string"
+        },
+        "jwt_client_base_field": {
+          "type": "string"
+        },
+        "jwt_policy_field_name": {
+          "type": "string"
+        },
+        "jwt_default_policies": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "jwt_issued_at_validation_skew": {
+          "type": "integer"
+        },
+        "jwt_expires_at_validation_skew": {
+          "type": "integer"
+        },
+        "jwt_not_before_validation_skew": {
+          "type": "integer"
+        },
+        "jwt_skip_kid": {
+          "type": "boolean"
+        },
+        "scopes": {
+          "$ref": "#/$defs/Scopes"
+        },
+        "jwt_scope_to_policy_mapping": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "jwt_scope_claim_name": {
+          "type": "string"
+        },
+        "notifications": {
+          "$ref": "#/$defs/NotificationsManager"
+        },
+        "enable_signature_checking": {
+          "type": "boolean"
+        },
+        "hmac_allowed_clock_skew": {
+          "type": "number"
+        },
+        "hmac_allowed_algorithms": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "request_signing": {
+          "$ref": "#/$defs/RequestSigningMeta"
+        },
+        "base_identity_provided_by": {
+          "type": "string"
+        },
+        "definition": {
+          "$ref": "#/$defs/VersionDefinition"
+        },
+        "version_data": {
+          "$ref": "#/$defs/VersionData"
+        },
+        "uptime_tests": {
+          "$ref": "#/$defs/UptimeTests"
+        },
+        "proxy": {
+          "$ref": "#/$defs/ProxyConfig"
+        },
+        "disable_rate_limit": {
+          "type": "boolean"
+        },
+        "disable_quota": {
+          "type": "boolean"
+        },
+        "custom_middleware": {
+          "$ref": "#/$defs/MiddlewareSection"
+        },
+        "custom_middleware_bundle": {
+          "type": "string"
+        },
+        "custom_middleware_bundle_disabled": {
+          "type": "boolean"
+        },
+        "cache_options": {
+          "$ref": "#/$defs/CacheOptions"
+        },
+        "session_lifetime_respects_key_expiration": {
+          "type": "boolean"
+        },
+        "session_lifetime": {
+          "type": "integer"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "internal": {
+          "type": "boolean"
+        },
+        "auth_provider": {
+          "$ref": "#/$defs/AuthProviderMeta"
+        },
+        "session_provider": {
+          "$ref": "#/$defs/SessionProviderMeta"
+        },
+        "event_handlers": {
+          "$ref": "#/$defs/EventHandlerMetaConfig"
+        },
+        "enable_batch_request_support": {
+          "type": "boolean"
+        },
+        "enable_ip_whitelisting": {
+          "type": "boolean"
+        },
+        "allowed_ips": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enable_ip_blacklisting": {
+          "type": "boolean"
+        },
+        "blacklisted_ips": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dont_set_quota_on_create": {
+          "type": "boolean"
+        },
+        "expire_analytics_after": {
+          "type": "integer"
+        },
+        "response_processors": {
+          "items": {
+            "$ref": "#/$defs/ResponseProcessor"
+          },
+          "type": "array"
+        },
+        "CORS": {
+          "$ref": "#/$defs/CORSConfig"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "domain_disabled": {
+          "type": "boolean"
+        },
+        "certificates": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "do_not_track": {
+          "type": "boolean"
+        },
+        "enable_context_vars": {
+          "type": "boolean"
+        },
+        "config_data": {
+          "type": "object"
+        },
+        "config_data_disabled": {
+          "type": "boolean"
+        },
+        "tag_headers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "global_rate_limit": {
+          "$ref": "#/$defs/GlobalRateLimit"
+        },
+        "strip_auth_data": {
+          "type": "boolean"
+        },
+        "enable_detailed_recording": {
+          "type": "boolean"
+        },
+        "graphql": {
+          "$ref": "#/$defs/GraphQLConfig"
+        },
+        "analytics_plugin": {
+          "$ref": "#/$defs/AnalyticsPluginConfig"
+        },
+        "tags_disabled": {
+          "type": "boolean"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "is_oas": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "slug",
+        "listen_port",
+        "protocol",
+        "enable_proxy_protocol",
+        "api_id",
+        "org_id",
+        "use_keyless",
+        "use_oauth2",
+        "external_oauth",
+        "use_openid",
+        "openid_options",
+        "oauth_meta",
+        "auth",
+        "auth_configs",
+        "use_basic_auth",
+        "basic_auth",
+        "use_mutual_tls_auth",
+        "client_certificates",
+        "upstream_certificates",
+        "pinned_public_keys",
+        "enable_jwt",
+        "use_standard_auth",
+        "use_go_plugin_auth",
+        "enable_coprocess_auth",
+        "custom_plugin_auth_enabled",
+        "jwt_signing_method",
+        "jwt_source",
+        "jwt_identity_base_field",
+        "jwt_client_base_field",
+        "jwt_policy_field_name",
+        "jwt_default_policies",
+        "jwt_issued_at_validation_skew",
+        "jwt_expires_at_validation_skew",
+        "jwt_not_before_validation_skew",
+        "jwt_skip_kid",
+        "jwt_scope_to_policy_mapping",
+        "jwt_scope_claim_name",
+        "notifications",
+        "enable_signature_checking",
+        "hmac_allowed_clock_skew",
+        "hmac_allowed_algorithms",
+        "request_signing",
+        "base_identity_provided_by",
+        "definition",
+        "version_data",
+        "uptime_tests",
+        "proxy",
+        "disable_rate_limit",
+        "disable_quota",
+        "custom_middleware",
+        "custom_middleware_bundle",
+        "custom_middleware_bundle_disabled",
+        "cache_options",
+        "session_lifetime",
+        "active",
+        "internal",
+        "auth_provider",
+        "session_provider",
+        "event_handlers",
+        "enable_batch_request_support",
+        "enable_ip_whitelisting",
+        "allowed_ips",
+        "enable_ip_blacklisting",
+        "blacklisted_ips",
+        "dont_set_quota_on_create",
+        "expire_analytics_after",
+        "response_processors",
+        "CORS",
+        "domain",
+        "certificates",
+        "do_not_track",
+        "enable_context_vars",
+        "config_data",
+        "config_data_disabled",
+        "tag_headers",
+        "global_rate_limit",
+        "strip_auth_data",
+        "enable_detailed_recording",
+        "graphql",
+        "tags"
+      ]
+    },
+    "AnalyticsPluginConfig": {
+      "properties": {
+        "enable": {
+          "type": "boolean"
+        },
+        "plugin_path": {
+          "type": "string"
+        },
+        "func_name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AuthConfig": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "use_param": {
+          "type": "boolean"
+        },
+        "param_name": {
+          "type": "string"
+        },
+        "use_cookie": {
+          "type": "boolean"
+        },
+        "cookie_name": {
+          "type": "string"
+        },
+        "disable_header": {
+          "type": "boolean"
+        },
+        "auth_header_name": {
+          "type": "string"
+        },
+        "use_certificate": {
+          "type": "boolean"
+        },
+        "validate_signature": {
+          "type": "boolean"
+        },
+        "signature": {
+          "$ref": "#/$defs/SignatureConfig"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "use_param",
+        "param_name",
+        "use_cookie",
+        "cookie_name",
+        "disable_header",
+        "auth_header_name",
+        "use_certificate",
+        "validate_signature"
+      ]
+    },
+    "AuthProviderMeta": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "storage_engine": {
+          "type": "string"
+        },
+        "meta": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "storage_engine",
+        "meta"
+      ]
+    },
+    "CORSConfig": {
+      "properties": {
+        "enable": {
+          "type": "boolean"
+        },
+        "allowed_origins": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "allowed_methods": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "allowed_headers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "exposed_headers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "allow_credentials": {
+          "type": "boolean"
+        },
+        "max_age": {
+          "type": "integer"
+        },
+        "options_passthrough": {
+          "type": "boolean"
+        },
+        "debug": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enable",
+        "allowed_origins",
+        "allowed_methods",
+        "allowed_headers",
+        "exposed_headers",
+        "allow_credentials",
+        "max_age",
+        "options_passthrough",
+        "debug"
+      ]
+    },
+    "CacheMeta": {
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "method": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "cache_key_regex": {
+          "type": "string"
+        },
+        "cache_response_codes": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disabled",
+        "method",
+        "path",
+        "cache_key_regex",
+        "cache_response_codes"
+      ]
+    },
+    "CacheOptions": {
+      "properties": {
+        "cache_timeout": {
+          "type": "integer"
+        },
+        "enable_cache": {
+          "type": "boolean"
+        },
+        "cache_all_safe_requests": {
+          "type": "boolean"
+        },
+        "cache_response_codes": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "enable_upstream_cache_control": {
+          "type": "boolean"
+        },
+        "cache_control_ttl_header": {
+          "type": "string"
+        },
+        "cache_by_headers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "cache_timeout",
+        "enable_cache",
+        "cache_all_safe_requests",
+        "cache_response_codes",
+        "enable_upstream_cache_control",
+        "cache_control_ttl_header",
+        "cache_by_headers"
+      ]
+    },
+    "CheckCommand": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "message"
+      ]
+    },
+    "CircuitBreakerMeta": {
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "threshold_percent": {
+          "type": "number"
+        },
+        "samples": {
+          "type": "integer"
+        },
+        "return_to_service_after": {
+          "type": "integer"
+        },
+        "disable_half_open_state": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "path",
+        "method",
+        "threshold_percent",
+        "samples",
+        "return_to_service_after",
+        "disable_half_open_state"
+      ]
+    },
+    "EndPointMeta": {
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "ignore_case": {
+          "type": "boolean"
+        },
+        "method_actions": {
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/$defs/EndpointMethodMeta"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disabled",
+        "path",
+        "method",
+        "ignore_case"
+      ]
+    },
+    "EndpointMethodMeta": {
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "type": "string"
+        },
+        "headers": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "action",
+        "code",
+        "data",
+        "headers"
+      ]
+    },
+    "EventHandlerMetaConfig": {
+      "properties": {
+        "events": {
+          "patternProperties": {
+            ".*": {
+              "items": {
+                "$ref": "#/$defs/EventHandlerTriggerConfig"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "events"
+      ]
+    },
+    "EventHandlerTriggerConfig": {
+      "properties": {
+        "handler_name": {
+          "type": "string"
+        },
+        "handler_meta": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "handler_name",
+        "handler_meta"
+      ]
+    },
+    "ExtendedPathsSet": {
+      "properties": {
+        "ignored": {
+          "items": {
+            "$ref": "#/$defs/EndPointMeta"
+          },
+          "type": "array"
+        },
+        "white_list": {
+          "items": {
+            "$ref": "#/$defs/EndPointMeta"
+          },
+          "type": "array"
+        },
+        "black_list": {
+          "items": {
+            "$ref": "#/$defs/EndPointMeta"
+          },
+          "type": "array"
+        },
+        "mock_response": {
+          "items": {
+            "$ref": "#/$defs/MockResponseMeta"
+          },
+          "type": "array"
+        },
+        "cache": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "advance_cache_config": {
+          "items": {
+            "$ref": "#/$defs/CacheMeta"
+          },
+          "type": "array"
+        },
+        "transform": {
+          "items": {
+            "$ref": "#/$defs/TemplateMeta"
+          },
+          "type": "array"
+        },
+        "transform_response": {
+          "items": {
+            "$ref": "#/$defs/TemplateMeta"
+          },
+          "type": "array"
+        },
+        "transform_jq": {
+          "items": {
+            "$ref": "#/$defs/TransformJQMeta"
+          },
+          "type": "array"
+        },
+        "transform_jq_response": {
+          "items": {
+            "$ref": "#/$defs/TransformJQMeta"
+          },
+          "type": "array"
+        },
+        "transform_headers": {
+          "items": {
+            "$ref": "#/$defs/HeaderInjectionMeta"
+          },
+          "type": "array"
+        },
+        "transform_response_headers": {
+          "items": {
+            "$ref": "#/$defs/HeaderInjectionMeta"
+          },
+          "type": "array"
+        },
+        "hard_timeouts": {
+          "items": {
+            "$ref": "#/$defs/HardTimeoutMeta"
+          },
+          "type": "array"
+        },
+        "circuit_breakers": {
+          "items": {
+            "$ref": "#/$defs/CircuitBreakerMeta"
+          },
+          "type": "array"
+        },
+        "url_rewrites": {
+          "items": {
+            "$ref": "#/$defs/URLRewriteMeta"
+          },
+          "type": "array"
+        },
+        "virtual": {
+          "items": {
+            "$ref": "#/$defs/VirtualMeta"
+          },
+          "type": "array"
+        },
+        "size_limits": {
+          "items": {
+            "$ref": "#/$defs/RequestSizeMeta"
+          },
+          "type": "array"
+        },
+        "method_transforms": {
+          "items": {
+            "$ref": "#/$defs/MethodTransformMeta"
+          },
+          "type": "array"
+        },
+        "track_endpoints": {
+          "items": {
+            "$ref": "#/$defs/TrackEndpointMeta"
+          },
+          "type": "array"
+        },
+        "do_not_track_endpoints": {
+          "items": {
+            "$ref": "#/$defs/TrackEndpointMeta"
+          },
+          "type": "array"
+        },
+        "validate_json": {
+          "items": {
+            "$ref": "#/$defs/ValidatePathMeta"
+          },
+          "type": "array"
+        },
+        "validate_request": {
+          "items": {
+            "$ref": "#/$defs/ValidateRequestMeta"
+          },
+          "type": "array"
+        },
+        "internal": {
+          "items": {
+            "$ref": "#/$defs/InternalMeta"
+          },
+          "type": "array"
+        },
+        "go_plugin": {
+          "items": {
+            "$ref": "#/$defs/GoPluginMeta"
+          },
+          "type": "array"
+        },
+        "persist_graphql": {
+          "items": {
+            "$ref": "#/$defs/PersistGraphQLMeta"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "persist_graphql"
+      ]
+    },
+    "ExternalOAuth": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "providers": {
+          "items": {
+            "$ref": "#/$defs/Provider"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "providers"
+      ]
+    },
+    "GlobalRateLimit": {
+      "properties": {
+        "rate": {
+          "type": "number"
+        },
+        "per": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "rate",
+        "per"
+      ]
+    },
+    "GoPluginMeta": {
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "plugin_path": {
+          "type": "string"
+        },
+        "func_name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disabled",
+        "path",
+        "method",
+        "plugin_path",
+        "func_name"
+      ]
+    },
+    "GraphQLConfig": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "execution_mode": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "last_schema_update": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "type_field_configurations": {
+          "items": {
+            "$ref": "#/$defs/TypeFieldConfiguration"
+          },
+          "type": "array"
+        },
+        "playground": {
+          "$ref": "#/$defs/GraphQLPlayground"
+        },
+        "engine": {
+          "$ref": "#/$defs/GraphQLEngineConfig"
+        },
+        "proxy": {
+          "$ref": "#/$defs/GraphQLProxyConfig"
+        },
+        "subgraph": {
+          "$ref": "#/$defs/GraphQLSubgraphConfig"
+        },
+        "supergraph": {
+          "$ref": "#/$defs/GraphQLSupergraphConfig"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "execution_mode",
+        "version",
+        "schema",
+        "type_field_configurations",
+        "playground",
+        "engine",
+        "proxy",
+        "subgraph",
+        "supergraph"
+      ]
+    },
+    "GraphQLEngineConfig": {
+      "properties": {
+        "field_configs": {
+          "items": {
+            "$ref": "#/$defs/GraphQLFieldConfig"
+          },
+          "type": "array"
+        },
+        "data_sources": {
+          "items": {
+            "$ref": "#/$defs/GraphQLEngineDataSource"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "field_configs",
+        "data_sources"
+      ]
+    },
+    "GraphQLEngineDataSource": {
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "internal": {
+          "type": "boolean"
+        },
+        "root_fields": {
+          "items": {
+            "$ref": "#/$defs/GraphQLTypeFields"
+          },
+          "type": "array"
+        },
+        "config": true
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "kind",
+        "name",
+        "internal",
+        "root_fields",
+        "config"
+      ]
+    },
+    "GraphQLFieldConfig": {
+      "properties": {
+        "type_name": {
+          "type": "string"
+        },
+        "field_name": {
+          "type": "string"
+        },
+        "disable_default_mapping": {
+          "type": "boolean"
+        },
+        "path": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type_name",
+        "field_name",
+        "disable_default_mapping",
+        "path"
+      ]
+    },
+    "GraphQLPlayground": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "path"
+      ]
+    },
+    "GraphQLProxyConfig": {
+      "properties": {
+        "auth_headers": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "subscription_type": {
+          "type": "string"
+        },
+        "request_headers": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "auth_headers",
+        "request_headers"
+      ]
+    },
+    "GraphQLSubgraphConfig": {
+      "properties": {
+        "sdl": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "sdl"
+      ]
+    },
+    "GraphQLSubgraphEntity": {
+      "properties": {
+        "api_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "sdl": {
+          "type": "string"
+        },
+        "headers": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "subscription_type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "api_id",
+        "name",
+        "url",
+        "sdl",
+        "headers"
+      ]
+    },
+    "GraphQLSupergraphConfig": {
+      "properties": {
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "subgraphs": {
+          "items": {
+            "$ref": "#/$defs/GraphQLSubgraphEntity"
+          },
+          "type": "array"
+        },
+        "merged_sdl": {
+          "type": "string"
+        },
+        "global_headers": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "disable_query_batching": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "subgraphs",
+        "merged_sdl",
+        "global_headers",
+        "disable_query_batching"
+      ]
+    },
+    "GraphQLTypeFields": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "fields"
+      ]
+    },
+    "HardTimeoutMeta": {
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "timeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disabled",
+        "path",
+        "method",
+        "timeout"
+      ]
+    },
+    "HeaderInjectionMeta": {
+      "properties": {
+        "delete_headers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "add_headers": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "act_on": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "delete_headers",
+        "add_headers",
+        "path",
+        "method",
+        "act_on"
+      ]
+    },
+    "HostCheckObject": {
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "timeout": {
+          "type": "integer"
+        },
+        "enable_proxy_protocol": {
+          "type": "boolean"
+        },
+        "commands": {
+          "items": {
+            "$ref": "#/$defs/CheckCommand"
+          },
+          "type": "array"
+        },
+        "method": {
+          "type": "string"
+        },
+        "headers": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "body": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "url",
+        "protocol",
+        "timeout",
+        "enable_proxy_protocol",
+        "commands",
+        "method",
+        "headers",
+        "body"
+      ]
+    },
+    "InternalMeta": {
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "path",
+        "method"
+      ]
+    },
+    "Introspection": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "identity_base_field": {
+          "type": "string"
+        },
+        "cache": {
+          "$ref": "#/$defs/IntrospectionCache"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "url",
+        "client_id",
+        "client_secret",
+        "identity_base_field",
+        "cache"
+      ]
+    },
+    "IntrospectionCache": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "timeout"
+      ]
+    },
+    "JWTValidation": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "signing_method": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "issued_at_validation_skew": {
+          "type": "integer"
+        },
+        "not_before_validation_skew": {
+          "type": "integer"
+        },
+        "expires_at_validation_skew": {
+          "type": "integer"
+        },
+        "identity_base_field": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "signing_method",
+        "source",
+        "issued_at_validation_skew",
+        "not_before_validation_skew",
+        "expires_at_validation_skew",
+        "identity_base_field"
+      ]
+    },
+    "MappingConfiguration": {
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disabled",
+        "path"
+      ]
+    },
+    "MethodTransformMeta": {
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "to_method": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disabled",
+        "path",
+        "method",
+        "to_method"
+      ]
+    },
+    "MiddlewareDefinition": {
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "require_session": {
+          "type": "boolean"
+        },
+        "raw_body_only": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disabled",
+        "name",
+        "path",
+        "require_session",
+        "raw_body_only"
+      ]
+    },
+    "MiddlewareIdExtractor": {
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "extract_from": {
+          "type": "string"
+        },
+        "extract_with": {
+          "type": "string"
+        },
+        "extractor_config": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disabled",
+        "extract_from",
+        "extract_with",
+        "extractor_config"
+      ]
+    },
+    "MiddlewareSection": {
+      "properties": {
+        "pre": {
+          "items": {
+            "$ref": "#/$defs/MiddlewareDefinition"
+          },
+          "type": "array"
+        },
+        "post": {
+          "items": {
+            "$ref": "#/$defs/MiddlewareDefinition"
+          },
+          "type": "array"
+        },
+        "post_key_auth": {
+          "items": {
+            "$ref": "#/$defs/MiddlewareDefinition"
+          },
+          "type": "array"
+        },
+        "auth_check": {
+          "$ref": "#/$defs/MiddlewareDefinition"
+        },
+        "response": {
+          "items": {
+            "$ref": "#/$defs/MiddlewareDefinition"
+          },
+          "type": "array"
+        },
+        "driver": {
+          "type": "string"
+        },
+        "id_extractor": {
+          "$ref": "#/$defs/MiddlewareIdExtractor"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "pre",
+        "post",
+        "post_key_auth",
+        "auth_check",
+        "response",
+        "driver",
+        "id_extractor"
+      ]
+    },
+    "MockResponseMeta": {
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "ignore_case": {
+          "type": "boolean"
+        },
+        "code": {
+          "type": "integer"
+        },
+        "body": {
+          "type": "string"
+        },
+        "headers": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disabled",
+        "path",
+        "method",
+        "ignore_case",
+        "code",
+        "body",
+        "headers"
+      ]
+    },
+    "NotificationsManager": {
+      "properties": {
+        "shared_secret": {
+          "type": "string"
+        },
+        "oauth_on_keychange_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "shared_secret",
+        "oauth_on_keychange_url"
+      ]
+    },
+    "OIDProviderConfig": {
+      "properties": {
+        "issuer": {
+          "type": "string"
+        },
+        "client_ids": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "issuer",
+        "client_ids"
+      ]
+    },
+    "OpenIDOptions": {
+      "properties": {
+        "providers": {
+          "items": {
+            "$ref": "#/$defs/OIDProviderConfig"
+          },
+          "type": "array"
+        },
+        "segregate_by_client": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "providers",
+        "segregate_by_client"
+      ]
+    },
+    "PersistGraphQLMeta": {
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "variables": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "path",
+        "method",
+        "operation",
+        "variables"
+      ]
+    },
+    "Provider": {
+      "properties": {
+        "jwt": {
+          "$ref": "#/$defs/JWTValidation"
+        },
+        "introspection": {
+          "$ref": "#/$defs/Introspection"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "jwt",
+        "introspection"
+      ]
+    },
+    "ProxyConfig": {
+      "properties": {
+        "preserve_host_header": {
+          "type": "boolean"
+        },
+        "listen_path": {
+          "type": "string"
+        },
+        "target_url": {
+          "type": "string"
+        },
+        "disable_strip_slash": {
+          "type": "boolean"
+        },
+        "strip_listen_path": {
+          "type": "boolean"
+        },
+        "enable_load_balancing": {
+          "type": "boolean"
+        },
+        "target_list": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "check_host_against_uptime_tests": {
+          "type": "boolean"
+        },
+        "service_discovery": {
+          "$ref": "#/$defs/ServiceDiscoveryConfiguration"
+        },
+        "transport": {
+          "properties": {
+            "ssl_insecure_skip_verify": {
+              "type": "boolean"
+            },
+            "ssl_ciphers": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "ssl_min_version": {
+              "type": "integer"
+            },
+            "ssl_max_version": {
+              "type": "integer"
+            },
+            "ssl_force_common_name_check": {
+              "type": "boolean"
+            },
+            "proxy_url": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ssl_insecure_skip_verify",
+            "ssl_ciphers",
+            "ssl_min_version",
+            "ssl_max_version",
+            "ssl_force_common_name_check",
+            "proxy_url"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "preserve_host_header",
+        "listen_path",
+        "target_url",
+        "disable_strip_slash",
+        "strip_listen_path",
+        "enable_load_balancing",
+        "target_list",
+        "check_host_against_uptime_tests",
+        "service_discovery",
+        "transport"
+      ]
+    },
+    "RequestSigningMeta": {
+      "properties": {
+        "is_enabled": {
+          "type": "boolean"
+        },
+        "secret": {
+          "type": "string"
+        },
+        "key_id": {
+          "type": "string"
+        },
+        "algorithm": {
+          "type": "string"
+        },
+        "header_list": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "certificate_id": {
+          "type": "string"
+        },
+        "signature_header": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "is_enabled",
+        "secret",
+        "key_id",
+        "algorithm",
+        "header_list",
+        "certificate_id",
+        "signature_header"
+      ]
+    },
+    "RequestSizeMeta": {
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "size_limit": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "path",
+        "method",
+        "size_limit"
+      ]
+    },
+    "ResponseProcessor": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "options": true
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "options"
+      ]
+    },
+    "RoutingTrigger": {
+      "properties": {
+        "on": {
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/$defs/RoutingTriggerOptions"
+        },
+        "rewrite_to": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "on",
+        "options",
+        "rewrite_to"
+      ]
+    },
+    "RoutingTriggerOptions": {
+      "properties": {
+        "header_matches": {
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/$defs/StringRegexMap"
+            }
+          },
+          "type": "object"
+        },
+        "query_val_matches": {
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/$defs/StringRegexMap"
+            }
+          },
+          "type": "object"
+        },
+        "path_part_matches": {
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/$defs/StringRegexMap"
+            }
+          },
+          "type": "object"
+        },
+        "session_meta_matches": {
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/$defs/StringRegexMap"
+            }
+          },
+          "type": "object"
+        },
+        "request_context_matches": {
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/$defs/StringRegexMap"
+            }
+          },
+          "type": "object"
+        },
+        "payload_matches": {
+          "$ref": "#/$defs/StringRegexMap"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "header_matches",
+        "query_val_matches",
+        "path_part_matches",
+        "session_meta_matches",
+        "request_context_matches",
+        "payload_matches"
+      ]
+    },
+    "ScopeClaim": {
+      "properties": {
+        "scope_claim_name": {
+          "type": "string"
+        },
+        "scope_to_policy": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Scopes": {
+      "properties": {
+        "jwt": {
+          "$ref": "#/$defs/ScopeClaim"
+        },
+        "oidc": {
+          "$ref": "#/$defs/ScopeClaim"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ServiceDiscoveryConfiguration": {
+      "properties": {
+        "use_discovery_service": {
+          "type": "boolean"
+        },
+        "query_endpoint": {
+          "type": "string"
+        },
+        "use_nested_query": {
+          "type": "boolean"
+        },
+        "parent_data_path": {
+          "type": "string"
+        },
+        "data_path": {
+          "type": "string"
+        },
+        "port_data_path": {
+          "type": "string"
+        },
+        "target_path": {
+          "type": "string"
+        },
+        "use_target_list": {
+          "type": "boolean"
+        },
+        "cache_disabled": {
+          "type": "boolean"
+        },
+        "cache_timeout": {
+          "type": "integer"
+        },
+        "endpoint_returns_list": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "use_discovery_service",
+        "query_endpoint",
+        "use_nested_query",
+        "parent_data_path",
+        "data_path",
+        "port_data_path",
+        "target_path",
+        "use_target_list",
+        "cache_disabled",
+        "cache_timeout",
+        "endpoint_returns_list"
+      ]
+    },
+    "SessionProviderMeta": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "storage_engine": {
+          "type": "string"
+        },
+        "meta": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "storage_engine",
+        "meta"
+      ]
+    },
+    "SignatureConfig": {
+      "properties": {
+        "algorithm": {
+          "type": "string"
+        },
+        "header": {
+          "type": "string"
+        },
+        "use_param": {
+          "type": "boolean"
+        },
+        "param_name": {
+          "type": "string"
+        },
+        "secret": {
+          "type": "string"
+        },
+        "allowed_clock_skew": {
+          "type": "integer"
+        },
+        "error_code": {
+          "type": "integer"
+        },
+        "error_message": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "algorithm",
+        "header",
+        "use_param",
+        "param_name",
+        "secret",
+        "allowed_clock_skew",
+        "error_code",
+        "error_message"
+      ]
+    },
+    "SourceConfig": {
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "data_source_config": true
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "kind",
+        "data_source_config"
+      ]
+    },
+    "StringRegexMap": {
+      "properties": {
+        "match_rx": {
+          "type": "string"
+        },
+        "reverse": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "match_rx",
+        "reverse"
+      ]
+    },
+    "TemplateData": {
+      "properties": {
+        "input_type": {
+          "type": "string"
+        },
+        "template_mode": {
+          "type": "string"
+        },
+        "enable_session": {
+          "type": "boolean"
+        },
+        "template_source": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "input_type",
+        "template_mode",
+        "enable_session",
+        "template_source"
+      ]
+    },
+    "TemplateMeta": {
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "template_data": {
+          "$ref": "#/$defs/TemplateData"
+        },
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disabled",
+        "template_data",
+        "path",
+        "method"
+      ]
+    },
+    "TrackEndpointMeta": {
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "path",
+        "method"
+      ]
+    },
+    "TransformJQMeta": {
+      "properties": {
+        "filter": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "filter",
+        "path",
+        "method"
+      ]
+    },
+    "TypeFieldConfiguration": {
+      "properties": {
+        "type_name": {
+          "type": "string"
+        },
+        "field_name": {
+          "type": "string"
+        },
+        "mapping": {
+          "$ref": "#/$defs/MappingConfiguration"
+        },
+        "data_source": {
+          "$ref": "#/$defs/SourceConfig"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type_name",
+        "field_name",
+        "mapping",
+        "data_source"
+      ]
+    },
+    "URLRewriteMeta": {
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "match_pattern": {
+          "type": "string"
+        },
+        "rewrite_to": {
+          "type": "string"
+        },
+        "triggers": {
+          "items": {
+            "$ref": "#/$defs/RoutingTrigger"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "path",
+        "method",
+        "match_pattern",
+        "rewrite_to",
+        "triggers"
+      ]
+    },
+    "UptimeTests": {
+      "properties": {
+        "check_list": {
+          "items": {
+            "$ref": "#/$defs/HostCheckObject"
+          },
+          "type": "array"
+        },
+        "config": {
+          "$ref": "#/$defs/UptimeTestsConfig"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "check_list",
+        "config"
+      ]
+    },
+    "UptimeTestsConfig": {
+      "properties": {
+        "expire_utime_after": {
+          "type": "integer"
+        },
+        "service_discovery": {
+          "$ref": "#/$defs/ServiceDiscoveryConfiguration"
+        },
+        "recheck_wait": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "expire_utime_after",
+        "service_discovery",
+        "recheck_wait"
+      ]
+    },
+    "ValidatePathMeta": {
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "object"
+        },
+        "schema_b64": {
+          "type": "string"
+        },
+        "error_response_code": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disabled",
+        "path",
+        "method",
+        "schema",
+        "error_response_code"
+      ]
+    },
+    "ValidateRequestMeta": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "error_response_code": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "path",
+        "method",
+        "error_response_code"
+      ]
+    },
+    "VersionData": {
+      "properties": {
+        "not_versioned": {
+          "type": "boolean"
+        },
+        "default_version": {
+          "type": "string"
+        },
+        "versions": {
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/$defs/VersionInfo"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "not_versioned",
+        "default_version",
+        "versions"
+      ]
+    },
+    "VersionDefinition": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "default": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "strip_path": {
+          "type": "boolean"
+        },
+        "strip_versioning_data": {
+          "type": "boolean"
+        },
+        "versions": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "name",
+        "default",
+        "location",
+        "key",
+        "strip_path",
+        "strip_versioning_data",
+        "versions"
+      ]
+    },
+    "VersionInfo": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "expires": {
+          "type": "string"
+        },
+        "paths": {
+          "properties": {
+            "ignored": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "white_list": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "black_list": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ignored",
+            "white_list",
+            "black_list"
+          ]
+        },
+        "use_extended_paths": {
+          "type": "boolean"
+        },
+        "extended_paths": {
+          "$ref": "#/$defs/ExtendedPathsSet"
+        },
+        "global_headers": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "global_headers_remove": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "global_response_headers": {
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "global_response_headers_remove": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ignore_endpoint_case": {
+          "type": "boolean"
+        },
+        "global_size_limit": {
+          "type": "integer"
+        },
+        "override_target": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "expires",
+        "paths",
+        "use_extended_paths",
+        "extended_paths",
+        "global_headers",
+        "global_headers_remove",
+        "global_response_headers",
+        "global_response_headers_remove",
+        "ignore_endpoint_case",
+        "global_size_limit",
+        "override_target"
+      ]
+    },
+    "VirtualMeta": {
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "response_function_name": {
+          "type": "string"
+        },
+        "function_source_type": {
+          "type": "string"
+        },
+        "function_source_uri": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "use_session": {
+          "type": "boolean"
+        },
+        "proxy_on_error": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "disabled",
+        "response_function_name",
+        "function_source_type",
+        "function_source_uri",
+        "path",
+        "method",
+        "use_session",
+        "proxy_on_error"
+      ]
+    }
+  }
+}

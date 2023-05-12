@@ -97,6 +97,9 @@ func Init(version string, confPaths []string) {
 		return nil
 	})
 
+	// Schema generator
+	app.Command("gen", "Generates json schema from known Tyk data models").Action(linter.RunSchemaGenerator)
+
 	// Add import command:
 	importer.AddTo(app)
 
