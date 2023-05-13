@@ -1,0 +1,25 @@
+---
+version: "3"
+
+tasks:
+  schema-gen:
+    dir: ..
+    desc: "Generate /schema/jsonschema/ for Tyk Go data models"
+    cmds:
+      - go run internal/cmd/schema-gen/main.go
+
+  test:
+    desc: "Run tests"
+    deps: [install:golangci-lint]
+    cmds:
+      - go fmt ./...
+      - go test ./... -race -cover -coverprofile .cover
+      - go tool cover -func .cover
+      - golangci-lint run --go=1.16 -p=bugs ./...
+
+  install:golangci-lint:
+    internal: true
+    status:
+      - golangci-lint version
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
