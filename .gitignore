@@ -26,6 +26,7 @@ build/
 logs/
 *.mprof
 *.cov
+.cov*
 /apps/test.json
 logs
 lint_results.txt
