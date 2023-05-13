@@ -6,29 +6,67 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type testStruct struct {
-	Bool      bool
-	Array     []string
-	Map       map[string]string
-	SubStruct *subStruct
-}
+func Test_IsZero(t *testing.T) {
+	type testStruct struct {
+		Name string
+	}
 
-type subStruct struct {
-	SubMap map[string]string
+	zeroes := []interface{}{
+		false,
+		0,
+		0.0,
+		[1]string{""},
+		(*testStruct)(nil),
+		(func())(nil),
+		"",
+		testStruct{},
+	}
+
+	for _, zero := range zeroes {
+		assert.True(t, IsEmpty(zero))
+	}
 }
 
 func Test_IsEmpty(t *testing.T) {
-	v1 := testStruct{}
-	v2 := testStruct{Array: make([]string, 0), Map: make(map[string]string), SubStruct: &subStruct{}}
-	v3 := testStruct{Array: make([]string, 0), Map: make(map[string]string), SubStruct: &subStruct{SubMap: make(map[string]string)}}
-	v4 := testStruct{Bool: true}
-	v5 := testStruct{Array: []string{"a"}}
-	v6 := testStruct{Map: map[string]string{"a": "b"}}
+	type subStruct struct {
+		SubMap map[string]string
+	}
+	type testStruct struct {
+		Bool      bool
+		Array     []string
+		Map       map[string]string
+		SubStruct *subStruct
+	}
 
-	assert.True(t, IsEmpty(v1))
-	assert.True(t, IsEmpty(v2))
-	assert.True(t, IsEmpty(v3))
-	assert.False(t, IsEmpty(v4))
-	assert.False(t, IsEmpty(v5))
-	assert.False(t, IsEmpty(v6))
+	testcases := []struct {
+		input testStruct
+		want  bool
+	}{
+		{
+			input: testStruct{},
+			want:  true,
+		},
+		{
+			input: testStruct{Array: make([]string, 0), Map: make(map[string]string), SubStruct: &subStruct{}},
+			want:  true,
+		},
+		{
+			input: testStruct{Array: make([]string, 0), Map: make(map[string]string), SubStruct: &subStruct{SubMap: make(map[string]string)}},
+			want:  true,
+		},
+		{
+			input: testStruct{Bool: true},
+		},
+		{
+			input: testStruct{Array: []string{"a"}},
+		},
+		{
+			input: testStruct{Map: map[string]string{"a": "b"}},
+		},
+	}
+
+	for _, testcase := range testcases {
+		got := IsEmpty(testcase.input)
+		assert.Equal(t, got, testcase.want)
+	}
 }

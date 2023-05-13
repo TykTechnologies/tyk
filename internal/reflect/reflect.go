@@ -48,9 +48,11 @@ func IsZero(v reflect.Value) bool {
 			}
 		}
 		return true
+	case reflect.Invalid:
+		fallthrough
 	default:
 		// This should never happens, but will act as a safeguard for
 		// later, as a default value doesn't makes sense here.
-		panic(&reflect.ValueError{Method: "oas.IsZero", Kind: v.Kind()})
+		panic(&reflect.ValueError{Method: "reflect.IsZero", Kind: v.Kind()})
 	}
 }

@@ -1,4 +1,4 @@
-package log
+package reflect
 
 import (
 	"fmt"
@@ -9,15 +9,14 @@ import (
 type FlatMap map[string]string
 
 // Flatten transform complex map to flatten map
-func Flatten(data map[string]interface{}) (flatmap FlatMap, err error) {
-	flatmap = make(FlatMap)
+func Flatten(data map[string]interface{}) (FlatMap, error) {
+	flatmap := make(FlatMap)
 	for k, raw := range data {
-		err = flatten(flatmap, k, reflect.ValueOf(raw))
-		if err != nil {
+		if err := flatten(flatmap, k, reflect.ValueOf(raw)); err != nil {
 			return nil, err
 		}
 	}
-	return
+	return flatmap, nil
 }
 
 func flatten(result FlatMap, prefix string, v reflect.Value) (err error) {
@@ -33,8 +32,12 @@ func flatten(result FlatMap, prefix string, v reflect.Value) (err error) {
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		result[prefix] = fmt.Sprintf("%d", v.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		result[prefix] = fmt.Sprintf("%d", v.Uint())
 	case reflect.Float64, reflect.Float32:
 		result[prefix] = fmt.Sprintf("%f", v.Float())
+	case reflect.Complex64, reflect.Complex128:
+		result[prefix] = fmt.Sprint(v.Complex())
 	case reflect.Map:
 		err = flattenMap(result, prefix, v)
 		if err != nil {
@@ -52,21 +55,16 @@ func flatten(result FlatMap, prefix string, v reflect.Value) (err error) {
 		}
 	case reflect.String:
 		result[prefix] = v.String()
-	case reflect.Invalid:
-		result[prefix] = ""
-	default:
-		return fmt.Errorf("Unknown: %s", v)
+	case reflect.Invalid, reflect.Chan, reflect.Func, reflect.Interface, reflect.Pointer, reflect.UnsafePointer:
+		return nil
 	}
 	return nil
 }
 
 func flattenMap(result FlatMap, prefix string, v reflect.Value) (err error) {
 	for _, k := range v.MapKeys() {
-		if k.Kind() == reflect.Interface {
-			k = k.Elem()
-		}
 		if k.Kind() != reflect.String {
-			panic(fmt.Sprintf("%s: map key is not string: %s", prefix, k))
+			return fmt.Errorf("%s: map key is not string: %s", prefix, k)
 		}
 		err = flatten(result, fmt.Sprintf("%s.%s", prefix, k.String()), v.MapIndex(k))
 		if err != nil {
