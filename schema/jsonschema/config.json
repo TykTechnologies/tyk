@@ -972,9 +972,6 @@
         "max_version": {
           "type": "integer"
         },
-        "typename": {
-          "type": "string"
-        },
         "skip_client_ca_announcement": {
           "type": "boolean"
         },
@@ -1012,7 +1009,6 @@
         "server_name",
         "min_version",
         "max_version",
-        "typename",
         "skip_client_ca_announcement",
         "flush_interval",
         "skip_url_cleaning",
