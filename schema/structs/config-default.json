@@ -1,0 +1,18 @@
+{
+  "app_path": "apps/",
+  "dns_cache": {
+    "multiple_ips_handle_strategy": "no_cache",
+    "ttl": 3600
+  },
+  "health_check_endpoint_name": "hello",
+  "listen_port": 8080,
+  "middleware_path": "middleware",
+  "secret": "352d20ee67be67f6340b4c0605b044b7",
+  "storage": {
+    "host": "localhost",
+    "optimisation_max_idle": 100,
+    "port": 6379,
+    "type": "redis"
+  },
+  "template_path": "templates"
+}

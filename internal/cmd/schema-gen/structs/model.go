@@ -9,6 +9,10 @@ import (
 // starting from the root struct declaration(XTykGateway).
 type StructList []*StructInfo
 
+func (x StructList) Len() int           { return len(x) }
+func (x StructList) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
+func (x StructList) Less(i, j int) bool { return x[i].Name < x[j].Name }
+
 func (x *StructList) append(newInfo *StructInfo) int {
 	*x = append(*x, newInfo)
 	return len(*x)

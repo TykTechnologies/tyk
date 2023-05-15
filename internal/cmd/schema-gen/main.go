@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/TykTechnologies/tyk/internal/cmd/schema-gen/defaults"
 	"github.com/TykTechnologies/tyk/internal/cmd/schema-gen/jsonschema"
 	"github.com/TykTechnologies/tyk/internal/cmd/schema-gen/structs"
 )
@@ -32,6 +33,7 @@ func start() (err error) {
 	generators := []func() error{
 		jsonschema.Dump,
 		structs.Dump,
+		defaults.Dump,
 	}
 	for _, generator := range generators {
 		if err := generator(); err != nil {

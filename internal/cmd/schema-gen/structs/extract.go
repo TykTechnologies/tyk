@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"sort"
 	"strings"
 )
 
@@ -59,6 +60,8 @@ func Extract(rootName, filepath string, ignoreFiles ...string) (StructList, erro
 		}
 		p.parse(rootName, rootName, rootStructInfo)
 	*/
+
+	sort.Stable(p.info)
 
 	if p.errList.Empty() {
 		return p.info, nil
@@ -123,6 +126,8 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 	if p.visited[name] != nil {
 		return
 	}
+
+	p.visited[name] = structInfo
 	p.info.append(structInfo)
 
 	for _, field := range structInfo.structObj.Fields.List {
@@ -132,6 +137,15 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 		var goName string
 		if len(field.Names) > 0 {
 			goName = field.Names[0].Name
+		}
+
+		// ignored field.
+		if goName == "_" {
+			continue
+		}
+		if goName == "" {
+			p.errList.WriteError(fmt.Sprintf("[%s] unidentified field in %s", filePos, goPath))
+			continue
 		}
 
 		// fmt.Println("goName", goName)
@@ -150,23 +164,13 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 		tagValue := ""
 		if field.Tag != nil {
 			tagValue = string(field.Tag.Value)
+			tagValue = strings.Trim(tagValue, "`")
 		}
 
-		if goName == "_" {
-			// ignored field.
-			continue
-		}
-
-		jsonName, isInline := jsonTagFromBasicLit(field.Tag)
-
-		if isInline {
-			p.parseInlineField(goPath, ident.Name, structInfo)
-			continue
-		}
-
-		if goName == "" {
-			p.errList.WriteError(fmt.Sprintf("[%s] unidentified field in %s", filePos, goPath))
-			continue
+		jsonName := jsonTag(tagValue)
+		if jsonName == "" {
+			// fields without json tag encode to field name
+			jsonName = goName
 		}
 
 		docs := cleanDocs(field.Doc)
@@ -196,30 +200,9 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 
 			fileSet: structInfo.fileSet,
 		}
-		p.parseNestedObj(ident.Name, fieldInfo)
+		// p.parseNestedObj(ident.Name, fieldInfo)
 
 		structInfo.Fields = append(structInfo.Fields, fieldInfo)
-	}
-
-	p.visited[name] = structInfo
-}
-
-func (p *objParser) parseInlineField(pathName, name string, structInfo *StructInfo) {
-	// for inline Global "struct", keep tree as it was but change the root struct
-	if structObj, ok := p.globals[name].(*ast.StructType); ok {
-		newInfo := p.visited[name]
-		if newInfo == nil {
-			newInfo = &StructInfo{
-				structObj: structObj,
-				fileSet:   structInfo.fileSet,
-				Name:      name,
-			}
-		}
-		p.parse(pathName, name, newInfo)
-		structInfo.Fields = append(structInfo.Fields, newInfo.Fields...)
-	} else {
-		// field is inline and exported but was not scanned
-		p.errList.WriteError(fmt.Sprintf("field %s.%s is declared but not found\n", pathName, name))
 	}
 }
 
@@ -392,23 +375,6 @@ func isExprArray(expr ast.Expr) bool {
 	return ok
 }
 
-func jsonTagFromBasicLit(tag *ast.BasicLit) (name string, isInline bool) {
-	if tag == nil {
-		return "", false
-	}
-
-	jsonTags := strings.Split(reflect.StructTag(tag.Value).Get("json"), ",")
-	if len(jsonTags) == 0 {
-		return "", false
-	}
-
-	if len(jsonTags) > 1 && jsonTags[1] == "inline" {
-		return "", true
-	}
-
-	if jsonTags[0] == "" || jsonTags[0] == "-" {
-		return "", false
-	}
-
-	return jsonTags[0], false
+func jsonTag(tag string) string {
+	return reflect.StructTag(tag).Get("json")
 }
