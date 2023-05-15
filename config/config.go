@@ -982,10 +982,7 @@ type Config struct {
 
 	// This section enables the use of the KV capabilities to substitute configuration values.
 	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/
-	KV struct {
-		Consul ConsulConfig `json:"consul"`
-		Vault  VaultConfig  `json:"vault"`
-	} `json:"kv"`
+	KV KeyValueConfig `json:"kv"`
 
 	// Secrets are key-value pairs that can be accessed in the dashboard via "secrets://"
 	Secrets map[string]string `json:"secrets"`
@@ -1024,6 +1021,12 @@ type Config struct {
 type TykError struct {
 	Message string `json:"message"`
 	Code    int    `json:"code"`
+}
+
+// KeyValueConfig is used to configure the backing KV stores.
+type KeyValueConfig struct {
+	Consul ConsulConfig `json:"consul"`
+	Vault  VaultConfig  `json:"vault"`
 }
 
 // VaultConfig is used to configure the creation of a client
