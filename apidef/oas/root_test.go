@@ -16,7 +16,6 @@ import (
 func TestXTykAPIGateway(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyXTykAPIGateway XTykAPIGateway
-		Fill(t, &emptyXTykAPIGateway.Server.GatewayTags, 0)
 
 		var convertedAPI apidef.APIDefinition
 		emptyXTykAPIGateway.ExtractTo(&convertedAPI)
@@ -37,12 +36,14 @@ func TestXTykAPIGateway(t *testing.T) {
 			},
 		}
 
-		oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
-			"custom": {
-				Value: &openapi3.SecurityScheme{
-					Type: typeApiKey,
-					Name: "x-query",
-					In:   "query",
+		oas.Components = &openapi3.Components{
+			SecuritySchemes: openapi3.SecuritySchemes{
+				"custom": {
+					Value: &openapi3.SecurityScheme{
+						Type: typeAPIKey,
+						Name: "x-query",
+						In:   "query",
+					},
 				},
 			},
 		}
@@ -69,7 +70,7 @@ func TestXTykAPIGateway(t *testing.T) {
 	})
 
 	t.Run("filled old", func(t *testing.T) {
-		t.SkipNow() // when we don't need to skip this, it means OAS and old API definition match
+		t.SkipNow() // when we don't need to skip this, it means OAS and Tyk classic API definition match
 		initialAPI := apidef.APIDefinition{}
 		Fill(t, &initialAPI, 0)
 

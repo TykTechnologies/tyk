@@ -73,17 +73,14 @@ func (r TCPTestRunner) Run(t testing.TB, testCases ...TCPTestCase) error {
 		if tc.ErrorMatch != "" {
 			if err == nil {
 				t.Fatalf("[%d] Expected error: %s", ti, tc.ErrorMatch)
-				break
 			}
 
 			if !strings.Contains(err.Error(), tc.ErrorMatch) {
 				t.Fatalf("[%d] Expected error %s, got %s", ti, err.Error(), tc.ErrorMatch)
-				break
 			}
 		} else {
 			if err != nil {
 				t.Fatalf("[%d] Unexpected error: %s", ti, err.Error())
-				break
 			}
 		}
 	}

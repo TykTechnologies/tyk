@@ -1,15 +1,27 @@
 package oas
 
 import (
-	"encoding/json"
-	"net/http"
+	"context"
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
+
+func minimumValidOAS() OAS {
+	return OAS{
+		T: openapi3.T{
+			Info: &openapi3.Info{
+				Title:   "title",
+				Version: "version",
+			},
+			OpenAPI: DefaultOpenAPI,
+		},
+	}
+}
 
 func TestOAS_PathsAndOperations(t *testing.T) {
 	t.Parallel()
@@ -28,8 +40,11 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 
 	var operation Operation
 	Fill(t, &operation, 0)
-	operation.ValidateRequest = nil // This one also fills native part, let's skip it for this test.
-
+	operation.ValidateRequest = nil                   // This one also fills native part, let's skip it for this test.
+	operation.MockResponse = nil                      // This one also fills native part, let's skip it for this test.
+	operation.TransformRequestBody.Path = ""          // if `path` and `body` are present, `body` would take precedence, detailed tests can be found in middleware_test.go
+	operation.VirtualEndpoint.Path = ""               // if `path` and `body` are present, `body` would take precedence, detailed tests can be found in middleware_test.go
+	operation.PostPlugins = operation.PostPlugins[:1] // only 1 post plugin is considered at this point, ignore others.
 	xTykAPIGateway := &XTykAPIGateway{
 		Middleware: &Middleware{
 			Operations: Operations{
@@ -43,11 +58,12 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	var ep apidef.ExtendedPathsSet
 	oas.extractPathsAndOperations(&ep)
 
-	var convertedOAS OAS
+	convertedOAS := minimumValidOAS()
 	convertedOAS.Paths = openapi3.Paths{
 		"/user": {
 			Post: &openapi3.Operation{
 				OperationID: existingOperationId,
+				Responses:   openapi3.NewResponses(),
 			},
 		},
 	}
@@ -60,14 +76,21 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 		"/user": {
 			Post: &openapi3.Operation{
 				OperationID: existingOperationId,
+				Responses:   openapi3.NewResponses(),
 			},
 			Get: &openapi3.Operation{
 				OperationID: operationId,
+				Responses:   openapi3.NewResponses(),
 			},
 		},
 	}
 
 	assert.Equal(t, expCombinedPaths, convertedOAS.Paths)
+
+	t.Run("oas validation", func(t *testing.T) {
+		err := convertedOAS.Validate(context.Background())
+		assert.NoError(t, err)
+	})
 }
 
 func TestOAS_PathsAndOperationsRegex(t *testing.T) {
@@ -85,6 +108,7 @@ func TestOAS_PathsAndOperationsRegex(t *testing.T) {
 		expectedPath: &openapi3.PathItem{
 			Get: &openapi3.Operation{
 				OperationID: expectedOperationID,
+				Responses:   openapi3.NewResponses(),
 			},
 			Parameters: []*openapi3.ParameterRef{
 				{
@@ -163,6 +187,8 @@ func TestOAS_RegexPaths(t *testing.T) {
 	}
 
 	tests := []test{
+		{"/v1.Service", "/v1.Service", 0},
+		{"/v1.Service/stats.Service", "/v1.Service/stats.Service", 0},
 		{"/.+", "/{customRegex1}", 1},
 		{"/.*", "/{customRegex1}", 1},
 		{"/[^a]*", "/{customRegex1}", 1},
@@ -176,12 +202,17 @@ func TestOAS_RegexPaths(t *testing.T) {
 
 	for i, tc := range tests {
 		var oas OAS
-		oas.Paths = openapi3.Paths{
-			tc.input: {
-				Get: &openapi3.Operation{},
-			},
-		}
+		oas.Paths = openapi3.Paths{}
 		_ = oas.getOperationID(tc.input, "GET")
+
+		pathKeys := make([]string, 0, len(oas.Paths))
+		for k, _ := range oas.Paths {
+			pathKeys = append(pathKeys, k)
+		}
+
+		assert.Lenf(t, oas.Paths, 1, "Expected one path key being created, got %#v", pathKeys)
+		_, ok := oas.Paths[tc.want]
+		assert.True(t, ok)
 
 		p, ok := oas.Paths[tc.want]
 		assert.Truef(t, ok, "test %d: path doesn't exist in OAS: %v", i, tc.want)
@@ -201,97 +232,4 @@ func TestOAS_RegexPaths(t *testing.T) {
 
 		assert.Equalf(t, tc.input, got, "test %d: rebuilt link, expected %v, got %v", i, tc.input, got)
 	}
-}
-
-func schemaAsMap(schema string) (schemaMap map[string]interface{}) {
-	_ = json.Unmarshal([]byte(schema), &schemaMap)
-	return
-}
-
-func TestValidateRequest(t *testing.T) {
-	const (
-		contentType = "application/json"
-		operationID = "getGET"
-	)
-
-	const personSchema = `
-	{
-		"properties": {
-			"name": {
-				"type": "string"
-			}
-		}
-	}`
-
-	metas := []apidef.ValidatePathMeta{
-		{
-			Disabled: false,
-			Path:     "/get",
-			Method:   http.MethodGet,
-			Schema:   schemaAsMap(personSchema),
-		},
-	}
-
-	t.Run("ref", func(t *testing.T) {
-		reqBodyString := `{
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Person"
-              }
-            }
-          }
-        }`
-
-		reqBody := openapi3.NewRequestBody()
-		_ = reqBody.UnmarshalJSON([]byte(reqBodyString))
-
-		getOperation := openapi3.NewOperation()
-		getOperation.OperationID = operationID
-		getOperation.RequestBody = &openapi3.RequestBodyRef{
-			Value: reqBody,
-		}
-
-		paths := make(openapi3.Paths)
-		paths["/get"] = &openapi3.PathItem{
-			Get: getOperation,
-		}
-
-		var s OAS
-		s.Paths = paths
-
-		s.SetTykExtension(&XTykAPIGateway{Middleware: &Middleware{}})
-
-		s.fillValidateRequest(metas)
-
-		resOperationSchema := s.Paths["/get"].Get.RequestBody.Value.Content[contentType].Schema
-		assert.Equal(t, "#/components/schemas/Person", resOperationSchema.Ref)
-		assert.Nil(t, resOperationSchema.Value)
-
-		expectedComponentsSchemas := make(openapi3.Schemas)
-		oasSchema := openapi3.NewSchema()
-		_ = oasSchema.UnmarshalJSON([]byte(personSchema))
-		expectedComponentsSchemas["Person"] = openapi3.NewSchemaRef("", oasSchema)
-		assert.Equal(t, expectedComponentsSchemas, s.Components.Schemas)
-
-		var ep apidef.ExtendedPathsSet
-		s.getTykOperations()[operationID].extractValidateRequestTo(&ep, "/get", http.MethodGet,
-			s.Paths["/get"].GetOperation(http.MethodGet), &s.Components)
-
-		assert.Equal(t, metas, ep.ValidateJSON)
-	})
-
-	t.Run("value", func(t *testing.T) {
-		var s OAS
-		s.Paths = make(map[string]*openapi3.PathItem)
-		s.SetTykExtension(&XTykAPIGateway{Middleware: &Middleware{}})
-
-		s.fillValidateRequest(metas)
-
-		var ep apidef.ExtendedPathsSet
-		s.getTykOperations()[operationID].extractValidateRequestTo(&ep, "/get", http.MethodGet,
-			s.Paths["/get"].GetOperation(http.MethodGet), &s.Components)
-
-		assert.Equal(t, metas, ep.ValidateJSON)
-	})
 }

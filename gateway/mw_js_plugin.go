@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
@@ -96,10 +98,12 @@ func specToJson(spec *APISpec) string {
 	m := map[string]interface{}{
 		"OrgID": spec.OrgID,
 		"APIID": spec.APIID,
-		// For backwards compatibility within 2.x.
-		// TODO: simplify or refactor in 3.x or later.
-		"config_data": spec.ConfigData,
 	}
+
+	if !spec.ConfigDataDisabled {
+		m["config_data"] = spec.ConfigData
+	}
+
 	bs, err := json.Marshal(m)
 	if err != nil {
 		log.Error("Failed to encode configuration data: ", err)
@@ -176,6 +180,10 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Run the middleware
 	middlewareClassname := d.MiddlewareClassName
+	if d.Spec.JSVM.VM == nil {
+		logger.WithError(err).Error("JSVM isn't enabled, check your gateway settings")
+		return errors.New("Middleware error"), 500
+	}
 	vm := d.Spec.JSVM.VM.Copy()
 	vm.Interrupt = make(chan func(), 1)
 	logger.Debug("Running: ", middlewareClassname)
@@ -294,7 +302,11 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	if d.Auth {
 		newRequestData.Session.KeyID = newRequestData.AuthValue
-		ctxSetSession(r, &newRequestData.Session, true, d.Gw.GetConfig().HashKeys)
+
+		switch d.Spec.BaseIdentityProvidedBy {
+		case apidef.CustomAuth, apidef.UnsetAuth:
+			ctxSetSession(r, &newRequestData.Session, true, d.Gw.GetConfig().HashKeys)
+		}
 	}
 
 	return nil, http.StatusOK
@@ -365,6 +377,13 @@ func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 
 	j.Log = logger // use the global logger by default
 	j.RawLog = rawLog
+}
+
+func (j *JSVM) DeInit() {
+	j.Spec = nil
+	j.Log = nil
+	j.RawLog = nil
+	j.Gw = nil
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file

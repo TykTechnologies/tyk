@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
@@ -10,15 +11,15 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
-	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
@@ -29,7 +30,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const mwStatusRespond = 666
+const (
+	mwStatusRespond                = 666
+	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
+)
 
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
@@ -129,12 +133,8 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
-				// GoPluginMiddleware are expected to send response in case of error
-				// but we still want to record error
-				_, isGoPlugin := actualMW.(*GoPluginMiddleware)
-
 				handler := ErrorHandler{*mw.Base()}
-				handler.HandleError(w, r, err.Error(), errCode, !isGoPlugin)
+				handler.HandleError(w, r, err.Error(), errCode, true)
 
 				meta["error"] = err.Error()
 
@@ -232,7 +232,8 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
-		t.Logger().Debug("Setting data expiry: ", session.OrgID)
+		t.Logger().Debug("Setting data expiry: ", orgID)
+
 		t.Gw.ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
@@ -253,16 +254,21 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 		if found {
 			return cachedVal, nil
 		}
+
 		s, found := t.OrgSession(orgid)
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 			return s.DataExpires, nil
 		}
+
 		return 0, errors.New("missing session")
 	})
 	if err != nil {
+
 		t.Logger().Debug("no cached entry found, returning 7 days")
-		return int64(604800)
+		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
+		return DEFAULT_ORG_SESSION_EXPIRATION
 	}
+
 	return id.(int64)
 }
 
@@ -278,7 +284,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		return false
 	}
 
-	lifetime := session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
+	lifetime := session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
 	if err := t.Gw.GlobalSessionManager.UpdateSession(token, session, lifetime, false); err != nil {
 		t.Logger().WithError(err).Error("Can't update session")
 		return false
@@ -363,6 +369,13 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
+				if r, ok := session.AccessRights[apiID]; ok {
+					// If GQL introspection is disabled, keep that configuration.
+					if r.DisableIntrospection {
+						accessRights.DisableIntrospection = r.DisableIntrospection
+					}
+				}
+
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
 
@@ -383,6 +396,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					// Merge ACLs for the same API
 					if r, ok := rights[k]; ok {
+						// If GQL introspection is disabled, keep that configuration.
+						if v.DisableIntrospection {
+							r.DisableIntrospection = v.DisableIntrospection
+						}
 						r.Versions = appendIfMissing(rights[k].Versions, v.Versions...)
 
 						for _, u := range v.AllowedURLs {
@@ -403,6 +420,14 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							for ri, rt := range r.RestrictedTypes {
 								if t.Name == rt.Name {
 									r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+								}
+							}
+						}
+
+						for _, t := range v.AllowedTypes {
+							for ri, rt := range r.AllowedTypes {
+								if t.Name == rt.Name {
+									r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
 								}
 							}
 						}
@@ -501,9 +526,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
-				if !usePartitions || policy.Partitions.Acl {
-					rights[k] = ar
-				}
+				rights[k] = ar
 			}
 
 			// Master policy case
@@ -579,6 +602,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 	// If some APIs had only ACL partitions, inherit rest from session level
 	for k, v := range rights {
+		if !didACL[k] {
+			delete(rights, k)
+			continue
+		}
+
 		if !didRateLimit[k] {
 			v.Limit.Rate = session.Rate
 			v.Limit.Per = session.Per
@@ -724,7 +752,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 			return session, false
 		}
 
-		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
+		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 		ctxScheduleSessionUpdate(r)
 		return session, found
 	}
@@ -752,7 +780,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 
 	var (
 		key         string
-		defaultName = headers.Authorization
+		defaultName = header.Authorization
 	)
 
 	headerName := config.AuthHeaderName
@@ -767,7 +795,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	paramName := config.ParamName
-	if config.UseParam || paramName != "" {
+	if config.UseParam {
 		if paramName == "" {
 			paramName = defaultName
 		}
@@ -781,7 +809,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	cookieName := config.CookieName
-	if config.UseCookie || cookieName != "" {
+	if config.UseCookie {
 		if cookieName == "" {
 			cookieName = defaultName
 		}
@@ -798,6 +826,13 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	return key, config
+}
+
+func (b BaseMiddleware) generateSessionID(id string) string {
+	// generate a virtual token
+	data := []byte(id)
+	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	return b.Gw.generateToken(b.Spec.OrgID, keyID)
 }
 
 type TykResponseHandler interface {

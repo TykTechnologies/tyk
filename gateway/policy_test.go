@@ -12,17 +12,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/storage/persistent/model"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
-
-	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
@@ -135,6 +136,21 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			Rate:       4,
 			Per:        4,
 		},
+		"rate-for-a": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+			Rate:         4,
+		},
+		"rate-for-b": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
+			Rate:         2,
+		},
+		"rate-for-a-b": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
+			Rate:         4,
+		},
 		"acl1": {
 			Partitions:   user.PolicyPartitions{Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
@@ -145,6 +161,10 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		},
 		"acl3": {
 			AccessRights: map[string]user.AccessDefinition{"c": {}},
+		},
+		"acl-for-a-b": {
+			Partitions:   user.PolicyPartitions{Acl: true},
+			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
 		},
 		"unlimitedComplexity": {
 			Partitions:    user.PolicyPartitions{Complexity: true},
@@ -300,6 +320,40 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 						{Name: "Country", Fields: []string{"code", "phone"}},
 						{Name: "Person", Fields: []string{"name", "mass"}},
 					},
+				}},
+		},
+		"allowed-types1": {
+			ID: "allowed_types_1",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					AllowedTypes: []graphql.Type{
+						{Name: "Country", Fields: []string{"code", "name"}},
+						{Name: "Person", Fields: []string{"name", "height"}},
+					},
+				}},
+		},
+		"allowed-types2": {
+			ID: "allowed_types_2",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					AllowedTypes: []graphql.Type{
+						{Name: "Country", Fields: []string{"code", "phone"}},
+						{Name: "Person", Fields: []string{"name", "mass"}},
+					},
+				}},
+		},
+		"introspection-disabled": {
+			ID: "introspection_disabled",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					DisableIntrospection: true,
+				}},
+		},
+		"introspection-enabled": {
+			ID: "introspection_enabled",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					DisableIntrospection: false,
 				}},
 		},
 		"field-level-depth-limit1": {
@@ -540,6 +594,23 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			}, nil,
 		},
 		{
+			"Acl for a and rate for a,b", []string{"acl1", "rate-for-a-b"},
+			"", func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4}}}
+				assert.Equal(t, want, s.AccessRights)
+			}, nil,
+		},
+		{
+			"Acl for a,b and individual rate for a,b", []string{"acl-for-a-b", "rate-for-a", "rate-for-b"},
+			"", func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": {Limit: user.APILimit{Rate: 4}},
+					"b": {Limit: user.APILimit{Rate: 2}},
+				}
+				assert.Equal(t, want, s.AccessRights)
+			}, nil,
+		},
+		{
 			"RightsUpdate", []string{"acl3"},
 			"", func(t *testing.T, ses *user.SessionState) {
 				newPolicy := user.Policy{
@@ -669,6 +740,37 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 							{Name: "Person", Fields: []string{"name"}},
 						},
 						Limit: user.APILimit{},
+					},
+				}
+
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name:     "Merge allowed fields for the same GraphQL API",
+			policies: []string{"allowed-types1", "allowed-types2"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": { // It should get intersection of restricted types.
+						AllowedTypes: []graphql.Type{
+							{Name: "Country", Fields: []string{"code"}},
+							{Name: "Person", Fields: []string{"name"}},
+						},
+						Limit: user.APILimit{},
+					},
+				}
+
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name:     "If GQL introspection is disabled, it remains disabled after merging",
+			policies: []string{"introspection-disabled", "introspection-enabled"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": {
+						DisableIntrospection: true, // If GQL introspection is disabled, it remains disabled after merging.
+						Limit:                user.APILimit{},
 					},
 				}
 
@@ -898,27 +1000,27 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			// 2 requests to api1, API limit quota remaining should be 98
 			{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "99"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "99"}},
 			{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "98"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "98"}},
 			// 3 requests to api2, API limit quota remaining should be 197
 			{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "199"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "199"}},
 			{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "198"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "198"}},
 			{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "197"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "197"}},
 			// 5 requests to api3, API limit quota remaining should be 45
 			{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "49"}},
 			{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "48"}},
 			{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "47"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "47"}},
 			{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "46"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "46"}},
 			{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "45"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "45"}},
 		}...)
 	})
 
@@ -1122,25 +1224,25 @@ func TestApplyMultiPolicies(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			// 2 requests to api1, API limit quota remaining should be 48
 			{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "49"}},
 			{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "48"}},
 
 			// 3 requests to api2, API limit quota remaining should be 197
 			{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "99"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "99"}},
 			{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "98"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "98"}},
 			{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "97"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "97"}},
 
 			// 3 requests to api3, should consume policy2 quota, same as for api2
 			{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "96"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "96"}},
 			{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "95"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "95"}},
 			{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "94"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "94"}},
 		}...)
 
 	})
@@ -1221,9 +1323,9 @@ func TestApplyMultiPolicies(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			// 2 requests to api1, API limit quota remaining should be 48
 			{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "49"}},
 			{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "48"}},
 		}...)
 	})
 
@@ -1243,7 +1345,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 	t.Run("Rate limits after policy update", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "47"}},
+				HeadersMatch: map[string]string{header.XRateLimitRemaining: "47"}},
 			{Path: "/api1", Headers: authHeader, Code: http.StatusTooManyRequests},
 		}...)
 	})
@@ -1400,7 +1502,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 
 func TestParsePoliciesFromRPC(t *testing.T) {
 
-	objectID := apidef.NewObjectId()
+	objectID := model.NewObjectID()
 	explicitID := "explicit_pol_id"
 	tcs := []struct {
 		testName      string

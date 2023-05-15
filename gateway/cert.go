@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -14,13 +15,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/gorilla/mux"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/gorilla/mux"
-	"github.com/pmylund/go-cache"
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 const ListDetailed = "detailed"
@@ -71,7 +72,7 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 
 	certMaps := []map[string]string{gw.GetConfig().Security.Certificates.Upstream}
 
-	if spec != nil && spec.UpstreamCertificates != nil {
+	if spec != nil && !spec.UpstreamCertificatesDisabled && spec.UpstreamCertificates != nil {
 		certMaps = append(certMaps, spec.UpstreamCertificates)
 	}
 
@@ -112,7 +113,8 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 }
 
 func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(gw.GetConfig().Security.PinnedPublicKeys) == 0 {
+	if (spec == nil || spec.CertificatePinningDisabled || len(spec.PinnedPublicKeys) == 0) &&
+		len(gw.GetConfig().Security.PinnedPublicKeys) == 0 {
 		return nil
 	}
 
@@ -189,7 +191,7 @@ func validateCommonName(host string, cert *x509.Certificate) error {
 func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
 	var checkPinnedKeys, checkCommonName bool
 	gwConfig := gw.GetConfig()
-	if (spec != nil && len(spec.PinnedPublicKeys) != 0) || len(gwConfig.Security.PinnedPublicKeys) != 0 {
+	if (spec != nil && !spec.CertificatePinningDisabled && len(spec.PinnedPublicKeys) != 0) || len(gwConfig.Security.PinnedPublicKeys) != 0 {
 		checkPinnedKeys = true
 	}
 
@@ -237,7 +239,7 @@ func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.C
 
 	pinMaps := []map[string]string{conf.Security.PinnedPublicKeys}
 
-	if spec != nil && spec.PinnedPublicKeys != nil {
+	if spec != nil && !spec.CertificatePinningDisabled && spec.PinnedPublicKeys != nil {
 		pinMaps = append(pinMaps, spec.PinnedPublicKeys)
 	}
 
@@ -271,14 +273,38 @@ func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.C
 	return gw.CertificateManager.ListPublicKeys(strings.Split(keyIDs, ","))
 }
 
-// dummyGetCertificate needed because TLSConfig require setting Certificates array or GetCertificate function from start, even if it get overriden by `getTLSConfigForClient`
+// dummyGetCertificate needed because TLSConfig require setting Certificates array or GetCertificate function from start, even if it get overridden by `getTLSConfigForClient`
 func dummyGetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return nil, nil
 }
 
-var tlsConfigCache = cache.New(60*time.Second, 60*time.Minute)
+var tlsConfigCache = cache.New(60, 3600)
 
 var tlsConfigMu sync.Mutex
+
+func getClientValidator(helloInfo *tls.ClientHelloInfo, certPool *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
+	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		if len(rawCerts) == 0 {
+			return errors.New("x509: missing client certificate")
+		}
+
+		cert, certErr := x509.ParseCertificate(rawCerts[0])
+		if certErr != nil {
+			return certErr
+		}
+
+		opts := x509.VerifyOptions{
+			Roots:         certPool,
+			CurrentTime:   time.Now(),
+			Intermediates: x509.NewCertPool(),
+			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}
+
+		_, err := cert.Verify(opts)
+
+		return err
+	}
+}
 
 func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	gwConfig := gw.GetConfig()
@@ -351,6 +377,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
 			return newConfig, nil
 		} else {
+			fmt.Printf("\n%v\n", gwConfig.ControlAPIHostname)
 			domainRequireCert[gwConfig.ControlAPIHostname] = -1
 		}
 
@@ -358,6 +385,14 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		defer gw.apisMu.RUnlock()
 
 		newConfig.ClientCAs = x509.NewCertPool()
+
+		directMTLSDomainMatch := false
+		for _, spec := range gw.apiSpecs {
+			if spec.UseMutualTLSAuth && spec.Domain == hello.ServerName {
+				directMTLSDomainMatch = true
+				break
+			}
+		}
 
 		for _, spec := range gw.apiSpecs {
 			switch {
@@ -372,7 +407,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 				}
 
 				// If current domain match or empty, whitelist client certificates
-				if spec.Domain == "" || spec.Domain == hello.ServerName {
+				if (!directMTLSDomainMatch && spec.Domain == "") || spec.Domain == hello.ServerName {
 					certIDs := append(spec.ClientCertificates, gwConfig.Security.Certificates.API...)
 
 					for _, cert := range gw.CertificateManager.List(certIDs, certs.CertificatePublic) {
@@ -447,8 +482,17 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			newConfig.ClientAuth = domainRequireCert[""]
 		}
 
+		if gwConfig.HttpServerOptions.SkipClientCAAnnouncement {
+			if newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+				newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
+			}
+			newConfig.ClientCAs = x509.NewCertPool()
+			newConfig.ClientAuth = tls.RequestClientCert
+		}
+
 		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
+
 		return newConfig, nil
 	}
 }

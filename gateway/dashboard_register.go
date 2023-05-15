@@ -7,9 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"time"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 )
 
 var dashLog = log.WithField("prefix", "dashboard")
@@ -30,6 +31,18 @@ type DashboardServiceSender interface {
 	NotifyDashboardOfEvent(interface{}) error
 }
 
+// Constants for heartBeatStopSentinel indicators.
+//
+// Go 1.17 adds atomic.Value.Swap which is great, but 1.19
+// adds atomic.Bool and other types. This is a go <1.13 cludge.
+const (
+	// HeartBeatStarted Zero value - the handlers started
+	HeartBeatStarted = 0
+
+	// HeartBeatStopped value - the handlers invoked shutdown
+	HeartBeatStopped = 1
+)
+
 type HTTPDashboardHandler struct {
 	RegistrationEndpoint    string
 	DeRegistrationEndpoint  string
@@ -38,8 +51,9 @@ type HTTPDashboardHandler struct {
 
 	Secret string
 
-	heartBeatStopSentinel bool
-	Gw                    *Gateway `json:"-"`
+	heartBeatStopSentinel int32
+
+	Gw *Gateway `json:"-"`
 }
 
 var dashClient *http.Client
@@ -127,9 +141,9 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	}
 
 	req.Header.Set("authorization", h.Secret)
-	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
+	req.Header.Set(header.XTykNodeID, h.Gw.GetNodeID())
 	h.Gw.ServiceNonceMutex.RLock()
-	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
+	req.Header.Set(header.XTykNonce, h.Gw.ServiceNonce)
 	h.Gw.ServiceNonceMutex.RUnlock()
 
 	c := h.Gw.initialiseClient()
@@ -213,13 +227,18 @@ func (h *HTTPDashboardHandler) Ping() error {
 		h.Gw.initialiseClient())
 }
 
+func (h *HTTPDashboardHandler) isHeartBeatStopped() bool {
+	return atomic.LoadInt32(&h.heartBeatStopSentinel) == HeartBeatStopped
+}
+
 func (h *HTTPDashboardHandler) StartBeating() error {
+	atomic.SwapInt32(&h.heartBeatStopSentinel, HeartBeatStarted)
 
 	req := h.newRequest(http.MethodGet, h.HeartBeatEndpoint)
 
 	client := h.Gw.initialiseClient()
 
-	for !h.heartBeatStopSentinel {
+	for !h.isHeartBeatStopped() {
 		if err := h.sendHeartBeat(req, client); err != nil {
 			dashLog.Warning(err)
 		}
@@ -227,12 +246,11 @@ func (h *HTTPDashboardHandler) StartBeating() error {
 	}
 
 	dashLog.Info("Stopped Heartbeat")
-	h.heartBeatStopSentinel = false
 	return nil
 }
 
 func (h *HTTPDashboardHandler) StopBeating() {
-	h.heartBeatStopSentinel = true
+	atomic.SwapInt32(&h.heartBeatStopSentinel, HeartBeatStopped)
 }
 
 func (h *HTTPDashboardHandler) newRequest(method, endpoint string) *http.Request {
@@ -241,15 +259,15 @@ func (h *HTTPDashboardHandler) newRequest(method, endpoint string) *http.Request
 		panic(err)
 	}
 	req.Header.Set("authorization", h.Secret)
-	req.Header.Set(headers.XTykHostname, h.Gw.hostDetails.Hostname)
-	req.Header.Set(headers.XTykSessionID, h.Gw.SessionID)
+	req.Header.Set(header.XTykHostname, h.Gw.hostDetails.Hostname)
+	req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
 	return req
 }
 
 func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client) error {
-	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
+	req.Header.Set(header.XTykNodeID, h.Gw.GetNodeID())
 	h.Gw.ServiceNonceMutex.RLock()
-	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
+	req.Header.Set(header.XTykNonce, h.Gw.ServiceNonce)
 	h.Gw.ServiceNonceMutex.RUnlock()
 
 	resp, err := client.Do(req)
@@ -283,9 +301,9 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 func (h *HTTPDashboardHandler) DeRegister() error {
 	req := h.newRequest(http.MethodDelete, h.DeRegistrationEndpoint)
 
-	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
+	req.Header.Set(header.XTykNodeID, h.Gw.GetNodeID())
 	h.Gw.ServiceNonceMutex.RLock()
-	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
+	req.Header.Set(header.XTykNonce, h.Gw.ServiceNonce)
 	h.Gw.ServiceNonceMutex.RUnlock()
 
 	c := h.Gw.initialiseClient()

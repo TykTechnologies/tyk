@@ -1159,7 +1159,7 @@ func TestInitTriggerRx(t *testing.T) {
 		Options.
 		HeaderMatches["abc"]
 	if headerMatch.Check("abc") == "" {
-		t.Errorf("Expected HeaderMatches initalized and matched, received no match")
+		t.Errorf("Expected HeaderMatches initialized and matched, received no match")
 	}
 
 	// assert QueryValMatches
@@ -1174,7 +1174,7 @@ func TestInitTriggerRx(t *testing.T) {
 		Options.
 		QueryValMatches["def"]
 	if queryValMatch.Check("def") == "" {
-		t.Errorf("Expected QueryValMatches initalized and matched, received no match")
+		t.Errorf("Expected QueryValMatches initialized and matched, received no match")
 	}
 
 	// assert PayloadMatches
@@ -1189,7 +1189,7 @@ func TestInitTriggerRx(t *testing.T) {
 		Options.
 		PayloadMatches
 	if payloadMatch.Check("ghi") == "" {
-		t.Errorf("Expected PayloadMatches initalized and matched, received no match")
+		t.Errorf("Expected PayloadMatches initialized and matched, received no match")
 	}
 }
 

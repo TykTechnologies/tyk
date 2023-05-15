@@ -5,14 +5,16 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/lonelycode/osin"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/lonelycode/osin"
-	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -177,7 +179,7 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 	})
 
 	auth := map[string]string{
-		headers.Authorization: key,
+		header.Authorization: key,
 	}
 
 	// Call 3 times
@@ -259,7 +261,7 @@ func TestRPCUpdateKey(t *testing.T) {
 			})
 
 			auth := map[string]string{
-				headers.Authorization: key,
+				header.Authorization: key,
 			}
 
 			_, _ = g.Run(t, []test.TestCase{
@@ -279,4 +281,51 @@ func TestRPCUpdateKey(t *testing.T) {
 			assert.Equal(t, tags, myUpdatedSession.Tags)
 		})
 	}
+}
+
+func TestGetGroupLoginCallback(t *testing.T) {
+	tcs := []struct {
+		testName                 string
+		syncEnabled              bool
+		givenKey                 string
+		givenGroup               string
+		expectedCallbackResponse interface{}
+	}{
+		{
+			testName:                 "sync disabled",
+			syncEnabled:              false,
+			givenKey:                 "key",
+			givenGroup:               "group",
+			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group"},
+		},
+		{
+			testName:                 "sync enabled",
+			syncEnabled:              true,
+			givenKey:                 "key",
+			givenGroup:               "group",
+			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group", ForceSync: true},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.testName, func(t *testing.T) {
+			g := StartTest(func(globalConf *config.Config) {
+				globalConf.SlaveOptions.SynchroniserEnabled = tc.syncEnabled
+			})
+			defer g.Close()
+			defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+
+			rpcListener := RPCStorageHandler{
+				KeyPrefix:        "rpc.listener.",
+				SuppressRegister: true,
+				Gw:               g.Gw,
+			}
+
+			fn := rpcListener.getGroupLoginCallback(tc.syncEnabled)
+			groupLogin, ok := fn(tc.givenKey, tc.givenGroup).(apidef.GroupLoginRequest)
+			assert.True(t, ok)
+			assert.Equal(t, tc.expectedCallbackResponse, groupLogin)
+		})
+	}
+
 }

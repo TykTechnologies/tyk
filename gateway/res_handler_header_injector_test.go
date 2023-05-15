@@ -57,6 +57,13 @@ func testPrepareResponseHeaderInjection(ts *Test) {
 			}}
 		})
 		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
+
+		spec.CacheOptions = apidef.CacheOptions{
+			EnableCache:                cacheEnabled,
+			EnableUpstreamCacheControl: true,
+			CacheTimeout:               60,
+			CacheAllSafeRequests:       true,
+		}
 	})
 }
 
@@ -66,17 +73,31 @@ func TestResponseHeaderInjection(t *testing.T) {
 
 	testPrepareResponseHeaderInjection(ts)
 
-	addHeaders := map[string]string{"X-Test": "test"}
-	deleteHeaders := map[string]string{"X-Tyk-Test": "1"}
+	addHeaders := map[string]string{
+		"X-Test": "test",
+	}
+	addHeadersCached := map[string]string{
+		"X-Test":             "test",
+		cachedResponseHeader: "1",
+	}
+
+	deleteHeaders := map[string]string{
+		"X-Tyk-Test":         "1",
+		cachedResponseHeader: "1",
+	}
+	deleteHeadersCached := map[string]string{
+		"X-Tyk-Test": "1",
+	}
+
 	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%v\"", VERSION)
 
-	ts.Run(t, []test.TestCase{
+	_, _ = ts.Run(t, []test.TestCase{
 		// Create base auth based key
 		{Method: "GET", Path: "/test-with-slash", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders},
 		{Method: "GET", Path: "/test-no-slash", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders},
 		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"Url":"/newpath"`},
-		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"X-I-Am":"Request"`},
-		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: userAgent},
+		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeadersCached, HeadersNotMatch: deleteHeadersCached, BodyMatch: `"X-I-Am":"Request"`},
+		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeadersCached, HeadersNotMatch: deleteHeadersCached, BodyMatch: userAgent},
 	}...)
 }
 
@@ -88,18 +109,32 @@ func BenchmarkResponseHeaderInjection(b *testing.B) {
 
 	testPrepareResponseHeaderInjection(ts)
 
-	addHeaders := map[string]string{"X-Test": "test"}
-	deleteHeaders := map[string]string{"X-Tyk-Test": "1"}
+	addHeaders := map[string]string{
+		"X-Test": "test",
+	}
+	addHeadersCached := map[string]string{
+		"X-Test":             "test",
+		cachedResponseHeader: "1",
+	}
+
+	deleteHeaders := map[string]string{
+		"X-Tyk-Test":         "1",
+		cachedResponseHeader: "1",
+	}
+	deleteHeadersCached := map[string]string{
+		"X-Tyk-Test": "1",
+	}
+
 	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%v\"", VERSION)
 
 	for i := 0; i < b.N; i++ {
-		ts.Run(b, []test.TestCase{
+		_, _ = ts.Run(b, []test.TestCase{
 			// Create base auth based key
 			{Method: "GET", Path: "/test-with-slash", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders},
 			{Method: "GET", Path: "/test-no-slash", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders},
 			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"Url":"/newpath"`},
-			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"X-I-Am":"Request"`},
-			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: userAgent},
+			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeadersCached, HeadersNotMatch: deleteHeadersCached, BodyMatch: `"X-I-Am":"Request"`},
+			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeadersCached, HeadersNotMatch: deleteHeadersCached, BodyMatch: userAgent},
 		}...)
 	}
 }

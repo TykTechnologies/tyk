@@ -8,12 +8,15 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/storage/persistent/model"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
-	"github.com/stretchr/testify/assert"
+	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestOpenTracing(t *testing.T) {
@@ -79,7 +82,6 @@ func TestInternalAPIUsage(t *testing.T) {
 
 	t.Run("with api id", func(t *testing.T) {
 		normal.Proxy.TargetURL = fmt.Sprintf("tyk://%s", internal.APIID)
-
 		g.Gw.LoadAPI(internal, normal)
 
 		_, _ = g.Run(t, []test.TestCase{
@@ -92,7 +94,7 @@ func TestFuzzyFindAPI(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	objectId := apidef.NewObjectId()
+	objectId := model.NewObjectID()
 
 	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
@@ -266,16 +268,19 @@ func TestCORS(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
 
+	api1ID := uuid.New()
+	api2ID := uuid.New()
+
 	apis := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "CORS test API"
-		spec.APIID = "cors-api"
+		spec.APIID = api1ID
 		spec.Proxy.ListenPath = "/cors-api/"
 		spec.CORS.Enable = false
 		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
 		spec.CORS.AllowedOrigins = []string{"*"}
 	}, func(spec *APISpec) {
 		spec.Name = "Another API"
-		spec.APIID = "another-api"
+		spec.APIID = api2ID
 		spec.Proxy.ListenPath = "/another-api/"
 		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
 		spec.CORS.AllowedOrigins = []string{"*"}
@@ -302,16 +307,16 @@ func TestCORS(t *testing.T) {
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Path: "/cors-api/", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
-		}...)
-
-		_, _ = g.Run(t, []test.TestCase{
 			{Path: "/another-api/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
+			{Path: "/" + api1ID + "/", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
+			{Path: "/" + api2ID + "/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
 		}...)
 	})
 
 	t.Run("oauth endpoints", func(t *testing.T) {
 		apis[0].UseOauth2 = true
 		apis[0].CORS.Enable = false
+
 		g.Gw.LoadAPI(apis...)
 
 		t.Run("CORS disabled", func(t *testing.T) {

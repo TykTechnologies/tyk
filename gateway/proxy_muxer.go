@@ -16,11 +16,11 @@ import (
 
 	"golang.org/x/net/http2/h2c"
 
+	proxyproto "github.com/pires/go-proxyproto"
+
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/tcp"
-	proxyproto "github.com/pires/go-proxyproto"
-	cache "github.com/pmylund/go-cache"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -29,7 +29,8 @@ import (
 
 // handleWrapper's only purpose is to allow router to be dynamically replaced
 type handleWrapper struct {
-	router *mux.Router
+	router             *mux.Router
+	maxRequestBodySize int64
 }
 
 // h2cWrapper tracks handleWrapper for swapping w.router on reloads.
@@ -43,6 +44,18 @@ func (h *h2cWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// limit request body size if configured
+	if h.maxRequestBodySize > 0 {
+		// if content length is set and already larger than the configured limit return a status 413
+		if r.ContentLength >= 0 && r.ContentLength > h.maxRequestBodySize {
+			http.HandlerFunc(requestEntityTooLarge).ServeHTTP(w, r)
+			return
+		}
+
+		// in case the content length is wrong or not set limit the reader itself
+		r.Body = http.MaxBytesReader(w, r.Body, h.maxRequestBodySize)
+	}
+
 	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
 	nopCloseRequestBody(r)
 	if NewRelicApplication != nil {
@@ -251,7 +264,7 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 	}
 }
 
-//nolint
+// nolint
 func (gw *Gateway) recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
 	if doNotTrack {
 		return nil
@@ -280,26 +293,14 @@ func (gw *Gateway) dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 	if dial == nil {
 		return nil
 	}
-	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-		log.Debug("[PROXY] Service discovery enabled")
-		if ServiceCache == nil {
-			log.Debug("[PROXY] Service cache initialising")
-			expiry := 120
-			if spec.Proxy.ServiceDiscovery.CacheTimeout > 0 {
-				expiry = int(spec.Proxy.ServiceDiscovery.CacheTimeout)
-			} else if spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout > 0 {
-				expiry = spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout
-			}
-			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
-		}
-	}
+
 	return func(network, address string) (net.Conn, error) {
 		hostList := spec.Proxy.StructuredTargetList
 		target := address
 		switch {
 		case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
 			var err error
-			hostList, err = urlFromService(spec)
+			hostList, err = urlFromService(spec, gw)
 			if err != nil {
 				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 				break
@@ -415,7 +416,10 @@ func (m *proxyMux) serve(gw *Gateway) {
 				writeTimeout = time.Duration(conf.HttpServerOptions.WriteTimeout) * time.Second
 			}
 			var h http.Handler
-			h = &handleWrapper{p.router}
+			h = &handleWrapper{
+				router:             p.router,
+				maxRequestBodySize: conf.HttpServerOptions.MaxRequestBodySize,
+			}
 			// by default enabling h2c by wrapping handler in h2c. This ensures all features including tracing work
 			// in h2c services.
 			h2s := &http2.Server{}
@@ -504,4 +508,9 @@ func (m *proxyMux) generateListener(listenPort int, protocol string, gw *Gateway
 		return nil, err
 	}
 	return l, nil
+}
+
+func requestEntityTooLarge(w http.ResponseWriter, _ *http.Request) {
+	status := http.StatusRequestEntityTooLarge
+	http.Error(w, http.StatusText(status), status)
 }

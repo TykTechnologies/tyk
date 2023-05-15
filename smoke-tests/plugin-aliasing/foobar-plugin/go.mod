@@ -1,6 +1,6 @@
 module github.com/TykTechnologies/tyk/smoke-tests/plugin-compiler/foobar-plugin
 
-go 1.15
+go 1.16
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.0 // indirect

@@ -10,15 +10,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/serializer"
-
 	"github.com/cenkalti/backoff/v4"
 	"github.com/gocraft/health"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/gorpc"
+	"github.com/TykTechnologies/tyk-pump/serializer"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 var (
@@ -51,10 +51,6 @@ var (
 
 	AnalyticsSerializers []serializer.AnalyticsSerializer
 )
-
-func init() {
-	AnalyticsSerializers = []serializer.AnalyticsSerializer{serializer.NewAnalyticsSerializer(serializer.MSGP_SERIALIZER), serializer.NewAnalyticsSerializer(serializer.PROTOBUF_SERIALIZER)}
-}
 
 // ErrRPCIsDown this is returned when we can't reach rpc server.
 var ErrRPCIsDown = errors.New("RPCStorageHandler: rpc is either down or was not configured")
@@ -230,7 +226,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	// Set up the cache
 	Log.Info("Setting new RPC connection!")
 
-	connID := uuid.NewV4().String()
+	connID := uuid.New()
 
 	// Length should fit into 1 byte. Protection if we decide change uuid in future.
 	if len(connID) > 255 {
@@ -510,7 +506,7 @@ func Disconnect() bool {
 }
 
 func register() {
-	id = uuid.NewV4().String()
+	id = uuid.New()
 	Log.Debug("RPC Client registered")
 }
 

@@ -25,13 +25,14 @@ type IdExtractor interface {
 
 // BaseExtractor is the base structure for an ID extractor, it implements the IdExtractor interface. Other extractors may override some of its methods.
 type BaseExtractor struct {
-	Config *apidef.MiddlewareIdExtractor
+	Config            *apidef.MiddlewareIdExtractor
+	IDExtractorConfig apidef.IDExtractorConfig
 	BaseMiddleware
 	Spec *APISpec
 }
 
 // ExtractAndCheck is called from the CP middleware, if ID extractor is enabled for the current API.
-func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (sessionID string, returnOverrides ReturnOverrides) {
+func (e *BaseExtractor) ExtractAndCheck(_ *http.Request) (sessionID string, returnOverrides ReturnOverrides) {
 	log.WithFields(logrus.Fields{
 		"prefix": "idextractor",
 	}).Error("This extractor doesn't implement an extraction method, rejecting.")
@@ -40,10 +41,10 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (sessionID string, retu
 
 // ExtractHeader is used when a HeaderSource is specified.
 func (e *BaseExtractor) ExtractHeader(r *http.Request) (headerValue string, err error) {
-	headerName := e.Config.ExtractorConfig["header_name"].(string)
+	headerName := e.IDExtractorConfig.HeaderName
 	headerValue = r.Header.Get(headerName)
 	if headerValue == "" {
-		err = errors.New("Bad header value.")
+		err = errors.New("bad header value")
 	}
 	return headerValue, err
 }
@@ -94,12 +95,6 @@ func (e *BaseExtractor) GenerateSessionID(input string, mw BaseMiddleware) (sess
 
 type ValueExtractor struct {
 	BaseExtractor
-	cfg *ValueExtractorConfig
-}
-
-type ValueExtractorConfig struct {
-	HeaderName    string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
-	FormParamName string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 }
 
 func (e *ValueExtractor) Extract(input interface{}) string {
@@ -108,22 +103,13 @@ func (e *ValueExtractor) Extract(input interface{}) string {
 }
 
 func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, returnOverrides ReturnOverrides) {
-	if e.cfg == nil {
-		config := &ValueExtractorConfig{}
-		if err := mapstructure.Decode(e.Config.ExtractorConfig, config); err != nil {
-			returnOverrides = e.Error(r, err, "Couldn't decode ValueExtractor configuration")
-			return sessionID, returnOverrides
-		}
-		e.cfg = config
-	}
-
 	var extractorOutput string
 	var err error
 	switch e.Config.ExtractFrom {
 	case apidef.HeaderSource:
 		extractorOutput, err = e.ExtractHeader(r)
 	case apidef.FormSource:
-		extractorOutput, err = e.ExtractForm(r, e.cfg.FormParamName)
+		extractorOutput, err = e.ExtractForm(r, e.IDExtractorConfig.FormParamName)
 	}
 
 	if err != nil {
@@ -150,35 +136,17 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 type RegexExtractor struct {
 	BaseExtractor
 	compiledExpr *regexp.Regexp
-	cfg          *RegexExtractorConfig
-}
-
-type RegexExtractorConfig struct {
-	HeaderName      string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
-	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
-	RegexMatchIndex int    `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
-	FormParamName   string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 }
 
 func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
-	// Parse specific configuration settings:
-	if e.cfg == nil {
-		config := &RegexExtractorConfig{}
-		if err := mapstructure.Decode(e.Config.ExtractorConfig, config); err != nil {
-			returnOverrides = e.Error(r, err, "Can't decode RegexExtractor configuration")
-			return SessionID, returnOverrides
-		}
-		e.cfg = config
-	}
-
-	if e.Config.ExtractorConfig["regex_expression"] == nil {
+	if e.IDExtractorConfig.RegexExpression == "" {
 		returnOverrides = e.Error(r, nil, "RegexExtractor expects an expression")
 		return SessionID, returnOverrides
 	}
 
 	var err error
 	if e.compiledExpr == nil {
-		e.compiledExpr, err = regexp.Compile(e.cfg.RegexExpression)
+		e.compiledExpr, err = regexp.Compile(e.IDExtractorConfig.RegexExpression)
 		if err != nil {
 			returnOverrides = e.Error(r, nil, "RegexExtractor found an invalid expression")
 			return SessionID, returnOverrides
@@ -192,7 +160,7 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	case apidef.BodySource:
 		extractorOutput, err = e.ExtractBody(r)
 	case apidef.FormSource:
-		extractorOutput, err = e.ExtractForm(r, e.cfg.FormParamName)
+		extractorOutput, err = e.ExtractForm(r, e.IDExtractorConfig.FormParamName)
 	}
 	if err != nil {
 		returnOverrides = e.Error(r, err, "RegexExtractor error")
@@ -200,12 +168,12 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	regexOutput := e.compiledExpr.FindAllString(extractorOutput, -1)
-	if e.cfg.RegexMatchIndex > len(regexOutput)-1 {
-		returnOverrides = e.Error(r, fmt.Errorf("Can't find regexp match group"), "RegexExtractor error")
+	if e.IDExtractorConfig.RegexMatchIndex > len(regexOutput)-1 {
+		returnOverrides = e.Error(r, fmt.Errorf("can't find regexp match group"), "RegexExtractor error")
 		return SessionID, returnOverrides
 	}
 
-	SessionID = e.GenerateSessionID(regexOutput[e.cfg.RegexMatchIndex], e.BaseMiddleware)
+	SessionID = e.GenerateSessionID(regexOutput[e.IDExtractorConfig.RegexMatchIndex], e.BaseMiddleware)
 	previousSession, keyExists := e.BaseMiddleware.CheckSessionAndIdentityForValidKey(SessionID, r)
 	SessionID = previousSession.KeyID
 
@@ -222,32 +190,19 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 type XPathExtractor struct {
 	BaseExtractor
-	cfg  *XPathExtractorConfig
 	path *xmlpath.Path
-}
-
-type XPathExtractorConfig struct {
-	HeaderName      string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
-	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
-	RegexMatchIndex int    `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
-	FormParamName   string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 }
 
 func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
 	var err error
-	config := &XPathExtractorConfig{}
-	if err = mapstructure.Decode(e.Config.ExtractorConfig, config); err != nil {
-		returnOverrides = e.Error(r, err, "Can't decode XPathExtractor configuration")
-		return SessionID, returnOverrides
-	}
-	e.cfg = config
-	if e.Config.ExtractorConfig["xpath_expression"] == nil {
+
+	if e.IDExtractorConfig.XPathExpression == "" {
 		returnOverrides = e.Error(r, err, "XPathExtractor: no expression set")
 		return SessionID, returnOverrides
 	}
 
 	if e.path == nil {
-		expressionString := e.Config.ExtractorConfig["xpath_expression"].(string)
+		expressionString := e.IDExtractorConfig.XPathExpression
 		e.path, err = xmlpath.Compile(expressionString)
 		if err != nil {
 			returnOverrides = e.Error(r, err, "XPathExtractor: bad expression")
@@ -262,7 +217,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	case apidef.BodySource:
 		extractorOutput, err = e.ExtractBody(r)
 	case apidef.FormSource:
-		extractorOutput, err = e.ExtractForm(r, e.cfg.FormParamName)
+		extractorOutput, err = e.ExtractForm(r, e.IDExtractorConfig.FormParamName)
 	}
 	if err != nil {
 		returnOverrides = e.Error(r, err, "XPathExtractor error")
@@ -299,18 +254,36 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 // newExtractor is called from the CP middleware for every API that specifies extractor settings.
 func newExtractor(referenceSpec *APISpec, mw BaseMiddleware) {
-	var extractor IdExtractor
+	if referenceSpec.CustomMiddleware.IdExtractor.Disabled {
+		return
+	}
 
-	baseExtractor := BaseExtractor{&referenceSpec.CustomMiddleware.IdExtractor, mw, referenceSpec}
+	var (
+		extractor         IdExtractor
+		idExtractorConfig apidef.IDExtractorConfig
+	)
 
-	// Initialize a extractor based on the API spec.
+	err := mapstructure.Decode(referenceSpec.CustomMiddleware.IdExtractor.ExtractorConfig, &idExtractorConfig)
+	if err != nil {
+		log.WithError(err).Error("error while decoding id extractor config")
+		return
+	}
+
+	baseExtractor := BaseExtractor{
+		Config:            &referenceSpec.CustomMiddleware.IdExtractor,
+		IDExtractorConfig: idExtractorConfig,
+		BaseMiddleware:    mw,
+		Spec:              referenceSpec,
+	}
+
+	// Initialize an extractor based on the API spec.
 	switch referenceSpec.CustomMiddleware.IdExtractor.ExtractWith {
 	case apidef.ValueExtractor:
-		extractor = &ValueExtractor{baseExtractor, nil}
+		extractor = &ValueExtractor{baseExtractor}
 	case apidef.RegexExtractor:
-		extractor = &RegexExtractor{baseExtractor, nil, nil}
+		extractor = &RegexExtractor{baseExtractor, nil}
 	case apidef.XPathExtractor:
-		extractor = &XPathExtractor{baseExtractor, nil, nil}
+		extractor = &XPathExtractor{baseExtractor, nil}
 	}
 
 	referenceSpec.CustomMiddleware.IdExtractor.Extractor = extractor

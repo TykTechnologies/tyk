@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -14,7 +16,7 @@ import (
 )
 
 func TestAnalytics_Write(t *testing.T) {
-
+	test.Flaky(t)
 	tcs := []struct {
 		TestName            string
 		analyticsSerializer string
@@ -40,22 +42,23 @@ func TestAnalytics_Write(t *testing.T) {
 			defer ts.Close()
 			base := ts.Gw.GetConfig()
 
-			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-				spec.UseKeylessAccess = false
-				spec.Proxy.ListenPath = "/"
-			})
-
 			redisAnalyticsKeyName := analyticsKeyName + ts.Gw.Analytics.analyticsSerializer.GetSuffix()
 
 			// Cleanup before test
-			// let records to to be sent
+			// let records to be sent
 			ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 
 			t.Run("Log errors", func(t *testing.T) {
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+				})
+
 				_, err := ts.Run(t, []test.TestCase{
 					{Path: "/", Code: 401},
 					{Path: "/", Code: 401},
 				}...)
+
 				if err != nil {
 					t.Error("Error executing test case")
 				}
@@ -64,9 +67,7 @@ func TestAnalytics_Write(t *testing.T) {
 				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
-				if len(results) != 2 {
-					t.Error("Should return 2 record", len(results))
-				}
+				assert.Equal(t, 2, len(results), "Should return 2 records")
 
 				var record analytics.AnalyticsRecord
 				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
@@ -79,6 +80,11 @@ func TestAnalytics_Write(t *testing.T) {
 			})
 
 			t.Run("Log success", func(t *testing.T) {
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+				})
+
 				key := CreateSession(ts.Gw)
 
 				authHeaders := map[string]string{
@@ -114,6 +120,7 @@ func TestAnalytics_Write(t *testing.T) {
 				defer func() {
 					ts.Gw.SetConfig(base)
 				}()
+
 				globalConf := ts.Gw.GetConfig()
 				globalConf.AnalyticsConfig.EnableDetailedRecording = false
 				ts.Gw.SetConfig(globalConf)
@@ -217,6 +224,7 @@ func TestAnalytics_Write(t *testing.T) {
 					t.Error("Detailed response info not found", record)
 				}
 			})
+
 			t.Run("Detailed analytics", func(t *testing.T) {
 				defer func() {
 					ts.Gw.SetConfig(base)
@@ -224,6 +232,9 @@ func TestAnalytics_Write(t *testing.T) {
 				globalConf := ts.Gw.GetConfig()
 				globalConf.AnalyticsConfig.EnableDetailedRecording = true
 				ts.Gw.SetConfig(globalConf)
+
+				// Since we changed config, we need to force all APIs be reloaded
+				ts.Gw.BuildAndLoadAPI()
 
 				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 					spec.UseKeylessAccess = false
@@ -282,6 +293,7 @@ func TestAnalytics_Write(t *testing.T) {
 					time.Sleep(2 * time.Millisecond)
 				}))
 				defer ls.Close()
+
 				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 					spec.UseKeylessAccess = false
 					spec.Proxy.ListenPath = "/"
@@ -368,13 +380,11 @@ func TestAnalytics_Write(t *testing.T) {
 					t.Error("Error executing test case")
 				}
 
-				// let records to to be sent
+				// let records to be sent
 				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
-				if len(results) != 2 {
-					t.Fatal("Should return 1 record: ", len(results))
-				}
+				assert.Equal(t, 2, len(results))
 
 				// Take second cached request
 				var record analytics.AnalyticsRecord
@@ -393,6 +403,55 @@ func TestAnalytics_Write(t *testing.T) {
 				if record.RawResponse == "" {
 					t.Error("Detailed response info not found", record)
 				}
+			})
+
+			t.Run("Upstream error analytics", func(t *testing.T) {
+				defer func() {
+					ts.Gw.SetConfig(base)
+				}()
+				ls := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					time.Sleep(2 * time.Millisecond)
+					w.WriteHeader(http.StatusOK)
+				}))
+				defer ls.Close()
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+					spec.Proxy.TargetURL = ls.URL
+				})
+
+				key := CreateSession(ts.Gw)
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				client := http.Client{
+					Timeout: 1 * time.Millisecond,
+				}
+				_, err := ts.Run(t, test.TestCase{
+					Path: "/", Headers: authHeaders, Code: 499, Client: &client, ErrorMatch: "context deadline exceeded",
+				})
+				assert.NotNil(t, err)
+
+				// we wait until the request finish
+				time.Sleep(3 * time.Millisecond)
+				// let records to to be sent
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				assert.Len(t, results, 1)
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				assert.Nil(t, err)
+
+				// expect a status 499 (context canceled) from the request
+				assert.Equal(t, 499, record.ResponseCode)
+				// expect that the analytic record maintained the APIKey
+				assert.Equal(t, key, record.APIKey)
+
 			})
 
 		})

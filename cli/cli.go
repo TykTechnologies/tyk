@@ -1,16 +1,18 @@
 package cli
 
+//lint:file-ignore faillint This file should be ignored by faillint (fmt in use).
+
 import (
 	"fmt"
 	"io/ioutil"
 	"os"
 
-	"github.com/TykTechnologies/tyk/cli/linter"
-
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/TykTechnologies/tyk/cli/bundler"
 	"github.com/TykTechnologies/tyk/cli/importer"
+	"github.com/TykTechnologies/tyk/cli/linter"
+	"github.com/TykTechnologies/tyk/cli/plugin"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -100,6 +102,9 @@ func Init(version string, confPaths []string) {
 
 	// Add bundler commands:
 	bundler.AddTo(app)
+
+	// Add plugin commands:
+	plugin.AddTo(app)
 }
 
 // Parse parses the command-line arguments.

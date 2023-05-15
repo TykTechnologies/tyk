@@ -4,8 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func Test_BuildDashboardConnStr(t *testing.T) {
@@ -26,4 +27,26 @@ func Test_BuildDashboardConnStr(t *testing.T) {
 	connStr := ts.Gw.buildDashboardConnStr("/test")
 
 	assert.Equal(t, connStr, "http://localhost/test")
+}
+
+func Test_DashboardLifecycle(t *testing.T) {
+	var handler HTTPDashboardHandler
+
+	handler = HTTPDashboardHandler{
+		heartBeatStopSentinel: HeartBeatStarted,
+	}
+	assert.False(t, handler.isHeartBeatStopped())
+
+	handler = HTTPDashboardHandler{
+		heartBeatStopSentinel: HeartBeatStopped,
+	}
+
+	assert.True(t, handler.isHeartBeatStopped())
+
+	handler = HTTPDashboardHandler{
+		heartBeatStopSentinel: HeartBeatStarted,
+	}
+
+	handler.StopBeating()
+	assert.True(t, handler.isHeartBeatStopped())
 }

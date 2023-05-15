@@ -1,20 +1,33 @@
 package oas
 
-import "github.com/TykTechnologies/tyk/apidef"
+import (
+	"sort"
+	"strings"
 
+	"github.com/TykTechnologies/tyk/apidef"
+)
+
+// Upstream holds configuration for an upstream server.
 type Upstream struct {
 	// URL defines the target URL that the request should be proxied to.
-	// Old API Definition: `proxy.target_url`
+	// Tyk classic API definition: `proxy.target_url`
 	URL string `bson:"url" json:"url"` // required
+
 	// ServiceDiscovery contains the configuration related to Service Discovery.
-	// Old API Definition: `proxy.service_discovery`
+	// Tyk classic API definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
+
 	// Test contains the configuration related to uptime tests.
-	Test             *Test            `bson:"test,omitempty" json:"test,omitempty"`
-	Certificates     Certificates     `bson:"certificates,omitempty" json:"certificates,omitempty"`
-	PinnedPublicKeys PinnedPublicKeys `bson:"pinnedPublicKeys,omitempty" json:"pinnedPublicKeys,omitempty"`
+	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
+
+	// MutualTLS contains the configuration related to upstream mutual TLS.
+	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
+
+	// CertificatePinning contains the configuration related to certificate pinning.
+	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
 }
 
+// Fill fills *Upstream from apidef.APIDefinition.
 func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.URL = api.Proxy.TargetURL
 
@@ -36,21 +49,26 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 		u.Test = nil
 	}
 
-	u.Certificates = make(Certificates, len(api.UpstreamCertificates))
-	u.Certificates.Fill(api.UpstreamCertificates)
-
-	if len(u.Certificates) == 0 {
-		u.Certificates = nil
+	if u.MutualTLS == nil {
+		u.MutualTLS = &MutualTLS{}
 	}
 
-	u.PinnedPublicKeys = make(PinnedPublicKeys, len(api.PinnedPublicKeys))
-	u.PinnedPublicKeys.Fill(api.PinnedPublicKeys)
+	u.MutualTLS.Fill(api)
+	if ShouldOmit(u.MutualTLS) {
+		u.MutualTLS = nil
+	}
 
-	if len(u.PinnedPublicKeys) == 0 {
-		u.PinnedPublicKeys = nil
+	if u.CertificatePinning == nil {
+		u.CertificatePinning = &CertificatePinning{}
+	}
+
+	u.CertificatePinning.Fill(api)
+	if ShouldOmit(u.CertificatePinning) {
+		u.CertificatePinning = nil
 	}
 }
 
+// ExtractTo extracts *Upstream into *apidef.APIDefinition.
 func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.TargetURL = u.URL
 
@@ -62,26 +80,29 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 		u.Test.ExtractTo(&api.UptimeTests)
 	}
 
-	if len(u.Certificates) > 0 {
-		api.UpstreamCertificates = make(map[string]string, len(u.Certificates))
-		u.Certificates.ExtractTo(api.UpstreamCertificates)
+	if u.MutualTLS != nil {
+		u.MutualTLS.ExtractTo(api)
 	}
 
-	if len(u.PinnedPublicKeys) > 0 {
-		api.PinnedPublicKeys = make(map[string]string, len(u.PinnedPublicKeys))
-		u.PinnedPublicKeys.ExtractTo(api.PinnedPublicKeys)
+	if u.CertificatePinning != nil {
+		u.CertificatePinning.ExtractTo(api)
 	}
 }
 
+// ServiceDiscovery holds configuration required for service discovery.
 type ServiceDiscovery struct {
 	// Enabled enables Service Discovery.
-	// Old API Definition: `service_discovery.use_discovery_service`
+	//
+	// Tyk classic API definition: `service_discovery.use_discovery_service`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
+
 	// QueryEndpoint is the endpoint to call, this would usually be Consul, etcd or Eureka K/V store.
-	// Old API Definition: `service_discovery.query_endpoint`
+	// Tyk classic API definition: `service_discovery.query_endpoint`
 	QueryEndpoint string `bson:"queryEndpoint,omitempty" json:"queryEndpoint,omitempty"`
+
 	// DataPath is the namespace of the data path - where exactly in your service response the namespace can be found.
 	// For example, if your service responds with:
+	//
 	// ```
 	// {
 	//  "action": "get",
@@ -92,13 +113,16 @@ type ServiceDiscovery struct {
 	//    "createdIndex": 6
 	//  }
 	// }
-	//```
+	// ```
 	//
 	// then your namespace would be `node.value`.
-	// Old API Definition: `service_discovery.data_path`
+	//
+	// Tyk classic API definition: `service_discovery.data_path`
 	DataPath string `bson:"dataPath,omitempty" json:"dataPath,omitempty"`
+
 	// UseNestedQuery enables using a combination of `dataPath` and `parentDataPath`.
 	// It is necessary when the data lives within this string-encoded JSON object.
+	//
 	// ```
 	// {
 	//  "action": "get",
@@ -109,44 +133,91 @@ type ServiceDiscovery struct {
 	//    "createdIndex": 6
 	//  }
 	// }
-	//```
-	// Old API Definition: `service_discovery.use_nested_query`
+	// ```
+	//
+	// Tyk classic API definition: `service_discovery.use_nested_query`
 	UseNestedQuery bool `bson:"useNestedQuery,omitempty" json:"useNestedQuery,omitempty"`
-	// ParentDataPath is the namespace of the where to find the nested value, if `useNestedQuery` is `true`.
-	// In the above example, it would be `node.value`. You would then change the `dataPath` setting to be `hostname`,
-	// since this is where the host name data resides in the JSON string.
-	// Tyk automatically assumes that `dataPath` in this case is in a string-encoded JSON object and will try to deserialize it.
-	// Old API Definition: `service_discovery.parent_data_path`
+
+	// ParentDataPath is the namespace of the where to find the nested
+	// value, if `useNestedQuery` is `true`. In the above example, it
+	// would be `node.value`. You would change the `dataPath` setting
+	// to be `hostname`, since this is where the host name data
+	// resides in the JSON string. Tyk automatically assumes that
+	// `dataPath` in this case is in a string-encoded JSON object and
+	// will try to deserialize it.
+	//
+	// Tyk classic API definition: `service_discovery.parent_data_path`
 	ParentDataPath string `bson:"parentDataPath,omitempty" json:"parentDataPath,omitempty"`
+
 	// PortDataPath is the port of the data path. In the above nested example, we can see that there is a separate `port` value
-	// for the service in the nested JSON. In this case, you can set the `portDataPath` value and Tyk will treat `dataPath`
-	// as the hostname and zip them together (this assumes that the hostname element does not end in a slash or resource identifier
+	// for the service in the nested JSON. In this case, you can set the `portDataPath` value and Tyk will treat `dataPath` as
+	// the hostname and zip them together (this assumes that the hostname element does not end in a slash or resource identifier
 	// such as `/widgets/`). In the above example, the `portDataPath` would be `port`.
-	// Old API Definition: `service_discovery.port_data_path`
+	//
+	// Tyk classic API definition: `service_discovery.port_data_path`
 	PortDataPath string `bson:"portDataPath,omitempty" json:"portDataPath,omitempty"`
+
 	// UseTargetList should be set to `true`, if you are using load balancing. Tyk will treat the data path as a list and
-	// inject it into the target list of your API Definition.
-	// Old API Definition: `service_discovery.use_target_list`
+	// inject it into the target list of your API definition.
+	//
+	// Tyk classic API definition: `service_discovery.use_target_list`
 	UseTargetList bool `bson:"useTargetList,omitempty" json:"useTargetList,omitempty"`
+
 	// CacheTimeout is the timeout of a cache value when a new data is loaded from a discovery service.
 	// Setting it too low will cause Tyk to call the SD service too often, setting it too high could mean that
 	// failures are not recovered from quickly enough.
-	// Old API Definition: `service_discovery.cache_timeout`
+	//
+	// Deprecated: The field is deprecated, usage needs to be updated to configure caching.
+	//
+	// Tyk classic API definition: `service_discovery.cache_timeout`
 	CacheTimeout int64 `bson:"cacheTimeout,omitempty" json:"cacheTimeout,omitempty"`
+
+	// Cache holds cache related flags.
+	//
+	// Tyk classic API definition:
+	// - `service_discovery.cache_disabled`
+	// - `service_discovery.cache_timeout`
+	Cache *ServiceDiscoveryCache `bson:"cache,omitempty" json:"cache,omitempty"`
+
 	// TargetPath is to set a target path to append to the discovered endpoint, since many SD services
 	// only provide host and port data. It is important to be able to target a specific resource on that host.
 	// Setting this value will enable that.
-	// Old API Definition: `service_discovery.target_path`
+	//
+	// Tyk classic API definition: `service_discovery.target_path`
 	TargetPath string `bson:"targetPath,omitempty" json:"targetPath,omitempty"`
+
 	// EndpointReturnsList is set `true` when the response type is a list instead of an object.
-	// Old API Definition: `service_discovery.endpoint_returns_list`
+	//
+	// Tyk classic API definition: `service_discovery.endpoint_returns_list`
 	EndpointReturnsList bool `bson:"endpointReturnsList,omitempty" json:"endpointReturnsList,omitempty"`
 }
 
+// ServiceDiscoveryCache holds configuration for caching ServiceDiscovery data.
+type ServiceDiscoveryCache struct {
+	// Enabled turns service discovery cache on or off.
+	//
+	// Tyk classic API definition: `service_discovery.cache_disabled`
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+
+	// Timeout is the TTL for a cached object in seconds.
+	//
+	// Tyk classic API definition: `service_discovery.cache_timeout`
+	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty"`
+}
+
+// CacheOptions returns the timeout value in effect, and a bool if cache is enabled.
+func (sd *ServiceDiscovery) CacheOptions() (int64, bool) {
+	if sd.Cache != nil {
+		return sd.Cache.Timeout, sd.Cache.Enabled
+	}
+
+	return sd.CacheTimeout, sd.CacheTimeout > 0
+}
+
+// Fill fills *ServiceDiscovery from apidef.ServiceDiscoveryConfiguration.
 func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfiguration) {
 	sd.Enabled = serviceDiscovery.UseDiscoveryService
 	sd.EndpointReturnsList = serviceDiscovery.EndpointReturnsList
-	sd.CacheTimeout = serviceDiscovery.CacheTimeout
 	sd.ParentDataPath = serviceDiscovery.ParentDataPath
 	sd.QueryEndpoint = serviceDiscovery.QueryEndpoint
 	sd.TargetPath = serviceDiscovery.TargetPath
@@ -154,12 +225,29 @@ func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfigu
 	sd.UseNestedQuery = serviceDiscovery.UseNestedQuery
 	sd.DataPath = serviceDiscovery.DataPath
 	sd.PortDataPath = serviceDiscovery.PortDataPath
+
+	enabled := !serviceDiscovery.CacheDisabled
+	timeout := serviceDiscovery.CacheTimeout
+
+	sd.CacheTimeout = 0
+	sd.Cache = &ServiceDiscoveryCache{
+		Enabled: enabled,
+		Timeout: timeout,
+	}
+	if ShouldOmit(sd.Cache) {
+		sd.Cache = nil
+	}
 }
 
+// ExtractTo extracts *ServiceDiscovery into *apidef.ServiceDiscoveryConfiguration.
 func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryConfiguration) {
+	if sd == nil {
+		serviceDiscovery.CacheDisabled = true
+		return
+	}
+
 	serviceDiscovery.UseDiscoveryService = sd.Enabled
 	serviceDiscovery.EndpointReturnsList = sd.EndpointReturnsList
-	serviceDiscovery.CacheTimeout = sd.CacheTimeout
 	serviceDiscovery.ParentDataPath = sd.ParentDataPath
 	serviceDiscovery.QueryEndpoint = sd.QueryEndpoint
 	serviceDiscovery.TargetPath = sd.TargetPath
@@ -167,14 +255,20 @@ func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryC
 	serviceDiscovery.UseNestedQuery = sd.UseNestedQuery
 	serviceDiscovery.DataPath = sd.DataPath
 	serviceDiscovery.PortDataPath = sd.PortDataPath
+
+	timeout, enabled := sd.CacheOptions()
+	serviceDiscovery.CacheTimeout = timeout
+	serviceDiscovery.CacheDisabled = !enabled
 }
 
+// Test holds the test configuration for service discovery.
 type Test struct {
 	// ServiceDiscovery contains the configuration related to test Service Discovery.
-	// Old API Definition: `proxy.service_discovery`
+	// Tyk classic API definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 }
 
+// Fill fills *Test from apidef.UptimeTests.
 func (t *Test) Fill(uptimeTests apidef.UptimeTests) {
 	if t.ServiceDiscovery == nil {
 		t.ServiceDiscovery = &ServiceDiscovery{}
@@ -186,8 +280,134 @@ func (t *Test) Fill(uptimeTests apidef.UptimeTests) {
 	}
 }
 
+// ExtractTo extracts *Test into *apidef.UptimeTests.
 func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
-	if t.ServiceDiscovery != nil {
-		t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
+	t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
+}
+
+// MutualTLS holds configuration related to mTLS on APIs, domain to certificate mappings.
+type MutualTLS struct {
+	// Enabled enables/disables upstream mutual TLS auth for the API.
+	// Tyk classic API definition: `upstream_certificates_disabled`
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// DomainToCertificates maintains the mapping of domain to certificate.
+	// Tyk classic API definition: `upstream_certificates`
+	DomainToCertificates []DomainToCertificate `bson:"domainToCertificateMapping" json:"domainToCertificateMapping"`
+}
+
+// DomainToCertificate holds a single mapping of domain name into a certificate.
+type DomainToCertificate struct {
+	// Domain contains the domain name.
+	Domain string `bson:"domain" json:"domain"`
+
+	// Certificate contains the certificate mapped to the domain.
+	Certificate string `bson:"certificate" json:"certificate"`
+}
+
+// Fill fills *MutualTLS from apidef.APIDefinition.
+func (m *MutualTLS) Fill(api apidef.APIDefinition) {
+	m.Enabled = !api.UpstreamCertificatesDisabled
+	m.DomainToCertificates = make([]DomainToCertificate, len(api.UpstreamCertificates))
+
+	i := 0
+	for domain, cert := range api.UpstreamCertificates {
+		m.DomainToCertificates[i] = DomainToCertificate{Domain: domain, Certificate: cert}
+		i++
+	}
+
+	if ShouldOmit(m.DomainToCertificates) {
+		api.UpstreamCertificates = nil
+	}
+}
+
+// ExtractTo extracts *MutualTLS into *apidef.APIDefinition.
+func (m *MutualTLS) ExtractTo(api *apidef.APIDefinition) {
+	api.UpstreamCertificatesDisabled = !m.Enabled
+
+	if len(m.DomainToCertificates) > 0 {
+		api.UpstreamCertificates = make(map[string]string)
+	}
+
+	for _, domainToCert := range m.DomainToCertificates {
+		api.UpstreamCertificates[domainToCert.Domain] = domainToCert.Certificate
+	}
+}
+
+// PinnedPublicKey contains a mapping from the domain name into a list of public keys.
+type PinnedPublicKey struct {
+	// Domain contains the domain name.
+	Domain string `bson:"domain" json:"domain"`
+
+	// PublicKeys contains a list of the public keys pinned to the domain name.
+	PublicKeys []string `bson:"publicKeys" json:"publicKeys"`
+}
+
+// PinnedPublicKeys is a list of domains and pinned public keys for them.
+type PinnedPublicKeys []PinnedPublicKey
+
+// Fill fills *PinnerPublicKeys (slice) from publicKeys argument.
+func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
+	domains := make([]string, len(publicKeys))
+
+	i := 0
+	for domain := range publicKeys {
+		domains[i] = domain
+		i++
+	}
+
+	sort.Slice(domains, func(i, j int) bool {
+		return domains[i] < domains[j]
+	})
+
+	i = 0
+	for _, domain := range domains {
+		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
+		i++
+	}
+}
+
+// ExtractTo extracts PinnedPublicKeys values into the publicKeys map.
+func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
+	for _, publicKey := range ppk {
+		publicKeys[publicKey.Domain] = strings.Join(publicKey.PublicKeys, ",")
+	}
+}
+
+// CertificatePinning holds the configuration about mapping of domains to pinned public keys.
+type CertificatePinning struct {
+	// Enabled is a boolean flag, if set to `true`, it enables certificate pinning for the API.
+	//
+	// Tyk classic API definition: `certificate_pinning_disabled`
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// DomainToPublicKeysMapping maintains the mapping of domain to pinned public keys.
+	//
+	// Tyk classic API definition: `pinned_public_keys`
+	DomainToPublicKeysMapping PinnedPublicKeys `bson:"domainToPublicKeysMapping" json:"domainToPublicKeysMapping"`
+}
+
+// Fill fills *CertificatePinning from apidef.APIDefinition.
+func (cp *CertificatePinning) Fill(api apidef.APIDefinition) {
+	cp.Enabled = !api.CertificatePinningDisabled
+
+	if cp.DomainToPublicKeysMapping == nil {
+		cp.DomainToPublicKeysMapping = make(PinnedPublicKeys, len(api.PinnedPublicKeys))
+	}
+
+	cp.DomainToPublicKeysMapping.Fill(api.PinnedPublicKeys)
+
+	if ShouldOmit(cp.DomainToPublicKeysMapping) {
+		cp.DomainToPublicKeysMapping = nil
+	}
+}
+
+// ExtractTo extracts *CertficiatePinning into *apidef.APIDefinition.
+func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
+	api.CertificatePinningDisabled = !cp.Enabled
+
+	if len(cp.DomainToPublicKeysMapping) > 0 {
+		api.PinnedPublicKeys = make(map[string]string)
+		cp.DomainToPublicKeysMapping.ExtractTo(api.PinnedPublicKeys)
 	}
 }

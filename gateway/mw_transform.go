@@ -111,7 +111,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 
 	newBuf := bytes.NewBufferString(s)
 
-	r.Body = ioutil.NopCloser(newBuf)
+	r.Body = io.NopCloser(newBuf)
 
 	r.ContentLength = int64(newBuf.Len())
 	nopCloseRequestBody(r)

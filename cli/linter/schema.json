@@ -270,6 +270,9 @@
         "coprocess_grpc_server": {
           "type": "string"
         },
+        "grpc_authority": {
+          "type": "string"
+        },
         "enable_coprocess": {
           "type": "boolean"
         },
@@ -423,6 +426,9 @@
     "global_session_lifetime": {
       "type": "integer"
     },
+    "session_lifetime_respects_key_expiration": {
+      "type": "boolean"
+    },
     "graylog_network_addr": {
       "type": "string"
     },
@@ -454,6 +460,17 @@
           "sha256"
         ]
       }
+    },
+    "basic_auth_hash_key_function": {
+      "type": "string",
+      "enum": [
+        "",
+        "bcrypt",
+        "murmur32",
+        "murmur64",
+        "murmur128",
+        "sha256"
+      ]
     },
     "health_check": {
       "type": [
@@ -549,6 +566,9 @@
         "override_defaults": {
           "type": "boolean"
         },
+        "skip_client_ca_announcement": {
+          "type": "boolean"
+        },
         "read_timeout": {
           "type": "integer"
         },
@@ -593,6 +613,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "max_request_body_size": {
+          "type": "integer"
         }
       }
     },
@@ -921,6 +944,9 @@
         },
         "rpc_global_cache_expiration": {
           "type": "number"
+        },
+        "synchroniser_enabled" : {
+          "type": "boolean"
         }
       }
     },
@@ -1100,6 +1126,9 @@
         },
         "license_key": {
           "type": "string"
+        },
+        "enable_distributed_tracing": {
+          "type": "boolean"
         }
       }
     },

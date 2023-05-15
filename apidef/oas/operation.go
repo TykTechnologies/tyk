@@ -6,62 +6,103 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Operations holds Operation definitions.
 type Operations map[string]*Operation
 
+// Operation holds a request operation configuration, allowances, tranformations, caching, timeouts and validation.
 type Operation struct {
-	Allow                *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
-	Block                *Allowance `bson:"block,omitempty" json:"block,omitempty"`
+	// Allow request by allowance.
+	Allow *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
+
+	// Block request by allowance.
+	Block *Allowance `bson:"block,omitempty" json:"block,omitempty"`
+
+	// IgnoreAuthentication ignores authentication on request by allowance.
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
+
 	// TransformRequestMethod allows you to transform the method of a request.
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
-	Cache                  *CachePlugin            `bson:"cache,omitempty" json:"cache,omitempty"`
-	EnforceTimeout         *EnforceTimeout         `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
-	ValidateRequest        *ValidateRequest        `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
+
+	// TransformRequestBody allows you to transform request body.
+	// When both `path` and `body` are provided, body would take precedence.
+	TransformRequestBody *TransformRequestBody `bson:"transformRequestBody,omitempty" json:"transformRequestBody,omitempty"`
+
+	// Cache contains the caching plugin configuration.
+	Cache *CachePlugin `bson:"cache,omitempty" json:"cache,omitempty"`
+
+	// EnforceTimeout contains the request timeout configuration.
+	EnforceTimeout *EnforceTimeout `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
+
+	// ValidateRequest contains the request validation configuration.
+	ValidateRequest *ValidateRequest `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
+
+	// MockResponse contains the mock response configuration.
+	MockResponse *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
+
+	// VirtualEndpoint contains virtual endpoint configuration.
+	VirtualEndpoint *VirtualEndpoint `bson:"virtualEndpoint,omitempty" json:"virtualEndpoint,omitempty"`
+
+	// PostPlugins contains endpoint level post plugins configuration.
+	PostPlugins EndpointPostPlugins `bson:"postPlugins,omitempty" json:"postPlugins,omitempty"`
 }
+
+// AllowanceType holds the valid allowance types values.
+type AllowanceType int
 
 const (
 	allow                AllowanceType = 0
 	block                AllowanceType = 1
 	ignoreAuthentication AllowanceType = 2
-	contentTypeJSON                    = "application/json"
+
+	contentTypeJSON = "application/json"
 )
 
-func (o *Operation) Import(oasOperation *openapi3.Operation, allowList, validateRequest *bool) {
-	if allowList != nil {
+// Import takes the arguments and populates the receiver *Operation values.
+func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykExtensionConfigParams) {
+	if overRideValues.AllowList != nil {
 		allow := o.Allow
 		if allow == nil {
 			allow = &Allowance{}
 		}
 
-		allow.Import(*allowList)
+		allow.Import(*overRideValues.AllowList)
 
-		if block := o.Block; block != nil && block.Enabled && *allowList {
+		if block := o.Block; block != nil && block.Enabled && *overRideValues.AllowList {
 			block.Enabled = false
 		}
 
 		o.Allow = allow
 	}
 
-	if validateRequest != nil {
+	if overRideValues.ValidateRequest != nil {
 		validate := o.ValidateRequest
 		if validate == nil {
 			validate = &ValidateRequest{}
 		}
 
-		if shouldImport := validate.shouldImportValidateRequest(oasOperation); !shouldImport {
-			return
+		if ok := validate.shouldImport(oasOperation); ok {
+			validate.Import(*overRideValues.ValidateRequest)
+			o.ValidateRequest = validate
+		}
+	}
+
+	if overRideValues.MockResponse != nil {
+		mock := o.MockResponse
+		if mock == nil {
+			mock = &MockResponse{}
 		}
 
-		validate.Import(*validateRequest)
-		o.ValidateRequest = validate
+		if ok := mock.shouldImport(oasOperation); ok {
+			mock.Import(*overRideValues.MockResponse)
+			o.MockResponse = mock
+		}
 	}
 }
-
-type AllowanceType int
 
 func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	// Regardless if `ep` is a zero value, we need a non-nil paths
@@ -74,9 +115,12 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillAllowance(ep.BlackList, block)
 	s.fillAllowance(ep.Ignored, ignoreAuthentication)
 	s.fillTransformRequestMethod(ep.MethodTransforms)
+	s.fillTransformRequestBody(ep.Transform)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
-	s.fillValidateRequest(ep.ValidateJSON)
+	s.fillOASValidateRequest(ep.ValidateJSON)
+	s.fillVirtualEndpoint(ep.Virtual)
+	s.fillEndpointPostPlugins(ep.GoPlugin)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -94,9 +138,11 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractAllowanceTo(ep, path, method, block)
 					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
 					tykOp.extractTransformRequestMethodTo(ep, path, method)
+					tykOp.extractTransformRequestBodyTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
-					tykOp.extractValidateRequestTo(ep, path, method, operation, &s.Components)
+					tykOp.extractVirtualEndpointTo(ep, path, method)
+					tykOp.extractEndpointPostPluginTo(ep, path, method)
 					break found
 				}
 			}
@@ -146,6 +192,22 @@ func (s *OAS) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {
 		operation.TransformRequestMethod.Fill(meta)
 		if ShouldOmit(operation.TransformRequestMethod) {
 			operation.TransformRequestMethod = nil
+		}
+	}
+}
+
+func (s *OAS) fillTransformRequestBody(metas []apidef.TemplateMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		if operation.TransformRequestBody == nil {
+			operation.TransformRequestBody = &TransformRequestBody{}
+		}
+
+		operation.TransformRequestBody.Fill(meta)
+		if ShouldOmit(operation.TransformRequestBody) {
+			operation.TransformRequestBody = nil
 		}
 	}
 }
@@ -212,6 +274,16 @@ func (o *Operation) extractTransformRequestMethodTo(ep *apidef.ExtendedPathsSet,
 	ep.MethodTransforms = append(ep.MethodTransforms, meta)
 }
 
+func (o *Operation) extractTransformRequestBodyTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.TransformRequestBody == nil {
+		return
+	}
+
+	meta := apidef.TemplateMeta{Path: path, Method: method}
+	o.TransformRequestBody.ExtractTo(&meta)
+	ep.Transform = append(ep.Transform, meta)
+}
+
 func (o *Operation) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.Cache == nil {
 		return
@@ -237,11 +309,12 @@ func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path st
 
 // detect possible regex pattern:
 // - character match ([a-z])
-// - greedy match (*)
-// - ungreedy match (+)
-// - any char (.)
-// - end of string ($)
-const regexPatterns = "[].+*$"
+// - greedy match (.*)
+// - ungreedy match (.+)
+// - end of string ($).
+var regexPatterns = []string{
+	".+", ".*", "[", "]", "$",
+}
 
 type pathPart struct {
 	name    string
@@ -257,7 +330,17 @@ func (p pathPart) String() string {
 	return p.value
 }
 
-// splitPath splits url into folder parts, detecting regex patterns
+// isRegex checks if value has expected regular expression patterns.
+func isRegex(value string) bool {
+	for _, pattern := range regexPatterns {
+		if strings.Contains(value, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// splitPath splits url into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
 	// Each url fragment can contain a regex, but the whole
 	// url isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
@@ -267,7 +350,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 
 	for k, value := range parts {
 		name := value
-		isRegex := strings.ContainsAny(value, regexPatterns)
+		isRegex := isRegex(value)
 		if isRegex {
 			found++
 			name = fmt.Sprintf("customRegex%d", found)
@@ -283,7 +366,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 }
 
 // buildPath converts the url paths with regex to named parameters
-// e.g. ["a", ".*"] becomes /a/{customRegex1}
+// e.g. ["a", ".*"] becomes /a/{customRegex1}.
 func buildPath(parts []pathPart, appendSlash bool) string {
 	newPath := ""
 
@@ -313,7 +396,9 @@ func (s *OAS) getOperationID(inPath, method string) string {
 		operation := p.GetOperation(method)
 
 		if operation == nil {
-			operation = &openapi3.Operation{}
+			operation = &openapi3.Operation{
+				Responses: openapi3.NewResponses(),
+			}
 			p.SetOperation(method, operation)
 		}
 
@@ -329,6 +414,7 @@ func (s *OAS) getOperationID(inPath, method string) string {
 
 	if hasRegex {
 		newPath := buildPath(parts, strings.HasSuffix(inPath, "/"))
+
 		p = createOrGetPathItem(newPath)
 		p.Parameters = []*openapi3.ParameterRef{}
 
@@ -379,22 +465,27 @@ func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
 	return operations[operationID]
 }
 
+// ValidateRequest holds configuration required for validating requests.
 type ValidateRequest struct {
-	Enabled           bool `bson:"enabled" json:"enabled"`
-	ErrorResponseCode int  `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
+	// Enabled is a boolean flag, if set to `true`, it enables request validation.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// ErrorResponseCode is the error code emitted when the request fails validation.
+	// If unset or zero, the response will returned with http status 422 Unprocessable Entity.
+	ErrorResponseCode int `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
 }
 
+// Fill fills *ValidateRequest receiver from apidef.ValidateRequestMeta.
 func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
 	v.Enabled = !meta.Disabled
 	v.ErrorResponseCode = meta.ErrorResponseCode
 }
 
-func (v *ValidateRequest) ExtractTo(meta *apidef.ValidatePathMeta) {
-	meta.Disabled = !v.Enabled
-	meta.ErrorResponseCode = v.ErrorResponseCode
-}
+func (*ValidateRequest) shouldImport(operation *openapi3.Operation) bool {
+	if len(operation.Parameters) > 0 {
+		return true
+	}
 
-func (v *ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operation) bool {
 	reqBody := operation.RequestBody
 	if reqBody == nil {
 		return false
@@ -410,14 +501,49 @@ func (v *ValidateRequest) shouldImportValidateRequest(operation *openapi3.Operat
 	return media != nil
 }
 
+// Import populates *ValidateRequest with enabled argument and a default error response code.
 func (v *ValidateRequest) Import(enabled bool) {
 	v.Enabled = enabled
 	v.ErrorResponseCode = http.StatusUnprocessableEntity
 }
 
-func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {
+func convertSchema(mapSchema map[string]interface{}) (*openapi3.Schema, error) {
+	bytes, err := json.Marshal(mapSchema)
+	if err != nil {
+		return nil, err
+	}
+
+	schema := openapi3.NewSchema()
+	err = schema.UnmarshalJSON(bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return schema, nil
+}
+
+func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
+
+		operation := s.Paths.Find(meta.Path).GetOperation(meta.Method)
+		requestBodyRef := operation.RequestBody
+		if operation.RequestBody == nil {
+			requestBodyRef = &openapi3.RequestBodyRef{}
+			operation.RequestBody = requestBodyRef
+		}
+
+		if requestBodyRef.Value == nil {
+			requestBodyRef.Value = openapi3.NewRequestBody()
+		}
+
+		schema, err := convertSchema(meta.Schema)
+		if err != nil {
+			log.WithError(err).Error("Couldn't convert classic API validate JSON schema to OAS")
+		} else {
+			requestBodyRef.Value.WithJSONSchema(schema)
+		}
+
 		tykOp := s.GetTykExtension().getOperation(operationID)
 
 		if tykOp.ValidateRequest == nil {
@@ -429,114 +555,107 @@ func (s *OAS) fillValidateRequest(metas []apidef.ValidatePathMeta) {
 		if ShouldOmit(tykOp.ValidateRequest) {
 			tykOp.ValidateRequest = nil
 		}
+	}
+}
 
-		var schema openapi3.Schema
-		schemaInBytes, err := json.Marshal(meta.Schema)
-		if err != nil {
-			log.WithError(err).Error("Path meta schema couldn't be marshalled")
-			return
-		}
+// MockResponse configures the mock responses.
+type MockResponse struct {
+	// Enabled enables the mock response middleware.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Code is the HTTP response code that will be returned.
+	Code int `bson:"code,omitempty" json:"code,omitempty"`
+	// Body is the HTTP response body that will be returned.
+	Body string `bson:"body,omitempty" json:"body,omitempty"`
+	// Headers are the HTTP response headers that will be returned.
+	Headers []Header `bson:"headers,omitempty" json:"headers,omitempty"`
+	// FromOASExamples is the configuration to extract a mock response from OAS documentation.
+	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
+}
 
-		err = schema.UnmarshalJSON(schemaInBytes)
-		if err != nil {
-			log.WithError(err).Error("Schema couldn't be unmarshalled")
-			return
-		}
+// FromOASExamples configures mock responses should be returned from OAS example responses.
+type FromOASExamples struct {
+	// Enabled enables getting a mock response from OAS examples or schemas documented in OAS.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Code is the default HTTP response code that the gateway reads from the path responses documented in OAS.
+	Code int `bson:"code,omitempty" json:"code,omitempty"`
+	// ContentType is the default HTTP response body type that the gateway reads from the path responses documented in OAS.
+	ContentType string `bson:"contentType,omitempty" json:"contentType,omitempty"`
+	// ExampleName is the default example name among multiple path response examples documented in OAS.
+	ExampleName string `bson:"exampleName,omitempty" json:"exampleName,omitempty"`
+}
 
-		operation := s.Paths[meta.Path].GetOperation(meta.Method)
-
-		requestBody := operation.RequestBody
-		if requestBody == nil {
-			requestBody = &openapi3.RequestBodyRef{
-				Value: openapi3.NewRequestBody(),
+func (*MockResponse) shouldImport(operation *openapi3.Operation) bool {
+	for _, response := range operation.Responses {
+		for _, content := range response.Value.Content {
+			if content.Example != nil || content.Schema != nil {
+				return true
 			}
 
-			operation.RequestBody = requestBody
-		}
-
-		bodyContent := requestBody.Value.Content
-		if bodyContent == nil {
-			bodyContent = openapi3.NewContent()
-			requestBody.Value.Content = bodyContent
-		}
-
-		mediaType := bodyContent.Get(contentTypeJSON)
-		if mediaType == nil {
-			mediaType = openapi3.NewMediaType()
-			bodyContent[contentTypeJSON] = mediaType
-		}
-
-		schemaRef := mediaType.Schema
-
-		if schemaRef == nil {
-			schemaRef = openapi3.NewSchemaRef("", &schema)
-		}
-
-		rawRef := schemaRef.Ref
-		ref := strings.TrimPrefix(rawRef, "#/components/schemas/")
-		if ref != "" {
-			if s.Components.Schemas == nil {
-				s.Components.Schemas = make(openapi3.Schemas)
+			for _, example := range content.Examples {
+				if example.Value != nil {
+					return true
+				}
 			}
+		}
+	}
 
-			s.Components.Schemas[ref] = openapi3.NewSchemaRef("", &schema)
-		} else {
-			operation.RequestBody.Value.WithJSONSchema(&schema)
+	return false
+}
+
+// Import populates *MockResponse with enabled argument for FromOASExamples.
+func (m *MockResponse) Import(enabled bool) {
+	m.Enabled = enabled
+	m.FromOASExamples = &FromOASExamples{
+		Enabled: enabled,
+	}
+}
+
+func (s *OAS) fillVirtualEndpoint(endpointMetas []apidef.VirtualMeta) {
+	for _, em := range endpointMetas {
+		operationID := s.getOperationID(em.Path, em.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.VirtualEndpoint == nil {
+			operation.VirtualEndpoint = &VirtualEndpoint{}
+		}
+
+		operation.VirtualEndpoint.Fill(em)
+		if ShouldOmit(operation.VirtualEndpoint) {
+			operation.VirtualEndpoint = nil
 		}
 	}
 }
 
-func (o *Operation) extractValidateRequestTo(ep *apidef.ExtendedPathsSet, path string, method string, operation *openapi3.Operation, components *openapi3.Components) {
-	meta := apidef.ValidatePathMeta{Path: path, Method: method}
-	if o.ValidateRequest != nil {
-		o.ValidateRequest.ExtractTo(&meta)
-
-		defer func() {
-			ep.ValidateJSON = append(ep.ValidateJSON, meta)
-		}()
-	}
-
-	reqBody := operation.RequestBody
-	if reqBody == nil {
+func (o *Operation) extractVirtualEndpointTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.VirtualEndpoint == nil {
 		return
 	}
 
-	reqBodyVal := reqBody.Value
-	if reqBodyVal == nil {
+	meta := apidef.VirtualMeta{Path: path, Method: method}
+	o.VirtualEndpoint.ExtractTo(&meta)
+	ep.Virtual = append(ep.Virtual, meta)
+}
+
+func (s *OAS) fillEndpointPostPlugins(endpointMetas []apidef.GoPluginMeta) {
+	for _, em := range endpointMetas {
+		operationID := s.getOperationID(em.Path, em.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.PostPlugins == nil {
+			operation.PostPlugins = make(EndpointPostPlugins, 1)
+		}
+
+		operation.PostPlugins.Fill(em)
+		if ShouldOmit(operation.PostPlugins) {
+			operation.PostPlugins = nil
+		}
+	}
+}
+
+func (o *Operation) extractEndpointPostPluginTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.PostPlugins == nil {
 		return
 	}
 
-	media := reqBodyVal.Content.Get("application/json")
-	if media == nil {
-		return
-	}
-
-	schema := media.Schema
-	if schema == nil {
-		return
-	}
-
-	var schemaVal *openapi3.Schema
-
-	ref := strings.TrimPrefix(schema.Ref, "#/components/schemas/")
-	if schemaRef, ok := components.Schemas[ref]; ok {
-		schemaVal = schemaRef.Value
-	} else {
-		schemaVal = schema.Value
-	}
-
-	if schemaVal == nil {
-		return
-	}
-
-	schemaInBytes, err := json.Marshal(schemaVal)
-	if err != nil {
-		log.WithError(err).Error("Schema value couldn't be marshalled")
-		return
-	}
-
-	err = json.Unmarshal(schemaInBytes, &meta.Schema)
-	if err != nil {
-		log.WithError(err).Error("Path meta schema couldn't be unmarshalled")
-	}
+	meta := apidef.GoPluginMeta{Path: path, Method: method}
+	o.PostPlugins.ExtractTo(&meta)
+	ep.GoPlugin = append(ep.GoPlugin, meta)
 }

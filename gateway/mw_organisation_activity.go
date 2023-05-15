@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/request"
@@ -49,7 +48,7 @@ func (k *OrganizationMonitor) setOrgHasNoSession(val bool) {
 	k.Spec.OrgHasNoSession = val
 }
 
-func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
+func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Skip rate limiting and quotas for looping
 	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
@@ -115,12 +114,12 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		false,
 	)
 
-	sessionLifeTime := orgSession.Lifetime(k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
+	sessionLifeTime := orgSession.Lifetime(k.Spec.GetSessionLifetimeRespectsKeyExpiration(), k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
 
 	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, orgSession, sessionLifeTime, false); err == nil {
 		// update in-app cache if needed
 		if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			k.Gw.SessionCache.Set(k.Spec.OrgID, orgSession.Clone(), time.Second*time.Duration(sessionLifeTime))
+			k.Gw.SessionCache.Set(k.Spec.OrgID, orgSession.Clone(), sessionLifeTime)
 		}
 	} else {
 		logger.WithError(err).Error("Could not update org session")
@@ -171,7 +170,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 	}
 
 	// Lets keep a reference of the org
-	setCtxValue(r, ctx.OrgSessionContext, &orgSession)
+	setCtxValue(r, ctx.OrgSessionContext, orgSession)
 
 	// Request is valid, carry on
 	return nil, http.StatusOK
@@ -246,12 +245,12 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		false,
 	)
 
-	sessionLifeTime := session.Lifetime(k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
+	sessionLifeTime := session.Lifetime(k.Spec.GetSessionLifetimeRespectsKeyExpiration(), k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
 
 	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, session, sessionLifeTime, false); err == nil {
 		// update in-app cache if needed
 		if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			k.Gw.SessionCache.Set(k.Spec.OrgID, session.Clone(), time.Second*time.Duration(sessionLifeTime))
+			k.Gw.SessionCache.Set(k.Spec.OrgID, session.Clone(), sessionLifeTime)
 		}
 	} else {
 		logEntry.WithError(err).WithField("orgID", k.Spec.OrgID).Error("Could not update org session")

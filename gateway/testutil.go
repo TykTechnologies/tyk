@@ -24,17 +24,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
+
 	"github.com/TykTechnologies/tyk/rpc"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/tyk/internal/uuid"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
@@ -45,6 +50,8 @@ import (
 	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
 	"github.com/TykTechnologies/tyk/user"
 )
+
+const jsonContentType = "application/json"
 
 var (
 	// to register to, but never used
@@ -125,7 +132,7 @@ func (r *ReloadMachinery) OnReload() {
 	}
 }
 
-// Reloaded returns true if a read has occured since r was enabled
+// Reloaded returns true if a read has occurred since r was enabled
 func (r *ReloadMachinery) Reloaded() bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -213,7 +220,7 @@ func (r *ReloadMachinery) Tick() {
 	r.reloadTick <- time.Time{}
 }
 
-// TickOk triggers a reload and ensures a queue happend and a reload cycle
+// TickOk triggers a reload and ensures a queue happened and a reload cycle
 // happens. This will block until all the cases are met.
 func (r *ReloadMachinery) TickOk(t *testing.T) {
 	r.EnsureQueued(t)
@@ -274,7 +281,7 @@ func (s *Test) RegisterBundle(name string, files map[string]string) string {
 	s.Gw.TestBundleMu.Lock()
 	defer s.Gw.TestBundleMu.Unlock()
 
-	bundleID := name + "-" + uuid.NewV4().String() + ".zip"
+	bundleID := name + "-" + uuid.NewHex() + ".zip"
 	s.Gw.TestBundles[bundleID] = files
 
 	return bundleID
@@ -373,6 +380,7 @@ func (s *Test) getMainRouter(m *proxyMux) *mux.Router {
 type TestHttpResponse struct {
 	Method  string
 	URI     string
+	Path    string
 	Url     string
 	Body    string
 	Headers map[string]string
@@ -395,6 +403,7 @@ const (
 	handlerPathGraphQLDataSource     = "/graphql-data-source"
 	handlerPathHeadersRestDataSource = "/rest-headers-data-source"
 	handlerSubgraphAccounts          = "/subgraph-accounts"
+	handlerSubgraphAccountsModified  = "/subgraph-accounts-modified"
 	handlerSubgraphReviews           = "/subgraph-reviews"
 
 	// We need a static port so that the urls can be used in static
@@ -403,19 +412,20 @@ const (
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-	TestHttpAny               = "http://" + testHttpListen
-	TestHttpGet               = TestHttpAny + "/get"
-	testHttpPost              = TestHttpAny + "/post"
-	testGraphQLProxyUpstream  = TestHttpAny + handlerPathGraphQLProxyUpstream
-	testGraphQLDataSource     = TestHttpAny + handlerPathGraphQLDataSource
-	testRESTDataSource        = TestHttpAny + handlerPathRestDataSource
-	testRESTHeadersDataSource = TestHttpAny + handlerPathHeadersRestDataSource
-	testSubgraphAccounts      = TestHttpAny + handlerSubgraphAccounts
-	testSubgraphReviews       = TestHttpAny + handlerSubgraphReviews
-	testHttpJWK               = TestHttpAny + "/jwk.json"
-	testHttpJWKLegacy         = TestHttpAny + "/jwk-legacy.json"
-	testHttpBundles           = TestHttpAny + "/bundles/"
-	testReloadGroup           = TestHttpAny + "/groupReload"
+	TestHttpAny                  = "http://" + testHttpListen
+	TestHttpGet                  = TestHttpAny + "/get"
+	testHttpPost                 = TestHttpAny + "/post"
+	testGraphQLProxyUpstream     = TestHttpAny + handlerPathGraphQLProxyUpstream
+	testGraphQLDataSource        = TestHttpAny + handlerPathGraphQLDataSource
+	testRESTDataSource           = TestHttpAny + handlerPathRestDataSource
+	testRESTHeadersDataSource    = TestHttpAny + handlerPathHeadersRestDataSource
+	testSubgraphAccounts         = TestHttpAny + handlerSubgraphAccounts
+	testSubgraphAccountsModified = TestHttpAny + handlerSubgraphAccountsModified
+	testSubgraphReviews          = TestHttpAny + handlerSubgraphReviews
+	testHttpJWK                  = TestHttpAny + "/jwk.json"
+	testHttpJWKLegacy            = TestHttpAny + "/jwk-legacy.json"
+	testHttpBundles              = TestHttpAny + "/bundles/"
+	testReloadGroup              = TestHttpAny + "/groupReload"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
@@ -464,6 +474,7 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 		err := json.NewEncoder(w).Encode(TestHttpResponse{
 			Method:  r.Method,
 			URI:     r.RequestURI,
+			Path:    r.URL.Path,
 			Url:     r.URL.String(),
 			Headers: firstVals(r.Header),
 			Form:    firstVals(r.Form),
@@ -482,6 +493,15 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 			}
 		}
 	}
+	dynamicHandler := func(w http.ResponseWriter, req *http.Request) {
+		path, varOk := mux.Vars(req)["rest"]
+		handler, handlerOk := s.dynamicHandlers[path]
+		if !varOk || !handlerOk {
+			handleMethod("")(w, req)
+			return
+		}
+		handler(w, req)
+	}
 
 	// use gorilla's mux as it allows to cancel URI cleaning
 	// (it is not configurable in standard http mux)
@@ -495,6 +515,7 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 	r.HandleFunc(handlerPathRestDataSource, restDataSourceHandler)
 	r.HandleFunc(handlerPathHeadersRestDataSource, restHeadersDataSourceHandler)
 	r.HandleFunc(handlerSubgraphAccounts, subgraphAccountsHandler)
+	r.HandleFunc(handlerSubgraphAccountsModified, subGraphAccountsHandlerAllAccounts)
 	r.HandleFunc(handlerSubgraphReviews, subgraphReviewsHandler)
 
 	r.HandleFunc("/ws", wsHandler)
@@ -505,23 +526,34 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 		io.WriteString(w, jwkTestJsonLegacy)
 	})
 
-	r.HandleFunc("/compressed", func(w http.ResponseWriter, r *http.Request) {
-		response := "This is a compressed response"
-		w.Header().Set("Content-Encoding", "gzip")
-		gz := gzip.NewWriter(w)
-		json.NewEncoder(gz).Encode(response)
-		gz.Close()
-	})
-	r.HandleFunc("/chunked", chunkedEncodingHandler)
+	r.HandleFunc("/compressed", compressedResponseHandler)
+	r.HandleFunc("/chunked", chunkedResponseHandler)
 	r.HandleFunc("/groupReload", gw.groupResetHandler)
 	r.HandleFunc("/bundles/{rest:.*}", s.BundleHandleFunc)
 	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
 		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
 		httpError(w, statusCode)
 	})
-	r.HandleFunc("/{rest:.*}", handleMethod(""))
+	r.HandleFunc("/{rest:.*}", dynamicHandler)
 
 	return r
+}
+
+func compressedResponseHandler(w http.ResponseWriter, r *http.Request) {
+	response := "This is a compressed response"
+	w.Header().Set("Content-Encoding", "gzip")
+	gz := gzip.NewWriter(w)
+	_ = json.NewEncoder(gz).Encode(response)
+	_ = gz.Close()
+}
+
+func chunkedResponseHandler(w http.ResponseWriter, r *http.Request) {
+	f, _ := w.(http.Flusher)
+	_, _ = w.Write([]byte(`This is a `))
+	f.Flush()
+
+	_, _ = w.Write([]byte(`chunked response`))
+	f.Flush()
 }
 
 func graphqlProxyUpstreamHandler(w http.ResponseWriter, r *http.Request) {
@@ -662,6 +694,24 @@ func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
 	}`))
 }
 
+func subGraphAccountsHandlerAllAccounts(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", jsonContentType)
+	_, _ = w.Write([]byte(`{
+  "data": {
+    "allUsers": [
+      {
+        "id": "1",
+        "username": "tyk"
+      },
+      {
+        "id": "2",
+        "username": "kofo"
+      }
+    ]
+  }
+}`))
+}
+
 func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{
@@ -681,23 +731,6 @@ func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
 				]
 			}
 		}`))
-}
-
-func chunkedEncodingHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost, http.MethodGet:
-	default:
-		http.Error(w, `{ "error": "request method not allowed"}`, http.StatusBadRequest)
-		return
-	}
-	if f, ok := w.(http.Flusher); ok {
-		_, _ = w.Write([]byte(`{"data":{"country":{`))
-		f.Flush()
-		_, _ = w.Write([]byte(`"code":"M","name":"Mars"}}}`))
-		f.Flush()
-		return
-	}
-	http.Error(w, `{ "error": "response writer does not implement flusher"}`, http.StatusInternalServerError)
 }
 
 const jwkTestJson = `{
@@ -887,7 +920,7 @@ func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Reques
 func (gw *Gateway) CreateDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{Gw: gw}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
-	spec := loader.MakeSpec(&def, nil)
+	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: &def}, nil)
 	return spec
 }
 
@@ -927,6 +960,8 @@ type Test struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	dynamicHandlers map[string]http.HandlerFunc
 }
 
 type SlaveDataCenter struct {
@@ -935,7 +970,9 @@ type SlaveDataCenter struct {
 }
 
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
-	t := &Test{}
+	t := &Test{
+		dynamicHandlers: make(map[string]http.HandlerFunc),
+	}
 
 	// DNS mock enabled by default
 	t.config.EnableTestDNSMock = false
@@ -1006,6 +1043,11 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 	}
 
 	return gw
+}
+
+func (s *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
+	path = strings.Trim(path, "/")
+	s.dynamicHandlers[path] = handlerFunc
 }
 
 func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
@@ -1198,7 +1240,25 @@ func (s *Test) Close() {
 	s.Gw.ReloadTestCase.StopTicker()
 	s.Gw.GlobalHostChecker.StopPoller()
 
-	os.RemoveAll(s.Gw.GetConfig().AppPath)
+	err = s.RemoveApis()
+	if err != nil {
+		log.Error("could not remove apis")
+	}
+}
+
+// RemoveApis clean all the apis from a living gw
+func (s *Test) RemoveApis() error {
+	s.Gw.apisMu.Lock()
+	defer s.Gw.apisMu.Unlock()
+	s.Gw.apiSpecs = []*APISpec{}
+	s.Gw.apisByID = map[string]*APISpec{}
+
+	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
+	if err != nil {
+		log.WithError(err).Error("removing apis from gw")
+	}
+
+	return err
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
@@ -1206,7 +1266,7 @@ func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, er
 	return s.testRunner.Run(t, testCases...)
 }
 
-//TODO:(gernest) when hot reload is supported enable this.
+// TODO:(gernest) when hot reload is supported enable this.
 func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	s.Run(t, testCases...)
 	var testMatrix = []struct {
@@ -1230,8 +1290,7 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 }
 
-func GetTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
-	// Setup HTTPS client
+func GetTLSConfig(cert *tls.Certificate, caCert []byte) *tls.Config {
 	tlsConfig := &tls.Config{}
 
 	if cert != nil {
@@ -1246,6 +1305,13 @@ func GetTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
 	} else {
 		tlsConfig.InsecureSkipVerify = true
 	}
+
+	return tlsConfig
+}
+
+func GetTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
+	// Setup HTTPS client
+	tlsConfig := GetTLSConfig(cert, caCert)
 
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 
@@ -1554,17 +1620,68 @@ func jsonMarshalString(i interface{}) (out string) {
 	return string(b)
 }
 
+func BuildOASAPI(oasGens ...func(oasDef *oas.OAS)) (specs []*APISpec) {
+	for _, gen := range oasGens {
+		oasAPI := getSampleOASAPI()
+		gen(&oasAPI)
+
+		var nativeAPIDefinition apidef.APIDefinition
+		oasAPI.ExtractTo(&nativeAPIDefinition)
+		nativeAPIDefinition.IsOAS = true
+		spec := &APISpec{APIDefinition: &nativeAPIDefinition, OAS: oasAPI}
+		specs = append(specs, spec)
+	}
+
+	return specs
+}
+
+func getSampleOASAPI() oas.OAS {
+	tykExtension := &oas.XTykAPIGateway{
+		Info: oas.Info{
+			Name: randStringBytes(8),
+			ID:   randStringBytes(8),
+			State: oas.State{
+				Active: false,
+			},
+		},
+		Upstream: oas.Upstream{
+			URL: TestHttpAny,
+		},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{
+				Value: "/oas-api/",
+				Strip: false,
+			},
+		},
+	}
+
+	oasAPI := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "oas doc",
+				Version: "1",
+			},
+			Paths: make(openapi3.Paths),
+		}}
+
+	oasAPI.SetTykExtension(tykExtension)
+	return oasAPI
+}
+
 func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	if len(apiGens) == 0 {
 		apiGens = append(apiGens, func(spec *APISpec) {})
 	}
 
-	for _, gen := range apiGens {
+	for idx, gen := range apiGens {
 		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 		if err := json.Unmarshal([]byte(sampleAPI), spec.APIDefinition); err != nil {
 			panic(err)
 		}
-
+		if idx > 0 {
+			spec.APIID = randStringBytes(8)
+		}
 		gen(spec)
 		specs = append(specs, spec)
 	}
@@ -1576,23 +1693,38 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	gwConf := gw.GetConfig()
 	oldPath := gwConf.AppPath
 	gwConf.AppPath, _ = ioutil.TempDir("", "apps")
-	gw.SetConfig(gwConf)
+	gw.SetConfig(gwConf, true)
 	defer func() {
 		globalConf := gw.GetConfig()
 		os.RemoveAll(globalConf.AppPath)
 		globalConf.AppPath = oldPath
-		gw.SetConfig(globalConf)
+		gw.SetConfig(globalConf, true)
 	}()
 
 	for i, spec := range specs {
-		specBytes, err := json.Marshal(spec)
+		if spec.Name == "" {
+			spec.Name = randStringBytes(15)
+		}
+
+		specBytes, err := json.Marshal(spec.APIDefinition)
 		if err != nil {
-			fmt.Printf(" \n %+v \n", spec)
+			log.WithError(err).Errorf("API Spec Marshal failed: %+v", spec)
 			panic(err)
 		}
 
 		specFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
 		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
+			panic(err)
+		}
+
+		oasSpecBytes, err := json.Marshal(&spec.OAS)
+		if err != nil {
+			log.WithError(err).Errorf("OAS Marshal failed: %+v", spec)
+			panic(err)
+		}
+
+		oasSpecFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+"-oas.json")
+		if err := ioutil.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
 			panic(err)
 		}
 	}

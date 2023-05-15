@@ -18,10 +18,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/storage"
-
-	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/storage"
+)
+
+const (
+	cacheDefaultTTL    = 300 // 5 minutes.
+	cacheCleanInterval = 600 // 10 minutes.
 )
 
 var CertManagerLogPrefix = "cert_storage"
@@ -29,7 +34,7 @@ var CertManagerLogPrefix = "cert_storage"
 type CertificateManager struct {
 	storage         storage.Handler
 	logger          *logrus.Entry
-	cache           *cache.Cache
+	cache           cache.Repository
 	secret          string
 	migrateCertList bool
 }
@@ -42,7 +47,7 @@ func NewCertificateManager(storage storage.Handler, secret string, logger *logru
 	return &CertificateManager{
 		storage:         storage,
 		logger:          logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
-		cache:           cache.New(5*time.Minute, 10*time.Minute),
+		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
 		secret:          secret,
 		migrateCertList: migrateCertList,
 	}
@@ -62,7 +67,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 
 	cm := &CertificateManager{
 		logger:          log,
-		cache:           cache.New(5*time.Minute, 10*time.Minute),
+		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
 		secret:          secret,
 		migrateCertList: migrateCertList,
 	}
@@ -596,8 +601,16 @@ func (c *CertificateManager) ValidateRequestCertificate(certIDs []string, r *htt
 
 	certID := HexSHA256(leaf.Raw)
 	for _, cert := range c.List(certIDs, CertificatePublic) {
+		// In case a cert can't be parsed or is invalid,
+		// it will be present in the cert list as 'nil'
+		if cert == nil {
+			// Invalid cert, continue to next one
+			continue
+		}
+
 		// Extensions[0] contains cache of certificate SHA256
-		if cert == nil || string(cert.Leaf.Extensions[0].Value) == certID {
+		if string(cert.Leaf.Extensions[0].Value) == certID {
+			// Happy flow, we matched a certificate
 			return nil
 		}
 	}

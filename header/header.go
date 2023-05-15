@@ -1,4 +1,4 @@
-package headers
+package header
 
 const (
 	UserAgent               = "User-Agent"

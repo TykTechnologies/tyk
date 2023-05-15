@@ -12,16 +12,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/request"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/request"
+
 	"github.com/lonelycode/osin"
-	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"strconv"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -179,7 +181,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 // returns a response to the client and notifies the provider of the access request (in order to track identity against
 // OAuth tokens without revealing tokens before they are requested).
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	// Handle response
 	resp := o.Manager.HandleAccess(r)
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
@@ -231,8 +233,8 @@ const (
 	refreshToken = "refresh_token"
 )
 
-//in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
-//ToDo: set an authentication mechanism
+// in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
+// ToDo: set an authentication mechanism
 func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
@@ -485,7 +487,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			keyName := o.Gw.generateToken(o.API.OrgID, username)
 
 			log.Debug("Updating user:", keyName)
-			err := o.Gw.GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime, o.Gw.GetConfig().ForceGlobalSessionLifetime, o.Gw.GetConfig().GlobalSessionLifetime), false)
+			err := o.Gw.GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.GetSessionLifetimeRespectsKeyExpiration(), o.API.SessionLifetime, o.Gw.GetConfig().ForceGlobalSessionLifetime, o.Gw.GetConfig().GlobalSessionLifetime), false)
 			if err != nil {
 				log.Error(err)
 			}
@@ -603,16 +605,16 @@ func (r *RedisOsinStorageInterface) Close() {}
 func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 	key := prefixClient + id
 
-	log.Info("Getting client ID:", id)
+	log.Debug("Getting client ID:", id)
 	clientJSON, err := r.store.GetKey(key)
 	if err != nil {
-		log.Errorf("Failure retrieving client ID key %q: %v", key, err)
+		log.Debugf("Failure retrieving client ID key %q: %v", key, err)
 		return nil, err
 	}
 
 	client := new(OAuthClient)
 	if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
-		log.Error("Couldn't unmarshal OAuth client object: ", err)
+		log.Debug("Couldn't unmarshal OAuth client object: ", err)
 	}
 	return client, nil
 }
@@ -1003,8 +1005,10 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		}
 	}
 
+	sessionLifetime := r.Gw.ApplyLifetime(newSession)
+
 	// Use the default session expiry here as this is OAuth
-	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, int64(accessData.ExpiresIn), false)
+	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, sessionLifetime, false)
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
@@ -1137,8 +1141,7 @@ func (a accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefre
 
 	accesstoken = a.Gw.keyGen.GenerateAuthKey(newSession.OrgID)
 	if generaterefresh {
-		u6 := uuid.NewV4()
-		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))
+		refreshtoken = base64.StdEncoding.EncodeToString([]byte(uuid.New()))
 	}
 	return
 }

@@ -124,7 +124,7 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 	// Append spec data:
 	if c.Middleware != nil {
 		configDataAsJSON := []byte("{}")
-		if len(c.Middleware.Spec.ConfigData) > 0 {
+		if shouldAddConfigData(c.Middleware.Spec) {
 			var err error
 			configDataAsJSON, err = json.Marshal(c.Middleware.Spec.ConfigData)
 			if err != nil {
@@ -140,8 +140,11 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 		object.Spec = map[string]string{
 			"OrgID":       c.Middleware.Spec.OrgID,
 			"APIID":       c.Middleware.Spec.APIID,
-			"config_data": string(configDataAsJSON),
 			"bundle_hash": bundleHash,
+		}
+
+		if shouldAddConfigData(c.Middleware.Spec) {
+			object.Spec["config_data"] = string(configDataAsJSON)
 		}
 	}
 
@@ -313,10 +316,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	originalURL := r.URL
 	authToken, _ := m.getAuthToken(apidef.CoprocessType, r)
 
-	var extractor IdExtractor
-	if m.Spec.EnableCoProcessAuth && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
-		extractor = m.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
-	}
+	extractor := getIDExtractor(m.Spec)
 
 	var returnOverrides ReturnOverrides
 	var sessionID string
@@ -441,7 +441,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Is this a CP authentication middleware?
-	if m.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
+	if coprocessAuthEnabled(m.Spec) && m.HookType == coprocess.HookType_CustomKeyCheck {
 		if extractor == nil {
 			sessionID = token
 		}
@@ -493,7 +493,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 
 		returnedSession.KeyID = sessionID
-		ctxSetSession(r, returnedSession, true, m.Gw.GetConfig().HashKeys)
+
+		switch m.Spec.BaseIdentityProvidedBy {
+		case apidef.CustomAuth, apidef.UnsetAuth:
+			ctxSetSession(r, returnedSession, true, m.Gw.GetConfig().HashKeys)
+		}
 	}
 
 	return nil, http.StatusOK
@@ -560,6 +564,10 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		return errors.New("Middleware error")
 	}
 
+	// Clear all response headers before populating from coprocess response object:
+	for k := range res.Header {
+		delete(res.Header, k)
+	}
 	// Set headers:
 	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for k, v := range retObject.Response.Headers {
@@ -585,4 +593,28 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 		return nil, err
 	}
 	return newObject, nil
+}
+
+func coprocessAuthEnabled(spec *APISpec) bool {
+	return spec.EnableCoProcessAuth || spec.CustomPluginAuthEnabled
+}
+
+func getIDExtractor(spec *APISpec) IdExtractor {
+	if !coprocessAuthEnabled(spec) {
+		return nil
+	}
+
+	if spec.CustomMiddleware.IdExtractor.Disabled {
+		return nil
+	}
+
+	if extractor, ok := spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor); ok {
+		return extractor
+	}
+
+	return nil
+}
+
+func shouldAddConfigData(spec *APISpec) bool {
+	return !spec.ConfigDataDisabled && len(spec.ConfigData) > 0
 }

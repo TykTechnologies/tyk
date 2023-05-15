@@ -9,22 +9,19 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
+
+	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/kelseyhightower/envconfig"
 )
 
 type IPsHandleStrategy string
 
 var (
-	log      = logger.Get()
-	global   atomic.Value
-	globalMu sync.Mutex
+	log = logger.Get()
 
 	Default = Config{
 		ListenPort:     8080,
@@ -224,7 +221,7 @@ type HealthCheckConfig struct {
 }
 
 type LivenessCheckConfig struct {
-	// Frequence of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
+	// Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
 	CheckDuration time.Duration `json:"check_duration"`
 }
 
@@ -237,7 +234,7 @@ type DnsCacheConfig struct {
 	TTL int64 `json:"ttl"`
 
 	CheckInterval int64 `json:"-" ignored:"true"`
-	//controls cache cleanup interval. By convention this shouldn't be exposed to a config or env_variable_setup
+	// controls cache cleanup interval. By convention this shouldn't be exposed to a config or env_variable_setup
 
 	// A strategy which will be used when a DNS query will reply with more than 1 IP Address per single host.
 	// As a DNS query response IP Addresses can have a changing order depending on DNS server balancing strategy (eg: round robin, geographically dependent origin-ip ordering, etc) this option allows you to not to limit the connection to the first host in a cached response list or prevent response caching.
@@ -326,6 +323,9 @@ type SlaveOptionsConfig struct {
 
 	// RPCKeysCacheExpiration defines the expiration time of the rpc cache that stores the keys, defined in seconds
 	RPCGlobalCacheExpiration float32 `json:"rpc_global_cache_expiration"`
+
+	// SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources
+	SynchroniserEnabled bool `json:"synchroniser_enabled"`
 }
 
 type LocalSessionCacheConf struct {
@@ -340,7 +340,8 @@ type CertsData []CertData
 func (certs *CertsData) Decode(value string) error {
 	err := json.Unmarshal([]byte(value), certs)
 	if err != nil {
-		log.Error("Error unmarshaling TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES")
+		log.Error("Error unmarshalling TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES: ", err)
+		return err
 	}
 	return nil
 }
@@ -349,17 +350,14 @@ type HttpServerOptionsConfig struct {
 	// No longer used
 	OverrideDefaults bool `json:"-"`
 
-	// User -> Gateway network read timeout
+	// API Consumer -> Gateway network read timeout. Not setting this config, or setting this to 0, defaults to 120 seconds
 	ReadTimeout int `json:"read_timeout"`
 
-	// User -> Gateway network write timeout
+	// API Consumer -> Gateway network write timeout. Not setting this config, or setting this to 0, defaults to 120 seconds
 	WriteTimeout int `json:"write_timeout"`
 
 	// Set to true to enable SSL connections
 	UseSSL bool `json:"use_ssl"`
-
-	// Enable Lets-Encrypt support
-	UseLE_SSL bool `json:"use_ssl_le"`
 
 	// Enable HTTP2 protocol handling
 	EnableHttp2 bool `json:"enable_http2"`
@@ -393,6 +391,11 @@ type HttpServerOptionsConfig struct {
 	// Maximum TLS version.
 	MaxVersion uint16 `json:"max_version"`
 
+	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
+	// This option is useful when you have a lot of ClientCAs and you want to reduce the handshake overhead, as some clients can hit TLS handshake limits.
+	// This option does not give any hints to the client, on which certificate to pick (but this is very rare situation when it is required)
+	SkipClientCAAnnouncement bool `json:"skip_client_ca_announcement"`
+
 	// Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.
 	// This option needed be set for streaming protocols like Server Side Events, or gRPC streaming.
 	FlushInterval int `json:"flush_interval"`
@@ -406,6 +409,16 @@ type HttpServerOptionsConfig struct {
 
 	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
 	Ciphers []string `json:"ssl_ciphers"`
+
+	// MaxRequestBodySize configures the maximum request body size in bytes.
+	//
+	// Tyk API Gateway copies the whole request into memory at the beginning
+	// of the request handling. Large requests could fill up memory if they
+	// are not blocked.
+	//
+	// See more information about setting request size limits here:
+	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
+	MaxRequestBodySize int64 `json:"max_request_body_size"`
 }
 
 type AuthOverrideConf struct {
@@ -451,6 +464,9 @@ type CoProcessConfig struct {
 	// Maximum message which can be sent to gRPC server
 	GRPCSendMaxSize int `json:"grpc_send_max_size"`
 
+	// Authority used in GRPC connection
+	GRPCAuthority string `json:"grpc_authority"`
+
 	// Sets the path to built-in Tyk modules. This will be part of the Python module lookup path. The value used here is the default one for most installations.
 	PythonPathPrefix string `json:"python_path_prefix"`
 
@@ -488,6 +504,8 @@ type NewRelicConfig struct {
 	AppName string `json:"app_name"`
 	// New Relic License key
 	LicenseKey string `json:"license_key"`
+	// Enable distributed tracing
+	EnableDistributedTracing bool `json:"enable_distributed_tracing"`
 }
 
 type Tracer struct {
@@ -539,6 +557,18 @@ func (r PortRange) Match(port int) bool {
 	return r.From <= port && r.To >= port
 }
 
+type PortsWhiteList map[string]PortWhiteList
+
+func (pwl *PortsWhiteList) Decode(value string) error {
+	err := json.Unmarshal([]byte(value), pwl)
+	if err != nil {
+		log.Error("Error unmarshalling TYK_GW_PORTWHITELIST: ", err)
+		return err
+	}
+
+	return nil
+}
+
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
 	// OriginalPath is the path to the config file that is read. If
@@ -546,10 +576,10 @@ type Config struct {
 	// was written.
 	OriginalPath string `json:"-"`
 
-	// Force your Gateway to work only on a specifc domain name. Can be overriden by API custom domain.
+	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
 	HostName string `json:"hostname"`
 
-	// If your machine has mulitple network devices or IPs you can force the Gateway to use the IP address you want.
+	// If your machine has multiple network devices or IPs you can force the Gateway to use the IP address you want.
 	ListenAddress string `json:"listen_address"`
 
 	// Setting this value will change the port that Tyk listens on. Default: 8080.
@@ -596,8 +626,12 @@ type Config struct {
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
 
-	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256
+	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
 	HashKeyFunction string `json:"hash_key_function"`
+
+	// Specify the Key hashing algorithm for "basic auth". Possible values: murmur64, murmur128, sha256, bcrypt.
+	// Will default to "bcrypt" if not set.
+	BasicAuthHashKeyFunction string `json:"basic_auth_hash_key_function"`
 
 	// Specify your previous key hashing algorithm if you migrated from one algorithm to another.
 	HashKeyFunctionFallback []string `json:"hash_key_function_fallback"`
@@ -616,10 +650,10 @@ type Config struct {
 	// A policy can be defined in a file (Open Source installations) or from the same database as the Dashboard.
 	Policies PoliciesConfig `json:"policies"`
 
-	// Defines the ports that will be available for the API services to bind to.
+	// Defines the ports that will be available for the API services to bind to in the following format: `"{“":“”}"`. Remember to escape JSON strings.
 	// This is a map of protocol to PortWhiteList. This allows per protocol
 	// configurations.
-	PortWhiteList map[string]PortWhiteList `json:"ports_whitelist"`
+	PortWhiteList PortsWhiteList `json:"ports_whitelist"`
 
 	// Disable port whilisting, essentially allowing you to use any port for your API.
 	DisablePortWhiteList bool `json:"disable_ports_whitelist"`
@@ -668,7 +702,7 @@ type Config struct {
 	// The standard rate limiter offers similar performance as the sentinel-based limiter. This is disabled by default.
 	EnableSentinelRateLimiter bool `json:"enable_sentinel_rate_limiter"`
 
-	// An enchancment for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
+	// An enhancement for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
 	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
 
 	// How frequently a distributed rate limiter synchronises information between the Gateway nodes. Default: 2 seconds.
@@ -948,10 +982,12 @@ type Config struct {
 
 	// Enable global API token expiration. Can be needed if all your APIs using JWT or oAuth 2.0 auth methods with dynamically generated keys.
 	ForceGlobalSessionLifetime bool `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
+	// SessionLifetimeRespectsKeyExpiration respects the key expiration time when the session lifetime is less than the key expiration. That is, Redis waits the key expiration for physical removal.
+	SessionLifetimeRespectsKeyExpiration bool `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration"`
 	// global session lifetime, in seconds.
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
-	// This section enables the use of the KV capabilites to substitute configuration values.
+	// This section enables the use of the KV capabilities to substitute configuration values.
 	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/
 	KV struct {
 		Consul ConsulConfig `json:"consul"`

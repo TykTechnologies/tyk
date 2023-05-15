@@ -3,24 +3,24 @@
 // The code below describes the Tyk Gateway API
 // Version: 2.8.0
 //
-//     Schemes: https, http
-//     Host: localhost
-//     BasePath: /tyk/
+//	Schemes: https, http
+//	Host: localhost
+//	BasePath: /tyk/
 //
-//     Consumes:
-//     - application/json
+//	Consumes:
+//	- application/json
 //
-//     Produces:
-//     - application/json
+//	Produces:
+//	- application/json
 //
-//     Security:
-//     - api_key:
+//	Security:
+//	- api_key:
 //
-//     SecurityDefinitions:
-//     api_key:
-//          type: apiKey
-//          name: X-Tyk-Authorization
-//          in: header
+//	SecurityDefinitions:
+//	api_key:
+//	     type: apiKey
+//	     name: X-Tyk-Authorization
+//	     in: header
 //
 // swagger:meta
 package gateway
@@ -43,10 +43,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/TykTechnologies/tyk/config"
 
+	"github.com/TykTechnologies/tyk/internal/uuid"
+
 	"github.com/TykTechnologies/tyk/apidef/oas"
-	uuid "github.com/satori/go.uuid"
 
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
@@ -57,11 +60,11 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 
-	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 )
 
 var (
@@ -108,8 +111,22 @@ type paginatedOAuthClientTokens struct {
 	Tokens     []OAuthClientToken
 }
 
+type VersionMetas struct {
+	Status string        `json:"status"`
+	Metas  []VersionMeta `json:"apis"`
+}
+
+type VersionMeta struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	VersionName      string `json:"versionName"`
+	Internal         bool   `json:"internal"`
+	ExpirationDate   string `json:"expirationDate"`
+	IsDefaultVersion bool   `json:"isDefaultVersion"`
+}
+
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
-	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(obj); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -243,12 +260,49 @@ func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionSta
 		return err
 	}
 
-	lifetime := session.Lifetime(spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
+	// calculate lifetime considering access rights
+	lifetime := gw.ApplyLifetime(session, spec)
 	if err := gw.GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// GetApiSpecsFromAccessRights from the session.AccessRights returns the collection of api specs
+func (gw *Gateway) GetApiSpecsFromAccessRights(sess *user.SessionState) []*APISpec {
+	var apis []*APISpec
+	if sess != nil && len(sess.AccessRights) > 0 {
+		for apiID := range sess.AccessRights {
+			spec := gw.getApiSpec(apiID)
+			if spec != nil {
+				apis = append(apis, spec)
+			}
+		}
+	}
+
+	return apis
+}
+
+// ApplyLifetime calculates the lifetime for the key. It considers the access rights and the bigger lifetime will be used
+func (gw *Gateway) ApplyLifetime(sess *user.SessionState, specs ...*APISpec) int64 {
+	var lifetime int64
+
+	if len(sess.AccessRights) > 0 {
+		specs = gw.GetApiSpecsFromAccessRights(sess)
+	}
+
+	for _, spec := range specs {
+		if spec != nil {
+			sessionLifeTime := sess.Lifetime(spec.GetSessionLifetimeRespectsKeyExpiration(), spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
+			// uses the greater lifetime
+			if sessionLifeTime > lifetime {
+				lifetime = sessionLifeTime
+			}
+		}
+	}
+
+	return lifetime
 }
 
 func resetAPILimits(accessRights map[string]user.AccessDefinition) {
@@ -272,7 +326,6 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 		// reset API-level limit to empty APILimit if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
 		// We have a specific list of access rules, only add / update those
-
 		for apiId := range newSession.AccessRights {
 			apiSpec := gw.getApiSpec(apiId)
 			if apiSpec == nil {
@@ -313,13 +366,13 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 		log.Warning("No API Access Rights set, adding key to ALL.")
 		gw.apisMu.RLock()
 		defer gw.apisMu.RUnlock()
+
 		for _, spec := range gw.apisByID {
 			if !dontReset {
 				gw.GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 			}
 			gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
-
 			// apply polices (if any) and save key
 			if err := gw.applyPoliciesAndSave(keyName, newSession, spec, isHashed); err != nil {
 				return err
@@ -346,16 +399,40 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 // remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
 // need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
 
-func setSessionPassword(session *user.SessionState) {
-	session.BasicAuthData.Hash = user.HashBCrypt
-	newPass, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
-	if err != nil {
-		log.Error("Could not hash password, setting to plaintext, error was: ", err)
-		session.BasicAuthData.Hash = user.HashPlainText
+func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
+	basicAuthHashAlgo := gw.basicAuthHashAlgo()
+
+	if basicAuthHashAlgo == string(user.HashBCrypt) {
+		session.BasicAuthData.Hash = user.HashBCrypt
+		hashedPassBytes, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
+		if err != nil {
+			log.WithError(err).Error("Could not hash password, setting to plaintext")
+			session.BasicAuthData.Hash = user.HashPlainText
+			return
+		}
+
+		session.BasicAuthData.Password = string(hashedPassBytes)
 		return
 	}
 
-	session.BasicAuthData.Password = string(newPass)
+	session.BasicAuthData.Password = storage.HashStr(session.BasicAuthData.Password, basicAuthHashAlgo)
+	session.BasicAuthData.Hash = user.HashType(basicAuthHashAlgo)
+}
+
+func (gw *Gateway) basicAuthHashAlgo() string {
+	config := gw.GetConfig()
+
+	// Use `basic_auth_hash_key_function` if set;
+	algo := config.BasicAuthHashKeyFunction
+
+	// If hash function name is empty/invalid
+	if ok := user.IsHashType(algo); !ok {
+		// set default basic auth hash to bcrypt
+		return string(user.HashBCrypt)
+	}
+
+	// Algo is validated at this point
+	return algo
 }
 
 func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
@@ -445,14 +522,14 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		switch r.Method {
 		case http.MethodPost:
 			// It's a create, so lets hash the password
-			setSessionPassword(newSession)
+			gw.setBasicAuthSessionPassword(newSession)
 		case http.MethodPut:
 			if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
 				// passwords dont match assume it's new, lets hash it
 				log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
 				log.Debug("New: newSession.BasicAuthData.Password")
 				log.Debug("Changing password")
-				setSessionPassword(newSession)
+				gw.setBasicAuthSessionPassword(newSession)
 			}
 		}
 	} else if originalKey.BasicAuthData.Password != "" {
@@ -645,7 +722,7 @@ func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
-func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string, orgId string) {
+func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	sess := &user.SessionState{}
 	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
@@ -654,12 +731,8 @@ func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string
 		return
 	}
 
-	var err error
-	if gw.GetConfig().HashKeys {
-		err = gw.GlobalSessionManager.UpdateSession(hashedName, sess, 0, true)
-	} else {
-		err = gw.GlobalSessionManager.UpdateSession(keyName, sess, 0, false)
-	}
+	lifetime := gw.ApplyLifetime(sess, nil)
+	err := gw.GlobalSessionManager.UpdateSession(keyName, sess, lifetime, gw.GetConfig().HashKeys)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -682,11 +755,14 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 	}
 	keyName = session.KeyID
 
+	if resetQuota {
+		gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
+	}
+
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		gw.apisMu.RLock()
 		removed := gw.GlobalSessionManager.RemoveSession(orgID, keyName, false)
-		gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
 		gw.apisMu.RUnlock()
 
 		if !removed {
@@ -714,10 +790,6 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 			"status": "fail",
 		}).Error("Failed to remove the key")
 		return apiError("Failed to remove the key"), http.StatusBadRequest
-	}
-
-	if resetQuota {
-		gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
 	}
 
 	statusObj := apiModifyKeySuccess{
@@ -971,8 +1043,12 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
 	var (
-		newDef apidef.APIDefinition
-		oasObj oas.OAS
+		newDef             apidef.APIDefinition
+		oasObj             oas.OAS
+		baseAPIID          = r.FormValue("base_api_id")
+		baseAPIVersionName = r.FormValue("base_api_version_name")
+		newVersionName     = r.FormValue("new_version_name")
+		setDefault         = r.FormValue("set_default") == "true"
 	)
 
 	if oasEndpoint {
@@ -1014,6 +1090,64 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
 		if err != nil {
 			return apiError(err.Error()), errCode
+		}
+	}
+
+	if baseAPIID != "" {
+		if baseAPIPtr := gw.getApiSpec(baseAPIID); baseAPIPtr == nil {
+			log.Errorf("Couldn't find a base API to bind with the given API id: %s", baseAPIID)
+		} else {
+			apiInBytes, err := json.Marshal(baseAPIPtr)
+			if err != nil {
+				log.WithError(err).Error("Couldn't marshal API spec")
+			}
+
+			var baseAPI APISpec
+			err = json.Unmarshal(apiInBytes, &baseAPI)
+			if err != nil {
+				log.WithError(err).Error("Couldn't unmarshal API spec")
+			}
+
+			baseAPI.VersionDefinition.Enabled = true
+			if baseAPIVersionName != "" {
+				baseAPI.VersionDefinition.Name = baseAPIVersionName
+				baseAPI.VersionDefinition.Default = baseAPIVersionName
+			}
+
+			if baseAPI.VersionDefinition.Key == "" {
+				baseAPI.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+			}
+
+			if baseAPI.VersionDefinition.Location == "" {
+				baseAPI.VersionDefinition.Location = apidef.HeaderLocation
+			}
+
+			if baseAPI.VersionDefinition.Default == "" {
+				baseAPI.VersionDefinition.Default = apidef.Self
+			}
+
+			if baseAPI.VersionDefinition.Versions == nil {
+				baseAPI.VersionDefinition.Versions = make(map[string]string)
+			}
+
+			baseAPI.VersionDefinition.Versions[newVersionName] = newDef.APIID
+
+			if setDefault {
+				baseAPI.VersionDefinition.Default = newVersionName
+			}
+
+			if baseAPI.IsOAS {
+				baseAPI.OAS.Fill(*baseAPI.APIDefinition)
+				err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
+				if err != nil {
+					log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
+				}
+			} else {
+				err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
+				if err != nil {
+					log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
+				}
+			}
 		}
 	}
 
@@ -1165,6 +1299,45 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 		os.Remove(defOASFilePath)
 	}
 
+	if spec.VersionDefinition.BaseID != "" {
+		baseAPIPtr := gw.getApiSpec(spec.VersionDefinition.BaseID)
+		apiInBytes, err := json.Marshal(baseAPIPtr)
+		if err != nil {
+			log.WithError(err).Error("Couldn't marshal API spec")
+		}
+
+		var baseAPI APISpec
+		err = json.Unmarshal(apiInBytes, &baseAPI)
+		if err != nil {
+			log.WithError(err).Error("Couldn't unmarshal API spec")
+		}
+
+		for versionName, versionAPIID := range baseAPI.VersionDefinition.Versions {
+			if apiID == versionAPIID {
+				delete(baseAPI.VersionDefinition.Versions, versionName)
+				if baseAPI.VersionDefinition.Default == versionName {
+					baseAPI.VersionDefinition.Default = baseAPI.VersionDefinition.Name
+				}
+
+				break
+			}
+		}
+
+		fs := afero.NewOsFs()
+		if baseAPI.IsOAS {
+			baseAPI.OAS.Fill(*baseAPI.APIDefinition)
+			err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
+			if err != nil {
+				log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
+			}
+		} else {
+			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
+			if err != nil {
+				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
+			}
+		}
+	}
+
 	response := apiModifyKeySuccess{
 		Key:    apiID,
 		Status: "ok",
@@ -1218,13 +1391,19 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	switch r.Method {
-	case "GET":
+	case http.MethodGet:
 		if apiID != "" {
 			log.Debugf("Requesting API definition for %q", apiID)
 			obj, code = gw.handleGetAPI(apiID, false)
 		} else {
 			log.Debug("Requesting API list")
 			obj, code = gw.handleGetAPIList()
+		}
+
+		if api, ok := obj.(*apidef.APIDefinition); ok {
+			if api.VersionDefinition.BaseID != "" {
+				w.Header().Set(apidef.HeaderBaseAPIID, api.VersionDefinition.BaseID)
+			}
 		}
 	case http.MethodPost:
 		log.Debug("Creating new definition file")
@@ -1236,7 +1415,7 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
-	case "DELETE":
+	case http.MethodDelete:
 		if apiID != "" {
 			log.Debug("Deleting API definition for: ", apiID)
 			obj, code = gw.handleDeleteAPI(apiID)
@@ -1261,6 +1440,13 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		log.Debug("Requesting API list")
 		obj, code = gw.handleGetAPIListOAS(scopePublic)
+	}
+
+	if oasAPI, ok := obj.(*oas.OAS); ok {
+		api := gw.getApiSpec(oasAPI.GetTykExtension().Info.ID)
+		if api != nil && api.VersionDefinition.BaseID != "" {
+			w.Header().Set(apidef.HeaderBaseAPIID, api.VersionDefinition.BaseID)
+		}
 	}
 
 	doJSONWrite(w, code, obj)
@@ -1607,6 +1793,7 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 		gw.DefaultQuotaStore.RemoveSession(orgID, rawKey, false)
 	}
 
+	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	err := sessionManager.UpdateSession(orgID, newSession, 0, false)
 	if err != nil {
 		return apiError("Error writing to key store " + err.Error()), http.StatusInternalServerError
@@ -1738,7 +1925,6 @@ func (gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
 // was in the URL parameters, it will block until the reload is done.
 // Otherwise, it won't block and fn will be called once the reload is
 // finished.
-//
 func (gw *Gateway) resetHandler(fn func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var wg sync.WaitGroup
@@ -1814,6 +2000,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				sessionManager := gw.GlobalSessionManager
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				sessionManager.ResetQuota(newKey, newSession, false)
+				// apply polices (if any) and save key
 				err := sessionManager.UpdateSession(newKey, newSession, -1, false)
 				if err != nil {
 					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
@@ -1844,7 +2031,6 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					gw.GlobalSessionManager.ResetQuota(newKey, newSession, false)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
-				// apply polices (if any) and save key
 				if err := gw.applyPoliciesAndSave(newKey, newSession, spec, false); err != nil {
 					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
 					return
@@ -1954,11 +2140,10 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Allow the client ID to be set
-	cleanSting := newOauthClient.ClientID
+	clientID := newOauthClient.ClientID
 
 	if newOauthClient.ClientID == "" {
-		u5 := uuid.NewV4()
-		cleanSting = strings.Replace(u5.String(), "-", "", -1)
+		clientID = uuid.NewHex()
 	}
 
 	// Allow the secret to be set
@@ -1968,7 +2153,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newClient := OAuthClient{
-		ClientID:          cleanSting,
+		ClientID:          clientID,
 		ClientRedirectURI: newOauthClient.ClientRedirectURI,
 		ClientSecret:      secret,
 		PolicyID:          newOauthClient.PolicyID,
@@ -2809,6 +2994,11 @@ func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		if err = oasObj.Validate(r.Context()); err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+
 		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
 		next.ServeHTTP(w, r)
 	}
@@ -2883,6 +3073,17 @@ func ctxSetData(r *http.Request, m map[string]interface{}) {
 		panic("setting a nil context ContextData")
 	}
 	setCtxValue(r, ctx.ContextData, m)
+}
+
+// ctxSetCacheOptions sets a cache key to use for the http request
+func ctxSetCacheOptions(r *http.Request, options *cacheOptions) {
+	setCtxValue(r, ctx.CacheOptions, options)
+}
+
+// ctxGetCacheOptions returns a cache key if we need to cache request
+func ctxGetCacheOptions(r *http.Request) *cacheOptions {
+	key, _ := r.Context().Value(ctx.CacheOptions).(*cacheOptions)
+	return key
 }
 
 func ctxGetSession(r *http.Request) *user.SessionState {
@@ -3172,9 +3373,20 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	return
 }
 
+func ctxSetOperation(r *http.Request, op *Operation) {
+	setCtxValue(r, ctx.OASOperation, op)
+}
+
+func ctxGetOperation(r *http.Request) (op *Operation) {
+	if v := r.Context().Value(ctx.OASOperation); v != nil {
+		op = v.(*Operation)
+	}
+	return
+}
+
 var createOauthClientSecret = func() string {
-	secret := uuid.NewV4()
-	return base64.StdEncoding.EncodeToString([]byte(secret.String()))
+	secret := uuid.New()
+	return base64.StdEncoding.EncodeToString([]byte(secret))
 }
 
 // invalidate tokens if we had a new policy
@@ -3201,10 +3413,13 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 		return nil, nil, ErrRequestMalformed
 	}
 
-	err = oasObj.UnmarshalJSON(reqBodyInBytes)
+	loader := openapi3.NewLoader()
+	t, err := loader.LoadFromData(reqBodyInBytes)
 	if err != nil {
 		return nil, nil, ErrRequestMalformed
 	}
+
+	oasObj.T = *t
 
 	return reqBodyInBytes, &oasObj, nil
 }

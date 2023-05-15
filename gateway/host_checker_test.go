@@ -15,8 +15,9 @@ import (
 	"time"
 
 	proxyproto "github.com/pires/go-proxyproto"
-	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -68,10 +69,11 @@ func (w *testEventHandler) HandleEvent(em config.EventMessage) {
 	w.cb(em)
 }
 
-//// ToDo check why it blocks
+// // ToDo check why it blocks
 func TestHostChecker(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.UptimeTests.PollerGroup = uuid.NewV4().String()
+		globalConf.UptimeTests.PollerGroup = uuid.New()
+
 	})
 	defer ts.Close()
 
@@ -178,7 +180,8 @@ func TestHostChecker(t *testing.T) {
 func TestReverseProxyAllDown(t *testing.T) {
 
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.UptimeTests.PollerGroup = uuid.NewV4().String()
+		globalConf.UptimeTests.PollerGroup = uuid.New()
+
 	})
 	defer ts.Close()
 
@@ -458,7 +461,8 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 		conf.UptimeTests.Config.FailureTriggerSampleSize = 1
 		conf.UptimeTests.Config.TimeWait = 5
 		conf.UptimeTests.Config.EnableUptimeAnalytics = true
-		conf.UptimeTests.PollerGroup = uuid.NewV4().String()
+		conf.UptimeTests.PollerGroup = uuid.New()
+
 	}
 	ts := StartTest(conf)
 	defer ts.Close()

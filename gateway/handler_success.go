@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"encoding/base64"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -170,14 +173,17 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			// mw_redis_cache instead? is there a reason not
 			// to include that in the analytics?
 			if responseCopy != nil {
-				// the body is assumed to be a nopCloser*
-				body := responseCopy.Body
+				contents, err := ioutil.ReadAll(responseCopy.Body)
+				if err != nil {
+					log.Error("Couldn't read response body", err)
+				}
+
 				responseCopy.Body = respBodyReader(r, responseCopy)
 
 				// Get the wire format representation
 				var wireFormatRes bytes.Buffer
 				responseCopy.Write(&wireFormatRes)
-				responseCopy.Body = body
+				responseCopy.Body = ioutil.NopCloser(bytes.NewBuffer(contents))
 				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 			}
 		}
@@ -200,7 +206,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			Path:          trackedPath,
 			RawPath:       r.URL.Path,
 			ContentLength: r.ContentLength,
-			UserAgent:     r.Header.Get(headers.UserAgent),
+			UserAgent:     r.Header.Get(header.UserAgent),
 			Day:           t.Day(),
 			Month:         t.Month(),
 			Year:          t.Year(),
@@ -228,6 +234,12 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
 			record.GetGeo(ip, s.Gw.Analytics.GeoIPDB)
+		}
+
+		// skip tagging subgraph requests for graphpump, it only handles generated supergraph requests
+		if s.Spec.GraphQL.Enabled && s.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
+			record.Tags = append(record.Tags, "tyk-graph-analytics")
+			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(s.Spec.GraphQL.Schema))
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
@@ -269,7 +281,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 }
 
 func recordDetail(r *http.Request, spec *APISpec) bool {
-
 	// when streaming in grpc, we do not record the request
 	if IsGrpcStreaming(r) {
 		return false
@@ -279,10 +290,8 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 		return true
 	}
 
-	session := ctxGetSession(r)
-
-	if session != nil {
-		if session.EnableDetailedRecording || session.EnableDetailRecording {
+	if session := ctxGetSession(r); session != nil {
+		if session.EnableDetailedRecording || session.EnableDetailRecording { // nolint:staticcheck // Deprecated DetailRecording
 			return true
 		}
 	}
@@ -293,16 +302,13 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 	}
 
 	// We are, so get session data
-	ses := r.Context().Value(ctx.OrgSessionContext)
-
-	if ses == nil {
-		// no session found, use global config
-		return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
+	session, ok := r.Context().Value(ctx.OrgSessionContext).(*user.SessionState)
+	if ok && session != nil {
+		return session.EnableDetailedRecording || session.EnableDetailRecording // nolint:staticcheck // Deprecated DetailRecording
 	}
 
-	// Session found
-	sess := ses.(*user.SessionState)
-	return sess.EnableDetailRecording || sess.EnableDetailedRecording
+	// no session found, use global config
+	return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
 }
 
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's

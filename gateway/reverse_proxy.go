@@ -31,21 +31,20 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
-	gqlhttp "github.com/jensneuse/graphql-go-tools/pkg/http"
-	"github.com/jensneuse/graphql-go-tools/pkg/subscription"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
 
 	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
@@ -61,10 +60,9 @@ var corsHeaders = []string{
 	"Access-Control-Allow-Methods",
 	"Access-Control-Allow-Headers"}
 
-var ServiceCache *cache.Cache
 var sdMu sync.RWMutex
 
-func urlFromService(spec *APISpec) (*apidef.HostList, error) {
+func urlFromService(spec *APISpec, gw *Gateway) (*apidef.HostList, error) {
 
 	doCacheRefresh := func() (*apidef.HostList, error) {
 		log.Debug("--> Refreshing")
@@ -91,7 +89,12 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 			return spec.LastGoodHostList, nil
 		}
 
-		ServiceCache.Set(spec.APIID, data, cache.DefaultExpiration)
+		ttl, cacheEnabled := spec.Proxy.ServiceDiscovery.CacheOptions()
+		if !cacheEnabled {
+			ttl = 0 // use gateway default cache time to live.
+		}
+		gw.ServiceCache.Set(spec.APIID, data, ttl)
+
 		// Stash it too
 		spec.LastGoodHostList = data
 		return data, nil
@@ -106,7 +109,7 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 	}
 
 	// Not first run - check the cache
-	cachedServiceData, found := ServiceCache.Get(spec.APIID)
+	cachedServiceData, found := gw.ServiceCache.Get(spec.APIID)
 	if !found {
 		if spec.ServiceRefreshInProgress {
 			// Are we already refreshing the cache? skip and return last good conf
@@ -217,19 +220,6 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			panic(server.Serve(listener))
 		}()
 	})
-	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-		log.Debug("[PROXY] Service discovery enabled")
-		if ServiceCache == nil {
-			log.Debug("[PROXY] Service cache initialising")
-			expiry := 120
-			if spec.Proxy.ServiceDiscovery.CacheTimeout > 0 {
-				expiry = int(spec.Proxy.ServiceDiscovery.CacheTimeout)
-			} else if spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout > 0 {
-				expiry = spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout
-			}
-			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
-		}
-	}
 
 	targetQuery := target.RawQuery
 	director := func(req *http.Request) {
@@ -237,7 +227,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		switch {
 		case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
 			var err error
-			hostList, err = urlFromService(spec)
+			hostList, err = urlFromService(spec, gw)
 			if err != nil {
 				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 				break
@@ -295,10 +285,10 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		} else {
 			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
 		}
-		if _, ok := req.Header[headers.UserAgent]; !ok {
+		if _, ok := req.Header[header.UserAgent]; !ok {
 			// Set Tyk's own default user agent. Without
 			// this line, we would get the net/http default.
-			req.Header.Set(headers.UserAgent, defaultUserAgent)
+			req.Header.Set(header.UserAgent, defaultUserAgent)
 		}
 
 		if spec.GlobalConfig.HttpServerOptions.SkipTargetPathEscaping {
@@ -403,25 +393,33 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 		dialContextFunc = p.Gw.dnsCacheManager.WrapDialer(dialer)
 	}
 
-	return &http.Transport{
+	if p.Gw.dialCtxFn != nil {
+		dialContextFunc = p.Gw.dialCtxFn
+	}
+
+	transport := &http.Transport{
 		DialContext:           dialContextFunc,
 		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
 		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
 		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
+
+	return transport
 }
 
-func singleJoiningSlash(a, b string, disableStripSlash bool) string {
-	if disableStripSlash && (len(b) == 0 || b == "/") {
-		return a
+func singleJoiningSlash(targetPath, subPath string, disableStripSlash bool) string {
+	if disableStripSlash && (len(subPath) == 0 || subPath == "/") {
+		return targetPath
 	}
-	a = strings.TrimRight(a, "/")
-	b = strings.TrimLeft(b, "/")
-	if len(b) > 0 {
-		return a + "/" + b
+
+	targetPath = strings.TrimRight(targetPath, "/")
+	subPath = strings.TrimLeft(subPath, "/")
+
+	if len(subPath) > 0 {
+		return targetPath + "/" + subPath
 	}
-	return a
+	return targetPath
 }
 
 func removeDuplicateCORSHeader(dst, src http.Header) {
@@ -917,6 +915,12 @@ func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outr
 		latency = time.Since(begin)
 	}()
 
+	if p.TykAPISpec.HasMock {
+		if res, err = p.mockResponse(outreq); res != nil {
+			return
+		}
+	}
+
 	if p.TykAPISpec.GraphQL.Enabled {
 		res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
 		return
@@ -959,7 +963,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 		}
 
 		if isIntrospection {
-			res, err = p.handleGraphQLIntrospection()
+			res, err = p.handleGraphQLIntrospection(gqlRequest)
 			return
 		}
 		if needEngine {
@@ -971,19 +975,41 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 	return
 }
 
-func (p *ReverseProxy) handleGraphQLIntrospection() (res *http.Response, err error) {
-	result, err := graphql.SchemaIntrospection(p.TykAPISpec.GraphQLExecutor.Schema)
-	if err != nil {
+func (p *ReverseProxy) handleGraphQLIntrospection(gqlRequest *graphql.Request) (res *http.Response, err error) {
+	switch p.TykAPISpec.GraphQL.Version {
+	case apidef.GraphQLConfigVersion2:
+		if p.TykAPISpec.GraphQLExecutor.EngineV2 == nil {
+			err = errors.New("execution engine is nil")
+			return
+		}
+
+		reqCtx := context.Background()
+		resultWriter := graphql.NewEngineResultWriter()
+		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter)
+		if err != nil {
+			return
+		}
+
+		httpStatus := http.StatusOK
+		headers := make(http.Header)
+		headers.Set("Content-Type", "application/json")
+		res = resultWriter.AsHTTPResponse(httpStatus, headers)
+		return
+	default:
+		var result *graphql.ExecutionResult
+		result, err = graphql.SchemaIntrospection(p.TykAPISpec.GraphQLExecutor.Schema)
+		if err != nil {
+			return
+		}
+
+		res = result.GetAsHTTPResponse()
 		return
 	}
-
-	res = result.GetAsHTTPResponse()
-	return
 }
 
 func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoundTripper, r *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	conn, err := p.wsUpgrader.Upgrade(w, r, http.Header{
-		headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+		header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
 	})
 	if err != nil {
 		p.logger.Error("websocket upgrade for GraphQL engine failed: ", err)
@@ -1027,10 +1053,30 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		}
 
 		resultWriter := graphql.NewEngineResultWriter()
-		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter,
+		execOptions := []graphql.ExecutionOptionsV2{
 			graphql.WithBeforeFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.BeforeFetchHook),
 			graphql.WithAfterFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.AfterFetchHook),
-		)
+		}
+
+		// if this context vars are enabled and this is a supergraph, inject the sub request id header
+		upstreamHeaders := http.Header{}
+		if p.TykAPISpec.EnableContextVars && p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph {
+			ctxData := ctxGetData(outreq)
+			if reqID, exists := ctxData["request_id"]; !exists {
+				log.Warn("context variables enabled but request_id missing")
+			} else if requestID, ok := reqID.(string); ok {
+				upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
+			}
+		}
+
+		// append the request headers if any
+		for h, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeaders {
+			val := p.Gw.replaceTykVariables(outreq, value, false)
+			upstreamHeaders.Set(h, val)
+		}
+		execOptions = append(execOptions, graphql.WithUpstreamHeaders(upstreamHeaders))
+
+		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
 		if err != nil {
 			return
 		}
@@ -1041,8 +1087,15 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 
 		if isProxyOnly {
 			proxyOnlyCtx := reqCtx.(*GraphQLProxyOnlyContext)
-			header = proxyOnlyCtx.upstreamResponse.Header
-			httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
+			// There is a case in the proxy-only mode where the request can be handled
+			// by the library without calling the upstream.
+			// This is a valid query for proxy-only mode: query { __typename }
+			// In this case, upstreamResponse is nil.
+			// See TT-6419 for further info.
+			if proxyOnlyCtx.upstreamResponse != nil {
+				header = proxyOnlyCtx.upstreamResponse.Header
+				httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
+			}
 		}
 
 		res = resultWriter.AsHTTPResponse(httpStatus, header)
@@ -1116,8 +1169,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// Do this before we make a shallow copy
 	session := ctxGetSession(req)
-	// mantain the body
-	copyRequest(req)
 
 	outreq := new(http.Request)
 	logreq := new(http.Request)
@@ -1140,6 +1191,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		outreq.Body = nil // Issue 16036: nil Body for http.Transport retries
 	}
 	outreq = outreq.WithContext(reqCtx)
+	setContext(logreq, outreq.Context())
 
 	outreq.Header = cloneHeader(req.Header)
 	if trace.IsEnabled() {
@@ -1184,8 +1236,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	addrs := requestIPHops(req)
-	if !p.CheckHeaderInRemoveList(headers.XForwardFor, p.TykAPISpec, req) {
-		outreq.Header.Set(headers.XForwardFor, addrs)
+	if !p.CheckHeaderInRemoveList(header.XForwardFor, p.TykAPISpec, req) {
+		outreq.Header.Set(header.XForwardFor, addrs)
 	}
 
 	// Circuit breaker
@@ -1268,7 +1320,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if err != nil {
-
 		token := ctxGetAuthToken(req)
 
 		var alias string
@@ -1285,14 +1336,18 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			"org_id":      p.TykAPISpec.OrgID,
 			"api_id":      p.TykAPISpec.APIID,
 		}).Error("http: proxy error: ", err)
+
+		if strings.HasPrefix(err.Error(), "mock:") {
+			p.ErrorHandler.HandleError(rw, logreq, err.Error(), res.StatusCode, true)
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
+		}
+
 		if strings.Contains(err.Error(), "timeout awaiting response headers") {
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", http.StatusGatewayTimeout, true)
 
 			if p.TykAPISpec.Proxy.ServiceDiscovery.UseDiscoveryService {
-				if ServiceCache != nil {
-					p.logger.Debug("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
-					ServiceCache.Delete(p.TykAPISpec.APIID)
-				}
+				p.logger.Debug("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
+				p.Gw.ServiceCache.Delete(p.TykAPISpec.APIID)
 			}
 			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
@@ -1317,7 +1372,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	upgrade, _ := p.IsUpgrade(req)
 	// Deal with 101 Switching Protocols responses: (WebSocket, h2c, etc)
-	if upgrade {
+	if upgrade && res.StatusCode == 101 {
 		if err := p.handleUpgradeResponse(rw, outreq, res); err != nil {
 			p.ErrorHandler.HandleError(rw, logreq, err.Error(), http.StatusInternalServerError, true)
 			return ProxyResponse{UpstreamLatency: upstreamLatency}
@@ -1373,7 +1428,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 	// Remove hop-by-hop headers listed in the
 	// "Connection" header of the response.
-	if c := res.Header.Get(headers.Connection); c != "" {
+	if c := res.Header.Get(header.Connection); c != "" {
 		for _, f := range strings.Split(c, ",") {
 			if f = strings.TrimSpace(f); f != "" {
 				res.Header.Del(f)
@@ -1388,16 +1443,16 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 	// Close connections
 	if p.Gw.GetConfig().CloseConnections {
-		res.Header.Set(headers.Connection, "close")
+		res.Header.Set(header.Connection, "close")
 	}
 
 	// Add resource headers
 	if ses != nil {
 		// We have found a session, lets report back
 		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(p.TykAPISpec.APIID)
-		res.Header.Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		res.Header.Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+		res.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		res.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		res.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
@@ -1661,9 +1716,97 @@ type nopCloser struct {
 func (n nopCloser) Read(p []byte) (int, error) {
 	num, err := n.ReadSeeker.Read(p)
 	if err == io.EOF { // move to start to have it ready for next read cycle
-		n.Seek(0, io.SeekStart)
+		_, seekErr := n.Seek(0, io.SeekStart)
+		if seekErr != nil {
+			log.WithError(seekErr).Error("can't rewind nopCloser")
+		}
 	}
 	return num, err
+}
+
+// nopCloserBuffer is like nopCloser above but uses pointer receiver for seeking
+// within an internal bytes.Buffer reference.
+type nopCloserBuffer struct {
+	reader   io.ReadCloser
+	once     sync.Once
+	buf      bytes.Buffer
+	position int64
+}
+
+// newNopCloserBuffer creates a new instance of a *nopCloserBuffer.
+func newNopCloserBuffer(buf io.ReadCloser) (*nopCloserBuffer, error) {
+	return &nopCloserBuffer{
+		reader: buf,
+	}, nil
+}
+
+// copy creates a copy of the io.Reader when we read from it (lazy).
+func (n *nopCloserBuffer) copy() (err error) {
+	n.once.Do(func() {
+		_, err = io.Copy(&n.buf, n.reader)
+		if err == nil {
+			if closeErr := n.reader.Close(); closeErr != nil {
+				log.WithError(closeErr).Warn("nopCloserBuffer: error closing original reader")
+			}
+			n.reader = nil
+		}
+	})
+	return
+}
+
+// Read just a wrapper around real Read which also moves position to the start if we get EOF
+// to have it ready for next read-cycle
+func (n *nopCloserBuffer) Read(p []byte) (int, error) {
+	if err := n.copy(); err != nil {
+		return 0, err
+	}
+
+	idx := n.position
+	num, err := bytes.NewBuffer(n.buf.Bytes()[idx:]).Read(p)
+
+	if err == nil {
+		cnt := int64(n.buf.Len())
+		if idx+int64(len(p)) < cnt {
+			n.position += int64(len(p))
+		} else {
+			n.position = cnt
+		}
+	}
+
+	// move to start to have it ready for next read cycle
+	if err == io.EOF {
+		_, seekErr := n.Seek(0, io.SeekStart)
+		if seekErr != nil {
+			log.WithError(seekErr).Error("can't rewind nopCloserBuffer")
+		}
+	}
+
+	return num, err
+}
+
+// Seek seeks within the buffer
+func (n *nopCloserBuffer) Seek(offset int64, whence int64) (int64, error) {
+	if whence != io.SeekStart {
+		return 0, errors.New("invalid seek method, only supporting SeekStart")
+	}
+
+	if offset == 0 && n.position == 0 {
+		return 0, nil
+	}
+
+	if err := n.copy(); err != nil {
+		return 0, err
+	}
+
+	cnt := int64(n.buf.Len())
+
+	if offset >= cnt || offset < 0 {
+		return 0, errors.New("invalid seek offset")
+	}
+
+	n.position = offset
+
+	return offset, nil
 }
 
 // Close is a no-op Close
@@ -1671,50 +1814,54 @@ func (n nopCloser) Close() error {
 	return nil
 }
 
-func copyBody(body io.ReadCloser) io.ReadCloser {
+// Close is a no-op Close
+func (n *nopCloserBuffer) Close() error {
+	return nil
+}
+
+func copyBody(body io.ReadCloser, isClientResponseBody bool) io.ReadCloser {
 	// check if body was already read and converted into our nopCloser
-	if nc, ok := body.(nopCloser); ok {
+	if nc, ok := body.(*nopCloserBuffer); ok {
 		// seek to the beginning to have it ready for next read
 		nc.Seek(0, io.SeekStart)
 		return body
 	}
 
-	// body is http's io.ReadCloser - let's close it after we read data
-	defer body.Close()
-
-	// body is http's io.ReadCloser - read it up until EOF
-	var bodyRead bytes.Buffer
-	_, err := io.Copy(&bodyRead, body)
+	// body is http's io.ReadCloser - read it up
+	rwc, err := newNopCloserBuffer(body)
 	if err != nil {
-		log.Error("copyBody failed", err)
+		log.WithError(err).Error("error creating buffered request body")
+		return body
+	}
+
+	// Consume reader if it's from a http client response.
+	//
+	// Server would automatically call Close(), we only do it for
+	// the *http.Response struct, but not *http.Request.
+	if isClientResponseBody {
+		if err := rwc.copy(); err != nil {
+			log.WithError(err).Error("error reading request body")
+			return body
+		}
 	}
 
 	// use seek-able reader for further body usage
-	reusableBody := bytes.NewReader(bodyRead.Bytes())
-
-	return nopCloser{reusableBody}
+	return rwc
 }
 
 func copyRequest(r *http.Request) *http.Request {
-	if r.ContentLength == -1 &&
-		// for unknown length, if request is not gRPC we assume it's chunked transfer encoding
-		IsGrpcStreaming(r) {
-		return r
-	}
-
-	if r.Body != nil {
-		r.Body = copyBody(r.Body)
-	}
-	return r
-}
-
-func copyResponse(r *http.Response) *http.Response {
-	// for the case of streaming for which Content-Length might be unset = -1.
-
 	if r.ContentLength == -1 {
 		return r
 	}
 
+	if r.Body != nil {
+		r.Body = copyBody(r.Body, false)
+	}
+
+	return r
+}
+
+func copyResponse(r *http.Response) *http.Response {
 	// If the response is 101 Switching Protocols then the body will contain a
 	// `*http.readWriteCloserBody` which cannot be copied (see stdlib documentation).
 	// In this case we want to return immediately to avoid a silent crash.
@@ -1723,8 +1870,9 @@ func copyResponse(r *http.Response) *http.Response {
 	}
 
 	if r.Body != nil {
-		r.Body = copyBody(r.Body)
+		r.Body = copyBody(r.Body, true)
 	}
+
 	return r
 }
 
@@ -1749,7 +1897,7 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 		return false, ""
 	}
 
-	connection := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Connection)))
+	connection := strings.ToLower(strings.TrimSpace(req.Header.Get(header.Connection)))
 	if connection != "upgrade" {
 		return false, ""
 	}
@@ -1764,7 +1912,5 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 
 // IsGrpcStreaming  determines wether a request represents a grpc streaming req
 func IsGrpcStreaming(r *http.Request) bool {
-	return r.ContentLength == -1 &&
-		// gRPC over HTTP/2 requests content-type should begin with "application/grpc"
-		strings.HasPrefix(r.Header.Get(headers.ContentType), "application/grpc")
+	return r.ContentLength == -1 && r.Header.Get(header.ContentType) == "application/grpc"
 }
