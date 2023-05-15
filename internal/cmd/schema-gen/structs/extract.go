@@ -15,7 +15,7 @@ import (
 const lintDocs = false
 
 // Extract package structs
-func Extract(rootName, filepath string, ignoreFiles ...string) (StructList, error) {
+func Extract(filepath string, ignoreFiles ...string) (StructList, error) {
 	ignoreList := make(map[string]bool)
 	for _, file := range ignoreFiles {
 		ignoreList[file] = true
@@ -51,15 +51,6 @@ func Extract(rootName, filepath string, ignoreFiles ...string) (StructList, erro
 
 	p := newObjParser(fileSet, pkgs[requiredPkgName])
 	p.parseGlobalStructs()
-
-	/*
-		rootStructInfo := &StructInfo{
-			Name:      rootName,
-			fileSet:   fileSet,
-			structObj: p.globals[rootName].(*ast.StructType),
-		}
-		p.parse(rootName, rootName, rootStructInfo)
-	*/
 
 	sort.Stable(p.info)
 

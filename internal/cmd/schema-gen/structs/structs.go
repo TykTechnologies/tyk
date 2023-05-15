@@ -12,12 +12,22 @@ type Request struct {
 }
 
 func Dump() (err error) {
-	sts, err := Extract("Config", "config/")
+	if err := write("schema/structs/config.json", "config/"); err != nil {
+		return err
+	}
+	if err := write("schema/structs/apidef.json", "apidef/"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func write(filename string, inputPackage string) error {
+	sts, err := Extract(inputPackage)
 	if err != nil {
 		return err
 	}
 
-	return dump("schema/structs/config.json", sts)
+	return dump(filename, sts)
 }
 
 func dump(filename string, data interface{}) error {

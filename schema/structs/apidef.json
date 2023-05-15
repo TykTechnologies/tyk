@@ -1,0 +1,4741 @@
+[
+  {
+    "Name": "APIDefinition",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Id",
+        "go_type": "object",
+        "go_path": "APIDefinition.Id",
+        "tag": "bson:\"_id,omitempty\" json:\"id,omitempty\" gorm:\"primaryKey;column:_id\"",
+        "json_name": "id,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "APIDefinition.Name",
+        "tag": "bson:\"name\" json:\"name\"",
+        "json_name": "name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Expiration",
+        "go_type": "string",
+        "go_path": "APIDefinition.Expiration",
+        "tag": "bson:\"expiration\" json:\"expiration,omitempty\"",
+        "json_name": "expiration,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ExpirationTs",
+        "go_type": "object",
+        "go_path": "APIDefinition.ExpirationTs",
+        "tag": "bson:\"-\" json:\"-\"",
+        "json_name": "-",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Slug",
+        "go_type": "string",
+        "go_path": "APIDefinition.Slug",
+        "tag": "bson:\"slug\" json:\"slug\"",
+        "json_name": "slug",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ListenPort",
+        "go_type": "int",
+        "go_path": "APIDefinition.ListenPort",
+        "tag": "bson:\"listen_port\" json:\"listen_port\"",
+        "json_name": "listen_port",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Protocol",
+        "go_type": "string",
+        "go_path": "APIDefinition.Protocol",
+        "tag": "bson:\"protocol\" json:\"protocol\"",
+        "json_name": "protocol",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EnableProxyProtocol",
+        "go_type": "bool",
+        "go_path": "APIDefinition.EnableProxyProtocol",
+        "tag": "bson:\"enable_proxy_protocol\" json:\"enable_proxy_protocol\"",
+        "json_name": "enable_proxy_protocol",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "APIID",
+        "go_type": "string",
+        "go_path": "APIDefinition.APIID",
+        "tag": "bson:\"api_id\" json:\"api_id\"",
+        "json_name": "api_id",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "OrgID",
+        "go_type": "string",
+        "go_path": "APIDefinition.OrgID",
+        "tag": "bson:\"org_id\" json:\"org_id\"",
+        "json_name": "org_id",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseKeylessAccess",
+        "go_type": "bool",
+        "go_path": "APIDefinition.UseKeylessAccess",
+        "tag": "bson:\"use_keyless\" json:\"use_keyless\"",
+        "json_name": "use_keyless",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseOauth2",
+        "go_type": "bool",
+        "go_path": "APIDefinition.UseOauth2",
+        "tag": "bson:\"use_oauth2\" json:\"use_oauth2\"",
+        "json_name": "use_oauth2",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ExternalOAuth",
+        "go_type": "ExternalOAuth",
+        "go_path": "APIDefinition.ExternalOAuth",
+        "tag": "bson:\"external_oauth\" json:\"external_oauth\"",
+        "json_name": "external_oauth",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseOpenID",
+        "go_type": "bool",
+        "go_path": "APIDefinition.UseOpenID",
+        "tag": "bson:\"use_openid\" json:\"use_openid\"",
+        "json_name": "use_openid",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "OpenIDOptions",
+        "go_type": "OpenIDOptions",
+        "go_path": "APIDefinition.OpenIDOptions",
+        "tag": "bson:\"openid_options\" json:\"openid_options\"",
+        "json_name": "openid_options",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Oauth2Meta",
+        "go_type": "any",
+        "go_path": "APIDefinition.Oauth2Meta",
+        "tag": "bson:\"oauth_meta\" json:\"oauth_meta\"",
+        "json_name": "oauth_meta",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Auth",
+        "go_type": "AuthConfig",
+        "go_path": "APIDefinition.Auth",
+        "tag": "bson:\"auth\" json:\"auth\"",
+        "json_name": "auth",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "AuthConfigs",
+        "go_type": "AuthConfig",
+        "go_path": "APIDefinition.AuthConfigs",
+        "tag": "bson:\"auth_configs\" json:\"auth_configs\"",
+        "json_name": "auth_configs",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseBasicAuth",
+        "go_type": "bool",
+        "go_path": "APIDefinition.UseBasicAuth",
+        "tag": "bson:\"use_basic_auth\" json:\"use_basic_auth\"",
+        "json_name": "use_basic_auth",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "BasicAuth",
+        "go_type": "any",
+        "go_path": "APIDefinition.BasicAuth",
+        "tag": "bson:\"basic_auth\" json:\"basic_auth\"",
+        "json_name": "basic_auth",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseMutualTLSAuth",
+        "go_type": "bool",
+        "go_path": "APIDefinition.UseMutualTLSAuth",
+        "tag": "bson:\"use_mutual_tls_auth\" json:\"use_mutual_tls_auth\"",
+        "json_name": "use_mutual_tls_auth",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ClientCertificates",
+        "go_type": "string",
+        "go_path": "APIDefinition.ClientCertificates",
+        "tag": "bson:\"client_certificates\" json:\"client_certificates\"",
+        "json_name": "client_certificates",
+        "is_array": true
+      },
+      {
+        "doc": "UpstreamCertificates stores the domain to certificate mapping for upstream mutualTLS ",
+        "go_name": "UpstreamCertificates",
+        "go_type": "string",
+        "go_path": "APIDefinition.UpstreamCertificates",
+        "tag": "bson:\"upstream_certificates\" json:\"upstream_certificates\"",
+        "json_name": "upstream_certificates",
+        "is_array": false
+      },
+      {
+        "doc": "UpstreamCertificatesDisabled disables upstream mutualTLS on the API ",
+        "go_name": "UpstreamCertificatesDisabled",
+        "go_type": "bool",
+        "go_path": "APIDefinition.UpstreamCertificatesDisabled",
+        "tag": "bson:\"upstream_certificates_disabled\" json:\"upstream_certificates_disabled,omitempty\"",
+        "json_name": "upstream_certificates_disabled,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "PinnedPublicKeys stores the public key pinning details ",
+        "go_name": "PinnedPublicKeys",
+        "go_type": "string",
+        "go_path": "APIDefinition.PinnedPublicKeys",
+        "tag": "bson:\"pinned_public_keys\" json:\"pinned_public_keys\"",
+        "json_name": "pinned_public_keys",
+        "is_array": false
+      },
+      {
+        "doc": "CertificatePinningDisabled disables public key pinning ",
+        "go_name": "CertificatePinningDisabled",
+        "go_type": "bool",
+        "go_path": "APIDefinition.CertificatePinningDisabled",
+        "tag": "bson:\"certificate_pinning_disabled\" json:\"certificate_pinning_disabled,omitempty\"",
+        "json_name": "certificate_pinning_disabled,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EnableJWT",
+        "go_type": "bool",
+        "go_path": "APIDefinition.EnableJWT",
+        "tag": "bson:\"enable_jwt\" json:\"enable_jwt\"",
+        "json_name": "enable_jwt",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseStandardAuth",
+        "go_type": "bool",
+        "go_path": "APIDefinition.UseStandardAuth",
+        "tag": "bson:\"use_standard_auth\" json:\"use_standard_auth\"",
+        "json_name": "use_standard_auth",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseGoPluginAuth",
+        "go_type": "bool",
+        "go_path": "APIDefinition.UseGoPluginAuth",
+        "tag": "bson:\"use_go_plugin_auth\" json:\"use_go_plugin_auth\"",
+        "json_name": "use_go_plugin_auth",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EnableCoProcessAuth",
+        "go_type": "bool",
+        "go_path": "APIDefinition.EnableCoProcessAuth",
+        "tag": "bson:\"enable_coprocess_auth\" json:\"enable_coprocess_auth\"",
+        "json_name": "enable_coprocess_auth",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CustomPluginAuthEnabled",
+        "go_type": "bool",
+        "go_path": "APIDefinition.CustomPluginAuthEnabled",
+        "tag": "bson:\"custom_plugin_auth_enabled\" json:\"custom_plugin_auth_enabled\"",
+        "json_name": "custom_plugin_auth_enabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "JWTSigningMethod",
+        "go_type": "string",
+        "go_path": "APIDefinition.JWTSigningMethod",
+        "tag": "bson:\"jwt_signing_method\" json:\"jwt_signing_method\"",
+        "json_name": "jwt_signing_method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "JWTSource",
+        "go_type": "string",
+        "go_path": "APIDefinition.JWTSource",
+        "tag": "bson:\"jwt_source\" json:\"jwt_source\"",
+        "json_name": "jwt_source",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "JWTIdentityBaseField",
+        "go_type": "string",
+        "go_path": "APIDefinition.JWTIdentityBaseField",
+        "tag": "bson:\"jwt_identit_base_field\" json:\"jwt_identity_base_field\"",
+        "json_name": "jwt_identity_base_field",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "JWTClientIDBaseField",
+        "go_type": "string",
+        "go_path": "APIDefinition.JWTClientIDBaseField",
+        "tag": "bson:\"jwt_client_base_field\" json:\"jwt_client_base_field\"",
+        "json_name": "jwt_client_base_field",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "JWTPolicyFieldName",
+        "go_type": "string",
+        "go_path": "APIDefinition.JWTPolicyFieldName",
+        "tag": "bson:\"jwt_policy_field_name\" json:\"jwt_policy_field_name\"",
+        "json_name": "jwt_policy_field_name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "JWTDefaultPolicies",
+        "go_type": "string",
+        "go_path": "APIDefinition.JWTDefaultPolicies",
+        "tag": "bson:\"jwt_default_policies\" json:\"jwt_default_policies\"",
+        "json_name": "jwt_default_policies",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "JWTIssuedAtValidationSkew",
+        "go_type": "uint64",
+        "go_path": "APIDefinition.JWTIssuedAtValidationSkew",
+        "tag": "bson:\"jwt_issued_at_validation_skew\" json:\"jwt_issued_at_validation_skew\"",
+        "json_name": "jwt_issued_at_validation_skew",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "JWTExpiresAtValidationSkew",
+        "go_type": "uint64",
+        "go_path": "APIDefinition.JWTExpiresAtValidationSkew",
+        "tag": "bson:\"jwt_expires_at_validation_skew\" json:\"jwt_expires_at_validation_skew\"",
+        "json_name": "jwt_expires_at_validation_skew",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "JWTNotBeforeValidationSkew",
+        "go_type": "uint64",
+        "go_path": "APIDefinition.JWTNotBeforeValidationSkew",
+        "tag": "bson:\"jwt_not_before_validation_skew\" json:\"jwt_not_before_validation_skew\"",
+        "json_name": "jwt_not_before_validation_skew",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "JWTSkipKid",
+        "go_type": "bool",
+        "go_path": "APIDefinition.JWTSkipKid",
+        "tag": "bson:\"jwt_skip_kid\" json:\"jwt_skip_kid\"",
+        "json_name": "jwt_skip_kid",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Scopes",
+        "go_type": "Scopes",
+        "go_path": "APIDefinition.Scopes",
+        "tag": "bson:\"scopes\" json:\"scopes,omitempty\"",
+        "json_name": "scopes,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "JWTScopeToPolicyMapping",
+        "go_type": "string",
+        "go_path": "APIDefinition.JWTScopeToPolicyMapping",
+        "tag": "bson:\"jwt_scope_to_policy_mapping\" json:\"jwt_scope_to_policy_mapping\"",
+        "json_name": "jwt_scope_to_policy_mapping",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "JWTScopeClaimName",
+        "go_type": "string",
+        "go_path": "APIDefinition.JWTScopeClaimName",
+        "tag": "bson:\"jwt_scope_claim_name\" json:\"jwt_scope_claim_name\"",
+        "json_name": "jwt_scope_claim_name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "NotificationsDetails",
+        "go_type": "NotificationsManager",
+        "go_path": "APIDefinition.NotificationsDetails",
+        "tag": "bson:\"notifications\" json:\"notifications\"",
+        "json_name": "notifications",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EnableSignatureChecking",
+        "go_type": "bool",
+        "go_path": "APIDefinition.EnableSignatureChecking",
+        "tag": "bson:\"enable_signature_checking\" json:\"enable_signature_checking\"",
+        "json_name": "enable_signature_checking",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "HmacAllowedClockSkew",
+        "go_type": "float64",
+        "go_path": "APIDefinition.HmacAllowedClockSkew",
+        "tag": "bson:\"hmac_allowed_clock_skew\" json:\"hmac_allowed_clock_skew\"",
+        "json_name": "hmac_allowed_clock_skew",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "HmacAllowedAlgorithms",
+        "go_type": "string",
+        "go_path": "APIDefinition.HmacAllowedAlgorithms",
+        "tag": "bson:\"hmac_allowed_algorithms\" json:\"hmac_allowed_algorithms\"",
+        "json_name": "hmac_allowed_algorithms",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "RequestSigning",
+        "go_type": "RequestSigningMeta",
+        "go_path": "APIDefinition.RequestSigning",
+        "tag": "bson:\"request_signing\" json:\"request_signing\"",
+        "json_name": "request_signing",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "BaseIdentityProvidedBy",
+        "go_type": "AuthTypeEnum",
+        "go_path": "APIDefinition.BaseIdentityProvidedBy",
+        "tag": "bson:\"base_identity_provided_by\" json:\"base_identity_provided_by\"",
+        "json_name": "base_identity_provided_by",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "VersionDefinition",
+        "go_type": "VersionDefinition",
+        "go_path": "APIDefinition.VersionDefinition",
+        "tag": "bson:\"definition\" json:\"definition\"",
+        "json_name": "definition",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "VersionData",
+        "go_type": "VersionData",
+        "go_path": "APIDefinition.VersionData",
+        "tag": "bson:\"version_data\" json:\"version_data\"",
+        "json_name": "version_data",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UptimeTests",
+        "go_type": "UptimeTests",
+        "go_path": "APIDefinition.UptimeTests",
+        "tag": "bson:\"uptime_tests\" json:\"uptime_tests\"",
+        "json_name": "uptime_tests",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Proxy",
+        "go_type": "ProxyConfig",
+        "go_path": "APIDefinition.Proxy",
+        "tag": "bson:\"proxy\" json:\"proxy\"",
+        "json_name": "proxy",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "DisableRateLimit",
+        "go_type": "bool",
+        "go_path": "APIDefinition.DisableRateLimit",
+        "tag": "bson:\"disable_rate_limit\" json:\"disable_rate_limit\"",
+        "json_name": "disable_rate_limit",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "DisableQuota",
+        "go_type": "bool",
+        "go_path": "APIDefinition.DisableQuota",
+        "tag": "bson:\"disable_quota\" json:\"disable_quota\"",
+        "json_name": "disable_quota",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CustomMiddleware",
+        "go_type": "MiddlewareSection",
+        "go_path": "APIDefinition.CustomMiddleware",
+        "tag": "bson:\"custom_middleware\" json:\"custom_middleware\"",
+        "json_name": "custom_middleware",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CustomMiddlewareBundle",
+        "go_type": "string",
+        "go_path": "APIDefinition.CustomMiddlewareBundle",
+        "tag": "bson:\"custom_middleware_bundle\" json:\"custom_middleware_bundle\"",
+        "json_name": "custom_middleware_bundle",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CustomMiddlewareBundleDisabled",
+        "go_type": "bool",
+        "go_path": "APIDefinition.CustomMiddlewareBundleDisabled",
+        "tag": "bson:\"custom_middleware_bundle_disabled\" json:\"custom_middleware_bundle_disabled\"",
+        "json_name": "custom_middleware_bundle_disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CacheOptions",
+        "go_type": "CacheOptions",
+        "go_path": "APIDefinition.CacheOptions",
+        "tag": "bson:\"cache_options\" json:\"cache_options\"",
+        "json_name": "cache_options",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SessionLifetimeRespectsKeyExpiration",
+        "go_type": "bool",
+        "go_path": "APIDefinition.SessionLifetimeRespectsKeyExpiration",
+        "tag": "bson:\"session_lifetime_respects_key_expiration\" json:\"session_lifetime_respects_key_expiration,omitempty\"",
+        "json_name": "session_lifetime_respects_key_expiration,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SessionLifetime",
+        "go_type": "int64",
+        "go_path": "APIDefinition.SessionLifetime",
+        "tag": "bson:\"session_lifetime\" json:\"session_lifetime\"",
+        "json_name": "session_lifetime",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Active",
+        "go_type": "bool",
+        "go_path": "APIDefinition.Active",
+        "tag": "bson:\"active\" json:\"active\"",
+        "json_name": "active",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Internal",
+        "go_type": "bool",
+        "go_path": "APIDefinition.Internal",
+        "tag": "bson:\"internal\" json:\"internal\"",
+        "json_name": "internal",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "AuthProvider",
+        "go_type": "AuthProviderMeta",
+        "go_path": "APIDefinition.AuthProvider",
+        "tag": "bson:\"auth_provider\" json:\"auth_provider\"",
+        "json_name": "auth_provider",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SessionProvider",
+        "go_type": "SessionProviderMeta",
+        "go_path": "APIDefinition.SessionProvider",
+        "tag": "bson:\"session_provider\" json:\"session_provider\"",
+        "json_name": "session_provider",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EventHandlers",
+        "go_type": "EventHandlerMetaConfig",
+        "go_path": "APIDefinition.EventHandlers",
+        "tag": "bson:\"event_handlers\" json:\"event_handlers\"",
+        "json_name": "event_handlers",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EnableBatchRequestSupport",
+        "go_type": "bool",
+        "go_path": "APIDefinition.EnableBatchRequestSupport",
+        "tag": "bson:\"enable_batch_request_support\" json:\"enable_batch_request_support\"",
+        "json_name": "enable_batch_request_support",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EnableIpWhiteListing",
+        "go_type": "bool",
+        "go_path": "APIDefinition.EnableIpWhiteListing",
+        "tag": "mapstructure:\"enable_ip_whitelisting\" bson:\"enable_ip_whitelisting\" json:\"enable_ip_whitelisting\"",
+        "json_name": "enable_ip_whitelisting",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "AllowedIPs",
+        "go_type": "string",
+        "go_path": "APIDefinition.AllowedIPs",
+        "tag": "mapstructure:\"allowed_ips\" bson:\"allowed_ips\" json:\"allowed_ips\"",
+        "json_name": "allowed_ips",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "EnableIpBlacklisting",
+        "go_type": "bool",
+        "go_path": "APIDefinition.EnableIpBlacklisting",
+        "tag": "mapstructure:\"enable_ip_blacklisting\" bson:\"enable_ip_blacklisting\" json:\"enable_ip_blacklisting\"",
+        "json_name": "enable_ip_blacklisting",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "BlacklistedIPs",
+        "go_type": "string",
+        "go_path": "APIDefinition.BlacklistedIPs",
+        "tag": "mapstructure:\"blacklisted_ips\" bson:\"blacklisted_ips\" json:\"blacklisted_ips\"",
+        "json_name": "blacklisted_ips",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "DontSetQuotasOnCreate",
+        "go_type": "bool",
+        "go_path": "APIDefinition.DontSetQuotasOnCreate",
+        "tag": "mapstructure:\"dont_set_quota_on_create\" bson:\"dont_set_quota_on_create\" json:\"dont_set_quota_on_create\"",
+        "json_name": "dont_set_quota_on_create",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ExpireAnalyticsAfter",
+        "go_type": "int64",
+        "go_path": "APIDefinition.ExpireAnalyticsAfter",
+        "tag": "mapstructure:\"expire_analytics_after\" bson:\"expire_analytics_after\" json:\"expire_analytics_after\"",
+        "json_name": "expire_analytics_after",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ResponseProcessors",
+        "go_type": "ResponseProcessor",
+        "go_path": "APIDefinition.ResponseProcessors",
+        "tag": "bson:\"response_processors\" json:\"response_processors\"",
+        "json_name": "response_processors",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "CORS",
+        "go_type": "CORSConfig",
+        "go_path": "APIDefinition.CORS",
+        "tag": "bson:\"CORS\" json:\"CORS\"",
+        "json_name": "CORS",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Domain",
+        "go_type": "string",
+        "go_path": "APIDefinition.Domain",
+        "tag": "bson:\"domain\" json:\"domain\"",
+        "json_name": "domain",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "DomainDisabled",
+        "go_type": "bool",
+        "go_path": "APIDefinition.DomainDisabled",
+        "tag": "bson:\"domain_disabled\" json:\"domain_disabled,omitempty\"",
+        "json_name": "domain_disabled,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Certificates",
+        "go_type": "string",
+        "go_path": "APIDefinition.Certificates",
+        "tag": "bson:\"certificates\" json:\"certificates\"",
+        "json_name": "certificates",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "DoNotTrack",
+        "go_type": "bool",
+        "go_path": "APIDefinition.DoNotTrack",
+        "tag": "bson:\"do_not_track\" json:\"do_not_track\"",
+        "json_name": "do_not_track",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EnableContextVars",
+        "go_type": "bool",
+        "go_path": "APIDefinition.EnableContextVars",
+        "tag": "bson:\"enable_context_vars\" json:\"enable_context_vars\"",
+        "json_name": "enable_context_vars",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ConfigData",
+        "go_type": "any",
+        "go_path": "APIDefinition.ConfigData",
+        "tag": "bson:\"config_data\" json:\"config_data\"",
+        "json_name": "config_data",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ConfigDataDisabled",
+        "go_type": "bool",
+        "go_path": "APIDefinition.ConfigDataDisabled",
+        "tag": "bson:\"config_data_disabled\" json:\"config_data_disabled\"",
+        "json_name": "config_data_disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "TagHeaders",
+        "go_type": "string",
+        "go_path": "APIDefinition.TagHeaders",
+        "tag": "bson:\"tag_headers\" json:\"tag_headers\"",
+        "json_name": "tag_headers",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "GlobalRateLimit",
+        "go_type": "GlobalRateLimit",
+        "go_path": "APIDefinition.GlobalRateLimit",
+        "tag": "bson:\"global_rate_limit\" json:\"global_rate_limit\"",
+        "json_name": "global_rate_limit",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "StripAuthData",
+        "go_type": "bool",
+        "go_path": "APIDefinition.StripAuthData",
+        "tag": "bson:\"strip_auth_data\" json:\"strip_auth_data\"",
+        "json_name": "strip_auth_data",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EnableDetailedRecording",
+        "go_type": "bool",
+        "go_path": "APIDefinition.EnableDetailedRecording",
+        "tag": "bson:\"enable_detailed_recording\" json:\"enable_detailed_recording\"",
+        "json_name": "enable_detailed_recording",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "GraphQL",
+        "go_type": "GraphQLConfig",
+        "go_path": "APIDefinition.GraphQL",
+        "tag": "bson:\"graphql\" json:\"graphql\"",
+        "json_name": "graphql",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "AnalyticsPlugin",
+        "go_type": "AnalyticsPluginConfig",
+        "go_path": "APIDefinition.AnalyticsPlugin",
+        "tag": "bson:\"analytics_plugin\" json:\"analytics_plugin,omitempty\"",
+        "json_name": "analytics_plugin,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "Gateway segment tags ",
+        "go_name": "TagsDisabled",
+        "go_type": "bool",
+        "go_path": "APIDefinition.TagsDisabled",
+        "tag": "bson:\"tags_disabled\" json:\"tags_disabled,omitempty\"",
+        "json_name": "tags_disabled,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Tags",
+        "go_type": "string",
+        "go_path": "APIDefinition.Tags",
+        "tag": "bson:\"tags\" json:\"tags\"",
+        "json_name": "tags",
+        "is_array": true
+      },
+      {
+        "doc": "IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS) ",
+        "go_name": "IsOAS",
+        "go_type": "bool",
+        "go_path": "APIDefinition.IsOAS",
+        "tag": "bson:\"is_oas\" json:\"is_oas,omitempty\"",
+        "json_name": "is_oas,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "VersionName",
+        "go_type": "string",
+        "go_path": "APIDefinition.VersionName",
+        "tag": "bson:\"-\" json:\"-\"",
+        "json_name": "-",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "AnalyticsPluginConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Enabled",
+        "go_type": "bool",
+        "go_path": "AnalyticsPluginConfig.Enabled",
+        "tag": "bson:\"enable\" json:\"enable,omitempty\"",
+        "json_name": "enable,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "PluginPath",
+        "go_type": "string",
+        "go_path": "AnalyticsPluginConfig.PluginPath",
+        "tag": "bson:\"plugin_path\" json:\"plugin_path,omitempty\"",
+        "json_name": "plugin_path,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "FuncName",
+        "go_type": "string",
+        "go_path": "AnalyticsPluginConfig.FuncName",
+        "tag": "bson:\"func_name\" json:\"func_name,omitempty\"",
+        "json_name": "func_name,omitempty",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "AuthConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "AuthConfig.Name",
+        "tag": "mapstructure:\"name\" bson:\"name\" json:\"name\"",
+        "json_name": "name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseParam",
+        "go_type": "bool",
+        "go_path": "AuthConfig.UseParam",
+        "tag": "mapstructure:\"use_param\" bson:\"use_param\" json:\"use_param\"",
+        "json_name": "use_param",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ParamName",
+        "go_type": "string",
+        "go_path": "AuthConfig.ParamName",
+        "tag": "mapstructure:\"param_name\" bson:\"param_name\" json:\"param_name\"",
+        "json_name": "param_name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseCookie",
+        "go_type": "bool",
+        "go_path": "AuthConfig.UseCookie",
+        "tag": "mapstructure:\"use_cookie\" bson:\"use_cookie\" json:\"use_cookie\"",
+        "json_name": "use_cookie",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CookieName",
+        "go_type": "string",
+        "go_path": "AuthConfig.CookieName",
+        "tag": "mapstructure:\"cookie_name\" bson:\"cookie_name\" json:\"cookie_name\"",
+        "json_name": "cookie_name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "DisableHeader",
+        "go_type": "bool",
+        "go_path": "AuthConfig.DisableHeader",
+        "tag": "mapstructure:\"disable_header\" bson:\"disable_header\" json:\"disable_header\"",
+        "json_name": "disable_header",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "AuthHeaderName",
+        "go_type": "string",
+        "go_path": "AuthConfig.AuthHeaderName",
+        "tag": "mapstructure:\"auth_header_name\" bson:\"auth_header_name\" json:\"auth_header_name\"",
+        "json_name": "auth_header_name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseCertificate",
+        "go_type": "bool",
+        "go_path": "AuthConfig.UseCertificate",
+        "tag": "mapstructure:\"use_certificate\" bson:\"use_certificate\" json:\"use_certificate\"",
+        "json_name": "use_certificate",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ValidateSignature",
+        "go_type": "bool",
+        "go_path": "AuthConfig.ValidateSignature",
+        "tag": "mapstructure:\"validate_signature\" bson:\"validate_signature\" json:\"validate_signature\"",
+        "json_name": "validate_signature",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Signature",
+        "go_type": "SignatureConfig",
+        "go_path": "AuthConfig.Signature",
+        "tag": "mapstructure:\"signature\" bson:\"signature\" json:\"signature,omitempty\"",
+        "json_name": "signature,omitempty",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "AuthProviderMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Name",
+        "go_type": "AuthProviderCode",
+        "go_path": "AuthProviderMeta.Name",
+        "tag": "bson:\"name\" json:\"name\"",
+        "json_name": "name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "StorageEngine",
+        "go_type": "StorageEngineCode",
+        "go_path": "AuthProviderMeta.StorageEngine",
+        "tag": "bson:\"storage_engine\" json:\"storage_engine\"",
+        "json_name": "storage_engine",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Meta",
+        "go_type": "any",
+        "go_path": "AuthProviderMeta.Meta",
+        "tag": "bson:\"meta\" json:\"meta\"",
+        "json_name": "meta",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "BundleManifest",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "FileList",
+        "go_type": "string",
+        "go_path": "BundleManifest.FileList",
+        "tag": "bson:\"file_list\" json:\"file_list\"",
+        "json_name": "file_list",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "CustomMiddleware",
+        "go_type": "MiddlewareSection",
+        "go_path": "BundleManifest.CustomMiddleware",
+        "tag": "bson:\"custom_middleware\" json:\"custom_middleware\"",
+        "json_name": "custom_middleware",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Checksum",
+        "go_type": "string",
+        "go_path": "BundleManifest.Checksum",
+        "tag": "bson:\"checksum\" json:\"checksum\"",
+        "json_name": "checksum",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Signature",
+        "go_type": "string",
+        "go_path": "BundleManifest.Signature",
+        "tag": "bson:\"signature\" json:\"signature\"",
+        "json_name": "signature",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "CORSConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Enable",
+        "go_type": "bool",
+        "go_path": "CORSConfig.Enable",
+        "tag": "bson:\"enable\" json:\"enable\"",
+        "json_name": "enable",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "AllowedOrigins",
+        "go_type": "string",
+        "go_path": "CORSConfig.AllowedOrigins",
+        "tag": "bson:\"allowed_origins\" json:\"allowed_origins\"",
+        "json_name": "allowed_origins",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "AllowedMethods",
+        "go_type": "string",
+        "go_path": "CORSConfig.AllowedMethods",
+        "tag": "bson:\"allowed_methods\" json:\"allowed_methods\"",
+        "json_name": "allowed_methods",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "AllowedHeaders",
+        "go_type": "string",
+        "go_path": "CORSConfig.AllowedHeaders",
+        "tag": "bson:\"allowed_headers\" json:\"allowed_headers\"",
+        "json_name": "allowed_headers",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "ExposedHeaders",
+        "go_type": "string",
+        "go_path": "CORSConfig.ExposedHeaders",
+        "tag": "bson:\"exposed_headers\" json:\"exposed_headers\"",
+        "json_name": "exposed_headers",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "AllowCredentials",
+        "go_type": "bool",
+        "go_path": "CORSConfig.AllowCredentials",
+        "tag": "bson:\"allow_credentials\" json:\"allow_credentials\"",
+        "json_name": "allow_credentials",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "MaxAge",
+        "go_type": "int",
+        "go_path": "CORSConfig.MaxAge",
+        "tag": "bson:\"max_age\" json:\"max_age\"",
+        "json_name": "max_age",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "OptionsPassthrough",
+        "go_type": "bool",
+        "go_path": "CORSConfig.OptionsPassthrough",
+        "tag": "bson:\"options_passthrough\" json:\"options_passthrough\"",
+        "json_name": "options_passthrough",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Debug",
+        "go_type": "bool",
+        "go_path": "CORSConfig.Debug",
+        "tag": "bson:\"debug\" json:\"debug\"",
+        "json_name": "debug",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "CacheMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Disabled",
+        "go_type": "bool",
+        "go_path": "CacheMeta.Disabled",
+        "tag": "bson:\"disabled\" json:\"disabled\"",
+        "json_name": "disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "CacheMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "CacheMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CacheKeyRegex",
+        "go_type": "string",
+        "go_path": "CacheMeta.CacheKeyRegex",
+        "tag": "bson:\"cache_key_regex\" json:\"cache_key_regex\"",
+        "json_name": "cache_key_regex",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CacheOnlyResponseCodes",
+        "go_type": "int",
+        "go_path": "CacheMeta.CacheOnlyResponseCodes",
+        "tag": "bson:\"cache_response_codes\" json:\"cache_response_codes\"",
+        "json_name": "cache_response_codes",
+        "is_array": true
+      }
+    ]
+  },
+  {
+    "Name": "CacheOptions",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "CacheTimeout",
+        "go_type": "int64",
+        "go_path": "CacheOptions.CacheTimeout",
+        "tag": "bson:\"cache_timeout\" json:\"cache_timeout\"",
+        "json_name": "cache_timeout",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EnableCache",
+        "go_type": "bool",
+        "go_path": "CacheOptions.EnableCache",
+        "tag": "bson:\"enable_cache\" json:\"enable_cache\"",
+        "json_name": "enable_cache",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CacheAllSafeRequests",
+        "go_type": "bool",
+        "go_path": "CacheOptions.CacheAllSafeRequests",
+        "tag": "bson:\"cache_all_safe_requests\" json:\"cache_all_safe_requests\"",
+        "json_name": "cache_all_safe_requests",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CacheOnlyResponseCodes",
+        "go_type": "int",
+        "go_path": "CacheOptions.CacheOnlyResponseCodes",
+        "tag": "bson:\"cache_response_codes\" json:\"cache_response_codes\"",
+        "json_name": "cache_response_codes",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "EnableUpstreamCacheControl",
+        "go_type": "bool",
+        "go_path": "CacheOptions.EnableUpstreamCacheControl",
+        "tag": "bson:\"enable_upstream_cache_control\" json:\"enable_upstream_cache_control\"",
+        "json_name": "enable_upstream_cache_control",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CacheControlTTLHeader",
+        "go_type": "string",
+        "go_path": "CacheOptions.CacheControlTTLHeader",
+        "tag": "bson:\"cache_control_ttl_header\" json:\"cache_control_ttl_header\"",
+        "json_name": "cache_control_ttl_header",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CacheByHeaders",
+        "go_type": "string",
+        "go_path": "CacheOptions.CacheByHeaders",
+        "tag": "bson:\"cache_by_headers\" json:\"cache_by_headers\"",
+        "json_name": "cache_by_headers",
+        "is_array": true
+      }
+    ]
+  },
+  {
+    "Name": "CheckCommand",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "CheckCommand.Name",
+        "tag": "bson:\"name\" json:\"name\"",
+        "json_name": "name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Message",
+        "go_type": "string",
+        "go_path": "CheckCommand.Message",
+        "tag": "bson:\"message\" json:\"message\"",
+        "json_name": "message",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "CircuitBreakerMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "CircuitBreakerMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "CircuitBreakerMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ThresholdPercent",
+        "go_type": "float64",
+        "go_path": "CircuitBreakerMeta.ThresholdPercent",
+        "tag": "bson:\"threshold_percent\" json:\"threshold_percent\"",
+        "json_name": "threshold_percent",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Samples",
+        "go_type": "int64",
+        "go_path": "CircuitBreakerMeta.Samples",
+        "tag": "bson:\"samples\" json:\"samples\"",
+        "json_name": "samples",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ReturnToServiceAfter",
+        "go_type": "int",
+        "go_path": "CircuitBreakerMeta.ReturnToServiceAfter",
+        "tag": "bson:\"return_to_service_after\" json:\"return_to_service_after\"",
+        "json_name": "return_to_service_after",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "DisableHalfOpenState",
+        "go_type": "bool",
+        "go_path": "CircuitBreakerMeta.DisableHalfOpenState",
+        "tag": "bson:\"disable_half_open_state\" json:\"disable_half_open_state\"",
+        "json_name": "disable_half_open_state",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "DefRequest",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "OrgId",
+        "go_type": "string",
+        "go_path": "DefRequest.OrgId",
+        "tag": "",
+        "json_name": "OrgId",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Tags",
+        "go_type": "string",
+        "go_path": "DefRequest.Tags",
+        "tag": "",
+        "json_name": "Tags",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "LoadOAS",
+        "go_type": "bool",
+        "go_path": "DefRequest.LoadOAS",
+        "tag": "",
+        "json_name": "LoadOAS",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "EndPointMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Disabled",
+        "go_type": "bool",
+        "go_path": "EndPointMeta.Disabled",
+        "tag": "bson:\"disabled\" json:\"disabled\"",
+        "json_name": "disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "EndPointMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "EndPointMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "IgnoreCase",
+        "go_type": "bool",
+        "go_path": "EndPointMeta.IgnoreCase",
+        "tag": "bson:\"ignore_case\" json:\"ignore_case\"",
+        "json_name": "ignore_case",
+        "is_array": false
+      },
+      {
+        "doc": "Deprecated. Use Method instead.\n",
+        "go_name": "MethodActions",
+        "go_type": "EndpointMethodMeta",
+        "go_path": "EndPointMeta.MethodActions",
+        "tag": "bson:\"method_actions,omitempty\" json:\"method_actions,omitempty\"",
+        "json_name": "method_actions,omitempty",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "EndpointMethodMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Action",
+        "go_type": "EndpointMethodAction",
+        "go_path": "EndpointMethodMeta.Action",
+        "tag": "bson:\"action\" json:\"action\"",
+        "json_name": "action",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Code",
+        "go_type": "int",
+        "go_path": "EndpointMethodMeta.Code",
+        "tag": "bson:\"code\" json:\"code\"",
+        "json_name": "code",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Data",
+        "go_type": "string",
+        "go_path": "EndpointMethodMeta.Data",
+        "tag": "bson:\"data\" json:\"data\"",
+        "json_name": "data",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Headers",
+        "go_type": "string",
+        "go_path": "EndpointMethodMeta.Headers",
+        "tag": "bson:\"headers\" json:\"headers\"",
+        "json_name": "headers",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "EventHandlerMetaConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Events",
+        "go_type": "EventHandlerTriggerConfig",
+        "go_path": "EventHandlerMetaConfig.Events",
+        "tag": "bson:\"events\" json:\"events\"",
+        "json_name": "events",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "EventHandlerTriggerConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Handler",
+        "go_type": "TykEventHandlerName",
+        "go_path": "EventHandlerTriggerConfig.Handler",
+        "tag": "bson:\"handler_name\" json:\"handler_name\"",
+        "json_name": "handler_name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "HandlerMeta",
+        "go_type": "any",
+        "go_path": "EventHandlerTriggerConfig.HandlerMeta",
+        "tag": "bson:\"handler_meta\" json:\"handler_meta\"",
+        "json_name": "handler_meta",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "ExtendedPathsSet",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Ignored",
+        "go_type": "EndPointMeta",
+        "go_path": "ExtendedPathsSet.Ignored",
+        "tag": "bson:\"ignored\" json:\"ignored,omitempty\"",
+        "json_name": "ignored,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "WhiteList",
+        "go_type": "EndPointMeta",
+        "go_path": "ExtendedPathsSet.WhiteList",
+        "tag": "bson:\"white_list\" json:\"white_list,omitempty\"",
+        "json_name": "white_list,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "BlackList",
+        "go_type": "EndPointMeta",
+        "go_path": "ExtendedPathsSet.BlackList",
+        "tag": "bson:\"black_list\" json:\"black_list,omitempty\"",
+        "json_name": "black_list,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "MockResponse",
+        "go_type": "MockResponseMeta",
+        "go_path": "ExtendedPathsSet.MockResponse",
+        "tag": "bson:\"mock_response\" json:\"mock_response,omitempty\"",
+        "json_name": "mock_response,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "Cached",
+        "go_type": "string",
+        "go_path": "ExtendedPathsSet.Cached",
+        "tag": "bson:\"cache\" json:\"cache,omitempty\"",
+        "json_name": "cache,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "AdvanceCacheConfig",
+        "go_type": "CacheMeta",
+        "go_path": "ExtendedPathsSet.AdvanceCacheConfig",
+        "tag": "bson:\"advance_cache_config\" json:\"advance_cache_config,omitempty\"",
+        "json_name": "advance_cache_config,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "Transform",
+        "go_type": "TemplateMeta",
+        "go_path": "ExtendedPathsSet.Transform",
+        "tag": "bson:\"transform\" json:\"transform,omitempty\"",
+        "json_name": "transform,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "TransformResponse",
+        "go_type": "TemplateMeta",
+        "go_path": "ExtendedPathsSet.TransformResponse",
+        "tag": "bson:\"transform_response\" json:\"transform_response,omitempty\"",
+        "json_name": "transform_response,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "TransformJQ",
+        "go_type": "TransformJQMeta",
+        "go_path": "ExtendedPathsSet.TransformJQ",
+        "tag": "bson:\"transform_jq\" json:\"transform_jq,omitempty\"",
+        "json_name": "transform_jq,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "TransformJQResponse",
+        "go_type": "TransformJQMeta",
+        "go_path": "ExtendedPathsSet.TransformJQResponse",
+        "tag": "bson:\"transform_jq_response\" json:\"transform_jq_response,omitempty\"",
+        "json_name": "transform_jq_response,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "TransformHeader",
+        "go_type": "HeaderInjectionMeta",
+        "go_path": "ExtendedPathsSet.TransformHeader",
+        "tag": "bson:\"transform_headers\" json:\"transform_headers,omitempty\"",
+        "json_name": "transform_headers,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "TransformResponseHeader",
+        "go_type": "HeaderInjectionMeta",
+        "go_path": "ExtendedPathsSet.TransformResponseHeader",
+        "tag": "bson:\"transform_response_headers\" json:\"transform_response_headers,omitempty\"",
+        "json_name": "transform_response_headers,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "HardTimeouts",
+        "go_type": "HardTimeoutMeta",
+        "go_path": "ExtendedPathsSet.HardTimeouts",
+        "tag": "bson:\"hard_timeouts\" json:\"hard_timeouts,omitempty\"",
+        "json_name": "hard_timeouts,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "CircuitBreaker",
+        "go_type": "CircuitBreakerMeta",
+        "go_path": "ExtendedPathsSet.CircuitBreaker",
+        "tag": "bson:\"circuit_breakers\" json:\"circuit_breakers,omitempty\"",
+        "json_name": "circuit_breakers,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "URLRewrite",
+        "go_type": "URLRewriteMeta",
+        "go_path": "ExtendedPathsSet.URLRewrite",
+        "tag": "bson:\"url_rewrites\" json:\"url_rewrites,omitempty\"",
+        "json_name": "url_rewrites,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "Virtual",
+        "go_type": "VirtualMeta",
+        "go_path": "ExtendedPathsSet.Virtual",
+        "tag": "bson:\"virtual\" json:\"virtual,omitempty\"",
+        "json_name": "virtual,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "SizeLimit",
+        "go_type": "RequestSizeMeta",
+        "go_path": "ExtendedPathsSet.SizeLimit",
+        "tag": "bson:\"size_limits\" json:\"size_limits,omitempty\"",
+        "json_name": "size_limits,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "MethodTransforms",
+        "go_type": "MethodTransformMeta",
+        "go_path": "ExtendedPathsSet.MethodTransforms",
+        "tag": "bson:\"method_transforms\" json:\"method_transforms,omitempty\"",
+        "json_name": "method_transforms,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "TrackEndpoints",
+        "go_type": "TrackEndpointMeta",
+        "go_path": "ExtendedPathsSet.TrackEndpoints",
+        "tag": "bson:\"track_endpoints\" json:\"track_endpoints,omitempty\"",
+        "json_name": "track_endpoints,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "DoNotTrackEndpoints",
+        "go_type": "TrackEndpointMeta",
+        "go_path": "ExtendedPathsSet.DoNotTrackEndpoints",
+        "tag": "bson:\"do_not_track_endpoints\" json:\"do_not_track_endpoints,omitempty\"",
+        "json_name": "do_not_track_endpoints,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "ValidateJSON",
+        "go_type": "ValidatePathMeta",
+        "go_path": "ExtendedPathsSet.ValidateJSON",
+        "tag": "bson:\"validate_json\" json:\"validate_json,omitempty\"",
+        "json_name": "validate_json,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "ValidateRequest",
+        "go_type": "ValidateRequestMeta",
+        "go_path": "ExtendedPathsSet.ValidateRequest",
+        "tag": "bson:\"validate_request\" json:\"validate_request,omitempty\"",
+        "json_name": "validate_request,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "Internal",
+        "go_type": "InternalMeta",
+        "go_path": "ExtendedPathsSet.Internal",
+        "tag": "bson:\"internal\" json:\"internal,omitempty\"",
+        "json_name": "internal,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "GoPlugin",
+        "go_type": "GoPluginMeta",
+        "go_path": "ExtendedPathsSet.GoPlugin",
+        "tag": "bson:\"go_plugin\" json:\"go_plugin,omitempty\"",
+        "json_name": "go_plugin,omitempty",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "PersistGraphQL",
+        "go_type": "PersistGraphQLMeta",
+        "go_path": "ExtendedPathsSet.PersistGraphQL",
+        "tag": "bson:\"persist_graphql\" json:\"persist_graphql\"",
+        "json_name": "persist_graphql",
+        "is_array": true
+      }
+    ]
+  },
+  {
+    "Name": "ExternalOAuth",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Enabled",
+        "go_type": "bool",
+        "go_path": "ExternalOAuth.Enabled",
+        "tag": "bson:\"enabled\" json:\"enabled\"",
+        "json_name": "enabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Providers",
+        "go_type": "Provider",
+        "go_path": "ExternalOAuth.Providers",
+        "tag": "bson:\"providers\" json:\"providers\"",
+        "json_name": "providers",
+        "is_array": true
+      }
+    ]
+  },
+  {
+    "Name": "GlobalRateLimit",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Rate",
+        "go_type": "float64",
+        "go_path": "GlobalRateLimit.Rate",
+        "tag": "bson:\"rate\" json:\"rate\"",
+        "json_name": "rate",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Per",
+        "go_type": "float64",
+        "go_path": "GlobalRateLimit.Per",
+        "tag": "bson:\"per\" json:\"per\"",
+        "json_name": "per",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GoPluginMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Disabled",
+        "go_type": "bool",
+        "go_path": "GoPluginMeta.Disabled",
+        "tag": "bson:\"disabled\" json:\"disabled\"",
+        "json_name": "disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "GoPluginMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "GoPluginMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "PluginPath",
+        "go_type": "string",
+        "go_path": "GoPluginMeta.PluginPath",
+        "tag": "bson:\"plugin_path\" json:\"plugin_path\"",
+        "json_name": "plugin_path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SymbolName",
+        "go_type": "string",
+        "go_path": "GoPluginMeta.SymbolName",
+        "tag": "bson:\"func_name\" json:\"func_name\"",
+        "json_name": "func_name",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLConfig",
+    "fields": [
+      {
+        "doc": "Enabled indicates if GraphQL should be enabled.\n",
+        "go_name": "Enabled",
+        "go_type": "bool",
+        "go_path": "GraphQLConfig.Enabled",
+        "tag": "bson:\"enabled\" json:\"enabled\"",
+        "json_name": "enabled",
+        "is_array": false
+      },
+      {
+        "doc": "ExecutionMode is the mode to define how an api behaves.\n",
+        "go_name": "ExecutionMode",
+        "go_type": "GraphQLExecutionMode",
+        "go_path": "GraphQLConfig.ExecutionMode",
+        "tag": "bson:\"execution_mode\" json:\"execution_mode\"",
+        "json_name": "execution_mode",
+        "is_array": false
+      },
+      {
+        "doc": "Version defines the version of the GraphQL config and engine to be used.\n",
+        "go_name": "Version",
+        "go_type": "GraphQLConfigVersion",
+        "go_path": "GraphQLConfig.Version",
+        "tag": "bson:\"version\" json:\"version\"",
+        "json_name": "version",
+        "is_array": false
+      },
+      {
+        "doc": "Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine.\n",
+        "go_name": "Schema",
+        "go_type": "string",
+        "go_path": "GraphQLConfig.Schema",
+        "tag": "bson:\"schema\" json:\"schema\"",
+        "json_name": "schema",
+        "is_array": false
+      },
+      {
+        "doc": "LastSchemaUpdate contains the date and time of the last triggered schema update to the upstream.\n",
+        "go_name": "LastSchemaUpdate",
+        "go_type": "object",
+        "go_path": "GraphQLConfig.LastSchemaUpdate",
+        "tag": "bson:\"last_schema_update\" json:\"last_schema_update,omitempty\"",
+        "json_name": "last_schema_update,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "TypeFieldConfigurations is a rule set of data source and mapping of a schema field.\n",
+        "go_name": "TypeFieldConfigurations",
+        "go_type": "object",
+        "go_path": "GraphQLConfig.TypeFieldConfigurations",
+        "tag": "bson:\"type_field_configurations\" json:\"type_field_configurations\"",
+        "json_name": "type_field_configurations",
+        "is_array": true
+      },
+      {
+        "doc": "GraphQLPlayground is the Playground specific configuration.\n",
+        "go_name": "GraphQLPlayground",
+        "go_type": "GraphQLPlayground",
+        "go_path": "GraphQLConfig.GraphQLPlayground",
+        "tag": "bson:\"playground\" json:\"playground\"",
+        "json_name": "playground",
+        "is_array": false
+      },
+      {
+        "doc": "Engine holds the configuration for engine v2 and upwards.\n",
+        "go_name": "Engine",
+        "go_type": "GraphQLEngineConfig",
+        "go_path": "GraphQLConfig.Engine",
+        "tag": "bson:\"engine\" json:\"engine\"",
+        "json_name": "engine",
+        "is_array": false
+      },
+      {
+        "doc": "Proxy holds the configuration for a proxy only api.\n",
+        "go_name": "Proxy",
+        "go_type": "GraphQLProxyConfig",
+        "go_path": "GraphQLConfig.Proxy",
+        "tag": "bson:\"proxy\" json:\"proxy\"",
+        "json_name": "proxy",
+        "is_array": false
+      },
+      {
+        "doc": "Subgraph holds the configuration for a GraphQL federation subgraph.\n",
+        "go_name": "Subgraph",
+        "go_type": "GraphQLSubgraphConfig",
+        "go_path": "GraphQLConfig.Subgraph",
+        "tag": "bson:\"subgraph\" json:\"subgraph\"",
+        "json_name": "subgraph",
+        "is_array": false
+      },
+      {
+        "doc": "Supergraph holds the configuration for a GraphQL federation supergraph.\n",
+        "go_name": "Supergraph",
+        "go_type": "GraphQLSupergraphConfig",
+        "go_path": "GraphQLConfig.Supergraph",
+        "tag": "bson:\"supergraph\" json:\"supergraph\"",
+        "json_name": "supergraph",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLEngineConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "FieldConfigs",
+        "go_type": "GraphQLFieldConfig",
+        "go_path": "GraphQLEngineConfig.FieldConfigs",
+        "tag": "bson:\"field_configs\" json:\"field_configs\"",
+        "json_name": "field_configs",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "DataSources",
+        "go_type": "GraphQLEngineDataSource",
+        "go_path": "GraphQLEngineConfig.DataSources",
+        "tag": "bson:\"data_sources\" json:\"data_sources\"",
+        "json_name": "data_sources",
+        "is_array": true
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLEngineDataSource",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Kind",
+        "go_type": "GraphQLEngineDataSourceKind",
+        "go_path": "GraphQLEngineDataSource.Kind",
+        "tag": "bson:\"kind\" json:\"kind\"",
+        "json_name": "kind",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSource.Name",
+        "tag": "bson:\"name\" json:\"name\"",
+        "json_name": "name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Internal",
+        "go_type": "bool",
+        "go_path": "GraphQLEngineDataSource.Internal",
+        "tag": "bson:\"internal\" json:\"internal\"",
+        "json_name": "internal",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "RootFields",
+        "go_type": "GraphQLTypeFields",
+        "go_path": "GraphQLEngineDataSource.RootFields",
+        "tag": "bson:\"root_fields\" json:\"root_fields\"",
+        "json_name": "root_fields",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "Config",
+        "go_type": "object",
+        "go_path": "GraphQLEngineDataSource.Config",
+        "tag": "bson:\"config\" json:\"config\"",
+        "json_name": "config",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLEngineDataSourceConfigGraphQL",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "URL",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigGraphQL.URL",
+        "tag": "bson:\"url\" json:\"url\"",
+        "json_name": "url",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigGraphQL.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Headers",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigGraphQL.Headers",
+        "tag": "bson:\"headers\" json:\"headers\"",
+        "json_name": "headers",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SubscriptionType",
+        "go_type": "SubscriptionType",
+        "go_path": "GraphQLEngineDataSourceConfigGraphQL.SubscriptionType",
+        "tag": "bson:\"subscription_type\" json:\"subscription_type,omitempty\"",
+        "json_name": "subscription_type,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "HasOperation",
+        "go_type": "bool",
+        "go_path": "GraphQLEngineDataSourceConfigGraphQL.HasOperation",
+        "tag": "bson:\"has_operation\" json:\"has_operation\"",
+        "json_name": "has_operation",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Operation",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigGraphQL.Operation",
+        "tag": "bson:\"operation\" json:\"operation\"",
+        "json_name": "operation",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Variables",
+        "go_type": "object",
+        "go_path": "GraphQLEngineDataSourceConfigGraphQL.Variables",
+        "tag": "bson:\"variables\" json:\"variables\"",
+        "json_name": "variables",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLEngineDataSourceConfigKafka",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "BrokerAddresses",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigKafka.BrokerAddresses",
+        "tag": "bson:\"broker_addresses\" json:\"broker_addresses\"",
+        "json_name": "broker_addresses",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "Topics",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigKafka.Topics",
+        "tag": "bson:\"topics\" json:\"topics\"",
+        "json_name": "topics",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "GroupID",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigKafka.GroupID",
+        "tag": "bson:\"group_id\" json:\"group_id\"",
+        "json_name": "group_id",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ClientID",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigKafka.ClientID",
+        "tag": "bson:\"client_id\" json:\"client_id\"",
+        "json_name": "client_id",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "KafkaVersion",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigKafka.KafkaVersion",
+        "tag": "bson:\"kafka_version\" json:\"kafka_version\"",
+        "json_name": "kafka_version",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "StartConsumingLatest",
+        "go_type": "bool",
+        "go_path": "GraphQLEngineDataSourceConfigKafka.StartConsumingLatest",
+        "tag": "json:\"start_consuming_latest\"",
+        "json_name": "start_consuming_latest",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "BalanceStrategy",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigKafka.BalanceStrategy",
+        "tag": "json:\"balance_strategy\"",
+        "json_name": "balance_strategy",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "IsolationLevel",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigKafka.IsolationLevel",
+        "tag": "json:\"isolation_level\"",
+        "json_name": "isolation_level",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SASL",
+        "go_type": "object",
+        "go_path": "GraphQLEngineDataSourceConfigKafka.SASL",
+        "tag": "json:\"sasl\"",
+        "json_name": "sasl",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLEngineDataSourceConfigREST",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "URL",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigREST.URL",
+        "tag": "bson:\"url\" json:\"url\"",
+        "json_name": "url",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigREST.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Headers",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigREST.Headers",
+        "tag": "bson:\"headers\" json:\"headers\"",
+        "json_name": "headers",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Query",
+        "go_type": "QueryVariable",
+        "go_path": "GraphQLEngineDataSourceConfigREST.Query",
+        "tag": "bson:\"query\" json:\"query\"",
+        "json_name": "query",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "Body",
+        "go_type": "string",
+        "go_path": "GraphQLEngineDataSourceConfigREST.Body",
+        "tag": "bson:\"body\" json:\"body\"",
+        "json_name": "body",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLFieldConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "TypeName",
+        "go_type": "string",
+        "go_path": "GraphQLFieldConfig.TypeName",
+        "tag": "bson:\"type_name\" json:\"type_name\"",
+        "json_name": "type_name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "FieldName",
+        "go_type": "string",
+        "go_path": "GraphQLFieldConfig.FieldName",
+        "tag": "bson:\"field_name\" json:\"field_name\"",
+        "json_name": "field_name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "DisableDefaultMapping",
+        "go_type": "bool",
+        "go_path": "GraphQLFieldConfig.DisableDefaultMapping",
+        "tag": "bson:\"disable_default_mapping\" json:\"disable_default_mapping\"",
+        "json_name": "disable_default_mapping",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "GraphQLFieldConfig.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": true
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLPlayground",
+    "fields": [
+      {
+        "doc": "Enabled indicates if the playground should be enabled.\n",
+        "go_name": "Enabled",
+        "go_type": "bool",
+        "go_path": "GraphQLPlayground.Enabled",
+        "tag": "bson:\"enabled\" json:\"enabled\"",
+        "json_name": "enabled",
+        "is_array": false
+      },
+      {
+        "doc": "Path sets the path on which the playground will be hosted if enabled.\n",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "GraphQLPlayground.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLProxyConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "AuthHeaders",
+        "go_type": "string",
+        "go_path": "GraphQLProxyConfig.AuthHeaders",
+        "tag": "bson:\"auth_headers\" json:\"auth_headers\"",
+        "json_name": "auth_headers",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SubscriptionType",
+        "go_type": "SubscriptionType",
+        "go_path": "GraphQLProxyConfig.SubscriptionType",
+        "tag": "bson:\"subscription_type\" json:\"subscription_type,omitempty\"",
+        "json_name": "subscription_type,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "RequestHeaders",
+        "go_type": "string",
+        "go_path": "GraphQLProxyConfig.RequestHeaders",
+        "tag": "bson:\"request_headers\" json:\"request_headers\"",
+        "json_name": "request_headers",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLSubgraphConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "SDL",
+        "go_type": "string",
+        "go_path": "GraphQLSubgraphConfig.SDL",
+        "tag": "bson:\"sdl\" json:\"sdl\"",
+        "json_name": "sdl",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLSubgraphEntity",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "APIID",
+        "go_type": "string",
+        "go_path": "GraphQLSubgraphEntity.APIID",
+        "tag": "bson:\"api_id\" json:\"api_id\"",
+        "json_name": "api_id",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "GraphQLSubgraphEntity.Name",
+        "tag": "bson:\"name\" json:\"name\"",
+        "json_name": "name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "URL",
+        "go_type": "string",
+        "go_path": "GraphQLSubgraphEntity.URL",
+        "tag": "bson:\"url\" json:\"url\"",
+        "json_name": "url",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SDL",
+        "go_type": "string",
+        "go_path": "GraphQLSubgraphEntity.SDL",
+        "tag": "bson:\"sdl\" json:\"sdl\"",
+        "json_name": "sdl",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Headers",
+        "go_type": "string",
+        "go_path": "GraphQLSubgraphEntity.Headers",
+        "tag": "bson:\"headers\" json:\"headers\"",
+        "json_name": "headers",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SubscriptionType",
+        "go_type": "SubscriptionType",
+        "go_path": "GraphQLSubgraphEntity.SubscriptionType",
+        "tag": "bson:\"subscription_type\" json:\"subscription_type,omitempty\"",
+        "json_name": "subscription_type,omitempty",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLSupergraphConfig",
+    "fields": [
+      {
+        "doc": "UpdatedAt contains the date and time of the last update of a supergraph API.\n",
+        "go_name": "UpdatedAt",
+        "go_type": "object",
+        "go_path": "GraphQLSupergraphConfig.UpdatedAt",
+        "tag": "bson:\"updated_at\" json:\"updated_at,omitempty\"",
+        "json_name": "updated_at,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Subgraphs",
+        "go_type": "GraphQLSubgraphEntity",
+        "go_path": "GraphQLSupergraphConfig.Subgraphs",
+        "tag": "bson:\"subgraphs\" json:\"subgraphs\"",
+        "json_name": "subgraphs",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "MergedSDL",
+        "go_type": "string",
+        "go_path": "GraphQLSupergraphConfig.MergedSDL",
+        "tag": "bson:\"merged_sdl\" json:\"merged_sdl\"",
+        "json_name": "merged_sdl",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "GlobalHeaders",
+        "go_type": "string",
+        "go_path": "GraphQLSupergraphConfig.GlobalHeaders",
+        "tag": "bson:\"global_headers\" json:\"global_headers\"",
+        "json_name": "global_headers",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "DisableQueryBatching",
+        "go_type": "bool",
+        "go_path": "GraphQLSupergraphConfig.DisableQueryBatching",
+        "tag": "bson:\"disable_query_batching\" json:\"disable_query_batching\"",
+        "json_name": "disable_query_batching",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GraphQLTypeFields",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Type",
+        "go_type": "string",
+        "go_path": "GraphQLTypeFields.Type",
+        "tag": "bson:\"type\" json:\"type\"",
+        "json_name": "type",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Fields",
+        "go_type": "string",
+        "go_path": "GraphQLTypeFields.Fields",
+        "tag": "bson:\"fields\" json:\"fields\"",
+        "json_name": "fields",
+        "is_array": true
+      }
+    ]
+  },
+  {
+    "Name": "GroupKeySpaceRequest",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "OrgID",
+        "go_type": "string",
+        "go_path": "GroupKeySpaceRequest.OrgID",
+        "tag": "",
+        "json_name": "OrgID",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "GroupID",
+        "go_type": "string",
+        "go_path": "GroupKeySpaceRequest.GroupID",
+        "tag": "",
+        "json_name": "GroupID",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "GroupLoginRequest",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "UserKey",
+        "go_type": "string",
+        "go_path": "GroupLoginRequest.UserKey",
+        "tag": "",
+        "json_name": "UserKey",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "GroupID",
+        "go_type": "string",
+        "go_path": "GroupLoginRequest.GroupID",
+        "tag": "",
+        "json_name": "GroupID",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ForceSync",
+        "go_type": "bool",
+        "go_path": "GroupLoginRequest.ForceSync",
+        "tag": "",
+        "json_name": "ForceSync",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "HardTimeoutMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Disabled",
+        "go_type": "bool",
+        "go_path": "HardTimeoutMeta.Disabled",
+        "tag": "bson:\"disabled\" json:\"disabled\"",
+        "json_name": "disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "HardTimeoutMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "HardTimeoutMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "TimeOut",
+        "go_type": "int",
+        "go_path": "HardTimeoutMeta.TimeOut",
+        "tag": "bson:\"timeout\" json:\"timeout\"",
+        "json_name": "timeout",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "HeaderInjectionMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "DeleteHeaders",
+        "go_type": "string",
+        "go_path": "HeaderInjectionMeta.DeleteHeaders",
+        "tag": "bson:\"delete_headers\" json:\"delete_headers\"",
+        "json_name": "delete_headers",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "AddHeaders",
+        "go_type": "string",
+        "go_path": "HeaderInjectionMeta.AddHeaders",
+        "tag": "bson:\"add_headers\" json:\"add_headers\"",
+        "json_name": "add_headers",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "HeaderInjectionMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "HeaderInjectionMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ActOnResponse",
+        "go_type": "bool",
+        "go_path": "HeaderInjectionMeta.ActOnResponse",
+        "tag": "bson:\"act_on\" json:\"act_on\"",
+        "json_name": "act_on",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "HostCheckObject",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "CheckURL",
+        "go_type": "string",
+        "go_path": "HostCheckObject.CheckURL",
+        "tag": "bson:\"url\" json:\"url\"",
+        "json_name": "url",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Protocol",
+        "go_type": "string",
+        "go_path": "HostCheckObject.Protocol",
+        "tag": "bson:\"protocol\" json:\"protocol\"",
+        "json_name": "protocol",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Timeout",
+        "go_type": "object",
+        "go_path": "HostCheckObject.Timeout",
+        "tag": "bson:\"timeout\" json:\"timeout\"",
+        "json_name": "timeout",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EnableProxyProtocol",
+        "go_type": "bool",
+        "go_path": "HostCheckObject.EnableProxyProtocol",
+        "tag": "bson:\"enable_proxy_protocol\" json:\"enable_proxy_protocol\"",
+        "json_name": "enable_proxy_protocol",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Commands",
+        "go_type": "CheckCommand",
+        "go_path": "HostCheckObject.Commands",
+        "tag": "bson:\"commands\" json:\"commands\"",
+        "json_name": "commands",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "HostCheckObject.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Headers",
+        "go_type": "string",
+        "go_path": "HostCheckObject.Headers",
+        "tag": "bson:\"headers\" json:\"headers\"",
+        "json_name": "headers",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Body",
+        "go_type": "string",
+        "go_path": "HostCheckObject.Body",
+        "tag": "bson:\"body\" json:\"body\"",
+        "json_name": "body",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "HostList",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "hMutex",
+        "go_type": "object",
+        "go_path": "HostList.hMutex",
+        "tag": "",
+        "json_name": "hMutex",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "hosts",
+        "go_type": "string",
+        "go_path": "HostList.hosts",
+        "tag": "",
+        "json_name": "hosts",
+        "is_array": true
+      }
+    ]
+  },
+  {
+    "Name": "IDExtractorConfig",
+    "fields": [
+      {
+        "doc": "HeaderName is the header name to extract ID from.\n",
+        "go_name": "HeaderName",
+        "go_type": "string",
+        "go_path": "IDExtractorConfig.HeaderName",
+        "tag": "mapstructure:\"header_name\" bson:\"header_name\" json:\"header_name\"",
+        "json_name": "header_name",
+        "is_array": false
+      },
+      {
+        "doc": "FormParamName is the form parameter name to extract ID from.\n",
+        "go_name": "FormParamName",
+        "go_type": "string",
+        "go_path": "IDExtractorConfig.FormParamName",
+        "tag": "mapstructure:\"param_name\" bson:\"param_name\" json:\"param_name\"",
+        "json_name": "param_name",
+        "is_array": false
+      },
+      {
+        "doc": "RegexExpression is the regular expression to match ID.\n",
+        "go_name": "RegexExpression",
+        "go_type": "string",
+        "go_path": "IDExtractorConfig.RegexExpression",
+        "tag": "mapstructure:\"regex_expression\" bson:\"regex_expression\" json:\"regex_expression\"",
+        "json_name": "regex_expression",
+        "is_array": false
+      },
+      {
+        "doc": "RegexMatchIndex is the index from which ID to be extracted after a match.\n",
+        "go_name": "RegexMatchIndex",
+        "go_type": "int",
+        "go_path": "IDExtractorConfig.RegexMatchIndex",
+        "tag": "mapstructure:\"regex_match_index\" bson:\"regex_match_index\" json:\"regex_match_index\"",
+        "json_name": "regex_match_index",
+        "is_array": false
+      },
+      {
+        "doc": "XPathExp is the xpath expression to match ID.\n",
+        "go_name": "XPathExpression",
+        "go_type": "string",
+        "go_path": "IDExtractorConfig.XPathExpression",
+        "tag": "mapstructure:\"xpath_expression\" bson:\"xpath_expression\" json:\"xpath_expression\"",
+        "json_name": "xpath_expression",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "InboundData",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "KeyName",
+        "go_type": "string",
+        "go_path": "InboundData.KeyName",
+        "tag": "",
+        "json_name": "KeyName",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Value",
+        "go_type": "string",
+        "go_path": "InboundData.Value",
+        "tag": "",
+        "json_name": "Value",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SessionState",
+        "go_type": "string",
+        "go_path": "InboundData.SessionState",
+        "tag": "",
+        "json_name": "SessionState",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Timeout",
+        "go_type": "int64",
+        "go_path": "InboundData.Timeout",
+        "tag": "",
+        "json_name": "Timeout",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Per",
+        "go_type": "int64",
+        "go_path": "InboundData.Per",
+        "tag": "",
+        "json_name": "Per",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Expire",
+        "go_type": "int64",
+        "go_path": "InboundData.Expire",
+        "tag": "",
+        "json_name": "Expire",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "InternalMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "InternalMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "InternalMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "Introspection",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Enabled",
+        "go_type": "bool",
+        "go_path": "Introspection.Enabled",
+        "tag": "bson:\"enabled\" json:\"enabled\"",
+        "json_name": "enabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "URL",
+        "go_type": "string",
+        "go_path": "Introspection.URL",
+        "tag": "bson:\"url\" json:\"url\"",
+        "json_name": "url",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ClientID",
+        "go_type": "string",
+        "go_path": "Introspection.ClientID",
+        "tag": "bson:\"client_id\" json:\"client_id\"",
+        "json_name": "client_id",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ClientSecret",
+        "go_type": "string",
+        "go_path": "Introspection.ClientSecret",
+        "tag": "bson:\"client_secret\" json:\"client_secret\"",
+        "json_name": "client_secret",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "IdentityBaseField",
+        "go_type": "string",
+        "go_path": "Introspection.IdentityBaseField",
+        "tag": "bson:\"identity_base_field\" json:\"identity_base_field\"",
+        "json_name": "identity_base_field",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Cache",
+        "go_type": "IntrospectionCache",
+        "go_path": "Introspection.Cache",
+        "tag": "bson:\"cache\" json:\"cache\"",
+        "json_name": "cache",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "IntrospectionCache",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Enabled",
+        "go_type": "bool",
+        "go_path": "IntrospectionCache.Enabled",
+        "tag": "bson:\"enabled\" json:\"enabled\"",
+        "json_name": "enabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Timeout",
+        "go_type": "int64",
+        "go_path": "IntrospectionCache.Timeout",
+        "tag": "bson:\"timeout\" json:\"timeout\"",
+        "json_name": "timeout",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "JWTValidation",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Enabled",
+        "go_type": "bool",
+        "go_path": "JWTValidation.Enabled",
+        "tag": "bson:\"enabled\" json:\"enabled\"",
+        "json_name": "enabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SigningMethod",
+        "go_type": "string",
+        "go_path": "JWTValidation.SigningMethod",
+        "tag": "bson:\"signing_method\" json:\"signing_method\"",
+        "json_name": "signing_method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Source",
+        "go_type": "string",
+        "go_path": "JWTValidation.Source",
+        "tag": "bson:\"source\" json:\"source\"",
+        "json_name": "source",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "IssuedAtValidationSkew",
+        "go_type": "uint64",
+        "go_path": "JWTValidation.IssuedAtValidationSkew",
+        "tag": "bson:\"issued_at_validation_skew\" json:\"issued_at_validation_skew\"",
+        "json_name": "issued_at_validation_skew",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "NotBeforeValidationSkew",
+        "go_type": "uint64",
+        "go_path": "JWTValidation.NotBeforeValidationSkew",
+        "tag": "bson:\"not_before_validation_skew\" json:\"not_before_validation_skew\"",
+        "json_name": "not_before_validation_skew",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ExpiresAtValidationSkew",
+        "go_type": "uint64",
+        "go_path": "JWTValidation.ExpiresAtValidationSkew",
+        "tag": "bson:\"expires_at_validation_skew\" json:\"expires_at_validation_skew\"",
+        "json_name": "expires_at_validation_skew",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "IdentityBaseField",
+        "go_type": "string",
+        "go_path": "JWTValidation.IdentityBaseField",
+        "tag": "bson:\"identity_base_field\" json:\"identity_base_field\"",
+        "json_name": "identity_base_field",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "KeysValuesPair",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Keys",
+        "go_type": "string",
+        "go_path": "KeysValuesPair.Keys",
+        "tag": "",
+        "json_name": "Keys",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "Values",
+        "go_type": "string",
+        "go_path": "KeysValuesPair.Values",
+        "tag": "",
+        "json_name": "Values",
+        "is_array": true
+      }
+    ]
+  },
+  {
+    "Name": "MethodTransformMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Disabled",
+        "go_type": "bool",
+        "go_path": "MethodTransformMeta.Disabled",
+        "tag": "bson:\"disabled\" json:\"disabled\"",
+        "json_name": "disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "MethodTransformMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "MethodTransformMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ToMethod",
+        "go_type": "string",
+        "go_path": "MethodTransformMeta.ToMethod",
+        "tag": "bson:\"to_method\" json:\"to_method\"",
+        "json_name": "to_method",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "MiddlewareDefinition",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Disabled",
+        "go_type": "bool",
+        "go_path": "MiddlewareDefinition.Disabled",
+        "tag": "bson:\"disabled\" json:\"disabled\"",
+        "json_name": "disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "MiddlewareDefinition.Name",
+        "tag": "bson:\"name\" json:\"name\"",
+        "json_name": "name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "MiddlewareDefinition.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "RequireSession",
+        "go_type": "bool",
+        "go_path": "MiddlewareDefinition.RequireSession",
+        "tag": "bson:\"require_session\" json:\"require_session\"",
+        "json_name": "require_session",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "RawBodyOnly",
+        "go_type": "bool",
+        "go_path": "MiddlewareDefinition.RawBodyOnly",
+        "tag": "bson:\"raw_body_only\" json:\"raw_body_only\"",
+        "json_name": "raw_body_only",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "MiddlewareIdExtractor",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Disabled",
+        "go_type": "bool",
+        "go_path": "MiddlewareIdExtractor.Disabled",
+        "tag": "bson:\"disabled\" json:\"disabled\"",
+        "json_name": "disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ExtractFrom",
+        "go_type": "IdExtractorSource",
+        "go_path": "MiddlewareIdExtractor.ExtractFrom",
+        "tag": "bson:\"extract_from\" json:\"extract_from\"",
+        "json_name": "extract_from",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ExtractWith",
+        "go_type": "IdExtractorType",
+        "go_path": "MiddlewareIdExtractor.ExtractWith",
+        "tag": "bson:\"extract_with\" json:\"extract_with\"",
+        "json_name": "extract_with",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ExtractorConfig",
+        "go_type": "any",
+        "go_path": "MiddlewareIdExtractor.ExtractorConfig",
+        "tag": "bson:\"extractor_config\" json:\"extractor_config\"",
+        "json_name": "extractor_config",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Extractor",
+        "go_type": "IDExtractor",
+        "go_path": "MiddlewareIdExtractor.Extractor",
+        "tag": "bson:\"-\" json:\"-\"",
+        "json_name": "-",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "MiddlewareSection",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Pre",
+        "go_type": "MiddlewareDefinition",
+        "go_path": "MiddlewareSection.Pre",
+        "tag": "bson:\"pre\" json:\"pre\"",
+        "json_name": "pre",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "Post",
+        "go_type": "MiddlewareDefinition",
+        "go_path": "MiddlewareSection.Post",
+        "tag": "bson:\"post\" json:\"post\"",
+        "json_name": "post",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "PostKeyAuth",
+        "go_type": "MiddlewareDefinition",
+        "go_path": "MiddlewareSection.PostKeyAuth",
+        "tag": "bson:\"post_key_auth\" json:\"post_key_auth\"",
+        "json_name": "post_key_auth",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "AuthCheck",
+        "go_type": "MiddlewareDefinition",
+        "go_path": "MiddlewareSection.AuthCheck",
+        "tag": "bson:\"auth_check\" json:\"auth_check\"",
+        "json_name": "auth_check",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Response",
+        "go_type": "MiddlewareDefinition",
+        "go_path": "MiddlewareSection.Response",
+        "tag": "bson:\"response\" json:\"response\"",
+        "json_name": "response",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "Driver",
+        "go_type": "MiddlewareDriver",
+        "go_path": "MiddlewareSection.Driver",
+        "tag": "bson:\"driver\" json:\"driver\"",
+        "json_name": "driver",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "IdExtractor",
+        "go_type": "MiddlewareIdExtractor",
+        "go_path": "MiddlewareSection.IdExtractor",
+        "tag": "bson:\"id_extractor\" json:\"id_extractor\"",
+        "json_name": "id_extractor",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "MockResponseMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Disabled",
+        "go_type": "bool",
+        "go_path": "MockResponseMeta.Disabled",
+        "tag": "bson:\"disabled\" json:\"disabled\"",
+        "json_name": "disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "MockResponseMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "MockResponseMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "IgnoreCase",
+        "go_type": "bool",
+        "go_path": "MockResponseMeta.IgnoreCase",
+        "tag": "bson:\"ignore_case\" json:\"ignore_case\"",
+        "json_name": "ignore_case",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Code",
+        "go_type": "int",
+        "go_path": "MockResponseMeta.Code",
+        "tag": "bson:\"code\" json:\"code\"",
+        "json_name": "code",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Body",
+        "go_type": "string",
+        "go_path": "MockResponseMeta.Body",
+        "tag": "bson:\"body\" json:\"body\"",
+        "json_name": "body",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Headers",
+        "go_type": "string",
+        "go_path": "MockResponseMeta.Headers",
+        "tag": "bson:\"headers\" json:\"headers\"",
+        "json_name": "headers",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "NotificationsManager",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "SharedSecret",
+        "go_type": "string",
+        "go_path": "NotificationsManager.SharedSecret",
+        "tag": "bson:\"shared_secret\" json:\"shared_secret\"",
+        "json_name": "shared_secret",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "OAuthKeyChangeURL",
+        "go_type": "string",
+        "go_path": "NotificationsManager.OAuthKeyChangeURL",
+        "tag": "bson:\"oauth_on_keychange_url\" json:\"oauth_on_keychange_url\"",
+        "json_name": "oauth_on_keychange_url",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "OIDProviderConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Issuer",
+        "go_type": "string",
+        "go_path": "OIDProviderConfig.Issuer",
+        "tag": "bson:\"issuer\" json:\"issuer\"",
+        "json_name": "issuer",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ClientIDs",
+        "go_type": "string",
+        "go_path": "OIDProviderConfig.ClientIDs",
+        "tag": "bson:\"client_ids\" json:\"client_ids\"",
+        "json_name": "client_ids",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "OpenIDOptions",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Providers",
+        "go_type": "OIDProviderConfig",
+        "go_path": "OpenIDOptions.Providers",
+        "tag": "bson:\"providers\" json:\"providers\"",
+        "json_name": "providers",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "SegregateByClient",
+        "go_type": "bool",
+        "go_path": "OpenIDOptions.SegregateByClient",
+        "tag": "bson:\"segregate_by_client\" json:\"segregate_by_client\"",
+        "json_name": "segregate_by_client",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "PersistGraphQLMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "PersistGraphQLMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "PersistGraphQLMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Operation",
+        "go_type": "string",
+        "go_path": "PersistGraphQLMeta.Operation",
+        "tag": "bson:\"operation\" json:\"operation\"",
+        "json_name": "operation",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Variables",
+        "go_type": "any",
+        "go_path": "PersistGraphQLMeta.Variables",
+        "tag": "bson:\"variables\" json:\"variables\"",
+        "json_name": "variables",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "Provider",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "JWT",
+        "go_type": "JWTValidation",
+        "go_path": "Provider.JWT",
+        "tag": "bson:\"jwt\" json:\"jwt\"",
+        "json_name": "jwt",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Introspection",
+        "go_type": "Introspection",
+        "go_path": "Provider.Introspection",
+        "tag": "bson:\"introspection\" json:\"introspection\"",
+        "json_name": "introspection",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "ProxyConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "PreserveHostHeader",
+        "go_type": "bool",
+        "go_path": "ProxyConfig.PreserveHostHeader",
+        "tag": "bson:\"preserve_host_header\" json:\"preserve_host_header\"",
+        "json_name": "preserve_host_header",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ListenPath",
+        "go_type": "string",
+        "go_path": "ProxyConfig.ListenPath",
+        "tag": "bson:\"listen_path\" json:\"listen_path\"",
+        "json_name": "listen_path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "TargetURL",
+        "go_type": "string",
+        "go_path": "ProxyConfig.TargetURL",
+        "tag": "bson:\"target_url\" json:\"target_url\"",
+        "json_name": "target_url",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "DisableStripSlash",
+        "go_type": "bool",
+        "go_path": "ProxyConfig.DisableStripSlash",
+        "tag": "bson:\"disable_strip_slash\" json:\"disable_strip_slash\"",
+        "json_name": "disable_strip_slash",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "StripListenPath",
+        "go_type": "bool",
+        "go_path": "ProxyConfig.StripListenPath",
+        "tag": "bson:\"strip_listen_path\" json:\"strip_listen_path\"",
+        "json_name": "strip_listen_path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EnableLoadBalancing",
+        "go_type": "bool",
+        "go_path": "ProxyConfig.EnableLoadBalancing",
+        "tag": "bson:\"enable_load_balancing\" json:\"enable_load_balancing\"",
+        "json_name": "enable_load_balancing",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Targets",
+        "go_type": "string",
+        "go_path": "ProxyConfig.Targets",
+        "tag": "bson:\"target_list\" json:\"target_list\"",
+        "json_name": "target_list",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "StructuredTargetList",
+        "go_type": "HostList",
+        "go_path": "ProxyConfig.StructuredTargetList",
+        "tag": "bson:\"-\" json:\"-\"",
+        "json_name": "-",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CheckHostAgainstUptimeTests",
+        "go_type": "bool",
+        "go_path": "ProxyConfig.CheckHostAgainstUptimeTests",
+        "tag": "bson:\"check_host_against_uptime_tests\" json:\"check_host_against_uptime_tests\"",
+        "json_name": "check_host_against_uptime_tests",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ServiceDiscovery",
+        "go_type": "ServiceDiscoveryConfiguration",
+        "go_path": "ProxyConfig.ServiceDiscovery",
+        "tag": "bson:\"service_discovery\" json:\"service_discovery\"",
+        "json_name": "service_discovery",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Transport",
+        "go_type": "any",
+        "go_path": "ProxyConfig.Transport",
+        "tag": "bson:\"transport\" json:\"transport\"",
+        "json_name": "transport",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "QueryVariable",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "QueryVariable.Name",
+        "tag": "bson:\"name\" json:\"name\"",
+        "json_name": "name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Value",
+        "go_type": "string",
+        "go_path": "QueryVariable.Value",
+        "tag": "bson:\"value\" json:\"value\"",
+        "json_name": "value",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "RequestSigningMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "IsEnabled",
+        "go_type": "bool",
+        "go_path": "RequestSigningMeta.IsEnabled",
+        "tag": "bson:\"is_enabled\" json:\"is_enabled\"",
+        "json_name": "is_enabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Secret",
+        "go_type": "string",
+        "go_path": "RequestSigningMeta.Secret",
+        "tag": "bson:\"secret\" json:\"secret\"",
+        "json_name": "secret",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "KeyId",
+        "go_type": "string",
+        "go_path": "RequestSigningMeta.KeyId",
+        "tag": "bson:\"key_id\" json:\"key_id\"",
+        "json_name": "key_id",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Algorithm",
+        "go_type": "string",
+        "go_path": "RequestSigningMeta.Algorithm",
+        "tag": "bson:\"algorithm\" json:\"algorithm\"",
+        "json_name": "algorithm",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "HeaderList",
+        "go_type": "string",
+        "go_path": "RequestSigningMeta.HeaderList",
+        "tag": "bson:\"header_list\" json:\"header_list\"",
+        "json_name": "header_list",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "CertificateId",
+        "go_type": "string",
+        "go_path": "RequestSigningMeta.CertificateId",
+        "tag": "bson:\"certificate_id\" json:\"certificate_id\"",
+        "json_name": "certificate_id",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SignatureHeader",
+        "go_type": "string",
+        "go_path": "RequestSigningMeta.SignatureHeader",
+        "tag": "bson:\"signature_header\" json:\"signature_header\"",
+        "json_name": "signature_header",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "RequestSizeMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "RequestSizeMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "RequestSizeMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SizeLimit",
+        "go_type": "int64",
+        "go_path": "RequestSizeMeta.SizeLimit",
+        "tag": "bson:\"size_limit\" json:\"size_limit\"",
+        "json_name": "size_limit",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "ResponseProcessor",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "ResponseProcessor.Name",
+        "tag": "bson:\"name\" json:\"name\"",
+        "json_name": "name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Options",
+        "go_type": "any",
+        "go_path": "ResponseProcessor.Options",
+        "tag": "bson:\"options\" json:\"options\"",
+        "json_name": "options",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "RoutingTrigger",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "On",
+        "go_type": "RoutingTriggerOnType",
+        "go_path": "RoutingTrigger.On",
+        "tag": "bson:\"on\" json:\"on\"",
+        "json_name": "on",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Options",
+        "go_type": "RoutingTriggerOptions",
+        "go_path": "RoutingTrigger.Options",
+        "tag": "bson:\"options\" json:\"options\"",
+        "json_name": "options",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "RewriteTo",
+        "go_type": "string",
+        "go_path": "RoutingTrigger.RewriteTo",
+        "tag": "bson:\"rewrite_to\" json:\"rewrite_to\"",
+        "json_name": "rewrite_to",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "RoutingTriggerOptions",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "HeaderMatches",
+        "go_type": "StringRegexMap",
+        "go_path": "RoutingTriggerOptions.HeaderMatches",
+        "tag": "bson:\"header_matches\" json:\"header_matches\"",
+        "json_name": "header_matches",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "QueryValMatches",
+        "go_type": "StringRegexMap",
+        "go_path": "RoutingTriggerOptions.QueryValMatches",
+        "tag": "bson:\"query_val_matches\" json:\"query_val_matches\"",
+        "json_name": "query_val_matches",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "PathPartMatches",
+        "go_type": "StringRegexMap",
+        "go_path": "RoutingTriggerOptions.PathPartMatches",
+        "tag": "bson:\"path_part_matches\" json:\"path_part_matches\"",
+        "json_name": "path_part_matches",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SessionMetaMatches",
+        "go_type": "StringRegexMap",
+        "go_path": "RoutingTriggerOptions.SessionMetaMatches",
+        "tag": "bson:\"session_meta_matches\" json:\"session_meta_matches\"",
+        "json_name": "session_meta_matches",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "RequestContextMatches",
+        "go_type": "StringRegexMap",
+        "go_path": "RoutingTriggerOptions.RequestContextMatches",
+        "tag": "bson:\"request_context_matches\" json:\"request_context_matches\"",
+        "json_name": "request_context_matches",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "PayloadMatches",
+        "go_type": "StringRegexMap",
+        "go_path": "RoutingTriggerOptions.PayloadMatches",
+        "tag": "bson:\"payload_matches\" json:\"payload_matches\"",
+        "json_name": "payload_matches",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "RuleAtLeastEnableOneAuthSource"
+  },
+  {
+    "Name": "RuleUniqueDataSourceNames"
+  },
+  {
+    "Name": "RuleValidateIPList"
+  },
+  {
+    "Name": "ScopeClaim",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "ScopeClaimName",
+        "go_type": "string",
+        "go_path": "ScopeClaim.ScopeClaimName",
+        "tag": "bson:\"scope_claim_name\" json:\"scope_claim_name,omitempty\"",
+        "json_name": "scope_claim_name,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ScopeToPolicy",
+        "go_type": "string",
+        "go_path": "ScopeClaim.ScopeToPolicy",
+        "tag": "json:\"scope_to_policy,omitempty\"",
+        "json_name": "scope_to_policy,omitempty",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "Scopes",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "JWT",
+        "go_type": "ScopeClaim",
+        "go_path": "Scopes.JWT",
+        "tag": "bson:\"jwt\" json:\"jwt,omitempty\"",
+        "json_name": "jwt,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "OIDC",
+        "go_type": "ScopeClaim",
+        "go_path": "Scopes.OIDC",
+        "tag": "bson:\"oidc\" json:\"oidc,omitempty\"",
+        "json_name": "oidc,omitempty",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "ServiceDiscoveryConfiguration",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "UseDiscoveryService",
+        "go_type": "bool",
+        "go_path": "ServiceDiscoveryConfiguration.UseDiscoveryService",
+        "tag": "bson:\"use_discovery_service\" json:\"use_discovery_service\"",
+        "json_name": "use_discovery_service",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "QueryEndpoint",
+        "go_type": "string",
+        "go_path": "ServiceDiscoveryConfiguration.QueryEndpoint",
+        "tag": "bson:\"query_endpoint\" json:\"query_endpoint\"",
+        "json_name": "query_endpoint",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseNestedQuery",
+        "go_type": "bool",
+        "go_path": "ServiceDiscoveryConfiguration.UseNestedQuery",
+        "tag": "bson:\"use_nested_query\" json:\"use_nested_query\"",
+        "json_name": "use_nested_query",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ParentDataPath",
+        "go_type": "string",
+        "go_path": "ServiceDiscoveryConfiguration.ParentDataPath",
+        "tag": "bson:\"parent_data_path\" json:\"parent_data_path\"",
+        "json_name": "parent_data_path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "DataPath",
+        "go_type": "string",
+        "go_path": "ServiceDiscoveryConfiguration.DataPath",
+        "tag": "bson:\"data_path\" json:\"data_path\"",
+        "json_name": "data_path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "PortDataPath",
+        "go_type": "string",
+        "go_path": "ServiceDiscoveryConfiguration.PortDataPath",
+        "tag": "bson:\"port_data_path\" json:\"port_data_path\"",
+        "json_name": "port_data_path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "TargetPath",
+        "go_type": "string",
+        "go_path": "ServiceDiscoveryConfiguration.TargetPath",
+        "tag": "bson:\"target_path\" json:\"target_path\"",
+        "json_name": "target_path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseTargetList",
+        "go_type": "bool",
+        "go_path": "ServiceDiscoveryConfiguration.UseTargetList",
+        "tag": "bson:\"use_target_list\" json:\"use_target_list\"",
+        "json_name": "use_target_list",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CacheDisabled",
+        "go_type": "bool",
+        "go_path": "ServiceDiscoveryConfiguration.CacheDisabled",
+        "tag": "bson:\"cache_disabled\" json:\"cache_disabled\"",
+        "json_name": "cache_disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CacheTimeout",
+        "go_type": "int64",
+        "go_path": "ServiceDiscoveryConfiguration.CacheTimeout",
+        "tag": "bson:\"cache_timeout\" json:\"cache_timeout\"",
+        "json_name": "cache_timeout",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EndpointReturnsList",
+        "go_type": "bool",
+        "go_path": "ServiceDiscoveryConfiguration.EndpointReturnsList",
+        "tag": "bson:\"endpoint_returns_list\" json:\"endpoint_returns_list\"",
+        "json_name": "endpoint_returns_list",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "SessionProviderMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Name",
+        "go_type": "SessionProviderCode",
+        "go_path": "SessionProviderMeta.Name",
+        "tag": "bson:\"name\" json:\"name\"",
+        "json_name": "name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "StorageEngine",
+        "go_type": "StorageEngineCode",
+        "go_path": "SessionProviderMeta.StorageEngine",
+        "tag": "bson:\"storage_engine\" json:\"storage_engine\"",
+        "json_name": "storage_engine",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Meta",
+        "go_type": "any",
+        "go_path": "SessionProviderMeta.Meta",
+        "tag": "bson:\"meta\" json:\"meta\"",
+        "json_name": "meta",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "SignatureConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Algorithm",
+        "go_type": "string",
+        "go_path": "SignatureConfig.Algorithm",
+        "tag": "mapstructure:\"algorithm\" bson:\"algorithm\" json:\"algorithm\"",
+        "json_name": "algorithm",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Header",
+        "go_type": "string",
+        "go_path": "SignatureConfig.Header",
+        "tag": "mapstructure:\"header\" bson:\"header\" json:\"header\"",
+        "json_name": "header",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseParam",
+        "go_type": "bool",
+        "go_path": "SignatureConfig.UseParam",
+        "tag": "mapstructure:\"use_param\" bson:\"use_param\" json:\"use_param\"",
+        "json_name": "use_param",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ParamName",
+        "go_type": "string",
+        "go_path": "SignatureConfig.ParamName",
+        "tag": "mapstructure:\"param_name\" bson:\"param_name\" json:\"param_name\"",
+        "json_name": "param_name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Secret",
+        "go_type": "string",
+        "go_path": "SignatureConfig.Secret",
+        "tag": "mapstructure:\"secret\" bson:\"secret\" json:\"secret\"",
+        "json_name": "secret",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "AllowedClockSkew",
+        "go_type": "int64",
+        "go_path": "SignatureConfig.AllowedClockSkew",
+        "tag": "mapstructure:\"allowed_clock_skew\" bson:\"allowed_clock_skew\" json:\"allowed_clock_skew\"",
+        "json_name": "allowed_clock_skew",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ErrorCode",
+        "go_type": "int",
+        "go_path": "SignatureConfig.ErrorCode",
+        "tag": "mapstructure:\"error_code\" bson:\"error_code\" json:\"error_code\"",
+        "json_name": "error_code",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ErrorMessage",
+        "go_type": "string",
+        "go_path": "SignatureConfig.ErrorMessage",
+        "tag": "mapstructure:\"error_message\" bson:\"error_message\" json:\"error_message\"",
+        "json_name": "error_message",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "StringRegexMap",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "MatchPattern",
+        "go_type": "string",
+        "go_path": "StringRegexMap.MatchPattern",
+        "tag": "bson:\"match_rx\" json:\"match_rx\"",
+        "json_name": "match_rx",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Reverse",
+        "go_type": "bool",
+        "go_path": "StringRegexMap.Reverse",
+        "tag": "bson:\"reverse\" json:\"reverse\"",
+        "json_name": "reverse",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "matchRegex",
+        "go_type": "object",
+        "go_path": "StringRegexMap.matchRegex",
+        "tag": "",
+        "json_name": "matchRegex",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "TemplateData",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Input",
+        "go_type": "RequestInputType",
+        "go_path": "TemplateData.Input",
+        "tag": "bson:\"input_type\" json:\"input_type\"",
+        "json_name": "input_type",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Mode",
+        "go_type": "SourceMode",
+        "go_path": "TemplateData.Mode",
+        "tag": "bson:\"template_mode\" json:\"template_mode\"",
+        "json_name": "template_mode",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "EnableSession",
+        "go_type": "bool",
+        "go_path": "TemplateData.EnableSession",
+        "tag": "bson:\"enable_session\" json:\"enable_session\"",
+        "json_name": "enable_session",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "TemplateSource",
+        "go_type": "string",
+        "go_path": "TemplateData.TemplateSource",
+        "tag": "bson:\"template_source\" json:\"template_source\"",
+        "json_name": "template_source",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "TemplateMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Disabled",
+        "go_type": "bool",
+        "go_path": "TemplateMeta.Disabled",
+        "tag": "bson:\"disabled\" json:\"disabled\"",
+        "json_name": "disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "TemplateData",
+        "go_type": "TemplateData",
+        "go_path": "TemplateMeta.TemplateData",
+        "tag": "bson:\"template_data\" json:\"template_data\"",
+        "json_name": "template_data",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "TemplateMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "TemplateMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "TrackEndpointMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "TrackEndpointMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "TrackEndpointMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "TransformJQMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Filter",
+        "go_type": "string",
+        "go_path": "TransformJQMeta.Filter",
+        "tag": "bson:\"filter\" json:\"filter\"",
+        "json_name": "filter",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "TransformJQMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "TransformJQMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "URLRewriteMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "URLRewriteMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "URLRewriteMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "MatchPattern",
+        "go_type": "string",
+        "go_path": "URLRewriteMeta.MatchPattern",
+        "tag": "bson:\"match_pattern\" json:\"match_pattern\"",
+        "json_name": "match_pattern",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "RewriteTo",
+        "go_type": "string",
+        "go_path": "URLRewriteMeta.RewriteTo",
+        "tag": "bson:\"rewrite_to\" json:\"rewrite_to\"",
+        "json_name": "rewrite_to",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Triggers",
+        "go_type": "RoutingTrigger",
+        "go_path": "URLRewriteMeta.Triggers",
+        "tag": "bson:\"triggers\" json:\"triggers\"",
+        "json_name": "triggers",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "MatchRegexp",
+        "go_type": "object",
+        "go_path": "URLRewriteMeta.MatchRegexp",
+        "tag": "json:\"-\"",
+        "json_name": "-",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "UptimeTests",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "CheckList",
+        "go_type": "HostCheckObject",
+        "go_path": "UptimeTests.CheckList",
+        "tag": "bson:\"check_list\" json:\"check_list\"",
+        "json_name": "check_list",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "Config",
+        "go_type": "UptimeTestsConfig",
+        "go_path": "UptimeTests.Config",
+        "tag": "bson:\"config\" json:\"config\"",
+        "json_name": "config",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "UptimeTestsConfig",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "ExpireUptimeAnalyticsAfter",
+        "go_type": "int64",
+        "go_path": "UptimeTestsConfig.ExpireUptimeAnalyticsAfter",
+        "tag": "bson:\"expire_utime_after\" json:\"expire_utime_after\"",
+        "json_name": "expire_utime_after",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ServiceDiscovery",
+        "go_type": "ServiceDiscoveryConfiguration",
+        "go_path": "UptimeTestsConfig.ServiceDiscovery",
+        "tag": "bson:\"service_discovery\" json:\"service_discovery\"",
+        "json_name": "service_discovery",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "RecheckWait",
+        "go_type": "int",
+        "go_path": "UptimeTestsConfig.RecheckWait",
+        "tag": "bson:\"recheck_wait\" json:\"recheck_wait\"",
+        "json_name": "recheck_wait",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "ValidatePathMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Disabled",
+        "go_type": "bool",
+        "go_path": "ValidatePathMeta.Disabled",
+        "tag": "bson:\"disabled\" json:\"disabled\"",
+        "json_name": "disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "ValidatePathMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "ValidatePathMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Schema",
+        "go_type": "any",
+        "go_path": "ValidatePathMeta.Schema",
+        "tag": "bson:\"-\" json:\"schema\"",
+        "json_name": "schema",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SchemaB64",
+        "go_type": "string",
+        "go_path": "ValidatePathMeta.SchemaB64",
+        "tag": "bson:\"schema_b64\" json:\"schema_b64,omitempty\"",
+        "json_name": "schema_b64,omitempty",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SchemaCache",
+        "go_type": "object",
+        "go_path": "ValidatePathMeta.SchemaCache",
+        "tag": "bson:\"-\" json:\"-\"",
+        "json_name": "-",
+        "is_array": false
+      },
+      {
+        "doc": "Allows override of default 422 Unprocessible Entity response code for validation errors.\n",
+        "go_name": "ErrorResponseCode",
+        "go_type": "int",
+        "go_path": "ValidatePathMeta.ErrorResponseCode",
+        "tag": "bson:\"error_response_code\" json:\"error_response_code\"",
+        "json_name": "error_response_code",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "ValidateRequestMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Enabled",
+        "go_type": "bool",
+        "go_path": "ValidateRequestMeta.Enabled",
+        "tag": "bson:\"enabled\" json:\"enabled\"",
+        "json_name": "enabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "ValidateRequestMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "ValidateRequestMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "Allows override of default 422 Unprocessible Entity response code for validation errors.\n",
+        "go_name": "ErrorResponseCode",
+        "go_type": "int",
+        "go_path": "ValidateRequestMeta.ErrorResponseCode",
+        "tag": "bson:\"error_response_code\" json:\"error_response_code\"",
+        "json_name": "error_response_code",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "ValidationResult",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "IsValid",
+        "go_type": "bool",
+        "go_path": "ValidationResult.IsValid",
+        "tag": "",
+        "json_name": "IsValid",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Errors",
+        "go_type": "error",
+        "go_path": "ValidationResult.Errors",
+        "tag": "",
+        "json_name": "Errors",
+        "is_array": true
+      }
+    ]
+  },
+  {
+    "Name": "VersionData",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "NotVersioned",
+        "go_type": "bool",
+        "go_path": "VersionData.NotVersioned",
+        "tag": "bson:\"not_versioned\" json:\"not_versioned\"",
+        "json_name": "not_versioned",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "DefaultVersion",
+        "go_type": "string",
+        "go_path": "VersionData.DefaultVersion",
+        "tag": "bson:\"default_version\" json:\"default_version\"",
+        "json_name": "default_version",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Versions",
+        "go_type": "VersionInfo",
+        "go_path": "VersionData.Versions",
+        "tag": "bson:\"versions\" json:\"versions\"",
+        "json_name": "versions",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "VersionDefinition",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Enabled",
+        "go_type": "bool",
+        "go_path": "VersionDefinition.Enabled",
+        "tag": "bson:\"enabled\" json:\"enabled\"",
+        "json_name": "enabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "VersionDefinition.Name",
+        "tag": "bson:\"name\" json:\"name\"",
+        "json_name": "name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Default",
+        "go_type": "string",
+        "go_path": "VersionDefinition.Default",
+        "tag": "bson:\"default\" json:\"default\"",
+        "json_name": "default",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Location",
+        "go_type": "string",
+        "go_path": "VersionDefinition.Location",
+        "tag": "bson:\"location\" json:\"location\"",
+        "json_name": "location",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Key",
+        "go_type": "string",
+        "go_path": "VersionDefinition.Key",
+        "tag": "bson:\"key\" json:\"key\"",
+        "json_name": "key",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "StripPath",
+        "go_type": "bool",
+        "go_path": "VersionDefinition.StripPath",
+        "tag": "bson:\"strip_path\" json:\"strip_path\"",
+        "json_name": "strip_path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "StripVersioningData",
+        "go_type": "bool",
+        "go_path": "VersionDefinition.StripVersioningData",
+        "tag": "bson:\"strip_versioning_data\" json:\"strip_versioning_data\"",
+        "json_name": "strip_versioning_data",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Versions",
+        "go_type": "string",
+        "go_path": "VersionDefinition.Versions",
+        "tag": "bson:\"versions\" json:\"versions\"",
+        "json_name": "versions",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "BaseID",
+        "go_type": "string",
+        "go_path": "VersionDefinition.BaseID",
+        "tag": "bson:\"base_id\" json:\"-\"",
+        "json_name": "-",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "VersionInfo",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "VersionInfo.Name",
+        "tag": "bson:\"name\" json:\"name\"",
+        "json_name": "name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Expires",
+        "go_type": "string",
+        "go_path": "VersionInfo.Expires",
+        "tag": "bson:\"expires\" json:\"expires\"",
+        "json_name": "expires",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ExpiresTs",
+        "go_type": "object",
+        "go_path": "VersionInfo.ExpiresTs",
+        "tag": "bson:\"-\" json:\"-\"",
+        "json_name": "-",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Paths",
+        "go_type": "any",
+        "go_path": "VersionInfo.Paths",
+        "tag": "bson:\"paths\" json:\"paths\"",
+        "json_name": "paths",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseExtendedPaths",
+        "go_type": "bool",
+        "go_path": "VersionInfo.UseExtendedPaths",
+        "tag": "bson:\"use_extended_paths\" json:\"use_extended_paths\"",
+        "json_name": "use_extended_paths",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ExtendedPaths",
+        "go_type": "ExtendedPathsSet",
+        "go_path": "VersionInfo.ExtendedPaths",
+        "tag": "bson:\"extended_paths\" json:\"extended_paths\"",
+        "json_name": "extended_paths",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "GlobalHeaders",
+        "go_type": "string",
+        "go_path": "VersionInfo.GlobalHeaders",
+        "tag": "bson:\"global_headers\" json:\"global_headers\"",
+        "json_name": "global_headers",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "GlobalHeadersRemove",
+        "go_type": "string",
+        "go_path": "VersionInfo.GlobalHeadersRemove",
+        "tag": "bson:\"global_headers_remove\" json:\"global_headers_remove\"",
+        "json_name": "global_headers_remove",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "GlobalResponseHeaders",
+        "go_type": "string",
+        "go_path": "VersionInfo.GlobalResponseHeaders",
+        "tag": "bson:\"global_response_headers\" json:\"global_response_headers\"",
+        "json_name": "global_response_headers",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "GlobalResponseHeadersRemove",
+        "go_type": "string",
+        "go_path": "VersionInfo.GlobalResponseHeadersRemove",
+        "tag": "bson:\"global_response_headers_remove\" json:\"global_response_headers_remove\"",
+        "json_name": "global_response_headers_remove",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "IgnoreEndpointCase",
+        "go_type": "bool",
+        "go_path": "VersionInfo.IgnoreEndpointCase",
+        "tag": "bson:\"ignore_endpoint_case\" json:\"ignore_endpoint_case\"",
+        "json_name": "ignore_endpoint_case",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "GlobalSizeLimit",
+        "go_type": "int64",
+        "go_path": "VersionInfo.GlobalSizeLimit",
+        "tag": "bson:\"global_size_limit\" json:\"global_size_limit\"",
+        "json_name": "global_size_limit",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "OverrideTarget",
+        "go_type": "string",
+        "go_path": "VersionInfo.OverrideTarget",
+        "tag": "bson:\"override_target\" json:\"override_target\"",
+        "json_name": "override_target",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "VirtualMeta",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Disabled",
+        "go_type": "bool",
+        "go_path": "VirtualMeta.Disabled",
+        "tag": "bson:\"disabled\" json:\"disabled\"",
+        "json_name": "disabled",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ResponseFunctionName",
+        "go_type": "string",
+        "go_path": "VirtualMeta.ResponseFunctionName",
+        "tag": "bson:\"response_function_name\" json:\"response_function_name\"",
+        "json_name": "response_function_name",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "FunctionSourceType",
+        "go_type": "SourceMode",
+        "go_path": "VirtualMeta.FunctionSourceType",
+        "tag": "bson:\"function_source_type\" json:\"function_source_type\"",
+        "json_name": "function_source_type",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "FunctionSourceURI",
+        "go_type": "string",
+        "go_path": "VirtualMeta.FunctionSourceURI",
+        "tag": "bson:\"function_source_uri\" json:\"function_source_uri\"",
+        "json_name": "function_source_uri",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Path",
+        "go_type": "string",
+        "go_path": "VirtualMeta.Path",
+        "tag": "bson:\"path\" json:\"path\"",
+        "json_name": "path",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Method",
+        "go_type": "string",
+        "go_path": "VirtualMeta.Method",
+        "tag": "bson:\"method\" json:\"method\"",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "UseSession",
+        "go_type": "bool",
+        "go_path": "VirtualMeta.UseSession",
+        "tag": "bson:\"use_session\" json:\"use_session\"",
+        "json_name": "use_session",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ProxyOnError",
+        "go_type": "bool",
+        "go_path": "VirtualMeta.ProxyOnError",
+        "tag": "bson:\"proxy_on_error\" json:\"proxy_on_error\"",
+        "json_name": "proxy_on_error",
+        "is_array": false
+      }
+    ]
+  }
+]
