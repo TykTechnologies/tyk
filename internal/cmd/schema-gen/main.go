@@ -1,56 +1,42 @@
 package main
 
-// This app reflects a json schema from known data models.
-// The schemas are written out in schema/jsonschema.
+// This app reflects the known data model structs and generates
+// various outputs based on the generator.
 //
-// Usage: go run internal/cmd/schema-gen/main.go
+// - `jsonschema` generates a jsonschema for validation,
+// - `structs` generates a custom json with go struct metadata.
+//
+// For each generator, the output is written out in schema/*.
+//
+// Usage:
+//
+// - `task schema-gen`
+// - `go run internal/cmd/schema-gen/main.go (from root)
 
 import (
-	"encoding/json"
+	"fmt"
 	"os"
 
-	"github.com/invopop/jsonschema"
-
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/apidef/oas"
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/cmd/schema-gen/jsonschema"
+	"github.com/TykTechnologies/tyk/internal/cmd/schema-gen/structs"
 )
 
 func main() {
 	if err := start(); err != nil {
-		println(err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
 func start() (err error) {
-	// The Gateway Config
-	err = dump("schema/jsonschema/config.json", jsonschema.Reflect(config.Config{}))
-	if err != nil {
-		return
+	generators := []func() error{
+		jsonschema.Dump,
+		structs.Dump,
 	}
-
-	// The API Definition
-	err = dump("schema/jsonschema/apidef.json", jsonschema.Reflect(apidef.APIDefinition{}))
-	if err != nil {
-		return
+	for _, generator := range generators {
+		if err := generator(); err != nil {
+			return err
+		}
 	}
-
-	// OAS API Tyk Extension
-	err = dump("schema/jsonschema/x-tyk-gateway.json", jsonschema.Reflect(oas.XTykAPIGateway{}))
-	if err != nil {
-		return
-	}
-
 	return nil
-}
-
-func dump(filename string, data interface{}) error {
-	println(filename)
-
-	dataBytes, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filename, dataBytes, 0644) //nolint:gosec
 }
