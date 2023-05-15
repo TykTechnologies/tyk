@@ -1,656 +1,5 @@
 [
   {
-    "Name": "AnalyticsConfigConfig",
-    "fields": [
-      {
-        "doc": "Set empty for a Self-Managed installation or `rpc` for multi-cloud.\n",
-        "go_name": "Type",
-        "go_type": "string",
-        "go_path": "AnalyticsConfigConfig.Type",
-        "tag": "`json:\"type\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Adding IP addresses to this list will cause Tyk to ignore these IPs in the analytics data. These IP addresses will not produce an analytics log record.\nThis is useful for health checks and other samplers that might skew usage data.\nThe IP addresses must be provided as a JSON array, with the values being single IPs. CIDR values are not supported.\n",
-        "go_name": "IgnoredIPs",
-        "go_type": "string",
-        "go_path": "AnalyticsConfigConfig.IgnoredIPs",
-        "tag": "`json:\"ignored_ips\"`",
-        "json_name": "",
-        "is_array": true
-      },
-      {
-        "doc": "Set this value to `true` to have Tyk store the inbound request and outbound response data in HTTP Wire format as part of the Analytics data.\nPlease note, this will greatly increase your analytics DB size and can cause performance degradation on analytics processing by the Dashboard.\nThis setting can be overridden with an organisation flag, enabed at an API level, or on individual Key level.\n",
-        "go_name": "EnableDetailedRecording",
-        "go_type": "bool",
-        "go_path": "AnalyticsConfigConfig.EnableDetailedRecording",
-        "tag": "`json:\"enable_detailed_recording\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Tyk can store GeoIP information based on MaxMind DB’s to enable GeoIP tracking on inbound request analytics. Set this value to `true` and assign a DB using the `geo_ip_db_path` setting.\n",
-        "go_name": "EnableGeoIP",
-        "go_type": "bool",
-        "go_path": "AnalyticsConfigConfig.EnableGeoIP",
-        "tag": "`json:\"enable_geo_ip\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Path to a MaxMind GeoIP database The analytics GeoIP DB can be replaced on disk. It will cleanly auto-reload every hour.\n",
-        "go_name": "GeoIPDBLocation",
-        "go_type": "string",
-        "go_path": "AnalyticsConfigConfig.GeoIPDBLocation",
-        "tag": "`json:\"geo_ip_db_path\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "This section describes methods that enable you to normalise inbound URLs in your analytics to have more meaningful per-path data.\n",
-        "go_name": "NormaliseUrls",
-        "go_type": "NormalisedURLConfig",
-        "go_path": "AnalyticsConfigConfig.NormaliseUrls",
-        "tag": "`json:\"normalise_urls\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Number of workers used to process analytics. Defaults to number of CPU cores.\n",
-        "go_name": "PoolSize",
-        "go_type": "int",
-        "go_path": "AnalyticsConfigConfig.PoolSize",
-        "tag": "`json:\"pool_size\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Number of records in analytics queue, per worker. Default: 1000.\n",
-        "go_name": "RecordsBufferSize",
-        "go_type": "uint64",
-        "go_path": "AnalyticsConfigConfig.RecordsBufferSize",
-        "tag": "`json:\"records_buffer_size\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "You can set a time (in seconds) to configure how long analytics are kept if they are not processed. The default is 60 seconds.\nThis is used to prevent the potential infinite growth of Redis analytics storage.\n",
-        "go_name": "StorageExpirationTime",
-        "go_type": "int",
-        "go_path": "AnalyticsConfigConfig.StorageExpirationTime",
-        "tag": "`json:\"storage_expiration_time\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Set this to `true` to have Tyk automatically divide the analytics records in multiple analytics keys.\nThis is especially useful when `storage.enable_cluster` is set to `true` since it will distribute the analytic keys across all the cluster nodes.\n",
-        "go_name": "EnableMultipleAnalyticsKeys",
-        "go_type": "bool",
-        "go_path": "AnalyticsConfigConfig.EnableMultipleAnalyticsKeys",
-        "tag": "`json:\"enable_multiple_analytics_keys\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "You can set the interval length on how often the tyk Gateway will purge analytics data. This value is in seconds and defaults to 10 seconds.\n",
-        "go_name": "PurgeInterval",
-        "go_type": "float32",
-        "go_path": "AnalyticsConfigConfig.PurgeInterval",
-        "tag": "`json:\"purge_interval\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "ignoredIPsCompiled",
-        "go_type": "bool",
-        "go_path": "AnalyticsConfigConfig.ignoredIPsCompiled",
-        "tag": "",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Determines the serialization engine for analytics. Available options: msgpack, and protobuf. By default, msgpack.\n",
-        "go_name": "SerializerType",
-        "go_type": "string",
-        "go_path": "AnalyticsConfigConfig.SerializerType",
-        "tag": "`json:\"serializer_type\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "NormalisedURLConfig",
-    "fields": [
-      {
-        "doc": "Set this to `true` to enable normalisation.\n",
-        "go_name": "Enabled",
-        "go_type": "bool",
-        "go_path": "NormalisedURLConfig.Enabled",
-        "tag": "`json:\"enabled\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Each UUID will be replaced with a placeholder {uuid} ",
-        "go_name": "NormaliseUUIDs",
-        "go_type": "bool",
-        "go_path": "NormalisedURLConfig.NormaliseUUIDs",
-        "tag": "`json:\"normalise_uuids\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Set this to true to have Tyk automatically match for numeric IDs, it will match with a preceding slash so as not to capture actual numbers:\n",
-        "go_name": "NormaliseNumbers",
-        "go_type": "bool",
-        "go_path": "NormalisedURLConfig.NormaliseNumbers",
-        "tag": "`json:\"normalise_numbers\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "This is a list of custom patterns you can add. These must be valid regex strings. Tyk will replace these values with a {var} placeholder.\n",
-        "go_name": "Custom",
-        "go_type": "string",
-        "go_path": "NormalisedURLConfig.Custom",
-        "tag": "`json:\"custom_patterns\"`",
-        "json_name": "",
-        "is_array": true
-      },
-      {
-        "doc": "",
-        "go_name": "CompiledPatternSet",
-        "go_type": "NormaliseURLPatterns",
-        "go_path": "NormalisedURLConfig.CompiledPatternSet",
-        "tag": "`json:\"-\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "NormaliseURLPatterns",
-    "fields": [
-      {
-        "doc": "",
-        "go_name": "UUIDs",
-        "go_type": "object",
-        "go_path": "NormaliseURLPatterns.UUIDs",
-        "tag": "",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "IDs",
-        "go_type": "object",
-        "go_path": "NormaliseURLPatterns.IDs",
-        "tag": "",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "Custom",
-        "go_type": "object",
-        "go_path": "NormaliseURLPatterns.Custom",
-        "tag": "",
-        "json_name": "",
-        "is_array": true
-      }
-    ]
-  },
-  {
-    "Name": "Sampler",
-    "fields": [
-      {
-        "doc": "Name is the name of the sampler to use. Options are \"boundary\" is appropriate for high-traffic instrumentation who provision random trace ids, and make the sampling decision only once.\nIt defends against nodes in the cluster selecting exactly the same ids.\n\"count\" is appropriate for low-traffic instrumentation or those who do not provision random trace ids. It is not appropriate for collectors as the sampling decision isn't idempotent (consistent based on trace id).\n\"mod\" provides a generic type Sampler ",
-        "go_name": "Name",
-        "go_type": "string",
-        "go_path": "Sampler.Name",
-        "tag": "`json:\"name\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Rate is used by both \"boundary\" and \"count\" samplers ",
-        "go_name": "Rate",
-        "go_type": "float64",
-        "go_path": "Sampler.Rate",
-        "tag": "`json:\"rate\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Salt is used by \"boundary\" sampler ",
-        "go_name": "Salt",
-        "go_type": "int64",
-        "go_path": "Sampler.Salt",
-        "tag": "`json:\"salt\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Mod is only used when sampler is mod ",
-        "go_name": "Mod",
-        "go_type": "uint64",
-        "go_path": "Sampler.Mod",
-        "tag": "`json:\"mod\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "ZipkinConfig",
-    "fields": [
-      {
-        "doc": "",
-        "go_name": "Reporter",
-        "go_type": "Reporter",
-        "go_path": "ZipkinConfig.Reporter",
-        "tag": "`json:\"reporter\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "Sampler",
-        "go_type": "Sampler",
-        "go_path": "ZipkinConfig.Sampler",
-        "tag": "`json:\"sampler\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "Reporter",
-    "fields": [
-      {
-        "doc": "URL connection url to the zipkin server ",
-        "go_name": "URL",
-        "go_type": "string",
-        "go_path": "Reporter.URL",
-        "tag": "`json:\"url\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "BatchSize",
-        "go_type": "int",
-        "go_path": "Reporter.BatchSize",
-        "tag": "`json:\"batch_size\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "MaxBacklog",
-        "go_type": "int",
-        "go_path": "Reporter.MaxBacklog",
-        "tag": "`json:\"max_backlog\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "KeyValueConfig",
-    "fields": [
-      {
-        "doc": "",
-        "go_name": "Consul",
-        "go_type": "ConsulConfig",
-        "go_path": "KeyValueConfig.Consul",
-        "tag": "`json:\"consul\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "Vault",
-        "go_type": "VaultConfig",
-        "go_path": "KeyValueConfig.Vault",
-        "tag": "`json:\"vault\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "ConsulConfig",
-    "fields": [
-      {
-        "doc": "Address is the address of the Consul server ",
-        "go_name": "Address",
-        "go_type": "string",
-        "go_path": "ConsulConfig.Address",
-        "tag": "`json:\"address\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Scheme is the URI scheme for the Consul server ",
-        "go_name": "Scheme",
-        "go_type": "string",
-        "go_path": "ConsulConfig.Scheme",
-        "tag": "`json:\"scheme\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "The datacenter to use. If not provided, the default agent datacenter is used.\n",
-        "go_name": "Datacenter",
-        "go_type": "string",
-        "go_path": "ConsulConfig.Datacenter",
-        "tag": "`json:\"datacenter\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "HttpAuth is the auth info to use for http access.\n",
-        "go_name": "HttpAuth",
-        "go_type": "any",
-        "go_path": "ConsulConfig.HttpAuth",
-        "tag": "`json:\"http_auth\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "WaitTime limits how long a Watch will block. If not provided, the agent default values will be used.\n",
-        "go_name": "WaitTime",
-        "go_type": "object",
-        "go_path": "ConsulConfig.WaitTime",
-        "tag": "`json:\"wait_time\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Token is used to provide a per-request ACL token which overrides the agent's default token.\n",
-        "go_name": "Token",
-        "go_type": "string",
-        "go_path": "ConsulConfig.Token",
-        "tag": "`json:\"token\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "TLS configuration ",
-        "go_name": "TLSConfig",
-        "go_type": "any",
-        "go_path": "ConsulConfig.TLSConfig",
-        "tag": "`json:\"tls_config\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "VaultConfig",
-    "fields": [
-      {
-        "doc": "Address is the address of the Vault server. This should be a complete URL such as \"http://vault.example.com\".\n",
-        "go_name": "Address",
-        "go_type": "string",
-        "go_path": "VaultConfig.Address",
-        "tag": "`json:\"address\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "AgentAddress is the address of the local Vault agent. This should be a complete URL such as \"http://vault.example.com\".\n",
-        "go_name": "AgentAddress",
-        "go_type": "string",
-        "go_path": "VaultConfig.AgentAddress",
-        "tag": "`json:\"agent_address\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "MaxRetries controls the maximum number of times to retry when a vault serer occurs ",
-        "go_name": "MaxRetries",
-        "go_type": "int",
-        "go_path": "VaultConfig.MaxRetries",
-        "tag": "`json:\"max_retries\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "Timeout",
-        "go_type": "object",
-        "go_path": "VaultConfig.Timeout",
-        "tag": "`json:\"timeout\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Token is the vault root token ",
-        "go_name": "Token",
-        "go_type": "string",
-        "go_path": "VaultConfig.Token",
-        "tag": "`json:\"token\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "KVVersion is the version number of Vault. Usually defaults to 2 ",
-        "go_name": "KVVersion",
-        "go_type": "int",
-        "go_path": "VaultConfig.KVVersion",
-        "tag": "`json:\"kv_version\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "TykError",
-    "fields": [
-      {
-        "doc": "",
-        "go_name": "Message",
-        "go_type": "string",
-        "go_path": "TykError.Message",
-        "tag": "`json:\"message\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "Code",
-        "go_type": "int",
-        "go_path": "TykError.Code",
-        "tag": "`json:\"code\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "UptimeTestsConfig",
-    "fields": [
-      {
-        "doc": "To disable uptime tests on this node, set this value to `true`.\n",
-        "go_name": "Disable",
-        "go_type": "bool",
-        "go_path": "UptimeTestsConfig.Disable",
-        "tag": "`json:\"disable\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "If you have multiple Gateway clusters connected to the same Redis instance, you need to set a unique poller group for each cluster.\n",
-        "go_name": "PollerGroup",
-        "go_type": "string",
-        "go_path": "UptimeTestsConfig.PollerGroup",
-        "tag": "`json:\"poller_group\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "Config",
-        "go_type": "UptimeTestsConfigDetail",
-        "go_path": "UptimeTestsConfig.Config",
-        "tag": "`json:\"config\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "UptimeTestsConfigDetail",
-    "fields": [
-      {
-        "doc": "The sample size to trigger a `HostUp` or `HostDown` event. For example, a setting of 3 will require at least three failures to occur before the uptime test is triggered.\n",
-        "go_name": "FailureTriggerSampleSize",
-        "go_type": "int",
-        "go_path": "UptimeTestsConfigDetail.FailureTriggerSampleSize",
-        "tag": "`json:\"failure_trigger_sample_size\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "The value in seconds between tests runs. All tests will run simultaneously. This value will set the time between those tests. So a value of 60 will run all uptime tests every 60 seconds.\n",
-        "go_name": "TimeWait",
-        "go_type": "int",
-        "go_path": "UptimeTestsConfigDetail.TimeWait",
-        "tag": "`json:\"time_wait\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "The goroutine pool size to keep idle for uptime tests. If you have many uptime tests running at a high time period, then increase this value.\n",
-        "go_name": "CheckerPoolSize",
-        "go_type": "int",
-        "go_path": "UptimeTestsConfigDetail.CheckerPoolSize",
-        "tag": "`json:\"checker_pool_size\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Set this value to `true` to have the node capture and record analytics data regarding the uptime tests.\n",
-        "go_name": "EnableUptimeAnalytics",
-        "go_type": "bool",
-        "go_path": "UptimeTestsConfigDetail.EnableUptimeAnalytics",
-        "tag": "`json:\"enable_uptime_analytics\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "ServiceDiscoveryConf",
-    "fields": [
-      {
-        "doc": "Service discovery cache timeout ",
-        "go_name": "DefaultCacheTimeout",
-        "go_type": "int",
-        "go_path": "ServiceDiscoveryConf.DefaultCacheTimeout",
-        "tag": "`json:\"default_cache_timeout\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "WebHookHandlerConf",
-    "fields": [
-      {
-        "doc": "The method to use for the webhook.\n",
-        "go_name": "Method",
-        "go_type": "string",
-        "go_path": "WebHookHandlerConf.Method",
-        "tag": "`bson:\"method\" json:\"method\"`",
-        "json_name": "method",
-        "is_array": false
-      },
-      {
-        "doc": "The target path on which to send the request.\n",
-        "go_name": "TargetPath",
-        "go_type": "string",
-        "go_path": "WebHookHandlerConf.TargetPath",
-        "tag": "`bson:\"target_path\" json:\"target_path\"`",
-        "json_name": "target_path",
-        "is_array": false
-      },
-      {
-        "doc": "The template to load in order to format the request.\n",
-        "go_name": "TemplatePath",
-        "go_type": "string",
-        "go_path": "WebHookHandlerConf.TemplatePath",
-        "tag": "`bson:\"template_path\" json:\"template_path\"`",
-        "json_name": "template_path",
-        "is_array": false
-      },
-      {
-        "doc": "Headers to set when firing the webhook.\n",
-        "go_name": "HeaderList",
-        "go_type": "string",
-        "go_path": "WebHookHandlerConf.HeaderList",
-        "tag": "`bson:\"header_map\" json:\"header_map\"`",
-        "json_name": "header_map",
-        "is_array": false
-      },
-      {
-        "doc": "The cool-down for the event so it does not trigger again (in seconds).\n",
-        "go_name": "EventTimeout",
-        "go_type": "int64",
-        "go_path": "WebHookHandlerConf.EventTimeout",
-        "tag": "`bson:\"event_timeout\" json:\"event_timeout\"`",
-        "json_name": "event_timeout",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "DnsCacheConfig",
-    "fields": [
-      {
-        "doc": "Setting this value to `true` will enable caching of DNS queries responses used for API endpoint’s host names. By default caching is disabled.\n",
-        "go_name": "Enabled",
-        "go_type": "bool",
-        "go_path": "DnsCacheConfig.Enabled",
-        "tag": "`json:\"enabled\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "This setting allows you to specify a duration in seconds before the record will be removed from cache after being added to it on the first DNS query resolution of API endpoints.\nSetting `ttl` to `-1` prevents record from being expired and removed from cache on next check interval.\n",
-        "go_name": "TTL",
-        "go_type": "int64",
-        "go_path": "DnsCacheConfig.TTL",
-        "tag": "`json:\"ttl\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "CheckInterval",
-        "go_type": "int64",
-        "go_path": "DnsCacheConfig.CheckInterval",
-        "tag": "`json:\"-\" ignored:\"true\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "A strategy which will be used when a DNS query will reply with more than 1 IP Address per single host.\nAs a DNS query response IP Addresses can have a changing order depending on DNS server balancing strategy (eg: round robin, geographically dependent origin-ip ordering, etc) this option allows you to not to limit the connection to the first host in a cached response list or prevent response caching.\n`pick_first` will instruct your Tyk Gateway to connect to the first IP in a returned IP list and cache the response.\n`random` will instruct your Tyk Gateway to connect to a random IP in a returned IP list and cache the response.\n`no_cache` will instruct your Tyk Gateway to connect to the first IP in a returned IP list and fetch each addresses list without caching on each API endpoint DNS query.\n",
-        "go_name": "MultipleIPsHandleStrategy",
-        "go_type": "IPsHandleStrategy",
-        "go_path": "DnsCacheConfig.MultipleIPsHandleStrategy",
-        "tag": "`json:\"multiple_ips_handle_strategy\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
     "Name": "SecurityConfig",
     "fields": [
       {
@@ -742,46 +91,704 @@
     ]
   },
   {
-    "Name": "PortWhiteList",
+    "Name": "UptimeTestsConfigDetail",
     "fields": [
       {
+        "doc": "The sample size to trigger a `HostUp` or `HostDown` event. For example, a setting of 3 will require at least three failures to occur before the uptime test is triggered.\n",
+        "go_name": "FailureTriggerSampleSize",
+        "go_type": "int",
+        "go_path": "UptimeTestsConfigDetail.FailureTriggerSampleSize",
+        "tag": "`json:\"failure_trigger_sample_size\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "The value in seconds between tests runs. All tests will run simultaneously. This value will set the time between those tests. So a value of 60 will run all uptime tests every 60 seconds.\n",
+        "go_name": "TimeWait",
+        "go_type": "int",
+        "go_path": "UptimeTestsConfigDetail.TimeWait",
+        "tag": "`json:\"time_wait\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "The goroutine pool size to keep idle for uptime tests. If you have many uptime tests running at a high time period, then increase this value.\n",
+        "go_name": "CheckerPoolSize",
+        "go_type": "int",
+        "go_path": "UptimeTestsConfigDetail.CheckerPoolSize",
+        "tag": "`json:\"checker_pool_size\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Set this value to `true` to have the node capture and record analytics data regarding the uptime tests.\n",
+        "go_name": "EnableUptimeAnalytics",
+        "go_type": "bool",
+        "go_path": "UptimeTestsConfigDetail.EnableUptimeAnalytics",
+        "tag": "`json:\"enable_uptime_analytics\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "UptimeTestsConfig",
+    "fields": [
+      {
+        "doc": "To disable uptime tests on this node, set this value to `true`.\n",
+        "go_name": "Disable",
+        "go_type": "bool",
+        "go_path": "UptimeTestsConfig.Disable",
+        "tag": "`json:\"disable\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "If you have multiple Gateway clusters connected to the same Redis instance, you need to set a unique poller group for each cluster.\n",
+        "go_name": "PollerGroup",
+        "go_type": "string",
+        "go_path": "UptimeTestsConfig.PollerGroup",
+        "tag": "`json:\"poller_group\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
         "doc": "",
-        "go_name": "Ranges",
-        "go_type": "PortRange",
-        "go_path": "PortWhiteList.Ranges",
-        "tag": "`json:\"ranges,omitempty\"`",
+        "go_name": "Config",
+        "go_type": "UptimeTestsConfigDetail",
+        "go_path": "UptimeTestsConfig.Config",
+        "tag": "`json:\"config\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "StorageOptionsConf",
+    "fields": [
+      {
+        "doc": "This should be set to `redis` (lowercase) ",
+        "go_name": "Type",
+        "go_type": "string",
+        "go_path": "StorageOptionsConf.Type",
+        "tag": "`json:\"type\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "The Redis host, by default this is set to `localhost`, but for production this should be set to a cluster.\n",
+        "go_name": "Host",
+        "go_type": "string",
+        "go_path": "StorageOptionsConf.Host",
+        "tag": "`json:\"host\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "The Redis instance port.\n",
+        "go_name": "Port",
+        "go_type": "int",
+        "go_path": "StorageOptionsConf.Port",
+        "tag": "`json:\"port\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Hosts",
+        "go_type": "string",
+        "go_path": "StorageOptionsConf.Hosts",
+        "tag": "`json:\"hosts\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "If you have multi-node setup, you should use this field instead. For example: [\"host1:port1\", \"host2:port2\"].\n",
+        "go_name": "Addrs",
+        "go_type": "string",
+        "go_path": "StorageOptionsConf.Addrs",
+        "tag": "`json:\"addrs\"`",
         "json_name": "",
         "is_array": true
       },
       {
-        "doc": "",
-        "go_name": "Ports",
+        "doc": "Redis sentinel master name ",
+        "go_name": "MasterName",
+        "go_type": "string",
+        "go_path": "StorageOptionsConf.MasterName",
+        "tag": "`json:\"master_name\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Redis sentinel password ",
+        "go_name": "SentinelPassword",
+        "go_type": "string",
+        "go_path": "StorageOptionsConf.SentinelPassword",
+        "tag": "`json:\"sentinel_password\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Redis user name ",
+        "go_name": "Username",
+        "go_type": "string",
+        "go_path": "StorageOptionsConf.Username",
+        "tag": "`json:\"username\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "If your Redis instance has a password set for access, you can set it here.\n",
+        "go_name": "Password",
+        "go_type": "string",
+        "go_path": "StorageOptionsConf.Password",
+        "tag": "`json:\"password\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Redis database ",
+        "go_name": "Database",
         "go_type": "int",
-        "go_path": "PortWhiteList.Ports",
-        "tag": "`json:\"ports,omitempty\"`",
+        "go_path": "StorageOptionsConf.Database",
+        "tag": "`json:\"database\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Set the number of maximum idle connections in the Redis connection pool, which defaults to 100. Set to a higher value if you are expecting more traffic.\n",
+        "go_name": "MaxIdle",
+        "go_type": "int",
+        "go_path": "StorageOptionsConf.MaxIdle",
+        "tag": "`json:\"optimisation_max_idle\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Set the number of maximum connections in the Redis connection pool, which defaults to 500. Set to a higher value if you are expecting more traffic.\n",
+        "go_name": "MaxActive",
+        "go_type": "int",
+        "go_path": "StorageOptionsConf.MaxActive",
+        "tag": "`json:\"optimisation_max_active\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Set a custom timeout for Redis network operations. Default value 5 seconds.\n",
+        "go_name": "Timeout",
+        "go_type": "int",
+        "go_path": "StorageOptionsConf.Timeout",
+        "tag": "`json:\"timeout\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Enable Redis Cluster support ",
+        "go_name": "EnableCluster",
+        "go_type": "bool",
+        "go_path": "StorageOptionsConf.EnableCluster",
+        "tag": "`json:\"enable_cluster\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Enable SSL/TLS connection between your Tyk Gateway \u0026 Redis.\n",
+        "go_name": "UseSSL",
+        "go_type": "bool",
+        "go_path": "StorageOptionsConf.UseSSL",
+        "tag": "`json:\"use_ssl\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Disable TLS verification ",
+        "go_name": "SSLInsecureSkipVerify",
+        "go_type": "bool",
+        "go_path": "StorageOptionsConf.SSLInsecureSkipVerify",
+        "tag": "`json:\"ssl_insecure_skip_verify\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "CertData",
+    "fields": [
+      {
+        "doc": "Domain name ",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "CertData.Name",
+        "tag": "`json:\"domain_name\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Path to certificate file ",
+        "go_name": "CertFile",
+        "go_type": "string",
+        "go_path": "CertData.CertFile",
+        "tag": "`json:\"cert_file\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Path to private key file ",
+        "go_name": "KeyFile",
+        "go_type": "string",
+        "go_path": "CertData.KeyFile",
+        "tag": "`json:\"key_file\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "ServicePort",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Protocol",
+        "go_type": "string",
+        "go_path": "ServicePort.Protocol",
+        "tag": "`json:\"protocol\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Port",
+        "go_type": "int",
+        "go_path": "ServicePort.Port",
+        "tag": "`json:\"port\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "PoliciesConfig",
+    "fields": [
+      {
+        "doc": "Set this value to `file` to look in the file system for a definition file. Set to `service` to use the Dashboard service.\n",
+        "go_name": "PolicySource",
+        "go_type": "string",
+        "go_path": "PoliciesConfig.PolicySource",
+        "tag": "`json:\"policy_source\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "This option is required if `policies.policy_source` is set to `service`.\nSet this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.\n",
+        "go_name": "PolicyConnectionString",
+        "go_type": "string",
+        "go_path": "PoliciesConfig.PolicyConnectionString",
+        "tag": "`json:\"policy_connection_string\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "This option is required if `policies.policy_source` is set to `file`.\nSpecifies the path of your JSON file containing the available policies.\n",
+        "go_name": "PolicyRecordName",
+        "go_type": "string",
+        "go_path": "PoliciesConfig.PolicyRecordName",
+        "tag": "`json:\"policy_record_name\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "In a Pro installation, Tyk will load Policy IDs and use the internal object-ID as the ID of the policy.\nThis is not portable in cases where the data needs to be moved from installation to installation.\nIf you set this value to `true`, then the id parameter in a stored policy (or imported policy using the Dashboard API), will be used instead of the internal ID.\nThis option should only be used when moving an installation to a new database.\n",
+        "go_name": "AllowExplicitPolicyID",
+        "go_type": "bool",
+        "go_path": "PoliciesConfig.AllowExplicitPolicyID",
+        "tag": "`json:\"allow_explicit_policy_id\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "This option is used for storing a policies  if `policies.policy_source` is set to `file`.\nit should be some existing file path on hard drive ",
+        "go_name": "PolicyPath",
+        "go_type": "string",
+        "go_path": "PoliciesConfig.PolicyPath",
+        "tag": "`json:\"policy_path\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "ServiceDiscoveryConf",
+    "fields": [
+      {
+        "doc": "Service discovery cache timeout ",
+        "go_name": "DefaultCacheTimeout",
+        "go_type": "int",
+        "go_path": "ServiceDiscoveryConf.DefaultCacheTimeout",
+        "tag": "`json:\"default_cache_timeout\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "Reporter",
+    "fields": [
+      {
+        "doc": "URL connection url to the zipkin server ",
+        "go_name": "URL",
+        "go_type": "string",
+        "go_path": "Reporter.URL",
+        "tag": "`json:\"url\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "BatchSize",
+        "go_type": "int",
+        "go_path": "Reporter.BatchSize",
+        "tag": "`json:\"batch_size\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "MaxBacklog",
+        "go_type": "int",
+        "go_path": "Reporter.MaxBacklog",
+        "tag": "`json:\"max_backlog\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "HttpServerOptionsConfig",
+    "fields": [
+      {
+        "doc": "No longer used ",
+        "go_name": "OverrideDefaults",
+        "go_type": "bool",
+        "go_path": "HttpServerOptionsConfig.OverrideDefaults",
+        "tag": "`json:\"-\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "API Consumer -\u003e Gateway network read timeout. Not setting this config, or setting this to 0, defaults to 120 seconds ",
+        "go_name": "ReadTimeout",
+        "go_type": "int",
+        "go_path": "HttpServerOptionsConfig.ReadTimeout",
+        "tag": "`json:\"read_timeout\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "API Consumer -\u003e Gateway network write timeout. Not setting this config, or setting this to 0, defaults to 120 seconds ",
+        "go_name": "WriteTimeout",
+        "go_type": "int",
+        "go_path": "HttpServerOptionsConfig.WriteTimeout",
+        "tag": "`json:\"write_timeout\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Set to true to enable SSL connections ",
+        "go_name": "UseSSL",
+        "go_type": "bool",
+        "go_path": "HttpServerOptionsConfig.UseSSL",
+        "tag": "`json:\"use_ssl\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Enable HTTP2 protocol handling ",
+        "go_name": "EnableHttp2",
+        "go_type": "bool",
+        "go_path": "HttpServerOptionsConfig.EnableHttp2",
+        "tag": "`json:\"enable_http2\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "EnableStrictRoutes changes the routing to avoid nearest-neighbour requests on overlapping routes \n- if disabled, `/apple` will route to `/app`, the current default behavior,\n- if enabled, `/app` only responds to `/app`, `/app/` and `/app/*` but not `/apple`\n\nRegular expressions and parameterized routes will be left alone regardless of this setting.\n",
+        "go_name": "EnableStrictRoutes",
+        "go_type": "bool",
+        "go_path": "HttpServerOptionsConfig.EnableStrictRoutes",
+        "tag": "`json:\"enable_strict_routes\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Disable TLS verification. Required if you are using self-signed certificates.\n",
+        "go_name": "SSLInsecureSkipVerify",
+        "go_type": "bool",
+        "go_path": "HttpServerOptionsConfig.SSLInsecureSkipVerify",
+        "tag": "`json:\"ssl_insecure_skip_verify\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Enabled WebSockets and server side events support ",
+        "go_name": "EnableWebSockets",
+        "go_type": "bool",
+        "go_path": "HttpServerOptionsConfig.EnableWebSockets",
+        "tag": "`json:\"enable_websockets\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Deprecated. SSL certificates used by Gateway server.\n",
+        "go_name": "Certificates",
+        "go_type": "[]CertData",
+        "go_path": "HttpServerOptionsConfig.Certificates",
+        "tag": "`json:\"certificates\"`",
+        "json_name": "",
+        "is_array": true
+      },
+      {
+        "doc": "SSL certificates used by your Gateway server. A list of certificate IDs or path to files.\n",
+        "go_name": "SSLCertificates",
+        "go_type": "string",
+        "go_path": "HttpServerOptionsConfig.SSLCertificates",
+        "tag": "`json:\"ssl_certificates\"`",
+        "json_name": "",
+        "is_array": true
+      },
+      {
+        "doc": "Start your Gateway HTTP server on specific server name ",
+        "go_name": "ServerName",
+        "go_type": "string",
+        "go_path": "HttpServerOptionsConfig.ServerName",
+        "tag": "`json:\"server_name\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Minimum TLS version. Possible values: https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#values-for-tls-versions ",
+        "go_name": "MinVersion",
+        "go_type": "uint16",
+        "go_path": "HttpServerOptionsConfig.MinVersion",
+        "tag": "`json:\"min_version\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Maximum TLS version.\n",
+        "go_name": "MaxVersion",
+        "go_type": "uint16",
+        "go_path": "HttpServerOptionsConfig.MaxVersion",
+        "tag": "`json:\"max_version\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.\nThis option is useful when you have a lot of ClientCAs and you want to reduce the handshake overhead, as some clients can hit TLS handshake limits.\nThis option does not give any hints to the client, on which certificate to pick (but this is very rare situation when it is required) ",
+        "go_name": "SkipClientCAAnnouncement",
+        "go_type": "bool",
+        "go_path": "HttpServerOptionsConfig.SkipClientCAAnnouncement",
+        "tag": "`json:\"skip_client_ca_announcement\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.\nThis option needed be set for streaming protocols like Server Side Events, or gRPC streaming.\n",
+        "go_name": "FlushInterval",
+        "go_type": "int",
+        "go_path": "HttpServerOptionsConfig.FlushInterval",
+        "tag": "`json:\"flush_interval\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Allow the use of a double slash in a URL path. This can be useful if you need to pass raw URLs to your API endpoints.\nFor example: `http://myapi.com/get/http://example.com`.\n",
+        "go_name": "SkipURLCleaning",
+        "go_type": "bool",
+        "go_path": "HttpServerOptionsConfig.SkipURLCleaning",
+        "tag": "`json:\"skip_url_cleaning\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Disable automatic character escaping, allowing to path original URL data to the upstream.\n",
+        "go_name": "SkipTargetPathEscaping",
+        "go_type": "bool",
+        "go_path": "HttpServerOptionsConfig.SkipTargetPathEscaping",
+        "tag": "`json:\"skip_target_path_escaping\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard ",
+        "go_name": "Ciphers",
+        "go_type": "string",
+        "go_path": "HttpServerOptionsConfig.Ciphers",
+        "tag": "`json:\"ssl_ciphers\"`",
+        "json_name": "",
+        "is_array": true
+      },
+      {
+        "doc": "Maximum accepted request body size in bytes.\n",
+        "go_name": "MaxRequestBodySize",
+        "go_type": "int64",
+        "go_path": "HttpServerOptionsConfig.MaxRequestBodySize",
+        "tag": "`json:\"max_request_body_size\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "LocalSessionCacheConf",
+    "fields": [
+      {
+        "doc": "By default sessions are set to cache. Set this to `true` to stop Tyk from caching keys locally on the node.\n",
+        "go_name": "DisableCacheSessionState",
+        "go_type": "bool",
+        "go_path": "LocalSessionCacheConf.DisableCacheSessionState",
+        "tag": "`json:\"disable_cached_session_state\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CachedSessionTimeout",
+        "go_type": "int",
+        "go_path": "LocalSessionCacheConf.CachedSessionTimeout",
+        "tag": "`json:\"cached_session_timeout\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CacheSessionEviction",
+        "go_type": "int",
+        "go_path": "LocalSessionCacheConf.CacheSessionEviction",
+        "tag": "`json:\"cached_session_eviction\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "Tracer",
+    "fields": [
+      {
+        "doc": "The name of the tracer to initialize. For instance appdash, to use appdash tracer ",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "Tracer.Name",
+        "tag": "`json:\"name\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Enable tracing ",
+        "go_name": "Enabled",
+        "go_type": "bool",
+        "go_path": "Tracer.Enabled",
+        "tag": "`json:\"enabled\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Tracing configuration. Refer to the Tracing Docs for the full list of options.\n",
+        "go_name": "Options",
+        "go_type": "any",
+        "go_path": "Tracer.Options",
+        "tag": "`json:\"options\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "DBAppConfOptionsConfig",
+    "fields": [
+      {
+        "doc": "Set the URL to your Dashboard instance (or a load balanced instance). The URL needs to be formatted as: `http://dashboard_host:port`.\n",
+        "go_name": "ConnectionString",
+        "go_type": "string",
+        "go_path": "DBAppConfOptionsConfig.ConnectionString",
+        "tag": "`json:\"connection_string\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Set to `true` to enable filtering (sharding) of APIs.\n",
+        "go_name": "NodeIsSegmented",
+        "go_type": "bool",
+        "go_path": "DBAppConfOptionsConfig.NodeIsSegmented",
+        "tag": "`json:\"node_is_segmented\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "The tags to use when filtering (sharding) Tyk Gateway nodes. Tags are processed as `OR` operations.\nIf you include a non-filter tag (e.g. an identifier such as `node-id-1`, this will become available to your Dashboard analytics).\n",
+        "go_name": "Tags",
+        "go_type": "string",
+        "go_path": "DBAppConfOptionsConfig.Tags",
+        "tag": "`json:\"tags\"`",
         "json_name": "",
         "is_array": true
       }
     ]
   },
   {
-    "Name": "PortRange",
+    "Name": "VaultConfig",
     "fields": [
       {
-        "doc": "",
-        "go_name": "From",
+        "doc": "Address is the address of the Vault server. This should be a complete URL such as \"http://vault.example.com\".\n",
+        "go_name": "Address",
+        "go_type": "string",
+        "go_path": "VaultConfig.Address",
+        "tag": "`json:\"address\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "AgentAddress is the address of the local Vault agent. This should be a complete URL such as \"http://vault.example.com\".\n",
+        "go_name": "AgentAddress",
+        "go_type": "string",
+        "go_path": "VaultConfig.AgentAddress",
+        "tag": "`json:\"agent_address\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "MaxRetries controls the maximum number of times to retry when a vault serer occurs ",
+        "go_name": "MaxRetries",
         "go_type": "int",
-        "go_path": "PortRange.From",
-        "tag": "`json:\"from\"`",
+        "go_path": "VaultConfig.MaxRetries",
+        "tag": "`json:\"max_retries\"`",
         "json_name": "",
         "is_array": false
       },
       {
         "doc": "",
-        "go_name": "To",
+        "go_name": "Timeout",
+        "go_type": "object",
+        "go_path": "VaultConfig.Timeout",
+        "tag": "`json:\"timeout\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Token is the vault root token ",
+        "go_name": "Token",
+        "go_type": "string",
+        "go_path": "VaultConfig.Token",
+        "tag": "`json:\"token\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "KVVersion is the version number of Vault. Usually defaults to 2 ",
+        "go_name": "KVVersion",
         "go_type": "int",
-        "go_path": "PortRange.To",
-        "tag": "`json:\"to\"`",
+        "go_path": "VaultConfig.KVVersion",
+        "tag": "`json:\"kv_version\"`",
         "json_name": "",
         "is_array": false
       }
@@ -838,32 +845,573 @@
     ]
   },
   {
-    "Name": "Tracer",
+    "Name": "WebHookHandlerConf",
     "fields": [
       {
-        "doc": "The name of the tracer to initialize. For instance appdash, to use appdash tracer ",
-        "go_name": "Name",
+        "doc": "The method to use for the webhook.\n",
+        "go_name": "Method",
         "go_type": "string",
-        "go_path": "Tracer.Name",
-        "tag": "`json:\"name\"`",
+        "go_path": "WebHookHandlerConf.Method",
+        "tag": "`bson:\"method\" json:\"method\"`",
+        "json_name": "method",
+        "is_array": false
+      },
+      {
+        "doc": "The target path on which to send the request.\n",
+        "go_name": "TargetPath",
+        "go_type": "string",
+        "go_path": "WebHookHandlerConf.TargetPath",
+        "tag": "`bson:\"target_path\" json:\"target_path\"`",
+        "json_name": "target_path",
+        "is_array": false
+      },
+      {
+        "doc": "The template to load in order to format the request.\n",
+        "go_name": "TemplatePath",
+        "go_type": "string",
+        "go_path": "WebHookHandlerConf.TemplatePath",
+        "tag": "`bson:\"template_path\" json:\"template_path\"`",
+        "json_name": "template_path",
+        "is_array": false
+      },
+      {
+        "doc": "Headers to set when firing the webhook.\n",
+        "go_name": "HeaderList",
+        "go_type": "string",
+        "go_path": "WebHookHandlerConf.HeaderList",
+        "tag": "`bson:\"header_map\" json:\"header_map\"`",
+        "json_name": "header_map",
+        "is_array": false
+      },
+      {
+        "doc": "The cool-down for the event so it does not trigger again (in seconds).\n",
+        "go_name": "EventTimeout",
+        "go_type": "int64",
+        "go_path": "WebHookHandlerConf.EventTimeout",
+        "tag": "`bson:\"event_timeout\" json:\"event_timeout\"`",
+        "json_name": "event_timeout",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "NormaliseURLPatterns",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "UUIDs",
+        "go_type": "object",
+        "go_path": "NormaliseURLPatterns.UUIDs",
+        "tag": "",
         "json_name": "",
         "is_array": false
       },
       {
-        "doc": "Enable tracing ",
+        "doc": "",
+        "go_name": "IDs",
+        "go_type": "object",
+        "go_path": "NormaliseURLPatterns.IDs",
+        "tag": "",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Custom",
+        "go_type": "object",
+        "go_path": "NormaliseURLPatterns.Custom",
+        "tag": "",
+        "json_name": "",
+        "is_array": true
+      }
+    ]
+  },
+  {
+    "Name": "HealthCheckConfig",
+    "fields": [
+      {
+        "doc": "Setting this value to `true` will enable the health-check endpoint on /Tyk/health.\n",
+        "go_name": "EnableHealthChecks",
+        "go_type": "bool",
+        "go_path": "HealthCheckConfig.EnableHealthChecks",
+        "tag": "`json:\"enable_health_checks\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "This setting defaults to 60 seconds. This is the time window that Tyk uses to sample health-check data.\nYou can set a higher value for more accurate data (a larger sample period), or a lower value for less accurate data.\nThe reason this value is configurable is because sample data takes up space in your Redis DB to store the data to calculate samples. On high-availability systems this may not be desirable and smaller values may be preferred.\n",
+        "go_name": "HealthCheckValueTimeout",
+        "go_type": "int64",
+        "go_path": "HealthCheckConfig.HealthCheckValueTimeout",
+        "tag": "`json:\"health_check_value_timeouts\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "AuthOverrideConf",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "ForceAuthProvider",
+        "go_type": "bool",
+        "go_path": "AuthOverrideConf.ForceAuthProvider",
+        "tag": "`json:\"force_auth_provider\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "AuthProvider",
+        "go_type": "object",
+        "go_path": "AuthOverrideConf.AuthProvider",
+        "tag": "`json:\"auth_provider\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "ForceSessionProvider",
+        "go_type": "bool",
+        "go_path": "AuthOverrideConf.ForceSessionProvider",
+        "tag": "`json:\"force_session_provider\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "SessionProvider",
+        "go_type": "object",
+        "go_path": "AuthOverrideConf.SessionProvider",
+        "tag": "`json:\"session_provider\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "NormalisedURLConfig",
+    "fields": [
+      {
+        "doc": "Set this to `true` to enable normalisation.\n",
         "go_name": "Enabled",
         "go_type": "bool",
-        "go_path": "Tracer.Enabled",
+        "go_path": "NormalisedURLConfig.Enabled",
         "tag": "`json:\"enabled\"`",
         "json_name": "",
         "is_array": false
       },
       {
-        "doc": "Tracing configuration. Refer to the Tracing Docs for the full list of options.\n",
-        "go_name": "Options",
+        "doc": "Each UUID will be replaced with a placeholder {uuid} ",
+        "go_name": "NormaliseUUIDs",
+        "go_type": "bool",
+        "go_path": "NormalisedURLConfig.NormaliseUUIDs",
+        "tag": "`json:\"normalise_uuids\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Set this to true to have Tyk automatically match for numeric IDs, it will match with a preceding slash so as not to capture actual numbers:\n",
+        "go_name": "NormaliseNumbers",
+        "go_type": "bool",
+        "go_path": "NormalisedURLConfig.NormaliseNumbers",
+        "tag": "`json:\"normalise_numbers\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "This is a list of custom patterns you can add. These must be valid regex strings. Tyk will replace these values with a {var} placeholder.\n",
+        "go_name": "Custom",
+        "go_type": "string",
+        "go_path": "NormalisedURLConfig.Custom",
+        "tag": "`json:\"custom_patterns\"`",
+        "json_name": "",
+        "is_array": true
+      },
+      {
+        "doc": "",
+        "go_name": "CompiledPatternSet",
+        "go_type": "NormaliseURLPatterns",
+        "go_path": "NormalisedURLConfig.CompiledPatternSet",
+        "tag": "`json:\"-\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "SlaveOptionsConfig",
+    "fields": [
+      {
+        "doc": "Set to `true` to connect a worker Gateway using RPC.\n",
+        "go_name": "UseRPC",
+        "go_type": "bool",
+        "go_path": "SlaveOptionsConfig.UseRPC",
+        "tag": "`json:\"use_rpc\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Set this option to `true` to use an SSL RPC connection.\n",
+        "go_name": "UseSSL",
+        "go_type": "bool",
+        "go_path": "SlaveOptionsConfig.UseSSL",
+        "tag": "`json:\"use_ssl\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Set this option to `true` to allow the certificate validation (certificate chain and hostname) to be skipped.\nThis can be useful if you use a self-signed certificate.\n",
+        "go_name": "SSLInsecureSkipVerify",
+        "go_type": "bool",
+        "go_path": "SlaveOptionsConfig.SSLInsecureSkipVerify",
+        "tag": "`json:\"ssl_insecure_skip_verify\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Use this setting to add the URL for your MDCB or load balancer host.\n",
+        "go_name": "ConnectionString",
+        "go_type": "string",
+        "go_path": "SlaveOptionsConfig.ConnectionString",
+        "tag": "`json:\"connection_string\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Your organisation ID to connect to the MDCB installation.\n",
+        "go_name": "RPCKey",
+        "go_type": "string",
+        "go_path": "SlaveOptionsConfig.RPCKey",
+        "tag": "`json:\"rpc_key\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "This the API key of a user used to authenticate and authorise the Gateway’s access through MDCB.\nThe user should be a standard Dashboard user with minimal privileges so as to reduce any risk if the user is compromised.\nThe suggested security settings are read for Real-time notifications and the remaining options set to deny.\n",
+        "go_name": "APIKey",
+        "go_type": "string",
+        "go_path": "SlaveOptionsConfig.APIKey",
+        "tag": "`json:\"api_key\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Set this option to `true` to enable RPC caching for keys.\n",
+        "go_name": "EnableRPCCache",
+        "go_type": "bool",
+        "go_path": "SlaveOptionsConfig.EnableRPCCache",
+        "tag": "`json:\"enable_rpc_cache\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "For an Self-Managed installation this can be left at `false` (the default setting). For Legacy Cloud Gateways it must be set to ‘true’.\n",
+        "go_name": "BindToSlugsInsteadOfListenPaths",
+        "go_type": "bool",
+        "go_path": "SlaveOptionsConfig.BindToSlugsInsteadOfListenPaths",
+        "tag": "`json:\"bind_to_slugs\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Set this option to `true` if you don’t want to monitor changes in the keys from a master Gateway.\n",
+        "go_name": "DisableKeySpaceSync",
+        "go_type": "bool",
+        "go_path": "SlaveOptionsConfig.DisableKeySpaceSync",
+        "tag": "`json:\"disable_keyspace_sync\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "This is the `zone` that this instance inhabits, e.g. the cluster/data-centre the Gateway lives in.\nThe group ID must be the same across all the Gateways of a data-centre/cluster which are also sharing the same Redis instance.\nThis ID should also be unique per cluster (otherwise another Gateway cluster can pick up your keyspace events and your cluster will get zero updates).\n",
+        "go_name": "GroupID",
+        "go_type": "string",
+        "go_path": "SlaveOptionsConfig.GroupID",
+        "tag": "`json:\"group_id\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Call Timeout allows to specify a time in seconds for the maximum allowed duration of a RPC call.\n",
+        "go_name": "CallTimeout",
+        "go_type": "int",
+        "go_path": "SlaveOptionsConfig.CallTimeout",
+        "tag": "`json:\"call_timeout\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "The maximum time in seconds that a RPC ping can last.\n",
+        "go_name": "PingTimeout",
+        "go_type": "int",
+        "go_path": "SlaveOptionsConfig.PingTimeout",
+        "tag": "`json:\"ping_timeout\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed.\n",
+        "go_name": "RPCPoolSize",
+        "go_type": "int",
+        "go_path": "SlaveOptionsConfig.RPCPoolSize",
+        "tag": "`json:\"rpc_pool_size\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "You can use this to set a period for which the Gateway will check if there are changes in keys that must be synchronized. If this value is not set then it will default to 10 seconds.\n",
+        "go_name": "KeySpaceSyncInterval",
+        "go_type": "float32",
+        "go_path": "SlaveOptionsConfig.KeySpaceSyncInterval",
+        "tag": "`json:\"key_space_sync_interval\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "RPCCertCacheExpiration defines the expiration time of the rpc cache that stores the certificates, defined in seconds ",
+        "go_name": "RPCCertCacheExpiration",
+        "go_type": "float32",
+        "go_path": "SlaveOptionsConfig.RPCCertCacheExpiration",
+        "tag": "`json:\"rpc_cert_cache_expiration\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "RPCKeysCacheExpiration defines the expiration time of the rpc cache that stores the keys, defined in seconds ",
+        "go_name": "RPCGlobalCacheExpiration",
+        "go_type": "float32",
+        "go_path": "SlaveOptionsConfig.RPCGlobalCacheExpiration",
+        "tag": "`json:\"rpc_global_cache_expiration\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources ",
+        "go_name": "SynchroniserEnabled",
+        "go_type": "bool",
+        "go_path": "SlaveOptionsConfig.SynchroniserEnabled",
+        "tag": "`json:\"synchroniser_enabled\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "LivenessCheckConfig",
+    "fields": [
+      {
+        "doc": "Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.\n",
+        "go_name": "CheckDuration",
+        "go_type": "object",
+        "go_path": "LivenessCheckConfig.CheckDuration",
+        "tag": "`json:\"check_duration\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "TykError",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Message",
+        "go_type": "string",
+        "go_path": "TykError.Message",
+        "tag": "`json:\"message\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Code",
+        "go_type": "int",
+        "go_path": "TykError.Code",
+        "tag": "`json:\"code\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "Sampler",
+    "fields": [
+      {
+        "doc": "Name is the name of the sampler to use. Options are \"boundary\" is appropriate for high-traffic instrumentation who provision random trace ids, and make the sampling decision only once.\nIt defends against nodes in the cluster selecting exactly the same ids.\n\"count\" is appropriate for low-traffic instrumentation or those who do not provision random trace ids. It is not appropriate for collectors as the sampling decision isn't idempotent (consistent based on trace id).\n\"mod\" provides a generic type Sampler ",
+        "go_name": "Name",
+        "go_type": "string",
+        "go_path": "Sampler.Name",
+        "tag": "`json:\"name\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Rate is used by both \"boundary\" and \"count\" samplers ",
+        "go_name": "Rate",
+        "go_type": "float64",
+        "go_path": "Sampler.Rate",
+        "tag": "`json:\"rate\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Salt is used by \"boundary\" sampler ",
+        "go_name": "Salt",
+        "go_type": "int64",
+        "go_path": "Sampler.Salt",
+        "tag": "`json:\"salt\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Mod is only used when sampler is mod ",
+        "go_name": "Mod",
+        "go_type": "uint64",
+        "go_path": "Sampler.Mod",
+        "tag": "`json:\"mod\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "EventMessage",
+    "fields": [
+      {
+        "doc": "",
+        "go_name": "Type",
+        "go_type": "object",
+        "go_path": "EventMessage.Type",
+        "tag": "",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "Meta",
         "go_type": "any",
-        "go_path": "Tracer.Options",
-        "tag": "`json:\"options\"`",
+        "go_path": "EventMessage.Meta",
+        "tag": "",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "TimeStamp",
+        "go_type": "string",
+        "go_path": "EventMessage.TimeStamp",
+        "tag": "",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "ConsulConfig",
+    "fields": [
+      {
+        "doc": "Address is the address of the Consul server ",
+        "go_name": "Address",
+        "go_type": "string",
+        "go_path": "ConsulConfig.Address",
+        "tag": "`json:\"address\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Scheme is the URI scheme for the Consul server ",
+        "go_name": "Scheme",
+        "go_type": "string",
+        "go_path": "ConsulConfig.Scheme",
+        "tag": "`json:\"scheme\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "The datacenter to use. If not provided, the default agent datacenter is used.\n",
+        "go_name": "Datacenter",
+        "go_type": "string",
+        "go_path": "ConsulConfig.Datacenter",
+        "tag": "`json:\"datacenter\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "HttpAuth is the auth info to use for http access.\n",
+        "go_name": "HttpAuth",
+        "go_type": "any",
+        "go_path": "ConsulConfig.HttpAuth",
+        "tag": "`json:\"http_auth\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "WaitTime limits how long a Watch will block. If not provided, the agent default values will be used.\n",
+        "go_name": "WaitTime",
+        "go_type": "object",
+        "go_path": "ConsulConfig.WaitTime",
+        "tag": "`json:\"wait_time\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "Token is used to provide a per-request ACL token which overrides the agent's default token.\n",
+        "go_name": "Token",
+        "go_type": "string",
+        "go_path": "ConsulConfig.Token",
+        "tag": "`json:\"token\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "TLS configuration ",
+        "go_name": "TLSConfig",
+        "go_type": "any",
+        "go_path": "ConsulConfig.TLSConfig",
+        "tag": "`json:\"tls_config\"`",
+        "json_name": "",
+        "is_array": false
+      }
+    ]
+  },
+  {
+    "Name": "DnsCacheConfig",
+    "fields": [
+      {
+        "doc": "Setting this value to `true` will enable caching of DNS queries responses used for API endpoint’s host names. By default caching is disabled.\n",
+        "go_name": "Enabled",
+        "go_type": "bool",
+        "go_path": "DnsCacheConfig.Enabled",
+        "tag": "`json:\"enabled\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "This setting allows you to specify a duration in seconds before the record will be removed from cache after being added to it on the first DNS query resolution of API endpoints.\nSetting `ttl` to `-1` prevents record from being expired and removed from cache on next check interval.\n",
+        "go_name": "TTL",
+        "go_type": "int64",
+        "go_path": "DnsCacheConfig.TTL",
+        "tag": "`json:\"ttl\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "",
+        "go_name": "CheckInterval",
+        "go_type": "int64",
+        "go_path": "DnsCacheConfig.CheckInterval",
+        "tag": "`json:\"-\" ignored:\"true\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "A strategy which will be used when a DNS query will reply with more than 1 IP Address per single host.\nAs a DNS query response IP Addresses can have a changing order depending on DNS server balancing strategy (eg: round robin, geographically dependent origin-ip ordering, etc) this option allows you to not to limit the connection to the first host in a cached response list or prevent response caching.\n`pick_first` will instruct your Tyk Gateway to connect to the first IP in a returned IP list and cache the response.\n`random` will instruct your Tyk Gateway to connect to a random IP in a returned IP list and cache the response.\n`no_cache` will instruct your Tyk Gateway to connect to the first IP in a returned IP list and fetch each addresses list without caching on each API endpoint DNS query.\n",
+        "go_name": "MultipleIPsHandleStrategy",
+        "go_type": "IPsHandleStrategy",
+        "go_path": "DnsCacheConfig.MultipleIPsHandleStrategy",
+        "tag": "`json:\"multiple_ips_handle_strategy\"`",
         "json_name": "",
         "is_array": false
       }
@@ -932,47 +1480,6 @@
         "go_type": "string",
         "go_path": "CoProcessConfig.PythonVersion",
         "tag": "`json:\"python_version\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "AuthOverrideConf",
-    "fields": [
-      {
-        "doc": "",
-        "go_name": "ForceAuthProvider",
-        "go_type": "bool",
-        "go_path": "AuthOverrideConf.ForceAuthProvider",
-        "tag": "`json:\"force_auth_provider\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "AuthProvider",
-        "go_type": "object",
-        "go_path": "AuthOverrideConf.AuthProvider",
-        "tag": "`json:\"auth_provider\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "ForceSessionProvider",
-        "go_type": "bool",
-        "go_path": "AuthOverrideConf.ForceSessionProvider",
-        "tag": "`json:\"force_session_provider\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "SessionProvider",
-        "go_type": "object",
-        "go_path": "AuthOverrideConf.SessionProvider",
-        "tag": "`json:\"session_provider\"`",
         "json_name": "",
         "is_array": false
       }
@@ -2065,7 +2572,7 @@
       {
         "doc": "This section enables the use of the KV capabilities to substitute configuration values.\nSee more details https://tyk.io/docs/tyk-configuration-reference/kv-store/ ",
         "go_name": "KV",
-        "go_type": "KeyValueConfig",
+        "go_type": "any",
         "go_path": "Config.KV",
         "tag": "`json:\"kv\"`",
         "json_name": "",
@@ -2110,666 +2617,168 @@
     ]
   },
   {
-    "Name": "HttpServerOptionsConfig",
+    "Name": "PortWhiteList",
     "fields": [
       {
-        "doc": "No longer used ",
-        "go_name": "OverrideDefaults",
-        "go_type": "bool",
-        "go_path": "HttpServerOptionsConfig.OverrideDefaults",
-        "tag": "`json:\"-\"`",
+        "doc": "",
+        "go_name": "Ranges",
+        "go_type": "PortRange",
+        "go_path": "PortWhiteList.Ranges",
+        "tag": "`json:\"ranges,omitempty\"`",
         "json_name": "",
-        "is_array": false
+        "is_array": true
       },
       {
-        "doc": "API Consumer -\u003e Gateway network read timeout. Not setting this config, or setting this to 0, defaults to 120 seconds ",
-        "go_name": "ReadTimeout",
+        "doc": "",
+        "go_name": "Ports",
         "go_type": "int",
-        "go_path": "HttpServerOptionsConfig.ReadTimeout",
-        "tag": "`json:\"read_timeout\"`",
+        "go_path": "PortWhiteList.Ports",
+        "tag": "`json:\"ports,omitempty\"`",
         "json_name": "",
-        "is_array": false
-      },
+        "is_array": true
+      }
+    ]
+  },
+  {
+    "Name": "PortRange",
+    "fields": [
       {
-        "doc": "API Consumer -\u003e Gateway network write timeout. Not setting this config, or setting this to 0, defaults to 120 seconds ",
-        "go_name": "WriteTimeout",
+        "doc": "",
+        "go_name": "From",
         "go_type": "int",
-        "go_path": "HttpServerOptionsConfig.WriteTimeout",
-        "tag": "`json:\"write_timeout\"`",
+        "go_path": "PortRange.From",
+        "tag": "`json:\"from\"`",
         "json_name": "",
         "is_array": false
       },
       {
-        "doc": "Set to true to enable SSL connections ",
-        "go_name": "UseSSL",
-        "go_type": "bool",
-        "go_path": "HttpServerOptionsConfig.UseSSL",
-        "tag": "`json:\"use_ssl\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Enable HTTP2 protocol handling ",
-        "go_name": "EnableHttp2",
-        "go_type": "bool",
-        "go_path": "HttpServerOptionsConfig.EnableHttp2",
-        "tag": "`json:\"enable_http2\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "EnableStrictRoutes changes the routing to avoid nearest-neighbour requests on overlapping routes \n- if disabled, `/apple` will route to `/app`, the current default behavior,\n- if enabled, `/app` only responds to `/app`, `/app/` and `/app/*` but not `/apple`\n\nRegular expressions and parameterized routes will be left alone regardless of this setting.\n",
-        "go_name": "EnableStrictRoutes",
-        "go_type": "bool",
-        "go_path": "HttpServerOptionsConfig.EnableStrictRoutes",
-        "tag": "`json:\"enable_strict_routes\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Disable TLS verification. Required if you are using self-signed certificates.\n",
-        "go_name": "SSLInsecureSkipVerify",
-        "go_type": "bool",
-        "go_path": "HttpServerOptionsConfig.SSLInsecureSkipVerify",
-        "tag": "`json:\"ssl_insecure_skip_verify\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Enabled WebSockets and server side events support ",
-        "go_name": "EnableWebSockets",
-        "go_type": "bool",
-        "go_path": "HttpServerOptionsConfig.EnableWebSockets",
-        "tag": "`json:\"enable_websockets\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Deprecated. SSL certificates used by Gateway server.\n",
-        "go_name": "Certificates",
-        "go_type": "[]CertData",
-        "go_path": "HttpServerOptionsConfig.Certificates",
-        "tag": "`json:\"certificates\"`",
-        "json_name": "",
-        "is_array": true
-      },
-      {
-        "doc": "SSL certificates used by your Gateway server. A list of certificate IDs or path to files.\n",
-        "go_name": "SSLCertificates",
-        "go_type": "string",
-        "go_path": "HttpServerOptionsConfig.SSLCertificates",
-        "tag": "`json:\"ssl_certificates\"`",
-        "json_name": "",
-        "is_array": true
-      },
-      {
-        "doc": "Start your Gateway HTTP server on specific server name ",
-        "go_name": "ServerName",
-        "go_type": "string",
-        "go_path": "HttpServerOptionsConfig.ServerName",
-        "tag": "`json:\"server_name\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Minimum TLS version. Possible values: https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#values-for-tls-versions ",
-        "go_name": "MinVersion",
-        "go_type": "uint16",
-        "go_path": "HttpServerOptionsConfig.MinVersion",
-        "tag": "`json:\"min_version\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Maximum TLS version.\n",
-        "go_name": "MaxVersion",
-        "go_type": "uint16",
-        "go_path": "HttpServerOptionsConfig.MaxVersion",
-        "tag": "`json:\"max_version\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.\nThis option is useful when you have a lot of ClientCAs and you want to reduce the handshake overhead, as some clients can hit TLS handshake limits.\nThis option does not give any hints to the client, on which certificate to pick (but this is very rare situation when it is required) ",
-        "go_name": "SkipClientCAAnnouncement",
-        "go_type": "bool",
-        "go_path": "HttpServerOptionsConfig.SkipClientCAAnnouncement",
-        "tag": "`json:\"skip_client_ca_announcement\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.\nThis option needed be set for streaming protocols like Server Side Events, or gRPC streaming.\n",
-        "go_name": "FlushInterval",
+        "doc": "",
+        "go_name": "To",
         "go_type": "int",
-        "go_path": "HttpServerOptionsConfig.FlushInterval",
-        "tag": "`json:\"flush_interval\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Allow the use of a double slash in a URL path. This can be useful if you need to pass raw URLs to your API endpoints.\nFor example: `http://myapi.com/get/http://example.com`.\n",
-        "go_name": "SkipURLCleaning",
-        "go_type": "bool",
-        "go_path": "HttpServerOptionsConfig.SkipURLCleaning",
-        "tag": "`json:\"skip_url_cleaning\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Disable automatic character escaping, allowing to path original URL data to the upstream.\n",
-        "go_name": "SkipTargetPathEscaping",
-        "go_type": "bool",
-        "go_path": "HttpServerOptionsConfig.SkipTargetPathEscaping",
-        "tag": "`json:\"skip_target_path_escaping\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard ",
-        "go_name": "Ciphers",
-        "go_type": "string",
-        "go_path": "HttpServerOptionsConfig.Ciphers",
-        "tag": "`json:\"ssl_ciphers\"`",
-        "json_name": "",
-        "is_array": true
-      },
-      {
-        "doc": "Maximum accepted request body size in bytes.\n",
-        "go_name": "MaxRequestBodySize",
-        "go_type": "int64",
-        "go_path": "HttpServerOptionsConfig.MaxRequestBodySize",
-        "tag": "`json:\"max_request_body_size\"`",
+        "go_path": "PortRange.To",
+        "tag": "`json:\"to\"`",
         "json_name": "",
         "is_array": false
       }
     ]
   },
   {
-    "Name": "CertData",
+    "Name": "AnalyticsConfigConfig",
     "fields": [
       {
-        "doc": "Domain name ",
-        "go_name": "Name",
-        "go_type": "string",
-        "go_path": "CertData.Name",
-        "tag": "`json:\"domain_name\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Path to certificate file ",
-        "go_name": "CertFile",
-        "go_type": "string",
-        "go_path": "CertData.CertFile",
-        "tag": "`json:\"cert_file\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Path to private key file ",
-        "go_name": "KeyFile",
-        "go_type": "string",
-        "go_path": "CertData.KeyFile",
-        "tag": "`json:\"key_file\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "PoliciesConfig",
-    "fields": [
-      {
-        "doc": "Set this value to `file` to look in the file system for a definition file. Set to `service` to use the Dashboard service.\n",
-        "go_name": "PolicySource",
-        "go_type": "string",
-        "go_path": "PoliciesConfig.PolicySource",
-        "tag": "`json:\"policy_source\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "This option is required if `policies.policy_source` is set to `service`.\nSet this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.\n",
-        "go_name": "PolicyConnectionString",
-        "go_type": "string",
-        "go_path": "PoliciesConfig.PolicyConnectionString",
-        "tag": "`json:\"policy_connection_string\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "This option is required if `policies.policy_source` is set to `file`.\nSpecifies the path of your JSON file containing the available policies.\n",
-        "go_name": "PolicyRecordName",
-        "go_type": "string",
-        "go_path": "PoliciesConfig.PolicyRecordName",
-        "tag": "`json:\"policy_record_name\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "In a Pro installation, Tyk will load Policy IDs and use the internal object-ID as the ID of the policy.\nThis is not portable in cases where the data needs to be moved from installation to installation.\nIf you set this value to `true`, then the id parameter in a stored policy (or imported policy using the Dashboard API), will be used instead of the internal ID.\nThis option should only be used when moving an installation to a new database.\n",
-        "go_name": "AllowExplicitPolicyID",
-        "go_type": "bool",
-        "go_path": "PoliciesConfig.AllowExplicitPolicyID",
-        "tag": "`json:\"allow_explicit_policy_id\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "This option is used for storing a policies  if `policies.policy_source` is set to `file`.\nit should be some existing file path on hard drive ",
-        "go_name": "PolicyPath",
-        "go_type": "string",
-        "go_path": "PoliciesConfig.PolicyPath",
-        "tag": "`json:\"policy_path\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "DBAppConfOptionsConfig",
-    "fields": [
-      {
-        "doc": "Set the URL to your Dashboard instance (or a load balanced instance). The URL needs to be formatted as: `http://dashboard_host:port`.\n",
-        "go_name": "ConnectionString",
-        "go_type": "string",
-        "go_path": "DBAppConfOptionsConfig.ConnectionString",
-        "tag": "`json:\"connection_string\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Set to `true` to enable filtering (sharding) of APIs.\n",
-        "go_name": "NodeIsSegmented",
-        "go_type": "bool",
-        "go_path": "DBAppConfOptionsConfig.NodeIsSegmented",
-        "tag": "`json:\"node_is_segmented\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "The tags to use when filtering (sharding) Tyk Gateway nodes. Tags are processed as `OR` operations.\nIf you include a non-filter tag (e.g. an identifier such as `node-id-1`, this will become available to your Dashboard analytics).\n",
-        "go_name": "Tags",
-        "go_type": "string",
-        "go_path": "DBAppConfOptionsConfig.Tags",
-        "tag": "`json:\"tags\"`",
-        "json_name": "",
-        "is_array": true
-      }
-    ]
-  },
-  {
-    "Name": "StorageOptionsConf",
-    "fields": [
-      {
-        "doc": "This should be set to `redis` (lowercase) ",
+        "doc": "Set empty for a Self-Managed installation or `rpc` for multi-cloud.\n",
         "go_name": "Type",
         "go_type": "string",
-        "go_path": "StorageOptionsConf.Type",
+        "go_path": "AnalyticsConfigConfig.Type",
         "tag": "`json:\"type\"`",
         "json_name": "",
         "is_array": false
       },
       {
-        "doc": "The Redis host, by default this is set to `localhost`, but for production this should be set to a cluster.\n",
-        "go_name": "Host",
+        "doc": "Adding IP addresses to this list will cause Tyk to ignore these IPs in the analytics data. These IP addresses will not produce an analytics log record.\nThis is useful for health checks and other samplers that might skew usage data.\nThe IP addresses must be provided as a JSON array, with the values being single IPs. CIDR values are not supported.\n",
+        "go_name": "IgnoredIPs",
         "go_type": "string",
-        "go_path": "StorageOptionsConf.Host",
-        "tag": "`json:\"host\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "The Redis instance port.\n",
-        "go_name": "Port",
-        "go_type": "int",
-        "go_path": "StorageOptionsConf.Port",
-        "tag": "`json:\"port\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "Hosts",
-        "go_type": "string",
-        "go_path": "StorageOptionsConf.Hosts",
-        "tag": "`json:\"hosts\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "If you have multi-node setup, you should use this field instead. For example: [\"host1:port1\", \"host2:port2\"].\n",
-        "go_name": "Addrs",
-        "go_type": "string",
-        "go_path": "StorageOptionsConf.Addrs",
-        "tag": "`json:\"addrs\"`",
+        "go_path": "AnalyticsConfigConfig.IgnoredIPs",
+        "tag": "`json:\"ignored_ips\"`",
         "json_name": "",
         "is_array": true
       },
       {
-        "doc": "Redis sentinel master name ",
-        "go_name": "MasterName",
-        "go_type": "string",
-        "go_path": "StorageOptionsConf.MasterName",
-        "tag": "`json:\"master_name\"`",
+        "doc": "Set this value to `true` to have Tyk store the inbound request and outbound response data in HTTP Wire format as part of the Analytics data.\nPlease note, this will greatly increase your analytics DB size and can cause performance degradation on analytics processing by the Dashboard.\nThis setting can be overridden with an organisation flag, enabed at an API level, or on individual Key level.\n",
+        "go_name": "EnableDetailedRecording",
+        "go_type": "bool",
+        "go_path": "AnalyticsConfigConfig.EnableDetailedRecording",
+        "tag": "`json:\"enable_detailed_recording\"`",
         "json_name": "",
         "is_array": false
       },
       {
-        "doc": "Redis sentinel password ",
-        "go_name": "SentinelPassword",
-        "go_type": "string",
-        "go_path": "StorageOptionsConf.SentinelPassword",
-        "tag": "`json:\"sentinel_password\"`",
+        "doc": "Tyk can store GeoIP information based on MaxMind DB’s to enable GeoIP tracking on inbound request analytics. Set this value to `true` and assign a DB using the `geo_ip_db_path` setting.\n",
+        "go_name": "EnableGeoIP",
+        "go_type": "bool",
+        "go_path": "AnalyticsConfigConfig.EnableGeoIP",
+        "tag": "`json:\"enable_geo_ip\"`",
         "json_name": "",
         "is_array": false
       },
       {
-        "doc": "Redis user name ",
-        "go_name": "Username",
+        "doc": "Path to a MaxMind GeoIP database The analytics GeoIP DB can be replaced on disk. It will cleanly auto-reload every hour.\n",
+        "go_name": "GeoIPDBLocation",
         "go_type": "string",
-        "go_path": "StorageOptionsConf.Username",
-        "tag": "`json:\"username\"`",
+        "go_path": "AnalyticsConfigConfig.GeoIPDBLocation",
+        "tag": "`json:\"geo_ip_db_path\"`",
         "json_name": "",
         "is_array": false
       },
       {
-        "doc": "If your Redis instance has a password set for access, you can set it here.\n",
-        "go_name": "Password",
-        "go_type": "string",
-        "go_path": "StorageOptionsConf.Password",
-        "tag": "`json:\"password\"`",
+        "doc": "This section describes methods that enable you to normalise inbound URLs in your analytics to have more meaningful per-path data.\n",
+        "go_name": "NormaliseUrls",
+        "go_type": "NormalisedURLConfig",
+        "go_path": "AnalyticsConfigConfig.NormaliseUrls",
+        "tag": "`json:\"normalise_urls\"`",
         "json_name": "",
         "is_array": false
       },
       {
-        "doc": "Redis database ",
-        "go_name": "Database",
+        "doc": "Number of workers used to process analytics. Defaults to number of CPU cores.\n",
+        "go_name": "PoolSize",
         "go_type": "int",
-        "go_path": "StorageOptionsConf.Database",
-        "tag": "`json:\"database\"`",
+        "go_path": "AnalyticsConfigConfig.PoolSize",
+        "tag": "`json:\"pool_size\"`",
         "json_name": "",
         "is_array": false
       },
       {
-        "doc": "Set the number of maximum idle connections in the Redis connection pool, which defaults to 100. Set to a higher value if you are expecting more traffic.\n",
-        "go_name": "MaxIdle",
+        "doc": "Number of records in analytics queue, per worker. Default: 1000.\n",
+        "go_name": "RecordsBufferSize",
+        "go_type": "uint64",
+        "go_path": "AnalyticsConfigConfig.RecordsBufferSize",
+        "tag": "`json:\"records_buffer_size\"`",
+        "json_name": "",
+        "is_array": false
+      },
+      {
+        "doc": "You can set a time (in seconds) to configure how long analytics are kept if they are not processed. The default is 60 seconds.\nThis is used to prevent the potential infinite growth of Redis analytics storage.\n",
+        "go_name": "StorageExpirationTime",
         "go_type": "int",
-        "go_path": "StorageOptionsConf.MaxIdle",
-        "tag": "`json:\"optimisation_max_idle\"`",
+        "go_path": "AnalyticsConfigConfig.StorageExpirationTime",
+        "tag": "`json:\"storage_expiration_time\"`",
         "json_name": "",
         "is_array": false
       },
       {
-        "doc": "Set the number of maximum connections in the Redis connection pool, which defaults to 500. Set to a higher value if you are expecting more traffic.\n",
-        "go_name": "MaxActive",
-        "go_type": "int",
-        "go_path": "StorageOptionsConf.MaxActive",
-        "tag": "`json:\"optimisation_max_active\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Set a custom timeout for Redis network operations. Default value 5 seconds.\n",
-        "go_name": "Timeout",
-        "go_type": "int",
-        "go_path": "StorageOptionsConf.Timeout",
-        "tag": "`json:\"timeout\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Enable Redis Cluster support ",
-        "go_name": "EnableCluster",
+        "doc": "Set this to `true` to have Tyk automatically divide the analytics records in multiple analytics keys.\nThis is especially useful when `storage.enable_cluster` is set to `true` since it will distribute the analytic keys across all the cluster nodes.\n",
+        "go_name": "EnableMultipleAnalyticsKeys",
         "go_type": "bool",
-        "go_path": "StorageOptionsConf.EnableCluster",
-        "tag": "`json:\"enable_cluster\"`",
+        "go_path": "AnalyticsConfigConfig.EnableMultipleAnalyticsKeys",
+        "tag": "`json:\"enable_multiple_analytics_keys\"`",
         "json_name": "",
         "is_array": false
       },
       {
-        "doc": "Enable SSL/TLS connection between your Tyk Gateway \u0026 Redis.\n",
-        "go_name": "UseSSL",
-        "go_type": "bool",
-        "go_path": "StorageOptionsConf.UseSSL",
-        "tag": "`json:\"use_ssl\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Disable TLS verification ",
-        "go_name": "SSLInsecureSkipVerify",
-        "go_type": "bool",
-        "go_path": "StorageOptionsConf.SSLInsecureSkipVerify",
-        "tag": "`json:\"ssl_insecure_skip_verify\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "SlaveOptionsConfig",
-    "fields": [
-      {
-        "doc": "Set to `true` to connect a worker Gateway using RPC.\n",
-        "go_name": "UseRPC",
-        "go_type": "bool",
-        "go_path": "SlaveOptionsConfig.UseRPC",
-        "tag": "`json:\"use_rpc\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Set this option to `true` to use an SSL RPC connection.\n",
-        "go_name": "UseSSL",
-        "go_type": "bool",
-        "go_path": "SlaveOptionsConfig.UseSSL",
-        "tag": "`json:\"use_ssl\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Set this option to `true` to allow the certificate validation (certificate chain and hostname) to be skipped.\nThis can be useful if you use a self-signed certificate.\n",
-        "go_name": "SSLInsecureSkipVerify",
-        "go_type": "bool",
-        "go_path": "SlaveOptionsConfig.SSLInsecureSkipVerify",
-        "tag": "`json:\"ssl_insecure_skip_verify\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Use this setting to add the URL for your MDCB or load balancer host.\n",
-        "go_name": "ConnectionString",
-        "go_type": "string",
-        "go_path": "SlaveOptionsConfig.ConnectionString",
-        "tag": "`json:\"connection_string\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Your organisation ID to connect to the MDCB installation.\n",
-        "go_name": "RPCKey",
-        "go_type": "string",
-        "go_path": "SlaveOptionsConfig.RPCKey",
-        "tag": "`json:\"rpc_key\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "This the API key of a user used to authenticate and authorise the Gateway’s access through MDCB.\nThe user should be a standard Dashboard user with minimal privileges so as to reduce any risk if the user is compromised.\nThe suggested security settings are read for Real-time notifications and the remaining options set to deny.\n",
-        "go_name": "APIKey",
-        "go_type": "string",
-        "go_path": "SlaveOptionsConfig.APIKey",
-        "tag": "`json:\"api_key\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Set this option to `true` to enable RPC caching for keys.\n",
-        "go_name": "EnableRPCCache",
-        "go_type": "bool",
-        "go_path": "SlaveOptionsConfig.EnableRPCCache",
-        "tag": "`json:\"enable_rpc_cache\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "For an Self-Managed installation this can be left at `false` (the default setting). For Legacy Cloud Gateways it must be set to ‘true’.\n",
-        "go_name": "BindToSlugsInsteadOfListenPaths",
-        "go_type": "bool",
-        "go_path": "SlaveOptionsConfig.BindToSlugsInsteadOfListenPaths",
-        "tag": "`json:\"bind_to_slugs\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Set this option to `true` if you don’t want to monitor changes in the keys from a master Gateway.\n",
-        "go_name": "DisableKeySpaceSync",
-        "go_type": "bool",
-        "go_path": "SlaveOptionsConfig.DisableKeySpaceSync",
-        "tag": "`json:\"disable_keyspace_sync\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "This is the `zone` that this instance inhabits, e.g. the cluster/data-centre the Gateway lives in.\nThe group ID must be the same across all the Gateways of a data-centre/cluster which are also sharing the same Redis instance.\nThis ID should also be unique per cluster (otherwise another Gateway cluster can pick up your keyspace events and your cluster will get zero updates).\n",
-        "go_name": "GroupID",
-        "go_type": "string",
-        "go_path": "SlaveOptionsConfig.GroupID",
-        "tag": "`json:\"group_id\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "Call Timeout allows to specify a time in seconds for the maximum allowed duration of a RPC call.\n",
-        "go_name": "CallTimeout",
-        "go_type": "int",
-        "go_path": "SlaveOptionsConfig.CallTimeout",
-        "tag": "`json:\"call_timeout\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "The maximum time in seconds that a RPC ping can last.\n",
-        "go_name": "PingTimeout",
-        "go_type": "int",
-        "go_path": "SlaveOptionsConfig.PingTimeout",
-        "tag": "`json:\"ping_timeout\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed.\n",
-        "go_name": "RPCPoolSize",
-        "go_type": "int",
-        "go_path": "SlaveOptionsConfig.RPCPoolSize",
-        "tag": "`json:\"rpc_pool_size\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "You can use this to set a period for which the Gateway will check if there are changes in keys that must be synchronized. If this value is not set then it will default to 10 seconds.\n",
-        "go_name": "KeySpaceSyncInterval",
+        "doc": "You can set the interval length on how often the tyk Gateway will purge analytics data. This value is in seconds and defaults to 10 seconds.\n",
+        "go_name": "PurgeInterval",
         "go_type": "float32",
-        "go_path": "SlaveOptionsConfig.KeySpaceSyncInterval",
-        "tag": "`json:\"key_space_sync_interval\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "RPCCertCacheExpiration defines the expiration time of the rpc cache that stores the certificates, defined in seconds ",
-        "go_name": "RPCCertCacheExpiration",
-        "go_type": "float32",
-        "go_path": "SlaveOptionsConfig.RPCCertCacheExpiration",
-        "tag": "`json:\"rpc_cert_cache_expiration\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "RPCKeysCacheExpiration defines the expiration time of the rpc cache that stores the keys, defined in seconds ",
-        "go_name": "RPCGlobalCacheExpiration",
-        "go_type": "float32",
-        "go_path": "SlaveOptionsConfig.RPCGlobalCacheExpiration",
-        "tag": "`json:\"rpc_global_cache_expiration\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources ",
-        "go_name": "SynchroniserEnabled",
-        "go_type": "bool",
-        "go_path": "SlaveOptionsConfig.SynchroniserEnabled",
-        "tag": "`json:\"synchroniser_enabled\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "HealthCheckConfig",
-    "fields": [
-      {
-        "doc": "Setting this value to `true` will enable the health-check endpoint on /Tyk/health.\n",
-        "go_name": "EnableHealthChecks",
-        "go_type": "bool",
-        "go_path": "HealthCheckConfig.EnableHealthChecks",
-        "tag": "`json:\"enable_health_checks\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "This setting defaults to 60 seconds. This is the time window that Tyk uses to sample health-check data.\nYou can set a higher value for more accurate data (a larger sample period), or a lower value for less accurate data.\nThe reason this value is configurable is because sample data takes up space in your Redis DB to store the data to calculate samples. On high-availability systems this may not be desirable and smaller values may be preferred.\n",
-        "go_name": "HealthCheckValueTimeout",
-        "go_type": "int64",
-        "go_path": "HealthCheckConfig.HealthCheckValueTimeout",
-        "tag": "`json:\"health_check_value_timeouts\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "LivenessCheckConfig",
-    "fields": [
-      {
-        "doc": "Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.\n",
-        "go_name": "CheckDuration",
-        "go_type": "object",
-        "go_path": "LivenessCheckConfig.CheckDuration",
-        "tag": "`json:\"check_duration\"`",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "LocalSessionCacheConf",
-    "fields": [
-      {
-        "doc": "By default sessions are set to cache. Set this to `true` to stop Tyk from caching keys locally on the node.\n",
-        "go_name": "DisableCacheSessionState",
-        "go_type": "bool",
-        "go_path": "LocalSessionCacheConf.DisableCacheSessionState",
-        "tag": "`json:\"disable_cached_session_state\"`",
+        "go_path": "AnalyticsConfigConfig.PurgeInterval",
+        "tag": "`json:\"purge_interval\"`",
         "json_name": "",
         "is_array": false
       },
       {
         "doc": "",
-        "go_name": "CachedSessionTimeout",
-        "go_type": "int",
-        "go_path": "LocalSessionCacheConf.CachedSessionTimeout",
-        "tag": "`json:\"cached_session_timeout\"`",
+        "go_name": "ignoredIPsCompiled",
+        "go_type": "bool",
+        "go_path": "AnalyticsConfigConfig.ignoredIPsCompiled",
+        "tag": "",
         "json_name": "",
         "is_array": false
       },
       {
-        "doc": "",
-        "go_name": "CacheSessionEviction",
-        "go_type": "int",
-        "go_path": "LocalSessionCacheConf.CacheSessionEviction",
-        "tag": "`json:\"cached_session_eviction\"`",
+        "doc": "Determines the serialization engine for analytics. Available options: msgpack, and protobuf. By default, msgpack.\n",
+        "go_name": "SerializerType",
+        "go_type": "string",
+        "go_path": "AnalyticsConfigConfig.SerializerType",
+        "tag": "`json:\"serializer_type\"`",
         "json_name": "",
         "is_array": false
       }
@@ -2808,55 +2817,23 @@
     ]
   },
   {
-    "Name": "EventMessage",
+    "Name": "ZipkinConfig",
     "fields": [
       {
         "doc": "",
-        "go_name": "Type",
-        "go_type": "object",
-        "go_path": "EventMessage.Type",
-        "tag": "",
+        "go_name": "Reporter",
+        "go_type": "Reporter",
+        "go_path": "ZipkinConfig.Reporter",
+        "tag": "`json:\"reporter\"`",
         "json_name": "",
         "is_array": false
       },
       {
         "doc": "",
-        "go_name": "Meta",
-        "go_type": "any",
-        "go_path": "EventMessage.Meta",
-        "tag": "",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "TimeStamp",
-        "go_type": "string",
-        "go_path": "EventMessage.TimeStamp",
-        "tag": "",
-        "json_name": "",
-        "is_array": false
-      }
-    ]
-  },
-  {
-    "Name": "ServicePort",
-    "fields": [
-      {
-        "doc": "",
-        "go_name": "Protocol",
-        "go_type": "string",
-        "go_path": "ServicePort.Protocol",
-        "tag": "`json:\"protocol\"`",
-        "json_name": "",
-        "is_array": false
-      },
-      {
-        "doc": "",
-        "go_name": "Port",
-        "go_type": "int",
-        "go_path": "ServicePort.Port",
-        "tag": "`json:\"port\"`",
+        "go_name": "Sampler",
+        "go_type": "Sampler",
+        "go_path": "ZipkinConfig.Sampler",
+        "tag": "`json:\"sampler\"`",
         "json_name": "",
         "is_array": false
       }

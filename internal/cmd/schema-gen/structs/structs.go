@@ -12,8 +12,6 @@ type Request struct {
 }
 
 func Dump() (err error) {
-	println("Struct extract:")
-
 	sts, err := Extract("Config", "config/")
 	if err != nil {
 		return err

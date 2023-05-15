@@ -51,14 +51,14 @@ func Extract(rootName, filepath string, ignoreFiles ...string) (StructList, erro
 	p := newObjParser(fileSet, pkgs[requiredPkgName])
 	p.parseGlobalStructs()
 
-/*
-	rootStructInfo := &StructInfo{
-		Name:      rootName,
-		fileSet:   fileSet,
-		structObj: p.globals[rootName].(*ast.StructType),
-	}
-	p.parse(rootName, rootName, rootStructInfo)
-*/
+	/*
+		rootStructInfo := &StructInfo{
+			Name:      rootName,
+			fileSet:   fileSet,
+			structObj: p.globals[rootName].(*ast.StructType),
+		}
+		p.parse(rootName, rootName, rootStructInfo)
+	*/
 
 	if p.errList.Empty() {
 		return p.info, nil
@@ -134,7 +134,7 @@ func (p *objParser) parse(goPath, name string, structInfo *StructInfo) {
 			goName = field.Names[0].Name
 		}
 
-		fmt.Println("goName", goName)
+		// fmt.Println("goName", goName)
 
 		ident := extractIdentFromExpr(field.Type)
 		if ident == nil {
