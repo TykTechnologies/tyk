@@ -73,6 +73,7 @@ require (
 	github.com/spf13/afero v1.6.0
 	github.com/square/go-jose v2.4.1+incompatible
 	github.com/stretchr/testify v1.8.1 // test
+	github.com/tidwall/gjson v1.14.4
 	github.com/uber/jaeger-client-go v2.30.1-0.20220110192849-8d8e8fcfd04d+incompatible
 	github.com/uber/jaeger-lib v2.4.2-0.20210604143007-135cf5605a6d+incompatible // indirect
 	github.com/valyala/fasthttp v1.43.0 // test
