@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -377,7 +376,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
 			return newConfig, nil
 		} else {
-			fmt.Printf("\n%v\n", gwConfig.ControlAPIHostname)
 			domainRequireCert[gwConfig.ControlAPIHostname] = -1
 		}
 
