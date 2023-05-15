@@ -34,7 +34,7 @@ func removeEmptyValues(parsed gjson.Result) gjson.Result {
 				return gjson.Result{}
 			}
 
-			marshaled, _ := json.Marshal(newObj)
+			marshaled, _ := json.Marshal(newObj) //nolint:errcheck,errchkjson
 
 			return gjson.Parse(string(marshaled))
 		} else {
@@ -51,7 +51,7 @@ func removeEmptyValues(parsed gjson.Result) gjson.Result {
 				return gjson.Result{}
 			}
 
-			marshaled, _ := json.Marshal(newObj)
+			marshaled, _ := json.Marshal(newObj) //nolint:errcheck,errchkjson
 
 			return gjson.Parse(string(marshaled))
 		}
