@@ -374,17 +374,17 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		fmt.Printf("\nControl api hostname: %v\n", gwConfig.ControlAPIHostname)
 		fmt.Printf("\nhello server name: %v\n", hello.ServerName)
 		domainRequireCert := map[string]tls.ClientAuthType{}
-		if isControlAPI && gwConfig.Security.ControlAPIUseMutualTLS {
-			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
-			newConfig.ClientCAs = gw.CertificateManager.CertPool(gwConfig.Security.Certificates.ControlAPI)
 
-			tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
+		if isControlAPI {
+			if gwConfig.Security.ControlAPIUseMutualTLS {
+				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
+				newConfig.ClientCAs = gw.CertificateManager.CertPool(gwConfig.Security.Certificates.ControlAPI)
 
-			fmt.Printf("\n==========1=============\n")
-			fmt.Printf("\n%+v\n", newConfig)
-			return newConfig, nil
-		} else if isControlAPI {
-			// is control api but not mutual tls is required
+				tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
+				return newConfig, nil
+			}
+
+			// Control API without mutual TLS
 			domainRequireCert[hello.ServerName] = -1
 		}
 
