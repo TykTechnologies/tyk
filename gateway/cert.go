@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -369,10 +368,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		}
 
 		isControlAPI := (listenPort != 0 && gwConfig.ControlAPIPort == listenPort) || (gwConfig.ControlAPIHostname == hello.ServerName)
-		fmt.Printf("\n Listen port: %v \n", listenPort)
-		fmt.Printf("\nControl api port: %v\n", gwConfig.ControlAPIPort)
-		fmt.Printf("\nControl api hostname: %v\n", gwConfig.ControlAPIHostname)
-		fmt.Printf("\nhello server name: %v\n", hello.ServerName)
 		domainRequireCert := map[string]tls.ClientAuthType{}
 
 		if isControlAPI {
@@ -404,12 +399,10 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		for _, spec := range gw.apiSpecs {
 			switch {
 			case spec.UseMutualTLSAuth:
-				// si el dominio es el mismo q control api, entonces si puede pedirlo
 				if domainRequireCert[spec.Domain] == 0 {
 					// Require verification only if there is a single known domain for TLS auth, otherwise use previous value
 					domainRequireCert[spec.Domain] = tls.RequireAndVerifyClientCert
 				} else if domainRequireCert[spec.Domain] != tls.RequireAndVerifyClientCert {
-					fmt.Println(domainRequireCert[spec.Domain])
 					// If we have another API on this domain, which is not mutual tls enabled, just ask for cert
 					domainRequireCert[spec.Domain] = tls.RequestClientCert
 				}
