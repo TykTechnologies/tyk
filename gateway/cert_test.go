@@ -319,7 +319,6 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 	// Initialize client certificates
 	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientCertPem2, _, _, clientCert2 := certs.GenCertificate(&x509.Certificate{}, false)
-	fmt.Println(clientCert2)
 	t.Run("acceptable CAs from server", func(t *testing.T) {
 		tlsConfig := GetTLSConfig(&clientCert, serverCertPem)
 		tlsConfig.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
@@ -432,200 +431,200 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 			})
 		})
 	})
-	/*
-			t.Run("Multiple APIs on same domain", func(t *testing.T) {
-				testSameDomain := func(t *testing.T, domain string) {
-					clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
-					defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
-					loadAPIS := func(certs ...string) {
-						ts.Gw.BuildAndLoadAPI(
-							func(spec *APISpec) {
-								spec.Proxy.ListenPath = "/without_mutual"
-								spec.Domain = domain
-							},
-							func(spec *APISpec) {
-								spec.Proxy.ListenPath = "/with_mutual"
-								spec.UseMutualTLSAuth = true
-								spec.ClientCertificates = certs
-								spec.Domain = domain
-							},
-						)
-					}
+	t.Run("Multiple APIs on same domain", func(t *testing.T) {
+		testSameDomain := func(t *testing.T, domain string) {
+			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+			defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
-					t.Run("Without certificate", func(t *testing.T) {
-						clientWithoutCert := GetTLSClient(nil, nil)
+			loadAPIS := func(certs ...string) {
+				ts.Gw.BuildAndLoadAPI(
+					func(spec *APISpec) {
+						spec.Proxy.ListenPath = "/without_mutual"
+						spec.Domain = domain
+					},
+					func(spec *APISpec) {
+						spec.Proxy.ListenPath = "/with_mutual"
+						spec.UseMutualTLSAuth = true
+						spec.ClientCertificates = certs
+						spec.Domain = domain
+					},
+				)
+			}
 
-						loadAPIS()
+			t.Run("Without certificate", func(t *testing.T) {
+				clientWithoutCert := GetTLSClient(nil, nil)
 
-						_, _ = ts.Run(t, []test.TestCase{
-							{
-								Path:      "/with_mutual",
-								Client:    clientWithoutCert,
-								Domain:    domain,
-								Code:      403,
-								BodyMatch: `"error": "` + certNotMatchErr,
-							},
-							{
-								Path:   "/without_mutual",
-								Client: clientWithoutCert,
-								Domain: domain,
-								Code:   200,
-							},
-						}...)
-					})
+				loadAPIS()
 
-					t.Run("Client certificate not match", func(t *testing.T) {
-						client := GetTLSClient(&clientCert, serverCertPem)
+				_, _ = ts.Run(t, []test.TestCase{
+					{
+						Path:      "/with_mutual",
+						Client:    clientWithoutCert,
+						Domain:    domain,
+						Code:      403,
+						BodyMatch: `"error": "` + certNotMatchErr,
+					},
+					{
+						Path:   "/without_mutual",
+						Client: clientWithoutCert,
+						Domain: domain,
+						Code:   200,
+					},
+				}...)
+			})
 
-						loadAPIS()
+			t.Run("Client certificate not match", func(t *testing.T) {
+				client := GetTLSClient(&clientCert, serverCertPem)
 
-						certNotAllowedErr := `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
+				loadAPIS()
 
-						_, _ = ts.Run(t, test.TestCase{
-							Path:      "/with_mutual",
-							Client:    client,
-							Domain:    domain,
-							Code:      403,
-							BodyMatch: `"error": "` + certNotAllowedErr,
-						})
-					})
+				certNotAllowedErr := `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
 
-					t.Run("Client certificate match", func(t *testing.T) {
-						loadAPIS(clientCertID)
-						client := GetTLSClient(&clientCert, serverCertPem)
+				_, _ = ts.Run(t, test.TestCase{
+					Path:      "/with_mutual",
+					Client:    client,
+					Domain:    domain,
+					Code:      403,
+					BodyMatch: `"error": "` + certNotAllowedErr,
+				})
+			})
 
-						_, _ = ts.Run(t, test.TestCase{
+			t.Run("Client certificate match", func(t *testing.T) {
+				loadAPIS(clientCertID)
+				client := GetTLSClient(&clientCert, serverCertPem)
+
+				_, _ = ts.Run(t, test.TestCase{
+					Path:   "/with_mutual",
+					Domain: domain,
+					Client: client,
+					Code:   200,
+				})
+			})
+		}
+
+		t.Run("Empty domain", func(t *testing.T) {
+			testSameDomain(t, "")
+		})
+
+		t.Run("Custom domain", func(t *testing.T) {
+			testSameDomain(t, "localhost")
+		})
+	})
+
+	t.Run("Multiple APIs with Mutual TLS on the same domain", func(t *testing.T) {
+		testSameDomain := func(t *testing.T, domain string) {
+			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+			defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+
+			clientCertID2, _ := ts.Gw.CertificateManager.Add(clientCertPem2, "")
+			defer ts.Gw.CertificateManager.Delete(clientCertID2, "")
+
+			loadAPIS := func(certs []string, certs2 []string) {
+				ts.Gw.BuildAndLoadAPI(
+					func(spec *APISpec) {
+						spec.Proxy.ListenPath = "/with_mutual"
+						spec.UseMutualTLSAuth = true
+						spec.ClientCertificates = certs
+						spec.Domain = domain
+					},
+					func(spec *APISpec) {
+						spec.Proxy.ListenPath = "/with_mutual_2"
+						spec.UseMutualTLSAuth = true
+						spec.ClientCertificates = certs2
+						spec.Domain = domain
+					},
+				)
+			}
+
+			t.Run("Without certificate", func(t *testing.T) {
+				clientWithoutCert := GetTLSClient(nil, nil)
+
+				loadAPIS([]string{}, []string{})
+
+				_, _ = ts.Run(t, []test.TestCase{
+					{
+						Path:       "/with_mutual",
+						Client:     clientWithoutCert,
+						Domain:     domain,
+						ErrorMatch: badcertErr,
+					},
+					{
+						Path:       "/with_mutual_2",
+						Client:     clientWithoutCert,
+						Domain:     domain,
+						ErrorMatch: badcertErr,
+					},
+				}...)
+			})
+
+			t.Run("Client certificate not match", func(t *testing.T) {
+				client := GetTLSClient(&clientCert, serverCertPem)
+
+				loadAPIS([]string{}, []string{})
+
+				_, _ = ts.Run(t, test.TestCase{
+					Path:       "/with_mutual",
+					Client:     client,
+					Domain:     domain,
+					ErrorMatch: badcertErr,
+				})
+
+				_, _ = ts.Run(t, test.TestCase{
+					Path:       "/with_mutual_2",
+					Client:     client,
+					Domain:     domain,
+					ErrorMatch: badcertErr,
+				})
+			})
+
+			t.Run("Client certificate match", func(t *testing.T) {
+				loadAPIS([]string{clientCertID}, []string{clientCertID2})
+				client := GetTLSClient(&clientCert, serverCertPem)
+				client2 := GetTLSClient(&clientCert2, serverCertPem)
+
+				_, _ = ts.Run(t,
+					[]test.TestCase{
+						{
 							Path:   "/with_mutual",
 							Domain: domain,
 							Client: client,
 							Code:   200,
-						})
-					})
-				}
-
-				t.Run("Empty domain", func(t *testing.T) {
-					testSameDomain(t, "")
-				})
-
-				t.Run("Custom domain", func(t *testing.T) {
-					testSameDomain(t, "localhost")
-				})
-			})
-
-		t.Run("Multiple APIs with Mutual TLS on the same domain", func(t *testing.T) {
-			testSameDomain := func(t *testing.T, domain string) {
-				clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
-				defer ts.Gw.CertificateManager.Delete(clientCertID, "")
-
-				clientCertID2, _ := ts.Gw.CertificateManager.Add(clientCertPem2, "")
-				defer ts.Gw.CertificateManager.Delete(clientCertID2, "")
-
-				loadAPIS := func(certs []string, certs2 []string) {
-					ts.Gw.BuildAndLoadAPI(
-						func(spec *APISpec) {
-							spec.Proxy.ListenPath = "/with_mutual"
-							spec.UseMutualTLSAuth = true
-							spec.ClientCertificates = certs
-							spec.Domain = domain
-						},
-						func(spec *APISpec) {
-							spec.Proxy.ListenPath = "/with_mutual_2"
-							spec.UseMutualTLSAuth = true
-							spec.ClientCertificates = certs2
-							spec.Domain = domain
-						},
-					)
-				}
-
-				t.Run("Without certificate", func(t *testing.T) {
-					clientWithoutCert := GetTLSClient(nil, nil)
-
-					loadAPIS([]string{}, []string{})
-
-					_, _ = ts.Run(t, []test.TestCase{
-						{
-							Path:       "/with_mutual",
-							Client:     clientWithoutCert,
-							Domain:     domain,
-							ErrorMatch: badcertErr,
 						},
 						{
-							Path:       "/with_mutual_2",
-							Client:     clientWithoutCert,
-							Domain:     domain,
-							ErrorMatch: badcertErr,
+							Path:      "/with_mutual_2",
+							Domain:    domain,
+							Client:    client,
+							Code:      403,
+							BodyMatch: `"error": "` + `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`,
 						},
-					}...)
-				})
-
-				t.Run("Client certificate not match", func(t *testing.T) {
-					client := GetTLSClient(&clientCert, serverCertPem)
-
-					loadAPIS([]string{}, []string{})
-
-					_, _ = ts.Run(t, test.TestCase{
-						Path:       "/with_mutual",
-						Client:     client,
-						Domain:     domain,
-						ErrorMatch: badcertErr,
-					})
-
-					_, _ = ts.Run(t, test.TestCase{
-						Path:       "/with_mutual_2",
-						Client:     client,
-						Domain:     domain,
-						ErrorMatch: badcertErr,
-					})
-				})
-
-				t.Run("Client certificate match", func(t *testing.T) {
-					loadAPIS([]string{clientCertID}, []string{clientCertID2})
-					client := GetTLSClient(&clientCert, serverCertPem)
-					client2 := GetTLSClient(&clientCert2, serverCertPem)
-
-					_, _ = ts.Run(t,
-						[]test.TestCase{
-							{
-								Path:   "/with_mutual",
-								Domain: domain,
-								Client: client,
-								Code:   200,
-							},
-							{
-								Path:      "/with_mutual_2",
-								Domain:    domain,
-								Client:    client,
-								Code:      403,
-								BodyMatch: `"error": "` + `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`,
-							},
-							{
-								Path:   "/with_mutual_2",
-								Domain: domain,
-								Client: client2,
-								Code:   200,
-							},
-							{
-								Path:      "/with_mutual",
-								Domain:    domain,
-								Client:    client2,
-								Code:      403,
-								BodyMatch: `"error": "` + `Certificate with SHA256 ` + certs.HexSHA256(clientCert2.Certificate[0]) + ` not allowed`,
-							},
-						}...,
-					)
-				})
-			}
-
-			t.Run("Empty domain", func(t *testing.T) {
-				testSameDomain(t, "")
+						{
+							Path:   "/with_mutual_2",
+							Domain: domain,
+							Client: client2,
+							Code:   200,
+						},
+						{
+							Path:      "/with_mutual",
+							Domain:    domain,
+							Client:    client2,
+							Code:      403,
+							BodyMatch: `"error": "` + `Certificate with SHA256 ` + certs.HexSHA256(clientCert2.Certificate[0]) + ` not allowed`,
+						},
+					}...,
+				)
 			})
+		}
 
-			t.Run("Custom domain", func(t *testing.T) {
-				testSameDomain(t, "localhost")
-			})
+		t.Run("Empty domain", func(t *testing.T) {
+			testSameDomain(t, "")
 		})
-	*/
+
+		t.Run("Custom domain", func(t *testing.T) {
+			testSameDomain(t, "localhost")
+		})
+	})
+
 	t.Run("Multiple APIs, mutual on custom", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
 			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
