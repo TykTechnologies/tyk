@@ -1,0 +1,16 @@
+name: OAS lint
+on:
+  workflow_dispatch:
+    inputs:
+      oas-file-path:
+        description: "The path to the oas swagger file"
+        required: true
+        default: "feat/oas-lint"
+
+jobs:
+  lint-oas:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lint OAS
+        run: |
+          echo "${{ github.event.inputs.message }}"
