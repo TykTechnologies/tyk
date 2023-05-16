@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -370,6 +371,8 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		isControlAPI := (listenPort != 0 && gwConfig.ControlAPIPort == listenPort) || (gwConfig.ControlAPIHostname == hello.ServerName)
 		domainRequireCert := map[string]tls.ClientAuthType{}
 
+		fmt.Println("api hostname: " + gwConfig.ControlAPIHostname)
+		fmt.Println(gwConfig.ControlAPIHostname == hello.ServerName)
 		if isControlAPI {
 			if gwConfig.Security.ControlAPIUseMutualTLS {
 				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
@@ -379,6 +382,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 				return newConfig, nil
 			}
 
+			fmt.Println("era controlllll========")
 			// Control API without mutual TLS
 			domainRequireCert[hello.ServerName] = -1
 		}
