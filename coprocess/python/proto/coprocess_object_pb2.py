@@ -17,14 +17,14 @@ import coprocess_session_state_pb2 as coprocess__session__state__pb2
 import coprocess_common_pb2 as coprocess__common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x63oprocess_object.proto\x12\tcoprocess\x1a#coprocess_mini_request_object.proto\x1a\x1f\x63oprocess_response_object.proto\x1a\x1d\x63oprocess_session_state.proto\x1a\x16\x63oprocess_common.proto\"\x85\x03\n\x06Object\x12&\n\thook_type\x18\x01 \x01(\x0e\x32\x13.coprocess.HookType\x12\x11\n\thook_name\x18\x02 \x01(\t\x12-\n\x07request\x18\x03 \x01(\x0b\x32\x1c.coprocess.MiniRequestObject\x12(\n\x07session\x18\x04 \x01(\x0b\x32\x17.coprocess.SessionState\x12\x31\n\x08metadata\x18\x05 \x03(\x0b\x32\x1f.coprocess.Object.MetadataEntry\x12)\n\x04spec\x18\x06 \x03(\x0b\x32\x1b.coprocess.Object.SpecEntry\x12+\n\x08response\x18\x07 \x01(\x0b\x32\x19.coprocess.ResponseObject\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a+\n\tSpecEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x18\n\x05\x45vent\x12\x0f\n\x07payload\x18\x01 \x01(\t\"\x0c\n\nEventReply2|\n\nDispatcher\x12\x32\n\x08\x44ispatch\x12\x11.coprocess.Object\x1a\x11.coprocess.Object\"\x00\x12:\n\rDispatchEvent\x12\x10.coprocess.Event\x1a\x15.coprocess.EventReply\"\x00\x42\x04Z\x02./b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x63oprocess_object.proto\x12\tcoprocess\x1a#coprocess_mini_request_object.proto\x1a\x1f\x63oprocess_response_object.proto\x1a\x1d\x63oprocess_session_state.proto\x1a\x16\x63oprocess_common.proto\"\x85\x03\n\x06Object\x12&\n\thook_type\x18\x01 \x01(\x0e\x32\x13.coprocess.HookType\x12\x11\n\thook_name\x18\x02 \x01(\t\x12-\n\x07request\x18\x03 \x01(\x0b\x32\x1c.coprocess.MiniRequestObject\x12(\n\x07session\x18\x04 \x01(\x0b\x32\x17.coprocess.SessionState\x12\x31\n\x08metadata\x18\x05 \x03(\x0b\x32\x1f.coprocess.Object.MetadataEntry\x12)\n\x04spec\x18\x06 \x03(\x0b\x32\x1b.coprocess.Object.SpecEntry\x12+\n\x08response\x18\x07 \x01(\x0b\x32\x19.coprocess.ResponseObject\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a+\n\tSpecEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x18\n\x05\x45vent\x12\x0f\n\x07payload\x18\x01 \x01(\t\"\x0c\n\nEventReply2|\n\nDispatcher\x12\x32\n\x08\x44ispatch\x12\x11.coprocess.Object\x1a\x11.coprocess.Object\"\x00\x12:\n\rDispatchEvent\x12\x10.coprocess.Event\x1a\x15.coprocess.EventReply\"\x00\x42\x0eZ\x0c../coprocessb\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'coprocess_object_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  DESCRIPTOR._serialized_options = b'Z\002./'
+  DESCRIPTOR._serialized_options = b'Z\014../coprocess'
   _OBJECT_METADATAENTRY._options = None
   _OBJECT_METADATAENTRY._serialized_options = b'8\001'
   _OBJECT_SPECENTRY._options = None

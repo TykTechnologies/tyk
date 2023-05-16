@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package coprocess;
 
-option go_package = "./";
+option go_package = "../coprocess";
 
 
 message ReturnOverrides {

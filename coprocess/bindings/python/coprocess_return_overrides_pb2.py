@@ -13,14 +13,14 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n coprocess_return_overrides.proto\x12\tcoprocess\"\xd9\x01\n\x0fReturnOverrides\x12\x15\n\rresponse_code\x18\x01 \x01(\x05\x12\x16\n\x0eresponse_error\x18\x02 \x01(\t\x12\x38\n\x07headers\x18\x03 \x03(\x0b\x32\'.coprocess.ReturnOverrides.HeadersEntry\x12\x16\n\x0eoverride_error\x18\x04 \x01(\x08\x12\x15\n\rresponse_body\x18\x05 \x01(\t\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x04Z\x02./b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n coprocess_return_overrides.proto\x12\tcoprocess\"\xd9\x01\n\x0fReturnOverrides\x12\x15\n\rresponse_code\x18\x01 \x01(\x05\x12\x16\n\x0eresponse_error\x18\x02 \x01(\t\x12\x38\n\x07headers\x18\x03 \x03(\x0b\x32\'.coprocess.ReturnOverrides.HeadersEntry\x12\x16\n\x0eoverride_error\x18\x04 \x01(\x08\x12\x15\n\rresponse_body\x18\x05 \x01(\t\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x0eZ\x0c../coprocessb\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'coprocess_return_overrides_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  DESCRIPTOR._serialized_options = b'Z\002./'
+  DESCRIPTOR._serialized_options = b'Z\014../coprocess'
   _RETURNOVERRIDES_HEADERSENTRY._options = None
   _RETURNOVERRIDES_HEADERSENTRY._serialized_options = b'8\001'
   _RETURNOVERRIDES._serialized_start=48

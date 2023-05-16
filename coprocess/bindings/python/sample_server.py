@@ -12,14 +12,7 @@ def MyPreMiddleware(coprocess_object):
   return coprocess_object
 
 def MyPostMiddleware(coprocess_object):
-  body = coprocess_object.response.body
-  json_body = json.loads(body)
-  json_body['Transform'] = 'Custom Field'
-
-  coprocess_object.response.body = json.dumps(json_body)
-  coprocess_object.response.raw_body=json.dumps(json_body).encode('utf-8')
-  coprocess_object.response.headers['Content-Length'] = str(len(coprocess_object.response.raw_body))
-
+  coprocess_object.response.headers["MyPostMiddleware"] = "MyPostMiddleware"
   return coprocess_object
 
 def MyResponseMiddleware(coprocess_object):
