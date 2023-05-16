@@ -480,7 +480,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 
 				certNotAllowedErr := `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
 
-				_, _ := ts.Run(t, test.TestCase{
+				_, _ = ts.Run(t, test.TestCase{
 					Path:      "/with_mutual",
 					Client:    client,
 					Domain:    domain,
