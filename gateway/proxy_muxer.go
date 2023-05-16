@@ -494,7 +494,6 @@ func (m *proxyMux) generateListener(listenPort int, protocol string, gw *Gateway
 			tlsConfig.NextProtos = append(tlsConfig.NextProtos, http2.NextProtoTLS)
 		}
 
-		fmt.Println("========jeeee-------------")
 		tlsConfig.GetConfigForClient = gw.getTLSConfigForClient(&tlsConfig, listenPort)
 		l, err = tls.Listen("tcp", targetPort, &tlsConfig)
 
