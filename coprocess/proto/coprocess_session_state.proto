@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package coprocess;
 
+option go_package = "./";
+
 message AccessSpec {
   string url = 1;
   repeated string methods = 2;
@@ -73,4 +75,8 @@ message SessionState {
   string certificate = 30;
 
   int64 max_query_depth = 31;
+
+  string key_hash = 32;
+  string key_id = 33;
+
 }

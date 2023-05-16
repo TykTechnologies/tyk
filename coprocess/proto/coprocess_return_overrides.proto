@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package coprocess;
 
+option go_package = "./";
+
+
 message ReturnOverrides {
   int32 response_code = 1;
   string response_error = 2;

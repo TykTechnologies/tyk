@@ -7,6 +7,7 @@ require 'coprocess_mini_request_object_pb'
 require 'coprocess_response_object_pb'
 require 'coprocess_session_state_pb'
 require 'coprocess_common_pb'
+
 Google::Protobuf::DescriptorPool.generated_pool.build do
   add_file("coprocess_object.proto", :syntax => :proto3) do
     add_message "coprocess.Object" do

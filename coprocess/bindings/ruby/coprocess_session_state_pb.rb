@@ -57,6 +57,8 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
       repeated :apply_policies, :string, 29
       optional :certificate, :string, 30
       optional :max_query_depth, :int64, 31
+      optional :key_hash, :string, 32
+      optional :key_id, :string, 33
     end
   end
 end

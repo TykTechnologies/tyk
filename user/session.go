@@ -145,8 +145,8 @@ type SessionState struct {
 	SessionLifetime         int64                  `bson:"session_lifetime" json:"session_lifetime"`
 
 	// Used to store token hash
-	keyHash string
-	KeyID   string `json:"-"`
+	keyHash string `json:"key_hash" msg:"key_hash"`
+	KeyID   string `json:"key_id" msg:"key_id"`
 }
 
 func NewSessionState() *SessionState {
