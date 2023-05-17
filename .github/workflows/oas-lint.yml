@@ -13,4 +13,6 @@ jobs:
     steps:
       - name: Lint OAS
         run: |
-          echo "${{ github.event.inputs.message }}"
+          echo "FILE_PATH=${{ github.event.inputs.oas-file-path }}" >> $GITHUB_ENV
+          echo "${{ env.FILE_PATH }}"
+          echo "Linting OAS API definition file"
