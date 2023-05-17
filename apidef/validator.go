@@ -53,6 +53,7 @@ type ValidationRuleSet []ValidationRule
 
 var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleUniqueDataSourceNames{},
+	&RuleValidateIPList{},
 }
 
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
