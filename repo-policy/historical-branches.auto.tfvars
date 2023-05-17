@@ -2,6 +2,11 @@
 # Branches here are required for the gpac bundle to work but it is not necessary to clutter the gromit
 # config file or main.tf with these.
 historical_branches = [
+{ branch    = "release-4-lts",
+	reviewers = "0",
+	convos    = "false",
+	source_branch  = "master",
+	required_tests = ["Go 1.15 Redis 6"]},
   { branch    = "release-4.0.10",
 	reviewers = "0",
 	convos    = "false",
