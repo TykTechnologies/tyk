@@ -359,7 +359,6 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 		globalConf.HttpServerOptions.SkipClientCAAnnouncement = skipCAAnnounce
 		globalConf.ControlAPIPort = 1212
 	}
-
 	ts := StartTest(conf)
 	defer ts.Close()
 
@@ -775,7 +774,6 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 
 	t.Run("Multiple APIs, mutual on empty", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
-
 			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 			defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
@@ -806,7 +804,6 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 						BodyMatch: `"error": "` + certNotMatchErr,
 					})
 				} else {
-
 					_, _ = ts.Run(t, test.TestCase{
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
@@ -864,7 +861,6 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 			testSameDomain(t, "localhost")
 		})
 	})
-
 }
 
 func TestUpstreamMutualTLS(t *testing.T) {
