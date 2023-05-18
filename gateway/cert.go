@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -305,6 +306,17 @@ func getClientValidator(helloInfo *tls.ClientHelloInfo, certPool *x509.CertPool)
 	}
 }
 
+func (gw *Gateway) AllApisAreMTLS() bool {
+	for _, api := range gw.apisByID {
+		fmt.Printf("\nname: %v active: %v mtls: %v\n", api.Name, api.Active, api.UseMutualTLSAuth)
+		if !api.UseMutualTLSAuth && api.Active {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	gwConfig := gw.GetConfig()
 	// Supporting legacy certificate configuration
@@ -367,7 +379,12 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			newConfig.NameToCertificate[name] = cert
 		}
 
-		isControlAPI := (listenPort != 0 && gwConfig.ControlAPIPort == listenPort) || (gwConfig.ControlAPIHostname == hello.ServerName)
+		// not ControlAPIHostname has been configured ot the hostName is the same in the hello handshake
+		isControlHostName := gwConfig.ControlAPIHostname == "" || (gwConfig.ControlAPIHostname == hello.ServerName)
+		// target port is the same where control api lives
+		isControlPort := gwConfig.ControlAPIPort == 0 || (gwConfig.ControlAPIPort == listenPort && listenPort != 0)
+		isControlAPI := isControlHostName && isControlPort
+
 		domainRequireCert := map[string]tls.ClientAuthType{}
 
 		if isControlAPI {
@@ -378,9 +395,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 				tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
 				return newConfig, nil
 			}
-
-			// Control API without mutual TLS
-			domainRequireCert[hello.ServerName] = -1
 		}
 
 		gw.apisMu.RLock()
@@ -488,6 +502,10 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 				newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
 			}
 			newConfig.ClientCAs = x509.NewCertPool()
+			newConfig.ClientAuth = tls.RequestClientCert
+		}
+
+		if newConfig.ClientAuth == tls.RequireAndVerifyClientCert && isControlAPI && !gwConfig.Security.ControlAPIUseMutualTLS {
 			newConfig.ClientAuth = tls.RequestClientCert
 		}
 

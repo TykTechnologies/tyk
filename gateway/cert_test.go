@@ -357,7 +357,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 		globalConf.HttpServerOptions.SkipClientCAAnnouncement = skipCAAnnounce
 
-		globalConf.ControlAPIHostname = "api.hostname"
+		globalConf.ControlAPIPort = 1212
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -813,7 +813,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
 						ErrorMatch: badcertErr,
-						//	BodyMatch: `"error": "` + certNotMatchErr,
+						//BodyMatch: `"error": "` + certNotMatchErr,
 					})
 				}
 
