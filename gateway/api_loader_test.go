@@ -2,13 +2,14 @@ package gateway
 
 import (
 	"fmt"
-	"github.com/TykTechnologies/storage/persistent/model"
-	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
 	"path"
 	_ "path"
 	"sync/atomic"
 	"testing"
+
+	"github.com/TykTechnologies/storage/persistent/model"
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/stretchr/testify/assert"
 
@@ -419,7 +420,7 @@ func TestAllApisAreMTLS(t *testing.T) {
 
 	// Call the method again
 	result = gw.AllApisAreMTLS()
-	
+
 	expected = false
 	if result != expected {
 		t.Errorf("Expected AllApisAreMTLS to return %v, but got %v", expected, result)
