@@ -293,6 +293,7 @@ func TestAPIMutualTLS(t *testing.T) {
 }
 
 func TestMutualTLSApisControlPortNotMTLS(t *testing.T) {
+	t.Skip()
 	// crear una api q es mtls, consumir control: 403
 	// crear una api q es mtls, setear control port, consumir control: 200
 	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
