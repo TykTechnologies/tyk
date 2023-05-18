@@ -143,6 +143,7 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 type cacheOptions struct {
 	key                    string
 	cacheOnlyResponseCodes []int
+	timeout                int64
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -198,6 +199,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	ctxSetCacheOptions(r, &cacheOptions{
 		key:                    key,
 		cacheOnlyResponseCodes: cacheOnlyResponseCodes,
+		timeout:                cacheMeta.Timeout,
 	})
 
 	retBlob, err = m.store.GetKey(key)
