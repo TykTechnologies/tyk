@@ -367,28 +367,25 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			newConfig.NameToCertificate[name] = cert
 		}
 
-		// not ControlAPIHostname has been configured ot the hostName is the same in the hello handshake
+		// not ControlAPIHostname has been configured or the hostName is the same in the hello handshake
 		isControlHostName := gwConfig.ControlAPIHostname == "" || (gwConfig.ControlAPIHostname == hello.ServerName)
 		// target port is the same where control api lives
 		isControlPort := gwConfig.ControlAPIPort == 0 || (gwConfig.ControlAPIPort == listenPort && listenPort != 0)
 		isControlAPI := isControlHostName && isControlPort
 
-		domainRequireCert := map[string]tls.ClientAuthType{}
+		if isControlAPI && gwConfig.Security.ControlAPIUseMutualTLS {
+			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
+			newConfig.ClientCAs = gw.CertificateManager.CertPool(gwConfig.Security.Certificates.ControlAPI)
 
-		if isControlAPI {
-			if gwConfig.Security.ControlAPIUseMutualTLS {
-				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
-				newConfig.ClientCAs = gw.CertificateManager.CertPool(gwConfig.Security.Certificates.ControlAPI)
-
-				tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
-				return newConfig, nil
-			}
+			tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
+			return newConfig, nil
 		}
 
 		gw.apisMu.RLock()
 		defer gw.apisMu.RUnlock()
 
 		newConfig.ClientCAs = x509.NewCertPool()
+		domainRequireCert := map[string]tls.ClientAuthType{}
 
 		directMTLSDomainMatch := false
 		for _, spec := range gw.apiSpecs {
