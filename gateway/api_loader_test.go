@@ -408,7 +408,7 @@ func TestAllApisAreMTLS(t *testing.T) {
 	gw.apisByID[spec2.APIID] = spec2
 	gw.apisByID[spec3.APIID] = spec3
 
-	result := gw.AllApisAreMTLS()
+	result := gw.allApisAreMTLS()
 
 	expected := true
 	if result != expected {
@@ -419,7 +419,7 @@ func TestAllApisAreMTLS(t *testing.T) {
 	spec3.UseMutualTLSAuth = false
 
 	// Call the method again
-	result = gw.AllApisAreMTLS()
+	result = gw.allApisAreMTLS()
 
 	expected = false
 	if result != expected {
