@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -304,17 +303,6 @@ func getClientValidator(helloInfo *tls.ClientHelloInfo, certPool *x509.CertPool)
 
 		return err
 	}
-}
-
-func (gw *Gateway) AllApisAreMTLS() bool {
-	for _, api := range gw.apisByID {
-		fmt.Printf("\nname: %v active: %v mtls: %v\n", api.Name, api.Active, api.UseMutualTLSAuth)
-		if !api.UseMutualTLSAuth && api.Active {
-			return false
-		}
-	}
-
-	return true
 }
 
 func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
