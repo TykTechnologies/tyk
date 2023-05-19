@@ -27,6 +27,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.0.2
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/clbanning/mxj v1.8.4
+	github.com/dlclark/regexp2 v1.10.0 // indirect
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible

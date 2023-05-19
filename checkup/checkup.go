@@ -1,9 +1,10 @@
 package checkup
 
 import (
-	"regexp"
 	"runtime"
 	"syscall"
+
+	regexp "github.com/dlclark/regexp2"
 
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -86,17 +87,17 @@ func cpus() {
 }
 
 func secretComplexity(c *config.Config) {
-	regex := regexp.MustCompile(c.SecretComplexity)
+	regex := regexp.MustCompile(c.SecretComplexity, 0)
 
 	complexityFailed := true
 
-	if !regex.MatchString(c.Secret) {
+	if match, _ := regex.MatchString(c.Secret); !match {
 		log.WithField("config.secret", c.Secret).WithField("config.secret_complexity", c.SecretComplexity).
 			Warning("Secret does not match complexity requirements.")
 		complexityFailed = false
 	}
 
-	if !regex.MatchString(c.NodeSecret) {
+	if match, _ := regex.MatchString(c.NodeSecret); !match {
 		log.WithField("config.node_secret", c.NodeSecret).WithField("config.secret_complexity", c.SecretComplexity).
 			Warning("Node Secret does not match complexity requirements.")
 		complexityFailed = false

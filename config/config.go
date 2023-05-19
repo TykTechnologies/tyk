@@ -26,7 +26,7 @@ var (
 	Default = Config{
 		ListenPort:       8080,
 		Secret:           "352d20ee67be67f6340b4c0605b044b7",
-		SecretComplexity: `^(?=.*\d)(?=.*[^a-zA-Z0-9]).{10,}$`,
+		SecretComplexity: `(?=.*\d)(?=.*[^a-zA-Z0-9]).{10,}$`,
 		TemplatePath:     "templates",
 		MiddlewarePath:   "middleware",
 		AppPath:          "apps/",
