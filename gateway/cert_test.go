@@ -292,60 +292,6 @@ func TestAPIMutualTLS(t *testing.T) {
 	})
 }
 
-func TestMutualTLSApisControlPortNotMTLS(t *testing.T) {
-	t.Skip()
-	// crear una api q es mtls, consumir control: 403
-	// crear una api q es mtls, setear control port, consumir control: 200
-	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
-	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
-	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
-
-	conf := func(globalConf *config.Config) {
-		globalConf.EnableCustomDomains = true
-		globalConf.HttpServerOptions.UseSSL = true
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-
-		globalConf.ControlAPIHostname = "api.hostname"
-	}
-	ts := StartTest(conf)
-	defer ts.Close()
-
-	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ts.Gw.CertificateManager.Delete(certID, "")
-	ts.ReloadGatewayProxy()
-
-	clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
-	defer ts.Gw.CertificateManager.Delete(clientCertID, "")
-
-	loadAPIS := func(certs ...string) {
-		ts.Gw.BuildAndLoadAPI(
-			func(spec *APISpec) {
-				spec.Proxy.ListenPath = "/with_mutual"
-				spec.UseMutualTLSAuth = true
-				spec.ClientCertificates = certs
-			},
-		)
-	}
-
-	t.Run("scenario 1", func(t *testing.T) {
-		loadAPIS(clientCertID)
-
-		client := GetTLSClient(&clientCert, serverCertPem)
-
-		_, _ = ts.Run(t, test.TestCase{
-			Path:   "/with_mutual",
-			Domain: "",
-			Client: client,
-			Code:   200,
-		})
-
-		// hit control and should be 403
-	})
-}
-
 func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 	t.Helper()
 
