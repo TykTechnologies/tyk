@@ -767,6 +767,12 @@
     "node_secret": {
       "type": "string"
     },
+    "secret_complexity": {
+      "type": "string"
+    },
+    "enforce_secret_complexity": {
+      "type": "boolean"
+    },
     "oauth_redirect_uri_separator": {
       "type": "string"
     },
