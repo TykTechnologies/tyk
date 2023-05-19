@@ -1012,6 +1012,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 }
 
 func (gw *Gateway) allApisAreMTLS() bool {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
 	for _, api := range gw.apisByID {
 		if !api.UseMutualTLSAuth && api.Active {
 			return false
