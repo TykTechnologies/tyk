@@ -24,11 +24,12 @@ var (
 	log = logger.Get()
 
 	Default = Config{
-		ListenPort:     8080,
-		Secret:         "352d20ee67be67f6340b4c0605b044b7",
-		TemplatePath:   "templates",
-		MiddlewarePath: "middleware",
-		AppPath:        "apps/",
+		ListenPort:       8080,
+		Secret:           "352d20ee67be67f6340b4c0605b044b7",
+		SecretComplexity: `^(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$`,
+		TemplatePath:     "templates",
+		MiddlewarePath:   "middleware",
+		AppPath:          "apps/",
 		Storage: StorageOptionsConf{
 			Type:    "redis",
 			Host:    "localhost",
@@ -598,6 +599,12 @@ type Config struct {
 
 	// The shared secret between the Gateway and the Dashboard to ensure that API Definition downloads, heartbeat and Policy loads are from a valid source.
 	NodeSecret string `json:"node_secret"`
+
+	// Complexity rules for the `secret` and `node_secret` values. Shouls be regexp.
+	SecretComplexity string `json:"secret_complexity"`
+
+	// Fail start application if secret complexity rules are not met
+	EnforceSecretComplexity bool `json:"enforce_secret_complexity"`
 
 	// Linux PID file location. Do not change unless you know what you are doing. Default: /var/run/tyk/tyk-gateway.pid
 	PIDFileLocation string `json:"pid_file_location"`

@@ -1,6 +1,7 @@
 package checkup
 
 import (
+	"regexp"
 	"runtime"
 	"syscall"
 
@@ -33,6 +34,7 @@ func Run(c *config.Config) {
 	fileDescriptors()
 	cpus()
 	defaultSecrets(c)
+	secretComplexity(c)
 	defaultAnalytics(c)
 }
 
@@ -80,6 +82,28 @@ func cpus() {
 			"\tPlease refer to the following link for further guidance:\n"+
 			"\t\thttps://tyk.io/docs/deploy-tyk-premise-production/#use-the-right-hardware",
 			cpus, minCPU)
+	}
+}
+
+func secretComplexity(c *config.Config) {
+	regex := regexp.MustCompile(c.SecretComplexity)
+
+	complexityFailed := true
+
+	if !regex.MatchString(c.Secret) {
+		log.WithField("config.secret", c.Secret).WithField("config.secret_complexity", c.SecretComplexity).
+			Warning("Secret does not match complexity requirements.")
+		complexityFailed = false
+	}
+
+	if !regex.MatchString(c.NodeSecret) {
+		log.WithField("config.node_secret", c.NodeSecret).WithField("config.secret_complexity", c.SecretComplexity).
+			Warning("Node Secret does not match complexity requirements.")
+		complexityFailed = false
+	}
+
+	if c.EnforceSecretComplexity && complexityFailed {
+		log.Fatal("Secret complexity enforcement failed. Exiting.")
 	}
 }
 
