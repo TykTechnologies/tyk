@@ -1454,6 +1454,7 @@ func TestUpstreamCertificates_WithProtocolTCP(t *testing.T) {
 	go listenProxyProto(ls)
 
 	certID, err := ts.Gw.CertificateManager.Add(combinedUpstreamCertPEM, "")
+	defer ts.Gw.CertificateManager.Delete(certID, "")
 
 	ts.EnablePort(6001, "tcp")
 	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -1492,5 +1493,75 @@ func TestUpstreamCertificates_WithProtocolTCP(t *testing.T) {
 		n, err := client.Read(received)
 		assert.Error(t, err)
 		assert.Equal(t, 0, n)
+	})
+}
+
+func TestClientCertificates_WithProtocolTLS(t *testing.T) {
+	const (
+		upstreamAddr    = "127.0.0.1:8005"
+		proxyListenPort = 6005
+	)
+
+	// upstream
+	upstream, err := net.Listen("tcp", upstreamAddr)
+	assert.NoError(t, err)
+	defer upstream.Close()
+
+	go listenProxyProto(upstream)
+
+	// tyk
+	_, _, tykServerCombinedPEM, _ := certs.GenServerCertificate()
+	serverCertID, _, _ := certs.GetCertIDAndChainPEM(tykServerCombinedPEM, "")
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.UseSSL = false
+		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
+	})
+	defer ts.Close()
+
+	_, _ = ts.Gw.CertificateManager.Add(tykServerCombinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
+
+	cert, key, combinedClientCertPEM, _ := certs.GenServerCertificate()
+	clientCertificate, err := tls.X509KeyPair(cert, key)
+	assert.NoError(t, err)
+
+	clientCertificateID, err := ts.Gw.CertificateManager.Add(combinedClientCertPEM, "")
+	defer ts.Gw.CertificateManager.Delete(clientCertificateID, "")
+
+	ts.EnablePort(proxyListenPort, "tls")
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Protocol = "tls"
+		spec.ListenPort = proxyListenPort
+		spec.Proxy.TargetURL = "tcp://" + upstreamAddr
+		spec.UseMutualTLSAuth = true
+		spec.UseMutualTLSAuth = true
+		spec.ClientCertificates = []string{clientCertificateID}
+	}, func(spec *APISpec) {
+		spec.Name = "another-api-on-control-port" // required to cover the case where there is another API in a different port.
+	})
+
+	apiAddr := fmt.Sprintf(":%d", proxyListenPort)
+	mTLSConfig := &tls.Config{InsecureSkipVerify: true}
+
+	// client
+	t.Run("bad certificate", func(t *testing.T) {
+		_, err := tls.Dial("tcp", apiAddr, mTLSConfig)
+		assert.ErrorContains(t, err, badcertErr)
+	})
+
+	t.Run("correct certificate", func(t *testing.T) {
+		mTLSConfig.Certificates = append(mTLSConfig.Certificates, clientCertificate)
+
+		client, err := tls.Dial("tcp", apiAddr, mTLSConfig)
+		assert.NoError(t, err)
+		defer client.Close()
+
+		_, _ = client.Write([]byte("ping"))
+		received := make([]byte, 4)
+		_, err = client.Read(received)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("pong"), received)
 	})
 }
