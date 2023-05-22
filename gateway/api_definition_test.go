@@ -14,6 +14,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -998,4 +1000,15 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 		assert.Equal(t, "/get", r.URL.Path)
 		assert.Equal(t, "", r.URL.RawPath)
 	})
+}
+
+func TestAPISpec_isListeningOnPort(t *testing.T) {
+	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
+	cfg := &config.Config{}
+
+	cfg.ListenPort = 7000
+	assert.True(t, s.isListeningOnPort(7000, cfg))
+
+	s.ListenPort = 8000
+	assert.True(t, s.isListeningOnPort(8000, cfg))
 }
