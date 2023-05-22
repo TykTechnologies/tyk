@@ -1440,6 +1440,137 @@ func TestCipherSuites(t *testing.T) {
 	})
 }
 
+func TestUpstreamCertificates_WithProtocolTCP(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	cert, key, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+	certificate, _ := tls.X509KeyPair(cert, key)
+
+	upstreamCert, _, combinedUpstreamCertPEM, _ := certs.GenServerCertificate()
+
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(upstreamCert)
+
+	serverTLSConfig := &tls.Config{Certificates: []tls.Certificate{certificate}, ClientCAs: certPool, ClientAuth: tls.RequireAndVerifyClientCert}
+	ls, err := tls.Listen("tcp", "127.0.0.1:8003", serverTLSConfig)
+	assert.NoError(t, err)
+	defer ls.Close()
+
+	go listenProxyProto(ls)
+
+	certID, err := ts.Gw.CertificateManager.Add(combinedUpstreamCertPEM, "")
+	defer ts.Gw.CertificateManager.Delete(certID, "")
+
+	ts.EnablePort(6001, "tcp")
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Protocol = "tcp"
+		spec.ListenPort = 6001
+		spec.Proxy.TargetURL = "tls://127.0.0.1:8003"
+		spec.Proxy.Transport.SSLInsecureSkipVerify = true
+		spec.UpstreamCertificates = map[string]string{
+			"*": certID,
+		}
+	})[0]
+
+	t.Run("enabled", func(t *testing.T) {
+		client, err := net.Dial("tcp", "127.0.0.1:6001")
+		assert.NoError(t, err)
+		defer client.Close()
+
+		_, _ = client.Write([]byte("ping"))
+		received := make([]byte, 4)
+		_, err = client.Read(received)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("pong"), received)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		api.UpstreamCertificates = nil
+		ts.Gw.LoadAPI(api)
+
+		client, err := net.Dial("tcp", "127.0.0.1:6001")
+		assert.NoError(t, err)
+		defer client.Close()
+
+		_, _ = client.Write([]byte("ping"))
+		received := make([]byte, 4)
+		n, err := client.Read(received)
+		assert.Error(t, err)
+		assert.Equal(t, 0, n)
+	})
+}
+func TestClientCertificates_WithProtocolTLS(t *testing.T) {
+	const (
+		upstreamAddr    = "127.0.0.1:8005"
+		proxyListenPort = 6005
+	)
+
+	// upstream
+	upstream, err := net.Listen("tcp", upstreamAddr)
+	assert.NoError(t, err)
+	defer upstream.Close()
+
+	go listenProxyProto(upstream)
+
+	// tyk
+	_, _, tykServerCombinedPEM, _ := certs.GenServerCertificate()
+	serverCertID, _, _ := certs.GetCertIDAndChainPEM(tykServerCombinedPEM, "")
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.UseSSL = false
+		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
+	})
+	defer ts.Close()
+
+	_, _ = ts.Gw.CertificateManager.Add(tykServerCombinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
+
+	cert, key, combinedClientCertPEM, _ := certs.GenServerCertificate()
+	clientCertificate, err := tls.X509KeyPair(cert, key)
+	assert.NoError(t, err)
+
+	clientCertificateID, err := ts.Gw.CertificateManager.Add(combinedClientCertPEM, "")
+	defer ts.Gw.CertificateManager.Delete(clientCertificateID, "")
+
+	ts.EnablePort(proxyListenPort, "tls")
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Protocol = "tls"
+		spec.ListenPort = proxyListenPort
+		spec.Proxy.TargetURL = "tcp://" + upstreamAddr
+		spec.UseMutualTLSAuth = true
+		spec.UseMutualTLSAuth = true
+		spec.ClientCertificates = []string{clientCertificateID}
+	}, func(spec *APISpec) {
+		spec.Name = "another-api-on-control-port" // required to cover the case where there is another API in a different port.
+	})
+
+	apiAddr := fmt.Sprintf(":%d", proxyListenPort)
+	mTLSConfig := &tls.Config{InsecureSkipVerify: true}
+
+	// client
+	t.Run("bad certificate", func(t *testing.T) {
+		_, err := tls.Dial("tcp", apiAddr, mTLSConfig)
+		assert.ErrorContains(t, err, badcertErr)
+	})
+
+	t.Run("correct certificate", func(t *testing.T) {
+		mTLSConfig.Certificates = append(mTLSConfig.Certificates, clientCertificate)
+
+		client, err := tls.Dial("tcp", apiAddr, mTLSConfig)
+		assert.NoError(t, err)
+		defer client.Close()
+
+		_, _ = client.Write([]byte("ping"))
+		received := make([]byte, 4)
+		_, err = client.Read(received)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("pong"), received)
+	})
+}
+
 func TestStaticMTLSAPI(t *testing.T) {
 	setup := func() (*Test, string, tls.Certificate) {
 		// generate certificate for gw.
