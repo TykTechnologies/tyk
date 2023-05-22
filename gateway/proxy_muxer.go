@@ -60,6 +60,10 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			httputil.LengthRequired(w, r)
 			return
 		}
+
+		// No length available reasonably at this point. The only thing
+		// we can do from here on is to limit the number of bytes read
+		// from a HTTP request body in the maxRequestBodySize check below.
 	}
 
 	// Limit request body size
