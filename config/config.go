@@ -417,16 +417,8 @@ type HttpServerOptionsConfig struct {
 	// large. If the content-length header is not present, it will limit the
 	// amount of the request we're reading in, up to the specified size.
 	//
-	// Apart from the content-length check, this ensures that a gateway
-	// will not send more than the configured length per request to the
-	// back end services. It's more aimed at streaming traffic, where
-	// a long running connection could be receiving malicious traffic,
-	// which would/could bypass the Content-Length check.
-	//
-	// Apart from back-end services, this also protects the gateway from
-	// similar issues - in various places, the gateway copies the request
-	// into memory. Large requests could increase traffic and memory
-	// pressure, and this option may be used to set a stricter limit.
+	// The gateway will copy the request body into memory after this
+	// check and limit are enforced.
 	//
 	// See more information about setting request size limits here:
 	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
@@ -442,6 +434,9 @@ type HttpServerOptionsConfig struct {
 	// detected, the request body wouldn't be validated as we'd have to
 	// read in the full request. In order to limit those kind of requests,
 	// a separate `max_request_body_size` option can be configured.
+	//
+	// The gateway will copy the request body into memory after this
+	// check and limit are enforced.
 	//
 	// See more information about setting request size limits here:
 	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
