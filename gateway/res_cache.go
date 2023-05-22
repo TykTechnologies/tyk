@@ -78,18 +78,6 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 	cacheThisRequest := true
 	cacheTTL := m.spec.CacheOptions.CacheTimeout
 
-	// make sure the status codes match if specified
-	if len(options.cacheOnlyResponseCodes) > 0 {
-		foundCode := false
-		for _, code := range options.cacheOnlyResponseCodes {
-			if code == res.StatusCode {
-				foundCode = true
-				break
-			}
-		}
-		cacheThisRequest = foundCode
-	}
-
 	// Are we using upstream cache control?
 	if m.spec.CacheOptions.EnableUpstreamCacheControl {
 		// Do we enable cache for this response?
@@ -110,6 +98,18 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 				cacheTTL = int64(cacheAsInt)
 			}
 		}
+	}
+
+	// make sure the status codes match if specified
+	if len(options.cacheOnlyResponseCodes) > 0 {
+		foundCode := false
+		for _, code := range options.cacheOnlyResponseCodes {
+			if code == res.StatusCode {
+				foundCode = true
+				break
+			}
+		}
+		cacheThisRequest = foundCode
 	}
 
 	var toStore string
