@@ -303,6 +303,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 		globalConf.HttpServerOptions.SkipClientCAAnnouncement = skipCAAnnounce
+		globalConf.ControlAPIPort = 1212
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -317,7 +318,6 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 	// Initialize client certificates
 	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientCertPem2, _, _, clientCert2 := certs.GenCertificate(&x509.Certificate{}, false)
-
 	t.Run("acceptable CAs from server", func(t *testing.T) {
 		tlsConfig := GetTLSConfig(&clientCert, serverCertPem)
 		tlsConfig.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
