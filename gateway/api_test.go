@@ -846,7 +846,6 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 }
 
 func TestHashKeyHandler(t *testing.T) {
-	test.Racy(t) // TODO: TT-5233
 	conf := func(globalConf *config.Config) {
 		// make it to use hashes for Redis keys
 		globalConf.HashKeys = true
@@ -1073,8 +1072,20 @@ func (ts *Test) testHashFuncAndBAHelper(t *testing.T) {
 			Code:      200,
 		},
 		{
-			Method:    "GET",
-			Path:      "/tyk/keys/defaultuser?username=true&org_id=default",
+			Method: "GET",
+			Path:   "/tyk/keys/defaultuser?username=true&org_id=default",
+			BodyMatchFunc: func(resp []byte) bool {
+				keyResp := user.SessionState{}
+				err := json.Unmarshal(resp, &keyResp)
+				if err != nil {
+					t.Log("error unmarshalling key state response")
+					return false
+				}
+				if keyResp.BasicAuthData.Password != "" {
+					return false
+				}
+				return true
+			},
 			AdminAuth: true,
 			Code:      200,
 		},
