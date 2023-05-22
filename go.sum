@@ -82,6 +82,8 @@ github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksr
 github.com/TykTechnologies/openid2go v0.1.2/go.mod h1:gYfkqeWa+lY3Xz/Z2xYtIzmYXynlgKZaBIbPCqdcdMA=
 github.com/TykTechnologies/storage v1.0.4 h1:Pb12Nyh1vQjkadOI4wpU/gQzE5LRNKkj1IZ80xVQjt8=
 github.com/TykTechnologies/storage v1.0.4/go.mod h1:+0S3KuNlLGBTMTSFREuZFm315zzXjuuCO4QSAPy+d3M=
+github.com/TykTechnologies/storage v1.0.5 h1:lfMljPueySAW7Mpc70g1/qC5n2LKNcKgQs+Xw30apP8=
+github.com/TykTechnologies/storage v1.0.5/go.mod h1:+0S3KuNlLGBTMTSFREuZFm315zzXjuuCO4QSAPy+d3M=
 github.com/TykTechnologies/tyk-pump v1.8.0-rc4 h1:odhM/skFNYWBdSL+atx49f6/PleNRq6l4E9SyeDfmTg=
 github.com/TykTechnologies/tyk-pump v1.8.0-rc4/go.mod h1:dTxcW0leM1oHhMJOxM784iTuWe+D2SnffAEhmHPZOug=
 github.com/agnivade/levenshtein v1.0.1/go.mod h1:CURSv5d9Uaml+FovSIICkLbAUZ9S4RqaHDIsdSBg7lM=
