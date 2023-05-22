@@ -20,6 +20,8 @@ import (
 	"github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/stretchr/testify/assert"
 
 	redis "github.com/go-redis/redis/v8"
@@ -1535,4 +1537,15 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 		assert.NoError(t, err, "error loading APIs from RPC:", err)
 		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC backup")
 	})
+}
+
+func TestAPISpec_isListeningOnPort(t *testing.T) {
+	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
+	cfg := &config.Config{}
+
+	cfg.ListenPort = 7000
+	assert.True(t, s.isListeningOnPort(7000, cfg))
+
+	s.ListenPort = 8000
+	assert.True(t, s.isListeningOnPort(8000, cfg))
 }

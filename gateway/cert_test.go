@@ -1501,6 +1501,7 @@ func TestUpstreamCertificates_WithProtocolTCP(t *testing.T) {
 		assert.Equal(t, 0, n)
 	})
 }
+
 func TestClientCertificates_WithProtocolTLS(t *testing.T) {
 	const (
 		upstreamAddr    = "127.0.0.1:8005"
