@@ -1801,3 +1801,12 @@ func (s *APISpec) hasVirtualEndpoint() bool {
 
 	return false
 }
+
+// isListeningOnPort checks whether the API listens on the given port.
+func (s *APISpec) isListeningOnPort(port int, gwConfig *config.Config) bool {
+	if s.ListenPort == 0 {
+		return gwConfig.ListenPort == port
+	}
+
+	return s.ListenPort == port
+}
