@@ -766,10 +766,6 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 }
 
 func TestHashKeyHandler(t *testing.T) {
-<<<<<<< HEAD
-
-=======
->>>>>>> 650e3031... [TT-8590]do not return password hash with basic auth data key fetch. (#5034)
 	conf := func(globalConf *config.Config) {
 		// make it to use hashes for Redis keys
 		globalConf.HashKeys = true
