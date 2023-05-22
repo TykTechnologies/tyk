@@ -1065,32 +1065,26 @@ func (ts *Test) testHashFuncAndBAHelper(t *testing.T) {
 
 	_, _ = ts.Run(t, []test.TestCase{
 		{
-			Method:    "POST",
+			Method:    http.MethodPost,
 			Path:      "/tyk/keys/defaultuser",
 			Data:      session,
 			AdminAuth: true,
 			Code:      200,
 		},
 		{
-			Method: "GET",
+			Method: http.MethodGet,
 			Path:   "/tyk/keys/defaultuser?username=true&org_id=default",
 			BodyMatchFunc: func(resp []byte) bool {
 				keyResp := user.SessionState{}
 				err := json.Unmarshal(resp, &keyResp)
-				if err != nil {
-					t.Log("error unmarshalling key state response")
-					return false
-				}
-				if keyResp.BasicAuthData.Password != "" {
-					return false
-				}
-				return true
+				assert.NoError(t, err)
+				return keyResp.BasicAuthData.Password == ""
 			},
 			AdminAuth: true,
 			Code:      200,
 		},
 		{
-			Method:    "DELETE",
+			Method:    http.MethodDelete,
 			Path:      "/tyk/keys/defaultuser?username=true&org_id=default",
 			AdminAuth: true,
 			Code:      200,
