@@ -370,7 +370,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		// not ControlAPIHostname has been configured or the hostName is the same in the hello handshake
 		isControlHostName := gwConfig.ControlAPIHostname == "" || (gwConfig.ControlAPIHostname == hello.ServerName)
 		// target port is the same where control api lives
-		isControlPort := gwConfig.ControlAPIPort == 0 || (gwConfig.ControlAPIPort == listenPort && listenPort != 0)
+		isControlPort := (gwConfig.ControlAPIPort == 0 && listenPort == gwConfig.ListenPort) || (gwConfig.ControlAPIPort == listenPort && listenPort != 0)
 		isControlAPI := isControlHostName && isControlPort
 
 		if isControlAPI && gwConfig.Security.ControlAPIUseMutualTLS {
@@ -496,6 +496,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		}
 
 		if newConfig.ClientAuth == tls.RequireAndVerifyClientCert && isControlAPI && !gwConfig.Security.ControlAPIUseMutualTLS {
+
 			newConfig.ClientAuth = tls.RequestClientCert
 		}
 
