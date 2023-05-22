@@ -678,6 +678,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 		if storage.TokenOrg(sessionKey) != "" {
 			session.KeyID = sessionKey
 		}
+		session.BasicAuthData.Password = ""
 	}
 
 	log.WithFields(logrus.Fields{
