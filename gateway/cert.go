@@ -367,7 +367,11 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			newConfig.NameToCertificate[name] = cert
 		}
 
-		isControlAPI := (listenPort != 0 && gwConfig.ControlAPIPort == listenPort) || (gwConfig.ControlAPIHostname == hello.ServerName)
+		// not ControlAPIHostname has been configured or the hostName is the same in the hello handshake
+		isControlHostName := gwConfig.ControlAPIHostname == "" || (gwConfig.ControlAPIHostname == hello.ServerName)
+		// target port is the same where control api lives
+		isControlPort := (gwConfig.ControlAPIPort == 0 && listenPort == gwConfig.ListenPort) || (gwConfig.ControlAPIPort == listenPort && listenPort != 0)
+		isControlAPI := isControlHostName && isControlPort
 
 		if isControlAPI && gwConfig.Security.ControlAPIUseMutualTLS {
 			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
@@ -488,6 +492,11 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 				newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
 			}
 			newConfig.ClientCAs = x509.NewCertPool()
+			newConfig.ClientAuth = tls.RequestClientCert
+		}
+
+		if newConfig.ClientAuth == tls.RequireAndVerifyClientCert && isControlAPI && !gwConfig.Security.ControlAPIUseMutualTLS {
+
 			newConfig.ClientAuth = tls.RequestClientCert
 		}
 
