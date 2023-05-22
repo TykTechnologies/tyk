@@ -1003,4 +1003,22 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	mainLog.Info("Initialised API Definitions")
 
+	gwListenPort := gw.GetConfig().ListenPort
+	controlApiIsConfigured := (gw.GetConfig().ControlAPIPort != 0 && gw.GetConfig().ControlAPIPort != gwListenPort) || gw.GetConfig().ControlAPIHostname != ""
+	if gw.allApisAreMTLS() && !gw.GetConfig().Security.ControlAPIUseMutualTLS && !controlApiIsConfigured {
+		mainLog.Warning("All APIs are protected with mTLS, except for the control API. " +
+			"We recommend configuring the control API port or control hostname to ensure consistent security measures")
+	}
+}
+
+func (gw *Gateway) allApisAreMTLS() bool {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+	for _, api := range gw.apisByID {
+		if !api.UseMutualTLSAuth && api.Active {
+			return false
+		}
+	}
+
+	return true
 }
