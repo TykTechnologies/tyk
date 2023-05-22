@@ -20,6 +20,7 @@ import (
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/tcp"
 
 	"github.com/gorilla/mux"
@@ -30,6 +31,7 @@ import (
 // handleWrapper's only purpose is to allow router to be dynamically replaced
 type handleWrapper struct {
 	router             *mux.Router
+	maxContentLength   int64
 	maxRequestBodySize int64
 }
 
@@ -44,11 +46,27 @@ func (h *h2cWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// limit request body size if configured
+	// Validate Content-Length, limit request size by header value
+	if h.maxContentLength > 0 {
+		// if Content-Length is larger than the configured limit return a status 413
+		if r.ContentLength > h.maxContentLength {
+			httputil.EntityTooLarge(w, r)
+			return
+		}
+
+		// Transfer-Encoding: chunked does not provide Content-Length
+		if !httputil.IsTransferEncodingChunked(r) {
+			// Request should include Content-Length header (HTTP 411)
+			httputil.LengthRequired(w, r)
+			return
+		}
+	}
+
+	// Limit request body size
 	if h.maxRequestBodySize > 0 {
-		// if content length is set and already larger than the configured limit return a status 413
-		if r.ContentLength >= 0 && r.ContentLength > h.maxRequestBodySize {
-			http.HandlerFunc(requestEntityTooLarge).ServeHTTP(w, r)
+		// if Content-Length is larger than the configured limit return a status 413
+		if r.ContentLength > h.maxRequestBodySize {
+			httputil.EntityTooLarge(w, r)
 			return
 		}
 
@@ -381,7 +399,6 @@ func (m *proxyMux) swap(new *proxyMux, gw *Gateway) {
 }
 
 func (m *proxyMux) serve(gw *Gateway) {
-
 	conf := gw.GetConfig()
 	for _, p := range m.proxies {
 		if p.listener == nil {
@@ -419,6 +436,7 @@ func (m *proxyMux) serve(gw *Gateway) {
 			h = &handleWrapper{
 				router:             p.router,
 				maxRequestBodySize: conf.HttpServerOptions.MaxRequestBodySize,
+				maxContentLength:   conf.HttpServerOptions.MaxContentLength,
 			}
 			// by default enabling h2c by wrapping handler in h2c. This ensures all features including tracing work
 			// in h2c services.
@@ -508,9 +526,4 @@ func (m *proxyMux) generateListener(listenPort int, protocol string, gw *Gateway
 		return nil, err
 	}
 	return l, nil
-}
-
-func requestEntityTooLarge(w http.ResponseWriter, _ *http.Request) {
-	status := http.StatusRequestEntityTooLarge
-	http.Error(w, http.StatusText(status), status)
 }
