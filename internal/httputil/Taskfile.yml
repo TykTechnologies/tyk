@@ -7,4 +7,4 @@ tasks:
     cmds:
       - go fmt ./...
       - goimports -w .
-      - go test -race -count=100 -v .
+      - go test -race -count=100 -cover .
