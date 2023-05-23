@@ -18,6 +18,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/buger/jsonparser"
 	"io"
 	"io/ioutil"
 	"net"
@@ -1040,6 +1041,22 @@ func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoun
 	return nil, true, nil
 }
 
+func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWriter *graphql.EngineResultWriter) error {
+	responseBody, err := io.ReadAll(proxyOnlyCtx.originalResponseBody)
+	if err != nil {
+		return err
+	}
+	// graphql-go-tools error message format: {"errors": [...]}
+	// Insert the upstream error into the first error message.
+	result, err := jsonparser.Set(resultWriter.Bytes(), responseBody, "errors", "[0]", "extensions")
+	if err != nil {
+		return err
+	}
+	resultWriter.Reset()
+	_, err = resultWriter.Write(result)
+	return err
+}
+
 func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
 
@@ -1115,6 +1132,12 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			if proxyOnlyCtx.upstreamResponse != nil {
 				header = proxyOnlyCtx.upstreamResponse.Header
 				httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
+				if p.TykAPISpec.GraphQL.Proxy.ReturnErrorsFromUpstream && httpStatus >= http.StatusBadRequest {
+					err = returnErrorsFromUpstream(proxyOnlyCtx, &resultWriter)
+					if err != nil {
+						return
+					}
+				}
 			}
 		}
 

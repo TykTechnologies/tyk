@@ -143,6 +143,9 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 		transportResponseBodyBytes, err := ioutil.ReadAll(transportResponse.Body)
 		require.NoError(t, err)
 		assert.Equal(t, response.body, string(transportResponseBodyBytes))
+
+		// Don't keep original response body of the upstream, it's only intended for errors.
+		assert.Nil(t, ctx.originalResponseBody)
 	})
 
 	t.Run("should ignore forwarded request if context is not proxyOnlyContext", func(t *testing.T) {
@@ -237,5 +240,41 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 		transportResponseBodyBytes, err := ioutil.ReadAll(transportResponse.Body)
 		require.NoError(t, err)
 		assert.Equal(t, response.body, string(transportResponseBodyBytes))
+	})
+
+	t.Run("in proxy-only mode, keep upstream response if the upstream returns an error", func(t *testing.T) {
+		const body = `{"error":"something went wrong"}`
+		expectations := serverExpectations{
+			method: http.MethodPut,
+			body:   body,
+		}
+
+		response := serverResponse{
+			statusCode: http.StatusInternalServerError,
+			body:       body,
+		}
+
+		testServer := newTestServer(t, expectations, response)
+		defer testServer.Close()
+
+		forwardedRequest, err := http.NewRequest(http.MethodPut, "http://tyk-gateway:8080", bytes.NewBufferString(`{"ignoredByTransport":true}`))
+		require.NoError(t, err)
+
+		ctx := NewGraphQLProxyOnlyContext(context.Background(), forwardedRequest)
+
+		httpClient := http.Client{
+			Transport: NewGraphQLEngineTransport(GraphQLEngineTransportTypeProxyOnly, http.DefaultTransport),
+		}
+
+		upstreamRequest, err := http.NewRequestWithContext(ctx, http.MethodPut, testServer.URL, bytes.NewBufferString(body))
+		require.NoError(t, err)
+
+		transportResponse, err := httpClient.Do(upstreamRequest)
+		require.NoError(t, err)
+		assert.Equal(t, response.statusCode, transportResponse.StatusCode)
+
+		assert.NotNil(t, ctx.originalResponseBody)
+		data, err := ioutil.ReadAll(ctx.originalResponseBody)
+		assert.Equal(t, body, string(data))
 	})
 }
