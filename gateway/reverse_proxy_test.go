@@ -1506,8 +1506,8 @@ func BenchmarkCopyRequestResponse(b *testing.B) {
 		req.Body = ioutil.NopCloser(strings.NewReader(str))
 		res.Body = ioutil.NopCloser(strings.NewReader(str))
 		for j := 0; j < 10; j++ {
-			req = copyRequest(req)
-			res = copyResponse(res)
+			req, _ = copyRequest(req)
+			res, _ = copyResponse(res)
 		}
 	}
 }

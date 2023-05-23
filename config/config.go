@@ -412,13 +412,35 @@ type HttpServerOptionsConfig struct {
 
 	// MaxRequestBodySize configures the maximum request body size in bytes.
 	//
-	// Tyk API Gateway copies the whole request into memory at the beginning
-	// of the request handling. Large requests could fill up memory if they
-	// are not blocked.
+	// Similarly to `max_content_length`, this option will use the header
+	// value of Content-Length to respond with HTTP 413 Request entity too
+	// large. If the content-length header is not present, it will limit the
+	// amount of the request we're reading in, up to the specified size.
+	//
+	// The gateway will copy the request body into memory after this
+	// check and limit are enforced.
 	//
 	// See more information about setting request size limits here:
 	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
+
+	// MaxContentLength configures maximum request body size validation.
+	//
+	// The option validates the Content-Length header of the request to
+	// limit the request size. It will respond with either "413 Request
+	// entity too large" or "411 Length required".
+	//
+	// With chunked encoding, the Content-Length header is unset. If it's
+	// detected, the request body wouldn't be validated as we'd have to
+	// read in the full request. In order to limit those kind of requests,
+	// a separate `max_request_body_size` option can be configured.
+	//
+	// The gateway will copy the request body into memory after this
+	// check and limit are enforced.
+	//
+	// See more information about setting request size limits here:
+	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
+	MaxContentLength int64 `json:"max_content_length"`
 }
 
 type AuthOverrideConf struct {
