@@ -1,0 +1,10 @@
+---
+version: "3"
+
+tasks:
+  default:
+    desc: "Run tests"
+    cmds:
+      - go fmt ./...
+      - goimports -w .
+      - go test -race -count=100 -v .
