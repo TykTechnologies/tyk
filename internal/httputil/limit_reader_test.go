@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	. "github.com/TykTechnologies/tyk/internal/httputil"
 )
 
@@ -29,7 +28,7 @@ func TestLimitReader(t *testing.T) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			if errors.Is(err, http.ErrBodyNotAllowed) {
-				httputil.EntityTooLarge(w, r)
+				EntityTooLarge(w, r)
 				return
 			}
 			t.Errorf("Failed to read request body: %v", err)
