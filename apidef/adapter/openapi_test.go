@@ -302,7 +302,8 @@ const expectedOpenAPIGraphQLConfig = `{
     },
     "proxy": {
         "auth_headers": {},
-        "request_headers": null
+        "request_headers": null,
+        "return_errors_from_upstream": false
     },
     "subgraph": {
         "sdl": ""
