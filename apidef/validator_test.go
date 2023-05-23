@@ -217,3 +217,117 @@ func TestRuleAtLeastEnableOneAuthConfig_Validate(t *testing.T) {
 		},
 	))
 }
+
+func TestRuleValidateIPList_Validate(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleValidateIPList{},
+	}
+
+	t.Run("valid IP and CIDR", runValidationTest(
+		&APIDefinition{
+			EnableIpWhiteListing: true,
+			AllowedIPs: []string{
+				"192.168.0.10",
+				"192.168.2.1/24",
+			},
+			EnableIpBlacklisting: true,
+			BlacklistedIPs: []string{
+				"192.168.0.20",
+				"192.168.3.1/24",
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: true,
+			Errors:  nil,
+		},
+	))
+
+	t.Run("invalid CIDR", runValidationTest(
+		&APIDefinition{
+			EnableIpWhiteListing: true,
+			AllowedIPs: []string{
+				"192.168.2.1/bob",
+			},
+			EnableIpBlacklisting: true,
+			BlacklistedIPs: []string{
+				"192.168.3.1/blah",
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: false,
+			Errors: []error{
+				fmt.Errorf(ErrInvalidIPCIDR, "192.168.2.1/bob"),
+				fmt.Errorf(ErrInvalidIPCIDR, "192.168.3.1/blah"),
+			},
+		},
+	))
+
+	t.Run("invalid IP and CIDR", runValidationTest(
+		&APIDefinition{
+			EnableIpWhiteListing: true,
+			AllowedIPs: []string{
+				"bob",
+				"192.168.2.1/24",
+			},
+			EnableIpBlacklisting: true,
+			BlacklistedIPs: []string{
+				"blah",
+				"192.168.3.1/24",
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: false,
+			Errors: []error{
+				fmt.Errorf(ErrInvalidIPCIDR, "bob"),
+				fmt.Errorf(ErrInvalidIPCIDR, "blah"),
+			},
+		},
+	))
+
+	t.Run("do not validate allowed IPs when whitelisting not enabled", runValidationTest(
+		&APIDefinition{
+			EnableIpWhiteListing: false,
+			AllowedIPs: []string{
+				"bob",
+				"192.168.2.1/24",
+			},
+			EnableIpBlacklisting: true,
+			BlacklistedIPs: []string{
+				"blah",
+				"192.168.3.1/24",
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: false,
+			Errors: []error{
+				fmt.Errorf(ErrInvalidIPCIDR, "blah"),
+			},
+		},
+	))
+
+	t.Run("do not validate blacklist when not enabled", runValidationTest(
+		&APIDefinition{
+			EnableIpWhiteListing: true,
+			AllowedIPs: []string{
+				"bob",
+				"192.168.2.1/24",
+			},
+			EnableIpBlacklisting: false,
+			BlacklistedIPs: []string{
+				"blah",
+				"192.168.3.1/24",
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: false,
+			Errors: []error{
+				fmt.Errorf(ErrInvalidIPCIDR, "bob"),
+			},
+		},
+	))
+}
