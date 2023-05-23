@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// ErrContentTooLong is an internal error to handle limit overflows.
 var ErrContentTooLong = errors.New("content size over the declared limit")
 
 // LimitReader replaces the request body with a reader designed to
@@ -24,6 +25,7 @@ type limitedRequestBody struct {
 	err   error
 }
 
+// Read implements io.Reader.
 func (l *limitedRequestBody) Read(p []byte) (n int, err error) {
 	n, err = l.body.Read(p)
 	if l.err != nil {
@@ -41,6 +43,7 @@ func (l *limitedRequestBody) Read(p []byte) (n int, err error) {
 	return n, err
 }
 
+// Close implements io.Closer.
 func (l *limitedRequestBody) Close() error {
 	l.err = nil
 	return nil
