@@ -1839,19 +1839,19 @@ func (n *nopCloserBuffer) Close() error {
 	return nil
 }
 
-func copyBody(body io.ReadCloser, isClientResponseBody bool) io.ReadCloser {
+func copyBody(body io.ReadCloser, isClientResponseBody bool) (io.ReadCloser, error) {
 	// check if body was already read and converted into our nopCloser
 	if nc, ok := body.(*nopCloserBuffer); ok {
 		// seek to the beginning to have it ready for next read
 		nc.Seek(0, io.SeekStart)
-		return body
+		return body, nil
 	}
 
 	// body is http's io.ReadCloser - read it up
 	rwc, err := newNopCloserBuffer(body)
 	if err != nil {
 		log.WithError(err).Error("error creating buffered request body")
-		return body
+		return body, nil
 	}
 
 	// Consume reader if it's from a http client response.
@@ -1861,39 +1861,50 @@ func copyBody(body io.ReadCloser, isClientResponseBody bool) io.ReadCloser {
 	if isClientResponseBody {
 		if err := rwc.copy(); err != nil {
 			log.WithError(err).Error("error reading request body")
-			return body
+			return body, err
 		}
 	}
 
 	// use seek-able reader for further body usage
-	return rwc
+	return rwc, nil
 }
 
-func copyRequest(r *http.Request) *http.Request {
+func copyRequest(r *http.Request) (*http.Request, error) {
+	var err error
 	if r.ContentLength == -1 {
-		return r
+		return r, nil
 	}
 
 	if r.Body != nil {
-		r.Body = copyBody(r.Body, false)
+		r.Body, err = copyBody(r.Body, false)
 	}
 
-	return r
+	return r, err
 }
 
-func copyResponse(r *http.Response) *http.Response {
+func copyResponse(r *http.Response) (*http.Response, error) {
+	var err error
 	// If the response is 101 Switching Protocols then the body will contain a
 	// `*http.readWriteCloserBody` which cannot be copied (see stdlib documentation).
 	// In this case we want to return immediately to avoid a silent crash.
 	if r.StatusCode == http.StatusSwitchingProtocols {
-		return r
+		return r, nil
 	}
 
 	if r.Body != nil {
-		r.Body = copyBody(r.Body, true)
+		r.Body, err = copyBody(r.Body, true)
 	}
 
-	return r
+	return r, err
+}
+
+func nopCloseRequestBodyErr(w http.ResponseWriter, r *http.Request) error {
+	if r == nil {
+		return nil
+	}
+
+	_, err := copyRequest(r)
+	return err
 }
 
 func nopCloseRequestBody(r *http.Request) {

@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -79,7 +80,12 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
-	nopCloseRequestBody(r)
+	if err := nopCloseRequestBodyErr(w, r); err != nil {
+		if errors.Is(err, http.ErrBodyNotAllowed) {
+			httputil.EntityTooLarge(w, r)
+		}
+	}
+
 	if NewRelicApplication != nil {
 		txn := NewRelicApplication.StartTransaction(r.URL.Path, w, r)
 		defer txn.End()
