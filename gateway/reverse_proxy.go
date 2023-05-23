@@ -18,7 +18,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"github.com/buger/jsonparser"
 	"io"
 	"io/ioutil"
 	"net"
@@ -28,6 +27,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/buger/jsonparser"
 
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"

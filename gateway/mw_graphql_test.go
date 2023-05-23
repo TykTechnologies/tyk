@@ -3,10 +3,11 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/buger/jsonparser"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/buger/jsonparser"
 
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
