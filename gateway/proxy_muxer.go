@@ -75,7 +75,7 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// in case the content length is wrong or not set limit the reader itself
-		r.Body = http.MaxBytesReader(w, r.Body, h.maxRequestBodySize)
+		httputil.LimitReader(r, h.maxRequestBodySize)
 	}
 
 	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
