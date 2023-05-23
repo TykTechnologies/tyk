@@ -1898,7 +1898,7 @@ func copyResponse(r *http.Response) (*http.Response, error) {
 	return r, err
 }
 
-func nopCloseRequestBodyErr(w http.ResponseWriter, r *http.Request) error {
+func nopCloseRequestBodyErr(r *http.Request) error {
 	if r == nil {
 		return nil
 	}

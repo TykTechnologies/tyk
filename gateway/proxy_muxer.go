@@ -46,20 +46,20 @@ func (h *h2cWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.h.ServeHTTP(w, r)
 }
 
-func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *handleWrapper) handleRequestLimits(w http.ResponseWriter, r *http.Request) bool {
 	// Validate Content-Length, limit request size by header value
 	if h.maxContentLength > 0 {
 		// if Content-Length is larger than the configured limit return a status 413
 		if r.ContentLength > h.maxContentLength {
 			httputil.EntityTooLarge(w, r)
-			return
+			return false
 		}
 
 		// Transfer-Encoding: chunked does not provide Content-Length
 		if !httputil.IsTransferEncodingChunked(r) {
 			// Request should include Content-Length header (HTTP 411)
 			httputil.LengthRequired(w, r)
-			return
+			return false
 		}
 
 		// No length available reasonably at this point. The only thing
@@ -72,17 +72,33 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// if Content-Length is larger than the configured limit return a status 413
 		if r.ContentLength > h.maxRequestBodySize {
 			httputil.EntityTooLarge(w, r)
-			return
+			return false
 		}
 
 		// in case the content length is wrong or not set limit the reader itself
 		httputil.LimitReader(r, h.maxRequestBodySize)
 	}
 
-	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
-	if err := nopCloseRequestBodyErr(w, r); err != nil {
+	// make request body to be nopCloser and re-readable
+	// before serve it through chain of middlewares
+	if err := nopCloseRequestBodyErr(r); err != nil {
+		// Handle the max request body size error returned from the body reader.
 		if errors.Is(err, httputil.ErrContentTooLong) {
 			httputil.EntityTooLarge(w, r)
+			return false
+		}
+		log.WithError(err).Error("Error reading request body")
+		return false
+	}
+
+	// No limiting
+	return true
+}
+
+func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Body != nil {
+		if !h.handleRequestLimits(w, r) {
+			return
 		}
 	}
 
