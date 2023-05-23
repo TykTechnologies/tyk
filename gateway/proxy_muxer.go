@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -48,34 +47,6 @@ func (h *h2cWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handleWrapper) handleRequestLimits(w http.ResponseWriter, r *http.Request) (ok bool) {
-	// Some requests requests have no valid content-length (not permitted)
-	if r.Method == http.MethodGet || r.Method == http.MethodDelete {
-		return true
-	}
-
-	// Validate Content-Length, limit request size by header value
-	if h.maxContentLength > 0 {
-		// Unknown or zero length, continue
-		if r.ContentLength <= 0 {
-			return true
-		}
-
-		// Transfer-Encoding does not provide Content-Length
-		if httputil.HasTransferEncoding(r) {
-			return true
-		}
-
-		// if Content-Length is larger than the configured limit return a status 413
-		if r.ContentLength > 0 && r.ContentLength > h.maxContentLength {
-			httputil.EntityTooLarge(w, r)
-			return false
-		}
-
-		// No length available reasonably at this point. The only thing
-		// we can do from here on is to limit the number of bytes read
-		// from a HTTP request body in the maxRequestBodySize check below.
-	}
-
 	// Limit request body size
 	if h.maxRequestBodySize > 0 {
 		// if Content-Length is larger than the configured limit return a status 413
@@ -85,10 +56,9 @@ func (h *handleWrapper) handleRequestLimits(w http.ResponseWriter, r *http.Reque
 		}
 
 		// in case the content length is wrong or not set limit the reader itself
-		httputil.LimitReader(r, h.maxRequestBodySize)
+		r.Body = http.MaxBytesReader(w, r.Body, h.maxRequestBodySize)
 	}
 
-	// No limiting
 	return true
 }
 
@@ -102,12 +72,12 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// make request body to be nopCloser and re-readable
 	// before serve it through chain of middlewares
 	if err := nopCloseRequestBodyErr(r); err != nil {
-		// Handle the max request body size error returned from the body reader.
-		if errors.Is(err, httputil.ErrContentTooLong) {
+		if err.Error() == "http: request body too large" {
 			httputil.EntityTooLarge(w, r)
 			return
 		}
-		log.WithError(err).Error("Error reading request body")
+
+		httputil.InternalServerError(w, r)
 		return
 	}
 
@@ -472,17 +442,17 @@ func (m *proxyMux) serve(gw *Gateway) {
 			if conf.HttpServerOptions.WriteTimeout > 0 {
 				writeTimeout = time.Duration(conf.HttpServerOptions.WriteTimeout) * time.Second
 			}
-			var h http.Handler
-			h = &handleWrapper{
+
+			h := &handleWrapper{
 				router:             p.router,
 				maxRequestBodySize: conf.HttpServerOptions.MaxRequestBodySize,
-				maxContentLength:   conf.HttpServerOptions.MaxContentLength,
 			}
+
 			// by default enabling h2c by wrapping handler in h2c. This ensures all features including tracing work
 			// in h2c services.
 			h2s := &http2.Server{}
-			h = &h2cWrapper{
-				w: h.(*handleWrapper),
+			handler := &h2cWrapper{
+				w: h,
 				h: h2c.NewHandler(h, h2s),
 			}
 
@@ -491,7 +461,7 @@ func (m *proxyMux) serve(gw *Gateway) {
 				Addr:         addr,
 				ReadTimeout:  readTimeout,
 				WriteTimeout: writeTimeout,
-				Handler:      h,
+				Handler:      handler,
 			}
 
 			if conf.CloseConnections {
