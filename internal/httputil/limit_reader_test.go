@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	. "github.com/TykTechnologies/tyk/internal/httputil"
 )
 
@@ -36,15 +38,10 @@ func TestLimitReader(t *testing.T) {
 
 		// Check if the body matches the expected value
 		expectedBody := "Lorem Ipsu"
-		if string(body) != expectedBody {
-			t.Errorf("Unexpected request body. Got: %s, want: %s", body, expectedBody)
-		}
+		assert.Equal(t, expectedBody, body)
 	})
 	handler.ServeHTTP(w, req)
 
 	// Check the response status code
-	expectedStatusCode := http.StatusRequestEntityTooLarge
-	if w.Result().StatusCode != expectedStatusCode {
-		t.Errorf("Unexpected status code. Got: %d, want: %d", w.Result().StatusCode, expectedStatusCode)
-	}
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Result().StatusCode)
 }

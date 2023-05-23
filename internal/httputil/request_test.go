@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 func TestIsTransferEncodingChunked(t *testing.T) {
