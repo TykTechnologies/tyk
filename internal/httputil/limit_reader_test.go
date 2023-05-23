@@ -27,7 +27,7 @@ func TestLimitReader(t *testing.T) {
 		// Read the request body
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			if errors.Is(err, http.ErrBodyNotAllowed) {
+			if errors.Is(err, ErrContentTooLong) {
 				EntityTooLarge(w, r)
 				return
 			}

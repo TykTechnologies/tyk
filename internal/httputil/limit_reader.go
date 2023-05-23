@@ -6,6 +6,8 @@ import (
 	"net/http"
 )
 
+var ErrContentTooLong = errors.New("content size over the declared limit")
+
 // LimitReader replaces the request body with a reader designed to
 // error out when the size limit has been exceeded.
 func LimitReader(r *http.Request, limit int64) {
@@ -32,7 +34,7 @@ func (l *limitedRequestBody) Read(p []byte) (n int, err error) {
 		l.limit -= int64(n)
 		if l.limit < 0 {
 			l.err = errors.New("request entity too large")
-			return n, http.ErrBodyNotAllowed
+			return n, ErrContentTooLong
 		}
 	}
 

@@ -81,7 +81,7 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
 	if err := nopCloseRequestBodyErr(w, r); err != nil {
-		if errors.Is(err, http.ErrBodyNotAllowed) {
+		if errors.Is(err, httputil.ErrContentTooLong) {
 			httputil.EntityTooLarge(w, r)
 		}
 	}
