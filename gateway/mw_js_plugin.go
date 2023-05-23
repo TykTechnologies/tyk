@@ -206,7 +206,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	case returnRaw = <-ret:
 		if err := <-errRet; err != nil {
 			logger.WithError(err).Error("Failed to run JS middleware")
-			return nil, http.StatusOK
+			return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
 		}
 		t.Stop()
 	case <-t.C:
@@ -217,7 +217,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			// that panics.
 			panic("stop")
 		}
-		return nil, http.StatusOK
+		return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
 	}
 	returnDataStr, _ := returnRaw.ToString()
 
@@ -225,7 +225,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	newRequestData := VMReturnObject{}
 	if err := json.Unmarshal([]byte(returnDataStr), &newRequestData); err != nil {
 		logger.WithError(err).Error("Failed to decode middleware request data on return from VM. Returned data: ", returnDataStr)
-		return nil, http.StatusOK
+		return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
 	}
 
 	// Reconstruct the request parts
