@@ -15,8 +15,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/stretchr/testify/assert"
 
 	redis "github.com/go-redis/redis/v8"
@@ -1425,15 +1423,4 @@ func TestAPISpec_GetSessionLifetimeRespectsKeyExpiration(t *testing.T) {
 		a.SessionLifetimeRespectsKeyExpiration = true
 		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
 	})
-}
-
-func TestAPISpec_isListeningOnPort(t *testing.T) {
-	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
-	cfg := &config.Config{}
-
-	cfg.ListenPort = 7000
-	assert.True(t, s.isListeningOnPort(7000, cfg))
-
-	s.ListenPort = 8000
-	assert.True(t, s.isListeningOnPort(8000, cfg))
 }

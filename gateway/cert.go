@@ -396,11 +396,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		}
 
 		for _, spec := range gw.apiSpecs {
-			// eliminate APIs which are not in the current port
-			if !spec.isListeningOnPort(listenPort, &gwConfig) {
-				continue
-			}
-
 			switch {
 			case spec.UseMutualTLSAuth:
 				if domainRequireCert[spec.Domain] == 0 {
