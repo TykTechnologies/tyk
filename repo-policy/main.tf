@@ -12,7 +12,6 @@ terraform {
   required_providers {
     github = {
       source  = "integrations/github"
-      version = "5.16.0"
     }
   }
 }
@@ -46,17 +45,17 @@ module "tyk" {
   vulnerability_alerts        = true
   squash_merge_commit_message = "PR_BODY"
   squash_merge_commit_title   = "PR_TITLE"
-  release_branches     = concat(var.historical_branches, [
+  release_branches     = concat(var.historical_branches,[
 { branch    = "master",
 	reviewers = "1",
 	convos    = "false",
 	required_tests = ["Go 1.19.x Redis 5","1.19-bullseye"]},
-{ branch    = "release-5-lts",
+{ branch    = "release-4-lts",
 	reviewers = "0",
 	convos    = "false",
 	source_branch  = "master",
-	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
-{ branch    = "release-5.0",
+	required_tests = ["Go 1.15 Redis 6"]},
+{ branch    = "release-5-lts",
 	reviewers = "0",
 	convos    = "false",
 	source_branch  = "master",
@@ -66,5 +65,10 @@ module "tyk" {
 	convos    = "false",
 	source_branch  = "release-5.0.1",
 	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
+{ branch    = "release-5.1",
+	reviewers = "0",
+	convos    = "false",
+	source_branch  = "master",
+	required_tests = ["Go 1.19.x Redis 5","1.19-bullseye"]},
 ])
 }

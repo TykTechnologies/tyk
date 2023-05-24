@@ -2,7 +2,6 @@ terraform {
   required_providers {
     github = {
       source  = "integrations/github"
-      version = "5.16.0"
     }
   }
 
@@ -70,5 +69,6 @@ resource "github_branch_protection" "automerge" {
   required_pull_request_reviews {
     require_code_owner_reviews      = false
     required_approving_review_count = each.value.reviewers
+
   }
 }
