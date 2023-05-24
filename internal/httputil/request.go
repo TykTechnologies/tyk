@@ -2,14 +2,17 @@ package httputil
 
 import "net/http"
 
-// IsTransferEncodingChunked checks that a http.Request is not
-// chunked. Requests with this transfer encoding do not include
-// a valid Content-Length header.
-func IsTransferEncodingChunked(req *http.Request) bool {
+// TransferEncoding gets the header value from the request.
+func TransferEncoding(req *http.Request) string {
 	for _, val := range req.TransferEncoding {
-		if val == "chunked" {
-			return true
+		if val != "" {
+			return val
 		}
 	}
-	return false
+	return ""
+}
+
+// HasTransferEncoding returns true if a transfer encoding header is present.
+func HasTransferEncoding(req *http.Request) bool {
+	return TransferEncoding(req) != ""
 }
