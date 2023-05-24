@@ -1133,7 +1133,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			if proxyOnlyCtx.upstreamResponse != nil {
 				header = proxyOnlyCtx.upstreamResponse.Header
 				httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
-				if p.TykAPISpec.GraphQL.Proxy.ReturnErrorsFromUpstream && httpStatus >= http.StatusBadRequest {
+				if p.TykAPISpec.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding && httpStatus >= http.StatusBadRequest {
 					err = returnErrorsFromUpstream(proxyOnlyCtx, &resultWriter)
 					if err != nil {
 						return

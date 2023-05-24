@@ -297,7 +297,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 				spec.GraphQL.Schema = gqlProxyUpstreamSchema
-				spec.GraphQL.Proxy.ReturnErrorsFromUpstream = true
+				spec.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding = true
 				spec.Proxy.ListenPath = "/"
 				spec.Proxy.TargetURL = testGraphQLProxyUpstreamError
 			})
