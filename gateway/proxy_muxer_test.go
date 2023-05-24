@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -13,10 +14,64 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 )
+
+func Test_handleRequestLimits(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		input  io.Reader
+		method string
+		want   int
+	}{
+		{
+			method: http.MethodGet,
+			input:  nil,
+			want:   http.StatusOK,
+		},
+		{
+			method: http.MethodDelete,
+			input:  nil,
+			want:   http.StatusOK,
+		},
+		{
+			method: http.MethodPost,
+			input:  strings.NewReader("tit petric"),
+			want:   http.StatusOK,
+		},
+		{
+			method: http.MethodPost,
+			input:  strings.NewReader("lorem ipsum dolor sit amet"),
+			want:   http.StatusRequestEntityTooLarge,
+		},
+	}
+
+	for index, testcase := range testcases {
+		testcase := testcase
+		t.Run(fmt.Sprintf("Test #%v", index), func(t *testing.T) {
+			t.Parallel()
+
+			// Create a test request with a request body larger than the limit
+			req := httptest.NewRequest(testcase.method, "/test", testcase.input)
+			req.ContentLength = 0
+
+			// Create a test response recorder
+			w := httptest.NewRecorder()
+
+			handler := &handleWrapper{
+				maxRequestBodySize: 10,
+			}
+			handler.ServeHTTP(w, req)
+
+			// Check the response status code
+			assert.Equal(t, testcase.want, w.Result().StatusCode)
+		})
+	}
+}
 
 func TestTCPDial_with_service_discovery(t *testing.T) {
 	ts := StartTest(nil)

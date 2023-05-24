@@ -17,3 +17,9 @@ func LengthRequired(w http.ResponseWriter, _ *http.Request) {
 	status := http.StatusLengthRequired
 	http.Error(w, http.StatusText(status), status)
 }
+
+// InternalServerError responds with HTTP 503 Internal Server Error.
+func InternalServerError(w http.ResponseWriter, _ *http.Request) {
+	status := http.StatusInternalServerError
+	http.Error(w, http.StatusText(status), status)
+}
