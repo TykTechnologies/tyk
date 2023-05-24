@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/buger/jsonparser"
+
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
 
@@ -1040,6 +1042,32 @@ func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoun
 	return nil, true, nil
 }
 
+func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWriter *graphql.EngineResultWriter) error {
+	body, ok := proxyOnlyCtx.upstreamResponse.Body.(*nopCloserBuffer)
+	if !ok {
+		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
+		return nil
+	}
+	_, err := body.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	responseBody, err := io.ReadAll(body)
+	if err != nil {
+		return err
+	}
+	// graphql-go-tools error message format: {"errors": [...]}
+	// Insert the upstream error into the first error message.
+	result, err := jsonparser.Set(resultWriter.Bytes(), responseBody, "errors", "[0]", "extensions")
+	if err != nil {
+		return err
+	}
+	resultWriter.Reset()
+	_, err = resultWriter.Write(result)
+	return err
+}
+
 func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
 
@@ -1115,6 +1143,12 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			if proxyOnlyCtx.upstreamResponse != nil {
 				header = proxyOnlyCtx.upstreamResponse.Header
 				httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
+				if p.TykAPISpec.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding && httpStatus >= http.StatusBadRequest {
+					err = returnErrorsFromUpstream(proxyOnlyCtx, &resultWriter)
+					if err != nil {
+						return
+					}
+				}
 			}
 		}
 
