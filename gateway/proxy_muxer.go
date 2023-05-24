@@ -249,7 +249,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, gw *Gate
 	if p := m.getProxy(spec.ListenPort, conf); p != nil {
 		p.tcpProxy.AddDomainHandler(hostname, spec.Proxy.TargetURL, modifier)
 	} else {
-		tlsConfig := tlsClientConfig(spec, gw)
+		tlsConfig := tlsClientConfig(spec)
 
 		p = &proxy{
 			port:             spec.ListenPort,

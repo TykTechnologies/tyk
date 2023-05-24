@@ -95,7 +95,6 @@ func (p *Proxy) Swap(new *Proxy) {
 	defer p.Unlock()
 
 	p.muxer = new.muxer
-	p.TLSConfigTarget = new.TLSConfigTarget
 }
 
 func (p *Proxy) RemoveDomainHandler(domain string) {

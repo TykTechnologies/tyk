@@ -580,28 +580,8 @@ func proxyFromAPI(api *APISpec) func(*http.Request) (*url.URL, error) {
 	}
 }
 
-func tlsClientConfig(s *APISpec, gw *Gateway) *tls.Config {
+func tlsClientConfig(s *APISpec) *tls.Config {
 	config := &tls.Config{}
-
-	if s.Protocol == "tls" || s.Protocol == "tcp" {
-		targetURL, err := url.Parse(s.Proxy.TargetURL)
-		if err != nil {
-			targetURL, err = url.Parse("tcp://" + s.Proxy.TargetURL)
-			if err != nil {
-				mainLog.WithError(err).Error("Error parsing target URL")
-			}
-		}
-
-		if targetURL != nil {
-			var tlsCertificates []tls.Certificate
-			if cert := gw.getUpstreamCertificate(targetURL.Host, s); cert != nil {
-				mainLog.Debug("Found upstream mutual TLS certificate")
-				tlsCertificates = []tls.Certificate{*cert}
-			}
-
-			config.Certificates = tlsCertificates
-		}
-	}
 
 	if s.GlobalConfig.ProxySSLInsecureSkipVerify {
 		config.InsecureSkipVerify = true
