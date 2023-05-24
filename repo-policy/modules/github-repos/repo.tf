@@ -70,5 +70,6 @@ resource "github_branch_protection" "automerge" {
   required_pull_request_reviews {
     require_code_owner_reviews      = false
     required_approving_review_count = each.value.reviewers
+
   }
 }
