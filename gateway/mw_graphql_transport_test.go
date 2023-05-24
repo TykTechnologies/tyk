@@ -275,6 +275,7 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 
 		assert.NotNil(t, ctx.originalResponseBody)
 		data, err := ioutil.ReadAll(ctx.originalResponseBody)
+		require.NoError(t, err)
 		assert.Equal(t, body, string(data))
 	})
 }
