@@ -12,7 +12,6 @@ terraform {
   required_providers {
     github = {
       source  = "integrations/github"
-      version = "5.16.0"
     }
   }
 }
@@ -69,6 +68,7 @@ module "tyk" {
 { branch    = "release-5.1",
 	reviewers = "0",
 	convos    = "false",
+	source_branch  = "master",
 	required_tests = ["Go 1.19.x Redis 5","1.19-bullseye"]},
 ])
 }
