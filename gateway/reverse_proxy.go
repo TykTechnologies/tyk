@@ -1873,7 +1873,7 @@ func (n *nopCloserBuffer) Close() error {
 	return nil
 }
 
-func copyBody(body io.ReadCloser, isClientResponseBody bool) (io.ReadCloser, error) {
+func copyBody(body io.ReadCloser, greedy bool) (io.ReadCloser, error) {
 	// check if body was already read and converted into our nopCloser
 	if nc, ok := body.(*nopCloserBuffer); ok {
 		// seek to the beginning to have it ready for next read
@@ -1892,7 +1892,7 @@ func copyBody(body io.ReadCloser, isClientResponseBody bool) (io.ReadCloser, err
 	//
 	// Server would automatically call Close(), we only do it for
 	// the *http.Response struct, but not *http.Request.
-	if isClientResponseBody {
+	if greedy {
 		if err := rwc.copy(); err != nil {
 			log.WithError(err).Error("error reading request body")
 			return body, err
@@ -1932,12 +1932,15 @@ func copyResponse(r *http.Response) (*http.Response, error) {
 	return r, err
 }
 
-func nopCloseRequestBodyErr(r *http.Request) error {
+func nopCloseRequestBodyErr(r *http.Request) (err error) {
 	if r == nil {
 		return nil
 	}
 
-	_, err := copyRequest(r)
+	if r.Body != nil {
+		r.Body, err = copyBody(r.Body, true)
+	}
+
 	return err
 }
 

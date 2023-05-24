@@ -9,15 +9,15 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
-func TestIsTransferEncodingChunked(t *testing.T) {
-	isTransferEncodingChunked := func(in []string) bool {
-		return httputil.IsTransferEncodingChunked(&http.Request{
+func TestTransferEncoding(t *testing.T) {
+	checkTransferEncoding := func(in []string) bool {
+		return httputil.HasTransferEncoding(&http.Request{
 			TransferEncoding: in,
 		})
 	}
 
-	assert.False(t, isTransferEncodingChunked([]string{"something-else"}))
-	assert.True(t, isTransferEncodingChunked([]string{"chunked"}))
-	assert.False(t, isTransferEncodingChunked([]string{}))
-	assert.False(t, isTransferEncodingChunked(nil))
+	assert.True(t, checkTransferEncoding([]string{"something-else"}))
+	assert.True(t, checkTransferEncoding([]string{"chunked"}))
+	assert.False(t, checkTransferEncoding([]string{}))
+	assert.False(t, checkTransferEncoding(nil))
 }
