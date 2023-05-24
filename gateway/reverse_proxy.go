@@ -1043,7 +1043,17 @@ func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoun
 }
 
 func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWriter *graphql.EngineResultWriter) error {
-	responseBody, err := io.ReadAll(proxyOnlyCtx.originalResponseBody)
+	body, ok := proxyOnlyCtx.upstreamResponse.Body.(*nopCloserBuffer)
+	if !ok {
+		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
+		return nil
+	}
+	_, err := body.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	responseBody, err := io.ReadAll(body)
 	if err != nil {
 		return err
 	}

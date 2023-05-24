@@ -31,7 +31,6 @@ type GraphQLProxyOnlyContext struct {
 	context.Context
 	forwardedRequest       *http.Request
 	upstreamResponse       *http.Response
-	originalResponseBody   *bytes.Reader
 	ignoreForwardedHeaders map[string]bool
 }
 
@@ -98,8 +97,11 @@ func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyCtx *GraphQLProxyOnlyC
 		// It's not possible to re-use io.ReadCloser. Because of that, we keep the
 		// original error message for later use.
 		// See TT-7808
-		proxyOnlyCtx.originalResponseBody = bytes.NewReader(body)
-		response.Body = io.NopCloser(bytes.NewReader(body))
+		reusableBody, err := newNopCloserBuffer(io.NopCloser(bytes.NewReader(body)))
+		if err != nil {
+			return nil, err
+		}
+		response.Body = reusableBody
 	}
 	proxyOnlyCtx.upstreamResponse = response
 	return response, err
