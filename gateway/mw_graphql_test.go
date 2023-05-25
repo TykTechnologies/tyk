@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/buger/jsonparser"
+
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
 
@@ -261,6 +263,34 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				},
 			}...)
 
+		})
+
+		t.Run("proxy-only return errors from upstream", func(t *testing.T) {
+			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+				spec.GraphQL.Schema = gqlProxyUpstreamSchema
+				spec.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding = true
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = testGraphQLProxyUpstreamError
+			})
+
+			request := gql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			}
+			_, _ = g.Run(t, test.TestCase{
+				Data:   request,
+				Method: http.MethodPost,
+				Code:   http.StatusInternalServerError,
+				BodyMatchFunc: func(i []byte) bool {
+					value, _, _, err := jsonparser.Get(i, "errors", "[0]", "extensions", "error")
+					if err != nil {
+						return false
+					}
+					return string(value) == "Something went wrong"
+				}})
 		})
 
 		t.Run("subgraph", func(t *testing.T) {
