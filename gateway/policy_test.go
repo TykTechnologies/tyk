@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -1550,4 +1551,71 @@ func TestParsePoliciesFromRPC(t *testing.T) {
 		})
 	}
 
+}
+
+type RPCDataLoaderMock struct {
+	ShouldConnect bool
+	Policies      []user.Policy
+	Apis          []nestedApiDefinition
+}
+
+func (s *RPCDataLoaderMock) Connect() bool {
+	return s.ShouldConnect
+}
+
+func (s *RPCDataLoaderMock) GetApiDefinitions(orgId string, tags []string) string {
+	apiList, err := json.Marshal(s.Apis)
+	if err != nil {
+		return ""
+	}
+	return string(apiList)
+}
+func (s *RPCDataLoaderMock) GetPolicies(orgId string) string {
+	policyList, err := json.Marshal(s.Policies)
+	if err != nil {
+		return ""
+	}
+	return string(policyList)
+}
+
+func Test_LoadPoliciesFromRPC(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	objectID := model.NewObjectID()
+
+	t.Run("load policies from RPC - success", func(t *testing.T) {
+		mockedStorage := &RPCDataLoaderMock{
+			ShouldConnect: true,
+			Policies: []user.Policy{
+				{MID: objectID, ID: "", OrgID: "org1"},
+			},
+		}
+
+		polMap, err := ts.Gw.LoadPoliciesFromRPC(mockedStorage, "org1", true)
+
+		assert.NoError(t, err, "error loading policies from RPC:", err)
+		assert.Equal(t, 1, len(polMap), "expected 0 policies to be loaded from RPC")
+	})
+
+	t.Run("load policies from RPC - success - then fail", func(t *testing.T) {
+		mockedStorage := &RPCDataLoaderMock{
+			ShouldConnect: true,
+			Policies: []user.Policy{
+				{MID: objectID, ID: "", OrgID: "org1"},
+			},
+		}
+
+		polMap, err := ts.Gw.LoadPoliciesFromRPC(mockedStorage, "org1", true)
+
+		assert.NoError(t, err, "error loading policies from RPC:", err)
+		assert.Equal(t, 1, len(polMap), "expected 0 policies to be loaded from RPC")
+
+		rpc.SetEmergencyMode(t, false)
+		defer rpc.ResetEmergencyMode()
+
+		polMap, err = ts.Gw.LoadPoliciesFromRPC(mockedStorage, "org1", true)
+
+		assert.NoError(t, err, "error loading policies from RPC:", err)
+		assert.Equal(t, 1, len(polMap), "expected 0 policies to be loaded from RPC")
+	})
 }

@@ -15,7 +15,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/stretchr/testify/assert"
 
@@ -1436,4 +1438,47 @@ func TestAPISpec_isListeningOnPort(t *testing.T) {
 
 	s.ListenPort = 8000
 	assert.True(t, s.isListeningOnPort(8000, cfg))
+}
+
+func Test_LoadAPIsFromRPC(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	objectID := model.NewObjectID()
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+
+	t.Run("load APIs from RPC - success", func(t *testing.T) {
+		mockedStorage := &RPCDataLoaderMock{
+			ShouldConnect: true,
+			Apis: []nestedApiDefinition{
+				{APIDefinition: &apidef.APIDefinition{Id: objectID, OrgID: "org1", APIID: "api1"}},
+			},
+		}
+
+		apisMap, err := loader.FromRPC(mockedStorage, "org1", ts.Gw)
+
+		assert.NoError(t, err, "error loading APIs from RPC:", err)
+		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC")
+	})
+
+	t.Run("load APIs from RPC - success - then fail", func(t *testing.T) {
+		mockedStorage := &RPCDataLoaderMock{
+			ShouldConnect: true,
+			Apis: []nestedApiDefinition{
+				{APIDefinition: &apidef.APIDefinition{Id: objectID, OrgID: "org1", APIID: "api1"}},
+			},
+		}
+
+		apisMap, err := loader.FromRPC(mockedStorage, "org1", ts.Gw)
+
+		assert.NoError(t, err, "error loading APIs from RPC:", err)
+		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC")
+
+		rpc.SetEmergencyMode(t, false)
+		defer rpc.ResetEmergencyMode()
+
+		apisMap, err = loader.FromRPC(mockedStorage, "org1", ts.Gw)
+
+		assert.NoError(t, err, "error loading APIs from RPC:", err)
+		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC backup")
+	})
 }
