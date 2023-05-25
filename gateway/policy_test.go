@@ -1604,16 +1604,18 @@ func Test_LoadPoliciesFromRPC(t *testing.T) {
 				{MID: objectID, ID: "", OrgID: "org1"},
 			},
 		}
-
+		// we load the Policies from RPC successfully - it should store the Policies in the backup
 		polMap, err := ts.Gw.LoadPoliciesFromRPC(mockedStorage, "org1", true)
 
 		assert.NoError(t, err, "error loading policies from RPC:", err)
 		assert.Equal(t, 1, len(polMap), "expected 0 policies to be loaded from RPC")
 
+		// we now simulate a failure to connect to RPC
 		mockedStorage.ShouldConnect = false
 		rpc.SetEmergencyMode(t, true)
 		defer rpc.ResetEmergencyMode()
 
+		// we now try to load the Policies again, and expect it to load the Policies from the backup
 		polMap, err = ts.Gw.LoadPoliciesFromRPC(mockedStorage, "org1", true)
 
 		assert.NoError(t, err, "error loading policies from RPC:", err)
