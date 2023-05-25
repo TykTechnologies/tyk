@@ -1610,7 +1610,8 @@ func Test_LoadPoliciesFromRPC(t *testing.T) {
 		assert.NoError(t, err, "error loading policies from RPC:", err)
 		assert.Equal(t, 1, len(polMap), "expected 0 policies to be loaded from RPC")
 
-		rpc.SetEmergencyMode(t, false)
+		mockedStorage.ShouldConnect = false
+		rpc.SetEmergencyMode(t, true)
 		defer rpc.ResetEmergencyMode()
 
 		polMap, err = ts.Gw.LoadPoliciesFromRPC(mockedStorage, "org1", true)

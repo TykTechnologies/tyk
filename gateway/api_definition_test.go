@@ -1473,7 +1473,8 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 		assert.NoError(t, err, "error loading APIs from RPC:", err)
 		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC")
 
-		rpc.SetEmergencyMode(t, false)
+		mockedStorage.ShouldConnect = false
+		rpc.SetEmergencyMode(t, true)
 		defer rpc.ResetEmergencyMode()
 
 		apisMap, err = loader.FromRPC(mockedStorage, "org1", ts.Gw)
