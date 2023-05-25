@@ -1087,10 +1087,8 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 
 		if isProxyOnly {
 			proxyOnlyCtx := reqCtx.(*GraphQLProxyOnlyContext)
-<<<<<<< HEAD
 			header = proxyOnlyCtx.upstreamResponse.Header
 			httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
-=======
 			// There is a case in the proxy-only mode where the request can be handled
 			// by the library without calling the upstream.
 			// This is a valid query for proxy-only mode: query { __typename }
@@ -1106,7 +1104,6 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 					}
 				}
 			}
->>>>>>> 81e54eb9... [TT-7808] In proxy-only mode, GraphQL query return errors from upstream (#5049)
 		}
 
 		res = resultWriter.AsHTTPResponse(httpStatus, header)

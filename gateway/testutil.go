@@ -401,23 +401,13 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 }
 
 const (
-<<<<<<< HEAD
-	handlerPathGraphQLProxyUpstream  = "/graphql-proxy-upstream"
-	handlerPathRestDataSource        = "/rest-data-source"
-	handlerPathGraphQLDataSource     = "/graphql-data-source"
-	handlerPathHeadersRestDataSource = "/rest-headers-data-source"
-	handlerSubgraphAccounts          = "/subgraph-accounts"
-	handlerSubgraphReviews           = "/subgraph-reviews"
-=======
 	handlerPathGraphQLProxyUpstream      = "/graphql-proxy-upstream"
 	handlerPathGraphQLProxyUpstreamError = "/graphql-proxy-upstream-error"
 	handlerPathRestDataSource            = "/rest-data-source"
 	handlerPathGraphQLDataSource         = "/graphql-data-source"
 	handlerPathHeadersRestDataSource     = "/rest-headers-data-source"
 	handlerSubgraphAccounts              = "/subgraph-accounts"
-	handlerSubgraphAccountsModified      = "/subgraph-accounts-modified"
 	handlerSubgraphReviews               = "/subgraph-reviews"
->>>>>>> 81e54eb9... [TT-7808] In proxy-only mode, GraphQL query return errors from upstream (#5049)
 
 	// We need a static port so that the urls can be used in static
 	// test data, and to prevent the requests from being randomized
@@ -425,21 +415,6 @@ const (
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-<<<<<<< HEAD
-	TestHttpAny               = "http://" + testHttpListen
-	TestHttpGet               = TestHttpAny + "/get"
-	testHttpPost              = TestHttpAny + "/post"
-	testGraphQLProxyUpstream  = TestHttpAny + handlerPathGraphQLProxyUpstream
-	testGraphQLDataSource     = TestHttpAny + handlerPathGraphQLDataSource
-	testRESTDataSource        = TestHttpAny + handlerPathRestDataSource
-	testRESTHeadersDataSource = TestHttpAny + handlerPathHeadersRestDataSource
-	testSubgraphAccounts      = TestHttpAny + handlerSubgraphAccounts
-	testSubgraphReviews       = TestHttpAny + handlerSubgraphReviews
-	testHttpJWK               = TestHttpAny + "/jwk.json"
-	testHttpJWKLegacy         = TestHttpAny + "/jwk-legacy.json"
-	testHttpBundles           = TestHttpAny + "/bundles/"
-	testReloadGroup           = TestHttpAny + "/groupReload"
-=======
 	TestHttpAny                   = "http://" + testHttpListen
 	TestHttpGet                   = TestHttpAny + "/get"
 	testHttpPost                  = TestHttpAny + "/post"
@@ -449,13 +424,11 @@ const (
 	testRESTDataSource            = TestHttpAny + handlerPathRestDataSource
 	testRESTHeadersDataSource     = TestHttpAny + handlerPathHeadersRestDataSource
 	testSubgraphAccounts          = TestHttpAny + handlerSubgraphAccounts
-	testSubgraphAccountsModified  = TestHttpAny + handlerSubgraphAccountsModified
 	testSubgraphReviews           = TestHttpAny + handlerSubgraphReviews
 	testHttpJWK                   = TestHttpAny + "/jwk.json"
 	testHttpJWKLegacy             = TestHttpAny + "/jwk-legacy.json"
 	testHttpBundles               = TestHttpAny + "/bundles/"
 	testReloadGroup               = TestHttpAny + "/groupReload"
->>>>>>> 81e54eb9... [TT-7808] In proxy-only mode, GraphQL query return errors from upstream (#5049)
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
@@ -1247,7 +1220,7 @@ func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, er
 	return s.testRunner.Run(t, testCases...)
 }
 
-//TODO:(gernest) when hot reload is supported enable this.
+// TODO:(gernest) when hot reload is supported enable this.
 func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	s.Run(t, testCases...)
 	var testMatrix = []struct {
