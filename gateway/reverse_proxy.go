@@ -1025,7 +1025,7 @@ func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWrite
 		return err
 	}
 
-	responseBody, err := io.ReadAll(body)
+	responseBody, err := ioutil.ReadAll(body)
 	if err != nil {
 		return err
 	}
