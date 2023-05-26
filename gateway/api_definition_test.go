@@ -15,6 +15,13 @@ import (
 	"text/template"
 	"time"
 
+<<<<<<< HEAD
+=======
+	"github.com/TykTechnologies/storage/persistent/model"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/rpc"
+
+>>>>>>> 3b6aa955... TT-9013 Fix RPCStorageHandler init when loading policies from RPC (#5059)
 	"github.com/stretchr/testify/assert"
 
 	redis "github.com/go-redis/redis/v8"
@@ -1424,3 +1431,67 @@ func TestAPISpec_GetSessionLifetimeRespectsKeyExpiration(t *testing.T) {
 		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
 	})
 }
+<<<<<<< HEAD
+=======
+
+func TestAPISpec_isListeningOnPort(t *testing.T) {
+	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
+	cfg := &config.Config{}
+
+	cfg.ListenPort = 7000
+	assert.True(t, s.isListeningOnPort(7000, cfg))
+
+	s.ListenPort = 8000
+	assert.True(t, s.isListeningOnPort(8000, cfg))
+}
+
+func Test_LoadAPIsFromRPC(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	objectID := model.NewObjectID()
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+
+	t.Run("load APIs from RPC - success", func(t *testing.T) {
+		mockedStorage := &RPCDataLoaderMock{
+			ShouldConnect: true,
+			Apis: []nestedApiDefinition{
+				{APIDefinition: &apidef.APIDefinition{Id: objectID, OrgID: "org1", APIID: "api1"}},
+			},
+		}
+
+		apisMap, err := loader.FromRPC(mockedStorage, "org1", ts.Gw)
+
+		assert.NoError(t, err, "error loading APIs from RPC:", err)
+		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC")
+	})
+
+	t.Run("load APIs from RPC - success - then fail", func(t *testing.T) {
+		mockedStorage := &RPCDataLoaderMock{
+			ShouldConnect: true,
+			Apis: []nestedApiDefinition{
+				{APIDefinition: &apidef.APIDefinition{Id: objectID, OrgID: "org1", APIID: "api1"}},
+			},
+		}
+		// we increment the load count by 1, as if we logged in successfully to RPC
+		rpc.SetLoadCounts(t, 1)
+		defer rpc.SetLoadCounts(t, 0)
+
+		// we load the APIs from RPC successfully - it should store the APIs in the backup
+		apisMap, err := loader.FromRPC(mockedStorage, "org1", ts.Gw)
+
+		assert.NoError(t, err, "error loading APIs from RPC:", err)
+		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC")
+
+		// we now simulate a failure to connect to RPC
+		mockedStorage.ShouldConnect = false
+		rpc.SetEmergencyMode(t, true)
+		defer rpc.ResetEmergencyMode()
+
+		// we now try to load the APIs again, and expect it to load the APIs from the backup
+		apisMap, err = loader.FromRPC(mockedStorage, "org1", ts.Gw)
+
+		assert.NoError(t, err, "error loading APIs from RPC:", err)
+		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC backup")
+	})
+}
+>>>>>>> 3b6aa955... TT-9013 Fix RPCStorageHandler init when loading policies from RPC (#5059)
