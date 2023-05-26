@@ -20,7 +20,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/certs/certs_mock"
+	"github.com/TykTechnologies/tyk/certs/mock"
+
 	"github.com/TykTechnologies/tyk/internal/crypto"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -1642,7 +1643,7 @@ func TestStaticMTLSAPI(t *testing.T) {
 
 		expiredClientCert.Leaf = leaf
 
-		mockCertManager := certs_mock.NewMockCertificateManager(ctrl)
+		mockCertManager := mock.NewMockCertificateManager(ctrl)
 
 		// CertManager.List is being called twice during the flow
 		// 1 during gw.getTLSConfigForClient

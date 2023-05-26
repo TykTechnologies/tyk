@@ -37,7 +37,7 @@ var (
 	GenServerCertificate = tykcrypto.GenServerCertificate
 )
 
-//go:generate mockgen -destination=./certs_mock/cert_manager_mock.go -package=certs_mock . CertificateManager
+//go:generate mockgen -destination=./mock/mock.go -package=mock . CertificateManager
 type CertificateManager interface {
 	List(certIDs []string, mode CertificateType) (out []*tls.Certificate)
 	ListPublicKeys(keyIDs []string) (out []string)
