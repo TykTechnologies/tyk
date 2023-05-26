@@ -17,10 +17,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/certs/certs_mock"
-	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/certs/certs_mock"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"

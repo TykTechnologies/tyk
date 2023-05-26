@@ -16,8 +16,9 @@ import (
 	"testing"
 	"time"
 
-	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/stretchr/testify/assert"
+
+	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 )
 
 type dummyStorage struct {
