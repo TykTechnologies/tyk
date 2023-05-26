@@ -175,12 +175,11 @@ func parsePoliciesFromRPC(list string, allowExplicit bool) (map[string]user.Poli
 	return policies, nil
 }
 
-func (gw *Gateway) LoadPoliciesFromRPC(orgId string, allowExplicit bool) (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string, allowExplicit bool) (map[string]user.Policy, error) {
 	if rpc.IsEmergencyMode() {
 		return gw.LoadPoliciesFromRPCBackup()
 	}
 
-	store := &RPCStorageHandler{Gw: gw}
 	if !store.Connect() {
 		return nil, errors.New("Policies backup: Failed connecting to database")
 	}
