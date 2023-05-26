@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/justinas/alice"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
@@ -17,8 +20,6 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/justinas/alice"
-	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
