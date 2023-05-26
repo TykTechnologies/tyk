@@ -29,7 +29,10 @@ const (
 	cacheCleanInterval = 600 // 10 minutes.
 )
 
-var CertManagerLogPrefix = "cert_storage"
+var (
+	CertManagerLogPrefix = "cert_storage"
+	ErrCertExpired       = errors.New("certificate is expired")
+)
 
 type CertificateManager struct {
 	storage         storage.Handler
@@ -327,7 +330,7 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 			}
 
 			if cert.NotAfter.Before(time.Now()) {
-				return certID, certChainPEM, errors.New("certificate is expired")
+				return certID, certChainPEM, ErrCertExpired
 			}
 
 			certBlocks = append(certBlocks, pem.EncodeToMemory(block))
@@ -611,7 +614,7 @@ func (c *CertificateManager) ValidateRequestCertificate(certIDs []string, r *htt
 		// Extensions[0] contains cache of certificate SHA256
 		if string(cert.Leaf.Extensions[0].Value) == certID {
 			if time.Now().After(cert.Leaf.NotAfter) {
-				return errors.New("certificate expired")
+				return ErrCertExpired
 			}
 			// Happy flow, we matched a certificate
 			return nil
