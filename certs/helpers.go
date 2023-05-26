@@ -19,8 +19,13 @@ func GenCertificate(template *x509.Certificate, setLeaf bool) ([]byte, []byte, [
 	serialNumber, _ := rand.Int(rand.Reader, serialNumberLimit)
 	template.SerialNumber = serialNumber
 	template.BasicConstraintsValid = true
-	template.NotBefore = time.Now()
-	template.NotAfter = template.NotBefore.Add(time.Hour)
+	if template.NotBefore.IsZero() {
+		template.NotBefore = time.Now()
+	}
+
+	if template.NotAfter.IsZero() {
+		template.NotAfter = template.NotBefore.Add(time.Hour)
+	}
 
 	derBytes, _ := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
 

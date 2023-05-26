@@ -610,6 +610,9 @@ func (c *CertificateManager) ValidateRequestCertificate(certIDs []string, r *htt
 
 		// Extensions[0] contains cache of certificate SHA256
 		if string(cert.Leaf.Extensions[0].Value) == certID {
+			if time.Now().After(cert.Leaf.NotAfter) {
+				return errors.New("certificate expired")
+			}
 			// Happy flow, we matched a certificate
 			return nil
 		}
