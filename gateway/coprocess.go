@@ -399,7 +399,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// The CP middleware indicates this is a bad auth:
 	if returnObject.Request.ReturnOverrides.ResponseCode >= http.StatusBadRequest && !returnObject.Request.ReturnOverrides.OverrideError {
-		logger.WithField("key", m.Gw.obfuscateKey(token)).Info("Attempted access with invalid key")
+		logger.WithField("key", m.Gw.ObfuscateKey(token)).Info("Attempted access with invalid key")
 
 		for h, v := range returnObject.Request.ReturnOverrides.Headers {
 			w.Header().Set(h, v)

@@ -34,6 +34,8 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	. "github.com/TykTechnologies/tyk/gateway/model"
 )
 
 func getStrPointer(str string) *string {
@@ -829,7 +831,7 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 			ts.Gw.SetConfig(globalConf)
 
 			keyName := tc.KeyName
-			if err := ts.Gw.doAddOrUpdate(ts.Gw.generateToken(session.OrgID, keyName), session, false, tc.HashKeys); err != nil {
+			if err := ts.Gw.doAddOrUpdate(ts.Gw.GenerateToken(session.OrgID, keyName), session, false, tc.HashKeys); err != nil {
 				t.Error("Failed to create key, ensure security settings are correct:" + err.Error())
 			}
 
@@ -946,7 +948,7 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	withAccessJSON, _ := json.Marshal(withAccess)
 
 	myKey := "my_key_id"
-	myKeyHash := storage.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
+	myKeyHash := storage.HashKey(ts.Gw.GenerateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
 
 	if len(myKeyHash) != expectedHashSize {
 		t.Errorf("Expected hash size: %d, got %d. Hash: %s. Key: %s", expectedHashSize, len(myKeyHash), myKeyHash, myKey)
@@ -1114,7 +1116,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	withAccessJSON, _ := json.Marshal(withAccess)
 
 	myKey := "my_key_id"
-	myKeyHash := storage.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
+	myKeyHash := storage.HashKey(ts.Gw.GenerateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
@@ -1232,7 +1234,7 @@ func TestKeyHandler_HashingDisabled(t *testing.T) {
 	withAccessJSON, _ := json.Marshal(withAccess)
 
 	myKeyID := "my_key_id"
-	token := ts.Gw.generateToken("default", myKeyID)
+	token := ts.Gw.GenerateToken("default", myKeyID)
 	myKeyHash := storage.HashKey(token, ts.Gw.GetConfig().HashKeys)
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {

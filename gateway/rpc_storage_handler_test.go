@@ -15,6 +15,8 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	. "github.com/TykTechnologies/tyk/gateway/model"
 )
 
 const (

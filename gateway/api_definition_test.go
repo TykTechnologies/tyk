@@ -26,6 +26,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	. "github.com/TykTechnologies/tyk/gateway/model"
 )
 
 func TestURLRewrites(t *testing.T) {

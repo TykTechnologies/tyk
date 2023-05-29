@@ -73,7 +73,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			Result: logrus.WithFields(logrus.Fields{
 				"path":   "/test",
 				"origin": "127.0.0.1",
-				"key":    ts.Gw.obfuscateKey("abs"),
+				"key":    ts.Gw.ObfuscateKey("abs"),
 			}),
 		},
 		// enable_key_logging is not set, key is not passed, no additional data field
@@ -96,7 +96,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 				"origin": "127.0.0.1",
 				"a":      1,
 				"b":      "test",
-				"key":    ts.Gw.obfuscateKey("abc"),
+				"key":    ts.Gw.ObfuscateKey("abc"),
 			}),
 		},
 		// enable_key_logging is not set, key is not passed, additional data fields are passed

@@ -97,7 +97,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 		log.Debug("Trying to find key by client certificate")
 		certHash = k.Spec.OrgID + certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
-		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
+		key = k.Gw.GenerateToken(k.Spec.OrgID, certHash)
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
@@ -158,7 +158,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 }
 
 func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errMsg string) (error, int) {
-	k.Logger().WithField("key", k.Gw.obfuscateKey(key)).Info(msg)
+	k.Logger().WithField("key", k.Gw.ObfuscateKey(key)).Info(msg)
 
 	// Fire Authfailed Event
 	AuthFailed(k, r, key)
@@ -172,7 +172,7 @@ func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errM
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 
 	_, authConfig := k.getAuthToken(k.getAuthType(), r)
-	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(key))
+	logger := k.Logger().WithField("key", k.Gw.ObfuscateKey(key))
 
 	if !authConfig.ValidateSignature {
 		return nil, http.StatusOK

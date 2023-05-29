@@ -89,7 +89,7 @@ func (e *BaseExtractor) Error(r *http.Request, err error, message string) (retur
 func (e *BaseExtractor) GenerateSessionID(input string, mw BaseMiddleware) (sessionID string) {
 	data := []byte(input)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID = e.Gw.generateToken(mw.Spec.OrgID, tokenID)
+	sessionID = e.Gw.GenerateToken(mw.Spec.OrgID, tokenID)
 	return sessionID
 }
 

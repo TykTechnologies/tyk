@@ -1075,7 +1075,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 	})
 
 	// check that key has right set of policies assigned - there should be all three - base one and two from scope
-	sessionID := ts.Gw.generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+	sessionID := ts.Gw.GenerateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(userID))))
 	t.Run("Request to check that session has got both based and scope policies", func(t *testing.T) {
 		ts.Run(
 			t,
@@ -1100,7 +1100,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 	})
 
 	// check that key has right set of policies assigned - there should be all three - base one and two from scope
-	sessionID = ts.Gw.generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(user2ID))))
+	sessionID = ts.Gw.GenerateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(user2ID))))
 	t.Run("If scopes present no default policy should be used", func(t *testing.T) {
 		ts.Run(
 			t,
@@ -1123,7 +1123,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 	})
 
 	// check that key has right set of policies assigned - there should be all three - base one and two from scope
-	sessionID = ts.Gw.generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(user3ID))))
+	sessionID = ts.Gw.GenerateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(user3ID))))
 	t.Run("Default policy should be applied if no scopes found", func(t *testing.T) {
 		ts.Run(
 			t,
@@ -1145,7 +1145,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 	})
 
 	authHeaders = map[string]string{"authorization": jwtToken}
-	sessionID = ts.Gw.generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+	sessionID = ts.Gw.GenerateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(userID))))
 	// try to access api1 using JWT issued via base-api
 	t.Run("Request to api1", func(t *testing.T) {
 		ts.Run(
@@ -1369,7 +1369,7 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
 
-	sessionID := ts.Gw.generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(user_id))))
+	sessionID := ts.Gw.GenerateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(user_id))))
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Initial request with 1st policy", func(t *testing.T) {
@@ -1798,7 +1798,7 @@ func TestJWTDefaultPolicies(t *testing.T) {
 
 	data := []byte("dummy")
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := ts.Gw.generateToken(spec.OrgID, keyID)
+	sessionID := ts.Gw.GenerateToken(spec.OrgID, keyID)
 
 	assert := func(t *testing.T, expected []string) {
 		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)

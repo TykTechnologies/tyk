@@ -26,6 +26,8 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
+
+	. "github.com/TykTechnologies/tyk/gateway/model"
 )
 
 /*
@@ -484,7 +486,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				}
 			}
 
-			keyName := o.Gw.generateToken(o.API.OrgID, username)
+			keyName := o.Gw.GenerateToken(o.API.OrgID, username)
 
 			log.Debug("Updating user:", keyName)
 			err := o.Gw.GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.GetSessionLifetimeRespectsKeyExpiration(), o.API.SessionLifetime, o.Gw.GetConfig().ForceGlobalSessionLifetime, o.Gw.GetConfig().GlobalSessionLifetime), false)

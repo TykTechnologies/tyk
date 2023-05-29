@@ -108,7 +108,7 @@ func (ts *Test) testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec,
 		username = "0987876"
 	}
 	password := "TEST"
-	keyName := ts.Gw.generateToken("default", username)
+	keyName := ts.Gw.GenerateToken("default", username)
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	err := ts.Gw.GlobalSessionManager.UpdateSession(keyName, baSession, 60, false)
 	if err != nil {

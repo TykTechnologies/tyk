@@ -85,7 +85,7 @@ func (k *BasicAuthKeyIsValid) getAuthType() string {
 
 func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, r *http.Request) (username, password string, err error, code int) {
 	token, _ := k.getAuthToken(k.getAuthType(), r)
-	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(token))
+	logger := k.Logger().WithField("key", k.Gw.ObfuscateKey(token))
 	if token == "" {
 		// No header value, fail
 		err, code = k.requestForBasicAuth(w, "Authorization field missing")
@@ -178,7 +178,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Check if API key valid
 	keyName := username
-	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(keyName))
+	logger := k.Logger().WithField("key", k.Gw.ObfuscateKey(keyName))
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(keyName, r)
 	keyName = session.KeyID
 

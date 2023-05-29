@@ -6,15 +6,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/go-redis/redis/v8"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 
-	"github.com/sirupsen/logrus"
+	. "github.com/TykTechnologies/tyk/gateway/model"
 )
 
 var (
@@ -1052,7 +1052,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
 				if storage.TokenOrg(key) == "" {
-					key = r.Gw.generateToken(orgId, key)
+					key = r.Gw.GenerateToken(orgId, key)
 				}
 				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
 			}

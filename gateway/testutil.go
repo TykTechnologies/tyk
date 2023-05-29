@@ -775,14 +775,14 @@ func (s *Test) withAuth(r *http.Request) *http.Request {
 
 // Deprecated: Use Test.CreateSession instead.
 func CreateSession(gw *Gateway, sGen ...func(s *user.SessionState)) string {
-	key := gw.generateToken("default", "")
+	key := gw.GenerateToken("default", "")
 	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
 
 	if session.Certificate != "" {
-		key = gw.generateToken("default", session.Certificate)
+		key = gw.GenerateToken("default", session.Certificate)
 	}
 
 	hashKeys := gw.GetConfig().HashKeys

@@ -1385,7 +1385,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			"prefix":      "proxy",
 			"user_ip":     addrs,
 			"server_name": outreq.Host,
-			"user_id":     p.Gw.obfuscateKey(token),
+			"user_id":     p.Gw.ObfuscateKey(token),
 			"user_name":   alias,
 			"org_id":      p.TykAPISpec.OrgID,
 			"api_id":      p.TykAPISpec.APIID,

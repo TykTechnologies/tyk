@@ -15,40 +15,9 @@ import (
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/storage"
+
+	. "github.com/TykTechnologies/tyk/gateway/model"
 )
-
-type NotificationCommand string
-
-const (
-	RedisPubSubChannel = "tyk.cluster.notifications"
-
-	NoticeApiUpdated             NotificationCommand = "ApiUpdated"
-	NoticeApiRemoved             NotificationCommand = "ApiRemoved"
-	NoticeApiAdded               NotificationCommand = "ApiAdded"
-	NoticeGroupReload            NotificationCommand = "GroupReload"
-	NoticePolicyChanged          NotificationCommand = "PolicyChanged"
-	NoticeConfigUpdate           NotificationCommand = "NoticeConfigUpdated"
-	NoticeDashboardZeroConf      NotificationCommand = "NoticeDashboardZeroConf"
-	NoticeDashboardConfigRequest NotificationCommand = "NoticeDashboardConfigRequest"
-	NoticeGatewayConfigResponse  NotificationCommand = "NoticeGatewayConfigResponse"
-	NoticeGatewayDRLNotification NotificationCommand = "NoticeGatewayDRLNotification"
-	KeySpaceUpdateNotification   NotificationCommand = "KeySpaceUpdateNotification"
-)
-
-// Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
-type Notification struct {
-	Command       NotificationCommand `json:"command"`
-	Payload       string              `json:"payload"`
-	Signature     string              `json:"signature"`
-	SignatureAlgo crypto.Hash         `json:"algorithm"`
-	Gw            *Gateway            `json:"-"`
-}
-
-func (n *Notification) Sign() {
-	n.SignatureAlgo = crypto.SHA256
-	hash := sha256.Sum256([]byte(string(n.Command) + n.Payload + n.Gw.GetConfig().NodeSecret))
-	n.Signature = hex.EncodeToString(hash[:])
-}
 
 func (gw *Gateway) startPubSubLoop() {
 	cacheStore := storage.RedisCluster{RedisController: gw.RedisController}
@@ -157,47 +126,52 @@ func (gw *Gateway) handleKeySpaceEventCacheFlush(payload string) {
 
 var redisInsecureWarn sync.Once
 
-func isPayloadSignatureValid(notification Notification) bool {
-	if notification.Gw.GetConfig().AllowInsecureConfigs {
+func (gw *Gateway) GetNotificationVerifier(msg Notification) goverify.Verifier {
+	if gw.NotificationVerifier != nil {
+		return gw.NotificationVerifier
+	}
+
+	if msg.Gw.GetConfig().PublicKeyPath == "" {
+		return nil
+	}
+
+	verifier, err := goverify.LoadPublicKeyFromFile(msg.Gw.GetConfig().PublicKeyPath)
+	if err != nil {
+		pubSubLog.WithError(err).Error("Notification signer: Failed loading public key from path")
+		return nil
+	}
+
+	gw.NotificationVerifier = verifier
+	return gw.NotificationVerifier
+}
+
+func isPayloadSignatureValid(msg Notification) bool {
+	if msg.Gw.GetConfig().AllowInsecureConfigs {
 		return true
 	}
 
-	switch notification.SignatureAlgo {
+	switch msg.SignatureAlgo {
 	case crypto.SHA256:
-		hash := sha256.Sum256([]byte(string(notification.Command) + notification.Payload + notification.Gw.GetConfig().NodeSecret))
+		hash := sha256.Sum256([]byte(string(msg.Command) + msg.Payload + msg.Gw.GetConfig().NodeSecret))
 		expectedSignature := hex.EncodeToString(hash[:])
 
-		if expectedSignature == notification.Signature {
+		if expectedSignature == msg.Signature {
 			return true
 		} else {
-			pubSubLog.Error("Notification signer: Failed verifying pub sub signature using node_secret: ")
+			pubSubLog.Error("Notification signer: Failed verifying pub sub signature using node_secret")
 			return false
 		}
 	default:
-		if notification.Gw.GetConfig().PublicKeyPath != "" && notification.Gw.NotificationVerifier == nil {
-			var err error
-
-			notification.Gw.NotificationVerifier, err = goverify.LoadPublicKeyFromFile(notification.Gw.GetConfig().PublicKeyPath)
+		verifier := msg.Gw.GetNotificationVerifier(msg)
+		if verifier != nil {
+			signed, err := base64.StdEncoding.DecodeString(msg.Signature)
 			if err != nil {
-
-				pubSubLog.Error("Notification signer: Failed loading public key from path: ", err)
-				return false
-			}
-		}
-
-		if notification.Gw.NotificationVerifier != nil {
-
-			signed, err := base64.StdEncoding.DecodeString(notification.Signature)
-			if err != nil {
-
 				pubSubLog.Error("Failed to decode signature: ", err)
 				return false
 			}
 
-			if err := notification.Gw.NotificationVerifier.Verify([]byte(notification.Payload), signed); err != nil {
-
-				pubSubLog.Error("Could not verify notification: ", err, ": ", notification)
-
+			if err := verifier.Verify([]byte(msg.Payload), signed); err != nil {
+				pubSubLog.WithError(err).Error("Could not verify notification: ", msg)
 				return false
 			}
 

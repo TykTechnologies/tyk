@@ -739,7 +739,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
-		t.Logger().Info("Recreating session for key: ", t.Gw.obfuscateKey(key))
+		t.Logger().Info("Recreating session for key: ", t.Gw.ObfuscateKey(key))
 
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
@@ -832,7 +832,7 @@ func (b BaseMiddleware) generateSessionID(id string) string {
 	// generate a virtual token
 	data := []byte(id)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
-	return b.Gw.generateToken(b.Spec.OrgID, keyID)
+	return b.Gw.GenerateToken(b.Spec.OrgID, keyID)
 }
 
 type TykResponseHandler interface {

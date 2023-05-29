@@ -167,12 +167,12 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 	data := []byte(ouser.ID)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := k.Gw.generateToken(k.Spec.OrgID, keyID)
+	sessionID := k.Gw.GenerateToken(k.Spec.OrgID, keyID)
 
 	if k.Spec.OpenIDOptions.SegregateByClient {
 		// We are segregating by client, so use it as part of the internal token
 		logger.Debug("Client ID:", clientID)
-		sessionID = k.Gw.generateToken(k.Spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(clientID)))+keyID)
+		sessionID = k.Gw.GenerateToken(k.Spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(clientID)))+keyID)
 	}
 
 	logger.Debug("Generated Session ID: ", sessionID)
@@ -241,7 +241,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
 	k.Logger().WithFields(logrus.Fields{
-		"key": k.Gw.obfuscateKey(tykId),
+		"key": k.Gw.ObfuscateKey(tykId),
 	}).Warning("Attempted access with invalid key.")
 
 	// Fire Authfailed Event

@@ -11,17 +11,6 @@ import (
 // identifies that field value was hidden before output to the log
 const logHiddenValue = "<hidden>"
 
-func (gw *Gateway) obfuscateKey(keyName string) string {
-	if gw.GetConfig().EnableKeyLogging {
-		return keyName
-	}
-
-	if len(keyName) > 4 {
-		return "****" + keyName[len(keyName)-4:]
-	}
-	return "--"
-}
-
 func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, key string, data map[string]interface{}) *logrus.Entry {
 	if logger == nil {
 		logger = logrus.NewEntry(log)
@@ -36,7 +25,7 @@ func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, 
 	if key != "" {
 		fields["key"] = key
 		if !gw.GetConfig().EnableKeyLogging {
-			fields["key"] = gw.obfuscateKey(key)
+			fields["key"] = gw.ObfuscateKey(key)
 		}
 	}
 	// add to log additional fields if any passed

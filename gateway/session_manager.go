@@ -12,6 +12,8 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
+
+	. "github.com/TykTechnologies/tyk/gateway/model"
 )
 
 type PublicSession struct {
@@ -25,11 +27,6 @@ type PublicSession struct {
 		Per  float64 `json:"per_unit"`
 	} `json:"rate_limit"`
 }
-
-const (
-	QuotaKeyPrefix     = "quota-"
-	RateLimitKeyPrefix = "rate-limit-"
-)
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not

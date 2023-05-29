@@ -60,7 +60,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 	if token == "" {
 		return hm.authorizationError(r)
 	}
-	logger := hm.Logger().WithField("key", hm.Gw.obfuscateKey(token))
+	logger := hm.Logger().WithField("key", hm.Gw.ObfuscateKey(token))
 
 	// Clean it
 	token = stripSignature(token)

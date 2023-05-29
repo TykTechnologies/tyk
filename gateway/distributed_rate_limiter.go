@@ -7,6 +7,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/drl"
+
+	. "github.com/TykTechnologies/tyk/gateway/model"
 )
 
 func (gw *Gateway) setupDRL() {

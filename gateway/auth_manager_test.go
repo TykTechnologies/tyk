@@ -5,14 +5,11 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/header"
-
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -73,7 +70,7 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 		})[0]
 
-		key := ts.Gw.generateToken("", "")
+		key := ts.Gw.GenerateToken("", "")
 
 		session := CreateStandardSession()
 		session.AccessRights = map[string]user.AccessDefinition{api.APIID: {

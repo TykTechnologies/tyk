@@ -65,6 +65,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	. "github.com/TykTechnologies/tyk/gateway/model"
 )
 
 var (
@@ -382,7 +384,7 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 
 	log.WithFields(logrus.Fields{
 		"prefix":      "api",
-		"key":         gw.obfuscateKey(keyName),
+		"key":         gw.ObfuscateKey(keyName),
 		"expires":     newSession.Expires,
 		"org_id":      newSession.OrgID,
 		"api_id":      "--",
@@ -507,7 +509,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		}
 	} else {
 		newSession.DateCreated = time.Now()
-		keyName = gw.generateToken(newSession.OrgID, keyName)
+		keyName = gw.GenerateToken(newSession.OrgID, keyName)
 	}
 
 	//set the original expiry if the content in payload is a past time
@@ -545,7 +547,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		}
 	} else {
 
-		newFormatKey := gw.generateToken(newSession.OrgID, keyName)
+		newFormatKey := gw.GenerateToken(newSession.OrgID, keyName)
 		// search as a custom key
 		_, err := gw.GlobalSessionManager.Store().GetKey(newFormatKey)
 
@@ -627,7 +629,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 		} else {
 			log.WithFields(logrus.Fields{
 				"prefix":  "api",
-				"key":     gw.obfuscateKey(quotaKey),
+				"key":     gw.ObfuscateKey(quotaKey),
 				"message": err,
 				"status":  "ok",
 			}).Info("Can't retrieve key quota")
@@ -667,7 +669,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
 				"apiID":  id,
-				"key":    gw.obfuscateKey(sessionKey),
+				"key":    gw.ObfuscateKey(sessionKey),
 				"error":  err,
 			}).Info("Can't retrieve api limit quota")
 		}
@@ -683,7 +685,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"key":    gw.obfuscateKey(sessionKey),
+		"key":    gw.ObfuscateKey(sessionKey),
 		"status": "ok",
 	}).Info("Retrieved key detail.")
 
@@ -737,14 +739,14 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    gw.obfuscateKey(keyName),
+			"key":    gw.ObfuscateKey(keyName),
 			"status": "fail",
 			"err":    err,
 		}).Error("Failed to update key.")
 	}
 	log.WithFields(logrus.Fields{
 		"prefix": "RPC",
-		"key":    gw.obfuscateKey(keyName),
+		"key":    gw.ObfuscateKey(keyName),
 		"status": "ok",
 	}).Info("Updated hashed key in slave storage.")
 }
@@ -769,7 +771,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 		if !removed {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
-				"key":    gw.obfuscateKey(keyName),
+				"key":    gw.ObfuscateKey(keyName),
 				"status": "fail",
 			}).Error("Failed to remove the key")
 			return apiError("Failed to remove the key"), http.StatusBadRequest
@@ -787,7 +789,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 	if !gw.GlobalSessionManager.RemoveSession(orgID, keyName, false) {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    gw.obfuscateKey(keyName),
+			"key":    gw.ObfuscateKey(keyName),
 			"status": "fail",
 		}).Error("Failed to remove the key")
 		return apiError("Failed to remove the key"), http.StatusBadRequest
@@ -821,7 +823,7 @@ func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, r
 	if code != http.StatusOK {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    gw.obfuscateKey(keyName),
+			"key":    gw.ObfuscateKey(keyName),
 			"status": "fail",
 		}).Error(res)
 	}
@@ -1595,7 +1597,7 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 	// check if passed key is user name and convert it to real key with respect to current hashing algorithm
 	origKeyName := keyName
 	if r.Method != http.MethodPost && isUserName {
-		keyName = gw.generateToken(orgID, keyName)
+		keyName = gw.GenerateToken(orgID, keyName)
 	}
 
 	var obj interface{}
@@ -1963,7 +1965,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if newSession.Certificate != "" {
-		newKey = gw.generateToken(newSession.OrgID, newSession.Certificate)
+		newKey = gw.GenerateToken(newSession.OrgID, newSession.Certificate)
 		_, ok := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, newKey, false)
 		if ok {
 			doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - Key with given certificate already found:"+newKey))
@@ -2075,7 +2077,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.WithFields(logrus.Fields{
 		"prefix":      "api",
-		"key":         gw.obfuscateKey(newKey),
+		"key":         gw.ObfuscateKey(newKey),
 		"status":      "ok",
 		"api_id":      "--",
 		"org_id":      newSession.OrgID,
@@ -2083,7 +2085,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		"user_ip":     requestIPHops(r),
 		"path":        "--",
 		"server_name": "system",
-	}).Info("Generated new key: (", gw.obfuscateKey(newKey), ")")
+	}).Info("Generated new key: (", gw.ObfuscateKey(newKey), ")")
 
 	doJSONWrite(w, http.StatusOK, obj)
 }

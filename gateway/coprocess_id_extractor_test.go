@@ -98,7 +98,7 @@ func prepareExtractorFormRequest(values map[string]string) *http.Request {
 func (s *Test) GenerateSessionID(input string) string {
 	data := []byte(input)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	return s.Gw.generateToken(MockOrgID, tokenID)
+	return s.Gw.GenerateToken(MockOrgID, tokenID)
 }
 
 func TestValueExtractor(t *testing.T) {

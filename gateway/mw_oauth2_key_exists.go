@@ -86,7 +86,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	accessToken := parts[1]
-	logger = logger.WithField("key", k.Gw.obfuscateKey(accessToken))
+	logger = logger.WithField("key", k.Gw.ObfuscateKey(accessToken))
 
 	// get session for the given oauth token
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(accessToken, r)

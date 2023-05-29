@@ -364,7 +364,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	// Generate a virtual token
 	data := []byte(baseFieldData)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := k.Gw.generateToken(k.Spec.OrgID, keyID)
+	sessionID := k.Gw.GenerateToken(k.Spec.OrgID, keyID)
 	updateSession := false
 
 	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)

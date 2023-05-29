@@ -60,6 +60,7 @@ import (
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 
+	. "github.com/TykTechnologies/tyk/gateway/model"
 	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
