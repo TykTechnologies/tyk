@@ -135,7 +135,7 @@ func (r *RedisCluster) Connect() bool {
 func (r *RedisCluster) singleton() (redis.UniversalClient, error) {
 	instance := r.RedisController.singleton(r.IsCache, r.IsAnalytics)
 	if instance == nil {
-		return nil, ErrRedisIsDown
+		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
 	}
 	return instance, nil
 }
@@ -171,7 +171,7 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	}
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return "", err
 	}
 
@@ -371,7 +371,7 @@ func (r *RedisCluster) Decrement(keyName string) {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return
 	}
 
@@ -393,7 +393,7 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return 0
 	}
 
@@ -422,7 +422,7 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return nil
 	}
 
@@ -508,7 +508,7 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return nil
 	}
 	values := make([]string, 0)
@@ -574,7 +574,7 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return false
 	}
 
@@ -595,7 +595,7 @@ func (r *RedisCluster) DeleteAllKeys() bool {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return false
 	}
 
@@ -620,7 +620,7 @@ func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return false
 	}
 
@@ -640,7 +640,7 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	}
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return false
 	}
 	log.Debug("Deleting: ", pattern)
@@ -720,7 +720,7 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 		log.Debug("Deleting: ", keys)
 		singleton, err := r.singleton()
 		if err != nil {
-			log.Error("Error trying to get singleton instance: ", err)
+			log.Error(err)
 			return false
 		}
 
@@ -825,7 +825,7 @@ func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return nil
 	}
 
@@ -866,7 +866,7 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return
 	}
 
@@ -882,7 +882,7 @@ func (r *RedisCluster) Exists(keyName string) (bool, error) {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return false, err
 	}
 
@@ -909,7 +909,7 @@ func (r *RedisCluster) RemoveFromList(keyName, value string) error {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return err
 	}
 
@@ -934,7 +934,7 @@ func (r *RedisCluster) GetListRange(keyName string, from, to int64) ([]string, e
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return nil, err
 	}
 
@@ -959,7 +959,7 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 	}
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return
 	}
 
@@ -982,7 +982,7 @@ func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return nil, err
 	}
 
@@ -1010,7 +1010,7 @@ func (r *RedisCluster) AddToSet(keyName, value string) {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return
 	}
 
@@ -1030,7 +1030,7 @@ func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return
 	}
 
@@ -1048,7 +1048,7 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return false
 	}
 
@@ -1079,7 +1079,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return 0, nil
 	}
 
@@ -1145,7 +1145,7 @@ func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool)
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return 0, nil
 	}
 
@@ -1208,7 +1208,7 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return
 	}
 
@@ -1232,7 +1232,7 @@ func (r *RedisCluster) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return nil, nil, err
 	}
 
@@ -1270,7 +1270,7 @@ func (r *RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) 
 
 	singleton, err := r.singleton()
 	if err != nil {
-		log.Error("Error trying to get singleton instance: ", err)
+		log.Error(err)
 		return err
 	}
 
