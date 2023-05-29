@@ -3,9 +3,10 @@ package gateway
 import (
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/gateway/service/auth"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/sirupsen/logrus"
 )
 
 type DefaultSessionManager = auth.SessionManager

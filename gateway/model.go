@@ -1,8 +1,9 @@
 package gateway
 
 import (
-	. "github.com/TykTechnologies/tyk/gateway/model"
 	"github.com/sirupsen/logrus"
+
+	. "github.com/TykTechnologies/tyk/gateway/model"
 )
 
 // Logger provides a log context for services.

@@ -3,6 +3,7 @@ package model
 import (
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/sirupsen/logrus"
 )
 
