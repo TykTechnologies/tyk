@@ -133,6 +133,9 @@ func (r *RedisCluster) Connect() bool {
 }
 
 func (r *RedisCluster) singleton() (redis.UniversalClient, error) {
+	if r.RedisController == nil {
+		return nil, fmt.Errorf("Error trying to get singleton instance: RedisController is nil")
+	}
 	instance := r.RedisController.singleton(r.IsCache, r.IsAnalytics)
 	if instance == nil {
 		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
