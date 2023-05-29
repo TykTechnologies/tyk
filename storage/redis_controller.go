@@ -134,13 +134,13 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(
 	c := []RedisCluster{
 		{
 			RedisController: rc,
+			IsAnalytics:     true,
 		},
 		{
-			IsCache:         true,
 			RedisController: rc,
 		},
 		{
-			IsAnalytics:     true,
+			IsCache:         true,
 			RedisController: rc,
 		},
 	}
