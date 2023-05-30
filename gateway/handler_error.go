@@ -33,7 +33,7 @@ const (
 	MsgKeyNotAuthorized                        = "Key not authorised"
 	MsgOauthClientRevoked                      = "Key not authorised. OAuth client access was revoked"
 	MsgKeyNotAuthorizedUnexpectedSigningMethod = "Key not authorized: Unexpected signing method"
-	MsgCertificateExpired                      = "certificate is expired"
+	MsgCertificateExpired                      = "certificate has expired"
 )
 
 var errCustomBodyResponse = errors.New("errCustomBodyResponse")

@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	ErrCertExpired = errors.New("certificate is expired")
+	ErrCertExpired = errors.New("certificate has expired")
 )
 
 // HexSHA256 calculates the SHA256 hash of the provided certificate bytes
