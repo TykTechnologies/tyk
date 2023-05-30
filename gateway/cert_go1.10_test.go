@@ -12,6 +12,7 @@ import (
 	"fmt"
 
 	"github.com/TykTechnologies/tyk/config"
+	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 
 	//	"net"
 	"net/http"
@@ -29,8 +30,8 @@ func (gw *Gateway) uploadCertPublicKey(serverCert tls.Certificate) (string, erro
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
 	pubID, _ := gw.CertificateManager.Add(pubPem, "")
 
-	if pubID != certs.HexSHA256(pubDer) {
-		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", certs.HexSHA256(pubDer), pubID)
+	if pubID != tykcrypto.HexSHA256(pubDer) {
+		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", tykcrypto.HexSHA256(pubDer), pubID)
 		return "", errors.New(errStr)
 	}
 

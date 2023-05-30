@@ -23,21 +23,22 @@ test:
 
 # lint runs all local linters that must pass before pushing
 .PHONY: lint lint-install lint-fast
-lint: lint-install
+lint: lint-fast
 	goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
 	gofmt -w .
 	faillint -ignore-tests -paths "$(shell grep -v '^#' .faillint | xargs echo | sed 's/ /,/g')" ./...
 
-lint-fast:
+lint-fast: lint-install
 	go generate ./...
 	go test -count 1 -v ./cli/linter/...
 	go fmt ./...
 	go mod tidy
 
-lint-install: lint-fast
+lint-install:
 	go install golang.org/x/tools/cmd/goimports@latest
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.0
 	go install github.com/fatih/faillint@latest
+	go install github.com/golang/mock/mockgen@v1.6.0
 
 .PHONY: bench
 bench:
