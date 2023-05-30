@@ -6,7 +6,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -14,12 +13,13 @@ import (
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
-	"net/http"
 	"strings"
 	"time"
 
 	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
+
+	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 )
 
 // StorageHandler is a standard interface to a storage backend,
@@ -36,7 +36,20 @@ type StorageHandler interface {
 	Exists(string) (bool, error)
 }
 
-type CertificateManager struct {
+//go:generate mockgen -destination=./mock/mock.go -package=mock . CertificateManager
+type CertificateManager interface {
+	List(certIDs []string, mode CertificateType) (out []*tls.Certificate)
+	ListPublicKeys(keyIDs []string) (out []string)
+	ListRawPublicKey(keyID string) (out interface{})
+	ListAllIds(prefix string) (out []string)
+	GetRaw(certID string) (string, error)
+	Add(certData []byte, orgID string) (string, error)
+	Delete(certID string, orgID string)
+	CertPool(certIDs []string) *x509.CertPool
+	FlushCache()
+}
+
+type certificateManager struct {
 	storage         StorageHandler
 	logger          *logrus.Entry
 	cache           *cache.Cache
@@ -44,12 +57,12 @@ type CertificateManager struct {
 	migrateCertList bool
 }
 
-func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
+func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
 
-	return &CertificateManager{
+	return &certificateManager{
 		storage:         storage,
 		logger:          logger.WithFields(logrus.Fields{"prefix": "cert_storage"}),
 		cache:           cache.New(5*time.Minute, 10*time.Minute),
@@ -90,11 +103,6 @@ func isSHA256(value string) bool {
 	}
 
 	return true
-}
-
-func HexSHA256(cert []byte) string {
-	certSHA := sha256.Sum256(cert)
-	return hex.EncodeToString(certSHA[:])
 }
 
 func ParsePEM(data []byte, secret string) ([]*pem.Block, error) {
@@ -148,7 +156,7 @@ func ParsePEMCertificate(data []byte, secret string) (*tls.Certificate, error) {
 
 	for _, block := range blocks {
 		if block.Type == "CERTIFICATE" {
-			certID = HexSHA256(block.Bytes)
+			certID = tykcrypto.HexSHA256(block.Bytes)
 			cert.Certificate = append(cert.Certificate, block.Bytes)
 			continue
 		}
@@ -164,7 +172,7 @@ func ParsePEMCertificate(data []byte, secret string) (*tls.Certificate, error) {
 		if block.Type == "PUBLIC KEY" {
 			// Create a dummny cert just for listing purpose
 			cert.Certificate = append(cert.Certificate, block.Bytes)
-			cert.Leaf = &x509.Certificate{Subject: pkix.Name{CommonName: "Public Key: " + HexSHA256(block.Bytes)}}
+			cert.Leaf = &x509.Certificate{Subject: pkix.Name{CommonName: "Public Key: " + tykcrypto.HexSHA256(block.Bytes)}}
 		}
 	}
 
@@ -314,10 +322,10 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 		certChainPEM = append(certChainPEM, []byte("\n")...)
 		certChainPEM = append(certChainPEM, pem.EncodeToMemory(encryptedKeyPEMBlock)...)
 
-		certID = HexSHA256(cert.Certificate[0])
+		certID = tykcrypto.HexSHA256(cert.Certificate[0])
 	} else if len(publicKeyPem) > 0 {
 		publicKey, _ := pem.Decode(publicKeyPem)
-		certID = HexSHA256(publicKey.Bytes)
+		certID = tykcrypto.HexSHA256(publicKey.Bytes)
 	} else {
 		// Get first cert
 		certRaw, _ := pem.Decode(certChainPEM)
@@ -327,12 +335,12 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 			return certID, certChainPEM, err
 		}
 
-		certID = HexSHA256(cert.Raw)
+		certID = tykcrypto.HexSHA256(cert.Raw)
 	}
 	return certID, certChainPEM, nil
 }
 
-func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
+func (c *certificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
 	var err error
@@ -378,7 +386,7 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 }
 
 // Returns list of fingerprints
-func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
+func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 	var rawKey []byte
 	var err error
 
@@ -413,7 +421,7 @@ func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 			continue
 		}
 
-		fingerprint := HexSHA256(block.Bytes)
+		fingerprint := tykcrypto.HexSHA256(block.Bytes)
 		c.cache.Set("pub-"+id, fingerprint, cache.DefaultExpiration)
 		out = append(out, fingerprint)
 	}
@@ -422,7 +430,7 @@ func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 }
 
 // Returns list of fingerprints
-func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
+func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 	var rawKey []byte
 	var err error
 
@@ -457,7 +465,7 @@ func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 	return out
 }
 
-func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
+func (c *certificateManager) ListAllIds(prefix string) (out []string) {
 	indexKey := prefix + "-index"
 	exists, _ := c.storage.Exists(indexKey)
 	if !c.migrateCertList || (exists && prefix != "") {
@@ -485,11 +493,11 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 	return out
 }
 
-func (c *CertificateManager) GetRaw(certID string) (string, error) {
+func (c *certificateManager) GetRaw(certID string) (string, error) {
 	return c.storage.GetKey("raw-" + certID)
 }
 
-func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) {
+func (c *certificateManager) Add(certData []byte, orgID string) (string, error) {
 
 	certID, certChainPEM, err := GetCertIDAndChainPEM(certData, c.secret)
 	if err != nil {
@@ -515,7 +523,7 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 	return certID, nil
 }
 
-func (c *CertificateManager) Delete(certID string, orgID string) {
+func (c *certificateManager) Delete(certID string, orgID string) {
 
 	if orgID != "" {
 		c.storage.RemoveFromList(orgID+"-index", "raw-"+certID)
@@ -525,7 +533,7 @@ func (c *CertificateManager) Delete(certID string, orgID string) {
 	c.cache.Delete(certID)
 }
 
-func (c *CertificateManager) CertPool(certIDs []string) *x509.CertPool {
+func (c *certificateManager) CertPool(certIDs []string) *x509.CertPool {
 	pool := x509.NewCertPool()
 
 	for _, cert := range c.List(certIDs, CertificatePublic) {
@@ -537,40 +545,10 @@ func (c *CertificateManager) CertPool(certIDs []string) *x509.CertPool {
 	return pool
 }
 
-func (c *CertificateManager) ValidateRequestCertificate(certIDs []string, r *http.Request) error {
-	if r.TLS == nil {
-		return errors.New("TLS not enabled")
-	}
-
-	if len(r.TLS.PeerCertificates) == 0 {
-		return errors.New("Client TLS certificate is required")
-	}
-
-	leaf := r.TLS.PeerCertificates[0]
-
-	certID := HexSHA256(leaf.Raw)
-	for _, cert := range c.List(certIDs, CertificatePublic) {
-		// In case a cert can't be parsed or is invalid,
-		// it will be present in the cert list as 'nil'
-		if cert == nil {
-			// Invalid cert, continue to next one
-			continue
-		}
-
-		// Extensions[0] contains cache of certificate SHA256
-		if string(cert.Leaf.Extensions[0].Value) == certID {
-			// Happy flow, we matched a certificate
-			return nil
-		}
-	}
-
-	return errors.New("Certificate with SHA256 " + certID + " not allowed")
-}
-
-func (c *CertificateManager) FlushCache() {
+func (c *certificateManager) FlushCache() {
 	c.cache.Flush()
 }
 
-func (c *CertificateManager) flushStorage() {
+func (c *certificateManager) flushStorage() {
 	c.storage.DeleteScanMatch("*")
 }

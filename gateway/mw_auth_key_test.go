@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/x509"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -9,9 +10,13 @@ import (
 	"testing"
 	"time"
 
+	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/justinas/alice"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/signature_validator"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -369,7 +374,6 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 		t.Error(recorder.Body.String())
 	}
 }
-
 func BenchmarkBearerTokenAuthKeySession(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -587,4 +591,78 @@ func BenchmarkStripBearer(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = stripBearer("Bearer abcdefghijklmnopqrstuvwxyz12345678910")
 	}
+}
+
+func TestDynamicMTLS(t *testing.T) {
+	serverCertPem, _, combinedPEM, _ := tykcrypto.GenServerCertificate()
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
+
+	conf := func(globalConf *config.Config) {
+		globalConf.Security.ControlAPIUseMutualTLS = false
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "default")
+	assert.NoError(t, err)
+	defer ts.Gw.CertificateManager.Delete(certID, "default")
+	ts.ReloadGatewayProxy()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "apiID-1"
+		spec.UseStandardAuth = true
+		spec.UseKeylessAccess = false
+		authConf := apidef.AuthConfig{
+			UseCertificate: true,
+			AuthHeaderName: "Authorization",
+		}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": authConf,
+		}
+		spec.Auth = authConf
+		spec.Proxy.ListenPath = "/dynamic-mtls"
+	})
+
+	// Initialize client certificates
+	clientCertPem, _, _, clientCert := tykcrypto.GenCertificate(&x509.Certificate{}, false)
+
+	clientCertID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+	assert.NoError(t, err)
+
+	ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{"apiID-1": {
+			APIID: "apiID-1",
+		}}
+		s.Certificate = clientCertID
+	})
+
+	t.Run("valid certificate provided", func(t *testing.T) {
+		validCertClient := GetTLSClient(&clientCert, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Domain: "localhost",
+			Client: validCertClient,
+			Path:   "/dynamic-mtls",
+			Code:   http.StatusOK,
+		})
+
+	})
+
+	t.Run("expired client cert", func(t *testing.T) {
+		_, _, _, expiredClientCert := tykcrypto.GenCertificate(&x509.Certificate{
+			NotBefore: time.Now().AddDate(-1, 0, 0),
+			NotAfter:  time.Now().AddDate(0, 0, -1),
+		}, false)
+
+		expiredCertClient := GetTLSClient(&expiredClientCert, serverCertPem)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Client:    expiredCertClient,
+			Path:      "/dynamic-mtls",
+			Code:      http.StatusForbidden,
+			BodyMatch: MsgCertificateExpired,
+		})
+	})
 }
