@@ -235,11 +235,11 @@ func (rc *RedisController) recoverLoop(ctx context.Context, onReconnect func()) 
 
 func (rc *RedisController) connectCluster(conf config.Config, v ...RedisCluster) bool {
 	for _, x := range v {
-		if ok := rc.establishConnection(&x, conf); ok {
-			return ok
+		if ok := rc.establishConnection(&x, conf); !ok {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 func (rc *RedisController) establishConnection(v *RedisCluster, conf config.Config) bool {
