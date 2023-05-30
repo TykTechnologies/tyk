@@ -341,7 +341,7 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 			}
 
 			if cert.NotAfter.Before(time.Now()) {
-				return certID, certChainPEM, tykcrypto.ErrCertExpired
+				return certID, certChainPEM, errors.New("certificate is expired")
 			}
 
 			certBlocks = append(certBlocks, pem.EncodeToMemory(block))
