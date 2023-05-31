@@ -116,7 +116,7 @@ func (s *dummyStorage) GetKeys(pattern string) (keys []string) {
 	return keys
 }
 
-func newManager() *certificateManager {
+func newManager() *CertificateManager {
 	return NewCertificateManager(newDummyStorage(), "test", nil, false)
 }
 

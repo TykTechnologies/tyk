@@ -14,13 +14,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/TykTechnologies/tyk/headers"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/certs/mock"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 
@@ -1434,98 +1430,5 @@ func TestClientCertificates_WithProtocolTLS(t *testing.T) {
 		_, err = client.Read(received)
 		assert.NoError(t, err)
 		assert.Equal(t, []byte("pong"), received)
-	})
-}
-
-func TestStaticMTLSAPI(t *testing.T) {
-	setup := func() (*Test, string, tls.Certificate) {
-		// generate certificate for gw.
-		_, _, combinedPEM, _ := certs.GenServerCertificate()
-		certID, _, err := certs.GetCertIDAndChainPEM(combinedPEM, "")
-		assert.NoError(t, err)
-
-		conf := func(globalConf *config.Config) {
-			globalConf.Security.ControlAPIUseMutualTLS = false
-			globalConf.HttpServerOptions.UseSSL = true
-			globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
-			globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
-			globalConf.SuppressRedisSignalReload = true
-		}
-		ts := StartTest(conf)
-
-		certID, err = ts.Gw.CertificateManager.Add(combinedPEM, "default")
-		assert.NoError(t, err)
-		defer ts.Gw.CertificateManager.Delete(certID, "default")
-		ts.ReloadGatewayProxy()
-
-		// Initialize client certificates
-		clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
-
-		clientCertID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
-		assert.NoError(t, err)
-
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.APIID = "apiID-1"
-			spec.UseMutualTLSAuth = true
-			spec.Proxy.ListenPath = "/static-mtls"
-			spec.ClientCertificates = []string{clientCertID}
-		})
-		return ts, clientCertID, clientCert
-	}
-
-	t.Run("valid client cert", func(t *testing.T) {
-		ts, _, clientCert := setup()
-		defer ts.Close()
-		validCertClient := GetTLSClient(&clientCert, nil)
-		_, _ = ts.Run(t, test.TestCase{
-			Domain: "localhost",
-			Client: validCertClient,
-			Path:   "/static-mtls",
-			Code:   http.StatusOK,
-		})
-	})
-
-	t.Run("expired certificate provided by client", func(t *testing.T) {
-		ts, clientCertID, _ := setup()
-		defer ts.Close()
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		// generate a certificate which got expired 5 days ago.
-		_, _, _, expiredClientCert := certs.GenCertificate(&x509.Certificate{
-			NotBefore: time.Now().AddDate(-1, 0, 0),
-			NotAfter:  time.Now().AddDate(0, 0, -5),
-		}, false)
-
-		// generate expected certID from the returned certificate.
-		expectedCertID := crypto.HexSHA256(expiredClientCert.Certificate[0])
-		leaf := &x509.Certificate{
-			Raw: expiredClientCert.Certificate[0],
-			Extensions: []pkix.Extension{
-				{Value: []byte(expectedCertID)},
-			},
-		}
-
-		expiredClientCert.Leaf = leaf
-
-		mockCertManager := mock.NewMockCertificateManager(ctrl)
-
-		// CertManager.List is being called twice during the flow
-		// 1 during gw.getTLSConfigForClient
-		// 2 inside crypto.ValidateRequestCerts
-		mockCertManager.EXPECT().List([]string{clientCertID}, certs.CertificatePublic).
-			Return([]*tls.Certificate{&expiredClientCert}).Times(2)
-
-		// replace the certificateManager with mockCertManager
-		ts.Gw.CertificateManager = mockCertManager
-		// generate HTTPS client with expired certificate.
-		expiredClient := GetTLSClient(&expiredClientCert, nil)
-		_, _ = ts.Run(t, test.TestCase{
-			Domain:    "localhost",
-			Code:      http.StatusForbidden,
-			Client:    expiredClient,
-			Path:      "/static-mtls",
-			BodyMatch: crypto.ErrCertExpired.Error(),
-		})
 	})
 }

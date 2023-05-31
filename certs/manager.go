@@ -41,20 +41,7 @@ var (
 	GenServerCertificate = tykcrypto.GenServerCertificate
 )
 
-//go:generate mockgen -destination=./mock/mock.go -package=mock . CertificateManager
-type CertificateManager interface {
-	List(certIDs []string, mode CertificateType) (out []*tls.Certificate)
-	ListPublicKeys(keyIDs []string) (out []string)
-	ListRawPublicKey(keyID string) (out interface{})
-	ListAllIds(prefix string) (out []string)
-	GetRaw(certID string) (string, error)
-	Add(certData []byte, orgID string) (string, error)
-	Delete(certID string, orgID string)
-	CertPool(certIDs []string) *x509.CertPool
-	FlushCache()
-}
-
-type certificateManager struct {
+type CertificateManager struct {
 	storage         StorageHandler
 	logger          *logrus.Entry
 	cache           *cache.Cache
@@ -62,12 +49,12 @@ type certificateManager struct {
 	migrateCertList bool
 }
 
-func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
+func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
 
-	return &certificateManager{
+	return &CertificateManager{
 		storage:         storage,
 		logger:          logger.WithFields(logrus.Fields{"prefix": "cert_storage"}),
 		cache:           cache.New(5*time.Minute, 10*time.Minute),
@@ -345,7 +332,7 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 	return certID, certChainPEM, nil
 }
 
-func (c *certificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
+func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
 	var err error
@@ -391,7 +378,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 }
 
 // Returns list of fingerprints
-func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
+func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 	var rawKey []byte
 	var err error
 
@@ -435,7 +422,7 @@ func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 }
 
 // Returns list of fingerprints
-func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
+func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 	var rawKey []byte
 	var err error
 
@@ -470,7 +457,7 @@ func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 	return out
 }
 
-func (c *certificateManager) ListAllIds(prefix string) (out []string) {
+func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 	indexKey := prefix + "-index"
 	exists, _ := c.storage.Exists(indexKey)
 	if !c.migrateCertList || (exists && prefix != "") {
@@ -498,11 +485,11 @@ func (c *certificateManager) ListAllIds(prefix string) (out []string) {
 	return out
 }
 
-func (c *certificateManager) GetRaw(certID string) (string, error) {
+func (c *CertificateManager) GetRaw(certID string) (string, error) {
 	return c.storage.GetKey("raw-" + certID)
 }
 
-func (c *certificateManager) Add(certData []byte, orgID string) (string, error) {
+func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) {
 
 	certID, certChainPEM, err := GetCertIDAndChainPEM(certData, c.secret)
 	if err != nil {
@@ -528,7 +515,7 @@ func (c *certificateManager) Add(certData []byte, orgID string) (string, error) 
 	return certID, nil
 }
 
-func (c *certificateManager) Delete(certID string, orgID string) {
+func (c *CertificateManager) Delete(certID string, orgID string) {
 
 	if orgID != "" {
 		c.storage.RemoveFromList(orgID+"-index", "raw-"+certID)
@@ -538,7 +525,7 @@ func (c *certificateManager) Delete(certID string, orgID string) {
 	c.cache.Delete(certID)
 }
 
-func (c *certificateManager) CertPool(certIDs []string) *x509.CertPool {
+func (c *CertificateManager) CertPool(certIDs []string) *x509.CertPool {
 	pool := x509.NewCertPool()
 
 	for _, cert := range c.List(certIDs, CertificatePublic) {
@@ -550,10 +537,10 @@ func (c *certificateManager) CertPool(certIDs []string) *x509.CertPool {
 	return pool
 }
 
-func (c *certificateManager) FlushCache() {
+func (c *CertificateManager) FlushCache() {
 	c.cache.Flush()
 }
 
-func (c *certificateManager) flushStorage() {
+func (c *CertificateManager) flushStorage() {
 	c.storage.DeleteScanMatch("*")
 }
