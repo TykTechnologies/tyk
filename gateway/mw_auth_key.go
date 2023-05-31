@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
@@ -102,6 +103,10 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 		log.Debug("Trying to find key by client certificate")
 		certHash = crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+		if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
+			return errorAndStatusCode(ErrAuthCertExpired)
+		}
+
 		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
 
 	} else {
