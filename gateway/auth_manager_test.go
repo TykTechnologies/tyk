@@ -7,7 +7,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/headers"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -143,7 +142,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	//We reload the gw proxy so it uses the added server certificate
 	ts.ReloadGatewayProxy()
 
-	clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+	clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 	if err != nil {
 		t.Fatal("certificate should be added to cert manager")

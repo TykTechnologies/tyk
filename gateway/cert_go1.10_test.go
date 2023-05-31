@@ -11,7 +11,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 
 	//	"net"
 	"net/http"
@@ -19,7 +21,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -29,8 +30,8 @@ func (gw *Gateway) uploadCertPublicKey(serverCert tls.Certificate) (string, erro
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
 	pubID, _ := gw.CertificateManager.Add(pubPem, "")
 
-	if pubID != certs.HexSHA256(pubDer) {
-		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", certs.HexSHA256(pubDer), pubID)
+	if pubID != tykcrypto.HexSHA256(pubDer) {
+		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", tykcrypto.HexSHA256(pubDer), pubID)
 		return "", errors.New(errStr)
 	}
 
@@ -163,7 +164,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		_, _, _, serverCert := certs.GenCertificate(&x509.Certificate{
 			EmailAddresses: []string{"test@test.com"},
 			Subject:        pkix.Name{CommonName: "localhost"},
-		})
+		}, false)
 		serverPubID, err := ts.Gw.uploadCertPublicKey(serverCert)
 		if err != nil {
 			t.Error(err)
@@ -182,7 +183,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		// start proxy
 		_, _, _, proxyCert := certs.GenCertificate(&x509.Certificate{
 			Subject: pkix.Name{CommonName: "local1.host"},
-		})
+		}, false)
 		proxyPubID, err := ts.Gw.uploadCertPublicKey(proxyCert)
 		if err != nil {
 			t.Error(err)

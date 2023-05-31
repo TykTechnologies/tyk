@@ -6,7 +6,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -14,12 +13,13 @@ import (
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
-	"net/http"
 	"strings"
 	"time"
 
 	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
+
+	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 )
 
 // StorageHandler is a standard interface to a storage backend,
@@ -35,6 +35,11 @@ type StorageHandler interface {
 	AppendToSet(string, string)
 	Exists(string) (bool, error)
 }
+
+var (
+	GenCertificate       = tykcrypto.GenCertificate
+	GenServerCertificate = tykcrypto.GenServerCertificate
+)
 
 type CertificateManager struct {
 	storage         StorageHandler
@@ -92,11 +97,6 @@ func isSHA256(value string) bool {
 	return true
 }
 
-func HexSHA256(cert []byte) string {
-	certSHA := sha256.Sum256(cert)
-	return hex.EncodeToString(certSHA[:])
-}
-
 func ParsePEM(data []byte, secret string) ([]*pem.Block, error) {
 	var pemBlocks []*pem.Block
 
@@ -148,7 +148,7 @@ func ParsePEMCertificate(data []byte, secret string) (*tls.Certificate, error) {
 
 	for _, block := range blocks {
 		if block.Type == "CERTIFICATE" {
-			certID = HexSHA256(block.Bytes)
+			certID = tykcrypto.HexSHA256(block.Bytes)
 			cert.Certificate = append(cert.Certificate, block.Bytes)
 			continue
 		}
@@ -164,7 +164,7 @@ func ParsePEMCertificate(data []byte, secret string) (*tls.Certificate, error) {
 		if block.Type == "PUBLIC KEY" {
 			// Create a dummny cert just for listing purpose
 			cert.Certificate = append(cert.Certificate, block.Bytes)
-			cert.Leaf = &x509.Certificate{Subject: pkix.Name{CommonName: "Public Key: " + HexSHA256(block.Bytes)}}
+			cert.Leaf = &x509.Certificate{Subject: pkix.Name{CommonName: "Public Key: " + tykcrypto.HexSHA256(block.Bytes)}}
 		}
 	}
 
@@ -314,10 +314,10 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 		certChainPEM = append(certChainPEM, []byte("\n")...)
 		certChainPEM = append(certChainPEM, pem.EncodeToMemory(encryptedKeyPEMBlock)...)
 
-		certID = HexSHA256(cert.Certificate[0])
+		certID = tykcrypto.HexSHA256(cert.Certificate[0])
 	} else if len(publicKeyPem) > 0 {
 		publicKey, _ := pem.Decode(publicKeyPem)
-		certID = HexSHA256(publicKey.Bytes)
+		certID = tykcrypto.HexSHA256(publicKey.Bytes)
 	} else {
 		// Get first cert
 		certRaw, _ := pem.Decode(certChainPEM)
@@ -327,7 +327,7 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 			return certID, certChainPEM, err
 		}
 
-		certID = HexSHA256(cert.Raw)
+		certID = tykcrypto.HexSHA256(cert.Raw)
 	}
 	return certID, certChainPEM, nil
 }
@@ -413,7 +413,7 @@ func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 			continue
 		}
 
-		fingerprint := HexSHA256(block.Bytes)
+		fingerprint := tykcrypto.HexSHA256(block.Bytes)
 		c.cache.Set("pub-"+id, fingerprint, cache.DefaultExpiration)
 		out = append(out, fingerprint)
 	}
@@ -535,36 +535,6 @@ func (c *CertificateManager) CertPool(certIDs []string) *x509.CertPool {
 	}
 
 	return pool
-}
-
-func (c *CertificateManager) ValidateRequestCertificate(certIDs []string, r *http.Request) error {
-	if r.TLS == nil {
-		return errors.New("TLS not enabled")
-	}
-
-	if len(r.TLS.PeerCertificates) == 0 {
-		return errors.New("Client TLS certificate is required")
-	}
-
-	leaf := r.TLS.PeerCertificates[0]
-
-	certID := HexSHA256(leaf.Raw)
-	for _, cert := range c.List(certIDs, CertificatePublic) {
-		// In case a cert can't be parsed or is invalid,
-		// it will be present in the cert list as 'nil'
-		if cert == nil {
-			// Invalid cert, continue to next one
-			continue
-		}
-
-		// Extensions[0] contains cache of certificate SHA256
-		if string(cert.Leaf.Extensions[0].Value) == certID {
-			// Happy flow, we matched a certificate
-			return nil
-		}
-	}
-
-	return errors.New("Certificate with SHA256 " + certID + " not allowed")
 }
 
 func (c *CertificateManager) FlushCache() {

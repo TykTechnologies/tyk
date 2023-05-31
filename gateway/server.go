@@ -19,6 +19,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
+
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
@@ -536,7 +539,8 @@ func stripSlashes(next http.Handler) http.Handler {
 func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if gw.GetConfig().Security.ControlAPIUseMutualTLS {
-			if err := gw.CertificateManager.ValidateRequestCertificate(gw.GetConfig().Security.Certificates.ControlAPI, r); err != nil {
+			gwCerts := gw.CertificateManager.List(gw.GetConfig().Security.Certificates.ControlAPI, certs.CertificatePublic)
+			if err := crypto.ValidateRequestCerts(r, gwCerts); err != nil {
 				doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 				return
 			}
