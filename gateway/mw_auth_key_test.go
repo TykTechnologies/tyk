@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/justinas/alice"
 	"github.com/stretchr/testify/assert"
 
@@ -594,7 +593,7 @@ func BenchmarkStripBearer(b *testing.B) {
 }
 
 func TestDynamicMTLS(t *testing.T) {
-	serverCertPem, _, combinedPEM, _ := tykcrypto.GenServerCertificate()
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	conf := func(globalConf *config.Config) {
@@ -627,7 +626,7 @@ func TestDynamicMTLS(t *testing.T) {
 	})
 
 	// Initialize client certificates
-	clientCertPem, _, _, clientCert := tykcrypto.GenCertificate(&x509.Certificate{}, false)
+	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 
 	clientCertID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
 	assert.NoError(t, err)
@@ -651,7 +650,7 @@ func TestDynamicMTLS(t *testing.T) {
 	})
 
 	t.Run("expired client cert", func(t *testing.T) {
-		_, _, _, expiredClientCert := tykcrypto.GenCertificate(&x509.Certificate{
+		_, _, _, expiredClientCert := certs.GenCertificate(&x509.Certificate{
 			NotBefore: time.Now().AddDate(-1, 0, 0),
 			NotAfter:  time.Now().AddDate(0, 0, -1),
 		}, false)

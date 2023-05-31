@@ -18,8 +18,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
-	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
-
 	"google.golang.org/grpc/metadata"
 
 	"golang.org/x/net/http2/h2c"
@@ -144,8 +142,8 @@ func TestHTTP2_TLS(t *testing.T) {
 	expected := "HTTP/2.0"
 
 	// Certificates
-	_, _, _, clientCert := tykcrypto.GenCertificate(&x509.Certificate{}, false)
-	serverCertPem, _, combinedPEM, _ := tykcrypto.GenServerCertificate()
+	_, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	// Upstream server supporting HTTP/2
@@ -197,8 +195,8 @@ func TestHTTP2_TLS(t *testing.T) {
 func TestTLSTyk_H2cUpstream(t *testing.T) {
 
 	// Certificates
-	_, _, _, clientCert := tykcrypto.GenCertificate(&x509.Certificate{}, false)
-	serverCertPem, _, combinedPEM, _ := tykcrypto.GenServerCertificate()
+	_, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	var port = 6666
@@ -254,7 +252,7 @@ func TestTLSTyk_H2cUpstream(t *testing.T) {
 
 func TestGRPC_TLS(t *testing.T) {
 
-	_, _, combinedPEM, _ := tykcrypto.GenServerCertificate()
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	// gRPC server
@@ -302,9 +300,9 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	// Mutual Authentication for both downstream-tyk and tyk-upstream
 
 	//generate certificates
-	_, _, combinedClientPEM, clientCert := tykcrypto.GenCertificate(&x509.Certificate{}, false)
+	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
-	serverCertPem, _, combinedPEM, _ := tykcrypto.GenServerCertificate()
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	// we can know the certId before add it to cert manager
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
@@ -358,7 +356,7 @@ func TestGRPC_MutualTLS(t *testing.T) {
 
 func TestGRPC_BasicAuthentication(t *testing.T) {
 
-	_, _, combinedPEM, _ := tykcrypto.GenServerCertificate()
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	// gRPC server
@@ -417,7 +415,7 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 
 func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 
-	_, _, combinedPEM, _ := tykcrypto.GenServerCertificate()
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	// gRPC server
@@ -523,7 +521,7 @@ func openListener(t *testing.T) net.Listener {
 }
 
 func grpcServerCreds(t *testing.T, clientCert *x509.Certificate) []grpc.ServerOption {
-	cert, key, _, _ := tykcrypto.GenCertificate(&x509.Certificate{}, false)
+	cert, key, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
 	certificate, _ := tls.X509KeyPair(cert, key)
 
 	pool := x509.NewCertPool()
@@ -671,7 +669,7 @@ func (*loginCredsOrToken) RequireTransportSecurity() bool {
 func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	// Mutual Authentication for both downstream-tyk and tyk-upstream
 
-	serverCertPem, _, combinedPEM, _ := tykcrypto.GenServerCertificate()
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	serverCertID, _, _ := certs.GetCertIDAndChainPEM(serverCertPem, "")
 
 	// Tyk
@@ -685,7 +683,7 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
-	_, _, combinedClientPEM, clientCert := tykcrypto.GenCertificate(&x509.Certificate{}, false)
+	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
 	defer ts.Gw.CertificateManager.Delete(certID, "")
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
@@ -725,7 +723,7 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 
 func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 
-	_, _, combinedPEM, _ := tykcrypto.GenServerCertificate()
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	serverCertID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	// gRPC server
@@ -802,7 +800,7 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 
 func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 
-	_, _, combinedPEM, _ := tykcrypto.GenServerCertificate()
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	serverCertID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	// gRPC server

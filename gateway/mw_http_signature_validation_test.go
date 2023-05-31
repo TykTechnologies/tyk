@@ -25,11 +25,10 @@ import (
 	"github.com/justinas/alice"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/user"
-
-	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const hmacAuthDef = `{
@@ -695,7 +694,7 @@ func TestRSAAuthSessionPass(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, _, serverCert := tykcrypto.GenServerCertificate()
+	_, _, _, serverCert := certs.GenServerCertificate()
 	privateKey := serverCert.PrivateKey.(*rsa.PrivateKey)
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
@@ -730,7 +729,7 @@ func BenchmarkRSAAuthSessionPass(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, _, serverCert := tykcrypto.GenServerCertificate()
+	_, _, _, serverCert := certs.GenServerCertificate()
 	privateKey := serverCert.PrivateKey.(*rsa.PrivateKey)
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
@@ -759,7 +758,7 @@ func TestRSAAuthSessionKeyMissing(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, _, serverCert := tykcrypto.GenServerCertificate()
+	_, _, _, serverCert := certs.GenServerCertificate()
 	privateKey := serverCert.PrivateKey.(*rsa.PrivateKey)
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)

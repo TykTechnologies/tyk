@@ -36,6 +36,11 @@ type StorageHandler interface {
 	Exists(string) (bool, error)
 }
 
+var (
+	GenCertificate       = tykcrypto.GenCertificate
+	GenServerCertificate = tykcrypto.GenServerCertificate
+)
+
 //go:generate mockgen -destination=./mock/mock.go -package=mock . CertificateManager
 type CertificateManager interface {
 	List(certIDs []string, mode CertificateType) (out []*tls.Certificate)
