@@ -39,6 +39,7 @@ type StorageHandler interface {
 var (
 	GenCertificate       = tykcrypto.GenCertificate
 	GenServerCertificate = tykcrypto.GenServerCertificate
+	HexSHA256            = tykcrypto.HexSHA256
 )
 
 type CertificateManager struct {
