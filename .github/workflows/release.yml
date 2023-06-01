@@ -120,6 +120,9 @@ jobs:
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
 
+      - name: Show Github SHA
+        run: echo ${{ github.sha }}
+
       - uses: goreleaser/goreleaser-action@v4
         with:
           version: latest
