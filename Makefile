@@ -102,7 +102,7 @@ mongo-shell:
 .PHONY: docker docker-std
 
 docker:
-	docker build --platform ${BUILD_PLATFORM} --no-cache --rm -t internal/tyk-gateway --squash .
+	docker build --platform ${BUILD_PLATFORM} --rm -t internal/tyk-gateway --squash .
 
 docker-std: build
 	docker build --platform ${BUILD_PLATFORM} --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .
