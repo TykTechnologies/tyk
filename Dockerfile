@@ -56,12 +56,17 @@ RUN	apt install python3 -y
 RUN find /tmp -type f -delete
 
 # Build gateway
-
 RUN mkdir /opt/tyk-gateway
 WORKDIR /opt/tyk-gateway
+ADD go.mod go.sum /opt/tyk-gateway
+RUN go mod download
 ADD . /opt/tyk-gateway
 
+<<<<<<< HEAD
 RUN make build && go clean -modcache
+=======
+RUN make build
+>>>>>>> 76a00611... [TT-9060] Improvement: Restructure dockerfile to take advantage of caching (#5060)
 
 COPY tyk.conf.example tyk.conf
 
