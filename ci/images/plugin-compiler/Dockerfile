@@ -21,7 +21,7 @@ RUN curl -L -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2
 RUN cd $TYK_GW_PATH
 
 # Remove some things to decrease CVE surface
-RUN  apt-get remove -y --allow-remove-essential --auto-remove curl libtiff5 ncurses-base mercurial \
+RUN  apt-get remove -y --allow-remove-essential --auto-remove curl mercurial \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 ENTRYPOINT ["/build.sh"]
