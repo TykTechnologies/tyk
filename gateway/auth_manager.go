@@ -53,8 +53,12 @@ func (b *DefaultSessionManager) Store() storage.Handler {
 
 func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState, isHashed bool) {
 	origKeyName := keyName
+	//is the key hashed? no, then do we want to hash the key? no, then we need to obfuscate the key
 	if !isHashed {
 		keyName = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
+	}
+	if !b.Gw.GetConfig().HashKeys && !b.Gw.GetConfig().EnableKeyLogging {
+		keyName = b.Gw.obfuscateKey(origKeyName)
 	}
 
 	rawKey := QuotaKeyPrefix + keyName
@@ -82,7 +86,6 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 	if !hashed {
 		cacheKey = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
 	}
-
 	// Delete gateway's cache immediately
 	b.Gw.SessionCache.Delete(cacheKey)
 
