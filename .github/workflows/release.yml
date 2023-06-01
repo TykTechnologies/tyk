@@ -136,6 +136,7 @@ jobs:
           DEBVERS: ${{ matrix.debvers }}
           RPMVERS: ${{ matrix.rpmvers }}
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+          GITHUB_SHA: ${{ github.sha }}
 
       - uses: actions/upload-artifact@v3
         with:
