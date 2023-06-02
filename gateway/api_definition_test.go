@@ -15,13 +15,9 @@ import (
 	"text/template"
 	"time"
 
-<<<<<<< HEAD
-=======
 	"github.com/TykTechnologies/storage/persistent/model"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/rpc"
 
->>>>>>> 3b6aa955... TT-9013 Fix RPCStorageHandler init when loading policies from RPC (#5059)
 	"github.com/stretchr/testify/assert"
 
 	redis "github.com/go-redis/redis/v8"
@@ -1431,19 +1427,6 @@ func TestAPISpec_GetSessionLifetimeRespectsKeyExpiration(t *testing.T) {
 		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
 	})
 }
-<<<<<<< HEAD
-=======
-
-func TestAPISpec_isListeningOnPort(t *testing.T) {
-	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
-	cfg := &config.Config{}
-
-	cfg.ListenPort = 7000
-	assert.True(t, s.isListeningOnPort(7000, cfg))
-
-	s.ListenPort = 8000
-	assert.True(t, s.isListeningOnPort(8000, cfg))
-}
 
 func Test_LoadAPIsFromRPC(t *testing.T) {
 	ts := StartTest(nil)
@@ -1494,4 +1477,3 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC backup")
 	})
 }
->>>>>>> 3b6aa955... TT-9013 Fix RPCStorageHandler init when loading policies from RPC (#5059)
