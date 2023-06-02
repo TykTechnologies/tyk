@@ -35,6 +35,7 @@ var (
 var (
 	GenCertificate       = tykcrypto.GenCertificate
 	GenServerCertificate = tykcrypto.GenServerCertificate
+	HexSHA256            = tykcrypto.HexSHA256
 )
 
 //go:generate mockgen -destination=./mock/mock.go -package=mock . CertificateManager
