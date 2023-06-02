@@ -13,15 +13,21 @@ import (
 
 // SetupNewRelic creates new newrelic.Application instance
 func (gw *Gateway) SetupNewRelic() (app newrelic.Application) {
-	var err error
+	var (
+		err      error
+		gwConfig = gw.GetConfig()
+	)
+
 	logger := log.WithFields(logrus.Fields{"prefix": "newrelic"})
 
 	logger.Info("Initializing NewRelic...")
 
-	cfg := newrelic.NewConfig(gw.GetConfig().NewRelic.AppName, gw.GetConfig().NewRelic.LicenseKey)
-	if gw.GetConfig().NewRelic.AppName != "" {
+	cfg := newrelic.NewConfig(gwConfig.NewRelic.AppName, gwConfig.NewRelic.LicenseKey)
+	if gwConfig.NewRelic.AppName != "" {
 		cfg.Enabled = true
 	}
+	cfg.DistributedTracer.Enabled = gwConfig.NewRelic.EnableDistributedTracing
+
 	cfg.Logger = &newRelicLogger{logger}
 
 	if app, err = newrelic.NewApplication(cfg); err != nil {

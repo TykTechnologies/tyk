@@ -57,7 +57,6 @@ func (d *GRPCDispatcher) DispatchEvent(eventJSON []byte) {
 	}
 
 	_, err := grpcClient.DispatchEvent(context.Background(), eventObject)
-
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
@@ -89,10 +88,13 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 	if gw.GetConfig().CoProcessOptions.CoProcessGRPCServer == "" {
 		return nil, errors.New("No gRPC URL is set")
 	}
+	authority := gw.GetConfig().CoProcessOptions.GRPCAuthority
+
 	var err error
 	grpcConnection, err = grpc.Dial("",
 		gw.grpcCallOpts(),
 		grpc.WithInsecure(),
+		grpc.WithAuthority(authority),
 		grpc.WithDialer(gw.dialer),
 	)
 

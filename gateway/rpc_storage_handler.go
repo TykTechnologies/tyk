@@ -7,8 +7,7 @@ import (
 	"strings"
 	"time"
 
-	cache "github.com/pmylund/go-cache"
-
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/go-redis/redis/v8"
@@ -113,6 +112,12 @@ type RPCStorageHandler struct {
 	SuppressRegister bool
 	DoReload         func()
 	Gw               *Gateway `json:"-"`
+}
+
+type RPCDataLoader interface {
+	Connect() bool
+	GetApiDefinitions(orgId string, tags []string) string
+	GetPolicies(orgId string) string
 }
 
 // Connect will establish a connection to the RPC

@@ -21,10 +21,11 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-redis/redis/v8"
-	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -645,11 +646,6 @@ func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 						}}
 					})
 
-					withAccess := CreateStandardSession()
-					withAccess.AccessRights = map[string]user.AccessDefinition{testAPIID: {
-						APIID: testAPIID,
-					}}
-
 					authHeaders := map[string]string{
 						"authorization": key,
 					}
@@ -850,7 +846,6 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 }
 
 func TestHashKeyHandler(t *testing.T) {
-	test.Racy(t) // TODO: TT-5233
 	conf := func(globalConf *config.Config) {
 		// make it to use hashes for Redis keys
 		globalConf.HashKeys = true
@@ -1070,20 +1065,26 @@ func (ts *Test) testHashFuncAndBAHelper(t *testing.T) {
 
 	_, _ = ts.Run(t, []test.TestCase{
 		{
-			Method:    "POST",
+			Method:    http.MethodPost,
 			Path:      "/tyk/keys/defaultuser",
 			Data:      session,
 			AdminAuth: true,
 			Code:      200,
 		},
 		{
-			Method:    "GET",
-			Path:      "/tyk/keys/defaultuser?username=true&org_id=default",
+			Method: http.MethodGet,
+			Path:   "/tyk/keys/defaultuser?username=true&org_id=default",
+			BodyMatchFunc: func(resp []byte) bool {
+				keyResp := user.SessionState{}
+				err := json.Unmarshal(resp, &keyResp)
+				assert.NoError(t, err)
+				return keyResp.BasicAuthData.Password == ""
+			},
 			AdminAuth: true,
 			Code:      200,
 		},
 		{
-			Method:    "DELETE",
+			Method:    http.MethodDelete,
 			Path:      "/tyk/keys/defaultuser?username=true&org_id=default",
 			AdminAuth: true,
 			Code:      200,
@@ -1836,7 +1837,8 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 
 	for hp := range inputs {
 		apis = append(apis, BuildAPI(func(spec *APISpec) {
-			spec.APIID = uuid.NewV4().String()
+			spec.APIID = uuid.New()
+
 			spec.Domain = hp.host
 			spec.Proxy.ListenPath = "/" + hp.path
 		})[0])
@@ -2745,7 +2747,7 @@ func TestOAS(t *testing.T) {
 				})
 				t.Run("get scope public", func(t *testing.T) {
 					_, _ = ts.Run(t, []test.TestCase{
-						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath + "?mode=public", BodyMatch: `.*components`,
+						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath + "?mode=public", BodyMatch: `.*info`,
 							BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
 						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID + "/export?mode=public",
 							BodyMatch: apidef.ErrOASGetForOldAPI.Error(), Code: http.StatusBadRequest},
@@ -2767,7 +2769,7 @@ func TestOAS(t *testing.T) {
 				})
 				t.Run("get scope public", func(t *testing.T) {
 					_, _ = ts.Run(t, []test.TestCase{
-						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oasAPIID + "/export?mode=public", BodyMatch: `components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oasAPIID + "/export?mode=public", BodyMatch: `info`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
 					}...)
 				})
 			})
@@ -2792,12 +2794,12 @@ func TestOAS(t *testing.T) {
 		// copy OAS API, we need to manipulate tyk extension here
 		copyOAS := func(oasAPI openapi3.T) oas.OAS {
 			apiInOAS := oas.OAS{T: oasAPI}
-			oasExt := oasAPI.ExtensionProps.Extensions
+			oasExt := oasAPI.Extensions
 			copyExt := make(map[string]interface{})
 			for k, v := range oasExt {
 				copyExt[k] = v
 			}
-			apiInOAS.T.ExtensionProps.Extensions = copyExt
+			apiInOAS.T.Extensions = copyExt
 			return apiInOAS
 		}
 
@@ -2892,7 +2894,7 @@ func TestOAS(t *testing.T) {
 			fillPaths(&apiInOAS)
 
 			tykExt := apiInOAS.GetTykExtension()
-			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 			apiInOAS.T.Info.Title = "patched-oas-doc"
 			testPatchOAS(t, ts, apiInOAS, nil, apiID)
@@ -2911,7 +2913,7 @@ func TestOAS(t *testing.T) {
 			fillReqBody(&apiInOAS, "/pets", http.MethodPost)
 
 			expectedTykExt := apiInOAS.GetTykExtension()
-			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 			listenPath, upstreamURL, customDomain := "/listen-api/", "https://new-upstream.org", "custom-upstream.com"
 
@@ -3033,7 +3035,7 @@ func TestOAS(t *testing.T) {
 				fillPaths(&apiInOAS)
 
 				tykExt := apiInOAS.GetTykExtension()
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				apiInOAS.T.Info.Title = "patched-oas-doc"
 
@@ -3060,7 +3062,7 @@ func TestOAS(t *testing.T) {
 				fillPaths(&apiInOAS)
 
 				tykExt := apiInOAS.GetTykExtension()
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				apiInOAS.T.Info.Title = "patched-oas-doc"
 
@@ -3093,7 +3095,7 @@ func TestOAS(t *testing.T) {
 		t.Run("error on invalid upstreamURL", func(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
 			fillPaths(&apiInOAS)
-			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 			upstreamURL := "new-upstream.org"
 
@@ -3115,7 +3117,7 @@ func TestOAS(t *testing.T) {
 			t.Run("empty apiID", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				patchPath := fmt.Sprintf("/tyk/apis/oas/%s", " ")
 
@@ -3128,7 +3130,7 @@ func TestOAS(t *testing.T) {
 			t.Run("malformed body", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				_, _ = ts.Run(t, []test.TestCase{
 					{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: `oas-body`,
@@ -3140,7 +3142,7 @@ func TestOAS(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
 
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				nonExistingAPIID := "non-existing-api-id"
 				patchPath := fmt.Sprintf("/tyk/apis/oas/%s", nonExistingAPIID)
@@ -3172,7 +3174,7 @@ func TestOAS(t *testing.T) {
 					ts.Gw.SetConfig(conf)
 				}()
 
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				_, _ = ts.Run(t, []test.TestCase{
 					{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &apiInOAS,
@@ -3210,7 +3212,7 @@ func TestOAS(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
 			fillPaths(&apiInOAS)
 
-			delete(apiInOAS.T.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			delete(apiInOAS.T.Extensions, oas.ExtensionTykAPIGateway)
 			apiInOAS.Paths = nil
 
 			patchPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
@@ -3241,8 +3243,8 @@ func TestOAS(t *testing.T) {
 
 			_, _ = ts.Run(t, []test.TestCase{
 				{Method: http.MethodGet, Path: listenPath, Code: http.StatusOK},
-				{AdminAuth: true, Method: http.MethodGet, Path: path, BodyNotMatch: "components", Code: http.StatusOK},
-				{AdminAuth: true, Method: http.MethodGet, Path: oasPath, BodyMatch: `components`, Code: http.StatusOK},
+				{AdminAuth: true, Method: http.MethodGet, Path: path, BodyNotMatch: "info", Code: http.StatusOK},
+				{AdminAuth: true, Method: http.MethodGet, Path: oasPath, BodyMatch: `info`, Code: http.StatusOK},
 				{AdminAuth: true, Method: http.MethodDelete, Path: path, BodyMatch: `"action":"deleted"`, Code: http.StatusOK},
 			}...)
 

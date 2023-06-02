@@ -877,6 +877,7 @@
             "jwt_claim",
             "oidc_user",
             "oauth_key",
+            "custom_auth",
             ""
           ]
         },

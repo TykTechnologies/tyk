@@ -32,7 +32,6 @@ const (
 	NoticeDashboardConfigRequest NotificationCommand = "NoticeDashboardConfigRequest"
 	NoticeGatewayConfigResponse  NotificationCommand = "NoticeGatewayConfigResponse"
 	NoticeGatewayDRLNotification NotificationCommand = "NoticeGatewayDRLNotification"
-	NoticeGatewayLENotification  NotificationCommand = "NoticeGatewayLENotification"
 	KeySpaceUpdateNotification   NotificationCommand = "KeySpaceUpdateNotification"
 )
 
@@ -126,8 +125,6 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 			return
 		}
 		gw.onServerStatusReceivedHandler(notif.Payload)
-	case NoticeGatewayLENotification:
-		gw.onLESSLStatusReceivedHandler(notif.Payload)
 	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
 		pubSubLog.Info("Reloading endpoints")
 		gw.reloadURLStructure(reloaded)

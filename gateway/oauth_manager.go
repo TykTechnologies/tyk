@@ -17,8 +17,9 @@ import (
 	"github.com/TykTechnologies/tyk/request"
 
 	"github.com/lonelycode/osin"
-	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"strconv"
 
@@ -1004,8 +1005,10 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		}
 	}
 
+	sessionLifetime := r.Gw.ApplyLifetime(newSession)
+
 	// Use the default session expiry here as this is OAuth
-	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, int64(accessData.ExpiresIn), false)
+	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, sessionLifetime, false)
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
@@ -1138,8 +1141,7 @@ func (a accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefre
 
 	accesstoken = a.Gw.keyGen.GenerateAuthKey(newSession.OrgID)
 	if generaterefresh {
-		u6 := uuid.NewV4()
-		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))
+		refreshtoken = base64.StdEncoding.EncodeToString([]byte(uuid.New()))
 	}
 	return
 }

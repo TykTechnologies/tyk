@@ -3,7 +3,6 @@ package gateway
 import (
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -11,7 +10,8 @@ import (
 )
 
 const (
-	checkOAuthClientDeletedInetrval = 1 * time.Second
+	// Check OAuth client deleted interval in seconds.
+	checkOAuthClientDeletedInterval = 1
 )
 
 const (
@@ -113,11 +113,11 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		// if not cached in memory then hit Redis to get oauth-client from there
 		if _, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(session.OauthClientID); err != nil {
 			// set this oauth client as deleted in memory cache for the next N sec
-			k.Gw.UtilCache.Set(oauthClientDeletedKey, true, checkOAuthClientDeletedInetrval)
+			k.Gw.UtilCache.Set(oauthClientDeletedKey, true, checkOAuthClientDeletedInterval)
 			oauthClientDeleted = true
 		} else {
 			// set this oauth client as NOT deleted in memory cache for next N sec
-			k.Gw.UtilCache.Set(oauthClientDeletedKey, false, checkOAuthClientDeletedInetrval)
+			k.Gw.UtilCache.Set(oauthClientDeletedKey, false, checkOAuthClientDeletedInterval)
 		}
 	}
 	if oauthClientDeleted {

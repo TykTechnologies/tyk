@@ -3,10 +3,10 @@ name: Policy as Code
 on:
   pull_request:
     paths:
-      - ci/repo-policy/**
+      - repo-policy/**
 
 env:
-  TERRAFORM_DIR: "./ci/repo-policy"
+  TERRAFORM_DIR: "./repo-policy"
 
 jobs:
   terraform:
@@ -49,6 +49,8 @@ jobs:
           terraform plan -no-color -input=false
           echo "::endgroup::"
         continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.ITS_GH_TOKEN }}
 
       - name: Update Pull Request
         uses: actions/github-script@v6

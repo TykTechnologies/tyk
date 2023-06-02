@@ -234,7 +234,7 @@ type DnsCacheConfig struct {
 	TTL int64 `json:"ttl"`
 
 	CheckInterval int64 `json:"-" ignored:"true"`
-	//controls cache cleanup interval. By convention this shouldn't be exposed to a config or env_variable_setup
+	// controls cache cleanup interval. By convention this shouldn't be exposed to a config or env_variable_setup
 
 	// A strategy which will be used when a DNS query will reply with more than 1 IP Address per single host.
 	// As a DNS query response IP Addresses can have a changing order depending on DNS server balancing strategy (eg: round robin, geographically dependent origin-ip ordering, etc) this option allows you to not to limit the connection to the first host in a cached response list or prevent response caching.
@@ -312,7 +312,7 @@ type SlaveOptionsConfig struct {
 	// The maximum time in seconds that a RPC ping can last.
 	PingTimeout int `json:"ping_timeout"`
 
-	// The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed.
+	// The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed. Defaults to 5.
 	RPCPoolSize int `json:"rpc_pool_size"`
 
 	// You can use this to set a period for which the Gateway will check if there are changes in keys that must be synchronized. If this value is not set then it will default to 10 seconds.
@@ -358,9 +358,6 @@ type HttpServerOptionsConfig struct {
 
 	// Set to true to enable SSL connections
 	UseSSL bool `json:"use_ssl"`
-
-	// Enable Lets-Encrypt support
-	UseLE_SSL bool `json:"use_ssl_le"`
 
 	// Enable HTTP2 protocol handling
 	EnableHttp2 bool `json:"enable_http2"`
@@ -412,6 +409,18 @@ type HttpServerOptionsConfig struct {
 
 	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
 	Ciphers []string `json:"ssl_ciphers"`
+
+	// MaxRequestBodySize configures the maximum request body size in bytes.
+	//
+	// This option evaluates the `Content-Length` header and responds with
+	// a HTTP 413 status code if larger than the defined size. If the header
+	// is not provided, the request body is read up to the defined size.
+	// If the request body is larger than the defined size, then we respond
+	// with HTTP 413 status code.
+	//
+	// See more information about setting request size limits here:
+	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
+	MaxRequestBodySize int64 `json:"max_request_body_size"`
 }
 
 type AuthOverrideConf struct {
@@ -457,6 +466,9 @@ type CoProcessConfig struct {
 	// Maximum message which can be sent to gRPC server
 	GRPCSendMaxSize int `json:"grpc_send_max_size"`
 
+	// Authority used in GRPC connection
+	GRPCAuthority string `json:"grpc_authority"`
+
 	// Sets the path to built-in Tyk modules. This will be part of the Python module lookup path. The value used here is the default one for most installations.
 	PythonPathPrefix string `json:"python_path_prefix"`
 
@@ -494,6 +506,8 @@ type NewRelicConfig struct {
 	AppName string `json:"app_name"`
 	// New Relic License key
 	LicenseKey string `json:"license_key"`
+	// Enable distributed tracing
+	EnableDistributedTracing bool `json:"enable_distributed_tracing"`
 }
 
 type Tracer struct {

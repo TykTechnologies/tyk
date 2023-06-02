@@ -14,14 +14,14 @@ env:
 
 jobs:
   test:
-    name: Go ${{ matrix.go }} Redis ${{ matrix.redis-version }}
+    name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
       matrix:
         redis-version: [5]
         python-version: ['3.9']
-        go: [1.16]
+        go-version: [1.19.x]
 
     steps:
       - name: Checkout Tyk
@@ -32,7 +32,7 @@ jobs:
       - name: Setup Golang
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ matrix.go-version }}
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -52,13 +52,17 @@ jobs:
           make lint
           
           git add --all
+
           git diff HEAD > git-state.log
-          echo "git-state=$(sed -ze 's/%/%25/g;s/\n/%0A/g' git-state.log)" >> $GITHUB_OUTPUT
 
           git_state_count=$(wc -l < git-state.log)
           
           if [[ $git_state_count -ne 0 ]]
           then 
+            echo "git-state<<EOF" >> $GITHUB_OUTPUT
+            cat git-state.log >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+
             echo "make lint made git state dirty, please run make lint locally and update PR"
             exit 1
           fi
@@ -71,7 +75,6 @@ jobs:
         with:
           redis-version: ${{ matrix.redis-version }}
 
-
       - name: Cache
         uses: actions/cache@v2
         with:
@@ -83,10 +86,7 @@ jobs:
       - name: Run Gateway Tests
         id: ci-tests
         run: |
-          ./bin/ci-tests.sh 2>&1 | tee test.log
-          result_code=${PIPESTATUS[0]}
-          echo "log=$(sed -ze 's/%/%25/g;s/\n/%0A/g' test.log)" >> $GITHUB_OUTPUT
-          exit $result_code
+          ./bin/ci-tests.sh 2>&1
 
       - name: Notify status
         if: ${{ failure() && github.event.pull_request.number }}
@@ -119,7 +119,7 @@ jobs:
             -Dsonar.projectKey=TykTechnologies_tyk
             -Dsonar.sources=.
             -Dsonar.exclusions=coprocess/**/*,ci/**,smoke-tests/**,apidef/oas/schema/schema.gen.go
-            -Dsonar.coverage.exclusions=**/*_test.go
+            -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*
             -Dsonar.test.inclusions=**/*_test.go
             -Dsonar.tests=.
             -Dsonar.go.coverage.reportPaths=*.cov

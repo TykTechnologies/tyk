@@ -1,31 +1,20 @@
 package adapter
 
 import (
-	"net/http"
-
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"sort"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
-func parseSchema(schemaAsString string) (parsedSchema *graphql.Schema, err error) {
-	parsedSchema, err = graphql.NewSchemaFromString(schemaAsString)
-	if err != nil {
-		return nil, err
-	}
+type GraphQLEngineAdapterType int
 
-	normalizationResult, err := parsedSchema.Normalize()
-	if err != nil {
-		return nil, err
-	}
-
-	if !normalizationResult.Successful && normalizationResult.Errors != nil {
-		return nil, normalizationResult.Errors
-	}
-
-	return parsedSchema, nil
-}
+const (
+	GraphQLEngineAdapterTypeUnknown = iota
+	GraphQLEngineAdapterTypeProxyOnly
+	GraphQLEngineAdapterTypeSupergraph
+	GraphQLEngineAdapterTypeUniversalDataGraph
+)
 
 func isSupergraphAPIDefinition(apiDefinition *apidef.APIDefinition) bool {
 	return apiDefinition.GraphQL.Enabled && apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
@@ -36,52 +25,67 @@ func isProxyOnlyAPIDefinition(apiDefinition *apidef.APIDefinition) bool {
 		(apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly || apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph)
 }
 
-func graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType) string {
-	wsProtocol := graphqlDataSource.ProtocolGraphQLWS
-	if subscriptionType == apidef.GQLSubscriptionTransportWS {
-		wsProtocol = graphqlDataSource.ProtocolGraphQLTWS
-	}
-	return wsProtocol
+func isUniversalDataGraphAPIDefinition(apiDefinition *apidef.APIDefinition) bool {
+	return apiDefinition.GraphQL.Enabled && apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine
 }
 
-func graphqlSubscriptionType(subscriptionType apidef.SubscriptionType) graphql.SubscriptionType {
-	switch subscriptionType {
-	case apidef.GQLSubscriptionWS:
-		return graphql.SubscriptionTypeGraphQLWS
-	case apidef.GQLSubscriptionTransportWS:
-		return graphql.SubscriptionTypeGraphQLTransportWS
-	case apidef.GQLSubscriptionSSE:
-		return graphql.SubscriptionTypeSSE
-	default:
-		return graphql.SubscriptionTypeUnknown
+func graphqlEngineAdapterTypeFromApiDefinition(apiDefinition *apidef.APIDefinition) GraphQLEngineAdapterType {
+	if isProxyOnlyAPIDefinition(apiDefinition) {
+		return GraphQLEngineAdapterTypeProxyOnly
+	}
+
+	if isSupergraphAPIDefinition(apiDefinition) {
+		return GraphQLEngineAdapterTypeSupergraph
+	}
+
+	if isUniversalDataGraphAPIDefinition(apiDefinition) {
+		return GraphQLEngineAdapterTypeUniversalDataGraph
+	}
+
+	return GraphQLEngineAdapterTypeUnknown
+}
+
+func newApiDefinition(name, orgId string) *apidef.APIDefinition {
+	return &apidef.APIDefinition{
+		Name:   name,
+		Active: true,
+		OrgID:  orgId,
+		APIID:  uuid.NewHex(),
+		GraphQL: apidef.GraphQLConfig{
+			Enabled:       true,
+			Version:       apidef.GraphQLConfigVersion2,
+			ExecutionMode: apidef.GraphQLExecutionModeExecutionEngine,
+			Proxy: apidef.GraphQLProxyConfig{
+				AuthHeaders: make(map[string]string),
+			},
+		},
+		VersionDefinition: apidef.VersionDefinition{
+			Enabled:  false,
+			Location: "header",
+		},
+		VersionData: apidef.VersionData{
+			NotVersioned: true,
+			Versions: map[string]apidef.VersionInfo{
+				"Default": {
+					Name:             "Default",
+					UseExtendedPaths: true,
+				},
+			},
+		},
+		Proxy: apidef.ProxyConfig{
+			StripListenPath: true,
+		},
 	}
 }
 
-func convertApiDefinitionHeadersToHttpHeaders(apiDefHeaders map[string]string) http.Header {
-	if len(apiDefHeaders) == 0 {
-		return nil
-	}
-
-	engineV2Headers := make(http.Header)
-	for apiDefHeaderKey, apiDefHeaderValue := range apiDefHeaders {
-		engineV2Headers.Add(apiDefHeaderKey, apiDefHeaderValue)
-	}
-
-	return engineV2Headers
+func sortFieldConfigsByName(apiDefinition *apidef.APIDefinition) {
+	sort.Slice(apiDefinition.GraphQL.Engine.FieldConfigs, func(i, j int) bool {
+		return apiDefinition.GraphQL.Engine.FieldConfigs[i].FieldName < apiDefinition.GraphQL.Engine.FieldConfigs[j].FieldName
+	})
 }
 
-func removeDuplicateApiDefinitionHeaders(headers ...map[string]string) map[string]string {
-	hdr := make(map[string]string)
-	// headers priority depends on the order of arguments
-	for _, header := range headers {
-		for k, v := range header {
-			keyCanonical := http.CanonicalHeaderKey(k)
-			if _, ok := hdr[keyCanonical]; ok {
-				// skip because header is present
-				continue
-			}
-			hdr[keyCanonical] = v
-		}
-	}
-	return hdr
+func sortDataSourcesByName(apiDefinition *apidef.APIDefinition) {
+	sort.Slice(apiDefinition.GraphQL.Engine.DataSources, func(i, j int) bool {
+		return apiDefinition.GraphQL.Engine.DataSources[i].Name < apiDefinition.GraphQL.Engine.DataSources[j].Name
+	})
 }

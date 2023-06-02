@@ -10,10 +10,11 @@ import (
 	"strings"
 
 	"github.com/buger/jsonparser"
-	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/murmur3"
 	logger "github.com/TykTechnologies/tyk/log"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 var log = logger.Get()
@@ -71,7 +72,7 @@ const defaultHashAlgorithm = "murmur64"
 // If hashing algorithm is empty, use legacy key generation
 func GenerateToken(orgID, keyID, hashAlgorithm string) (string, error) {
 	if keyID == "" {
-		keyID = strings.Replace(uuid.NewV4().String(), "-", "", -1)
+		keyID = uuid.NewHex()
 	}
 
 	if hashAlgorithm != "" {

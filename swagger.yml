@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Tyk Gateway API
-  version: 4.3.0
+  version: 5.0.0
   description: |-
     The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway system. This API is very small, and has no granular permissions system. It is intended to be used purely for internal automation and integration.
 
@@ -3008,9 +3008,10 @@ components:
           type: number
           x-go-name: MaxQueryDepth
         access_rights:
-          $ref: '#/components/schemas/AccessDefinition'
           type: object
           x-go-name: AccessRights
+          additionalProperties:
+              $ref: '#/components/schemas/AccessDefinition'
         hmac_enabled:
           type: boolean
           x-go-name: HMACEnabled

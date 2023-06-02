@@ -8,13 +8,16 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
+	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestOpenTracing(t *testing.T) {
@@ -92,7 +95,7 @@ func TestFuzzyFindAPI(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	objectId := apidef.NewObjectId()
+	objectId := model.NewObjectID()
 
 	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
@@ -266,16 +269,19 @@ func TestCORS(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
 
+	api1ID := uuid.New()
+	api2ID := uuid.New()
+
 	apis := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "CORS test API"
-		spec.APIID = "cors-api"
+		spec.APIID = api1ID
 		spec.Proxy.ListenPath = "/cors-api/"
 		spec.CORS.Enable = false
 		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
 		spec.CORS.AllowedOrigins = []string{"*"}
 	}, func(spec *APISpec) {
 		spec.Name = "Another API"
-		spec.APIID = "another-api"
+		spec.APIID = api2ID
 		spec.Proxy.ListenPath = "/another-api/"
 		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
 		spec.CORS.AllowedOrigins = []string{"*"}
@@ -302,10 +308,9 @@ func TestCORS(t *testing.T) {
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Path: "/cors-api/", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
-		}...)
-
-		_, _ = g.Run(t, []test.TestCase{
 			{Path: "/another-api/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
+			{Path: "/" + api1ID + "/", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
+			{Path: "/" + api2ID + "/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
 		}...)
 	})
 
@@ -367,4 +372,57 @@ func TestTykRateLimitsStatusOfAPI(t *testing.T) {
 		quotaMax, quotaRemaining, rate, per)
 
 	_, _ = g.Run(t, test.TestCase{Path: "/my-api/tyk/rate-limits/", Headers: authHeader, BodyMatch: bodyMatch, Code: http.StatusOK})
+}
+
+func TestAllApisAreMTLS(t *testing.T) {
+	// Create a new instance of the Gateway
+	gw := &Gateway{
+		apisByID: make(map[string]*APISpec),
+	}
+
+	// Define API specs
+	spec1 := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			UseMutualTLSAuth: true,
+			Active:           true,
+			APIID:            "api1",
+		},
+	}
+	spec2 := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			UseMutualTLSAuth: true,
+			Active:           true,
+			APIID:            "api2",
+		},
+	}
+	spec3 := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			UseMutualTLSAuth: true,
+			Active:           true,
+			APIID:            "api3",
+		},
+	}
+
+	// Add API specs to the gateway
+	gw.apisByID[spec1.APIID] = spec1
+	gw.apisByID[spec2.APIID] = spec2
+	gw.apisByID[spec3.APIID] = spec3
+
+	result := gw.allApisAreMTLS()
+
+	expected := true
+	if result != expected {
+		t.Errorf("Expected AllApisAreMTLS to return %v, but got %v", expected, result)
+	}
+
+	// Change one API to not use mutual TLS authentication
+	spec3.UseMutualTLSAuth = false
+
+	// Call the method again
+	result = gw.allApisAreMTLS()
+
+	expected = false
+	if result != expected {
+		t.Errorf("Expected AllApisAreMTLS to return %v, but got %v", expected, result)
+	}
 }
