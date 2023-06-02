@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -325,6 +326,140 @@ func TestGetGroupLoginCallback(t *testing.T) {
 			groupLogin, ok := fn(tc.givenKey, tc.givenGroup).(apidef.GroupLoginRequest)
 			assert.True(t, ok)
 			assert.Equal(t, tc.expectedCallbackResponse, groupLogin)
+		})
+	}
+
+}
+
+func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
+	tcs := []struct {
+		testName         string
+		givenTs          func() *Test
+		expectedNodeInfo apidef.NodeData
+	}{
+		{
+			testName: "base",
+			givenTs: func() *Test {
+				ts := StartTest(func(globalConf *config.Config) {
+				})
+				return ts
+			},
+			expectedNodeInfo: apidef.NodeData{
+				NodeID:      "",
+				GroupName:   "",
+				TTL:         0,
+				Tags:        nil,
+				NodeVersion: VERSION,
+				Health:      make(map[string]apidef.HealthCheckItem, 0),
+				Stats: apidef.GWStats{
+					APIsCount:     0,
+					PoliciesCount: 0,
+				},
+			},
+		},
+		{
+			testName: "custom conf",
+			givenTs: func() *Test {
+				ts := StartTest(func(globalConf *config.Config) {
+					globalConf.SlaveOptions.GroupID = "group"
+					globalConf.DBAppConfOptions.Tags = []string{"tag1"}
+					globalConf.LivenessCheck.CheckDuration = 1
+				})
+
+				return ts
+			},
+			expectedNodeInfo: apidef.NodeData{
+				NodeID:      "",
+				GroupName:   "group",
+				TTL:         1,
+				Tags:        []string{"tag1"},
+				NodeVersion: VERSION,
+				Health:      make(map[string]apidef.HealthCheckItem, 0),
+				Stats: apidef.GWStats{
+					APIsCount:     0,
+					PoliciesCount: 0,
+				},
+			},
+		},
+		{
+			testName: "with loaded apis and policies",
+			givenTs: func() *Test {
+				ts := StartTest(func(globalConf *config.Config) {
+					globalConf.SlaveOptions.GroupID = "group"
+					globalConf.DBAppConfOptions.Tags = []string{"tag1"}
+					globalConf.LivenessCheck.CheckDuration = 1
+				})
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.APIID = "test"
+					spec.UseKeylessAccess = false
+					spec.Auth.UseParam = true
+					spec.OrgID = "default"
+				})
+
+				ts.CreatePolicy(func(p *user.Policy) {
+					p.Partitions.RateLimit = true
+					p.Tags = []string{"p1-tag"}
+					p.MetaData = map[string]interface{}{
+						"p1-meta": "p1-value",
+					}
+				})
+
+				return ts
+			},
+			expectedNodeInfo: apidef.NodeData{
+				NodeID:      "",
+				GroupName:   "group",
+				TTL:         1,
+				Tags:        []string{"tag1"},
+				NodeVersion: VERSION,
+				Health:      make(map[string]apidef.HealthCheckItem, 0),
+				Stats: apidef.GWStats{
+					APIsCount:     1,
+					PoliciesCount: 1,
+				},
+			},
+		},
+		{
+			testName: "with node_id",
+			givenTs: func() *Test {
+				ts := StartTest(func(globalConf *config.Config) {
+					globalConf.SlaveOptions.GroupID = "group"
+					globalConf.DBAppConfOptions.Tags = []string{"tag1", "tag2"}
+					globalConf.LivenessCheck.CheckDuration = 1
+				})
+
+				ts.Gw.SetNodeID("test-node-id")
+				return ts
+			},
+			expectedNodeInfo: apidef.NodeData{
+				NodeID:      "test-node-id",
+				GroupName:   "group",
+				TTL:         1,
+				Tags:        []string{"tag1", "tag2"},
+				NodeVersion: VERSION,
+				Health:      make(map[string]apidef.HealthCheckItem, 0),
+				Stats: apidef.GWStats{
+					APIsCount:     0,
+					PoliciesCount: 0,
+				},
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.testName, func(t *testing.T) {
+			ts := tc.givenTs()
+			defer ts.Close()
+
+			r := &RPCStorageHandler{Gw: ts.Gw}
+
+			expected, err := json.Marshal(tc.expectedNodeInfo)
+			assert.Nil(t, err)
+
+			result := r.buildNodeInfo()
+
+			assert.Equal(t, expected, result)
 		})
 	}
 

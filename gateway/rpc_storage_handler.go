@@ -164,7 +164,12 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		},
 	}
 
-	data, _ := json.Marshal(node)
+	data, err := json.Marshal(node)
+	if err != nil {
+		log.Error("Error marshalling node info", err)
+		return nil
+	}
+
 	return data
 }
 

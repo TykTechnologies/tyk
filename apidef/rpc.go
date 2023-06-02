@@ -23,18 +23,18 @@ type GroupLoginRequest struct {
 }
 
 type NodeData struct {
-	NodeID      string
-	GroupName   string
-	NodeVersion string
-	TTL         int64
-	Tags        []string
-	Health      map[string]HealthCheckItem
-	Stats       GWStats
+	NodeID      string                     `json:"node_id"`
+	GroupName   string                     `json:"group_name"`
+	NodeVersion string                     `json:"node_version"`
+	TTL         int64                      `json:"ttl"`
+	Tags        []string                   `json:"tags"`
+	Health      map[string]HealthCheckItem `json:"health"`
+	Stats       GWStats                    `json:"stats"`
 }
 
 type GWStats struct {
-	APIsCount     int
-	PoliciesCount int
+	APIsCount     int `json:"apis_count"`
+	PoliciesCount int `json:"policies_count"`
 }
 
 type GroupKeySpaceRequest struct {
