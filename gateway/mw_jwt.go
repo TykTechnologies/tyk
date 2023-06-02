@@ -527,7 +527,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			scopeClaimName = "scope"
 		}
 
-		if scope := getScopeFromClaim(claims, scopeClaimName); scope != nil {
+		if scope := getScopeFromClaim(claims, scopeClaimName); len(scope) > 0 {
 			polIDs := []string{
 				basePolicyID, // add base policy as a first one
 			}
