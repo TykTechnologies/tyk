@@ -223,3 +223,21 @@ func TestSingleton(t *testing.T) {
 	assert.NoError(t, cmd.Err())
 	assert.Equal(t, cacheInstance, cacheInstance2)
 }
+
+func TestCheckIsOpen(t *testing.T) {
+	conf := config.Default
+	rc := NewRedisController(context.Background())
+
+	cluster := RedisCluster{
+		RedisController: rc,
+	}
+	err := cluster.checkIsOpen()
+	assert.Error(t, err)
+	assert.EqualError(t, err, ErrRedisIsDown.Error())
+	ok := rc.connectSingleton(false, false, conf)
+	assert.True(t, ok)
+
+	err = cluster.checkIsOpen()
+	assert.NoError(t, err)
+
+}

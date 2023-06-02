@@ -116,6 +116,9 @@ func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
 	c := cluster.RedisController.singleton(cluster.IsCache, cluster.IsAnalytics)
+	if c == nil {
+		return false
+	}
 	testKey := "redis-test-" + uuid.New()
 	if err := c.Set(cluster.RedisController.ctx, testKey, "test", time.Second).Err(); err != nil {
 		return false
@@ -141,6 +144,15 @@ func (r *RedisCluster) singleton() (redis.UniversalClient, error) {
 		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
 	}
 	return instance, nil
+}
+
+// checkIsOpen checks if the connection is open. This method is using for backoff retry.
+func (r *RedisCluster) checkIsOpen() error {
+	isOpen := clusterConnectionIsOpen(r)
+	if !isOpen {
+		return ErrRedisIsDown
+	}
+	return nil
 }
 
 func (r *RedisCluster) hashKey(in string) string {

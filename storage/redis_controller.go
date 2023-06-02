@@ -147,22 +147,15 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(
 	}
 
 	// First time connecting to the clusters. We need this for the first connection (and avoid waiting 1second for the rc.statusCheck loop).
-	up := true
 	for _, v := range c {
 		rc.connectSingleton(v.IsCache, v.IsAnalytics, *conf)
-		err := backoff.Retry(func() error {
-			isOpen := clusterConnectionIsOpen(&v)
-			if !isOpen {
-				return ErrRedisIsDown
-			}
-			return nil
-		}, getExponentialBackoff())
+		err := backoff.Retry(v.checkIsOpen, getExponentialBackoff())
 		if err != nil {
 			log.WithError(err).Errorf("Could not connect to Redis cluster after many attempts. Host(s): %v", getRedisAddrs(conf.Storage))
 		}
 	}
 
-	rc.redisUp.Store(up)
+	rc.redisUp.Store(true)
 
 	defer func() {
 		close(rc.reconnect)
