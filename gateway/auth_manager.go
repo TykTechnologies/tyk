@@ -65,13 +65,11 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 		keyName = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
 	}
 
-	keyName = b.ResetQuotaObfuscateKey(keyName)
-
 	rawKey := QuotaKeyPrefix + keyName
 	log.WithFields(logrus.Fields{
 		"prefix":      "auth-mgr",
 		"inbound-key": b.Gw.obfuscateKey(origKeyName),
-		"key":         rawKey,
+		"key":         b.ResetQuotaObfuscateKey(keyName),
 	}).Info("Reset quota for key.")
 
 	rateLimiterSentinelKey := RateLimitKeyPrefix + keyName + ".BLOCKED"
