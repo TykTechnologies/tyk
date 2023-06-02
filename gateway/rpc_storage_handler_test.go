@@ -285,43 +285,26 @@ func TestRPCUpdateKey(t *testing.T) {
 }
 
 func TestGetGroupLoginCallback(t *testing.T) {
-	expectedNodeInfo := apidef.NodeData{
-		NodeID:      "",
-		GroupID:     "",
-		APIKey:      "",
-		TTL:         0,
-		Tags:        nil,
-		NodeVersion: VERSION,
-		Health:      make(map[string]apidef.HealthCheckItem, 0),
-		Stats: apidef.GWStats{
-			APIsCount:     0,
-			PoliciesCount: 0,
-		},
-	}
-
-	nodeData, err := json.Marshal(expectedNodeInfo)
-	assert.Nil(t, err)
-
 	tcs := []struct {
 		testName                 string
 		syncEnabled              bool
 		givenKey                 string
 		givenGroup               string
-		expectedCallbackResponse interface{}
+		expectedCallbackResponse apidef.GroupLoginRequest
 	}{
 		{
 			testName:                 "sync disabled",
 			syncEnabled:              false,
 			givenKey:                 "key",
 			givenGroup:               "group",
-			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group", Node: nodeData},
+			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group"},
 		},
 		{
 			testName:                 "sync enabled",
 			syncEnabled:              true,
 			givenKey:                 "key",
 			givenGroup:               "group",
-			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group", Node: nodeData, ForceSync: true},
+			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group", ForceSync: true},
 		},
 	}
 
@@ -338,6 +321,25 @@ func TestGetGroupLoginCallback(t *testing.T) {
 				SuppressRegister: true,
 				Gw:               g.Gw,
 			}
+
+			expectedNodeInfo := apidef.NodeData{
+				NodeID:      "",
+				GroupID:     "",
+				APIKey:      "",
+				TTL:         0,
+				Tags:        nil,
+				NodeVersion: VERSION,
+				Health:      g.Gw.getHealthCheckInfo(),
+				Stats: apidef.GWStats{
+					APIsCount:     0,
+					PoliciesCount: 0,
+				},
+			}
+
+			nodeData, err := json.Marshal(expectedNodeInfo)
+			assert.Nil(t, err)
+
+			tc.expectedCallbackResponse.Node = nodeData
 
 			fn := rpcListener.getGroupLoginCallback(tc.syncEnabled)
 			groupLogin, ok := fn(tc.givenKey, tc.givenGroup).(apidef.GroupLoginRequest)
