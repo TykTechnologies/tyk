@@ -4,7 +4,11 @@ import (
 	"context"
 	"sync/atomic"
 
+<<<<<<< HEAD
 	"github.com/TykTechnologies/tyk/config"
+=======
+	"github.com/cenk/backoff"
+>>>>>>> ccecd4cd... [TT-8901] Preventing panics if cache_storage is down (#5065)
 	redis "github.com/go-redis/redis/v8"
 
 	"time"
@@ -120,6 +124,7 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onConnect func(),
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	c := []RedisCluster{
+<<<<<<< HEAD
 		{RedisController: rc},
 		{IsCache: true, RedisController: rc},
 		{IsAnalytics: true, RedisController: rc},
@@ -133,10 +138,67 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onConnect func(),
 		if !clusterConnectionIsOpen(&v) {
 			rc.redisUp.Store(false)
 			break
+=======
+		{
+			RedisController: rc,
+		},
+		{
+			RedisController: rc,
+			IsCache:         true,
+		},
+		{
+			RedisController: rc,
+			IsAnalytics:     true,
+		},
+	}
+
+	// First time connecting to the clusters. We need this for the first connection (and avoid waiting 1second for the rc.statusCheck loop).
+	for _, v := range c {
+		rc.connectSingleton(v.IsCache, v.IsAnalytics, *conf)
+		err := backoff.Retry(v.checkIsOpen, getExponentialBackoff())
+		if err != nil {
+			log.WithError(err).Errorf("Could not connect to Redis cluster after many attempts. Host(s): %v", getRedisAddrs(conf.Storage))
+>>>>>>> ccecd4cd... [TT-8901] Preventing panics if cache_storage is down (#5065)
 		}
 		ok = true
 	}
+<<<<<<< HEAD
 	rc.redisUp.Store(ok)
+=======
+
+	rc.redisUp.Store(true)
+
+	defer func() {
+		close(rc.reconnect)
+		rc.disconnect()
+	}()
+
+	go rc.recoverLoop(ctx, onReconnect)
+
+	// We need the ticker to constantly checking the connection status of Redis. If Redis gets down and up again, we should be able to recover.
+	rc.statusCheck(ctx, conf, c)
+}
+
+// getExponentialBackoff returns a backoff.ExponentialBackOff with the following settings:
+//   - Multiplier: 2
+//   - MaxInterval: 10 seconds
+//   - MaxElapsedTime: 0 (no limit)
+func getExponentialBackoff() *backoff.ExponentialBackOff {
+	exponentialBackoff := backoff.NewExponentialBackOff()
+	exponentialBackoff.Multiplier = 2
+	exponentialBackoff.MaxInterval = 10 * time.Second
+	exponentialBackoff.MaxElapsedTime = 0
+
+	return exponentialBackoff
+}
+
+// statusCheck will check the Redis status each second. If we transition from a disconnected to connected state, it will send a msg to the reconnect chan.
+// This method will be constantly modifying the redisUp control flag.
+func (rc *RedisController) statusCheck(ctx context.Context, conf *config.Config, clusters []RedisCluster) {
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+
+>>>>>>> ccecd4cd... [TT-8901] Preventing panics if cache_storage is down (#5065)
 	for {
 		select {
 		case <-ctx.Done():
@@ -161,11 +223,11 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onConnect func(),
 
 func (rc *RedisController) connectCluster(conf config.Config, v ...RedisCluster) bool {
 	for _, x := range v {
-		if ok := rc.establishConnection(&x, conf); ok {
-			return ok
+		if ok := rc.establishConnection(&x, conf); !ok {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 func (rc *RedisController) establishConnection(v *RedisCluster, conf config.Config) bool {
