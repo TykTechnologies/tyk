@@ -151,16 +151,18 @@ func (r *RPCStorageHandler) Connect() bool {
 }
 
 func (r *RPCStorageHandler) buildNodeInfo() []byte {
+	config := r.Gw.GetConfig()
 	node := apidef.NodeData{
 		NodeID:      r.Gw.GetNodeID(),
-		GroupName:   r.Gw.GetConfig().SlaveOptions.GroupID,
+		GroupID:     config.SlaveOptions.GroupID,
+		Hostname:    config.HostName,
 		NodeVersion: VERSION,
-		TTL:         int64(r.Gw.GetConfig().LivenessCheck.CheckDuration),
-		Tags:        r.Gw.GetConfig().DBAppConfOptions.Tags,
+		TTL:         int64(config.LivenessCheck.CheckDuration),
+		Tags:        config.DBAppConfOptions.Tags,
 		Health:      r.Gw.getHealthCheckInfo(),
 		Stats: apidef.GWStats{
-			APIsCount:     len(r.Gw.apisByID),
-			PoliciesCount: len(r.Gw.policiesByID),
+			APIsCount:     r.Gw.apisByIDLen(),
+			PoliciesCount: r.Gw.policiesByIDLen(),
 		},
 	}
 
@@ -192,7 +194,7 @@ func (r *RPCStorageHandler) getGroupLoginCallback(synchroniserEnabled bool) func
 		}
 	}
 	if synchroniserEnabled {
-		forcer := rpc.NewSyncForcer(r.Gw.RedisController)
+		forcer := rpc.NewSyncForcer(r.Gw.RedisController, r.buildNodeInfo())
 		groupLoginCallbackFn = forcer.GroupLoginCallback
 	}
 	return groupLoginCallbackFn

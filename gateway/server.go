@@ -308,6 +308,12 @@ func (gw *Gateway) getPolicy(polID string) user.Policy {
 	return pol
 }
 
+func (gw *Gateway) policiesByIDLen() int {
+	gw.policiesMu.RLock()
+	defer gw.policiesMu.RUnlock()
+	return len(gw.policiesByID)
+}
+
 func (gw *Gateway) apisByIDLen() int {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()

@@ -285,6 +285,23 @@ func TestRPCUpdateKey(t *testing.T) {
 }
 
 func TestGetGroupLoginCallback(t *testing.T) {
+	expectedNodeInfo := apidef.NodeData{
+		NodeID:      "",
+		GroupID:     "",
+		Hostname:    "",
+		TTL:         0,
+		Tags:        nil,
+		NodeVersion: VERSION,
+		Health:      make(map[string]apidef.HealthCheckItem, 0),
+		Stats: apidef.GWStats{
+			APIsCount:     0,
+			PoliciesCount: 0,
+		},
+	}
+
+	nodeData, err := json.Marshal(expectedNodeInfo)
+	assert.Nil(t, err)
+
 	tcs := []struct {
 		testName                 string
 		syncEnabled              bool
@@ -297,14 +314,14 @@ func TestGetGroupLoginCallback(t *testing.T) {
 			syncEnabled:              false,
 			givenKey:                 "key",
 			givenGroup:               "group",
-			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group"},
+			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group", Node: nodeData},
 		},
 		{
 			testName:                 "sync enabled",
 			syncEnabled:              true,
 			givenKey:                 "key",
 			givenGroup:               "group",
-			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group", ForceSync: true},
+			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group", Node: nodeData, ForceSync: true},
 		},
 	}
 
@@ -346,7 +363,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			},
 			expectedNodeInfo: apidef.NodeData{
 				NodeID:      "",
-				GroupName:   "",
+				GroupID:     "",
 				TTL:         0,
 				Tags:        nil,
 				NodeVersion: VERSION,
@@ -364,13 +381,15 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 					globalConf.SlaveOptions.GroupID = "group"
 					globalConf.DBAppConfOptions.Tags = []string{"tag1"}
 					globalConf.LivenessCheck.CheckDuration = 1
+					globalConf.HostName = "hostname-test"
 				})
 
 				return ts
 			},
 			expectedNodeInfo: apidef.NodeData{
 				NodeID:      "",
-				GroupName:   "group",
+				GroupID:     "group",
+				Hostname:    "hostname-test",
 				TTL:         1,
 				Tags:        []string{"tag1"},
 				NodeVersion: VERSION,
@@ -409,7 +428,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			},
 			expectedNodeInfo: apidef.NodeData{
 				NodeID:      "",
-				GroupName:   "group",
+				GroupID:     "group",
 				TTL:         1,
 				Tags:        []string{"tag1"},
 				NodeVersion: VERSION,
@@ -434,7 +453,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			},
 			expectedNodeInfo: apidef.NodeData{
 				NodeID:      "test-node-id",
-				GroupName:   "group",
+				GroupID:     "group",
 				TTL:         1,
 				Tags:        []string{"tag1", "tag2"},
 				NodeVersion: VERSION,
@@ -462,5 +481,4 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			assert.Equal(t, expected, result)
 		})
 	}
-
 }
