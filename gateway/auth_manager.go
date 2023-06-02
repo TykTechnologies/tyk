@@ -34,6 +34,13 @@ type DefaultSessionManager struct {
 	Gw    *Gateway `json:"-"`
 }
 
+func (b *DefaultSessionManager) ResetQuotaObfuscateKey(keyName string) string {
+	if !b.Gw.GetConfig().HashKeys && !b.Gw.GetConfig().EnableKeyLogging {
+		return b.Gw.obfuscateKey(keyName)
+	}
+	return keyName
+}
+
 func (b *DefaultSessionManager) Init(store storage.Handler) {
 	b.store = store
 	b.store.Connect()
@@ -53,13 +60,12 @@ func (b *DefaultSessionManager) Store() storage.Handler {
 
 func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState, isHashed bool) {
 	origKeyName := keyName
-	//is the key hashed? no, then do we want to hash the key? no, then we need to obfuscate the key
+
 	if !isHashed {
 		keyName = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
 	}
-	if !b.Gw.GetConfig().HashKeys && !b.Gw.GetConfig().EnableKeyLogging {
-		keyName = b.Gw.obfuscateKey(origKeyName)
-	}
+
+	keyName = b.ResetQuotaObfuscateKey(keyName)
 
 	rawKey := QuotaKeyPrefix + keyName
 	log.WithFields(logrus.Fields{
