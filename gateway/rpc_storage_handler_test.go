@@ -288,7 +288,7 @@ func TestGetGroupLoginCallback(t *testing.T) {
 	expectedNodeInfo := apidef.NodeData{
 		NodeID:      "",
 		GroupID:     "",
-		Hostname:    "",
+		APIKey:      "",
 		TTL:         0,
 		Tags:        nil,
 		NodeVersion: VERSION,
@@ -364,10 +364,10 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			expectedNodeInfo: apidef.NodeData{
 				NodeID:      "",
 				GroupID:     "",
+				APIKey:      "",
 				TTL:         0,
 				Tags:        nil,
 				NodeVersion: VERSION,
-				Health:      make(map[string]apidef.HealthCheckItem, 0),
 				Stats: apidef.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
@@ -381,7 +381,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 					globalConf.SlaveOptions.GroupID = "group"
 					globalConf.DBAppConfOptions.Tags = []string{"tag1"}
 					globalConf.LivenessCheck.CheckDuration = 1
-					globalConf.HostName = "hostname-test"
+					globalConf.SlaveOptions.APIKey = "apikey-test"
 				})
 
 				return ts
@@ -389,11 +389,10 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			expectedNodeInfo: apidef.NodeData{
 				NodeID:      "",
 				GroupID:     "group",
-				Hostname:    "hostname-test",
+				APIKey:      "apikey-test",
 				TTL:         1,
 				Tags:        []string{"tag1"},
 				NodeVersion: VERSION,
-				Health:      make(map[string]apidef.HealthCheckItem, 0),
 				Stats: apidef.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
@@ -432,7 +431,6 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				TTL:         1,
 				Tags:        []string{"tag1"},
 				NodeVersion: VERSION,
-				Health:      make(map[string]apidef.HealthCheckItem, 0),
 				Stats: apidef.GWStats{
 					APIsCount:     1,
 					PoliciesCount: 1,
@@ -457,7 +455,6 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				TTL:         1,
 				Tags:        []string{"tag1", "tag2"},
 				NodeVersion: VERSION,
-				Health:      make(map[string]apidef.HealthCheckItem, 0),
 				Stats: apidef.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
@@ -472,6 +469,8 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			defer ts.Close()
 
 			r := &RPCStorageHandler{Gw: ts.Gw}
+
+			tc.expectedNodeInfo.Health = ts.Gw.getHealthCheckInfo()
 
 			expected, err := json.Marshal(tc.expectedNodeInfo)
 			assert.Nil(t, err)

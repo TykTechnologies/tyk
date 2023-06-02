@@ -22,12 +22,17 @@ func (gw *Gateway) setCurrentHealthCheckInfo(h map[string]apidef.HealthCheckItem
 }
 
 func (gw *Gateway) getHealthCheckInfo() map[string]apidef.HealthCheckItem {
-	ret := gw.healthCheckInfo.Load().(map[string]apidef.HealthCheckItem)
+	ret, ok := gw.healthCheckInfo.Load().(map[string]apidef.HealthCheckItem)
+	if !ok {
+		return make(map[string]apidef.HealthCheckItem, 0)
+	}
 	return ret
 }
 
 func (gw *Gateway) initHealthCheck(ctx context.Context) {
 	gw.setCurrentHealthCheckInfo(make(map[string]apidef.HealthCheckItem, 3))
+	// execute one health check before start the loop so we don't wait X seconds to get the first result
+	gw.gatherHealthChecks()
 
 	go func(ctx context.Context) {
 		var n = gw.GetConfig().LivenessCheck.CheckDuration

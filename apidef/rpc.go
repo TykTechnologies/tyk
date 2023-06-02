@@ -24,8 +24,8 @@ type GroupLoginRequest struct {
 
 type NodeData struct {
 	NodeID      string                     `json:"node_id"`
+	APIKey      string                     `json:"api_key"`
 	GroupID     string                     `json:"group_id"`
-	Hostname    string                     `json:"hostname"`
 	NodeVersion string                     `json:"node_version"`
 	TTL         int64                      `json:"ttl"`
 	Tags        []string                   `json:"tags"`

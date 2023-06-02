@@ -155,7 +155,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 	node := apidef.NodeData{
 		NodeID:      r.Gw.GetNodeID(),
 		GroupID:     config.SlaveOptions.GroupID,
-		Hostname:    config.HostName,
+		APIKey:      config.SlaveOptions.APIKey,
 		NodeVersion: VERSION,
 		TTL:         int64(config.LivenessCheck.CheckDuration),
 		Tags:        config.DBAppConfOptions.Tags,
