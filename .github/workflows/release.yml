@@ -140,6 +140,7 @@ jobs:
           RPMVERS: ${{ matrix.rpmvers }}
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
           GITHUB_SHA: ${{ github.sha }}
+          DOCKER_BUILD_ARGS: "--build-arg GITHUB_SHA=${{ github.sha }} --build-arg GOLANG_CROSS=${{ matrix.golang_cross }}"
 
       - uses: actions/upload-artifact@v3
         with:
