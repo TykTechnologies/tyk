@@ -289,9 +289,7 @@ func toScopeStringsSlice(v interface{}, scopeSlice *[]string, nested bool) []str
 	case string:
 		if !nested {
 			splitStringScopes := strings.Split(e, " ")
-			for _, scope := range splitStringScopes {
-				*scopeSlice = append(*scopeSlice, scope)
-			}
+			*scopeSlice = append(*scopeSlice, splitStringScopes...)
 		} else {
 			*scopeSlice = append(*scopeSlice, e)
 		}
