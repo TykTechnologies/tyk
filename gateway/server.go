@@ -1566,17 +1566,24 @@ func Start() {
 		gw.reloadURLStructure(func() {})
 	}, &configs)
 
+	unix := time.Now().Unix()
+
+	var (
+		memprofile = fmt.Sprintf("tyk.%d.mprof", unix)
+		cpuprofile = fmt.Sprintf("tyk.%d.prof", unix)
+	)
+
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")
 		var err error
-		if memProfFile, err = os.Create("tyk.mprof"); err != nil {
+		if memProfFile, err = os.Create(memprofile); err != nil {
 			panic(err)
 		}
 		defer memProfFile.Close()
 	}
 	if *cli.CPUProfile {
 		mainLog.Info("Cpu profiling active")
-		cpuProfFile, err := os.Create("tyk.prof")
+		cpuProfFile, err := os.Create(cpuprofile)
 		if err != nil {
 			panic(err)
 		}
