@@ -748,10 +748,15 @@ const (
 	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
 )
 
+type GraphQLResponseExtensions struct {
+	OnErrorForwarding bool `bson:"on_error_forwarding" json:"on_error_forwarding"`
+}
+
 type GraphQLProxyConfig struct {
-	AuthHeaders      map[string]string `bson:"auth_headers" json:"auth_headers"`
-	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
-	RequestHeaders   map[string]string `bson:"request_headers" json:"request_headers"`
+	AuthHeaders           map[string]string         `bson:"auth_headers" json:"auth_headers"`
+	SubscriptionType      SubscriptionType          `bson:"subscription_type" json:"subscription_type,omitempty"`
+	RequestHeaders        map[string]string         `bson:"request_headers" json:"request_headers"`
+	UseResponseExtensions GraphQLResponseExtensions `bson:"use_response_extensions" json:"use_response_extensions"`
 }
 
 type GraphQLSubgraphConfig struct {
