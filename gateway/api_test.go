@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
@@ -1499,7 +1500,7 @@ func TestGroupResetHandler(t *testing.T) {
 	cacheStore.Connect()
 
 	go func() {
-		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
+		err := cacheStore.StartPubSubHandler(context.Background(), RedisPubSubChannel, func(v interface{}) {
 			switch x := v.(type) {
 			case *redis.Subscription:
 				didSubscribe <- true
