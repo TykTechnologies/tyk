@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/ctx"
+
 	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -1265,6 +1267,93 @@ func TestLoopingUrl(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.host, func(t *testing.T) {
 			assert.Equal(t, tc.expectedHost, LoopingUrl(tc.host))
+		})
+	}
+}
+
+func TestURLRewriteMiddleware_CheckHostRewrite(t *testing.T) {
+	type args struct {
+		oldPath   string
+		newTarget string
+	}
+
+	tests := []struct {
+		name          string
+		args          args
+		errExpected   bool
+		retainHostVal interface{}
+	}{
+		{
+			name: "no host rewrite",
+			args: args{
+				oldPath:   "/hello",
+				newTarget: "/status",
+			},
+			errExpected:   false,
+			retainHostVal: nil,
+		},
+		{
+			name: "invalid new path",
+			args: args{
+				oldPath:   "/hello",
+				newTarget: "http:// example.com/status",
+			},
+			errExpected:   true,
+			retainHostVal: nil,
+		},
+		{
+			name: "host rewrite",
+			args: args{
+				oldPath:   "/hello",
+				newTarget: "http://example.com/status",
+			},
+			errExpected:   false,
+			retainHostVal: true,
+		},
+		{
+			name: "scheme in oldPath - host rewrite",
+			args: args{
+				oldPath:   "http://tyk-gateway/hello",
+				newTarget: "http://example.com/status",
+			},
+			errExpected:   false,
+			retainHostVal: true,
+		},
+		{
+			name: "scheme in oldPath - no host rewrite",
+			args: args{
+				oldPath:   "http://tyk-gateway/hello",
+				newTarget: "/status",
+			},
+			errExpected:   false,
+			retainHostVal: nil,
+		},
+		{
+			name: "same host for new and old URL",
+			args: args{
+				oldPath:   "http://tyk-gateway/hello",
+				newTarget: "http://tyk-gateway/status",
+			},
+			errExpected:   false,
+			retainHostVal: nil,
+		},
+		{
+			name: "invalid old URL",
+			args: args{
+				oldPath:   "http://tyk gateway/hello",
+				newTarget: "http://tyk-gateway/status",
+			},
+			errExpected:   true,
+			retainHostVal: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &URLRewriteMiddleware{}
+			r := &http.Request{}
+			err := m.CheckHostRewrite(tt.args.oldPath, tt.args.newTarget, r)
+			assert.Equal(t, tt.errExpected, err != nil)
+			assert.Equal(t, tt.retainHostVal, r.Context().Value(ctx.RetainHost))
 		})
 	}
 }
