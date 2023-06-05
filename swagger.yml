@@ -2081,8 +2081,6 @@ components:
           type: array
           x-go-name: ClientCertificates
         config_data:
-          additionalProperties:
-            type: object
           type: object
           x-go-name: ConfigData
         custom_middleware:
@@ -2490,8 +2488,6 @@ components:
     AuthProviderMeta:
       properties:
         meta:
-          additionalProperties:
-            type: object
           type: object
           x-go-name: Meta
         name:
@@ -2874,8 +2870,6 @@ components:
         extract_with:
           $ref: '#/components/schemas/IdExtractorType'
         extractor_config:
-          additionalProperties:
-            type: object
           type: object
           x-go-name: ExtractorConfig
       type: object
@@ -3321,8 +3315,6 @@ components:
     SessionProviderMeta:
       properties:
         meta:
-          additionalProperties:
-            type: object
           type: object
           x-go-name: Meta
         name:
@@ -3414,8 +3406,6 @@ components:
           type: string
           x-go-name: LastUpdated
         meta_data:
-          additionalProperties:
-            type: object
           type: object
           x-go-name: MetaData
         monitor:
@@ -3613,8 +3603,6 @@ components:
           type: string
           x-go-name: Path
         schema:
-          additionalProperties:
-            type: object
           type: object
           x-go-name: Schema
         schema_b64:
