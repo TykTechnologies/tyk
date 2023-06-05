@@ -1,4 +1,4 @@
-FROM debian:bullseye as assets
+FROM debian:bullseye AS assets
 
 # This Dockerfile facilitates bleeding edge development docker image builds
 # directly from source. To build a development image, run `make docker`.
@@ -62,11 +62,7 @@ ADD go.mod go.sum /opt/tyk-gateway
 RUN go mod download
 ADD . /opt/tyk-gateway
 
-<<<<<<< HEAD
-RUN make build && go clean -modcache
-=======
 RUN make build
->>>>>>> 76a00611... [TT-9060] Improvement: Restructure dockerfile to take advantage of caching (#5060)
 
 COPY tyk.conf.example tyk.conf
 
