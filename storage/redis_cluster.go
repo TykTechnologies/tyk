@@ -173,7 +173,6 @@ func (r *RedisCluster) cleanKey(keyName string) string {
 }
 
 func (r *RedisCluster) up() error {
-
 	if !r.RedisController.Connected() {
 		return ErrRedisIsDown
 	}
@@ -742,22 +741,18 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 
 		switch v := singleton.(type) {
 		case *redis.ClusterClient:
-			{
-				pipe := v.Pipeline()
-				for _, k := range keys {
-					pipe.Del(r.RedisController.ctx, k)
-				}
+			pipe := v.Pipeline()
+			for _, k := range keys {
+				pipe.Del(r.RedisController.ctx, k)
+			}
 
-				if _, err := pipe.Exec(r.RedisController.ctx); err != nil {
-					log.Error("Error trying to delete keys:", err)
-				}
+			if _, err := pipe.Exec(r.RedisController.ctx); err != nil {
+				log.Error("Error trying to delete keys:", err)
 			}
 		case *redis.Client:
-			{
-				_, err := v.Del(r.RedisController.ctx, keys...).Result()
-				if err != nil {
-					log.Error("Error trying to delete keys: ", err)
-				}
+			_, err := v.Del(r.RedisController.ctx, keys...).Result()
+			if err != nil {
+				log.Error("Error trying to delete keys: ", err)
 			}
 		}
 	} else {
@@ -769,7 +764,7 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 
 // StartPubSubHandler will listen for a signal and run the callback for
 // every subscription and message event.
-func (r *RedisCluster) StartPubSubHandler(channel string, callback func(interface{})) error {
+func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channel string, callback func(interface{})) error {
 	if err := r.up(); err != nil {
 		return err
 	}
@@ -779,31 +774,40 @@ func (r *RedisCluster) StartPubSubHandler(channel string, callback func(interfac
 		return err
 	}
 
-<<<<<<< HEAD
-	pubsub := client.Subscribe(r.RedisController.ctx, channel)
-=======
 	pubsub := singleton.Subscribe(ctx, channel)
->>>>>>> ccecd4cd... [TT-8901] Preventing panics if cache_storage is down (#5065)
 	defer pubsub.Close()
 
 	for {
-		msg, err := pubsub.Receive(r.RedisController.ctx)
-		if err != nil {
-			log.Error("Error while receiving pubsub message:", err)
+		if err := r.handleReceive(ctx, pubsub.Receive, callback); err != nil {
 			return err
 		}
-		switch v := msg.(type) {
-		case *redis.Message:
-			callback(v)
-
-		case *redis.Subscription:
-			callback(v)
-
-		case error:
-			log.Error("Redis disconnected or error received, attempting to reconnect: ", v)
-			return v
-		}
 	}
+}
+
+// handleReceive is split from pubsub inner loop to inject fake
+// receive function for code coverage tests.
+func (r *RedisCluster) handleReceive(ctx context.Context, receiveFn func(context.Context) (interface{}, error), callback func(interface{})) error {
+	msg, err := receiveFn(ctx)
+	return r.handleMessage(msg, err, callback)
+}
+
+func (r *RedisCluster) handleMessage(msg interface{}, err error, callback func(interface{})) error {
+	if err == nil {
+		if callback != nil {
+			callback(msg)
+		}
+		return err
+	}
+
+	log.Error("Error while receiving pubsub message:", err)
+
+	// This error occurs when we cancel the context for pubsub.
+	// To enable handling the error, it is coalesced to ErrClosed.
+	if strings.Contains(err.Error(), "use of closed network connection") {
+		return redis.ErrClosed
+	}
+
+	return err
 }
 
 func (r *RedisCluster) Publish(channel, message string) error {
@@ -886,7 +890,7 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 	}
 }
 
-//Exists check if keyName exists
+// Exists check if keyName exists
 func (r *RedisCluster) Exists(keyName string) (bool, error) {
 	fixedKey := r.fixKey(keyName)
 	log.WithField("keyName", fixedKey).Debug("Checking if exists")
@@ -1066,7 +1070,7 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 	val, err := singleton.SIsMember(r.RedisController.ctx, r.fixKey(keyName), value).Result()
 
 	if err != nil {
-		log.Error("Error trying to check set memeber: ", err)
+		log.Error("Error trying to check set member: ", err)
 		return false
 	}
 
