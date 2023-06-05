@@ -1294,6 +1294,18 @@ func TestGetScopeFromClaim(t *testing.T) {
 			expectedClaims: []string{"foo", "bar", "baz"},
 			name:           "nested slice strings",
 		},
+		{
+			jwt:            `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwic2NvcGUiOlsiZm9vIGJhciIsImJheiJdfQ.XYJ5gEHQhKxLMhXrYsQ7prZ98bty9UPa7LXvF5N4IPM`,
+			key:            "scope",
+			expectedClaims: []string{"foo bar", "baz"},
+			name:           "slice strings with spaced values",
+		},
+		{
+			jwt:            `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwic2NvcGUiOlsiZm9vIGJhciIsImJheiIsWyJoZWxsbyB3b3JsZCIsIm9uZSJdXX0.A6Yc-WEZSGtOy8hBMsMrvRXNNKSDO7OLMdznoYERKWk`,
+			key:            "scope",
+			expectedClaims: []string{"foo bar", "baz", "hello world", "one"},
+			name:           "nested slice strings with spaced values",
+		},
 	}
 
 	pubKey := []byte(`mysecret`)
