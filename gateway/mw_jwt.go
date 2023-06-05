@@ -17,7 +17,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/osin"
-	jose "github.com/square/go-jose"
+	"github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -280,18 +280,27 @@ func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error)
 	return getUserIDFromClaim(claims, k.Spec.JWTIdentityBaseField)
 }
 
-func toStrings(v interface{}) []string {
+func toScopeStringsSlice(v interface{}, scopeSlice *[]string, nested bool) []string {
+	if scopeSlice == nil {
+		scopeSlice = &[]string{}
+	}
+
 	switch e := v.(type) {
 	case string:
-		return strings.Split(e, " ")
-	case []interface{}:
-		var r []string
-		for _, x := range e {
-			r = append(r, toStrings(x)...)
+		if !nested {
+			splitStringScopes := strings.Split(e, " ")
+			*scopeSlice = append(*scopeSlice, splitStringScopes...)
+		} else {
+			*scopeSlice = append(*scopeSlice, e)
 		}
-		return r
+
+	case []interface{}:
+		for _, scopeElement := range e {
+			toScopeStringsSlice(scopeElement, scopeSlice, true)
+		}
 	}
-	return nil
+
+	return *scopeSlice
 }
 
 func nestedMapLookup(m map[string]interface{}, ks ...string) interface{} {
@@ -318,7 +327,7 @@ func getMapContext(m interface{}, k string) (rval interface{}) {
 func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
 	lookedUp := nestedMapLookup(claims, strings.Split(scopeClaimName, ".")...)
 
-	return toStrings(lookedUp)
+	return toScopeStringsSlice(lookedUp, nil, false)
 }
 
 func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
@@ -516,7 +525,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			scopeClaimName = "scope"
 		}
 
-		if scope := getScopeFromClaim(claims, scopeClaimName); scope != nil {
+		if scope := getScopeFromClaim(claims, scopeClaimName); len(scope) > 0 {
 			polIDs := []string{
 				basePolicyID, // add base policy as a first one
 			}
