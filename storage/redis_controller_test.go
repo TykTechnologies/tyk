@@ -26,7 +26,7 @@ func TestRecoverLoop(t *testing.T) {
 
 	conf := config.Default
 
-	rc := NewRedisController()
+	rc := NewRedisController(ctx)
 	go rc.ConnectToRedis(ctx, onRecover, &conf)
 
 	rc.DisableRedis(false)

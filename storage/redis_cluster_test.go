@@ -146,7 +146,7 @@ func TestSingleton(t *testing.T) {
 	assert.EqualError(t, err, "Error trying to get singleton instance: RedisController is nil")
 	assert.Nil(t, instance)
 
-	r.RedisController = rc
+	r.RedisController = &rc
 
 	instance, err = r.singleton()
 	assert.Nil(t, err)
