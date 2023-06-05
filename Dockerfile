@@ -1,4 +1,4 @@
-FROM debian:bullseye as assets
+FROM debian:bullseye AS assets
 
 # This Dockerfile facilitates bleeding edge development docker image builds
 # directly from source. To build a development image, run `make docker`.
@@ -56,12 +56,13 @@ RUN	apt install python3 -y
 RUN find /tmp -type f -delete
 
 # Build gateway
-
 RUN mkdir /opt/tyk-gateway
 WORKDIR /opt/tyk-gateway
+ADD go.mod go.sum /opt/tyk-gateway
+RUN go mod download
 ADD . /opt/tyk-gateway
 
-RUN make build && go clean -modcache
+RUN make build
 
 COPY tyk.conf.example tyk.conf
 
