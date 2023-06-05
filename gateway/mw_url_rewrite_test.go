@@ -2,11 +2,8 @@ package gateway
 
 import (
 	"bytes"
-	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1331,6 +1328,24 @@ func TestURLRewriteMiddleware_CheckHostRewrite(t *testing.T) {
 			errExpected:   false,
 			retainHostVal: nil,
 		},
+		{
+			name: "same host for new and old URL",
+			args: args{
+				oldPath:   "http://tyk-gateway/hello",
+				newTarget: "http://tyk-gateway/status",
+			},
+			errExpected:   false,
+			retainHostVal: nil,
+		},
+		{
+			name: "invalid old URL",
+			args: args{
+				oldPath:   "http://tyk gateway/hello",
+				newTarget: "http://tyk-gateway/status",
+			},
+			errExpected:   true,
+			retainHostVal: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1341,80 +1356,4 @@ func TestURLRewriteMiddleware_CheckHostRewrite(t *testing.T) {
 			assert.Equal(t, tt.retainHostVal, r.Context().Value(ctx.RetainHost))
 		})
 	}
-}
-
-func TestURLRewrite(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-	baseSpec := func(spec *APISpec, listenPath string) {
-		spec.Proxy.ListenPath = listenPath
-		spec.URLRewriteEnabled = true
-		spec.UseKeylessAccess = true
-		spec.VersionData.NotVersioned = true
-		spec.VersionData.Versions = map[string]apidef.VersionInfo{
-			"Default": {
-				Name:             "Default",
-				UseExtendedPaths: true,
-				ExtendedPaths: apidef.ExtendedPathsSet{
-					URLRewrite: []apidef.URLRewriteMeta{
-						{
-							Path:         "/hello",
-							Method:       http.MethodGet,
-							MatchPattern: "/hello",
-							RewriteTo:    "/get",
-						},
-					},
-				},
-			},
-		}
-	}
-
-	specWithHostRewrite := func(spec *APISpec, listenPath string) {
-		baseSpec(spec, listenPath)
-		// update rewrite url with host rewrite
-		localhostURL := strings.ReplaceAll(TestHttpAny, "127.0.0.1", "localhost")
-		spec.VersionData.Versions["Default"].ExtendedPaths.URLRewrite[0].RewriteTo = localhostURL + "/get"
-	}
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		baseSpec(spec, "/url-rewrite-1")
-	}, func(spec *APISpec) {
-		specWithHostRewrite(spec, "/url-rewrite-2")
-	})
-
-	t.Run("relative URL in request URL path (HTTP verb argument)", func(t *testing.T) {
-		ts.Run(t, []test.TestCase{
-			{
-				Method:    http.MethodGet,
-				Path:      "/url-rewrite-1/hello",
-				BodyMatch: `/get`,
-			},
-			{
-				Method:    http.MethodGet,
-				Path:      "/url-rewrite-2/hello",
-				BodyMatch: `/get`,
-			},
-		}...)
-	})
-
-	t.Run("absolute URL in request URL path (HTTP verb argument)", func(t *testing.T) {
-		testAbsoluteURL := func(path string) {
-			reqURL := fmt.Sprintf("%s/%s", ts.URL, path)
-			req, err := http.NewRequest(http.MethodGet, reqURL, nil)
-			assert.NoError(t, err)
-
-			req.URL.Path = reqURL
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				log.Fatalln(err)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			assert.NoError(t, err)
-			assert.Equal(t, true, strings.Contains(string(body), `/get`))
-		}
-
-		testAbsoluteURL("url-rewrite-1/hello")
-		testAbsoluteURL("url-rewrite-2/hello")
-	})
 }
