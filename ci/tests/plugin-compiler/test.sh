@@ -24,7 +24,7 @@ fi
 
 # pass plugin params to docker compose
 set -x
-export plugin_version=$1
+export plugin_version=$(echo $1 | perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"')
 export plugin_os=${GOOS}
 export plugin_arch=${GOARCH}
 
@@ -39,13 +39,9 @@ trap "$compose down" EXIT
 rm -fv testplugin/*.so || true
 docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${tag} testplugin.so
 
-# This ensures correct paths when running by hand
-TYK_GW_PATH=$(readlink -f $(dirname $(readlink -f $0))/../../..)
-# Get version from source code (will not include rc tags - same as ci/images/plugin-compiler build.sh)
-TYK_GW_VERSION=$(echo $tag | perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"')
-
 $compose up -d
 
 sleep 2 # Wait for init
+
 curl -vvv http://localhost:8080/goplugin/headers
 curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"' || { $compose logs gw; exit 1; }
