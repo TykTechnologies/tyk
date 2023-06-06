@@ -14,13 +14,16 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 
 RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
-COPY ci/images/plugin-compiler/data/build.sh /build.sh
-RUN chmod +x /build.sh
-
 RUN  apt-get remove -y --allow-remove-essential --auto-remove mercurial \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
+ADD go.mod go.sum $TYK_GW_PATH
+WORKDIR $TYK_GW_PATH
+RUN go mod download
+
 ADD . $TYK_GW_PATH
-RUN cd $TYK_GW_PATH
+
+COPY ci/images/plugin-compiler/data/build.sh /build.sh
+RUN chmod +x /build.sh
 
 ENTRYPOINT ["/build.sh"]

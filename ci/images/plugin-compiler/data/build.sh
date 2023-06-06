@@ -25,8 +25,10 @@ GOOS=${3:-$(go env GOOS)}
 GOARCH=${4:-$(go env GOARCH)}
 
 # Some defaults that can be overriden with env
+WORKSPACE_ROOT=$(dirname $TYK_GW_PATH)
+
 PLUGIN_SOURCE_PATH=${PLUGIN_SOURCE_PATH:-"/plugin-source"}
-PLUGIN_BUILD_PATH=${PLUGIN_BUILD_PATH:-"/opt/plugin_${plugin_name%.*}$plugin_id"}
+PLUGIN_BUILD_PATH=${PLUGIN_BUILD_PATH:-"${WORKSPACE_ROOT}/plugin_${plugin_name%.*}$plugin_id"}
 
 function usage() {
     cat <<EOF
@@ -48,10 +50,24 @@ if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
 fi
 
 # Copy plugin source into plugin build folder.
+set -x
 
 mkdir -p $PLUGIN_BUILD_PATH
 yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
+
+# Create worspace
+cd $WORKSPACE_ROOT
+
+go work init ./tyk
+go work use ./$(basename $PLUGIN_BUILD_PATH)
+
+echo "---"
+cat go.work
+echo "---"
+
 cd $PLUGIN_BUILD_PATH
+
+set +x
 
 # Dump settings for inspection
 
