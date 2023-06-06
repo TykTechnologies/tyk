@@ -359,6 +359,7 @@ jobs:
         shell: bash
         run: |
           set -eaxo pipefail
+          export GITHUB_TAG="{{ github.ref }}"
           if [ ! -d smoke-tests ]; then
              echo "::warning No repo specific smoke tests defined"
           fi
