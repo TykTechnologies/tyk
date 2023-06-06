@@ -1,4 +1,5 @@
 ARG GOLANG_CROSS
+ARG GITHUB_SHA
 
 FROM tykio/golang-cross:${GOLANG_CROSS}
 LABEL description="Image for plugin development"
