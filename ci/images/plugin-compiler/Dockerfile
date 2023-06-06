@@ -1,5 +1,6 @@
 ARG GOLANG_CROSS
 ARG GITHUB_SHA
+ARG GITHUB_TAG
 
 FROM tykio/golang-cross:${GOLANG_CROSS}
 LABEL description="Image for plugin development"
@@ -8,6 +9,7 @@ ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
 
 ENV GO111MODULE=on
 ENV GITHUB_SHA=${GITHUB_SHA}
+ENV GITHUB_TAG=${GITHUB_TAG}
 
 # This directory will contain the plugin source and will be
 # mounted from the host box by the user using docker volumes
