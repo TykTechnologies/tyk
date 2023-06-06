@@ -26,7 +26,6 @@ on:
 env:
   SLACK_CLI_TOKEN: ${{ secrets.BENDER_TOKEN }}
   GOPRIVATE: github.com/TykTechnologies
-  GITHUB_TAG: {{ github.ref }}
   
 jobs:
   goreleaser:
@@ -358,6 +357,8 @@ jobs:
 
       - name: Run tests
         shell: bash
+        env:
+          GITHUB_TAG: {{ github.ref }}
         run: |
           set -eaxo pipefail
           if [ ! -d smoke-tests ]; then
