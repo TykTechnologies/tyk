@@ -119,6 +119,7 @@ jobs:
           DEBVERS: ${{ matrix.debvers }}
           RPMVERS: ${{ matrix.rpmvers }}
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+          DOCKER_CLI_EXPERIMENTAL: "enabled"
 
       - uses: actions/upload-artifact@v3
         with:
