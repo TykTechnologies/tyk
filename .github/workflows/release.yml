@@ -26,6 +26,7 @@ on:
 env:
   SLACK_CLI_TOKEN: ${{ secrets.BENDER_TOKEN }}
   GOPRIVATE: github.com/TykTechnologies
+  GITHUB_TAG: "{{ github.ref }}"
   
 jobs:
   goreleaser:
@@ -359,7 +360,6 @@ jobs:
         shell: bash
         run: |
           set -eaxo pipefail
-          export GITHUB_TAG="{{ github.ref }}"
           if [ ! -d smoke-tests ]; then
              echo "::warning No repo specific smoke tests defined"
           fi
