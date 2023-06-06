@@ -6,6 +6,7 @@ LABEL description="Image for plugin development"
 ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
 
 ENV GO111MODULE=on
+ENV GITHUB_SHA=${GITHUB_SHA}
 
 # This directory will contain the plugin source and will be
 # mounted from the host box by the user using docker volumes
@@ -19,8 +20,7 @@ RUN chmod +x /build.sh
 RUN  apt-get remove -y --allow-remove-essential --auto-remove mercurial \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
-RUN curl -L -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/repos/TykTechnologies/tyk/tarball/$GITUHB_SHA --output - | tar --strip-components 1 -C $TYK_GW_PATH -xzf -
+ADD . $TYK_GW_PATH
 RUN cd $TYK_GW_PATH
 
 ENTRYPOINT ["/build.sh"]
-
