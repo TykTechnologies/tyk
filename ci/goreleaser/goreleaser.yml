@@ -148,7 +148,7 @@ dockers:
     - go.mod
     - go.sum
     - ci/images/plugin-compiler
-    - glob: **.go
+    - glob: ./**.go
 
 docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}
