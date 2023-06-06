@@ -232,27 +232,38 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		}
 	}
 
+	if logger == nil {
+		logger = logrus.NewEntry(log)
+	}
+
+	logger = logger.WithField("mw", "ReverseProxy")
+
 	targetQuery := target.RawQuery
 	director := func(req *http.Request) {
+		logger := logger
+		spec := spec
+		target := target
+		gw := gw
+
 		hostList := spec.Proxy.StructuredTargetList
 		switch {
 		case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
 			var err error
 			hostList, err = urlFromService(spec)
 			if err != nil {
-				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
+				logger.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 				break
 			}
 			fallthrough // implies load balancing, with replaced host list
 		case spec.Proxy.EnableLoadBalancing:
 			host, err := gw.nextTarget(hostList, spec)
 			if err != nil {
-				log.Error("[PROXY] [LOAD BALANCING] ", err)
+				logger.Error("[PROXY] [LOAD BALANCING] ", err)
 				host = allHostsDownURL
 			}
 			lbRemote, err := url.Parse(host)
 			if err != nil {
-				log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
+				logger.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
 			} else {
 				// Only replace target if everything is OK
 				target = lbRemote
@@ -263,10 +274,10 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		targetToUse := target
 
 		if spec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
-			log.Debug("Detected host rewrite, overriding target")
+			logger.Debug("Detected host rewrite, overriding target")
 			tmpTarget, err := url.Parse(req.URL.String())
 			if err != nil {
-				log.Error("Failed to parse URL! Err: ", err)
+				logger.Error("Failed to parse URL! Err: ", err)
 			} else {
 				// Specifically override with a URL rewrite
 				targetToUse = tmpTarget
@@ -320,12 +331,6 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			req.URL.Scheme = "https"
 		}
 	}
-
-	if logger == nil {
-		logger = logrus.NewEntry(log)
-	}
-
-	logger = logger.WithField("mw", "ReverseProxy")
 
 	proxy := &ReverseProxy{
 		Director:      director,
