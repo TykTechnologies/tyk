@@ -8,6 +8,7 @@ GOINSTALL=$(GOCMD) install
 
 BINARY_NAME=tyk
 BINARY_LINUX=tyk
+BUILD_PLATFORM=linux/amd64
 TAGS=coprocess grpc goplugin
 CONF=tyk.conf
 
@@ -100,8 +101,8 @@ mongo-shell:
 .PHONY: docker docker-std
 
 docker:
-	docker build --no-cache --rm -t internal/tyk-gateway --squash .
+	docker build --platform ${BUILD_PLATFORM} --no-cache --rm -t internal/tyk-gateway --squash .
 
 docker-std: build
-	docker build --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .
+	docker build --platform ${BUILD_PLATFORM} --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .
 
