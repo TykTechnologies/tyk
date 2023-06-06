@@ -358,7 +358,7 @@ jobs:
       - name: Run tests
         shell: bash
         env:
-          GITHUB_TAG: {{ github.ref }}
+          GITHUB_TAG: ${{ github.ref }}
         run: |
           set -eaxo pipefail
           if [ ! -d smoke-tests ]; then
