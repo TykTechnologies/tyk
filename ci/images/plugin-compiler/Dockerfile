@@ -8,9 +8,6 @@ LABEL description="Image for plugin development"
 ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
 
 ENV GO111MODULE=on
-ENV GITHUB_SHA=${GITHUB_SHA}
-ENV GITHUB_TAG=${GITHUB_TAG}
-
 # This directory will contain the plugin source and will be
 # mounted from the host box by the user using docker volumes
 ENV PLUGIN_SOURCE_PATH=/plugin-source
@@ -25,6 +22,9 @@ WORKDIR $TYK_GW_PATH
 RUN go mod download
 
 ADD . $TYK_GW_PATH
+
+ENV GITHUB_SHA=${GITHUB_SHA}
+ENV GITHUB_TAG=${GITHUB_TAG}
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
