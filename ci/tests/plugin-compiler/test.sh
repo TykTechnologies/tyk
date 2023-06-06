@@ -14,11 +14,24 @@ EOF
     exit 1
 }
 
+[[ -z $1 ]] && usage $0
+
+# if params were not sent, then attempt to get them from env vars
+if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
+    GOOS=$(go env GOOS)
+    GOARCH=$(go env GOARCH)
+fi
+
+# pass plugin params to docker compose
+set -x
+export plugin_version=$1
+export plugin_os=${GOOS}
+export plugin_arch=${GOARCH}
+
 compose='docker-compose'
 # composev2 is a client plugin
 [[ $(docker version --format='{{ .Client.Version }}') =~ "20.10" ]] && compose='docker compose'
 
-[[ -z $1 ]] && usage $0
 export tag=$1
 
 trap "$compose down" EXIT
@@ -29,18 +42,7 @@ docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${t
 # This ensures correct paths when running by hand
 TYK_GW_PATH=$(readlink -f $(dirname $(readlink -f $0))/../../..)
 # Get version from source code (will not include rc tags - same as ci/images/plugin-compiler build.sh)
-TYK_GW_VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' $TYK_GW_PATH/gateway/version.go)
-
-# if params were not sent, then attempt to get them from env vars
-if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
-    GOOS=$(go env GOOS)
-    GOARCH=$(go env GOARCH)
-fi
-
-# pass plugin params
-export plugin_version=${TYK_GW_VERSION}
-export plugin_os=${GOOS}
-export plugin_arch=${GOARCH}
+TYK_GW_VERSION=$(echo $tag | perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"')
 
 $compose up -d
 
