@@ -35,9 +35,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        golang_cross: [ 1.19-bullseye ]
+        golang_cross: [ 1.19-ibm ]
         include:
-          - golang_cross: 1.19-bullseye
+          - golang_cross: 1.19-ibm
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             rpmvers: 'el/8 el/9'
             debvers: 'ubuntu/bionic ubuntu/focal ubuntu/jammy debian/buster debian/bullseye'
@@ -189,7 +189,7 @@ jobs:
           push: true
           context: "."
           file: ci/Dockerfile.std
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/tyk:${{ needs.goreleaser.outputs.tag }}
             ${{ steps.login-ecr.outputs.registry }}/tyk:${{ github.sha }}
@@ -242,6 +242,8 @@ jobs:
         arch:
           - amd64
           - arm64
+          - s390x
+          - ppc64le
         distro:
           - ubuntu:jammy
           - ubuntu:bionic

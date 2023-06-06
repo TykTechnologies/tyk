@@ -28,6 +28,33 @@ builds:
     goarch:
       - arm64
     binary: tyk
+  - id: std-s390x
+    flags:
+      - -tags=goplugin
+    ldflags:
+      - -X github.com/TykTechnologies/tyk/gateway.VERSION={{.Version}} -X github.com/TykTechnologies/tyk/gateway.Commit={{.FullCommit}} -X github.com/TykTechnologies/tyk/gateway.buildDate={{.Date}} -X github.com/TykTechnologies/tyk/gateway.builtBy=goreleaser
+    env:
+     - CC=s390x-linux-gnu-gcc
+     - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - s390x
+    binary: tyk
+  - id: std-ppc64le
+    flags:
+      - -tags=goplugin
+    ldflags:
+      - -X github.com/TykTechnologies/tyk/gateway.VERSION={{.Version}} -X github.com/TykTechnologies/tyk/gateway.Commit={{.FullCommit}} -X github.com/TykTechnologies/tyk/gateway.buildDate={{.Date}} -X github.com/TykTechnologies/tyk/gateway.builtBy=goreleaser
+    env:
+     - CC=powerpc64le-linux-gnu-gcc
+     - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - ppc64le
+    binary: tyk
+
 
 dockers:
 # Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway (amd64)
@@ -105,6 +132,62 @@ dockers:
     - "policies"
     - "coprocess"
     - "tyk.conf.example"
+    
+- ids:
+    - std
+  image_templates:
+    - "tykio/tyk-gateway:{{ .Tag }}-s390x"
+    - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-s390x"
+  build_flag_templates:
+    - "--build-arg=PORTS=8080"
+    - "--platform=linux/s390x"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.title={{.ProjectName}}"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+  use: buildx
+  goarch: s390x
+  goos: linux
+  dockerfile: ci/Dockerfile.std
+  extra_files:
+    - "ci/install/"
+    - "README.md"
+    - "LICENSE.md"
+    - "apps/app_sample.json"
+    - "templates"
+    - "middleware"
+    - "event_handlers/sample"
+    - "policies"
+    - "coprocess"
+    - "tyk.conf.example"
+    
+- ids:
+    - std
+  image_templates:
+    - "tykio/tyk-gateway:{{ .Tag }}-ppc64le"
+    - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-ppc64le"
+  build_flag_templates:
+    - "--build-arg=PORTS=8080"
+    - "--platform=linux/ppc64le"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.title={{.ProjectName}}"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+  use: buildx
+  goarch: ppc64le
+  goos: linux
+  dockerfile: ci/Dockerfile.std
+  extra_files:
+    - "ci/install/"
+    - "README.md"
+    - "LICENSE.md"
+    - "apps/app_sample.json"
+    - "templates"
+    - "middleware"
+    - "event_handlers/sample"
+    - "policies"
+    - "coprocess"
+    - "tyk.conf.example"
 
 # Build gateway hybrid container arm64
 - ids:
@@ -149,10 +232,14 @@ docker_manifests:
     image_templates:
     - tykio/tyk-gateway:{{ .Tag }}-amd64
     - tykio/tyk-gateway:{{ .Tag }}-arm64
+    - tykio/tyk-gateway:{{ .Tag }}-s390x
+    - tykio/tyk-gateway:{{ .Tag }}-ppc64le
   - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
     image_templates:
     - tykio/tyk-gateway:{{ .Tag }}-amd64
     - tykio/tyk-gateway:{{ .Tag }}-arm64
+    - tykio/tyk-gateway:{{ .Tag }}-s390x
+    - tykio/tyk-gateway:{{ .Tag }}-ppc64le
   - name_template: tykio/tyk-hybrid-docker:{{ .Tag }}
     image_templates:
     - tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
@@ -168,6 +255,8 @@ nfpms:
     builds:
       - std-linux
       - std-arm64
+      - std-s390x
+      - std-ppc64le
     formats:
       - deb
       - rpm
@@ -214,6 +303,8 @@ nfpms:
           amd64: x86_64
           arm: aarch64
           arm64: aarch64
+          s390x: s390x
+          ppc64le: ppc64le
       deb:
         file_name_template: '{{ .PackageName }}_{{ replace .Version "-" "~" }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}'
         replacements:
