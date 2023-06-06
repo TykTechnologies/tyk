@@ -357,34 +357,4 @@ jobs:
               fi
           done
 
-  # AWS updates only for stable releases
-  aws-mktplace-byol:
-    if: ( 'a' == 'b' )
-    runs-on: ubuntu-latest
-    needs:
-      - smoke-tests
-    strategy:
-      matrix:
-        flavour:
-          - al2
-          - rhel
-
-    steps:
-      - name: Checkout tyk
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 1
-
-      - uses: actions/download-artifact@v3
-        with:
-          name: rpm
-          path: aws
-
-      - name: Packer build
-        working-directory: ./ci/aws
-        run: |
-          export VERSION=${{ needs.goreleaser.outputs.tag }}
-          packer validate -var-file=${{ matrix.flavour }}.vars.json byol.pkr.hcl
-          packer build -var-file=${{ matrix.flavour }}.vars.json byol.pkr.hcl
-
 
