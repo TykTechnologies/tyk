@@ -206,7 +206,7 @@ jobs:
       tyk-analytics-version: ${{ github.ref_name }}
 
   upgrade-deb:
-    if: startsWith(github.ref, 'refs/tags') && !github.event.pull_request.draft
+    if: startsWith(github.ref, 'refs/tags')
     runs-on: ubuntu-latest
     needs: goreleaser
     strategy:
