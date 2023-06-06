@@ -76,5 +76,5 @@ echo "PLUGIN_SOURCE_PATH: ${PLUGIN_SOURCE_PATH}"
 echo "plugin_name: ${plugin_name}"
 
 set -x
-CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -o $plugin_name
+CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
 mv $plugin_name $PLUGIN_SOURCE_PATH
