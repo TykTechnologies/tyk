@@ -143,7 +143,11 @@ dockers:
   goos: linux
   dockerfile: ci/images/plugin-compiler/Dockerfile
   extra_files:
-    - ./
+    - .git/
+    - go.mod
+    - go.sum
+    - ci/images/plugin-compiler
+    - glob: **.go
 
 docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}
