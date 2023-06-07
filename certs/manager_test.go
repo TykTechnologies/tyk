@@ -17,8 +17,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
-	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 )
 
 type dummyStorage struct {
@@ -208,7 +206,7 @@ func (s *dummyStorage) GetKeys(pattern string) (keys []string) {
 	return keys
 }
 
-func newManager() *certificateManager {
+func newManager() *CertificateManager {
 	return NewCertificateManager(newDummyStorage(), "test", nil, false)
 }
 
@@ -257,13 +255,13 @@ func TestAddCertificate(t *testing.T) {
 	priv, _ := rsa.GenerateKey(rand.Reader, 512)
 	privDer, _ := x509.MarshalPKIXPublicKey(&priv.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: privDer})
-	pubID := tykcrypto.HexSHA256(privDer)
+	pubID := HexSHA256(privDer)
 
 	certRaw, _ := pem.Decode(certPem)
-	certID := tykcrypto.HexSHA256(certRaw.Bytes)
+	certID := HexSHA256(certRaw.Bytes)
 
 	cert2Raw, _ := pem.Decode(cert2Pem)
-	cert2ID := tykcrypto.HexSHA256(cert2Raw.Bytes)
+	cert2ID := HexSHA256(cert2Raw.Bytes)
 
 	emptyCertID := ""
 

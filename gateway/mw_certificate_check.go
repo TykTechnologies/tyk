@@ -2,9 +2,6 @@ package gateway
 
 import (
 	"net/http"
-
-	"github.com/TykTechnologies/tyk/certs"
-	"github.com/TykTechnologies/tyk/internal/crypto"
 )
 
 // CertificateCheckMW is used if domain was not detected or multiple APIs bind on the same domain. In this case authentification check happens not on TLS side but on HTTP level using this middleware
@@ -27,8 +24,8 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 	if m.Spec.UseMutualTLSAuth {
 		certIDs := append(m.Spec.ClientCertificates, m.Spec.GlobalConfig.Security.Certificates.API...)
-		apiCerts := m.Gw.CertificateManager.List(certIDs, certs.CertificatePublic)
-		if err := crypto.ValidateRequestCerts(r, apiCerts); err != nil {
+
+		if err := m.Gw.CertificateManager.ValidateRequestCertificate(certIDs, r); err != nil {
 			return err, http.StatusForbidden
 		}
 	}

@@ -16,8 +16,6 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
@@ -136,7 +134,7 @@ func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tl
 				continue
 			}
 
-			fingerprint := crypto.HexSHA256(pub)
+			fingerprint := certs.HexSHA256(pub)
 
 			for _, w := range whitelist {
 				if w == fingerprint {
@@ -166,7 +164,7 @@ func (gw *Gateway) validatePublicKeys(host string, conn *tls.Conn, spec *APISpec
 		if err != nil {
 			continue
 		}
-		fingerprint := crypto.HexSHA256(der)
+		fingerprint := certs.HexSHA256(der)
 
 		for _, w := range whitelist {
 			if w == fingerprint {
