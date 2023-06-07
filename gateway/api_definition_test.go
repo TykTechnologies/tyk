@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -947,60 +946,6 @@ func TestRoundRobin(t *testing.T) {
 	if got, want := rr.WithLen(0), 0; got != want {
 		t.Errorf("RR Pos of 0 wrong: want %d got %d", want, got)
 	}
-}
-
-func setupKeepalive(conn net.Conn) error {
-	tcpConn := conn.(*net.TCPConn)
-	if err := tcpConn.SetKeepAlive(true); err != nil {
-		return err
-	}
-	if err := tcpConn.SetKeepAlivePeriod(30 * time.Second); err != nil {
-		return err
-	}
-	return nil
-}
-
-type customListener struct {
-	L net.Listener
-}
-
-func (ln *customListener) Init(addr string) (err error) {
-	ln.L, err = net.Listen("tcp", addr)
-	return
-}
-
-func (ln *customListener) Accept() (conn net.Conn, err error) {
-	c, err := ln.L.Accept()
-	if err != nil {
-		return
-	}
-
-	if err = setupKeepalive(c); err != nil {
-		c.Close()
-		return
-	}
-
-	handshake := make([]byte, 6)
-	if _, err = io.ReadFull(c, handshake); err != nil {
-		return
-	}
-
-	idLenBuf := make([]byte, 1)
-	if _, err = io.ReadFull(c, idLenBuf); err != nil {
-		return
-	}
-
-	idLen := uint8(idLenBuf[0])
-	id := make([]byte, idLen)
-	if _, err = io.ReadFull(c, id); err != nil {
-		return
-	}
-
-	return c, nil
-}
-
-func (ln *customListener) Close() error {
-	return ln.L.Close()
 }
 
 func TestDefaultVersion(t *testing.T) {

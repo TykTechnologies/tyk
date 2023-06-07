@@ -6,7 +6,6 @@ package gateway
 import (
 	"errors"
 	"net/http"
-	_ "net/http"
 	"testing"
 	"time"
 
@@ -17,48 +16,6 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/stretchr/testify/assert"
 )
-
-func StartSlaveGw(connectionString string, groupId string) *Test {
-	conf := func(globalConf *config.Config) {
-		globalConf.SlaveOptions.UseRPC = true
-		globalConf.SlaveOptions.RPCKey = "test_org"
-		globalConf.SlaveOptions.APIKey = "test"
-		globalConf.Policies.PolicySource = "rpc"
-		globalConf.SlaveOptions.GroupID = groupId
-		globalConf.SlaveOptions.CallTimeout = 1
-		globalConf.SlaveOptions.RPCPoolSize = 2
-		globalConf.AuthOverride.ForceAuthProvider = true
-		globalConf.AuthOverride.AuthProvider.StorageEngine = "rpc"
-		globalConf.SlaveOptions.ConnectionString = connectionString
-	}
-	return StartTest(conf)
-}
-
-func startRPCMock(dispatcher *gorpc.Dispatcher) (*gorpc.Server, string) {
-
-	rpc.GlobalRPCCallTimeout = 100 * time.Millisecond
-
-	server := gorpc.NewTCPServer("127.0.0.1:0", dispatcher.NewHandlerFunc())
-	list := &customListener{}
-	server.Listener = list
-	server.LogError = gorpc.NilErrorLogger
-
-	if err := server.Start(); err != nil {
-		panic(err)
-	}
-
-	return server, list.L.Addr().String()
-}
-
-func stopRPCMock(server *gorpc.Server) {
-
-	if server != nil {
-		server.Listener.Close()
-		server.Stop()
-	}
-
-	rpc.Reset()
-}
 
 const apiDefListTest = `[{
 	"api_id": "1",
@@ -147,10 +104,10 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 		return `[]`, nil
 	})
 
-	rpcMock, connectionString := startRPCMock(dispatcher)
-	defer stopRPCMock(rpcMock)
+	rpcMock, connectionString := startRPCMock(t, dispatcher)
+	defer stopRPCMock(t, rpcMock)
 
-	ts := StartSlaveGw(connectionString, "")
+	ts := StartSlaveGw(t, connectionString, "")
 	defer ts.Close()
 
 	store := RPCStorageHandler{Gw: ts.Gw}
@@ -189,10 +146,10 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	})
 
 	t.Run("RPC is live", func(t *testing.T) {
-		rpcMock, connectionString := startRPCMock(dispatcher)
-		defer stopRPCMock(rpcMock)
+		rpcMock, connectionString := startRPCMock(t, dispatcher)
+		defer stopRPCMock(t, rpcMock)
 
-		ts := StartSlaveGw(connectionString, "")
+		ts := StartSlaveGw(t, connectionString, "")
 		defer ts.Close()
 
 		GetKeyCounter = 0
@@ -255,7 +212,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		if GetKeyCounter != 0 {
 			t.Error("getKey should have been called 0 times")
 		}
-		stopRPCMock(nil)
+		stopRPCMock(t, nil)
 	})
 
 	t.Run("RPC is back, hard reload", func(t *testing.T) {
@@ -278,10 +235,10 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			return jsonMarshalString(CreateStandardSession()), nil
 		})
 		// Back to live
-		rpcMock, connectionString := startRPCMock(dispatcher)
-		defer stopRPCMock(rpcMock)
+		rpcMock, connectionString := startRPCMock(t, dispatcher)
+		defer stopRPCMock(t, rpcMock)
 
-		ts := StartSlaveGw(connectionString, "")
+		ts := StartSlaveGw(t, connectionString, "")
 		defer ts.Close()
 
 		time.Sleep(1000 * time.Millisecond)
@@ -305,9 +262,9 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	})
 
 	t.Run("RPC is back, live reload", func(t *testing.T) {
-		rpcMock, connectionString := startRPCMock(dispatcher)
+		rpcMock, connectionString := startRPCMock(t, dispatcher)
 
-		ts := StartSlaveGw(connectionString, "")
+		ts := StartSlaveGw(t, connectionString, "")
 		defer ts.Close()
 		time.Sleep(100 * time.Millisecond)
 
@@ -363,10 +320,10 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 		return jsonMarshalString(CreateStandardSession()), nil
 	})
 
-	rpcMock, connectionString := startRPCMock(dispatcher)
-	defer stopRPCMock(rpcMock)
+	rpcMock, connectionString := startRPCMock(t, dispatcher)
+	defer stopRPCMock(t, rpcMock)
 
-	ts := StartSlaveGw(connectionString, "")
+	ts := StartSlaveGw(t, connectionString, "")
 	defer ts.Close()
 
 	t.Run("Should load apis when redis is down", func(t *testing.T) {
@@ -453,10 +410,10 @@ func TestRPCStorageHandler_Disconnect(t *testing.T) {
 			return nil
 		})
 
-		rpcMock, connectionString := startRPCMock(dispatcher)
-		defer stopRPCMock(rpcMock)
+		rpcMock, connectionString := startRPCMock(t, dispatcher)
+		defer stopRPCMock(t, rpcMock)
 
-		ts := StartSlaveGw(connectionString, "test-group")
+		ts := StartSlaveGw(t, connectionString, "test-group")
 		defer ts.Close()
 
 		r := &RPCStorageHandler{Gw: ts.Gw}

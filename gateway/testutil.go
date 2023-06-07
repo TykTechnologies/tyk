@@ -26,6 +26,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
+	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/TykTechnologies/tyk/rpc"
@@ -1919,4 +1920,102 @@ func randStringBytes(n int) string {
 	}
 
 	return string(b)
+}
+
+func StartSlaveGw(t *testing.T, connectionString string, groupId string) *Test {
+	t.Helper()
+	conf := func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "test"
+		globalConf.Policies.PolicySource = "rpc"
+		globalConf.SlaveOptions.GroupID = groupId
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.AuthOverride.ForceAuthProvider = true
+		globalConf.AuthOverride.AuthProvider.StorageEngine = "rpc"
+		globalConf.SlaveOptions.ConnectionString = connectionString
+	}
+	return StartTest(conf)
+}
+
+func startRPCMock(t *testing.T, dispatcher *gorpc.Dispatcher) (*gorpc.Server, string) {
+	t.Helper()
+	rpc.GlobalRPCCallTimeout = 100 * time.Millisecond
+
+	server := gorpc.NewTCPServer("127.0.0.1:0", dispatcher.NewHandlerFunc())
+	list := &customListener{}
+	server.Listener = list
+	server.LogError = gorpc.NilErrorLogger
+
+	if err := server.Start(); err != nil {
+		t.Fail()
+		panic(err)
+	}
+
+	return server, list.L.Addr().String()
+}
+
+func stopRPCMock(t *testing.T, server *gorpc.Server) {
+	t.Helper()
+	if server != nil {
+		server.Listener.Close()
+		server.Stop()
+	}
+
+	rpc.Reset()
+}
+
+type customListener struct {
+	L net.Listener
+}
+
+func (ln *customListener) Init(addr string) (err error) {
+	ln.L, err = net.Listen("tcp", addr)
+	return
+}
+
+func (ln *customListener) Accept() (conn net.Conn, err error) {
+	c, err := ln.L.Accept()
+	if err != nil {
+		return
+	}
+
+	if err = setupKeepalive(c); err != nil {
+		c.Close()
+		return
+	}
+
+	handshake := make([]byte, 6)
+	if _, err = io.ReadFull(c, handshake); err != nil {
+		return
+	}
+
+	idLenBuf := make([]byte, 1)
+	if _, err = io.ReadFull(c, idLenBuf); err != nil {
+		return
+	}
+
+	idLen := uint8(idLenBuf[0])
+	id := make([]byte, idLen)
+	if _, err = io.ReadFull(c, id); err != nil {
+		return
+	}
+
+	return c, nil
+}
+
+func (ln *customListener) Close() error {
+	return ln.L.Close()
+}
+
+func setupKeepalive(conn net.Conn) error {
+	tcpConn := conn.(*net.TCPConn)
+	if err := tcpConn.SetKeepAlive(true); err != nil {
+		return err
+	}
+	if err := tcpConn.SetKeepAlivePeriod(30 * time.Second); err != nil {
+		return err
+	}
+	return nil
 }
