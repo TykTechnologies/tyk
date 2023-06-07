@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 
@@ -486,13 +487,38 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 }
 
 func TestRPCStorageHandler_Disconnect(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+	t.Run("disconnect error", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
 
-	r := &RPCStorageHandler{Gw: ts.Gw}
+		r := &RPCStorageHandler{Gw: ts.Gw}
 
-	// we just can test error case since we don't have any way to rampup rpc server
-	err := r.Disconnect()
-	expectedErr := errors.New("RPCStorageHandler: rpc is either down or was not configured")
-	assert.EqualError(t, err, expectedErr.Error())
+		err := r.Disconnect()
+		expectedErr := errors.New("RPCStorageHandler: rpc is either down or was not configured")
+		assert.EqualError(t, err, expectedErr.Error())
+	})
+
+	t.Run("disconnect ok", func(t *testing.T) {
+		dispatcher := gorpc.NewDispatcher()
+		dispatcher.AddFunc("LoginWithGroup", func(clientAddr string, groupData *apidef.GroupLoginRequest) bool {
+			return true
+		})
+		dispatcher.AddFunc("Disconnect", func(clientAddr string, groupData *apidef.GroupLoginRequest) error {
+			return nil
+		})
+
+		rpcMock, connectionString := startRPCMock(dispatcher)
+		defer stopRPCMock(rpcMock)
+
+		ts := StartSlaveGw(connectionString, "")
+		defer ts.Close()
+
+		r := &RPCStorageHandler{Gw: ts.Gw}
+
+		connected := r.Connect()
+		assert.True(t, connected)
+
+		err := r.Disconnect()
+		assert.Nil(t, err)
+	})
 }

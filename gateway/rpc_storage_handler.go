@@ -178,9 +178,10 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 func (r *RPCStorageHandler) Disconnect() error {
 	request := apidef.GroupLoginRequest{
 		UserKey: r.Gw.GetConfig().SlaveOptions.APIKey,
-		GroupID: r.Gw.GetConfig().SlaveOptions.APIKey,
+		GroupID: r.Gw.GetConfig().SlaveOptions.GroupID,
 		Node:    r.buildNodeInfo(),
 	}
+
 	_, err := rpc.FuncClientSingleton("Disconnect", request)
 	return err
 }
