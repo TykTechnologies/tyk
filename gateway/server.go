@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/test"
 
 	"sync/atomic"
@@ -108,7 +109,7 @@ type Gateway struct {
 	MonitoringHandler    config.TykEventHandler
 	RPCListener          RPCStorageHandler
 	DashService          DashboardServiceSender
-	CertificateManager   *certs.CertificateManager
+	CertificateManager   certs.CertificateManager
 	GlobalHostChecker    HostCheckerManager
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
@@ -586,7 +587,8 @@ func stripSlashes(next http.Handler) http.Handler {
 func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if gw.GetConfig().Security.ControlAPIUseMutualTLS {
-			if err := gw.CertificateManager.ValidateRequestCertificate(gw.GetConfig().Security.Certificates.ControlAPI, r); err != nil {
+			gwCerts := gw.CertificateManager.List(gw.GetConfig().Security.Certificates.ControlAPI, certs.CertificatePublic)
+			if err := crypto.ValidateRequestCerts(r, gwCerts); err != nil {
 				doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 				return
 			}
