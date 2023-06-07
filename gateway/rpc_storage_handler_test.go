@@ -2,15 +2,12 @@ package gateway
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/lonelycode/osin"
 	"github.com/stretchr/testify/assert"
@@ -485,42 +482,4 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			assert.Equal(t, expected, result)
 		})
 	}
-}
-
-func TestRPCStorageHandler_Disconnect(t *testing.T) {
-	rpc.UseSyncLoginRPC = true
-
-	t.Run("disconnect ok", func(t *testing.T) {
-		dispatcher := gorpc.NewDispatcher()
-		dispatcher.AddFunc("LoginWithGroup", func(clientAddr string, groupData *apidef.GroupLoginRequest) bool {
-			return true
-		})
-		dispatcher.AddFunc("Disconnect", func(clientAddr string, groupData *apidef.GroupLoginRequest) error {
-			return nil
-		})
-
-		rpcMock, connectionString := startRPCMock(dispatcher)
-		defer stopRPCMock(rpcMock)
-
-		ts := StartSlaveGw(connectionString, "test-group")
-		defer ts.Close()
-
-		r := &RPCStorageHandler{Gw: ts.Gw}
-		rpc.UseSyncLoginRPC = true
-		connected := r.Connect()
-		assert.True(t, connected)
-
-		err := r.Disconnect()
-		assert.Nil(t, err)
-	})
-	t.Run("disconnect error", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
-		r := &RPCStorageHandler{Gw: ts.Gw}
-
-		err := r.Disconnect()
-		expectedErr := errors.New("RPCStorageHandler: rpc is either down or was not configured")
-		assert.EqualError(t, err, expectedErr.Error())
-	})
 }
