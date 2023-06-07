@@ -460,7 +460,6 @@ func TestRPCStorageHandler_Disconnect(t *testing.T) {
 		defer ts.Close()
 
 		r := &RPCStorageHandler{Gw: ts.Gw}
-		rpc.UseSyncLoginRPC = true
 		connected := r.Connect()
 		assert.True(t, connected)
 
