@@ -1,10 +1,34 @@
 #!/bin/bash
-set -xe
+set -e
+
+GATEWAY_VERSION=$(echo $GITHUB_TAG | perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"')
+
+# Plugin compiler arguments:
+#
+# - 1. plugin_name = vendor-plugin.so
+# - 2. plugin_id = optional, sets build folder to `/opt/plugin_{plugin_name}{plugin_id}`
+# - 3. GOOS = optional override of GOOS
+# - 4. GOARCH = optional override of GOARCH
+#
+# The script will build a plugin named according to the following:
+#
+# - `{plugin_name%.*}_{GATEWAY_VERSION}_{GOOS}_{GOARCH}.so`
+#
+# If GOOS and GOARCH are not set, it will build `{plugin_name}`.
+#
+# Example command: ./build.sh 
+# Example output: tyk-extras_5.0.0_linux_amd64.so
 
 plugin_name=$1
 plugin_id=$2
+GOOS=${3:-$(go env GOOS)}
+GOARCH=${4:-$(go env GOARCH)}
 
-PLUGIN_BUILD_PATH="/go/src/plugin_${plugin_name%.*}$plugin_id"
+# Some defaults that can be overriden with env
+WORKSPACE_ROOT=$(dirname $TYK_GW_PATH)
+
+PLUGIN_SOURCE_PATH=${PLUGIN_SOURCE_PATH:-"/plugin-source"}
+PLUGIN_BUILD_PATH=${PLUGIN_BUILD_PATH:-"${WORKSPACE_ROOT}/plugin_${plugin_name%.*}$plugin_id"}
 
 function usage() {
     cat <<EOF
@@ -20,38 +44,38 @@ if [ -z "$plugin_name" ]; then
     exit 1
 fi
 
+# if arch and os present then update the name of file with those params
+if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
+  plugin_name="${plugin_name%.*}_${GATEWAY_VERSION}_${GOOS}_${GOARCH}.so"
+fi
+
+# Copy plugin source into plugin build folder.
+set -x
+
 mkdir -p $PLUGIN_BUILD_PATH
-# Plugin's vendor folder, has precedence over the cached vendor'd dependencies from tyk
 yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
+
+# Create worspace
+cd $WORKSPACE_ROOT
+
+go work init ./tyk
+go work use ./$(basename $PLUGIN_BUILD_PATH)
+
+echo "---"
+cat go.work
+echo "---"
 
 cd $PLUGIN_BUILD_PATH
 
-# Handle if plugin has own vendor folder, and ignore error if not
-[ -f go.mod ] && [ ! -d ./vendor ] && GO111MODULE=on go mod vendor
-# Ensure that go modules not used
-rm -rf go.mod
+set +x
 
-# We do not need to care which version of Tyk vendored in plugin, since we going to use version inside compiler
-rm -rf $PLUGIN_BUILD_PATH/vendor/github.com/TykTechnologies/tyk
+# Dump settings for inspection
 
-# Copy plugin vendored pkgs to GOPATH
-yes | cp -rf $PLUGIN_BUILD_PATH/vendor/* $GOPATH/src || true \
-        && rm -rf $PLUGIN_BUILD_PATH/vendor
+echo "PLUGIN_BUILD_PATH: ${PLUGIN_BUILD_PATH}"
+echo "PLUGIN_SOURCE_PATH: ${PLUGIN_SOURCE_PATH}"
+echo "plugin_name: ${plugin_name}"
 
-# Ensure that GW package versions have priorities
-
-# We can't just copy Tyk dependencies on top of plugin dependencies, since different package versions have different file structures
-# First we need to find which deps GW already has, remove this folders, and after copy fresh versions from GW
-
-# github.com and rest of packages have different nesting levels, so have to handle it separately
-ls -d $TYK_GW_PATH/vendor/github.com/*/* | sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | xargs -d '\n' rm -rf
-ls -d $TYK_GW_PATH/vendor/*/* | sed "s|$TYK_GW_PATH/vendor|$GOPATH/src|g" | grep -v github | xargs -d '\n' rm -rf
-
-# Copy GW dependencies
-yes | cp -rf $TYK_GW_PATH/vendor/* $GOPATH/src
-rm -rf $TYK_GW_PATH/vendor
-
-rm /go/src/modules.txt
-
-GO111MODULE=off go build -buildmode=plugin -o $plugin_name \
-    && mv $plugin_name $PLUGIN_SOURCE_PATH
+set -x
+CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
+mv $plugin_name $PLUGIN_SOURCE_PATH
+rm -f $WORKSPACE_ROOT/go.work
