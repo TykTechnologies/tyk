@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
@@ -482,4 +483,17 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			assert.Equal(t, expected, result)
 		})
 	}
+}
+
+func TestRPCStorageHandler_Disconnect(t *testing.T) {
+	t.Run("disconnect error", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		r := &RPCStorageHandler{Gw: ts.Gw}
+
+		err := r.Disconnect()
+		expectedErr := errors.New("RPCStorageHandler: rpc is either down or was not configured")
+		assert.EqualError(t, err, expectedErr.Error())
+	})
 }

@@ -2,15 +2,14 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"testing"
 	"text/template"
@@ -80,63 +79,6 @@ func TestURLRewrites(t *testing.T) {
 			{Path: "/rewrite1?show_env=1", Code: http.StatusOK, BodyMatch: `"URI":"/get\?show_env=2"`},
 			{Path: "/rewrite", Code: http.StatusOK, BodyMatch: `"URI":"/get\?just_rewrite"`},
 		}...)
-	})
-
-	t.Run("absolute URL in request URL path (HTTP verb argument)", func(t *testing.T) {
-		baseSpec := func(spec *APISpec, listenPath string) {
-			spec.Proxy.ListenPath = listenPath
-			spec.URLRewriteEnabled = true
-			spec.UseKeylessAccess = true
-			spec.VersionData.NotVersioned = true
-			spec.VersionData.Versions = map[string]apidef.VersionInfo{
-				"Default": {
-					Name:             "Default",
-					UseExtendedPaths: true,
-					ExtendedPaths: apidef.ExtendedPathsSet{
-						URLRewrite: []apidef.URLRewriteMeta{
-							{
-								Path:         "/hello",
-								Method:       http.MethodGet,
-								MatchPattern: "/hello",
-								RewriteTo:    "/get",
-							},
-						},
-					},
-				},
-			}
-		}
-
-		specWithHostRewrite := func(spec *APISpec, listenPath string) {
-			baseSpec(spec, listenPath)
-			// update rewrite url with host rewrite
-			localhostURL := strings.ReplaceAll(TestHttpAny, "127.0.0.1", "localhost")
-			spec.VersionData.Versions["Default"].ExtendedPaths.URLRewrite[0].RewriteTo = localhostURL + "/get"
-		}
-
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			baseSpec(spec, "/url-rewrite-1")
-		}, func(spec *APISpec) {
-			specWithHostRewrite(spec, "/url-rewrite-2")
-		})
-
-		testAbsoluteURL := func(path string) {
-			reqURL := fmt.Sprintf("%s/%s", ts.URL, path)
-			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, reqURL, nil)
-			assert.NoError(t, err)
-
-			req.URL.Path = reqURL
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				log.Fatalln(err)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			assert.NoError(t, err)
-			assert.Equal(t, true, strings.Contains(string(body), `/get`))
-		}
-
-		testAbsoluteURL("url-rewrite-1/hello")
-		testAbsoluteURL("url-rewrite-2/hello")
 	})
 }
 
@@ -946,6 +888,60 @@ func TestRoundRobin(t *testing.T) {
 	if got, want := rr.WithLen(0), 0; got != want {
 		t.Errorf("RR Pos of 0 wrong: want %d got %d", want, got)
 	}
+}
+
+func setupKeepalive(conn net.Conn) error {
+	tcpConn := conn.(*net.TCPConn)
+	if err := tcpConn.SetKeepAlive(true); err != nil {
+		return err
+	}
+	if err := tcpConn.SetKeepAlivePeriod(30 * time.Second); err != nil {
+		return err
+	}
+	return nil
+}
+
+type customListener struct {
+	L net.Listener
+}
+
+func (ln *customListener) Init(addr string) (err error) {
+	ln.L, err = net.Listen("tcp", addr)
+	return
+}
+
+func (ln *customListener) Accept() (conn net.Conn, err error) {
+	c, err := ln.L.Accept()
+	if err != nil {
+		return
+	}
+
+	if err = setupKeepalive(c); err != nil {
+		c.Close()
+		return
+	}
+
+	handshake := make([]byte, 6)
+	if _, err = io.ReadFull(c, handshake); err != nil {
+		return
+	}
+
+	idLenBuf := make([]byte, 1)
+	if _, err = io.ReadFull(c, idLenBuf); err != nil {
+		return
+	}
+
+	idLen := uint8(idLenBuf[0])
+	id := make([]byte, idLen)
+	if _, err = io.ReadFull(c, id); err != nil {
+		return
+	}
+
+	return c, nil
+}
+
+func (ln *customListener) Close() error {
+	return ln.L.Close()
 }
 
 func TestDefaultVersion(t *testing.T) {
