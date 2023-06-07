@@ -57,7 +57,7 @@ dev:
 
 .PHONY: build
 build:
-	$(GOBUILD) -tags "$(TAGS)" -o $(BINARY_NAME) -v .
+	$(GOBUILD) -tags "$(TAGS)" -o $(BINARY_NAME) -trimpath -v .
 
 .PHONY: build-linux
 build-linux:
