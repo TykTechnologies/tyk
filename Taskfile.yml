@@ -1,0 +1,24 @@
+---
+version: "3"
+
+tasks:
+  test:plugin-compiler:
+    desc: "Plugin compiler local build/test"
+    cmds:
+      - docker build --build-arg GOLANG_CROSS=1.19-bullseye --build-arg GITHUB_TAG=v5.1.0-alpha18 --build-arg GITHUB_SHA=$(git rev-parse HEAD) --platform=linux/amd64 --rm -t internal/plugin-compiler -f ci/images/plugin-compiler/Dockerfile .
+      - docker run -it --rm -v $(readlink -f .)/ci/images/plugin-compiler/data/basic-plugin:/plugin-source internal/plugin-compiler basic-plugin.so
+      - docker run -it --rm -v $PWD:/go/src/github.com/TykTechnologies/tyk -w /go/src/github.com/TykTechnologies/tyk tykio/golang-cross:1.19-bullseye go build -trimpath -tags=goplugin .
+      - ./tyk plugin load -f ./ci/images/plugin-compiler/data/basic-plugin/basic-plugin*.so -s MyPluginPre
+
+  test:goreleaser:
+    desc: "Test goreleaser locally"
+    vars:
+      pluginTemp: /tmp/plugin-compiler.extra_paths
+    cmds:
+      - go list ./... | perl -p -e 's/.+tyk\///g' | grep -v github | perl -p -e 's/\/.+//g' | sort | uniq > {{.pluginTemp}}
+      - echo -e "go.mod\ngo.sum\nmain.go\nci/images/plugin-compiler" >> {{.pluginTemp}}
+      - |
+        set -x
+        replacement=$(cat {{.pluginTemp}} | paste -sd , - | sed -e 's/,/","/g')
+        yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
+      - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
