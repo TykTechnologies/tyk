@@ -33,7 +33,6 @@ const (
 	MsgKeyNotAuthorized                        = "Key not authorised"
 	MsgOauthClientRevoked                      = "Key not authorised. OAuth client access was revoked"
 	MsgKeyNotAuthorizedUnexpectedSigningMethod = "Key not authorized: Unexpected signing method"
-	MsgCertificateExpired                      = "Certificate has expired"
 )
 
 var errCustomBodyResponse = errors.New("errCustomBodyResponse")
@@ -59,11 +58,6 @@ func defaultTykErrors() {
 
 	TykErrors[ErrAuthCertNotFound] = config.TykError{
 		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrAuthCertExpired] = config.TykError{
-		Message: MsgCertificateExpired,
 		Code:    http.StatusForbidden,
 	}
 
