@@ -18,6 +18,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/starlight-go/starlight"
 	"io"
 	"io/ioutil"
 	"net"
@@ -1157,11 +1158,38 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			}
 		}
 
+		sj := &StarlarkJson{}
+		globals := map[string]interface{}{
+			"rw":              &resultWriter,
+			"Printf":          fmt.Printf,
+			"Sprintf":         fmt.Sprintf,
+			"ToUpper":         strings.ToUpper,
+			"header":          &header,
+			"json":            sj,
+			"graphql_request": gqlRequest,
+		}
+		now := time.Now()
+		_, err = starlight.Eval("/Users/buraksezer/go/src/github.com/TykTechnologies/tyk/gateway/udg-plugin.star", globals, nil)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(time.Since(now))
+
 		res = resultWriter.AsHTTPResponse(httpStatus, header)
 		return
 	}
 
 	return nil, false, errors.New("graphql configuration is invalid")
+}
+
+type StarlarkJson struct{}
+
+func (s *StarlarkJson) Set(data []byte, setValue []byte, keys ...string) (value []byte, err error) {
+	return jsonparser.Set(data, setValue, keys...)
+}
+
+func (s *StarlarkJson) Get(data []byte, keys ...string) (value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	return jsonparser.Get(data, keys...)
 }
 
 func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn, req *http.Request) {
