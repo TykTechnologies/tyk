@@ -170,6 +170,44 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithInvalidDirectKey, Data: request, BodyMatch: "", Code: http.StatusForbidden})
 		})
 	})
+
+	t.Run("null input on non nullable variable should fail with 400", func(t *testing.T) {
+		testSpec := BuildAPI(func(spec *APISpec) {
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+			spec.GraphQL.Schema = gqlCountriesSchema
+			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+			spec.Proxy.TargetURL = testGraphQLProxyUpstream
+			spec.Proxy.ListenPath = "/"
+			spec.GraphQL.Enabled = true
+		})[0]
+
+		g.Gw.LoadAPI(testSpec)
+
+		_, err := g.Run(
+			t,
+			test.TestCase{
+				Path:   "/",
+				Method: http.MethodPost,
+				Data: gql.Request{
+					Query:     gqlContinentQueryVariable,
+					Variables: []byte(`{"code":null}`),
+				},
+				Code: 400,
+			},
+			test.TestCase{
+				Path:   "/",
+				Method: http.MethodPost,
+				Data: gql.Request{
+					Query:     gqlStateQueryVariable,
+					Variables: []byte(`{"filter":{"code":{"eq":"filterString"}}}`),
+				},
+				Code: 400,
+				BodyMatchFunc: func(i []byte) bool {
+					return strings.Contains(string(i), `Validation for variable \"filter\" failed`)
+				},
+			})
+		assert.NoError(t, err)
+	})
 }
 
 func TestGraphQLMiddleware_EngineMode(t *testing.T) {
@@ -969,6 +1007,11 @@ input LanguageFilterInput {
   code: StringQueryOperatorInput
 }
 
+input StateFilterInput{
+  code: StringQueryOperatorInput
+  compulsory: String!
+}
+
 type Query {
   continents(filter: ContinentFilterInput): [Continent!]!
   continent(code: ID!): Continent
@@ -976,6 +1019,7 @@ type Query {
   country(code: ID!): Country
   languages(filter: LanguageFilterInput): [Language!]!
   language(code: ID!): Language
+  state(filter: StateFilterInput): [State!]!
 }
 
 type State {
@@ -1009,6 +1053,12 @@ query ($code: ID!){
     continent(code: $code){
         name
     }
+}`
+	gqlStateQueryVariable = `
+query ($filter: StateFilterInput) {
+  state(filter: $filter) {
+    name
+  }
 }`
 )
 
