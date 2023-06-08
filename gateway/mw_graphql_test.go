@@ -265,10 +265,12 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		}
 
 		expectedBody := []byte(`{"data":{"__typename":"Query"}}`)
-		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatchFunc: func(body []byte) bool {
-			return bytes.Equal(expectedBody, body)
-		},
-			Code: http.StatusOK})
+		_, _ = g.Run(t, test.TestCase{
+			Data: request, BodyMatchFunc: func(body []byte) bool {
+				return bytes.Equal(expectedBody, body)
+			},
+			Code: http.StatusOK,
+		})
 	})
 
 	t.Run("graphql engine v2", func(t *testing.T) {
@@ -325,7 +327,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					},
 				},
 			}...)
-
 		})
 
 		t.Run("proxy-only return errors from upstream", func(t *testing.T) {
@@ -353,7 +354,8 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						return false
 					}
 					return string(value) == "Something went wrong"
-				}})
+				},
+			})
 		})
 
 		t.Run("subgraph", func(t *testing.T) {
@@ -625,7 +627,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						assert.NoError(t, err)
 					})
 				})
-
 			})
 		})
 	})
@@ -737,7 +738,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					}...)
 				})
 			})
-
 		})
 	})
 }
