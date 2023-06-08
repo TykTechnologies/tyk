@@ -995,7 +995,8 @@ input StringQueryOperatorInput {
 
 scalar Upload`
 
-const gqlContinentQuery = `
+const (
+	gqlContinentQuery = `
 query {
     continent(code: "NG"){
         code
@@ -1003,6 +1004,13 @@ query {
     }
 }
 `
+	gqlContinentQueryVariable = `
+query ($code: ID!){
+    continent(code: $code){
+        name
+    }
+}`
+)
 
 const gqlSubgraphSchemaAccounts = `scalar _Any
 scalar _FieldSet

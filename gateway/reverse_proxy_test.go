@@ -968,6 +968,39 @@ func TestGraphql_Headers(t *testing.T) {
 	})
 }
 
+func TestGraphql_InputValidation(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	defaultSpec := BuildAPI(func(spec *APISpec) {
+		spec.Name = "tyk-api"
+		spec.APIID = "tyk-api"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+		spec.GraphQL.Schema = gqlCountriesSchema
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		spec.Proxy.TargetURL = testGraphQLProxyUpstream
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	t.Run("missing variable should fail with 400 bad request", func(t *testing.T) {
+		testSpec := defaultSpec
+		g.Gw.LoadAPI(testSpec)
+
+		_, err := g.Run(t, test.TestCase{
+			Path:   "/",
+			Method: http.MethodPost,
+			Data: graphql.Request{
+				Query:     gqlContinentQueryVariable,
+				Variables: []byte(`{"code":null}`),
+			},
+			Code: 400,
+		})
+		assert.NoError(t, err)
+	})
+
+}
+
 func TestGraphQL_InternalDataSource(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
