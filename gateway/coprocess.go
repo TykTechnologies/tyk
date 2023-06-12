@@ -71,14 +71,25 @@ type CoProcessor struct {
 
 // BuildObject constructs a CoProcessObject from a given http.Request.
 func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *APISpec) (*coprocess.Object, error) {
-	headers := ProtoMap(req.Header)
+	var headers []*coprocess.Header
+	for key, values := range req.Header {
+		h := &coprocess.Header{
+			Key:    key,
+			Values: values,
+		}
+		headers = append(headers, h)
+	}
 
 	host := req.Host
 	if host == "" && req.URL != nil {
 		host = req.URL.Host
 	}
 	if host != "" {
-		headers["Host"] = host
+		h := &coprocess.Header{
+			Key:    "Host",
+			Values: []string{host},
+		}
+		headers = append(headers, h)
 	}
 	scheme := "http"
 	if req.TLS != nil {
@@ -159,12 +170,22 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 
 	// Append response data if it's available:
 	if res != nil {
+		headers := make([]*coprocess.Header, len(res.Header))
 		resObj := &coprocess.ResponseObject{
-			Headers: make(map[string]string, len(res.Header)),
+			Headers: headers,
 		}
 		for k, v := range res.Header {
-			resObj.Headers[k] = v[0]
+			fmt.Printf("\nProcessing: %v     Values:%v \n", k, v)
+			resObj.Headers = append(resObj.Headers, &coprocess.Header{
+				Key:    k,
+				Values: v,
+			})
+
+			for _, j := range v {
+				fmt.Printf("\n\t %v\n", j)
+			}
 		}
+
 		resObj.StatusCode = int32(res.StatusCode)
 		rawBody, err := ioutil.ReadAll(res.Body)
 		if err != nil {
@@ -401,8 +422,10 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if returnObject.Request.ReturnOverrides.ResponseCode >= http.StatusBadRequest && !returnObject.Request.ReturnOverrides.OverrideError {
 		logger.WithField("key", m.Gw.obfuscateKey(token)).Info("Attempted access with invalid key")
 
-		for h, v := range returnObject.Request.ReturnOverrides.Headers {
-			w.Header().Set(h, v)
+		for _, header := range returnObject.Request.ReturnOverrides.Headers {
+			for _, value := range header.Values {
+				w.Header().Add(header.Key, value)
+			}
 		}
 
 		// Fire Authfailed Event
@@ -420,9 +443,12 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	if returnObject.Request.ReturnOverrides.ResponseCode > 0 {
-		for h, v := range returnObject.Request.ReturnOverrides.Headers {
-			w.Header().Set(h, v)
+		for _, header := range returnObject.Request.ReturnOverrides.Headers {
+			for _, value := range header.Values {
+				w.Header().Add(header.Key, value)
+			}
 		}
+
 		w.WriteHeader(int(returnObject.Request.ReturnOverrides.ResponseCode))
 		w.Write([]byte(returnObject.Request.ReturnOverrides.ResponseBody))
 
@@ -569,9 +595,12 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		delete(res.Header, k)
 	}
 	// Set headers:
-	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
-	for k, v := range retObject.Response.Headers {
-		setCustomHeader(res.Header, k, v, ignoreCanonical)
+	//ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
+	for _, v := range retObject.Response.Headers {
+		//ToDo : Use ignoreCanonical
+		for _, j := range v.Values {
+			res.Header.Add(v.Key, j)
+		}
 	}
 
 	// Set response body:
