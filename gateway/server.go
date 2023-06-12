@@ -308,6 +308,12 @@ func (gw *Gateway) getPolicy(polID string) user.Policy {
 	return pol
 }
 
+func (gw *Gateway) policiesByIDLen() int {
+	gw.policiesMu.RLock()
+	defer gw.policiesMu.RUnlock()
+	return len(gw.policiesByID)
+}
+
 func (gw *Gateway) apisByIDLen() int {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
@@ -1634,6 +1640,17 @@ func Start() {
 		err := gw.DashService.DeRegister()
 		if err != nil {
 			mainLog.WithError(err).Error("deregistering in dashboard")
+		}
+	}
+	if gwConfig.SlaveOptions.UseRPC {
+		store := RPCStorageHandler{
+			DoReload: gw.DoReload,
+			Gw:       gw,
+		}
+
+		err := store.Disconnect()
+		if err != nil {
+			mainLog.WithError(err).Error("deregistering in MDCB")
 		}
 	}
 
