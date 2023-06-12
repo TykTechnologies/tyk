@@ -1,11 +1,16 @@
 syntax = "proto3";
 
+import "coprocess_common.proto";
+
 package coprocess;
+
+//option go_package = "github.com/TykTechnologies/tyk/coprocess";
+option go_package = "/";
 
 message ReturnOverrides {
   int32 response_code = 1;
   string response_error = 2;
-  map<string, string> headers = 3;
+  repeated Header headers = 3;
   bool override_error = 4;
   string response_body = 5;
 }

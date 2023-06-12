@@ -40,6 +40,7 @@ type PythonDispatcher struct {
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
 func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+	fmt.Printf("\nPYTHON DISPATCHER\n")
 	// Prepare the PB object:
 	objectMsg, err := proto.Marshal(object)
 	if err != nil {
@@ -78,7 +79,12 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		return nil, err
 	}
 
-	python.PyTupleSetItem(args, 0, objectBytes)
+	err = python.PyTupleSetItem(args, 0, objectBytes)
+	if err != nil {
+		log.WithError(err).Error("PyTupleSetItem")
+	}
+	fmt.Printf("\nArgs: %+v\n", args)
+	fmt.Printf("\nCalling: %v\n", dispatchHookFunc)
 	result, err := python.PyObjectCallObject(dispatchHookFunc, args)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -131,6 +137,8 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		}).Error(err)
 		return nil, err
 	}
+	fmt.Printf("\nal eponder: \n %+v \n", newObject.Response.Headers)
+
 	return newObject, nil
 
 }
@@ -215,7 +223,7 @@ func PythonLoadDispatcher() error {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
-		}).Fatalf("Couldn't initialize Python dispatcher")
+		}).Fatalf("Couldn't initialize Python dispatcher1")
 		python.PyErr_Print()
 		return err
 	}

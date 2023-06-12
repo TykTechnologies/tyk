@@ -1,12 +1,15 @@
 syntax = "proto3";
 
 import "coprocess_return_overrides.proto";
-// import "coprocess_common.proto";
+import "coprocess_common.proto";
 
 package coprocess;
 
+//option go_package = "github.com/TykTechnologies/tyk/coprocess";
+option go_package = "/";
+
 message MiniRequestObject {
-  map<string, string> headers = 1;
+  repeated Header headers = 1;
   map<string, string> set_headers = 2;
   repeated string delete_headers = 3;
   string body = 4;

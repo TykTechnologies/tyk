@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package coprocess;
 
+//option go_package = "github.com/TykTechnologies/tyk/coprocess";
+option go_package = "/";
 enum HookType {
   Unknown = 0;
   Pre = 1;
@@ -13,4 +15,9 @@ enum HookType {
 
 message StringSlice {
   repeated string items = 1;
+}
+
+message Header {
+  string key = 1;
+  repeated string values = 2;
 }

@@ -461,6 +461,7 @@ func setCustomHeader(h http.Header, key string, value string, ignoreCanonical bo
 	if ignoreCanonical {
 		h[key] = []string{value}
 	} else {
+		fmt.Printf("\n\nelse\n")
 		h.Set(key, value)
 	}
 }

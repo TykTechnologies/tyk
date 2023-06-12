@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package coprocess;
 
+//option go_package = "github.com/TykTechnologies/tyk/coprocess";
+option go_package = "/";
+
 message AccessSpec {
   string url = 1;
   repeated string methods = 2;

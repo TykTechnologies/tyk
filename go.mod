@@ -36,7 +36,7 @@ require (
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/gofrs/uuid v3.3.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.4.2
-	github.com/golang/protobuf v1.5.2
+	github.com/golang/protobuf v1.5.3
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
@@ -82,6 +82,7 @@ require (
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	google.golang.org/grpc v1.36.0
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
+	google.golang.org/protobuf v1.30.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1

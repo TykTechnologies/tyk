@@ -7,7 +7,7 @@
 
 echo "Generating bindings for Go."
 protoc -I. --go_out=plugins=grpc:../ *.proto
-
+exit
 echo "Generating bindings for Python."
 mkdir -p ../bindings/python
 protoc -I. --python_out=../bindings/python *.proto
