@@ -453,7 +453,7 @@ func TestHandle404Called(t *testing.T) {
 	buf := &bytes.Buffer{}
 
 	log := logger.Get()
-	log.AddHook(&writer.Hook { // Send info and debug logs to stdout
+	log.AddHook(&writer.Hook { // Capture error logs
 		Writer: buf,
 		LogLevels: []logrus.Level{
 			logrus.ErrorLevel,
