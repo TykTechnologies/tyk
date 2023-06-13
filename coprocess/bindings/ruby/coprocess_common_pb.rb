@@ -8,6 +8,10 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     add_message "coprocess.StringSlice" do
       repeated :items, :string, 1
     end
+    add_message "coprocess.Header" do
+      optional :key, :string, 1
+      repeated :values, :string, 2
+    end
     add_enum "coprocess.HookType" do
       value :Unknown, 0
       value :Pre, 1
@@ -21,5 +25,6 @@ end
 
 module Coprocess
   StringSlice = ::Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.StringSlice").msgclass
+  Header = ::Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.Header").msgclass
   HookType = ::Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.HookType").enummodule
 end

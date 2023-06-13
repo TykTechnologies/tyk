@@ -4,7 +4,7 @@ import "coprocess_common.proto";
 
 package coprocess;
 
-option go_package = "/";
+option go_package = "/coprocess";
 
 message ReturnOverrides {
   int32 response_code = 1;

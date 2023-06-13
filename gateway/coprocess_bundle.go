@@ -117,6 +117,7 @@ func (b *Bundle) AddToSpec() {
 			"prefix": "coprocess",
 		}).Info("Python dispatcher was initialized")
 	}
+
 	dispatcher := loadedDrivers[b.Spec.CustomMiddleware.Driver]
 	if dispatcher != nil {
 		dispatcher.HandleMiddlewareCache(&b.Manifest, b.Path)

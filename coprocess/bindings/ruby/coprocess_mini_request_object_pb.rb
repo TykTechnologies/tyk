@@ -4,10 +4,11 @@
 require 'google/protobuf'
 
 require 'coprocess_return_overrides_pb'
+require 'coprocess_common_pb'
 Google::Protobuf::DescriptorPool.generated_pool.build do
   add_file("coprocess_mini_request_object.proto", :syntax => :proto3) do
     add_message "coprocess.MiniRequestObject" do
-      map :headers, :string, :string, 1
+      repeated :headers, :message, 1, "coprocess.Header"
       map :set_headers, :string, :string, 2
       repeated :delete_headers, :string, 3
       optional :body, :string, 4

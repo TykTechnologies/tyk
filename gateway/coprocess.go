@@ -215,6 +215,7 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	}
 	ignoreCanonical := c.Middleware.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for h, v := range object.Request.SetHeaders {
+		fmt.Printf("\nEntra con: %v", v)
 		setCustomHeader(r.Header, h, v, ignoreCanonical)
 	}
 
@@ -578,7 +579,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		return errors.New("Middleware error")
 	}
 	object.Session = ProtoSessionState(ses)
-
+	fmt.Printf("\n Headers sent: %+v\n", object.Response.Headers)
 	retObject, err := coProcessor.Dispatch(object)
 	if err != nil {
 		log.WithError(err).Debug("Couldn't dispatch request object")
@@ -617,6 +618,7 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 		err := fmt.Errorf("Couldn't dispatch request, driver '%s' isn't available", c.Middleware.MiddlewareDriver)
 		return nil, err
 	}
+
 	newObject, err := dispatcher.Dispatch(object)
 	if err != nil {
 		return nil, err

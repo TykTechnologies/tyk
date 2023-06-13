@@ -6,7 +6,13 @@
 # * pip3 install grpcio grpcio-tools
 
 echo "Generating bindings for Go."
-protoc -I. --go_out=plugins=grpc:../ *.proto
+# protoc -I. --go_out=plugins=grpc:../ *.proto
+cd ../coprocess
+protoc --proto_path=proto --go_out=.  --go-grpc_out=. proto/*.proto
+mv * ../
+cd ..
+rmdir coprocess
+cd proto
 
 echo "Generating bindings for Python."
 mkdir -p ../bindings/python

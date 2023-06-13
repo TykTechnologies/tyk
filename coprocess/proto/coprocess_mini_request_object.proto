@@ -5,7 +5,7 @@ import "coprocess_common.proto";
 
 package coprocess;
 
-option go_package = "/";
+option go_package = "/coprocess";
 
 message MiniRequestObject {
   repeated Header headers = 1;

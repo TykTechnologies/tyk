@@ -3,12 +3,13 @@
 
 require 'google/protobuf'
 
+require 'coprocess_common_pb'
 Google::Protobuf::DescriptorPool.generated_pool.build do
   add_file("coprocess_return_overrides.proto", :syntax => :proto3) do
     add_message "coprocess.ReturnOverrides" do
       optional :response_code, :int32, 1
       optional :response_error, :string, 2
-      map :headers, :string, :string, 3
+      repeated :headers, :message, 3, "coprocess.Header"
       optional :override_error, :bool, 4
       optional :response_body, :string, 5
     end
