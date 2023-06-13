@@ -18,9 +18,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='coprocess_response_object.proto',
   package='coprocess',
   syntax='proto3',
-  serialized_options=b'Z\001/',
+  serialized_options=b'Z\n/coprocess',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x1f\x63oprocess_response_object.proto\x12\tcoprocess\x1a\x16\x63oprocess_common.proto\"i\n\x0eResponseObject\x12\x13\n\x0bstatus_code\x18\x01 \x01(\x05\x12\x10\n\x08raw_body\x18\x02 \x01(\x0c\x12\x0c\n\x04\x62ody\x18\x03 \x01(\t\x12\"\n\x07headers\x18\x04 \x03(\x0b\x32\x11.coprocess.HeaderB\x03Z\x01/b\x06proto3'
+  serialized_pb=b'\n\x1f\x63oprocess_response_object.proto\x12\tcoprocess\x1a\x16\x63oprocess_common.proto\"i\n\x0eResponseObject\x12\x13\n\x0bstatus_code\x18\x01 \x01(\x05\x12\x10\n\x08raw_body\x18\x02 \x01(\x0c\x12\x0c\n\x04\x62ody\x18\x03 \x01(\t\x12\"\n\x07headers\x18\x04 \x03(\x0b\x32\x11.coprocess.HeaderB\x0cZ\n/coprocessb\x06proto3'
   ,
   dependencies=[coprocess__common__pb2.DESCRIPTOR,])
 

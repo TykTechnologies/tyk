@@ -18,9 +18,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='coprocess_common.proto',
   package='coprocess',
   syntax='proto3',
-  serialized_options=b'Z\001/',
+  serialized_options=b'Z\n/coprocess',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x16\x63oprocess_common.proto\x12\tcoprocess\"\x1c\n\x0bStringSlice\x12\r\n\x05items\x18\x01 \x03(\t\"%\n\x06Header\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t*]\n\x08HookType\x12\x0b\n\x07Unknown\x10\x00\x12\x07\n\x03Pre\x10\x01\x12\x08\n\x04Post\x10\x02\x12\x0f\n\x0bPostKeyAuth\x10\x03\x12\x12\n\x0e\x43ustomKeyCheck\x10\x04\x12\x0c\n\x08Response\x10\x05\x42\x03Z\x01/b\x06proto3'
+  serialized_pb=b'\n\x16\x63oprocess_common.proto\x12\tcoprocess\"\x1c\n\x0bStringSlice\x12\r\n\x05items\x18\x01 \x03(\t\"%\n\x06Header\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t*]\n\x08HookType\x12\x0b\n\x07Unknown\x10\x00\x12\x07\n\x03Pre\x10\x01\x12\x08\n\x04Post\x10\x02\x12\x0f\n\x0bPostKeyAuth\x10\x03\x12\x12\n\x0e\x43ustomKeyCheck\x10\x04\x12\x0c\n\x08Response\x10\x05\x42\x0cZ\n/coprocessb\x06proto3'
 )
 
 _HOOKTYPE = _descriptor.EnumDescriptor(
