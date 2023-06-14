@@ -9,4 +9,10 @@ message ResponseObject {
   bytes raw_body = 2;
   string body = 3;
   map<string, string> headers = 4;
+  repeated Header multivalue_headers = 5;
+}
+
+message Header {
+  string key = 1;
+  repeated string values = 2;
 }
