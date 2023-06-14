@@ -62,6 +62,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
+
+	"github.com/TykTechnologies/tyk/struct_viewer"
 )
 
 var (
@@ -190,6 +192,8 @@ type Gateway struct {
 	healthCheckInfo atomic.Value
 
 	dialCtxFn test.DialContext
+
+	configHelper *struct_viewer.Viewer
 }
 
 type hostDetails struct {
@@ -628,6 +632,12 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
 		stripSlashes(gw.checkIsAPIOwner(gw.controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
 	))
+
+	//muxer.PathPrefix("/config").Handler(allowMethods(gw.configHelper.JSONHandler, "GET"))
+	//muxer.PathPrefix("/envs").Handler(allowMethods(gw.configHelper.EnvsHandler, "GET"))
+
+	muxer.HandleFunc("/config", gw.configHelper.JSONHandler)
+	muxer.HandleFunc("/envs", gw.configHelper.EnvsHandler)
 
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
@@ -1283,6 +1293,20 @@ func (gw *Gateway) initialiseSystem() error {
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
+
+	svCfg := struct_viewer.Config{
+		Object:        gw.GetConfig(),
+		ParseComments: true,
+		Path:          "./config/config.go",
+	}
+
+	var errLoadingSv error
+	gw.configHelper, errLoadingSv = struct_viewer.New(&svCfg, config.EnvPrefix+"_")
+	if errLoadingSv != nil {
+		mainLog.WithError(errLoadingSv).Error("error loading config viewer")
+	} else {
+		mainLog.Info("CONFIG HELPER successss")
+	}
 	return nil
 }
 
