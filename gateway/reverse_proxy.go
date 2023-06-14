@@ -481,7 +481,6 @@ func setCustomHeaderMultipleValues(h http.Header, key string, values []string, i
 			h.Add(key, value)
 		}
 	}
-
 }
 
 func cloneHeader(h http.Header) http.Header {

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -1731,4 +1732,41 @@ func TestSSE(t *testing.T) {
 	t.Run("websockets enabled", func(t *testing.T) {
 		stream(true)
 	})
+}
+
+func TestSetCustomHeaderMultipleValues(t *testing.T) {
+	tests := []struct {
+		name            string
+		headers         http.Header
+		key             string
+		values          []string
+		ignoreCanonical bool
+		want            http.Header
+	}{
+		{
+			name:            "Add multiple values without canonical form",
+			headers:         http.Header{},
+			key:             "X-Test",
+			values:          []string{"value1", "value2"},
+			ignoreCanonical: true,
+			want:            http.Header{"X-Test": {"value1", "value2"}},
+		},
+		{
+			name:            "Add multiple values with canonical form",
+			headers:         http.Header{},
+			key:             "X-Test",
+			values:          []string{"value1", "value2"},
+			ignoreCanonical: false,
+			want:            http.Header{"X-Test": {"value1", "value2"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setCustomHeaderMultipleValues(tt.headers, tt.key, tt.values, tt.ignoreCanonical)
+			if !reflect.DeepEqual(tt.headers, tt.want) {
+				t.Errorf("setCustomHeaderMultipleValues() got = %v, want %v", tt.headers, tt.want)
+			}
+		})
+	}
 }

@@ -578,8 +578,9 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		delete(res.Header, k)
 	}
 
-	// check changes in headers
-	if !compareMaps(object.Response.Headers, retObject.Response.Headers) {
+	// check if we have changes in headers
+	if !areMapsEqual(object.Response.Headers, retObject.Response.Headers) {
+		// as we have changes we need to synchronize them
 		syncHeadersAndMultiValueHeaders(retObject.Response.Headers, retObject.Response.MultivalueHeaders)
 	}
 
@@ -640,18 +641,6 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 		return nil, err
 	}
 	return newObject, nil
-}
-
-func compareMaps(a, b map[string]string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if b[k] != v {
-			return false
-		}
-	}
-	return true
 }
 
 func coprocessAuthEnabled(spec *APISpec) bool {
