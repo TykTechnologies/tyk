@@ -45,7 +45,8 @@ if [ -z "$plugin_name" ]; then
 fi
 
 CC=$(go env CC)
-if [[ $GOARCH == "arm64" ]] && [[ $GOOS == "linux" ]] ; then
+
+if [[ $BASE_IMAGE == *"golang-cross"* ]] && [[ $GOARCH == "arm64" ]] && [[ $GOOS == "linux" ]] ; then
 	CC=aarch64-linux-gnu-gcc
 fi
 
