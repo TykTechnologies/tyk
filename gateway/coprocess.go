@@ -175,15 +175,10 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 			Headers: headers,
 		}
 		for k, v := range res.Header {
-			fmt.Printf("\nProcessing: %v     Values:%v \n", k, v)
 			resObj.Headers = append(resObj.Headers, &coprocess.Header{
 				Key:    k,
 				Values: v,
 			})
-
-			for _, j := range v {
-				fmt.Printf("\n\t %v\n", j)
-			}
 		}
 
 		resObj.StatusCode = int32(res.StatusCode)
@@ -596,12 +591,9 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		delete(res.Header, k)
 	}
 	// Set headers:
-	//ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for _, v := range retObject.Response.Headers {
-		//ToDo : Use ignoreCanonical
-		for _, j := range v.Values {
-			res.Header.Add(v.Key, j)
-		}
+		setCustomHeaderMultipleValues(res.Header, v.Key, v.Values, ignoreCanonical)
 	}
 
 	// Set response body:
