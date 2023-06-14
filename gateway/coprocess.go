@@ -561,6 +561,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	}
 	object.Session = ProtoSessionState(ses)
 
+	// keep headers in temporal object
 	retObject, err := coProcessor.Dispatch(object)
 	if err != nil {
 		log.WithError(err).Debug("Couldn't dispatch request object")
@@ -577,10 +578,15 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		delete(res.Header, k)
 	}
 
+	// check changes in headers
+	if !compareMaps(object.Response.Headers, retObject.Response.Headers) {
+		syncHeadersAndMultiValueHeaders(retObject.Response.Headers, retObject.Response.MultivalueHeaders)
+	}
+
 	// Set headers:
 	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
-	for k, v := range retObject.Response.Headers {
-		setCustomHeader(res.Header, k, v, ignoreCanonical)
+	for _, v := range retObject.Response.MultivalueHeaders {
+		setCustomHeaderMultipleValues(res.Header, v.Key, v.Values, ignoreCanonical)
 	}
 
 	// Set response body:
@@ -589,6 +595,38 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 
 	res.StatusCode = int(retObject.Response.StatusCode)
 	return nil
+}
+
+func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeaders []*coprocess.Header) []*coprocess.Header {
+	updatedMultiValueHeaders := []*coprocess.Header{}
+
+	for k, v := range headers {
+		found := false
+		for _, header := range multiValueHeaders {
+			if header.Key == k {
+				found = true
+				header.Values = []string{v}
+				break
+			}
+		}
+
+		if !found {
+			newHeader := &coprocess.Header{
+				Key:    k,
+				Values: []string{v},
+			}
+			updatedMultiValueHeaders = append(updatedMultiValueHeaders, newHeader)
+		}
+	}
+
+	// Append any existing headers that are still in the headers map
+	for _, header := range multiValueHeaders {
+		if _, ok := headers[header.Key]; ok {
+			updatedMultiValueHeaders = append(updatedMultiValueHeaders, header)
+		}
+	}
+
+	return updatedMultiValueHeaders
 }
 
 func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
@@ -602,6 +640,18 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 		return nil, err
 	}
 	return newObject, nil
+}
+
+func compareMaps(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 func coprocessAuthEnabled(spec *APISpec) bool {
