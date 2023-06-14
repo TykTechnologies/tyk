@@ -22,4 +22,5 @@ tasks:
         set -x
         replacement=$(cat {{.pluginTemp}} | paste -sd , - | sed -e 's/,/","/g')
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
+        yq -i ".dockers[5].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
