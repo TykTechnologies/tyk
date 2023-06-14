@@ -114,7 +114,6 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 	}
 
 	newObjectBytes, err := python.PyBytesAsString(newObjectPtr, python.PyLongAsLong(newObjectLen))
-	err = proto.Unmarshal(newObjectBytes, newObject1)
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
