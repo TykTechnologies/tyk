@@ -598,6 +598,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 					developerID, keyFound := data["tyk_developer_id"].(string)
 					if keyFound {
 						session.MetaData["tyk_developer_id"] = developerID
+						updateSession = true
 					}
 
 					// pteam-<id>, porg-<id>
@@ -606,11 +607,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 						for _, tag := range clientTags {
 							session.Tags = append(session.Tags, tag.(string))
 						}
+						updateSession = true
 					}
 					
 					policies, ok := data["policies"].(string)
 					if ok {
 						session["policies"] = policies
+						updateSession = true
 					}
 				}
 			}
