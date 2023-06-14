@@ -45,12 +45,7 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("------inside python dispatch--------")
 
-	newObject1 := &coprocess.Object{}
-	err = proto.Unmarshal(objectMsg, newObject1)
-	fmt.Printf("\nLLega: %+v\n", newObject1.Response.Headers)
-	//--------------
 	pythonLock.Lock()
 	// Find the dispatch_hook:
 	dispatchHookFunc, err := python.PyObjectGetAttr(dispatcherInstance, "dispatch_hook")
@@ -85,21 +80,6 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 
 	python.PyTupleSetItem(args, 0, objectBytes)
 
-	//------
-	newObjectPtr1, err := python.PyTupleGetItem(args, 0)
-	if err != nil {
-		panic(err)
-	}
-	newObjectLen1 := 549
-
-	newObjectBytes1, err := python.PyBytesAsString(newObjectPtr1, newObjectLen1)
-	if err != nil {
-		panic(err)
-	}
-	proto.Unmarshal(newObjectBytes1, newObject1)
-	fmt.Printf("\nJust Here: %+v\n", newObject1.Response)
-
-	//------
 	result, err := python.PyObjectCallObject(dispatchHookFunc, args)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -108,9 +88,8 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		python.PyErr_Print()
 		pythonLock.Unlock()
 		return nil, err
-	} else {
-
 	}
+
 	python.PyDecRef(args)
 	python.PyDecRef(dispatchHookFunc)
 
@@ -136,7 +115,6 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 
 	newObjectBytes, err := python.PyBytesAsString(newObjectPtr, python.PyLongAsLong(newObjectLen))
 	err = proto.Unmarshal(newObjectBytes, newObject1)
-	fmt.Printf("\nDevuelve: %+v\n", newObject1.Response.Headers)
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -227,7 +205,6 @@ func PythonInit(pythonVersion string) error {
 
 // PythonLoadDispatcher creates reference to the dispatcher class.
 func PythonLoadDispatcher() error {
-	fmt.Println("-----------PYTHON DISPATCHER----------------------")
 	pythonLock.Lock()
 	defer pythonLock.Unlock()
 	moduleDict, err := python.LoadModuleDict("dispatcher")
