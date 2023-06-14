@@ -163,7 +163,15 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 			Headers: make(map[string]string, len(res.Header)),
 		}
 		for k, v := range res.Header {
+			// set univalue header
 			resObj.Headers[k] = v[0]
+
+			// set multivalue header
+			currentHeader := coprocess.Header{
+				Key:    k,
+				Values: v,
+			}
+			resObj.MultivalueHeaders = append(resObj.MultivalueHeaders, &currentHeader)
 		}
 		resObj.StatusCode = int32(res.StatusCode)
 		rawBody, err := ioutil.ReadAll(res.Body)
@@ -568,6 +576,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	for k := range res.Header {
 		delete(res.Header, k)
 	}
+
 	// Set headers:
 	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for k, v := range retObject.Response.Headers {
