@@ -8,7 +8,6 @@ package coprocess
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -59,15 +58,14 @@ func (c *dispatcherClient) DispatchEvent(ctx context.Context, in *Event, opts ..
 }
 
 // DispatcherServer is the server API for Dispatcher service.
-// All implementations must embed UnimplementedDispatcherServer
+// All implementations should embed UnimplementedDispatcherServer
 // for forward compatibility
 type DispatcherServer interface {
 	Dispatch(context.Context, *Object) (*Object, error)
 	DispatchEvent(context.Context, *Event) (*EventReply, error)
-	mustEmbedUnimplementedDispatcherServer()
 }
 
-// UnimplementedDispatcherServer must be embedded to have forward compatible implementations.
+// UnimplementedDispatcherServer should be embedded to have forward compatible implementations.
 type UnimplementedDispatcherServer struct {
 }
 
@@ -77,7 +75,6 @@ func (UnimplementedDispatcherServer) Dispatch(context.Context, *Object) (*Object
 func (UnimplementedDispatcherServer) DispatchEvent(context.Context, *Event) (*EventReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DispatchEvent not implemented")
 }
-func (UnimplementedDispatcherServer) mustEmbedUnimplementedDispatcherServer() {}
 
 // UnsafeDispatcherServer may be embedded to opt out of forward compatibility for this service.
 // Use of this interface is not recommended, as added methods to DispatcherServer will
