@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/coprocess"
