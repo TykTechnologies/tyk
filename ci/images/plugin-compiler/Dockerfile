@@ -1,5 +1,6 @@
-ARG GOLANG_CROSS
-FROM tykio/golang-cross:${GOLANG_CROSS}
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
 LABEL description="Image for plugin development"
 
 ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
@@ -22,6 +23,8 @@ ADD . $TYK_GW_PATH
 
 ARG GITHUB_SHA
 ARG GITHUB_TAG
+ARG BASE_IMAGE
+ENV BASE_IMAGE ${BASE_IMAGE}
 ENV GITHUB_SHA ${GITHUB_SHA}
 ENV GITHUB_TAG ${GITHUB_TAG}
 
