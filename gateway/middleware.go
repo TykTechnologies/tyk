@@ -131,10 +131,14 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 				return
 			}
 
-			err, errCode := mw.ProcessRequest(w, r, mwConf)
+			rw := &customResponseWriter{
+				ResponseWriter: w,
+			}
+
+			err, errCode := mw.ProcessRequest(rw, r, mwConf)
 			if err != nil {
 				handler := ErrorHandler{*mw.Base()}
-				handler.HandleError(w, r, err.Error(), errCode, true)
+				handler.HandleError(w, r, err.Error(), errCode, !rw.responseSent)
 
 				meta["error"] = err.Error()
 
