@@ -46,7 +46,6 @@ func (d *dispatcher) grpcError(object *coprocess.Object, errorMsg string) (*copr
 }
 
 func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
-	fmt.Printf("\nEntra aqui y hace: %v\n", object.HookName)
 	switch object.HookName {
 	case "testPreHook1":
 		object.Request.SetHeaders = map[string]string{
@@ -787,7 +786,6 @@ func TestGRPCConfigData(t *testing.T) {
 				HeadersMatch: map[string]string{"x-config-data": "true"},
 			},
 		}...)
-		fmt.Printf("\nHeaders: %+v\n", res.Header)
 	})
 
 	t.Run("config data disabled", func(t *testing.T) {
