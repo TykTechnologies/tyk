@@ -46,6 +46,7 @@ func (d *dispatcher) grpcError(object *coprocess.Object, errorMsg string) (*copr
 }
 
 func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
+	fmt.Printf("\nEntra aqui y hace: %v\n", object.HookName)
 	switch object.HookName {
 	case "testPreHook1":
 		object.Request.SetHeaders = map[string]string{
@@ -115,8 +116,16 @@ func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*c
 	case "testConfigDataResponseHook":
 		if _, ok := object.Spec["config_data"]; ok {
 			object.Response.Headers["x-config-data"] = "true"
+			object.Response.MultivalueHeaders = append(object.Response.MultivalueHeaders, &coprocess.Header{
+				Key:    "x-config-data",
+				Values: []string{"true"},
+			})
 		} else {
 			object.Response.Headers["x-config-data"] = "false"
+			object.Response.MultivalueHeaders = append(object.Response.MultivalueHeaders, &coprocess.Header{
+				Key:    "x-config-data",
+				Values: []string{"false"},
+			})
 		}
 	case "testAuthHook1":
 		req := object.Request
@@ -773,11 +782,12 @@ func TestGRPCConfigData(t *testing.T) {
 
 	t.Run("config data disabled", func(t *testing.T) {
 		path := "/grpc-config-data-1/"
-		_, _ = ts.Run(t, []test.TestCase{
+		res, _ := ts.Run(t, []test.TestCase{
 			{Method: http.MethodGet, Path: path, Code: http.StatusOK,
 				HeadersMatch: map[string]string{"x-config-data": "true"},
 			},
 		}...)
+		fmt.Printf("\nHeaders: %+v\n", res.Header)
 	})
 
 	t.Run("config data disabled", func(t *testing.T) {
