@@ -37,7 +37,9 @@ const (
 	testHeaderValue = "testvalue"
 )
 
-type dispatcher struct{}
+type dispatcher struct {
+	coprocess.UnimplementedDispatcherServer
+}
 
 func (d *dispatcher) grpcError(object *coprocess.Object, errorMsg string) (*coprocess.Object, error) {
 	object.Request.ReturnOverrides.ResponseError = errorMsg
