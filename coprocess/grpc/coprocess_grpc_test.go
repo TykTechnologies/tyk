@@ -781,7 +781,7 @@ func TestGRPCConfigData(t *testing.T) {
 
 	t.Run("config data disabled", func(t *testing.T) {
 		path := "/grpc-config-data-1/"
-		= ts.Run(t, []test.TestCase{
+		ts.Run(t, []test.TestCase{
 			{Method: http.MethodGet, Path: path, Code: http.StatusOK,
 				HeadersMatch: map[string]string{"x-config-data": "true"},
 			},
