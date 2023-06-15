@@ -1040,11 +1040,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
 			var status int
 			if isHashed {
-				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+				log.Debug("--> removing cached (hashed) key: ", r.Gw.obfuscateKey(splitKeys[0]))
 				key = splitKeys[0]
 				_, status = r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
 			} else {
-				log.Info("--> removing cached key: ", key)
+				log.Debug("--> removing cached key: ", r.Gw.obfuscateKey(key))
 				// in case it's an username (basic auth) then generate the token
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
