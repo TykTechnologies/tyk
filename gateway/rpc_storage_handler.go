@@ -166,7 +166,7 @@ func (r *RPCStorageHandler) hashKey(in string) string {
 func (r *RPCStorageHandler) fixKey(keyName string) string {
 	setKeyName := r.KeyPrefix + r.hashKey(keyName)
 
-	log.Debug("Input key was: ", setKeyName)
+	log.Debug("Input key was: ", r.Gw.obfuscateKey(setKeyName))
 
 	return setKeyName
 }
@@ -448,8 +448,8 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 // DeleteKey will remove a key from the database
 func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
-	log.Debug("DEL Key was: ", keyName)
-	log.Debug("DEL Key became: ", r.fixKey(keyName))
+	log.Debug("DEL Key was: ", r.Gw.obfuscateKey(keyName))
+	log.Debug("DEL Key became: ", r.Gw.obfuscateKey(r.fixKey(keyName)))
 	ok, err := rpc.FuncClientSingleton("DeleteKey", r.fixKey(keyName))
 	if err != nil {
 		rpc.EmitErrorEventKv(
