@@ -38,13 +38,15 @@ jobs:
         golang_cross: [ 1.16, 1.16-el7 ]
         include:
           - golang_cross: 1.16-el7
+            go_version: 1.16
             goreleaser: 'ci/goreleaser/goreleaser-el7.yml'
             rpmvers: 'el/7 amazon/2'
             debvers: 'ubuntu/xenial ubuntu/bionic debian/jessie'
           - golang_cross: 1.16
+            go_version: 1.16
             goreleaser: 'ci/goreleaser/goreleaser.yml'
-            rpmvers: 'el/8 el/9'
-            debvers: 'ubuntu/bionic ubuntu/focal ubuntu/jammy debian/buster debian/bullseye'
+            rpmvers: 'el/8'
+            debvers: 'ubuntu/focal debian/buster debian/bullseye'
     outputs:
       tag: ${{ steps.targets.outputs.tag }}
 
@@ -133,6 +135,7 @@ jobs:
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           GOLANG_CROSS: ${{ matrix.golang_cross }}
+          GO_VERSION: ${{ matrix.go_version }}
           DEBVERS: ${{ matrix.debvers }}
           RPMVERS: ${{ matrix.rpmvers }}
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
@@ -239,15 +242,6 @@ jobs:
           --text 'Commit message: ${{ github.event.head_commit.message }}' \
           --title 'Failed to add new build for CD' \
           --title-link 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-
-  sbom:
-    needs: ci
-    uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@main
-    secrets:
-      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
-      DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
-      DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
-      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
 
   upgrade-deb:
     if: startsWith(github.ref, 'refs/tags')
