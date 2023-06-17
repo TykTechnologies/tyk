@@ -410,13 +410,15 @@ type HttpServerOptionsConfig struct {
 	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
 	Ciphers []string `json:"ssl_ciphers"`
 
-	// MaxRequestBodySize configures the maximum request body size in bytes.
+	// MaxRequestBodySize configures a maximum size limit for request body size (in bytes) for all APIs on the Gateway.
 	//
-	// This option evaluates the `Content-Length` header and responds with
-	// a HTTP 413 status code if larger than the defined size. If the header
-	// is not provided, the request body is read up to the defined size.
-	// If the request body is larger than the defined size, then we respond
-	// with HTTP 413 status code.
+	// Tyk Gateway will evaluate all API requests against this size limit and will respond with HTTP 413 status code if the body of the request is larger.
+	//
+	// Two methods are used to perform the comparison:
+	//  - If the API Request contains the `Content-Length` header, this is directly compared against `MaxRequestBodySize`.
+	//  - If the `Content-Length` header is not provided, the Request body is read in chunks to compare total size against `MaxRequestBodySize`.
+	//
+	// A value of zero (default) means that no maximum is set and API requests will not be tested.
 	//
 	// See more information about setting request size limits here:
 	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
