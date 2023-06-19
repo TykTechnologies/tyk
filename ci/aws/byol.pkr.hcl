@@ -22,6 +22,7 @@ variable "source_ami_owner" {
 variable "ami_search_string" {
   type    = string
 }
+
 variable "geoip_license" {
   type    = string
   default = "${env("GEOIP_LICENSE")}"
@@ -85,6 +86,7 @@ source "amazon-ebs" "byol" {
 # https://www.packer.io/docs/from-1.5/blocks/build
 build {
   sources = ["source.amazon-ebs.byol"]
+
   provisioner "file" {
     destination = "/tmp/semver.sh"
     source      = "utils/semver.sh"
