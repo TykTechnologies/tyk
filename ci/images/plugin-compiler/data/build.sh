@@ -42,12 +42,6 @@ if [ -z "$plugin_name" ]; then
     exit 1
 fi
 
-CC=$(go env CC)
-
-if [[ $BASE_IMAGE == *"golang-cross"* ]] && [[ $GOARCH == "arm64" ]] && [[ $GOOS == "linux" ]] ; then
-	CC=aarch64-linux-gnu-gcc
-fi
-
 # if arch and os present then update the name of file with those params
 if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
   plugin_name="${plugin_name%.*}_${GATEWAY_VERSION}_${GOOS}_${GOARCH}.so"
@@ -63,9 +57,8 @@ cd $PLUGIN_BUILD_PATH
 
 echo "PLUGIN_BUILD_PATH: ${PLUGIN_BUILD_PATH}"
 echo "PLUGIN_SOURCE_PATH: ${PLUGIN_SOURCE_PATH}"
-echo "CC: ${CC}"
 echo "plugin_name: ${plugin_name}"
 
 set -x
-CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
+CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
 mv $plugin_name $PLUGIN_SOURCE_PATH
