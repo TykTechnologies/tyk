@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-GATEWAY_VERSION=$(echo $GITHUB_TAG | perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"')
+GATEWAY_VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' $TYK_GW_PATH/gateway/version.go)
 
 # Plugin compiler arguments:
 #
@@ -25,10 +25,8 @@ GOOS=${3:-$(go env GOOS)}
 GOARCH=${4:-$(go env GOARCH)}
 
 # Some defaults that can be overriden with env
-WORKSPACE_ROOT=$(dirname $TYK_GW_PATH)
-
 PLUGIN_SOURCE_PATH=${PLUGIN_SOURCE_PATH:-"/plugin-source"}
-PLUGIN_BUILD_PATH=${PLUGIN_BUILD_PATH:-"${WORKSPACE_ROOT}/plugin_${plugin_name%.*}$plugin_id"}
+PLUGIN_BUILD_PATH=${PLUGIN_BUILD_PATH:-"/opt/plugin_${plugin_name%.*}$plugin_id"}
 
 function usage() {
     cat <<EOF
@@ -56,24 +54,10 @@ if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
 fi
 
 # Copy plugin source into plugin build folder.
-set -x
 
 mkdir -p $PLUGIN_BUILD_PATH
 yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
-
-# Create worspace
-cd $WORKSPACE_ROOT
-
-go work init ./tyk
-go work use ./$(basename $PLUGIN_BUILD_PATH)
-
-echo "---"
-cat go.work
-echo "---"
-
 cd $PLUGIN_BUILD_PATH
-
-set +x
 
 # Dump settings for inspection
 
@@ -85,4 +69,3 @@ echo "plugin_name: ${plugin_name}"
 set -x
 CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
 mv $plugin_name $PLUGIN_SOURCE_PATH
-rm -f $WORKSPACE_ROOT/go.work
