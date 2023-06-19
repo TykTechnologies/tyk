@@ -609,10 +609,10 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 						}
 						updateSession = true
 					}
-					
-					policies, ok := data["policies"].(string)
+
+					policies, ok := data["policies"].([]interface{})
 					if ok {
-						session["policies"] = policies
+						session.MetaData["policies"] = policies
 						updateSession = true
 					}
 				}
