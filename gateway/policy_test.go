@@ -137,6 +137,16 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			Rate:       4,
 			Per:        4,
 		},
+		"rate4": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Rate:         8,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+		},
+		"rate5": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Rate:         10,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+		},
 		"rate-for-a": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
@@ -553,6 +563,12 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				if s.Rate != 4 {
 					t.Fatalf("Should pick bigger value")
 				}
+			}, nil,
+		},
+		{
+			"RateParts with acl", []string{"rate5", "rate4"},
+			"", func(t *testing.T, s *user.SessionState) {
+				assert.Equal(t, float64(10), s.Rate)
 			}, nil,
 		},
 		{
