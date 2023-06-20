@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Jeffail/tunny"
@@ -21,6 +22,14 @@ import (
 const (
 	defaultTimeout             = 10
 	defaultSampletTriggerLimit = 3
+)
+
+const (
+	// Zero value - the service is open and ready to use
+	OPEN = 0
+
+	// Closed value - the service shouldn't be used
+	CLOSED = 1
 )
 
 var defaultWorkerPoolSize = runtime.NumCPU()
@@ -68,18 +77,12 @@ type HostUptimeChecker struct {
 	doResetList bool
 	newList     map[string]HostData
 	Gw          *Gateway `json:"-"`
+
+	isClosed int32
 }
 
-func (h *HostUptimeChecker) getStopLoop() bool {
-	h.muStopLoop.RLock()
-	defer h.muStopLoop.RUnlock()
-	return h.stopLoop
-}
-
-func (h *HostUptimeChecker) setStopLoop(newValue bool) {
-	h.muStopLoop.Lock()
-	h.stopLoop = newValue
-	h.muStopLoop.Unlock()
+func (h *HostUptimeChecker) isOpen() bool {
+	return atomic.LoadInt32(&h.isClosed) == OPEN
 }
 
 func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
@@ -144,10 +147,8 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			if !h.getStopLoop() {
-				h.Stop()
-				log.Debug("[HOST CHECKER] Received cancel signal")
-			}
+			h.Stop()
+			log.Debug("[HOST CHECKER] Received cancel signal")
 			return
 		case okHost := <-h.okChan:
 			// check if the the host url is in the sample map
@@ -384,7 +385,6 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 
 func (h *HostUptimeChecker) Start(ctx context.Context) {
 	// Start the loop that checks for bum hosts
-	h.setStopLoop(false)
 	log.Debug("[HOST CHECKER] Starting...")
 	go h.HostCheckLoop(ctx)
 	log.Debug("[HOST CHECKER] Check loop started...")
@@ -402,9 +402,8 @@ func eraseSyncMap(m *sync.Map) {
 }
 
 func (h *HostUptimeChecker) Stop() {
-	if !h.getStopLoop() {
-		h.setStopLoop(true)
-
+	wasClosed := atomic.SwapInt32(&h.isClosed, CLOSED)
+	if wasClosed == 0 {
 		eraseSyncMap(h.samples)
 
 		log.Info("[HOST CHECKER] Stopping poller")
