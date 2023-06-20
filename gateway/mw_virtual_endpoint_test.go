@@ -241,17 +241,16 @@ func TestVirtualEndpointDisabled(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt1",
-		proxyOnErrorDisabled, keylessAuthEnabled, cacheEnabled, true)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt2",
+		proxyOnErrorDisabled, keylessAuthEnabled, false, true)
 
 	_, _ = ts.Run(t,
 		test.TestCase{
-			Path:         "/virt1",
+			Path:         "/virt2",
 			BodyNotMatch: "foobar",
 			HeadersNotMatch: map[string]string{
-				cachedResponseHeader: "1",
-				"data-foo":           "x",
-				"data-bar-y":         "3",
+				"data-foo":   "x",
+				"data-bar-y": "3",
 			},
 		},
 	)

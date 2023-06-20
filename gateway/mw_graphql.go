@@ -254,6 +254,15 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return m.writeGraphQLError(w, validationResult.Errors)
 	}
 
+	inputValidationResult, err := gqlRequest.ValidateInput(m.Spec.GraphQLExecutor.Schema)
+	if err != nil {
+		m.Logger().Errorf("Error while validating variables for request: %v", err)
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+	if inputValidationResult.Errors != nil && inputValidationResult.Errors.Count() > 0 {
+		return m.writeGraphQLError(w, inputValidationResult.Errors)
+	}
+
 	return nil, http.StatusOK
 }
 

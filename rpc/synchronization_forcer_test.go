@@ -29,7 +29,7 @@ func init() {
 }
 
 func TestNewSyncForcer(t *testing.T) {
-	sf := NewSyncForcer(rc)
+	sf := NewSyncForcer(rc, []byte{})
 
 	assert.True(t, sf.store.ControllerInitiated())
 	assert.Equal(t, "synchronizer-group-", sf.store.KeyPrefix)
@@ -38,7 +38,7 @@ func TestNewSyncForcer(t *testing.T) {
 }
 
 func TestGroupLoginCallback(t *testing.T) {
-	sf := NewSyncForcer(rc)
+	sf := NewSyncForcer(rc, []byte{})
 	defer sf.store.DeleteAllKeys()
 
 	key := "key"
