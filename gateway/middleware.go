@@ -482,8 +482,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					if greaterThanFloat64(policy.Rate, ar.Limit.Rate) {
 						ar.Limit.Rate = policy.Rate
-						//if policy.Partitions.RateLimit then we must set this value in the global data of the key
-						if greaterThanFloat64(policy.Rate, session.Rate) || policy.Partitions.RateLimit {
+						if greaterThanFloat64(policy.Rate, session.Rate) {
 							session.Rate = policy.Rate
 						}
 					}
