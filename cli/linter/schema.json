@@ -438,7 +438,7 @@
     "hash_keys": {
       "type": "boolean"
     },
-    "disable_key_search_by_user_name": {
+    "disable_key_actions_by_username": {
       "type": "boolean"
     },
     "hash_key_function": {
