@@ -1,0 +1,25 @@
+version: '3'
+
+tasks:
+  generate:
+    desc: Generating bindings for Go, Python and Ruby
+    cmds:
+      - echo "Generating bindings for Go."
+      - cd ../
+      - protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false *.proto
+      - cd ..
+      - rmdir coprocess
+      - cd proto
+      
+      - echo "Generating bindings for Python."
+      - mkdir -p ../bindings/python
+      - protoc -I. --python_out=../bindings/python *.proto
+      - python3 codegen.py
+      
+      - echo "Generating bindings for Ruby."
+      - mkdir -p ../bindings/ruby
+      - protoc -I. --ruby_out=plugins=grpc:../bindings/ruby *.proto
+      
+      - cp ../bindings/python/* ../python/proto/
+      
+      - echo "Done"
