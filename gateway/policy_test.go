@@ -119,6 +119,11 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			AccessRights: map[string]user.AccessDefinition{"b": {}},
 			Partitions:   user.PolicyPartitions{Quota: true},
 		},
+		"quota5": {
+			QuotaMax:     4,
+			Partitions:   user.PolicyPartitions{Quota: true},
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
+		},
 		"unlimited-rate": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
@@ -136,6 +141,16 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			Partitions: user.PolicyPartitions{RateLimit: true},
 			Rate:       4,
 			Per:        4,
+		},
+		"rate4": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Rate:         8,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+		},
+		"rate5": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Rate:         10,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"rate-for-a": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
@@ -414,7 +429,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		},
 		{
 			name:     "MultiNonPart",
-			policies: []string{"nonpart1", "nonpart2"},
+			policies: []string{"nonpart1", "nonpart2", "nonexistent"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
 					"a": {
@@ -512,6 +527,12 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			}, nil,
 		},
 		{
+			"QuotaParts with acl", []string{"quota5", "quota4"},
+			"", func(t *testing.T, s *user.SessionState) {
+				assert.Equal(t, int64(4), s.QuotaMax)
+			}, nil,
+		},
+		{
 			"QuotaPart with access rights", []string{"quota3"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != 3 {
@@ -553,6 +574,12 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				if s.Rate != 4 {
 					t.Fatalf("Should pick bigger value")
 				}
+			}, nil,
+		},
+		{
+			"RateParts with acl", []string{"rate5", "rate4"},
+			"", func(t *testing.T, s *user.SessionState) {
+				assert.Equal(t, float64(10), s.Rate)
 			}, nil,
 		},
 		{
