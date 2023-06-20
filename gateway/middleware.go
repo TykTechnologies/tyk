@@ -320,6 +320,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
+			if len(policies) > 1 {
+				continue
+			}
+
 			return err
 		}
 		// Check ownership, policy org owner must be the same as API,
