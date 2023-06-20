@@ -463,8 +463,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 
 						ar.Limit.QuotaMax = policy.QuotaMax
-						//if partition for quota is set the we must use this value in the global information of the key
-						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) || policy.Partitions.Quota {
+						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) {
 							session.QuotaMax = policy.QuotaMax
 						}
 					}
@@ -482,8 +481,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					if greaterThanFloat64(policy.Rate, ar.Limit.Rate) {
 						ar.Limit.Rate = policy.Rate
-						//if policy.Partitions.RateLimit then we must set this value in the global data of the key
-						if greaterThanFloat64(policy.Rate, session.Rate) || policy.Partitions.RateLimit {
+						if greaterThanFloat64(policy.Rate, session.Rate) {
 							session.Rate = policy.Rate
 						}
 					}
