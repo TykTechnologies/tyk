@@ -93,7 +93,7 @@ type DBAppConfOptionsConfig struct {
 	// Set the URL to your Dashboard instance (or a load balanced instance). The URL needs to be formatted as: `http://dashboard_host:port`
 	ConnectionString string `json:"connection_string"`
 
-	// Set the timeout for your Dashboard connection. Defaults to 30 seconds. In seconds.
+	// Set a timeout value, in seconds, for your Dashboard connection. Default value is 30.
 	ConnectionTimeout int `json:"connection_timeout"`
 
 	// Set to `true` to enable filtering (sharding) of APIs.
