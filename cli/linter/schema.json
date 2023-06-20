@@ -306,6 +306,9 @@
         "connection_string": {
           "type": "string"
         },
+        "connection_timeout": {
+          "type": "integer"
+        },
         "node_is_segmented": {
           "type": "boolean"
         },
