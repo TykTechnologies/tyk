@@ -894,7 +894,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				_, status = r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
 				r.Gw.getSessionAndCreate(splitKeys[0], r, true, orgId)
 			} else {
+<<<<<<< HEAD
 				log.Debug("--> removing cached key: ", r.Gw.obfuscateKey(key))
+=======
+				log.Info("--> removing cached key: ", r.Gw.obfuscateKey(key))
+>>>>>>> 56d57566... TT-9177 obsfuscate key on log (#5152)
 				// in case it's an username (basic auth) then generate the token
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
