@@ -45,15 +45,15 @@ jobs:
       env:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: |
-        echo "branch=master" >> $GITHUB_OUTPUT
+        echo "::set-output name=branch::master"
         if [ ! -z "${{ github.head_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.head_ref	}}; then
-          echo "branch=${{ github.head_ref	}}" >> $GITHUB_OUTPUT
+          echo "::set-output name=branch::${{ github.head_ref	}}"
         fi
         if [ ! -z "${{ github.base_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.base_ref	}}; then
-          echo "branch=${{ github.base_ref	}}" >> $GITHUB_OUTPUT
+          echo "::set-output name=branch::${{ github.base_ref	}}"
         fi
         if [ ! -z "${{ github.ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.ref }}; then
-          echo "branch=${{ github.ref	}}" >> $GITHUB_OUTPUT
+          echo "::set-output name=branch::${{ github.ref	}}"
         fi
 
     - name: Checkout test repository
@@ -129,11 +129,9 @@ jobs:
         TYK_TEST_REDIS: "tyk-redis"
         TYK_TEST_DB_ADMIN: "12345"
         TYK_TEST_GW_SECRET: "352d20ee67be67f6340b4c0605b044b7"
-        TYK_TEST_FEDERATION_HOST: federation
       run: |
         pytest
       working-directory: tyk-automated-tests
-      timeout-minutes: 30
 
     - name: Archive Integration tests report
       if: ${{ always() }}

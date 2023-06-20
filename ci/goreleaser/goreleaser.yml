@@ -97,7 +97,7 @@ dockers:
   goos: linux
   dockerfile: ci/Dockerfile.std
   extra_files:
-    - "ci/"
+    - "ci/install/"
     - "README.md"
     - "LICENSE.md"
     - "apps/app_sample.json"
@@ -125,7 +125,7 @@ dockers:
   goos: linux
   dockerfile: ci/Dockerfile.slim
   extra_files:
-    - "ci/"
+    - "ci/install/"
     - "README.md"
     - "LICENSE.md"
     - "apps/app_sample.json"
