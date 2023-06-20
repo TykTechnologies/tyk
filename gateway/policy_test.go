@@ -429,7 +429,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		},
 		{
 			name:     "MultiNonPart",
-			policies: []string{"nonpart1", "nonpart2"},
+			policies: []string{"nonpart1", "nonpart2", "nonexistent"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
 					"a": {
