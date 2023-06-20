@@ -1,15 +1,21 @@
 version: '3'
 
 tasks:
+  install-deps:
+    desc: install the required dependencies to generate the bindings. gRPC is required to be installed
+    cmds:
+      - go get -u github.com/golang/protobuf/protoc-gen-go
+      - pip3 install grpcio grpcio-tools
   generate:
     desc: Generating bindings for Go, Python and Ruby
     cmds:
-      - echo "Generating bindings for Go."
-      - cd ../
+      - cd ../proto
       - protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false *.proto
-      - cd ..
+      - pwd
+      - cd coprocess/
+      - pwd
+      - mv coprocess/* ../
       - rmdir coprocess
-      - cd proto
       
       - echo "Generating bindings for Python."
       - mkdir -p ../bindings/python
@@ -19,7 +25,5 @@ tasks:
       - echo "Generating bindings for Ruby."
       - mkdir -p ../bindings/ruby
       - protoc -I. --ruby_out=plugins=grpc:../bindings/ruby *.proto
-      
       - cp ../bindings/python/* ../python/proto/
-      
       - echo "Done"
