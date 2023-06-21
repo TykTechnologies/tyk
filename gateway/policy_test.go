@@ -167,6 +167,10 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
 			Rate:         4,
 		},
+		"rate-no-partition": {
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+			Rate:         12,
+		},
 		"acl1": {
 			Partitions:   user.PolicyPartitions{Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
@@ -586,6 +590,12 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			"RateParts with acl respected by session", []string{"rate4", "rate5"},
 			"", func(t *testing.T, s *user.SessionState) {
 				assert.Equal(t, float64(10), s.Rate)
+			}, &user.SessionState{Rate: 20},
+		},
+		{
+			"Rate with no partition respected by session", []string{"rate-no-partition"},
+			"", func(t *testing.T, s *user.SessionState) {
+				assert.Equal(t, float64(12), s.Rate)
 			}, &user.SessionState{Rate: 20},
 		},
 		{
