@@ -579,6 +579,10 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 
 	// add key hash for newly created key
 	if gw.GetConfig().HashKeys && r.Method == http.MethodPost {
+		if newSession.BasicAuthData.Password != "" {
+			response.Key = ""
+		}
+
 		if isHashed {
 			response.KeyHash = keyName
 		} else {
