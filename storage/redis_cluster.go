@@ -36,6 +36,13 @@ type RedisCluster struct {
 	RedisController *RedisController
 }
 
+func obfuscateKey(keyName string) string {
+	if len(keyName) > 4 {
+		return "****" + keyName[len(keyName)-4:]
+	}
+	return "--"
+}
+
 func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.UniversalClient {
 	// redisSingletonMu is locked and we know the singleton is nil
 	cfg := conf.Storage
@@ -584,6 +591,7 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 		log.Debug(err)
 		return false
 	}
+<<<<<<< HEAD
 	log.Debug("DEL Key was: ", keyName)
 	log.Debug("DEL Key became: ", r.fixKey(keyName))
 
@@ -594,6 +602,11 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 	}
 
 	n, err := singleton.Del(r.RedisController.ctx, r.fixKey(keyName)).Result()
+=======
+	log.Debug("DEL Key was: ", obfuscateKey(keyName))
+	log.Debug("DEL Key became: ", obfuscateKey(r.fixKey(keyName)))
+	n, err := r.singleton().Del(r.RedisController.ctx, r.fixKey(keyName)).Result()
+>>>>>>> c8928382... Backport TT-9177 to 4.3.4 (#5153)
 	if err != nil {
 		log.WithError(err).Error("Error trying to delete key")
 	}
