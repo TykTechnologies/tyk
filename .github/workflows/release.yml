@@ -120,10 +120,14 @@ jobs:
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
 
+      - name: Set whether goreleaser snapshot or not.
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: echo "GRFLAGS=--snapshot" >> $GITHUB_ENV
+
       - uses: goreleaser/goreleaser-action@v4
         with:
           version: latest
-          args: release --clean -f ${{ matrix.goreleaser }}
+          args: release --clean ${{ env.GRFLAGS }} -f ${{ matrix.goreleaser }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
