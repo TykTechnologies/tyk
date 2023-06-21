@@ -1594,13 +1594,14 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// check if passed key is user name and convert it to real key with respect to current hashing algorithm
 	origKeyName := keyName
-	if r.Method != http.MethodPost && isUserName {
+	gwConfig := gw.GetConfig()
+
+	if r.Method != http.MethodPost && isUserName && !gwConfig.DisableKeyActionsByUsername {
 		keyName = gw.generateToken(orgID, keyName)
 	}
 
 	var obj interface{}
 	var code int
-	gwConfig := gw.GetConfig()
 	hashKeyFunction := gwConfig.HashKeyFunction
 
 	switch r.Method {
