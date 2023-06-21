@@ -60,7 +60,7 @@ func (gw *Gateway) startPubSubLoop() {
 		case <-gw.ctx.Done():
 			return
 		default:
-			err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
+			err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
 				gw.handleRedisEvent(v, nil, nil)
 			})
 			if err != nil {

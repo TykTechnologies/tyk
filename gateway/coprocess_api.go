@@ -3,6 +3,8 @@ package gateway
 import "C"
 
 import (
+	"context"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -15,12 +17,13 @@ const CoProcessDefaultKeyPrefix = "coprocess-data:"
 // TODO: implement INCR, DECR?
 
 // TykStoreData is a CoProcess API function for storing data.
+//
 //export TykStoreData
 func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	key := C.GoString(CKey)
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
-	rc := storage.NewRedisController()
+	rc := storage.NewRedisController(context.Background())
 	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, RedisController: rc}
 	err := store.SetKey(key, value, ttl)
 	if err != nil {
@@ -29,6 +32,7 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 }
 
 // TykGetData is a CoProcess API function for fetching data.
+//
 //export TykGetData
 func TykGetData(CKey *C.char) *C.char {
 	key := C.GoString(CKey)
@@ -43,6 +47,7 @@ func TykGetData(CKey *C.char) *C.char {
 var GatewayFireSystemEvent func(name apidef.TykEvent, meta interface{})
 
 // TykTriggerEvent is a CoProcess API function for triggering Tyk system events.
+//
 //export TykTriggerEvent
 func TykTriggerEvent(CEventName, CPayload *C.char) {
 	eventName := C.GoString(CEventName)
@@ -54,6 +59,7 @@ func TykTriggerEvent(CEventName, CPayload *C.char) {
 }
 
 // CoProcessLog is a bridge for using Tyk log from CP.
+//
 //export CoProcessLog
 func CoProcessLog(CMessage, CLogLevel *C.char) {
 	message := C.GoString(CMessage)

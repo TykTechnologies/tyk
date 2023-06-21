@@ -138,3 +138,65 @@ func TestRedisExpirationTime(t *testing.T) {
 	assert.Equal(t, nil, errGetExp)
 
 }
+
+func TestSingleton(t *testing.T) {
+	r := &RedisCluster{}
+	instance, err := r.singleton()
+	assert.NotNil(t, err)
+	assert.EqualError(t, err, "Error trying to get singleton instance: RedisController is nil")
+	assert.Nil(t, instance)
+
+	r.RedisController = &rc
+
+	instance, err = r.singleton()
+	assert.Nil(t, err)
+	assert.NotNil(t, instance)
+	cmd := instance.Ping(context.Background())
+	assert.NotNil(t, cmd)
+	assert.NoError(t, cmd.Err())
+
+	r.IsAnalytics = true
+	analyticsInstance, err := r.singleton()
+	assert.Nil(t, err)
+	assert.NotNil(t, analyticsInstance)
+	cmd = analyticsInstance.Ping(context.Background())
+	assert.NotNil(t, cmd)
+	assert.NoError(t, cmd.Err())
+	assert.NotEqual(t, instance, analyticsInstance)
+
+	r.IsCache = true
+	cacheInstance, err := r.singleton()
+	assert.Nil(t, err)
+	assert.NotNil(t, cacheInstance)
+	cmd = cacheInstance.Ping(context.Background())
+	assert.NotNil(t, cmd)
+	assert.NoError(t, cmd.Err())
+	assert.NotEqual(t, instance, cacheInstance)
+	assert.NotEqual(t, analyticsInstance, cacheInstance)
+
+	cacheInstance2, err := r.singleton()
+	assert.Nil(t, err)
+	assert.NotNil(t, cacheInstance)
+	cmd = cacheInstance.Ping(context.Background())
+	assert.NotNil(t, cmd)
+	assert.NoError(t, cmd.Err())
+	assert.Equal(t, cacheInstance, cacheInstance2)
+}
+
+func TestCheckIsOpen(t *testing.T) {
+	conf := config.Default
+	rc := NewRedisController(context.Background())
+
+	cluster := RedisCluster{
+		RedisController: rc,
+	}
+	err := cluster.checkIsOpen()
+	assert.Error(t, err)
+	assert.EqualError(t, err, ErrRedisIsDown.Error())
+	ok := rc.connectSingleton(false, false, conf)
+	assert.True(t, ok)
+
+	err = cluster.checkIsOpen()
+	assert.NoError(t, err)
+
+}

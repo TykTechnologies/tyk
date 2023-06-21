@@ -1,28 +1,34 @@
-ARG GOLANG_CROSS
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
 
-FROM tykio/golang-cross:${GOLANG_CROSS}
 LABEL description="Image for plugin development"
 
 ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
 
 ENV GO111MODULE=on
-
 # This directory will contain the plugin source and will be
 # mounted from the host box by the user using docker volumes
 ENV PLUGIN_SOURCE_PATH=/plugin-source
 
 RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
-COPY ci/images/plugin-compiler/data/build.sh /build.sh
-RUN chmod +x /build.sh
-
-
-RUN curl -L -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/repos/TykTechnologies/tyk/tarball/$GITUHB_SHA --output - | tar --strip-components 1 -C $TYK_GW_PATH -xzf -
-RUN cd $TYK_GW_PATH
-
-# Remove some things to decrease CVE surface
 RUN  apt-get remove -y --allow-remove-essential --auto-remove curl mercurial \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
-ENTRYPOINT ["/build.sh"]
+ADD go.mod go.sum $TYK_GW_PATH
+WORKDIR $TYK_GW_PATH
+RUN go mod download
 
+ADD . $TYK_GW_PATH
+
+ARG GITHUB_SHA
+ARG GITHUB_TAG
+ARG BASE_IMAGE
+ENV BASE_IMAGE ${BASE_IMAGE}
+ENV GITHUB_SHA ${GITHUB_SHA}
+ENV GITHUB_TAG ${GITHUB_TAG}
+
+COPY ci/images/plugin-compiler/data/build.sh /build.sh
+RUN chmod +x /build.sh
+
+ENTRYPOINT ["/build.sh"]
