@@ -132,6 +132,15 @@ func (p proxy) getListener() net.Listener {
 	return p.listener
 }
 
+func (p proxy) Shutdown(ctx context.Context) error {
+	if p.httpServer != nil && p.started {
+		mainLog.Info("shutting down proxy:", p.httpServer.Addr)
+		return p.httpServer.Shutdown(ctx)
+	}
+
+	return nil
+}
+
 type proxyMux struct {
 	sync.RWMutex
 	proxies      []*proxy

@@ -1617,14 +1617,26 @@ func Start() {
 			mainLog.Fatal(err)
 		}
 	}
+
 	_, err = again.Wait(&gw.DefaultProxyMux.again)
 	if err != nil {
 		mainLog.WithError(err).Error("waiting")
 	}
 	mainLog.Info("Stop signal received.")
-	if err = gw.DefaultProxyMux.again.Close(); err != nil {
-		mainLog.Error("Closing listeners: ", err)
+
+	for _, proxy := range gw.DefaultProxyMux.proxies {
+		if proxy != nil {
+			ctx, cancelfn := context.WithTimeout(context.Background(), time.Duration(30*time.Second))
+			defer cancelfn()
+
+			proxy.Shutdown(ctx)
+		}
 	}
+	/*
+		if err = gw.DefaultProxyMux.again.Close(); err != nil {
+			mainLog.Error("Closing listeners: ", err)
+		}
+	*/
 	// stop analytics workers
 	if gwConfig.EnableAnalytics && gw.Analytics.Store == nil {
 		gw.Analytics.Stop()
