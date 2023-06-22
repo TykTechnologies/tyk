@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -882,6 +883,82 @@ func TestHashKeyHandler(t *testing.T) {
 	}
 }
 
+func TestDisableKeyActionsByUserName(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		globalConf.HashKeys = true
+		globalConf.EnableHashedKeysListing = true
+		globalConf.HashKeyFunction = storage.HashMurmur64
+		globalConf.DisableKeyActionsByUsername = true
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	session := ts.testPrepareBasicAuth(false)
+	userName := "defaultuser1"
+	res, _ := ts.Run(t, []test.TestCase{
+		{
+			Method:    http.MethodPost,
+			Path:      fmt.Sprintf("/tyk/keys/%s", userName),
+			Data:      session,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		},
+	}...)
+
+	sessionToUpdate := session.Clone()
+	sessionToUpdate.BasicAuthData.Password = "newpassword"
+
+	resp, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+	apiRes := apiModifyKeySuccess{}
+	err = json.Unmarshal(resp, &apiRes)
+	assert.NoError(t, err)
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{
+			Method:    http.MethodGet,
+			Path:      fmt.Sprintf("/tyk/keys/%s?username=true&org_id=default", userName),
+			AdminAuth: true,
+			Code:      http.StatusNotFound,
+		},
+		// ensure that key is accessible by hash
+		{
+			Method:    http.MethodGet,
+			Path:      fmt.Sprintf("/tyk/keys/%s?hashed=true&org_id=default", apiRes.KeyHash),
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		},
+		{
+			Method:    http.MethodPut,
+			Path:      fmt.Sprintf("/tyk/keys/%s?username=true&org_id=default", userName),
+			Data:      sessionToUpdate,
+			AdminAuth: true,
+			Code:      http.StatusNotFound,
+		},
+		// ensure that update is possible by hash
+		{
+			Method:    http.MethodPut,
+			Path:      fmt.Sprintf("/tyk/keys/%s?hashed=true&org_id=default", apiRes.KeyHash),
+			Data:      sessionToUpdate,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		},
+		{
+			Method:    http.MethodDelete,
+			Path:      fmt.Sprintf("/tyk/keys/%s?username=true&org_id=default", userName),
+			AdminAuth: true,
+			Code:      http.StatusNotFound,
+		},
+		// ensure that delete is possible by hash
+		{
+			Method:    http.MethodDelete,
+			Path:      fmt.Sprintf("/tyk/keys/%s?hashed=true&org_id=default", apiRes.KeyHash),
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		},
+	}...)
+}
 func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	test.Racy(t) // TODO: TT-5233
 	ts := StartTest(nil)
