@@ -35,108 +35,108 @@ dockers:
   - ids:
       - std
     image_templates:
-      - "tykio/tyk-gateway:{{ .Tag }}-amd64"
-      - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}"
-      - "docker.tyk.io/tyk-gateway/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}"
+      - 'tykio/tyk-gateway:{{ .Tag }}-amd64'
+      - 'docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}'
+      - 'docker.tyk.io/tyk-gateway/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}'
     build_flag_templates:
-      - "--build-arg=PORTS=8080"
-      - "--platform=linux/amd64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
+      - '--build-arg=PORTS=8080'
+      - '--platform=linux/amd64'
+      - '--label=org.opencontainers.image.created={{.Date}}'
+      - '--label=org.opencontainers.image.title={{.ProjectName}}'
+      - '--label=org.opencontainers.image.revision={{.FullCommit}}'
+      - '--label=org.opencontainers.image.version={{.Version}}'
     use: buildx
     goarch: amd64
     goos: linux
     dockerfile: ci/Dockerfile.std
     extra_files:
-      - "ci/install/"
-      - "README.md"
-      - "LICENSE.md"
-      - "apps/app_sample.json"
-      - "templates"
-      - "middleware"
-      - "event_handlers/sample"
-      - "policies"
-      - "coprocess"
-      - "tyk.conf.example"
+      - 'ci/install/'
+      - 'README.md'
+      - 'LICENSE.md'
+      - 'apps/app_sample.json'
+      - 'templates'
+      - 'middleware'
+      - 'event_handlers/sample'
+      - 'policies'
+      - 'coprocess'
+      - 'tyk.conf.example'
   # Build gateway hybrid container amd64
   - ids:
       - std
     image_templates:
-      - "tykio/tyk-hybrid-docker:{{ .Tag }}-amd64"
+      - 'tykio/tyk-hybrid-docker:{{ .Tag }}-amd64'
     build_flag_templates:
-      - "--platform=linux/amd64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}-hybrid"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
+      - '--platform=linux/amd64'
+      - '--label=org.opencontainers.image.created={{.Date}}'
+      - '--label=org.opencontainers.image.title={{.ProjectName}}-hybrid'
+      - '--label=org.opencontainers.image.revision={{.FullCommit}}'
+      - '--label=org.opencontainers.image.version={{.Version}}'
     use: buildx
     goarch: amd64
     goos: linux
     dockerfile: ci/images/hybrid/Dockerfile
     extra_files:
-      - "ci/images/hybrid/"
+      - 'ci/images/hybrid/'
   # Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway (arm64)
   - ids:
       - std
     image_templates:
-      - "tykio/tyk-gateway:{{ .Tag }}-arm64"
-      - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-arm64"
+      - 'tykio/tyk-gateway:{{ .Tag }}-arm64'
+      - 'docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-arm64'
     build_flag_templates:
-      - "--build-arg=PORTS=8080"
-      - "--platform=linux/arm64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
+      - '--build-arg=PORTS=8080'
+      - '--platform=linux/arm64'
+      - '--label=org.opencontainers.image.created={{.Date}}'
+      - '--label=org.opencontainers.image.title={{.ProjectName}}'
+      - '--label=org.opencontainers.image.revision={{.FullCommit}}'
+      - '--label=org.opencontainers.image.version={{.Version}}'
     use: buildx
     goarch: arm64
     goos: linux
     dockerfile: ci/Dockerfile.std
     extra_files:
-      - "ci/install/"
-      - "README.md"
-      - "LICENSE.md"
-      - "apps/app_sample.json"
-      - "templates"
-      - "middleware"
-      - "event_handlers/sample"
-      - "policies"
-      - "coprocess"
-      - "tyk.conf.example"
+      - 'ci/install/'
+      - 'README.md'
+      - 'LICENSE.md'
+      - 'apps/app_sample.json'
+      - 'templates'
+      - 'middleware'
+      - 'event_handlers/sample'
+      - 'policies'
+      - 'coprocess'
+      - 'tyk.conf.example'
   # Build gateway hybrid container arm64
   - ids:
       - std
     image_templates:
-      - "tykio/tyk-hybrid-docker:{{ .Tag }}-arm64"
+      - 'tykio/tyk-hybrid-docker:{{ .Tag }}-arm64'
     build_flag_templates:
-      - "--platform=linux/arm64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}-hybrid"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
+      - '--platform=linux/arm64'
+      - '--label=org.opencontainers.image.created={{.Date}}'
+      - '--label=org.opencontainers.image.title={{.ProjectName}}-hybrid'
+      - '--label=org.opencontainers.image.revision={{.FullCommit}}'
+      - '--label=org.opencontainers.image.version={{.Version}}'
     use: buildx
     goarch: arm64
     goos: linux
     dockerfile: ci/images/hybrid/Dockerfile
     extra_files:
-      - "ci/images/hybrid/"
+      - 'ci/images/hybrid/'
   # Build plugin-compiler container amd64
   - ids:
       - std
     image_templates:
-      - "tykio/tyk-plugin-compiler:{{ .Tag }}-amd64"
-      - "tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-amd64"
+      - 'tykio/tyk-plugin-compiler:{{ .Tag }}-amd64'
+      - 'tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-amd64'
     build_flag_templates:
-      - "--platform=linux/amd64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title=tyk-plugin-compiler"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--build-arg=BASE_IMAGE=tykio/golang-cross:{{ .Env.GOLANG_CROSS }}"
-      - "--build-arg=GITHUB_SHA={{ .Env.GITHUB_SHA }}"
-      - "--build-arg=GITHUB_TAG={{ .Tag }}"
+      - '--platform=linux/amd64'
+      - '--label=org.opencontainers.image.created={{.Date}}'
+      - '--label=org.opencontainers.image.title=tyk-plugin-compiler'
+      - '--label=org.opencontainers.image.revision={{.FullCommit}}'
+      - '--label=org.opencontainers.image.version={{.Version}}'
+      - '--build-arg=BASE_IMAGE=tykio/golang-cross:{{ .Env.GOLANG_CROSS }}'
+      - '--build-arg=GITHUB_SHA={{ .Env.GITHUB_SHA }}'
+      - '--build-arg=GITHUB_TAG={{ .Tag }}'
     use: buildx
     goarch: amd64
     goos: linux
@@ -174,17 +174,17 @@ dockers:
   - ids:
       - std
     image_templates:
-      - "tykio/tyk-plugin-compiler:{{ .Tag }}-arm64"
-      - "tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-arm64"
+      - 'tykio/tyk-plugin-compiler:{{ .Tag }}-arm64'
+      - 'tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-arm64'
     build_flag_templates:
-      - "--platform=linux/arm64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title=tyk-plugin-compiler"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--build-arg=BASE_IMAGE=golang:{{ .Env.GO_VERSION }}"
-      - "--build-arg=GITHUB_SHA={{ .Env.GITHUB_SHA }}"
-      - "--build-arg=GITHUB_TAG={{ .Tag }}"
+      - '--platform=linux/arm64'
+      - '--label=org.opencontainers.image.created={{.Date}}'
+      - '--label=org.opencontainers.image.title=tyk-plugin-compiler'
+      - '--label=org.opencontainers.image.revision={{.FullCommit}}'
+      - '--label=org.opencontainers.image.version={{.Version}}'
+      - '--build-arg=BASE_IMAGE=golang:{{ .Env.GO_VERSION }}'
+      - '--build-arg=GITHUB_SHA={{ .Env.GITHUB_SHA }}'
+      - '--build-arg=GITHUB_TAG={{ .Tag }}'
     use: buildx
     goarch: arm64
     goos: linux
@@ -222,11 +222,9 @@ docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}
     image_templates:
       - tykio/tyk-gateway:{{ .Tag }}-amd64
-      - tykio/tyk-gateway:{{ .Tag }}-arm64
   - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
     image_templates:
       - tykio/tyk-gateway:{{ .Tag }}-amd64
-      - tykio/tyk-gateway:{{ .Tag }}-arm64
   - name_template: tykio/tyk-hybrid-docker:{{ .Tag }}
     image_templates:
       - tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
@@ -241,9 +239,9 @@ docker_manifests:
       - tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-arm64
 nfpms:
   - id: std
-    vendor: "Tyk Technologies Ltd"
-    homepage: "https://tyk.io"
-    maintainer: "Tyk <info@tyk.io>"
+    vendor: 'Tyk Technologies Ltd'
+    homepage: 'https://tyk.io'
+    maintainer: 'Tyk <info@tyk.io>'
     description: Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
     package_name: tyk-gateway
     builds:
@@ -253,41 +251,41 @@ nfpms:
       - deb
       - rpm
     contents:
-      - src: "README.md"
-        dst: "/opt/share/docs/tyk-gateway/README.md"
-      - src: "ci/install/*"
-        dst: "/opt/tyk-gateway/install"
+      - src: 'README.md'
+        dst: '/opt/share/docs/tyk-gateway/README.md'
+      - src: 'ci/install/*'
+        dst: '/opt/tyk-gateway/install'
       - src: ci/install/inits/systemd/system/tyk-gateway.service
         dst: /lib/systemd/system/tyk-gateway.service
       - src: ci/install/inits/sysv/init.d/tyk-gateway
         dst: /etc/init.d/tyk-gateway
       - src: /opt/tyk-gateway
         dst: /opt/tyk
-        type: "symlink"
-      - src: "LICENSE.md"
-        dst: "/opt/share/docs/tyk-gateway/LICENSE.md"
-      - src: "apps/app_sample.*"
-        dst: "/opt/tyk-gateway/apps"
-      - src: "templates/*.json"
-        dst: "/opt/tyk-gateway/templates"
-      - src: "templates/playground/*"
-        dst: "/opt/tyk-gateway/templates/playground"
-      - src: "middleware/*.js"
-        dst: "/opt/tyk-gateway/middleware"
-      - src: "event_handlers/sample/*.js"
-        dst: "/opt/tyk-gateway/event_handlers/sample"
-      - src: "policies/*.json"
-        dst: "/opt/tyk-gateway/policies"
-      - src: "coprocess/*"
-        dst: "/opt/tyk-gateway/coprocess"
+        type: 'symlink'
+      - src: 'LICENSE.md'
+        dst: '/opt/share/docs/tyk-gateway/LICENSE.md'
+      - src: 'apps/app_sample.*'
+        dst: '/opt/tyk-gateway/apps'
+      - src: 'templates/*.json'
+        dst: '/opt/tyk-gateway/templates'
+      - src: 'templates/playground/*'
+        dst: '/opt/tyk-gateway/templates/playground'
+      - src: 'middleware/*.js'
+        dst: '/opt/tyk-gateway/middleware'
+      - src: 'event_handlers/sample/*.js'
+        dst: '/opt/tyk-gateway/event_handlers/sample'
+      - src: 'policies/*.json'
+        dst: '/opt/tyk-gateway/policies'
+      - src: 'coprocess/*'
+        dst: '/opt/tyk-gateway/coprocess'
       - src: tyk.conf.example
         dst: /opt/tyk-gateway/tyk.conf
-        type: "config|noreplace"
+        type: 'config|noreplace'
     scripts:
-      preinstall: "ci/install/before_install.sh"
-      postinstall: "ci/install/post_install.sh"
-      postremove: "ci/install/post_remove.sh"
-    bindir: "/opt/tyk-gateway"
+      preinstall: 'ci/install/before_install.sh'
+      postinstall: 'ci/install/post_install.sh'
+      postremove: 'ci/install/post_remove.sh'
+    bindir: '/opt/tyk-gateway'
     overrides:
       rpm:
         file_name_template: '{{ .PackageName }}-{{ replace .Version "-" "~" }}-1.{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}'
@@ -323,16 +321,16 @@ archives:
       - std-arm64
     files:
       - README.md
-      - "ci/install/*"
-      - "LICENSE.md"
-      - "apps/app_sample.json"
-      - "templates/*.json"
-      - "templates/playground/index.html"
-      - "templates/playground/playground.js"
-      - "middleware/*.js"
-      - "event_handlers/sample/*.js"
-      - "policies/*.json"
-      - "coprocess/*"
+      - 'ci/install/*'
+      - 'LICENSE.md'
+      - 'apps/app_sample.json'
+      - 'templates/*.json'
+      - 'templates/playground/index.html'
+      - 'templates/playground/playground.js'
+      - 'middleware/*.js'
+      - 'event_handlers/sample/*.js'
+      - 'policies/*.json'
+      - 'coprocess/*'
       - tyk.conf.example
 checksum:
   disable: true
@@ -343,4 +341,4 @@ release:
     name: tyk
   prerelease: auto
   draft: true
-  name_template: "{{.ProjectName}}-v{{.Version}}"
+  name_template: '{{.ProjectName}}-v{{.Version}}'
