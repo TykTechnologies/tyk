@@ -38,7 +38,6 @@ jobs:
         golang_cross: [ 1.19-bullseye ]
         include:
           - golang_cross: 1.19-bullseye
-            go_version: 1.19
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             rpmvers: 'el/8 el/9'
             debvers: 'ubuntu/bionic ubuntu/focal ubuntu/jammy debian/buster debian/bullseye'
@@ -117,7 +116,6 @@ jobs:
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           GOLANG_CROSS: ${{ matrix.golang_cross }}
-          GO_VERSION: ${{ matrix.go_version }}
           DEBVERS: ${{ matrix.debvers }}
           RPMVERS: ${{ matrix.rpmvers }}
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
