@@ -472,6 +472,17 @@ func setCustomHeader(h http.Header, key string, value string, ignoreCanonical bo
 	}
 }
 
+// setCustomHeaderMultipleValues accepts multiple values for a key header and append it
+func setCustomHeaderMultipleValues(h http.Header, key string, values []string, ignoreCanonical bool) {
+	for _, value := range values {
+		if ignoreCanonical {
+			h[key] = append(h[key], value)
+		} else {
+			h.Add(key, value)
+		}
+	}
+}
+
 func cloneHeader(h http.Header) http.Header {
 	h2 := make(http.Header, len(h))
 	for k, vv := range h {

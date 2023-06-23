@@ -115,8 +115,16 @@ func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*c
 	case "testConfigDataResponseHook":
 		if _, ok := object.Spec["config_data"]; ok {
 			object.Response.Headers["x-config-data"] = "true"
+			object.Response.MultivalueHeaders = append(object.Response.MultivalueHeaders, &coprocess.Header{
+				Key:    "x-config-data",
+				Values: []string{"true"},
+			})
 		} else {
 			object.Response.Headers["x-config-data"] = "false"
+			object.Response.MultivalueHeaders = append(object.Response.MultivalueHeaders, &coprocess.Header{
+				Key:    "x-config-data",
+				Values: []string{"false"},
+			})
 		}
 	case "testAuthHook1":
 		req := object.Request
