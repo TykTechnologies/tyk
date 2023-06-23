@@ -328,3 +328,8 @@ func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, 
 
 	return s.QuotaMax, s.QuotaRemaining, s.QuotaRenewalRate, s.QuotaRenews
 }
+
+// IsBasicAuth returns whether the key is basic auth or not.
+func (s *SessionState) IsBasicAuth() bool {
+	return s.BasicAuthData.Password != ""
+}

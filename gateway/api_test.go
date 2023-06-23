@@ -1142,9 +1142,15 @@ func (ts *Test) testHashFuncAndBAHelper(t *testing.T) {
 
 	_, _ = ts.Run(t, []test.TestCase{
 		{
-			Method:    http.MethodPost,
-			Path:      "/tyk/keys/defaultuser",
-			Data:      session,
+			Method: http.MethodPost,
+			Path:   "/tyk/keys/defaultuser",
+			Data:   session,
+			BodyMatchFunc: func(resp []byte) bool {
+				keyResp := apiModifyKeySuccess{}
+				err := json.Unmarshal(resp, &keyResp)
+				assert.NoError(t, err)
+				return keyResp.Key == "" && keyResp.KeyHash != ""
+			},
 			AdminAuth: true,
 			Code:      200,
 		},
