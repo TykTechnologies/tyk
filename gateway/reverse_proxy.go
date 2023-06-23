@@ -38,7 +38,6 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
 
 	"github.com/akutz/memconn"
-	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpguts"
@@ -1461,7 +1460,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		*inres = *res // includes shallow copies of maps, but okay
 
 		if !upgrade {
-			defer res.Body.Close()
+			closeConn := res.Body.Close
+			defer closeConn()
 
 			// Buffer body data
 			var bodyBuffer bytes.Buffer
