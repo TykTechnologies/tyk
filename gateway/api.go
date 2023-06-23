@@ -516,7 +516,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	}
 
 	// Update our session object (create it)
-	if newSession.BasicAuthData.Password != "" {
+	if newSession.IsBasicAuth() {
 		// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
 		// Only if it's NEW
 		switch r.Method {
@@ -532,7 +532,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 				gw.setBasicAuthSessionPassword(newSession)
 			}
 		}
-	} else if originalKey.BasicAuthData.Password != "" {
+	} else if originalKey.IsBasicAuth() {
 		// preserve basic auth data
 		newSession.BasicAuthData.Hash = originalKey.BasicAuthData.Hash
 		newSession.BasicAuthData.Password = originalKey.BasicAuthData.Password
@@ -579,7 +579,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 
 	// add key hash for newly created key
 	if gw.GetConfig().HashKeys && r.Method == http.MethodPost {
-		if newSession.BasicAuthData.Password != "" {
+		if newSession.IsBasicAuth() {
 			response.Key = ""
 		}
 
@@ -678,7 +678,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 	}
 
 	// If it's a basic auth key and a valid Base64 string, use it as the key ID:
-	if session.BasicAuthData.Password != "" {
+	if session.IsBasicAuth() {
 		if storage.TokenOrg(sessionKey) != "" {
 			session.KeyID = sessionKey
 		}
