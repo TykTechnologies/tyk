@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"github.com/TykTechnologies/tyk/coprocess"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -136,4 +138,104 @@ func Test_shouldAddConfigData(t *testing.T) {
 			assert.Equal(t, tc.shouldAdd, shouldAddConfigData(tc.spec))
 		})
 	}
+}
+
+func TestSyncHeadersAndMultiValueHeaders(t *testing.T) {
+	// defining the test cases
+	testCases := []struct {
+		name                      string
+		headers                   map[string]string
+		initialMultiValueHeaders  []*coprocess.Header
+		expectedMultiValueHeaders []*coprocess.Header
+	}{
+		{
+			name: "adding a header",
+			headers: map[string]string{
+				"Header1": "value1",
+				"Header2": "value2",
+			},
+			initialMultiValueHeaders: []*coprocess.Header{
+				{
+					Key:    "Header1",
+					Values: []string{"oldValue1"},
+				},
+			},
+			expectedMultiValueHeaders: []*coprocess.Header{
+				{
+					Key:    "Header1",
+					Values: []string{"value1"},
+				},
+				{
+					Key:    "Header2",
+					Values: []string{"value2"},
+				},
+			},
+		},
+		{
+			name: "removing a header",
+			headers: map[string]string{
+				"Header1": "value1",
+			},
+			initialMultiValueHeaders: []*coprocess.Header{
+				{
+					Key:    "Header1",
+					Values: []string{"oldValue1"},
+				},
+				{
+					Key:    "Header2",
+					Values: []string{"oldValue2"},
+				},
+			},
+			expectedMultiValueHeaders: []*coprocess.Header{
+				{
+					Key:    "Header1",
+					Values: []string{"value1"},
+				},
+			},
+		},
+		{
+			name: "updating a header",
+			headers: map[string]string{
+				"Header1": "newValue1",
+			},
+			initialMultiValueHeaders: []*coprocess.Header{
+				{
+					Key:    "Header1",
+					Values: []string{"oldValue1"},
+				},
+			},
+			expectedMultiValueHeaders: []*coprocess.Header{
+				{
+					Key:    "Header1",
+					Values: []string{"newValue1"},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			updatedMultiValueHeaders := syncHeadersAndMultiValueHeaders(tc.headers, tc.initialMultiValueHeaders)
+			if !equalHeaders(updatedMultiValueHeaders, tc.expectedMultiValueHeaders) {
+				t.Errorf("syncHeadersAndMultiValueHeaders() = %v, want %v", updatedMultiValueHeaders, tc.expectedMultiValueHeaders)
+			}
+		})
+	}
+}
+
+func equalHeaders(h1, h2 []*coprocess.Header) bool {
+	if len(h1) != len(h2) {
+		return false
+	}
+	m := make(map[string][]string)
+	for _, h := range h1 {
+		m[h.Key] = h.Values
+	}
+	for _, h := range h2 {
+		if !reflect.DeepEqual(m[h.Key], h.Values) {
+			return false
+		}
+		delete(m, h.Key)
+	}
+	return len(m) == 0
 }
