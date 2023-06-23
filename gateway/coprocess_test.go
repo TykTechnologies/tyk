@@ -1,9 +1,10 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/coprocess"
 	"reflect"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/coprocess"
 
 	"github.com/stretchr/testify/assert"
 
