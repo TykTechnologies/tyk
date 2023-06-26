@@ -916,7 +916,7 @@ Enabled is a boolean flag. If set to `true`, the advanced caching plugin will be
 
 **Field: `cacheByRegex` (`string`)**
 CacheByRege defines a regular expression used against the request body to produce a cache key.
-Example value: `\"id\":[^,]*` (quoted json value).
+Example valu: `\"id\":[^,]*` (quoted json value).
 
 **Field: `cacheResponseCodes` (`[]int`)**
 CacheResponseCodes contains a list of valid response codes for responses that are okay to add to the cache.
