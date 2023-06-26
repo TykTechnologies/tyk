@@ -919,7 +919,7 @@ CacheByRege defines a regular expression used against the request body to produc
 Example valu: `\"id\":[^,]*` (quoted json value).
 
 **Field: `cacheResponseCodes` (`[]int`)**
-CacheResponseCodes contains a list of valid response codes for responses that are okay to add to the cache.
+CacheResponseCodes contai a list of valid response codes for responses that are okay to add to the cache.
 
 
 ### **EnforceTimeout**
