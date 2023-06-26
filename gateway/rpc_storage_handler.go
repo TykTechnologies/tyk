@@ -142,7 +142,7 @@ func (r *RPCStorageHandler) hashKey(in string) string {
 func (r *RPCStorageHandler) fixKey(keyName string) string {
 	setKeyName := r.KeyPrefix + r.hashKey(keyName)
 
-	log.Debug("Input key was: ", setKeyName)
+	log.Debug("Input key was: ", r.Gw.obfuscateKey(setKeyName))
 
 	return setKeyName
 }
@@ -424,8 +424,8 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 // DeleteKey will remove a key from the database
 func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
-	log.Debug("DEL Key was: ", keyName)
-	log.Debug("DEL Key became: ", r.fixKey(keyName))
+	log.Debug("DEL Key was: ", r.Gw.obfuscateKey(keyName))
+	log.Debug("DEL Key became: ", r.Gw.obfuscateKey(r.fixKey(keyName)))
 	ok, err := rpc.FuncClientSingleton("DeleteKey", r.fixKey(keyName))
 	if err != nil {
 		rpc.EmitErrorEventKv(
@@ -890,11 +890,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			var status int
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
 				key = splitKeys[0]
-				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+				log.Debug("--> removing cached (hashed) key: ", r.Gw.obfuscateKey(splitKeys[0]))
 				_, status = r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
 				r.Gw.getSessionAndCreate(splitKeys[0], r, true, orgId)
 			} else {
-				log.Info("--> removing cached key: ", key)
+				log.Debug("--> removing cached key: ", r.Gw.obfuscateKey(key))
 				// in case it's an username (basic auth) then generate the token
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)

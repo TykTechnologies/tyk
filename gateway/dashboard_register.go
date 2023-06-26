@@ -60,11 +60,20 @@ var dashClient *http.Client
 
 func (gw *Gateway) initialiseClient() *http.Client {
 	if dashClient == nil {
-		dashClient = &http.Client{
-			Timeout: 30 * time.Second,
+		conf := gw.GetConfig()
+		timeout := conf.DBAppConfOptions.ConnectionTimeout
+
+		// I don't think this is the appropriate place for this. I recommend we look at
+		// something like https://github.com/mcuadros/go-defaults to normalize all our defaults.
+		if timeout < 1 {
+			timeout = 30
 		}
 
-		if gw.GetConfig().HttpServerOptions.UseSSL {
+		dashClient = &http.Client{
+			Timeout: time.Duration(timeout) * time.Second,
+		}
+
+		if conf.HttpServerOptions.UseSSL {
 			// Setup HTTPS client
 			tlsConfig := &tls.Config{
 				InsecureSkipVerify: gw.GetConfig().HttpServerOptions.SSLInsecureSkipVerify,
