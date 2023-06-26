@@ -931,7 +931,7 @@ Enabled is a boolean flag. If set to `true`, requests will enforce a configured 
 Value is the configured timeout in seconds.
 
 
-### **ValidateRequests**
+### **ValidateRequest**
 
 **Field: `enabled` (`boolean`)**
 Enabled is a boolean flag, if set to `true`, it enables request validation.
@@ -941,7 +941,7 @@ ErrorResponseCode is the error code emitted when the request fails validation.
 If unset or zero, the response will returned with http status 422 Unprocessable Entity.
 
 
-### **MockResponse**
+### **MockResponses**
 
 **Field: `enabled` (`boolean`)**
 Enabled enables the mock response middleware.
@@ -959,7 +959,7 @@ Headers are the HTTP response headers that will be returned.
 FromOASExamples is the configuration to extract a mock response from OAS documentation.
 
 
-### **Header**
+### **Headers**
 
 **Field: `name` (`string`)**
 Name is the name of the header.
