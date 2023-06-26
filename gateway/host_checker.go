@@ -402,8 +402,8 @@ func eraseSyncMap(m *sync.Map) {
 }
 
 func (h *HostUptimeChecker) Stop() {
-	wasClosed := atomic.SwapInt32(&h.isClosed, CLOSED)
-	if wasClosed == 0 {
+	was := atomic.SwapInt32(&h.isClosed, CLOSED)
+	if was == OPEN {
 		eraseSyncMap(h.samples)
 
 		log.Info("[HOST CHECKER] Stopping poller")
