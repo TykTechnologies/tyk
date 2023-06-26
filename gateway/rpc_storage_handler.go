@@ -888,14 +888,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
 			var status int
-<<<<<<< HEAD
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
-=======
-			if isHashed {
-				log.Debug("--> removing cached (hashed) key: ", r.Gw.obfuscateKey(splitKeys[0]))
->>>>>>> c8928382... Backport TT-9177 to 4.3.4 (#5153)
 				key = splitKeys[0]
-				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+				log.Debug("--> removing cached (hashed) key: ", r.Gw.obfuscateKey(splitKeys[0]))
 				_, status = r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
 				r.Gw.getSessionAndCreate(splitKeys[0], r, true, orgId)
 			} else {
