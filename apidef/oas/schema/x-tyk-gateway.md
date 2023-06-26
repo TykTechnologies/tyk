@@ -915,7 +915,7 @@ Body base64 encoded representation of the template.
 Enabled is a boolean flag. If set to `true`, the advanced caching plugin will be enabled.
 
 **Field: `cacheByRegex` (`string`)**
-CacheByRegex defines a regular expression used against the request body to produce a cache key.
+CacheByRege defines a regular expression used against the request body to produce a cache key.
 Example value: `\"id\":[^,]*` (quoted json value).
 
 **Field: `cacheResponseCodes` (`[]int`)**
@@ -941,7 +941,7 @@ ErrorResponseCode is the error code emitted when the request fails validation.
 If unset or zero, the response will returned with http status 422 Unprocessable Entity.
 
 
-### **MockResponses**
+### **MockResponse**
 
 **Field: `enabled` (`boolean`)**
 Enabled enables the mock response middleware.
@@ -959,7 +959,7 @@ Headers are the HTTP response headers that will be returned.
 FromOASExamples is the configuration to extract a mock response from OAS documentation.
 
 
-### **Headers**
+### **Header**
 
 **Field: `name` (`string`)**
 Name is the name of the header.
