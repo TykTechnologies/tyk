@@ -8,6 +8,7 @@ on:
       - master
       - release-**
       - test-workflow-oas
+      - add-branch-input
     paths:
       - apidef/oas/schema/x-tyk-gateway.md
 
