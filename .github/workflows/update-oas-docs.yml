@@ -22,3 +22,4 @@ jobs:
           repository: TykTechnologies/tyk-docs
           event-type: tyk-oas-docs
           client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
+
