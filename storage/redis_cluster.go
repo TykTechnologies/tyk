@@ -591,9 +591,8 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 		log.Debug(err)
 		return false
 	}
-<<<<<<< HEAD
-	log.Debug("DEL Key was: ", keyName)
-	log.Debug("DEL Key became: ", r.fixKey(keyName))
+	log.Debug("DEL Key was: ", obfuscateKey(keyName))
+	log.Debug("DEL Key became: ", obfuscateKey(r.fixKey(keyName)))
 
 	singleton, err := r.singleton()
 	if err != nil {
@@ -602,11 +601,6 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 	}
 
 	n, err := singleton.Del(r.RedisController.ctx, r.fixKey(keyName)).Result()
-=======
-	log.Debug("DEL Key was: ", obfuscateKey(keyName))
-	log.Debug("DEL Key became: ", obfuscateKey(r.fixKey(keyName)))
-	n, err := r.singleton().Del(r.RedisController.ctx, r.fixKey(keyName)).Result()
->>>>>>> c8928382... Backport TT-9177 to 4.3.4 (#5153)
 	if err != nil {
 		log.WithError(err).Error("Error trying to delete key")
 	}
