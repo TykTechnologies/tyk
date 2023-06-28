@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"context"
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +11,7 @@ import (
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
 )
 
 func Test_InitOTel(t *testing.T) {
@@ -46,6 +49,44 @@ func Test_InitOTel(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		{
+			testName: "opentelemetry enabled, exporter set to grpc",
+			givenConfig: config.Config{
+				OpenTelemetry: otelconfig.OpenTelemetry{
+					Enabled:  true,
+					Exporter: "grpc",
+					Endpoint: "localhost:4317",
+				},
+			},
+			setupFn: func() (string, func()) {
+				lis, err := net.Listen("tcp", "localhost:0")
+				if err != nil {
+					t.Fatalf("failed to listen: %v", err)
+				}
+
+				// Create a gRPC server and serve on the listener
+				s := grpc.NewServer()
+				go func() {
+					if err := s.Serve(lis); err != nil {
+						t.Logf("failed to serve: %v", err)
+					}
+				}()
+
+				return lis.Addr().String(), s.Stop
+			},
+			expectedErr: nil,
+		},
+		{
+			testName: "opentelemetry enabled, exporter set to invalid",
+			givenConfig: config.Config{
+				OpenTelemetry: otelconfig.OpenTelemetry{
+					Enabled:  true,
+					Exporter: "invalid",
+					Endpoint: "localhost:4317",
+				},
+			},
+			expectedErr: errors.New("failed to create exporter: invalid exporter type: invalid"),
+		},
 	}
 
 	for _, tc := range tcs {
@@ -64,11 +105,15 @@ func Test_InitOTel(t *testing.T) {
 			gw.afterConfSetup()
 
 			actualErr := gw.initOtel()
-			assert.Equal(t, tc.expectedErr, actualErr)
 
 			if tc.expectedErr == nil {
 				assert.NotNil(t, gw.TraceProvider)
+				assert.Nil(t, actualErr)
+				return
 			}
+			assert.Nil(t, gw.TraceProvider)
+			assert.NotNil(t, actualErr)
+			assert.Equal(t, tc.expectedErr.Error(), actualErr.Error())
 
 		})
 	}
