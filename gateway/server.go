@@ -61,6 +61,7 @@ import (
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 
+	oteltrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
@@ -113,6 +114,7 @@ type Gateway struct {
 	GlobalHostChecker    HostCheckerManager
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
+	TraceProvider        oteltrace.Provider
 
 	keyGen DefaultKeyGenerator
 
@@ -1389,6 +1391,10 @@ func (gw *Gateway) afterConfSetup() {
 		}
 	}
 
+	if conf.OpenTelemetry.Enabled {
+		conf.OpenTelemetry.SetDefaults()
+	}
+
 	gw.SetConfig(conf)
 }
 
@@ -1565,7 +1571,10 @@ func Start() {
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)
 		defer trace.Close()
+	} else if gwConfig.OpenTelemetry.Enabled {
+		go gw.initOtel()
 	}
+
 	gw.start()
 	configs := gw.GetConfig()
 	go gw.RedisController.ConnectToRedis(gw.ctx, func() {
