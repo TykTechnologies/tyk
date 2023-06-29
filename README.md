@@ -63,7 +63,6 @@ You can run this in detach mode as follows:
 docker-compose up -d
 ```
 
-
 **Congratulations, you’re done!**
 
 Your Tyk Gateway is now configured and ready to use. Confirm this by checking against the ‘hello’ endpoint:
