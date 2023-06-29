@@ -29,7 +29,6 @@ builds:
     goarch:
       - arm64
     binary: tyk
-
 nfpms:
   - id: std
     vendor: "Tyk Technologies Ltd"
@@ -99,7 +98,6 @@ nfpms:
       signature:
         key_file: tyk.io.signing.key
         type: origin
-
 publishers:
   - name: tyk-gateway-unstable
     env:
@@ -108,36 +106,59 @@ publishers:
       - RPMVERS={{ .Env.RPMVERS }}
       - DEBVERS={{ .Env.DEBVERS }}
     cmd: /pc.sh {{ .ArtifactPath }}
-
-
 # This disables archives
 archives:
   - format: binary
     allow_different_binary_count: true
 dockers:
-# Build plugin-compiler
-- ids:
-    - std
-  image_templates:
-    - tykio/tyk-plugin-compiler:{{ .Tag }}-el7
-    - tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-el7
-  build_flag_templates:
-    - "--label=org.opencontainers.image.created={{.Date}}"
-    - "--label=org.opencontainers.image.title=tyk-plugin-compiler"
-    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-    - "--label=org.opencontainers.image.version={{.Version}}"
-    - "--build-arg=TYK_GW_TAG={{ .Tag }}"
-    - "--build-arg=GOLANG_CROSS={{ .Env.GOLANG_CROSS }}"
-    - "--build-arg=GITHUB_SHA={{ .Env.GITHUB_SHA }}"
-  goarch: amd64
-  goos: linux
-  dockerfile: ci/images/plugin-compiler/Dockerfile
-  extra_files:
-    - ci/images/plugin-compiler
-
+  # Build plugin-compiler
+  - ids:
+      - std
+    image_templates:
+      - tykio/tyk-plugin-compiler:{{ .Tag }}-el7
+      - tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-el7
+    build_flag_templates:
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title=tyk-plugin-compiler"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--build-arg=BASE_IMAGE=tykio/golang-cross:{{ .Env.GOLANG_CROSS }}"
+      - "--build-arg=GITHUB_SHA={{ .Env.GITHUB_SHA }}"
+      - "--build-arg=GITHUB_TAG={{ .Tag }}"
+    goarch: amd64
+    goos: linux
+    dockerfile: ci/images/plugin-compiler/Dockerfile
+    extra_files:
+      - apidef
+      - certs
+      - checkup
+      - cli
+      - config
+      - coprocess
+      - ctx
+      - dlpython
+      - dnscache
+      - gateway
+      - goplugin
+      - header
+      - internal
+      - log
+      - regexp
+      - request
+      - rpc
+      - signature_validator
+      - storage
+      - tcp
+      - templates
+      - test
+      - trace
+      - user
+      - go.mod
+      - go.sum
+      - main.go
+      - ci/images/plugin-compiler
 checksum:
   disable: true
-
 release:
   disable: true
   github:
