@@ -40,31 +40,26 @@ We’ll install Tyk, add auth, analytics, quotas and rate limiting to your API i
 We recommend “[Tyk Gateway Docker](https://github.com/TykTechnologies/tyk-gateway-docker#start-up-the-deployment)” as the quickest way to get started now. Later, you can move to one of our other [supported distributions](https://tyk.io/docs/apim/open-source/installation/) if you prefer.
 
 #### Step 1 - Clone the docker-compose repository
-```shell
+```console
 git clone https://github.com/TykTechnologies/tyk-gateway-docker
 ```
 
 #### Step 2 - Change to the new directory
-```shell
+```console
 cd tyk-gateway-docker
 ```
 
 #### Step 3 - Deploy Tyk Gateway and Redis
-```shell
+```console
 docker-compose up
 ```
 
-You can run this in detach mode as follows:
-
-
-```shell
-docker-compose up -d
-```
+You can run this in detach mode use the `-d` flag: `docker-compose up -d`
 
 **Congratulations, you’re done!**
 
 Your Tyk Gateway is now configured and ready to use. Confirm this by checking against the ‘hello’ endpoint:
-```shell
+```console
 curl localhost:8080/hello
 ```
 Output:  
@@ -141,7 +136,7 @@ Tyk Technologies maintains other Open Source Software which can be used in conju
 
 
 ## Documentation
-All the documentation for Tyk Gateway and other OSS related topics, can be found at [https://tyk.io/docs/tyk-oss-gateway/](https://tyk.io/docs/tyk-oss-gateway/)
+All the documentation for Tyk Gateway and other OSS-related topics can be found at [https://tyk.io/docs/tyk-oss-gateway/](https://tyk.io/docs/tyk-oss-gateway/)
 
 
 ## Community
@@ -158,14 +153,14 @@ Tyk is released under the MPL v2.0; please see [LICENSE.md](https://github.com/T
 ## Compiling Tyk Gateway
 
 Compile from Source
-```shell
+```console
 git clone https://github.com/TykTechnologies/tyk
 go build
 ```
-Go version 1.12 is required to build `master`, the current development version. Tyk is officially supported on `linux/amd64`, `linux/i386` and `linux/arm64`.
+Go version 1.12 is required to build `master`, the current development version. Tyk is officially supported on `Linux/amd64`, `Linux/i386` and `Linux/arm64`.
 
 Tests are run against both Go versions 1.12, 1.13, 1.14 and 1.15, however at present, only Go 1.12 is officially supported. In order to run tests locally use the following command:
-```shell
+```console
 go test ./...
 ```
 Note that tests require Redis to be running on the same machine (default port).
