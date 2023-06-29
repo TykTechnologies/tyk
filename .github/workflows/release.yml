@@ -44,7 +44,7 @@ jobs:
             debvers: 'ubuntu/xenial ubuntu/bionic debian/jessie'
           - golang_cross: 1.16
             go_version: 1.16
-            goreleaser: 'ci/goreleaser/goreleaser.yml'
+            goreleaser: 'ci/goreleaser/goreleaser-5.0.yml'
             rpmvers: 'el/8'
             debvers: 'ubuntu/focal debian/buster debian/bullseye'
     outputs:
