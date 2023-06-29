@@ -1,8 +1,7 @@
-# Tyk API Gateway
-
 ![tyk-github-header](https://github.com/TykTechnologies/tyk/assets/8012032/02b3fbae-80ed-4d1f-be87-016326f82ece)
 
-**Tyk** is the cloud-native, open source, API Gateway.  \
+# Tyk API Gateway
+**Tyk Gateway** is the cloud-native, open source, API Gateway.  \
 We support REST, GraphQL, TCP and gRPC protocols.
 
 Built from the ground up, as the [fastest API Gateway](https://tyk.io/performance-benchmarks/) on the planet since 2014.
