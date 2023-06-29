@@ -21,9 +21,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/cenk/backoff"
+
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/test"
-	"github.com/cenk/backoff"
 
 	"sync/atomic"
 	textTemplate "text/template"
