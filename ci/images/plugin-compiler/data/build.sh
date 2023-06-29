@@ -44,8 +44,8 @@ if [ -z "$plugin_name" ]; then
     exit 1
 fi
 
+# Set up arm64 cross build
 CC=$(go env CC)
-
 if [[ $GOARCH == "arm64" ]] && [[ $GOOS == "linux" ]] ; then
 	CC=aarch64-linux-gnu-gcc
 fi
@@ -56,33 +56,27 @@ if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
 fi
 
 # Copy plugin source into plugin build folder.
-set -x
-
 mkdir -p $PLUGIN_BUILD_PATH
 yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
 
 # Create worspace
 cd $WORKSPACE_ROOT
-
 go work init ./tyk
 go work use ./$(basename $PLUGIN_BUILD_PATH)
 
-echo "---"
-cat go.work
-echo "---"
-
+# Go to plugin build path
 cd $PLUGIN_BUILD_PATH
-
-set +x
 
 # Dump settings for inspection
 
 echo "PLUGIN_BUILD_PATH: ${PLUGIN_BUILD_PATH}"
 echo "PLUGIN_SOURCE_PATH: ${PLUGIN_SOURCE_PATH}"
-echo "CC: ${CC}"
-echo "plugin_name: ${plugin_name}"
 
 set -x
 CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
+set +x
+
 mv $plugin_name $PLUGIN_SOURCE_PATH
+
+# Clean up workspace
 rm -f $WORKSPACE_ROOT/go.work
