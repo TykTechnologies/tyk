@@ -161,14 +161,19 @@ Tyk is released under the MPL v2.0; please see [LICENSE.md](https://github.com/T
 ## Compiling Tyk Gateway
 
 Compile from Source
-
+```shell
+git clone https://github.com/TykTechnologies/tyk
+go build
+```
 Go version 1.12 is required to build `master`, the current development version. Tyk is officially supported on `linux/amd64`, `linux/i386` and `linux/arm64`.
 
 Tests are run against both Go versions 1.12, 1.13, 1.14 and 1.15, however at present, only Go 1.12 is officially supported. In order to run tests locally use the following command:
-
+```shell
+go test ./...
+```
 Note that tests require Redis to be running on the same machine (default port).
 
-In order to write your own test pls use this guide [https://github.com/TykTechnologies/tyk/blob/master/TESTING.md](https://github.com/TykTechnologies/tyk/blob/master/TESTING.md)
+In order to write your own test please use this guide [https://github.com/TykTechnologies/tyk/blob/master/TESTING.md](https://github.com/TykTechnologies/tyk/blob/master/TESTING.md)
 
 ## Contributing
 
