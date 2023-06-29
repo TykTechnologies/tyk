@@ -1,8 +1,9 @@
 package gateway
 
 import (
-	oteltrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/sirupsen/logrus"
+
+	oteltrace "github.com/TykTechnologies/opentelemetry/trace"
 )
 
 func (gw *Gateway) initOtel() error {
