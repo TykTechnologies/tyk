@@ -1,14 +1,23 @@
-version: "3"
 services:
   redis:
-    image: redis
+    image: redis:6.0-alpine
+    networks: [ test-plugin-compiler ]
       
   gw:
     image: tykio/tyk-gateway:${tag}
+    networks: [ test-plugin-compiler ]
+    depends_on:
+      - redis
     volumes:
       - ./testplugin/testplugin_${plugin_version}_${plugin_os}_${plugin_arch}.so:/opt/tyk-gateway/middleware/testplugin.so
       - ./testplugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
     ports:
       - "0.0.0.0:8080:8080"
     environment:
+      - TYK_DB_REDISHOST=redis
       - TYK_LOGLEVEL=debug
+
+networks:
+  test-plugin-compiler:
+    name: test-plugin-compiler
+    driver: bridge

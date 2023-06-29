@@ -38,11 +38,13 @@ jobs:
         golang_cross: [ 1.16, 1.16-el7 ]
         include:
           - golang_cross: 1.16-el7
+            go_version: 1.16
             goreleaser: 'ci/goreleaser/goreleaser-el7.yml'
             rpmvers: 'el/7 amazon/2'
             debvers: 'ubuntu/xenial ubuntu/bionic debian/jessie'
           - golang_cross: 1.16
-            goreleaser: 'ci/goreleaser/goreleaser.yml'
+            go_version: 1.16
+            goreleaser: 'ci/goreleaser/goreleaser-5.0.yml'
             rpmvers: 'el/8'
             debvers: 'ubuntu/focal debian/buster debian/bullseye'
     outputs:
@@ -122,7 +124,7 @@ jobs:
 
       - uses: goreleaser/goreleaser-action@v4
         with:
-          version: latest
+          version: 1.18.2
           args: release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -132,10 +134,13 @@ jobs:
           NFPM_PAYG_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          GO_VERSION: ${{ matrix.go_version }}
           GOLANG_CROSS: ${{ matrix.golang_cross }}
           DEBVERS: ${{ matrix.debvers }}
           RPMVERS: ${{ matrix.rpmvers }}
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+          DOCKER_BUILDKIT: "1"
+          DOCKER_CLI_EXPERIMENTAL: "enabled"
 
       - uses: actions/upload-artifact@v3
         with:
@@ -373,6 +378,8 @@ jobs:
           fetch-depth: 1
 
       - name: Run tests
+        env:
+          GITHUB_TAG: ${{ github.ref }}
         shell: bash
         run: |
           set -eaxo pipefail
