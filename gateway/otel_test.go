@@ -8,10 +8,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	otelconfig "github.com/TykTechnologies/opentelemetry/config"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
+
+	otelconfig "github.com/TykTechnologies/opentelemetry/config"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func Test_InitOTel(t *testing.T) {
