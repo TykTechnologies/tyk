@@ -64,11 +64,14 @@ docker-compose up -d
 ```
 
 
-Congratulations, you’re done!
+**Congratulations, you’re done!**
 
 Your Tyk Gateway is now configured and ready to use. Confirm this by checking against the ‘hello’ endpoint:
+```shell
+curl localhost:8080/hello
 
-Output: `{"status":"pass","version":"v3.2.1","description":"Tyk GW"}`
+```
+Output:  `{"status":"pass","version":"v3.2.1","description":"Tyk GW"}`
 
 Next, visit [adding your first API](https://tyk.io/docs/getting-started/create-api/) to Tyk and follow the Open Source instructions.
 
@@ -124,7 +127,6 @@ Analytics logging - Record detailed usage data on who is using your API's (raw d
 Tyk Technologies uses the same API Gateway for all it’s applications. Protecting, securing, and processing APIs for thousands of organizations and businesses around the world. Ideal for Open Banking, building software in the clouds as well as exposing APIs to teams, partners & consumers.
 
 
-
 ## Tyk OSS Integrations
 
 Tyk Technologies maintains other Open Source Software which can be used in conjunction with Tyk API Gateway:
@@ -154,13 +156,7 @@ All the documentation for Tyk Gateway and other OSS can be found at [https://tyk
 
 ## Open Source License
 
-
 Tyk is released under the MPL v2.0; please see [LICENSE.md](https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md) for a full version of the license.
-
-
-
-<p id="gdcalert4" ><span style="color: red; font-weight: bold">>>>>>  gd2md-html alert: error handling inline image </span><br>(<a href="#">Back to top</a>)(<a href="#gdcalert5">Next alert</a>)<br><span style="color: red; font-weight: bold">>>>>> </span></p>
-
 
 ## Compiling Tyk Gateway
 
