@@ -1377,7 +1377,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
 		if p.TykAPISpec.HTTPTransport != nil {
-			p.TykAPISpec.HTTPTransport.transport.CloseIdleConnections()
+			oldTransport.CloseIdleConnections()
 		}
 	}
 
