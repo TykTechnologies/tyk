@@ -34,9 +34,7 @@ Tyk runs natively on _Kubernetes_, if you prefer, thanks to the _[Tyk Kubernetes
 
 ---
 
-
-# 
-**Get Started**
+## Get Started
 
 We’ll install Tyk, add auth, analytics, quotas and rate limiting to your API in under 5 minutes.
 
@@ -79,8 +77,6 @@ Next, visit [adding your first API](https://tyk.io/docs/getting-started/create-a
 
 Other Installations are available:
 
-
-
 1. [Docker](https://tyk.io/docs/tyk-oss/ce-docker/) (Recommended method)
 2. [Kubernetes-Native ](https://github.com/TykTechnologies/tyk-oss-k8s-deployment)
 3. [Kubernetes-Helm](https://github.com/TykTechnologies/tyk-helm-chart#install-tyk-community-edition)
@@ -90,10 +86,8 @@ Other Installations are available:
 7. [CentOS](https://tyk.io/docs/tyk-oss/ce-centos/)
 8. Compile from Source (see instructions below) ←add link in markdown
 
-# 
-**Open Source API Gateway Features**
 
-
+## Open Source API Gateway Features
 Use any protocol: REST, SOAP, [GraphQL](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/graphql/), [gRPC](https://tyk.io/docs/key-concepts/grpc-proxy/), and [TCP](https://tyk.io/docs/key-concepts/tcp-proxy/).
 
 Industry Standard Authentication: [OIDC](https://tyk.io/docs/advanced-configuration/integrate/api-auth-mode/open-id-connect/#setting-up-oidc), [JWT,](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/jwt/) [bearer Tokens](https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/bearer-tokens/), [Basic Auth](https://tyk.io/docs/tyk-apis/tyk-dashboard-api/basic-authentication/), Client Certificates and more.
@@ -130,8 +124,8 @@ Analytics logging - Record detailed usage data on who is using your API's (raw d
 Tyk Technologies uses the same API Gateway for all it’s applications. Protecting, securing, and processing APIs for thousands of organizations and businesses around the world. Ideal for Open Banking, building software in the clouds as well as exposing APIs to teams, partners & consumers.
 
 
-# 
-**Tyk OSS Integrations**
+
+## Tyk OSS Integrations
 
 Tyk Technologies maintains other Open Source Software which can be used in conjunction with Tyk API Gateway:
 
@@ -146,25 +140,19 @@ Tyk Technologies maintains other Open Source Software which can be used in conju
 [Tyk Mserv](https://github.com/TykTechnologies/mserv) - Asset Server and gRPC host
 
 
-# 
-**Documentation**
 
+## Documentation
 All the documentation for Tyk Gateway and other OSS can be found at [https://tyk.io/docs/tyk-oss-gateway/](https://tyk.io/docs/tyk-oss-gateway/)
 
 
-# 
-**Community**
-
-
-
+## Community
 * [Tyk Community Board](https://community.tyk.io/) - Technical support from the Tyk Community
 * [Write a GitHub Issue](https://github.com/TykTechnologies/tyk/issues/new/choose) - Feature requests & bug reports welcome
 * [Technical blog](https://tyk.io/api-expertise/blog/) - Tyk announcements and updates
 * [Newsletters ](https://pages.tyk.io/newsletter)- Subscribe to our GraphQL & API newsletters
 * If you are using Tyk give us a star ⭐️
 
-# 
-**Open Source License**
+## Open Source License
 
 
 Tyk is released under the MPL v2.0; please see [LICENSE.md](https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md) for a full version of the license.
@@ -174,10 +162,7 @@ Tyk is released under the MPL v2.0; please see [LICENSE.md](https://github.com/T
 <p id="gdcalert4" ><span style="color: red; font-weight: bold">>>>>>  gd2md-html alert: error handling inline image </span><br>(<a href="#">Back to top</a>)(<a href="#gdcalert5">Next alert</a>)<br><span style="color: red; font-weight: bold">>>>>> </span></p>
 
 
-
-
-# 
-**Compiling Tyk Gateway**
+## Compiling Tyk Gateway
 
 Compile from Source
 
@@ -189,9 +174,7 @@ Note that tests require Redis to be running on the same machine (default port).
 
 In order to write your own test pls use this guide [https://github.com/TykTechnologies/tyk/blob/master/TESTING.md](https://github.com/TykTechnologies/tyk/blob/master/TESTING.md)
 
-
-# 
-**Contributing**
+## Contributing
 
 For more information about contributing PRs and issues, see [CONTRIBUTING.md](https://github.com/TykTechnologies/tyk/blob/master/CONTRIBUTING.md).
 
