@@ -23,6 +23,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/cenk/backoff"
 
 	"sync/atomic"
 	textTemplate "text/template"
@@ -1572,7 +1573,19 @@ func Start() {
 		trace.SetLogger(mainLog)
 		defer trace.Close()
 	} else if gwConfig.OpenTelemetry.Enabled {
-		go gw.initOtel()
+		go func() {
+			exponentialBackoff := backoff.NewExponentialBackOff()
+			exponentialBackoff.Multiplier = BackoffMultiplier
+			exponentialBackoff.MaxInterval = 10 * time.Second
+			exponentialBackoff.MaxElapsedTime = 0
+			operation := func() error {
+				return gw.initOtel()
+			}
+			err = backoff.Retry(operation, backoff.WithMaxRetries(exponentialBackoff, MaxBackoffRetries))
+			if err != nil {
+				mainLog.Error("Failed to initialize OpenTelemetry after max retries: ", err)
+			}
+		}()
 	}
 
 	gw.start()
