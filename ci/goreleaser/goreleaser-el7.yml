@@ -118,6 +118,7 @@ dockers:
       - tykio/tyk-plugin-compiler:{{ .Tag }}-el7
       - tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-el7
     build_flag_templates:
+      - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{.Date}}"
       - "--label=org.opencontainers.image.title=tyk-plugin-compiler"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
