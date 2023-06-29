@@ -131,6 +131,7 @@ jobs:
       run: |
         pytest
       working-directory: tyk-automated-tests
+      timeout-minutes: 30
 
     - name: Archive Integration tests report
       if: ${{ always() }}
