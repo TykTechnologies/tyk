@@ -40,17 +40,17 @@ We’ll install Tyk, add auth, analytics, quotas and rate limiting to your API i
 
 We recommend “[Tyk Gateway Docker](https://github.com/TykTechnologies/tyk-gateway-docker#start-up-the-deployment)” as the quickest way to get started now. Later, you can move to one of our other [supported distributions](https://tyk.io/docs/apim/open-source/installation/) if you prefer.
 
-### Step 1 - Clone the docker-compose repository
+#### Step 1 - Clone the docker-compose repository
 ```shell
 git clone https://github.com/TykTechnologies/tyk-gateway-docker
 ```
 
-### Step 2 - Change to the new directory
+#### Step 2 - Change to the new directory
 ```shell
 cd tyk-gateway-docker
 ```
 
-### Step 3 - Deploy Tyk Gateway and Redis
+#### Step 3 - Deploy Tyk Gateway and Redis
 ```shell
 docker-compose up
 
