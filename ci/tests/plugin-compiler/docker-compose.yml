@@ -1,14 +1,50 @@
-version: "3"
 services:
   redis:
-    image: redis
+    image: redis:6.0-alpine
+    networks: [ test-plugin-compiler ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 5s
+      retries: 10
+      start_period: 2s
+      timeout: 10s
       
   gw:
     image: tykio/tyk-gateway:${tag}
+    networks: [ test-plugin-compiler ]
+    depends_on:
+      - redis
     volumes:
       - ./testplugin/testplugin_${plugin_version}_${plugin_os}_${plugin_arch}.so:/opt/tyk-gateway/middleware/testplugin.so
       - ./testplugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
     ports:
       - "0.0.0.0:8080:8080"
     environment:
+      - TYK_DB_REDISHOST=redis
       - TYK_LOGLEVEL=debug
+
+  gw-checker:
+    image: curlimages/curl
+    networks: [ test-plugin-compiler ]
+    command: tail -f /dev/null
+    depends_on:
+      - gw
+    healthcheck:
+      test: curl -s --fail http://gw:8080/hello | grep -o '.*{"redis":{"status":"pass",'
+      interval: 5s
+      retries: 10
+      start_period: 4s
+      timeout: 10s
+
+  wait:
+    image: hello-world:linux
+    depends_on:
+        redis:
+            condition: service_healthy
+        gw-checker:
+            condition: service_healthy
+
+networks:
+  test-plugin-compiler:
+    name: test-plugin-compiler
+    driver: bridge
