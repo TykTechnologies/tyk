@@ -19,7 +19,7 @@ RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial \
 ADD go.mod go.sum $TYK_GW_PATH/
 WORKDIR $TYK_GW_PATH
 
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod go mod download
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod go mod download && go mod vendor
 
 ADD . $TYK_GW_PATH
 
