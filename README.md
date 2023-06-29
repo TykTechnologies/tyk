@@ -141,7 +141,7 @@ Tyk Technologies maintains other Open Source Software which can be used in conju
 
 
 ## Documentation
-All the documentation for Tyk Gateway and other OSS can be found at [https://tyk.io/docs/tyk-oss-gateway/](https://tyk.io/docs/tyk-oss-gateway/)
+All the documentation for Tyk Gateway and other OSS related topics, can be found at [https://tyk.io/docs/tyk-oss-gateway/](https://tyk.io/docs/tyk-oss-gateway/)
 
 
 ## Community
