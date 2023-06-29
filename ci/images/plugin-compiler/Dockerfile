@@ -16,7 +16,7 @@ RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
-ADD go.mod go.sum $TYK_GW_PATH
+ADD go.mod go.sum $TYK_GW_PATH/
 WORKDIR $TYK_GW_PATH
 
 RUN --mount=type=cache,mode=0755,target=/go/pkg/mod go mod download
