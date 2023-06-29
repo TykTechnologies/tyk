@@ -87,7 +87,7 @@ Other Installations are available:
 5. [Red Hat](https://tyk.io/docs/tyk-oss/ce-redhat/)
 6. [Ubuntu](https://tyk.io/docs/tyk-oss/ce-ubuntu/)
 7. [CentOS](https://tyk.io/docs/tyk-oss/ce-centos/)
-8. Compile from Source (see instructions below) ←add link in markdown
+8. Compile from Source ([see instructions below](#compiling-tyk-gateway)) 
 
 
 ## Open Source API Gateway Features
