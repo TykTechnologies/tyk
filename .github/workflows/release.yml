@@ -377,6 +377,8 @@ jobs:
           fetch-depth: 1
 
       - name: Run tests
+        env:
+          GITHUB_TAG: ${{ github.ref }}
         shell: bash
         run: |
           set -eaxo pipefail
