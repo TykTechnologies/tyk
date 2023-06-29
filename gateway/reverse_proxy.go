@@ -1370,13 +1370,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if createTransport {
-		if p.TykAPISpec.HTTPTransport != nil {
-			p.TykAPISpec.HTTPTransport.transport.CloseIdleConnections()
-		}
-
+		oldTransport := p.TykAPISpec.HTTPTransport.transport
+		
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
+
+		if p.TykAPISpec.HTTPTransport != nil {
+			p.TykAPISpec.HTTPTransport.transport.CloseIdleConnections()
+		}
 	}
 
 	roundTripper = p.TykAPISpec.HTTPTransport
