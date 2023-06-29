@@ -1,5 +1,7 @@
 # Tyk API Gateway
 
+![tyk-github-header](https://github.com/TykTechnologies/tyk/assets/8012032/02b3fbae-80ed-4d1f-be87-016326f82ece)
+
 Tyk is the cloud-native, open source, API Gateway.
 
 <!-- [![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=master)](https://travis-ci.org/TykTechnologies/tyk) -->
