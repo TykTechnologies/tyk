@@ -118,7 +118,7 @@ jobs:
           cp -r -f vendor/* /go/src
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
-          rm -rf vendor
+          find /go/src -name vendor | xargs --no-run-if-empty -d'\n' rm -rf
 
       - uses: goreleaser/goreleaser-action@v4
         with:

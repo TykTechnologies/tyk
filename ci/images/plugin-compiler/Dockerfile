@@ -30,7 +30,7 @@ RUN --mount=type=cache,mode=0755,target=/go/pkg/mod true && \
           cp -r -f vendor/* /go/src && \
           mkdir -p $TYK_GW_PATH && \
           cp -r ./* $TYK_GW_PATH && \
-          rm -rf vendor
+          find /go/src -name vendor | xargs --no-run-if-empty -d '\n' rm -rf
 
 ENV GO111MODULE=off
 
