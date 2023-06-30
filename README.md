@@ -1,7 +1,7 @@
 # Tyk API Gateway
 
 ![tyk-github-header](https://github.com/TykTechnologies/tyk/assets/8012032/02b3fbae-80ed-4d1f-be87-016326f82ece)
-
+[![Go Report Card](https://goreportcard.com/badge/github.com/TykTechnologies/tyk)](https://goreportcard.com/report/github.com/TykTechnologies/tyk)
 **Tyk** is the cloud-native, open source, API Gateway.  \
 We support REST, GraphQL, TCP and gRPC protocols.
 
