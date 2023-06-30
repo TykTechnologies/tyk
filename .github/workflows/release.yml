@@ -116,8 +116,6 @@ jobs:
           go mod tidy
           go mod vendor
           cp -r -f vendor/* /go/src
-          rm -rf vendor
-          rm -rf /go/src/github.com/TykTechnologies/tyk
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
 
