@@ -1582,7 +1582,7 @@ func Start() {
 			operation := func() error {
 				return gw.initOtel()
 			}
-			err = backoff.Retry(operation, backoff.WithMaxRetries(exponentialBackoff, MaxBackoffRetries))
+			err = backoff.Retry(operation, exponentialBackoff)
 			if err != nil {
 				mainLog.Error("Failed to initialize OpenTelemetry after max retries: ", err)
 			}

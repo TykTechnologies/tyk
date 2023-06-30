@@ -14,7 +14,7 @@ func (gw *Gateway) initOtel() error {
 			"opentelemetry.exporter":           gwConfig.OpenTelemetry.Exporter,
 			"opentelemetry.endpoint":           gwConfig.OpenTelemetry.Endpoint,
 			"opentelemetry.connection_timeout": gwConfig.OpenTelemetry.ConnectionTimeout,
-		}).Error("unable to initialize tracing provider:", err)
+		}).Error("unable to initialize tracing provider: ", err)
 		return err
 	}
 
