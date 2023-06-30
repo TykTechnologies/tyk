@@ -167,6 +167,7 @@ dockers:
       - test
       - trace
       - user
+      - testdata
       - go.mod
       - go.sum
       - main.go
