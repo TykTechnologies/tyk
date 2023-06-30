@@ -1,6 +1,6 @@
 ![tyk-github-header](https://github.com/TykTechnologies/tyk/assets/8012032/02b3fbae-80ed-4d1f-be87-016326f82ece)
 
-![GitHub release (release name instead of tag name)](https://img.shields.io/github/v/release/TykTechnologies/tyk?color=green) ![Docker Pulls](https://img.shields.io/docker/pulls/tykio/tyk-gateway?color=8836FB) [![Go Report Card](https://goreportcard.com/badge/github.com/TykTechnologies/tyk)](https://goreportcard.com/report/github.com/TykTechnologies/tyk) ![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/m/TykTechnologies/tyk?style=flat-square&color=8836FB) ![GitHub Repo stars](https://img.shields.io/github/stars/TykTechnologies/tyk?color=1AEFB7) ![Twitter Follow](https://img.shields.io/twitter/follow/tyk_io)
+![GitHub release (release name instead of tag name)](https://img.shields.io/github/v/release/TykTechnologies/tyk?color=1AEFB7) ![Docker Pulls](https://img.shields.io/docker/pulls/tykio/tyk-gateway?color=8836FB)![Builds](https://github.com/github/TykTechnologies/tyk/actions/workflows/ci-tests.yml/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/TykTechnologies/tyk)](https://goreportcard.com/report/github.com/TykTechnologies/tyk) ![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/m/TykTechnologies/tyk?style=flat-square&color=8836FB) ![GitHub Repo stars](https://img.shields.io/github/stars/TykTechnologies/tyk?color=1AEFB7) ![Twitter Follow](https://img.shields.io/twitter/follow/tyk_io)
 
 
 
