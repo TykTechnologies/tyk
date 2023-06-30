@@ -112,7 +112,7 @@ jobs:
 
       - name: Fix vendor
         run: |
-          mkdir -p /go/src || true
+          mkdir -p /go/src
           go mod tidy
           go mod vendor
           cp -r -f vendor/* /go/src
