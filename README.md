@@ -2,10 +2,45 @@
 
 ![GitHub release (release name instead of tag name)](https://img.shields.io/github/v/release/TykTechnologies/tyk?color=5900CB) ![Docker Pulls](https://img.shields.io/docker/pulls/tykio/tyk-gateway?color=8438FA) ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/TykTechnologies/tyk/ci-tests.yml?label=Build%20%26%20Tests&color=8438FA) [![Go Report Card](https://img.shields.io/badge/go%20report-A+-brightgreen.svg?style=flat_card&color=8438FA)](https://goreportcard.com/report/github.com/TykTechnologies/tyk?style=flat-square) ![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/m/TykTechnologies/tyk?style=flat-square&color=8836FB) ![GitHub Repo stars](https://img.shields.io/github/stars/TykTechnologies/tyk?color=ffc743) ![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg?style=flat_card&color=8438FA) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_shield) ![Twitter Follow](https://img.shields.io/twitter/follow/tyk_io)
 
-
-
-
 # Tyk API Gateway
+**Tyk Gateway** is the cloud-native, open source, API Gateway.  \
+We support REST, GraphQL, TCP and gRPC protocols.
+
+Built from the ground up, as the [fastest API Gateway](https://tyk.io/performance-benchmarks/) on the planet since 2014.
+## TL;DC - Get Started
+
+We’ll now deploy fully working *Tyk Gateway* in under **5 minutes**.
+
+#### Step 1 - Clone the docker-compose repository
+```console
+git clone https://github.com/TykTechnologies/tyk-gateway-docker
+```
+
+#### Step 2 - Deploy Tyk Gateway and Redis
+```console
+cd tyk-gateway-docker; docker-compose up
+```
+
+You can run this in detach mode using the `-d` flag: `docker-compose up -d`
+
+#### Congratulations, you’re done!
+
+Your Tyk Gateway is now configured and ready to use. Confirm this by checking against the ‘hello’ endpoint:
+```console
+curl localhost:8080/hello
+```
+Output:  
+```json
+{"status": "pass", "version": "v3.2.1", "description": "Tyk GW"}
+```
+
+### What's Next
+We recommend [creating your first API in Tyk](https://github.com/TykTechnologies/tyk-gateway-docker/blob/master/get-started/your-first-api.md) and then [creating your first key](get-started/your-first-token.md).
+Check also the official docs on [creating API](https://tyk.io/docs/getting-started/create-api/) for more information and for your next steps in API management.
+
+---
+
+##
 **Tyk Gateway** is the cloud-native, open source, API Gateway.  \
 We support REST, GraphQL, TCP and gRPC protocols.
 
@@ -34,58 +69,6 @@ Tyk runs natively on _Kubernetes_, if you prefer, thanks to the _[Tyk Kubernetes
 
 \
 [Documentation](https://tyk.io/docs/) | [Forum](https://community.tyk.io) | [Blog](https://tyk.io/blog/) | [About](https://tyk.io)
-
-
----
-
-## Get Started
-
-We’ll install Tyk, add auth, analytics, quotas and rate limiting to your API in under 5 minutes.
-
-We recommend “[Tyk Gateway Docker](https://github.com/TykTechnologies/tyk-gateway-docker#start-up-the-deployment)” as the quickest way to get started now. Later, you can move to one of our other [supported distributions](https://tyk.io/docs/apim/open-source/installation/) if you prefer.
-
-#### Step 1 - Clone the docker-compose repository
-```console
-git clone https://github.com/TykTechnologies/tyk-gateway-docker
-```
-
-#### Step 2 - Change to the new directory
-```console
-cd tyk-gateway-docker
-```
-
-#### Step 3 - Deploy Tyk Gateway and Redis
-```console
-docker-compose up
-```
-
-You can run this in detach mode use the `-d` flag: `docker-compose up -d`
-
-**Congratulations, you’re done!**
-
-Your Tyk Gateway is now configured and ready to use. Confirm this by checking against the ‘hello’ endpoint:
-```console
-curl localhost:8080/hello
-```
-Output:  
-```json
-{"status": "pass", "version": "v3.2.1", "description": "Tyk GW"}
-```
-
-Next, visit [adding your first API](https://tyk.io/docs/getting-started/create-api/) to Tyk and follow the Open Source instructions.
-
----
-
-Other Installations are available:
-
-1. [Docker](https://tyk.io/docs/tyk-oss/ce-docker/)
-2. [Kubernetes-Native ](https://github.com/TykTechnologies/tyk-oss-k8s-deployment)
-3. [Kubernetes-Helm](https://github.com/TykTechnologies/tyk-helm-chart#install-tyk-community-edition)
-4. [Ansible](https://tyk.io/docs/tyk-oss/ce-ansible/)
-5. [Red Hat](https://tyk.io/docs/tyk-oss/ce-redhat/)
-6. [Ubuntu](https://tyk.io/docs/tyk-oss/ce-ubuntu/)
-7. [CentOS](https://tyk.io/docs/tyk-oss/ce-centos/)
-8. [Compile Tyk from Source](#compiling-tyk-gateway)
 
 
 ## Open Source API Gateway Features
@@ -156,6 +139,20 @@ All the documentation for Tyk Gateway and other OSS-related topics can be found 
 Tyk is released under the MPL v2.0; please see [LICENSE.md](https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md) for a full version of the license.
 
 ![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=large)
+
+## Other Installations
+
+Tyk offers lots of other [deployment](https://tyk.io/docs/apim/open-source/installation/) options:
+
+1. [Docker](https://tyk.io/docs/tyk-oss/ce-docker/)
+2. [Kubernetes-Native ](https://github.com/TykTechnologies/tyk-oss-k8s-deployment)
+3. [Kubernetes-Helm](https://github.com/TykTechnologies/tyk-helm-chart#install-tyk-community-edition)
+4. [Ansible](https://tyk.io/docs/tyk-oss/ce-ansible/)
+5. [Red Hat](https://tyk.io/docs/tyk-oss/ce-redhat/)
+6. [Ubuntu](https://tyk.io/docs/tyk-oss/ce-ubuntu/)
+7. [CentOS](https://tyk.io/docs/tyk-oss/ce-centos/)
+8. [Compile Tyk from Source](#compiling-tyk-gateway)
+
 
 ## Compiling Tyk Gateway
 
