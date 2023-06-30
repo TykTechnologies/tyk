@@ -66,6 +66,7 @@ func (u *UniversalDataGraph) engineConfigV2FieldConfigs() (planFieldConfigs plan
 }
 
 func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan.DataSourceConfiguration, err error) {
+	globalHeaders := u.ApiDefinition.GraphQL.Engine.GlobalHeaders
 	for _, ds := range u.ApiDefinition.GraphQL.Engine.DataSources {
 		planDataSource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{},
@@ -103,7 +104,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 					Method: restConfig.Method,
 					Body:   restConfig.Body,
 					Query:  queryConfigs,
-					Header: convertApiDefinitionHeadersToHttpHeaders(restConfig.Headers),
+					Header: convertApiDefinitionHeadersToHttpHeaders(removeDuplicateApiDefinitionHeaders(restConfig.Headers, globalHeaders)),
 				},
 			})
 
@@ -118,7 +119,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 				planDataSource.Factory = &restDataSource.Factory{
 					Client: u.HttpClient,
 				}
-				planDataSource.Custom, err = generateRestDataSourceFromGraphql(graphqlConfig)
+				planDataSource.Custom, err = generateRestDataSourceFromGraphql(graphqlConfig, globalHeaders)
 				if err != nil {
 					return nil, err
 				}
@@ -138,7 +139,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 			planDataSource.Custom = graphqlDataSource.ConfigJson(graphqlDataSourceConfiguration(
 				graphqlConfig.URL,
 				graphqlConfig.Method,
-				graphqlConfig.Headers,
+				removeDuplicateApiDefinitionHeaders(graphqlConfig.Headers, globalHeaders),
 				graphqlConfig.SubscriptionType,
 			))
 
