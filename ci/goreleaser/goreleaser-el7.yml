@@ -159,6 +159,7 @@ dockers:
       - test
       - trace
       - user
+      - vendor
       - go.mod
       - go.sum
       - main.go
