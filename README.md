@@ -155,6 +155,8 @@ All the documentation for Tyk Gateway and other OSS-related topics can be found 
 
 Tyk is released under the MPL v2.0; please see [LICENSE.md](https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md) for a full version of the license.
 
+![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=large)
+
 ## Compiling Tyk Gateway
 
 Compile from Source
