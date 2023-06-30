@@ -168,7 +168,7 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					Header: map[string][]string{
 						"Authorization":      {"123"},
 						"X-Custom":           {"A, B"},
-						"Test-Global-Header": {"test-value"},
+						"Test-Global-Header": {"custom-value"},
 					},
 					Body: "body",
 					Query: []restDataSource.QueryConfiguration{
@@ -283,7 +283,7 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					Method: "POST",
 					Header: map[string][]string{
 						"Auth":               {"123"},
-						"Test-Global-Header": {"test-value"},
+						"Test-Global-Header": {"custom-graphql"},
 					},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
@@ -575,7 +575,8 @@ var graphqlEngineV2ConfigJson = `{
 					"method": "POST",
 					"headers": {
 						"Authorization": "123",
-						"X-Custom": "A, B"
+						"X-Custom": "A, B",
+						"Test-Global-Header": "custom-value"
 					},
 					"query": [
 						{
@@ -646,7 +647,8 @@ var graphqlEngineV2ConfigJson = `{
 					"url": "https://graphql.example.com",
 					"method": "POST",
 					"headers": {
-						"Auth": "123"
+						"Auth": "123",
+						"Test-Global-Header": "custom-graphql"
 					}
 				}
 			},
