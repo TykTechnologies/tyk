@@ -3,25 +3,36 @@ FROM ${BASE_IMAGE}
 
 LABEL description="Image for plugin development"
 
-ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
-
-ENV GO111MODULE=on
 
 # This directory will contain the plugin source and will be
 # mounted from the host box by the user using docker volumes
 ENV PLUGIN_SOURCE_PATH=/plugin-source
 
-RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH
+RUN mkdir -p $PLUGIN_SOURCE_PATH
 
 RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
-ADD go.mod go.sum $TYK_GW_PATH/
-WORKDIR $TYK_GW_PATH
+# This is already vendored from release pipeline
+WORKDIR /opt/tyk-gateway/src
+ADD . /opt/tyk-gateway/src
 
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod go mod download && go mod vendor
+# TYK_GW_PATH points to the GOHOME source for gateway.
+ENV TYK_GW_PATH /go/src/github.com/TykTechnologies/tyk
 
-ADD . $TYK_GW_PATH
+# This has to mirror the before goreleaser step in release.yml;
+# It builds the go source tree for $GOHOME builds from gw.
+
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod true && \
+          mkdir -p /go/src && \
+          go mod tidy && \
+          go mod vendor && \
+          cp -r -f vendor/* /go/src && \
+          mkdir -p $TYK_GW_PATH && \
+          cp -r ./* $TYK_GW_PATH && \
+          find /go/src -name vendor | xargs --no-run-if-empty -d '\n' rm -rf
+
+ENV GO111MODULE=off
 
 ARG GITHUB_SHA
 ARG GITHUB_TAG
