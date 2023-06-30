@@ -20,7 +20,8 @@ ADD . $TYK_GW_PATH
 
 # This has to mirror the before goreleaser step in release.yml;
 
-RUN       mkdir -p /go/src && \
+RUN  --mount=type=cache,mode=0755,target=/go/pkg/mod \
+          mkdir -p /go/src && \
           go mod tidy && \
           go mod vendor && \
           cp -r -f vendor/* /go/src && \
