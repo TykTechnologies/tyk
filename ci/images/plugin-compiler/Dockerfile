@@ -20,15 +20,12 @@ ADD . $TYK_GW_PATH
 
 # This has to mirror the before goreleaser step in release.yml;
 
-RUN  --mount=type=cache,mode=0755,target=/go/pkg/mod \
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod true && \
           mkdir -p /go/src && \
           go mod tidy && \
           go mod vendor && \
-          cp -r -f vendor/* /go/src && \
-          rm -rf vendor && \
-          rm -rf /go/src/github.com/TykTechnologies/tyk && \
-          mkdir -p /go/src/github.com/TykTechnologies/tyk && \
-          cp -r ./* /go/src/github.com/TykTechnologies/tyk
+          mkdir -p vendor && touch vendor/.placeholder && \
+          cp -rf vendor/* /go/src
 
 ENV GO111MODULE=off
 
