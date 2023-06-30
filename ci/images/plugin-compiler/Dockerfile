@@ -5,8 +5,6 @@ LABEL description="Image for plugin development"
 
 ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
 
-ENV GO111MODULE=off
-
 # This directory will contain the plugin source and will be
 # mounted from the host box by the user using docker volumes
 ENV PLUGIN_SOURCE_PATH=/plugin-source
@@ -19,6 +17,19 @@ RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial \
 # This is already vendored from release pipeline
 WORKDIR $TYK_GW_PATH
 ADD . $TYK_GW_PATH
+
+# This has to mirror the before goreleaser step in release.yml;
+
+RUN       mkdir -p /go/src && \
+          go mod tidy && \
+          go mod vendor && \
+          cp -r -f vendor/* /go/src && \
+          rm -rf vendor && \
+          rm -rf /go/src/github.com/TykTechnologies/tyk && \
+          mkdir -p /go/src/github.com/TykTechnologies/tyk && \
+          cp -r ./* /go/src/github.com/TykTechnologies/tyk
+
+ENV GO111MODULE=off
 
 ARG GITHUB_SHA
 ARG GITHUB_TAG
