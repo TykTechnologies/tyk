@@ -102,5 +102,5 @@ echo "plugin_name: ${plugin_name}"
 
 set -x
 
-CGO_ENABLED=1 GO111MODULE=off CC=$CC GOOS=$GOOS GOARCH=$GOARCH go build -trimpath -buildmode=plugin -o $plugin_name
+CGO_ENABLED=1 GO111MODULE=off CC=$CC GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -o $plugin_name
 mv $plugin_name $PLUGIN_SOURCE_PATH
