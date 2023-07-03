@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"path"
@@ -10,6 +11,10 @@ import (
 
 	"github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/writer"
 
 	"github.com/stretchr/testify/assert"
 
@@ -425,4 +430,42 @@ func TestAllApisAreMTLS(t *testing.T) {
 	if result != expected {
 		t.Errorf("Expected AllApisAreMTLS to return %v, but got %v", expected, result)
 	}
+}
+
+func TestHandle404Called(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		globalConf.Track404Logs = true
+	}
+	ts := StartTest(conf, TestConfig {
+		SeparateControlAPI: true,
+	})
+	defer ts.Close()
+
+	// Need to load at least 1 api definition for the 404 handler to register
+	apiDefs := BuildAPI(func(spec *APISpec) {
+		spec.Name = "internal"
+		spec.APIID = "test"
+		spec.Proxy.ListenPath = "/dummy"
+	})
+
+	ts.Gw.LoadAPI(apiDefs...)
+
+	buf := &bytes.Buffer{}
+
+	log := logger.Get()
+	log.AddHook(&writer.Hook { // Capture error logs
+		Writer: buf,
+		LogLevels: []logrus.Level{
+			logrus.ErrorLevel,
+		},
+	})
+
+	// Note: "404 page not found" is the default 404 error response, which would show up if proxyMuxer.handle404 isn't 
+	// registered as the 404 handler
+	_, _ = ts.Run(t, test.TestCase{Path: "/i-do-not-exist/", BodyNotMatch: "404 page not found", Code: http.StatusNotFound})
+
+	loggerOut := buf.String()
+
+	assert.Contains(t, loggerOut, `msg="Not Found"`)
+	assert.Contains(t, loggerOut, `GET /i-do-not-exist/`)
 }

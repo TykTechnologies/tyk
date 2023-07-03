@@ -735,6 +735,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	router := muxer.router(port, spec.Protocol, gwConfig)
 	if router == nil {
 		router = mux.NewRouter()
+		router.NotFoundHandler = http.HandlerFunc(muxer.handle404)
 		muxer.setRouter(port, spec.Protocol, router, gwConfig)
 	}
 
