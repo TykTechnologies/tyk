@@ -1,8 +1,9 @@
 package gateway
 
 import (
-	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/sirupsen/logrus"
+
+	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 )
 
 func (gw *Gateway) InitOpenTelemetry() {

@@ -116,6 +116,9 @@
         "resource_name":{
           "type": "string"
         },
+        "span_processor_type":{
+          "type":"string"
+        },
         "headers": {
           "type": [
             "array",

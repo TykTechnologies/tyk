@@ -102,7 +102,6 @@ func Test_InitOTel(t *testing.T) {
 
 			gw.InitOpenTelemetry()
 			assert.NotNil(t, gw.TraceProvider)
-
 		})
 	}
 }
