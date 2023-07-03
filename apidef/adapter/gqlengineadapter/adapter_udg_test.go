@@ -551,9 +551,12 @@ var graphqlEngineV2ConfigJson = `{
 	"schema": ` + v2Schema + `,
 	"last_schema_update": "2020-11-11T11:11:11.000+01:00",
 	"engine": {
-		"global_headers": {
-			"test-global-header": "test-value"
-		},
+		"global_headers": [
+  			{
+    			"key": "test-global-header",
+    			"value": "test-value"
+  			}
+		],
 		"field_configs": [
 			{
 				"type_name": "Query",

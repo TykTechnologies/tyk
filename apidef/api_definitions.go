@@ -784,7 +784,12 @@ type GraphQLSubgraphEntity struct {
 type GraphQLEngineConfig struct {
 	FieldConfigs  []GraphQLFieldConfig      `bson:"field_configs" json:"field_configs"`
 	DataSources   []GraphQLEngineDataSource `bson:"data_sources" json:"data_sources"`
-	GlobalHeaders map[string]string         `bson:"global_headers" json:"global_headers"`
+	GlobalHeaders []UDGGlobalHeader         `bson:"global_headers" json:"global_headers"`
+}
+
+type UDGGlobalHeader struct {
+	Key   string `bson:"key" json:"key"`
+	Value string `bson:"value" json:"value"`
 }
 
 type GraphQLFieldConfig struct {
