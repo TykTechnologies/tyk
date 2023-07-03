@@ -486,6 +486,9 @@ func (g *GraphQLConfigAdapter) removeDuplicateHeaders(headers ...map[string]stri
 
 func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
 	for i := range planDataSources {
+		if _, ok := planDataSources[i].Factory.(*restDataSource.Factory); ok {
+			continue
+		}
 		for j := range planDataSources[i].RootNodes {
 			typeName := planDataSources[i].RootNodes[j].TypeName
 			for k := range planDataSources[i].RootNodes[j].FieldNames {
