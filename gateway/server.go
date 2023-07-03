@@ -21,8 +21,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cenk/backoff"
-
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/test"
 
@@ -65,6 +63,8 @@ import (
 
 	oteltrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/tyk/internal/cache"
+
+	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 )
 
 var (
@@ -1395,6 +1395,10 @@ func (gw *Gateway) afterConfSetup() {
 
 	if conf.OpenTelemetry.Enabled {
 		conf.OpenTelemetry.SetDefaults()
+
+		if conf.OpenTelemetry.ResourceName == "" {
+			conf.OpenTelemetry.ResourceName = "tyk-gateway"
+		}
 	}
 
 	gw.SetConfig(conf)
@@ -1573,20 +1577,23 @@ func Start() {
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)
 		defer trace.Close()
-	} else if gwConfig.OpenTelemetry.Enabled {
-		go func() {
-			exponentialBackoff := backoff.NewExponentialBackOff()
-			exponentialBackoff.Multiplier = BackoffMultiplier
-			exponentialBackoff.MaxInterval = 10 * time.Second
-			exponentialBackoff.MaxElapsedTime = 0
-			operation := func() error {
-				return gw.initOtel()
-			}
-			err = backoff.Retry(operation, exponentialBackoff)
-			if err != nil {
-				mainLog.Error("Failed to initialize OpenTelemetry after max retries: ", err)
-			}
-		}()
+	}
+
+	traceLogger := mainLog.WithFields(logrus.Fields{
+		"exporter":           gwConfig.OpenTelemetry.Exporter,
+		"endpoint":           gwConfig.OpenTelemetry.Endpoint,
+		"connection_timeout": gwConfig.OpenTelemetry.ConnectionTimeout,
+	})
+
+	var errOtel error
+	gw.TraceProvider, errOtel = tyktrace.NewProvider(
+		tyktrace.WithContext(gw.ctx),
+		tyktrace.WithConfig(&gwConfig.OpenTelemetry),
+		tyktrace.WithLogger(traceLogger),
+	)
+
+	if errOtel != nil {
+		mainLog.Errorf("Initializing OpenTelemetry %s", errOtel)
 	}
 
 	gw.start()
