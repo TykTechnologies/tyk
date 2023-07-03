@@ -12,9 +12,10 @@ import (
 
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 	"github.com/TykTechnologies/tyk/config"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
-func Test_InitOTel(t *testing.T) {
+func Test_InitOpenTelemetry(t *testing.T) {
 	tcs := []struct {
 		testName string
 
@@ -102,6 +103,11 @@ func Test_InitOTel(t *testing.T) {
 
 			gw.InitOpenTelemetry()
 			assert.NotNil(t, gw.TraceProvider)
+
+			if tc.givenConfig.OpenTelemetry.Endpoint == "invalid" {
+				// making sure that noop tracer provider is used when exporter is invalid
+				assert.Equal(t, oteltrace.NewNoopTracerProvider(), gw.TraceProvider)
+			}
 		})
 	}
 }
