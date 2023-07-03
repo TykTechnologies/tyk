@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"context"
-	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -21,7 +20,6 @@ func Test_InitOTel(t *testing.T) {
 
 		givenConfig config.Config
 		setupFn     func() (string, func())
-		expectedErr error
 	}{
 		{
 			testName: "opentelemetry disabled",
@@ -48,7 +46,6 @@ func Test_InitOTel(t *testing.T) {
 
 				return server.URL, server.Close
 			},
-			expectedErr: nil,
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to grpc",
@@ -75,10 +72,9 @@ func Test_InitOTel(t *testing.T) {
 
 				return lis.Addr().String(), s.Stop
 			},
-			expectedErr: nil,
 		},
 		{
-			testName: "opentelemetry enabled, exporter set to invalid",
+			testName: "opentelemetry enabled, exporter set to invalid - noop provider should be used",
 			givenConfig: config.Config{
 				OpenTelemetry: otelconfig.OpenTelemetry{
 					Enabled:  true,
@@ -86,7 +82,6 @@ func Test_InitOTel(t *testing.T) {
 					Endpoint: "localhost:4317",
 				},
 			},
-			expectedErr: errors.New("failed to create exporter: invalid exporter type: invalid"),
 		},
 	}
 
@@ -105,16 +100,8 @@ func Test_InitOTel(t *testing.T) {
 			gw.SetConfig(tc.givenConfig)
 			gw.afterConfSetup()
 
-			actualErr := gw.initOtel()
-
-			if tc.expectedErr == nil {
-				assert.NotNil(t, gw.TraceProvider)
-				assert.Nil(t, actualErr)
-				return
-			}
-			assert.Nil(t, gw.TraceProvider)
-			assert.NotNil(t, actualErr)
-			assert.Equal(t, tc.expectedErr.Error(), actualErr.Error())
+			gw.InitOpenTelemetry()
+			assert.NotNil(t, gw.TraceProvider)
 
 		})
 	}

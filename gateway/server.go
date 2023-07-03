@@ -63,8 +63,6 @@ import (
 
 	oteltrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/tyk/internal/cache"
-
-	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 )
 
 var (
@@ -1579,22 +1577,7 @@ func Start() {
 		defer trace.Close()
 	}
 
-	traceLogger := mainLog.WithFields(logrus.Fields{
-		"exporter":           gwConfig.OpenTelemetry.Exporter,
-		"endpoint":           gwConfig.OpenTelemetry.Endpoint,
-		"connection_timeout": gwConfig.OpenTelemetry.ConnectionTimeout,
-	})
-
-	var errOtel error
-	gw.TraceProvider, errOtel = tyktrace.NewProvider(
-		tyktrace.WithContext(gw.ctx),
-		tyktrace.WithConfig(&gwConfig.OpenTelemetry),
-		tyktrace.WithLogger(traceLogger),
-	)
-
-	if errOtel != nil {
-		mainLog.Errorf("Initializing OpenTelemetry %s", errOtel)
-	}
+	gw.InitOpenTelemetry()
 
 	gw.start()
 	configs := gw.GetConfig()
