@@ -438,8 +438,12 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	} else if gw.GetConfig().SlaveOptions.UseRPC {
 		mainLog.Debug("Using RPC Configuration")
 
+		dataLoader := &RPCStorageHandler{
+			Gw:       gw,
+			DoReload: gw.DoReload,
+		}
 		var err error
-		s, err = loader.FromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw)
+		s, err = loader.FromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw)
 		if err != nil {
 			return 0, err
 		}
@@ -498,7 +502,11 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		pols = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
-		pols, err = gw.LoadPoliciesFromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
+		dataLoader := &RPCStorageHandler{
+			Gw:       gw,
+			DoReload: gw.DoReload,
+		}
+		pols, err = gw.LoadPoliciesFromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	default:
 		// this is the only case now where we need a policy record name
 		if gw.GetConfig().Policies.PolicyRecordName == "" {
