@@ -108,7 +108,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 			assert.NotNil(t, gw.TraceProvider)
 
 			if tc.expectNoOp {
-				assert.Equal(t, oteltrace.NewNoopTracerProvider(), gw.TraceProvider)
+				assert.IsType(t, oteltrace.NewNoopTracerProvider().Tracer(""), gw.TraceProvider.Tracer())
 			}
 		})
 	}
