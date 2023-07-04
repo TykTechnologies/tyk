@@ -591,11 +591,6 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 		log.Debug(err)
 		return false
 	}
-<<<<<<< HEAD
-	log.Debug("DEL Key was: ", obfuscateKey(keyName))
-	log.Debug("DEL Key became: ", obfuscateKey(r.fixKey(keyName)))
-=======
->>>>>>> 56d57566... TT-9177 obsfuscate key on log (#5152)
 
 	singleton, err := r.singleton()
 	if err != nil {
