@@ -1395,7 +1395,7 @@ func (gw *Gateway) afterConfSetup() {
 		conf.OpenTelemetry.SetDefaults()
 
 		if conf.OpenTelemetry.ResourceName == "" {
-			conf.OpenTelemetry.ResourceName = "tyk-gateway"
+			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
 		}
 	}
 
@@ -1577,7 +1577,7 @@ func Start() {
 		defer trace.Close()
 	}
 
-	gw.InitOpenTelemetry()
+	gw.initOpenTelemetry()
 
 	gw.start()
 	configs := gw.GetConfig()

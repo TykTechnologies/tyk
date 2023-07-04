@@ -6,7 +6,9 @@ import (
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 )
 
-func (gw *Gateway) InitOpenTelemetry() {
+// initOpenTelemetry initializes OpenTelemetry tracer provider
+// in case of invalid configuration or disabled OpenTelemetry, it will initialize a noop tracer
+func (gw *Gateway) initOpenTelemetry() {
 	gwConfig := gw.GetConfig()
 
 	traceLogger := mainLog.WithFields(logrus.Fields{

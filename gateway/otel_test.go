@@ -22,6 +22,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 
 		givenConfig config.Config
 		setupFn     func() (string, func())
+		expectNoOp  bool
 	}{
 		{
 			testName: "opentelemetry disabled",
@@ -84,6 +85,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 					Endpoint: "localhost:4317",
 				},
 			},
+			expectNoOp: true,
 		},
 	}
 
@@ -102,11 +104,10 @@ func Test_InitOpenTelemetry(t *testing.T) {
 			gw.SetConfig(tc.givenConfig)
 			gw.afterConfSetup()
 
-			gw.InitOpenTelemetry()
+			gw.initOpenTelemetry()
 			assert.NotNil(t, gw.TraceProvider)
 
-			if tc.givenConfig.OpenTelemetry.Endpoint == "invalid" {
-				// making sure that noop tracer provider is used when exporter is invalid
+			if tc.expectNoOp {
 				assert.Equal(t, oteltrace.NewNoopTracerProvider(), gw.TraceProvider)
 			}
 		})

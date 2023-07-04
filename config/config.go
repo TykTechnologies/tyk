@@ -64,6 +64,8 @@ const (
 
 	DefaultDashPolicySource     = "service"
 	DefaultDashPolicyRecordName = "tyk_policies"
+
+	DefaultOTelResourceName = "tyk-gateway"
 )
 
 type PoliciesConfig struct {
