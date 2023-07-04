@@ -731,7 +731,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    keyName,
+			"key":    gw.obfuscateKey(keyName),
 			"status": "ok",
 		}).Info("Deleted key across all APIs.")
 
@@ -761,7 +761,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"key":    keyName,
+		"key":    gw.obfuscateKey(keyName),
 		"status": "ok",
 	}).Info("Deleted key.")
 
@@ -782,7 +782,7 @@ func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, r
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"key":    keyName,
+		"key":    gw.obfuscateKey(keyName),
 		"status": "ok",
 	}).Info("Deleted hashed key across all APIs.")
 
