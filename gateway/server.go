@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/test"
 
 	"sync/atomic"
@@ -61,7 +62,6 @@ import (
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 
-	oteltrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
@@ -114,7 +114,7 @@ type Gateway struct {
 	GlobalHostChecker    HostCheckerManager
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
-	TraceProvider        oteltrace.Provider
+	TracerProvider       otel.TracerProvider
 
 	keyGen DefaultKeyGenerator
 
@@ -1577,7 +1577,7 @@ func Start() {
 		defer trace.Close()
 	}
 
-	gw.initOpenTelemetry()
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig)
 
 	gw.start()
 	configs := gw.GetConfig()

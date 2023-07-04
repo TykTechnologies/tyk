@@ -1,4 +1,4 @@
-package gateway
+package otel
 
 import (
 	"context"
@@ -7,11 +7,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc"
+	"github.com/sirupsen/logrus"
 
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
+
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
+
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -93,8 +96,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.testName, func(t *testing.T) {
-			gw := &Gateway{}
-			gw.ctx = context.Background()
+			ctx := context.Background()
 
 			if tc.setupFn != nil {
 				endpoint, teardown := tc.setupFn()
@@ -103,13 +105,10 @@ func Test_InitOpenTelemetry(t *testing.T) {
 				tc.givenConfig.OpenTelemetry.Endpoint = endpoint
 			}
 
-			gw.SetConfig(tc.givenConfig)
-			gw.afterConfSetup()
+			provider := InitOpenTelemetry(ctx, logrus.New(), &tc.givenConfig)
+			assert.NotNil(t, provider)
 
-			gw.initOpenTelemetry()
-			assert.NotNil(t, gw.TraceProvider)
-
-			assert.Equal(t, tc.expectedType, gw.TraceProvider.Type())
+			assert.Equal(t, tc.expectedType, provider.Type())
 		})
 	}
 }
