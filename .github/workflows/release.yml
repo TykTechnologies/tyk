@@ -135,7 +135,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v4
         with:
           version: 1.18.2
-          args: release --clean -f ${{ matrix.goreleaser }}
+          args: release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
