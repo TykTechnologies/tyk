@@ -97,14 +97,6 @@ github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632 h1:T5NWziF
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632/go.mod h1:UsPYgOFBpNzDXLEti7MKOwHLpVSqdzuNGkVFPspQmnQ=
 github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksrF4dY9KW8o8=
 github.com/TykTechnologies/openid2go v0.1.2/go.mod h1:gYfkqeWa+lY3Xz/Z2xYtIzmYXynlgKZaBIbPCqdcdMA=
-github.com/TykTechnologies/opentelemetry v0.0.3 h1:S7TkDXozHo5oAC1ZbxMq7F+CMVqz3MOe2pjkSiE5D3Q=
-github.com/TykTechnologies/opentelemetry v0.0.3/go.mod h1:O/kFyW5Jrj3vHxv2xDNHsc1c0P5u3WTPigLit5wHa1M=
-github.com/TykTechnologies/opentelemetry v0.0.4-0.20230704135011-222a62f4aa3e h1:Q7gS84naKcNBt4fHsLn/22mT2taL0Co5Pevff7OlLwg=
-github.com/TykTechnologies/opentelemetry v0.0.4-0.20230704135011-222a62f4aa3e/go.mod h1:O/kFyW5Jrj3vHxv2xDNHsc1c0P5u3WTPigLit5wHa1M=
-github.com/TykTechnologies/opentelemetry v0.0.4-0.20230704141819-33f532dd4b85 h1:kWjLnjwOePX0gjXQrJBvHEv+gkKzEr8YYGrdBIOfs/E=
-github.com/TykTechnologies/opentelemetry v0.0.4-0.20230704141819-33f532dd4b85/go.mod h1:O/kFyW5Jrj3vHxv2xDNHsc1c0P5u3WTPigLit5wHa1M=
-github.com/TykTechnologies/opentelemetry v0.0.4-0.20230704142537-e4116cd2fcca h1:4cVudIJXtQLXOq06837Rrel5rq6HJ1kgICnIQ8gy1UY=
-github.com/TykTechnologies/opentelemetry v0.0.4-0.20230704142537-e4116cd2fcca/go.mod h1:O/kFyW5Jrj3vHxv2xDNHsc1c0P5u3WTPigLit5wHa1M=
 github.com/TykTechnologies/opentelemetry v0.0.4-0.20230704144548-ba3118f611ed h1:1rrv1LRHDG+k+LOx2uFtGRPgKFnBqf4tqo4gwVf4w70=
 github.com/TykTechnologies/opentelemetry v0.0.4-0.20230704144548-ba3118f611ed/go.mod h1:O/kFyW5Jrj3vHxv2xDNHsc1c0P5u3WTPigLit5wHa1M=
 github.com/TykTechnologies/storage v1.0.5 h1:lfMljPueySAW7Mpc70g1/qC5n2LKNcKgQs+Xw30apP8=

@@ -19,7 +19,6 @@ import (
 	"github.com/justinas/alice"
 	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -527,13 +526,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}).Info("API Loaded")
 
 	return &chainDef
-}
-
-func NewHTTPHandler(name string, handler http.Handler, tracerProvider otel.TracerProvider) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		otelhttp.NewHandler(handler, name).ServeHTTP(w, r)
-	})
 }
 
 // Check for recursion

@@ -11,9 +11,10 @@ import (
 	"strconv"
 	"time"
 
+	"go.opentelemetry.io/otel/codes"
+
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/rpc"
-	"go.opentelemetry.io/otel/codes"
 
 	"github.com/TykTechnologies/tyk/header"
 

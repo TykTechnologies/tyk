@@ -77,7 +77,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/TykTechnologies/opentelemetry v0.0.4-0.20230704144548-ba3118f611ed
+require (
+	github.com/TykTechnologies/opentelemetry v0.0.4-0.20230704144548-ba3118f611ed
+	go.opentelemetry.io/otel v1.16.0
+)
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
@@ -174,7 +177,6 @@ require (
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190809123943-df4f5c81cb3b // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.42.0 // indirect
-	go.opentelemetry.io/otel v1.16.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.16.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.16.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.16.0 // indirect
