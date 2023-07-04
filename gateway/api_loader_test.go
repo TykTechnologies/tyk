@@ -452,7 +452,7 @@ func TestOpenTelemetry(t *testing.T) {
 
 			// Here you can check the request and return a response
 			w.WriteHeader(http.StatusOK)
-		}, "127.0.0.1:9997")
+		}, ":0")
 
 		// Start the server.
 		otelCollectorMock.Start()
@@ -481,7 +481,7 @@ func TestOpenTelemetry(t *testing.T) {
 
 		otelCollectorMock := httpCollectorMock(t, func(w http.ResponseWriter, r *http.Request) {
 			t.Fail()
-		}, "127.0.0.1:9998")
+		}, ":0")
 
 		// Start the server.
 		otelCollectorMock.Start()
@@ -509,6 +509,7 @@ func TestOpenTelemetry(t *testing.T) {
 
 func httpCollectorMock(t *testing.T, fn http.HandlerFunc, address string) *httptest.Server {
 	t.Helper()
+
 	l, err := net.Listen("tcp", address)
 	if err != nil {
 		t.Fatalf("error setting up collector mock: %s", err.Error())
