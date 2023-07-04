@@ -1,26 +1,45 @@
-ARG GOLANG_CROSS
+ARG BASE_IMAGE=tykio/golang-cross:1.16-bullseye
+FROM ${BASE_IMAGE}
 
-FROM tykio/golang-cross:${GOLANG_CROSS}
 LABEL description="Image for plugin development"
 
-ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
-
-ENV GO111MODULE=on
 
 # This directory will contain the plugin source and will be
 # mounted from the host box by the user using docker volumes
 ENV PLUGIN_SOURCE_PATH=/plugin-source
 
-RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
+RUN mkdir -p $PLUGIN_SOURCE_PATH
+
+RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial \
+	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
+
+# This is already vendored from release pipeline
+WORKDIR /opt/tyk-gateway/src
+ADD . /opt/tyk-gateway/src
+
+# TYK_GW_PATH points to the GOHOME source for gateway.
+ENV TYK_GW_PATH /go/src/github.com/TykTechnologies/tyk
+
+# This has to mirror the before goreleaser step in release.yml;
+# It builds the go source tree for $GOHOME builds from gw.
+
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod true && \
+          mkdir -p /go/src && \
+          go mod tidy && \
+          go mod vendor && \
+          cp -r -f vendor/* /go/src && \
+          mkdir -p $TYK_GW_PATH && \
+          cp -r ./* $TYK_GW_PATH && \
+          find /go/src -name vendor | xargs --no-run-if-empty -d '\n' rm -rf
+
+ENV GO111MODULE=off
+
+ARG GITHUB_SHA
+ARG GITHUB_TAG
+ENV GITHUB_SHA ${GITHUB_SHA}
+ENV GITHUB_TAG ${GITHUB_TAG}
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
-RUN  apt-get remove -y --allow-remove-essential --auto-remove mercurial \
-	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
-
-RUN curl -L -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/repos/TykTechnologies/tyk/tarball/$GITUHB_SHA --output - | tar --strip-components 1 -C $TYK_GW_PATH -xzf -
-RUN cd $TYK_GW_PATH
-
 ENTRYPOINT ["/build.sh"]
-
