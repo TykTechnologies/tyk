@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -33,6 +34,28 @@ func TestGateway_afterConfSetup(t *testing.T) {
 					KeySpaceSyncInterval:     10,
 					RPCCertCacheExpiration:   3600,
 					RPCGlobalCacheExpiration: 30,
+				},
+				AnalyticsConfig: config.AnalyticsConfigConfig{
+					PurgeInterval: 10,
+				},
+				HealthCheckEndpointName: "hello",
+			},
+		},
+		{
+			name: "opentelemetry options test",
+			initialConfig: config.Config{
+				OpenTelemetry: otel.Config{
+					Enabled: true,
+				},
+			},
+			expectedConfig: config.Config{
+				OpenTelemetry: otel.Config{
+					Enabled:           true,
+					Exporter:          "grpc",
+					Endpoint:          "localhost:4317",
+					ResourceName:      "tyk-gateway",
+					SpanProcessorType: "batch",
+					ConnectionTimeout: 1,
 				},
 				AnalyticsConfig: config.AnalyticsConfigConfig{
 					PurgeInterval: 10,

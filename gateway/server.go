@@ -1392,11 +1392,11 @@ func (gw *Gateway) afterConfSetup() {
 	}
 
 	if conf.OpenTelemetry.Enabled {
-		conf.OpenTelemetry.SetDefaults()
-
 		if conf.OpenTelemetry.ResourceName == "" {
 			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
 		}
+
+		conf.OpenTelemetry.SetDefaults()
 	}
 
 	gw.SetConfig(conf)
