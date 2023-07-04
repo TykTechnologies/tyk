@@ -732,7 +732,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 			"prefix": "api",
 			"key":    gw.obfuscateKey(keyName),
 			"status": "ok",
-		}).Debug("Deleted key across all APIs.")
+		}).Info("Deleted key across all APIs.")
 
 		return nil, http.StatusOK
 	}
