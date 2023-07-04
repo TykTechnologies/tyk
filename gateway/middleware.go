@@ -11,9 +11,8 @@ import (
 	"strconv"
 	"time"
 
-	"go.opentelemetry.io/otel/codes"
-
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -75,7 +74,9 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
 			if err != nil {
-				span.SetStatus(codes.Error, err.Error())
+				span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
+			} else {
+				span.SetStatus(otel.SPAN_STATUS_OK, "")
 			}
 
 			return err, i
