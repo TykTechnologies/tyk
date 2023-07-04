@@ -637,6 +637,7 @@ type Config struct {
 	HashKeys bool `json:"hash_keys"`
 
 	// DisableKeyActionsByUsername disables key search by username.
+	// Please ensure that dashboard has the same value for seamless functionality.
 	DisableKeyActionsByUsername bool `json:"disable_key_actions_by_username"`
 
 	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
