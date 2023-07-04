@@ -10,9 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 	"github.com/TykTechnologies/tyk/config"
-	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 func Test_InitOpenTelemetry(t *testing.T) {
