@@ -176,3 +176,7 @@ jobs:
         CLIENT_ID: ${{secrets.XRAY_CLIENT_ID}}
         CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
         BRANCH: ${{ github.ref }}
+
+    - name: Getting gateway logs on failure
+      if: ${{ failure() }}
+      run: docker logs tyk-gateway

@@ -478,7 +478,7 @@ func TestGoPluginMiddleware_ProcessRequest_ShouldFailWhenNotLoaded(t *testing.T)
 		v.UseExtendedPaths = true
 		v.ExtendedPaths = apidef.ExtendedPathsSet{
 			GoPlugin: []apidef.GoPluginMeta{
-				apidef.GoPluginMeta{
+				{
 					Path:       "/my-plugin",
 					Method:     http.MethodGet,
 					PluginPath: "non-existing.so",

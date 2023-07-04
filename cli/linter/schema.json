@@ -306,6 +306,9 @@
         "connection_string": {
           "type": "string"
         },
+        "connection_timeout": {
+          "type": "integer"
+        },
         "node_is_segmented": {
           "type": "boolean"
         },
@@ -433,6 +436,9 @@
       "type": "string"
     },
     "hash_keys": {
+      "type": "boolean"
+    },
+    "disable_key_actions_by_username": {
       "type": "boolean"
     },
     "hash_key_function": {

@@ -220,12 +220,6 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"withChildren"},
 				},
 			},
-			ChildNodes: []plan.TypeField{
-				{
-					TypeName:   "WithChildren",
-					FieldNames: []string{"id", "name", "__typename"},
-				},
-			},
 			Factory: &restDataSource.Factory{
 				Client: httpClient,
 			},
@@ -241,12 +235,6 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 				{
 					TypeName:   "WithChildren",
 					FieldNames: []string{"nested"},
-				},
-			},
-			ChildNodes: []plan.TypeField{
-				{
-					TypeName:   "Nested",
-					FieldNames: []string{"id", "name", "__typename"},
 				},
 			},
 			Factory: &restDataSource.Factory{
