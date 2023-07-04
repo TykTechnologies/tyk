@@ -96,6 +96,36 @@
           }
         }
       }
+    },
+    "OpenTelemetry":{
+      "type":"object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "exporter":{
+          "type": "string"
+        },
+        "endpoint":{
+          "type": "string"
+        },
+        "connection_timeout":{
+          "type": "integer"
+        },
+        "resource_name":{
+          "type": "string"
+        },
+        "span_processor_type":{
+          "type":"string"
+        },
+        "headers": {
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      }
     }
   },
   "properties": {
@@ -683,6 +713,9 @@
           ]
         }
       }
+    },
+    "opentelemetry": {
+      "$ref": "#/definitions/OpenTelemetry"
     },
     "logstash_network_addr": {
       "type": "string"
