@@ -98,8 +98,8 @@ dockers:
   dockerfile: ci/Dockerfile.std
   extra_files:
     - "ci/install/"
+    - "ci/Dockerfile.std"
     - "README.md"
-
     - "LICENSE.md"
     - "apps/app_sample.json"
     - "templates"
@@ -127,8 +127,8 @@ dockers:
   dockerfile: ci/Dockerfile.slim
   extra_files:
     - "ci/install/"
+    - "ci/Dockerfile.slim"
     - "README.md"
-
     - "LICENSE.md"
     - "apps/app_sample.json"
     - "templates"
