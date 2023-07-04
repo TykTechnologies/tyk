@@ -38,10 +38,12 @@ jobs:
         golang_cross: [ 1.16, 1.16-el7 ]
         include:
           - golang_cross: 1.16-el7
+            go_version: 1.16
             goreleaser: 'ci/goreleaser/goreleaser-el7.yml'
             rpmvers: 'el/7 amazon/2'
             debvers: 'ubuntu/xenial ubuntu/bionic debian/jessie'
           - golang_cross: 1.16
+            go_version: 1.16
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             rpmvers: 'el/8'
             debvers: 'ubuntu/focal debian/buster debian/bullseye'
@@ -107,18 +109,17 @@ jobs:
             *.tar.gz
             *.txt.sig
             *.txt
+
       - name: Fix vendor
         run: |
-          export GOPATH=/go
-          mkdir -p /go/src || true
-          whereis go
+          mkdir -p /go/src
           go mod tidy
           go mod vendor
-          echo "Moving vendor"
-          cp -r -f vendor/* $GOPATH/src
-          rm -rf vendor
+          cp -r -f vendor/* /go/src
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
+          find /go/src -name vendor | xargs --no-run-if-empty -d'\n' rm -rf
+          rm -rf vendor
 
       - uses: goreleaser/goreleaser-action@v4
         with:
@@ -126,16 +127,17 @@ jobs:
           args: release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CGO_ENABLED: 1
-          GO111MODULE: off
           NFPM_STD_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           NFPM_PAYG_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          GO_VERSION: ${{ matrix.go_version }}
           GOLANG_CROSS: ${{ matrix.golang_cross }}
           DEBVERS: ${{ matrix.debvers }}
           RPMVERS: ${{ matrix.rpmvers }}
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+          DOCKER_BUILDKIT: "1"
+          DOCKER_CLI_EXPERIMENTAL: "enabled"
 
       - uses: actions/upload-artifact@v3
         with:
@@ -373,6 +375,8 @@ jobs:
           fetch-depth: 1
 
       - name: Run tests
+        env:
+          GITHUB_TAG: ${{ github.ref }}
         shell: bash
         run: |
           set -eaxo pipefail
