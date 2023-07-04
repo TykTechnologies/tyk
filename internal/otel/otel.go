@@ -13,6 +13,10 @@ type TracerProvider = tyktrace.Provider
 
 type Config = otelconfig.OpenTelemetry
 
+var HTTPHandler = tyktrace.NewHTTPHandler
+
+var HTTPRoundTripper = tyktrace.NewHTTPTransport
+
 // InitOpenTelemetry initializes OpenTelemetry - it returns a TracerProvider
 // which can be used to create a tracer. If OpenTelemetry is disabled or misconfigured,
 // a NoopProvider is returned.

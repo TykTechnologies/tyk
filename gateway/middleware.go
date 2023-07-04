@@ -13,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/rpc"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/TykTechnologies/tyk/header"
 
@@ -64,6 +65,20 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		defer span.Finish()
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
+	} else if baseMw := tr.Base(); baseMw != nil {
+		if cfg := baseMw.Gw.GetConfig(); cfg.OpenTelemetry.Enabled {
+			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
+			defer span.End()
+
+			setContext(r, ctx)
+
+			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
+			if err != nil {
+				span.SetStatus(codes.Error, err.Error())
+			}
+
+			return err, i
+		}
 	}
 
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)

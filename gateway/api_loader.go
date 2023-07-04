@@ -19,9 +19,11 @@ import (
 	"github.com/justinas/alice"
 	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 )
@@ -496,8 +498,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	logger.Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
 
-	if trace.IsEnabled() {
+	if trace.IsEnabled() { // trace.IsEnabled = check if opentracing is enabled
 		chainDef.ThisHandler = trace.Handle(spec.Name, chain)
+	} else if gw.GetConfig().OpenTelemetry.Enabled { // check if opentelemetry is enabled
+		chainDef.ThisHandler = otel.HTTPHandler(spec.Name, chain, gw.TracerProvider)
 	} else {
 		chainDef.ThisHandler = chain
 	}
@@ -523,6 +527,13 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}).Info("API Loaded")
 
 	return &chainDef
+}
+
+func NewHTTPHandler(name string, handler http.Handler, tracerProvider otel.TracerProvider) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		otelhttp.NewHandler(handler, name).ServeHTTP(w, r)
+	})
 }
 
 // Check for recursion
