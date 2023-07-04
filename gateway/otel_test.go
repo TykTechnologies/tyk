@@ -10,9 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
+	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -20,9 +19,9 @@ func Test_InitOpenTelemetry(t *testing.T) {
 	tcs := []struct {
 		testName string
 
-		givenConfig config.Config
-		setupFn     func() (string, func())
-		expectNoOp  bool
+		givenConfig  config.Config
+		setupFn      func() (string, func())
+		expectedType string
 	}{
 		{
 			testName: "opentelemetry disabled",
@@ -31,6 +30,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 					Enabled: false,
 				},
 			},
+			expectedType: tyktrace.NOOP_PROVIDER,
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to http",
@@ -49,6 +49,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 
 				return server.URL, server.Close
 			},
+			expectedType: tyktrace.OTEL_PROVIDER,
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to grpc",
@@ -75,6 +76,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 
 				return lis.Addr().String(), s.Stop
 			},
+			expectedType: tyktrace.OTEL_PROVIDER,
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to invalid - noop provider should be used",
@@ -85,7 +87,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 					Endpoint: "localhost:4317",
 				},
 			},
-			expectNoOp: true,
+			expectedType: tyktrace.NOOP_PROVIDER,
 		},
 	}
 
@@ -107,9 +109,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 			gw.initOpenTelemetry()
 			assert.NotNil(t, gw.TraceProvider)
 
-			if tc.expectNoOp {
-				assert.IsType(t, oteltrace.NewNoopTracerProvider().Tracer(""), gw.TraceProvider.Tracer())
-			}
+			assert.Equal(t, tc.expectedType, gw.TraceProvider.Type())
 		})
 	}
 }
