@@ -13,8 +13,8 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 
-	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 )
@@ -941,7 +941,7 @@ type Config struct {
 	Tracer Tracer `json:"tracing"`
 
 	// Section for configuring Opentelemetry
-	OpenTelemetry otelconfig.OpenTelemetry `json:"opentelemetry"`
+	OpenTelemetry otel.Config `json:"opentelemetry"`
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 

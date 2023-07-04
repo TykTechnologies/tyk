@@ -1577,7 +1577,7 @@ func Start() {
 		defer trace.Close()
 	}
 
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig)
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry)
 
 	gw.start()
 	configs := gw.GetConfig()

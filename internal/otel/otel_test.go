@@ -9,40 +9,33 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
-
-	"github.com/TykTechnologies/tyk/config"
 )
 
 func Test_InitOpenTelemetry(t *testing.T) {
 	tcs := []struct {
 		testName string
 
-		givenConfig  config.Config
+		givenConfig  Config
 		setupFn      func() (string, func())
 		expectedType string
 	}{
 		{
 			testName: "opentelemetry disabled",
-			givenConfig: config.Config{
-				OpenTelemetry: otelconfig.OpenTelemetry{
-					Enabled: false,
-				},
+			givenConfig: Config{
+				Enabled: false,
 			},
 			expectedType: tyktrace.NOOP_PROVIDER,
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to http",
-			givenConfig: config.Config{
-				OpenTelemetry: otelconfig.OpenTelemetry{
-					Enabled:  true,
-					Exporter: "http",
-					Endpoint: "http://localhost:4317",
-				},
+			givenConfig: Config{
+				Enabled:  true,
+				Exporter: "http",
+				Endpoint: "http://localhost:4317",
 			},
 			setupFn: func() (string, func()) {
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -56,12 +49,10 @@ func Test_InitOpenTelemetry(t *testing.T) {
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to grpc",
-			givenConfig: config.Config{
-				OpenTelemetry: otelconfig.OpenTelemetry{
-					Enabled:  true,
-					Exporter: "grpc",
-					Endpoint: "localhost:4317",
-				},
+			givenConfig: Config{
+				Enabled:  true,
+				Exporter: "grpc",
+				Endpoint: "localhost:4317",
 			},
 			setupFn: func() (string, func()) {
 				lis, err := net.Listen("tcp", "localhost:0")
@@ -83,12 +74,10 @@ func Test_InitOpenTelemetry(t *testing.T) {
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to invalid - noop provider should be used",
-			givenConfig: config.Config{
-				OpenTelemetry: otelconfig.OpenTelemetry{
-					Enabled:  true,
-					Exporter: "invalid",
-					Endpoint: "localhost:4317",
-				},
+			givenConfig: Config{
+				Enabled:  true,
+				Exporter: "invalid",
+				Endpoint: "localhost:4317",
 			},
 			expectedType: tyktrace.NOOP_PROVIDER,
 		},
@@ -102,7 +91,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 				endpoint, teardown := tc.setupFn()
 				defer teardown()
 
-				tc.givenConfig.OpenTelemetry.Endpoint = endpoint
+				tc.givenConfig.Endpoint = endpoint
 			}
 
 			provider := InitOpenTelemetry(ctx, logrus.New(), &tc.givenConfig)
