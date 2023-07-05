@@ -47,6 +47,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
@@ -814,9 +815,19 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return handleInMemoryLoop(handler, r)
 	}
 
+	if rt.Gw.GetConfig().OpenTelemetry.Enabled {
+		var baseRoundTripper http.RoundTripper = rt.transport
+		if rt.h2ctransport != nil {
+			baseRoundTripper = rt.h2ctransport
+		}
+
+		tr := otel.HTTPRoundTripper(baseRoundTripper)
+		return tr.RoundTrip(r)
+	}
 	if rt.h2ctransport != nil {
 		return rt.h2ctransport.RoundTrip(r)
 	}
+
 	return rt.transport.RoundTrip(r)
 }
 

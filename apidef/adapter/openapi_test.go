@@ -298,7 +298,8 @@ const expectedOpenAPIGraphQLConfig = `{
                     "body": ""
                 }
             }
-        ]
+        ],
+        "global_headers": null
     },
     "proxy": {
         "auth_headers": {},
