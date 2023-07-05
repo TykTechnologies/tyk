@@ -119,6 +119,9 @@
         "span_processor_type":{
           "type":"string"
         },
+        "context_propagation":{
+          "type":"string"
+        },
         "headers": {
           "type": [
             "array",
