@@ -84,7 +84,7 @@ func removeDuplicateApiDefinitionHeaders(headers ...map[string]string) map[strin
 	return hdr
 }
 
-func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConfigGraphQL) (json.RawMessage, error) {
+func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConfigGraphQL, globalHeaders map[string]string) (json.RawMessage, error) {
 	if !config.HasOperation {
 		return nil, ErrGraphQLConfigIsMissingOperation
 	}
@@ -101,7 +101,7 @@ func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConf
 			URL:    config.URL,
 			Method: config.Method,
 			Body:   body,
-			Header: convertApiDefinitionHeadersToHttpHeaders(config.Headers),
+			Header: convertApiDefinitionHeadersToHttpHeaders(removeDuplicateApiDefinitionHeaders(config.Headers, globalHeaders)),
 		},
 	})
 	return customMessage, nil

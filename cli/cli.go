@@ -65,7 +65,7 @@ func Init(version string, confPaths []string) {
 	MutexProfile = startCmd.Flag("mutexprofile", "generate a mutex profile").Bool()
 	HTTPProfile = startCmd.Flag("httpprofile", "expose runtime profiling data via HTTP").Bool()
 	DebugMode = startCmd.Flag("debug", "enable debug mode").Bool()
-	LogInstrumentation = startCmd.Flag("log-intrumentation", "output intrumentation output to stdout").Bool()
+	LogInstrumentation = startCmd.Flag("log-instrumentation", "output instrumentation output to stdout").Bool()
 
 	startCmd.Action(func(ctx *kingpin.ParseContext) error {
 		DefaultMode = true
