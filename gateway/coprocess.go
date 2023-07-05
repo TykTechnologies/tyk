@@ -18,7 +18,7 @@ import (
 
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
@@ -104,7 +104,7 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 	if req.Body != nil {
 		defer req.Body.Close()
 		var err error
-		miniRequestObject.RawBody, err = ioutil.ReadAll(req.Body)
+		miniRequestObject.RawBody, err = io.ReadAll(req.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -174,12 +174,12 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 			resObj.MultivalueHeaders = append(resObj.MultivalueHeaders, &currentHeader)
 		}
 		resObj.StatusCode = int32(res.StatusCode)
-		rawBody, err := ioutil.ReadAll(res.Body)
+		rawBody, err := io.ReadAll(res.Body)
 		if err != nil {
 			return nil, err
 		}
 		resObj.RawBody = rawBody
-		res.Body = ioutil.NopCloser(bytes.NewReader(rawBody))
+		res.Body = io.NopCloser(bytes.NewReader(rawBody))
 		if utf8.Valid(rawBody) && !c.Middleware.RawBodyOnly {
 			resObj.Body = string(rawBody)
 		}
@@ -192,7 +192,7 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 // ObjectPostProcess does CoProcessObject post-processing (adding/removing headers or params, etc.).
 func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Request, origURL string, origMethod string) (err error) {
 	r.ContentLength = int64(len(object.Request.RawBody))
-	r.Body = ioutil.NopCloser(bytes.NewReader(object.Request.RawBody))
+	r.Body = io.NopCloser(bytes.NewReader(object.Request.RawBody))
 	nopCloseRequestBody(r)
 
 	logger := c.Middleware.Logger()
@@ -591,7 +591,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 
 	// Set response body:
 	bodyBuf := bytes.NewBuffer(retObject.Response.RawBody)
-	res.Body = ioutil.NopCloser(bodyBuf)
+	res.Body = io.NopCloser(bodyBuf)
 
 	res.StatusCode = int(retObject.Response.StatusCode)
 	return nil

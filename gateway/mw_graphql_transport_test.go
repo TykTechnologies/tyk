@@ -3,7 +3,7 @@ package gateway
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -82,7 +82,7 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 				}
 			}
 
-			bodyBytes, err := ioutil.ReadAll(r.Body)
+			bodyBytes, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
 			assert.Equal(t, expectations.body, string(bodyBytes))
 
@@ -140,7 +140,7 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 			}
 		}
 
-		transportResponseBodyBytes, err := ioutil.ReadAll(transportResponse.Body)
+		transportResponseBodyBytes, err := io.ReadAll(transportResponse.Body)
 		require.NoError(t, err)
 		assert.Equal(t, response.body, string(transportResponseBodyBytes))
 	})
@@ -187,7 +187,7 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 			}
 		}
 
-		transportResponseBodyBytes, err := ioutil.ReadAll(transportResponse.Body)
+		transportResponseBodyBytes, err := io.ReadAll(transportResponse.Body)
 		require.NoError(t, err)
 		assert.Equal(t, response.body, string(transportResponseBodyBytes))
 	})
@@ -234,7 +234,7 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 			}
 		}
 
-		transportResponseBodyBytes, err := ioutil.ReadAll(transportResponse.Body)
+		transportResponseBodyBytes, err := io.ReadAll(transportResponse.Body)
 		require.NoError(t, err)
 		assert.Equal(t, response.body, string(transportResponseBodyBytes))
 	})

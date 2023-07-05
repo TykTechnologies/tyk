@@ -12,7 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -415,7 +415,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 		// fallback to file
 		if err != nil {
 			// Try read from file
-			rawCert, err = ioutil.ReadFile(id)
+			rawCert, err = os.ReadFile(id)
 			if err != nil {
 				c.logger.Warn("Can't retrieve certificate:", id, err)
 				out = append(out, nil)
@@ -464,7 +464,7 @@ func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 			}
 			rawKey = []byte(val)
 		} else {
-			rawKey, err = ioutil.ReadFile(id)
+			rawKey, err = os.ReadFile(id)
 			if err != nil {
 				c.logger.Error("Error while reading public key from file:", id, err)
 				out = append(out, "")
@@ -501,7 +501,7 @@ func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 		}
 		rawKey = []byte(val)
 	} else {
-		rawKey, err = ioutil.ReadFile(keyID)
+		rawKey, err = os.ReadFile(keyID)
 		if err != nil {
 			c.logger.Error("Error while reading public key from file:", keyID, err)
 			return nil

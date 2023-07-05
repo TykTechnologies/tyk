@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -340,7 +339,7 @@ func TestHTTP_custom_ports(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer w.Body.Close()
-	b, err := ioutil.ReadAll(w.Body)
+	b, err := io.ReadAll(w.Body)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,7 +17,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -162,7 +161,7 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 	}
 
 	defer resp.Body.Close()
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
 
 // Get mocks an HTTP(S) GET request.

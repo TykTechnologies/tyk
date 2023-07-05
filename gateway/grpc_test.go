@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -84,7 +84,7 @@ func TestHTTP2_h2C(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer w.Body.Close()
-	b, err := ioutil.ReadAll(w.Body)
+	b, err := io.ReadAll(w.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -462,7 +462,7 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 	}...)
 
 	// Read key
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	var resMap map[string]string
 	err := json.Unmarshal(body, &resMap)
 	if err != nil {
@@ -781,7 +781,7 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 	}
 
 	// Read key
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Error("Fail reading body from create key request")
 	}

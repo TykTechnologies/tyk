@@ -5,7 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 
@@ -30,7 +30,7 @@ func TestExtractDocFromXTyk(t *testing.T) {
 	if *dumpXTykDoc {
 		filename := path.Join("schema", xTykDocPath)
 		t.Logf("Writing out: %s", filename)
-		err = ioutil.WriteFile(filename, []byte(xTykDocToMarkdown(fInfo)), 0666)
+		err = os.WriteFile(filename, []byte(xTykDocToMarkdown(fInfo)), 0666)
 		assert.NoError(t, err)
 	} else {
 		t.Log("Skipping writing out x-tyk-gateway.md docs")

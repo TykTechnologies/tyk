@@ -2,7 +2,7 @@ package oas_test
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path"
 	"runtime"
 	"sort"
@@ -27,7 +27,7 @@ func findTestPath(filename string) string {
 // - Asserts expected routes for validateRequest.
 func TestImportValidateRequest(t *testing.T) {
 	// Load petstore
-	oasContents, err := ioutil.ReadFile(findTestPath("testdata/petstore-no-responses.json"))
+	oasContents, err := os.ReadFile(findTestPath("testdata/petstore-no-responses.json"))
 	assert.NoError(t, err)
 	assert.NotNil(t, oasContents)
 

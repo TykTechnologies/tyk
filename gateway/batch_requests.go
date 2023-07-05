@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -69,7 +69,7 @@ func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchR
 	}
 
 	defer resp.Body.Close()
-	content, err := ioutil.ReadAll(resp.Body)
+	content, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Warning("Body read failure! ", err)
 		return BatchReplyUnit{}

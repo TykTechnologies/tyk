@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
@@ -173,7 +172,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			// mw_redis_cache instead? is there a reason not
 			// to include that in the analytics?
 			if responseCopy != nil {
-				contents, err := ioutil.ReadAll(responseCopy.Body)
+				contents, err := io.ReadAll(responseCopy.Body)
 				if err != nil {
 					log.Error("Couldn't read response body", err)
 				}
@@ -183,7 +182,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 				// Get the wire format representation
 				var wireFormatRes bytes.Buffer
 				responseCopy.Write(&wireFormatRes)
-				responseCopy.Body = ioutil.NopCloser(bytes.NewBuffer(contents))
+				responseCopy.Body = io.NopCloser(bytes.NewBuffer(contents))
 				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 			}
 		}

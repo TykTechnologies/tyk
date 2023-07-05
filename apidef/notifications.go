@@ -3,7 +3,7 @@ package apidef
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"time"
@@ -79,7 +79,7 @@ func (n NotificationsManager) SendRequest(wait bool, count int, notification int
 		return
 	}
 	defer resp.Body.Close()
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error("Request failed, trying again in 10s. Error was: ", err)
 		count++

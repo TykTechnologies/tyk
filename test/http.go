@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -47,8 +46,8 @@ type TestCase struct {
 }
 
 func AssertResponse(resp *http.Response, tc *TestCase) error {
-	body, _ := ioutil.ReadAll(resp.Body)
-	resp.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body = io.NopCloser(bytes.NewBuffer(body))
 	defer resp.Body.Close()
 
 	if tc.Code != 0 && resp.StatusCode != tc.Code {

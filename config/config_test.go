@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -82,7 +81,7 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 }
 
 func TestConfigFiles(t *testing.T) {
-	dir, err := ioutil.TempDir("", "tyk")
+	dir, err := os.MkdirTemp("", "tyk")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +96,7 @@ func TestConfigFiles(t *testing.T) {
 	if conf.ListenPort != 8080 {
 		t.Fatalf("Expected ListenPort to be set to its default")
 	}
-	bs, _ := ioutil.ReadFile(path1)
+	bs, _ := os.ReadFile(path1)
 	if !strings.Contains(string(bs), "8080") {
 		t.Fatalf("Expected 8080 to be in the written conf file")
 	}
@@ -141,7 +140,7 @@ func TestConfigFiles(t *testing.T) {
 
 	// path1 exists but is invalid
 	os.Remove(path2)
-	ioutil.WriteFile(path1, []byte("{"), 0644)
+	os.WriteFile(path1, []byte("{"), 0644)
 	if err := Load(paths, conf); err == nil {
 		t.Fatalf("Load with an invalid config did not error")
 	}
@@ -152,7 +151,7 @@ func TestConfig_GetEventTriggers(t *testing.T) {
 	assert := func(t *testing.T, config string, expected string) {
 		conf := &Config{}
 
-		f, err := ioutil.TempFile("", "tyk.conf")
+		f, err := os.CreateTemp("", "tyk.conf")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -194,7 +193,7 @@ func TestConfig_GetEventTriggers(t *testing.T) {
 }
 
 func TestLoad_tracing(t *testing.T) {
-	dir, err := ioutil.TempDir("", "tyk")
+	dir, err := os.MkdirTemp("", "tyk")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +211,7 @@ func TestLoad_tracing(t *testing.T) {
 					filepath.Dir(f),
 					"expect."+filepath.Base(f),
 				)
-				expect, err := ioutil.ReadFile(o)
+				expect, err := os.ReadFile(o)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -269,7 +268,7 @@ func TestLoad_tracing(t *testing.T) {
 					filepath.Dir(v.file),
 					"expect."+filepath.Base(v.file),
 				)
-				expect, err := ioutil.ReadFile(o)
+				expect, err := os.ReadFile(o)
 				if err != nil {
 					t.Fatal(err)
 				}

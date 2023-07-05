@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -1276,7 +1276,7 @@ func TestAPIDefinitionLoader(t *testing.T) {
 	})
 
 	t.Run("loadBlobTemplate", func(t *testing.T) {
-		templateInBytes, _ := ioutil.ReadFile(testTemplatePath)
+		templateInBytes, _ := os.ReadFile(testTemplatePath)
 		tempBase64 := base64.StdEncoding.EncodeToString(templateInBytes)
 
 		temp, err := l.loadBlobTemplate(tempBase64)

@@ -2,7 +2,6 @@ package linter
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -108,7 +107,7 @@ func allContains(got, want []string) bool {
 func TestLint(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			f, err := ioutil.TempFile("", "tyk-lint")
+			f, err := os.CreateTemp("", "tyk-lint")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -117,7 +116,7 @@ func TestLint(t *testing.T) {
 			}
 			f.Close()
 
-			confSchema, err := ioutil.ReadFile("cli/linter/schema.json")
+			confSchema, err := os.ReadFile("cli/linter/schema.json")
 			if err != nil {
 				t.Fatal(err)
 			}

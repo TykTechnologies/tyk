@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -59,7 +58,7 @@ var (
 	discardMuxer = mux.NewRouter()
 
 	// Used to store the test bundles:
-	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
+	testMiddlewarePath, _ = os.MkdirTemp("", "tyk-middleware-path")
 
 	defaultTestConfig config.Config
 	EnableTestDNSMock = false
@@ -300,7 +299,7 @@ func (s *Test) RegisterJSFileMiddleware(apiid string, files map[string]string) {
 	}
 
 	for file, content := range files {
-		err = ioutil.WriteFile(gwConfig.MiddlewarePath+"/"+apiid+"/"+file, []byte(content), 0755)
+		err = os.WriteFile(gwConfig.MiddlewarePath+"/"+apiid+"/"+file, []byte(content), 0755)
 		if err != nil {
 			log.WithError(err).Error("writing in file")
 		}
@@ -472,7 +471,7 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 		}
 		r.URL.Opaque = r.URL.RawPath
 		w.Header().Set("X-Tyk-Test", "1")
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 
 		err := json.NewEncoder(w).Encode(TestHttpResponse{
 			Method:  r.Method,
@@ -1085,7 +1084,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	var err error
 	gwConfig.Storage.Database = rand.Intn(15)
-	gwConfig.AppPath, err = ioutil.TempDir("", "tyk-test-")
+	gwConfig.AppPath, err = os.MkdirTemp("", "tyk-test-")
 
 	if err != nil {
 		panic(err)
@@ -1703,7 +1702,7 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	gwConf := gw.GetConfig()
 	oldPath := gwConf.AppPath
-	gwConf.AppPath, _ = ioutil.TempDir("", "apps")
+	gwConf.AppPath, _ = os.MkdirTemp("", "apps")
 	gw.SetConfig(gwConf, true)
 	defer func() {
 		globalConf := gw.GetConfig()
@@ -1724,7 +1723,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 		}
 
 		specFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
-		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
+		if err := os.WriteFile(specFilePath, specBytes, 0644); err != nil {
 			panic(err)
 		}
 
@@ -1735,7 +1734,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 		}
 
 		oasSpecFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+"-oas.json")
-		if err := ioutil.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
+		if err := os.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
 			panic(err)
 		}
 	}

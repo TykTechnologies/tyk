@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -118,7 +118,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	logger := d.Logger()
 
 	// Create the proxy object
-	originalBody, err := ioutil.ReadAll(r.Body)
+	originalBody, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.WithError(err).Error("Failed to read request body")
 		return nil, http.StatusOK
@@ -233,10 +233,10 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Reconstruct the request parts
 	if newRequestData.Request.IgnoreBody {
 		r.ContentLength = int64(len(originalBody))
-		r.Body = ioutil.NopCloser(bytes.NewReader(originalBody))
+		r.Body = io.NopCloser(bytes.NewReader(originalBody))
 	} else {
 		r.ContentLength = int64(len(newRequestData.Request.Body))
-		r.Body = ioutil.NopCloser(bytes.NewReader(newRequestData.Request.Body))
+		r.Body = io.NopCloser(bytes.NewReader(newRequestData.Request.Body))
 	}
 
 	// make sure request's body can be re-read again
@@ -575,7 +575,7 @@ func (j *JSVM) LoadTykJSApi() {
 			return otto.Value{}
 		}
 
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		bodyStr := string(body)
 		tykResp := TykJSHttpResponse{
 			Code:        resp.StatusCode,

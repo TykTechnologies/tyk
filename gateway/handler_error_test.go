@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,7 +19,7 @@ func (s *Test) TestHandleError_text_xml(t *testing.T) {
 	<code>500</code>
 	<message>{{.Message}}</message>
 </error>`
-	err := ioutil.WriteFile(file, []byte(xml), 0600)
+	err := os.WriteFile(file, []byte(xml), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}

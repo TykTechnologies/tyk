@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"io/ioutil"
+	"io"
 	stdlog "log"
 	"log/syslog"
 	"net"
@@ -1166,9 +1166,9 @@ func (gw *Gateway) initialiseSystem() error {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output
 		log.SetLevel(logrus.ErrorLevel)
-		log.SetOutput(ioutil.Discard)
+		log.SetOutput(io.Discard)
 		gorpc.SetErrorLogger(func(string, ...interface{}) {})
-		stdlog.SetOutput(ioutil.Discard)
+		stdlog.SetOutput(io.Discard)
 	} else if *cli.DebugMode {
 		log.Level = logrus.DebugLevel
 		mainLog.Debug("Enabling debug-level output")
@@ -1293,11 +1293,11 @@ func writePIDFile(file string) error {
 		return err
 	}
 	pid := strconv.Itoa(os.Getpid())
-	return ioutil.WriteFile(file, []byte(pid), 0600)
+	return os.WriteFile(file, []byte(pid), 0600)
 }
 
 func readPIDFromFile(file string) (int, error) {
-	b, err := ioutil.ReadFile(file)
+	b, err := os.ReadFile(file)
 	if err != nil {
 		return 0, err
 	}

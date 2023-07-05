@@ -4,7 +4,7 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -67,7 +67,7 @@ func (e *BaseExtractor) ExtractForm(r *http.Request, paramName string) (formValu
 
 // ExtractBody is used when BodySource is specified.
 func (e *BaseExtractor) ExtractBody(r *http.Request) (string, error) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return "", err
 	}

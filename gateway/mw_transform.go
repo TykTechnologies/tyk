@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/clbanning/mxj"
@@ -52,7 +51,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 }
 
 func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware) error {
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	defer r.Body.Close()
 
 	// Put into an interface:

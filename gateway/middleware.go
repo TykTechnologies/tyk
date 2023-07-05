@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
@@ -949,11 +948,11 @@ func parseForm(r *http.Request) {
 	// application/x-www-form-urlencoded
 	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" && r.Form == nil {
 		var b bytes.Buffer
-		r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &b))
+		r.Body = io.NopCloser(io.TeeReader(r.Body, &b))
 
 		r.ParseForm()
 
-		r.Body = ioutil.NopCloser(&b)
+		r.Body = io.NopCloser(&b)
 		return
 	}
 
