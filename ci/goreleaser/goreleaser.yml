@@ -50,8 +50,6 @@ dockers:
   extra_files:
     - "ci/install/"
     - "README.md"
-<<<<<<< HEAD
-
     - "LICENSE.md"
     - "apps/app_sample.json"
     - "templates"
