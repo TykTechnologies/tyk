@@ -130,7 +130,7 @@ func TestGenerateRestDataSourceFromGraphql(t *testing.T) {
 			Variables:        nil,
 		}
 
-		restEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig)
+		restEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig, nil)
 		assert.Equal(t, err, ErrGraphQLConfigIsMissingOperation)
 		assert.Nil(t, restEngineConfig)
 	})
@@ -159,7 +159,7 @@ func TestGenerateRestDataSourceFromGraphql(t *testing.T) {
 			},
 		})
 
-		actualRestEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig)
+		actualRestEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedRestEngineConfig, actualRestEngineConfig)
 	})
