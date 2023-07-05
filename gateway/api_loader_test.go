@@ -2,7 +2,7 @@ package gateway
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -436,7 +436,7 @@ func TestOpenTelemetry(t *testing.T) {
 	t.Run("Opentelemetry enabled - check if we are sending traces", func(t *testing.T) {
 		otelCollectorMock := httpCollectorMock(t, func(w http.ResponseWriter, r *http.Request) {
 			//check the body
-			body, err := ioutil.ReadAll(r.Body)
+			body, err := io.ReadAll(r.Body)
 			assert.Nil(t, err)
 
 			assert.NotEmpty(t, body)
