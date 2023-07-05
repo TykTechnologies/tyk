@@ -62,6 +62,7 @@ jobs:
           TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
         run: >
           git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
+          git config --global --add safe.directory /__w/tyk/tyk
 
       - name: Checkout of tyk
         uses: actions/checkout@v2
