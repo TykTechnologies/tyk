@@ -1241,14 +1241,15 @@ func TestURLRewriteCaseSensitivity(t *testing.T) {
 func TestValToStr(t *testing.T) {
 
 	example := []interface{}{
-		"abc",      // string
-		int64(456), // int64
-		12.22,      // float
-		"abc,def",  // string url encode
+		"abc",              // string
+		int64(456),         // int64
+		12.22,              // float
+		float64(123452342), // float64
+		"abc,def",          // string url encode
 	}
 
 	str := valToStr(example)
-	expected := "abc,456,12.22,abc%2Cdef"
+	expected := "abc,456,12.22,123452342,abc%2Cdef"
 
 	if str != expected {
 		t.Errorf("expected (%s) got (%s)", expected, str)
