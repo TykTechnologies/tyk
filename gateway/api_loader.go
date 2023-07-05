@@ -3,7 +3,7 @@ package gateway
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"net/http"
 	"net/url"
 	"path"
@@ -826,7 +826,7 @@ var playgroundTemplate *template.Template
 
 func (gw *Gateway) readGraphqlPlaygroundTemplate() {
 	playgroundPath := filepath.Join(gw.GetConfig().TemplatePath, "playground")
-	files, err := ioutil.ReadDir(playgroundPath)
+	files, err := os.ReadDir(playgroundPath)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "playground",

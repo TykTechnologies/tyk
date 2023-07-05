@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"mime/multipart"
 	"net"
@@ -502,7 +502,7 @@ func TestGRPCDispatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %s", err.Error())
 		}
-		data, err := ioutil.ReadAll(res.Body)
+		data, err := io.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("Couldn't read response body: %s", err.Error())
 		}

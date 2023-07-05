@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -54,7 +53,7 @@ func writeManifestFile(t testing.TB, manifest interface{}, filename string) *str
 		manifestString := manifest.(string)
 		data = []byte(manifestString)
 	}
-	ioutil.WriteFile(filename, data, 0600)
+	os.WriteFile(filename, data, 0600)
 	if err != nil {
 		t.Fatalf("Couldn't write manifest file: %s", err.Error())
 	}
@@ -132,7 +131,7 @@ func TestBuild(t *testing.T) {
 	// Build a simple bundle:
 	t.Run("Simple bundle build", func(t *testing.T) {
 		ctx := &kingpin.ParseContext{}
-		err := ioutil.WriteFile("middleware.py", []byte(""), 0600)
+		err := os.WriteFile("middleware.py", []byte(""), 0600)
 		if err != nil {
 			t.Fatalf("Couldn't write middleware.py: %s", err.Error())
 		}

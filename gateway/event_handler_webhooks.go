@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"html/template"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -244,7 +244,7 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	} else {
 		defer resp.Body.Close()
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			content, err := ioutil.ReadAll(resp.Body)
+			content, err := io.ReadAll(resp.Body)
 			if err == nil {
 				log.WithFields(logrus.Fields{
 					"prefix":       "webhooks",

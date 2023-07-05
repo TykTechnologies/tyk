@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -18,7 +18,7 @@ func TestTraceHttpRequest_toRequest(t *testing.T) {
 	tr := &traceHttpRequest{Path: "", Method: http.MethodPost, Body: body, Headers: header}
 
 	request, err := tr.toRequest(ts.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
-	bodyInBytes, _ := ioutil.ReadAll(request.Body)
+	bodyInBytes, _ := io.ReadAll(request.Body)
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.MethodPost, request.Method)

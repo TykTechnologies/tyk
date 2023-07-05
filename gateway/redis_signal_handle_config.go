@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"syscall"
 	"time"
@@ -28,7 +27,7 @@ func (gw *Gateway) backupConfiguration() error {
 	now := time.Now()
 	asStr := now.Format("Mon-Jan-_2-15-04-05-2006")
 	fName := asStr + ".tyk.conf"
-	return ioutil.WriteFile(fName, oldConfig, 0644)
+	return os.WriteFile(fName, oldConfig, 0644)
 }
 
 func writeNewConfiguration(payload ConfigPayload) error {
@@ -36,7 +35,7 @@ func writeNewConfiguration(payload ConfigPayload) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(confPaths[0], newConfig, 0644)
+	return os.WriteFile(confPaths[0], newConfig, 0644)
 }
 
 func (gw *Gateway) handleNewConfiguration(payload string) {

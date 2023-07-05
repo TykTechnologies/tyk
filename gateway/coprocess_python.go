@@ -5,7 +5,6 @@ package gateway
 
 import (
 	"C"
-	"io/ioutil"
 	"path/filepath"
 	"runtime"
 	"unsafe"
@@ -261,7 +260,7 @@ func PythonSetEnv(pythonPaths ...string) {
 func getBundlePaths(conf config.Config) []string {
 	bundlePath := filepath.Join(conf.MiddlewarePath, "bundles")
 	directories := make([]string, 0)
-	bundles, _ := ioutil.ReadDir(bundlePath)
+	bundles, _ := os.ReadDir(bundlePath)
 	for _, f := range bundles {
 		if f.IsDir() {
 			fullPath := filepath.Join(bundlePath, f.Name())

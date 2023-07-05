@@ -9,7 +9,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -303,7 +302,7 @@ func TestAddCertificate(t *testing.T) {
 
 func TestCertificateStorage(t *testing.T) {
 	m := newManager()
-	dir, _ := ioutil.TempDir("", "certs")
+	dir, _ := os.MkdirTemp("", "certs")
 
 	defer func() {
 		os.RemoveAll(dir)
@@ -311,7 +310,7 @@ func TestCertificateStorage(t *testing.T) {
 
 	certPem, _ := genCertificateFromCommonName("file", false)
 	certPath := filepath.Join(dir, "cert.pem")
-	ioutil.WriteFile(certPath, certPem, 0666)
+	os.WriteFile(certPath, certPem, 0666)
 
 	privateCertPEM, keyCertPEM := genCertificateFromCommonName("private", false)
 	privateCertID, _ := m.Add(append(privateCertPEM, keyCertPEM...), "")

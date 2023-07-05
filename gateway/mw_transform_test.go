@@ -2,7 +2,7 @@ package gateway
 
 import (
 	"encoding/base64"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -47,7 +47,7 @@ func TestTransformNonAscii(t *testing.T) {
 	if err := transformBody(r, tmeta, &transform); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
-	gotBs, err := ioutil.ReadAll(r.Body)
+	gotBs, err := io.ReadAll(r.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 	if err := transformBody(r, tmeta, &transform); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
-	gotBs, err := ioutil.ReadAll(r.Body)
+	gotBs, err := io.ReadAll(r.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 	if err := transformBody(r, tmeta, &transform); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
-	gotBs, err := ioutil.ReadAll(r.Body)
+	gotBs, err := io.ReadAll(r.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +220,7 @@ func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
 	if err := transformBody(r, tmeta, &transform); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
-	gotBs, err := ioutil.ReadAll(r.Body)
+	gotBs, err := io.ReadAll(r.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +266,7 @@ func TestTransformXMLMarshal(t *testing.T) {
 		if err := transformBody(r, tmeta, &transform); err != nil {
 			t.Fatalf("wanted nil error, got %v", err)
 		}
-		gotBs, err := ioutil.ReadAll(r.Body)
+		gotBs, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatal(err)
 		}

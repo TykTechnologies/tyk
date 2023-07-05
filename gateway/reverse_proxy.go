@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -1482,8 +1481,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			*bodyBuffer2 = bodyBuffer
 
 			// Create new ReadClosers so we can split output
-			res.Body = ioutil.NopCloser(&bodyBuffer)
-			inres.Body = ioutil.NopCloser(bodyBuffer2)
+			res.Body = io.NopCloser(&bodyBuffer)
+			inres.Body = io.NopCloser(bodyBuffer2)
 		}
 	}
 
@@ -1687,7 +1686,7 @@ func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.R
 	go spc.copyFromBackend(errc)
 	<-errc
 
-	res.Body = ioutil.NopCloser(strings.NewReader(""))
+	res.Body = io.NopCloser(strings.NewReader(""))
 
 	return nil
 }

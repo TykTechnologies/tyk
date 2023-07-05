@@ -11,7 +11,6 @@ import "C"
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -57,7 +56,7 @@ func FindPythonConfig(customVersion string) (selectedVersion string, err error) 
 		if !strings.HasSuffix(p, "/bin") {
 			continue
 		}
-		files, err := ioutil.ReadDir(p)
+		files, err := os.ReadDir(p)
 		if err != nil {
 			continue
 		}

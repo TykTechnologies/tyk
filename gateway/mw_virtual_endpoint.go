@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -130,7 +129,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Create the proxy object
-	originalBody, err := ioutil.ReadAll(r.Body)
+	originalBody, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
@@ -148,7 +147,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// We need to copy the body _back_ for the decode
-	r.Body = ioutil.NopCloser(bytes.NewReader(originalBody))
+	r.Body = io.NopCloser(bytes.NewReader(originalBody))
 	parseForm(r)
 	requestData.Params = r.Form
 

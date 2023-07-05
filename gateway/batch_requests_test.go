@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -61,7 +61,7 @@ func TestBatch(t *testing.T) {
 
 	resp, _ := ts.Do(test.TestCase{Method: "POST", Path: "/v1/tyk/batch/", Data: testBatchRequest})
 	if resp != nil {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 
 		var batchResponse []map[string]json.RawMessage

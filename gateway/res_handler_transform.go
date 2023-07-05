@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -42,7 +41,7 @@ func respBodyReader(req *http.Request, resp *http.Response) io.ReadCloser {
 		reader, err := gzip.NewReader(resp.Body)
 		if err != nil {
 			log.Error("Body decompression error:", err)
-			return ioutil.NopCloser(bytes.NewReader(nil))
+			return io.NopCloser(bytes.NewReader(nil))
 		}
 
 		// represents unknown length
@@ -97,7 +96,7 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	tmeta := meta.(*TransformSpec)
 
 	respBody := respBodyReader(req, res)
-	body, _ := ioutil.ReadAll(respBody)
+	body, _ := io.ReadAll(respBody)
 	defer respBody.Close()
 
 	// Put into an interface:
@@ -164,7 +163,7 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 
 	res.ContentLength = int64(bodyBuffer.Len())
 	res.Header.Set("Content-Length", strconv.Itoa(bodyBuffer.Len()))
-	res.Body = ioutil.NopCloser(&bodyBuffer)
+	res.Body = io.NopCloser(&bodyBuffer)
 
 	return nil
 }

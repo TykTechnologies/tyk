@@ -6,7 +6,6 @@ import (
 	"errors"
 	"html/template"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
@@ -208,7 +207,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 			rsp := io.MultiWriter(w, &log)
 			tmplExecutor.Execute(rsp, &apiError)
-			response.Body = ioutil.NopCloser(&log)
+			response.Body = io.NopCloser(&log)
 		}
 	}
 

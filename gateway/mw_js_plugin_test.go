@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -185,11 +185,11 @@ leakMid.NewProcessRequest(function(request, session) {
 
 	want := body + " appended"
 
-	newBodyInBytes, _ := ioutil.ReadAll(req.Body)
+	newBodyInBytes, _ := io.ReadAll(req.Body)
 	assert.Equal(t, want, string(newBodyInBytes))
 
 	t.Run("check request body is re-readable", func(t *testing.T) {
-		newBodyInBytes, _ = ioutil.ReadAll(req.Body)
+		newBodyInBytes, _ = io.ReadAll(req.Body)
 		assert.Equal(t, want, string(newBodyInBytes))
 	})
 }
@@ -496,7 +496,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 		MiddlewareClassName: "testJSVMCore",
 		Pre:                 true,
 	}
-	tfile, err := ioutil.TempFile("", "tykjs")
+	tfile, err := os.CreateTemp("", "tykjs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -558,7 +558,7 @@ leakMid.NewProcessRequest(function(request, session) {
 	dynMid.Spec.JSVM = jsvm
 	dynMid.ProcessRequest(nil, req, nil)
 
-	bs, err := ioutil.ReadAll(req.Body)
+	bs, err := io.ReadAll(req.Body)
 	if err != nil {
 		t.Fatalf("failed to read final body: %v", err)
 	}
