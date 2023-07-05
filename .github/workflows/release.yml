@@ -60,7 +60,7 @@ jobs:
       - name: Fix private module deps
         env:
           TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
-        run: >
+        run: |
           git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /__w/tyk/tyk
 
