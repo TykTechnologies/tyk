@@ -1356,6 +1356,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	if createTransport {
 		oldTransport := p.TykAPISpec.HTTPTransport.transport
+		// Prevent new idle connections to be generated.
+		oldTransport.DisableKeepAlives()
 		
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
