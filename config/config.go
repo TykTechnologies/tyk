@@ -637,7 +637,9 @@ type Config struct {
 	HashKeys bool `json:"hash_keys"`
 
 	// DisableKeyActionsByUsername disables key search by username.
-	// Please ensure that dashboard has the same value for seamless functionality.
+	// When this is set to `true` you are able to search for keys only by keyID or key hash (if `hash_keys` is also set to `true`)
+	// Note that if `hash_keys` is also set to `true`, then the keyID will not be provided for APIs secured using basic auth so the only search option would be using key hash
+	// If you are using the Tyk Dashboard, you must configure this setting with the same value in both Gateway and Dashboard
 	DisableKeyActionsByUsername bool `json:"disable_key_actions_by_username"`
 
 	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
