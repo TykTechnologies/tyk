@@ -11,6 +11,7 @@ tasks:
     desc: Generating bindings for Go, Python and Ruby
     cmds:
       - echo "Generating bindings for Go."
+      - export PATH=$PATH:$GOPATH/bin
       - protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false *.proto
       - mv coprocess/* ../
       - rmdir coprocess
