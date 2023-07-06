@@ -1,4 +1,4 @@
-name: API integration Tests
+name: API integration Tests for dashboard
 
 on:
   pull_request:
@@ -44,14 +44,14 @@ jobs:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: |
         echo "branch=master" >> $GITHUB_OUTPUT
-        if [ ! -z "${{ github.head_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.head_ref	}}; then
-          echo "branch=${{ github.head_ref	}}" >> $GITHUB_OUTPUT
+        if [ ! -z "${{ github.head_ref }}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.head_ref  }}; then
+          echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
         fi
-        if [ ! -z "${{ github.base_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.base_ref	}}; then
-          echo "branch=${{ github.base_ref	}}" >> $GITHUB_OUTPUT
+        if [ ! -z "${{ github.base_ref }}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.base_ref  }}; then
+          echo "branch=${{ github.base_ref }}" >> $GITHUB_OUTPUT
         fi
-        if [ ! -z "${{ github.ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.ref }}; then
-          echo "branch=${{ github.ref	}}" >> $GITHUB_OUTPUT
+        if [ ! -z "${{ github.ref  }}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.ref }}; then
+          echo "branch=${{ github.ref  }}" >> $GITHUB_OUTPUT
         fi
 
     - name: Checkout test repository
@@ -60,7 +60,8 @@ jobs:
         repository: TykTechnologies/tyk-automated-tests
         token: ${{ secrets.ORG_GH_TOKEN }}
         path: tyk-automated-tests
-        ref: ${{ steps.check_test_branch.outputs.branch	 }}
+        ref: ${{ steps.check_test_branch.outputs.branch   }}
+
 
     - name: Check if dashboard branch exists
       id: check_dashboard_branch
@@ -68,14 +69,14 @@ jobs:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: |
         echo "branch=master" >> $GITHUB_OUTPUT
-        if [ ! -z "${{ github.head_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.head_ref	}}; then
-          echo "branch=${{ github.head_ref	}}" >> $GITHUB_OUTPUT
+        if [ ! -z "${{ github.head_ref }}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.head_ref  }}; then
+          echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
         fi
-        if [ ! -z "${{ github.base_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.base_ref	}}; then
-          echo "branch=${{ github.base_ref	}}" >> $GITHUB_OUTPUT
+        if [ ! -z "${{ github.base_ref }}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.base_ref  }}; then
+          echo "branch=${{ github.base_ref }}" >> $GITHUB_OUTPUT
         fi
-        if [ ! -z "${{ github.ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.ref }}; then
-          echo "branch=${{ github.ref	}}" >> $GITHUB_OUTPUT
+        if [ ! -z "${{ github.ref  }}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.ref }}; then
+          echo "branch=${{ github.ref  }}" >> $GITHUB_OUTPUT
         fi
 
     - name: Checkout dashboard
@@ -85,7 +86,7 @@ jobs:
         token: ${{ secrets.ORG_GH_TOKEN }}
         submodules: true
         path: tyk-analytics
-        ref: ${{ steps.check_dashboard_branch.outputs.branch	 }}
+        ref: ${{ steps.check_dashboard_branch.outputs.branch }}
 
     - name: start docker compose
       run: docker-compose -f ci/ci_testing_env.yml up -d
@@ -117,7 +118,11 @@ jobs:
       run: |
         while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:3000/hello/)" != "200" ]]; do sleep 60 && echo "waiting for dashboard '$(date +"%T")'"; done
       timeout-minutes: 15    
-    
+
+    - name: Getting tyk logs on failure
+      if: ${{ failure() }}      
+      run: docker logs tyk-gateway      
+
     - name: Test with pytest
       id: test_execution
       env:
@@ -140,16 +145,18 @@ jobs:
          name: api-test-report
          path: ./tyk-automated-tests/reports/
 
+
     - name: Notify slack
       if: ${{ always() }}
       uses: rtCamp/action-slack-notify@v2
       env:
-        SLACK_WEBHOOK: ${{ secrets.GW_SLACK_WEBHOOK }}
+        SLACK_WEBHOOK: ${{ secrets.GW_SLACK_WEBHOOK}}
         SLACK_COLOR: ${{ job.status }}
         SLACK_TITLE: "Result: ${{ steps.test_execution.outcome }}"
         SLACK_USERNAME: API GW test automation
+        SLACK_MESSAGE: ${{ github.event.head_commit.message }}${{ github.event.pull_request.title }}
         SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
-  
+
     - name: Comment on PR
       if: ${{ always() }} && github.event.issue.pull_request
       uses: mshick/add-pr-comment@v1
@@ -177,6 +184,3 @@ jobs:
         CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
         BRANCH: ${{ github.ref }}
 
-    - name: Getting gateway logs on failure
-      if: ${{ failure() }}
-      run: docker logs tyk-gateway
