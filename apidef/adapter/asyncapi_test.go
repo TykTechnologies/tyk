@@ -317,11 +317,15 @@ const expectedGraphqlConfig = `{
                     }
                 }
             }
-        ]
+        ],
+        "global_headers": null
     },
     "proxy": {
         "auth_headers": {},
-        "request_headers": null
+        "request_headers": null,
+        "use_response_extensions": {
+            "on_error_forwarding": false
+        }
     },
     "subgraph": {
         "sdl": ""

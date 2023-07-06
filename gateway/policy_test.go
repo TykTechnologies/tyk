@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -118,6 +119,11 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			AccessRights: map[string]user.AccessDefinition{"b": {}},
 			Partitions:   user.PolicyPartitions{Quota: true},
 		},
+		"quota5": {
+			QuotaMax:     4,
+			Partitions:   user.PolicyPartitions{Quota: true},
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
+		},
 		"unlimited-rate": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
@@ -136,6 +142,16 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			Rate:       4,
 			Per:        4,
 		},
+		"rate4": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Rate:         8,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+		},
+		"rate5": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Rate:         10,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+		},
 		"rate-for-a": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
@@ -150,6 +166,10 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
 			Rate:         4,
+		},
+		"rate-no-partition": {
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+			Rate:         12,
 		},
 		"acl1": {
 			Partitions:   user.PolicyPartitions{Acl: true},
@@ -413,7 +433,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		},
 		{
 			name:     "MultiNonPart",
-			policies: []string{"nonpart1", "nonpart2"},
+			policies: []string{"nonpart1", "nonpart2", "nonexistent"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
 					"a": {
@@ -511,6 +531,12 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			}, nil,
 		},
 		{
+			"QuotaParts with acl", []string{"quota5", "quota4"},
+			"", func(t *testing.T, s *user.SessionState) {
+				assert.Equal(t, int64(4), s.QuotaMax)
+			}, nil,
+		},
+		{
 			"QuotaPart with access rights", []string{"quota3"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != 3 {
@@ -553,6 +579,24 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					t.Fatalf("Should pick bigger value")
 				}
 			}, nil,
+		},
+		{
+			"RateParts with acl", []string{"rate5", "rate4"},
+			"", func(t *testing.T, s *user.SessionState) {
+				assert.Equal(t, float64(10), s.Rate)
+			}, nil,
+		},
+		{
+			"RateParts with acl respected by session", []string{"rate4", "rate5"},
+			"", func(t *testing.T, s *user.SessionState) {
+				assert.Equal(t, float64(10), s.Rate)
+			}, &user.SessionState{Rate: 20},
+		},
+		{
+			"Rate with no partition respected by session", []string{"rate-no-partition"},
+			"", func(t *testing.T, s *user.SessionState) {
+				assert.Equal(t, float64(12), s.Rate)
+			}, &user.SessionState{Rate: 20},
 		},
 		{
 			"ComplexityPart with unlimited", []string{"unlimitedComplexity"},
@@ -1550,4 +1594,74 @@ func TestParsePoliciesFromRPC(t *testing.T) {
 		})
 	}
 
+}
+
+type RPCDataLoaderMock struct {
+	ShouldConnect bool
+	Policies      []user.Policy
+	Apis          []nestedApiDefinition
+}
+
+func (s *RPCDataLoaderMock) Connect() bool {
+	return s.ShouldConnect
+}
+
+func (s *RPCDataLoaderMock) GetApiDefinitions(orgId string, tags []string) string {
+	apiList, err := json.Marshal(s.Apis)
+	if err != nil {
+		return ""
+	}
+	return string(apiList)
+}
+func (s *RPCDataLoaderMock) GetPolicies(orgId string) string {
+	policyList, err := json.Marshal(s.Policies)
+	if err != nil {
+		return ""
+	}
+	return string(policyList)
+}
+
+func Test_LoadPoliciesFromRPC(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	objectID := model.NewObjectID()
+
+	t.Run("load policies from RPC - success", func(t *testing.T) {
+		mockedStorage := &RPCDataLoaderMock{
+			ShouldConnect: true,
+			Policies: []user.Policy{
+				{MID: objectID, ID: "", OrgID: "org1"},
+			},
+		}
+
+		polMap, err := ts.Gw.LoadPoliciesFromRPC(mockedStorage, "org1", true)
+
+		assert.NoError(t, err, "error loading policies from RPC:", err)
+		assert.Equal(t, 1, len(polMap), "expected 0 policies to be loaded from RPC")
+	})
+
+	t.Run("load policies from RPC - success - then fail", func(t *testing.T) {
+		mockedStorage := &RPCDataLoaderMock{
+			ShouldConnect: true,
+			Policies: []user.Policy{
+				{MID: objectID, ID: "", OrgID: "org1"},
+			},
+		}
+		// we load the Policies from RPC successfully - it should store the Policies in the backup
+		polMap, err := ts.Gw.LoadPoliciesFromRPC(mockedStorage, "org1", true)
+
+		assert.NoError(t, err, "error loading policies from RPC:", err)
+		assert.Equal(t, 1, len(polMap), "expected 0 policies to be loaded from RPC")
+
+		// we now simulate a failure to connect to RPC
+		mockedStorage.ShouldConnect = false
+		rpc.SetEmergencyMode(t, true)
+		defer rpc.ResetEmergencyMode()
+
+		// we now try to load the Policies again, and expect it to load the Policies from the backup
+		polMap, err = ts.Gw.LoadPoliciesFromRPC(mockedStorage, "org1", true)
+
+		assert.NoError(t, err, "error loading policies from RPC:", err)
+		assert.Equal(t, 1, len(polMap), "expected 0 policies to be loaded from RPC")
+	})
 }

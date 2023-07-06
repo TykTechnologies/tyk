@@ -748,10 +748,15 @@ const (
 	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
 )
 
+type GraphQLResponseExtensions struct {
+	OnErrorForwarding bool `bson:"on_error_forwarding" json:"on_error_forwarding"`
+}
+
 type GraphQLProxyConfig struct {
-	AuthHeaders      map[string]string `bson:"auth_headers" json:"auth_headers"`
-	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
-	RequestHeaders   map[string]string `bson:"request_headers" json:"request_headers"`
+	AuthHeaders           map[string]string         `bson:"auth_headers" json:"auth_headers"`
+	SubscriptionType      SubscriptionType          `bson:"subscription_type" json:"subscription_type,omitempty"`
+	RequestHeaders        map[string]string         `bson:"request_headers" json:"request_headers"`
+	UseResponseExtensions GraphQLResponseExtensions `bson:"use_response_extensions" json:"use_response_extensions"`
 }
 
 type GraphQLSubgraphConfig struct {
@@ -777,8 +782,14 @@ type GraphQLSubgraphEntity struct {
 }
 
 type GraphQLEngineConfig struct {
-	FieldConfigs []GraphQLFieldConfig      `bson:"field_configs" json:"field_configs"`
-	DataSources  []GraphQLEngineDataSource `bson:"data_sources" json:"data_sources"`
+	FieldConfigs  []GraphQLFieldConfig      `bson:"field_configs" json:"field_configs"`
+	DataSources   []GraphQLEngineDataSource `bson:"data_sources" json:"data_sources"`
+	GlobalHeaders []UDGGlobalHeader         `bson:"global_headers" json:"global_headers"`
+}
+
+type UDGGlobalHeader struct {
+	Key   string `bson:"key" json:"key"`
+	Value string `bson:"value" json:"value"`
 }
 
 type GraphQLFieldConfig struct {

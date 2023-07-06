@@ -163,7 +163,15 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 			Headers: make(map[string]string, len(res.Header)),
 		}
 		for k, v := range res.Header {
+			// set univalue header
 			resObj.Headers[k] = v[0]
+
+			// set multivalue header
+			currentHeader := coprocess.Header{
+				Key:    k,
+				Values: v,
+			}
+			resObj.MultivalueHeaders = append(resObj.MultivalueHeaders, &currentHeader)
 		}
 		resObj.StatusCode = int32(res.StatusCode)
 		rawBody, err := ioutil.ReadAll(res.Body)
@@ -568,10 +576,17 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	for k := range res.Header {
 		delete(res.Header, k)
 	}
+
+	// check if we have changes in headers
+	if !areMapsEqual(object.Response.Headers, retObject.Response.Headers) {
+		// as we have changes we need to synchronize them
+		retObject.Response.MultivalueHeaders = syncHeadersAndMultiValueHeaders(retObject.Response.Headers, retObject.Response.MultivalueHeaders)
+	}
+
 	// Set headers:
 	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
-	for k, v := range retObject.Response.Headers {
-		setCustomHeader(res.Header, k, v, ignoreCanonical)
+	for _, v := range retObject.Response.MultivalueHeaders {
+		setCustomHeaderMultipleValues(res.Header, v.Key, v.Values, ignoreCanonical)
 	}
 
 	// Set response body:
@@ -580,6 +595,41 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 
 	res.StatusCode = int(retObject.Response.StatusCode)
 	return nil
+}
+
+// syncHeadersAndMultiValueHeaders synchronizes the content of 'headers' and 'multiValueHeaders'.
+// If a key is updated or added in 'headers', the corresponding key in 'multiValueHeaders' is also updated or added.
+// If a key is removed from 'headers', the corresponding key in 'multiValueHeaders' is also removed.
+func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeaders []*coprocess.Header) []*coprocess.Header {
+	updatedMultiValueHeaders := []*coprocess.Header{}
+
+	for k, v := range headers {
+		found := false
+		for _, header := range multiValueHeaders {
+			if header.Key == k {
+				found = true
+				header.Values = []string{v}
+				break
+			}
+		}
+
+		if !found {
+			newHeader := &coprocess.Header{
+				Key:    k,
+				Values: []string{v},
+			}
+			updatedMultiValueHeaders = append(updatedMultiValueHeaders, newHeader)
+		}
+	}
+
+	// Append any existing headers that are still in the headers map
+	for _, header := range multiValueHeaders {
+		if _, ok := headers[header.Key]; ok {
+			updatedMultiValueHeaders = append(updatedMultiValueHeaders, header)
+		}
+	}
+
+	return updatedMultiValueHeaders
 }
 
 func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {

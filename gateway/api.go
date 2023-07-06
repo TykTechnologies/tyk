@@ -516,7 +516,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	}
 
 	// Update our session object (create it)
-	if newSession.BasicAuthData.Password != "" {
+	if newSession.IsBasicAuth() {
 		// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
 		// Only if it's NEW
 		switch r.Method {
@@ -532,7 +532,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 				gw.setBasicAuthSessionPassword(newSession)
 			}
 		}
-	} else if originalKey.BasicAuthData.Password != "" {
+	} else if originalKey.IsBasicAuth() {
 		// preserve basic auth data
 		newSession.BasicAuthData.Hash = originalKey.BasicAuthData.Hash
 		newSession.BasicAuthData.Password = originalKey.BasicAuthData.Password
@@ -579,6 +579,10 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 
 	// add key hash for newly created key
 	if gw.GetConfig().HashKeys && r.Method == http.MethodPost {
+		if newSession.IsBasicAuth() {
+			response.Key = ""
+		}
+
 		if isHashed {
 			response.KeyHash = keyName
 		} else {
@@ -674,10 +678,11 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 	}
 
 	// If it's a basic auth key and a valid Base64 string, use it as the key ID:
-	if session.BasicAuthData.Password != "" {
+	if session.IsBasicAuth() {
 		if storage.TokenOrg(sessionKey) != "" {
 			session.KeyID = sessionKey
 		}
+		session.BasicAuthData.Password = ""
 	}
 
 	log.WithFields(logrus.Fields{
@@ -776,7 +781,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    keyName,
+			"key":    gw.obfuscateKey(keyName),
 			"status": "ok",
 		}).Info("Deleted key across all APIs.")
 
@@ -806,7 +811,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"key":    keyName,
+		"key":    gw.obfuscateKey(keyName),
 		"status": "ok",
 	}).Info("Deleted key.")
 
@@ -827,7 +832,7 @@ func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, r
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"key":    keyName,
+		"key":    gw.obfuscateKey(keyName),
 		"status": "ok",
 	}).Info("Deleted hashed key across all APIs.")
 
@@ -1593,13 +1598,14 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// check if passed key is user name and convert it to real key with respect to current hashing algorithm
 	origKeyName := keyName
-	if r.Method != http.MethodPost && isUserName {
+	gwConfig := gw.GetConfig()
+
+	if r.Method != http.MethodPost && isUserName && !gwConfig.DisableKeyActionsByUsername {
 		keyName = gw.generateToken(orgID, keyName)
 	}
 
 	var obj interface{}
 	var code int
-	gwConfig := gw.GetConfig()
 	hashKeyFunction := gwConfig.HashKeyFunction
 
 	switch r.Method {

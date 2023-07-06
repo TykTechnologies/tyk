@@ -14,6 +14,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 )
@@ -63,6 +64,8 @@ const (
 
 	DefaultDashPolicySource     = "service"
 	DefaultDashPolicyRecordName = "tyk_policies"
+
+	DefaultOTelResourceName = "tyk-gateway"
 )
 
 type PoliciesConfig struct {
@@ -92,6 +95,9 @@ type PoliciesConfig struct {
 type DBAppConfOptionsConfig struct {
 	// Set the URL to your Dashboard instance (or a load balanced instance). The URL needs to be formatted as: `http://dashboard_host:port`
 	ConnectionString string `json:"connection_string"`
+
+	// Set a timeout value, in seconds, for your Dashboard connection. Default value is 30.
+	ConnectionTimeout int `json:"connection_timeout"`
 
 	// Set to `true` to enable filtering (sharding) of APIs.
 	NodeIsSegmented bool `json:"node_is_segmented"`
@@ -312,7 +318,7 @@ type SlaveOptionsConfig struct {
 	// The maximum time in seconds that a RPC ping can last.
 	PingTimeout int `json:"ping_timeout"`
 
-	// The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed.
+	// The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed. Defaults to 5.
 	RPCPoolSize int `json:"rpc_pool_size"`
 
 	// You can use this to set a period for which the Gateway will check if there are changes in keys that must be synchronized. If this value is not set then it will default to 10 seconds.
@@ -410,7 +416,18 @@ type HttpServerOptionsConfig struct {
 	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
 	Ciphers []string `json:"ssl_ciphers"`
 
-	// Maximum accepted request body size in bytes.
+	// MaxRequestBodySize configures a maximum size limit for request body size (in bytes) for all APIs on the Gateway.
+	//
+	// Tyk Gateway will evaluate all API requests against this size limit and will respond with HTTP 413 status code if the body of the request is larger.
+	//
+	// Two methods are used to perform the comparison:
+	//  - If the API Request contains the `Content-Length` header, this is directly compared against `MaxRequestBodySize`.
+	//  - If the `Content-Length` header is not provided, the Request body is read in chunks to compare total size against `MaxRequestBodySize`.
+	//
+	// A value of zero (default) means that no maximum is set and API requests will not be tested.
+	//
+	// See more information about setting request size limits here:
+	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
 }
 
@@ -618,6 +635,9 @@ type Config struct {
 
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
+
+	// DisableKeyActionsByUsername disables key search by username.
+	DisableKeyActionsByUsername bool `json:"disable_key_actions_by_username"`
 
 	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
 	HashKeyFunction string `json:"hash_key_function"`
@@ -919,6 +939,9 @@ type Config struct {
 
 	// Section for configuring OpenTracing support
 	Tracer Tracer `json:"tracing"`
+
+	// Section for configuring Opentelemetry
+	OpenTelemetry otel.Config `json:"opentelemetry"`
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 

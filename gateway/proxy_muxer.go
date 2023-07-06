@@ -20,6 +20,7 @@ import (
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/tcp"
 
 	"github.com/gorilla/mux"
@@ -29,7 +30,9 @@ import (
 
 // handleWrapper's only purpose is to allow router to be dynamically replaced
 type handleWrapper struct {
-	router             *mux.Router
+	router http.Handler // *mux.Router
+
+	maxContentLength   int64
 	maxRequestBodySize int64
 }
 
@@ -43,21 +46,55 @@ func (h *h2cWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.h.ServeHTTP(w, r)
 }
 
-func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// limit request body size if configured
+func (h *handleWrapper) handleRequestLimits(w http.ResponseWriter, r *http.Request) (ok bool) {
+	// Limit request body size
 	if h.maxRequestBodySize > 0 {
-		// if content length is set and already larger than the configured limit return a status 413
-		if r.ContentLength >= 0 && r.ContentLength > h.maxRequestBodySize {
-			http.HandlerFunc(requestEntityTooLarge).ServeHTTP(w, r)
-			return
+		// if Content-Length is larger than the configured limit return a status 413
+		if r.ContentLength > 0 && r.ContentLength > h.maxRequestBodySize {
+			httputil.EntityTooLarge(w, r)
+			return false
 		}
 
 		// in case the content length is wrong or not set limit the reader itself
 		r.Body = http.MaxBytesReader(w, r.Body, h.maxRequestBodySize)
 	}
 
-	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
-	nopCloseRequestBody(r)
+	return true
+}
+
+func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Body != nil {
+		if !h.handleRequestLimits(w, r) {
+			return
+		}
+	}
+
+	if h.maxRequestBodySize > 0 {
+		// this greedily reads in the request body and
+		// make request body to be nopCloser and re-readable
+		// before serve it through chain of middlewares
+		if err := nopCloseRequestBodyErr(r); err != nil {
+			if err.Error() == "http: request body too large" {
+				httputil.EntityTooLarge(w, r)
+				return
+			}
+
+			httputil.InternalServerError(w, r)
+			return
+		}
+	} else {
+		// this leaves the body on lazy read as before
+		if _, err := copyRequest(r); err != nil {
+			log.WithError(err).Error("Error reading request body")
+			httputil.InternalServerError(w, r)
+		}
+	}
+
+	// Test don't provide a router
+	if h.router == nil {
+		return
+	}
+
 	if NewRelicApplication != nil {
 		txn := NewRelicApplication.StartTransaction(r.URL.Path, w, r)
 		defer txn.End()
@@ -205,7 +242,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, gw *Gate
 	if p := m.getProxy(spec.ListenPort, conf); p != nil {
 		p.tcpProxy.AddDomainHandler(hostname, spec.Proxy.TargetURL, modifier)
 	} else {
-		tlsConfig := tlsClientConfig(spec)
+		tlsConfig := tlsClientConfig(spec, gw)
 
 		p = &proxy{
 			port:             spec.ListenPort,
@@ -381,7 +418,6 @@ func (m *proxyMux) swap(new *proxyMux, gw *Gateway) {
 }
 
 func (m *proxyMux) serve(gw *Gateway) {
-
 	conf := gw.GetConfig()
 	for _, p := range m.proxies {
 		if p.listener == nil {
@@ -415,16 +451,17 @@ func (m *proxyMux) serve(gw *Gateway) {
 			if conf.HttpServerOptions.WriteTimeout > 0 {
 				writeTimeout = time.Duration(conf.HttpServerOptions.WriteTimeout) * time.Second
 			}
-			var h http.Handler
-			h = &handleWrapper{
+
+			h := &handleWrapper{
 				router:             p.router,
 				maxRequestBodySize: conf.HttpServerOptions.MaxRequestBodySize,
 			}
+
 			// by default enabling h2c by wrapping handler in h2c. This ensures all features including tracing work
 			// in h2c services.
 			h2s := &http2.Server{}
-			h = &h2cWrapper{
-				w: h.(*handleWrapper),
+			handler := &h2cWrapper{
+				w: h,
 				h: h2c.NewHandler(h, h2s),
 			}
 
@@ -433,7 +470,7 @@ func (m *proxyMux) serve(gw *Gateway) {
 				Addr:         addr,
 				ReadTimeout:  readTimeout,
 				WriteTimeout: writeTimeout,
-				Handler:      h,
+				Handler:      handler,
 			}
 
 			if conf.CloseConnections {
@@ -508,9 +545,4 @@ func (m *proxyMux) generateListener(listenPort int, protocol string, gw *Gateway
 		return nil, err
 	}
 	return l, nil
-}
-
-func requestEntityTooLarge(w http.ResponseWriter, _ *http.Request) {
-	status := http.StatusRequestEntityTooLarge
-	http.Error(w, http.StatusText(status), status)
 }

@@ -206,7 +206,7 @@ func TestOAS_RegexPaths(t *testing.T) {
 		_ = oas.getOperationID(tc.input, "GET")
 
 		pathKeys := make([]string, 0, len(oas.Paths))
-		for k, _ := range oas.Paths {
+		for k := range oas.Paths {
 			pathKeys = append(pathKeys, k)
 		}
 

@@ -545,14 +545,9 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, error) {
+func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gateway) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
 		return gw.LoadDefinitionsFromRPCBackup()
-	}
-
-	store := RPCStorageHandler{
-		DoReload: gw.DoReload,
-		Gw:       a.Gw,
 	}
 
 	if !store.Connect() {
@@ -1802,4 +1797,13 @@ func (s *APISpec) hasVirtualEndpoint() bool {
 	}
 
 	return false
+}
+
+// isListeningOnPort checks whether the API listens on the given port.
+func (s *APISpec) isListeningOnPort(port int, gwConfig *config.Config) bool {
+	if s.ListenPort == 0 {
+		return gwConfig.ListenPort == port
+	}
+
+	return s.ListenPort == port
 }

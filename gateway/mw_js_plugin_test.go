@@ -27,6 +27,80 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
+func TestJSVM_StopProxyWhenFail(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const apiID = "my-api-id"
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.APIID = apiID
+		spec.Proxy.ListenPath = "/"
+		spec.CustomMiddleware.Driver = apidef.OttoDriver
+		spec.CustomMiddleware.Pre = []apidef.MiddlewareDefinition{
+			{
+				Name: "nonExistingMiddleware",
+				Path: "non-existing.js",
+			},
+		}
+	})[0]
+
+	t.Run("not loaded", func(t *testing.T) {
+		ts.Gw.LoadAPI(api)
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/get", Code: http.StatusInternalServerError, BodyMatch: http.StatusText(http.StatusInternalServerError),
+		})
+	})
+
+	t.Run("failed to decode returned data", func(t *testing.T) {
+		var malformedDataJS = `
+var malformedDataMiddleware = new TykJS.TykMiddleware.NewMiddleware({});
+malformedDataMiddleware.NewProcessRequest(function(request, session) {
+	return {Request:request, Session:"malformed"}
+});`
+
+		ts.RegisterJSFileMiddleware(apiID, map[string]string{
+			"malformedData.js": malformedDataJS,
+		})
+
+		api.CustomMiddleware.Pre[0].Name = "malformedDataMiddleware"
+		api.CustomMiddleware.Pre[0].Path = ts.Gw.GetConfig().MiddlewarePath + "/my-api-id/malformedData.js"
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/get", Code: http.StatusInternalServerError, BodyMatch: http.StatusText(http.StatusInternalServerError),
+		})
+	})
+
+	t.Run("middleware timed out", func(t *testing.T) {
+		var timeoutJS = `
+var timeoutMiddleware = new TykJS.TykMiddleware.NewMiddleware({});
+timeoutMiddleware.NewProcessRequest(function(request, session) {
+		while(true) {}  // infinite loop to timeout
+	return timeoutMiddleware.ReturnData(request, {})
+});`
+
+		ts.RegisterJSFileMiddleware(apiID, map[string]string{
+			"timeout.js": timeoutJS,
+		})
+
+		// set timeout to a small value
+		gwConfig := ts.Gw.GetConfig()
+		gwConfig.JSVMTimeout = 1
+		ts.Gw.SetConfig(gwConfig)
+		ts.Gw.GlobalEventsJSVM.DeInit()
+		ts.Gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), ts.Gw)
+
+		api.CustomMiddleware.Pre[0].Name = "timeoutMiddleware"
+		api.CustomMiddleware.Pre[0].Path = ts.Gw.GetConfig().MiddlewarePath + "/my-api-id/timeout.js"
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/get", Code: http.StatusInternalServerError, BodyMatch: http.StatusText(http.StatusInternalServerError),
+		})
+	})
+}
+
 func TestJSVMLogs(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

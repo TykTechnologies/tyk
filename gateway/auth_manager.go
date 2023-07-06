@@ -34,6 +34,13 @@ type DefaultSessionManager struct {
 	Gw    *Gateway `json:"-"`
 }
 
+func (b *DefaultSessionManager) ResetQuotaObfuscateKey(keyName string) string {
+	if !b.Gw.GetConfig().HashKeys && !b.Gw.GetConfig().EnableKeyLogging {
+		return b.Gw.obfuscateKey(keyName)
+	}
+	return keyName
+}
+
 func (b *DefaultSessionManager) Init(store storage.Handler) {
 	b.store = store
 	b.store.Connect()
@@ -53,6 +60,7 @@ func (b *DefaultSessionManager) Store() storage.Handler {
 
 func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState, isHashed bool) {
 	origKeyName := keyName
+
 	if !isHashed {
 		keyName = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
 	}
@@ -61,7 +69,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	log.WithFields(logrus.Fields{
 		"prefix":      "auth-mgr",
 		"inbound-key": b.Gw.obfuscateKey(origKeyName),
-		"key":         rawKey,
+		"key":         b.ResetQuotaObfuscateKey(keyName),
 	}).Info("Reset quota for key.")
 
 	rateLimiterSentinelKey := RateLimitKeyPrefix + keyName + ".BLOCKED"
@@ -82,7 +90,6 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 	if !hashed {
 		cacheKey = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
 	}
-
 	// Delete gateway's cache immediately
 	b.Gw.SessionCache.Delete(cacheKey)
 
@@ -143,9 +150,15 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	} else {
 		if storage.TokenOrg(keyName) != orgID {
 			// try to get legacy and new format key at once
-			toSearchList := []string{b.Gw.generateToken(orgID, keyName), keyName}
+			toSearchList := []string{keyName}
+			if !b.Gw.GetConfig().DisableKeyActionsByUsername {
+				toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName))
+			}
+
 			for _, fallback := range b.Gw.GetConfig().HashKeyFunctionFallback {
-				toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName, fallback))
+				if !b.Gw.GetConfig().DisableKeyActionsByUsername {
+					toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName, fallback))
+				}
 			}
 
 			var jsonKeyValList []string

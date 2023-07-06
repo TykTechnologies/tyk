@@ -12,13 +12,26 @@ terraform {
   required_providers {
     github = {
       source  = "integrations/github"
-      version = "5.16.0"
     }
   }
 }
 
 provider "github" {
   owner = "TykTechnologies"
+}
+
+# Copypasta from modules/github-repos/variables.tf
+# FIXME: Unmodularise the github-repos module
+variable "historical_branches" {
+  type = list(object({
+    branch         = string           # Name of the branch
+    source_branch  = optional(string) # Source of the branch, needed when creating it
+    reviewers      = number           # Min number of reviews needed
+    required_tests = list(string)     # Workflows that need to pass before merging
+    convos         = bool             # Should conversations be resolved before merging
+
+  }))
+  description = "List of branches managed by terraform"
 }
 
 module "tyk" {
@@ -32,70 +45,45 @@ module "tyk" {
   vulnerability_alerts        = true
   squash_merge_commit_message = "PR_BODY"
   squash_merge_commit_title   = "PR_TITLE"
-  release_branches     = [
+  release_branches     = concat(var.historical_branches,[
 { branch    = "master",
 	reviewers = "1",
 	convos    = "false",
 	required_tests = ["Go 1.19.x Redis 5","1.19-bullseye"]},
-{ branch    = "release-4.0.10",
+{ branch    = "release-4-lts",
+	reviewers = "0",
+	convos    = "false",
+	source_branch  = "master",
+	required_tests = ["Go 1.15 Redis 6"]},
+{ branch    = "release-4.0.14",
 	reviewers = "0",
 	convos    = "false",
 	source_branch  = "release-4-lts",
-	required_tests = ["Go 1.15 Redis 5","1.15","1.15-el7"]},
-{ branch    = "release-4.0.11",
-	reviewers = "0",
-	convos    = "false",
-	source_branch  = "release-4-lts",
-	required_tests = ["Go 1.15 Redis 5","1.15","1.15-el7"]},
-{ branch    = "release-4.0.12",
-	reviewers = "0",
-	convos    = "false",
-	source_branch  = "release-4-lts",
-	required_tests = ["Go 1.15 Redis 5","1.15","1.15-el7"]},
-{ branch    = "release-4.0.13",
-	reviewers = "0",
-	convos    = "false",
-	source_branch  = "release-4-lts",
-	required_tests = ["Go 1.15 Redis 5","1.15","1.15-el7"]},
-{ branch    = "release-4.3",
-	reviewers = "0",
-	convos    = "false",
-	source_branch  = "release-4",
-	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
-{ branch    = "release-4.3.0",
-	reviewers = "0",
-	convos    = "false",
-	source_branch  = "release-4",
-	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
-{ branch    = "release-4.3.1",
-	reviewers = "0",
-	convos    = "false",
-	source_branch  = "release-4.3",
-	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
-{ branch    = "release-4.3.2",
-	reviewers = "0",
-	convos    = "false",
-	source_branch  = "release-4.3",
-	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
-{ branch    = "release-4.3.3",
-	reviewers = "0",
-	convos    = "false",
-	source_branch  = "release-4.3",
-	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
+	required_tests = ["Go 1.15 Redis 6"]},
 { branch    = "release-5-lts",
 	reviewers = "0",
 	convos    = "false",
 	source_branch  = "master",
 	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
-{ branch    = "release-5.0",
-	reviewers = "0",
-	convos    = "false",
-	source_branch  = "master",
-	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
-{ branch    = "release-5.0.1",
+{ branch    = "release-5.0.3",
 	reviewers = "0",
 	convos    = "false",
 	source_branch  = "release-5-lts",
 	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
-]
+{ branch    = "release-5.0.2",
+	reviewers = "0",
+	convos    = "false",
+	source_branch  = "release-5.0.1",
+	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
+{ branch    = "release-5.1",
+	reviewers = "0",
+	convos    = "false",
+	source_branch  = "master",
+	required_tests = ["Go 1.19.x Redis 5","1.19-bullseye"]},
+{ branch    = "release-5.1.0",
+	reviewers = "0",
+	convos    = "false",
+	source_branch  = "release-5.1",
+	required_tests = ["Go 1.19.x Redis 5","1.19-bullseye"]},
+])
 }

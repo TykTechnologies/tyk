@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -64,6 +65,22 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		defer span.Finish()
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
+	} else if baseMw := tr.Base(); baseMw != nil {
+		if cfg := baseMw.Gw.GetConfig(); cfg.OpenTelemetry.Enabled {
+			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
+			defer span.End()
+
+			setContext(r, ctx)
+
+			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
+			if err != nil {
+				span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
+			} else {
+				span.SetStatus(otel.SPAN_STATUS_OK, "")
+			}
+
+			return err, i
+		}
 	}
 
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
@@ -301,6 +318,38 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	return true
 }
 
+// clearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
+// Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
+func (t BaseMiddleware) clearSession(session *user.SessionState) {
+	policies := session.PolicyIDs()
+	for _, polID := range policies {
+		t.Gw.policiesMu.RLock()
+		policy, ok := t.Gw.policiesByID[polID]
+		t.Gw.policiesMu.RUnlock()
+		if !ok {
+			continue
+		}
+
+		all := !(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity)
+
+		if policy.Partitions.Quota || all {
+			session.QuotaMax = 0
+			session.QuotaRemaining = 0
+		}
+
+		if policy.Partitions.RateLimit || all {
+			session.Rate = 0
+			session.Per = 0
+			session.ThrottleRetryLimit = 0
+			session.ThrottleInterval = 0
+		}
+
+		if policy.Partitions.Complexity || all {
+			session.MaxQueryDepth = 0
+		}
+	}
+}
+
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
@@ -309,6 +358,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	if session.MetaData == nil {
 		session.MetaData = make(map[string]interface{})
 	}
+
+	t.clearSession(session)
 
 	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
@@ -320,6 +371,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
+			if len(policies) > 1 {
+				continue
+			}
+
 			return err
 		}
 		// Check ownership, policy org owner must be the same as API,
@@ -463,8 +518,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 
 						ar.Limit.QuotaMax = policy.QuotaMax
-						//if partition for quota is set the we must use this value in the global information of the key
-						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) || policy.Partitions.Quota {
+						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) {
 							session.QuotaMax = policy.QuotaMax
 						}
 					}
@@ -482,8 +536,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					if greaterThanFloat64(policy.Rate, ar.Limit.Rate) {
 						ar.Limit.Rate = policy.Rate
-						//if policy.Partitions.RateLimit then we must set this value in the global data of the key
-						if greaterThanFloat64(policy.Rate, session.Rate) || policy.Partitions.RateLimit {
+						if greaterThanFloat64(policy.Rate, session.Rate) {
 							session.Rate = policy.Rate
 						}
 					}

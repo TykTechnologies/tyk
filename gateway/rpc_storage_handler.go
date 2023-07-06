@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -85,6 +86,9 @@ var (
 		"Ping": func() bool {
 			return false
 		},
+		"Disconnect": func(clientAddr string, groupData *apidef.GroupLoginRequest) error {
+			return nil
+		},
 	}
 )
 
@@ -108,6 +112,12 @@ type RPCStorageHandler struct {
 	SuppressRegister bool
 	DoReload         func()
 	Gw               *Gateway `json:"-"`
+}
+
+type RPCDataLoader interface {
+	Connect() bool
+	GetApiDefinitions(orgId string, tags []string) string
+	GetPolicies(orgId string) string
 }
 
 // Connect will establish a connection to the RPC
@@ -140,15 +150,52 @@ func (r *RPCStorageHandler) Connect() bool {
 	)
 }
 
+func (r *RPCStorageHandler) buildNodeInfo() []byte {
+	config := r.Gw.GetConfig()
+	node := apidef.NodeData{
+		NodeID:      r.Gw.GetNodeID(),
+		GroupID:     config.SlaveOptions.GroupID,
+		APIKey:      config.SlaveOptions.APIKey,
+		NodeVersion: VERSION,
+		TTL:         int64(config.LivenessCheck.CheckDuration),
+		Tags:        config.DBAppConfOptions.Tags,
+		Health:      r.Gw.getHealthCheckInfo(),
+		Stats: apidef.GWStats{
+			APIsCount:     r.Gw.apisByIDLen(),
+			PoliciesCount: r.Gw.policiesByIDLen(),
+		},
+	}
+
+	data, err := json.Marshal(node)
+	if err != nil {
+		log.Error("Error marshalling node info", err)
+		return nil
+	}
+
+	return data
+}
+
+func (r *RPCStorageHandler) Disconnect() error {
+	request := apidef.GroupLoginRequest{
+		UserKey: r.Gw.GetConfig().SlaveOptions.APIKey,
+		GroupID: r.Gw.GetConfig().SlaveOptions.GroupID,
+		Node:    r.buildNodeInfo(),
+	}
+
+	_, err := rpc.FuncClientSingleton("Disconnect", request)
+	return err
+}
+
 func (r *RPCStorageHandler) getGroupLoginCallback(synchroniserEnabled bool) func(userKey string, groupID string) interface{} {
 	groupLoginCallbackFn := func(userKey string, groupID string) interface{} {
 		return apidef.GroupLoginRequest{
 			UserKey: userKey,
 			GroupID: groupID,
+			Node:    r.buildNodeInfo(),
 		}
 	}
 	if synchroniserEnabled {
-		forcer := rpc.NewSyncForcer(r.Gw.RedisController)
+		forcer := rpc.NewSyncForcer(r.Gw.RedisController, r.buildNodeInfo())
 		groupLoginCallbackFn = forcer.GroupLoginCallback
 	}
 	return groupLoginCallbackFn
@@ -165,7 +212,7 @@ func (r *RPCStorageHandler) hashKey(in string) string {
 func (r *RPCStorageHandler) fixKey(keyName string) string {
 	setKeyName := r.KeyPrefix + r.hashKey(keyName)
 
-	log.Debug("Input key was: ", setKeyName)
+	log.Debug("Input key was: ", r.Gw.obfuscateKey(setKeyName))
 
 	return setKeyName
 }
@@ -447,8 +494,8 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 // DeleteKey will remove a key from the database
 func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
-	log.Debug("DEL Key was: ", keyName)
-	log.Debug("DEL Key became: ", r.fixKey(keyName))
+	log.Debug("DEL Key was: ", r.Gw.obfuscateKey(keyName))
+	log.Debug("DEL Key became: ", r.Gw.obfuscateKey(r.fixKey(keyName)))
 	ok, err := rpc.FuncClientSingleton("DeleteKey", r.fixKey(keyName))
 	if err != nil {
 		rpc.EmitErrorEventKv(
@@ -1043,7 +1090,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				key = splitKeys[0]
 				_, status = r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
 			} else {
-				log.Info("--> removing cached key: ", key)
+				log.Info("--> removing cached key: ", r.Gw.obfuscateKey(key))
 				// in case it's an username (basic auth) then generate the token
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)

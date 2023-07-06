@@ -130,7 +130,7 @@ func TestGenerateRestDataSourceFromGraphql(t *testing.T) {
 			Variables:        nil,
 		}
 
-		restEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig)
+		restEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig, nil)
 		assert.Equal(t, err, ErrGraphQLConfigIsMissingOperation)
 		assert.Nil(t, restEngineConfig)
 	})
@@ -152,14 +152,14 @@ func TestGenerateRestDataSourceFromGraphql(t *testing.T) {
 			Fetch: restDataSource.FetchConfiguration{
 				URL:    "http://local.fake",
 				Method: http.MethodPost,
-				Body:   `{"operationName":"","variables":{"var":"val"},"query":"mutation MyOp { myOperation }"}`,
+				Body:   `{"variables":{"var":"val"},"query":"mutation MyOp { myOperation }"}`,
 				Header: http.Header{
 					"X-Header": []string{"header-value"},
 				},
 			},
 		})
 
-		actualRestEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig)
+		actualRestEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedRestEngineConfig, actualRestEngineConfig)
 	})

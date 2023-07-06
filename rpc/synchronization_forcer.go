@@ -8,13 +8,14 @@ import (
 )
 
 type SyncronizerForcer struct {
-	store *storage.RedisCluster
+	store    *storage.RedisCluster
+	nodeData []byte
 }
 
 // NewSyncForcer returns a new syncforcer with a connected redis with a key prefix synchronizer-group- for group synchronization control.
-func NewSyncForcer(redisController *storage.RedisController) *SyncronizerForcer {
+func NewSyncForcer(redisController *storage.RedisController, nodeData []byte) *SyncronizerForcer {
 	sf := &SyncronizerForcer{}
-
+	sf.nodeData = nodeData
 	sf.store = &storage.RedisCluster{KeyPrefix: "synchronizer-group-", RedisController: redisController}
 	sf.store.Connect()
 
@@ -40,6 +41,7 @@ func (sf *SyncronizerForcer) GroupLoginCallback(userKey string, groupID string) 
 	return apidef.GroupLoginRequest{
 		UserKey:   userKey,
 		GroupID:   groupID,
+		Node:      sf.nodeData,
 		ForceSync: shouldForce,
 	}
 }

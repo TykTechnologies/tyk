@@ -21,6 +21,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/test"
 
 	"sync/atomic"
@@ -108,10 +110,11 @@ type Gateway struct {
 	MonitoringHandler    config.TykEventHandler
 	RPCListener          RPCStorageHandler
 	DashService          DashboardServiceSender
-	CertificateManager   *certs.CertificateManager
+	CertificateManager   certs.CertificateManager
 	GlobalHostChecker    HostCheckerManager
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
+	TracerProvider       otel.TracerProvider
 
 	keyGen DefaultKeyGenerator
 
@@ -307,6 +310,12 @@ func (gw *Gateway) getPolicy(polID string) user.Policy {
 	return pol
 }
 
+func (gw *Gateway) policiesByIDLen() int {
+	gw.policiesMu.RLock()
+	defer gw.policiesMu.RUnlock()
+	return len(gw.policiesByID)
+}
+
 func (gw *Gateway) apisByIDLen() int {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
@@ -473,8 +482,12 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	} else if gw.GetConfig().SlaveOptions.UseRPC {
 		mainLog.Debug("Using RPC Configuration")
 
+		dataLoader := &RPCStorageHandler{
+			Gw:       gw,
+			DoReload: gw.DoReload,
+		}
 		var err error
-		s, err = loader.FromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw)
+		s, err = loader.FromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw)
 		if err != nil {
 			return 0, err
 		}
@@ -531,7 +544,11 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		pols = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
-		pols, err = gw.LoadPoliciesFromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
+		dataLoader := &RPCStorageHandler{
+			Gw:       gw,
+			DoReload: gw.DoReload,
+		}
+		pols, err = gw.LoadPoliciesFromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	default:
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
@@ -578,7 +595,8 @@ func stripSlashes(next http.Handler) http.Handler {
 func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if gw.GetConfig().Security.ControlAPIUseMutualTLS {
-			if err := gw.CertificateManager.ValidateRequestCertificate(gw.GetConfig().Security.Certificates.ControlAPI, r); err != nil {
+			gwCerts := gw.CertificateManager.List(gw.GetConfig().Security.Certificates.ControlAPI, certs.CertificatePublic)
+			if err := crypto.ValidateRequestCerts(r, gwCerts); err != nil {
 				doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 				return
 			}
@@ -1373,6 +1391,14 @@ func (gw *Gateway) afterConfSetup() {
 		}
 	}
 
+	if conf.OpenTelemetry.Enabled {
+		if conf.OpenTelemetry.ResourceName == "" {
+			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
+		}
+
+		conf.OpenTelemetry.SetDefaults()
+	}
+
 	gw.SetConfig(conf)
 }
 
@@ -1550,23 +1576,33 @@ func Start() {
 		trace.SetLogger(mainLog)
 		defer trace.Close()
 	}
+
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry)
+
 	gw.start()
 	configs := gw.GetConfig()
 	go gw.RedisController.ConnectToRedis(gw.ctx, func() {
 		gw.reloadURLStructure(func() {})
 	}, &configs)
 
+	unix := time.Now().Unix()
+
+	var (
+		memprofile = fmt.Sprintf("tyk.%d.mprof", unix)
+		cpuprofile = fmt.Sprintf("tyk.%d.prof", unix)
+	)
+
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")
 		var err error
-		if memProfFile, err = os.Create("tyk.mprof"); err != nil {
+		if memProfFile, err = os.Create(memprofile); err != nil {
 			panic(err)
 		}
 		defer memProfFile.Close()
 	}
 	if *cli.CPUProfile {
 		mainLog.Info("Cpu profiling active")
-		cpuProfFile, err := os.Create("tyk.prof")
+		cpuProfFile, err := os.Create(cpuprofile)
 		if err != nil {
 			panic(err)
 		}
@@ -1617,6 +1653,17 @@ func Start() {
 		err := gw.DashService.DeRegister()
 		if err != nil {
 			mainLog.WithError(err).Error("deregistering in dashboard")
+		}
+	}
+	if gwConfig.SlaveOptions.UseRPC {
+		store := RPCStorageHandler{
+			DoReload: gw.DoReload,
+			Gw:       gw,
+		}
+
+		err := store.Disconnect()
+		if err != nil {
+			mainLog.WithError(err).Error("deregistering in MDCB")
 		}
 	}
 
