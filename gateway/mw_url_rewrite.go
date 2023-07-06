@@ -340,7 +340,7 @@ func valToStr(v interface{}) string {
 	case string:
 		s = x
 	case float64:
-		s = strconv.FormatFloat(x, 'f', -1, 32)
+		s = strconv.FormatFloat(x, 'f', -1, 64)
 	case int64:
 		s = strconv.FormatInt(x, 10)
 	case []string:
