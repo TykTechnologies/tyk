@@ -36,6 +36,7 @@ RUN apt update && apt install build-essential zlib1g-dev libncurses5-dev libgdbm
 # Install $PYTHON_VERSION
 
 ## This just installs whatever is is bullseye, makes docker build (fast/small)-(er)
+
 RUN	apt install python3 -y
 
 ## This runs python code slower, but the process finishes quicker
@@ -53,16 +54,15 @@ RUN	apt install python3 -y
 #	ldconfig $PWD
 
 # Clean up build assets
+
 RUN find /tmp -type f -delete
 
 # Build gateway
+
 RUN mkdir /opt/tyk-gateway
 WORKDIR /opt/tyk-gateway
-ADD go.mod go.sum /opt/tyk-gateway
-RUN go mod download
 ADD . /opt/tyk-gateway
-
-RUN make build
+RUN make build && go clean -modcache
 
 COPY tyk.conf.example tyk.conf
 
