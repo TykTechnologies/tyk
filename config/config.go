@@ -938,6 +938,7 @@ type Config struct {
 	LogLevel string `json:"log_level"`
 
 	// Section for configuring OpenTracing support
+	// Deprecated: use OpenTelemetry instead.
 	Tracer Tracer `json:"tracing"`
 
 	// Section for configuring Opentelemetry
