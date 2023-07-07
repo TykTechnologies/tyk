@@ -733,10 +733,10 @@ func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, re
 			},
 			AllowHTTP: true,
 		}
-		return &TykRoundTripper{transport, h2t, p.logger, p.Gw, p.TykAPISpec}
+		return &TykRoundTripper{transport, h2t, p.logger, p.Gw}
 	}
 
-	return &TykRoundTripper{transport, nil, p.logger, p.Gw, p.TykAPISpec}
+	return &TykRoundTripper{transport, nil, p.logger, p.Gw}
 }
 
 func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
@@ -793,7 +793,6 @@ type TykRoundTripper struct {
 	h2ctransport *http2.Transport
 	logger       *logrus.Entry
 	Gw           *Gateway `json:"-"`
-	apiDef       *APISpec `json:"-"`
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -816,7 +815,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return handleInMemoryLoop(handler, r)
 	}
 
-	if rt.Gw.GetConfig().OpenTelemetry.Enabled && rt.apiDef.DetailedTracing {
+	if rt.Gw.GetConfig().OpenTelemetry.Enabled {
 		var baseRoundTripper http.RoundTripper = rt.transport
 		if rt.h2ctransport != nil {
 			baseRoundTripper = rt.h2ctransport
