@@ -2,9 +2,9 @@ version: '3'
 
 tasks:
   tracetest:
-    desc: "install tracetest v0.11.16 on darwin"
+    desc: "install tracetest on darwin"
     status:
       - type tracetest
     cmds:
-      - brew install kubeshop/tracetest/tracetest@v0.11.16
+      - brew install kubeshop/tracetest/tracetest
       - tracetest configure -g --endpoint http://localhost:11633

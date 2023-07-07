@@ -2,9 +2,9 @@ version: '3'
 
 tasks:
   tracetest:
-    desc: "install tracetest v0.11.16 on linux"
+    desc: "install tracetest on linux"
     status:
       - type tracetest
     cmds:
-      - curl -L https://raw.githubusercontent.com/kubeshop/tracetest/v0.11.16/install-cli.sh | bash
+      - curl -L https://raw.githubusercontent.com/kubeshop/tracetest/main/install-cli.sh | bash
     
