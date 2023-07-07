@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/buger/jsonparser"
 
@@ -850,6 +851,116 @@ func TestIsGraphQLProxyOnly(t *testing.T) {
 			assert.Equal(t, tc.expected, result)
 		})
 	}
+}
+
+func TestGraphQLMiddleware_ContextVars(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	customRestUpstreamURL := "/custom-rest-upstream"
+	restConfig := apidef.GraphQLEngineDataSourceConfigREST{
+		Method: "GET",
+		Headers: map[string]string{
+			"rest-header": "rest-value",
+		},
+		URL: TestHttpAny + customRestUpstreamURL,
+	}
+	restConfigData, err := json.Marshal(restConfig)
+	require.NoError(t, err)
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.Schema = gqlProxyUpstreamSchema
+		spec.EnableContextVars = true
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		spec.GraphQL.Engine.FieldConfigs = []apidef.GraphQLFieldConfig{
+			{
+				TypeName:  "Query",
+				FieldName: "hello",
+			},
+		}
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Name:   "Main Rest Datasource",
+				Kind:   apidef.GraphQLEngineDataSourceKindREST,
+				Config: restConfigData,
+				RootFields: []apidef.GraphQLTypeFields{
+					{
+						Type:   "Query",
+						Fields: []string{"hello"},
+					},
+				},
+			},
+		}
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	t.Run("replace global context vars successfully", func(t *testing.T) {
+		spec.GraphQL.Engine.GlobalHeaders = []apidef.UDGGlobalHeader{
+			{Key: "global-header", Value: "global-header-value"},
+			{Key: "global-header-second", Value: "$tyk_context.headers_Code"},
+		}
+		g.Gw.LoadAPI(spec)
+
+		receivedHeader := false
+		g.AddDynamicHandler(customRestUpstreamURL, func(writer http.ResponseWriter, request *http.Request) {
+			headers := request.Header
+			if headers.Get("global-header") == "global-header-value" && headers.Get("global-header-second") == "value" {
+				receivedHeader = true
+			}
+		})
+
+		_, err := g.Run(t, test.TestCase{Path: "/", Method: "POST",
+			Data: gql.Request{
+				Query: `{hello(name: "Test")}`,
+			},
+			Headers: map[string]string{
+				"code": "value",
+			},
+			Code: 200,
+		})
+		assert.NoError(t, err)
+		assert.Eventuallyf(t, func() bool {
+			return receivedHeader
+		}, time.Second, time.Millisecond*100, "headers not sent to upstream")
+	})
+
+	t.Run("replace datasource context vars successfully", func(t *testing.T) {
+		spec.GraphQL.Engine.GlobalHeaders = []apidef.UDGGlobalHeader{
+			{Key: "global-header", Value: "$tyk_context.headers_Second"},
+		}
+		restConfig.Headers = map[string]string{
+			"datasource-header": "$tyk_context.headers_Code",
+		}
+		restConfigData, err := json.Marshal(restConfig)
+		require.NoError(t, err)
+		spec.GraphQL.Engine.DataSources[0].Config = restConfigData
+		g.Gw.LoadAPI(spec)
+
+		receivedHeader := false
+		g.AddDynamicHandler(customRestUpstreamURL, func(writer http.ResponseWriter, request *http.Request) {
+			headers := request.Header
+			if headers.Get("global-header") == "second-value" && headers.Get("datasource-header") == "value" {
+				receivedHeader = true
+			}
+		})
+
+		_, err = g.Run(t, test.TestCase{Path: "/", Method: "POST",
+			Data: gql.Request{
+				Query: `{hello(name: "Test")}`,
+			},
+			Headers: map[string]string{
+				"code":   "value",
+				"second": "second-value",
+			},
+			Code: 200,
+		})
+		assert.NoError(t, err)
+
+		assert.Eventuallyf(t, func() bool {
+			return receivedHeader
+		}, time.Second, time.Millisecond*100, "headers not sent to upstream")
+	})
 }
 
 const gqlIntrospectionQuery = `query IntrospectionQuery {

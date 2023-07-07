@@ -263,7 +263,20 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return m.writeGraphQLError(w, inputValidationResult.Errors)
 	}
 
+	if m.Spec.EnableContextVars {
+		// replace the context variable headers and recreate the GraphQLEngine
+		m.replaceUDGContextVars(r)
+		m.initGraphQLEngineV2(abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level)))
+	}
+
 	return nil, http.StatusOK
+}
+
+func (m *GraphQLMiddleware) replaceUDGContextVars(r *http.Request) {
+	// replace all global headers
+	for i := range m.Spec.GraphQL.Engine.GlobalHeaders {
+		m.Spec.GraphQL.Engine.GlobalHeaders[i].Value = m.Gw.replaceTykVariables(r, m.Spec.GraphQL.Engine.GlobalHeaders[i].Value, false)
+	}
 }
 
 func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.Errors) (error, int) {
