@@ -83,11 +83,7 @@ require (
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	google.golang.org/grpc v1.36.0
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
-<<<<<<< HEAD
-	google.golang.org/protobuf v1.28.1
-=======
 	google.golang.org/protobuf v1.31.0
->>>>>>> cc757f80... TT-9363 regenerated bindings with older protobuf (#5281)
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1
