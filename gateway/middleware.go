@@ -66,7 +66,8 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
 	} else if baseMw := tr.Base(); baseMw != nil {
-		if cfg := baseMw.Gw.GetConfig(); cfg.OpenTelemetry.Enabled {
+		cfg := baseMw.Gw.GetConfig()
+		if cfg.OpenTelemetry.Enabled && baseMw.Spec.DetailedTracing {
 			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
 			defer span.End()
 
