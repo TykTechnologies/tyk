@@ -18,7 +18,7 @@ jobs:
         arch: [amd64]
         node-version: [15.x]
     runs-on: ${{ matrix.platform }}
-    
+
     steps:
     - name: Set up Python 3.7
       uses: actions/setup-python@v4
@@ -30,14 +30,14 @@ jobs:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: >
         git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
-    
+
     - name: Checkout
       uses: actions/checkout@v2
       with:
         path: tyk
         token: ${{ secrets.ORG_GH_TOKEN }}
         submodules: true
-    
+
     - name: Check if test framework branch exists
       id: check_test_branch
       env:
@@ -60,7 +60,7 @@ jobs:
         repository: TykTechnologies/tyk-automated-tests
         token: ${{ secrets.ORG_GH_TOKEN }}
         path: tyk-automated-tests
-        ref: ${{ steps.check_test_branch.outputs.branch   }}
+        ref: ${{ steps.check_test_branch.outputs.branch }}
 
 
     - name: Check if dashboard branch exists
@@ -105,7 +105,7 @@ jobs:
         pip install flake8 pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       working-directory: tyk-automated-tests
-    
+
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
@@ -117,11 +117,11 @@ jobs:
     - name: Waiting for dashboard
       run: |
         while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:3000/hello/)" != "200" ]]; do sleep 60 && echo "waiting for dashboard '$(date +"%T")'"; done
-      timeout-minutes: 15    
+      timeout-minutes: 15
 
     - name: Getting tyk logs on failure
-      if: ${{ failure() }}      
-      run: docker logs tyk-gateway      
+      if: ${{ failure() }}
+      run: docker logs tyk-gateway
 
     - name: Test with pytest
       id: test_execution
@@ -150,7 +150,7 @@ jobs:
       if: ${{ always() }}
       uses: rtCamp/action-slack-notify@v2
       env:
-        SLACK_WEBHOOK: ${{ secrets.GW_SLACK_WEBHOOK}}
+        SLACK_WEBHOOK: ${{ secrets.GW_SLACK_WEBHOOK }}
         SLACK_COLOR: ${{ job.status }}
         SLACK_TITLE: "Result: ${{ steps.test_execution.outcome }}"
         SLACK_USERNAME: API GW test automation
@@ -162,7 +162,7 @@ jobs:
       uses: mshick/add-pr-comment@v1
       with:
         message: |
-          **API tests result: ${{ steps.test_execution.outcome }}** ${{ env.STATUS }} 
+          **API tests result: ${{ steps.test_execution.outcome }}** ${{ env.STATUS }}
           Branch used: ${{ github.ref }}
           Commit: ${{ github.event.after }} ${{ github.event.commits[0].message }}
           Triggered by: ${{ github.event_name }} (@${{ github.actor }})
@@ -171,7 +171,7 @@ jobs:
         allow-repeats: true
       env:
         STATUS: "${{ steps.test_execution.outcome == 'success' && ':white_check_mark:' || ':no_entry_sign:' }}"
-       
+
     - name: Xray update
       if: ${{ always() }} && github.event_name != 'pull_request'
       run: |
