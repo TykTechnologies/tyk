@@ -277,6 +277,40 @@ func (m *GraphQLMiddleware) replaceUDGContextVars(r *http.Request) {
 	for i := range m.Spec.GraphQL.Engine.GlobalHeaders {
 		m.Spec.GraphQL.Engine.GlobalHeaders[i].Value = m.Gw.replaceTykVariables(r, m.Spec.GraphQL.Engine.GlobalHeaders[i].Value, false)
 	}
+
+	// replace all datasource headers
+	for i := range m.Spec.GraphQL.Engine.DataSources {
+		source := &m.Spec.GraphQL.Engine.DataSources[i]
+		switch source.Kind {
+		case apidef.GraphQLEngineDataSourceKindGraphQL:
+			var graphqlConfig apidef.GraphQLEngineDataSourceConfigGraphQL
+			if err := json.Unmarshal(source.Config, &graphqlConfig); err != nil {
+				continue
+			}
+			for key, value := range graphqlConfig.Headers {
+				graphqlConfig.Headers[key] = m.Gw.replaceTykVariables(r, value, false)
+			}
+			dat, err := json.Marshal(graphqlConfig)
+			if err != nil {
+				continue
+			}
+			source.Config = dat
+		case apidef.GraphQLEngineDataSourceKindREST:
+			var restConfig apidef.GraphQLEngineDataSourceConfigREST
+			if err := json.Unmarshal(source.Config, &restConfig); err != nil {
+				continue
+			}
+			for key, value := range restConfig.Headers {
+				restConfig.Headers[key] = m.Gw.replaceTykVariables(r, value, false)
+			}
+			dat, err := json.Marshal(restConfig)
+			if err != nil {
+				continue
+			}
+			source.Config = dat
+		default:
+		}
+	}
 }
 
 func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.Errors) (error, int) {
