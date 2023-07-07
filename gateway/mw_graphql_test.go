@@ -857,7 +857,8 @@ func TestGraphQLMiddleware_ContextVars(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
 
-	customRestUpstreamURL := "/custom-rest-upstream"
+	customRestUpstreamURL, customGraphQLUpstreamURL := "/custom-rest-upstream", "/custom-graphql-upstream"
+
 	restConfig := apidef.GraphQLEngineDataSourceConfigREST{
 		Method: "GET",
 		Headers: map[string]string{
@@ -867,6 +868,14 @@ func TestGraphQLMiddleware_ContextVars(t *testing.T) {
 	}
 	restConfigData, err := json.Marshal(restConfig)
 	require.NoError(t, err)
+
+	graphQLConfig := apidef.GraphQLEngineDataSourceConfigGraphQL{
+		URL:    TestHttpAny + customGraphQLUpstreamURL,
+		Method: "POST",
+	}
+	graphqlConfigData, err := json.Marshal(graphQLConfig)
+	require.NoError(t, err)
+
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.GraphQL.Enabled = true
 		spec.GraphQL.Schema = gqlProxyUpstreamSchema
@@ -877,12 +886,27 @@ func TestGraphQLMiddleware_ContextVars(t *testing.T) {
 				TypeName:  "Query",
 				FieldName: "hello",
 			},
+			{
+				TypeName:  "Query",
+				FieldName: "httpMethod",
+			},
 		}
 		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
 			{
 				Name:   "Main Rest Datasource",
 				Kind:   apidef.GraphQLEngineDataSourceKindREST,
 				Config: restConfigData,
+				RootFields: []apidef.GraphQLTypeFields{
+					{
+						Type:   "Query",
+						Fields: []string{"httpMethod"},
+					},
+				},
+			},
+			{
+				Name:   "Main GraphQL Datasource",
+				Kind:   apidef.GraphQLEngineDataSourceKindGraphQL,
+				Config: graphqlConfigData,
 				RootFields: []apidef.GraphQLTypeFields{
 					{
 						Type:   "Query",
@@ -910,9 +934,10 @@ func TestGraphQLMiddleware_ContextVars(t *testing.T) {
 			}
 		})
 
-		_, err := g.Run(t, test.TestCase{Path: "/", Method: "POST",
+		_, err := g.Run(t, test.TestCase{
+			Path: "/", Method: "POST",
 			Data: gql.Request{
-				Query: `{hello(name: "Test")}`,
+				Query: `{httpMethod}`,
 			},
 			Headers: map[string]string{
 				"code": "value",
@@ -937,17 +962,29 @@ func TestGraphQLMiddleware_ContextVars(t *testing.T) {
 		spec.GraphQL.Engine.DataSources[0].Config = restConfigData
 		g.Gw.LoadAPI(spec)
 
-		receivedHeader := false
+		var receivedRestHeader, receivedGQLHeader bool
+		g.AddDynamicHandler(customGraphQLUpstreamURL, func(writer http.ResponseWriter, request *http.Request) {
+			headers := request.Header
+			if headers.Get("global-header") == "second-value" {
+				receivedGQLHeader = true
+			}
+		})
 		g.AddDynamicHandler(customRestUpstreamURL, func(writer http.ResponseWriter, request *http.Request) {
 			headers := request.Header
 			if headers.Get("global-header") == "second-value" && headers.Get("datasource-header") == "value" {
-				receivedHeader = true
+				receivedRestHeader = true
 			}
 		})
 
-		_, err = g.Run(t, test.TestCase{Path: "/", Method: "POST",
+		_, err = g.Run(t, test.TestCase{
+			Path: "/", Method: "POST",
 			Data: gql.Request{
-				Query: `{hello(name: "Test")}`,
+				Query: `
+{
+  httpMethod
+  hello(name: "Test")
+}
+`,
 			},
 			Headers: map[string]string{
 				"code":   "value",
@@ -958,7 +995,7 @@ func TestGraphQLMiddleware_ContextVars(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Eventuallyf(t, func() bool {
-			return receivedHeader
+			return receivedRestHeader && receivedGQLHeader
 		}, time.Second, time.Millisecond*100, "headers not sent to upstream")
 	})
 }
