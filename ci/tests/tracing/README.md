@@ -22,4 +22,5 @@ It needs the following services to work:
     - `cache`: This service runs a Redis server (version 6) as a cache, with the unless-stopped restart policy. It periodically checks the health of the Redis server using the redis-cli ping command.
 
 
-The `tests` folder contains all the `*.yml` declarations of tests that are going to be executed against the gateway.
+The `tests` folder contains all the `*.yml` declarations of tests that are going to be executed. Please take into consideration:
+- the target URL for gateway APIs is `http://httpbin:80/` for HTTP APIs
