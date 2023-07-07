@@ -1,7 +1,29 @@
 ---
 version: "3"
 
+includes:
+  deps: ./.taskfiles/deps_{{OS}}.yml
+
 tasks:
+  docker:
+    desc: "build Tyk gateway internal/tyk-gateway"
+    cmds:
+      - make docker
+    sources:
+      - gateway/*.go
+      - apidef/*.go
+      - config/*.go
+      - 
+      - certs/*.go
+      - internal/*.go
+      - rpc/*.go
+      - storage/*.go
+      - user/*.go
+      - tcp/*.go
+      - goplugin/*.go
+      - ctx/*.go
+      - regexp/*.go
+
   test:plugin-compiler:
     desc: "Plugin compiler local build/test"
     cmds:
@@ -25,3 +47,36 @@ tasks:
         yq -i ".dockers[0].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser-el7.yml
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
+
+  test:opentelemetry:setup:
+    desc: "setup e2e opentelemetry tests"
+    deps: 
+      - deps:tracetest
+      - docker
+    status:
+      - tracetest version
+    cmds:
+      - docker compose -f ci/tests/tracing/docker-compose.yml up -d
+      - tracetest configure -g --endpoint http://localhost:11633
+
+
+  test:opentelemetry:test:
+    desc: "run e2e opentelemetry tests"
+    deps:
+      - test:opentelemetry:setup
+    cmds:
+      - tracetest test run -d ./ci/tests/tracing/tests/tyk_test.yml -w -o pretty
+
+  test:opentelemetry:teardown:
+    desc: "teardown e2e opentelemetry tests enviroment"
+    deps: [test:opentelemetry:setup]
+    cmds:
+      - docker compose -f ci/tests/tracing/docker-compose.yml down --remove-orphans
+ 
+  test:opentelemetry:
+    desc : "setup, execute and shutdown e2e opentelemetry tests"
+    cmds:
+      - task: test:opentelemetry:setup
+      - task: test:opentelemetry:test
+      - task: test:opentelemetry:teardown
+
