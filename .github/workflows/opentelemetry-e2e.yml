@@ -2,7 +2,7 @@ name: Opentelemetry e2e
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   e2e:
