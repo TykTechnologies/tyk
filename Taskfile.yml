@@ -8,12 +8,11 @@ tasks:
   docker:
     desc: "build Tyk gateway internal/tyk-gateway"
     cmds:
-      - make docker
+      - docker build --platform "linux/amd64" --rm -t internal/tyk-gateway .
     sources:
       - gateway/*.go
       - apidef/*.go
       - config/*.go
-      - 
       - certs/*.go
       - internal/*.go
       - rpc/*.go
