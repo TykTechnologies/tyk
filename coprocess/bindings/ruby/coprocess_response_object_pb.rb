@@ -4,22 +4,20 @@
 require 'google/protobuf'
 
 Google::Protobuf::DescriptorPool.generated_pool.build do
-  add_file("coprocess_response_object.proto", :syntax => :proto3) do
-    add_message "coprocess.ResponseObject" do
-      optional :status_code, :int32, 1
-      optional :raw_body, :bytes, 2
-      optional :body, :string, 3
-      map :headers, :string, :string, 4
-      repeated :multivalue_headers, :message, 5, "coprocess.Header"
-    end
-    add_message "coprocess.Header" do
-      optional :key, :string, 1
-      repeated :values, :string, 2
-    end
+  add_message "coprocess.ResponseObject" do
+    optional :status_code, :int32, 1
+    optional :raw_body, :bytes, 2
+    optional :body, :string, 3
+    map :headers, :string, :string, 4
+    repeated :multivalue_headers, :message, 5, "coprocess.Header"
+  end
+  add_message "coprocess.Header" do
+    optional :key, :string, 1
+    repeated :values, :string, 2
   end
 end
 
 module Coprocess
-  ResponseObject = ::Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.ResponseObject").msgclass
-  Header = ::Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.Header").msgclass
+  ResponseObject = Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.ResponseObject").msgclass
+  Header = Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.Header").msgclass
 end
