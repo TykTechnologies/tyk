@@ -28,4 +28,4 @@ spec:
     assertions:
     - attr:http.status_code = 500
     - attr:http.url = "http://httpbin:80/status/500"
-    - attr:tracetest.span.parent_id = "168217599e049977"
+    - attr:tracetest.span.parent_id != ""
