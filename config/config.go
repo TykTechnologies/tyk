@@ -14,6 +14,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 )
@@ -63,6 +64,8 @@ const (
 
 	DefaultDashPolicySource     = "service"
 	DefaultDashPolicyRecordName = "tyk_policies"
+
+	DefaultOTelResourceName = "tyk-gateway"
 )
 
 type PoliciesConfig struct {
@@ -634,6 +637,9 @@ type Config struct {
 	HashKeys bool `json:"hash_keys"`
 
 	// DisableKeyActionsByUsername disables key search by username.
+	// When this is set to `true` you are able to search for keys only by keyID or key hash (if `hash_keys` is also set to `true`)
+	// Note that if `hash_keys` is also set to `true` then the keyID will not be provided for APIs secured using basic auth. In this scenario the only search option would be to use key hash
+	// If you are using the Tyk Dashboard, you must configure this setting with the same value in both Gateway and Dashboard
 	DisableKeyActionsByUsername bool `json:"disable_key_actions_by_username"`
 
 	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
@@ -936,6 +942,9 @@ type Config struct {
 
 	// Section for configuring OpenTracing support
 	Tracer Tracer `json:"tracing"`
+
+	// Section for configuring Opentelemetry
+	OpenTelemetry otel.Config `json:"opentelemetry"`
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 

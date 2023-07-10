@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/test"
 
 	"sync/atomic"
@@ -113,6 +114,7 @@ type Gateway struct {
 	GlobalHostChecker    HostCheckerManager
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
+	TracerProvider       otel.TracerProvider
 
 	keyGen DefaultKeyGenerator
 
@@ -1389,6 +1391,14 @@ func (gw *Gateway) afterConfSetup() {
 		}
 	}
 
+	if conf.OpenTelemetry.Enabled {
+		if conf.OpenTelemetry.ResourceName == "" {
+			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
+		}
+
+		conf.OpenTelemetry.SetDefaults()
+	}
+
 	gw.SetConfig(conf)
 }
 
@@ -1566,6 +1576,9 @@ func Start() {
 		trace.SetLogger(mainLog)
 		defer trace.Close()
 	}
+
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry)
+
 	gw.start()
 	configs := gw.GetConfig()
 	go gw.RedisController.ConnectToRedis(gw.ctx, func() {
