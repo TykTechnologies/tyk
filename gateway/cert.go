@@ -499,11 +499,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			newConfig.ClientAuth = tls.RequestClientCert
 		}
 
-		if newConfig.ClientAuth == tls.RequireAndVerifyClientCert && isControlAPI && !gwConfig.Security.ControlAPIUseMutualTLS {
-
-			newConfig.ClientAuth = tls.RequestClientCert
-		}
-
 		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
 
