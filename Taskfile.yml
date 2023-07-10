@@ -59,7 +59,8 @@ tasks:
       - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test_200.yml -w -o pretty
       - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test_500.yml -w -o pretty
       - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_testauth_401.yml -w -o pretty
-
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_tykprotocol_200.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_tykprotocol-auth_401.yml -w -o pretty
 
 
   test:opentelemetry:teardown:
