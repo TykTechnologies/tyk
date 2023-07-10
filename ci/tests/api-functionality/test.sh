@@ -25,5 +25,4 @@ export tag=$1
 trap "$compose down" EXIT
 
 $compose up -d
-sleep 2 # Wait for init
 ./api_test.sh || { $compose logs gw; exit 1; }
