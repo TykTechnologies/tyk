@@ -134,7 +134,7 @@ dockers:
       - "--label=org.opencontainers.image.title=tyk-plugin-compiler"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--build-arg=GOLANG_CROSS={{ .Env.GOLANG_CROSS }}"
+      - "--build-arg=BASE_IMAGE=tykio/golang-cross:{{ .Env.GOLANG_CROSS }}"
       - "--build-arg=GITHUB_SHA={{ .Env.GITHUB_SHA }}"
       - "--build-arg=GITHUB_TAG={{ .Tag }}"
     use: buildx
