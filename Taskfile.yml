@@ -10,9 +10,10 @@ tasks:
     cmds:
       - docker build --platform "linux/amd64" --rm -t internal/tyk-gateway .
     sources:
-      - */*.go
       - go.mod
       - go.sum
+      - './**/*.go'
+
 
   test:plugin-compiler:
     desc: "Plugin compiler local build/test"
