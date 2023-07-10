@@ -617,7 +617,7 @@ type APIDefinition struct {
 	IsOAS       bool   `bson:"is_oas" json:"is_oas,omitempty"`
 	VersionName string `bson:"-" json:"-"`
 
-	DetailedTracing bool `bson:"detailed_tracing" json:"detailed_tracing,omitempty"`
+	DetailedTracing bool `bson:"detailed_tracing" json:"detailed_tracing"`
 }
 
 type AnalyticsPluginConfig struct {
