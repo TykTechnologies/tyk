@@ -11,8 +11,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-        with:
-          fetch-depth: 2
       - name: Install Task
         uses: arduino/setup-task@v1
         with:
