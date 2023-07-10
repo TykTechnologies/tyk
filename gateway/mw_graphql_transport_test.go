@@ -59,6 +59,59 @@ func TestDetermineGraphQLEngineTransportType(t *testing.T) {
 	}
 }
 
+func TestGraphQLEngineTransport_GlobalHeaders(t *testing.T) {
+	initTestServer := func(t *testing.T, expectedHeaders map[string]string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			for key, val := range expectedHeaders {
+				assert.Equal(t, val, request.Header.Get(key))
+			}
+		}))
+	}
+
+	t.Run("should add all global headers to upstream request", func(t *testing.T) {
+		testServer := initTestServer(t, map[string]string{
+			"test-global-header":     "header-value",
+			"test-datasource-header": "header-value",
+		})
+		defer testServer.Close()
+
+		testReq, err := http.NewRequest(http.MethodPost, testServer.URL, nil)
+		testReq.Header.Set("test-datasource-header", "header-value")
+		assert.NoError(t, err)
+
+		client := http.Client{
+			Transport: NewGraphQLEngineTransport(GraphQLEngineTransportTypeMultiUpstream, http.DefaultTransport, WithGlobalHeaders(map[string]string{
+				"test-global-header": "header-value",
+			})),
+		}
+
+		_, err = client.Do(testReq)
+		assert.NoError(t, err)
+	})
+
+	t.Run("should not replace existing global header", func(t *testing.T) {
+		testServer := initTestServer(t, map[string]string{
+			"test-global-header":     "header-value",
+			"test-datasource-header": "datasource-value",
+		})
+		defer testServer.Close()
+
+		testReq, err := http.NewRequest(http.MethodPost, testServer.URL, nil)
+		testReq.Header.Set("test-datasource-header", "datasource-value")
+		assert.NoError(t, err)
+
+		client := http.Client{
+			Transport: NewGraphQLEngineTransport(GraphQLEngineTransportTypeMultiUpstream, http.DefaultTransport, WithGlobalHeaders(map[string]string{
+				"test-global-header":     "header-value",
+				"test-datasource-header": "header-value",
+			})),
+		}
+
+		_, err = client.Do(testReq)
+		assert.NoError(t, err)
+	})
+}
+
 func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 	type serverExpectations struct {
 		method  string
