@@ -22,9 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         branch:
-          - release-4-lts
-          - release-5.0.2
-          - release-5-lts
+          - temporarily-suspended
 
     steps:
       - uses: actions/checkout@v3
