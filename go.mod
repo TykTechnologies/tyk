@@ -14,7 +14,7 @@ require (
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
 	github.com/TykTechnologies/gorpc v0.0.0-20210624160652-fe65bda0ccb9
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230626134045-0f122dc76501
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230703083850-4fa1c79561a6
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
@@ -36,7 +36,7 @@ require (
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/gofrs/uuid v3.3.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.4.2
-	github.com/golang/mock v1.4.1
+	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0
@@ -56,8 +56,7 @@ require (
 	github.com/mavricknz/ldap v0.0.0-20160227184754-f5a958005e43
 	github.com/miekg/dns v1.0.14
 	github.com/mitchellh/copystructure v1.2.0 // indirect
-	github.com/mitchellh/mapstructure v1.4.1
-	github.com/nats-io/nats-server/v2 v2.3.4 // indirect
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e // test
 	github.com/opentracing/opentracing-go v1.2.0
