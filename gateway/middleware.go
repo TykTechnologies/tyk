@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -29,6 +30,8 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
+
+	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 )
 
 const (
@@ -67,17 +70,20 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
 	} else if baseMw := tr.Base(); baseMw != nil {
 		cfg := baseMw.Gw.GetConfig()
-		if cfg.OpenTelemetry.Enabled && baseMw.Spec.DetailedTracing {
-			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
-			defer span.End()
-
-			setContext(r, ctx)
+		if cfg.OpenTelemetry.Enabled {
+			var span tyktrace.Span
+			if baseMw.Spec.DetailedTracing {
+				var ctx context.Context
+				ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
+				defer span.End()
+				setContext(r, ctx)
+			} else {
+				span = tyktrace.SpanFromContext(r.Context())
+			}
 
 			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
 			if err != nil {
 				span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
-			} else {
-				span.SetStatus(otel.SPAN_STATUS_OK, "")
 			}
 
 			return err, i
