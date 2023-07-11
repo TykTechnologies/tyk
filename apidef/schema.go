@@ -724,7 +724,10 @@ const Schema = `{
         },
 		"is_oas": {
 			"type": "boolean"
-		}
+		},
+        "detailed_tracing": {
+            "type": "boolean"
+        }
     },
     "required": [
         "name",
