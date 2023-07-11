@@ -2,6 +2,12 @@ services:
   redis:
     image: redis:6.0-alpine
     networks: [ test-api-functionality ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 5s
+      retries: 10
+      start_period: 2s
+      timeout: 10s
 
   gw:
     image: tykio/tyk-gateway:${tag}
@@ -15,6 +21,27 @@ services:
     environment:
       - TYK_DB_REDISHOST=redis
       - TYK_LOGLEVEL=debug
+
+  gw-checker:
+    image: curlimages/curl
+    networks: [ test-api-functionality ]
+    command: tail -f /dev/null
+    depends_on:
+      - gw
+    healthcheck:
+      test: curl -s --fail http://gw:8080/hello | grep -o '.*{"redis":{"status":"pass",'
+      interval: 5s
+      retries: 10
+      start_period: 4s
+      timeout: 10s
+
+  wait:
+    image: hello-world:linux
+    depends_on:
+        redis:
+            condition: service_healthy
+        gw-checker:
+            condition: service_healthy
 
 networks:
   test-api-functionality:
