@@ -1608,6 +1608,17 @@ func TestStaticMTLSAPI(t *testing.T) {
 		return ts, clientCertID, clientCert
 	}
 
+	t.Run("control API is not affected", func(t *testing.T) {
+		ts, _, _ := setup()
+		defer ts.Close()
+
+		tlsConfig := &tls.Config{InsecureSkipVerify: true}
+		transport := &http.Transport{TLSClientConfig: tlsConfig}
+		_, _ = ts.Run(t, test.TestCase{
+			AdminAuth: true, Path: "/tyk/apis/oas", Code: http.StatusOK, Client: &http.Client{Transport: transport},
+		})
+	})
+
 	t.Run("valid client cert", func(t *testing.T) {
 		ts, _, clientCert := setup()
 		defer ts.Close()
