@@ -110,12 +110,18 @@ services:
         networks:
             default: null
         ports:
-        - 6379:6379
+            - 6379:6379
         command: redis-server --appendonly yes
     httpbin:
         image: kennethreitz/httpbin:latest
         networks:
             default: null
+    grpcapi:
+        image: romk/grpc-helloworld-reflection
+        networks:
+            default: null
+        ports:
+            - 50001:50051
 networks:
     default:
         name: _default
