@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
+
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -40,6 +42,7 @@ const (
 	UrlRewriteTarget
 	TransformedRequestMethod
 	Definition
+	OASDefinition
 	RequestStatus
 	GraphQLRequest
 	GraphQLIsWebSocketUpgrade
@@ -132,4 +135,39 @@ func GetDefinition(r *http.Request) *apidef.APIDefinition {
 		}
 	}
 	return nil
+}
+
+// GetOASDefinition returns a copy of the OAS definition of the called API.
+func GetOASDefinition(r *http.Request) *oas.OAS {
+	v := r.Context().Value(OASDefinition)
+	if v == nil {
+		return nil
+	}
+
+	val, ok := v.(*oas.OAS)
+	if !ok {
+		return nil
+	}
+
+	ret, err := cloneOAS(val)
+	if err != nil {
+		logger.Get().Error("Cloning OAS object in the request context")
+	}
+
+	return ret
+}
+
+func cloneOAS(val *oas.OAS) (*oas.OAS, error) {
+	oasInBytes, err := json.Marshal(val)
+	if err != nil {
+		return nil, err
+	}
+
+	var retOAS oas.OAS
+	err = json.Unmarshal(oasInBytes, &retOAS)
+	if err != nil {
+		return nil, err
+	}
+
+	return &retOAS, nil
 }
