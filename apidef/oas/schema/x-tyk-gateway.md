@@ -915,11 +915,11 @@ Body base64 encoded representation of the template.
 Enabled is a boolean flag. If set to `true`, the advanced caching plugin will be enabled.
 
 **Field: `cacheByRegex` (`string`)**
-CacheByRegex defines a regular expression used against the request body to produce a cache key.
-Example value: `\"id\":[^,]*` (quoted json value).
+CacheByRege defines a regular expression used against the request body to produce a cache key.
+Example valu: `\"id\":[^,]*` (quoted json value).
 
 **Field: `cacheResponseCodes` (`[]int`)**
-CacheResponseCodes contains a list of valid response codes for responses that are okay to add to the cache.
+CacheResponseCodes contai a list of valid response codes for responses that are okay to add to the cache.
 
 
 ### **EnforceTimeout**
