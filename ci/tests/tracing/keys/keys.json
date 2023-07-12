@@ -1,0 +1,24 @@
+{
+	"last_check": 0,
+	"allowance": 1,
+	"rate": 1,
+	"per": 6000,
+	"throttle_interval": -1,
+	"throttle_retry_limit": -1,
+	"expires": 0,
+	"quota_max": -1,
+	"quota_renews": 1587524070,
+	"quota_remaining": -1,
+	"quota_renewal_rate": -1,
+	"access_rights": {
+		"4": {
+			"api_name": "RatelimitAPI",
+			"api_id": "4",
+			"versions": ["Default"],
+			"allowed_urls": [],
+			"limit": null,
+			"allowance_scope": ""
+		}
+	},
+	"org_id": "default"
+}
