@@ -1,6 +1,10 @@
 ---
 version: "3"
 
+includes:
+  deps: ./.taskfiles/deps/Taskfile.yml
+  tracetest: ./.taskfiles/tracetest/Taskfile.yml
+
 tasks:
   test:plugin-compiler:
     desc: "Plugin compiler local build/test"
