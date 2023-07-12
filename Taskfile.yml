@@ -2,7 +2,8 @@
 version: "3"
 
 includes:
-  deps: ./.taskfiles/deps_{{OS}}.yml
+  deps: ./.taskfiles/deps/Taskfile.yml
+  tracetest: ./.taskfiles/tracetest/Taskfile.yml
 
 tasks:
   docker:
@@ -41,8 +42,8 @@ tasks:
 
   test:opentelemetry:setup:
     desc: "setup e2e opentelemetry tests"
-    deps: 
-      - deps:tracetest
+    deps:
+      - tracetest
       - docker
     status:
       - tracetest version
