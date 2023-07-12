@@ -1,0 +1,21 @@
+---
+version: "3"
+
+tasks:
+  default:
+    desc: "Configure tracetest"
+    deps:
+      - install
+    cmds:
+      - tracetest configure -g --endpoint http://localhost:11633
+
+  install:
+    internal: true
+    desc: "Install tracetest"
+    status:
+      - type tracetest
+    cmds:
+      - cmd: brew install kubeshop/tracetest/tracetest
+        platforms: [darwin]
+      - cmd: curl -L https://raw.githubusercontent.com/kubeshop/tracetest/main/install-cli.sh | bash
+        platforms: [linux]

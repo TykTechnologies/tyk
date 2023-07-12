@@ -1,0 +1,30 @@
+type: Test
+spec:
+  id: 4pnmVurVg
+  name: HTTP Test API - ok request   
+  trigger:
+    type: http
+    httpRequest:
+      url: tyk:8080/test/ip
+      method: GET
+      headers:
+      - key: Content-Type
+        value: application/json
+  specs:
+  - name: Test main span attributes
+    selector: span[tracetest.span.type="http" name="GET /test/ip" http.method="GET"]
+    assertions:
+    - attr:http.method  =  "GET"
+    - attr:http.status_code  =  200
+    - attr:http.user_agent  =  "Go-http-client/1.1"
+    - attr:http.wrote_bytes  !=  0
+    - attr:tracetest.span.type  =  "http"
+  - name: Check if it contains Version and Rate middlewares
+    selector: span[tracetest.span.type="general" name="Tracetest trigger"] span[tracetest.span.type="general"]
+    assertions:
+    - attr:tracetest.selected_spans.count  =  2
+    - attr:tracetest.span.parent_id != ""
+  - name: Check for RateCheckMiddleware
+    selector: span[tracetest.span.type="general" name="RateCheckMW"]
+    assertions:
+    - attr:name  =  "RateCheckMW"
