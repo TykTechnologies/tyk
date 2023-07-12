@@ -931,7 +931,7 @@ Enabled is a boolean flag. If set to `true`, requests will enforce a configured 
 Value is the configured timeout in seconds.
 
 
-### **ValidateRequest**
+### **ValidateRequests**
 
 **Field: `enabled` (`boolean`)**
 Enabled is a boolean flag, if set to `true`, it enables request validation.

@@ -7,6 +7,7 @@ on:
     branches:
       - master
       - release-**
+      - test-workflow-oas
     paths:
       - apidef/oas/schema/x-tyk-gateway.md
 
@@ -21,3 +22,4 @@ jobs:
           repository: TykTechnologies/tyk-docs
           event-type: tyk-oas-docs
           client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
+
