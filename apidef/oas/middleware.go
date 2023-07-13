@@ -781,11 +781,11 @@ func (tm *TransformRequestMethod) ExtractTo(meta *apidef.MethodTransformMeta) {
 	meta.ToMethod = tm.ToMethod
 }
 
-// TransformRequestBody holds configuration about body request transformations.
-type TransformRequestBody struct {
-	// Enabled enables transform request body middleware.
+// TransformBody holds configuration about request/response body transformations.
+type TransformBody struct {
+	// Enabled enables transform request/request body middleware.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// Format of the request body, xml or json.
+	// Format of the request/response body, xml or json.
 	Format apidef.RequestInputType `bson:"format" json:"format"`
 	// Path file path for the template.
 	Path string `bson:"path,omitempty" json:"path,omitempty"`
@@ -793,8 +793,8 @@ type TransformRequestBody struct {
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 }
 
-// Fill fills *TransformRequestBody from apidef.TemplateMeta.
-func (tr *TransformRequestBody) Fill(meta apidef.TemplateMeta) {
+// Fill fills *TransformBody from apidef.TemplateMeta.
+func (tr *TransformBody) Fill(meta apidef.TemplateMeta) {
 	tr.Enabled = !meta.Disabled
 	tr.Format = meta.TemplateData.Input
 	if meta.TemplateData.Mode == apidef.UseBlob {
@@ -804,8 +804,8 @@ func (tr *TransformRequestBody) Fill(meta apidef.TemplateMeta) {
 	}
 }
 
-// ExtractTo extracts data from *TransformRequestBody into *apidef.TemplateMeta.
-func (tr *TransformRequestBody) ExtractTo(meta *apidef.TemplateMeta) {
+// ExtractTo extracts data from *TransformBody into *apidef.TemplateMeta.
+func (tr *TransformBody) ExtractTo(meta *apidef.TemplateMeta) {
 	meta.Disabled = !tr.Enabled
 	meta.TemplateData.Input = tr.Format
 	meta.TemplateData.EnableSession = true

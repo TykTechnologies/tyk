@@ -1572,6 +1572,7 @@ func Start() {
 	}
 
 	if tr := gwConfig.Tracer; tr.Enabled {
+		mainLog.Warn("OpenTracing is deprecated, use OpenTelemetry instead.")
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)
 		defer trace.Close()
