@@ -127,6 +127,18 @@
             "array",
             "null"
           ]
+        },
+        "sampling": {
+          "type": "object",
+          "sampler_type":{
+            "type": "string"
+          },
+          "sampling_rate": {
+            "type": "integer"
+          },
+          "parent_based_sampling": {
+            "type": "bool"
+          }
         }
       }
     }
