@@ -1,16 +1,15 @@
-# To be called from the release workflow, after all the
-# assets are built by goreleaser.
+---
 name: Plugin-compiler build
 
 on:
-  workflow_call:
-    inputs:
-      version:
-        required: true
-        type: string
-      golang-cross:
-        required: true
-        type: string
+  workflow_run:
+    workflows:
+      - Release
+    types:
+      - completed
+
+env:
+  GOLANG_CROSS: 1.19-bullseye
 
 jobs:
   docker-build:
@@ -18,9 +17,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
 
       - name: Set up buildx
         uses: docker/setup-buildx-action@v2
+
+      - name: Get git tag
+        id: set-target
+        shell: bash
+        run:
+          ref = ${{ github.event.workflow_run.head_branch }}
+          current_tag=${ref##*/}
+          echo "tag=${current_tag}" >> GITHUB_OUTPUT
 
       - name: Set docker metadata
         id: set-metadata
@@ -29,7 +38,8 @@ jobs:
           images: tykio/tyk-plugin-compiler
           labels: |
             org.opencontainers.image.title=tyk-plugin-compiler
-            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.version=${{ steps.set-target.outputs.tag }}
+            org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway
           tags: |
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
@@ -46,10 +56,10 @@ jobs:
           context: .
           file: ci/images/plugin-compiler/Dockerfile
           platforms: linux/amd64
-          push: ${{ startsWith(github.ref, 'refs/tags') }}
+          # push: ${{ startsWith(github.event.workflow_run.head_branch, 'refs/tags') }}
           labels: ${{ steps.set-metadata.outputs.labels }}
           tags: ${{ steps.set-metadata.outputs.tags }}
           build-args: |
-            BASE-IMAGE=tykio/golang-cross:${{ inputs.golang-cross }}
-            GITHUB_SHA=${{ github.sha }}
-            GITHUB_TAG=${{ inputs.version }}
+            BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            GITHUB_SHA=${{ github.event.workflow_run.head_sha }}
+            GITHUB_TAG=${{ steps.set-target.outputs.tag }}

@@ -346,13 +346,6 @@ jobs:
         run: |
           docker run --rm test-${{ matrix.distro }}
 
-  build-plugin-compiler:
-    needs: goreleaser
-    uses: ./.github/workflows/plugin-compiler-build.yml
-    with:
-      version: ${{ needs.goreleaser.outputs.tag }}
-      golang-cross: 1.19-bullseye
-
 
   smoke-tests:
     if: startsWith(github.ref, 'refs/tags') && !github.event.pull_request.draft
