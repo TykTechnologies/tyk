@@ -216,9 +216,7 @@ func (hc *HostCheckerManager) StartPoller(ctx context.Context) {
 
 func (hc *HostCheckerManager) StopPoller() {
 	hc.checkerMu.Lock()
-	if hc.checker != nil {
-		hc.checker.Stop()
-	}
+	hc.checker.Stop()
 	hc.checkerMu.Unlock()
 }
 
