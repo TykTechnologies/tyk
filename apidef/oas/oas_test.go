@@ -497,6 +497,54 @@ func TestOAS_MarshalJSON(t *testing.T) {
 	})
 }
 
+func TestOAS_Clone(t *testing.T) {
+	s := &OAS{}
+	s.SetTykExtension(&XTykAPIGateway{Info: Info{
+		Name: "my-api",
+	}})
+
+	clonedOAS, err := s.Clone()
+	assert.NoError(t, err)
+	assert.Equal(t, s, clonedOAS)
+
+	s.GetTykExtension().Info.Name = "my-api-modified"
+	assert.NotEqual(t, s, clonedOAS)
+
+	t.Run("marshal error", func(t *testing.T) {
+		s.Extensions["weird extension"] = make(chan int)
+		_, err = s.Clone()
+		assert.ErrorContains(t, err, "unsupported type: chan int")
+	})
+}
+
+func BenchmarkOAS_Clone(b *testing.B) {
+	oas := &OAS{
+		T: openapi3.T{
+			Info: &openapi3.Info{
+				Title: "my-oas-doc",
+			},
+			Paths: map[string]*openapi3.PathItem{
+				"/get": {
+					Get: &openapi3.Operation{
+						Responses: openapi3.Responses{
+							"200": &openapi3.ResponseRef{
+								Value: &openapi3.Response{
+									Description: getStrPointer("some example endpoint"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for i := 0; i < b.N; i++ {
+		_, err := oas.Clone()
+		assert.NoError(b, err)
+	}
+}
+
 func TestMigrateAndFillOAS(t *testing.T) {
 	var api apidef.APIDefinition
 	api.SetDisabledFlags()
