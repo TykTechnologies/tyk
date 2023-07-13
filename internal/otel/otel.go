@@ -13,6 +13,8 @@ type TracerProvider = tyktrace.Provider
 
 type Config = otelconfig.OpenTelemetry
 
+type Sampling = otelconfig.Sampling
+
 var HTTPHandler = tyktrace.NewHTTPHandler
 
 var HTTPRoundTripper = tyktrace.NewHTTPTransport

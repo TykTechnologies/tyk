@@ -57,6 +57,10 @@ func TestGateway_afterConfSetup(t *testing.T) {
 					SpanProcessorType:  "batch",
 					ConnectionTimeout:  1,
 					ContextPropagation: "tracecontext",
+					Sampling: otel.Sampling{
+						SamplerType:  "AlwaysOn",
+						SamplingRate: 0.5,
+					},
 				},
 				AnalyticsConfig: config.AnalyticsConfigConfig{
 					PurgeInterval: 10,
