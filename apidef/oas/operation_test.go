@@ -43,6 +43,7 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	operation.ValidateRequest = nil                   // This one also fills native part, let's skip it for this test.
 	operation.MockResponse = nil                      // This one also fills native part, let's skip it for this test.
 	operation.TransformRequestBody.Path = ""          // if `path` and `body` are present, `body` would take precedence, detailed tests can be found in middleware_test.go
+	operation.TransformResponseBody.Path = ""         // if `path` and `body` are present, `body` would take precedence, detailed tests can be found in middleware_test.go
 	operation.VirtualEndpoint.Path = ""               // if `path` and `body` are present, `body` would take precedence, detailed tests can be found in middleware_test.go
 	operation.PostPlugins = operation.PostPlugins[:1] // only 1 post plugin is considered at this point, ignore others.
 	xTykAPIGateway := &XTykAPIGateway{
