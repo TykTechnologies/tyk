@@ -515,8 +515,7 @@ func httpCollectorMock(t *testing.T, fn http.HandlerFunc, address string) *httpt
 		t.Fatalf("error setting up collector mock: %s", err.Error())
 	}
 
-	otelCollectorMock := httptest.NewUnstartedServer(http.HandlerFunc(fn))
-
+	otelCollectorMock := httptest.NewUnstartedServer(fn)
 	// NewUnstartedServer creates a listener. Close that listener and replace
 	// with the one we created.
 	otelCollectorMock.Listener.Close()
