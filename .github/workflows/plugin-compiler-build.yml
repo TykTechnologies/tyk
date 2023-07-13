@@ -1,0 +1,55 @@
+# To be called from the release workflow, after all the
+# assets are built by goreleaser.
+name: Plugin-compiler build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      golang-cross:
+        required: true
+        type: string
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Set docker metadata
+        id: set-metadata
+        uses: docker/metadata-action@v4
+        with:
+          images: tykio/tyk-plugin-compiler
+          labels: |
+            org.opencontainers.image.title=tyk-plugin-compiler
+            org.opencontainers.image.version=${{ inputs.version }}
+          tags: |
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler/Dockerfile
+          platforms: linux/amd64
+          push: ${{ startsWith(github.ref, 'refs/tags') }}
+          labels: ${{ steps.set-metadata.outputs.labels }}
+          tags: ${{ steps.set-metadata.outputs.tags }}
+          build-args: |
+            BASE-IMAGE=tykio/golang-cross:${{ inputs.golang-cross }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ inputs.version }}
