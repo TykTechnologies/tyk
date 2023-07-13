@@ -194,3 +194,8 @@ func MyAnalyticsPluginMaskJSONLoginBody(record *analytics.AnalyticsRecord) {
 		}
 	}
 }
+
+func MyPluginAccessingOASAPI(rw http.ResponseWriter, r *http.Request) {
+	oas := ctx.GetOASDefinition(r)
+	rw.Header().Add("X-OAS-Doc-Title", oas.Info.Title)
+}

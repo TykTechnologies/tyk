@@ -58,7 +58,7 @@ RUN find /tmp -type f -delete
 # Build gateway
 RUN mkdir /opt/tyk-gateway
 WORKDIR /opt/tyk-gateway
-ADD go.mod go.sum /opt/tyk-gateway
+ADD go.mod go.sum /opt/tyk-gateway/
 RUN go mod download
 ADD . /opt/tyk-gateway
 
