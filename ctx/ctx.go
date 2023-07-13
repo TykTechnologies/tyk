@@ -42,7 +42,6 @@ const (
 	UrlRewriteTarget
 	TransformedRequestMethod
 	Definition
-	OASDefinition
 	RequestStatus
 	GraphQLRequest
 	GraphQLIsWebSocketUpgrade
@@ -50,6 +49,7 @@ const (
 
 	// CacheOptions holds cache options required for cache writer middleware.
 	CacheOptions
+	OASDefinition
 )
 
 func setContext(r *http.Request, ctx context.Context) {
@@ -137,7 +137,7 @@ func GetDefinition(r *http.Request) *apidef.APIDefinition {
 	return nil
 }
 
-// GetOASDefinition returns a copy of the OAS definition of the called API.
+// GetOASDefinition returns a deep copy of the OAS definition of the called API.
 func GetOASDefinition(r *http.Request) *oas.OAS {
 	v := r.Context().Value(OASDefinition)
 	if v == nil {
@@ -149,25 +149,10 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 		return nil
 	}
 
-	ret, err := cloneOAS(val)
+	ret, err := val.Clone()
 	if err != nil {
-		logger.Get().Error("Cloning OAS object in the request context")
+		logger.Get().WithError(err).Error("Cloning OAS object in the request context")
 	}
 
 	return ret
-}
-
-func cloneOAS(val *oas.OAS) (*oas.OAS, error) {
-	oasInBytes, err := json.Marshal(val)
-	if err != nil {
-		return nil, err
-	}
-
-	var retOAS oas.OAS
-	err = json.Unmarshal(oasInBytes, &retOAS)
-	if err != nil {
-		return nil, err
-	}
-
-	return &retOAS, nil
 }
