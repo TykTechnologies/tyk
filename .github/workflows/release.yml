@@ -295,6 +295,7 @@ jobs:
           docker run --rm test-${{ matrix.distro }}-${{ matrix.arch }}
 
   upgrade-rpm:
+    if: startsWith(github.ref, 'refs/tags') && !github.event.pull_request.draft
     needs: goreleaser
     runs-on: ubuntu-latest
     strategy:
