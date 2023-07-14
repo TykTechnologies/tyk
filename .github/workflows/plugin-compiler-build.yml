@@ -14,6 +14,8 @@ env:
 jobs:
   docker-build:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.set-targets.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -63,3 +65,21 @@ jobs:
             BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.event.workflow_run.head_sha }}
             GITHUB_TAG=${{ steps.set-target.outputs.tag }}
+
+  smoke-tests:
+    if: startsWith(github.event.workflow_run.head_branch, 'refs/tags')
+    needs:
+      - docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      - name: Run test
+        shell: bash
+        run: |
+          set -eaxo pipefail
+          cd ci/tests/plugin-compiler
+          ./test.sh ${{ needs.docker-build.outputs.tag }}

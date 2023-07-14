@@ -374,6 +374,11 @@ jobs:
           for d in ci/tests/*/
           do
               echo Attempting to test $d
+              testname = basename $d
+              if [ $testname == "plugin-compiler" ]; then
+                echo "Plugin compiler tests to be run on plugin build workflow"
+                continue
+              fi
               if [ -d $d ] && [ -e $d/test.sh ]; then
                   cd $d
                   ./test.sh ${{ needs.goreleaser.outputs.tag }}
@@ -383,6 +388,10 @@ jobs:
           for d in smoke-tests/*/
           do
               echo Attempting to test $d
+              testname = basename $d
+              if [ $testname == "plugin-compiler" ]; then
+                echo "Plugin compiler tests to be run on plugin build workflow"
+                continue
               if [ -d $d ] && [ -e $d/test.sh ]; then
                   cd $d
                   ./test.sh ${{ needs.goreleaser.outputs.tag }}
