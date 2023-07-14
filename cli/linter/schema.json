@@ -133,10 +133,10 @@
           "sampler_type":{
             "type": "string"
           },
-          "sampling_rate": {
+          "rate": {
             "type": "integer"
           },
-          "parent_based_sampling": {
+          "parent_based": {
             "type": "bool"
           }
         }
