@@ -166,9 +166,8 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					URL:    "tyk://rest-example",
 					Method: "POST",
 					Header: map[string][]string{
-						"Authorization":      {"123"},
-						"X-Custom":           {"A, B"},
-						"Test-Global-Header": {"custom-value"},
+						"Authorization": {"123"},
+						"X-Custom":      {"A, B"},
 					},
 					Body: "body",
 					Query: []restDataSource.QueryConfiguration{
@@ -205,8 +204,7 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					URL:    "http://graphql-example",
 					Method: "POST",
 					Header: http.Header{
-						"X-Tyk-Internal":     []string{"true"},
-						"Test-Global-Header": []string{"test-value"},
+						"X-Tyk-Internal": []string{"true"},
 					},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
@@ -229,9 +227,6 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 				Fetch: restDataSource.FetchConfiguration{
 					URL:    "https://rest.example.com",
 					Method: "POST",
-					Header: map[string][]string{
-						"Test-Global-Header": {"test-value"},
-					},
 				},
 			}),
 		},
@@ -249,9 +244,6 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 				Fetch: restDataSource.FetchConfiguration{
 					URL:    "https://rest.example.com",
 					Method: "POST",
-					Header: map[string][]string{
-						"Test-Global-Header": {"test-value"},
-					},
 				},
 			}),
 		},
@@ -282,8 +274,7 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					URL:    "https://graphql.example.com",
 					Method: "POST",
 					Header: map[string][]string{
-						"Auth":               {"123"},
-						"Test-Global-Header": {"custom-graphql"},
+						"Auth": {"123"},
 					},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
@@ -320,9 +311,6 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 							Value: "{{.arguments.limit}}",
 						},
 					},
-					Header: map[string][]string{
-						"Test-Global-Header": {"test-value"},
-					},
 				},
 			}),
 		},
@@ -340,9 +328,6 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 				Fetch: restDataSource.FetchConfiguration{
 					URL:    "https://rest-with-path-params.example.com/{{.arguments.id}}",
 					Method: "POST",
-					Header: map[string][]string{
-						"Test-Global-Header": {"test-value"},
-					},
 				},
 			}),
 		},
@@ -360,9 +345,6 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 				Fetch: restDataSource.FetchConfiguration{
 					URL:    "{{.arguments.url}}",
 					Method: "POST",
-					Header: map[string][]string{
-						"Test-Global-Header": {"test-value"},
-					},
 				},
 			}),
 		},
@@ -393,8 +375,7 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					URL:    "https://graphql.example.com",
 					Method: "POST",
 					Header: map[string][]string{
-						"Auth":               {"123"},
-						"Test-Global-Header": {"test-value"},
+						"Auth": {"123"},
 					},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
@@ -419,8 +400,7 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					URL:    "https://graphql.example.com",
 					Method: "POST",
 					Header: http.Header{
-						"Auth":               []string{"123"},
-						"Test-Global-Header": {"test-value"},
+						"Auth": []string{"123"},
 					},
 					Query: nil,
 					Body:  `{"variables":"","query":"{ fromNested }"}`,
@@ -551,12 +531,6 @@ var graphqlEngineV2ConfigJson = `{
 	"schema": ` + v2Schema + `,
 	"last_schema_update": "2020-11-11T11:11:11.000+01:00",
 	"engine": {
-		"global_headers": [
-  			{
-    			"key": "test-global-header",
-    			"value": "test-value"
-  			}
-		],
 		"field_configs": [
 			{
 				"type_name": "Query",
@@ -578,8 +552,7 @@ var graphqlEngineV2ConfigJson = `{
 					"method": "POST",
 					"headers": {
 						"Authorization": "123",
-						"X-Custom": "A, B",
-						"Test-Global-Header": "custom-value"
+						"X-Custom": "A, B"
 					},
 					"query": [
 						{
@@ -650,8 +623,7 @@ var graphqlEngineV2ConfigJson = `{
 					"url": "https://graphql.example.com",
 					"method": "POST",
 					"headers": {
-						"Auth": "123",
-						"Test-Global-Header": "custom-graphql"
+						"Auth": "123"
 					}
 				}
 			},
