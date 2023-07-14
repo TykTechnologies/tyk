@@ -29,7 +29,7 @@ jobs:
         id: set-target
         shell: bash
         run:
-          ref = ${{ github.event.workflow_run.head_branch }}
+          ref=${{ github.event.workflow_run.head_branch }}
           current_tag=${ref##*/}
           echo "tag=${current_tag}" >> GITHUB_OUTPUT
 
