@@ -130,15 +130,18 @@
         },
         "sampling": {
           "type": "object",
-          "sampler_type":{
-            "type": "string"
+          "properties": {
+            "type":{
+              "type": "string"
+            },
+            "rate": {
+              "type": "integer"
+            },
+            "parent_based": {
+              "type": "bool"
+            }
           },
-          "rate": {
-            "type": "integer"
-          },
-          "parent_based": {
-            "type": "bool"
-          }
+
         }
       }
     }
