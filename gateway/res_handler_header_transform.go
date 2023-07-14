@@ -25,7 +25,11 @@ type HeaderTransform struct {
 	Gw     *Gateway `json:"-"`
 }
 
-func (HeaderTransform) Name() string {
+func (h *HeaderTransform) Enabled() bool {
+	return true
+}
+
+func (h *HeaderTransform) Name() string {
 	return "HeaderTransform"
 }
 

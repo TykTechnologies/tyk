@@ -25,6 +25,10 @@ type ResponseCacheMiddleware struct {
 	store storage.Handler
 }
 
+func (ResponseCacheMiddleware) Enabled() bool {
+	return true
+}
+
 func (m *ResponseCacheMiddleware) Name() string {
 	return "ResponseCacheMiddleware"
 }

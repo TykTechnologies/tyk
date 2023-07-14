@@ -21,13 +21,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/test"
-
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/test"
 
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
@@ -888,14 +888,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 // Create the response processor chain
 func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
-	// Prealloc size
-	chainLen := len(spec.ResponseProcessors)
-	// Append capacity
-	chainCapacity := chainLen + 1 + len(responseFuncs)
-
-	responseChain := make([]TykResponseHandler, chainLen, chainCapacity)
-
-	for i, processorDetail := range spec.ResponseProcessors {
+	var responseMWChain []TykResponseHandler
+	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{Spec: spec})
+	for _, processorDetail := range spec.ResponseProcessors {
 		processor := gw.responseProcessorByName(processorDetail.Name)
 		if processor == nil {
 			mainLog.Error("No such processor: ", processorDetail.Name)
@@ -905,7 +900,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 			mainLog.Debug("Failed to init processor: ", err)
 		}
 		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
-		responseChain[i] = processor
+		responseMWChain = append(responseMWChain, processor)
 	}
 
 	for _, mw := range responseFuncs {
@@ -926,7 +921,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		if err := processor.Init(mw, spec); err != nil {
 			mainLog.WithError(err).Debug("Failed to init processor")
 		}
-		responseChain = append(responseChain, processor)
+		responseMWChain = append(responseMWChain, processor)
 	}
 
 	keyPrefix := "cache-" + spec.APIID
@@ -939,9 +934,9 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		mainLog.WithError(err).Debug("Failed to init processor")
 	}
 
-	responseChain = append(responseChain, processor)
+	responseMWChain = append(responseMWChain, processor)
 
-	spec.ResponseChain = responseChain
+	spec.ResponseChain = responseMWChain
 }
 
 func (gw *Gateway) isRPCMode() bool {

@@ -14,6 +14,10 @@ type ResponseTransformJQMiddleware struct {
 	Gw   *Gateway `json:"-"`
 }
 
+func (ResponseTransformJQMiddleware) Enabled() bool {
+	return true
+}
+
 func (ResponseTransformJQMiddleware) Name() string {
 	return "ResponseTransformJQMiddleware"
 }

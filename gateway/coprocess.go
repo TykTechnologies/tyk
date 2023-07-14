@@ -516,6 +516,10 @@ type CustomMiddlewareResponseHook struct {
 	Gw *Gateway `json:"-"`
 }
 
+func (CustomMiddlewareResponseHook) Enabled() bool {
+	return true
+}
+
 func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
 	mwDefinition := mwDef.(apidef.MiddlewareDefinition)
 
