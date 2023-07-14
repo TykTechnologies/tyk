@@ -166,6 +166,7 @@ type EndPointCacheMeta struct {
 	Method                 string
 	CacheKeyRegex          string
 	CacheOnlyResponseCodes []int
+	Timeout                int64
 }
 
 type TransformSpec struct {
