@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=tykio/golang:1.19
+ARG BASE_IMAGE=golang:1.19
 
 # Install docker from docker image
 FROM docker:24-cli AS docker
@@ -60,7 +60,7 @@ COPY --from=schema-gen /usr/local/bin/ /usr/local/bin/
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/
 COPY --from=docker /usr/local/bin/docker-compose /root/.docker/cli-plugins/
 
-RUN docker compose version
+RUN docker compose version && python3 -V
 
 # Add gateway source tree
 WORKDIR /src

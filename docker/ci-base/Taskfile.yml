@@ -50,7 +50,7 @@ tasks:
     desc: "Build docker image"
     cmds:
       - |
-        docker build --rm \
+        docker build --rm --progress=plain \
         --platform {{.platform}} \
         --build-arg BASE_IMAGE={{.base}} \
         --build-arg=GITHUB_TAG={{.tag}} \
