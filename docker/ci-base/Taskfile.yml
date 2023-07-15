@@ -1,0 +1,64 @@
+---
+version: "3"
+
+# Run as follows:
+#
+# - `task build` for latest/Dockerfile
+# - `task release=5.0 build` for 5.0/Dockerfile
+#
+# Env parameters: `GITHUB_TAG`, `GITHUB_SHA` and `BUILD_PLATFORM`.
+# All of them are optional. BUILD_PLATFORM defaults to linux/amd64.
+
+vars:
+  release: latest
+  base: tykio/golang-cross:1.19-bullseye
+  dockerfile: Dockerfile
+  tag: '{{.GITHUB_TAG | default "v5.1.0-dev"}}'
+  sha: '{{.GITHUB_SHA | default "730d98024fda2a9fa9b3dddc6c4cc031813876ff"}}'
+  platform: '{{.BUILD_PLATFORM | default "linux/amd64"}}'
+  root:
+    sh: git rev-parse --show-toplevel
+
+env:
+  DOCKER_BUILDKIT: 1
+  BUILDX_EXPERIMENTAL: 1
+
+tasks:
+  build:
+    desc: "Build and test all targets"
+    cmds:
+      - task: docker:build
+        vars: { base: 'golang:1.19', image: 'tykio/ci-base:5.1' }
+      - task: docker:build
+        vars: { base: 'golang:1.16', image: 'tykio/ci-base:5.0' }
+
+  test:
+    desc: "Build and test all targets"
+    cmds:
+      - task: docker:test
+        vars: { image: 'tykio/ci-base:5.1' }
+      - task: docker:test
+        vars: { image: 'tykio/ci-base:5.0' }
+
+  docker:test:
+    desc: "Run tests on docker image"
+    cmds:
+      - docker run --rm -v {{.root}}:/src -w /src {{.image}} go build -v .
+      - docker run --rm -v {{.root}}:/src -w /src/gateway {{.image}} go test -c .
+
+  docker:build:
+    desc: "Build docker image"
+    cmds:
+      - |
+        docker build --rm \
+        --platform {{.platform}} \
+        --build-arg BASE_IMAGE={{.base}} \
+        --build-arg=GITHUB_TAG={{.tag}} \
+        --build-arg=GITHUB_SHA={{.sha}} \
+        -t {{.image}} \
+        -f {{.release}}/{{.dockerfile}} {{.release}}
+
+  docker:push:
+    desc: Push CI base image
+    cmds:
+      - docker push {{ .image }}

@@ -1,0 +1,16 @@
+name: 'Git Dirty Check'
+description: >-
+  Check whether any Git-worthy changes have been made to the checkout.
+runs:
+  using: "composite"
+  steps:
+    - name: "Dirty git Check"
+      shell: bash
+      run: |
+        git add .
+        if [[ -n "$(git status --porcelain)" ]]; then
+           echo "git-state<<EOF" >> $GITHUB_OUTPUT
+           git diff --cached >> $GITHUB_OUTPUT
+           echo "EOF" >> $GITHUB_OUTPUT
+           exit 1
+        fi

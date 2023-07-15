@@ -7,73 +7,56 @@ on:
       - release-**
 
 env:
-  TYK_DB_REDISHOST: localhost
-  TYK_GW_STORAGE_HOST: localhost
-  PYTHON_VERSION: '3.9'
+  TYK_GW_STORAGE_HOST: redis
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
   test:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     runs-on: ubuntu-latest
+    container: titpetric/base-ci
+
     strategy:
       fail-fast: true
       matrix:
-        redis-version: [5]
+        redis-version: [6]
         python-version: ['3.9']
-        go-version: [1.19.x]
+        go-version: ['1.19.x']
+
+    services:
+      redis:
+        image: redis:${{ matrix.redis-version }}
+        ports:
+          - 6379:6379
 
     steps:
       - name: Checkout Tyk
         uses: actions/checkout@v2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
-      - name: Setup Golang
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
+      - name: "Add Git safe.directory"
+        run: git config --global --add safe.directory $GITHUB_WORKSPACE
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-            python-version: ${{ matrix.python-version }}
+      - name: Codegen, lint, fmt
+        run: task codegen lint fmt
 
-      - name: Install Dependencies and basic hygiene test
-        id: hygiene
-        run: |
-          sudo apt-get install libluajit-5.1-dev
-
-          python -m pip install --upgrade pip
-          pip install setuptools
-          pip install google
-          pip install protobuf
-
-          make lint
-          
-          git add --all
-
-          git diff HEAD > git-state.log
-
-          git_state_count=$(wc -l < git-state.log)
-          
-          if [[ $git_state_count -ne 0 ]]
-          then 
-            echo "git-state<<EOF" >> $GITHUB_OUTPUT
-            cat git-state.log >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-
-            echo "make lint made git state dirty, please run make lint locally and update PR"
-            exit 1
-          fi
+      - name: Check git state
+        id: git-check
+        uses: ./.github/actions/check-git
 
       - name: Fetch base branch
         if: ${{ github.event_name == 'pull_request' }}
         run: git fetch origin ${{ github.base_ref }}
-      - name: Start Redis
-        uses: supercharge/redis-github-action@1.2.0
-        with:
-          redis-version: ${{ matrix.redis-version }}
+
+      - name: golangci-lint
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
+
+      - name: Hygiene tests passing
+        id: hygiene
+        run: date
 
       - name: Cache
         uses: actions/cache@v2
@@ -84,9 +67,8 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Run Gateway Tests
-        id: ci-tests
         run: |
-          ./bin/ci-tests.sh 2>&1
+          ./bin/ci-tests.sh
 
       - name: Notify status
         if: ${{ failure() && github.event.pull_request.number }}
@@ -98,18 +80,10 @@ jobs:
 
             ## git-state
             ```shellsession
-            ${{ steps.hygiene.outputs.git-state || 'all ok' }}
+            ${{ steps.git-check.outputs.git-state || 'all ok' }}
             ```
             
             Please look at [the run](https://github.com/TykTechnologies/tyk/pull/${{ github.event.pull_request.number }}/checks?check_run_id=${{ github.run_id }}) or in the _Checks_ tab.
-
-      - name: Download golangci-lint
-        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
-
-      - name: golangci-lint
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
 
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master

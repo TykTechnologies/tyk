@@ -7,7 +7,7 @@ includes:
 
 tasks:
   docker:
-    desc: "build Tyk gateway internal/tyk-gateway"
+    desc: "Build Tyk gateway internal/tyk-gateway"
     cmds:
       - docker build --platform "linux/amd64" --rm -t internal/tyk-gateway .
     sources:
@@ -15,6 +15,26 @@ tasks:
       - go.sum
       - './**/*.go'
 
+  fmt:
+    desc: Run formatters
+    aliases: [tidy]
+    cmds:
+      - go fmt ./...
+      - gofmt -w .
+      - goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
+      - go mod tidy
+
+  lint:
+    desc: Run linters
+    cmds:
+      - go test -count 1 ./cli/linter/...
+      - faillint -ignore-tests -paths "$(grep -v '^#' .faillint | xargs echo | sed 's/ /,/g')" ./...
+
+  codegen:
+    desc: Run code generation
+    aliases: [gen]
+    cmds:
+      - go generate ./...
 
   test:plugin-compiler:
     desc: "Plugin compiler local build/test"
