@@ -14,7 +14,7 @@ jobs:
   test:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     runs-on: ubuntu-latest
-    container: titpetric/base-ci:latest
+    container: titpetric/ci-base:latest
 
     strategy:
       fail-fast: true
