@@ -70,21 +70,6 @@ jobs:
         run: |
           ./bin/ci-tests.sh
 
-      - name: Notify status
-        if: ${{ failure() && github.event.pull_request.number }}
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            # :boom: CI tests failed :see_no_evil:
-
-            ## git-state
-            ```shellsession
-            ${{ steps.git-check.outputs.git-state || 'all ok' }}
-            ```
-            
-            Please look at [the run](https://github.com/TykTechnologies/tyk/pull/${{ github.event.pull_request.number }}/checks?check_run_id=${{ github.run_id }}) or in the _Checks_ tab.
-
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
         with:

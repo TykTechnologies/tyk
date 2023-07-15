@@ -9,8 +9,6 @@ runs:
       run: |
         git add .
         if [[ -n "$(git status --porcelain)" ]]; then
-           echo "git-state<<EOF" >> $GITHUB_OUTPUT
-           git diff --cached >> $GITHUB_OUTPUT
-           echo "EOF" >> $GITHUB_OUTPUT
+           PAGER= git diff --cached
            exit 1
         fi
