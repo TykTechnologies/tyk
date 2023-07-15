@@ -13,7 +13,7 @@ vars:
   release: latest
   base: tykio/golang-cross:1.19-bullseye
   dockerfile: Dockerfile
-  tag: '{{.GITHUB_TAG | default "v5.1.0-dev"}}'
+  tag: '{{.GITHUB_TAG | default "v5.2.0-dev"}}'
   sha: '{{.GITHUB_SHA | default "730d98024fda2a9fa9b3dddc6c4cc031813876ff"}}'
   platform: '{{.BUILD_PLATFORM | default "linux/amd64"}}'
   root:
@@ -57,6 +57,8 @@ tasks:
         --build-arg=GITHUB_SHA={{.sha}} \
         -t {{.image}} \
         -f {{.release}}/{{.dockerfile}} {{.release}}
+      - |
+        docker inspect {{.image}} | jq .
 
   docker:push:
     desc: Push CI base image

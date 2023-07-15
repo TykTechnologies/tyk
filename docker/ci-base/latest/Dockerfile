@@ -71,3 +71,12 @@ RUN --mount=type=cache,mode=0755,target=/go/pkg/mod task
 
 # Clean up work directory
 RUN rm -rf /src && mkdir /src
+
+# Set envs
+
+ARG GITHUB_SHA
+ARG GITHUB_TAG
+ENV GITHUB_SHA ${GITHUB_SHA}
+ENV GITHUB_TAG ${GITHUB_TAG}
+
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
