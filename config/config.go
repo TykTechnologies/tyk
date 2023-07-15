@@ -1218,19 +1218,31 @@ func Load(paths []string, conf *Config) error {
 	}
 
 	if len(paths) > 0 && r == nil {
-		path := paths[0]
-		log.Warnf("No config file found, writing default to %s", path)
-		if err := WriteDefault(path, conf); err != nil {
+		filename := paths[0]
+		log.Warnf("No config file found, writing default to %s", filename)
+		if err := WriteDefault(filename, conf); err != nil {
 			return err
 		}
 		log.Info("Loading default configuration...")
-		return Load([]string{path}, conf)
+		return Load([]string{filename}, conf)
 	}
 
-	if err := json.NewDecoder(r).Decode(&conf); err != nil {
-		return fmt.Errorf("couldn't unmarshal config: %v", err)
+	if r != nil {
+		if err := json.NewDecoder(r).Decode(&conf); err != nil {
+			return fmt.Errorf("couldn't unmarshal config: %v", err)
+		}
 	}
 
+	if err := FillEnv(conf); err != nil {
+		log.WithError(err).Error("Failed to process environment variables after config file load")
+		return err
+	}
+
+	return nil
+}
+
+// FillEnv will inspect the environment and fill the config.
+func FillEnv(conf *Config) error {
 	shouldOmit, omitEnvExist := os.LookupEnv(envPrefix + "_OMITCONFIGFILE")
 	if omitEnvExist && strings.ToLower(shouldOmit) == "true" {
 		*conf = Config{}
