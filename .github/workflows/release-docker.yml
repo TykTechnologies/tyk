@@ -37,7 +37,7 @@ jobs:
           pull: true
           push: false
           context: .
-          file: docker/ci-base/Dockerfile
+          file: docker/ci-base/latest/Dockerfile
           platforms: linux/amd64
           build-args: |
             GITHUB_SHA=${{ github.sha }}
@@ -52,7 +52,7 @@ jobs:
         with:
           push: false
           context: .
-          file: docker/ci-base/Dockerfile
+          file: docker/ci-base/latest/Dockerfile
           platforms: linux/amd64
           build-args: |
             GITHUB_SHA=${{ github.sha }}
