@@ -1217,7 +1217,7 @@ func Load(paths []string, conf *Config) error {
 		return err
 	}
 
-	if r == nil {
+	if len(paths) > 0 && r == nil {
 		path := paths[0]
 		log.Warnf("No config file found, writing default to %s", path)
 		if err := WriteDefault(path, conf); err != nil {
