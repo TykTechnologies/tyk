@@ -6,7 +6,7 @@ export TYK_GW_STORAGE_ADDRS=${TYK_GW_STORAGE_HOST}:6379
 TEST_TIMEOUT=15m
 
 package=$(go list .)
-packages=$(go list ./... | tail -n +2 | sed -e "s|$package/||g" | egrep -v -e '(\/|testing)')
+packages=$(go list ./... | tail -n +2 | sed -e "s|$package/||g" | grep -v '/')
 
 # Support passing custom flags (-json, etc.)
 OPTS="$@"
