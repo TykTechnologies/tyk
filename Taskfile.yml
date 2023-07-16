@@ -98,3 +98,11 @@ tasks:
       - task: test:opentelemetry:test
       - task: test:opentelemetry:teardown
 
+  go:list:
+    desc: "List gateway root packages for tests"
+    silent: true
+    vars:
+      package:
+        sh: go list .
+    cmds:
+      - go list ./... | tail -n +2 | sed -e "s|{{.package}}/||g" | grep -v /
