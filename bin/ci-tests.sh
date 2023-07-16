@@ -1,5 +1,7 @@
 #!/bin/bash
 
+TYK_GW_STORAGE_HOST=${TYK_GW_STORAGE_HOST:-redis}
+
 TEST_TIMEOUT=15m
 
 PKGS="$(go list ./...)"
