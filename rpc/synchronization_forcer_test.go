@@ -28,7 +28,7 @@ func init() {
 
 	connected := rc.WaitConnect(timeout)
 	if !connected {
-		panic("can't connect to redis, timeout")
+		panic("can't connect to redis '" + conf.Storage.Host+"', timeout")
 	}
 }
 
