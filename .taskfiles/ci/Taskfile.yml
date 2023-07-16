@@ -1,0 +1,62 @@
+---
+version: "3"
+
+vars:
+  image: titpetric/ci-base
+  redis: localhost
+  timeout: 15m
+  testflags: -race -count=1 -tags goplugin -v -timeout {{.timeout}}
+  root:
+    sh: git rev-parse --show-toplevel
+
+tasks:
+  default:
+    desc: "Run all CI tests"
+    cmds:
+      - task: scripts
+      - task: storage
+      - task: rpc
+      - task: coprocess
+
+  scripts:
+    desc: "Run bin/ci-tests.sh"
+    vars:
+      temp: "/tmp/tyk-ci"
+      docker: 'docker run -it --env CI=true --env TYK_GW_STORAGE_HOST={{.redis}} --net=host --rm -v {{.root}}:/src -v {{.temp}}/buildcache:/root/.cache/go-build -v {{.temp}}/pkg:/go/pkg/mod -w /src {{.image}}'
+    cmds:
+      - mkdir -p {{.temp}}/{pkg,buildcache}
+      - |
+        {{ .docker }} ./bin/ci-tests.sh
+
+  rpc:
+    desc: "Run rpc tests"
+    vars:
+      temp: "/tmp/tyk-ci"
+      docker: 'docker run --env CI=true --env TYK_GW_STORAGE_HOST={{.redis}} --net=host --rm -v {{.root}}:/src -v {{.temp}}/buildcache:/root/.cache/go-build -v {{.temp}}/pkg:/go/pkg/mod -w /src {{.image}}'
+    cmds:
+      - mkdir -p {{.temp}}/{pkg,buildcache}
+      - |
+        {{ .docker }} go test {{.testflags}} ./rpc/...
+
+  storage:
+    desc: "Run storage tests"
+    vars:
+      temp: "/tmp/tyk-ci"
+      docker: 'docker run --env CI=true --env TYK_GW_STORAGE_HOST={{.redis}} --net=host --rm -v {{.root}}:/src -v {{.temp}}/buildcache:/root/.cache/go-build -v {{.temp}}/pkg:/go/pkg/mod -w /src {{.image}}'
+    cmds:
+      - mkdir -p {{.temp}}/{pkg,buildcache}
+      - |
+        {{ .docker }} go test {{.testflags}} ./storage/...
+
+  coprocess:
+    desc: "Run coprocess tests"
+    vars:
+      temp: "/tmp/tyk-ci"
+      docker: 'docker run  --env CI=true --env TYK_GW_STORAGE_HOST={{.redis}} --net=host --rm -v {{.root}}:/src -v {{.temp}}/buildcache:/root/.cache/go-build -v {{.temp}}/pkg:/go/pkg/mod -w /src {{.image}}'
+    cmds:
+      - mkdir -p {{.temp}}/{pkg,buildcache}
+      - |
+        {{ .docker }} go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
+      - |
+        {{ .docker }} go test {{.testflags}} ./coprocess/python/...
+
