@@ -8,21 +8,19 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
 var rc *storage.RedisController
 
 func init() {
-	var conf config.Config
-	err := config.FillEnv(&conf)
+	conf, err := NewConfig()
 	if err != nil {
 		panic(err)
 	}
 
 	rc = storage.NewRedisController(context.Background())
-	go rc.ConnectToRedis(context.Background(), nil, &conf)
+	go rc.ConnectToRedis(context.Background(), nil, conf)
 
 	timeout, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
