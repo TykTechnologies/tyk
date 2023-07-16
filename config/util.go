@@ -8,9 +8,9 @@ import (
 	"runtime"
 )
 
-// NewConfig produces a new config object by parsing
+// New produces a new config object by parsing
 // the default configuration for the values.
-func NewConfig() (*Config, error) {
+func New() (*Config, error) {
 	cfg := new(Config)
 
 	cfgFile, err := findFile("tyk.conf")

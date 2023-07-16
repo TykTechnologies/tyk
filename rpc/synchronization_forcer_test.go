@@ -15,7 +15,7 @@ import (
 var rc *storage.RedisController
 
 func init() {
-	conf, err := config.NewConfig()
+	conf, err := config.New()
 	if err != nil {
 		panic(err)
 	}
@@ -28,7 +28,7 @@ func init() {
 
 	connected := rc.WaitConnect(timeout)
 	if !connected {
-		panic("can't connect to redis '" + conf.Storage.Host+"', timeout")
+		panic("can't connect to redis '" + conf.Storage.Host + "', timeout")
 	}
 }
 
