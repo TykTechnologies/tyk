@@ -15,7 +15,7 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.set-targets.outputs.tag }}
+      tag: ${{ fromJson(steps.verify-tag.outputs.result) && fromJson(steps.verify-tag.outputs.result).tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -25,13 +25,31 @@ jobs:
       - name: Set up buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Get git tag
-        id: set-target
-        shell: bash
-        run:
-          ref=${{ github.event.workflow_run.head_branch }}
-          current_tag=${ref##*/}
-          echo "tag=${current_tag}" >> GITHUB_OUTPUT
+      - name: Setup node to match github-script v6 node runtime
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+
+      - name: install dependency
+        run: npm install semver
+
+      - name: Verify whether valid semver tag
+        id: verify-tag
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const semver = require('semver')
+            var out  = {tag: null, majorminor: null}
+            let tag = semver.valid(context.payload.workflow_run.head_branch)
+            if (tag == null) {
+              return out
+            } else {
+              out.tag = 'v'+tag
+            }
+            if (semver.prerelease(tag) == null) {
+              out.majorminor = 'v'+semver.major(tag)+'.'+semver.minor(tag)
+            }
+            return out
 
       - name: Set docker metadata
         id: set-metadata
@@ -40,11 +58,13 @@ jobs:
           images: tykio/tyk-plugin-compiler
           labels: |
             org.opencontainers.image.title=tyk-plugin-compiler
-            org.opencontainers.image.version=${{ steps.set-target.outputs.tag }}
+            org.opencontainers.image.version=${{ fromJson(steps.verify-tag.outputs.result).tag }}
             org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway
           tags: |
-            type=semver,pattern=v{{version}}
-            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{version}},value=${{ fromJson(steps.verify-tag.outputs.result).tag }}
+            type=raw,value=${{ fromJson(steps.verify-tag.outputs.result).tag }}
+            type=raw,value=${{ fromJson(steps.verify-tag.outputs.result).majorminor }}
+
 
       - name: Login to Dockerhub
         uses: docker/login-action@v2
@@ -58,18 +78,18 @@ jobs:
           context: .
           file: ci/images/plugin-compiler/Dockerfile
           platforms: linux/amd64
-          # push: ${{ startsWith(github.event.workflow_run.head_branch, 'refs/tags') }}
+          push: ${{ fromJson(steps.verify-tag.outputs.result).tag != '' }}
           labels: ${{ steps.set-metadata.outputs.labels }}
           tags: ${{ steps.set-metadata.outputs.tags }}
           build-args: |
             BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.event.workflow_run.head_sha }}
-            GITHUB_TAG=${{ steps.set-target.outputs.tag }}
+            GITHUB_TAG=${{ fromJson(steps.verify-tag.outputs.result).tag }}
 
   smoke-tests:
-    if: startsWith(github.event.workflow_run.head_branch, 'refs/tags')
     needs:
       - docker-build
+    if: ${{ needs.docker-build.outputs.tag != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
