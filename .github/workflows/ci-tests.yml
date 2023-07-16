@@ -7,6 +7,7 @@ on:
       - release-**
 
 env:
+  TYK_DB_REDISHOST: redis
   TYK_GW_STORAGE_HOST: redis
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
