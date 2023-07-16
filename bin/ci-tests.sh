@@ -7,7 +7,16 @@ export PYTHON_VERSION=${PYTHON_VERSION:-3.9}
 TEST_TIMEOUT=15m
 
 package=$(go list .)
-packages=$(go list ./... | tail -n +2 | sed -e "s|$package/||g" | grep -v '/')
+
+# This is a version to print just the root packages, so we
+# could test it with `./...`. Alas, test setups have poor
+# cleanups and end up conflicting.
+
+#packages=$(go list ./... | tail -n +2 | sed -e "s|$package/||g" | grep -v '/')
+
+# This is a version that prints all the packages as reported
+# by go list, sanitized into local filenames.
+packages=$(go list ./... | tail -n +2 | sed -e "s|$package/||g")
 
 # Support passing custom flags (-json, etc.)
 OPTS="$@"
@@ -27,7 +36,8 @@ go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugi
 set -x
 
 for pkg in ${packages}; do
-    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${pkg}.cov ./${pkg}/...
+    # pkg gets converted from a/b/c to a-b-c to not conflict coverage profiles
+    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${pkg//\//-}.cov ./${pkg} # /... (crying emoji)
 done
 
 # run rpc tests separately (@titpetric: why? how is this not covered above?)
