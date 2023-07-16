@@ -5,7 +5,8 @@ export TYK_GW_STORAGE_ADDRS=${TYK_GW_STORAGE_HOST}:6379
 
 TEST_TIMEOUT=15m
 
-PKGS="$(go list ./...)"
+package=$(go list .)
+packages=$(go list ./... | tail -n +2 | sed -e "s|$package/||g" | egrep -v -e '(\/|testing)')
 
 # Support passing custom flags (-json, etc.)
 OPTS="$@"
@@ -22,13 +23,12 @@ set -e
 echo "Building go plugin"
 go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
 
-for pkg in ${PKGS}; do
-    coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
+set -x
 
-    echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg}
-    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg}
+for pkg in ${packages}; do
+    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${pkg}.cov ./${pkg}/...
 done
 
-# run rpc tests separately
+# run rpc tests separately (@titpetric: why? how is this not covered above?)
 rpc_tests='SyncAPISpecsRPC|OrgSessionWithRPCDown'
 go test -count=1 -timeout ${TEST_TIMEOUT} -v -coverprofile=gateway-rpc.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"'
