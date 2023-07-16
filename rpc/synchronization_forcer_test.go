@@ -8,13 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
 var rc *storage.RedisController
 
 func init() {
-	conf, err := NewConfig()
+	conf, err := config.NewConfig()
 	if err != nil {
 		panic(err)
 	}
