@@ -500,7 +500,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	if trace.IsEnabled() { // trace.IsEnabled = check if opentracing is enabled
 		chainDef.ThisHandler = trace.Handle(spec.Name, chain)
 	} else if gw.GetConfig().OpenTelemetry.Enabled { // check if opentelemetry is enabled
-		chainDef.ThisHandler = otel.HTTPHandler(spec.Name, chain, gw.TracerProvider)
+		chainDef.ThisHandler = otel.HTTPHandler(spec.Name, chain, gw.TracerProvider, otel.ApidefSpanAttributes(spec.APIDefinition)...)
 	} else {
 		chainDef.ThisHandler = chain
 	}
