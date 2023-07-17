@@ -969,7 +969,7 @@ func parseForm(r *http.Request) {
 }
 
 type BaseTykResponseHandler struct {
-	Spec *APISpec
+	Spec *APISpec `json:"-"`
 	Gw   *Gateway `json:"-"`
 }
 
