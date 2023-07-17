@@ -101,6 +101,8 @@ github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksr
 github.com/TykTechnologies/openid2go v0.1.2/go.mod h1:gYfkqeWa+lY3Xz/Z2xYtIzmYXynlgKZaBIbPCqdcdMA=
 github.com/TykTechnologies/opentelemetry v0.0.8-0.20230717140847-75763736e2c0 h1:zxyB9aHIb+/VsGpCO0T6Vglfm+0abFOFrFWZ+K26tVY=
 github.com/TykTechnologies/opentelemetry v0.0.8-0.20230717140847-75763736e2c0/go.mod h1:bltWc1OyxnIyiado+XTl85g4EbMiCUjH52W12rbW194=
+github.com/TykTechnologies/opentelemetry v0.0.8 h1:0GjNLv4bTIyZG6aZd9oQH58TkPV4My6pPRHIVdJKW4k=
+github.com/TykTechnologies/opentelemetry v0.0.8/go.mod h1:bltWc1OyxnIyiado+XTl85g4EbMiCUjH52W12rbW194=
 github.com/TykTechnologies/storage v1.0.5 h1:lfMljPueySAW7Mpc70g1/qC5n2LKNcKgQs+Xw30apP8=
 github.com/TykTechnologies/storage v1.0.5/go.mod h1:+0S3KuNlLGBTMTSFREuZFm315zzXjuuCO4QSAPy+d3M=
 github.com/TykTechnologies/tyk-pump v1.8.0-rc4 h1:odhM/skFNYWBdSL+atx49f6/PleNRq6l4E9SyeDfmTg=
