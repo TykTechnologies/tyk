@@ -59,7 +59,7 @@ cd tyk-gateway-docker
 docker compose up
 ```
 
-You can run this in detach mode use the `-d` flag: `docker-compose up -d`
+You can run this in detach mode use the `-d` flag: `docker compose up -d`
 
 **Congratulations, you’re done!**
 
