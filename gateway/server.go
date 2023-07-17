@@ -888,10 +888,13 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 // Create the response processor chain
 func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
-	var responseMWChain []TykResponseHandler
-	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{Spec: spec})
+	var (
+		responseMWChain []TykResponseHandler
+		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
+	)
+	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler})
 	for _, processorDetail := range spec.ResponseProcessors {
-		processor := gw.responseProcessorByName(processorDetail.Name)
+		processor := gw.responseProcessorByName(processorDetail.Name, baseHandler)
 		if processor == nil {
 			mainLog.Error("No such processor: ", processorDetail.Name)
 			return
@@ -907,9 +910,9 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		var processor TykResponseHandler
 		//is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
-			processor = gw.responseProcessorByName("goplugin_res_hook")
+			processor = gw.responseProcessorByName("goplugin_res_hook", baseHandler)
 		} else {
-			processor = gw.responseProcessorByName("custom_mw_res_hook")
+			processor = gw.responseProcessorByName("custom_mw_res_hook", baseHandler)
 		}
 
 		// TODO: perhaps error when plugin support is disabled?

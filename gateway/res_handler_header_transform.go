@@ -20,9 +20,8 @@ type HeaderTransformOptions struct {
 }
 
 type HeaderTransform struct {
-	Spec   *APISpec
+	BaseTykResponseHandler
 	config HeaderTransformOptions
-	Gw     *Gateway `json:"-"`
 }
 
 func (h *HeaderTransform) Enabled() bool {

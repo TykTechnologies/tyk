@@ -512,8 +512,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 }
 
 type CustomMiddlewareResponseHook struct {
+	BaseTykResponseHandler
 	mw *CoProcessMiddleware
-	Gw *Gateway `json:"-"`
 }
 
 func (CustomMiddlewareResponseHook) Enabled() bool {

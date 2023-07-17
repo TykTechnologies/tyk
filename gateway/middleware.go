@@ -910,18 +910,18 @@ type TykGoPluginResponseHandler interface {
 	HandleGoPluginResponse(http.ResponseWriter, *http.Response, *http.Request) error
 }
 
-func (gw *Gateway) responseProcessorByName(name string) TykResponseHandler {
+func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykResponseHandler) TykResponseHandler {
 	switch name {
 	case "header_injector":
-		return &HeaderInjector{Gw: gw}
+		return &HeaderInjector{BaseTykResponseHandler: baseHandler}
 	case "response_body_transform_jq":
-		return &ResponseTransformJQMiddleware{Gw: gw}
+		return &ResponseTransformJQMiddleware{BaseTykResponseHandler: baseHandler}
 	case "header_transform":
-		return &HeaderTransform{Gw: gw}
+		return &HeaderTransform{BaseTykResponseHandler: baseHandler}
 	case "custom_mw_res_hook":
-		return &CustomMiddlewareResponseHook{Gw: gw}
+		return &CustomMiddlewareResponseHook{BaseTykResponseHandler: baseHandler}
 	case "goplugin_res_hook":
-		return &ResponseGoPluginMiddleware{}
+		return &ResponseGoPluginMiddleware{BaseTykResponseHandler: baseHandler}
 	}
 
 	return nil
@@ -967,3 +967,26 @@ func parseForm(r *http.Request) {
 
 	r.ParseForm()
 }
+
+type BaseTykResponseHandler struct {
+	Spec *APISpec
+	Gw   *Gateway `json:"-"`
+}
+
+func (b *BaseTykResponseHandler) Enabled() bool {
+	return true
+}
+
+func (b *BaseTykResponseHandler) Init(i interface{}, spec *APISpec) error {
+	return nil
+}
+
+func (b *BaseTykResponseHandler) Name() string {
+	return "BaseTykResponseHandler"
+}
+
+func (b *BaseTykResponseHandler) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	return nil
+}
+
+func (b *BaseTykResponseHandler) HandleError(writer http.ResponseWriter, h *http.Request) {}

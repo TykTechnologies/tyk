@@ -10,8 +10,7 @@ import (
 )
 
 type ResponseTransformJQMiddleware struct {
-	Spec *APISpec
-	Gw   *Gateway `json:"-"`
+	BaseTykResponseHandler
 }
 
 func (ResponseTransformJQMiddleware) Enabled() bool {

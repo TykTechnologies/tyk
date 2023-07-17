@@ -19,7 +19,7 @@ import (
 )
 
 type ResponseTransformMiddleware struct {
-	Spec *APISpec
+	BaseTykResponseHandler
 }
 
 func (r *ResponseTransformMiddleware) Enabled() bool {
