@@ -853,8 +853,12 @@ IgnoreAuthentication ignores authentication on request by allowance.
 **Field: `transformRequestMethod` ([TransformRequestMethod](#transformrequestmethod))**
 TransformRequestMethod allows you to transform the method of a request.
 
-**Field: `transformRequestBody` ([TransformRequestBody](#transformrequestbody))**
+**Field: `transformRequestBody` ([TransformBody](#transformbody))**
 TransformRequestBody allows you to transform request body.
+When both `path` and `body` are provided, body would take precedence.
+
+**Field: `transformResponseBody` ([TransformBody](#transformbody))**
+TransformResponseBody allows you to transform response body.
 When both `path` and `body` are provided, body would take precedence.
 
 **Field: `cache` ([CachePlugin](#cacheplugin))**
@@ -894,13 +898,13 @@ Enabled enables Method Transform for the given path and method.
 ToMethod is the http method value to which the method of an incoming request will be transformed.
 
 
-### **TransformRequestBody**
+### **TransformBody**
 
 **Field: `enabled` (`boolean`)**
-Enabled enables transform request body middleware.
+Enabled enables transform request/request body middleware.
 
 **Field: `format` (`object`)**
-Format of the request body, xml or json.
+Format of the request/response body, xml or json.
 
 **Field: `path` (`string`)**
 Path file path for the template.
