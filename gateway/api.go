@@ -3377,7 +3377,10 @@ func ctxSetSpanAttributes(r *http.Request, mwName string, attrs ...otel.SpanAttr
 
 func ctxGetSpanAttributes(r *http.Request, mwName string) (attrs []otel.SpanAttribute) {
 	if v := r.Context().Value(mwName); v != nil {
-		attrs = v.([]otel.SpanAttribute)
+		got, ok := v.([]otel.SpanAttribute)
+		if ok {
+			attrs = got
+		}
 	}
 	return
 }
