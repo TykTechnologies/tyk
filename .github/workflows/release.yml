@@ -203,7 +203,7 @@ jobs:
 
   tat:
     needs: ci
-    uses: tyklabs/tyk-pro/.github/workflows/tests.yml@v1
+    uses: tyklabs/tyk-pro/.github/workflows/tests.yml@v1.0.1
     with:      
       tyk-version: ${{ github.ref_name }}
       tyk-analytics-version: ${{ github.ref_name }}
