@@ -15,9 +15,8 @@ type HeaderInjectorOptions struct {
 }
 
 type HeaderInjector struct {
-	Spec   *APISpec
+	BaseTykResponseHandler
 	config HeaderInjectorOptions
-	Gw     *Gateway `json:"-"`
 }
 
 func (HeaderInjector) Name() string {

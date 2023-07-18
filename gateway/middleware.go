@@ -195,6 +195,15 @@ func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware)
 	return false
 }
 
+func (gw *Gateway) responseMWAppendEnabled(chain *[]TykResponseHandler, responseMW TykResponseHandler) bool {
+	if responseMW.Enabled() {
+		*chain = append(*chain, responseMW)
+		return true
+	}
+
+	return false
+}
+
 func (gw *Gateway) mwList(mws ...TykMiddleware) []alice.Constructor {
 	var list []alice.Constructor
 	for _, mw := range mws {
@@ -889,6 +898,7 @@ func (b BaseMiddleware) generateSessionID(id string) string {
 }
 
 type TykResponseHandler interface {
+	Enabled() bool
 	Init(interface{}, *APISpec) error
 	Name() string
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
@@ -900,20 +910,18 @@ type TykGoPluginResponseHandler interface {
 	HandleGoPluginResponse(http.ResponseWriter, *http.Response, *http.Request) error
 }
 
-func (gw *Gateway) responseProcessorByName(name string) TykResponseHandler {
+func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykResponseHandler) TykResponseHandler {
 	switch name {
 	case "header_injector":
-		return &HeaderInjector{Gw: gw}
-	case "response_body_transform":
-		return &ResponseTransformMiddleware{}
+		return &HeaderInjector{BaseTykResponseHandler: baseHandler}
 	case "response_body_transform_jq":
-		return &ResponseTransformJQMiddleware{Gw: gw}
+		return &ResponseTransformJQMiddleware{BaseTykResponseHandler: baseHandler}
 	case "header_transform":
-		return &HeaderTransform{Gw: gw}
+		return &HeaderTransform{BaseTykResponseHandler: baseHandler}
 	case "custom_mw_res_hook":
-		return &CustomMiddlewareResponseHook{Gw: gw}
+		return &CustomMiddlewareResponseHook{BaseTykResponseHandler: baseHandler}
 	case "goplugin_res_hook":
-		return &ResponseGoPluginMiddleware{}
+		return &ResponseGoPluginMiddleware{BaseTykResponseHandler: baseHandler}
 	}
 
 	return nil
@@ -959,3 +967,26 @@ func parseForm(r *http.Request) {
 
 	r.ParseForm()
 }
+
+type BaseTykResponseHandler struct {
+	Spec *APISpec `json:"-"`
+	Gw   *Gateway `json:"-"`
+}
+
+func (b *BaseTykResponseHandler) Enabled() bool {
+	return true
+}
+
+func (b *BaseTykResponseHandler) Init(i interface{}, spec *APISpec) error {
+	return nil
+}
+
+func (b *BaseTykResponseHandler) Name() string {
+	return "BaseTykResponseHandler"
+}
+
+func (b *BaseTykResponseHandler) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	return nil
+}
+
+func (b *BaseTykResponseHandler) HandleError(writer http.ResponseWriter, h *http.Request) {}
