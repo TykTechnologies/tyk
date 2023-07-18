@@ -146,7 +146,10 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	case apidef.AuthToken, apidef.UnsetAuth:
 		ctxSetSession(r, &session, updateSession, k.Gw.GetConfig().HashKeys)
 		k.setContextVars(r, key)
-		ctxSetSpanAttributes(r, k.Name(), otel.APIKeyAttribute(key))
+		ctxSetSpanAttributes(r, k.Name(), []otel.SpanAttribute{
+			otel.APIKeyAttribute(key),
+			otel.APIKeyAliasAttribute(session.Alias),
+		}...)
 	}
 
 	// Try using org-key format first:

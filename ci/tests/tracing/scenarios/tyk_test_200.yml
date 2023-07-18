@@ -14,16 +14,18 @@ spec:
   - selector: span[tracetest.span.type="http" name="GET /test/ip" http.method="GET"]
     name: Test main span attributes
     assertions:
-    - attr:http.method    =    "GET"
-    - attr:http.status_code    =    200
-    - attr:http.user_agent    =    "Go-http-client/1.1"
-    - attr:http.wrote_bytes    !=    0
-    - attr:tracetest.span.type    =    "http"
-    - attr:tyk.api.id  =  "3"
-    - attr:tyk.api.name  =  "TestAPI"
-    - attr:tyk.api.orgid  =  "default"
-    - attr:tyk.api.tags  not-contains "test"
-    - attr:tyk.api.path  =  "/test/"
+    - attr:http.method         =         "GET"
+    - attr:http.status_code         =         200
+    - attr:http.user_agent         =         "Go-http-client/1.1"
+    - attr:http.wrote_bytes         !=         0
+    - attr:tracetest.span.type         =         "http"
+    - attr:tyk.api.id       =       "3"
+    - attr:tyk.api.name       =       "TestAPI"
+    - attr:tyk.api.orgid       =       "default"
+    - attr:tyk.api.tags       not-contains      "test"
+    - attr:tyk.api.path       =       "/test/"
+    - attr:tyk.gw.hybrid  =   "false"
+    - attr:tyk.gw.id != ""
   - selector: span[tracetest.span.type="general" name="Tracetest trigger"] span[tracetest.span.type="general"]
     name: Check if it contains Version and Rate middlewares
     assertions:

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/attribute"
 
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
@@ -104,38 +105,6 @@ func Test_InitOpenTelemetry(t *testing.T) {
 	}
 }
 
-/*
-func ApidefSpanAttributes(apidef *apidef.APIDefinition) []SpanAttribute {
-	attrs := []SpanAttribute{
-		semconv.TykAPIName(apidef.Name),
-		semconv.TykAPIOrgID(apidef.OrgID),
-		semconv.TykAPIID(apidef.APIID),
-		semconv.TykAPIListenPath(apidef.Proxy.ListenPath),
-	}
-
-	if !apidef.TagsDisabled {
-		tags := apidef.Tags
-		tags = append(tags, apidef.TagHeaders...)
-
-		attrs = append(attrs, semconv.TykAPITags(tags...))
-	}
-
-	return attrs
-}
-
-func APIVersionAttribute(version string) SpanAttribute {
-	if version == "" {
-		version = "Non Versioned"
-	}
-	return semconv.TykAPIVersion(version)
-}
-
-var APIKeyAttribute = semconv.TykAPIKey
-
-var OAuthClientIDAttribute = semconv.TykOauthID
-
-*/
-
 func Test_ApidefSpanAttributes(t *testing.T) {
 	tcs := []struct {
 		name               string
@@ -201,7 +170,7 @@ func Test_APIVersionAttribute(t *testing.T) {
 		{
 			name:                   "empty version",
 			givenVersion:           "",
-			exepectedSpanAttribute: tyktrace.NewAttribute(string(semconv.TykAPIVersionKey), "Non Versioned"),
+			exepectedSpanAttribute: tyktrace.NewAttribute(string(semconv.TykAPIVersionKey), NON_VERSIONED),
 		},
 		{
 			name:                   "with version",
@@ -214,6 +183,65 @@ func Test_APIVersionAttribute(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := APIVersionAttribute(tc.givenVersion)
 			assert.Equal(t, tc.exepectedSpanAttribute, actual)
+		})
+	}
+}
+
+func TestGatewaySpanAttributes(t *testing.T) {
+	tests := []struct {
+		name         string
+		gwID         string
+		isHybrid     bool
+		groupID      string
+		isSegmented  bool
+		segmentTags  []string
+		expectedAttr []attribute.KeyValue
+	}{
+		{
+			name:        "Non-hybrid, non-segmented gateway",
+			gwID:        "gw1",
+			isHybrid:    false,
+			groupID:     "",
+			isSegmented: false,
+			segmentTags: nil,
+			expectedAttr: []attribute.KeyValue{
+				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw1"),
+				tyktrace.NewAttribute(string(semconv.TykGWHybridKey), false),
+			},
+		},
+		{
+			name:        "Hybrid, non-segmented gateway",
+			gwID:        "gw2",
+			isHybrid:    true,
+			groupID:     "group1",
+			isSegmented: false,
+			segmentTags: nil,
+			expectedAttr: []attribute.KeyValue{
+				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw2"),
+				tyktrace.NewAttribute(string(semconv.TykGWHybridKey), true),
+				tyktrace.NewAttribute(string(semconv.TykHybridGWGroupIDKey), "group1"),
+			},
+		},
+		{
+			name:        "Hybrid, segmented gateway",
+			gwID:        "gw3",
+			isHybrid:    true,
+			groupID:     "group2",
+			isSegmented: true,
+			segmentTags: []string{"tag1", "tag2"},
+			expectedAttr: []attribute.KeyValue{
+				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw3"),
+				tyktrace.NewAttribute(string(semconv.TykGWHybridKey), true),
+				tyktrace.NewAttribute(string(semconv.TykHybridGWGroupIDKey), "group2"),
+				tyktrace.NewAttribute(string(semconv.TykGWSegmentTagsKey), []string{"tag1", "tag2"}),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attrs := GatewaySpanAttributes(tt.gwID, tt.isHybrid, tt.groupID, tt.isSegmented, tt.segmentTags)
+			assert.Equal(t, tt.expectedAttr, attrs)
 		})
 	}
 }

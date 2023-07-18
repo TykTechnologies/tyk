@@ -36,6 +36,10 @@ const (
 	SPAN_STATUS_UNSET = tyktrace.SPAN_STATUS_UNSET
 )
 
+const (
+	NON_VERSIONED = "Non Versioned"
+)
+
 // InitOpenTelemetry initializes OpenTelemetry - it returns a TracerProvider
 // which can be used to create a tracer. If OpenTelemetry is disabled or misconfigured,
 // a NoopProvider is returned.
@@ -79,13 +83,32 @@ func ApidefSpanAttributes(apidef *apidef.APIDefinition) []SpanAttribute {
 	return attrs
 }
 
+func GatewaySpanAttributes(gwID string, isHybrid bool, groupID string, isSegmented bool, segmentTags []string) []SpanAttribute {
+	attrs := []SpanAttribute{
+		semconv.TykGWID(gwID),
+		semconv.TykGWHybrid(isHybrid),
+	}
+
+	if isHybrid {
+		attrs = append(attrs, semconv.TykHybridGWGroupID(groupID))
+	}
+
+	if isSegmented {
+		attrs = append(attrs, semconv.TykGWSegmentTags(segmentTags...))
+	}
+
+	return attrs
+}
+
 func APIVersionAttribute(version string) SpanAttribute {
 	if version == "" {
-		version = "Non Versioned"
+		version = NON_VERSIONED
 	}
 	return semconv.TykAPIVersion(version)
 }
 
 var APIKeyAttribute = semconv.TykAPIKey
+
+var APIKeyAliasAttribute = semconv.TykAPIKeyAlias
 
 var OAuthClientIDAttribute = semconv.TykOauthID
