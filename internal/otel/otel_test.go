@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	"go.opentelemetry.io/otel/attribute"
 
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
@@ -195,7 +194,7 @@ func TestGatewaySpanAttributes(t *testing.T) {
 		groupID      string
 		isSegmented  bool
 		segmentTags  []string
-		expectedAttr []attribute.KeyValue
+		expectedAttr []SpanAttribute
 	}{
 		{
 			name:        "Non-hybrid, non-segmented gateway",
@@ -204,7 +203,7 @@ func TestGatewaySpanAttributes(t *testing.T) {
 			groupID:     "",
 			isSegmented: false,
 			segmentTags: nil,
-			expectedAttr: []attribute.KeyValue{
+			expectedAttr: []SpanAttribute{
 				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw1"),
 				tyktrace.NewAttribute(string(semconv.TykGWHybridKey), false),
 			},
@@ -216,7 +215,7 @@ func TestGatewaySpanAttributes(t *testing.T) {
 			groupID:     "group1",
 			isSegmented: false,
 			segmentTags: nil,
-			expectedAttr: []attribute.KeyValue{
+			expectedAttr: []SpanAttribute{
 				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw2"),
 				tyktrace.NewAttribute(string(semconv.TykGWHybridKey), true),
 				tyktrace.NewAttribute(string(semconv.TykHybridGWGroupIDKey), "group1"),
@@ -229,7 +228,7 @@ func TestGatewaySpanAttributes(t *testing.T) {
 			groupID:     "group2",
 			isSegmented: true,
 			segmentTags: []string{"tag1", "tag2"},
-			expectedAttr: []attribute.KeyValue{
+			expectedAttr: []SpanAttribute{
 				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw3"),
 				tyktrace.NewAttribute(string(semconv.TykGWHybridKey), true),
 				tyktrace.NewAttribute(string(semconv.TykHybridGWGroupIDKey), "group2"),
