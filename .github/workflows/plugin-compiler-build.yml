@@ -61,7 +61,6 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push to dockerhub
-        if: ${{ startsWith(github.ref, 'refs/tags') }}
         uses: docker/build-push-action@v4
         with:
           context: .
