@@ -18,6 +18,11 @@ spec:
     - attr:http.method    =    "GET"
     - attr:http.scheme    =    "http"
     - attr:http.status_code    =    500
+    - attr:tyk.api.id  =  "3"
+    - attr:tyk.api.name  =  "TestAPI"
+    - attr:tyk.api.orgid  =  "default"
+    - attr:tyk.api.tags  not-contains "test"
+    - attr:tyk.api.path  =  "/test/"
   - name: Check the number of spans
     selector: "span[tracetest.span.type=\"general\" name=\"Tracetest trigger\"] span[tracetest.span.type=\"general\"],
       \nspan[tracetest.span.type = \"http\"]"

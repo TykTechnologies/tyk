@@ -79,6 +79,11 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 				span.SetStatus(otel.SPAN_STATUS_OK, "")
 			}
 
+			attrs := ctxGetSpanAttributes(r, tr.TykMiddleware.Name())
+			if len(attrs) > 0 {
+				span.SetAttributes(attrs...)
+			}
+
 			return err, i
 		}
 	}

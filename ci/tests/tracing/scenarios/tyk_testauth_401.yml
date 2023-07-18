@@ -26,3 +26,8 @@ spec:
     assertions:
     - attr:http.method = "GET"
     - attr:http.status_code = 401
+    - attr:tyk.api.id  =  "1"
+    - attr:tyk.api.name  =  "AuthAPI"
+    - attr:tyk.api.orgid  =  "default"
+    - attr:tyk.api.tags  not-contains "test"
+    - attr:tyk.api.path  =  "/test-auth/"
