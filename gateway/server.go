@@ -897,7 +897,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		processor := gw.responseProcessorByName(processorDetail.Name, baseHandler)
 		if processor == nil {
 			mainLog.Error("No such processor: ", processorDetail.Name)
-			return
+			continue
 		}
 		if err := processor.Init(processorDetail.Options, spec); err != nil {
 			mainLog.Debug("Failed to init processor: ", err)
