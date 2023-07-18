@@ -24,10 +24,6 @@ type HeaderTransform struct {
 	config HeaderTransformOptions
 }
 
-func (h *HeaderTransform) Enabled() bool {
-	return true
-}
-
 func (h *HeaderTransform) Name() string {
 	return "HeaderTransform"
 }

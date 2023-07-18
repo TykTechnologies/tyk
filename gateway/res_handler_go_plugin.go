@@ -21,10 +21,6 @@ type ResponseGoPluginMiddleware struct {
 	ResHandler func(rw http.ResponseWriter, res *http.Response, req *http.Request)
 }
 
-func (ResponseGoPluginMiddleware) Enabled() bool {
-	return true
-}
-
 func (ResponseGoPluginMiddleware) Name() string {
 	return "ResponseGoPluginMiddleware"
 }

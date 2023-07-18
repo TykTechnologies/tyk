@@ -13,10 +13,6 @@ type ResponseTransformJQMiddleware struct {
 	BaseTykResponseHandler
 }
 
-func (ResponseTransformJQMiddleware) Enabled() bool {
-	return true
-}
-
 func (ResponseTransformJQMiddleware) Name() string {
 	return "ResponseTransformJQMiddleware"
 }

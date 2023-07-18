@@ -19,10 +19,6 @@ type HeaderInjector struct {
 	config HeaderInjectorOptions
 }
 
-func (HeaderInjector) Enabled() bool {
-	return true
-}
-
 func (HeaderInjector) Name() string {
 	return "HeaderInjector"
 }
