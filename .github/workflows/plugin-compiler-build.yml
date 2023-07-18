@@ -13,6 +13,8 @@ env:
 jobs:
   docker-build:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v3
