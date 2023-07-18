@@ -80,7 +80,7 @@ require (
 )
 
 require (
-	github.com/TykTechnologies/opentelemetry v0.0.9
+	github.com/TykTechnologies/opentelemetry v0.0.10
 	go.opentelemetry.io/otel v1.16.0
 )
 
