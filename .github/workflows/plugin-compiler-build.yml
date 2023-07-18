@@ -42,7 +42,8 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: |
-            tykio/tyk-plugin-compiler
+            tykio/tyk-plugin-compiler,enable=${{ startsWith(github.ref, 'refs/tags') }}
+            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler
           labels: |
             org.opencontainers.image.title=tyk-plugin-compiler
             org.opencontainers.image.version=${{ steps.set-tag.outputs.tag  }}
@@ -50,6 +51,8 @@ jobs:
           tags: |
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern={{raw}}
+            type=raw,value=${{ github.sha }},enable=${{ !startsWith(github.ref, 'refs/tags') }}
 
       - name: Login to Dockerhub
         uses: docker/login-action@v2
@@ -64,25 +67,9 @@ jobs:
           context: .
           file: ci/images/plugin-compiler/Dockerfile
           platforms: linux/amd64
-          push: ${{ startsWith(github.ref, 'refs/tags') }}
-          labels: ${{ steps.set-metadata.outputs.labels }}
-          tags: ${{ steps.set-metadata.outputs.tags }}
-          build-args: |
-            BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
-            GITHUB_SHA=${{ github.sha }}
-            GITHUB_TAG=${{ steps.set-target.output.tag }}
-
-      - name: Push to ecr
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ci/images/plugin-compiler/Dockerfile
-          platforms: linux/amd64
           push: true
           labels: ${{ steps.set-metadata.outputs.labels }}
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:{{ steps.set-tag.outputs.tag }}
-            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:{{ github.sha }}
+          tags: ${{ steps.set-metadata.outputs.tags }}
           build-args: |
             BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
