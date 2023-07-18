@@ -20,10 +20,9 @@ import (
 	"github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 type JWTMiddleware struct {
@@ -61,6 +60,7 @@ func (k *JWTMiddleware) EnabledForSpec() bool {
 }
 
 var JWKCache cache.Repository = cache.New(240, 30)
+var VaultJWTSourceCache cache.Repository = cache.New(240, 30)
 
 type JWK struct {
 	Alg string   `json:"alg"`
@@ -185,12 +185,37 @@ func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
 	return tykId, err
 }
 
+func (k *JWTMiddleware) getJWTSignatureSourceFromVault(r *http.Request, jwtSource string) string {
+	cachedVaultJWTSourceCache, found := VaultJWTSourceCache.Get(k.Spec.APIID)
+	if !found {
+		contextData := ctxGetData(r)
+		vars := vaultMatch.FindAllString(jwtSource, -1)
+
+		jwtSource = k.Gw.replaceVariables(jwtSource, vars, contextData, vaultLabel, false)
+
+		// Cache it
+		k.Logger().Debug("Caching JWT Source from Vault")
+		VaultJWTSourceCache.Set(k.Spec.APIID, jwtSource, cache.DefaultExpiration)
+	} else {
+		jwtSource = cachedVaultJWTSourceCache.(string)
+	}
+
+	return jwtSource
+}
+
 func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.Token) (interface{}, error) {
+
 	config := k.Spec.APIDefinition
 	// Check for central JWT source
-	if config.JWTSource != "" {
+
+	jwtSource := config.JWTSource
+	if jwtSource != "" {
+		if strings.Contains(jwtSource, vaultLabel) {
+			jwtSource = k.getJWTSignatureSourceFromVault(r, jwtSource)
+		}
+
 		// Is it a URL?
-		if httpScheme.MatchString(config.JWTSource) {
+		if httpScheme.MatchString(jwtSource) {
 			return k.getSecretFromURL(config.JWTSource, token.Header[KID], k.Spec.JWTSigningMethod)
 		}
 
