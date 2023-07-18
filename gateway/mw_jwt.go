@@ -216,11 +216,11 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 
 		// Is it a URL?
 		if httpScheme.MatchString(jwtSource) {
-			return k.getSecretFromURL(config.JWTSource, token.Header[KID], k.Spec.JWTSigningMethod)
+			return k.getSecretFromURL(jwtSource, token.Header[KID], k.Spec.JWTSigningMethod)
 		}
 
 		// If not, return the actual value
-		decodedCert, err := base64.StdEncoding.DecodeString(config.JWTSource)
+		decodedCert, err := base64.StdEncoding.DecodeString(jwtSource)
 		if err != nil {
 			return nil, err
 		}
