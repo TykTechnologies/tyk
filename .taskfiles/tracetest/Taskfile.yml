@@ -15,7 +15,7 @@ tasks:
     status:
       - type tracetest
     cmds:
-      - cmd: brew install kubeshop/tracetest/tracetest
+      - cmd: brew install tracetest@0.12.2
         platforms: [darwin]
-      - cmd: curl -L https://raw.githubusercontent.com/kubeshop/tracetest/main/install-cli.sh | bash
+      - cmd: sudo apt-get install tracetest=0.12.2
         platforms: [linux]
