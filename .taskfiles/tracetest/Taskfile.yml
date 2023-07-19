@@ -12,10 +12,9 @@ tasks:
   install:
     internal: true
     desc: "Install tracetest"
-    status:
-      - type tracetest
+
     cmds:
-      - cmd: brew install tracetest@0.12.2
+      - cmd: brew install kubeshop/tracetest/tracetest@0.12.2
         platforms: [darwin]
-      - cmd: sudo apt-get install tracetest=0.12.2
+      - cmd: sudo apt-get install kubeshop/tracetest/tracetest=0.12.2
         platforms: [linux]
