@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -19,7 +21,6 @@ import (
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
-	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
@@ -64,6 +65,27 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		defer span.Finish()
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
+	} else if baseMw := tr.Base(); baseMw != nil {
+		if cfg := baseMw.Gw.GetConfig(); cfg.OpenTelemetry.Enabled {
+			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
+			defer span.End()
+
+			setContext(r, ctx)
+
+			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
+			if err != nil {
+				span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
+			} else {
+				span.SetStatus(otel.SPAN_STATUS_OK, "")
+			}
+
+			attrs := ctxGetSpanAttributes(r, tr.TykMiddleware.Name())
+			if len(attrs) > 0 {
+				span.SetAttributes(attrs...)
+			}
+
+			return err, i
+		}
 	}
 
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
@@ -133,12 +155,8 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
-				// GoPluginMiddleware are expected to send response in case of error
-				// but we still want to record error
-				_, isGoPlugin := actualMW.(*GoPluginMiddleware)
-
 				handler := ErrorHandler{*mw.Base()}
-				handler.HandleError(w, r, err.Error(), errCode, !isGoPlugin)
+				handler.HandleError(w, r, err.Error(), errCode, true)
 
 				meta["error"] = err.Error()
 
@@ -179,6 +197,15 @@ func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware)
 		*chain = append(*chain, gw.createMiddleware(mw))
 		return true
 	}
+	return false
+}
+
+func (gw *Gateway) responseMWAppendEnabled(chain *[]TykResponseHandler, responseMW TykResponseHandler) bool {
+	if responseMW.Enabled() {
+		*chain = append(*chain, responseMW)
+		return true
+	}
+
 	return false
 }
 
@@ -305,6 +332,38 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	return true
 }
 
+// clearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
+// Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
+func (t BaseMiddleware) clearSession(session *user.SessionState) {
+	policies := session.PolicyIDs()
+	for _, polID := range policies {
+		t.Gw.policiesMu.RLock()
+		policy, ok := t.Gw.policiesByID[polID]
+		t.Gw.policiesMu.RUnlock()
+		if !ok {
+			continue
+		}
+
+		all := !(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity)
+
+		if policy.Partitions.Quota || all {
+			session.QuotaMax = 0
+			session.QuotaRemaining = 0
+		}
+
+		if policy.Partitions.RateLimit || all {
+			session.Rate = 0
+			session.Per = 0
+			session.ThrottleRetryLimit = 0
+			session.ThrottleInterval = 0
+		}
+
+		if policy.Partitions.Complexity || all {
+			session.MaxQueryDepth = 0
+		}
+	}
+}
+
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
@@ -313,6 +372,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	if session.MetaData == nil {
 		session.MetaData = make(map[string]interface{})
 	}
+
+	t.clearSession(session)
 
 	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
@@ -324,6 +385,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
+			if len(policies) > 1 {
+				continue
+			}
+
 			return err
 		}
 		// Check ownership, policy org owner must be the same as API,
@@ -467,8 +532,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 
 						ar.Limit.QuotaMax = policy.QuotaMax
-						//if partition for quota is set the we must use this value in the global information of the key
-						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) || policy.Partitions.Quota {
+						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) {
 							session.QuotaMax = policy.QuotaMax
 						}
 					}
@@ -486,8 +550,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					if greaterThanFloat64(policy.Rate, ar.Limit.Rate) {
 						ar.Limit.Rate = policy.Rate
-						//if policy.Partitions.RateLimit then we must set this value in the global data of the key
-						if greaterThanFloat64(policy.Rate, session.Rate) || policy.Partitions.RateLimit {
+						if greaterThanFloat64(policy.Rate, session.Rate) {
 							session.Rate = policy.Rate
 						}
 					}
@@ -530,9 +593,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
-				if !usePartitions || policy.Partitions.Acl {
-					rights[k] = ar
-				}
+				rights[k] = ar
 			}
 
 			// Master policy case
@@ -608,6 +669,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 	// If some APIs had only ACL partitions, inherit rest from session level
 	for k, v := range rights {
+		if !didACL[k] {
+			delete(rights, k)
+			continue
+		}
+
 		if !didRateLimit[k] {
 			v.Limit.Rate = session.Rate
 			v.Limit.Per = session.Per
@@ -837,6 +903,7 @@ func (b BaseMiddleware) generateSessionID(id string) string {
 }
 
 type TykResponseHandler interface {
+	Enabled() bool
 	Init(interface{}, *APISpec) error
 	Name() string
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
@@ -848,20 +915,18 @@ type TykGoPluginResponseHandler interface {
 	HandleGoPluginResponse(http.ResponseWriter, *http.Response, *http.Request) error
 }
 
-func (gw *Gateway) responseProcessorByName(name string) TykResponseHandler {
+func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykResponseHandler) TykResponseHandler {
 	switch name {
 	case "header_injector":
-		return &HeaderInjector{Gw: gw}
-	case "response_body_transform":
-		return &ResponseTransformMiddleware{}
+		return &HeaderInjector{BaseTykResponseHandler: baseHandler}
 	case "response_body_transform_jq":
-		return &ResponseTransformJQMiddleware{Gw: gw}
+		return &ResponseTransformJQMiddleware{BaseTykResponseHandler: baseHandler}
 	case "header_transform":
-		return &HeaderTransform{Gw: gw}
+		return &HeaderTransform{BaseTykResponseHandler: baseHandler}
 	case "custom_mw_res_hook":
-		return &CustomMiddlewareResponseHook{Gw: gw}
+		return &CustomMiddlewareResponseHook{BaseTykResponseHandler: baseHandler}
 	case "goplugin_res_hook":
-		return &ResponseGoPluginMiddleware{}
+		return &ResponseGoPluginMiddleware{BaseTykResponseHandler: baseHandler}
 	}
 
 	return nil
@@ -907,3 +972,26 @@ func parseForm(r *http.Request) {
 
 	r.ParseForm()
 }
+
+type BaseTykResponseHandler struct {
+	Spec *APISpec `json:"-"`
+	Gw   *Gateway `json:"-"`
+}
+
+func (b *BaseTykResponseHandler) Enabled() bool {
+	return true
+}
+
+func (b *BaseTykResponseHandler) Init(i interface{}, spec *APISpec) error {
+	return nil
+}
+
+func (b *BaseTykResponseHandler) Name() string {
+	return "BaseTykResponseHandler"
+}
+
+func (b *BaseTykResponseHandler) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	return nil
+}
+
+func (b *BaseTykResponseHandler) HandleError(writer http.ResponseWriter, h *http.Request) {}

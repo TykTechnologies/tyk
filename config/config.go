@@ -14,6 +14,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 )
@@ -63,6 +64,8 @@ const (
 
 	DefaultDashPolicySource     = "service"
 	DefaultDashPolicyRecordName = "tyk_policies"
+
+	DefaultOTelResourceName = "tyk-gateway"
 )
 
 type PoliciesConfig struct {
@@ -92,6 +95,9 @@ type PoliciesConfig struct {
 type DBAppConfOptionsConfig struct {
 	// Set the URL to your Dashboard instance (or a load balanced instance). The URL needs to be formatted as: `http://dashboard_host:port`
 	ConnectionString string `json:"connection_string"`
+
+	// Set a timeout value, in seconds, for your Dashboard connection. Default value is 30.
+	ConnectionTimeout int `json:"connection_timeout"`
 
 	// Set to `true` to enable filtering (sharding) of APIs.
 	NodeIsSegmented bool `json:"node_is_segmented"`
@@ -234,7 +240,7 @@ type DnsCacheConfig struct {
 	TTL int64 `json:"ttl"`
 
 	CheckInterval int64 `json:"-" ignored:"true"`
-	//controls cache cleanup interval. By convention this shouldn't be exposed to a config or env_variable_setup
+	// controls cache cleanup interval. By convention this shouldn't be exposed to a config or env_variable_setup
 
 	// A strategy which will be used when a DNS query will reply with more than 1 IP Address per single host.
 	// As a DNS query response IP Addresses can have a changing order depending on DNS server balancing strategy (eg: round robin, geographically dependent origin-ip ordering, etc) this option allows you to not to limit the connection to the first host in a cached response list or prevent response caching.
@@ -312,7 +318,7 @@ type SlaveOptionsConfig struct {
 	// The maximum time in seconds that a RPC ping can last.
 	PingTimeout int `json:"ping_timeout"`
 
-	// The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed.
+	// The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed. Defaults to 5.
 	RPCPoolSize int `json:"rpc_pool_size"`
 
 	// You can use this to set a period for which the Gateway will check if there are changes in keys that must be synchronized. If this value is not set then it will default to 10 seconds.
@@ -358,9 +364,6 @@ type HttpServerOptionsConfig struct {
 
 	// Set to true to enable SSL connections
 	UseSSL bool `json:"use_ssl"`
-
-	// Enable Lets-Encrypt support
-	UseLE_SSL bool `json:"use_ssl_le"`
 
 	// Enable HTTP2 protocol handling
 	EnableHttp2 bool `json:"enable_http2"`
@@ -412,6 +415,20 @@ type HttpServerOptionsConfig struct {
 
 	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
 	Ciphers []string `json:"ssl_ciphers"`
+
+	// MaxRequestBodySize configures a maximum size limit for request body size (in bytes) for all APIs on the Gateway.
+	//
+	// Tyk Gateway will evaluate all API requests against this size limit and will respond with HTTP 413 status code if the body of the request is larger.
+	//
+	// Two methods are used to perform the comparison:
+	//  - If the API Request contains the `Content-Length` header, this is directly compared against `MaxRequestBodySize`.
+	//  - If the `Content-Length` header is not provided, the Request body is read in chunks to compare total size against `MaxRequestBodySize`.
+	//
+	// A value of zero (default) means that no maximum is set and API requests will not be tested.
+	//
+	// See more information about setting request size limits here:
+	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
+	MaxRequestBodySize int64 `json:"max_request_body_size"`
 }
 
 type AuthOverrideConf struct {
@@ -457,6 +474,9 @@ type CoProcessConfig struct {
 	// Maximum message which can be sent to gRPC server
 	GRPCSendMaxSize int `json:"grpc_send_max_size"`
 
+	// Authority used in GRPC connection
+	GRPCAuthority string `json:"grpc_authority"`
+
 	// Sets the path to built-in Tyk modules. This will be part of the Python module lookup path. The value used here is the default one for most installations.
 	PythonPathPrefix string `json:"python_path_prefix"`
 
@@ -494,6 +514,8 @@ type NewRelicConfig struct {
 	AppName string `json:"app_name"`
 	// New Relic License key
 	LicenseKey string `json:"license_key"`
+	// Enable distributed tracing
+	EnableDistributedTracing bool `json:"enable_distributed_tracing"`
 }
 
 type Tracer struct {
@@ -613,6 +635,12 @@ type Config struct {
 
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
+
+	// DisableKeyActionsByUsername disables key search by username.
+	// When this is set to `true` you are able to search for keys only by keyID or key hash (if `hash_keys` is also set to `true`)
+	// Note that if `hash_keys` is also set to `true` then the keyID will not be provided for APIs secured using basic auth. In this scenario the only search option would be to use key hash
+	// If you are using the Tyk Dashboard, you must configure this setting with the same value in both Gateway and Dashboard
+	DisableKeyActionsByUsername bool `json:"disable_key_actions_by_username"`
 
 	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
 	HashKeyFunction string `json:"hash_key_function"`
@@ -913,7 +941,11 @@ type Config struct {
 	LogLevel string `json:"log_level"`
 
 	// Section for configuring OpenTracing support
+	// Deprecated: use OpenTelemetry instead.
 	Tracer Tracer `json:"tracing"`
+
+	// Section for configuring Opentelemetry
+	OpenTelemetry otel.Config `json:"opentelemetry"`
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 

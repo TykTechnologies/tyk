@@ -545,14 +545,9 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, error) {
+func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gateway) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
 		return gw.LoadDefinitionsFromRPCBackup()
-	}
-
-	store := RPCStorageHandler{
-		DoReload: gw.DoReload,
-		Gw:       a.Gw,
 	}
 
 	if !store.Connect() {
@@ -685,6 +680,8 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 	nestDef := nestedApiDefinition{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
+		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.
+		loader.ReadFromURIFunc = openapi3.ReadFromFile
 		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(filePath))
 		if err == nil {
 			nestDef.OAS = &oas.OAS{T: *oasDoc}
@@ -1002,10 +999,8 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 					}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)
 
 					if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-						if ServiceCache != nil {
-							log.Warning("[PROXY] [CIRCUIT BREAKER] Refreshing host list")
-							ServiceCache.Delete(spec.APIID)
-						}
+						log.Warning("[PROXY] [CIRCUIT BREAKER] Refreshing host list")
+						a.Gw.ServiceCache.Delete(spec.APIID)
 					}
 
 					spec.FireEvent(EventBreakerTriggered, EventCurcuitBreakerMeta{
@@ -1802,4 +1797,13 @@ func (s *APISpec) hasVirtualEndpoint() bool {
 	}
 
 	return false
+}
+
+// isListeningOnPort checks whether the API listens on the given port.
+func (s *APISpec) isListeningOnPort(port int, gwConfig *config.Config) bool {
+	if s.ListenPort == 0 {
+		return gwConfig.ListenPort == port
+	}
+
+	return s.ListenPort == port
 }

@@ -4,10 +4,15 @@
 package goplugin_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -451,4 +456,94 @@ func TestGoPluginAPIandPerPath(t *testing.T) {
 			},
 		}...)
 	})
+}
+
+func TestGoPluginMiddleware_ProcessRequest_ShouldFailWhenNotLoaded(t *testing.T) {
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = false
+		spec.CustomPluginAuthEnabled = true
+		spec.CustomMiddleware.Driver = apidef.GoPluginDriver
+		spec.CustomMiddleware.AuthCheck.Name = "my-auth"
+		spec.CustomMiddleware.AuthCheck.Path = "auth.so"
+	})[0]
+
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/get", Code: http.StatusInternalServerError, BodyMatch: http.StatusText(http.StatusInternalServerError),
+	})
+
+	t.Run("path level", func(t *testing.T) {
+		api.CustomPluginAuthEnabled = false
+		api.UseKeylessAccess = true
+
+		v := api.VersionData.Versions["v1"]
+		v.UseExtendedPaths = true
+		v.ExtendedPaths = apidef.ExtendedPathsSet{
+			GoPlugin: []apidef.GoPluginMeta{
+				{
+					Path:       "/my-plugin",
+					Method:     http.MethodGet,
+					PluginPath: "non-existing.so",
+					SymbolName: "NonExistingPlugin",
+				},
+			},
+		}
+		api.VersionData.Versions["v1"] = v
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/get", Code: http.StatusOK},
+			{Path: "/my-plugin", Code: http.StatusInternalServerError, BodyMatch: http.StatusText(http.StatusInternalServerError)},
+		}...)
+	})
+}
+
+func TestGoPlugin_AccessingOASAPIDef(t *testing.T) {
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	const oasDocTitle = "My OAS Documentation"
+
+	oasDoc := oas.OAS{}
+	oasDoc.OpenAPI = "3.0.3"
+	oasDoc.Info = &openapi3.Info{
+		Version: "1",
+		Title:   oasDocTitle,
+	}
+	oasDoc.Paths = openapi3.Paths{}
+
+	oasDoc.SetTykExtension(&oas.XTykAPIGateway{})
+
+	err := oasDoc.Validate(context.Background())
+	assert.NoError(t, err)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+		spec.Proxy.ListenPath = "/oas-goplugin/"
+		spec.UseKeylessAccess = true
+		spec.UseStandardAuth = false
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+			Pre: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPluginAccessingOASAPI",
+					Path: "../test/goplugins/goplugins.so",
+				},
+			},
+		}
+	})
+
+	ts.Run(t, []test.TestCase{
+		{
+			Path: "/oas-goplugin/get",
+			Code: http.StatusOK,
+			HeadersMatch: map[string]string{
+				"X-OAS-Doc-Title": oasDocTitle,
+			},
+		},
+	}...)
 }

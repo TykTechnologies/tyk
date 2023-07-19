@@ -340,7 +340,7 @@ func valToStr(v interface{}) string {
 	case string:
 		s = x
 	case float64:
-		s = strconv.FormatFloat(x, 'f', -1, 32)
+		s = strconv.FormatFloat(x, 'f', -1, 64)
 	case int64:
 		s = strconv.FormatInt(x, 10)
 	case []string:
@@ -431,23 +431,39 @@ func (m *URLRewriteMiddleware) EnabledForSpec() bool {
 	return false
 }
 
-func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) {
+func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) error {
 	oldAsURL, errParseOld := url.Parse(oldPath)
 	if errParseOld != nil {
-		log.WithError(errParseOld).WithField("url", oldPath).Error("could not parse")
-		return
+		return errParseOld
 	}
 
 	newAsURL, errParseNew := url.Parse(newTarget)
 	if errParseNew != nil {
-		log.WithError(errParseNew).WithField("url", newTarget).Error("could not parse")
-		return
+		return errParseNew
 	}
 
-	if newAsURL.Scheme != LoopScheme && oldAsURL.Host != newAsURL.Host {
+	if shouldRewriteHost(oldAsURL, newAsURL) {
 		log.Debug("Detected a host rewrite in pattern!")
 		setCtxValue(r, ctx.RetainHost, true)
 	}
+
+	return nil
+}
+
+func shouldRewriteHost(oldURL, newURL *url.URL) bool {
+	if newURL.Scheme == "" {
+		return false
+	}
+
+	if newURL.Scheme == LoopScheme {
+		return false
+	}
+
+	if oldURL.Host == newURL.Host {
+		return false
+	}
+
+	return true
 }
 
 const LoopScheme = "tyk"
@@ -495,7 +511,9 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		})
 	}
 
-	m.CheckHostRewrite(oldPath, p, r)
+	if err = m.CheckHostRewrite(oldPath, p, r); err != nil {
+		log.WithError(err).WithField("from", oldPath).WithField("to", p).Error("Checking Host rewrite: error parsing URL")
+	}
 
 	newURL, err := url.Parse(p)
 	if err != nil {

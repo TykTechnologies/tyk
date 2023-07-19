@@ -73,11 +73,11 @@ func (m *GraphQLMiddleware) Init() {
 	if needsGraphQLExecutionEngine(m.Spec) {
 		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
 		m.Spec.GraphQLExecutor.Client = &http.Client{
-			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec)},
+			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
 		}
 		m.Spec.GraphQLExecutor.StreamingClient = &http.Client{
 			Timeout:   0,
-			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec)},
+			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
 		}
 
 		if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 {
@@ -252,6 +252,15 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	if validationResult.Errors != nil && validationResult.Errors.Count() > 0 {
 		return m.writeGraphQLError(w, validationResult.Errors)
+	}
+
+	inputValidationResult, err := gqlRequest.ValidateInput(m.Spec.GraphQLExecutor.Schema)
+	if err != nil {
+		m.Logger().Errorf("Error while validating variables for request: %v", err)
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+	if inputValidationResult.Errors != nil && inputValidationResult.Errors.Count() > 0 {
+		return m.writeGraphQLError(w, inputValidationResult.Errors)
 	}
 
 	return nil, http.StatusOK

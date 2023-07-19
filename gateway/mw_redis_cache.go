@@ -100,7 +100,10 @@ func addBodyHash(req *http.Request, regex string, h hash.Hash) (err error) {
 }
 
 func readBody(req *http.Request) (bodyBytes []byte, err error) {
-	req.Body = copyBody(req.Body, false)
+	req.Body, err = copyBody(req.Body, false)
+	if err != nil {
+		return nil, err
+	}
 	return ioutil.ReadAll(req.Body)
 }
 

@@ -114,6 +114,17 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 				return nil, err
 			}
 
+			if graphqlConfig.HasOperation {
+				planDataSource.Factory = &restDataSource.Factory{
+					Client: u.HttpClient,
+				}
+				planDataSource.Custom, err = generateRestDataSourceFromGraphql(graphqlConfig)
+				if err != nil {
+					return nil, err
+				}
+				break
+			}
+
 			planDataSource.Factory, err = createGraphQLDataSourceFactory(createGraphQLDataSourceFactoryParams{
 				graphqlConfig:             graphqlConfig,
 				subscriptionClientFactory: subscriptionClientFactoryOrDefault(u.subscriptionClientFactory),
@@ -188,6 +199,9 @@ func (u *UniversalDataGraph) engineConfigV2Arguments(fieldConfs *plan.FieldConfi
 
 func (u *UniversalDataGraph) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
 	for i := range planDataSources {
+		if _, ok := planDataSources[i].Factory.(*restDataSource.Factory); ok {
+			continue
+		}
 		for j := range planDataSources[i].RootNodes {
 			typeName := planDataSources[i].RootNodes[j].TypeName
 			for k := range planDataSources[i].RootNodes[j].FieldNames {

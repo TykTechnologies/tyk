@@ -1,19 +1,20 @@
 package apidef
 
 import (
-	"database/sql/driver"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"net/http"
 	"text/template"
 	"time"
 
+	"github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
-	"gopkg.in/mgo.v2/bson"
+
+	"github.com/TykTechnologies/tyk/internal/reflect"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
@@ -71,6 +72,7 @@ const (
 	// For multi-type auth
 	AuthTypeNone  AuthTypeEnum = ""
 	AuthToken     AuthTypeEnum = "auth_token"
+	CustomAuth    AuthTypeEnum = "custom_auth"
 	HMACKey       AuthTypeEnum = "hmac_key"
 	BasicAuthUser AuthTypeEnum = "basic_auth_user"
 	JWTClaim      AuthTypeEnum = "jwt_claim"
@@ -120,76 +122,6 @@ var (
 	ErrAPINotFound                = errors.New("API not found")
 	ErrMissingAPIID               = errors.New("missing API ID")
 )
-
-type ObjectId bson.ObjectId
-
-func (j *ObjectId) Scan(value interface{}) error {
-	var bytes []byte
-	switch v := value.(type) {
-	case []byte:
-		bytes = v
-	case string:
-		bytes = []byte(v)
-	default:
-		return fmt.Errorf("Failed to unmarshal JSON value: %v", value)
-	}
-
-	// reflect magic to update existing string without creating new one
-	if len(bytes) > 0 {
-		bs := ObjectId(bson.ObjectIdHex(string(bytes)))
-		*j = bs
-	}
-
-	return nil
-}
-
-func (j ObjectId) Value() (driver.Value, error) {
-	return bson.ObjectId(j).Hex(), nil
-}
-
-func (j ObjectId) Hex() string {
-	return bson.ObjectId(j).Hex()
-}
-
-func (j ObjectId) Time() time.Time {
-	return bson.ObjectId(j).Time()
-}
-
-func (j ObjectId) Valid() bool {
-	return bson.ObjectId(j).Valid()
-}
-
-func (j ObjectId) String() string {
-	return j.Hex()
-}
-
-func (j ObjectId) GetBSON() (interface{}, error) {
-	return bson.ObjectId(j), nil
-}
-
-func ObjectIdHex(hex string) ObjectId {
-	return ObjectId(bson.ObjectIdHex(hex))
-}
-
-func NewObjectId() ObjectId {
-	return ObjectId(bson.NewObjectId())
-}
-
-func IsObjectIdHex(hex string) bool {
-	return bson.IsObjectIdHex(hex)
-}
-
-func (j ObjectId) MarshalJSON() ([]byte, error) {
-	return bson.ObjectId(j).MarshalJSON()
-}
-
-func (j *ObjectId) UnmarshalJSON(buf []byte) error {
-	var b bson.ObjectId
-	b.UnmarshalJSON(buf)
-	*j = ObjectId(string(b))
-
-	return nil
-}
 
 type EndpointMethodMeta struct {
 	Action  EndpointMethodAction `bson:"action" json:"action"`
@@ -536,8 +468,14 @@ type ServiceDiscoveryConfiguration struct {
 	PortDataPath        string `bson:"port_data_path" json:"port_data_path"`
 	TargetPath          string `bson:"target_path" json:"target_path"`
 	UseTargetList       bool   `bson:"use_target_list" json:"use_target_list"`
+	CacheDisabled       bool   `bson:"cache_disabled" json:"cache_disabled"`
 	CacheTimeout        int64  `bson:"cache_timeout" json:"cache_timeout"`
 	EndpointReturnsList bool   `bson:"endpoint_returns_list" json:"endpoint_returns_list"`
+}
+
+// CacheOptions returns the timeout value in effect, and a bool if cache is enabled.
+func (sd *ServiceDiscoveryConfiguration) CacheOptions() (int64, bool) {
+	return sd.CacheTimeout, !sd.CacheDisabled
 }
 
 type OIDProviderConfig struct {
@@ -564,21 +502,21 @@ type Scopes struct {
 //
 // swagger:model
 type APIDefinition struct {
-	Id                  ObjectId      `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
-	Name                string        `bson:"name" json:"name"`
-	Expiration          string        `bson:"expiration" json:"expiration,omitempty"`
-	ExpirationTs        time.Time     `bson:"-" json:"-"`
-	Slug                string        `bson:"slug" json:"slug"`
-	ListenPort          int           `bson:"listen_port" json:"listen_port"`
-	Protocol            string        `bson:"protocol" json:"protocol"`
-	EnableProxyProtocol bool          `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
-	APIID               string        `bson:"api_id" json:"api_id"`
-	OrgID               string        `bson:"org_id" json:"org_id"`
-	UseKeylessAccess    bool          `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2           bool          `bson:"use_oauth2" json:"use_oauth2"`
-	ExternalOAuth       ExternalOAuth `bson:"external_oauth" json:"external_oauth"`
-	UseOpenID           bool          `bson:"use_openid" json:"use_openid"`
-	OpenIDOptions       OpenIDOptions `bson:"openid_options" json:"openid_options"`
+	Id                  model.ObjectID `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
+	Name                string         `bson:"name" json:"name"`
+	Expiration          string         `bson:"expiration" json:"expiration,omitempty"`
+	ExpirationTs        time.Time      `bson:"-" json:"-"`
+	Slug                string         `bson:"slug" json:"slug"`
+	ListenPort          int            `bson:"listen_port" json:"listen_port"`
+	Protocol            string         `bson:"protocol" json:"protocol"`
+	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	APIID               string         `bson:"api_id" json:"api_id"`
+	OrgID               string         `bson:"org_id" json:"org_id"`
+	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
+	UseOauth2           bool           `bson:"use_oauth2" json:"use_oauth2"`
+	ExternalOAuth       ExternalOAuth  `bson:"external_oauth" json:"external_oauth"`
+	UseOpenID           bool           `bson:"use_openid" json:"use_openid"`
+	OpenIDOptions       OpenIDOptions  `bson:"openid_options" json:"openid_options"`
 	Oauth2Meta          struct {
 		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
@@ -689,11 +627,13 @@ type AnalyticsPluginConfig struct {
 
 type UptimeTests struct {
 	CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
-	Config    struct {
-		ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
-		ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-		RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
-	} `bson:"config" json:"config"`
+	Config    UptimeTestsConfig `bson:"config" json:"config"`
+}
+
+type UptimeTestsConfig struct {
+	ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
+	ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
+	RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
 }
 
 type AuthConfig struct {
@@ -809,10 +749,15 @@ const (
 	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
 )
 
+type GraphQLResponseExtensions struct {
+	OnErrorForwarding bool `bson:"on_error_forwarding" json:"on_error_forwarding"`
+}
+
 type GraphQLProxyConfig struct {
-	AuthHeaders      map[string]string `bson:"auth_headers" json:"auth_headers"`
-	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
-	RequestHeaders   map[string]string `bson:"request_headers" json:"request_headers"`
+	AuthHeaders           map[string]string         `bson:"auth_headers" json:"auth_headers"`
+	SubscriptionType      SubscriptionType          `bson:"subscription_type" json:"subscription_type,omitempty"`
+	RequestHeaders        map[string]string         `bson:"request_headers" json:"request_headers"`
+	UseResponseExtensions GraphQLResponseExtensions `bson:"use_response_extensions" json:"use_response_extensions"`
 }
 
 type GraphQLSubgraphConfig struct {
@@ -838,8 +783,14 @@ type GraphQLSubgraphEntity struct {
 }
 
 type GraphQLEngineConfig struct {
-	FieldConfigs []GraphQLFieldConfig      `bson:"field_configs" json:"field_configs"`
-	DataSources  []GraphQLEngineDataSource `bson:"data_sources" json:"data_sources"`
+	FieldConfigs  []GraphQLFieldConfig      `bson:"field_configs" json:"field_configs"`
+	DataSources   []GraphQLEngineDataSource `bson:"data_sources" json:"data_sources"`
+	GlobalHeaders []UDGGlobalHeader         `bson:"global_headers" json:"global_headers"`
+}
+
+type UDGGlobalHeader struct {
+	Key   string `bson:"key" json:"key"`
+	Value string `bson:"value" json:"value"`
 }
 
 type GraphQLFieldConfig struct {
@@ -883,6 +834,9 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 	Method           string            `bson:"method" json:"method"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
 	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
+	HasOperation     bool              `bson:"has_operation" json:"has_operation"`
+	Operation        string            `bson:"operation" json:"operation"`
+	Variables        json.RawMessage   `bson:"variables" json:"variables"`
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
@@ -966,14 +920,6 @@ func (a *APIDefinition) EncodeForDB() {
 	if a.Auth.AuthHeaderName == "" {
 		a.Auth = a.AuthConfigs["authToken"]
 	}
-	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
-	if !a.UseOpenID && a.Scopes.JWT.ScopeClaimName != "" {
-		a.JWTScopeToPolicyMapping = a.Scopes.JWT.ScopeToPolicy
-		a.JWTScopeClaimName = a.Scopes.JWT.ScopeClaimName
-	} else if a.UseOpenID && a.Scopes.OIDC.ScopeClaimName != "" {
-		a.JWTScopeToPolicyMapping = a.Scopes.OIDC.ScopeToPolicy
-		a.JWTScopeClaimName = a.Scopes.OIDC.ScopeClaimName
-	}
 }
 
 func (a *APIDefinition) DecodeFromDB() {
@@ -1040,14 +986,6 @@ func (a *APIDefinition) DecodeFromDB() {
 
 	makeCompatible("authToken", a.UseStandardAuth)
 	makeCompatible("jwt", a.EnableJWT)
-	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
-	if !a.UseOpenID && a.JWTScopeClaimName != "" && a.Scopes.JWT.ScopeClaimName == "" {
-		a.Scopes.JWT.ScopeToPolicy = a.JWTScopeToPolicyMapping
-		a.Scopes.JWT.ScopeClaimName = a.JWTScopeClaimName
-	} else if a.UseOpenID && a.JWTScopeClaimName != "" && a.Scopes.OIDC.ScopeClaimName == "" {
-		a.Scopes.OIDC.ScopeToPolicy = a.JWTScopeToPolicyMapping
-		a.Scopes.OIDC.ScopeClaimName = a.JWTScopeClaimName
-	}
 }
 
 // Expired returns true if this Version has expired
@@ -1290,6 +1228,30 @@ func DummyAPI() APIDefinition {
 		Tags:    []string{},
 		GraphQL: graphql,
 	}
+}
+
+func (a *APIDefinition) GetScopeClaimName() string {
+	if reflect.IsEmpty(a.Scopes) {
+		return a.JWTScopeClaimName
+	}
+
+	if a.UseOpenID {
+		return a.Scopes.OIDC.ScopeClaimName
+	}
+
+	return a.Scopes.JWT.ScopeClaimName
+}
+
+func (a *APIDefinition) GetScopeToPolicyMapping() map[string]string {
+	if reflect.IsEmpty(a.Scopes) {
+		return a.JWTScopeToPolicyMapping
+	}
+
+	if a.UseOpenID {
+		return a.Scopes.OIDC.ScopeToPolicy
+	}
+
+	return a.Scopes.JWT.ScopeToPolicy
 }
 
 var Template = template.New("").Funcs(map[string]interface{}{

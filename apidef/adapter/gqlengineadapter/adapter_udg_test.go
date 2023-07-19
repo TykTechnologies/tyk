@@ -220,12 +220,6 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"withChildren"},
 				},
 			},
-			ChildNodes: []plan.TypeField{
-				{
-					TypeName:   "WithChildren",
-					FieldNames: []string{"id", "name", "__typename"},
-				},
-			},
 			Factory: &restDataSource.Factory{
 				Client: httpClient,
 			},
@@ -241,12 +235,6 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 				{
 					TypeName:   "WithChildren",
 					FieldNames: []string{"nested"},
-				},
-			},
-			ChildNodes: []plan.TypeField{
-				{
-					TypeName:   "Nested",
-					FieldNames: []string{"id", "name", "__typename"},
 				},
 			},
 			Factory: &restDataSource.Factory{
@@ -399,6 +387,29 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 		{
 			RootNodes: []plan.TypeField{
 				{
+					TypeName:   "Nested",
+					FieldNames: []string{"nestedGql"},
+				},
+			},
+			ChildNodes: nil,
+			Factory: &restDataSource.Factory{
+				Client: httpClient,
+			},
+			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+				Fetch: restDataSource.FetchConfiguration{
+					URL:    "https://graphql.example.com",
+					Method: "POST",
+					Header: http.Header{
+						"Auth": []string{"123"},
+					},
+					Query: nil,
+					Body:  `{"variables":"","query":"{ fromNested }"}`,
+				},
+			}),
+		},
+		{
+			RootNodes: []plan.TypeField{
+				{
 					TypeName:   "Subscription",
 					FieldNames: []string{"foobar"},
 				},
@@ -497,6 +508,7 @@ type WithChildren implements IDType {
 type Nested {
   id: ID!
   name: String!
+  nestedGql: String!
 }
 type MultiRoot1 {
   id: ID!
@@ -677,6 +689,23 @@ var graphqlEngineV2ConfigJson = `{
 					"headers": {
 						"Auth": "123"
 					}
+				}
+			},
+			{
+				"kind": "GraphQL",
+				"internal": false,
+				"root_fields": [
+					{ "type": "Nested", "fields": ["nestedGql"] }
+				],
+				"config": {
+					"url": "https://graphql.example.com",
+					"method": "POST",
+					"headers": {
+						"Auth": "123"
+					},
+					"has_operation": true,
+					"operation": "{ fromNested }",
+					"variables": ""
 				}
 			},
 			{

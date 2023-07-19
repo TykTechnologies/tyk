@@ -167,8 +167,17 @@ type ServiceDiscovery struct {
 	// Setting it too low will cause Tyk to call the SD service too often, setting it too high could mean that
 	// failures are not recovered from quickly enough.
 	//
+	// Deprecated: The field is deprecated, usage needs to be updated to configure caching.
+	//
 	// Tyk classic API definition: `service_discovery.cache_timeout`
 	CacheTimeout int64 `bson:"cacheTimeout,omitempty" json:"cacheTimeout,omitempty"`
+
+	// Cache holds cache related flags.
+	//
+	// Tyk classic API definition:
+	// - `service_discovery.cache_disabled`
+	// - `service_discovery.cache_timeout`
+	Cache *ServiceDiscoveryCache `bson:"cache,omitempty" json:"cache,omitempty"`
 
 	// TargetPath is to set a target path to append to the discovered endpoint, since many SD services
 	// only provide host and port data. It is important to be able to target a specific resource on that host.
@@ -183,11 +192,32 @@ type ServiceDiscovery struct {
 	EndpointReturnsList bool `bson:"endpointReturnsList,omitempty" json:"endpointReturnsList,omitempty"`
 }
 
+// ServiceDiscoveryCache holds configuration for caching ServiceDiscovery data.
+type ServiceDiscoveryCache struct {
+	// Enabled turns service discovery cache on or off.
+	//
+	// Tyk classic API definition: `service_discovery.cache_disabled`
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+
+	// Timeout is the TTL for a cached object in seconds.
+	//
+	// Tyk classic API definition: `service_discovery.cache_timeout`
+	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty"`
+}
+
+// CacheOptions returns the timeout value in effect, and a bool if cache is enabled.
+func (sd *ServiceDiscovery) CacheOptions() (int64, bool) {
+	if sd.Cache != nil {
+		return sd.Cache.Timeout, sd.Cache.Enabled
+	}
+
+	return sd.CacheTimeout, sd.CacheTimeout > 0
+}
+
 // Fill fills *ServiceDiscovery from apidef.ServiceDiscoveryConfiguration.
 func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfiguration) {
 	sd.Enabled = serviceDiscovery.UseDiscoveryService
 	sd.EndpointReturnsList = serviceDiscovery.EndpointReturnsList
-	sd.CacheTimeout = serviceDiscovery.CacheTimeout
 	sd.ParentDataPath = serviceDiscovery.ParentDataPath
 	sd.QueryEndpoint = serviceDiscovery.QueryEndpoint
 	sd.TargetPath = serviceDiscovery.TargetPath
@@ -195,13 +225,29 @@ func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfigu
 	sd.UseNestedQuery = serviceDiscovery.UseNestedQuery
 	sd.DataPath = serviceDiscovery.DataPath
 	sd.PortDataPath = serviceDiscovery.PortDataPath
+
+	enabled := !serviceDiscovery.CacheDisabled
+	timeout := serviceDiscovery.CacheTimeout
+
+	sd.CacheTimeout = 0
+	sd.Cache = &ServiceDiscoveryCache{
+		Enabled: enabled,
+		Timeout: timeout,
+	}
+	if ShouldOmit(sd.Cache) {
+		sd.Cache = nil
+	}
 }
 
 // ExtractTo extracts *ServiceDiscovery into *apidef.ServiceDiscoveryConfiguration.
 func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryConfiguration) {
+	if sd == nil {
+		serviceDiscovery.CacheDisabled = true
+		return
+	}
+
 	serviceDiscovery.UseDiscoveryService = sd.Enabled
 	serviceDiscovery.EndpointReturnsList = sd.EndpointReturnsList
-	serviceDiscovery.CacheTimeout = sd.CacheTimeout
 	serviceDiscovery.ParentDataPath = sd.ParentDataPath
 	serviceDiscovery.QueryEndpoint = sd.QueryEndpoint
 	serviceDiscovery.TargetPath = sd.TargetPath
@@ -209,6 +255,10 @@ func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryC
 	serviceDiscovery.UseNestedQuery = sd.UseNestedQuery
 	serviceDiscovery.DataPath = sd.DataPath
 	serviceDiscovery.PortDataPath = sd.PortDataPath
+
+	timeout, enabled := sd.CacheOptions()
+	serviceDiscovery.CacheTimeout = timeout
+	serviceDiscovery.CacheDisabled = !enabled
 }
 
 // Test holds the test configuration for service discovery.
@@ -232,9 +282,7 @@ func (t *Test) Fill(uptimeTests apidef.UptimeTests) {
 
 // ExtractTo extracts *Test into *apidef.UptimeTests.
 func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
-	if t.ServiceDiscovery != nil {
-		t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
-	}
+	t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
 }
 
 // MutualTLS holds configuration related to mTLS on APIs, domain to certificate mappings.

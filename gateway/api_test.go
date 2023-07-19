@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -646,11 +647,6 @@ func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 						}}
 					})
 
-					withAccess := CreateStandardSession()
-					withAccess.AccessRights = map[string]user.AccessDefinition{testAPIID: {
-						APIID: testAPIID,
-					}}
-
 					authHeaders := map[string]string{
 						"authorization": key,
 					}
@@ -851,7 +847,6 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 }
 
 func TestHashKeyHandler(t *testing.T) {
-	test.Racy(t) // TODO: TT-5233
 	conf := func(globalConf *config.Config) {
 		// make it to use hashes for Redis keys
 		globalConf.HashKeys = true
@@ -888,6 +883,82 @@ func TestHashKeyHandler(t *testing.T) {
 	}
 }
 
+func TestDisableKeyActionsByUserName(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		globalConf.HashKeys = true
+		globalConf.EnableHashedKeysListing = true
+		globalConf.HashKeyFunction = storage.HashMurmur64
+		globalConf.DisableKeyActionsByUsername = true
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	session := ts.testPrepareBasicAuth(false)
+	userName := "defaultuser1"
+	res, _ := ts.Run(t, []test.TestCase{
+		{
+			Method:    http.MethodPost,
+			Path:      fmt.Sprintf("/tyk/keys/%s", userName),
+			Data:      session,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		},
+	}...)
+
+	sessionToUpdate := session.Clone()
+	sessionToUpdate.BasicAuthData.Password = "newpassword"
+
+	resp, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+	apiRes := apiModifyKeySuccess{}
+	err = json.Unmarshal(resp, &apiRes)
+	assert.NoError(t, err)
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{
+			Method:    http.MethodGet,
+			Path:      fmt.Sprintf("/tyk/keys/%s?username=true&org_id=default", userName),
+			AdminAuth: true,
+			Code:      http.StatusNotFound,
+		},
+		// ensure that key is accessible by hash
+		{
+			Method:    http.MethodGet,
+			Path:      fmt.Sprintf("/tyk/keys/%s?hashed=true&org_id=default", apiRes.KeyHash),
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		},
+		{
+			Method:    http.MethodPut,
+			Path:      fmt.Sprintf("/tyk/keys/%s?username=true&org_id=default", userName),
+			Data:      sessionToUpdate,
+			AdminAuth: true,
+			Code:      http.StatusNotFound,
+		},
+		// ensure that update is possible by hash
+		{
+			Method:    http.MethodPut,
+			Path:      fmt.Sprintf("/tyk/keys/%s?hashed=true&org_id=default", apiRes.KeyHash),
+			Data:      sessionToUpdate,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		},
+		{
+			Method:    http.MethodDelete,
+			Path:      fmt.Sprintf("/tyk/keys/%s?username=true&org_id=default", userName),
+			AdminAuth: true,
+			Code:      http.StatusNotFound,
+		},
+		// ensure that delete is possible by hash
+		{
+			Method:    http.MethodDelete,
+			Path:      fmt.Sprintf("/tyk/keys/%s?hashed=true&org_id=default", apiRes.KeyHash),
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		},
+	}...)
+}
 func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	test.Racy(t) // TODO: TT-5233
 	ts := StartTest(nil)
@@ -1071,20 +1142,32 @@ func (ts *Test) testHashFuncAndBAHelper(t *testing.T) {
 
 	_, _ = ts.Run(t, []test.TestCase{
 		{
-			Method:    "POST",
-			Path:      "/tyk/keys/defaultuser",
-			Data:      session,
+			Method: http.MethodPost,
+			Path:   "/tyk/keys/defaultuser",
+			Data:   session,
+			BodyMatchFunc: func(resp []byte) bool {
+				keyResp := apiModifyKeySuccess{}
+				err := json.Unmarshal(resp, &keyResp)
+				assert.NoError(t, err)
+				return keyResp.Key == "" && keyResp.KeyHash != ""
+			},
 			AdminAuth: true,
 			Code:      200,
 		},
 		{
-			Method:    "GET",
-			Path:      "/tyk/keys/defaultuser?username=true&org_id=default",
+			Method: http.MethodGet,
+			Path:   "/tyk/keys/defaultuser?username=true&org_id=default",
+			BodyMatchFunc: func(resp []byte) bool {
+				keyResp := user.SessionState{}
+				err := json.Unmarshal(resp, &keyResp)
+				assert.NoError(t, err)
+				return keyResp.BasicAuthData.Password == ""
+			},
 			AdminAuth: true,
 			Code:      200,
 		},
 		{
-			Method:    "DELETE",
+			Method:    http.MethodDelete,
 			Path:      "/tyk/keys/defaultuser?username=true&org_id=default",
 			AdminAuth: true,
 			Code:      200,
@@ -2747,7 +2830,7 @@ func TestOAS(t *testing.T) {
 				})
 				t.Run("get scope public", func(t *testing.T) {
 					_, _ = ts.Run(t, []test.TestCase{
-						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath + "?mode=public", BodyMatch: `.*components`,
+						{AdminAuth: true, Method: http.MethodGet, Path: oasExportPath + "?mode=public", BodyMatch: `.*info`,
 							BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
 						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID + "/export?mode=public",
 							BodyMatch: apidef.ErrOASGetForOldAPI.Error(), Code: http.StatusBadRequest},
@@ -2769,7 +2852,7 @@ func TestOAS(t *testing.T) {
 				})
 				t.Run("get scope public", func(t *testing.T) {
 					_, _ = ts.Run(t, []test.TestCase{
-						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oasAPIID + "/export?mode=public", BodyMatch: `components`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
+						{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oasAPIID + "/export?mode=public", BodyMatch: `info`, BodyNotMatch: ".*\"x-tyk-api-gateway\":", Code: http.StatusOK, HeadersMatch: matchHeaders},
 					}...)
 				})
 			})
@@ -2794,12 +2877,12 @@ func TestOAS(t *testing.T) {
 		// copy OAS API, we need to manipulate tyk extension here
 		copyOAS := func(oasAPI openapi3.T) oas.OAS {
 			apiInOAS := oas.OAS{T: oasAPI}
-			oasExt := oasAPI.ExtensionProps.Extensions
+			oasExt := oasAPI.Extensions
 			copyExt := make(map[string]interface{})
 			for k, v := range oasExt {
 				copyExt[k] = v
 			}
-			apiInOAS.T.ExtensionProps.Extensions = copyExt
+			apiInOAS.T.Extensions = copyExt
 			return apiInOAS
 		}
 
@@ -2894,7 +2977,7 @@ func TestOAS(t *testing.T) {
 			fillPaths(&apiInOAS)
 
 			tykExt := apiInOAS.GetTykExtension()
-			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 			apiInOAS.T.Info.Title = "patched-oas-doc"
 			testPatchOAS(t, ts, apiInOAS, nil, apiID)
@@ -2913,7 +2996,7 @@ func TestOAS(t *testing.T) {
 			fillReqBody(&apiInOAS, "/pets", http.MethodPost)
 
 			expectedTykExt := apiInOAS.GetTykExtension()
-			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 			listenPath, upstreamURL, customDomain := "/listen-api/", "https://new-upstream.org", "custom-upstream.com"
 
@@ -3035,7 +3118,7 @@ func TestOAS(t *testing.T) {
 				fillPaths(&apiInOAS)
 
 				tykExt := apiInOAS.GetTykExtension()
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				apiInOAS.T.Info.Title = "patched-oas-doc"
 
@@ -3062,7 +3145,7 @@ func TestOAS(t *testing.T) {
 				fillPaths(&apiInOAS)
 
 				tykExt := apiInOAS.GetTykExtension()
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				apiInOAS.T.Info.Title = "patched-oas-doc"
 
@@ -3095,7 +3178,7 @@ func TestOAS(t *testing.T) {
 		t.Run("error on invalid upstreamURL", func(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
 			fillPaths(&apiInOAS)
-			delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 			upstreamURL := "new-upstream.org"
 
@@ -3117,7 +3200,7 @@ func TestOAS(t *testing.T) {
 			t.Run("empty apiID", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				patchPath := fmt.Sprintf("/tyk/apis/oas/%s", " ")
 
@@ -3130,7 +3213,7 @@ func TestOAS(t *testing.T) {
 			t.Run("malformed body", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				_, _ = ts.Run(t, []test.TestCase{
 					{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: `oas-body`,
@@ -3142,7 +3225,7 @@ func TestOAS(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
 
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				nonExistingAPIID := "non-existing-api-id"
 				patchPath := fmt.Sprintf("/tyk/apis/oas/%s", nonExistingAPIID)
@@ -3174,7 +3257,7 @@ func TestOAS(t *testing.T) {
 					ts.Gw.SetConfig(conf)
 				}()
 
-				delete(apiInOAS.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+				delete(apiInOAS.Extensions, oas.ExtensionTykAPIGateway)
 
 				_, _ = ts.Run(t, []test.TestCase{
 					{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &apiInOAS,
@@ -3212,7 +3295,7 @@ func TestOAS(t *testing.T) {
 			apiInOAS := copyOAS(oasAPI)
 			fillPaths(&apiInOAS)
 
-			delete(apiInOAS.T.ExtensionProps.Extensions, oas.ExtensionTykAPIGateway)
+			delete(apiInOAS.T.Extensions, oas.ExtensionTykAPIGateway)
 			apiInOAS.Paths = nil
 
 			patchPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
@@ -3243,8 +3326,8 @@ func TestOAS(t *testing.T) {
 
 			_, _ = ts.Run(t, []test.TestCase{
 				{Method: http.MethodGet, Path: listenPath, Code: http.StatusOK},
-				{AdminAuth: true, Method: http.MethodGet, Path: path, BodyNotMatch: "components", Code: http.StatusOK},
-				{AdminAuth: true, Method: http.MethodGet, Path: oasPath, BodyMatch: `components`, Code: http.StatusOK},
+				{AdminAuth: true, Method: http.MethodGet, Path: path, BodyNotMatch: "info", Code: http.StatusOK},
+				{AdminAuth: true, Method: http.MethodGet, Path: oasPath, BodyMatch: `info`, Code: http.StatusOK},
 				{AdminAuth: true, Method: http.MethodDelete, Path: path, BodyMatch: `"action":"deleted"`, Code: http.StatusOK},
 			}...)
 

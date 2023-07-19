@@ -12,6 +12,7 @@ import (
 	"fmt"
 
 	"github.com/TykTechnologies/tyk/config"
+	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 
 	//	"net"
 	"net/http"
@@ -29,8 +30,8 @@ func (gw *Gateway) uploadCertPublicKey(serverCert tls.Certificate) (string, erro
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
 	pubID, _ := gw.CertificateManager.Add(pubPem, "")
 
-	if pubID != certs.HexSHA256(pubDer) {
-		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", certs.HexSHA256(pubDer), pubID)
+	if pubID != tykcrypto.HexSHA256(pubDer) {
+		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", tykcrypto.HexSHA256(pubDer), pubID)
 		return "", errors.New(errStr)
 	}
 
@@ -67,6 +68,8 @@ func newUpstreamSSL(t *testing.T, gw *Gateway, serverCert tls.Certificate, handl
 }
 
 func TestPublicKeyPinning(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5260
+
 	_, _, _, serverCert := certs.GenServerCertificate()
 
 	t.Run("Pub key match", func(t *testing.T) {
@@ -89,8 +92,6 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Pub key not match", func(t *testing.T) {
-		test.Flaky(t) // TODO: TT-5260
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -127,8 +128,6 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Global setting", func(t *testing.T) {
-		test.Flaky(t) // TODO: TT-5260
-
 		ts := StartTest(func(globalConf *config.Config) {
 			globalConf.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
 		})

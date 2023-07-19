@@ -193,8 +193,17 @@ Tyk classic API definition: `service_discovery.use_target_list`.
 **Field: `cacheTimeout` (`int`)**
 CacheTimeout is the timeout of a cache value when a new data is loaded from a discovery service.
 Setting it too low will cause Tyk to call the SD service too often, setting it too high could mean that failures are not recovered from quickly enough.
+Deprecated: The field is deprecated, usage needs to be updated to configure caching.
 
 Tyk classic API definition: `service_discovery.cache_timeout`.
+
+**Field: `cache` ([ServiceDiscoveryCache](#servicediscoverycache))**
+Cache holds cache related flags.
+
+Tyk classic API definition:
+
+- `service_discovery.cache_disabled`
+- `service_discovery.cache_timeout`
 
 **Field: `targetPath` (`string`)**
 TargetPath is to set a target path to append to the discovered endpoint, since many SD services only provide host and port data. It is important to be able to target a specific resource on that host.
@@ -206,6 +215,19 @@ Tyk classic API definition: `service_discovery.target_path`.
 EndpointReturnsList is set `true` when the response type is a list instead of an object.
 
 Tyk classic API definition: `service_discovery.endpoint_returns_list`.
+
+
+### **ServiceDiscoveryCache**
+
+**Field: `enabled` (`boolean`)**
+Enabled turns service discovery cache on or off.
+
+Tyk classic API definition: `service_discovery.cache_disabled`.
+
+**Field: `timeout` (`int`)**
+Timeout is the TTL for a cached object in seconds.
+
+Tyk classic API definition: `service_discovery.cache_timeout`.
 
 
 ### **Test**
@@ -314,12 +336,13 @@ Tyk classic API definition: `strip_auth_data`.
 BaseIdentityProvider enables multi authentication mechanism and provides the session object that determines rate limits, ACL rules and quotas.
 It should be set to one of the following:
 
-- `auth_token`,
-- `hmac_key`,
-- `basic_auth_user`,
-- `jwt_claim`,
-- `oidc_user`,
-- `oauth_key`.
+- `auth_token`
+- `hmac_key`
+- `basic_auth_user`
+- `jwt_claim`
+- `oidc_user`
+- `oauth_key`
+- `custom_auth`
 
 
 Tyk classic API definition: `base_identity_provided_by`.
@@ -830,8 +853,12 @@ IgnoreAuthentication ignores authentication on request by allowance.
 **Field: `transformRequestMethod` ([TransformRequestMethod](#transformrequestmethod))**
 TransformRequestMethod allows you to transform the method of a request.
 
-**Field: `transformRequestBody` ([TransformRequestBody](#transformrequestbody))**
+**Field: `transformRequestBody` ([TransformBody](#transformbody))**
 TransformRequestBody allows you to transform request body.
+When both `path` and `body` are provided, body would take precedence.
+
+**Field: `transformResponseBody` ([TransformBody](#transformbody))**
+TransformResponseBody allows you to transform response body.
 When both `path` and `body` are provided, body would take precedence.
 
 **Field: `cache` ([CachePlugin](#cacheplugin))**
@@ -871,13 +898,13 @@ Enabled enables Method Transform for the given path and method.
 ToMethod is the http method value to which the method of an incoming request will be transformed.
 
 
-### **TransformRequestBody**
+### **TransformBody**
 
 **Field: `enabled` (`boolean`)**
-Enabled enables transform request body middleware.
+Enabled enables transform request/request body middleware.
 
 **Field: `format` (`object`)**
-Format of the request body, xml or json.
+Format of the request/response body, xml or json.
 
 **Field: `path` (`string`)**
 Path file path for the template.

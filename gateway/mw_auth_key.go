@@ -4,8 +4,10 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
-	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/user"
@@ -25,6 +27,7 @@ const (
 	ErrAuthAuthorizationFieldMissing = "auth.auth_field_missing"
 	ErrAuthKeyNotFound               = "auth.key_not_found"
 	ErrAuthCertNotFound              = "auth.cert_not_found"
+	ErrAuthCertExpired               = "auth.cert_expired"
 	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
 
 	MsgNonExistentKey  = "Attempted access with non-existent key."
@@ -50,6 +53,11 @@ func init() {
 
 	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
 		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertExpired] = config.TykError{
+		Message: MsgCertificateExpired,
 		Code:    http.StatusForbidden,
 	}
 }
@@ -96,7 +104,11 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		key = stripBearer(key)
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 		log.Debug("Trying to find key by client certificate")
-		certHash = k.Spec.OrgID + certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+		certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+		if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
+			return errorAndStatusCode(ErrAuthCertExpired)
+		}
+
 		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
@@ -134,6 +146,10 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	case apidef.AuthToken, apidef.UnsetAuth:
 		ctxSetSession(r, &session, updateSession, k.Gw.GetConfig().HashKeys)
 		k.setContextVars(r, key)
+		ctxSetSpanAttributes(r, k.Name(), []otel.SpanAttribute{
+			otel.APIKeyAttribute(key),
+			otel.APIKeyAliasAttribute(session.Alias),
+		}...)
 	}
 
 	// Try using org-key format first:

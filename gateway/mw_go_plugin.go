@@ -2,17 +2,22 @@ package gateway
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
+
+	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -109,8 +114,10 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 
 	// per path go plugins
 	for _, version := range m.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.GoPlugin) > 0 {
-			return true
+		for _, p := range version.ExtendedPaths.GoPlugin {
+			if !p.Disabled {
+				return true
+			}
 		}
 	}
 
@@ -179,9 +186,14 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		if pluginMw, found := m.goPluginFromRequest(r); found {
 			logger = pluginMw.logger
 			handler = pluginMw.handler
+		} else {
+			return nil, http.StatusOK // next middleware
 		}
 	}
+
 	if handler == nil {
+		respCode = http.StatusInternalServerError
+		err = errors.New(http.StatusText(respCode))
 		return
 	}
 
@@ -209,7 +221,12 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	t1 := time.Now()
 
 	// Inject definition into request context:
-	ctx.SetDefinition(r, m.Spec.APIDefinition)
+	if m.Spec.IsOAS {
+		setOASDefinition(r, &m.Spec.OAS)
+	} else {
+		ctx.SetDefinition(r, m.Spec.APIDefinition)
+	}
+
 	handler(rw, r)
 
 	// calculate latency
@@ -246,4 +263,10 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	return
+}
+
+func setOASDefinition(r *http.Request, s *oas.OAS) {
+	cntx := r.Context()
+	cntx = context.WithValue(cntx, ctx.OASDefinition, s)
+	setContext(r, cntx)
 }

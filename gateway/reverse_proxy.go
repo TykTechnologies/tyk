@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/buger/jsonparser"
+
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
 
@@ -38,7 +40,6 @@ import (
 	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
@@ -46,6 +47,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
@@ -61,10 +63,9 @@ var corsHeaders = []string{
 	"Access-Control-Allow-Methods",
 	"Access-Control-Allow-Headers"}
 
-var ServiceCache *cache.Cache
 var sdMu sync.RWMutex
 
-func urlFromService(spec *APISpec) (*apidef.HostList, error) {
+func urlFromService(spec *APISpec, gw *Gateway) (*apidef.HostList, error) {
 
 	doCacheRefresh := func() (*apidef.HostList, error) {
 		log.Debug("--> Refreshing")
@@ -91,7 +92,12 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 			return spec.LastGoodHostList, nil
 		}
 
-		ServiceCache.Set(spec.APIID, data, cache.DefaultExpiration)
+		ttl, cacheEnabled := spec.Proxy.ServiceDiscovery.CacheOptions()
+		if !cacheEnabled {
+			ttl = 0 // use gateway default cache time to live.
+		}
+		gw.ServiceCache.Set(spec.APIID, data, ttl)
+
 		// Stash it too
 		spec.LastGoodHostList = data
 		return data, nil
@@ -106,7 +112,7 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 	}
 
 	// Not first run - check the cache
-	cachedServiceData, found := ServiceCache.Get(spec.APIID)
+	cachedServiceData, found := gw.ServiceCache.Get(spec.APIID)
 	if !found {
 		if spec.ServiceRefreshInProgress {
 			// Are we already refreshing the cache? skip and return last good conf
@@ -217,41 +223,39 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			panic(server.Serve(listener))
 		}()
 	})
-	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-		log.Debug("[PROXY] Service discovery enabled")
-		if ServiceCache == nil {
-			log.Debug("[PROXY] Service cache initialising")
-			expiry := 120
-			if spec.Proxy.ServiceDiscovery.CacheTimeout > 0 {
-				expiry = int(spec.Proxy.ServiceDiscovery.CacheTimeout)
-			} else if spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout > 0 {
-				expiry = spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout
-			}
-			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
-		}
+
+	if logger == nil {
+		logger = logrus.NewEntry(log)
 	}
+
+	logger = logger.WithField("mw", "ReverseProxy")
 
 	targetQuery := target.RawQuery
 	director := func(req *http.Request) {
+		logger := logger
+		spec := spec
+		target := target
+		gw := gw
+
 		hostList := spec.Proxy.StructuredTargetList
 		switch {
 		case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
 			var err error
-			hostList, err = urlFromService(spec)
+			hostList, err = urlFromService(spec, gw)
 			if err != nil {
-				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
+				logger.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 				break
 			}
 			fallthrough // implies load balancing, with replaced host list
 		case spec.Proxy.EnableLoadBalancing:
 			host, err := gw.nextTarget(hostList, spec)
 			if err != nil {
-				log.Error("[PROXY] [LOAD BALANCING] ", err)
+				logger.Error("[PROXY] [LOAD BALANCING] ", err)
 				host = allHostsDownURL
 			}
 			lbRemote, err := url.Parse(host)
 			if err != nil {
-				log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
+				logger.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
 			} else {
 				// Only replace target if everything is OK
 				target = lbRemote
@@ -262,10 +266,10 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		targetToUse := target
 
 		if spec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
-			log.Debug("Detected host rewrite, overriding target")
+			logger.Debug("Detected host rewrite, overriding target")
 			tmpTarget, err := url.Parse(req.URL.String())
 			if err != nil {
-				log.Error("Failed to parse URL! Err: ", err)
+				logger.Error("Failed to parse URL! Err: ", err)
 			} else {
 				// Specifically override with a URL rewrite
 				targetToUse = tmpTarget
@@ -319,12 +323,6 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			req.URL.Scheme = "https"
 		}
 	}
-
-	if logger == nil {
-		logger = logrus.NewEntry(log)
-	}
-
-	logger = logger.WithField("mw", "ReverseProxy")
 
 	proxy := &ReverseProxy{
 		Director:      director,
@@ -475,6 +473,17 @@ func setCustomHeader(h http.Header, key string, value string, ignoreCanonical bo
 	}
 }
 
+// setCustomHeaderMultipleValues accepts multiple values for a key header and append it
+func setCustomHeaderMultipleValues(h http.Header, key string, values []string, ignoreCanonical bool) {
+	for _, value := range values {
+		if ignoreCanonical {
+			h[key] = append(h[key], value)
+		} else {
+			h.Add(key, value)
+		}
+	}
+}
+
 func cloneHeader(h http.Header) http.Header {
 	h2 := make(http.Header, len(h))
 	for k, vv := range h {
@@ -590,8 +599,28 @@ func proxyFromAPI(api *APISpec) func(*http.Request) (*url.URL, error) {
 	}
 }
 
-func tlsClientConfig(s *APISpec) *tls.Config {
+func tlsClientConfig(s *APISpec, gw *Gateway) *tls.Config {
 	config := &tls.Config{}
+
+	if s.Protocol == "tls" || s.Protocol == "tcp" {
+		targetURL, err := url.Parse(s.Proxy.TargetURL)
+		if err != nil {
+			targetURL, err = url.Parse("tcp://" + s.Proxy.TargetURL)
+			if err != nil {
+				mainLog.WithError(err).Error("Error parsing target URL")
+			}
+		}
+
+		if targetURL != nil {
+			var tlsCertificates []tls.Certificate
+			if cert := gw.getUpstreamCertificate(targetURL.Host, s); cert != nil {
+				mainLog.Debug("Found upstream mutual TLS certificate")
+				tlsCertificates = []tls.Certificate{*cert}
+			}
+
+			config.Certificates = tlsCertificates
+		}
+	}
 
 	if s.GlobalConfig.ProxySSLInsecureSkipVerify {
 		config.InsecureSkipVerify = true
@@ -786,9 +815,19 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return handleInMemoryLoop(handler, r)
 	}
 
+	if rt.Gw.GetConfig().OpenTelemetry.Enabled {
+		var baseRoundTripper http.RoundTripper = rt.transport
+		if rt.h2ctransport != nil {
+			baseRoundTripper = rt.h2ctransport
+		}
+
+		tr := otel.HTTPRoundTripper(baseRoundTripper)
+		return tr.RoundTrip(r)
+	}
 	if rt.h2ctransport != nil {
 		return rt.h2ctransport.RoundTrip(r)
 	}
+
 	return rt.transport.RoundTrip(r)
 }
 
@@ -1030,8 +1069,48 @@ func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoun
 	return nil, true, nil
 }
 
+func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWriter *graphql.EngineResultWriter) error {
+	body, ok := proxyOnlyCtx.upstreamResponse.Body.(*nopCloserBuffer)
+	if !ok {
+		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
+		return nil
+	}
+	_, err := body.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	responseBody, err := io.ReadAll(body)
+	if err != nil {
+		return err
+	}
+	// graphql-go-tools error message format: {"errors": [...]}
+	// Insert the upstream error into the first error message.
+	result, err := jsonparser.Set(resultWriter.Bytes(), responseBody, "errors", "[0]", "extensions")
+	if err != nil {
+		return err
+	}
+	resultWriter.Reset()
+	_, err = resultWriter.Write(result)
+	return err
+}
+
+func headerStructToHeaderMap(headers []apidef.UDGGlobalHeader) map[string]string {
+	headerMap := make(map[string]string)
+	for _, header := range headers {
+		headerMap[header.Key] = header.Value
+	}
+	return headerMap
+}
+
 func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
-	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
+	transportOptions := []GraphqlEngineTransportOption{
+		WithGlobalHeaders(headerStructToHeaderMap(p.TykAPISpec.GraphQL.Engine.GlobalHeaders)),
+	}
+	if p.TykAPISpec.EnableContextVars {
+		transportOptions = append(transportOptions, ReplaceContextVars(outreq, p.Gw))
+	}
+	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper, transportOptions...)
 
 	switch p.TykAPISpec.GraphQL.Version {
 	case apidef.GraphQLConfigVersionNone:
@@ -1105,6 +1184,12 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			if proxyOnlyCtx.upstreamResponse != nil {
 				header = proxyOnlyCtx.upstreamResponse.Header
 				httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
+				if p.TykAPISpec.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding && httpStatus >= http.StatusBadRequest {
+					err = returnErrorsFromUpstream(proxyOnlyCtx, &resultWriter)
+					if err != nil {
+						return
+					}
+				}
 			}
 		}
 
@@ -1356,10 +1441,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", http.StatusGatewayTimeout, true)
 
 			if p.TykAPISpec.Proxy.ServiceDiscovery.UseDiscoveryService {
-				if ServiceCache != nil {
-					p.logger.Debug("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
-					ServiceCache.Delete(p.TykAPISpec.APIID)
-				}
+				p.logger.Debug("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
+				p.Gw.ServiceCache.Delete(p.TykAPISpec.APIID)
 			}
 			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
@@ -1384,7 +1467,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	upgrade, _ := p.IsUpgrade(req)
 	// Deal with 101 Switching Protocols responses: (WebSocket, h2c, etc)
-	if upgrade {
+	if upgrade && res.StatusCode == 101 {
 		if err := p.handleUpgradeResponse(rw, outreq, res); err != nil {
 			p.ErrorHandler.HandleError(rw, logreq, err.Error(), http.StatusInternalServerError, true)
 			return ProxyResponse{UpstreamLatency: upstreamLatency}
@@ -1831,61 +1914,75 @@ func (n *nopCloserBuffer) Close() error {
 	return nil
 }
 
-func copyBody(body io.ReadCloser, isClientResponseBody bool) io.ReadCloser {
+func copyBody(body io.ReadCloser, greedy bool) (io.ReadCloser, error) {
 	// check if body was already read and converted into our nopCloser
 	if nc, ok := body.(*nopCloserBuffer); ok {
 		// seek to the beginning to have it ready for next read
 		nc.Seek(0, io.SeekStart)
-		return body
+		return body, nil
 	}
 
 	// body is http's io.ReadCloser - read it up
 	rwc, err := newNopCloserBuffer(body)
 	if err != nil {
 		log.WithError(err).Error("error creating buffered request body")
-		return body
+		return body, nil
 	}
 
 	// Consume reader if it's from a http client response.
 	//
 	// Server would automatically call Close(), we only do it for
 	// the *http.Response struct, but not *http.Request.
-	if isClientResponseBody {
+	if greedy {
 		if err := rwc.copy(); err != nil {
 			log.WithError(err).Error("error reading request body")
-			return body
+			return body, err
 		}
 	}
 
 	// use seek-able reader for further body usage
-	return rwc
+	return rwc, nil
 }
 
-func copyRequest(r *http.Request) *http.Request {
+func copyRequest(r *http.Request) (*http.Request, error) {
+	var err error
 	if r.ContentLength == -1 {
-		return r
+		return r, nil
 	}
 
 	if r.Body != nil {
-		r.Body = copyBody(r.Body, false)
+		r.Body, err = copyBody(r.Body, false)
 	}
 
-	return r
+	return r, err
 }
 
-func copyResponse(r *http.Response) *http.Response {
+func copyResponse(r *http.Response) (*http.Response, error) {
+	var err error
 	// If the response is 101 Switching Protocols then the body will contain a
 	// `*http.readWriteCloserBody` which cannot be copied (see stdlib documentation).
 	// In this case we want to return immediately to avoid a silent crash.
 	if r.StatusCode == http.StatusSwitchingProtocols {
-		return r
+		return r, nil
 	}
 
 	if r.Body != nil {
-		r.Body = copyBody(r.Body, true)
+		r.Body, err = copyBody(r.Body, true)
 	}
 
-	return r
+	return r, err
+}
+
+func nopCloseRequestBodyErr(r *http.Request) (err error) {
+	if r == nil {
+		return nil
+	}
+
+	if r.Body != nil {
+		r.Body, err = copyBody(r.Body, true)
+	}
+
+	return err
 }
 
 func nopCloseRequestBody(r *http.Request) {

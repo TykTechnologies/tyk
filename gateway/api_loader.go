@@ -22,6 +22,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 )
@@ -496,8 +497,19 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	logger.Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
 
-	if trace.IsEnabled() {
+	if trace.IsEnabled() { // trace.IsEnabled = check if opentracing is enabled
 		chainDef.ThisHandler = trace.Handle(spec.Name, chain)
+	} else if gw.GetConfig().OpenTelemetry.Enabled { // check if opentelemetry is enabled
+		spanAttrs := []otel.SpanAttribute{}
+		spanAttrs = append(spanAttrs, otel.ApidefSpanAttributes(spec.APIDefinition)...)
+		spanAttrs = append(spanAttrs, otel.GatewaySpanAttributes(
+			gw.GetNodeID(),
+			gw.GetConfig().SlaveOptions.UseRPC,
+			gw.GetConfig().SlaveOptions.GroupID,
+			gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
+			gw.GetConfig().DBAppConfOptions.Tags,
+		)...)
+		chainDef.ThisHandler = otel.HTTPHandler(spec.Name, chain, gw.TracerProvider, spanAttrs...)
 	} else {
 		chainDef.ThisHandler = chain
 	}
@@ -1003,4 +1015,22 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	mainLog.Info("Initialised API Definitions")
 
+	gwListenPort := gw.GetConfig().ListenPort
+	controlApiIsConfigured := (gw.GetConfig().ControlAPIPort != 0 && gw.GetConfig().ControlAPIPort != gwListenPort) || gw.GetConfig().ControlAPIHostname != ""
+	if gw.allApisAreMTLS() && !gw.GetConfig().Security.ControlAPIUseMutualTLS && !controlApiIsConfigured {
+		mainLog.Warning("All APIs are protected with mTLS, except for the control API. " +
+			"We recommend configuring the control API port or control hostname to ensure consistent security measures")
+	}
+}
+
+func (gw *Gateway) allApisAreMTLS() bool {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+	for _, api := range gw.apisByID {
+		if !api.UseMutualTLSAuth && api.Active {
+			return false
+		}
+	}
+
+	return true
 }

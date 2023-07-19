@@ -21,11 +21,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/test"
-
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/test"
 
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
@@ -33,10 +35,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
-	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
-	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
@@ -61,6 +61,8 @@ import (
 	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 var (
@@ -108,10 +110,11 @@ type Gateway struct {
 	MonitoringHandler    config.TykEventHandler
 	RPCListener          RPCStorageHandler
 	DashService          DashboardServiceSender
-	CertificateManager   *certs.CertificateManager
+	CertificateManager   certs.CertificateManager
 	GlobalHostChecker    HostCheckerManager
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
+	TracerProvider       otel.TracerProvider
 
 	keyGen DefaultKeyGenerator
 
@@ -119,15 +122,17 @@ type Gateway struct {
 	SessionMonitor Monitor
 
 	// RPCGlobalCache stores keys
-	RPCGlobalCache *cache.Cache
+	RPCGlobalCache cache.Repository
 	// RPCCertCache stores certificates
-	RPCCertCache *cache.Cache
+	RPCCertCache cache.Repository
 	// key session memory cache
-	SessionCache *cache.Cache
+	SessionCache cache.Repository
 	// org session memory cache
-	ExpiryCache *cache.Cache
+	ExpiryCache cache.Repository
 	// memory cache to store arbitrary items
-	UtilCache *cache.Cache
+	UtilCache cache.Repository
+	// ServiceCache is the service discovery cache
+	ServiceCache cache.Repository
 
 	// Nonce to use when interacting with the dashboard service
 	ServiceNonce      string
@@ -145,9 +150,6 @@ type Gateway struct {
 
 	consulKVStore kv.Store
 	vaultKVStore  kv.Store
-
-	LE_MANAGER  letsencrypt.Manager
-	LE_FIRSTRUN bool
 
 	NotificationVerifier goverify.Verifier
 
@@ -218,9 +220,16 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 		Timeout: 500 * time.Millisecond,
 	}
 
-	gw.SessionCache = cache.New(10*time.Second, 5*time.Second)
-	gw.ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
-	gw.UtilCache = cache.New(time.Hour, 10*time.Minute)
+	gw.SessionCache = cache.New(10, 5)
+	gw.ExpiryCache = cache.New(600, 10*60)
+	gw.UtilCache = cache.New(3600, 10*60)
+
+	var timeout = int64(config.ServiceDiscovery.DefaultCacheTimeout)
+	if timeout <= 0 {
+		timeout = 120 // 2 minutes
+	}
+
+	gw.ServiceCache = cache.New(timeout, 15)
 
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
@@ -247,8 +256,8 @@ func (gw *Gateway) MarshalJSON() ([]byte, error) {
 
 func (gw *Gateway) InitializeRPCCache() {
 	conf := gw.GetConfig()
-	gw.RPCGlobalCache = cache.New(time.Duration(conf.SlaveOptions.RPCGlobalCacheExpiration)*time.Second, 15*time.Second)
-	gw.RPCCertCache = cache.New(time.Duration(conf.SlaveOptions.RPCCertCacheExpiration)*time.Second, 15*time.Second)
+	gw.RPCGlobalCache = cache.New(int64(conf.SlaveOptions.RPCGlobalCacheExpiration), 15)
+	gw.RPCCertCache = cache.New(int64(conf.SlaveOptions.RPCCertCacheExpiration), 15)
 }
 
 // SetNodeID writes NodeID safely.
@@ -299,6 +308,12 @@ func (gw *Gateway) getPolicy(polID string) user.Policy {
 	pol := gw.policiesByID[polID]
 	gw.policiesMu.RUnlock()
 	return pol
+}
+
+func (gw *Gateway) policiesByIDLen() int {
+	gw.policiesMu.RLock()
+	defer gw.policiesMu.RUnlock()
+	return len(gw.policiesByID)
 }
 
 func (gw *Gateway) apisByIDLen() int {
@@ -467,8 +482,12 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	} else if gw.GetConfig().SlaveOptions.UseRPC {
 		mainLog.Debug("Using RPC Configuration")
 
+		dataLoader := &RPCStorageHandler{
+			Gw:       gw,
+			DoReload: gw.DoReload,
+		}
 		var err error
-		s, err = loader.FromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw)
+		s, err = loader.FromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw)
 		if err != nil {
 			return 0, err
 		}
@@ -525,7 +544,11 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		pols = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
-		pols, err = gw.LoadPoliciesFromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
+		dataLoader := &RPCStorageHandler{
+			Gw:       gw,
+			DoReload: gw.DoReload,
+		}
+		pols, err = gw.LoadPoliciesFromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	default:
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
@@ -572,7 +595,8 @@ func stripSlashes(next http.Handler) http.Handler {
 func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if gw.GetConfig().Security.ControlAPIUseMutualTLS {
-			if err := gw.CertificateManager.ValidateRequestCertificate(gw.GetConfig().Security.Certificates.ControlAPI, r); err != nil {
+			gwCerts := gw.CertificateManager.List(gw.GetConfig().Security.Certificates.ControlAPI, certs.CertificatePublic)
+			if err := crypto.ValidateRequestCerts(r, gwCerts); err != nil {
 				doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 				return
 			}
@@ -864,33 +888,31 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 // Create the response processor chain
 func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
-	// Prealloc size
-	chainLen := len(spec.ResponseProcessors)
-	// Append capacity
-	chainCapacity := chainLen + 1 + len(responseFuncs)
-
-	responseChain := make([]TykResponseHandler, chainLen, chainCapacity)
-
-	for i, processorDetail := range spec.ResponseProcessors {
-		processor := gw.responseProcessorByName(processorDetail.Name)
+	var (
+		responseMWChain []TykResponseHandler
+		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
+	)
+	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler})
+	for _, processorDetail := range spec.ResponseProcessors {
+		processor := gw.responseProcessorByName(processorDetail.Name, baseHandler)
 		if processor == nil {
 			mainLog.Error("No such processor: ", processorDetail.Name)
-			return
+			continue
 		}
 		if err := processor.Init(processorDetail.Options, spec); err != nil {
 			mainLog.Debug("Failed to init processor: ", err)
 		}
 		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
-		responseChain[i] = processor
+		responseMWChain = append(responseMWChain, processor)
 	}
 
 	for _, mw := range responseFuncs {
 		var processor TykResponseHandler
 		//is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
-			processor = gw.responseProcessorByName("goplugin_res_hook")
+			processor = gw.responseProcessorByName("goplugin_res_hook", baseHandler)
 		} else {
-			processor = gw.responseProcessorByName("custom_mw_res_hook")
+			processor = gw.responseProcessorByName("custom_mw_res_hook", baseHandler)
 		}
 
 		// TODO: perhaps error when plugin support is disabled?
@@ -902,7 +924,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		if err := processor.Init(mw, spec); err != nil {
 			mainLog.WithError(err).Debug("Failed to init processor")
 		}
-		responseChain = append(responseChain, processor)
+		responseMWChain = append(responseMWChain, processor)
 	}
 
 	keyPrefix := "cache-" + spec.APIID
@@ -910,14 +932,14 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	cacheStore.Connect()
 
 	// Add cache writer as the final step of the response middleware chain
-	processor := &ResponseCacheMiddleware{store: cacheStore}
+	processor := &ResponseCacheMiddleware{BaseTykResponseHandler: baseHandler, store: cacheStore}
 	if err := processor.Init(nil, spec); err != nil {
 		mainLog.WithError(err).Debug("Failed to init processor")
 	}
 
-	responseChain = append(responseChain, processor)
+	responseMWChain = append(responseMWChain, processor)
 
-	spec.ResponseChain = responseChain
+	spec.ResponseChain = responseMWChain
 }
 
 func (gw *Gateway) isRPCMode() bool {
@@ -1257,10 +1279,6 @@ func (gw *Gateway) initialiseSystem() error {
 	gw.InitializeRPCCache()
 	gw.setupInstrumentation()
 
-	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
-		go gw.StartPeriodicStateBackup(&gw.LE_MANAGER)
-	}
-
 	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
@@ -1369,6 +1387,14 @@ func (gw *Gateway) afterConfSetup() {
 		if err != nil {
 			log.Fatalf("Could not fetch policy connection string... %v", err)
 		}
+	}
+
+	if conf.OpenTelemetry.Enabled {
+		if conf.OpenTelemetry.ResourceName == "" {
+			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
+		}
+
+		conf.OpenTelemetry.SetDefaults()
 	}
 
 	gw.SetConfig(conf)
@@ -1544,27 +1570,38 @@ func Start() {
 	}
 
 	if tr := gwConfig.Tracer; tr.Enabled {
+		mainLog.Warn("OpenTracing is deprecated, use OpenTelemetry instead.")
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)
 		defer trace.Close()
 	}
+
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry)
+
 	gw.start()
 	configs := gw.GetConfig()
 	go gw.RedisController.ConnectToRedis(gw.ctx, func() {
 		gw.reloadURLStructure(func() {})
 	}, &configs)
 
+	unix := time.Now().Unix()
+
+	var (
+		memprofile = fmt.Sprintf("tyk.%d.mprof", unix)
+		cpuprofile = fmt.Sprintf("tyk.%d.prof", unix)
+	)
+
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")
 		var err error
-		if memProfFile, err = os.Create("tyk.mprof"); err != nil {
+		if memProfFile, err = os.Create(memprofile); err != nil {
 			panic(err)
 		}
 		defer memProfFile.Close()
 	}
 	if *cli.CPUProfile {
 		mainLog.Info("Cpu profiling active")
-		cpuProfFile, err := os.Create("tyk.prof")
+		cpuProfFile, err := os.Create(cpuprofile)
 		if err != nil {
 			panic(err)
 		}
@@ -1615,6 +1652,17 @@ func Start() {
 		err := gw.DashService.DeRegister()
 		if err != nil {
 			mainLog.WithError(err).Error("deregistering in dashboard")
+		}
+	}
+	if gwConfig.SlaveOptions.UseRPC {
+		store := RPCStorageHandler{
+			DoReload: gw.DoReload,
+			Gw:       gw,
+		}
+
+		err := store.Disconnect()
+		if err != nil {
+			mainLog.WithError(err).Error("deregistering in MDCB")
 		}
 	}
 

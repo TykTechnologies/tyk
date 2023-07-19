@@ -67,7 +67,7 @@ func TestImportValidateRequest(t *testing.T) {
 		}
 
 		got := make([]string, 0, len(petstore.Paths))
-		for endpoint, _ := range petstore.Paths {
+		for endpoint := range petstore.Paths {
 			got = append(got, endpoint)
 		}
 

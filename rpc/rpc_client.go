@@ -253,7 +253,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 
 	clientSingleton.Conns = values.Config().RPCPoolSize
 	if clientSingleton.Conns == 0 {
-		clientSingleton.Conns = 20
+		clientSingleton.Conns = 5
 	}
 
 	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
@@ -535,5 +535,11 @@ func ForceConnected(t *testing.T) {
 
 // SetEmergencyMode used in tests to force emergency mode
 func SetEmergencyMode(t *testing.T, value bool) {
+	t.Helper()
 	values.SetEmergencyMode(value)
+}
+
+func SetLoadCounts(t *testing.T, value int) {
+	t.Helper()
+	values.SetLoadCounts(value)
 }

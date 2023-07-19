@@ -26,9 +26,23 @@ services:
       - "0.0.0.0:8080:8080"
     environment:
       - TYK_LOGLEVEL=debug
+
+  gw-checker:
+    image: curlimages/curl
+    command: tail -f /dev/null
+    depends_on:
+      - gw
+    healthcheck:
+      test: curl -s --fail http://gw:8080/hello | grep -o '.*{"redis":{"status":"pass",'
+      interval: 5s
+      retries: 10
+      start_period: 4s
+      timeout: 10s
+
   wait:
     image: hello-world:linux
     depends_on:
         redis:
             condition: service_healthy
-      
+        gw-checker:
+            condition: service_healthy

@@ -232,6 +232,7 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateAuthenticationPlugin()
 	a.migrateIDExtractor()
 	a.migrateCustomDomain()
+	a.migrateScopeToPolicy()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -399,6 +400,8 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.CustomMiddlewareBundleDisabled = true
 	a.CustomMiddleware.IdExtractor.Disabled = true
 	a.ConfigDataDisabled = true
+	a.Proxy.ServiceDiscovery.CacheDisabled = true
+	a.UptimeTests.Config.ServiceDiscovery.CacheDisabled = true
 
 	for i := 0; i < len(a.CustomMiddleware.Pre); i++ {
 		a.CustomMiddleware.Pre[i].Disabled = true
@@ -422,4 +425,21 @@ func (a *APIDefinition) SetDisabledFlags() {
 			a.VersionData.Versions[version].ExtendedPaths.GoPlugin[i].Disabled = true
 		}
 	}
+}
+
+func (a *APIDefinition) migrateScopeToPolicy() {
+	scopeClaim := ScopeClaim{
+		ScopeClaimName: a.JWTScopeClaimName,
+		ScopeToPolicy:  a.JWTScopeToPolicyMapping,
+	}
+
+	a.JWTScopeToPolicyMapping = nil
+	a.JWTScopeClaimName = ""
+
+	if a.UseOpenID {
+		a.Scopes.OIDC = scopeClaim
+		return
+	}
+
+	a.Scopes.JWT = scopeClaim
 }

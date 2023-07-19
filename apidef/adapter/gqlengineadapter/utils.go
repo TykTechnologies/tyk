@@ -1,12 +1,19 @@
 package gqlengineadapter
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 
 	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
+)
+
+var (
+	ErrGraphQLConfigIsMissingOperation = errors.New("graphql data source config is missing an operation")
 )
 
 func parseSchema(schemaAsString string) (parsedSchema *graphql.Schema, err error) {
@@ -75,4 +82,27 @@ func removeDuplicateApiDefinitionHeaders(headers ...map[string]string) map[strin
 		}
 	}
 	return hdr
+}
+
+func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConfigGraphQL) (json.RawMessage, error) {
+	if !config.HasOperation {
+		return nil, ErrGraphQLConfigIsMissingOperation
+	}
+	req := graphql.Request{
+		Query:     config.Operation,
+		Variables: config.Variables,
+	}
+	body, err := graphql.MarshalRequestString(req)
+	if err != nil {
+		return nil, err
+	}
+	customMessage := restDataSource.ConfigJSON(restDataSource.Configuration{
+		Fetch: restDataSource.FetchConfiguration{
+			URL:    config.URL,
+			Method: config.Method,
+			Body:   body,
+			Header: convertApiDefinitionHeadersToHttpHeaders(config.Headers),
+		},
+	})
+	return customMessage, nil
 }
