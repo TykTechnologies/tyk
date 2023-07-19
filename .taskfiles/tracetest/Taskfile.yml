@@ -5,27 +5,28 @@ tasks:
   default:
     desc: "Configure tracetest"
     deps:
-      - install
+      - install-linux
+      - install-darwin
     cmds:
       - tracetest configure -g --endpoint http://localhost:11633
 
-  install:
+  install-darwin:
     internal: true
     desc: "Install tracetest"
     status:
       - type tracetest
+    platforms: [darwin]
     cmds:
-      - cmd: brew install kubeshop/tracetest/tracetest@0.12.2
-        platforms: [darwin]
-      - cmd: task: tracetest:linux
-        platforms: [linux]
+      - brew install kubeshop/tracetest/tracetest@0.12.2
 
-  tracetest:linux:
+  install-linux:
     internal: true
-    desc: "Install tracetest on linux"
+    desc: "Install tracetest"
+    status:
+      - type tracetest
+    platforms: [linux]
     cmds:  # https://docs.tracetest.io/getting-started/cli-installation-reference#apt
       - sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates
       - echo "deb [trusted=yes] https://apt.fury.io/tracetest/ /" | sudo tee /etc/apt/sources.list.d/fury.list
       - sudo apt-get update
       - sudo apt-get install tracetest=0.12.2
-
