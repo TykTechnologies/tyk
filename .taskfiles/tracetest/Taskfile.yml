@@ -5,12 +5,12 @@ tasks:
   default:
     desc: "Configure tracetest"
     deps:
-      - install-linux
-      - install-darwin
+      - install:linux
+      - install:darwin
     cmds:
       - tracetest configure -g --endpoint http://localhost:11633
 
-  install-darwin:
+  install:darwin:
     internal: true
     desc: "Install tracetest"
     status:
@@ -19,7 +19,7 @@ tasks:
     cmds:
       - brew install kubeshop/tracetest/tracetest@0.12.2
 
-  install-linux:
+  install:linux:
     internal: true
     desc: "Install tracetest"
     status:
