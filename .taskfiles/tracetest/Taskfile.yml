@@ -17,10 +17,15 @@ tasks:
     cmds:
       - cmd: brew install kubeshop/tracetest/tracetest@0.12.2
         platforms: [darwin]
-      - cmds:  # https://docs.tracetest.io/getting-started/cli-installation-reference#apt
-          - sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates
-          - echo "deb [trusted=yes] https://apt.fury.io/tracetest/ /" | sudo tee /etc/apt/sources.list.d/fury.list
-          - sudo apt-get update
-          - sudo apt-get install tracetest=0.12.2
+      - cmd: task: tracetest:linux
         platforms: [linux]
+
+  tracetest:linux:
+    internal: true
+    desc: "Install tracetest on linux"
+    cmds:  # https://docs.tracetest.io/getting-started/cli-installation-reference#apt
+      - sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates
+      - echo "deb [trusted=yes] https://apt.fury.io/tracetest/ /" | sudo tee /etc/apt/sources.list.d/fury.list
+      - sudo apt-get update
+      - sudo apt-get install tracetest=0.12.2
 
