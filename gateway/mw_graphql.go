@@ -177,16 +177,25 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 		return
 	}
 	engineConfig.SetWebsocketBeforeStartHook(m)
-
 	specCtx, cancel := context.WithCancel(context.Background())
+
 	engine, err := gql.NewExecutionEngineV2(specCtx, logger, *engineConfig)
 	if err != nil {
 		m.Logger().WithError(err).Error("could not create execution engine v2")
 		cancel()
 		return
 	}
-
 	m.Spec.GraphQLExecutor.EngineV2 = engine
+	conf := m.Gw.GetConfig()
+	if conf.OpenTelemetry.Enabled {
+		executor, err := gql.NewCustomExecutionEngineV2Executor(NewOtelGraphqlEngineV2(m.Gw.TracerProvider, engine))
+		if err != nil {
+			m.Logger().WithError(err).Error("could not create execution engine executor v2")
+		}
+		m.Spec.GraphQLExecutor.CustomExecutor = executor
+	} else {
+
+	}
 	m.Spec.GraphQLExecutor.CancelV2 = cancel
 	m.Spec.GraphQLExecutor.HooksV2.BeforeFetchHook = m
 	m.Spec.GraphQLExecutor.HooksV2.AfterFetchHook = m

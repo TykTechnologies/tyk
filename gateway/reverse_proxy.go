@@ -1165,9 +1165,15 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		}
 		execOptions = append(execOptions, graphql.WithUpstreamHeaders(upstreamHeaders))
 
-		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
-		if err != nil {
-			return
+		if p.TykAPISpec.GraphQLExecutor.CustomExecutor != nil {
+			if err = p.TykAPISpec.GraphQLExecutor.CustomExecutor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
+				return
+			}
+		} else {
+			err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
+			if err != nil {
+				return
+			}
 		}
 
 		httpStatus := http.StatusOK
