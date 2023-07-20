@@ -77,6 +77,8 @@ dockers:
     dockerfile: ci/images/hybrid/Dockerfile
     extra_files:
       - "ci/images/hybrid/"
+  # The plugin compiler image is built outside of goreleaser in a
+  # plugin-compiler-build workflow.
   # Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway (arm64)
   - ids:
       - std
