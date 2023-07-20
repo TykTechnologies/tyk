@@ -19,12 +19,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Set tag
-        id: set-tag
-        shell: bash
-        run: |
-          echo "tag=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
-
       - name: Configure AWS Credentials
         id: configure-aws
         uses: aws-actions/configure-aws-credentials@v2
@@ -46,7 +40,6 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler
           labels: |
             org.opencontainers.image.title=tyk-plugin-compiler
-            org.opencontainers.image.version=${{ steps.set-tag.outputs.tag  }}
             org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway
           tags: |
             type=semver,pattern=v{{version}}
@@ -72,4 +65,4 @@ jobs:
           build-args: |
             BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
-            GITHUB_TAG=${{ steps.set-target.output.tag }}
+            GITHUB_TAG=${{ github.ref_name }}
