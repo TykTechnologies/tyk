@@ -526,7 +526,7 @@
         "toMethod"
       ]
     },
-    "X-Tyk-TransformRequestBody": {
+    "X-Tyk-TransformBody": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -708,7 +708,10 @@
           "$ref": "#/definitions/X-Tyk-TransformRequestMethod"
         },
         "transformRequestBody": {
-          "$ref": "#/definitions/X-Tyk-TransformRequestBody"
+          "$ref": "#/definitions/X-Tyk-TransformBody"
+        },
+        "transformResponseBody": {
+          "$ref": "#/definitions/X-Tyk-TransformBody"
         },
         "virtualEndpoint": {
           "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
