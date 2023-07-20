@@ -1095,8 +1095,22 @@ func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWrite
 	return err
 }
 
+func headerStructToHeaderMap(headers []apidef.UDGGlobalHeader) map[string]string {
+	headerMap := make(map[string]string)
+	for _, header := range headers {
+		headerMap[header.Key] = header.Value
+	}
+	return headerMap
+}
+
 func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
-	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
+	transportOptions := []GraphqlEngineTransportOption{
+		WithGlobalHeaders(headerStructToHeaderMap(p.TykAPISpec.GraphQL.Engine.GlobalHeaders)),
+	}
+	if p.TykAPISpec.EnableContextVars {
+		transportOptions = append(transportOptions, ReplaceContextVars(outreq, p.Gw))
+	}
+	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper, transportOptions...)
 
 	switch p.TykAPISpec.GraphQL.Version {
 	case apidef.GraphQLConfigVersionNone:

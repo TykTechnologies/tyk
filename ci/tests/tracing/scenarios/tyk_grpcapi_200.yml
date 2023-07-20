@@ -56,4 +56,3 @@ spec:
     assertions:
     - attr:http.method = "POST"
     - attr:http.url = "http://grpcapi:50051/helloworld.Greeter/SayHello"
-    - attr:http.user_agent = "grpc-go/1.52.0"

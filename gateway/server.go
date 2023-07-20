@@ -21,13 +21,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/test"
-
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/test"
 
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
@@ -888,33 +888,31 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 // Create the response processor chain
 func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
-	// Prealloc size
-	chainLen := len(spec.ResponseProcessors)
-	// Append capacity
-	chainCapacity := chainLen + 1 + len(responseFuncs)
-
-	responseChain := make([]TykResponseHandler, chainLen, chainCapacity)
-
-	for i, processorDetail := range spec.ResponseProcessors {
-		processor := gw.responseProcessorByName(processorDetail.Name)
+	var (
+		responseMWChain []TykResponseHandler
+		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
+	)
+	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler})
+	for _, processorDetail := range spec.ResponseProcessors {
+		processor := gw.responseProcessorByName(processorDetail.Name, baseHandler)
 		if processor == nil {
 			mainLog.Error("No such processor: ", processorDetail.Name)
-			return
+			continue
 		}
 		if err := processor.Init(processorDetail.Options, spec); err != nil {
 			mainLog.Debug("Failed to init processor: ", err)
 		}
 		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
-		responseChain[i] = processor
+		responseMWChain = append(responseMWChain, processor)
 	}
 
 	for _, mw := range responseFuncs {
 		var processor TykResponseHandler
 		//is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
-			processor = gw.responseProcessorByName("goplugin_res_hook")
+			processor = gw.responseProcessorByName("goplugin_res_hook", baseHandler)
 		} else {
-			processor = gw.responseProcessorByName("custom_mw_res_hook")
+			processor = gw.responseProcessorByName("custom_mw_res_hook", baseHandler)
 		}
 
 		// TODO: perhaps error when plugin support is disabled?
@@ -926,7 +924,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		if err := processor.Init(mw, spec); err != nil {
 			mainLog.WithError(err).Debug("Failed to init processor")
 		}
-		responseChain = append(responseChain, processor)
+		responseMWChain = append(responseMWChain, processor)
 	}
 
 	keyPrefix := "cache-" + spec.APIID
@@ -934,14 +932,14 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	cacheStore.Connect()
 
 	// Add cache writer as the final step of the response middleware chain
-	processor := &ResponseCacheMiddleware{store: cacheStore}
+	processor := &ResponseCacheMiddleware{BaseTykResponseHandler: baseHandler, store: cacheStore}
 	if err := processor.Init(nil, spec); err != nil {
 		mainLog.WithError(err).Debug("Failed to init processor")
 	}
 
-	responseChain = append(responseChain, processor)
+	responseMWChain = append(responseMWChain, processor)
 
-	spec.ResponseChain = responseChain
+	spec.ResponseChain = responseMWChain
 }
 
 func (gw *Gateway) isRPCMode() bool {
