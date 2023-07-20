@@ -188,10 +188,12 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 	m.Spec.GraphQLExecutor.EngineV2 = engine
 	conf := m.Gw.GetConfig()
 	if conf.OpenTelemetry.Enabled {
-		executor, err := gql.NewCustomExecutionEngineV2Executor(NewOtelGraphqlEngineV2(m.Gw.TracerProvider, engine))
+		executor := NewOtelGraphqlEngineV2(m.Gw.TracerProvider, engine)
+		rootExecutor, err := gql.NewCustomExecutionEngineV2Executor(executor)
 		if err != nil {
-			m.Logger().WithError(err).Error("could not create execution engine executor v2")
+			m.Logger().WithError(err).Error("error creating custom execution engine v2")
 		}
+		executor.setRootExecutor(rootExecutor)
 		m.Spec.GraphQLExecutor.CustomExecutor = executor
 	} else {
 

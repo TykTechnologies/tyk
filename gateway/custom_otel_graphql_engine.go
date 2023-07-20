@@ -17,26 +17,31 @@ type OtelGraphqlEngineV2 struct {
 	mutex          sync.Mutex
 	logger         *logrus.Entry
 	spec           *APISpec
-	spanContext    context.Context
+	traceContext   context.Context
 	tracerProvider otel.TracerProvider
 
-	engine graphql.CustomExecutionEngineV2
+	engine       *graphql.ExecutionEngineV2
+	rootExecutor graphql.ExecutionEngineV2Executor
 }
 
 func (o *OtelGraphqlEngineV2) setContext(ctx context.Context) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-	o.spanContext = ctx
+	o.traceContext = ctx
+}
+
+func (o *OtelGraphqlEngineV2) setRootExecutor(executor graphql.ExecutionEngineV2Executor) {
+	o.rootExecutor = executor
 }
 
 func (o *OtelGraphqlEngineV2) Normalize(operation *graphql.Request) error {
 	var operationName = "NormalizeRequest"
 	if tyktrace.IsEnabled() {
-		span, ctx := tyktrace.Span(o.spanContext, operationName)
+		span, ctx := tyktrace.Span(o.traceContext, operationName)
 		defer span.Finish()
 		o.setContext(ctx)
 	} else {
-		ctx, span := o.tracerProvider.Tracer().Start(o.spanContext, operationName)
+		ctx, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 		defer span.End()
 		o.setContext(ctx)
 	}
@@ -44,36 +49,92 @@ func (o *OtelGraphqlEngineV2) Normalize(operation *graphql.Request) error {
 }
 
 func (o *OtelGraphqlEngineV2) ValidateForSchema(operation *graphql.Request) error {
-	//TODO implement me
-	panic("implement me")
+	var operationName = "ValidateRequest"
+	if tyktrace.IsEnabled() {
+		span, ctx := tyktrace.Span(o.traceContext, operationName)
+		defer span.Finish()
+		o.setContext(ctx)
+	} else {
+		ctx, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
+		defer span.End()
+		o.setContext(ctx)
+	}
+	return o.engine.ValidateForSchema(operation)
 }
 
 func (o *OtelGraphqlEngineV2) Setup(ctx context.Context, postProcessor *postprocess.Processor, resolveContext *resolve.Context, operation *graphql.Request, options ...graphql.ExecutionOptionsV2) {
-	//TODO implement me
-	panic("implement me")
+	var operationName = "SetupResolver"
+	if tyktrace.IsEnabled() {
+		span, ctx := tyktrace.Span(o.traceContext, operationName)
+		defer span.Finish()
+		o.setContext(ctx)
+	} else {
+		ctx, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
+		defer span.End()
+		o.setContext(ctx)
+	}
+	o.engine.Setup(ctx, postProcessor, resolveContext, operation, options...)
 }
 
 func (o *OtelGraphqlEngineV2) Plan(postProcessor *postprocess.Processor, operation *graphql.Request, report *operationreport.Report) (plan.Plan, error) {
-	//TODO implement me
-	panic("implement me")
+	var operationName = "GeneratePlan"
+	if tyktrace.IsEnabled() {
+		span, ctx := tyktrace.Span(o.traceContext, operationName)
+		defer span.Finish()
+		o.setContext(ctx)
+	} else {
+		ctx, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
+		defer span.End()
+		o.setContext(ctx)
+	}
+	return o.engine.Plan(postProcessor, operation, report)
 }
 
 func (o *OtelGraphqlEngineV2) Resolve(resolveContext *resolve.Context, planResult plan.Plan, writer resolve.FlushWriter) error {
-	//TODO implement me
-	panic("implement me")
+	var operationName = "ResolvePlan"
+	if tyktrace.IsEnabled() {
+		span, ctx := tyktrace.Span(o.traceContext, operationName)
+		defer span.Finish()
+		o.setContext(ctx)
+	} else {
+		ctx, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
+		defer span.End()
+		o.setContext(ctx)
+	}
+	return o.engine.Resolve(resolveContext, planResult, writer)
 }
 
 func (o *OtelGraphqlEngineV2) Teardown() {
-	//TODO implement me
-	panic("implement me")
 }
 
 func (o *OtelGraphqlEngineV2) InputValidation(operation *graphql.Request) error {
-	//TODO implement me
-	panic("implement me")
+	var operationName = "InputValidation"
+	if tyktrace.IsEnabled() {
+		span, ctx := tyktrace.Span(o.traceContext, operationName)
+		defer span.Finish()
+		o.setContext(ctx)
+	} else {
+		ctx, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
+		defer span.End()
+		o.setContext(ctx)
+	}
+	return o.engine.InputValidation(operation)
 }
 
-func NewOtelGraphqlEngineV2(tracerProvider otel.TracerProvider, engine graphql.CustomExecutionEngineV2) *OtelGraphqlEngineV2 {
+func (o *OtelGraphqlEngineV2) Execute(inCtx context.Context, operation *graphql.Request, writer resolve.FlushWriter, options ...graphql.ExecutionOptionsV2) error {
+	if tyktrace.IsEnabled() {
+		span, ctx := tyktrace.Span(inCtx, "GraphqlEngine")
+		defer span.Finish()
+		o.setContext(ctx)
+	} else {
+		ctx, span := o.tracerProvider.Tracer().Start(inCtx, "GraphqlEngine")
+		defer span.End()
+		o.setContext(ctx)
+	}
+	return o.rootExecutor.Execute(inCtx, operation, writer, options...)
+}
+
+func NewOtelGraphqlEngineV2(tracerProvider otel.TracerProvider, engine *graphql.ExecutionEngineV2) *OtelGraphqlEngineV2 {
 	return &OtelGraphqlEngineV2{
 		tracerProvider: tracerProvider,
 		engine:         engine,

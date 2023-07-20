@@ -220,7 +220,7 @@ type APISpec struct {
 		Engine         *graphql.ExecutionEngine
 		CancelV2       context.CancelFunc
 		EngineV2       *graphql.ExecutionEngineV2
-		CustomExecutor *graphql.CustomExecutionEngineV2Executor
+		CustomExecutor graphql.ExecutionEngineV2Executor
 		HooksV2        struct {
 			BeforeFetchHook resolve.BeforeFetchHook
 			AfterFetchHook  resolve.AfterFetchHook

@@ -1137,8 +1137,19 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 
 		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
 		reqCtx := context.Background()
+		// TODO remove this as a span and simply pass the last span
+		// add the tracer context to the request context
+		if trace.IsEnabled() {
+			span, c := trace.Span(outreq.Context(), "ReverseProxy")
+			defer span.Finish()
+			reqCtx = c
+		} else {
+			c, span := p.Gw.TracerProvider.Tracer().Start(outreq.Context(), "ReverseProxy")
+			defer span.End()
+			reqCtx = c
+		}
 		if isProxyOnly {
-			reqCtx = NewGraphQLProxyOnlyContext(context.Background(), outreq)
+			reqCtx = NewGraphQLProxyOnlyContext(reqCtx, outreq)
 		}
 
 		resultWriter := graphql.NewEngineResultWriter()
