@@ -33,5 +33,6 @@
         "target_url": "http://httpbin:80/",
         "strip_listen_path": true
     },
-    "enable_batch_request_support": true
+    "enable_batch_request_support": true,
+    "detailed_tracing":true
 }

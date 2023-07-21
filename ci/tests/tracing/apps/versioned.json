@@ -105,5 +105,6 @@
         "target_url": "http://httpbin:80/",
         "strip_listen_path": true
     },
-    "do_not_track": true
+    "do_not_track": true,
+    "detailed_tracing":true
 }
