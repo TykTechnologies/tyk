@@ -22,6 +22,8 @@ func Test_InitOpenTelemetry(t *testing.T) {
 		testName string
 
 		givenConfig  Config
+		givenVersion string
+		givenId      string
 		setupFn      func() (string, func())
 		expectedType string
 	}{
@@ -96,7 +98,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 				tc.givenConfig.Endpoint = endpoint
 			}
 
-			provider := InitOpenTelemetry(ctx, logrus.New(), &tc.givenConfig)
+			provider := InitOpenTelemetry(ctx, logrus.New(), &tc.givenConfig, tc.givenId, tc.givenVersion)
 			assert.NotNil(t, provider)
 
 			assert.Equal(t, tc.expectedType, provider.Type())

@@ -79,7 +79,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/TykTechnologies/opentelemetry v0.0.10
+require github.com/TykTechnologies/opentelemetry v0.0.11
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect

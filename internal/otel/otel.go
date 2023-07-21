@@ -43,7 +43,7 @@ const (
 // InitOpenTelemetry initializes OpenTelemetry - it returns a TracerProvider
 // which can be used to create a tracer. If OpenTelemetry is disabled or misconfigured,
 // a NoopProvider is returned.
-func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *Config) TracerProvider {
+func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *Config, id string, version string) TracerProvider {
 
 	traceLogger := logger.WithFields(logrus.Fields{
 		"exporter":           gwConfig.Exporter,
@@ -55,6 +55,11 @@ func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *Con
 		tyktrace.WithContext(ctx),
 		tyktrace.WithConfig(gwConfig),
 		tyktrace.WithLogger(traceLogger),
+		tyktrace.WithServiceID(id),
+		tyktrace.WithServiceVersion(version),
+		tyktrace.WithHostDetector(),
+		tyktrace.WithContainerDetector(),
+		tyktrace.WithProcessDetector(),
 	)
 
 	if errOtel != nil {
