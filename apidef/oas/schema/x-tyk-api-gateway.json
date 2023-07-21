@@ -546,6 +546,18 @@
           "type": "string"
         }
       },
+      "oneOf": [
+        {
+          "required": [
+            "body"
+          ]
+        },
+        {
+          "required": [
+            "path"
+          ]
+        }
+      ],
       "required": [
         "enabled",
         "format"
