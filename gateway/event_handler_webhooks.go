@@ -96,7 +96,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 			"target": w.conf.TargetPath,
-		}).Info("Loading default htmlTemplate.")
+		}).Info("Loading default template.")
 		defaultPath := filepath.Join(w.Gw.GetConfig().TemplatePath, "default_webhook.json")
 		w.template, err = htmlTemplate.ParseFiles(defaultPath)
 		if err != nil {
