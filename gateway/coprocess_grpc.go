@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net"
 	"net/url"
+	"context"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
