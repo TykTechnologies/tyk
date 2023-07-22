@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/justinas/alice"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
@@ -231,7 +232,8 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 	h.Write([]byte(signatureString))
 	hashed := h.Sum(nil)
 
-	signature, _ := rsa.SignPKCS1v15(cryptoRand.Reader, privateKey, crypto.SHA256, hashed)
+	signature, err := rsa.SignPKCS1v15(cryptoRand.Reader, privateKey, crypto.SHA256, hashed)
+	assert.NoError(t, err)
 
 	sigString := base64.StdEncoding.EncodeToString(signature)
 
