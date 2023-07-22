@@ -1,10 +1,10 @@
 package gateway
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/url"
-	"context"
 	"time"
 
 	"github.com/sirupsen/logrus"

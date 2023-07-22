@@ -13,8 +13,8 @@ import (
 	"github.com/go-redis/redis/v8"
 
 	"github.com/TykTechnologies/goverify"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 type NotificationCommand string
