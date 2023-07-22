@@ -233,7 +233,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 	hashed := h.Sum(nil)
 
 	signature, err := rsa.SignPKCS1v15(cryptoRand.Reader, privateKey, crypto.SHA256, hashed)
-	assert.NoError(t, err)
+	assert.NoError(tb, err)
 
 	sigString := base64.StdEncoding.EncodeToString(signature)
 
