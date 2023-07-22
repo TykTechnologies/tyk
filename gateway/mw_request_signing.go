@@ -1,8 +1,7 @@
 package gateway
 
 import (
-	"crypto"
-	"crypto/rand"
+	cryptoRand "crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 )
 
 type RequestSigning struct {
@@ -194,7 +194,7 @@ func generateRSAEncodedSignature(signatureString string, privateKey *rsa.Private
 	hashFunction.Write([]byte(signatureString))
 	hashed := hashFunction.Sum(nil)
 
-	rawsignature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, hashType, hashed)
+	rawsignature, err := rsa.SignPKCS1v15(cryptoRand.Reader, privateKey, hashType, hashed)
 	if err != nil {
 		return "", err
 	}

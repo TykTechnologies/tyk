@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"crypto"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 )
 
 type NotificationCommand string

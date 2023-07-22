@@ -1,9 +1,8 @@
 package gateway
 
 import (
-	"crypto"
 	"crypto/hmac"
-	"crypto/rand"
+	cryptoRand "crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -30,6 +29,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 )
 
 const hmacAuthDef = `{
@@ -231,7 +231,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 	h.Write([]byte(signatureString))
 	hashed := h.Sum(nil)
 
-	signature, _ := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, hashed)
+	signature, _ := rsa.SignPKCS1v15(cryptoRand.Reader, privateKey, crypto.SHA256, hashed)
 
 	sigString := base64.StdEncoding.EncodeToString(signature)
 

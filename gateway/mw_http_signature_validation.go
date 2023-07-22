@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"crypto"
 	"crypto/hmac"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -21,6 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
