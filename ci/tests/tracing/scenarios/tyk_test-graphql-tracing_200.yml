@@ -1,0 +1,22 @@
+type: Test
+spec:
+  id: hXtQIVq4R
+  name: Test Graphql Tracing
+  description: Test Graphql Tracing
+  trigger:
+    type: http
+    httpRequest:
+      method: GET
+      url: tyk:8080/test-graphql-tracing/test-grapql-tracing
+      body: "{\n  \"query\": \"{\\n  country(code: \\\"NG\\\"){\\n    name\\n  }\\n}\"\n}"
+      headers:
+        - key: Content-Type
+          value: application/json
+  specs:
+    - selector: span[tracetest.span.type="general" name="GraphqlEngine"]
+      name: Check if the graphql engine span exists
+      assertions:
+        - attr:name = "GraphqlEngine"
+    - selector: span[tracetest.span.type="http" name="HTTP POST" http.method="POST"]
+      assertions:
+        - attr:http.status_code = 200

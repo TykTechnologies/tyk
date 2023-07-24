@@ -36,11 +36,13 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
+	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 
 	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 
@@ -1136,18 +1138,8 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		}
 
 		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
-		reqCtx := context.Background()
-		// TODO remove this as a span and simply pass the last span
-		// add the tracer context to the request context
-		if trace.IsEnabled() {
-			span, c := trace.Span(outreq.Context(), "ReverseProxy")
-			defer span.Finish()
-			reqCtx = c
-		} else {
-			c, span := p.Gw.TracerProvider.Tracer().Start(outreq.Context(), "ReverseProxy")
-			defer span.End()
-			reqCtx = c
-		}
+		span := tyktrace.SpanFromContext(outreq.Context())
+		reqCtx := oteltrace.ContextWithSpan(context.Background(), span)
 		if isProxyOnly {
 			reqCtx = NewGraphQLProxyOnlyContext(reqCtx, outreq)
 		}

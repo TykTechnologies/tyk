@@ -65,6 +65,7 @@ tasks:
       - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_403.yml -w -o pretty
       - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_not_detailed_200.yml -w -o pretty
       - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_not_detailed_403.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test-graphql-tracing_200.yml -w -o pretty
 
   test:opentelemetry:teardown:
     desc: "teardown e2e opentelemetry tests enviroment"
