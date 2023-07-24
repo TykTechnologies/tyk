@@ -30,8 +30,6 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
-
-	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 )
 
 const (
@@ -71,14 +69,14 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	} else if baseMw := tr.Base(); baseMw != nil {
 		cfg := baseMw.Gw.GetConfig()
 		if cfg.OpenTelemetry.Enabled {
-			var span tyktrace.Span
+			var span otel.Span
 			if baseMw.Spec.DetailedTracing {
 				var ctx context.Context
 				ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
 				defer span.End()
 				setContext(r, ctx)
 			} else {
-				span = tyktrace.SpanFromContext(r.Context())
+				span = otel.SpanFromContext(r.Context())
 			}
 
 			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
