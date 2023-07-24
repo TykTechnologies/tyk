@@ -1,0 +1,15 @@
+name: call OIDC reusable workflow
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs: 
+  tat:
+    uses: tyklabs/tyk-pro/.github/workflows/tests.yml@v1.0.1
+    permissions:
+      id-token: write   # This is required for requesting the JWT
+      contents: read    # This is required for actions/checkout
+    with:      
+      tyk-version: master
+      tyk-analytics-version: master
