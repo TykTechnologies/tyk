@@ -26,11 +26,31 @@ var testV1ExtendedPaths = ExtendedPathsSet{
 	WhiteList: []EndPointMeta{
 		{Method: http.MethodGet, Path: "/get1"},
 	},
+	TransformResponse: []TemplateMeta{
+		{
+			Method: http.MethodGet, Path: "/transform1",
+			TemplateData: TemplateData{
+				EnableSession:  true,
+				Mode:           UseBlob,
+				TemplateSource: `{"http_method":"{{.Method}}"}`,
+				Input:          RequestJSON,
+			}},
+	},
 }
 
 var testV2ExtendedPaths = ExtendedPathsSet{
 	WhiteList: []EndPointMeta{
 		{Method: http.MethodGet, Path: "/get2"},
+	},
+	TransformResponse: []TemplateMeta{
+		{
+			Method: http.MethodGet, Path: "/transform2",
+			TemplateData: TemplateData{
+				EnableSession:  true,
+				Mode:           UseBlob,
+				TemplateSource: `{"http_method":"{{.Method}}"}`,
+				Input:          RequestJSON,
+			}},
 	},
 }
 
@@ -99,6 +119,9 @@ func oldTestAPI() APIDefinition {
 				UseCookie:      true,
 				CookieName:     "Authorization",
 			},
+		},
+		ResponseProcessors: []ResponseProcessor{
+			{Name: "response_body_transform"},
 		},
 	}
 }
@@ -730,4 +753,12 @@ func TestAPIDefinition_migrateScopeToPolicy(t *testing.T) {
 		check(t, apiDef.JWTScopeClaimName, apiDef.JWTScopeToPolicyMapping, apiDef.Scopes.OIDC)
 	})
 
+}
+
+func TestAPIDefinition_migrateResponseProcessors(t *testing.T) {
+	base := oldTestAPI()
+	_, err := base.Migrate()
+	assert.NoError(t, err)
+
+	assert.Empty(t, base.ResponseProcessors)
 }
