@@ -39,7 +39,13 @@ var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
 func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
-	path := r.URL.String()
+	rawPath := r.URL.String()
+
+	path, err := url.PathUnescape(rawPath)
+	if err != nil {
+		return rawPath, fmt.Errorf("Error decoding URL path: %s", rawPath)
+	}
+
 	log.Debug("Inbound path: ", path)
 	newpath := path
 

@@ -22,6 +22,11 @@ var testRewriterData = []struct {
 	in, want    string
 }{
 	{
+		"Encoded",
+		"/test/payment-intents", "/change/to/me",
+		"/test/payment%2Dintents", "/change/to/me",
+	},
+	{
 		"Straight",
 		"/test/straight/rewrite", "/change/to/me",
 		"/test/straight/rewrite", "/change/to/me",
