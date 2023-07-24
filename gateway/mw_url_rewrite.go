@@ -43,7 +43,7 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 
 	path, err := url.PathUnescape(rawPath)
 	if err != nil {
-		return rawPath, fmt.Errorf("Failed to decode URL path: %s", rawPath)
+		return rawPath, fmt.Errorf("failed to decode URL path: %s", rawPath)
 	}
 
 	log.Debug("Inbound path: ", path)
