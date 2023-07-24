@@ -493,15 +493,6 @@ func LoopingUrl(host string) string {
 	return LoopScheme + "://" + replaceNonAlphaNumeric(host)
 }
 
-func decodeUrl(rawPath string) (string, error) {
-	path, err := url.PathUnescape(rawPath)
-	if err != nil {
-		return rawPath, fmt.Errorf("failed to decode URL path: %s", rawPath)
-	}
-
-	return path, nil
-}
-
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	vInfo, _ := m.Spec.Version(r)
