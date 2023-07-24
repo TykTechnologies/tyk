@@ -13,8 +13,7 @@ tasks:
     sources:
       - go.mod
       - go.sum
-      - './**/*.go'
-
+      - "./**/*.go"
 
   test:plugin-compiler:
     desc: "Plugin compiler local build/test"
@@ -51,7 +50,6 @@ tasks:
       - docker compose -f ci/tests/tracing/docker-compose.yml up -d
       - tracetest configure -g --endpoint http://localhost:11633
 
-
   test:opentelemetry:test:
     desc: "run e2e opentelemetry tests"
     deps:
@@ -63,16 +61,21 @@ tasks:
       - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_tykprotocol_200.yml -w -o pretty
       - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_tykprotocol-auth_401.yml -w -o pretty
       - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_grpcapi_200.yml -w -o pretty
-
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_200.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_403.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_not_detailed_200.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_not_detailed_403.yml -w -o pretty
 
   test:opentelemetry:teardown:
     desc: "teardown e2e opentelemetry tests enviroment"
     cmds:
       - docker compose -f ci/tests/tracing/docker-compose.yml down --remove-orphans
- 
+
   test:opentelemetry:
-    desc : "setup, execute and shutdown e2e opentelemetry tests"
+    desc: "setup, execute and shutdown e2e opentelemetry tests"
     cmds:
-      - task: test:opentelemetry:setup
-      - task: test:opentelemetry:test
-      - task: test:opentelemetry:teardown
+      - |
+        set -e
+        task test:opentelemetry:setup
+        trap 'task test:opentelemetry:teardown' EXIT
+        task test:opentelemetry:test
