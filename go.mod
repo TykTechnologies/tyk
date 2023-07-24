@@ -79,7 +79,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/TykTechnologies/opentelemetry v0.0.11
+require (
+	github.com/TykTechnologies/kin-openapi v0.90.0
+	github.com/TykTechnologies/opentelemetry v0.0.11
+)
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
@@ -107,6 +110,7 @@ require (
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/getsentry/raven-go v0.2.0 // indirect
+	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
