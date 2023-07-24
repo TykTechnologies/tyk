@@ -2,14 +2,16 @@ package gateway
 
 import (
 	"context"
+	"sync"
+
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
 	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/sirupsen/logrus"
-	"sync"
 )
 
 type OtelGraphqlEngineV2 struct {
