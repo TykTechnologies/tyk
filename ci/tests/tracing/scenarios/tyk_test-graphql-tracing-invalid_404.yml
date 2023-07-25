@@ -1,0 +1,19 @@
+type: Test
+spec:
+  id: mC3EJHq4g
+  name: Test Graphql Tracing Invalid
+  description: Invalid upstream URL
+  trigger:
+    type: http
+    httpRequest:
+      method: GET
+      url: tyk:8080/test-graphql-tracing-invalid/test-graphql-tracing-invalid
+      body: "{\n  \"query\": \"{\\n  country(code: \\\"NG\\\"){\\n    name\\n  }\\n}\"\n}"
+      headers:
+        - key: Content-Type
+          value: application/json
+  specs:
+    - selector: span[tracetest.span.type="http" name="HTTP GET" http.method="GET"]
+      name: Should return 404 for upstream
+      assertions:
+        - attr:http.status_code = 404
