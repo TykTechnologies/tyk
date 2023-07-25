@@ -448,7 +448,7 @@ func (a *APIDefinition) migrateScopeToPolicy() {
 func (a *APIDefinition) migrateResponseProcessors() {
 	var responseProcessors []ResponseProcessor
 	for i := range a.ResponseProcessors {
-		if a.ResponseProcessors[i].Name == "response_body_transform" {
+		if a.ResponseProcessors[i].Name == ResponseProcessorResponseBodyTransform {
 			continue
 		}
 		responseProcessors = append(responseProcessors, a.ResponseProcessors[i])

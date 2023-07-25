@@ -26,7 +26,7 @@ func TestTransformResponseWithURLRewrite(t *testing.T) {
 		RewriteTo:    "get",
 	}
 
-	responseProcessorConf := []apidef.ResponseProcessor{{Name: "response_body_transform"}}
+	responseProcessorConf := []apidef.ResponseProcessor{{Name: apidef.ResponseProcessorResponseBodyTransform}}
 
 	t.Run("Transform without rewrite", func(t *testing.T) {
 		ts := StartTest(nil)
@@ -99,7 +99,7 @@ func TestTransformResponse_ContextVars(t *testing.T) {
 		},
 	}
 
-	responseProcessorConf := []apidef.ResponseProcessor{{Name: "response_body_transform"}}
+	responseProcessorConf := []apidef.ResponseProcessor{{Name: apidef.ResponseProcessorResponseBodyTransform}}
 
 	// When Context Vars are disabled
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -143,7 +143,7 @@ func TestTransformResponse_WithCache(t *testing.T) {
 			TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"foo":"{{._tyk_context.headers_Foo}}"}`)),
 		},
 	}
-	responseProcessorConf := []apidef.ResponseProcessor{{Name: "response_body_transform"}}
+	responseProcessorConf := []apidef.ResponseProcessor{{Name: apidef.ResponseProcessorResponseBodyTransform}}
 
 	createAPI := func(withCache bool) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {

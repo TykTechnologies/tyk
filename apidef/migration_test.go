@@ -121,7 +121,7 @@ func oldTestAPI() APIDefinition {
 			},
 		},
 		ResponseProcessors: []ResponseProcessor{
-			{Name: "response_body_transform"},
+			{Name: ResponseProcessorResponseBodyTransform},
 		},
 	}
 }

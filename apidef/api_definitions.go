@@ -111,6 +111,8 @@ const (
 	OAuthType         = "oauth"
 	ExternalOAuthType = "externalOAuth"
 	OIDCType          = "oidc"
+
+	ResponseProcessorResponseBodyTransform = "response_body_transform"
 )
 
 var (
