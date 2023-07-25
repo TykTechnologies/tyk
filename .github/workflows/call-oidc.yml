@@ -13,3 +13,5 @@ jobs:
     with:      
       tyk-version: master
       tyk-analytics-version: master
+    secrets:
+      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
