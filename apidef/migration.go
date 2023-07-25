@@ -11,6 +11,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
+const (
+	ResponseProcessorResponseBodyTransform = "response_body_transform"
+)
+
 var (
 	ErrMigrationNewVersioningEnabled = errors.New("not migratable - new versioning is already enabled")
 )
