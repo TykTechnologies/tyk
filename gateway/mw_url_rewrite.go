@@ -38,11 +38,11 @@ var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
-func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request, decodeUrl bool) (string, error) {
+func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request, decodeURL bool) (string, error) {
 	rawPath := r.URL.String()
 	path := rawPath
 
-	if decodeUrl {
+	if decodeURL {
 		var err error
 		path, err = url.PathUnescape(rawPath)
 		if err != nil {
