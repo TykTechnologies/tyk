@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -19,6 +18,8 @@ import (
 	"sync/atomic"
 	"text/template"
 	"time"
+
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 
 	"github.com/getkin/kin-openapi/routers"
 

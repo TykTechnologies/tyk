@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/TykTechnologies/tyk/internal/graphql"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/internal/graphql"
 
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
@@ -188,7 +189,6 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 	}
 	m.Spec.GraphQLExecutor.EngineV2 = engine
 	conf := m.Gw.GetConfig()
-	// TODO check if the root executor can be set without using a getter
 	if conf.OpenTelemetry.Enabled {
 		executor := graphql.NewOtelGraphqlEngineV2(m.Gw.TracerProvider, engine)
 		rootExecutor, err := gql.NewCustomExecutionEngineV2Executor(executor)

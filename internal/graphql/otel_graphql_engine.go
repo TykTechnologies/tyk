@@ -2,8 +2,9 @@ package graphql
 
 import (
 	"context"
-	"go.opentelemetry.io/otel/codes"
 	"sync"
+
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/sirupsen/logrus"
 
