@@ -10,11 +10,9 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 
 RUN mkdir -p $PLUGIN_SOURCE_PATH
 
-RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby-dev \
+# remove for avoiding CVEs
+RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby-dev python3.9 \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
-
-# remove python 3.7 if exists.
-RUN apt-get remove -y --allow-remove-essential --auto-remove python3.7 || true
 
 # This is already vendored from release pipeline
 WORKDIR /opt/tyk-gateway/src
