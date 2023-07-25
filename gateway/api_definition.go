@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -217,11 +218,11 @@ type APISpec struct {
 	network analytics.NetworkStats
 
 	GraphQLExecutor struct {
-		Engine         *graphql.ExecutionEngine
-		CancelV2       context.CancelFunc
-		EngineV2       *graphql.ExecutionEngineV2
-		CustomExecutor graphql.ExecutionEngineV2Executor
-		HooksV2        struct {
+		Engine       *graphql.ExecutionEngine
+		CancelV2     context.CancelFunc
+		EngineV2     *graphql.ExecutionEngineV2
+		OtelExecutor *graphqlinternal.OtelGraphqlEngineV2
+		HooksV2      struct {
 			BeforeFetchHook resolve.BeforeFetchHook
 			AfterFetchHook  resolve.AfterFetchHook
 		}

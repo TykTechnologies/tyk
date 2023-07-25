@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/TykTechnologies/tyk/internal/graphql"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -187,14 +188,15 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 	}
 	m.Spec.GraphQLExecutor.EngineV2 = engine
 	conf := m.Gw.GetConfig()
+	// TODO check if the root executor can be set without using a getter
 	if conf.OpenTelemetry.Enabled {
-		executor := NewOtelGraphqlEngineV2(m.Gw.TracerProvider, engine)
+		executor := graphql.NewOtelGraphqlEngineV2(m.Gw.TracerProvider, engine)
 		rootExecutor, err := gql.NewCustomExecutionEngineV2Executor(executor)
 		if err != nil {
 			m.Logger().WithError(err).Error("error creating custom execution engine v2")
 		}
-		executor.setRootExecutor(rootExecutor)
-		m.Spec.GraphQLExecutor.CustomExecutor = executor
+		executor.SetRootExecutor(rootExecutor)
+		m.Spec.GraphQLExecutor.OtelExecutor = executor
 	} else {
 
 	}
@@ -244,7 +246,14 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	defer ctxSetGraphQLRequest(r, &gqlRequest)
+	if conf := m.Gw.GetConfig(); conf.OpenTelemetry.Enabled {
+		return m.validateRequestWithOtel(r.Context(), w, &gqlRequest)
+	} else {
+		return m.validateRequest(w, &gqlRequest)
+	}
+}
 
+func (m *GraphQLMiddleware) validateRequest(w http.ResponseWriter, gqlRequest *gql.Request) (error, int) {
 	normalizationResult, err := gqlRequest.Normalize(m.Spec.GraphQLExecutor.Schema)
 	if err != nil {
 		m.Logger().Errorf("Error while normalizing GraphQL request: '%s'", err)
@@ -273,7 +282,44 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	if inputValidationResult.Errors != nil && inputValidationResult.Errors.Count() > 0 {
 		return m.writeGraphQLError(w, inputValidationResult.Errors)
 	}
+	return nil, http.StatusOK
+}
 
+func (m *GraphQLMiddleware) validateRequestWithOtel(ctx context.Context, w http.ResponseWriter, req *gql.Request) (error, int) {
+	m.Spec.GraphQLExecutor.OtelExecutor.SetContext(ctx)
+
+	// normalization
+	err := m.Spec.GraphQLExecutor.OtelExecutor.Normalize(req)
+	if err != nil {
+		m.Logger().Errorf("Error while normalizing GraphqlRequest: %v", err)
+		if err, ok := err.(*gql.RequestErrors); ok {
+			return m.writeGraphQLError(w, err)
+		} else {
+			return ProxyingRequestFailedErr, http.StatusInternalServerError
+		}
+	}
+
+	// validation
+	err = m.Spec.GraphQLExecutor.OtelExecutor.ValidateForSchema(req)
+	if err != nil {
+		m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
+		if err, ok := err.(*gql.RequestErrors); ok {
+			return m.writeGraphQLError(w, err)
+		} else {
+			return ProxyingRequestFailedErr, http.StatusInternalServerError
+		}
+	}
+
+	// input validation
+	err = m.Spec.GraphQLExecutor.OtelExecutor.InputValidation(req)
+	if err != nil {
+		m.Logger().Errorf("Error while validating variables for request: %v", err)
+		if err, ok := err.(*gql.RequestErrors); ok {
+			return m.writeGraphQLError(w, err)
+		} else {
+			return ProxyingRequestFailedErr, http.StatusInternalServerError
+		}
+	}
 	return nil, http.StatusOK
 }
 

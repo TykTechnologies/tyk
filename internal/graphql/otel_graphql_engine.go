@@ -1,7 +1,8 @@
-package gateway
+package graphql
 
 import (
 	"context"
+	"go.opentelemetry.io/otel/codes"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -17,7 +18,6 @@ import (
 type OtelGraphqlEngineV2 struct {
 	mutex          sync.Mutex
 	logger         *logrus.Entry
-	spec           *APISpec
 	traceContext   context.Context
 	tracerProvider otel.TracerProvider
 
@@ -25,13 +25,13 @@ type OtelGraphqlEngineV2 struct {
 	rootExecutor graphql.ExecutionEngineV2Executor
 }
 
-func (o *OtelGraphqlEngineV2) setContext(ctx context.Context) {
+func (o *OtelGraphqlEngineV2) SetContext(ctx context.Context) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 	o.traceContext = ctx
 }
 
-func (o *OtelGraphqlEngineV2) setRootExecutor(executor graphql.ExecutionEngineV2Executor) {
+func (o *OtelGraphqlEngineV2) SetRootExecutor(executor graphql.ExecutionEngineV2Executor) {
 	o.rootExecutor = executor
 }
 
@@ -39,14 +39,26 @@ func (o *OtelGraphqlEngineV2) Normalize(operation *graphql.Request) error {
 	var operationName = "NormalizeRequest"
 	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
-	return o.engine.Normalize(operation)
+	err := o.engine.Normalize(operation)
+	if err != nil {
+		span.SetStatus(codes.Error, "request normalization failed")
+		return err
+	}
+	span.SetStatus(codes.Ok, "success")
+	return nil
 }
 
 func (o *OtelGraphqlEngineV2) ValidateForSchema(operation *graphql.Request) error {
 	var operationName = "ValidateRequest"
 	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
-	return o.engine.ValidateForSchema(operation)
+	err := o.engine.ValidateForSchema(operation)
+	if err != nil {
+		span.SetStatus(codes.Error, "request validation failed")
+		return err
+	}
+	span.SetStatus(codes.Ok, "success")
+	return nil
 }
 
 func (o *OtelGraphqlEngineV2) Setup(ctx context.Context, postProcessor *postprocess.Processor, resolveContext *resolve.Context, operation *graphql.Request, options ...graphql.ExecutionOptionsV2) {
@@ -60,7 +72,13 @@ func (o *OtelGraphqlEngineV2) Plan(postProcessor *postprocess.Processor, operati
 	var operationName = "GeneratePlan"
 	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
-	return o.engine.Plan(postProcessor, operation, report)
+	plan, err := o.engine.Plan(postProcessor, operation, report)
+	if err != nil {
+		span.SetStatus(codes.Error, "failed to generate plan")
+		return nil, err
+	}
+	span.SetStatus(codes.Ok, "success")
+	return plan, nil
 }
 
 func (o *OtelGraphqlEngineV2) Resolve(resolveContext *resolve.Context, planResult plan.Plan, writer resolve.FlushWriter) error {
@@ -68,7 +86,12 @@ func (o *OtelGraphqlEngineV2) Resolve(resolveContext *resolve.Context, planResul
 	ctx, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
 	resolveContext.Context = ctx
-	return o.engine.Resolve(resolveContext, planResult, writer)
+	if err := o.engine.Resolve(resolveContext, planResult, writer); err != nil {
+		span.SetStatus(codes.Error, "failed to resolve")
+		return err
+	}
+	span.SetStatus(codes.Ok, "success")
+	return nil
 }
 
 func (o *OtelGraphqlEngineV2) Teardown() {
@@ -78,14 +101,24 @@ func (o *OtelGraphqlEngineV2) InputValidation(operation *graphql.Request) error 
 	var operationName = "InputValidation"
 	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
-	return o.engine.InputValidation(operation)
+	if err := o.engine.InputValidation(operation); err != nil {
+		span.SetStatus(codes.Error, "failed input validation")
+		return err
+	}
+	span.SetStatus(codes.Ok, "success")
+	return nil
 }
 
 func (o *OtelGraphqlEngineV2) Execute(inCtx context.Context, operation *graphql.Request, writer resolve.FlushWriter, options ...graphql.ExecutionOptionsV2) error {
 	ctx, span := o.tracerProvider.Tracer().Start(inCtx, "GraphqlEngine")
 	defer span.End()
-	o.setContext(ctx)
-	return o.rootExecutor.Execute(inCtx, operation, writer, options...)
+	o.SetContext(ctx)
+	if err := o.engine.Execute(inCtx, operation, writer, options...); err != nil {
+		span.SetStatus(codes.Error, "failed to execute")
+		return err
+	}
+	span.SetStatus(codes.Ok, "success")
+	return nil
 }
 
 func NewOtelGraphqlEngineV2(tracerProvider otel.TracerProvider, engine *graphql.ExecutionEngineV2) *OtelGraphqlEngineV2 {
