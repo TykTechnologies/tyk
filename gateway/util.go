@@ -148,3 +148,69 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 
 	return result.String()
 }
+<<<<<<< HEAD
+=======
+
+func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
+	if existingSpec == nil {
+		return true
+	}
+
+	if existingSpec.Checksum != newSpec.Checksum {
+		return true
+	}
+
+	if newSpec.hasVirtualEndpoint() {
+		return true
+	}
+
+	if newSpec.CustomMiddleware.Driver == apidef.GrpcDriver {
+		return false
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.AuthCheck) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Pre...) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.PostKeyAuth...) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Post...) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Response...) {
+		return true
+	}
+
+	return false
+}
+
+// check if 2 maps are the same
+func areMapsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
+// checks if a string contains escaped characters
+func containsEscapedChars(str string) bool {
+	unescaped, err := url.PathUnescape(str)
+	if err != nil {
+		return true
+	}
+
+	return str != unescaped
+}
+>>>>>>> 4346303f... [TT-9327] Decoding the URL request first, before handling any additional logic (#5345)
