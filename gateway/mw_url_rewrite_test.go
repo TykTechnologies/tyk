@@ -27,6 +27,11 @@ var testRewriterData = []struct {
 		"/test/payment%2Dintents", "/change/to/me",
 	},
 	{
+		"MatchEncodedChars",
+		"^(.+)%2[Dd](.+)$", "/change/to/me",
+		"/test/payment%2Dintents", "/change/to/me",
+	},
+	{
 		"Straight",
 		"/test/straight/rewrite", "/change/to/me",
 		"/test/straight/rewrite", "/change/to/me",
