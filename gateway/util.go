@@ -202,3 +202,13 @@ func areMapsEqual(a, b map[string]string) bool {
 	}
 	return true
 }
+
+// checks if a string contains escaped characters
+func containsEscapedChars(str string) bool {
+	unescaped, err := url.PathUnescape(str)
+	if err != nil {
+		return true
+	}
+
+	return str != unescaped
+}
