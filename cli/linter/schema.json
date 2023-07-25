@@ -139,6 +139,30 @@
           "parent_based": {
               "type": "bool"
           }
+        },
+        "tls": {
+          "type" :"object",
+          "enable": {
+            "type":"bool"
+          },
+          "insecure_skip_verify": {
+            "type":"bool"
+          },
+          "ca_file": {
+            "type":"string"
+          },
+          "cert_file": {
+            "type":"string"
+          },
+          "key_file": {
+            "type":"string"
+          },
+          "max_version": {
+            "type":"string"
+          },
+          "min_version": {
+            "type":"string"
+          }
         }
       }
     }

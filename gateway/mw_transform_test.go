@@ -388,3 +388,39 @@ func TestTransformRequestBody(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{Path: "/get", Data: body, BodyNotMatch: bodyMatch, Code: http.StatusOK})
 	})
 }
+
+func TestTransformResponseBody(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	loadAPI := func(disabled bool) {
+		transformResponseConf := apidef.TemplateMeta{
+			Disabled: disabled,
+			Path:     "/transform",
+			Method:   http.MethodGet,
+			TemplateData: apidef.TemplateData{
+				Mode:           "blob",
+				TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"http_method":"{{.Method}}"}`)),
+			},
+		}
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{transformResponseConf}
+			})
+		})
+	}
+
+	t.Run("transform body enabled", func(t *testing.T) {
+		loadAPI(false)
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/transform", Code: 200, BodyMatch: `{"http_method":"GET"}`,
+		})
+	})
+
+	t.Run("transform body disabled", func(t *testing.T) {
+		loadAPI(true)
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/transform", Code: 200, BodyNotMatch: `{"http_method":"GET"}`,
+		})
+	})
+}
