@@ -9,7 +9,7 @@ jobs:
     uses: TykTechnologies/tyk-automated-tests/.github/workflows/tests.yml@v1.0.1
     permissions:
       id-token: write   # This is required for requesting the JWT
-      contents: read    # This is required for actions/checkout
+      contents: read    # This is required for actions/checkoutf
     with:      
       tyk-version: master
       tyk-analytics-version: master
