@@ -6,7 +6,7 @@ on:
 
 jobs: 
   tat:
-    uses: tyklabs/tyk-pro/.github/workflows/tests.yml@v1.0.1
+    uses: TykTechnologies/tyk-automated-tests/.github/workflows/tests.yml@v1.0.1
     permissions:
       id-token: write   # This is required for requesting the JWT
       contents: read    # This is required for actions/checkout
