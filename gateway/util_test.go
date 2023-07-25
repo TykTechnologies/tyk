@@ -215,3 +215,68 @@ func Test_shouldReloadSpec(t *testing.T) {
 		assertionHelper(t, tcs)
 	})
 }
+<<<<<<< HEAD
+=======
+
+func TestAreMapsEqual(t *testing.T) {
+	tests := []struct {
+		name     string
+		map1     map[string]string
+		map2     map[string]string
+		expected bool
+	}{
+		{
+			name:     "Equal maps",
+			map1:     map[string]string{"key1": "value1", "key2": "value2"},
+			map2:     map[string]string{"key1": "value1", "key2": "value2"},
+			expected: true,
+		},
+		{
+			name:     "Different maps",
+			map1:     map[string]string{"key1": "value1", "key2": "value2"},
+			map2:     map[string]string{"key1": "value1", "key2": "value3"},
+			expected: false,
+		},
+		{
+			name:     "Different sizes",
+			map1:     map[string]string{"key1": "value1", "key2": "value2", "key3": "value3"},
+			map2:     map[string]string{"key1": "value1", "key2": "value2"},
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := areMapsEqual(test.map1, test.map2)
+			if result != test.expected {
+				t.Errorf("areMapsEqual() = %v, want %v", result, test.expected)
+			}
+		})
+	}
+}
+
+func TestContainsEscapedCharacters(t *testing.T) {
+	tests := []struct {
+		value    string
+		expected bool
+	}{
+		{
+			value:    "payment%2Dintents",
+			expected: true,
+		},
+		{
+			value:    "payment-intents",
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.value, func(t *testing.T) {
+			result := containsEscapedChars(test.value)
+			if result != test.expected {
+				t.Errorf("containsEscapedChars() = %v, want %v", result, test.expected)
+			}
+		})
+	}
+}
+>>>>>>> 4346303f... [TT-9327] Decoding the URL request first, before handling any additional logic (#5345)
