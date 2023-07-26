@@ -148,3 +148,13 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 
 	return result.String()
 }
+
+// checks if a string contains escaped characters
+func containsEscapedChars(str string) bool {
+	unescaped, err := url.PathUnescape(str)
+	if err != nil {
+		return true
+	}
+
+	return str != unescaped
+}

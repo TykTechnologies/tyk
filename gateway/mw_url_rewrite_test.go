@@ -20,6 +20,16 @@ var testRewriterData = []struct {
 	in, want    string
 }{
 	{
+		"Encoded",
+		"/test/payment-intents", "/change/to/me",
+		"/test/payment%2Dintents", "/change/to/me",
+	},
+	{
+		"MatchEncodedChars",
+		"^(.+)%2[Dd](.+)$", "/change/to/me",
+		"/test/payment%2Dintents", "/change/to/me",
+	},
+	{
 		"Straight",
 		"/test/straight/rewrite", "/change/to/me",
 		"/test/straight/rewrite", "/change/to/me",
@@ -95,7 +105,7 @@ func TestRewriter(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := tc.reqMaker()
-			got, err := ts.Gw.urlRewrite(tc.meta, r)
+			got, err := ts.Gw.urlRewrite(tc.meta, r, false)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
@@ -113,7 +123,7 @@ func BenchmarkRewriter(b *testing.B) {
 	//warm-up regexp caches
 	for _, tc := range cases {
 		r := tc.reqMaker()
-		ts.Gw.urlRewrite(tc.meta, r)
+		ts.Gw.urlRewrite(tc.meta, r, false)
 	}
 
 	b.ReportAllocs()
@@ -123,7 +133,7 @@ func BenchmarkRewriter(b *testing.B) {
 			b.StopTimer()
 			r := tc.reqMaker()
 			b.StartTimer()
-			ts.Gw.urlRewrite(tc.meta, r)
+			ts.Gw.urlRewrite(tc.meta, r, false)
 		}
 	}
 }
@@ -1081,7 +1091,7 @@ func TestRewriterTriggers(t *testing.T) {
 				Triggers:     tc.triggerConf,
 			}
 
-			got, err := ts.Gw.urlRewrite(&testConf, tc.req)
+			got, err := ts.Gw.urlRewrite(&testConf, tc.req, false)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
