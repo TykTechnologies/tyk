@@ -1541,7 +1541,6 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
 func TestAPISpec_isListeningOnPort(t *testing.T) {
 	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
 	cfg := &config.Config{}
@@ -1551,7 +1550,8 @@ func TestAPISpec_isListeningOnPort(t *testing.T) {
 
 	s.ListenPort = 8000
 	assert.True(t, s.isListeningOnPort(8000, cfg))
-=======
+}
+
 func TestAPISpec_setHasMock(t *testing.T) {
 	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
 
@@ -1591,5 +1591,4 @@ func TestAPISpec_setHasMock(t *testing.T) {
 	mock.Enabled = true
 	s.setHasMock()
 	assert.True(t, s.HasMock)
->>>>>>> 8a2b4c14... [TT-9586] Prevent panic in setHasMock func (#5361)
 }
