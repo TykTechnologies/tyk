@@ -283,7 +283,8 @@ func (s *OAS) getTykSecurityScheme(name string) interface{} {
 	return securitySchemes[name]
 }
 
-func (s *OAS) getTykMiddleware() (middleware *Middleware) {
+// GetTykMiddleware returns middleware section from XTykAPIGateway.
+func (s *OAS) GetTykMiddleware() (middleware *Middleware) {
 	if s.GetTykExtension() != nil {
 		middleware = s.GetTykExtension().Middleware
 	}
@@ -292,8 +293,8 @@ func (s *OAS) getTykMiddleware() (middleware *Middleware) {
 }
 
 func (s *OAS) getTykOperations() (operations Operations) {
-	if s.getTykMiddleware() != nil {
-		operations = s.getTykMiddleware().Operations
+	if s.GetTykMiddleware() != nil {
+		operations = s.GetTykMiddleware().Operations
 	}
 
 	return
