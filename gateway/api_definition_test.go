@@ -15,6 +15,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
+
 	"github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -1487,5 +1489,17 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 
 		assert.NoError(t, err, "error loading APIs from RPC:", err)
 		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC backup")
+	})
+}
+
+func TestAPISpec_Validate(t *testing.T) {
+	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+	t.Run("oas and xTyk=nil", func(t *testing.T) {
+		s.IsOAS = true
+		s.OAS = oas.OAS{}
+
+		err := s.Validate()
+		assert.ErrorIs(t, apidef.ErrOASNoTykExt, err)
 	})
 }

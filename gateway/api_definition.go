@@ -271,6 +271,10 @@ func (s *APISpec) Release() {
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
 func (s *APISpec) Validate() error {
 	if s.IsOAS {
+		if s.OAS.GetTykExtension() == nil {
+			return apidef.ErrOASNoTykExt
+		}
+
 		err := s.OAS.Validate(context.Background())
 		if err != nil {
 			return err
