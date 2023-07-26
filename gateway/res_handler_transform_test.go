@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestTransformResponseWithURLRewrite(t *testing.T) {
