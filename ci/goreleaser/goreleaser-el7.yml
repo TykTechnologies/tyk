@@ -104,26 +104,9 @@ publishers:
 archives:
   - format: binary
     allow_different_binary_count: true
-dockers:
-# Build plugin-compiler
-- ids:
-    - std
-  image_templates:
-    - tykio/tyk-plugin-compiler:{{ .Tag }}-el7
-    - tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-el7
-  build_flag_templates:
-    - "--label=org.opencontainers.image.created={{.Date}}"
-    - "--label=org.opencontainers.image.title=tyk-plugin-compiler"
-    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-    - "--label=org.opencontainers.image.version={{.Version}}"
-    - "--build-arg=TYK_GW_TAG={{ .Tag }}"
-    - "--build-arg=GOLANG_CROSS={{ .Env.GOLANG_CROSS }}"
-    - "--build-arg=GITHUB_SHA={{ .Env.GITHUB_SHA }}"
-  goarch: amd64
-  goos: linux
-  dockerfile: ci/images/plugin-compiler/Dockerfile
-  extra_files:
-    - ci/images/plugin-compiler
+
+# plugin-compiler now built from a separate independent workflow
+# that also takes care of the el7 plugin compiler build
 
 checksum:
   disable: true
