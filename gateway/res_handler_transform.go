@@ -25,7 +25,11 @@ type ResponseTransformMiddleware struct {
 func (r *ResponseTransformMiddleware) Enabled() bool {
 	for _, version := range r.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.TransformResponse) > 0 {
-			return true
+			for _, transformResponse := range version.ExtendedPaths.TransformResponse {
+				if !transformResponse.Disabled {
+					return true
+				}
+			}
 		}
 	}
 	return false

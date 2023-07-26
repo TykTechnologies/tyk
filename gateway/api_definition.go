@@ -1728,7 +1728,7 @@ func (a *APISpec) setHasMock() {
 		return
 	}
 
-	middleware := a.OAS.GetTykExtension().Middleware
+	middleware := a.OAS.GetTykMiddleware()
 	if middleware == nil {
 		a.HasMock = false
 		return
