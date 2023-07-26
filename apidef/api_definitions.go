@@ -121,6 +121,7 @@ var (
 	ErrPayloadWithoutTykExtension = errors.New("the payload should contain x-tyk-api-gateway")
 	ErrAPINotFound                = errors.New("API not found")
 	ErrMissingAPIID               = errors.New("missing API ID")
+	ErrOASNoTykExt                = errors.New("OAS API does not include tyk extension")
 )
 
 type EndpointMethodMeta struct {
