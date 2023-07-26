@@ -17,6 +17,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
+
 	"github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -1548,4 +1550,45 @@ func TestAPISpec_isListeningOnPort(t *testing.T) {
 
 	s.ListenPort = 8000
 	assert.True(t, s.isListeningOnPort(8000, cfg))
+}
+
+func TestAPISpec_setHasMock(t *testing.T) {
+	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	s.IsOAS = true
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	s.OAS = oas.OAS{}
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	xTyk := &oas.XTykAPIGateway{}
+	s.OAS.SetTykExtension(xTyk)
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	middleware := &oas.Middleware{}
+	xTyk.Middleware = middleware
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	op := &oas.Operation{}
+	middleware.Operations = oas.Operations{
+		"my-operation": op,
+	}
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	mock := &oas.MockResponse{}
+	op.MockResponse = mock
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	mock.Enabled = true
+	s.setHasMock()
+	assert.True(t, s.HasMock)
 }
