@@ -548,20 +548,26 @@
       },
       "oneOf": [
         {
-          "required": [
-            "body"
-          ]
+          "required": ["body", "path"]
         },
         {
-          "required": [
-            "path"
-          ]
+          "required": ["body"],
+          "not": {
+            "required": ["path"]
+          }
+        },
+        {
+          "required": ["path"],
+          "not": {
+            "required": ["body"]
+          }
         }
       ],
       "required": [
         "enabled",
         "format"
-      ]
+      ],
+      "minProperties": 3
     },
     "X-Tyk-CachePlugin": {
       "type": "object",
