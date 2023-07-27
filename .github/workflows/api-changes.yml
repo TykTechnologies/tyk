@@ -1,0 +1,78 @@
+name: API Changes
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  check-api-changes:
+    name: Detect API changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Tyk
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Setup Golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.20
+
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }}
+
+      - name: Cache
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Setup deps, stash taskfiles
+        run: |
+          apt install -y rsync
+          go install github.com/go-task/task/v3/cmd/task@latest
+          mkdir /tmp/.taskfiles
+          rsync -a ./.taskfiles/ /tmp/.taskfiles/
+
+      - name: Set up comment author
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "brunswick[bot]"
+
+      - name: Collect godoc and diff it
+        id: check
+        run: |
+          go mod tidy
+          task -t .taskfiles/godoc/Taskfile.yml > current.txt
+          git checkout -- .
+          git checkout ${{ github.base_ref }}
+          rsync -a /tmp/.taskfiles/ .taskfiles/
+          task -t .taskfiles/godoc/Taskfile.yml > prev.txt
+          echo "diff<<EOF" >> $GITHUB_OUTPUT
+          diff -u prev.txt current.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Find Comment
+        uses: peter-evans/find-comment@v2
+        id: fc
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'brunswick[bot]'
+          body-includes: API Changes
+
+      - name: Create or update comment
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            API Changes
+            ```shellsession
+            ${{ steps.check.outputs.diff || "none detected" }}
+            ```
+          edit-mode: replace

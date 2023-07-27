@@ -7,7 +7,7 @@ tasks:
     dir: ../..
     vars:
       package:
-        sh: go list .
+        sh: go mod edit -json | jq .Module.Path -r
       packages:
         sh: go list ./... | sed -e 's|{{.package}}|.|g'
     silent: true
@@ -15,5 +15,6 @@ tasks:
       - |
         set -e;
         {{- range $i, $package := .packages | splitLines -}}
-          go doc {{ $package }}
+          echo -e "# Package: {{ $package }}\n"
+          go doc -all {{ $package }} || true
         {{ end -}}
