@@ -37,7 +37,7 @@ jobs:
       - name: Set up comment author
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "brunswick[bot]"
+          git config --local user.name "github-actions[bot]"
 
       - name: Collect godoc and diff it
         id: api-check
@@ -58,7 +58,7 @@ jobs:
         id: fc
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          comment-author: 'brunswick[bot]'
+          comment-author: 'github-actions[bot]'
           body-includes: API Changes
 
       - name: Create or update comment
