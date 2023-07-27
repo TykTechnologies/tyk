@@ -4,8 +4,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/internal/maps"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/internal/maps"
 )
 
 var (
