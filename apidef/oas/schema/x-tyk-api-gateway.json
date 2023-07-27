@@ -548,19 +548,10 @@
       },
       "anyOf": [
         {
-          "required": ["body", "path"]
+          "required": ["body"]
         },
         {
-          "required": ["body"],
-          "not": {
-            "required": ["path"]
-          }
-        },
-        {
-          "required": ["path"],
-          "not": {
-            "required": ["body"]
-          }
+          "required": ["path"]
         }
       ],
       "required": [
