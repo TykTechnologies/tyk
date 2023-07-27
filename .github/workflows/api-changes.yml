@@ -49,8 +49,11 @@ jobs:
           go mod tidy
           rsync -a /tmp/.taskfiles/ .taskfiles/
           task -t .taskfiles/godoc/Taskfile.yml > prev.txt
-          echo "diff<<EOF" >> $GITHUB_OUTPUT
-          diff -u prev.txt current.txt || true >> $GITHUB_OUTPUT
+
+          diff -u prev.txt current.txt > changes.txt
+
+          echo "diff-output<<EOF" >> $GITHUB_OUTPUT
+          cat current.txt >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Find Comment
@@ -69,6 +72,6 @@ jobs:
           body: |
             API Changes
             ```shellsession
-            ${{ steps.api-check.outputs.diff || 'none detected' }}
+            ${{ steps.api-check.outputs.diff-output || 'none detected' }}
             ```
           edit-mode: replace
