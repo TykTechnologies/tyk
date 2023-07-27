@@ -39,8 +39,7 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-      - name: Collect godoc and diff it
-        id: api-check
+      - name: Collect API docs
         run: |
           go mod tidy
           task -t .taskfiles/godoc/Taskfile.yml > current.txt
@@ -50,10 +49,13 @@ jobs:
           rsync -a /tmp/.taskfiles/ .taskfiles/
           task -t .taskfiles/godoc/Taskfile.yml > prev.txt
 
+      - name: Diff API docs
+        id: api-check
+        run: |
+          set +e
           diff -u prev.txt current.txt > changes.txt
-
           echo "diff-output<<EOF" >> $GITHUB_OUTPUT
-          cat current.txt >> $GITHUB_OUTPUT
+          cat changes.txt >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Find Comment
