@@ -576,6 +576,10 @@
               "type": "integer"
             }
           ]
+        },
+        "timeout": {
+          "type": "integer",
+          "format": "int64"
         }
       },
       "required": [
