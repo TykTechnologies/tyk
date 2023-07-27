@@ -50,7 +50,7 @@ jobs:
           rsync -a /tmp/.taskfiles/ .taskfiles/
           task -t .taskfiles/godoc/Taskfile.yml > prev.txt
           echo "diff<<EOF" >> $GITHUB_OUTPUT
-          diff -u prev.txt current.txt >> $GITHUB_OUTPUT
+          diff -u prev.txt current.txt || true >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Find Comment
