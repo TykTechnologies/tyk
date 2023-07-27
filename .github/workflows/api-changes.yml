@@ -21,14 +21,17 @@ jobs:
         with:
           go-version: 1.20
 
+      - name: Install Task
+        uses: arduino/setup-task@v1
+        with:
+          version: 3
+
       - name: Fetch base branch
         run: git fetch origin ${{ github.base_ref }}
 
-      - name: Setup deps, stash taskfiles
+      - name: Stash taskfiles
         run: |
-          sudo apt install -y rsync
-          go install github.com/go-task/task/v3/cmd/task@latest
-          mkdir /tmp/.taskfiles
+          mkdir -p /tmp/.taskfiles
           rsync -a ./.taskfiles/ /tmp/.taskfiles/
 
       - name: Set up comment author
@@ -43,6 +46,7 @@ jobs:
           task -t .taskfiles/godoc/Taskfile.yml > current.txt
           git checkout -- .
           git checkout ${{ github.base_ref }}
+          go mod tidy
           rsync -a /tmp/.taskfiles/ .taskfiles/
           task -t .taskfiles/godoc/Taskfile.yml > prev.txt
           echo "diff<<EOF" >> $GITHUB_OUTPUT
