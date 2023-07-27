@@ -6,7 +6,7 @@ on:
       - master
 
 jobs:
-  check-api-changes:
+  test:
     name: Detect API changes
     runs-on: ubuntu-latest
 
@@ -45,7 +45,7 @@ jobs:
           git config --local user.name "brunswick[bot]"
 
       - name: Collect godoc and diff it
-        id: check
+        id: api-check
         run: |
           go mod tidy
           task -t .taskfiles/godoc/Taskfile.yml > current.txt
@@ -73,6 +73,6 @@ jobs:
           body: |
             API Changes
             ```shellsession
-            ${{ steps.check.outputs.diff || "none detected" }}
+            ${{ steps.api-check.outputs.diff || 'none detected' }}
             ```
           edit-mode: replace
