@@ -830,6 +830,9 @@ type CachePlugin struct {
 
 	// CacheResponseCodes contains a list of valid response codes for responses that are okay to add to the cache.
 	CacheResponseCodes []int `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
+
+	// Timeout is the TTL for the endpoint level caching in seconds. 0 means no caching.
+	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 // Fill fills *CachePlugin from apidef.CacheMeta.
@@ -837,6 +840,7 @@ func (a *CachePlugin) Fill(cm apidef.CacheMeta) {
 	a.Enabled = !cm.Disabled
 	a.CacheByRegex = cm.CacheKeyRegex
 	a.CacheResponseCodes = cm.CacheOnlyResponseCodes
+	a.Timeout = cm.Timeout
 }
 
 // ExtractTo extracts *CachePlugin values to *apidef.CacheMeta.
@@ -844,6 +848,7 @@ func (a *CachePlugin) ExtractTo(cm *apidef.CacheMeta) {
 	cm.Disabled = !a.Enabled
 	cm.CacheKeyRegex = a.CacheByRegex
 	cm.CacheOnlyResponseCodes = a.CacheResponseCodes
+	cm.Timeout = a.Timeout
 }
 
 // EnforceTimeout holds the configuration for enforcing request timeouts.
