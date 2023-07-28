@@ -76,7 +76,7 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 	}
 
 	cacheThisRequest := true
-	cacheTTL := m.Spec.CacheOptions.CacheTimeout
+	cacheTTL := options.timeout
 
 	// make sure the status codes match if specified
 	if len(options.cacheOnlyResponseCodes) > 0 {
