@@ -73,7 +73,7 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             API Changes
-            ```shellsession
+            ```diff
             ${{ steps.api-check.outputs.diff-output || 'none detected' }}
             ```
           edit-mode: replace
