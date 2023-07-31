@@ -432,7 +432,6 @@ func TestAllApisAreMTLS(t *testing.T) {
 }
 
 func TestOpenTelemetry(t *testing.T) {
-
 	t.Run("Opentelemetry enabled - check if we are sending traces", func(t *testing.T) {
 		otelCollectorMock := httpCollectorMock(t, func(w http.ResponseWriter, r *http.Request) {
 			//check the body
@@ -466,15 +465,19 @@ func TestOpenTelemetry(t *testing.T) {
 			globalConf.OpenTelemetry.SpanProcessorType = "simple"
 		})
 		defer ts.Close()
+		detailedTracing := []bool{true, false}
+		for _, detailed := range detailedTracing {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.APIID = "test"
+				spec.Proxy.ListenPath = "/my-api/"
+				spec.UseKeylessAccess = true
+				spec.DetailedTracing = detailed
+			})
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.APIID = "test"
-			spec.Proxy.ListenPath = "/my-api/"
-			spec.UseKeylessAccess = true
-		})
+			_, _ = ts.Run(t, test.TestCase{Path: "/my-api/", Code: http.StatusOK})
+			assert.Equal(t, "otel", ts.Gw.TracerProvider.Type())
+		}
 
-		_, _ = ts.Run(t, test.TestCase{Path: "/my-api/", Code: http.StatusOK})
-		assert.Equal(t, "otel", ts.Gw.TracerProvider.Type())
 	})
 
 	t.Run("Opentelemetry disabled - check if we are not sending traces", func(t *testing.T) {

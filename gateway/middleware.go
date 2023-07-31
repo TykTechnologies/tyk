@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -66,17 +67,21 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
 	} else if baseMw := tr.Base(); baseMw != nil {
-		if cfg := baseMw.Gw.GetConfig(); cfg.OpenTelemetry.Enabled {
-			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
-			defer span.End()
-
-			setContext(r, ctx)
+		cfg := baseMw.Gw.GetConfig()
+		if cfg.OpenTelemetry.Enabled {
+			var span otel.Span
+			if baseMw.Spec.DetailedTracing {
+				var ctx context.Context
+				ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
+				defer span.End()
+				setContext(r, ctx)
+			} else {
+				span = otel.SpanFromContext(r.Context())
+			}
 
 			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
 			if err != nil {
 				span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
-			} else {
-				span.SetStatus(otel.SPAN_STATUS_OK, "")
 			}
 
 			attrs := ctxGetSpanAttributes(r, tr.TykMiddleware.Name())
