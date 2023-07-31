@@ -292,33 +292,33 @@ func (m *GraphQLMiddleware) validateRequestWithOtel(ctx context.Context, w http.
 	err := m.Spec.GraphQLExecutor.OtelExecutor.Normalize(req)
 	if err != nil {
 		m.Logger().Errorf("Error while normalizing GraphqlRequest: %v", err)
-		if err, ok := err.(*gql.RequestErrors); ok {
-			return m.writeGraphQLError(w, err)
-		} else {
-			return ProxyingRequestFailedErr, http.StatusInternalServerError
+		var reqErr gql.RequestErrors
+		if errors.As(err, &reqErr) {
+			return m.writeGraphQLError(w, reqErr)
 		}
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 
 	// validation
 	err = m.Spec.GraphQLExecutor.OtelExecutor.ValidateForSchema(req)
 	if err != nil {
 		m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
-		if err, ok := err.(*gql.RequestErrors); ok {
-			return m.writeGraphQLError(w, err)
-		} else {
-			return ProxyingRequestFailedErr, http.StatusInternalServerError
+		var reqErr gql.RequestErrors
+		if errors.As(err, &reqErr) {
+			return m.writeGraphQLError(w, reqErr)
 		}
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 
 	// input validation
 	err = m.Spec.GraphQLExecutor.OtelExecutor.InputValidation(req)
 	if err != nil {
 		m.Logger().Errorf("Error while validating variables for request: %v", err)
-		if err, ok := err.(*gql.RequestErrors); ok {
-			return m.writeGraphQLError(w, err)
-		} else {
-			return ProxyingRequestFailedErr, http.StatusInternalServerError
+		var reqErr gql.RequestErrors
+		if errors.As(err, &reqErr) {
+			return m.writeGraphQLError(w, reqErr)
 		}
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 	return nil, http.StatusOK
 }
