@@ -40,7 +40,6 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
-	oteltrace "go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 
@@ -1137,7 +1136,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 
 		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
 		span := otel.SpanFromContext(outreq.Context())
-		reqCtx := oteltrace.ContextWithSpan(context.Background(), span)
+		reqCtx := otel.ContextWithSpan(context.Background(), span)
 		if isProxyOnly {
 			reqCtx = NewGraphQLProxyOnlyContext(reqCtx, outreq)
 		}

@@ -16,5 +16,6 @@ spec:
     - selector: span[tracetest.span.type="http" name="HTTP POST" http.method="POST"]
       name: Upstream Request is valid
       assertions:
-        - attr:http.status_code   =   200
-        - attr:http.url = "https://countries.trevorblades.com/"
+        - attr:http.status_code    =    200
+        - attr:http.url  =  "https://countries.trevorblades.com/"
+        - attr:http.method = "POST"
