@@ -3,10 +3,11 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/config"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/buger/jsonparser"
 

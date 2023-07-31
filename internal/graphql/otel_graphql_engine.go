@@ -12,23 +12,23 @@ import (
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
+type ExecutionEngineI interface {
+	graphql.CustomExecutionEngineV2
+	graphql.ExecutionEngineV2Executor
+}
+
 type OtelGraphqlEngineV2 struct {
 	mutex          sync.Mutex
 	traceContext   context.Context
 	tracerProvider otel.TracerProvider
 
-	engine       *graphql.ExecutionEngineV2
-	rootExecutor graphql.ExecutionEngineV2Executor
+	engine ExecutionEngineI
 }
 
 func (o *OtelGraphqlEngineV2) SetContext(ctx context.Context) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 	o.traceContext = ctx
-}
-
-func (o *OtelGraphqlEngineV2) SetRootExecutor(executor graphql.ExecutionEngineV2Executor) {
-	o.rootExecutor = executor
 }
 
 func (o *OtelGraphqlEngineV2) Normalize(operation *graphql.Request) error {
@@ -111,7 +111,7 @@ func (o *OtelGraphqlEngineV2) Execute(inCtx context.Context, operation *graphql.
 	return nil
 }
 
-func NewOtelGraphqlEngineV2(tracerProvider otel.TracerProvider, engine *graphql.ExecutionEngineV2) *OtelGraphqlEngineV2 {
+func NewOtelGraphqlEngineV2(tracerProvider otel.TracerProvider, engine ExecutionEngineI) *OtelGraphqlEngineV2 {
 	return &OtelGraphqlEngineV2{
 		tracerProvider: tracerProvider,
 		engine:         engine,

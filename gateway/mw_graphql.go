@@ -191,11 +191,9 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 	conf := m.Gw.GetConfig()
 	if conf.OpenTelemetry.Enabled {
 		executor := graphql.NewOtelGraphqlEngineV2(m.Gw.TracerProvider, engine)
-		rootExecutor, err := gql.NewCustomExecutionEngineV2Executor(executor)
 		if err != nil {
 			m.Logger().WithError(err).Error("error creating custom execution engine v2")
 		}
-		executor.SetRootExecutor(rootExecutor)
 		m.Spec.GraphQLExecutor.OtelExecutor = executor
 	} else {
 
