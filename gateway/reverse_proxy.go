@@ -36,8 +36,6 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
-	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
-
 	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
@@ -1138,7 +1136,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		}
 
 		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
-		span := tyktrace.SpanFromContext(outreq.Context())
+		span := otel.SpanFromContext(outreq.Context())
 		reqCtx := oteltrace.ContextWithSpan(context.Background(), span)
 		if isProxyOnly {
 			reqCtx = NewGraphQLProxyOnlyContext(reqCtx, outreq)
