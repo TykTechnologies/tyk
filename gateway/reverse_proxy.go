@@ -1058,7 +1058,7 @@ func (p *ReverseProxy) handleGraphQLIntrospection(gqlRequest *graphql.Request) (
 
 func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoundTripper, r *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	conn, err := p.wsUpgrader.Upgrade(w, r, http.Header{
-		header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+		header.SecWebSocketProtocol: {r.Header.Get(header.SecWebSocketProtocol)},
 	})
 	if err != nil {
 		p.logger.Error("websocket upgrade for GraphQL engine failed: ", err)
@@ -1227,7 +1227,14 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 	}
 
 	//go gqlhttp.HandleWebsocket(done, errChan, conn, executorPool, absLogger)
-	go gqlwebsocket.Handle(done, errChan, conn, executorPool, gqlwebsocket.WithLogger(absLogger))
+	go gqlwebsocket.Handle(
+		done,
+		errChan,
+		conn,
+		executorPool,
+		gqlwebsocket.WithLogger(absLogger),
+		gqlwebsocket.WithProtocolFromRequestHeaders(req),
+	)
 	select {
 	case err := <-errChan:
 		log.Error("could not start graphql websocket handler: ", err)

@@ -276,7 +276,7 @@ func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.
 
 func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request) bool {
 	websocketProtocol := r.Header.Get(header.SecWebSocketProtocol)
-	return websocketProtocol == GraphQLWebSocketProtocol
+	return websocketProtocol == GraphQLWebSocketProtocol || websocketProtocol == "graphql-transport-ws"
 }
 
 func (m *GraphQLMiddleware) checkForUnsupportedUsage() error {
