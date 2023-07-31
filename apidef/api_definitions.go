@@ -155,6 +155,7 @@ type CacheMeta struct {
 	Path                   string `bson:"path" json:"path"`
 	CacheKeyRegex          string `bson:"cache_key_regex" json:"cache_key_regex"`
 	CacheOnlyResponseCodes []int  `bson:"cache_response_codes" json:"cache_response_codes"`
+	Timeout                int64  `bson:"timeout" json:"timeout"`
 }
 
 type RequestInputType string

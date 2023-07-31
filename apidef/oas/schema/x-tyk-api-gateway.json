@@ -546,22 +546,19 @@
           "type": "string"
         }
       },
-      "oneOf": [
+      "anyOf": [
         {
-          "required": [
-            "body"
-          ]
+          "required": ["body"]
         },
         {
-          "required": [
-            "path"
-          ]
+          "required": ["path"]
         }
       ],
       "required": [
         "enabled",
         "format"
-      ]
+      ],
+      "minProperties": 3
     },
     "X-Tyk-CachePlugin": {
       "type": "object",
@@ -579,6 +576,11 @@
               "type": "integer"
             }
           ]
+        },
+        "timeout": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
         }
       },
       "required": [

@@ -925,6 +925,9 @@ Example value: `\"id\":[^,]*` (quoted json value).
 **Field: `cacheResponseCodes` (`[]int`)**
 CacheResponseCodes contains a list of valid response codes for responses that are okay to add to the cache.
 
+**Field: `timeout` (`int`)**
+Timeout is the TTL for the endpoint level caching in seconds. 0 means no caching.
+
 
 ### **EnforceTimeout**
 
