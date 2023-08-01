@@ -2,6 +2,7 @@ package otel
 
 import (
 	"context"
+	"github.com/TykTechnologies/tyk-pump/logger"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -244,5 +245,21 @@ func TestGatewaySpanAttributes(t *testing.T) {
 			attrs := GatewaySpanAttributes(tt.gwID, tt.isHybrid, tt.groupID, tt.isSegmented, tt.segmentTags)
 			assert.Equal(t, tt.expectedAttr, attrs)
 		})
+	}
+}
+
+func TestContextWithSpan(t *testing.T) {
+	provider := InitOpenTelemetry(context.Background(), logger.GetLogger(), &Config{
+		Enabled:  true,
+		Endpoint: "invalid",
+	}, "test", "test")
+
+	ctx := context.Background()
+	_, span := provider.Tracer().Start(context.Background(), "test operation")
+
+	newContext := ContextWithSpan(ctx, span)
+
+	if got := SpanFromContext(newContext); got != span {
+		t.Errorf("got wrong span")
 	}
 }
