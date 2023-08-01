@@ -1,0 +1,85 @@
+version: "3.9"
+services:
+  tyk:
+    container_name: tyk
+    image: ${tyk_image}
+    env_file:
+      - tyk.env
+    volumes:
+      - ./certs:/usr/local/share/ca-certificates
+      - ${confs_dir}:/conf/
+    ports:
+      - "6000:6000"
+      - "8003:8003"
+      - "8080:8080"
+    entrypoint: ["/bin/bash"]
+    command:
+      - "-c"
+      - |
+        update-ca-certificates
+        /opt/tyk-gateway/tyk --conf /conf/tyk.conf
+
+  tyk-analytics:
+    container_name: tyk-analytics
+    image: ${tyk_analytics_image}
+    volumes:
+      - ${confs_dir}:/conf/
+    ports:
+      - "3000:3000"
+      - "5000:5000"
+      - "1026:1025"
+    env_file:
+      - tyk-analytics.env
+    command: [ "--conf", "/conf/tyk-analytics.conf" ]
+
+
+  tyk-pump:
+    container_name: tyk-pump
+    image: ${tyk_pump_image}
+    volumes:
+      - ${confs_dir}:/conf/
+    ports:    
+      - "8061:8061"
+    env_file:
+      - tyk-pump.env
+    command: [ "--conf", "/conf/tyk-pump.conf" ]
+
+  # tyk-sink:
+  #   container_name: tyk-sink
+  #   image: ${registry}/${tyk_sink_image}
+  #   ports:
+  #   - "9090:9090"
+  #   env_file:
+  #     - tyk-sink.env
+
+  gateway-checker:
+    image: curlimages/curl
+    command: tail -f /dev/null
+    depends_on:
+      - tyk
+    healthcheck:
+      test: curl -s -k --fail https://tyk:8080/hello | grep -o '.*status":"pass".*dashboard":{"status":"pass".*redis":{"status":"pass"'
+      interval: 5s
+      retries: 10
+      start_period: 4s
+      timeout: 10s
+
+  dashboard-checker:
+    image: curlimages/curl
+    command: tail -f /dev/null
+    depends_on:
+      - tyk-analytics
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' tyk-analytics:3000/hello/ | grep -q '^200$'"]
+      interval: 10s
+      retries: 30
+      start_period: 10s
+      timeout: 10s
+
+  wait:
+    image: hello-world:linux
+    depends_on:
+        gateway-checker:
+            condition: service_healthy
+        dashboard-checker:
+            condition: service_healthy 
