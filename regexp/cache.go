@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"time"
 
-	gocache "github.com/pmylund/go-cache"
+	gocache "github.com/patrickmn/go-cache"
 )
 
 const (

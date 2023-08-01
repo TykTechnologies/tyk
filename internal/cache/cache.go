@@ -3,7 +3,7 @@ package cache
 import (
 	"time"
 
-	"github.com/pmylund/go-cache"
+	"github.com/patrickmn/go-cache"
 )
 
 // DefaultExpiration is a helper value that uses the repository defaults.

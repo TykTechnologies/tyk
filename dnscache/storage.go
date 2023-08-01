@@ -6,7 +6,7 @@ import (
 
 	"fmt"
 
-	cache "github.com/pmylund/go-cache"
+	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
 )
 
