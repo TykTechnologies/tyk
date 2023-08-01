@@ -29,6 +29,13 @@ jobs:
     name: '${{ matrix.golang_cross }}'
     runs-on: ubuntu-latest
     container: 'tykio/golang-cross:${{ matrix.golang_cross }}'
+    permissions:
+      id-token: write   # This is required for requesting the JWT
+      contents: read    # This is required for actions/checkout
+
+    outputs:
+      tags: ${{ steps.metadata.outputs.tags }}
+
     strategy:
       fail-fast: false
       matrix:
@@ -38,7 +45,7 @@ jobs:
             go_version: 1.19
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             rpmvers: 'el/8 el/9 amazon/2023'
-            debvers: 'ubuntu/bionic ubuntu/focal ubuntu/jammy debian/buster debian/bullseye'
+            debvers: 'ubuntu/bionic ubuntu/focal ubuntu/jammy debian/buster debian/bullseye debian/bookworm'
 
     steps:
       - name: Fix private module deps
@@ -65,6 +72,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
       - name: Login to Cloudsmith
         if: startsWith(github.ref, 'refs/tags')
         uses: docker/login-action@v2
@@ -73,8 +81,7 @@ jobs:
           username: ${{ secrets.CLOUDSMITH_USERNAME }}
           password: ${{ secrets.CLOUDSMITH_API_KEY }}
 
-      - name: Unlock agent and set tag
-        id: targets
+      - name: Unlock agent
         shell: bash
         env:
           NFPM_STD_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
@@ -83,20 +90,14 @@ jobs:
         run: |
           ci/bin/unlock-agent.sh
 
-      - name: Delete old release assets
-        if: startsWith(github.ref, 'refs/tags')
-        uses: mknejp/delete-release-assets@v1
+      - uses: actions/cache@v3
         with:
-          token: ${{ github.token }}
-          tag: ${{ github.ref }}
-          fail-if-no-assets: false
-          fail-if-no-release: false
-          assets: |
-            *.deb
-            *.rpm
-            *.tar.gz
-            *.txt.sig
-            *.txt
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - uses: goreleaser/goreleaser-action@v4
         with:
@@ -115,6 +116,46 @@ jobs:
           RPMVERS: ${{ matrix.rpmvers }}
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
           DOCKER_CLI_EXPERIMENTAL: "enabled"
+
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: cipush
+          aws-region: eu-central-1
+          # Don't mask to pass it across job boundaries
+          mask-aws-account-id: false
+
+      - uses: aws-actions/amazon-ecr-login@v1
+        id: ecr
+
+      - name: Docker metadata for CI
+        id: metadata
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ steps.ecr.outputs.registry }}/tyk
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{version}}
+
+      - name: CI push
+        shell: bash
+        env:
+          t: ${{ steps.metadata.outputs.tags }}
+        run: |
+          set +e
+          IFS=$'\n' tags=($t)
+          for tag in $tags; do
+             for arch in amd64 arm64; do 
+                docker tag tykio/tyk-gateway:v0.0.0-${arch} ${tag}-${arch} && docker push ${tag}-${arch}
+             done
+             docker manifest create ${tag} ${tag}-amd64 ${tag}-arm64 && docker manifest push ${tag}
+          done
+
       - uses: actions/upload-artifact@v3
         with:
           name: deb
@@ -130,20 +171,25 @@ jobs:
           path: |
             dist/*.rpm
             !dist/*PAYG*.rpm
-  ci:
-    needs:
-      - goreleaser
+
+  sbom:
+    needs: goreleaser
+    uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@main
+    secrets:
+      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+      DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
+      DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
+      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+
+  api-tests:
+    needs: goreleaser
     runs-on: ubuntu-latest
     permissions:
       id-token: write   # This is required for requesting the JWT
       contents: read    # This is required for actions/checkout
-
-    outputs:
-      ecr-pass: ${{ steps.ecr-pass.outputs.ECR_PASS }}
-
+    
     steps:
-      - name: Shallow checkout of tyk
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 1
 
@@ -153,112 +199,42 @@ jobs:
           role-session-name: cipush
           aws-region: eu-central-1
 
-      - name: Get ecr password
-        id: ecr-pass
-        run: |
-          echo "ECR_PASS=$(aws ecr get-login-password --region eu-central-1)" >> "$GITHUB_OUTPUT"
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - uses: actions/download-artifact@v3
-        with:
-          name: deb
-
-      - uses: docker/setup-qemu-action@v2
-
-      - uses: docker/setup-buildx-action@v2
-
-      - name: Docker metadata
-        id: metadata
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ steps.login-ecr.outputs.registry }}/tyk
-          flavor: |
-            latest=false
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha
-            type=semver,pattern=v{{major}}.{{minor}}
-            type=semver,pattern=v{{version}}
-
-      - name: CI build
-        uses: docker/build-push-action@v4
-        with:
-          push: true
-          context: "."
-          file: ci/Dockerfile.std
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ steps.metadata.outputs.tags }}
-
-  sbom:
-    needs: ci
-    uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@main
-    secrets:
-      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
-      DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
-      DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
-      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
-
-  api-tests:
-    needs: ci
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write   # This is required for requesting the JWT
-      contents: read    # This is required for actions/checkout
-    container:
-      image: 754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
-      credentials:
-        username: AWS
-        password: ${{ needs.ci.outputs.ecr-pass }}
-    
-    steps:
-      - uses: aws-actions/configure-aws-credentials@v2
-        with:
-          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
-          role-session-name: cipush
-          aws-region: eu-central-1
-
       - id: ecr
         uses: aws-actions/amazon-ecr-login@v1
 
+        # Only ${{ github.actor }} has access
+        # See https://github.com/mxschmitt/action-tmate#use-registered-public-ssh-keys
+      - name: Setup tmate session only in debug mode
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ runner.debug == '1' }}
+        with:
+          detached: true
+          limit-access-to-actor: true
+
       - name: env up
-        working-directory: auto
-        run: |
-          echo "registry=${{ steps.ecr.outputs.registry }}
-          tyk_sink_image=\${registry}/tyk-sink:${{ inputs.tyk-sink-version || 'master' }}
-          tyk_image=\${registry}/tyk:${{ inputs.tyk-version || 'master' }}
-          tyk_analytics_image=\${registry}/tyk-analytics:${{ inputs.tyk-analytics-version || 'master' }}
-          tyk_pump_image=\${registry}/tyk-pump:${{ inputs.tyk-pump-version || 'master' }}" > versions.env
-          # bring up env
-          cat versions.env
-          docker compose -f ${{ github.job }}.yml -f deps.yml --env-file versions.env --env-file tat.env up --quiet-pull -d
-
-      - name: Docker ps
-        if: ${{always()}}
-        run: docker ps
-
-      - name: Docker Compose logs
-        if: ${{failure()}}
-        working-directory: auto
-        run: docker compose -f ${{ github.job }}.yml -f deps.yml --env-file versions.env --env-file tat.env logs
-
-# TODO: PR comment, using just one comment and updating rather than a new comment each time
-
-      - name: Xray update
-        if: ${{ always() }} && github.event_name != 'pull_request'
-        run: |
-          ./update_xray.sh
-        working-directory: tyk-automated-tests
+        shell: bash
+        working-directory: ci/auto
         env:
-          TEST: "QA-901"
-          STATUS: "${{ steps.test_execution.outcome }}"
-          CLIENT_ID: ${{secrets.XRAY_CLIENT_ID}}
-          CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
-          BRANCH: ${{ github.ref }}
+          t: ${{ needs.goreleaser.outputs.tags }}
+        run: |
+          echo CI tags: $t
+          tags=($t)
+          echo First tag: ${tags[0]}
+          echo "registry=${{ steps.ecr.outputs.registry }}
+          tyk_image=${tags[0]}
+          tyk_analytics_image=\${registry}/tyk-analytics:${{ inputs.tyk-analytics-version || 'master' }}
+          tyk_sink_image=\${registry}/tyk-sink:${{ inputs.tyk-sink-version || 'master' }}
+          tyk_pump_image=\${registry}/tyk-pump:${{ inputs.tyk-pump-version || 'master' }}
+          confs_dir=./pro" > versions.env
+          cat versions.env
+          # bring up env
+          docker compose -f pro.yml -f deps.yml --env-file versions.env up --quiet-pull -d
+
+      - name: Run tests
+        run:
+          docker run --rm 754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
+
+# TODO: PR comment, using just one comment and updating, not a new comment each time
 
   upgrade-deb:
     if: startsWith(github.ref, 'refs/tags')
@@ -278,6 +254,7 @@ jobs:
           - ubuntu:bionic
           - ubuntu:focal
           - debian:bullseye
+          - debian:bookworm
 
     steps:
       - uses: actions/checkout@v3
@@ -420,6 +397,3 @@ jobs:
                   cd -
               fi
           done
-
-
-
