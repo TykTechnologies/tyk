@@ -1255,6 +1255,15 @@ func (s *Test) Close() {
 	if err != nil {
 		log.Error("could not remove apis")
 	}
+
+	s.Gw.SessionCache = nil
+	s.Gw.ExpiryCache = nil
+	s.Gw.UtilCache = nil
+	s.Gw.ServiceCache = nil
+	s.Gw.RPCGlobalCache = nil
+	s.Gw.RPCCertCache = nil
+
+	runtime.GC()
 }
 
 // RemoveApis clean all the apis from a living gw
