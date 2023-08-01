@@ -2,11 +2,12 @@ package otel
 
 import (
 	"context"
-	"github.com/TykTechnologies/tyk-pump/logger"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/TykTechnologies/tyk-pump/logger"
 
 	"github.com/sirupsen/logrus"
 
