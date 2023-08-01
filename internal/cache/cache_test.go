@@ -31,4 +31,6 @@ func TestCache(t *testing.T) {
 	cache.Set("key", "value", 1)
 	cache.Flush()
 	assert.Equal(t, 0, cache.Count())
+
+	cache.Close()
 }
