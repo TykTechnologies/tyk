@@ -13,7 +13,6 @@ func TestStartTestLeaks(t *testing.T) {
 	ts.Close()
 
 	tick := func() {
-		runtime.GC()
 		time.Sleep(time.Second)
 		t.Logf("Tick with %d goroutines", runtime.NumGoroutine())
 	}
