@@ -42,10 +42,6 @@ const (
 	NON_VERSIONED = "Non Versioned"
 )
 
-func SpanFromContext(ctx context.Context) tyktrace.Span {
-	return tyktrace.SpanFromContext(ctx)
-}
-
 func ContextWithSpan(ctx context.Context, span tyktrace.Span) context.Context {
 	return tyktrace.ContextWithSpan(ctx, span)
 }

@@ -33,15 +33,16 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
 	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"

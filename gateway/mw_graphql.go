@@ -195,8 +195,6 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 			m.Logger().WithError(err).Error("error creating custom execution engine v2")
 		}
 		m.Spec.GraphQLExecutor.OtelExecutor = executor
-	} else {
-
 	}
 	m.Spec.GraphQLExecutor.CancelV2 = cancel
 	m.Spec.GraphQLExecutor.HooksV2.BeforeFetchHook = m
