@@ -166,20 +166,6 @@ jobs:
         with:
           name: deb
 
-      - name: Docker metadata
-        id: metadata
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ steps.login-ecr.outputs.registry }}/tyk
-          flavor: |
-            latest=false
-            prefix=v
-          tags: |
-              type=semver,pattern=v{{version}}
-              type=semver,pattern=v{{major}}.{{minor}}
-              type=semver,pattern=v{{major}}
-              type=ref,event=branch
-
       - uses: docker/setup-qemu-action@v2
 
       - uses: docker/setup-buildx-action@v2
