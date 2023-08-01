@@ -90,6 +90,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-replace gorm.io/gorm => github.com/TykTechnologies/gorm v1.20.7-0.20210409171139-b5c340f85ed0
-
 //replace github.com/TykTechnologies/graphql-go-tools => ../graphql-go-tools
