@@ -605,7 +605,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 					clientTags, ok := data["tags"].([]interface{})
 					if ok {
 						for _, tag := range clientTags {
-							session.Tags = append(session.Tags, tag.(string))
+							strTag, _ := tag.(string)
+							session.Tags = append(session.Tags, strTag)
 						}
 						updateSession = true
 					}
