@@ -59,9 +59,6 @@ var (
 	// to register to, but never used
 	discardMuxer = mux.NewRouter()
 
-	// Used to store the test bundles:
-	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
-
 	defaultTestConfig config.Config
 	EnableTestDNSMock = false
 	MockHandle        *test.DnsMockHandle
@@ -1108,6 +1105,9 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	gwConfig.CoProcessOptions.EnableCoProcess = true
 	gwConfig.EnableBundleDownloader = true
 	gwConfig.BundleBaseURL = testHttpBundles
+
+	// Used to store the test bundles:
+	testMiddlewarePath, _ := ioutil.TempDir("", "tyk-middleware-path")
 	gwConfig.MiddlewarePath = testMiddlewarePath
 
 	// force ipv4 for now, to work around the docker bug affecting
