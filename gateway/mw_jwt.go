@@ -108,7 +108,7 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 			return nil, err
 		}
 
-		JWKCache.Set("legacy-"+k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+		JWKCache.Set("legacy-"+k.Spec.APIID, jwkSet, k.Spec.JWTJWKSCacheTimeout)
 	} else {
 		jwkSet = cachedJWK.(JWKs)
 	}
@@ -160,7 +160,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 
 		// Cache it
 		k.Logger().Debug("Caching JWK")
-		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+		JWKCache.Set(k.Spec.APIID, jwkSet, k.Spec.JWTJWKSCacheTimeout)
 	} else {
 		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
 	}
