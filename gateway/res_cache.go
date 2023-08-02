@@ -21,7 +21,7 @@ const (
 
 // ResponseCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type ResponseCacheMiddleware struct {
-	spec  *APISpec
+	BaseTykResponseHandler
 	store storage.Handler
 }
 
@@ -30,7 +30,7 @@ func (m *ResponseCacheMiddleware) Name() string {
 }
 
 func (h *ResponseCacheMiddleware) Init(c interface{}, spec *APISpec) error {
-	h.spec = spec
+	h.Spec = spec
 	return nil
 }
 
@@ -38,7 +38,7 @@ func (h *ResponseCacheMiddleware) HandleError(rw http.ResponseWriter, req *http.
 }
 
 func (m *ResponseCacheMiddleware) EnabledForSpec() bool {
-	return m.spec.CacheOptions.EnableCache
+	return m.Spec.CacheOptions.EnableCache
 }
 
 func (m *ResponseCacheMiddleware) getTimeTTL(cacheTTL int64) int64 {
@@ -76,7 +76,7 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 	}
 
 	cacheThisRequest := true
-	cacheTTL := m.spec.CacheOptions.CacheTimeout
+	cacheTTL := options.timeout
 
 	// make sure the status codes match if specified
 	if len(options.cacheOnlyResponseCodes) > 0 {
@@ -91,7 +91,7 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 	}
 
 	// Are we using upstream cache control?
-	if m.spec.CacheOptions.EnableUpstreamCacheControl {
+	if m.Spec.CacheOptions.EnableUpstreamCacheControl {
 		// Do we enable cache for this response?
 		if res.Header.Get(upstreamCacheHeader) != "" {
 			cacheThisRequest = true
@@ -99,8 +99,8 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 
 		// Read custom or default cache TTL header name
 		cacheTTLHeader := upstreamCacheTTLHeader
-		if m.spec.CacheOptions.CacheControlTTLHeader != "" {
-			cacheTTLHeader = m.spec.CacheOptions.CacheControlTTLHeader
+		if m.Spec.CacheOptions.CacheControlTTLHeader != "" {
+			cacheTTLHeader = m.Spec.CacheOptions.CacheControlTTLHeader
 		}
 
 		// Get cache TTL from header

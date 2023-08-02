@@ -1201,7 +1201,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	go s.reloadSimulation(s.ctx, gw)
 
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry)
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry, gw.GetNodeID(), VERSION)
 
 	return gw
 }

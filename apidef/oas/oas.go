@@ -152,6 +152,22 @@ func (s *OAS) RemoveTykExtension() {
 	delete(s.Extensions, ExtensionTykAPIGateway)
 }
 
+// Clone creates a deep copy of the OAS object and returns a new instance.
+func (s *OAS) Clone() (*OAS, error) {
+	oasInBytes, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	var retOAS OAS
+	_ = json.Unmarshal(oasInBytes, &retOAS)
+
+	// convert Tyk extension from map to struct
+	retOAS.GetTykExtension()
+
+	return &retOAS, nil
+}
+
 func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 	if s.GetTykExtension() != nil {
 		authentication = s.GetTykExtension().Server.Authentication
@@ -267,7 +283,8 @@ func (s *OAS) getTykSecurityScheme(name string) interface{} {
 	return securitySchemes[name]
 }
 
-func (s *OAS) getTykMiddleware() (middleware *Middleware) {
+// GetTykMiddleware returns middleware section from XTykAPIGateway.
+func (s *OAS) GetTykMiddleware() (middleware *Middleware) {
 	if s.GetTykExtension() != nil {
 		middleware = s.GetTykExtension().Middleware
 	}
@@ -276,8 +293,8 @@ func (s *OAS) getTykMiddleware() (middleware *Middleware) {
 }
 
 func (s *OAS) getTykOperations() (operations Operations) {
-	if s.getTykMiddleware() != nil {
-		operations = s.getTykMiddleware().Operations
+	if s.GetTykMiddleware() != nil {
+		operations = s.GetTykMiddleware().Operations
 	}
 
 	return

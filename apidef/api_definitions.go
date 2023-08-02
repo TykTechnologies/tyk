@@ -155,6 +155,7 @@ type CacheMeta struct {
 	Path                   string `bson:"path" json:"path"`
 	CacheKeyRegex          string `bson:"cache_key_regex" json:"cache_key_regex"`
 	CacheOnlyResponseCodes []int  `bson:"cache_response_codes" json:"cache_response_codes"`
+	Timeout                int64  `bson:"timeout" json:"timeout"`
 }
 
 type RequestInputType string
@@ -616,6 +617,8 @@ type APIDefinition struct {
 	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
 	IsOAS       bool   `bson:"is_oas" json:"is_oas,omitempty"`
 	VersionName string `bson:"-" json:"-"`
+
+	DetailedTracing bool `bson:"detailed_tracing" json:"detailed_tracing"`
 }
 
 type AnalyticsPluginConfig struct {
