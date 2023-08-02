@@ -20,6 +20,8 @@ type (
 	Sampling = otelconfig.Sampling
 
 	SpanAttribute = tyktrace.Attribute
+
+	Span = tyktrace.Span
 )
 
 // HTTP Handlers
@@ -117,3 +119,7 @@ var APIKeyAttribute = semconv.TykAPIKey
 var APIKeyAliasAttribute = semconv.TykAPIKeyAlias
 
 var OAuthClientIDAttribute = semconv.TykOauthID
+
+func SpanFromContext(ctx context.Context) tyktrace.Span {
+	return tyktrace.SpanFromContext(ctx)
+}
