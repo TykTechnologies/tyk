@@ -230,6 +230,18 @@ jobs:
           # bring up env
           docker compose -f pro.yml -f deps.yml --env-file versions.env up --quiet-pull -d
 
+      - name: Check containers exit codes
+        shell: bash
+        run: |
+          container_ids=$(docker ps -q)
+          for container_id in $container_ids; do
+            container_exit_code=$(docker inspect -f '{{.State.ExitCode}}' "$container_id")
+            if [ "$container_exit_code" -ne 0 ]; then
+              exit_code=1
+            fi
+          done
+          exit $exit_code
+
       - name: Run tests
         run:
           docker run --rm --network auto_default 754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} pytest -c pytest_ci.ini -m "dash_admin"
