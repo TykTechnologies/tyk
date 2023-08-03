@@ -42,6 +42,10 @@ const (
 	NON_VERSIONED = "Non Versioned"
 )
 
+func ContextWithSpan(ctx context.Context, span tyktrace.Span) context.Context {
+	return tyktrace.ContextWithSpan(ctx, span)
+}
+
 // InitOpenTelemetry initializes OpenTelemetry - it returns a TracerProvider
 // which can be used to create a tracer. If OpenTelemetry is disabled or misconfigured,
 // a NoopProvider is returned.

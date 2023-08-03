@@ -19,6 +19,8 @@ import (
 	"text/template"
 	"time"
 
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
@@ -217,10 +219,11 @@ type APISpec struct {
 	network analytics.NetworkStats
 
 	GraphQLExecutor struct {
-		Engine   *graphql.ExecutionEngine
-		CancelV2 context.CancelFunc
-		EngineV2 *graphql.ExecutionEngineV2
-		HooksV2  struct {
+		Engine       *graphql.ExecutionEngine
+		CancelV2     context.CancelFunc
+		EngineV2     *graphql.ExecutionEngineV2
+		OtelExecutor *graphqlinternal.OtelGraphqlEngineV2
+		HooksV2      struct {
 			BeforeFetchHook resolve.BeforeFetchHook
 			AfterFetchHook  resolve.AfterFetchHook
 		}
