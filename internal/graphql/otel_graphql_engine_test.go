@@ -46,10 +46,11 @@ func TestOtelGraphqlEngineV2_Normalize(t *testing.T) {
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().Normalize(gomock.Any()).MaxTimes(1).Return(nil)
 
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
-		err := engine.Normalize(&request)
+		err = engine.Normalize(&request)
 		assert.NoError(t, err)
 	})
 
@@ -60,10 +61,11 @@ func TestOtelGraphqlEngineV2_Normalize(t *testing.T) {
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().Normalize(gomock.Any()).MaxTimes(1).Return(graphql.RequestErrorsFromError(errors.New("error normalizing request")))
 
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
-		err := engine.Normalize(&request)
+		err = engine.Normalize(&request)
 		var reqErr graphql.RequestErrors
 		assert.True(t, errors.As(err, &reqErr), "errors should be of type request errors")
 
@@ -79,10 +81,11 @@ func TestOtelGraphqlEngineV2_InputValidation(t *testing.T) {
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().InputValidation(gomock.Any()).MaxTimes(1).Return(nil)
 
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
-		err := engine.InputValidation(&request)
+		err = engine.InputValidation(&request)
 		assert.NoError(t, err)
 	})
 
@@ -93,10 +96,11 @@ func TestOtelGraphqlEngineV2_InputValidation(t *testing.T) {
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().InputValidation(gomock.Any()).MaxTimes(1).Return(graphql.RequestErrorsFromError(errors.New("error normalizing request")))
 
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
-		err := engine.InputValidation(&request)
+		err = engine.InputValidation(&request)
 		var reqErr graphql.RequestErrors
 		assert.True(t, errors.As(err, &reqErr), "errors should be of type request errors")
 
@@ -111,10 +115,11 @@ func TestOtelGraphqlEngineV2_ValidateForSchema(t *testing.T) {
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().ValidateForSchema(gomock.Any()).MaxTimes(1).Return(nil)
 
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
-		err := engine.ValidateForSchema(&request)
+		err = engine.ValidateForSchema(&request)
 		assert.NoError(t, err)
 	})
 
@@ -125,10 +130,11 @@ func TestOtelGraphqlEngineV2_ValidateForSchema(t *testing.T) {
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().ValidateForSchema(gomock.Any()).MaxTimes(1).Return(graphql.RequestErrorsFromError(errors.New("error normalizing request")))
 
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
-		err := engine.ValidateForSchema(&request)
+		err = engine.ValidateForSchema(&request)
 		var reqErr graphql.RequestErrors
 		assert.True(t, errors.As(err, &reqErr), "errors should be of type request errors")
 
@@ -147,10 +153,11 @@ func TestOtelGraphqlEngineV2_Plan(t *testing.T) {
 				report.AddExternalError(operationreport.ExternalError{Message: "error creating plan"})
 			})
 
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
-		_, err := engine.Plan(nil, &request, &report)
+		_, err = engine.Plan(nil, &request, &report)
 		assert.NoError(t, err)
 		assert.True(t, report.HasErrors(), "expected error from operation report, got none")
 	})
@@ -163,10 +170,11 @@ func TestOtelGraphqlEngineV2_Plan(t *testing.T) {
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().Plan(gomock.Any(), gomock.Any(), &report).MaxTimes(1).Return(nil, nil)
 
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
-		_, err := engine.Plan(nil, &request, &report)
+		_, err = engine.Plan(nil, &request, &report)
 		assert.NoError(t, err)
 		assert.False(t, report.HasErrors())
 	})
@@ -180,10 +188,11 @@ func TestOtelGraphqlEngineV2_Plan(t *testing.T) {
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().Plan(gomock.Any(), gomock.Any(), &report).MaxTimes(1).Return(nil, expectedErr)
 
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
-		_, err := engine.Plan(nil, &request, &report)
+		_, err = engine.Plan(nil, &request, &report)
 		assert.ErrorIs(t, expectedErr, err)
 		assert.False(t, report.HasErrors())
 	})
@@ -197,10 +206,11 @@ func TestOtelGraphqlEngineV2_Resolve(t *testing.T) {
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().Resolve(gomock.Any(), gomock.Any(), nil).MaxTimes(1).Return(nil)
 
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
-		err := engine.Resolve(&resolve.Context{}, nil, nil)
+		err = engine.Resolve(&resolve.Context{}, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -212,10 +222,11 @@ func TestOtelGraphqlEngineV2_Resolve(t *testing.T) {
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().Resolve(gomock.Any(), gomock.Any(), nil).MaxTimes(1).Return(expectedErr)
 
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
-		err := engine.Resolve(&resolve.Context{}, nil, nil)
+		err = engine.Resolve(&resolve.Context{}, nil, nil)
 		assert.ErrorIs(t, err, expectedErr)
 	})
 }
@@ -227,11 +238,12 @@ func TestOtelGraphqlEngineV2_Execute(t *testing.T) {
 
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().Execute(gomock.Any(), &request, nil).MaxTimes(1).Return(nil)
-
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine.executor = mockExecutor
+		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
-		err := engine.Execute(context.Background(), &request, nil)
+		err = engine.Execute(context.Background(), &request, nil)
 		assert.NoError(t, err)
 	})
 
@@ -243,10 +255,12 @@ func TestOtelGraphqlEngineV2_Execute(t *testing.T) {
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().Execute(gomock.Any(), &request, nil).MaxTimes(1).Return(expectedErr)
 
-		engine := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
+		engine.executor = mockExecutor
 		engine.SetContext(context.Background())
 
-		err := engine.Execute(context.Background(), &request, nil)
+		err = engine.Execute(context.Background(), &request, nil)
 		assert.ErrorIs(t, err, expectedErr)
 	})
 }

@@ -22,7 +22,8 @@ type OtelGraphqlEngineV2 struct {
 	traceContext   context.Context
 	tracerProvider otel.TracerProvider
 
-	engine ExecutionEngineI
+	engine   ExecutionEngineI
+	executor graphql.ExecutionEngineV2Executor
 }
 
 func (o *OtelGraphqlEngineV2) SetContext(ctx context.Context) {
@@ -104,16 +105,23 @@ func (o *OtelGraphqlEngineV2) Execute(inCtx context.Context, operation *graphql.
 	ctx, span := o.tracerProvider.Tracer().Start(inCtx, "GraphqlEngine")
 	defer span.End()
 	o.SetContext(ctx)
-	if err := o.engine.Execute(inCtx, operation, writer, options...); err != nil {
+	if err := o.executor.Execute(inCtx, operation, writer, options...); err != nil {
 		span.SetStatus(otel.SPAN_STATUS_ERROR, "failed to execute")
 		return err
 	}
 	return nil
 }
 
-func NewOtelGraphqlEngineV2(tracerProvider otel.TracerProvider, engine ExecutionEngineI) *OtelGraphqlEngineV2 {
-	return &OtelGraphqlEngineV2{
+func NewOtelGraphqlEngineV2(tracerProvider otel.TracerProvider, engine ExecutionEngineI) (*OtelGraphqlEngineV2, error) {
+	otelEngine := &OtelGraphqlEngineV2{
 		tracerProvider: tracerProvider,
 		engine:         engine,
 	}
+	executor, err := graphql.NewCustomExecutionEngineV2Executor(otelEngine)
+	if err != nil {
+		return nil, err
+	}
+
+	otelEngine.executor = executor
+	return otelEngine, nil
 }
