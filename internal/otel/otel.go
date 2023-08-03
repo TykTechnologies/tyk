@@ -94,14 +94,14 @@ func ApidefSpanAttributes(apidef *apidef.APIDefinition) []SpanAttribute {
 	return attrs
 }
 
-func GatewaySpanAttributes(gwID string, isHybrid bool, groupID string, isSegmented bool, segmentTags []string) []SpanAttribute {
+func GatewaySpanAttributes(gwID string, isDataplane bool, groupID string, isSegmented bool, segmentTags []string) []SpanAttribute {
 	attrs := []SpanAttribute{
 		semconv.TykGWID(gwID),
-		semconv.TykGWHybrid(isHybrid),
+		semconv.TykGWDataplane(isDataplane),
 	}
 
-	if isHybrid {
-		attrs = append(attrs, semconv.TykHybridGWGroupID(groupID))
+	if isDataplane {
+		attrs = append(attrs, semconv.TykDataplaneGWGroupID(groupID))
 	}
 
 	if isSegmented {
