@@ -229,6 +229,9 @@ jobs:
           cat versions.env
           # bring up env
           docker compose -f pro.yml -f deps.yml --env-file versions.env up --quiet-pull -d
+          #debug
+          echo "DOCKER NETWORKS"
+          docker network ls
 
       - name: Check containers exit codes
         shell: bash
