@@ -3,7 +3,9 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -526,7 +528,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.UseKeylessAccess = true
 				spec.Proxy.ListenPath = "/"
 				spec.GraphQL.Enabled = true
-				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 			})[0]
 
@@ -691,6 +693,61 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						assert.Equal(t, `{"id":"1","type":"error","payload":[{"message":"depth limit exceeded"}]}`, string(msg))
 						assert.NoError(t, err)
 					})
+				})
+
+				t.Run("should send configured headers upstream", func(t *testing.T) {
+					proxyOnlyHeaders := map[string][]string{
+						"MyCustomHeader": {"custom-value"},
+					}
+
+					wsTestServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						for expectedHeaderKey := range proxyOnlyHeaders {
+							values := r.Header.Values(expectedHeaderKey)
+							headerExists := assert.Greater(t, len(values), 0, fmt.Sprintf("no header values found for header '%s'", expectedHeaderKey))
+							if !headerExists {
+								return
+							}
+							for _, expectedHeaderValue := range proxyOnlyHeaders[expectedHeaderKey] {
+								assert.Contains(t, values, expectedHeaderValue, fmt.Sprintf("expected header value '%s' was not found for '%s'", expectedHeaderValue, expectedHeaderKey))
+							}
+						}
+					}))
+					defer wsTestServer.Close()
+
+					g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+						spec.UseKeylessAccess = true
+						spec.Proxy.ListenPath = "/"
+						spec.GraphQL.Enabled = true
+						spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+						spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+						spec.GraphQL.Schema = `type Query { hello: String } type Subscription { subscribe: String }`
+						spec.GraphQL.Proxy.RequestHeaders = map[string]string{
+							"MyCustomHeader": "custom-value",
+						}
+						spec.Proxy.TargetURL = wsTestServer.URL
+					})
+
+					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+						header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+					})
+					require.NoError(t, err)
+					defer wsConn.Close()
+
+					// Send a connection init message to gateway
+					err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init"}`))
+					require.NoError(t, err)
+
+					// Gateway should acknowledge the connection
+					_, msg, err := wsConn.ReadMessage()
+					require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+					require.NoError(t, err)
+
+					// Start subscription
+					err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id":"1","type":"start","payload":{"query":"subscription { subscribe }"}}`))
+					require.NoError(t, err)
+
+					_, msg, err = wsConn.ReadMessage()
+					require.Equal(t, `{"id":"1","type":"error","payload":[{"message":"failed to WebSocket dial: expected handshake response status code 101 but got 200"}]}`, string(msg))
 				})
 			})
 		})
