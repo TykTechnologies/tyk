@@ -3,6 +3,8 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"html/template"
 	"io"
@@ -151,28 +153,26 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			contentType = header.ApplicationJSON
 		}
 
-		w.Header().Set(header.ContentType, contentType)
-		response.Header = http.Header{}
-		response.Header.Set(header.ContentType, contentType)
-		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
-
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
-		tmpl := e.Gw.templates.Lookup(templateName)
+		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
+		tmpl := e.Gw.templatesRaw.Lookup(templateName)
 
 		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
 		if tmpl == nil {
 			templateName = defaultTemplateName + "." + templateExtension
-			tmpl = e.Gw.templates.Lookup(templateName)
+			tmpl = e.Gw.templatesRaw.Lookup(templateName)
 		}
 
 		// If no template is available for this content type, fallback to "error.json".
 		if tmpl == nil {
 			templateName = defaultTemplateName + "." + defaultTemplateFormat
-			tmpl = e.Gw.templates.Lookup(templateName)
-			w.Header().Set(header.ContentType, defaultContentType)
-			response.Header.Set(header.ContentType, defaultContentType)
-
+			tmpl = e.Gw.templatesRaw.Lookup(templateName)
+			contentType = defaultContentType
 		}
+
+		w.Header().Set(header.ContentType, contentType)
+		response.Header = http.Header{}
+		response.Header.Set(header.ContentType, contentType)
 
 		//If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
@@ -184,30 +184,35 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GlobalConfig.CloseConnections {
 			w.Header().Add(header.Connection, "close")
 			response.Header.Add(header.Connection, "close")
-
 		}
 
 		// If error is not customized write error in default way
 		if errMsg != errCustomBodyResponse.Error() {
 			w.WriteHeader(errCode)
 			response.StatusCode = errCode
-			var tmplExecutor TemplateExecutor
-			tmplExecutor = tmpl
 
-			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
-
+			apiError := APIError{}
 			if contentType == header.ApplicationXML || contentType == header.TextXML {
-				apiError.Message = template.HTML(errMsg)
-
-				//we look up in the last defined templateName to obtain the template.
-				rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
-				tmplExecutor = rawTmpl
+				escapedBuffer := &bytes.Buffer{}
+				err := xml.EscapeText(escapedBuffer, []byte(errMsg))
+				if err != nil {
+					log.WithError(err).Error("could not escape error message for XML")
+				}
+				apiError.Message = template.HTML(escapedBuffer.String())
+			} else {
+				escaped, err := json.Marshal(errMsg)
+				if err != nil {
+					log.WithError(err).Error("could not escape error message for JSON")
+				} else if escapedLen := len(escaped); escapedLen >= 2 {
+					escaped = escaped[1 : escapedLen-1]
+					apiError.Message = template.HTML(escaped)
+				}
 			}
 
 			var log bytes.Buffer
 
 			rsp := io.MultiWriter(w, &log)
-			tmplExecutor.Execute(rsp, &apiError)
+			tmpl.Execute(rsp, &apiError)
 			response.Body = ioutil.NopCloser(&log)
 		}
 	}
