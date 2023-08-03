@@ -73,6 +73,20 @@ func TestOtelGraphqlEngineV2_Normalize(t *testing.T) {
 
 }
 
+func TestOtelGraphqlEngineV2_Setup(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockExecutor := NewMockExecutionEngineI(ctrl)
+	mockExecutor.EXPECT().Setup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).MaxTimes(1)
+	engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
+	assert.NoError(t, err)
+	engine.SetContext(context.Background())
+
+	engine.Setup(context.Background(), nil, nil, &request)
+	assert.NoError(t, err)
+}
+
 func TestOtelGraphqlEngineV2_InputValidation(t *testing.T) {
 	t.Run("successfully validate", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
