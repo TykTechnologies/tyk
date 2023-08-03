@@ -100,7 +100,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 				tc.givenConfig.Endpoint = endpoint
 			}
 
-			provider := InitOpenTelemetry(ctx, logrus.New(), &tc.givenConfig, tc.givenId, tc.givenVersion)
+			provider := InitOpenTelemetry(ctx, logrus.New(), &tc.givenConfig, tc.givenId, tc.givenVersion, false, "", false, []string{})
 			assert.NotNil(t, provider)
 
 			assert.Equal(t, tc.expectedType, provider.Type())
@@ -190,7 +190,7 @@ func Test_APIVersionAttribute(t *testing.T) {
 	}
 }
 
-func TestGatewaySpanAttributes(t *testing.T) {
+func TestGatewayResourceAttributes(t *testing.T) {
 	tests := []struct {
 		name         string
 		gwID         string
@@ -243,7 +243,7 @@ func TestGatewaySpanAttributes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			attrs := GatewaySpanAttributes(tt.gwID, tt.isHybrid, tt.groupID, tt.isSegmented, tt.segmentTags)
+			attrs := GatewayResourceAttributes(tt.gwID, tt.isHybrid, tt.groupID, tt.isSegmented, tt.segmentTags)
 			assert.Equal(t, tt.expectedAttr, attrs)
 		})
 	}
@@ -253,7 +253,7 @@ func TestContextWithSpan(t *testing.T) {
 	provider := InitOpenTelemetry(context.Background(), logger.GetLogger(), &Config{
 		Enabled:  true,
 		Endpoint: "invalid",
-	}, "test", "test")
+	}, "test", "test", false, "", false, []string{})
 
 	ctx := context.Background()
 	_, span := provider.Tracer().Start(context.Background(), "test operation")

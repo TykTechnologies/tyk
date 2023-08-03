@@ -49,7 +49,8 @@ func ContextWithSpan(ctx context.Context, span tyktrace.Span) context.Context {
 // InitOpenTelemetry initializes OpenTelemetry - it returns a TracerProvider
 // which can be used to create a tracer. If OpenTelemetry is disabled or misconfigured,
 // a NoopProvider is returned.
-func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *Config, id string, version string) TracerProvider {
+func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *Config, id string, version string,
+	useRPC bool, groupID string, isSegmented bool, segmentTags []string) TracerProvider {
 
 	traceLogger := logger.WithFields(logrus.Fields{
 		"exporter":           gwConfig.Exporter,
@@ -66,6 +67,13 @@ func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *Con
 		tyktrace.WithHostDetector(),
 		tyktrace.WithContainerDetector(),
 		tyktrace.WithProcessDetector(),
+		tyktrace.WithCustomResourceAttributes(GatewayResourceAttributes(
+			id,
+			useRPC,
+			groupID,
+			isSegmented,
+			segmentTags,
+		)...),
 	)
 
 	if errOtel != nil {
@@ -94,7 +102,7 @@ func ApidefSpanAttributes(apidef *apidef.APIDefinition) []SpanAttribute {
 	return attrs
 }
 
-func GatewaySpanAttributes(gwID string, isHybrid bool, groupID string, isSegmented bool, segmentTags []string) []SpanAttribute {
+func GatewayResourceAttributes(gwID string, isHybrid bool, groupID string, isSegmented bool, segmentTags []string) []SpanAttribute {
 	attrs := []SpanAttribute{
 		semconv.TykGWID(gwID),
 		semconv.TykGWHybrid(isHybrid),
