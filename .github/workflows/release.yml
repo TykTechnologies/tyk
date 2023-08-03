@@ -232,7 +232,7 @@ jobs:
 
       - name: Run tests
         run:
-          docker run --rm 754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
+          docker run --rm 754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} pytest -c pytest_ci.ini tests/dashboard_admin_api
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
 

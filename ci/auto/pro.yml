@@ -23,6 +23,7 @@ services:
     container_name: tyk-analytics
     image: ${tyk_analytics_image}
     volumes:
+      - ./certs:/usr/local/share/ca-certificates
       - ${confs_dir}:/conf/
     ports:
       - "3000:3000"
@@ -70,7 +71,7 @@ services:
     depends_on:
       - tyk-analytics
     healthcheck:
-      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' tyk-analytics:3000/hello/ | grep -q '^200$'"]
+      test: ["CMD-SHELL", "curl -s -k -o /dev/null -w '%{http_code}' https://tyk-analytics:3000/hello/ | grep -q '^200$'"]
       interval: 10s
       retries: 30
       start_period: 10s
