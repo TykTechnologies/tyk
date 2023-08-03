@@ -51,7 +51,7 @@ func (rc *RedisController) DisableRedis(setRedisDown bool) {
 	rc.reconnect <- struct{}{}
 }
 
-func (rc *RedisController) enabled() bool {
+func (rc *RedisController) Enabled() bool {
 	ok := true
 	if v := rc.disableRedis.Load(); v != nil {
 		ok = !v.(bool)
@@ -193,7 +193,7 @@ func (rc *RedisController) statusCheck(ctx context.Context, conf *config.Config,
 			return
 		case <-tick.C:
 			//if we disabled redis - we don't want to check anything
-			if !rc.enabled() {
+			if !rc.Enabled() {
 				continue
 			}
 

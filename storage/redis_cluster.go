@@ -25,6 +25,7 @@ const (
 
 // ErrRedisIsDown is returned when we can't communicate with redis
 var ErrRedisIsDown = errors.New("storage: Redis is either down or was not configured")
+var ErrRedisDisabled = errors.New("storage: Redis is disabled. Operating in-memory")
 
 // RedisCluster is a storage manager that uses the redis database.
 type RedisCluster struct {
@@ -139,6 +140,11 @@ func (r *RedisCluster) singleton() (redis.UniversalClient, error) {
 	if r.RedisController == nil {
 		return nil, fmt.Errorf("Error trying to get singleton instance: RedisController is nil")
 	}
+
+	if !r.RedisController.Enabled() {
+		return nil, ErrRedisDisabled
+	}
+
 	instance := r.RedisController.singleton(r.IsCache, r.IsAnalytics)
 	if instance == nil {
 		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
@@ -148,6 +154,10 @@ func (r *RedisCluster) singleton() (redis.UniversalClient, error) {
 
 // checkIsOpen checks if the connection is open. This method is using for backoff retry.
 func (r *RedisCluster) checkIsOpen() error {
+	if !r.RedisController.Enabled() {
+		return ErrRedisDisabled
+	}
+
 	isOpen := clusterConnectionIsOpen(r)
 	if !isOpen {
 		return ErrRedisIsDown
@@ -156,7 +166,6 @@ func (r *RedisCluster) checkIsOpen() error {
 }
 
 func (r *RedisCluster) hashKey(in string) string {
-
 	if !r.HashKeys {
 		// Not hashing? Return the raw key
 		return in
@@ -173,6 +182,10 @@ func (r *RedisCluster) cleanKey(keyName string) string {
 }
 
 func (r *RedisCluster) up() error {
+	if !r.RedisController.Enabled() {
+		return ErrRedisDisabled
+	}
+
 	if !r.RedisController.Connected() {
 		return ErrRedisIsDown
 	}

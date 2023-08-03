@@ -340,7 +340,8 @@ func (gw *Gateway) setupGlobals() {
 	}
 
 	if gwConfig.EnableAnalytics && gwConfig.Storage.Type != "redis" {
-		mainLog.Fatal("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
+		mainLog.Warn("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
+		gwConfig.EnableAnalytics = false
 	}
 
 	// Initialise HostCheckerManager only if uptime tests are enabled.
@@ -1214,7 +1215,7 @@ func (gw *Gateway) initialiseSystem() error {
 	}
 
 	if gwConfig.Storage.Type != "redis" {
-		mainLog.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
+		mainLog.Warn("Redis connection details not set, starting in dbless mode, features like analytics and rate limits going to be disabled")
 	}
 
 	// suply rpc client globals to join it main loging and instrumentation sub systems
@@ -1271,6 +1272,10 @@ func (gw *Gateway) initialiseSystem() error {
 		if gwConfig.Policies.PolicyRecordName == "" {
 			gwConfig.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
 		}
+	}
+
+	if gwConfig.Storage.Type != "redis" {
+		gw.RedisController.DisableRedis(true)
 	}
 
 	gw.SetConfig(gwConfig)

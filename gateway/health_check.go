@@ -76,6 +76,10 @@ func (gw *Gateway) gatherHealthChecks() {
 	go func() {
 		defer wg.Done()
 
+		if !gw.RedisController.Enabled() {
+			return
+		}
+
 		var checkItem = apidef.HealthCheckItem{
 			Status:        apidef.Pass,
 			ComponentType: apidef.Datastore,
