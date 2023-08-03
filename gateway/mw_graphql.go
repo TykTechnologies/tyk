@@ -193,6 +193,7 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 		executor, err := graphql.NewOtelGraphqlEngineV2(m.Gw.TracerProvider, engine)
 		if err != nil {
 			m.Logger().WithError(err).Error("error creating custom execution engine v2")
+			cancel()
 			return
 		}
 		m.Spec.GraphQLExecutor.OtelExecutor = executor
