@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/otel"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
@@ -72,6 +73,15 @@ func addVersionHeader(w http.ResponseWriter, r *http.Request, globalConf config.
 			if globalConf.VersionHeader != "" {
 				w.Header().Set(globalConf.VersionHeader, vinfo.Name)
 			}
+		}
+	}
+}
+
+func addTraceID(w http.ResponseWriter, r *http.Request, globalConf config.Config) {
+	if globalConf.OpenTelemetry.Enabled {
+		span := otel.SpanFromContext(r.Context())
+		if span.SpanContext().HasTraceID() {
+			w.Header().Set("X-Otel-Trace-Id", span.SpanContext().TraceID().String())
 		}
 	}
 }
@@ -322,6 +332,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	s.Spec.SanitizeProxyPaths(r)
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
+	addTraceID(w, r, s.Spec.GlobalConfig)
 
 	t1 := time.Now()
 	resp := s.Proxy.ServeHTTP(w, r)
@@ -353,6 +364,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	millisec := DurationToMillisecond(time.Since(t1))
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
+	addTraceID(w, r, s.Spec.GlobalConfig)
 
 	log.Debug("Upstream request took (ms): ", millisec)
 
