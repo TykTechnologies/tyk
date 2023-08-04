@@ -516,6 +516,10 @@ type CustomMiddlewareResponseHook struct {
 	mw *CoProcessMiddleware
 }
 
+func (h CustomMiddlewareResponseHook) Base() *BaseTykResponseHandler {
+	return &h.BaseTykResponseHandler
+}
+
 func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
 	mwDefinition := mwDef.(apidef.MiddlewareDefinition)
 

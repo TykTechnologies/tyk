@@ -24,6 +24,10 @@ type HeaderTransform struct {
 	config HeaderTransformOptions
 }
 
+func (h *HeaderTransform) Base() *BaseTykResponseHandler {
+	return &h.BaseTykResponseHandler
+}
+
 func (h *HeaderTransform) Name() string {
 	return "HeaderTransform"
 }

@@ -109,6 +109,7 @@ func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, 
 
 // Generic middleware caller to make extension easier
 func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
+
 	mw := &TraceMiddleware{
 		TykMiddleware: actualMW,
 	}
@@ -206,10 +207,10 @@ func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware)
 }
 
 func (gw *Gateway) responseMWAppendEnabled(chain *[]TykResponseHandler, responseMW TykResponseHandler) bool {
-	if responseMW.Enabled() {
-		*chain = append(*chain, responseMW)
-		return true
-	}
+	//if responseMW.Enabled() {
+	*chain = append(*chain, responseMW)
+	return true
+	//}
 
 	return false
 }
@@ -913,6 +914,7 @@ type TykResponseHandler interface {
 	Name() string
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
 	HandleError(http.ResponseWriter, *http.Request)
+	Base() *BaseTykResponseHandler
 }
 
 type TykGoPluginResponseHandler interface {
@@ -957,6 +959,25 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		span, ctx := trace.Span(req.Context(), rh.Name())
 		defer span.Finish()
 		req = req.WithContext(ctx)
+	} else if rh.Base().Gw.GetConfig().OpenTelemetry.Enabled {
+		var span otel.Span
+		baseMw := rh.Base()
+		//	cfg := baseMw.Gw.GetConfig()
+
+		if baseMw.Spec.DetailedTracing {
+			var ctx context.Context
+
+			ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(res.Request.Context(), rh.Name())
+			defer span.End()
+			setContext(req, ctx)
+		} else {
+			span = otel.SpanFromContext(req.Context())
+		}
+
+		err := rh.HandleResponse(rw, res, req, ses)
+		if err != nil {
+			span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
+		}
 	}
 	return rh.HandleResponse(rw, res, req, ses)
 }

@@ -19,6 +19,10 @@ type HeaderInjector struct {
 	config HeaderInjectorOptions
 }
 
+func (h *HeaderInjector) Base() *BaseTykResponseHandler {
+	return &h.BaseTykResponseHandler
+}
+
 func (HeaderInjector) Name() string {
 	return "HeaderInjector"
 }
@@ -32,7 +36,6 @@ func (h *HeaderInjector) HandleError(rw http.ResponseWriter, req *http.Request) 
 
 func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	// TODO: This should only target specific paths
-
 	ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	vInfo, _ := h.Spec.Version(req)
 	versionPaths := h.Spec.RxPaths[vInfo.Name]

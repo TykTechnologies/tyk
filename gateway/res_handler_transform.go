@@ -22,6 +22,10 @@ type ResponseTransformMiddleware struct {
 	BaseTykResponseHandler
 }
 
+func (r *ResponseTransformMiddleware) Base() *BaseTykResponseHandler {
+	return &r.BaseTykResponseHandler
+}
+
 func (r *ResponseTransformMiddleware) Enabled() bool {
 	for _, version := range r.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.TransformResponse) > 0 {
@@ -93,7 +97,6 @@ func (r *ResponseTransformMiddleware) HandleError(rw http.ResponseWriter, req *h
 }
 
 func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
-
 	logger := log.WithFields(logrus.Fields{
 		"prefix":      "outbound-transform",
 		"server_name": r.Spec.Proxy.TargetURL,
