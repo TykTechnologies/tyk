@@ -33,7 +33,7 @@ func TestMain(m *testing.M) {
 	tracerProvider = otel.InitOpenTelemetry(context.Background(), logger.GetLogger(), &otel.Config{
 		Enabled:  true,
 		Exporter: "invalid",
-	}, "test", "test")
+	}, "test", "test", false, "", false, []string{})
 	exitVal := m.Run()
 	os.Exit(exitVal)
 }

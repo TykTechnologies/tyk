@@ -502,13 +502,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	} else if gw.GetConfig().OpenTelemetry.Enabled { // check if opentelemetry is enabled
 		spanAttrs := []otel.SpanAttribute{}
 		spanAttrs = append(spanAttrs, otel.ApidefSpanAttributes(spec.APIDefinition)...)
-		spanAttrs = append(spanAttrs, otel.GatewaySpanAttributes(
-			gw.GetNodeID(),
-			gw.GetConfig().SlaveOptions.UseRPC,
-			gw.GetConfig().SlaveOptions.GroupID,
-			gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
-			gw.GetConfig().DBAppConfOptions.Tags,
-		)...)
 		chainDef.ThisHandler = otel.HTTPHandler(spec.Name, chain, gw.TracerProvider, spanAttrs...)
 	} else {
 		chainDef.ThisHandler = chain
