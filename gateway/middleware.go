@@ -972,7 +972,7 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 			defer span.End()
 			setContext(res.Request, ctx)
 		} else {
-			span = otel.SpanFromContext(req.Context())
+			span = otel.SpanFromContext(res.Request.Context())
 		}
 
 		err := rh.HandleResponse(rw, res, req, ses)
