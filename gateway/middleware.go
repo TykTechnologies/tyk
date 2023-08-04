@@ -109,7 +109,6 @@ func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, 
 
 // Generic middleware caller to make extension easier
 func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
-
 	mw := &TraceMiddleware{
 		TykMiddleware: actualMW,
 	}
@@ -207,10 +206,10 @@ func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware)
 }
 
 func (gw *Gateway) responseMWAppendEnabled(chain *[]TykResponseHandler, responseMW TykResponseHandler) bool {
-	//if responseMW.Enabled() {
-	*chain = append(*chain, responseMW)
-	return true
-	//}
+	if responseMW.Enabled() {
+		*chain = append(*chain, responseMW)
+		return true
+	}
 
 	return false
 }
@@ -962,7 +961,9 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 	} else if rh.Base().Gw.GetConfig().OpenTelemetry.Enabled {
 		var span otel.Span
 		baseMw := rh.Base()
-		//	cfg := baseMw.Gw.GetConfig()
+		if baseMw == nil {
+			return errors.New("unsupported base middleware")
+		}
 
 		if baseMw.Spec.DetailedTracing {
 			var ctx context.Context
