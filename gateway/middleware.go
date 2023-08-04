@@ -969,7 +969,7 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 
 			ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(res.Request.Context(), rh.Name())
 			defer span.End()
-			setContext(req, ctx)
+			setContext(res.Request, ctx)
 		} else {
 			span = otel.SpanFromContext(req.Context())
 		}
@@ -978,6 +978,13 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		if err != nil {
 			span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
 		}
+
+		attrs := ctxGetSpanAttributes(res.Request, rh.Name())
+		if len(attrs) > 0 {
+			span.SetAttributes(attrs...)
+		}
+
+		return err
 	}
 	return rh.HandleResponse(rw, res, req, ses)
 }
