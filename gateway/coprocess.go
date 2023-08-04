@@ -285,6 +285,7 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 	var supported bool
 	for _, driver := range supportedDrivers {
+		fmt.Println("supported driver:", driver)
 		if m.Spec.CustomMiddleware.Driver == driver {
 			supported = true
 		}
@@ -638,6 +639,13 @@ func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeader
 
 func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
 	dispatcher := loadedDrivers[c.Middleware.MiddlewareDriver]
+
+	fmt.Println("dipatchers")
+
+	for key, _ := range loadedDrivers {
+		fmt.Println(key)
+	}
+	fmt.Println("end of dispatchers")
 	if dispatcher == nil {
 		err := fmt.Errorf("Couldn't dispatch request, driver '%s' isn't available", c.Middleware.MiddlewareDriver)
 		return nil, err
