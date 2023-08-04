@@ -209,7 +209,7 @@ func TestGatewayResourceAttributes(t *testing.T) {
 			segmentTags: nil,
 			expectedAttr: []SpanAttribute{
 				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw1"),
-				tyktrace.NewAttribute(string(semconv.TykGWHybridKey), false),
+				tyktrace.NewAttribute(string(semconv.TykGWDataplaneKey), false),
 			},
 		},
 		{
@@ -221,8 +221,8 @@ func TestGatewayResourceAttributes(t *testing.T) {
 			segmentTags: nil,
 			expectedAttr: []SpanAttribute{
 				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw2"),
-				tyktrace.NewAttribute(string(semconv.TykGWHybridKey), true),
-				tyktrace.NewAttribute(string(semconv.TykHybridGWGroupIDKey), "group1"),
+				tyktrace.NewAttribute(string(semconv.TykGWDataplaneKey), true),
+				tyktrace.NewAttribute(string(semconv.TykDataplaneGWGroupIDKey), "group1"),
 			},
 		},
 		{
@@ -234,8 +234,8 @@ func TestGatewayResourceAttributes(t *testing.T) {
 			segmentTags: []string{"tag1", "tag2"},
 			expectedAttr: []SpanAttribute{
 				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw3"),
-				tyktrace.NewAttribute(string(semconv.TykGWHybridKey), true),
-				tyktrace.NewAttribute(string(semconv.TykHybridGWGroupIDKey), "group2"),
+				tyktrace.NewAttribute(string(semconv.TykGWDataplaneKey), true),
+				tyktrace.NewAttribute(string(semconv.TykDataplaneGWGroupIDKey), "group2"),
 				tyktrace.NewAttribute(string(semconv.TykGWSegmentTagsKey), []string{"tag1", "tag2"}),
 			},
 		},
