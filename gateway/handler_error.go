@@ -226,6 +226,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	ip := request.RealIP(r)
 
+	addTraceID(w, r, e.Spec.GlobalConfig)
+
 	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
 
 		t := time.Now()
