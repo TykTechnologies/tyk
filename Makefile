@@ -20,7 +20,7 @@ BENCH_RUN=NONE
 
 .PHONY: test
 test:
-	$(GOTEST) -run=$(TEST_REGEX) -count=$(TEST_COUNT) ./...
+    $(GOTEST) -run=$(TEST_REGEX) -count=$(TEST_COUNT) ./...
 
 # lint runs all local linters that must pass before pushing
 .PHONY: lint lint-install lint-fast
