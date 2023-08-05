@@ -2,6 +2,7 @@ version: "3"
 services:
   redis:
     image: redis
+    command: echo "ID=$(uuidgen)" > /etc/release
     logging:
       driver: "json-file"
       options:
