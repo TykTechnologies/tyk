@@ -22,7 +22,7 @@ func (r *RedisCluster) ControllerInitiated() bool {
 }
 	defaultRedisPort = 6379
 )
-
+...
 // ErrRedisIsDown is returned when we can't communicate with redis
 var ErrRedisIsDown = errors.New("storage: Redis is either down or was not configured")
 
