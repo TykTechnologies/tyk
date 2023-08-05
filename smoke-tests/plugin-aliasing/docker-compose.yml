@@ -5,8 +5,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "200k"
-        max-file: "10"
+        max-size: "100k"
+        max-file: "5"
 
   gw:
     image: tykio/tyk-gateway:${tag}
