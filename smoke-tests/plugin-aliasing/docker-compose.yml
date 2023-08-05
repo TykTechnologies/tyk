@@ -2,6 +2,11 @@ version: "3"
 services:
   redis:
     image: redis
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
 
   gw:
     image: tykio/tyk-gateway:${tag}
