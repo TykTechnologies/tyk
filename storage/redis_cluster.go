@@ -16,10 +16,10 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
-
-// ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
-
-const (
+...
+func (r *RedisCluster) ControllerInitiated() bool {
+	return r.RedisController != nil
+}
 	defaultRedisPort = 6379
 )
 
