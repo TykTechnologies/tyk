@@ -145,8 +145,8 @@ func (r *RedisCluster) singleton() (redis.UniversalClient, error) {
 	}
 	instance := r.RedisController.singleton(r.IsCache, r.IsAnalytics)
 	if instance == nil {
-		// Modify the error message to include more specific details about the connection failure
-		return nil, fmt.Errorf("Error trying to get singleton instance: %s. Check if the hostname failed to resolve, if the TCP request timed out, if Redis prompted for a password, if Redis responded with WRONGPASS, or if SSL failed.", ErrRedisIsDown)
+		// Modify the error message to clarify that these are potential issues to check for
+		return nil, fmt.Errorf("Error trying to get singleton instance: %s. Potential issues to check: hostname resolution, TCP timeout, Redis password prompt, WRONGPASS response from Redis, SSL failure.", ErrRedisIsDown)
 	}
 	return instance, nil
 }
