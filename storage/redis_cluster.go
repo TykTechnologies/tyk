@@ -71,7 +71,7 @@ func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.Un
 	}
 
 	var client redis.UniversalClient
-	opts := &redis.UniversalOptions{
+...
 		Addrs:            getRedisAddrs(cfg),
 		MasterName:       cfg.MasterName,
 		SentinelPassword: cfg.SentinelPassword,
