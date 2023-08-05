@@ -106,4 +106,3 @@ docker:
 
 docker-std: build
 	docker build --platform ${BUILD_PLATFORM} --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .
-
