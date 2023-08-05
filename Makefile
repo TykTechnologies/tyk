@@ -25,9 +25,9 @@ test:
 # lint runs all local linters that must pass before pushing
 .PHONY: lint lint-install lint-fast
 lint: lint-fast
-	goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
-	gofmt -w .
-	faillint -ignore-tests -paths "$(shell grep -v '^#' .faillint | xargs echo | sed 's/ /,/g')" ./...
+	@goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
+	@gofmt -w .
+	@faillint -ignore-tests -paths "$(shell grep -v '^#' .faillint | xargs echo | sed 's/ /,/g')" ./...
 
 lint-fast: lint-install
 	go generate ./...
