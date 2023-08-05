@@ -7,8 +7,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "100k"
-        max-file: "5"
+        max-size: "500k"
+        max-file: "10"
     healthcheck:
       test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
       interval: 5s
