@@ -939,13 +939,12 @@ func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykRespo
 }
 
 func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
+
 	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
-		fmt.Printf("\n Block from the chain: %v", rh.Name())
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
 			// Abort the request if this handler is a response middleware hook:
 			if rh.Name() == "CustomMiddlewareResponseHook" {
-				fmt.Printf("\n\n entra al abort en: %v\n", rh.Name())
 				rh.HandleError(rw, req)
 				return true, err
 			}
@@ -968,11 +967,18 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		}
 
 		if baseMw.Spec.DetailedTracing {
-			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(res.Request.Context(), rh.Name())
+
+			var ctx context.Context
+			ctx = res.Request.Context()
+			if rh.Name() == "ResponseGoPluginMiddleware" {
+				ctx = req.Context()
+			}
+			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
+
 			defer span.End()
 			setContext(res.Request, ctx)
 		} else {
-			span = otel.SpanFromContext(res.Request.Context())
+			span = otel.SpanFromContext(req.Context())
 		}
 
 		err := rh.HandleResponse(rw, res, req, ses)
@@ -980,7 +986,7 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 			span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
 		}
 
-		attrs := ctxGetSpanAttributes(res.Request, rh.Name())
+		attrs := ctxGetSpanAttributes(req, rh.Name())
 		if len(attrs) > 0 {
 			span.SetAttributes(attrs...)
 		}
