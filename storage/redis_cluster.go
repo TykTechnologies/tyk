@@ -46,6 +46,10 @@ func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.Un
 	}
 	log.Debug("Creating new Redis connection pool")
 
+	// Log the host Tyk is attempting to connect to
+	log.Debug("Attempting to connect to Redis host: ", cfg.Host)
+
+...
 	// poolSize applies per cluster node and not for the whole cluster.
 	poolSize := 500
 	if cfg.MaxActive > 0 {
@@ -141,7 +145,8 @@ func (r *RedisCluster) singleton() (redis.UniversalClient, error) {
 	}
 	instance := r.RedisController.singleton(r.IsCache, r.IsAnalytics)
 	if instance == nil {
-		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
+		// Modify the error message to include more specific details about the connection failure
+		return nil, fmt.Errorf("Error trying to get singleton instance: %s. Check if the hostname failed to resolve, if the TCP request timed out, if Redis prompted for a password, if Redis responded with WRONGPASS, or if SSL failed.", ErrRedisIsDown)
 	}
 	return instance, nil
 }
