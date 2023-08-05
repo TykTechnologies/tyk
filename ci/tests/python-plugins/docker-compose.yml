@@ -2,6 +2,7 @@ version: "3"
 services:
   redis:
     image: redis
+    command: echo "ID=$(uuidgen)" > /etc/release
     ports:
       - "0.0.0.0:6379:6379"
     logging:
