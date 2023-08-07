@@ -25,7 +25,7 @@ func (r *RedisCluster) ControllerInitiated() bool {
 ...
 // ErrRedisIsDown is returned when we can't communicate with redis
 var ErrRedisIsDown = errors.New("storage: Redis is either down or was not configured")
-
+...
 // RedisCluster is a storage manager that uses the redis database.
 type RedisCluster struct {
 	KeyPrefix   string
