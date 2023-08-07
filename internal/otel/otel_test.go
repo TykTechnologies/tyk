@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/TykTechnologies/tyk-pump/logger"
+
 	"github.com/sirupsen/logrus"
 
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
@@ -98,7 +100,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 				tc.givenConfig.Endpoint = endpoint
 			}
 
-			provider := InitOpenTelemetry(ctx, logrus.New(), &tc.givenConfig, tc.givenId, tc.givenVersion)
+			provider := InitOpenTelemetry(ctx, logrus.New(), &tc.givenConfig, tc.givenId, tc.givenVersion, false, "", false, []string{})
 			assert.NotNil(t, provider)
 
 			assert.Equal(t, tc.expectedType, provider.Type())
@@ -188,7 +190,7 @@ func Test_APIVersionAttribute(t *testing.T) {
 	}
 }
 
-func TestGatewaySpanAttributes(t *testing.T) {
+func TestGatewayResourceAttributes(t *testing.T) {
 	tests := []struct {
 		name         string
 		gwID         string
@@ -207,7 +209,7 @@ func TestGatewaySpanAttributes(t *testing.T) {
 			segmentTags: nil,
 			expectedAttr: []SpanAttribute{
 				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw1"),
-				tyktrace.NewAttribute(string(semconv.TykGWHybridKey), false),
+				tyktrace.NewAttribute(string(semconv.TykGWDataplaneKey), false),
 			},
 		},
 		{
@@ -219,8 +221,8 @@ func TestGatewaySpanAttributes(t *testing.T) {
 			segmentTags: nil,
 			expectedAttr: []SpanAttribute{
 				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw2"),
-				tyktrace.NewAttribute(string(semconv.TykGWHybridKey), true),
-				tyktrace.NewAttribute(string(semconv.TykHybridGWGroupIDKey), "group1"),
+				tyktrace.NewAttribute(string(semconv.TykGWDataplaneKey), true),
+				tyktrace.NewAttribute(string(semconv.TykDataplaneGWGroupIDKey), "group1"),
 			},
 		},
 		{
@@ -232,8 +234,8 @@ func TestGatewaySpanAttributes(t *testing.T) {
 			segmentTags: []string{"tag1", "tag2"},
 			expectedAttr: []SpanAttribute{
 				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw3"),
-				tyktrace.NewAttribute(string(semconv.TykGWHybridKey), true),
-				tyktrace.NewAttribute(string(semconv.TykHybridGWGroupIDKey), "group2"),
+				tyktrace.NewAttribute(string(semconv.TykGWDataplaneKey), true),
+				tyktrace.NewAttribute(string(semconv.TykDataplaneGWGroupIDKey), "group2"),
 				tyktrace.NewAttribute(string(semconv.TykGWSegmentTagsKey), []string{"tag1", "tag2"}),
 			},
 		},
@@ -241,8 +243,24 @@ func TestGatewaySpanAttributes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			attrs := GatewaySpanAttributes(tt.gwID, tt.isHybrid, tt.groupID, tt.isSegmented, tt.segmentTags)
+			attrs := GatewayResourceAttributes(tt.gwID, tt.isHybrid, tt.groupID, tt.isSegmented, tt.segmentTags)
 			assert.Equal(t, tt.expectedAttr, attrs)
 		})
+	}
+}
+
+func TestContextWithSpan(t *testing.T) {
+	provider := InitOpenTelemetry(context.Background(), logger.GetLogger(), &Config{
+		Enabled:  true,
+		Endpoint: "invalid",
+	}, "test", "test", false, "", false, []string{})
+
+	ctx := context.Background()
+	_, span := provider.Tracer().Start(context.Background(), "test operation")
+
+	newContext := ContextWithSpan(ctx, span)
+
+	if got := SpanFromContext(newContext); got != span {
+		t.Errorf("got wrong span")
 	}
 }
