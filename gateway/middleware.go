@@ -967,12 +967,7 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		}
 
 		if baseMw.Spec.DetailedTracing {
-
-			var ctx context.Context
-			ctx = res.Request.Context()
-			if rh.Name() == "ResponseGoPluginMiddleware" {
-				ctx = req.Context()
-			}
+			ctx := res.Request.Context()
 			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
 
 			defer span.End()
