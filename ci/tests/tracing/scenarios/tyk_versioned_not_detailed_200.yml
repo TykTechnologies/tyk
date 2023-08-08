@@ -7,6 +7,7 @@ spec:
     httpRequest:
       method: GET
       url: tyk:8080/versioned-not-detailed/ip?version=v1
+      timeout: 5000
       headers:
         - key: Content-Type
           value: application/json
