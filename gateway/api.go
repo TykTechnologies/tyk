@@ -1188,10 +1188,6 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 
 		oasObj.ExtractTo(&newDef)
 	} else {
-		if spec.IsOAS {
-			return apiError(apidef.ErrAPIMigrated.Error()), http.StatusBadRequest
-		}
-
 		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
 			log.Error("Couldn't decode new API Definition object: ", err)
 			return apiError("Request malformed"), http.StatusBadRequest
