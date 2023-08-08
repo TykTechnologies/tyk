@@ -15,7 +15,7 @@ type SpanAttribute struct{}
 var dummy SpanAttribute
 
 func APIKeyAttribute(string) SpanAttribute        { return dummy }
-func APIVersionAttribute(string) SpanAttribute        { return dummy }
+func APIVersionAttribute(string) SpanAttribute    { return dummy }
 func APIKeyAliasAttribute(string) SpanAttribute   { return dummy }
 func OAuthClientIDAttribute(string) SpanAttribute { return dummy }
 

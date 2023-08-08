@@ -19,7 +19,7 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk-pump/logger"
 	. "github.com/TykTechnologies/tyk/internal/graphql"
-	. "github.com/TykTechnologies/tyk/internal/graphql_mock"
+	. "github.com/TykTechnologies/tyk/internal/graphql/mock"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 

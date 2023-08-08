@@ -8,11 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestGraphQLMiddleware_OpenTelemetry(t *testing.T) {
