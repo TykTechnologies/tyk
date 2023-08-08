@@ -1,0 +1,6 @@
+version: '3'
+services:
+  failing_service:
+    image: failing_service_image
+    volumes:
+      - ./:/__w/tyk/tyk/auto
