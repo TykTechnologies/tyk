@@ -183,6 +183,7 @@ func (r *RedisCluster) cleanKey(keyName string) string {
 
 func (r *RedisCluster) up() error {
 	if !r.RedisController.Connected() {
+		log.Error("Redis server is not available")
 		return ErrRedisIsDown
 	}
 	return nil
