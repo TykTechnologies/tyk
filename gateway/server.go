@@ -1389,13 +1389,7 @@ func (gw *Gateway) afterConfSetup() {
 		}
 	}
 
-	if conf.OpenTelemetry.Enabled {
-		if conf.OpenTelemetry.ResourceName == "" {
-			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
-		}
-
-		conf.OpenTelemetry.SetDefaults()
-	}
+	gw.afterConfSetupFeatures(conf)
 
 	gw.SetConfig(conf)
 }
@@ -1576,13 +1570,7 @@ func Start() {
 		defer trace.Close()
 	}
 
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
-		gw.GetNodeID(),
-		VERSION,
-		gw.GetConfig().SlaveOptions.UseRPC,
-		gw.GetConfig().SlaveOptions.GroupID,
-		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
-		gw.GetConfig().DBAppConfOptions.Tags)
+	registerTracerProvider(gw)
 
 	gw.start()
 	configs := gw.GetConfig()

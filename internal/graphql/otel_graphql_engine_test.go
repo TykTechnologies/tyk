@@ -1,4 +1,7 @@
-package graphql
+//go:build v52
+// +build v52
+
+package graphql_test
 
 import (
 	"context"
@@ -15,6 +18,8 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk-pump/logger"
+	. "github.com/TykTechnologies/tyk/internal/graphql"
+	. "github.com/TykTechnologies/tyk/internal/graphql_mock"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
@@ -253,7 +258,6 @@ func TestOtelGraphqlEngineV2_Execute(t *testing.T) {
 		mockExecutor := NewMockExecutionEngineI(ctrl)
 		mockExecutor.EXPECT().Execute(gomock.Any(), &request, nil).MaxTimes(1).Return(nil)
 		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
-		engine.executor = mockExecutor
 		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
@@ -271,7 +275,6 @@ func TestOtelGraphqlEngineV2_Execute(t *testing.T) {
 
 		engine, err := NewOtelGraphqlEngineV2(tracerProvider, mockExecutor)
 		assert.NoError(t, err)
-		engine.executor = mockExecutor
 		engine.SetContext(context.Background())
 
 		err = engine.Execute(context.Background(), &request, nil)

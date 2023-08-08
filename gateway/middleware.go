@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -13,7 +12,6 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -52,48 +50,6 @@ type TykMiddleware interface {
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	EnabledForSpec() bool
 	Name() string
-}
-
-type TraceMiddleware struct {
-	TykMiddleware
-}
-
-func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
-	if trace.IsEnabled() {
-		span, ctx := trace.Span(r.Context(),
-			tr.Name(),
-		)
-		defer span.Finish()
-		setContext(r, ctx)
-		return tr.TykMiddleware.ProcessRequest(w, r, conf)
-	} else if baseMw := tr.Base(); baseMw != nil {
-		cfg := baseMw.Gw.GetConfig()
-		if cfg.OpenTelemetry.Enabled {
-			var span otel.Span
-			if baseMw.Spec.DetailedTracing {
-				var ctx context.Context
-				ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
-				defer span.End()
-				setContext(r, ctx)
-			} else {
-				span = otel.SpanFromContext(r.Context())
-			}
-
-			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
-			if err != nil {
-				span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
-			}
-
-			attrs := ctxGetSpanAttributes(r, tr.TykMiddleware.Name())
-			if len(attrs) > 0 {
-				span.SetAttributes(attrs...)
-			}
-
-			return err, i
-		}
-	}
-
-	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
 
 func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMiddleware) func(http.Handler) http.Handler {

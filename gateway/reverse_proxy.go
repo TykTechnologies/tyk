@@ -795,42 +795,6 @@ type TykRoundTripper struct {
 	Gw           *Gateway `json:"-"`
 }
 
-func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
-
-	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
-
-	if r.URL.Scheme == "tyk" || hasInternalHeader {
-		if hasInternalHeader {
-			r.Header.Del(apidef.TykInternalApiHeader)
-		}
-
-		handler, _, found := rt.Gw.findInternalHttpHandlerByNameOrID(r.Host)
-		if !found {
-			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
-			return nil, errors.New("handler could")
-		}
-
-		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
-
-		return handleInMemoryLoop(handler, r)
-	}
-
-	if rt.Gw.GetConfig().OpenTelemetry.Enabled {
-		var baseRoundTripper http.RoundTripper = rt.transport
-		if rt.h2ctransport != nil {
-			baseRoundTripper = rt.h2ctransport
-		}
-
-		tr := otel.HTTPRoundTripper(baseRoundTripper)
-		return tr.RoundTrip(r)
-	}
-	if rt.h2ctransport != nil {
-		return rt.h2ctransport.RoundTrip(r)
-	}
-
-	return rt.transport.RoundTrip(r)
-}
-
 const (
 	checkIdleMemConnInterval = 5 * time.Minute
 	maxIdleMemConnDuration   = time.Minute
@@ -1166,15 +1130,8 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		}
 		execOptions = append(execOptions, graphql.WithUpstreamHeaders(upstreamHeaders))
 
-		if p.TykAPISpec.GraphQLExecutor.OtelExecutor != nil {
-			if err = p.TykAPISpec.GraphQLExecutor.OtelExecutor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
-				return
-			}
-		} else {
-			err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
-			if err != nil {
-				return
-			}
+		if err = p.TykAPISpec.GraphQLExecutor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
+			return
 		}
 
 		httpStatus := http.StatusOK

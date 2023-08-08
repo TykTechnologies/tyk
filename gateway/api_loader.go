@@ -22,7 +22,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 )
@@ -138,6 +137,8 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router, logger *
 
 func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gs *generalStores, logger *logrus.Entry) *ChainObject {
+
+	gwConfig := gw.GetConfig()
 
 	var chainDef ChainObject
 
@@ -257,7 +258,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	var mwPaths []string
 
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = gw.loadCustomMiddleware(spec)
-	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || mwDriver == apidef.OttoDriver) {
+	if gwConfig.EnableJSVM && (spec.hasVirtualEndpoint() || mwDriver == apidef.OttoDriver) {
 		logger.Debug("Loading JS Paths")
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
 	}
@@ -497,15 +498,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	logger.Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
 
-	if trace.IsEnabled() { // trace.IsEnabled = check if opentracing is enabled
-		chainDef.ThisHandler = trace.Handle(spec.Name, chain)
-	} else if gw.GetConfig().OpenTelemetry.Enabled { // check if opentelemetry is enabled
-		spanAttrs := []otel.SpanAttribute{}
-		spanAttrs = append(spanAttrs, otel.ApidefSpanAttributes(spec.APIDefinition)...)
-		chainDef.ThisHandler = otel.HTTPHandler(spec.Name, chain, gw.TracerProvider, spanAttrs...)
-	} else {
-		chainDef.ThisHandler = chain
-	}
+	chainDef.ThisHandler = setupTracing(&gwConfig, gw.TracerProvider, spec, chain)
 
 	if spec.APIDefinition.AnalyticsPlugin.Enabled {
 

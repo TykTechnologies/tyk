@@ -19,8 +19,6 @@ import (
 	"text/template"
 	"time"
 
-	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
-
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
@@ -31,8 +29,6 @@ import (
 
 	"github.com/cenk/backoff"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
-
 	"github.com/Masterminds/sprig/v3"
 
 	"github.com/gorilla/mux"
@@ -40,7 +36,7 @@ import (
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/tyk/internal/graphql"
 
 	"github.com/TykTechnologies/gojsonschema"
 
@@ -218,19 +214,7 @@ type APISpec struct {
 
 	network analytics.NetworkStats
 
-	GraphQLExecutor struct {
-		Engine       *graphql.ExecutionEngine
-		CancelV2     context.CancelFunc
-		EngineV2     *graphql.ExecutionEngineV2
-		OtelExecutor *graphqlinternal.OtelGraphqlEngineV2
-		HooksV2      struct {
-			BeforeFetchHook resolve.BeforeFetchHook
-			AfterFetchHook  resolve.AfterFetchHook
-		}
-		Client          *http.Client
-		StreamingClient *http.Client
-		Schema          *graphql.Schema
-	} `json:"-"`
+	GraphQLExecutor graphql.Executor
 
 	HasMock            bool
 	HasValidateRequest bool
