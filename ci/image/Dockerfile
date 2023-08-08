@@ -23,7 +23,7 @@ ADD tyk.tar.gz /opt/tyk
 
 VOLUME ["/conf"]
 WORKDIR /opt/tyk
-RUN mkdir -p /__w/tyk/tyk/auto
+RUN mkdir -p /__w/tyk/tyk/auto && ls /__w/tyk/tyk
 
 ENTRYPOINT ["/opt/tyk/tyk" ]
 CMD [ "--conf=/conf/tyk/tyk.conf" ]
