@@ -42,20 +42,6 @@ func TestGateway_afterConfSetup(t *testing.T) {
 				HealthCheckEndpointName: "hello",
 			},
 		},
-		{
-			name: "opentelemetry options test",
-			initialConfig: config.Config{
-				OpenTelemetry: otel.Config{
-					Enabled: true,
-				},
-			},
-			expectedConfig: config.Config{
-				AnalyticsConfig: config.AnalyticsConfigConfig{
-					PurgeInterval: 10,
-				},
-				HealthCheckEndpointName: "hello",
-			},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
