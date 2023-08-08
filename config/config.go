@@ -14,7 +14,6 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 )
@@ -581,6 +580,11 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
+	// Features contains data model additions that need to be gated by
+	// release build tags. This allows extending the config schema, without
+	// needing to modify the Config struct. Embedding is used.
+	Features
+
 	// OriginalPath is the path to the config file that is read. If
 	// none was found, it's the path to the default config file that
 	// was written.
@@ -943,9 +947,6 @@ type Config struct {
 	// Section for configuring OpenTracing support
 	// Deprecated: use OpenTelemetry instead.
 	Tracer Tracer `json:"tracing"`
-
-	// Section for configuring Opentelemetry
-	OpenTelemetry otel.Config `json:"opentelemetry"`
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 
