@@ -22,8 +22,9 @@ RUN apt-get autoremove -y
 ADD tyk.tar.gz /opt/tyk
 
 VOLUME ["/conf"]
+RUN mkdir -p /__w/tyk/tyk/auto
 WORKDIR /opt/tyk
-RUN mkdir -p /__w/tyk/tyk/auto && ls /__w/tyk/tyk
+RUN ls /__w/tyk/tyk
 
 ENTRYPOINT ["/opt/tyk/tyk" ]
 CMD [ "--conf=/conf/tyk/tyk.conf" ]
