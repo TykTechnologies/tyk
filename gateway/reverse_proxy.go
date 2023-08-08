@@ -33,16 +33,16 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
-
 	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
@@ -1136,9 +1136,10 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		}
 
 		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
-		reqCtx := context.Background()
+		span := otel.SpanFromContext(outreq.Context())
+		reqCtx := otel.ContextWithSpan(context.Background(), span)
 		if isProxyOnly {
-			reqCtx = NewGraphQLProxyOnlyContext(context.Background(), outreq)
+			reqCtx = NewGraphQLProxyOnlyContext(reqCtx, outreq)
 		}
 
 		resultWriter := graphql.NewEngineResultWriter()
@@ -1165,9 +1166,15 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		}
 		execOptions = append(execOptions, graphql.WithUpstreamHeaders(upstreamHeaders))
 
-		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
-		if err != nil {
-			return
+		if p.TykAPISpec.GraphQLExecutor.OtelExecutor != nil {
+			if err = p.TykAPISpec.GraphQLExecutor.OtelExecutor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
+				return
+			}
+		} else {
+			err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
+			if err != nil {
+				return
+			}
 		}
 
 		httpStatus := http.StatusOK

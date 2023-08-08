@@ -89,8 +89,8 @@ github.com/TykTechnologies/gorpc v0.0.0-20210624160652-fe65bda0ccb9/go.mod h1:v6
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708 h1:cmXjlMzcexhc/Cg+QB/c2CPUVs1ux9xn6162qaf/LC4=
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
 github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230320143102-7a16078ce517/go.mod h1:ZiFZcrue3+n2mHH+KLHRipbYVULkgy3Myko5S7IIs74=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230629083404-7adc3c0fdfac h1:sSXsnNJdM78MAAQ11OEPTDyeq9x7QYJQ6L9P2q+z5eE=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230629083404-7adc3c0fdfac/go.mod h1:ZWpfrRjWhBPryIMCDK8kAew4hji0QUQxj3Uhc2COlMU=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230807142628-f787e7ab594e h1:5iMgqxmb7ZobBi0LNPKbQSnLxmaLCp37DXigeXbVtgI=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230807142628-f787e7ab594e/go.mod h1:ZWpfrRjWhBPryIMCDK8kAew4hji0QUQxj3Uhc2COlMU=
 github.com/TykTechnologies/kin-openapi v0.90.0 h1:kHw0mtANwIpmlU6eCeeCgRMa52EiPPhEZPuHc3lKawo=
 github.com/TykTechnologies/kin-openapi v0.90.0/go.mod h1:pkzuiceujHvAuDu3bTD/AD5OacuP4eMfrz9QhJlMvdQ=
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c h1:j6fd0Fz1R4oSWOmcooGjrdahqrML+btQ+PfEJw8SzbA=
@@ -99,8 +99,8 @@ github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632 h1:T5NWziF
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632/go.mod h1:UsPYgOFBpNzDXLEti7MKOwHLpVSqdzuNGkVFPspQmnQ=
 github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksrF4dY9KW8o8=
 github.com/TykTechnologies/openid2go v0.1.2/go.mod h1:gYfkqeWa+lY3Xz/Z2xYtIzmYXynlgKZaBIbPCqdcdMA=
-github.com/TykTechnologies/opentelemetry v0.0.11 h1:JeM0/51nEH9dnLaWvnGJ6+jIa9GpL4Tbt++MGQIrva8=
-github.com/TykTechnologies/opentelemetry v0.0.11/go.mod h1:bltWc1OyxnIyiado+XTl85g4EbMiCUjH52W12rbW194=
+github.com/TykTechnologies/opentelemetry v0.0.15 h1:SxFP5HPry7C3SeTRw8Egc4W05+Z7rqqZgfNcNwGFAGw=
+github.com/TykTechnologies/opentelemetry v0.0.15/go.mod h1:bltWc1OyxnIyiado+XTl85g4EbMiCUjH52W12rbW194=
 github.com/TykTechnologies/storage v1.0.5 h1:lfMljPueySAW7Mpc70g1/qC5n2LKNcKgQs+Xw30apP8=
 github.com/TykTechnologies/storage v1.0.5/go.mod h1:+0S3KuNlLGBTMTSFREuZFm315zzXjuuCO4QSAPy+d3M=
 github.com/TykTechnologies/tyk-pump v1.8.0-rc4 h1:odhM/skFNYWBdSL+atx49f6/PleNRq6l4E9SyeDfmTg=
