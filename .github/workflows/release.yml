@@ -187,6 +187,15 @@ jobs:
     permissions:
       id-token: write   # This is required for requesting the JWT
       contents: read    # This is required for actions/checkout
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [ "mongo44", "postgres15" ]
+        include:
+          - db: postgres15
+            markers: "not sql"
+          - db: postgres15
+            markers: "sql"
     
     steps:
       - uses: actions/checkout@v3
@@ -216,19 +225,23 @@ jobs:
         working-directory: ci/auto
         env:
           t: ${{ needs.goreleaser.outputs.tags }}
+          TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
         run: |
           echo CI tags: $t
           tags=($t)
           echo First tag: ${tags[0]}
           echo "registry=${{ steps.ecr.outputs.registry }}
           tyk_image=${tags[0]}
-          tyk_analytics_image=\${registry}/tyk-analytics:${{ inputs.tyk-analytics-version || 'master' }}
-          tyk_sink_image=\${registry}/tyk-sink:${{ inputs.tyk-sink-version || 'master' }}
-          tyk_pump_image=\${registry}/tyk-pump:${{ inputs.tyk-pump-version || 'master' }}
-          confs_dir=./pro" > versions.env
+          tyk_analytics_image=\${registry}/tyk-analytics:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
+          tyk_sink_image=\${registry}/tyk-sink:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
+          tyk_pump_image=\${registry}/tyk-pump:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
+          # base dir for config files
+          confs_dir=./pro
+          # overrides via envvars
+          env_file=local-${{ matrix.db }}.env" > versions.env
           cat versions.env
           # bring up env
-          docker compose -f pro.yml -f deps.yml --env-file versions.env up --quiet-pull -d
+          docker compose -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env up --quiet-pull -d
 
       - name: Check containers exit codes
         shell: bash
@@ -244,7 +257,7 @@ jobs:
 
       - name: Run tests
         run:
-          docker run --rm --network auto_default 754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} pytest -c pytest_ci.ini -m "not local and not mdcb and not dind"
+          docker run --rm --network auto_default 754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} pytest -m "not local and not mdcb and not dind and ${{ matrix.markers }}"
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
 

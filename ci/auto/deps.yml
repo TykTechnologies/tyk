@@ -4,7 +4,7 @@ services:
     container_name: redis
     image: bitnami/redis:6.2
     environment:
-      - REDIS_PASSWORD=my777godpassUNBREAKABLE..
+      - ALLOW_EMPTY_PASSWORD=yes
     ports:
       - "6379:6379"
     healthcheck:
@@ -14,21 +14,6 @@ services:
       start_period: 2s
       timeout: 10s
     # command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
-
-  mongo:
-    container_name: mongo
-    image: mongo:4.4
-    # environment:
-    #   - MONGO_INITDB_ROOT_USERNAME=root
-    #   - MONGO_INITDB_ROOT_PASSWORD=123456789
-    ports:
-      - "27017:27017"
-    healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongo mongo:27017/test --quiet
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 10s
 
   bundle-server:
     container_name: bundle-server
@@ -83,6 +68,4 @@ services:
     image: hello-world:linux
     depends_on:
         redis:
-            condition: service_healthy
-        mongo:
             condition: service_healthy

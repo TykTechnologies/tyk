@@ -4,7 +4,7 @@ services:
     container_name: tyk
     image: ${tyk_image}
     env_file:
-      - tyk.env
+      - ${env_file}
     volumes:
       - ./certs:/usr/local/share/ca-certificates
       - ${confs_dir}:/conf/
@@ -22,6 +22,10 @@ services:
   tyk-analytics:
     container_name: tyk-analytics
     image: ${tyk_analytics_image}
+    env_file:
+      - ${env_file}
+    environment:
+      - TYK_DB_LICENSEKEY=${TYK_DB_LICENSEKEY}
     volumes:
       - ./certs:/usr/local/share/ca-certificates
       - ${confs_dir}:/conf/
@@ -29,29 +33,27 @@ services:
       - "3000:3000"
       - "5000:5000"
       - "1026:1025"
-    env_file:
-      - tyk-analytics.env
     command: [ "--conf", "/conf/tyk-analytics.conf" ]
-
+    restart: on-failure
 
   tyk-pump:
     container_name: tyk-pump
     image: ${tyk_pump_image}
+    env_file:
+      - ${env_file}
     volumes:
       - ${confs_dir}:/conf/
     ports:    
       - "8061:8061"
-    env_file:
-      - tyk-pump.env
     command: [ "--conf", "/conf/tyk-pump.conf" ]
 
-  # tyk-sink:
-  #   container_name: tyk-sink
-  #   image: ${registry}/${tyk_sink_image}
-  #   ports:
-  #   - "9090:9090"
-  #   env_file:
-  #     - tyk-sink.env
+  tyk-sink:
+    container_name: tyk-sink
+    env_file:
+      - ${env_file}
+    image: ${tyk_sink_image}
+    ports:
+    - "9090:9090"
 
   gateway-checker:
     image: curlimages/curl
