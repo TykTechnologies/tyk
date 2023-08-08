@@ -3,7 +3,7 @@ version: "3"
 
 includes:
   deps: ./.taskfiles/deps/Taskfile.yml
-  tracetest: ./.taskfiles/tracetest/Taskfile.yml
+  tracetest: ./new_location/tracetest/Taskfile.yml
 
 tasks:
   docker:
