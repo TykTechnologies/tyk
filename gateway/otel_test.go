@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -48,21 +49,25 @@ func TestGateway_afterConfSetup(t *testing.T) {
 		{
 			name: "opentelemetry options test",
 			initialConfig: config.Config{
-				OpenTelemetry: otel.Config{
-					Enabled: true,
+				Features: config.Features{
+					OpenTelemetry: otel.Config{
+						Enabled: true,
+					},
 				},
 			},
 			expectedConfig: config.Config{
-				OpenTelemetry: otel.Config{
-					Enabled:            true,
-					Exporter:           "grpc",
-					Endpoint:           "localhost:4317",
-					ResourceName:       "tyk-gateway",
-					SpanProcessorType:  "batch",
-					ConnectionTimeout:  1,
-					ContextPropagation: "tracecontext",
-					Sampling: otel.Sampling{
-						Type: "AlwaysOn",
+				Features: config.Features{
+					OpenTelemetry: otel.Config{
+						Enabled:            true,
+						Exporter:           "grpc",
+						Endpoint:           "localhost:4317",
+						ResourceName:       "tyk-gateway",
+						SpanProcessorType:  "batch",
+						ConnectionTimeout:  1,
+						ContextPropagation: "tracecontext",
+						Sampling: otel.Sampling{
+							Type: "AlwaysOn",
+						},
 					},
 				},
 				AnalyticsConfig: config.AnalyticsConfigConfig{

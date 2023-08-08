@@ -20,12 +20,12 @@ func TestGraphQLMiddleware_OpenTelemetry(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
 
-	spec := BuildAPI(func(spec *APISpec) {
+	BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
 		spec.GraphQL.Enabled = true
 		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
-	})[0]
+	})
 
 	t.Run("fail input validation with otel tracing active", func(t *testing.T) {
 		local := StartTest(func(globalConf *config.Config) {
