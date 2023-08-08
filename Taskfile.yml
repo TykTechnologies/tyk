@@ -49,6 +49,7 @@ tasks:
       - tracetest version
     cmds:
       - docker compose -f ci/tests/tracing/docker-compose.yml up -d
+      - curl --fail http://tyk:8080 || (echo "Server is not running" && exit 1)
       - tracetest configure -g --endpoint http://localhost:11633
 
   test:opentelemetry:test:
