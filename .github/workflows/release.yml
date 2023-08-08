@@ -193,9 +193,7 @@ jobs:
         db: [ "mongo44", "postgres15" ]
         include:
           - db: postgres15
-            markers: "not sql"
-          - db: postgres15
-            markers: "sql"
+            markers: "and not sql"
     
     steps:
       - uses: actions/checkout@v3
@@ -258,8 +256,8 @@ jobs:
       - name: Run tests
         run: |
           docker run --rm --network auto_default \
-              754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
-              pytest -m "not local and not mdcb and not dind and ${{ matrix.markers }}"
+          754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
+          pytest -c pytest_ci.ini -m "not local and not mdcb and not dind ${{ matrix.markers }}"
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
 
