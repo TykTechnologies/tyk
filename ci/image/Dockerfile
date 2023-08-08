@@ -22,9 +22,7 @@ RUN apt-get autoremove -y
 ADD tyk.tar.gz /opt/tyk
 
 VOLUME ["/conf"]
-RUN mkdir -p /__w/tyk/tyk/auto && [ -d "/__w/tyk/tyk/auto" ] || echo "Directory /__w/tyk/tyk/auto was not created"
 WORKDIR /opt/tyk
-RUN ls /__w/tyk/tyk
 
 ENTRYPOINT ["/opt/tyk/tyk" ]
 CMD [ "--conf=/conf/tyk/tyk.conf" ]
