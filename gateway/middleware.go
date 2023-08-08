@@ -940,6 +940,10 @@ func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykRespo
 
 func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
 
+	// otel adds info to res.Request context that is not available in req
+	ctx := res.Request.Context()
+	setContext(req, ctx)
+
 	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
@@ -967,11 +971,11 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		}
 
 		if baseMw.Spec.DetailedTracing {
-			ctx := res.Request.Context()
+			ctx := req.Context()
 			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
 
 			defer span.End()
-			setContext(res.Request, ctx)
+			setContext(req, ctx)
 		} else {
 			span = otel.SpanFromContext(req.Context())
 		}
