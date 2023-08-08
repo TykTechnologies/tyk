@@ -79,7 +79,7 @@ func (o *OtelGraphqlEngineV2) Resolve(resolveContext *resolve.Context, planResul
 	var operationName = "ResolvePlan"
 	ctx, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
-	resolveContext.Context = ctx
+	resolveContext = resolveContext.WithContext(ctx)
 	if err := o.engine.Resolve(resolveContext, planResult, writer); err != nil {
 		span.SetStatus(otel.SPAN_STATUS_ERROR, "failed to resolve")
 		return err
