@@ -11,13 +11,9 @@ Tyk can be deployed in many ways. A deployment is modelled by a compose file. `p
 auto
 ├── bundle_server
 ├── deps.yml           # dependencies that can be reused between deployment models
-├── master.env         # versions of the Tyk components
-├── pro/               # Tyk config that is independent of where the deployment is running
+├── pro/               # Tyk config that is the starting point
 ├── pro.yml            # compose file defining the Tyk components in a Pro deployment
-├── tyk-analytics.env  # Tyk config that depends on where the deployment is running
-├── tyk.env
-├── tyk-pump.env
-└── tyk-sink.env
+├── local-*.env        # Tyk config for the local compose env
 ```
 
 The configuration for the tyk components are provided via config files and env variables. The distinction between the two modes of supplying configuration is that config parameters that are dependent on the deployment env are in the env file while all other config is in the config file.
@@ -26,8 +22,8 @@ The configuration for the tyk components are provided via config files and env v
 ## Pre-requisites
 - docker compose plugin or above (not docker-compose)
 - AWS integration account credentials
-- dashboard license (in tyk-analytics.env files)
-- mdcb license (fill in tyk-sink.env files)
+- dashboard license (`export TYK_DB_LICENSEKEY=`)
+- mdcb license
 
 ## How to login to AWS ECR
 You need an access token and a functional AWS CLI with the sub-account to publish, install, and delete packages in AWS ECR. There is [a note in OneLogin](https://tyk.onelogin.com/notes/108502) with the AWS credentials which have just enough privileges to push and pull from the registry as well as access to logs. Once you have the CLI functional, you can login with:
@@ -40,7 +36,7 @@ This will bring up a Pro installation using the `master` branch for all componen
 ``` shellsession
 # define an alias for later
 # confs_dir points to the root of the config dir
-$ alias master="confs_dir=./pro docker compose -f pro.yml -f deps.yml -p master --env-file master.env --env-file=tat.env"
+$ alias master="env_file=local-mongo44.env docker compose -f pro.yml -f deps.yml -p master --env-file master.env"
 $ master up -d
 ```
 

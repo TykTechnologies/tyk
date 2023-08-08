@@ -1,0 +1,22 @@
+version: "3"
+services:
+  mongo:
+    container_name: mongo
+    image: mongo:4.4
+    # environment:
+    #   - MONGO_INITDB_ROOT_USERNAME=root
+    #   - MONGO_INITDB_ROOT_PASSWORD=123456789
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo mongo:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  wait_deps:
+    image: hello-world:linux
+    depends_on:
+        mongo:
+            condition: service_healthy

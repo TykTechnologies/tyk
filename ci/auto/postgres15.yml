@@ -1,0 +1,22 @@
+version: "3"
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:15
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_DB=tyk_analytics
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: echo 'show all' | psql -U postgres
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  wait_deps:
+    image: hello-world:linux
+    depends_on:
+        postgres:
+            condition: service_healthy
