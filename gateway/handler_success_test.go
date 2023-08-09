@@ -3,17 +3,20 @@ package gateway
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/sirupsen/logrus"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	ctxpkg "github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -191,4 +194,63 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 		},
 	)
 	assert.NoError(t, err)
+}
+
+func TestAddTraceID(t *testing.T) {
+	tests := []struct {
+		name       string
+		enabled    bool
+		hasTraceID bool
+		wantHeader bool
+	}{
+		{
+			name:       "otel enabled with trace id",
+			enabled:    true,
+			hasTraceID: true,
+			wantHeader: true,
+		},
+		{
+			name:       "otel enabled without trace id",
+			enabled:    true,
+			hasTraceID: false,
+			wantHeader: false,
+		},
+		{
+			name:       "otel disabled",
+			enabled:    false,
+			hasTraceID: false,
+			wantHeader: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			w := httptest.NewRecorder()
+
+			otelConfig := otel.Config{
+				Enabled:  tt.enabled,
+				Exporter: "http",
+				Endpoint: "http://localhost:4317",
+			}
+
+			gwConfig := config.Config{
+				OpenTelemetry: otelConfig,
+			}
+
+			if tt.hasTraceID {
+				ot := otel.InitOpenTelemetry(context.Background(), logrus.New(), &otelConfig, "test", "test", false, "test", false, []string{})
+				ctx, _ := ot.Tracer().Start(context.Background(), "testing")
+				req = req.WithContext(ctx)
+			}
+
+			addTraceID(w, req, gwConfig)
+
+			if tt.wantHeader && w.Header().Get("X-Tyk-Trace-Id") == "" {
+				t.Errorf("expected header to be set, but it wasn't")
+			} else if !tt.wantHeader && w.Header().Get("X-Tyk-Trace-Id") != "" {
+				t.Errorf("expected header not to be set, but it was")
+			}
+		})
+	}
 }
