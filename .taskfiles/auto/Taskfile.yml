@@ -77,12 +77,12 @@ tasks:
       Deploys pytest container that runs against local infrastructure using docker compose manifest
     dir: '{{.auto_folder}}'
     env:
-      MARKERS: "mdcb"
+      OPTIONS: "--ci -m mdcb"
     cmds: 
       - |
-        docker run --rm --network auto_default \
+        docker run --rm --network auto_default --env-file pytest.env \
         754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:master \
-        pytest -c pytest_ci.ini -m "${MARKERS}"
+        pytest -c pytest_ci.ini "${OPTIONS}"
 
   healthcheck:
     cmds:

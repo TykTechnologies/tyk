@@ -5,8 +5,7 @@ services:
     container_name: redis
     image: bitnami/redis:6.2
     environment:
-      - REDIS_PASSWORD=my777godpassUNBREAKABLE..
-      # - ALLOW_EMPTY_PASSWORD=yes
+      - ALLOW_EMPTY_PASSWORD=yes
     ports:
       - "6379:6379"
     healthcheck:
@@ -21,8 +20,7 @@ services:
     container_name: redis-datacenter-1
     image: bitnami/redis:6.2
     environment:
-      - REDIS_PASSWORD=my777godpassUNBREAKABLE..
-      # - ALLOW_EMPTY_PASSWORD=yes    
+      - ALLOW_EMPTY_PASSWORD=yes    
     ports:
       - "6381:6379"
     healthcheck:
@@ -36,9 +34,8 @@ services:
     profiles: ["all", "slave-datacenter"]
     container_name: redis-datacenter-2
     image: bitnami/redis:6.2
-    environment:
-      - REDIS_PASSWORD=my777godpassUNBREAKABLE..    
-      # - ALLOW_EMPTY_PASSWORD=yes    
+    environment:   
+      - ALLOW_EMPTY_PASSWORD=yes    
     ports:
       - "6382:6379"
     healthcheck:
