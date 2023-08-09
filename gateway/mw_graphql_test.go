@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -556,7 +557,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				cfg.HttpServerOptions.EnableWebSockets = true
 				g.Gw.SetConfig(cfg)
 
-				t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
+				t.Run("should deny upgrade with 400 when protocol is not graphql-ws or graphql-transport-ws", func(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
@@ -573,21 +574,41 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				})
 
 				t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
-					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-						header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+					t.Run("graphql-ws", func(t *testing.T) {
+						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+							header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
+						})
+						require.NoError(t, err)
+						defer wsConn.Close()
+
+						// Send a connection init message to gateway
+						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
+						require.NoError(t, err)
+
+						_, msg, err := wsConn.ReadMessage()
+
+						// Gateway should acknowledge the connection
+						assert.Equal(t, `{"type":"connection_ack"}`, string(msg))
+						assert.NoError(t, err)
 					})
-					require.NoError(t, err)
-					defer wsConn.Close()
+					t.Run("graphql-transport-ws", func(t *testing.T) {
+						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+							header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLTransportWS)},
+						})
+						require.NoError(t, err)
+						defer wsConn.Close()
 
-					// Send a connection init message to gateway
-					err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
-					require.NoError(t, err)
+						// Send a connection init message to gateway
+						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init"}`))
+						require.NoError(t, err)
 
-					_, msg, err := wsConn.ReadMessage()
+						_, msg, err := wsConn.ReadMessage()
 
-					// Gateway should acknowledge the connection
-					assert.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
-					assert.NoError(t, err)
+						// Gateway should acknowledge the connection
+						assert.Equal(t, `{"type":"connection_ack"}`, string(msg))
+						assert.NoError(t, err)
+					})
+
 				})
 
 				t.Run("graphql over websockets", func(t *testing.T) {
@@ -611,7 +632,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						})
 
 						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
 							header.Authorization:        {directKey},
 						})
 						require.NoError(t, err)
@@ -624,7 +645,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						_, msg, err := wsConn.ReadMessage()
 
 						// Gateway should acknowledge the connection
-						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+						require.Equal(t, `{"type":"connection_ack"}`, string(msg))
 						require.NoError(t, err)
 
 						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "{ countries { name } }", "variables": null}}`))
@@ -647,7 +668,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						})
 
 						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
 							header.Authorization:        {directKey},
 						})
 						require.NoError(t, err)
@@ -660,7 +681,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						_, msg, err := wsConn.ReadMessage()
 
 						// Gateway should acknowledge the connection
-						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+						require.Equal(t, `{"type":"connection_ack"}`, string(msg))
 						require.NoError(t, err)
 
 						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "{ countries { name } }", "variables": null}}`))
