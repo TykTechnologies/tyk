@@ -941,8 +941,9 @@ func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykRespo
 func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
 
 	traceIsEnabled := trace.IsEnabled()
+	theCtx := res.Request.Context()
 	for _, rh := range chain {
-		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
+		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled, &theCtx); err != nil {
 			// Abort the request if this handler is a response middleware hook:
 			if rh.Name() == "CustomMiddlewareResponseHook" {
 				rh.HandleError(rw, req)
@@ -954,13 +955,13 @@ func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res
 	return false, nil
 }
 
-func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState, shouldTrace bool) error {
+func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState, shouldTrace bool, theCtx *context.Context) error {
 	if shouldTrace {
 		span, ctx := trace.Span(req.Context(), rh.Name())
 		defer span.Finish()
 		req = req.WithContext(ctx)
 	} else if rh.Base().Gw.GetConfig().OpenTelemetry.Enabled {
-		//	ctx := res.Request.Context()
+		//ctx := req.Context()
 		//	setContext(req, ctx)
 
 		var span otel.Span
@@ -970,11 +971,11 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		}
 
 		if baseMw.Spec.DetailedTracing {
-			ctx := req.Context()
-			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
-
+			//	ctx := req.Context()
+			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(*theCtx, rh.Name())
+			theCtx = &ctx
 			defer span.End()
-			setContext(req, ctx)
+			//	setContext(req, ctx)
 		} else {
 			span = otel.SpanFromContext(req.Context())
 		}
