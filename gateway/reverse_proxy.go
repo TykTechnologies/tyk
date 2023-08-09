@@ -41,8 +41,8 @@ import (
 	"golang.org/x/net/http2"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
+	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
@@ -1058,7 +1058,7 @@ func (p *ReverseProxy) handleGraphQLIntrospection(gqlRequest *graphql.Request) (
 
 func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoundTripper, r *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	conn, err := p.wsUpgrader.Upgrade(w, r, http.Header{
-		header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+		header.SecWebSocketProtocol: {r.Header.Get(header.SecWebSocketProtocol)},
 	})
 	if err != nil {
 		p.logger.Error("websocket upgrade for GraphQL engine failed: ", err)
@@ -1233,7 +1233,14 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 		executorPool = subscription.NewExecutorV2Pool(p.TykAPISpec.GraphQLExecutor.EngineV2, initialRequestContext)
 	}
 
-	go gqlhttp.HandleWebsocket(done, errChan, conn, executorPool, absLogger)
+	go gqlwebsocket.Handle(
+		done,
+		errChan,
+		conn,
+		executorPool,
+		gqlwebsocket.WithLogger(absLogger),
+		gqlwebsocket.WithProtocolFromRequestHeaders(req),
+	)
 	select {
 	case err := <-errChan:
 		log.Error("could not start graphql websocket handler: ", err)
