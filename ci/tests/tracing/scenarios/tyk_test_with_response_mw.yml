@@ -12,6 +12,6 @@ spec:
         - key: Content-Type
           value: application/json
   specs:
-    - selector: span[tracetest.span.type="general" name="HeaderInjector"]
+    - selector: span[tracetest.span.type="http" name="HTTP GET"] span[tracetest.span.type = "general" name = "HeaderInjector"]
       assertions:
         - attr:tracetest.selected_spans.count = 1
