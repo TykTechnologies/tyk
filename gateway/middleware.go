@@ -961,7 +961,7 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		defer span.Finish()
 		req = req.WithContext(ctx)
 	} else if rh.Base().Gw.GetConfig().OpenTelemetry.Enabled {
-		//ctx := req.Context()
+		ctx := req.Context()
 		//	setContext(req, ctx)
 
 		var span otel.Span
@@ -973,11 +973,11 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		if baseMw.Spec.DetailedTracing {
 			//	ctx := req.Context()
 			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(*theCtx, rh.Name())
-			theCtx = &ctx
+			*theCtx = ctx
 			defer span.End()
 			//	setContext(req, ctx)
 		} else {
-			span = otel.SpanFromContext(req.Context())
+			span = otel.SpanFromContext(ctx)
 		}
 
 		err := rh.HandleResponse(rw, res, req, ses)
