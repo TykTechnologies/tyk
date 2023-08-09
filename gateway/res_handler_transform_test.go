@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/base64"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"testing"
 	"time"
@@ -272,4 +273,22 @@ func TestResponseTransformMiddleware_Enabled(t *testing.T) {
 			assert.Equal(t, tc.mwEnabled, responseTransformMW.Enabled())
 		})
 	}
+}
+
+func TestHeaderTransformBase(t *testing.T) {
+	// Initialize the HeaderTransform
+	ht := &HeaderTransform{
+		BaseTykResponseHandler: BaseTykResponseHandler{
+			// You can populate fields if needed
+		},
+		config: HeaderTransformOptions{
+			// You can populate fields if needed
+		},
+	}
+
+	// Get the base using the method
+	base := ht.Base()
+
+	// Check that the returned base is indeed the BaseTykResponseHandler of ht
+	require.Equal(t, &ht.BaseTykResponseHandler, base, "Base method did not return the expected BaseTykResponseHandler")
 }

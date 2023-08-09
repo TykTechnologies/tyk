@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"github.com/stretchr/testify/require"
 	"reflect"
 	"testing"
 
@@ -239,4 +240,15 @@ func equalHeaders(h1, h2 []*coprocess.Header) bool {
 		delete(m, h.Key)
 	}
 	return len(m) == 0
+}
+
+func TestCoProcessMiddlewareName(t *testing.T) {
+	// Initialize the CoProcessMiddleware
+	m := &CoProcessMiddleware{}
+
+	// Get the name using the method
+	name := m.Name()
+
+	// Check that the returned name is "CoProcessMiddleware"
+	require.Equal(t, "CoProcessMiddleware", name, "Name method did not return the expected value")
 }
