@@ -1300,6 +1300,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		span := opentracing.SpanFromContext(req.Context())
 		trace.Inject(p.TykAPISpec.Name, span, outreq.Header)
 	}
+
 	p.Director(outreq)
 	outreq.Close = false
 
@@ -1490,6 +1491,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// the trick. Chain can be empty, in which case this is a no-op.
 	// abortRequest is set to true when a response hook fails
 	// For reference see "HandleError" in coprocess.go
+
 	abortRequest, err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses)
 	if abortRequest {
 		return ProxyResponse{UpstreamLatency: upstreamLatency}
@@ -1522,6 +1524,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// We should at least copy the status code in
 	inres.StatusCode = res.StatusCode
 	inres.ContentLength = res.ContentLength
+
 	p.HandleResponse(rw, res, ses)
 	return ProxyResponse{UpstreamLatency: upstreamLatency, Response: inres}
 }

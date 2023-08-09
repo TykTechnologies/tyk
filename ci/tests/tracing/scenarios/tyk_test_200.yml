@@ -27,7 +27,7 @@ spec:
   - selector: span[tracetest.span.type="general" name="Tracetest trigger"] span[tracetest.span.type="general"]
     name: Check if it contains Version and Rate middlewares
     assertions:
-    - attr:tracetest.selected_spans.count  =  2
+    - attr:tracetest.selected_spans.count  =  3
     - attr:tracetest.span.parent_id != ""
   - selector: span[tracetest.span.type="general" name="RateCheckMW"]
     name: Check for RateCheckMiddleware
