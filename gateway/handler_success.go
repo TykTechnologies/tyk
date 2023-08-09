@@ -81,7 +81,7 @@ func addTraceID(w http.ResponseWriter, r *http.Request, globalConf config.Config
 	if globalConf.OpenTelemetry.Enabled {
 		span := otel.SpanFromContext(r.Context())
 		if span.SpanContext().HasTraceID() {
-			w.Header().Set("X-Otel-Trace-Id", span.SpanContext().TraceID().String())
+			w.Header().Set("X-Tyk-Trace-Id", span.SpanContext().TraceID().String())
 		}
 	}
 }
