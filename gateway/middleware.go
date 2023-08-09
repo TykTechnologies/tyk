@@ -960,8 +960,8 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		defer span.Finish()
 		req = req.WithContext(ctx)
 	} else if rh.Base().Gw.GetConfig().OpenTelemetry.Enabled {
-		ctx := res.Request.Context()
-		setContext(req, ctx)
+		//	ctx := res.Request.Context()
+		//	setContext(req, ctx)
 
 		var span otel.Span
 		baseMw := rh.Base()
