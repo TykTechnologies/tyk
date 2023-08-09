@@ -1,6 +1,7 @@
 version: "3.9"
 services:
   tyk:
+    profiles: ["all", "master-datacenter"]
     container_name: tyk
     image: ${tyk_image}
     env_file:
@@ -20,6 +21,7 @@ services:
         /opt/tyk-gateway/tyk --conf /conf/tyk.conf
 
   tyk-analytics:
+    profiles: ["all", "master-datacenter"]
     container_name: tyk-analytics
     image: ${tyk_analytics_image}
     env_file:
@@ -37,10 +39,11 @@ services:
     restart: on-failure
 
   tyk-pump:
+    profiles: ["all", "master-datacenter"]
     container_name: tyk-pump
     image: ${tyk_pump_image}
     env_file:
-      - ${env_file}
+      - ${env_file}      
     volumes:
       - ${confs_dir}:/conf/
     ports:    
@@ -48,12 +51,86 @@ services:
     command: [ "--conf", "/conf/tyk-pump.conf" ]
 
   tyk-sink:
+    profiles: ["all", "master-datacenter"]
     container_name: tyk-sink
+    image: ${tyk_sink_image}
     env_file:
       - ${env_file}
-    image: ${tyk_sink_image}
+    environment:
+      - TYK_MDCB_LICENSE=${TYK_MDCB_LICENSE}
+    volumes:
+      - ${confs_dir}:/conf/
     ports:
     - "9090:9090"
+    entrypoint: ["/opt/tyk-sink/tyk-sink", "--conf", "/conf/tyk-sink.conf"]
+    
+  tyk-gateway-datacenter-1-alfa:
+    profiles: ["all", "slave-datacenter"]
+    container_name: tyk-gateway-datacenter-1-alfa
+    image: ${tyk_alfa_image}
+    env_file:
+      - ${env_file}
+    environment:
+      - TYK_GW_LISTENPORT=8181
+      - TYK_GW_DBAPPCONFOPTIONS_TAGS=alfa
+      - TYK_GW_STORAGE_HOST=redis-datacenter-1
+    volumes:
+      - ./certs:/usr/local/share/ca-certificates
+      - ${confs_dir}:/conf/
+    ports:
+      - "8181:8181"
+    entrypoint: ["/opt/tyk-gateway/tyk", "--conf", "/conf/tyk-datacenter-1.conf"]
+
+  tyk-gateway-datacenter-1-beta:
+    profiles: ["all", "slave-datacenter"]
+    container_name: tyk-gateway-datacenter-1-beta
+    image: ${tyk_beta_image}
+    env_file:
+      - ${env_file}
+    environment:
+      - TYK_GW_LISTENPORT=8182
+      - TYK_GW_DBAPPCONFOPTIONS_TAGS=beta
+      - TYK_GW_STORAGE_HOST=redis-datacenter-1
+    volumes:
+      - ./certs:/usr/local/share/ca-certificates
+      - ${confs_dir}:/conf/
+    ports:
+      - "8182:8182"
+    entrypoint: ["/opt/tyk-gateway/tyk", "--conf", "/conf/tyk-datacenter-1.conf"]
+
+  tyk-gateway-datacenter-2-alfa:
+    profiles: ["all", "slave-datacenter"]
+    container_name: tyk-gateway-datacenter-2-alfa
+    image: ${tyk_alfa_image}
+    env_file:
+      - ${env_file}
+    environment:
+      - TYK_GW_LISTENPORT=8281
+      - TYK_GW_DBAPPCONFOPTIONS_TAGS=alfa
+      - TYK_GW_STORAGE_HOST=redis-datacenter-2
+    volumes:
+      - ./certs:/usr/local/share/ca-certificates
+      - ${confs_dir}:/conf/
+    ports:
+      - "8281:8281"
+    entrypoint: ["/opt/tyk-gateway/tyk", "--conf", "/conf/tyk-datacenter-2.conf"]
+
+  tyk-gateway-datacenter-2-beta:
+    profiles: ["all", "slave-datacenter"]
+    container_name: tyk-gateway-datacenter-2-beta
+    image: ${tyk_beta_image}
+    env_file:
+      - ${env_file}
+    environment:
+      - TYK_GW_LISTENPORT=8282
+      - TYK_GW_DBAPPCONFOPTIONS_TAGS=beta
+      - TYK_GW_STORAGE_HOST=redis-datacenter-2
+    volumes:
+      - ./certs:/usr/local/share/ca-certificates
+      - ${confs_dir}:/conf/
+    ports:
+      - "8282:8282"
+    entrypoint: ["/opt/tyk-gateway/tyk", "--conf", "/conf/tyk-datacenter-2.conf"]
 
   gateway-checker:
     image: curlimages/curl

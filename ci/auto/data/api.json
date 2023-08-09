@@ -1,0 +1,70 @@
+{
+  "api_definition": {
+    "use_keyless": true,
+    "enable_coprocess_auth": false,
+    "disable_quota": false,
+    "enable_ip_blacklisting": false,
+    "expire_analytics_after": 0,
+    "domain": "",
+    "active": true,
+    "check_host_against_uptime_tests": false,
+    "name": "httpbin",
+    "slug": "httpbin",
+    "proxy": {
+      "target_url": "http://httpbin.org/",
+      "check_host_against_uptime_tests": false,
+      "preserve_host_header": false,
+      "strip_listen_path": true,
+      "listen_path": "/smoke-test-api/",
+      "disable_strip_slash": false
+    },
+    "use_basic_auth": false,
+    "version_data": {
+      "not_versioned": true,
+      "default_version": "",
+      "versions": {
+        "Default": {
+          "name": "Default",
+          "expires": "",
+          "paths": {
+            "ignored": [],
+            "white_list": [],
+            "black_list": []
+          },
+          "use_extended_paths": true,
+          "extended_paths": {
+            "ignored": [],
+            "white_list": [],
+            "black_list": [],
+            "transform": [],
+            "transform_response": [],
+            "transform_jq": [],
+            "transform_jq_response": [],
+            "transform_headers": [],
+            "transform_response_headers": [],
+            "hard_timeouts": [],
+            "circuit_breakers": [],
+            "url_rewrites": [],
+            "virtual": [],
+            "size_limits": [],
+            "method_transforms": [],
+            "track_endpoints": [],
+            "do_not_track_endpoints": [],
+            "validate_json": [],
+            "internal": []
+          },
+          "global_headers": {},
+          "global_headers_remove": [],
+          "global_size_limit": 0,
+          "override_target": ""
+        }
+      }
+    },
+    "use_standard_auth": false,
+    "definition": {
+      "location": "header",
+      "key": "x-api-version",
+      "strip_path": false
+    }
+  }
+}

@@ -4,6 +4,7 @@ version: "3"
 includes:
   deps: ./.taskfiles/deps/Taskfile.yml
   tracetest: ./.taskfiles/tracetest/Taskfile.yml
+  auto: ./.taskfiles/auto/Taskfile.yml
 
 tasks:
   docker:

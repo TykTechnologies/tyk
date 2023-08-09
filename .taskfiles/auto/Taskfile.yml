@@ -1,0 +1,92 @@
+version: '3'
+
+#dotenv: ['.env']
+
+vars:
+  auto_folder: ci/auto
+
+env:
+  DEFAULT_WORKING_DIR: 'ci/auto'
+
+tasks:
+  login:
+    sumary: |
+      Logins into AWS ECR registry to allow pull required images from it
+    cmds:
+      - aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin 754489498669.dkr.ecr.eu-central-1.amazonaws.com
+
+  bootstrap:
+    sumary: |
+      Bootstraps dashboard with an organization and user
+    dir: '{{.auto_folder}}'
+    cmds:
+      - sleep 8
+      - ./dash-bootstrap.sh http://localhost:3000
+      - sleep 8
+
+  local:
+    sumary: |
+      Deploys infrastructure locally using docker compose manifest
+    dir: '{{.auto_folder}}'
+    env:
+      DB: '{{ or .DB "mongo44" }}'
+      confs_dir: '{{ or .confs_dir "./pro" }}'
+      env_file: local-{{.DB}}.env
+    cmds:
+      - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env --profile master-datacenter up --quiet-pull -d
+
+  clean:
+    sumary: |
+      Tears down all local infrastructure including networking
+    dir: '{{.auto_folder}}'
+    env:
+      DB: '{{ or .DB "mongo44" }}'
+      confs_dir: '{{ or .confs_dir "./pro" }}'
+      env_file: local-{{.DB}}.env
+    cmds:
+      - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env --profile master-datacenter down
+
+
+  local-ha:
+    sumary: |
+      Deploys infrastructure locally using docker compose manifest
+    dir: '{{.auto_folder}}'
+    env:
+      DB: '{{ or .DB "mongo44" }}'
+      confs_dir: '{{ or .confs_dir "./pro-ha" }}'
+      env_file: local-{{.DB}}.env
+    cmds:
+      - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env --profile master-datacenter up --quiet-pull -d
+      - task: bootstrap
+      - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env --profile slave-datacenter up --quiet-pull -d
+
+  clean-ha:
+    sumary: |
+      Tears down all local infrastructure including networking
+    dir: '{{.auto_folder}}'
+    env:
+      DB: '{{ or .DB "mongo44" }}'
+      confs_dir: '{{ or .confs_dir "./pro-ha" }}'
+      env_file: local-{{.DB}}.env
+    cmds:
+      - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env --profile all down
+
+
+  pytest:
+    sumary: |
+      Deploys pytest container that runs against local infrastructure using docker compose manifest
+    dir: '{{.auto_folder}}'
+    env:
+      MARKERS: "mdcb"
+    cmds: 
+      - |
+        docker run --rm --network auto_default \
+        754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:master \
+        pytest -c pytest_ci.ini -m "${MARKERS}"
+
+  healthcheck:
+    cmds:
+      - echo "---Gateway Status---"
+      - curl -s --fail -k https://"{{.HOST}}":8080/hello
+    vars:
+      HOST: localhost
