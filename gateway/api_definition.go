@@ -214,7 +214,7 @@ type APISpec struct {
 
 	network analytics.NetworkStats
 
-	GraphQLExecutor graphql.Executor
+	GraphQLExecutor graphql.Executor `json:"-"`
 
 	HasMock            bool
 	HasValidateRequest bool
