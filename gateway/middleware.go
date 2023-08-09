@@ -941,11 +941,6 @@ func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykRespo
 func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
 
 	traceIsEnabled := trace.IsEnabled()
-	/*	theCtx := req.Context()
-		if req.Response != nil {
-			theCtx = res.Request.Context()
-		}
-	*/
 	for _, rh := range chain {
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
 			// Abort the request if this handler is a response middleware hook:
@@ -965,39 +960,47 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		defer span.Finish()
 		req = req.WithContext(ctx)
 	} else if rh.Base().Gw.GetConfig().OpenTelemetry.Enabled {
-		ctx := req.Context()
-		if res.Request != nil {
-			ctx = res.Request.Context()
-			setContext(req, ctx)
-		}
-
-		var span otel.Span
-		baseMw := rh.Base()
-		if baseMw == nil {
-			return errors.New("unsupported base middleware")
-		}
-
-		if baseMw.Spec.DetailedTracing {
-			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
-			defer span.End()
-			setContext(req, ctx)
-		} else {
-			span = otel.SpanFromContext(ctx)
-		}
-
-		err := rh.HandleResponse(rw, res, req, ses)
-		if err != nil {
-			span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
-		}
-
-		attrs := ctxGetSpanAttributes(req, rh.Name())
-		if len(attrs) > 0 {
-			span.SetAttributes(attrs...)
-		}
-
-		return err
+		return handleOtelTracedResponse(rh, rw, res, req, ses)
 	}
 	return rh.HandleResponse(rw, res, req, ses)
+}
+
+// handleOtelTracedResponse handles the tracing for the response middlewares when
+// otel is enabled in the gateway
+func handleOtelTracedResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	ctx := req.Context()
+	if res.Request != nil {
+		// res.Request context contains otel information from the
+		// response set in the otel roundtripper
+		ctx = res.Request.Context()
+		setContext(req, ctx)
+	}
+
+	var span otel.Span
+	baseMw := rh.Base()
+	if baseMw == nil {
+		return errors.New("unsupported base middleware")
+	}
+
+	if baseMw.Spec.DetailedTracing {
+		ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
+		defer span.End()
+		setContext(req, ctx)
+	} else {
+		span = otel.SpanFromContext(ctx)
+	}
+
+	err := rh.HandleResponse(rw, res, req, ses)
+	if err != nil {
+		span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
+	}
+
+	attrs := ctxGetSpanAttributes(req, rh.Name())
+	if len(attrs) > 0 {
+		span.SetAttributes(attrs...)
+	}
+
+	return err
 }
 
 func parseForm(r *http.Request) {
