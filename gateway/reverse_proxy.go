@@ -28,7 +28,6 @@ import (
 	"sync"
 	"time"
 
-	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 	"github.com/buger/jsonparser"
 
 	"github.com/gorilla/websocket"
@@ -43,6 +42,7 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
+	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
