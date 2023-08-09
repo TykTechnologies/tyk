@@ -2,10 +2,11 @@ package gateway
 
 import (
 	"encoding/base64"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 
