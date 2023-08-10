@@ -133,6 +133,7 @@ services:
     entrypoint: ["/opt/tyk-gateway/tyk", "--conf", "/conf/tyk-datacenter-2.conf"]
 
   gateway-checker:
+    profiles: ["all", "master-datacenter"]
     image: curlimages/curl
     command: tail -f /dev/null
     depends_on:
@@ -145,6 +146,7 @@ services:
       timeout: 10s
 
   dashboard-checker:
+    profiles: ["all", "master-datacenter"]
     image: curlimages/curl
     command: tail -f /dev/null
     depends_on:
@@ -157,6 +159,7 @@ services:
       timeout: 10s
 
   wait:
+    profiles: ["all", "master-datacenter"]
     image: hello-world:linux
     depends_on:
         gateway-checker:

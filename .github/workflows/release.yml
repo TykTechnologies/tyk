@@ -190,8 +190,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        db: [ "mongo44", "postgres15" ]
-        config: ["pro", "pro-ha"]
         include:
           - config: pro
             db: mongo44
