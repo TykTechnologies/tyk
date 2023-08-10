@@ -248,7 +248,7 @@ jobs:
           env_file=local-${{ matrix.db }}.env" > versions.env
           cat versions.env
           # bring up env
-          docker compose -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env up --quiet-pull -d
+          docker compose -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
 
       - name: Check containers exit codes
         shell: bash
