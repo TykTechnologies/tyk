@@ -972,15 +972,16 @@ func handleOtelTracedResponse(rh TykResponseHandler, rw http.ResponseWriter, res
 	if res.Request != nil {
 		// res.Request context contains otel information from the otel roundtripper
 		r = res.Request
+		setContext(req, r.Context())
 	}
 
-	ctx := r.Context()
 	var span otel.Span
 	baseMw := rh.Base()
 	if baseMw == nil {
 		return errors.New("unsupported base middleware")
 	}
 
+	ctx := r.Context()
 	if baseMw.Spec.DetailedTracing {
 		ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
 		defer span.End()
