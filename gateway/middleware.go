@@ -968,14 +968,13 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 // handleOtelTracedResponse handles the tracing for the response middlewares when
 // otel is enabled in the gateway
 func handleOtelTracedResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
-	ctx := req.Context()
+	r := req
 	if res.Request != nil {
-		// res.Request context contains otel information from the
-		// response set in the otel roundtripper
-		ctx = res.Request.Context()
-		setContext(req, ctx)
+		// res.Request context contains otel information from the otel roundtripper
+		r = res.Request
 	}
 
+	ctx := r.Context()
 	var span otel.Span
 	baseMw := rh.Base()
 	if baseMw == nil {
@@ -985,7 +984,7 @@ func handleOtelTracedResponse(rh TykResponseHandler, rw http.ResponseWriter, res
 	if baseMw.Spec.DetailedTracing {
 		ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
 		defer span.End()
-		setContext(req, ctx)
+		setContext(r, ctx)
 	} else {
 		span = otel.SpanFromContext(ctx)
 	}
