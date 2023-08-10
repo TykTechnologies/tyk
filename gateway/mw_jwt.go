@@ -616,6 +616,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 						session.MetaData["policies"] = policies
 						updateSession = true
 					}
+					if err := k.ApplyPolicies(&session); err != nil {
+						return errors.New("failed to create key: " + err.Error()), http.StatusInternalServerError
+					}
 				}
 			}
 		} else {
