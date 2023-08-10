@@ -230,6 +230,7 @@ jobs:
         env:
           t: ${{ needs.goreleaser.outputs.tags }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
+          TYK_MDCB_LICENSE: ${{ secrets.TYK_MDCB_LICENSE }}
         run: |
           echo CI tags: $t
           tags=($t)
@@ -239,6 +240,8 @@ jobs:
           tyk_analytics_image=\${registry}/tyk-analytics:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
           tyk_sink_image=\${registry}/tyk-sink:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
           tyk_pump_image=\${registry}/tyk-pump:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
+          tyk_alfa_image=${tags[0]}
+          tyk_beta_image=${tags[0]}
           # base dir for config files
           confs_dir=./${{ matrix.config }}
           # overrides via envvars
