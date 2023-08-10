@@ -23,6 +23,14 @@ if [ -z $1 ]; then
     exit 1
 fi
 
+if [[ "$(uname)" == "Darwin" ]]; then
+  echo "Running on macOS"
+	sed_exp="-i ''"
+else
+	sed_exp="-i"
+fi
+
+
 db_base=${1:-"http://localhost:3000"}
 
 org_json='{
@@ -39,7 +47,7 @@ orgid=$(curlf --header "admin-auth: 12345" \
 	      ${db_base}/admin/organisations | jq -r '.Meta')
 
 echo "TYK_GW_SLAVEOPTIONS_RPCKEY=${orgid}"
-sed -i "" "s/TYK_GW_SLAVEOPTIONS_RPCKEY=.*/TYK_GW_SLAVEOPTIONS_RPCKEY=${orgid}/g" *.env
+sed ${sed_exp} "s/TYK_GW_SLAVEOPTIONS_RPCKEY=.*/TYK_GW_SLAVEOPTIONS_RPCKEY=${orgid}/g" *.env
 
 # 1a. Add orgid into user creation json
 user_json=$(jq --arg oid $orgid '. + { org_id: $oid }' <<<'{
@@ -56,8 +64,9 @@ user_auth=$(curlf --header "admin-auth: 12345" \
 		  ${db_base}/admin/users | jq -r '.Message')
 
 echo "TYK_GW_SLAVEOPTIONS_APIKEY=${user_auth}"
-sed -i "" "s/TYK_GW_SLAVEOPTIONS_APIKEY=.*/TYK_GW_SLAVEOPTIONS_APIKEY=${user_auth}/g" *.env
-sed -i "" "s/USER_API_SECRET=.*/USER_API_SECRET=${user_auth}/g" *.env
+sed ${sed_exp} "s/TYK_GW_SLAVEOPTIONS_APIKEY=.*/TYK_GW_SLAVEOPTIONS_APIKEY=${user_auth}/g" *.env
+sed ${sed_exp} "s/USER_API_SECRET=.*/USER_API_SECRET=${user_auth}/g" *.env
+
 
 # 3. Get user id of newly created user using user authentication
 uid=$(curlf --header "authorization: $user_auth" \

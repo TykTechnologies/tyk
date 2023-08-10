@@ -193,7 +193,7 @@ jobs:
         db: [ "mongo44", "postgres15" ]
         config: ["pro", "pro-ha"]
         include:
-          - conf: pro
+          - config: pro
             db: mongo44
             markers: -m "not local and not mdcb and not dind"
           - config: pro
