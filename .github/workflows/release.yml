@@ -279,7 +279,7 @@ jobs:
         run: |
           docker run --rm --network auto_default \
           754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
-          pytest -c pytest_ci.ini "${{ matrix.markers }}"
+          pytest -c pytest_ci.ini ${{ matrix.markers }}
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
 
