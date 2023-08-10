@@ -255,7 +255,7 @@ jobs:
           env_file=local-${{ matrix.db }}.env
           " > versions.env
           # Add Tyk component config variations to $env_file
-          cat confs/${{ matrix.config }}.env >> local-${{ matrix.db }}.env
+          # cat confs/${{ matrix.config }}.env >> local-${{ matrix.db }}.env
           # bring up env
           docker compose -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
           if [[ "${{ matrix.config }}" == "pro-ha" ]];then
