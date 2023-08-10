@@ -109,6 +109,24 @@ func TestOAS(t *testing.T) {
 	})
 }
 
+func TestOAS_ExtractTo_DontTouchExistingClassicFields(t *testing.T) {
+	var api apidef.APIDefinition
+	api.VersionData.Versions = map[string]apidef.VersionInfo{
+		Main: {
+			ExtendedPaths: apidef.ExtendedPathsSet{
+				TransformHeader: []apidef.HeaderInjectionMeta{
+					{},
+				},
+			},
+		},
+	}
+
+	var s OAS
+	s.ExtractTo(&api)
+
+	assert.Len(t, api.VersionData.Versions[Main].ExtendedPaths.TransformHeader, 1)
+}
+
 func TestOAS_AddServers(t *testing.T) {
 	t.Parallel()
 	type fields struct {

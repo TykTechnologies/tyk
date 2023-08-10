@@ -93,7 +93,7 @@ func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 
 	s.extractSecurityTo(api)
 
-	var ep apidef.ExtendedPathsSet
+	ep := api.VersionData.Versions[Main].ExtendedPaths
 	s.extractPathsAndOperations(&ep)
 
 	api.VersionData.Versions = map[string]apidef.VersionInfo{
