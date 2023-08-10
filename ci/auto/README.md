@@ -9,14 +9,16 @@ Tyk can be deployed in many ways. A deployment is modelled by a compose file. `p
 ## Directory structure
 ```
 auto
-├── bundle_server
 ├── deps.yml           # dependencies that can be reused between deployment models
-├── pro/               # Tyk config that is the starting point
 ├── pro.yml            # compose file defining the Tyk components in a Pro deployment
-├── local-*.env        # Tyk config for the local compose env
+├── {mongo,postgres,..}.yml  # composable compose for 
+├── pro.yml            # compose file defining the Tyk components in a Pro deployment
+├── pro/               # Tyk configs passed to services in pro.yml
+├── confs/             # env var based config settings to override behaviour
+├── local-*.env        # Env vars here can be set in the Tyk compose services by setting env_file=<file>
 ```
 
-The configuration for the tyk components are provided via config files and env variables. The distinction between the two modes of supplying configuration is that config parameters that are dependent on the deployment env are in the env file while all other config is in the config file.
+The configuration for the tyk components are provided via config files and env variables. The config files are used as the default configuration and behaviour can be overridden using environment variables in `confs/` or `local-*.env`.
 
 # Running tests locally
 ## Pre-requisites
@@ -35,7 +37,6 @@ You need an access token and a functional AWS CLI with the sub-account to publis
 This will bring up a Pro installation using the `master` branch for all components. It does not _build_ the images but relies on `release.yml` in the repo having already pushed the images to ECR. 
 ``` shellsession
 # define an alias for later
-# confs_dir points to the root of the config dir
 $ alias master="env_file=local-mongo44.env docker compose -f pro.yml -f deps.yml -p master --env-file master.env"
 $ master up -d
 ```
