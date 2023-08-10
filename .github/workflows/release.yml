@@ -195,16 +195,16 @@ jobs:
         include:
           - config: pro
             db: mongo44
-            markers: -m "not local and not mdcb and not dind"
+            markers: '-m "not local and not mdcb and not dind"'
           - config: pro
             db: postgres15
-            markers: -m "not local and not mdcb and not dind and not sql"
+            markers: '-m "not local and not mdcb and not dind and not sql"'
           - config: pro-ha
             db: postgres15
-            markers: --ci -m "mdcb"
+            markers: '--ci -m "mdcb"'
           - config: pro-ha
             db: mongo44
-            markers: --ci -m "mdcb"
+            markers: '--ci -m "mdcb"'
     
     steps:
       - uses: actions/checkout@v3

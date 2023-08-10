@@ -1,0 +1,105 @@
+name: reusable api tests
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # This is required for requesting the JWT
+      contents: read    # This is required for actions/checkout
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - config: pro
+            db: mongo44
+            markers: '-m "not local and not mdcb and not dind"'
+          - config: pro
+            db: postgres15
+            markers: '-m "not local and not mdcb and not dind and not sql"'
+          - config: pro-ha
+            db: postgres15
+            markers: '--ci -m "mdcb"'
+          - config: pro-ha
+            db: mongo44
+            markers: '--ci -m "mdcb"'
+    
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: cipush
+          aws-region: eu-central-1
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: 'true'
+
+        # Only ${{ github.actor }} has access
+        # See https://github.com/mxschmitt/action-tmate#use-registered-public-ssh-keys
+      - name: Setup tmate session only in debug mode
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ runner.debug == '1' }}
+        with:
+          detached: true
+          limit-access-to-actor: true
+
+      - name: env up
+        shell: bash
+        working-directory: ci/auto
+        env:
+          TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
+          TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
+        run: |
+          echo CI tags: $t
+          tags=($t)
+          echo First tag: ${tags[0]}
+          echo "registry=${{ steps.ecr.outputs.registry }}
+          tyk_image=${tags[0]}
+          tyk_analytics_image=\${registry}/tyk-analytics:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
+          tyk_sink_image=\${registry}/tyk-sink:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
+          tyk_pump_image=\${registry}/tyk-pump:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
+          tyk_alfa_image=${tags[0]}
+          tyk_beta_image=${tags[0]}
+          # base dir for config files
+          confs_dir=./${{ matrix.config }}
+          # overrides via envvars
+          env_file=local-${{ matrix.db }}.env
+          " > versions.env
+          # Add Tyk component config variations to $env_file
+          # cat confs/${{ matrix.config }}.env >> local-${{ matrix.db }}.env
+          # bring up env
+          docker compose -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
+          if [[ "${{ matrix.config }}" == "pro-ha" ]];then
+            ./dash-bootstrap.sh http://localhost:3000
+            docker compose -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
+          fi
+
+      - name: Check containers exit codes
+        shell: bash
+        run: |
+          container_ids=$(docker ps -q)
+          for container_id in $container_ids; do
+            container_exit_code=$(docker inspect -f '{{.State.ExitCode}}' "$container_id")
+            if [ "$container_exit_code" -ne 0 ]; then
+              exit_code=1
+            fi
+          done
+          exit $exit_code
+
+      - name: Run tests
+        run: |
+          docker run --rm --network auto_default \
+          754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
+          pytest -c pytest_ci.ini "${{ matrix.markers }}"
