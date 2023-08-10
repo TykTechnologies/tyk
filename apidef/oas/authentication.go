@@ -399,11 +399,8 @@ func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 func (s *Scopes) ExtractTo(scopeClaim *apidef.ScopeClaim) {
 	scopeClaim.ScopeClaimName = s.ClaimName
 
+	scopeClaim.ScopeToPolicy = map[string]string{}
 	for _, v := range s.ScopeToPolicyMapping {
-		if scopeClaim.ScopeToPolicy == nil {
-			scopeClaim.ScopeToPolicy = make(map[string]string)
-		}
-
 		scopeClaim.ScopeToPolicy[v.Scope] = v.PolicyID
 	}
 }
@@ -549,7 +546,7 @@ func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 	api.AuthConfigs["oidc"] = authConfig
 
 	api.OpenIDOptions.SegregateByClient = o.SegregateByClientId
-
+	api.OpenIDOptions.Providers = []apidef.OIDProviderConfig{}
 	for _, p := range o.Providers {
 		clientIDs := make(map[string]string)
 		for _, mapping := range p.ClientToPolicyMapping {
