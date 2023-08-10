@@ -106,8 +106,10 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	// everytime
 	api.VersionData.NotVersioned = true
 	api.VersionData.DefaultVersion = ""
-	api.VersionData.Versions = map[string]apidef.VersionInfo{
-		"": {},
+	if len(api.VersionData.Versions) == 0 {
+		api.VersionData.Versions = map[string]apidef.VersionInfo{
+			"": {},
+		}
 	}
 }
 
