@@ -245,7 +245,7 @@ func TestAddTraceID(t *testing.T) {
 				req = req.WithContext(ctx)
 			}
 
-			addTraceID(w, req, gwConfig)
+			otel.AddTraceID(w, req, gwConfig.OpenTelemetry.Enabled)
 
 			if tt.wantHeader && w.Header().Get("X-Tyk-Trace-Id") == "" {
 				t.Errorf("expected header to be set, but it wasn't")

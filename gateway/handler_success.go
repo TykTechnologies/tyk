@@ -77,15 +77,6 @@ func addVersionHeader(w http.ResponseWriter, r *http.Request, globalConf config.
 	}
 }
 
-func addTraceID(w http.ResponseWriter, r *http.Request, globalConf config.Config) {
-	if globalConf.OpenTelemetry.Enabled {
-		span := otel.SpanFromContext(r.Context())
-		if span.SpanContext().HasTraceID() {
-			w.Header().Set("X-Tyk-Trace-Id", span.SpanContext().TraceID().String())
-		}
-	}
-}
-
 func estimateTagsCapacity(session *user.SessionState, apiSpec *APISpec) int {
 	size := 5 // that number of tags expected to be added at least before we record hit
 	if session != nil {
@@ -332,7 +323,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	s.Spec.SanitizeProxyPaths(r)
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
-	addTraceID(w, r, s.Spec.GlobalConfig)
+	otel.AddTraceID(w, r, s.Spec.GlobalConfig.OpenTelemetry.Enabled)
 
 	t1 := time.Now()
 	resp := s.Proxy.ServeHTTP(w, r)
@@ -364,7 +355,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	millisec := DurationToMillisecond(time.Since(t1))
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
-	addTraceID(w, r, s.Spec.GlobalConfig)
+	otel.AddTraceID(w, r, s.Spec.GlobalConfig.OpenTelemetry.Enabled)
 
 	log.Debug("Upstream request took (ms): ", millisec)
 
