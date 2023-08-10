@@ -12,7 +12,7 @@ on:
         type: string
 
 jobs:
-  api-tests:
+  api-tests-reusable:
     runs-on: ubuntu-latest
     permissions:
       id-token: write   # This is required for requesting the JWT
