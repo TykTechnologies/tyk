@@ -58,3 +58,13 @@ func TestGroupLoginCallback(t *testing.T) {
 	assert.Equal(t, key, groupLogin.UserKey)
 	assert.Equal(t, groupID, groupLogin.GroupID)
 }
+
+func TestGetNodeDataFunc(t *testing.T) {
+	// Checking if the getNodeDataFunc is returning different values on each call
+	valueToFetch := "foo"
+	sf := NewSyncForcer(rc, func() []byte { return []byte(valueToFetch) })
+	assert.Equal(t, valueToFetch, string(sf.getNodeDataFunc()))
+
+	valueToFetch = "bar"
+	assert.Equal(t, valueToFetch, string(sf.getNodeDataFunc()))
+}
