@@ -230,7 +230,7 @@ jobs:
         env:
           t: ${{ needs.goreleaser.outputs.tags }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
-          TYK_MDCB_LICENSE: ${{ secrets.TYK_MDCB_LICENSE }}
+          TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
         run: |
           echo CI tags: $t
           tags=($t)
