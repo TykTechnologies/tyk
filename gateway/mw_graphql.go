@@ -14,6 +14,7 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
+	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter"
@@ -31,10 +32,6 @@ const (
 	SchemaDataSource     = "SchemaDataSource"
 	TykRESTDataSource    = "TykRESTDataSource"
 	TykGraphQLDataSource = "TykGraphQLDataSource"
-)
-
-const (
-	GraphQLWebSocketProtocol = "graphql-ws"
 )
 
 var (
@@ -334,7 +331,8 @@ func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.
 
 func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request) bool {
 	websocketProtocol := r.Header.Get(header.SecWebSocketProtocol)
-	return websocketProtocol == GraphQLWebSocketProtocol
+	return websocketProtocol == string(gqlwebsocket.ProtocolGraphQLWS) ||
+		websocketProtocol == string(gqlwebsocket.ProtocolGraphQLTransportWS)
 }
 
 func (m *GraphQLMiddleware) checkForUnsupportedUsage() error {
