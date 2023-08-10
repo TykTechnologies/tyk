@@ -1,23 +1,17 @@
-version: '3'
-
-#dotenv: ['.env']
+---
+version: "3"
 
 vars:
   auto_folder: ci/auto
 
-env:
-  DEFAULT_WORKING_DIR: 'ci/auto'
-
 tasks:
   login:
-    sumary: |
-      Logins into AWS ECR registry to allow pull required images from it
+    desc: Logins into AWS ECR registry to allow pull required images from it
     cmds:
       - aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin 754489498669.dkr.ecr.eu-central-1.amazonaws.com
 
   bootstrap:
-    sumary: |
-      Bootstraps dashboard with an organization and user
+    desc: Bootstraps dashboard with an organization and user
     dir: '{{.auto_folder}}'
     cmds:
       - sleep 8
@@ -25,8 +19,7 @@ tasks:
       - sleep 8
 
   local:
-    sumary: |
-      Deploys infrastructure locally using docker compose manifest
+    desc: Deploys infrastructure locally using docker compose manifest
     dir: '{{.auto_folder}}'
     env:
       DB: '{{ or .DB "mongo44" }}'
@@ -36,8 +29,7 @@ tasks:
       - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env --profile master-datacenter up --quiet-pull -d
 
   clean:
-    sumary: |
-      Tears down all local infrastructure including networking
+    desc: Tears down all local infrastructure including networking
     dir: '{{.auto_folder}}'
     env:
       DB: '{{ or .DB "mongo44" }}'
@@ -48,8 +40,7 @@ tasks:
 
 
   local-ha:
-    sumary: |
-      Deploys infrastructure locally using docker compose manifest
+    desc: Deploys infrastructure locally using docker compose manifest
     dir: '{{.auto_folder}}'
     env:
       DB: '{{ or .DB "mongo44" }}'
@@ -61,8 +52,7 @@ tasks:
       - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env --profile slave-datacenter up --quiet-pull -d
 
   clean-ha:
-    sumary: |
-      Tears down all local infrastructure including networking
+    desc: Tears down all local infrastructure including networking
     dir: '{{.auto_folder}}'
     env:
       DB: '{{ or .DB "mongo44" }}'
@@ -73,18 +63,19 @@ tasks:
 
 
   pytest:
-    sumary: |
+    desc: |
       Deploys pytest container that runs against local infrastructure using docker compose manifest
+      - For mdcb you may want to use the ARGS "--ci -m "mdcb""
+      - For non mdcb deployments something like "-m "not local and not mdcb""
     dir: '{{.auto_folder}}'
-    env:
-      OPTIONS: "--ci -m mdcb"
     cmds: 
       - |
-        docker run --rm --network auto_default --env-file pytest.env \
+        docker run --rm --network auto_default --env-file ./pytest.env \
         754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:master \
-        pytest -c pytest_ci.ini "${OPTIONS}"
+        pytest -c pytest_ci.ini {{.CLI_ARGS}}
 
   healthcheck:
+    desc: Usefull healthchecks to ensure services are up and running
     cmds:
       - echo "---Gateway Status---"
       - curl -s --fail -k https://"{{.HOST}}":8080/hello

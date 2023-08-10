@@ -191,9 +191,15 @@ jobs:
       fail-fast: false
       matrix:
         db: [ "mongo44", "postgres15" ]
+        config: ["pro"]
+        # config: ["pro", "pro-ha"]
         include:
-          - db: postgres15
-            markers: "and not sql"
+          - conf: pro
+            db: mongo
+            markers: -m "not local and not mdcb and not dind"
+          - config: pro
+            db: postgres15
+            markers: -m "not local and not mdcb and not dind and not sql"
     
     steps:
       - uses: actions/checkout@v3
@@ -234,7 +240,7 @@ jobs:
           tyk_sink_image=\${registry}/tyk-sink:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
           tyk_pump_image=\${registry}/tyk-pump:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
           # base dir for config files
-          confs_dir=./pro
+          confs_dir=./${{ matrix.config }}
           # overrides via envvars
           env_file=local-${{ matrix.db }}.env" > versions.env
           cat versions.env
@@ -257,7 +263,7 @@ jobs:
         run: |
           docker run --rm --network auto_default \
           754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
-          pytest -c pytest_ci.ini -m "not local and not mdcb and not dind ${{ matrix.markers }}"
+          pytest -c pytest_ci.ini ${{ matrix.markers }}"
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
 
