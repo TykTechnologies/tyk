@@ -191,15 +191,20 @@ jobs:
       fail-fast: false
       matrix:
         db: [ "mongo44", "postgres15" ]
-        config: ["pro"]
-        # config: ["pro", "pro-ha"]
+        config: ["pro", "pro-ha"]
         include:
           - conf: pro
-            db: mongo
+            db: mongo44
             markers: -m "not local and not mdcb and not dind"
           - config: pro
             db: postgres15
             markers: -m "not local and not mdcb and not dind and not sql"
+          - config: pro-ha
+            db: postgres15
+            markers: --ci -m "mdcb"
+          - config: pro-ha
+            db: mongo44
+            markers: --ci -m "mdcb"
     
     steps:
       - uses: actions/checkout@v3
@@ -249,6 +254,10 @@ jobs:
           cat versions.env
           # bring up env
           docker compose -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
+          if [[ "${{ matrix.config }}" == "pro-ha" ]];then
+            ./dash-bootstrap.sh http://localhost:3000
+            docker compose -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
+          fi
 
       - name: Check containers exit codes
         shell: bash
@@ -266,7 +275,7 @@ jobs:
         run: |
           docker run --rm --network auto_default \
           754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
-          pytest -c pytest_ci.ini ${{ matrix.markers }}"
+          pytest -c pytest_ci.ini "${{ matrix.markers }}"
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
 
