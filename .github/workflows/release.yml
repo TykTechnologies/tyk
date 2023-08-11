@@ -196,16 +196,30 @@ jobs:
           - config: pro
             db: mongo44
             markers: '-m "not local and not mdcb and not dind"'
+            variation: murmur64
+          - config: pro
+            db: mongo44
+            markers: '-m "not local and not mdcb and not dind"'
+            variation: sha256
           - config: pro
             db: postgres15
             markers: '-m "not local and not mdcb and not dind and not sql"'
+            variation: murmur64
+          - config: pro
+            db: postgres15
+            markers: '-m "not local and not mdcb and not dind and not sql"'
+            variation: sha256
           # - config: pro-ha
           #   db: postgres15
           #   markers: '--ci -m "mdcb"'
           - config: pro-ha
             db: mongo44
             markers: '--ci -m "mdcb"'
-    
+            variation: murmur64
+          - config: pro-ha
+            db: mongo44
+            markers: '--ci -m "mdcb"'
+            variation: sha256    
     steps:
       - uses: actions/checkout@v3
         with:
@@ -255,7 +269,7 @@ jobs:
           env_file=local-${{ matrix.db }}.env
           " > versions.env
           # Add Tyk component config variations to $env_file
-          # cat confs/${{ matrix.config }}.env >> local-${{ matrix.db }}.env
+          cat confs/${{ matrix.variation }}.env >> local-${{ matrix.db }}.env
           # bring up env
           docker compose -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
           if [[ "${{ matrix.config }}" == "pro-ha" ]];then
