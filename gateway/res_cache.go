@@ -25,6 +25,10 @@ type ResponseCacheMiddleware struct {
 	store storage.Handler
 }
 
+func (m *ResponseCacheMiddleware) Base() *BaseTykResponseHandler {
+	return &m.BaseTykResponseHandler
+}
+
 func (m *ResponseCacheMiddleware) Name() string {
 	return "ResponseCacheMiddleware"
 }

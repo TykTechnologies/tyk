@@ -913,6 +913,7 @@ type TykResponseHandler interface {
 	Name() string
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
 	HandleError(http.ResponseWriter, *http.Request)
+	Base() *BaseTykResponseHandler
 }
 
 type TykGoPluginResponseHandler interface {
@@ -938,6 +939,12 @@ func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykRespo
 }
 
 func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
+
+	if res.Request != nil {
+		// res.Request context contains otel information from the otel roundtripper
+		setContext(req, res.Request.Context())
+	}
+
 	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
@@ -957,8 +964,54 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		span, ctx := trace.Span(req.Context(), rh.Name())
 		defer span.Finish()
 		req = req.WithContext(ctx)
+	} else if rh.Base().Gw.GetConfig().OpenTelemetry.Enabled {
+		return handleOtelTracedResponse(rh, rw, res, req, ses)
 	}
 	return rh.HandleResponse(rw, res, req, ses)
+}
+
+// handleOtelTracedResponse handles the tracing for the response middlewares when
+// otel is enabled in the gateway
+func handleOtelTracedResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	var span otel.Span
+	var err error
+
+	baseMw := rh.Base()
+	if baseMw == nil {
+		return errors.New("unsupported base middleware")
+	}
+
+	// ResponseCacheMiddleware always executes but not always caches,so check if we must create the span
+	shouldTrace := shouldPerformTracing(rh, baseMw)
+	ctx := req.Context()
+	if shouldTrace {
+		if baseMw.Spec.DetailedTracing {
+			ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
+			defer span.End()
+			setContext(req, ctx)
+		} else {
+			span = otel.SpanFromContext(ctx)
+		}
+
+		err = rh.HandleResponse(rw, res, req, ses)
+
+		if err != nil {
+			span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
+		}
+
+		attrs := ctxGetSpanAttributes(req, rh.Name())
+		if len(attrs) > 0 {
+			span.SetAttributes(attrs...)
+		}
+	} else {
+		err = rh.HandleResponse(rw, res, req, ses)
+	}
+
+	return err
+}
+
+func shouldPerformTracing(rh TykResponseHandler, baseMw *BaseTykResponseHandler) bool {
+	return rh.Name() != "ResponseCacheMiddleware" || baseMw.Spec.CacheOptions.EnableCache
 }
 
 func parseForm(r *http.Request) {
