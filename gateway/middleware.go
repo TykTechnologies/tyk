@@ -381,16 +381,33 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	t.clearSession(session)
 
 	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
-	policies := session.PolicyIDs()
 
-	for _, polID := range policies {
+	var (
+		err       error
+		lookupMap map[string]user.Policy
+		policyIDs []string
+	)
+
+	customPolicies, err := session.CustomPolicies()
+	if err != nil {
+		policyIDs = session.PolicyIDs()
 		t.Gw.policiesMu.RLock()
-		policy, ok := t.Gw.policiesByID[polID]
-		t.Gw.policiesMu.RUnlock()
+		lookupMap = t.Gw.policiesByID
+		defer t.Gw.policiesMu.RUnlock()
+	} else {
+		lookupMap = customPolicies
+		policyIDs = make([]string, 0, len(customPolicies))
+		for _, val := range customPolicies {
+			policyIDs = append(policyIDs, val.ID)
+		}
+	}
+
+	for _, polID := range policyIDs {
+		policy, ok := lookupMap[polID]
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
-			if len(policies) > 1 {
+			if len(policyIDs) > 1 {
 				continue
 			}
 
@@ -654,7 +671,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		session.Tags = appendIfMissing(session.Tags, tag)
 	}
 
-	if len(policies) == 0 {
+	if len(policyIDs) == 0 {
 		for apiID, accessRight := range session.AccessRights {
 			// check if the api in the session has per api limit
 			if !accessRight.Limit.IsEmpty() {
