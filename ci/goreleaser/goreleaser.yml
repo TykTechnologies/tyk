@@ -8,22 +8,25 @@
 builds:
   - id: std-linux
     flags:
-      - -trimpath
       - -tags=goplugin
     ldflags:
       - -X github.com/TykTechnologies/tyk/gateway.VERSION={{.Version}} -X github.com/TykTechnologies/tyk/gateway.Commit={{.FullCommit}} -X github.com/TykTechnologies/tyk/gateway.buildDate={{.Date}} -X github.com/TykTechnologies/tyk/gateway.builtBy=goreleaser
     goos:
       - linux
+    env:
+      - CGO_ENABLED=1
+      - GO111MODULE=off
     goarch:
       - amd64
     binary: tyk
   - id: std-arm64
     flags:
-      - -trimpath
       - -tags=goplugin
     ldflags:
       - -X github.com/TykTechnologies/tyk/gateway.VERSION={{.Version}} -X github.com/TykTechnologies/tyk/gateway.Commit={{.FullCommit}} -X github.com/TykTechnologies/tyk/gateway.buildDate={{.Date}} -X github.com/TykTechnologies/tyk/gateway.builtBy=goreleaser
     env:
+      - CGO_ENABLED=1
+      - GO111MODULE=off
       - CC=aarch64-linux-gnu-gcc
     goos:
       - linux
