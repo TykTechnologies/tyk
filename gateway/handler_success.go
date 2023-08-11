@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/otel"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
@@ -322,6 +323,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	s.Spec.SanitizeProxyPaths(r)
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
+	otel.AddTraceID(w, r, s.Spec.GlobalConfig.OpenTelemetry.Enabled)
 
 	t1 := time.Now()
 	resp := s.Proxy.ServeHTTP(w, r)
@@ -353,6 +355,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	millisec := DurationToMillisecond(time.Since(t1))
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
+	otel.AddTraceID(w, r, s.Spec.GlobalConfig.OpenTelemetry.Enabled)
 
 	log.Debug("Upstream request took (ms): ", millisec)
 

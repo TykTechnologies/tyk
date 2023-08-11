@@ -474,7 +474,8 @@ func TestOpenTelemetry(t *testing.T) {
 				spec.DetailedTracing = detailed
 			})
 
-			_, _ = ts.Run(t, test.TestCase{Path: "/my-api/", Code: http.StatusOK})
+			response, _ := ts.Run(t, test.TestCase{Path: "/my-api/", Code: http.StatusOK})
+			assert.NotEmpty(t, response.Header.Get("X-Tyk-Trace-Id"))
 			assert.Equal(t, "otel", ts.Gw.TracerProvider.Type())
 		}
 
@@ -505,7 +506,8 @@ func TestOpenTelemetry(t *testing.T) {
 			spec.UseKeylessAccess = true
 		})
 
-		_, _ = ts.Run(t, test.TestCase{Path: "/my-api/", Code: http.StatusOK})
+		response, _ := ts.Run(t, test.TestCase{Path: "/my-api/", Code: http.StatusOK})
+		assert.Empty(t, response.Header.Get("X-Tyk-Trace-Id"))
 		assert.Equal(t, "noop", ts.Gw.TracerProvider.Type())
 	})
 }
