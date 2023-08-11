@@ -5,6 +5,11 @@ on:
     branches:
       - master
       - release-**
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
 
 env:
   GOPRIVATE: github.com/TykTechnologies
