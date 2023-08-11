@@ -12,8 +12,8 @@ func (s *SessionState) TagsFromMetadata(data map[string]interface{}) (updateSess
 	clientTags, ok := data["tags"].([]interface{})
 	if ok {
 		for _, tag := range clientTags {
-			strTag, err := tag.(string)
-			if err {
+			strTag, ok := tag.(string)
+			if !ok {
 				continue
 			}
 			s.Tags = append(s.Tags, strTag)
