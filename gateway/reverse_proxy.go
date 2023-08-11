@@ -1529,7 +1529,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// We should at least copy the status code in
 	inres.StatusCode = res.StatusCode
 	inres.ContentLength = res.ContentLength
-
 	p.HandleResponse(rw, res, ses)
 	return ProxyResponse{UpstreamLatency: upstreamLatency, Response: inres}
 }

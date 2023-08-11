@@ -638,7 +638,6 @@ func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeader
 
 func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
 	dispatcher := loadedDrivers[c.Middleware.MiddlewareDriver]
-
 	if dispatcher == nil {
 		err := fmt.Errorf("Couldn't dispatch request, driver '%s' isn't available", c.Middleware.MiddlewareDriver)
 		return nil, err
