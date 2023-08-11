@@ -1,10 +1,16 @@
 on:
   pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
   issue_comment:
 jobs:
   pr_agent_job:
     runs-on: ubuntu-latest
     name: Run pr agent on every pull request, respond to user comments
+    if: !github.event.pull_request.draft
     steps:
       - name: PR Agent action step
         id: pragent
