@@ -2717,6 +2717,15 @@ func TestOAS(t *testing.T) {
 				oasAPIInOld := testGetOldAPI(t, ts, apiID, "oas api")
 
 				oasAPIInOld.Name = "old-updated oas api"
+
+				t.Run("update oas API with old format - should fail", func(t *testing.T) {
+					updatePath := "/tyk/apis/" + apiID
+
+					_, _ = ts.Run(t, []test.TestCase{
+						{AdminAuth: true, Method: http.MethodPut, Path: updatePath, Data: &oasAPIInOld,
+							BodyMatch: apidef.ErrAPIMigrated.Error(), Code: http.StatusBadRequest},
+					}...)
+				})
 			})
 
 			t.Run("with oas and gateway tags enabled", func(t *testing.T) {
