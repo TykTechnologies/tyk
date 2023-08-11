@@ -418,15 +418,9 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	return transport
 }
 
-<<<<<<< HEAD
-func singleJoiningSlash(a, b string, disableStripSlash bool) string {
-	if disableStripSlash && len(b) == 0 {
-		return a
-=======
 func singleJoiningSlash(targetPath, subPath string, disableStripSlash bool) string {
 	if disableStripSlash && (len(subPath) == 0 || subPath == "/") {
 		return targetPath
->>>>>>> 7fa4a7ef... Improve path joining tests with disable strip slash (#4813)
 	}
 
 	targetPath = strings.TrimRight(targetPath, "/")

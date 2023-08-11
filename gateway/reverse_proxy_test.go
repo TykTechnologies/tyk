@@ -578,15 +578,11 @@ func TestSingleJoiningSlash(t *testing.T) {
 		{"foo", "", "foo"},
 		{"foo", "/", "foo"},
 		{"foo/", "", "foo/"},
-<<<<<<< HEAD
-		{"foo", "", "foo"},
-=======
 		{"foo/", "/", "foo/"},
 		{"foo/", "/name", "foo/name"},
 		{"foo/", "/name/", "foo/name/"},
 		{"foo/", "//name", "foo/name"},
 		{"foo/", "//name/", "foo/name/"},
->>>>>>> 7fa4a7ef... Improve path joining tests with disable strip slash (#4813)
 	}
 	for i, tc := range testsTrue {
 		t.Run(fmt.Sprintf("disabled StripSlashes #%d", i), func(t *testing.T) {
