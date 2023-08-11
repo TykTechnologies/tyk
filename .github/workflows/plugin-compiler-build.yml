@@ -69,6 +69,6 @@ jobs:
           labels: ${{ steps.set-metadata.outputs.labels }}
           tags: ${{ steps.set-metadata.outputs.tags }}
           build-args: |
-            BASE-IMAGE=tykio/golang-cross:${{ matrix.golang_cross }}
+            BASE_IMAGE=tykio/golang-cross:${{ matrix.golang_cross }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
