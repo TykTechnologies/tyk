@@ -595,27 +595,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			if userData != nil {
 				data, ok := userData.(map[string]interface{})
 				if ok {
-					developerID, keyFound := data["tyk_developer_id"].(string)
-					if keyFound {
-						session.MetaData["tyk_developer_id"] = developerID
-						updateSession = true
-					}
+					updateSession = session.TagsFromMetadata(data)
 
-					// pteam-<id>, porg-<id>
-					clientTags, ok := data["tags"].([]interface{})
-					if ok {
-						for _, tag := range clientTags {
-							strTag, _ := tag.(string)
-							session.Tags = append(session.Tags, strTag)
-						}
-						updateSession = true
-					}
-
-					policies, ok := data["policies"].([]interface{})
-					if ok {
-						session.MetaData["policies"] = policies
-						updateSession = true
-					}
 					if err := k.ApplyPolicies(&session); err != nil {
 						return errors.New("failed to apply policies in session metadata: " + err.Error()), http.StatusInternalServerError
 					}
