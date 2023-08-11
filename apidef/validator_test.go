@@ -3,6 +3,7 @@ package apidef
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -330,4 +331,87 @@ func TestRuleValidateIPList_Validate(t *testing.T) {
 			},
 		},
 	))
+}
+
+func TestRuleValidateEnforceTimeout_Validate(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleValidateEnforceTimeout{},
+	}
+
+	getAPIDef := func(hardTimeouts []HardTimeoutMeta) *APIDefinition {
+		return &APIDefinition{
+			VersionData: VersionData{
+				Versions: map[string]VersionInfo{
+					"Default": {
+						Name: "Default",
+						ExtendedPaths: ExtendedPathsSet{
+							HardTimeouts: hardTimeouts,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name   string
+		apiDef *APIDefinition
+		result ValidationResult
+	}{
+		{
+			name: "negative timeout",
+			apiDef: getAPIDef([]HardTimeoutMeta{
+				{
+					Disabled: false,
+					Path:     "/get",
+					Method:   http.MethodGet,
+					TimeOut:  -1,
+				},
+			}),
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidTimeoutValue},
+			},
+		},
+		{
+			name: "negative timeout for one among multiple paths",
+			apiDef: getAPIDef([]HardTimeoutMeta{
+				{
+					Disabled: false,
+					Path:     "/post",
+					Method:   http.MethodGet,
+					TimeOut:  -1,
+				},
+				{
+					Disabled: false,
+					Path:     "/get",
+					Method:   http.MethodGet,
+					TimeOut:  10,
+				},
+			}),
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidTimeoutValue},
+			},
+		},
+		{
+			name: "positive timeout",
+			apiDef: getAPIDef([]HardTimeoutMeta{
+				{
+					Disabled: true,
+					Path:     "/post",
+					Method:   http.MethodGet,
+					TimeOut:  10,
+				},
+			}),
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
+	}
 }
