@@ -13,6 +13,10 @@ type ResponseTransformJQMiddleware struct {
 	BaseTykResponseHandler
 }
 
+func (h ResponseTransformJQMiddleware) Base() *BaseTykResponseHandler {
+	return &h.BaseTykResponseHandler
+}
+
 func (ResponseTransformJQMiddleware) Name() string {
 	return "ResponseTransformJQMiddleware"
 }
