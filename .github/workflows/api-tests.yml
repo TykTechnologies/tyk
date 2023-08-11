@@ -141,7 +141,7 @@ jobs:
          path: ./tyk-automated-tests/reports/
 
     - name: Notify slack
-      if: '! github.event.pull_request.draft'
+      if: !github.event.pull_request.draft
       uses: rtCamp/action-slack-notify@v2
       env:
         SLACK_WEBHOOK: ${{ secrets.GW_SLACK_WEBHOOK }}
