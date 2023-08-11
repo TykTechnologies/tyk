@@ -74,7 +74,7 @@ module "tyk" {
 	reviewers = "0",
 	convos    = "false",
 	source_branch  = "release-5-lts",
-	required_tests = ["Go 1.16 Redis 5","1.16","1.16-el7"]},
+	required_tests = ["Go 1.16 Redis 5","1.16-bullseye","1.16-el7"]},
 { branch    = "release-5.1",
 	reviewers = "0",
 	convos    = "false",
