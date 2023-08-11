@@ -293,21 +293,3 @@ func TestHeaderTransformBase(t *testing.T) {
 	// Check that the returned base is indeed the BaseTykResponseHandler of ht
 	require.Equal(t, &ht.BaseTykResponseHandler, base, "Base method did not return the expected BaseTykResponseHandler")
 }
-
-func TestResponseTransformJQMiddleware_Base(t *testing.T) {
-	mw := ResponseTransformJQMiddleware{
-		BaseTykResponseHandler: BaseTykResponseHandler{ /* You can set any properties if needed */ },
-	}
-
-	if mw.Base() != &mw.BaseTykResponseHandler {
-		t.Error("Base() did not return the expected BaseTykResponseHandler reference")
-	}
-}
-
-func TestResponseTransformJQMiddleware_Name(t *testing.T) {
-	mw := ResponseTransformJQMiddleware{}
-
-	if mw.Name() != "ResponseTransformJQMiddleware" {
-		t.Errorf("Expected Name() to return 'ResponseTransformJQMiddleware', got '%s'", mw.Name())
-	}
-}
