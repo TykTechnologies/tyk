@@ -580,7 +580,8 @@
           "type": "boolean"
         },
         "value": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 0
         }
       },
       "required": [
