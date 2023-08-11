@@ -974,31 +974,44 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 // otel is enabled in the gateway
 func handleOtelTracedResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	var span otel.Span
+	var err error
+
 	baseMw := rh.Base()
 	if baseMw == nil {
 		return errors.New("unsupported base middleware")
 	}
 
+	// ResponseCacheMiddleware always executes but not always caches,so check if we must create the span
+	shouldTrace := shouldPerformTracing(rh, baseMw)
 	ctx := req.Context()
-	if baseMw.Spec.DetailedTracing {
-		ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
-		defer span.End()
-		setContext(req, ctx)
+	if shouldTrace {
+		if baseMw.Spec.DetailedTracing {
+			ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
+			defer span.End()
+			setContext(req, ctx)
+		} else {
+			span = otel.SpanFromContext(ctx)
+		}
+
+		err = rh.HandleResponse(rw, res, req, ses)
+
+		if err != nil {
+			span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
+		}
+
+		attrs := ctxGetSpanAttributes(req, rh.Name())
+		if len(attrs) > 0 {
+			span.SetAttributes(attrs...)
+		}
 	} else {
-		span = otel.SpanFromContext(ctx)
-	}
-
-	err := rh.HandleResponse(rw, res, req, ses)
-	if err != nil {
-		span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
-	}
-
-	attrs := ctxGetSpanAttributes(req, rh.Name())
-	if len(attrs) > 0 {
-		span.SetAttributes(attrs...)
+		err = rh.HandleResponse(rw, res, req, ses)
 	}
 
 	return err
+}
+
+func shouldPerformTracing(rh TykResponseHandler, baseMw *BaseTykResponseHandler) bool {
+	return rh.Name() != "ResponseCacheMiddleware" || baseMw.Spec.CacheOptions.EnableCache
 }
 
 func parseForm(r *http.Request) {
