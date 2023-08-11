@@ -17,6 +17,7 @@ services:
       start_period: 10s
 
   wait_postgres:
+    profiles: ["all", "master-datacenter"]
     image: hello-world:linux
     depends_on:
         postgres:
