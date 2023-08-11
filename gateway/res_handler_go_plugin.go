@@ -21,6 +21,10 @@ type ResponseGoPluginMiddleware struct {
 	ResHandler func(rw http.ResponseWriter, res *http.Response, req *http.Request)
 }
 
+func (h ResponseGoPluginMiddleware) Base() *BaseTykResponseHandler {
+	return &h.BaseTykResponseHandler
+}
+
 func (ResponseGoPluginMiddleware) Name() string {
 	return "ResponseGoPluginMiddleware"
 }

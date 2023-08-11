@@ -1534,7 +1534,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 }
 
 func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) error {
-
 	// Remove hop-by-hop headers listed in the
 	// "Connection" header of the response.
 	if c := res.Header.Get(header.Connection); c != "" {
