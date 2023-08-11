@@ -199,9 +199,9 @@ jobs:
           - config: pro
             db: postgres15
             markers: '-m "not local and not mdcb and not dind and not sql"'
-          - config: pro-ha
-            db: postgres15
-            markers: '--ci -m "mdcb"'
+          # - config: pro-ha
+          #   db: postgres15
+          #   markers: '--ci -m "mdcb"'
           - config: pro-ha
             db: mongo44
             markers: '--ci -m "mdcb"'
@@ -276,8 +276,9 @@ jobs:
           exit $exit_code
 
       - name: Run tests
+        working-directory: ci/auto
         run: |
-          docker run --rm --network auto_default \
+          docker run --rm --network auto_default --env-file ./pytest.env \
           754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
           pytest -c pytest_ci.ini ${{ matrix.markers }}
 

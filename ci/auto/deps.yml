@@ -55,7 +55,7 @@ services:
 
   federation-server:
     profiles: ["all", "master-datacenter"]
-    container_name: federation-server
+    container_name: federation
     image: agatawitkowska/federation-example
     ports:
       - "4000:4000"
