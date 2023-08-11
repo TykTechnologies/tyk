@@ -27,7 +27,7 @@ spec:
     selector: "span[tracetest.span.type=\"general\" name=\"Tracetest trigger\"] span[tracetest.span.type=\"general\"],
       \nspan[tracetest.span.type = \"http\"]"
     assertions:
-    - attr:tracetest.selected_spans.count = 5
+    - attr:tracetest.selected_spans.count = 4
   - name: Check the proxying request span
     selector: span[tracetest.span.type="http" name="HTTP GET" http.method="GET"]
     assertions:

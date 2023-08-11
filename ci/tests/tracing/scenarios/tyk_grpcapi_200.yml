@@ -50,7 +50,7 @@ spec:
       span[tracetest.span.type="general"]
     name: Check the middlewares executed
     assertions:
-    - attr:tracetest.selected_spans.count  =  4
+    - attr:tracetest.selected_spans.count  =  3
   - selector: span[tracetest.span.type="http" name="HTTP POST" http.method="POST"]
     name: Checking the h2c proxying  
     assertions:
