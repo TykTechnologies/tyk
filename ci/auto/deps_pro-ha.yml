@@ -1,6 +1,7 @@
 version: "3.9"
 services:
   redis:
+    profiles: ["all", "master-datacenter"]
     container_name: redis
     image: bitnami/redis:6.2
     environment:
@@ -13,9 +14,39 @@ services:
       retries: 10
       start_period: 2s
       timeout: 10s
-    # command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+
+  redis-datacenter-1:
+    profiles: ["all", "slave-datacenter"]
+    container_name: redis-datacenter-1
+    image: bitnami/redis:6.2
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes    
+    ports:
+      - "6381:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 5s
+      retries: 10
+      start_period: 2s
+      timeout: 10s
+
+  redis-datacenter-2:
+    profiles: ["all", "slave-datacenter"]
+    container_name: redis-datacenter-2
+    image: bitnami/redis:6.2
+    environment:   
+      - ALLOW_EMPTY_PASSWORD=yes    
+    ports:
+      - "6382:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 5s
+      retries: 10
+      start_period: 2s
+      timeout: 10s
 
   bundle-server:
+    profiles: ["all", "master-datacenter"]
     container_name: bundle-server
     build:
       context: ./bundle-server
@@ -23,6 +54,7 @@ services:
       - "8000:8000"
 
   federation-server:
+    profiles: ["all", "master-datacenter"]
     container_name: federation
     image: agatawitkowska/federation-example
     ports:
@@ -32,6 +64,7 @@ services:
       - "4003:4003"
 
   openldap:
+    profiles: ["all", "master-datacenter"]
     container_name: openldap
     image: osixia/openldap:1.5.0
     ports:
@@ -43,6 +76,7 @@ services:
       - LDAP_READONLY_USER_PASSWORD=password
 
   graphql-faker:
+    profiles: ["all", "master-datacenter"]
     container_name: graphql-faker
     image: apisguru/graphql-faker:latest
     volumes:
@@ -52,19 +86,23 @@ services:
       - "9002:9002"
 
   upstream:
+    profiles: ["all", "master-datacenter"]
     container_name: httpbin.org
     image: kennethreitz/httpbin
     restart: always
 
   restcountries:
+    profiles: ["all", "master-datacenter"]
     container_name: restcountries
     image: bigpapoo/restcountries:1.0
       
   trevorblades:
+    profiles: ["all", "master-datacenter"]
     container_name: trevorblades
     image: mangomm/trevorblades-countries
 
   wait_deps:
+    profiles: ["all", "master-datacenter"]
     image: hello-world:linux
     depends_on:
         redis:
