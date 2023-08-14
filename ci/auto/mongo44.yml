@@ -1,7 +1,6 @@
 version: "3"
 services:
   mongo:
-    profiles: ["all", "master-datacenter"]
     container_name: mongo
     image: mongo:4.4
     # environment:
@@ -16,8 +15,7 @@ services:
       retries: 5
       start_period: 10s
 
-  wait_mongo:
-    profiles: ["all", "master-datacenter"]
+  wait_deps:
     image: hello-world:linux
     depends_on:
         mongo:
