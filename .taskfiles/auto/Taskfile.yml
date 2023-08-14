@@ -26,7 +26,7 @@ tasks:
       confs_dir: '{{ or .confs_dir "./pro" }}'
       env_file: local-{{.DB}}.env
     cmds:
-      - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env --profile master-datacenter up --quiet-pull -d
+      - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env up --quiet-pull -d
 
   clean:
     desc: Tears down all local infrastructure including networking
@@ -36,7 +36,7 @@ tasks:
       confs_dir: '{{ or .confs_dir "./pro" }}'
       env_file: local-{{.DB}}.env
     cmds:
-      - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env --profile master-datacenter down
+      - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env down
 
 
   local-ha:
@@ -47,9 +47,9 @@ tasks:
       confs_dir: '{{ or .confs_dir "./pro-ha" }}'
       env_file: local-{{.DB}}.env
     cmds:
-      - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env --profile master-datacenter up --quiet-pull -d
+      - docker compose -f pro-ha.yml -f deps_pro-ha.yml -f ${DB}.yml --env-file master.env --profile master-datacenter up --quiet-pull -d
       - task: bootstrap
-      - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env --profile slave-datacenter up --quiet-pull -d
+      - docker compose -f pro-ha.yml -f deps_pro-ha.yml -f ${DB}.yml --env-file master.env --profile slave-datacenter up --quiet-pull -d
 
   clean-ha:
     desc: Tears down all local infrastructure including networking
@@ -59,7 +59,7 @@ tasks:
       confs_dir: '{{ or .confs_dir "./pro-ha" }}'
       env_file: local-{{.DB}}.env
     cmds:
-      - docker compose -f pro.yml -f deps.yml -f ${DB}.yml --env-file master.env --profile all down
+      - docker compose -f pro-ha.yml -f deps_pro-ha.yml -f ${DB}.yml --env-file master.env --profile all down
 
 
   pytest:
@@ -70,7 +70,7 @@ tasks:
     dir: '{{.auto_folder}}'
     cmds: 
       - |
-        docker run --rm --network auto_default --env-file ./pytest.env \
+        docker run --rm --network auto_default \
         754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:master \
         pytest -c pytest_ci.ini {{.CLI_ARGS}}
 
