@@ -609,6 +609,8 @@ type Config struct {
 	// Disable dynamic API and Policy reloads, e.g. it will load new changes only on procecss start.
 	SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
 
+	ReloadInterval int64 `json:"reload_interval"`
+
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
 
