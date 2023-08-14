@@ -696,18 +696,19 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				})
 
 				t.Run("should send configured headers upstream", func(t *testing.T) {
-					proxyOnlyHeaders := map[string][]string{
-						"MyCustomHeader": {"custom-value"},
+					expectedProxyOnlyHeaders := map[string][]string{
+						"My-Custom-Header": {"custom-value"},
+						"From-Request":     {"request-value"},
 					}
 
 					wsTestServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						for expectedHeaderKey := range proxyOnlyHeaders {
+						for expectedHeaderKey := range expectedProxyOnlyHeaders {
 							values := r.Header.Values(expectedHeaderKey)
 							headerExists := assert.Greater(t, len(values), 0, fmt.Sprintf("no header values found for header '%s'", expectedHeaderKey))
 							if !headerExists {
 								return
 							}
-							for _, expectedHeaderValue := range proxyOnlyHeaders[expectedHeaderKey] {
+							for _, expectedHeaderValue := range expectedProxyOnlyHeaders[expectedHeaderKey] {
 								assert.Contains(t, values, expectedHeaderValue, fmt.Sprintf("expected header value '%s' was not found for '%s'", expectedHeaderValue, expectedHeaderKey))
 							}
 						}
@@ -717,18 +718,21 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 						spec.UseKeylessAccess = true
 						spec.Proxy.ListenPath = "/"
+						spec.EnableContextVars = true
 						spec.GraphQL.Enabled = true
 						spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 						spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 						spec.GraphQL.Schema = `type Query { hello: String } type Subscription { subscribe: String }`
 						spec.GraphQL.Proxy.RequestHeaders = map[string]string{
-							"MyCustomHeader": "custom-value",
+							"My-Custom-Header": "custom-value",
+							"From-Request":     "$tyk_context.headers_X_My_Request",
 						}
 						spec.Proxy.TargetURL = wsTestServer.URL
 					})
 
 					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-						header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+						header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
+						"X-My-Request":              {"request-value"},
 					})
 					require.NoError(t, err)
 					defer wsConn.Close()
@@ -739,7 +743,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 					// Gateway should acknowledge the connection
 					_, msg, err := wsConn.ReadMessage()
-					require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+					require.Equal(t, `{"type":"connection_ack"}`, string(msg))
 					require.NoError(t, err)
 
 					// Start subscription
