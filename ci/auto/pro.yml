@@ -1,0 +1,88 @@
+version: "3.9"
+services:
+  tyk:
+    container_name: tyk
+    image: ${tyk_image}
+    env_file:
+      - ${env_file}
+    volumes:
+      - ./certs:/usr/local/share/ca-certificates
+      - ${confs_dir}:/conf/
+    ports:
+      - "6000:6000"
+      - "8003:8003"
+      - "8080:8080"
+    entrypoint: ["/bin/bash"]
+    command:
+      - "-c"
+      - |
+        update-ca-certificates
+        /opt/tyk-gateway/tyk --conf /conf/tyk.conf
+
+  tyk-analytics:
+    container_name: tyk-analytics
+    image: ${tyk_analytics_image}
+    env_file:
+      - ${env_file}
+    environment:
+      - TYK_DB_LICENSEKEY=${TYK_DB_LICENSEKEY}
+    volumes:
+      - ./certs:/usr/local/share/ca-certificates
+      - ${confs_dir}:/conf/
+    ports:
+      - "3000:3000"
+      - "5000:5000"
+      - "1026:1025"
+    command: [ "--conf", "/conf/tyk-analytics.conf" ]
+    restart: on-failure
+
+  tyk-pump:
+    container_name: tyk-pump
+    image: ${tyk_pump_image}
+    env_file:
+      - ${env_file}
+    volumes:
+      - ${confs_dir}:/conf/
+    ports:    
+      - "8061:8061"
+    command: [ "--conf", "/conf/tyk-pump.conf" ]
+
+  tyk-sink:
+    container_name: tyk-sink
+    env_file:
+      - ${env_file}
+    image: ${tyk_sink_image}
+    ports:
+    - "9090:9090"
+
+  gateway-checker:
+    image: curlimages/curl
+    command: tail -f /dev/null
+    depends_on:
+      - tyk
+    healthcheck:
+      test: curl -s -k --fail https://tyk:8080/hello | grep -o '.*status":"pass".*dashboard":{"status":"pass".*redis":{"status":"pass"'
+      interval: 5s
+      retries: 10
+      start_period: 4s
+      timeout: 10s
+
+  dashboard-checker:
+    image: curlimages/curl
+    command: tail -f /dev/null
+    depends_on:
+      - tyk-analytics
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://tyk-analytics:3000/hello/ | grep -q '^200$'"]
+      interval: 10s
+      retries: 30
+      start_period: 10s
+      timeout: 10s
+
+  wait:
+    image: hello-world:linux
+    depends_on:
+        gateway-checker:
+            condition: service_healthy
+        dashboard-checker:
+            condition: service_healthy 
