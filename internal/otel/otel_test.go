@@ -300,7 +300,7 @@ func TestAddTraceID(t *testing.T) {
 				req = req.WithContext(ctx)
 			}
 
-			AddTraceID(w, req)
+			AddTraceID(req.Context(), w)
 
 			if tt.wantHeader && w.Header().Get("X-Tyk-Trace-Id") == "" {
 				t.Errorf("expected header to be set, but it wasn't")

@@ -137,8 +137,8 @@ func SpanFromContext(ctx context.Context) tyktrace.Span {
 	return tyktrace.SpanFromContext(ctx)
 }
 
-func AddTraceID(w http.ResponseWriter, r *http.Request) {
-	span := SpanFromContext(r.Context())
+func AddTraceID(ctx context.Context, w http.ResponseWriter) {
+	span := SpanFromContext(ctx)
 	if span.SpanContext().HasTraceID() {
 		w.Header().Set("X-Tyk-Trace-Id", span.SpanContext().TraceID().String())
 	}
