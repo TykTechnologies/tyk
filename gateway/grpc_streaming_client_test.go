@@ -30,9 +30,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/test"
 	"google.golang.org/grpc"
 	pb "google.golang.org/grpc/examples/route_guide/routeguide"
+
+	"github.com/TykTechnologies/tyk/test"
 )
 
 // printFeature gets the feature for the given point.
