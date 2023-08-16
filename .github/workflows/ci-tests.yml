@@ -94,7 +94,7 @@ jobs:
           ./bin/ci-tests.sh 2>&1
 
       - name: Notify status
-        if: ${{ failure() && github.event.pull_request.number && !github.event.pull_request.draft }}
+        if: ${{ failure() && github.event.pull_request.number && github.event.pull_request.draft == false }}
         uses: peter-evans/create-or-update-comment@v1
         with:
           issue-number: ${{ github.event.pull_request.number }}
