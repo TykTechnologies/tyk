@@ -24,13 +24,13 @@ package gateway
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/test"
 	"google.golang.org/grpc"
 	pb "google.golang.org/grpc/examples/route_guide/routeguide"
 )
@@ -71,7 +71,7 @@ func printFeatures(t *testing.T, client pb.RouteGuideClient, rect *pb.Rectangle)
 	for {
 		feature, err := stream.Recv()
 		if err == io.EOF {
-			b, _ := json.Marshal(features)
+			b := test.MarshalJSON(t)(features)
 			got := string(b)
 			if got != expectedFeatures {
 				t.Error("Failed to get features")
