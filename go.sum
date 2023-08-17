@@ -89,8 +89,8 @@ github.com/TykTechnologies/gorpc v0.0.0-20210624160652-fe65bda0ccb9/go.mod h1:v6
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708 h1:cmXjlMzcexhc/Cg+QB/c2CPUVs1ux9xn6162qaf/LC4=
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
 github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230320143102-7a16078ce517/go.mod h1:ZiFZcrue3+n2mHH+KLHRipbYVULkgy3Myko5S7IIs74=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230810130937-14e9bde9e643 h1:OtsSk3+y8ckIATx1J88r14wfBvFWLzdGhLpq9AmE99Q=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230810130937-14e9bde9e643/go.mod h1:ZWpfrRjWhBPryIMCDK8kAew4hji0QUQxj3Uhc2COlMU=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230816144234-72a7dd46b805 h1:1NdVrhjJsAKA2F7Z9+RAp1GCbfp57nI+y+8QBpevzaY=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230816144234-72a7dd46b805/go.mod h1:ZWpfrRjWhBPryIMCDK8kAew4hji0QUQxj3Uhc2COlMU=
 github.com/TykTechnologies/kin-openapi v0.90.0 h1:kHw0mtANwIpmlU6eCeeCgRMa52EiPPhEZPuHc3lKawo=
 github.com/TykTechnologies/kin-openapi v0.90.0/go.mod h1:pkzuiceujHvAuDu3bTD/AD5OacuP4eMfrz9QhJlMvdQ=
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c h1:j6fd0Fz1R4oSWOmcooGjrdahqrML+btQ+PfEJw8SzbA=
