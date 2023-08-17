@@ -342,7 +342,10 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 			if apiSpec == nil {
 				logger.WithField("api_id", apiId).Warn("Can't find active API, storing anyway")
 			}
-			gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
+
+			if apiSpec != nil {
+				gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
+			}
 
 			// Lets reset keys if they are edited by admin
 			if apiSpec == nil || !apiSpec.DontSetQuotasOnCreate {
@@ -351,11 +354,11 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 					gw.GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
+			}
 
-				// apply polices (if any) and save key
-				if err := gw.applyPoliciesAndSave(keyName, newSession, apiSpec, isHashed); err != nil {
-					return err
-				}
+			// apply polices (if any) and save key
+			if err := gw.applyPoliciesAndSave(keyName, newSession, apiSpec, isHashed); err != nil {
+				return err
 			}
 		}
 	} else {
@@ -1970,9 +1973,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	newSession.DateCreated = time.Now()
 
-	mw := BaseMiddleware{Gw: gw}
-	// TODO: handle apply policies error
-	mw.ApplyPolicies(newSession)
+	sessionManager := gw.GlobalSessionManager
 
 	if len(newSession.AccessRights) > 0 {
 		// reset API-level limit to nil if any has a zero-value
@@ -1981,28 +1982,18 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			apiSpec := gw.getApiSpec(apiID)
 			if apiSpec != nil {
 				gw.checkAndApplyTrialPeriod(newKey, newSession, false)
-				// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
-				if !apiSpec.DontSetQuotasOnCreate {
-					// Reset quota by default
-					gw.GlobalSessionManager.ResetQuota(newKey, newSession, false)
-					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-				}
-				// apply polices (if any) and save key
-				if err := gw.applyPoliciesAndSave(newKey, newSession, apiSpec, false); err != nil {
-					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
-					return
-				}
-			} else {
-				// Use fallback
-				sessionManager := gw.GlobalSessionManager
+			}
+
+			if apiSpec == nil || !apiSpec.DontSetQuotasOnCreate {
+				// Reset quota by default
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				sessionManager.ResetQuota(newKey, newSession, false)
-				// apply polices (if any) and save key
-				err := sessionManager.UpdateSession(newKey, newSession, -1, false)
-				if err != nil {
-					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
-					return
-				}
+			}
+
+			// apply polices (if any) and save key
+			if err := gw.applyPoliciesAndSave(newKey, newSession, apiSpec, false); err != nil {
+				doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
+				return
 			}
 		}
 	} else {
@@ -2024,8 +2015,8 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			for _, spec := range gw.apisByID {
 				gw.checkAndApplyTrialPeriod(newKey, newSession, false)
 				if !spec.DontSetQuotasOnCreate {
-					// Reset quote by default
-					gw.GlobalSessionManager.ResetQuota(newKey, newSession, false)
+					// Reset quota by default
+					sessionManager.ResetQuota(newKey, newSession, false)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 				if err := gw.applyPoliciesAndSave(newKey, newSession, spec, false); err != nil {
