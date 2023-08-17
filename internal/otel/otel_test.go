@@ -268,25 +268,16 @@ func TestContextWithSpan(t *testing.T) {
 func TestAddTraceID(t *testing.T) {
 	tests := []struct {
 		name       string
-		enabled    bool
 		hasTraceID bool
 		wantHeader bool
 	}{
 		{
 			name:       "otel enabled with trace id",
-			enabled:    true,
 			hasTraceID: true,
 			wantHeader: true,
 		},
 		{
 			name:       "otel enabled without trace id",
-			enabled:    true,
-			hasTraceID: false,
-			wantHeader: false,
-		},
-		{
-			name:       "otel disabled",
-			enabled:    false,
 			hasTraceID: false,
 			wantHeader: false,
 		},
@@ -297,8 +288,13 @@ func TestAddTraceID(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
 
+<<<<<<< HEAD
 			otelConfig := OpenTelemetry{
 				Enabled:  tt.enabled,
+=======
+			otelConfig := Config{
+				Enabled:  true,
+>>>>>>> a923516e... [TT-9504] Moving AddTraceID call to ProcessRequest function (#5425)
 				Exporter: "http",
 				Endpoint: "http://localhost:4317",
 			}
@@ -309,7 +305,7 @@ func TestAddTraceID(t *testing.T) {
 				req = req.WithContext(ctx)
 			}
 
-			AddTraceID(w, req, tt.enabled)
+			AddTraceID(req.Context(), w)
 
 			if tt.wantHeader && w.Header().Get("X-Tyk-Trace-Id") == "" {
 				t.Errorf("expected header to be set, but it wasn't")

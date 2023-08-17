@@ -12,8 +12,11 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+<<<<<<< HEAD
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+=======
+>>>>>>> a923516e... [TT-9504] Moving AddTraceID call to ProcessRequest function (#5425)
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
@@ -327,7 +330,6 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	s.Spec.SanitizeProxyPaths(r)
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
-	otel.AddTraceID(w, r, s.Spec.GlobalConfig.OpenTelemetry.Enabled)
 
 	t1 := time.Now()
 	resp := s.Proxy.ServeHTTP(w, r)
@@ -359,7 +361,6 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	millisec := DurationToMillisecond(time.Since(t1))
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
-	otel.AddTraceID(w, r, s.Spec.GlobalConfig.OpenTelemetry.Enabled)
 
 	log.Debug("Upstream request took (ms): ", millisec)
 
