@@ -333,32 +333,14 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 	})
 
 	if len(newSession.AccessRights) > 0 {
-		// Find session detail
-		_, foundSession := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
-
 		// reset API-level limit to empty APILimit if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
+
 		// We have a specific list of access rules, only add / update those
-		for apiId, info := range newSession.AccessRights {
+		for apiId := range newSession.AccessRights {
 			apiSpec := gw.getApiSpec(apiId)
 			if apiSpec == nil {
-				if !foundSession {
-					logger.Warn("API inactive or doesn't exist.")
-					return errors.New("API must be active to add keys")
-				}
-
 				logger.WithField("api_id", apiId).Warn("Can't find active API, storing anyway")
-
-				// Fill APISpec with some defaults, asuming the API ID is
-				// referencing an inactive API. As long as the session
-				// detail exists, we can apply the policies.
-				apiSpec = &APISpec{
-					APIDefinition: &apidef.APIDefinition{
-						APIID: apiId,
-						Name:  info.APIName,
-						OrgID: newSession.OrgID,
-					},
-				}
 			}
 			gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
 
