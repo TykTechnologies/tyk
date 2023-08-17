@@ -593,7 +593,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		}
 		n.Sign()
 		msg := redis.Message{}
-		payload, _ := json.Marshal(n)
+		payload := test.MarshalJSON(t)(n)
 		msg.Payload = string(payload)
 
 		callbackRun := false
