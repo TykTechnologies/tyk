@@ -273,7 +273,7 @@ func TestKeyHandler(t *testing.T) {
 	withUnknownAPI.AccessRights = map[string]user.AccessDefinition{"unknown": {
 		APIID: "unknown", Versions: []string{"v1"},
 	}}
-	withUnknownAPIJSON, _ := json.Marshal(withUnknownAPI)
+	withUnknownAPIJSON := test.MarshalJSON(t)(withUnknownAPI)
 
 	t.Run("Create key", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
