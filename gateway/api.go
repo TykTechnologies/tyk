@@ -345,7 +345,7 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 			gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
 
 			// Lets reset keys if they are edited by admin
-			if !apiSpec.DontSetQuotasOnCreate {
+			if apiSpec == nil || !apiSpec.DontSetQuotasOnCreate {
 				// Reset quote by default
 				if !dontReset {
 					gw.GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
