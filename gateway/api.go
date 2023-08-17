@@ -263,11 +263,8 @@ func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionSta
 
 	// calculate lifetime considering access rights
 	lifetime := gw.ApplyLifetime(session, spec)
-	if err := gw.GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed); err != nil {
-		return err
-	}
 
-	return nil
+	return gw.GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed)
 }
 
 // GetApiSpecsFromAccessRights from the session.AccessRights returns the collection of api specs
@@ -323,24 +320,45 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 		newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	}
 
+	logger := log.WithFields(logrus.Fields{
+		"prefix":      "api",
+		"key":         gw.obfuscateKey(keyName),
+		"org_id":      newSession.OrgID,
+		"expires":     newSession.Expires,
+		"api_id":      "--",
+		"user_id":     "system",
+		"user_ip":     "--",
+		"path":        "--",
+		"server_name": "system",
+	})
+
 	if len(newSession.AccessRights) > 0 {
+		// Find session detail
+		_, foundSession := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
+
 		// reset API-level limit to empty APILimit if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
 		// We have a specific list of access rules, only add / update those
-		for apiId := range newSession.AccessRights {
+		for apiId, info := range newSession.AccessRights {
 			apiSpec := gw.getApiSpec(apiId)
 			if apiSpec == nil {
-				log.WithFields(logrus.Fields{
-					"prefix":      "api",
-					"key":         keyName,
-					"org_id":      newSession.OrgID,
-					"api_id":      apiId,
-					"user_id":     "system",
-					"user_ip":     "--",
-					"path":        "--",
-					"server_name": "system",
-				}).Error("Could not add key for this API ID, API doesn't exist.")
-				return errors.New("API must be active to add keys")
+				if !foundSession {
+					logger.Warn("API inactive or doesn't exist.")
+					return errors.New("API must be active to add keys")
+				}
+
+				logger.WithField("api_id", apiId).Warn("Can't find active API, storing anyway")
+
+				// Fill APISpec with some defaults, asuming the API ID is
+				// referencing an inactive API. As long as the session
+				// detail exists, we can apply the policies.
+				apiSpec = &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						APIID: apiId,
+						Name:  info.APIName,
+						OrgID: newSession.OrgID,
+					},
+				}
 			}
 			gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
 
@@ -361,10 +379,10 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 	} else {
 		// nothing defined, add key to ALL
 		if !gw.GetConfig().AllowMasterKeys {
-			log.Error("Master keys disallowed in configuration, key not added.")
+			logger.Error("Master keys disallowed in configuration, key not added.")
 			return errors.New("Master keys not allowed")
 		}
-		log.Warning("No API Access Rights set, adding key to ALL.")
+		logger.Warning("No API Access Rights set, adding key to ALL.")
 		gw.apisMu.RLock()
 		defer gw.apisMu.RUnlock()
 
@@ -381,17 +399,7 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 		}
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix":      "api",
-		"key":         gw.obfuscateKey(keyName),
-		"expires":     newSession.Expires,
-		"org_id":      newSession.OrgID,
-		"api_id":      "--",
-		"user_id":     "system",
-		"user_ip":     "--",
-		"path":        "--",
-		"server_name": "system",
-	}).Info("Key added or updated.")
+	logger.Info("Key added or updated.")
 	return nil
 }
 
