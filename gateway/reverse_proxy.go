@@ -44,6 +44,8 @@ import (
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
@@ -1122,23 +1124,8 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			graphql.WithAfterFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.AfterFetchHook),
 		}
 
-		// if this context vars are enabled and this is a supergraph, inject the sub request id header
-		upstreamHeaders := http.Header{}
-		if p.TykAPISpec.EnableContextVars && p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph {
-			ctxData := ctxGetData(outreq)
-			if reqID, exists := ctxData["request_id"]; !exists {
-				log.Warn("context variables enabled but request_id missing")
-			} else if requestID, ok := reqID.(string); ok {
-				upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
-			}
-		}
-
-		// append the request headers if any
-		for h, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeaders {
-			val := p.Gw.replaceTykVariables(outreq, value, false)
-			upstreamHeaders.Set(h, val)
-		}
-		execOptions = append(execOptions, graphql.WithUpstreamHeaders(upstreamHeaders))
+		upstreamHeaders := p.graphqlEngineAdditionalUpstreamHeaders(outreq)
+		execOptions = append(execOptions, graphql.WithHeaderModifier(p.graphqlEngineHeaderModifier(outreq, upstreamHeaders)))
 
 		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
 		if err != nil {
@@ -1198,7 +1185,12 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 			return
 		}
 		initialRequestContext := subscription.NewInitialHttpRequestContext(req)
-		executorPool = subscription.NewExecutorV2Pool(p.TykAPISpec.GraphQLExecutor.EngineV2, initialRequestContext)
+		upstreamHeaders := p.graphqlEngineAdditionalUpstreamHeaders(req)
+		executorPool = subscription.NewExecutorV2Pool(
+			p.TykAPISpec.GraphQLExecutor.EngineV2,
+			initialRequestContext,
+			subscription.WithExecutorV2HeaderModifier(p.graphqlEngineHeaderModifier(req, upstreamHeaders)),
+		)
 	}
 
 	go gqlhttp.HandleWebsocket(done, errChan, conn, executorPool, absLogger)
@@ -1978,6 +1970,40 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 	}
 
 	return false, ""
+}
+
+func (p *ReverseProxy) graphqlEngineAdditionalUpstreamHeaders(outreq *http.Request) http.Header {
+	upstreamHeaders := http.Header{}
+	switch p.TykAPISpec.GraphQL.ExecutionMode {
+	case apidef.GraphQLExecutionModeSupergraph:
+		// if this context vars are enabled and this is a supergraph, inject the sub request id header
+		if !p.TykAPISpec.EnableContextVars {
+			break
+		}
+		ctxData := ctxGetData(outreq)
+		if reqID, exists := ctxData["request_id"]; !exists {
+			log.Warn("context variables enabled but request_id missing")
+		} else if requestID, ok := reqID.(string); ok {
+			upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
+		}
+	}
+
+	return upstreamHeaders
+}
+
+func (p *ReverseProxy) graphqlEngineHeaderModifier(outreq *http.Request, additionalHeaders http.Header) postprocess.HeaderModifier {
+	return func(header http.Header) {
+		for key := range additionalHeaders {
+			if header.Get(key) == "" {
+				header.Set(key, additionalHeaders.Get(key))
+			}
+		}
+
+		for key := range header {
+			val := p.Gw.replaceTykVariables(outreq, header.Get(key), false)
+			header.Set(key, val)
+		}
+	}
 }
 
 // IsGrpcStreaming  determines wether a request represents a grpc streaming req

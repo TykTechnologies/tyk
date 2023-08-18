@@ -1484,7 +1484,9 @@ const testRESTHeadersDataSourceConfigurationV2 = `
 		"method": "GET",
 		"headers": {
 			"static": "barbaz",
-			"injected": "{{ .request.headers.injected }}"
+			"injected": "{{ .request.headers.injected }}",
+			"context": "$tyk_context.headers_From_Request",
+			"does-exist-already": "ds-does-exist-already"
 		},
 		"query": [],
 		"body": ""

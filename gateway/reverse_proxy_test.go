@@ -853,12 +853,13 @@ func TestNopCloseResponseBody(t *testing.T) {
 	}
 }
 
-func TestGraphQL_HeadersInjection(t *testing.T) {
+func TestGraphQL_UDGHeaders(t *testing.T) {
 	g := StartTest(nil)
 	t.Cleanup(g.Close)
 
 	composedAPI := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
+		spec.EnableContextVars = true
 		spec.GraphQL.Enabled = true
 		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
@@ -881,20 +882,26 @@ func TestGraphQL_HeadersInjection(t *testing.T) {
 
 	_, _ = g.Run(t, []test.TestCase{
 		{
-			Data:    headers,
-			Headers: map[string]string{"injected": "FOO"},
-			Code:    http.StatusOK,
+			Data: headers,
+			Headers: map[string]string{
+				"injected":            "FOO",
+				"From-Request":        "request-context",
+				"Global-From-Request": "request-global-context",
+			},
+			Code: http.StatusOK,
 
 			BodyMatchFunc: func(b []byte) bool {
 				return strings.Contains(string(b), `"headers":`) &&
 					strings.Contains(string(b), `{"name":"Injected","value":"FOO"}`) &&
-					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`)
+					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`) &&
+					strings.Contains(string(b), `{"name":"Context","value":"request-context"}`) &&
+					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`)
 			},
 		},
 	}...)
 }
 
-func TestGraphql_Headers(t *testing.T) {
+func TestGraphQL_ProxyOnlyHeaders(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
 
