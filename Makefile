@@ -23,8 +23,8 @@ test:
 	$(GOTEST) -run=$(TEST_REGEX) -count=$(TEST_COUNT) ./...
 
 # lint runs all local linters that must pass before pushing
-.PHONY: lint lint-install lint-fast
-lint: lint-fast
+.PHONY: lint lint-install lint-fast lint-check
+lint: lint-fast lint-check
 	goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
 	gofmt -w .
 	faillint -ignore-tests -paths "$(shell grep -v '^#' .faillint | xargs echo | sed 's/ /,/g')" ./...
@@ -34,6 +34,10 @@ lint-fast: lint-install
 	go test -count 1 -v ./cli/linter/...
 	go fmt ./...
 	go mod tidy
+
+lint-check:
+	$(GOTEST) -run=$(TEST_REGEX) -count=$(TEST_COUNT) ./cli/linter/...
+	$(GOTEST) -run=$(TEST_REGEX) -count=$(TEST_COUNT) ./gateway/...
 
 lint-install:
 	go install golang.org/x/tools/cmd/goimports@latest
