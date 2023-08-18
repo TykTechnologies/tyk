@@ -1975,6 +1975,12 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	sessionManager := gw.GlobalSessionManager
 
+	mw := BaseMiddleware{Gw: gw}
+	if err := mw.ApplyPolicies(newSession); err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
+		return
+	}
+
 	if len(newSession.AccessRights) > 0 {
 		// reset API-level limit to nil if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
