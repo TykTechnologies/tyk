@@ -18,19 +18,14 @@ type OpenAPIComponent struct {
 func GenerateOpenAPIDocument() {
 	// Define the generateComponents function
 	generateComponents := func() []OpenAPIComponent {
- 	// Implement the generateComponents function
- 	generateComponents := func() []OpenAPIComponent {
- 		// TODO: Use reflection to traverse the source code and generate the OpenAPI components
- 		components := make([]OpenAPIComponent, 0)
- 		// TODO: Add code to generate the OpenAPI components
- 		return components
- 	}
- 	// Use reflection to traverse the source code and generate the OpenAPI components
- 	components := generateComponents()
- 	return components
+		// TODO: Use reflection to traverse the source code and generate the OpenAPI components
+		components := make([]OpenAPIComponent, 0)
+		// TODO: Add code to generate the OpenAPI components
+		return components
 	}
- // Use reflection to traverse the source code and generate the OpenAPI components
- components := generateComponents()
+
+	// Use reflection to traverse the source code and generate the OpenAPI components
+	components := generateComponents()
 
 	// Generate the OpenAPI document
 	doc := map[string]interface{}{
