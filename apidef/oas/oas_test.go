@@ -109,6 +109,80 @@ func TestOAS(t *testing.T) {
 	})
 }
 
+	t.Run("nil paths", func(t *testing.T) {
+		t.Parallel()
+
+		var nilOASPaths OAS
+		nilOASPaths.Components = &openapi3.Components{}
+		nilOASPaths.SetTykExtension(&XTykAPIGateway{})
+
+		var convertedAPI apidef.APIDefinition
+		nilOASPaths.ExtractTo(&convertedAPI)
+
+		var resultOAS OAS
+		resultOAS.Fill(convertedAPI)
+
+		// No paths in base OAS produce empty paths{} when converted back
+		nilOASPaths.Paths = make(openapi3.Paths)
+		nilOASPaths.Extensions = nil
+		assert.Equal(t, nilOASPaths, resultOAS)
+	})
+
+	t.Run("extract paths", func(t *testing.T) {
+		const operationID = "userGET"
+		t.Parallel()
+
+		var oasWithPaths OAS
+		oasWithPaths.Components = &openapi3.Components{}
+		oasWithPaths.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: Operations{
+					operationID: {
+						Allow: &Allowance{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+		oasWithPaths.Paths = openapi3.Paths{
+			"/user": {
+				Get: &openapi3.Operation{
+					OperationID: operationID,
+					Responses:   openapi3.NewResponses(),
+				},
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		oasWithPaths.ExtractTo(&convertedAPI)
+
+		var resultOAS OAS
+		resultOAS.Fill(convertedAPI)
+
+		assert.Equal(t, oasWithPaths, resultOAS)
+	})
+
+	t.Run("auth configs", func(t *testing.T) {
+		t.Parallel()
+
+		var api apidef.APIDefinition
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+
+		a := apidef.AuthConfig{}
+		Fill(t, &a, 0)
+		api.AuthConfigs[apidef.AuthTokenType] = a
+
+		sw := &OAS{}
+		sw.Fill(api)
+
+		var converted apidef.APIDefinition
+		sw.ExtractTo(&converted)
+
+		assert.Equal(t, api.AuthConfigs, converted.AuthConfigs)
+	})
+}
+
 func TestOAS_ExtractTo_DontTouchExistingClassicFields(t *testing.T) {
 	var api apidef.APIDefinition
 	api.VersionData.Versions = map[string]apidef.VersionInfo{
