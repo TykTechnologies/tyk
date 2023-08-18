@@ -872,6 +872,10 @@ func TestGraphQL_UDGHeaders(t *testing.T) {
 				Key:   "Global-Context",
 				Value: "$tyk_context.headers_Global_From_Request",
 			},
+			{
+				Key:   "Does-Exist-Already",
+				Value: "global-does-exist-already",
+			},
 		}
 
 		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
@@ -906,7 +910,8 @@ func TestGraphQL_UDGHeaders(t *testing.T) {
 					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`) &&
 					strings.Contains(string(b), `{"name":"Context","value":"request-context"}`) &&
 					strings.Contains(string(b), `{"name":"Global-Static","value":"foobar"}`) &&
-					strings.Contains(string(b), `{"name":"Global-Context","value":"request-global-context"}`)
+					strings.Contains(string(b), `{"name":"Global-Context","value":"request-global-context"}`) &&
+					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`)
 			},
 		},
 	}...)

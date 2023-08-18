@@ -53,27 +53,9 @@ func (g *GraphQLProxyOnlyContext) Response() *http.Response {
 type GraphQLEngineTransport struct {
 	originalTransport http.RoundTripper
 	transportType     GraphQLEngineTransportType
-	globalHeaders     map[string]string
-	outReq            *http.Request
-	gateway           *Gateway
-	replaceContextVar bool
 }
 
 type GraphqlEngineTransportOption func(transport *GraphQLEngineTransport)
-
-func WithGlobalHeaders(headers map[string]string) GraphqlEngineTransportOption {
-	return func(transport *GraphQLEngineTransport) {
-		transport.globalHeaders = headers
-	}
-}
-
-func ReplaceContextVars(request *http.Request, gw *Gateway) GraphqlEngineTransportOption {
-	return func(transport *GraphQLEngineTransport) {
-		transport.outReq = request
-		transport.replaceContextVar = true
-		transport.gateway = gw
-	}
-}
 
 func NewGraphQLEngineTransport(transportType GraphQLEngineTransportType, originalTransport http.RoundTripper, options ...GraphqlEngineTransportOption) *GraphQLEngineTransport {
 	transport := &GraphQLEngineTransport{
@@ -92,19 +74,6 @@ func (g *GraphQLEngineTransport) RoundTrip(request *http.Request) (res *http.Res
 		proxyOnlyCtx, ok := request.Context().(*GraphQLProxyOnlyContext)
 		if ok {
 			return g.handleProxyOnly(proxyOnlyCtx, request)
-		}
-	case GraphQLEngineTransportTypeMultiUpstream:
-		for key, value := range g.globalHeaders {
-			if request.Header.Get(key) == "" {
-				request.Header.Set(key, value)
-			}
-		}
-
-		// replace context var for all headers if it is enabled
-		if g.replaceContextVar {
-			for key := range request.Header {
-				request.Header.Set(key, g.gateway.replaceTykVariables(g.outReq, request.Header.Get(key), false))
-			}
 		}
 	}
 
