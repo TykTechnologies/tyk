@@ -650,7 +650,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 							g.Gw.BuildAndLoadAPI(apiSpec(wsTestServer.URL))
 
 							wsConnHeaders := http.Header{
-								header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
+								header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
 							}
 
 							for key, value := range requestHeaders {
@@ -667,7 +667,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 							// Gateway should acknowledge the connection
 							_, msg, err := wsConn.ReadMessage()
-							require.Equal(t, `{"type":"connection_ack"}`, string(msg))
+							require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
 							require.NoError(t, err)
 
 							// Start subscription
@@ -715,16 +715,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 								spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 								spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 								spec.GraphQL.Schema = `type Query { hello: String } type Subscription { subscribe: String }`
-								spec.GraphQL.Engine.GlobalHeaders = []apidef.UDGGlobalHeader{
-									{
-										Key:   "Global-Key",
-										Value: "global-value",
-									},
-									{
-										Key:   "Already-Used-Key",
-										Value: "global-used-value",
-									},
-								}
 								spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
 									{
 										Kind:     apidef.GraphQLEngineDataSourceKindGraphQL,
@@ -756,7 +746,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 							"Already-Used-Key": {"local-used-value"},
 							"Local-Key":        {"local-value"},
 							"Context-Key":      {"request-value"},
-							"Global-Key":       {"global-value"},
 						},
 					))
 				})

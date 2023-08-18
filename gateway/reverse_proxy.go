@@ -44,10 +44,7 @@ import (
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
-	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
@@ -1130,13 +1127,6 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		upstreamHeaders := p.graphqlEngineAdditionalUpstreamHeaders(outreq)
 		execOptions = append(execOptions, graphql.WithHeaderModifier(p.graphqlEngineHeaderModifier(outreq, upstreamHeaders)))
 
-		// append the request headers if any
-		for h, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeaders {
-			val := p.Gw.replaceTykVariables(outreq, value, false)
-			upstreamHeaders.Set(h, val)
-		}
-		execOptions = append(execOptions, graphql.WithUpstreamHeaders(upstreamHeaders))
-
 		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
 		if err != nil {
 			return
@@ -1995,11 +1985,6 @@ func (p *ReverseProxy) graphqlEngineAdditionalUpstreamHeaders(outreq *http.Reque
 			log.Warn("context variables enabled but request_id missing")
 		} else if requestID, ok := reqID.(string); ok {
 			upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
-		}
-	case apidef.GraphQLExecutionModeExecutionEngine:
-		globalHeaders := headerStructToHeaderMap(p.TykAPISpec.GraphQL.Engine.GlobalHeaders)
-		for key, value := range globalHeaders {
-			upstreamHeaders.Set(key, value)
 		}
 	}
 
