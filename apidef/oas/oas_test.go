@@ -20,19 +20,20 @@ func TestOAS(t *testing.T) {
 		t.Parallel()
 
 		// Update the test case to fix the failure
-		var emptyOASPaths OAS
-		emptyOASPaths.Components = &openapi3.Components{}
-		emptyOASPaths.Paths = make(openapi3.Paths)
-		emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
+	var emptyOASPaths OAS
+	emptyOASPaths.Components = &openapi3.Components{}
+	emptyOASPaths.Paths = make(openapi3.Paths)
+	emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
 
-		var convertedAPI apidef.APIDefinition
-		emptyOASPaths.ExtractTo(&convertedAPI)
+	var convertedAPI apidef.APIDefinition
+	emptyOASPaths.ExtractTo(&convertedAPI)
 
-		var resultOAS OAS
-		resultOAS.Fill(convertedAPI)
+	var resultOAS OAS
+	resultOAS.Fill(convertedAPI)
 
-		// This tests that zero-value extensions are cleared
-		emptyOASPaths.Extensions = nil
+	emptyOASPaths.Extensions = nil
+	emptyOASPaths.Extensions = nil
+	assert.Equal(t, emptyOASPaths, resultOAS)
 		assert.Equal(t, emptyOASPaths, resultOAS)
 	})
 
