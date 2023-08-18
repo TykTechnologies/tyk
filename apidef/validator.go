@@ -149,7 +149,7 @@ func (r *RuleValidateIPList) Validate(apiDef *APIDefinition, validationResult *V
 	if apiDef.EnableIpWhiteListing {
 		if errs := r.validateIPAddr(apiDef.AllowedIPs); len(errs) > 0 {
 			validationResult.IsValid = false
-			validationResult.Errors = errs
+			validationResult.Errors = append(validationResult.Errors, errs...)
 		}
 	}
 
