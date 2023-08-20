@@ -44,12 +44,12 @@ func TestGateway_afterConfSetup(t *testing.T) {
 		{
 			name: "opentelemetry options test",
 			initialConfig: config.Config{
-				OpenTelemetry: otel.Config{
+				OpenTelemetry: otel.OpenTelemetry{
 					Enabled: true,
 				},
 			},
 			expectedConfig: config.Config{
-				OpenTelemetry: otel.Config{
+				OpenTelemetry: otel.OpenTelemetry{
 					Enabled:            true,
 					Exporter:           "grpc",
 					Endpoint:           "localhost:4317",
