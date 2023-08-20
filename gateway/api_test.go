@@ -230,14 +230,14 @@ func TestKeyHandler(t *testing.T) {
 
 	// Access right not specified
 	masterKey := CreateStandardSession()
-	masterKeyJSON, _ := json.Marshal(masterKey)
+	masterKeyJSON := test.MarshalJSON(t)(masterKey)
 	//TestTykMakeHTTPRequest
 	// with access
 	withAccess := CreateStandardSession()
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
 		APIID: "test", Versions: []string{"v1"},
 	}}
-	withAccessJSON, _ := json.Marshal(withAccess)
+	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
 	// with policy
 	ts.Gw.policiesMu.Lock()
@@ -252,12 +252,12 @@ func TestKeyHandler(t *testing.T) {
 	}
 	ts.Gw.policiesMu.Unlock()
 	withPolicy := CreateStandardSession()
-	withoutPolicyJSON, _ := json.Marshal(withPolicy)
+	withoutPolicyJSON := test.MarshalJSON(t)(withPolicy)
 
 	withPolicy.ApplyPolicies = []string{
 		"abc_policy",
 	}
-	withPolicyJSON, _ := json.Marshal(withPolicy)
+	withPolicyJSON := test.MarshalJSON(t)(withPolicy)
 
 	// with invalid policy
 	withBadPolicy := CreateStandardSession()
@@ -267,7 +267,7 @@ func TestKeyHandler(t *testing.T) {
 	withBadPolicy.ApplyPolicies = []string{
 		"xyz_policy",
 	}
-	withBadPolicyJSON, _ := json.Marshal(withBadPolicy)
+	withBadPolicyJSON := test.MarshalJSON(t)(withBadPolicy)
 
 	t.Run("Create key", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
@@ -461,7 +461,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 
 	t.Run("Add policy not enforcing acl", func(t *testing.T) {
 		session.ApplyPolicies = append(session.ApplyPolicies, pID2)
-		sessionData, _ := json.Marshal(session)
+		sessionData := test.MarshalJSON(t)(session)
 		path := fmt.Sprintf("/tyk/keys/%s", key)
 
 		_, _ = ts.Run(t, []test.TestCase{
@@ -477,7 +477,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 
 	t.Run("Remove policy not enforcing acl", func(t *testing.T) {
 		session.ApplyPolicies = []string{}
-		sessionData, _ := json.Marshal(session)
+		sessionData := test.MarshalJSON(t)(session)
 		path := fmt.Sprintf("/tyk/keys/%s", key)
 
 		_, _ = ts.Run(t, []test.TestCase{
@@ -492,7 +492,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 
 	t.Run("Tags on key level", func(t *testing.T) {
 		assertTags := func(session *user.SessionState, expected []string) {
-			sessionData, _ := json.Marshal(session)
+			sessionData := test.MarshalJSON(t)(session)
 			path := fmt.Sprintf("/tyk/keys/%s", key)
 
 			_, _ = ts.Run(t, []test.TestCase{
@@ -533,7 +533,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 
 	t.Run("MetaData on key level", func(t *testing.T) {
 		assertMetaData := func(session *user.SessionState, expected map[string]interface{}) {
-			sessionData, _ := json.Marshal(session)
+			sessionData := test.MarshalJSON(t)(session)
 			path := fmt.Sprintf("/tyk/keys/%s", key)
 
 			_, _ = ts.Run(t, []test.TestCase{
@@ -712,7 +712,7 @@ func TestUpdateKeyWithCert(t *testing.T) {
 		})
 
 		session.Certificate = newCertID
-		sessionData, _ := json.Marshal(session)
+		sessionData := test.MarshalJSON(t)(session)
 
 		path := fmt.Sprintf("/tyk/keys/%s", key)
 		_, _ = ts.Run(t, []test.TestCase{
@@ -735,7 +735,7 @@ func TestUpdateKeyWithCert(t *testing.T) {
 
 		// attempt to set an empty cert
 		session.Certificate = ""
-		sessionData, _ := json.Marshal(session)
+		sessionData := test.MarshalJSON(t)(session)
 
 		path := fmt.Sprintf("/tyk/keys/%s", key)
 		_, _ = ts.Run(t, []test.TestCase{
@@ -757,7 +757,7 @@ func TestUpdateKeyWithCert(t *testing.T) {
 		})
 
 		session.Certificate = "invalid-cert-id"
-		sessionData, _ := json.Marshal(session)
+		sessionData := test.MarshalJSON(t)(session)
 
 		path := fmt.Sprintf("/tyk/keys/%s", key)
 		_, _ = ts.Run(t, []test.TestCase{
@@ -834,7 +834,7 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 				t.Error("Failed to create key, ensure security settings are correct:" + err.Error())
 			}
 
-			requestByte, _ := json.Marshal(session)
+			requestByte := test.MarshalJSON(t)(session)
 			r := httptest.NewRequest(http.MethodPut, "/tyk/keys/"+keyName, bytes.NewReader(requestByte))
 			ts.Gw.handleAddOrUpdate(keyName, r, tc.HashKeys)
 
@@ -1020,7 +1020,7 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
 		APIID: "test", Versions: []string{"v1"},
 	}}
-	withAccessJSON, _ := json.Marshal(withAccess)
+	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
 	myKey := "my_key_id"
 	myKeyHash := storage.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
@@ -1142,9 +1142,15 @@ func (ts *Test) testHashFuncAndBAHelper(t *testing.T) {
 
 	_, _ = ts.Run(t, []test.TestCase{
 		{
-			Method:    http.MethodPost,
-			Path:      "/tyk/keys/defaultuser",
-			Data:      session,
+			Method: http.MethodPost,
+			Path:   "/tyk/keys/defaultuser",
+			Data:   session,
+			BodyMatchFunc: func(resp []byte) bool {
+				keyResp := apiModifyKeySuccess{}
+				err := json.Unmarshal(resp, &keyResp)
+				assert.NoError(t, err)
+				return keyResp.Key == "" && keyResp.KeyHash != ""
+			},
 			AdminAuth: true,
 			Code:      200,
 		},
@@ -1188,7 +1194,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
 		APIID: "test", Versions: []string{"v1"},
 	}}
-	withAccessJSON, _ := json.Marshal(withAccess)
+	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
 	myKey := "my_key_id"
 	myKeyHash := storage.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
@@ -1306,7 +1312,7 @@ func TestKeyHandler_HashingDisabled(t *testing.T) {
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
 		APIID: "test", Versions: []string{"v1"},
 	}}
-	withAccessJSON, _ := json.Marshal(withAccess)
+	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
 	myKeyID := "my_key_id"
 	token := ts.Gw.generateToken("default", myKeyID)
@@ -1447,7 +1453,7 @@ func TestGetOAuthClients(t *testing.T) {
 		APIID:             "test",
 		ClientSecret:      "secret",
 	}
-	validOauthRequest, _ := json.Marshal(oauthRequest)
+	validOauthRequest := test.MarshalJSON(t)(oauthRequest)
 
 	ts.Run(t, []test.TestCase{
 		{Path: "/tyk/oauth/clients/unknown", AdminAuth: true, Code: 404},
@@ -1552,7 +1558,7 @@ func TestCreateOAuthClient(t *testing.T) {
 
 	for testName, testData := range tests {
 		t.Run(testName, func(t *testing.T) {
-			requestData, _ := json.Marshal(testData.req)
+			requestData := test.MarshalJSON(t)(testData.req)
 			_, _ = ts.Run(
 				t,
 				test.TestCase{
@@ -1677,7 +1683,7 @@ func TestUpdateOauthClientHandler(t *testing.T) {
 
 	for testName, testData := range tests {
 		t.Run(testName, func(t *testing.T) {
-			requestData, _ := json.Marshal(testData.req)
+			requestData := test.MarshalJSON(t)(testData.req)
 			testCase := test.TestCase{
 				Method:    http.MethodPut,
 				Path:      "/tyk/oauth/clients/test/12345",
@@ -2023,7 +2029,7 @@ func TestRotateClientSecretHandler(t *testing.T) {
 
 	for testName, testData := range tests {
 		t.Run(testName, func(t *testing.T) {
-			requestData, _ := json.Marshal(testData.req)
+			requestData := test.MarshalJSON(t)(testData.req)
 			testCase := test.TestCase{
 				Method:    http.MethodPut,
 				Path:      "/tyk/oauth/clients/test/12345/rotate",

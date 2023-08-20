@@ -9,6 +9,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -64,6 +65,8 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	if targetVersion == "" {
 		targetVersion = v.Spec.VersionDefinition.Default
 	}
+
+	ctxSetSpanAttributes(r, v.Name(), otel.APIVersionAttribute(targetVersion))
 
 	if v.Spec.VersionDefinition.Enabled && targetVersion != apidef.Self && targetVersion != v.Spec.VersionDefinition.Name {
 		if targetVersion == "" {

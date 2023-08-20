@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -852,15 +853,30 @@ func TestNopCloseResponseBody(t *testing.T) {
 	}
 }
 
-func TestGraphQL_HeadersInjection(t *testing.T) {
+func TestGraphQL_UDGHeaders(t *testing.T) {
 	g := StartTest(nil)
 	t.Cleanup(g.Close)
 
 	composedAPI := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
+		spec.EnableContextVars = true
 		spec.GraphQL.Enabled = true
 		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		spec.GraphQL.Engine.GlobalHeaders = []apidef.UDGGlobalHeader{
+			{
+				Key:   "Global-Static",
+				Value: "foobar",
+			},
+			{
+				Key:   "Global-Context",
+				Value: "$tyk_context.headers_Global_From_Request",
+			},
+			{
+				Key:   "Does-Exist-Already",
+				Value: "global-does-exist-already",
+			},
+		}
 
 		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
 			generateRESTDataSourceV2(func(ds *apidef.GraphQLEngineDataSource, restConfig *apidef.GraphQLEngineDataSourceConfigREST) {
@@ -880,20 +896,28 @@ func TestGraphQL_HeadersInjection(t *testing.T) {
 
 	_, _ = g.Run(t, []test.TestCase{
 		{
-			Data:    headers,
-			Headers: map[string]string{"injected": "FOO"},
-			Code:    http.StatusOK,
+			Data: headers,
+			Headers: map[string]string{
+				"injected":            "FOO",
+				"From-Request":        "request-context",
+				"Global-From-Request": "request-global-context",
+			},
+			Code: http.StatusOK,
 
 			BodyMatchFunc: func(b []byte) bool {
 				return strings.Contains(string(b), `"headers":`) &&
 					strings.Contains(string(b), `{"name":"Injected","value":"FOO"}`) &&
-					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`)
+					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`) &&
+					strings.Contains(string(b), `{"name":"Context","value":"request-context"}`) &&
+					strings.Contains(string(b), `{"name":"Global-Static","value":"foobar"}`) &&
+					strings.Contains(string(b), `{"name":"Global-Context","value":"request-global-context"}`) &&
+					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`)
 			},
 		},
 	}...)
 }
 
-func TestGraphql_Headers(t *testing.T) {
+func TestGraphQL_ProxyOnlyHeaders(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
 
@@ -1731,4 +1755,41 @@ func TestSSE(t *testing.T) {
 	t.Run("websockets enabled", func(t *testing.T) {
 		stream(true)
 	})
+}
+
+func TestSetCustomHeaderMultipleValues(t *testing.T) {
+	tests := []struct {
+		name            string
+		headers         http.Header
+		key             string
+		values          []string
+		ignoreCanonical bool
+		want            http.Header
+	}{
+		{
+			name:            "Add multiple values without canonical form",
+			headers:         http.Header{},
+			key:             "X-Test",
+			values:          []string{"value1", "value2"},
+			ignoreCanonical: true,
+			want:            http.Header{"X-Test": {"value1", "value2"}},
+		},
+		{
+			name:            "Add multiple values with canonical form",
+			headers:         http.Header{},
+			key:             "X-Test",
+			values:          []string{"value1", "value2"},
+			ignoreCanonical: false,
+			want:            http.Header{"X-Test": {"value1", "value2"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setCustomHeaderMultipleValues(tt.headers, tt.key, tt.values, tt.ignoreCanonical)
+			if !reflect.DeepEqual(tt.headers, tt.want) {
+				t.Errorf("setCustomHeaderMultipleValues() got = %v, want %v", tt.headers, tt.want)
+			}
+		})
+	}
 }

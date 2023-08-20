@@ -3,9 +3,13 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/buger/jsonparser"
 
@@ -18,6 +22,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -184,6 +189,48 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 		g.Gw.LoadAPI(testSpec)
 
 		_, err := g.Run(
+			t,
+			test.TestCase{
+				Path:   "/",
+				Method: http.MethodPost,
+				Data: gql.Request{
+					Query:     gqlContinentQueryVariable,
+					Variables: []byte(`{"code":null}`),
+				},
+				Code: 400,
+			},
+			test.TestCase{
+				Path:   "/",
+				Method: http.MethodPost,
+				Data: gql.Request{
+					Query:     gqlStateQueryVariable,
+					Variables: []byte(`{"filter":{"code":{"eq":"filterString"}}}`),
+				},
+				Code: 400,
+				BodyMatchFunc: func(i []byte) bool {
+					return strings.Contains(string(i), `Validation for variable \"filter\" failed`)
+				},
+			})
+		assert.NoError(t, err)
+	})
+
+	t.Run("fail input validation with otel tracing active", func(t *testing.T) {
+		local := StartTest(func(globalConf *config.Config) {
+			globalConf.OpenTelemetry.Enabled = true
+		})
+		defer local.Close()
+		testSpec := BuildAPI(func(spec *APISpec) {
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+			spec.GraphQL.Schema = gqlCountriesSchema
+			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+			spec.Proxy.TargetURL = testGraphQLProxyUpstream
+			spec.Proxy.ListenPath = "/"
+			spec.GraphQL.Enabled = true
+		})[0]
+
+		local.Gw.LoadAPI(testSpec)
+
+		_, err := local.Run(
 			t,
 			test.TestCase{
 				Path:   "/",
@@ -481,7 +528,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.UseKeylessAccess = true
 				spec.Proxy.ListenPath = "/"
 				spec.GraphQL.Enabled = true
-				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 			})[0]
 
@@ -512,7 +559,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				cfg.HttpServerOptions.EnableWebSockets = true
 				g.Gw.SetConfig(cfg)
 
-				t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
+				t.Run("should deny upgrade with 400 when protocol is not graphql-ws or graphql-transport-ws", func(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
@@ -529,21 +576,41 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				})
 
 				t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
-					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-						header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+					t.Run("graphql-ws", func(t *testing.T) {
+						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+							header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
+						})
+						require.NoError(t, err)
+						defer wsConn.Close()
+
+						// Send a connection init message to gateway
+						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
+						require.NoError(t, err)
+
+						_, msg, err := wsConn.ReadMessage()
+
+						// Gateway should acknowledge the connection
+						assert.Equal(t, `{"type":"connection_ack"}`, string(msg))
+						assert.NoError(t, err)
 					})
-					require.NoError(t, err)
-					defer wsConn.Close()
+					t.Run("graphql-transport-ws", func(t *testing.T) {
+						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+							header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLTransportWS)},
+						})
+						require.NoError(t, err)
+						defer wsConn.Close()
 
-					// Send a connection init message to gateway
-					err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
-					require.NoError(t, err)
+						// Send a connection init message to gateway
+						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init"}`))
+						require.NoError(t, err)
 
-					_, msg, err := wsConn.ReadMessage()
+						_, msg, err := wsConn.ReadMessage()
 
-					// Gateway should acknowledge the connection
-					assert.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
-					assert.NoError(t, err)
+						// Gateway should acknowledge the connection
+						assert.Equal(t, `{"type":"connection_ack"}`, string(msg))
+						assert.NoError(t, err)
+					})
+
 				})
 
 				t.Run("graphql over websockets", func(t *testing.T) {
@@ -567,7 +634,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						})
 
 						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
 							header.Authorization:        {directKey},
 						})
 						require.NoError(t, err)
@@ -580,7 +647,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						_, msg, err := wsConn.ReadMessage()
 
 						// Gateway should acknowledge the connection
-						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+						require.Equal(t, `{"type":"connection_ack"}`, string(msg))
 						require.NoError(t, err)
 
 						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "{ countries { name } }", "variables": null}}`))
@@ -603,7 +670,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						})
 
 						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
 							header.Authorization:        {directKey},
 						})
 						require.NoError(t, err)
@@ -616,7 +683,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						_, msg, err := wsConn.ReadMessage()
 
 						// Gateway should acknowledge the connection
-						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+						require.Equal(t, `{"type":"connection_ack"}`, string(msg))
 						require.NoError(t, err)
 
 						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "{ countries { name } }", "variables": null}}`))
@@ -626,6 +693,137 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						assert.Equal(t, `{"id":"1","type":"error","payload":[{"message":"depth limit exceeded"}]}`, string(msg))
 						assert.NoError(t, err)
 					})
+				})
+
+				t.Run("should send configured headers upstream", func(t *testing.T) {
+					run := func(apiSpec func(testServerURL string) func(apiSpec *APISpec), requestHeaders, expectedHeaders http.Header) func(t *testing.T) {
+						return func(t *testing.T) {
+							wsTestServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+								for expectedHeaderKey := range expectedHeaders {
+									values := r.Header.Values(expectedHeaderKey)
+									headerExists := assert.Greater(t, len(values), 0, fmt.Sprintf("no header values found for header '%s'", expectedHeaderKey))
+									if !headerExists {
+										return
+									}
+									for _, expectedHeaderValue := range expectedHeaders[expectedHeaderKey] {
+										assert.Contains(t, values, expectedHeaderValue, fmt.Sprintf("expected header value '%s' was not found for '%s'", expectedHeaderValue, expectedHeaderKey))
+									}
+								}
+							}))
+							defer wsTestServer.Close()
+
+							g.Gw.BuildAndLoadAPI(apiSpec(wsTestServer.URL))
+
+							wsConnHeaders := http.Header{
+								header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
+							}
+
+							for key, value := range requestHeaders {
+								wsConnHeaders.Set(key, value[0])
+							}
+
+							wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, wsConnHeaders)
+							require.NoError(t, err)
+							defer wsConn.Close()
+
+							// Send a connection init message to gateway
+							err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init"}`))
+							require.NoError(t, err)
+
+							// Gateway should acknowledge the connection
+							_, msg, err := wsConn.ReadMessage()
+							require.Equal(t, `{"type":"connection_ack"}`, string(msg))
+							require.NoError(t, err)
+
+							// Start subscription
+							err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id":"1","type":"start","payload":{"query":"subscription { subscribe }"}}`))
+							require.NoError(t, err)
+
+							_, msg, err = wsConn.ReadMessage()
+							require.Equal(t, `{"id":"1","type":"error","payload":[{"message":"failed to WebSocket dial: expected handshake response status code 101 but got 200"}]}`, string(msg))
+						}
+					}
+
+					t.Run("for proxy-only", run(
+						func(testServerURL string) func(apiSpec *APISpec) {
+							return func(spec *APISpec) {
+								spec.UseKeylessAccess = true
+								spec.Proxy.ListenPath = "/"
+								spec.EnableContextVars = true
+								spec.GraphQL.Enabled = true
+								spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+								spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+								spec.GraphQL.Schema = `type Query { hello: String } type Subscription { subscribe: String }`
+								spec.GraphQL.Proxy.RequestHeaders = map[string]string{
+									"My-Custom-Header": "custom-value",
+									"From-Request":     "$tyk_context.headers_X_My_Request",
+								}
+								spec.Proxy.TargetURL = testServerURL
+							}
+						},
+						http.Header{
+							"X-My-Request": {"request-value"},
+						},
+						http.Header{
+							"My-Custom-Header": {"custom-value"},
+							"From-Request":     {"request-value"},
+						},
+					))
+
+					t.Run("for udg", run(
+						func(testServerURL string) func(apiSpec *APISpec) {
+							return func(spec *APISpec) {
+								spec.UseKeylessAccess = true
+								spec.Proxy.ListenPath = "/"
+								spec.EnableContextVars = true
+								spec.GraphQL.Enabled = true
+								spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+								spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+								spec.GraphQL.Schema = `type Query { hello: String } type Subscription { subscribe: String }`
+								spec.GraphQL.Engine.GlobalHeaders = []apidef.UDGGlobalHeader{
+									{
+										Key:   "Global-Key",
+										Value: "global-value",
+									},
+									{
+										Key:   "Already-Used-Key",
+										Value: "global-used-value",
+									},
+								}
+								spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+									{
+										Kind:     apidef.GraphQLEngineDataSourceKindGraphQL,
+										Name:     "ds",
+										Internal: false,
+										RootFields: []apidef.GraphQLTypeFields{
+											{
+												Type:   "Subscription",
+												Fields: []string{"subscribe"},
+											},
+										},
+										Config: []byte(fmt.Sprintf(`{
+											"url": "%s",
+											"method": "POST",
+											"headers": {
+												"Already-Used-Key": "local-used-value",
+												"Local-Key": "local-value",
+												"Context-Key": "$tyk_context.headers_X_My_Request"
+											}
+										}`, testServerURL)),
+									},
+								}
+							}
+						},
+						http.Header{
+							"X-My-Request": {"request-value"},
+						},
+						http.Header{
+							"Already-Used-Key": {"local-used-value"},
+							"Local-Key":        {"local-value"},
+							"Context-Key":      {"request-value"},
+							"Global-Key":       {"global-value"},
+						},
+					))
 				})
 			})
 		})

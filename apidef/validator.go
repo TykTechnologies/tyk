@@ -56,6 +56,7 @@ var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleUniqueDataSourceNames{},
 	&RuleAtLeastEnableOneAuthSource{},
 	&RuleValidateIPList{},
+	&RuleValidateEnforceTimeout{},
 }
 
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
@@ -148,7 +149,7 @@ func (r *RuleValidateIPList) Validate(apiDef *APIDefinition, validationResult *V
 	if apiDef.EnableIpWhiteListing {
 		if errs := r.validateIPAddr(apiDef.AllowedIPs); len(errs) > 0 {
 			validationResult.IsValid = false
-			validationResult.Errors = errs
+			validationResult.Errors = append(validationResult.Errors, errs...)
 		}
 	}
 
@@ -179,4 +180,22 @@ func (r *RuleValidateIPList) validateIPAddr(ips []string) []error {
 	}
 
 	return errs
+}
+
+var ErrInvalidTimeoutValue = errors.New("invalid timeout value")
+
+type RuleValidateEnforceTimeout struct{}
+
+func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	if apiDef.VersionData.Versions != nil {
+		for _, vInfo := range apiDef.VersionData.Versions {
+			for _, hardTimeOutMeta := range vInfo.ExtendedPaths.HardTimeouts {
+				if hardTimeOutMeta.TimeOut < 0 {
+					validationResult.IsValid = false
+					validationResult.AppendError(ErrInvalidTimeoutValue)
+					return
+				}
+			}
+		}
+	}
 }

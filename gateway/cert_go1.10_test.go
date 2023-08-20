@@ -68,6 +68,8 @@ func newUpstreamSSL(t *testing.T, gw *Gateway, serverCert tls.Certificate, handl
 }
 
 func TestPublicKeyPinning(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5260
+
 	_, _, _, serverCert := certs.GenServerCertificate()
 
 	t.Run("Pub key match", func(t *testing.T) {
@@ -90,8 +92,6 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Pub key not match", func(t *testing.T) {
-		test.Flaky(t) // TODO: TT-5260
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -128,8 +128,6 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Global setting", func(t *testing.T) {
-		test.Flaky(t) // TODO: TT-5260
-
 		ts := StartTest(func(globalConf *config.Config) {
 			globalConf.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
 		})

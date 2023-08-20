@@ -15,6 +15,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
+
 	"github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -1488,4 +1490,45 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 		assert.NoError(t, err, "error loading APIs from RPC:", err)
 		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC backup")
 	})
+}
+
+func TestAPISpec_setHasMock(t *testing.T) {
+	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	s.IsOAS = true
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	s.OAS = oas.OAS{}
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	xTyk := &oas.XTykAPIGateway{}
+	s.OAS.SetTykExtension(xTyk)
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	middleware := &oas.Middleware{}
+	xTyk.Middleware = middleware
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	op := &oas.Operation{}
+	middleware.Operations = oas.Operations{
+		"my-operation": op,
+	}
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	mock := &oas.MockResponse{}
+	op.MockResponse = mock
+	s.setHasMock()
+	assert.False(t, s.HasMock)
+
+	mock.Enabled = true
+	s.setHasMock()
+	assert.True(t, s.HasMock)
 }

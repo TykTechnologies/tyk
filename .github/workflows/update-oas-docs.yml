@@ -5,8 +5,7 @@ name: Update OAS docs
 on:
   push:
     branches:
-      - master
-      - release-**
+      - temporarily-suspended
     paths:
       - apidef/oas/schema/x-tyk-gateway.md
 

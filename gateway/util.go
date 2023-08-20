@@ -189,3 +189,26 @@ func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
 
 	return false
 }
+
+// check if 2 maps are the same
+func areMapsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
+// checks if a string contains escaped characters
+func containsEscapedChars(str string) bool {
+	unescaped, err := url.PathUnescape(str)
+	if err != nil {
+		return true
+	}
+
+	return str != unescaped
+}
