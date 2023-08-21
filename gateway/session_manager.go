@@ -191,7 +191,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		log.WithField("apiID", api.APIID).Debugf("[RATE] %s", err.Error())
 		return sessionFailRateLimit
 	}
-	
+
 	if l.Gw == nil {
 		panic("gateway not set in session limiter")
 	}
