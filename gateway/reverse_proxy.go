@@ -393,7 +393,7 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	}
 
 	dialer := &net.Dialer{
-		Timeout:   time.Duration(float64(timeout) * float64(time.Second)),
+		Timeout:   time.Duration(timeout) * time.Second,
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}
@@ -410,7 +410,7 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 		DialContext:           dialContextFunc,
 		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
 		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
-		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
+		ResponseHeaderTimeout: time.Duration(timeout) * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
 
@@ -1358,6 +1358,16 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
+	} else {
+		// NOTE: Each TykAPISpec can have only one HTTPTransport therefore only one Timeout for all endpoints
+		// This code looks for timeout information based on endpoint and updates the timeout in HTTPTransport
+		// But this code adds overhead of looking for timeout information for each request
+		// TODO: need to refactor the code to avoid this overhead
+		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+		if timeout == 0 {
+			timeout = 30
+		}
+		p.TykAPISpec.HTTPTransport.transport.ResponseHeaderTimeout = time.Duration(timeout) * time.Second
 	}
 
 	roundTripper = p.TykAPISpec.HTTPTransport
