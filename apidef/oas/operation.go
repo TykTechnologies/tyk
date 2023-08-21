@@ -129,6 +129,18 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
+	ep.Ignored = nil
+	ep.WhiteList = nil
+	ep.BlackList = nil
+	ep.AdvanceCacheConfig = nil
+	ep.Transform = nil
+	ep.TransformResponse = nil
+	ep.HardTimeouts = nil
+	ep.Virtual = nil
+	ep.MethodTransforms = nil
+	ep.ValidateRequest = nil
+	ep.GoPlugin = nil
+
 	tykOperations := s.getTykOperations()
 	if len(tykOperations) == 0 {
 		return
