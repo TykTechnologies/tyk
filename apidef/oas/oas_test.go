@@ -314,8 +314,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.GraphQL.Engine.DataSources[0].RootFields[0].Type",
 		"APIDefinition.GraphQL.Engine.DataSources[0].RootFields[0].Fields[0]",
 		"APIDefinition.GraphQL.Engine.DataSources[0].Config[0]",
-		"APIDefinition.GraphQL.Engine.GlobalHeaders[0].Key",
-		"APIDefinition.GraphQL.Engine.GlobalHeaders[0].Value",
 		"APIDefinition.GraphQL.Proxy.AuthHeaders[0]",
 		"APIDefinition.GraphQL.Proxy.SubscriptionType",
 		"APIDefinition.GraphQL.Proxy.RequestHeaders[0]",
@@ -333,7 +331,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.AnalyticsPlugin.Enabled",
 		"APIDefinition.AnalyticsPlugin.PluginPath",
 		"APIDefinition.AnalyticsPlugin.FuncName",
-		"APIDefinition.DetailedTracing",
 	}
 
 	assert.Equal(t, expectedFields, noOASSupportFields)
