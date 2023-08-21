@@ -15,16 +15,16 @@ func TestOAS_Security(t *testing.T) {
 	Fill(t, &auth, 0)
 	auth.DisableHeader = false
 
-	var api apidef.APIDefinition
+	var api apidef.APIDefinition // bundle enabled
 	api.AuthConfigs = map[string]apidef.AuthConfig{
 		apidef.AuthTokenType: auth,
 	}
 
-	var oas OAS
+	var oas OAS // bundle enabled true
 	oas.SetTykExtension(&XTykAPIGateway{})
 	oas.fillSecurity(api)
 
-	var convertedAPI apidef.APIDefinition
+	var convertedAPI apidef.APIDefinition // bundle enabled
 	oas.extractSecurityTo(&convertedAPI)
 
 	assert.Equal(t, api, convertedAPI)
