@@ -31,9 +31,14 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *Middleware into *apidef.APIDefinition.
 func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
-	if m.Global != nil {
-		m.Global.ExtractTo(api)
+	if m.Global == nil {
+		m.Global = &Global{}
+		defer func() {
+			m.Global = nil
+		}()
 	}
+
+	m.Global.ExtractTo(api)
 }
 
 // Global holds configuration applies globally: CORS and caching.
@@ -134,33 +139,68 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *Global into *apidef.APIDefinition.
 func (g *Global) ExtractTo(api *apidef.APIDefinition) {
-	if g.PluginConfig != nil {
-		g.PluginConfig.ExtractTo(api)
+	if g.PluginConfig == nil {
+		g.PluginConfig = &PluginConfig{}
+		defer func() {
+			g.PluginConfig = nil
+		}()
 	}
 
-	if g.CORS != nil {
-		g.CORS.ExtractTo(&api.CORS)
+	g.PluginConfig.ExtractTo(api)
+
+	if g.CORS == nil {
+		g.CORS = &CORS{}
+		defer func() {
+			g.CORS = nil
+		}()
 	}
 
-	if g.PrePlugin != nil {
-		g.PrePlugin.ExtractTo(api)
+	g.CORS.ExtractTo(&api.CORS)
+
+	if g.PrePlugin == nil {
+		g.PrePlugin = &PrePlugin{}
+		defer func() {
+			g.PrePlugin = nil
+		}()
 	}
 
-	if g.PostAuthenticationPlugin != nil {
-		g.PostAuthenticationPlugin.ExtractTo(api)
+	g.PrePlugin.ExtractTo(api)
+
+	if g.PostAuthenticationPlugin == nil {
+		g.PostAuthenticationPlugin = &PostAuthenticationPlugin{}
+		defer func() {
+			g.PostAuthenticationPlugin = nil
+		}()
 	}
 
-	if g.PostPlugin != nil {
-		g.PostPlugin.ExtractTo(api)
+	g.PostAuthenticationPlugin.ExtractTo(api)
+
+	if g.PostPlugin == nil {
+		g.PostPlugin = &PostPlugin{}
+		defer func() {
+			g.PostPlugin = nil
+		}()
 	}
 
-	if g.Cache != nil {
-		g.Cache.ExtractTo(&api.CacheOptions)
+	g.PostPlugin.ExtractTo(api)
+
+	if g.Cache == nil {
+		g.Cache = &Cache{}
+		defer func() {
+			g.Cache = nil
+		}()
 	}
 
-	if g.ResponsePlugin != nil {
-		g.ResponsePlugin.ExtractTo(api)
+	g.Cache.ExtractTo(&api.CacheOptions)
+
+	if g.ResponsePlugin == nil {
+		g.ResponsePlugin = &ResponsePlugin{}
+		defer func() {
+			g.ResponsePlugin = nil
+		}()
 	}
+
+	g.ResponsePlugin.ExtractTo(api)
 }
 
 // PluginConfigData configures config data for custom plugins.
@@ -232,13 +272,23 @@ func (p *PluginConfig) Fill(api apidef.APIDefinition) {
 func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.Driver = p.Driver
 
-	if p.Bundle != nil {
-		p.Bundle.ExtractTo(api)
+	if p.Bundle == nil {
+		p.Bundle = &PluginBundle{}
+		defer func() {
+			p.Bundle = nil
+		}()
 	}
 
-	if p.Data != nil {
-		p.Data.ExtractTo(api)
+	p.Bundle.ExtractTo(api)
+
+	if p.Data == nil {
+		p.Data = &PluginConfigData{}
+		defer func() {
+			p.Data = nil
+		}()
 	}
+
+	p.Data.ExtractTo(api)
 }
 
 // PluginBundle holds configuration for custom plugins.
