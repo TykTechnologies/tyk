@@ -66,16 +66,32 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	s.ListenPath.ExtractTo(api)
 	api.Slug = s.Slug
 
-	if s.ClientCertificates != nil {
-		s.ClientCertificates.ExtractTo(api)
-	}
-	if s.GatewayTags != nil {
-		s.GatewayTags.ExtractTo(api)
+	if s.ClientCertificates == nil {
+		s.ClientCertificates = &ClientCertificates{}
+		defer func() {
+			s.ClientCertificates = nil
+		}()
 	}
 
-	if s.CustomDomain != nil {
-		s.CustomDomain.ExtractTo(api)
+	s.ClientCertificates.ExtractTo(api)
+
+	if s.GatewayTags == nil {
+		s.GatewayTags = &GatewayTags{}
+		defer func() {
+			s.GatewayTags = nil
+		}()
 	}
+
+	s.GatewayTags.ExtractTo(api)
+
+	if s.CustomDomain == nil {
+		s.CustomDomain = &Domain{}
+		defer func() {
+			s.CustomDomain = nil
+		}()
+	}
+
+	s.CustomDomain.ExtractTo(api)
 }
 
 // ListenPath represents the path the server should listen on.
