@@ -10,7 +10,7 @@ jobs:
   pr_agent_job:
     runs-on: ubuntu-latest
     name: Run pr agent on every pull request, respond to user comments
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == 'false'
     steps:
       - name: PR Agent action step
         id: pragent
