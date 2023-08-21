@@ -87,21 +87,21 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *OAS into *apidef.APIDefinition.
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
-	if s.GetTykExtension() != nil {
-		s.GetTykExtension().ExtractTo(api)
+	if s.GetTykExtension() == nil {
+		s.SetTykExtension(&XTykAPIGateway{})
+		defer func() {
+			delete(s.Extensions, ExtensionTykAPIGateway)
+		}()
 	}
+
+	s.GetTykExtension().ExtractTo(api)
 
 	s.extractSecurityTo(api)
 
-	ep := api.VersionData.Versions[Main].ExtendedPaths
-	s.extractPathsAndOperations(&ep)
-
-	api.VersionData.Versions = map[string]apidef.VersionInfo{
-		Main: {
-			UseExtendedPaths: true,
-			ExtendedPaths:    ep,
-		},
-	}
+	vInfo := api.VersionData.Versions[Main]
+	vInfo.UseExtendedPaths = true
+	s.extractPathsAndOperations(&vInfo.ExtendedPaths)
+	api.VersionData.Versions[Main] = vInfo
 }
 
 // SetTykExtension populates our OAS schema extension inside *OAS.

@@ -124,6 +124,218 @@ func TestOAS_ExtractTo_DontTouchExistingClassicFields(t *testing.T) {
 	assert.Len(t, api.VersionData.Versions[Main].ExtendedPaths.TransformHeader, 1)
 }
 
+func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
+	var a apidef.APIDefinition
+	Fill(t, &a, 0)
+
+	var vInfo apidef.VersionInfo
+	Fill(t, &vInfo, 0)
+	a.VersionData.Versions = map[string]apidef.VersionInfo{
+		Main: vInfo,
+	}
+
+	var s OAS
+	s.ExtractTo(&a)
+
+	a.UseKeylessAccess = false
+	a.UpstreamCertificatesDisabled = false
+	a.CertificatePinningDisabled = false
+	a.Proxy.ServiceDiscovery.CacheDisabled = false
+	a.CustomMiddlewareBundleDisabled = false
+	a.DomainDisabled = false
+	a.ConfigDataDisabled = false
+	a.TagsDisabled = false
+	a.IsOAS = false
+
+	// deprecated fields
+	a.Auth = apidef.AuthConfig{}
+	a.VersionDefinition.StripPath = false
+	a.UseGoPluginAuth = false
+	a.EnableCoProcessAuth = false
+	a.JWTScopeToPolicyMapping = nil
+	a.JWTScopeClaimName = ""
+	a.VersionData.NotVersioned = false
+	vInfo = a.VersionData.Versions[""]
+	vInfo.Name = ""
+	vInfo.Expires = ""
+	vInfo.Paths.Ignored = nil
+	vInfo.Paths.WhiteList = nil
+	vInfo.Paths.BlackList = nil
+	vInfo.OverrideTarget = ""
+	vInfo.UseExtendedPaths = false
+	vInfo.ExtendedPaths.MockResponse = nil
+	vInfo.ExtendedPaths.Cached = nil
+	vInfo.ExtendedPaths.ValidateJSON = nil
+	a.VersionData.Versions[""] = vInfo
+
+	assert.Empty(t, a.Name)
+
+	noOASSupportFields := getNonEmptyFields(a, "APIDefinition")
+
+	expectedFields := []string{
+		"APIDefinition.ListenPort",
+		"APIDefinition.Protocol",
+		"APIDefinition.EnableProxyProtocol",
+		"APIDefinition.RequestSigning.IsEnabled",
+		"APIDefinition.RequestSigning.Secret",
+		"APIDefinition.RequestSigning.KeyId",
+		"APIDefinition.RequestSigning.Algorithm",
+		"APIDefinition.RequestSigning.HeaderList[0]",
+		"APIDefinition.RequestSigning.CertificateId",
+		"APIDefinition.RequestSigning.SignatureHeader",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Filter",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Filter",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].DeleteHeaders[0]",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].AddHeaders[0]",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].ActOnResponse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].DeleteHeaders[0]",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].AddHeaders[0]",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].ActOnResponse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].ThresholdPercent",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Samples",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].ReturnToServiceAfter",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].DisableHalfOpenState",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].RewriteTo",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].On",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.HeaderMatches[0].MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.HeaderMatches[0].Reverse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.QueryValMatches[0].MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.QueryValMatches[0].Reverse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PathPartMatches[0].MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PathPartMatches[0].Reverse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.SessionMetaMatches[0].MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.SessionMetaMatches[0].Reverse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.RequestContextMatches[0].MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.RequestContextMatches[0].Reverse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PayloadMatches.MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PayloadMatches.Reverse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].RewriteTo",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].SizeLimit",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TrackEndpoints[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TrackEndpoints[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.DoNotTrackEndpoints[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.DoNotTrackEndpoints[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.Internal[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.Internal[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Variables[0]",
+		"APIDefinition.VersionData.Versions[0].GlobalHeaders[0]",
+		"APIDefinition.VersionData.Versions[0].GlobalHeadersRemove[0]",
+		"APIDefinition.VersionData.Versions[0].GlobalResponseHeaders[0]",
+		"APIDefinition.VersionData.Versions[0].GlobalResponseHeadersRemove[0]",
+		"APIDefinition.VersionData.Versions[0].IgnoreEndpointCase",
+		"APIDefinition.VersionData.Versions[0].GlobalSizeLimit",
+		"APIDefinition.UptimeTests.CheckList[0].CheckURL",
+		"APIDefinition.UptimeTests.CheckList[0].Protocol",
+		"APIDefinition.UptimeTests.CheckList[0].Timeout",
+		"APIDefinition.UptimeTests.CheckList[0].EnableProxyProtocol",
+		"APIDefinition.UptimeTests.CheckList[0].Commands[0].Name",
+		"APIDefinition.UptimeTests.CheckList[0].Commands[0].Message",
+		"APIDefinition.UptimeTests.CheckList[0].Method",
+		"APIDefinition.UptimeTests.CheckList[0].Headers[0]",
+		"APIDefinition.UptimeTests.CheckList[0].Body",
+		"APIDefinition.UptimeTests.Config.ExpireUptimeAnalyticsAfter",
+		"APIDefinition.UptimeTests.Config.ServiceDiscovery.CacheDisabled",
+		"APIDefinition.UptimeTests.Config.RecheckWait",
+		"APIDefinition.Proxy.PreserveHostHeader",
+		"APIDefinition.Proxy.DisableStripSlash",
+		"APIDefinition.Proxy.EnableLoadBalancing",
+		"APIDefinition.Proxy.Targets[0]",
+		"APIDefinition.Proxy.CheckHostAgainstUptimeTests",
+		"APIDefinition.Proxy.Transport.SSLInsecureSkipVerify",
+		"APIDefinition.Proxy.Transport.SSLCipherSuites[0]",
+		"APIDefinition.Proxy.Transport.SSLMinVersion",
+		"APIDefinition.Proxy.Transport.SSLMaxVersion",
+		"APIDefinition.Proxy.Transport.SSLForceCommonNameCheck",
+		"APIDefinition.Proxy.Transport.ProxyURL",
+		"APIDefinition.DisableRateLimit",
+		"APIDefinition.DisableQuota",
+		"APIDefinition.SessionLifetimeRespectsKeyExpiration",
+		"APIDefinition.SessionLifetime",
+		"APIDefinition.AuthProvider.Name",
+		"APIDefinition.AuthProvider.StorageEngine",
+		"APIDefinition.AuthProvider.Meta[0]",
+		"APIDefinition.SessionProvider.Name",
+		"APIDefinition.SessionProvider.StorageEngine",
+		"APIDefinition.SessionProvider.Meta[0]",
+		"APIDefinition.EventHandlers.Events[0]",
+		"APIDefinition.EnableBatchRequestSupport",
+		"APIDefinition.EnableIpWhiteListing",
+		"APIDefinition.AllowedIPs[0]",
+		"APIDefinition.EnableIpBlacklisting",
+		"APIDefinition.BlacklistedIPs[0]",
+		"APIDefinition.DontSetQuotasOnCreate",
+		"APIDefinition.ExpireAnalyticsAfter",
+		"APIDefinition.ResponseProcessors[0].Name",
+		"APIDefinition.ResponseProcessors[0].Options",
+		"APIDefinition.Certificates[0]",
+		"APIDefinition.DoNotTrack",
+		"APIDefinition.EnableContextVars",
+		"APIDefinition.TagHeaders[0]",
+		"APIDefinition.GlobalRateLimit.Rate",
+		"APIDefinition.GlobalRateLimit.Per",
+		"APIDefinition.EnableDetailedRecording",
+		"APIDefinition.GraphQL.Enabled",
+		"APIDefinition.GraphQL.ExecutionMode",
+		"APIDefinition.GraphQL.Version",
+		"APIDefinition.GraphQL.Schema",
+		"APIDefinition.GraphQL.TypeFieldConfigurations[0].TypeName",
+		"APIDefinition.GraphQL.TypeFieldConfigurations[0].FieldName",
+		"APIDefinition.GraphQL.TypeFieldConfigurations[0].Mapping.Disabled",
+		"APIDefinition.GraphQL.TypeFieldConfigurations[0].Mapping.Path",
+		"APIDefinition.GraphQL.TypeFieldConfigurations[0].DataSource.Name",
+		"APIDefinition.GraphQL.TypeFieldConfigurations[0].DataSource.Config[0]",
+		"APIDefinition.GraphQL.GraphQLPlayground.Enabled",
+		"APIDefinition.GraphQL.GraphQLPlayground.Path",
+		"APIDefinition.GraphQL.Engine.FieldConfigs[0].TypeName",
+		"APIDefinition.GraphQL.Engine.FieldConfigs[0].FieldName",
+		"APIDefinition.GraphQL.Engine.FieldConfigs[0].DisableDefaultMapping",
+		"APIDefinition.GraphQL.Engine.FieldConfigs[0].Path[0]",
+		"APIDefinition.GraphQL.Engine.DataSources[0].Kind",
+		"APIDefinition.GraphQL.Engine.DataSources[0].Name",
+		"APIDefinition.GraphQL.Engine.DataSources[0].Internal",
+		"APIDefinition.GraphQL.Engine.DataSources[0].RootFields[0].Type",
+		"APIDefinition.GraphQL.Engine.DataSources[0].RootFields[0].Fields[0]",
+		"APIDefinition.GraphQL.Engine.DataSources[0].Config[0]",
+		"APIDefinition.GraphQL.Proxy.AuthHeaders[0]",
+		"APIDefinition.GraphQL.Proxy.SubscriptionType",
+		"APIDefinition.GraphQL.Proxy.RequestHeaders[0]",
+		"APIDefinition.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding",
+		"APIDefinition.GraphQL.Subgraph.SDL",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].APIID",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].Name",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].URL",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].SDL",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].Headers[0]",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].SubscriptionType",
+		"APIDefinition.GraphQL.Supergraph.MergedSDL",
+		"APIDefinition.GraphQL.Supergraph.GlobalHeaders[0]",
+		"APIDefinition.GraphQL.Supergraph.DisableQueryBatching",
+		"APIDefinition.AnalyticsPlugin.Enabled",
+		"APIDefinition.AnalyticsPlugin.PluginPath",
+		"APIDefinition.AnalyticsPlugin.FuncName",
+	}
+
+	assert.Equal(t, expectedFields, noOASSupportFields)
+}
+
 func TestOAS_AddServers(t *testing.T) {
 	t.Parallel()
 	type fields struct {
