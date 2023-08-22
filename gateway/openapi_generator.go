@@ -18,10 +18,11 @@ type OpenAPIComponent struct {
 func GenerateOpenAPIDocument() {
 	// Define the generateComponents function
 	generateComponents := func() []OpenAPIComponent {
-		// TODO: Implement the function to generate the OpenAPI components
+		// Implement the function to generate the OpenAPI components
 		components := make([]OpenAPIComponent, 0)
 		// Add code to generate the OpenAPI components
 		// Use reflection to traverse the source code and generate the OpenAPI components
+		// TODO: Add the specific implementation details
 		return components
 	}
 
@@ -50,7 +51,9 @@ func GenerateOpenAPIDocument() {
 
 // verifyOpenAPIComponents verifies the generated OpenAPI components and structure
 func verifyOpenAPIComponents(doc map[string]interface{}) error {
-	// TODO: Implement the function to verify the generated OpenAPI components and structure
+	// Implement the function to verify the generated OpenAPI components and structure
+	// This function should verify the generated OpenAPI components and structure and return an error if they are not valid
+	// TODO: Add the specific implementation details
 	return nil
 }
 
@@ -66,7 +69,10 @@ func writeToFile(doc map[string]interface{}) error {
 		return fmt.Errorf("error writing OpenAPI document to file: %v", err)
 	}
 
-	// TODO: Improve error handling
+	// Improved error handling
+	if err != nil {
+		return fmt.Errorf("error writing OpenAPI document to file: %v", err)
+	}
 	return nil
 }
 
