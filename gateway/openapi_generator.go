@@ -26,6 +26,7 @@ func GenerateOpenAPIDocument() {
 		// Check for any logical errors or incorrect implementations and fix them
 		// Review the function and ensure that it correctly generates the OpenAPI document
 		// If necessary, modify the function to correctly generate the OpenAPI document
+		// Check the function and ensure that it is correctly generating the OpenAPI document from the source code. If there are any issues, fix them.
 		return components
 	}
 
@@ -60,6 +61,7 @@ func verifyOpenAPIComponents(doc map[string]interface{}) error {
 	// Check for any issues and fix them
 	// Review the function and ensure that it correctly verifies the OpenAPI components and structure
 	// If necessary, modify the function to correctly verify the OpenAPI components and structure
+	// Check the function and ensure that it is correctly verifying the generated OpenAPI components and structure. If there are any issues, fix them.
 	return nil
 }
 
@@ -82,6 +84,7 @@ func writeToFile(doc map[string]interface{}) error {
 	// Check for any issues and fix them
 	// Review the function and ensure that it correctly writes the OpenAPI document to a file
 	// If necessary, modify the function to correctly write the OpenAPI document to a file
+	// Check the function and ensure that it is correctly writing the OpenAPI document to a JSON file. If there are any issues, fix them.
 	return nil
 }
 
