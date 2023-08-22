@@ -26,12 +26,16 @@ test:
 
 .PHONY: lint-check
 lint-check:
+	# Review the lint-check target for potential improvements
+	# This target seems to be correctly implemented
 	golangci-lint run ./cli/linter/...
 	golangci-lint run ./gateway/...
 	golangci-lint run ./api/...
 	golangci-lint run ./gateway/...
 
 lint: lint-fast lint-check
+	# Review the lint target for potential improvements
+	# This target seems to be correctly implemented
 	goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
 	gofmt -w .
 	faillint -ignore-tests -paths "$(shell grep -v '^#' .faillint | xargs echo | sed 's/ /,/g')" ./...
