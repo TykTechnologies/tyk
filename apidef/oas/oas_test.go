@@ -37,6 +37,30 @@ func TestOAS(t *testing.T) {
 		assert.Equal(t, emptyOASPaths, resultOAS)
 	})
 
+	t.Run("generate OpenAPI document", func(t *testing.T) {
+		t.Parallel()
+
+		// Call the GenerateOpenAPIDocument function
+		GenerateOpenAPIDocument()
+
+		// Read the generated OpenAPI document from the file
+		data, err := ioutil.ReadFile("openapi.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Unmarshal the data into an OpenAPI object
+		var doc map[string]interface{}
+		err = json.Unmarshal(data, &doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Verify the OpenAPI document
+		verifyOpenAPIComponents(doc)
+	})
+}
+
 	t.Run("nil paths", func(t *testing.T) {
 		t.Parallel()
 
