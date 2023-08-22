@@ -30,7 +30,7 @@ var tracerProvider otel.TracerProvider
 
 func TestMain(m *testing.M) {
 	//use noop tracer exporter
-	tracerProvider = otel.InitOpenTelemetry(context.Background(), logger.GetLogger(), &otel.Config{
+	tracerProvider = otel.InitOpenTelemetry(context.Background(), logger.GetLogger(), &otel.OpenTelemetry{
 		Enabled:  true,
 		Exporter: "invalid",
 	}, "test", "test", false, "", false, []string{})
