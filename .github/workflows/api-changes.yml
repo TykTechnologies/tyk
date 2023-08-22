@@ -8,6 +8,6 @@ on:
 
 jobs:
   godoc:
-    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@558b72af55fcb54b718ad23c2cb070912ceb578b
+    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@main
     secrets:
       ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
