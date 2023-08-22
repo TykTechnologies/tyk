@@ -23,7 +23,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 	tcs := []struct {
 		testName string
 
-		givenConfig  Config
+		givenConfig  OpenTelemetry
 		givenVersion string
 		givenId      string
 		setupFn      func() (string, func())
@@ -31,14 +31,14 @@ func Test_InitOpenTelemetry(t *testing.T) {
 	}{
 		{
 			testName: "opentelemetry disabled",
-			givenConfig: Config{
+			givenConfig: OpenTelemetry{
 				Enabled: false,
 			},
 			expectedType: tyktrace.NOOP_PROVIDER,
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to http",
-			givenConfig: Config{
+			givenConfig: OpenTelemetry{
 				Enabled:  true,
 				Exporter: "http",
 				Endpoint: "http://localhost:4317",
@@ -55,7 +55,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to grpc",
-			givenConfig: Config{
+			givenConfig: OpenTelemetry{
 				Enabled:  true,
 				Exporter: "grpc",
 				Endpoint: "localhost:4317",
@@ -80,7 +80,7 @@ func Test_InitOpenTelemetry(t *testing.T) {
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to invalid - noop provider should be used",
-			givenConfig: Config{
+			givenConfig: OpenTelemetry{
 				Enabled:  true,
 				Exporter: "invalid",
 				Endpoint: "localhost:4317",
@@ -250,7 +250,7 @@ func TestGatewayResourceAttributes(t *testing.T) {
 }
 
 func TestContextWithSpan(t *testing.T) {
-	provider := InitOpenTelemetry(context.Background(), logger.GetLogger(), &Config{
+	provider := InitOpenTelemetry(context.Background(), logger.GetLogger(), &OpenTelemetry{
 		Enabled:  true,
 		Endpoint: "invalid",
 	}, "test", "test", false, "", false, []string{})
@@ -288,7 +288,7 @@ func TestAddTraceID(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
 
-			otelConfig := Config{
+			otelConfig := OpenTelemetry{
 				Enabled:  true,
 				Exporter: "http",
 				Endpoint: "http://localhost:4317",

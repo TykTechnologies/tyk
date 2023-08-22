@@ -187,6 +187,74 @@ func Fill(t *testing.T, input interface{}, index int) {
 	}
 }
 
+// getNonEmptyFields returns non-empty fields inside a struct.
+func getNonEmptyFields(data interface{}, prefix string) (fields []string) {
+	val := reflect.ValueOf(data)
+	if val.Kind() != reflect.Struct {
+		fields = append(fields, prefix)
+		return
+	}
+
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		fieldType := val.Type().Field(i)
+
+		fieldName := fieldType.Name
+		fullName := prefix + "." + fieldName
+
+		switch field.Kind() {
+		case reflect.String:
+			if field.String() != "" {
+				fields = append(fields, fullName)
+			}
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			if field.Int() != 0 {
+				fields = append(fields, fullName)
+			}
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			if field.Uint() != 0 {
+				fields = append(fields, fullName)
+			}
+		case reflect.Float32, reflect.Float64:
+			if field.Float() != 0 {
+				fields = append(fields, fullName)
+			}
+		case reflect.Bool:
+			if field.Bool() {
+				fields = append(fields, fullName)
+			}
+		case reflect.Struct:
+			fields = append(fields, getNonEmptyFields(field.Interface(), fullName)...)
+		case reflect.Array, reflect.Slice:
+			for j := 0; j < field.Len(); j++ {
+				elemFullName := fullName + fmt.Sprintf("[%d]", j)
+				fields = append(fields, getNonEmptyFields(field.Index(j).Interface(), elemFullName)...)
+				break
+			}
+
+		case reflect.Map:
+			for _, key := range field.MapKeys() {
+				elemFullName := fullName + "[0]"
+				fields = append(fields, getNonEmptyFields(field.MapIndex(key).Interface(), elemFullName)...)
+				break
+			}
+		case reflect.Interface:
+			if !field.IsNil() {
+				fields = append(fields, getNonEmptyFields(field.Elem().Interface(), fullName)...)
+			}
+		case reflect.Ptr:
+			if !field.IsNil() {
+				fields = append(fields, getNonEmptyFields(field.Elem().Interface(), fullName)...)
+			}
+		default:
+			panic(fmt.Sprintf("unsupported kind: %v", field.Kind()))
+		}
+
+	}
+
+	return fields
+}
+
 func FillTestAuthConfigs(t *testing.T, index int) map[string]apidef.AuthConfig {
 	authConfigs := make(map[string]apidef.AuthConfig)
 
