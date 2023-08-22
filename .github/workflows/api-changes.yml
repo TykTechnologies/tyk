@@ -7,10 +7,4 @@ on:
 
 jobs:
   test:
-    name: Detect API changes
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@1e98fcf2bc8abfabb146718459f40ab682e53287
-        with:
-          fetch-depth: 1
+    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@1e98fcf2bc8abfabb146718459f40ab682e53287
