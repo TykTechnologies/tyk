@@ -822,11 +822,13 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 
 	apiSpec := r.Context().Value("apiSpec").(*APISpec)
+	r = r.WithContext(context.WithValue(r.Context(), "apiSpec", nil))
+
+	if !apiSpec.EnforcedTimeoutEnabled {
+		return rt.transport.RoundTrip(r)
+	}
+
 	exists, timeout := CheckHardTimeoutEnforced(apiSpec, r, rt.logger)
-
-	updatedCtx := context.WithValue(r.Context(), "apiSpec", nil)
-
-	r = r.WithContext(updatedCtx)
 
 	if !exists {
 		return rt.transport.RoundTrip(r)
