@@ -53,7 +53,28 @@ func GenerateOpenAPIDocument() {
   		"components": map[string]interface{}{
   			"schemas": components,
   		},
-  	}
+  		"servers": []map[string]interface{}{
++			{
++				"url": "http://localhost:8080",
++				"description": "The production API server",
++			},
++		},
++		"security": []map[string]interface{}{
++			{
++				"api_key": []interface{}{},
++			},
++		},
++		"tags": []map[string]interface{}{
++			{
++				"name": "users",
++				"description": "Operations about users",
++			},
++		},
++		"externalDocs": map[string]interface{}{
++			"description": "Find out more about Tyk",
++			"url": "http://tyk.io",
++		},
++	}
   
   	// Verify the generated OpenAPI components and structure
   	// TODO: Review and modify this function if it is not correctly verifying the components
@@ -80,6 +101,34 @@ func verifyOpenAPIComponents(doc map[string]interface{}) error {
 	// TODO: If necessary, modify the function to correctly verify the OpenAPI components and structure
 	// Check the function and ensure that it is correctly verifying the generated OpenAPI components and structure. If there are any issues, fix them.
 	// TODO: Check the function and ensure that it is correctly verifying the generated OpenAPI components and structure. If there are any issues, fix them.
++	// Verify the paths of the OpenAPI document
++	if _, ok := doc["paths"]; !ok {
++		return fmt.Errorf("paths not found in OpenAPI document")
++	}
++	// Verify the components of the OpenAPI document
++	if _, ok := doc["components"]; !ok {
++		return fmt.Errorf("components not found in OpenAPI document")
++	}
++	// Verify the info of the OpenAPI document
++	if _, ok := doc["info"]; !ok {
++		return fmt.Errorf("info not found in OpenAPI document")
++	}
++	// Verify the servers of the OpenAPI document
++	if _, ok := doc["servers"]; !ok {
++		return fmt.Errorf("servers not found in OpenAPI document")
++	}
++	// Verify the security of the OpenAPI document
++	if _, ok := doc["security"]; !ok {
++		return fmt.Errorf("security not found in OpenAPI document")
++	}
++	// Verify the tags of the OpenAPI document
++	if _, ok := doc["tags"]; !ok {
++		return fmt.Errorf("tags not found in OpenAPI document")
++	}
++	// Verify the externalDocs of the OpenAPI document
++	if _, ok := doc["externalDocs"]; !ok {
++		return fmt.Errorf("externalDocs not found in OpenAPI document")
++	}
 	return nil
 }
 
@@ -90,19 +139,25 @@ func writeToFile(doc map[string]interface{}) error {
 		return fmt.Errorf("error marshalling OpenAPI document: %v", err)
 	}
 
-	err = ioutil.WriteFile("openapi.json", data, 0644)
+	// Open the file
+	file, err := os.OpenFile("openapi.json", os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing OpenAPI document to file: %v", err)
-	}
++		return fmt.Errorf("error opening OpenAPI document file: %v", err)
++	}
++	defer file.Close()
 
-	// Improved error handling
+	// Write the document to the file
+	_, err = file.Write(data)
 	if err != nil {
-		return fmt.Errorf("error writing OpenAPI document to file: %v", err)
-	}
-	// Check for any issues and fix them
-	// Review the function and ensure that it correctly writes the OpenAPI document to a file
-	// If necessary, modify the function to correctly write the OpenAPI document to a file
-	// Check the function and ensure that it is correctly writing the OpenAPI document to a JSON file. If there are any issues, fix them.
++		return fmt.Errorf("error writing OpenAPI document to file: %v", err)
++	}
+
+	// Close the file
+	err = file.Close()
+	if err != nil {
++		return fmt.Errorf("error closing OpenAPI document file: %v", err)
++	}
+
 	return nil
 }
 
