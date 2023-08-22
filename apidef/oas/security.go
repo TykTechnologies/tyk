@@ -732,8 +732,8 @@ func resetSecuritySchemes(api *apidef.APIDefinition) {
 
 	// Custom
 	api.CustomPluginAuthEnabled = false
-	api.CustomMiddleware.AuthCheck = apidef.MiddlewareDefinition{}
-	api.CustomMiddleware.IdExtractor = apidef.MiddlewareIdExtractor{}
+	api.CustomMiddleware.AuthCheck = apidef.MiddlewareDefinition{Disabled: true}
+	api.CustomMiddleware.IdExtractor = apidef.MiddlewareIdExtractor{Disabled: true}
 }
 
 func (s *OAS) fillAPIKeyScheme(ac *apidef.AuthConfig) {
