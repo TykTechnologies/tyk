@@ -144,6 +144,8 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.CustomMiddlewareBundleDisabled = false
 	a.DomainDisabled = false
 	a.ConfigDataDisabled = false
+	a.CustomMiddleware.AuthCheck.Disabled = false
+	a.CustomMiddleware.IdExtractor.Disabled = false
 	a.TagsDisabled = false
 	a.IsOAS = false
 
