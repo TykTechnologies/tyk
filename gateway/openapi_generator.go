@@ -22,6 +22,7 @@ func GenerateOpenAPIDocument() {
 		components := make([]OpenAPIComponent, 0)
 		// Add code to generate the OpenAPI components
 		// TODO: Implement this function
+		// This function should use reflection to traverse the source code and generate the OpenAPI components
 		return components
 	}
 
@@ -49,21 +50,25 @@ func GenerateOpenAPIDocument() {
 }
 
 // verifyOpenAPIComponents verifies the generated OpenAPI components and structure
-func verifyOpenAPIComponents(doc map[string]interface{}) {
+func verifyOpenAPIComponents(doc map[string]interface{}) error {
 	// Add code to verify the generated OpenAPI components and structure
 	// TODO: Implement this function
+	// This function should verify the generated OpenAPI components and structure and return an error if they are not valid
+	return nil
 }
 
 // writeToFile writes the OpenAPI document to a JSON file
-func writeToFile(doc map[string]interface{}) {
+func writeToFile(doc map[string]interface{}) error {
 	data, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
-		log.Fatalf("Error marshalling OpenAPI document: %v", err)
+		return fmt.Errorf("error marshalling OpenAPI document: %v", err)
 	}
 
 	err = ioutil.WriteFile("openapi.json", data, 0644)
 	if err != nil {
-		log.Fatalf("Error writing OpenAPI document to file: %v", err)
+		return fmt.Errorf("error writing OpenAPI document to file: %v", err)
 	}
+
+	return nil
 }
 
