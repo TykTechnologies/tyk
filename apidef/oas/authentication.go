@@ -3,6 +3,7 @@ package oas
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -62,13 +63,11 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.StripAuthorizationData = api.StripAuthData
 	a.BaseIdentityProvider = api.BaseIdentityProvidedBy
 
-	if api.CustomPluginAuthEnabled {
-		if a.Custom == nil {
-			a.Custom = &CustomPluginAuthentication{}
-		}
-
-		a.Custom.Fill(api)
+	if a.Custom == nil {
+		a.Custom = &CustomPluginAuthentication{}
 	}
+
+	a.Custom.Fill(api)
 
 	if ShouldOmit(a.Custom) {
 		a.Custom = nil
@@ -117,9 +116,14 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 		a.OIDC.ExtractTo(api)
 	}
 
-	if a.Custom != nil {
-		a.Custom.ExtractTo(api)
+	if a.Custom == nil {
+		a.Custom = &CustomPluginAuthentication{}
+		defer func() {
+			a.Custom = nil
+		}()
 	}
+
+	a.Custom.ExtractTo(api)
 }
 
 // SecuritySchemes holds security scheme values, filled with Import().
@@ -399,11 +403,8 @@ func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 func (s *Scopes) ExtractTo(scopeClaim *apidef.ScopeClaim) {
 	scopeClaim.ScopeClaimName = s.ClaimName
 
+	scopeClaim.ScopeToPolicy = map[string]string{}
 	for _, v := range s.ScopeToPolicyMapping {
-		if scopeClaim.ScopeToPolicy == nil {
-			scopeClaim.ScopeToPolicy = make(map[string]string)
-		}
-
 		scopeClaim.ScopeToPolicy[v.Scope] = v.PolicyID
 	}
 }
@@ -550,6 +551,7 @@ func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 
 	api.OpenIDOptions.SegregateByClient = o.SegregateByClientId
 
+	api.OpenIDOptions.Providers = []apidef.OIDProviderConfig{}
 	for _, p := range o.Providers {
 		clientIDs := make(map[string]string)
 		for _, mapping := range p.ClientToPolicyMapping {
@@ -622,14 +624,19 @@ func (c *CustomPluginAuthentication) Fill(api apidef.APIDefinition) {
 func (c *CustomPluginAuthentication) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomPluginAuthEnabled = c.Enabled
 
-	if c.Config != nil {
-		c.Config.ExtractTo(api)
+	if c.Config == nil {
+		c.Config = &AuthenticationPlugin{}
+		defer func() {
+			c.Config = nil
+		}()
 	}
+
+	c.Config.ExtractTo(api)
 
 	authConfig := apidef.AuthConfig{}
 	c.AuthSources.ExtractTo(&authConfig)
 
-	if ShouldOmit(authConfig) {
+	if reflect.DeepEqual(authConfig, apidef.AuthConfig{DisableHeader: true}) {
 		return
 	}
 
@@ -675,9 +682,14 @@ func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.AuthCheck.Path = ap.Path
 	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
 
-	if ap.IDExtractor != nil {
-		ap.IDExtractor.ExtractTo(api)
+	if ap.IDExtractor == nil {
+		ap.IDExtractor = &IDExtractor{}
+		defer func() {
+			ap.IDExtractor = nil
+		}()
 	}
+
+	ap.IDExtractor.ExtractTo(api)
 }
 
 // IDExtractorConfig specifies the configuration for ID extractor.
@@ -734,6 +746,11 @@ func (id *IDExtractorConfig) ExtractTo(api *apidef.APIDefinition) {
 		log.WithError(err).Error("error while encoding IDExtractorConfig")
 		return
 	}
+
+	if len(extractorConfigMap) == 0 {
+		extractorConfigMap = nil
+	}
+
 	api.CustomMiddleware.IdExtractor.ExtractorConfig = extractorConfigMap
 }
 
@@ -771,7 +788,12 @@ func (id *IDExtractor) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.IdExtractor.ExtractFrom = id.Source
 	api.CustomMiddleware.IdExtractor.ExtractWith = id.With
 
-	if id.Config != nil {
-		id.Config.ExtractTo(api)
+	if id.Config == nil {
+		id.Config = &IDExtractorConfig{}
+		defer func() {
+			id.Config = nil
+		}()
 	}
+
+	id.Config.ExtractTo(api)
 }

@@ -72,21 +72,41 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.TargetURL = u.URL
 
-	if u.ServiceDiscovery != nil {
-		u.ServiceDiscovery.ExtractTo(&api.Proxy.ServiceDiscovery)
+	if u.ServiceDiscovery == nil {
+		u.ServiceDiscovery = &ServiceDiscovery{}
+		defer func() {
+			u.ServiceDiscovery = nil
+		}()
 	}
 
-	if u.Test != nil {
-		u.Test.ExtractTo(&api.UptimeTests)
+	u.ServiceDiscovery.ExtractTo(&api.Proxy.ServiceDiscovery)
+
+	if u.Test == nil {
+		u.Test = &Test{}
+		defer func() {
+			u.Test = nil
+		}()
 	}
 
-	if u.MutualTLS != nil {
-		u.MutualTLS.ExtractTo(api)
+	u.Test.ExtractTo(&api.UptimeTests)
+
+	if u.MutualTLS == nil {
+		u.MutualTLS = &MutualTLS{}
+		defer func() {
+			u.MutualTLS = nil
+		}()
 	}
 
-	if u.CertificatePinning != nil {
-		u.CertificatePinning.ExtractTo(api)
+	u.MutualTLS.ExtractTo(api)
+
+	if u.CertificatePinning == nil {
+		u.CertificatePinning = &CertificatePinning{}
+		defer func() {
+			u.CertificatePinning = nil
+		}()
 	}
+
+	u.CertificatePinning.ExtractTo(api)
 }
 
 // ServiceDiscovery holds configuration required for service discovery.
@@ -241,11 +261,6 @@ func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfigu
 
 // ExtractTo extracts *ServiceDiscovery into *apidef.ServiceDiscoveryConfiguration.
 func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryConfiguration) {
-	if sd == nil {
-		serviceDiscovery.CacheDisabled = true
-		return
-	}
-
 	serviceDiscovery.UseDiscoveryService = sd.Enabled
 	serviceDiscovery.EndpointReturnsList = sd.EndpointReturnsList
 	serviceDiscovery.ParentDataPath = sd.ParentDataPath
@@ -282,6 +297,13 @@ func (t *Test) Fill(uptimeTests apidef.UptimeTests) {
 
 // ExtractTo extracts *Test into *apidef.UptimeTests.
 func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
+	if t.ServiceDiscovery == nil {
+		t.ServiceDiscovery = &ServiceDiscovery{}
+		defer func() {
+			t.ServiceDiscovery = nil
+		}()
+	}
+
 	t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
 }
 
@@ -327,6 +349,8 @@ func (m *MutualTLS) ExtractTo(api *apidef.APIDefinition) {
 
 	if len(m.DomainToCertificates) > 0 {
 		api.UpstreamCertificates = make(map[string]string)
+	} else {
+		api.UpstreamCertificates = nil
 	}
 
 	for _, domainToCert := range m.DomainToCertificates {
@@ -409,5 +433,7 @@ func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
 	if len(cp.DomainToPublicKeysMapping) > 0 {
 		api.PinnedPublicKeys = make(map[string]string)
 		cp.DomainToPublicKeysMapping.ExtractTo(api.PinnedPublicKeys)
+	} else {
+		api.PinnedPublicKeys = nil
 	}
 }

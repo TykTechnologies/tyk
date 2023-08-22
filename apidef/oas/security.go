@@ -633,12 +633,16 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 }
 
 func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
-	if tykAuthentication := s.getTykAuthentication(); tykAuthentication != nil {
-		tykAuthentication.ExtractTo(api)
-	} else {
-		api.UseKeylessAccess = true
-		return
+	if s.getTykAuthentication() == nil {
+		s.GetTykExtension().Server.Authentication = &Authentication{}
+		defer func() {
+			s.GetTykExtension().Server.Authentication = nil
+		}()
 	}
+
+	resetSecuritySchemes(api)
+
+	s.getTykAuthentication().ExtractTo(api)
 
 	if api.AuthConfigs == nil {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
@@ -679,6 +683,61 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 			}
 		}
 	}
+}
+
+func resetSecuritySchemes(api *apidef.APIDefinition) {
+	api.AuthConfigs = nil
+
+	// OAuth2
+	api.UseOauth2 = false
+	api.Oauth2Meta.AllowedAccessTypes = nil
+	api.Oauth2Meta.AllowedAuthorizeTypes = nil
+	api.Oauth2Meta.AuthorizeLoginRedirect = ""
+	api.NotificationsDetails = apidef.NotificationsManager{}
+
+	// External OAuth
+	api.ExternalOAuth = apidef.ExternalOAuth{}
+
+	// OIDC
+	api.UseOpenID = false
+	api.Scopes.OIDC = apidef.ScopeClaim{}
+	api.OpenIDOptions = apidef.OpenIDOptions{}
+
+	// Basic
+	api.UseBasicAuth = false
+	api.BasicAuth.DisableCaching = false
+	api.BasicAuth.CacheTTL = 0
+	api.BasicAuth.ExtractFromBody = false
+	api.BasicAuth.BodyUserRegexp = ""
+	api.BasicAuth.BodyPasswordRegexp = ""
+	delete(api.AuthConfigs, "basic")
+
+	// HMAC
+	api.EnableSignatureChecking = false
+	api.HmacAllowedClockSkew = 0
+	api.HmacAllowedAlgorithms = nil
+
+	// JWT
+	api.EnableJWT = false
+	api.JWTSource = ""
+	api.JWTSigningMethod = ""
+	api.JWTIdentityBaseField = ""
+	api.JWTSkipKid = false
+	api.JWTPolicyFieldName = ""
+	api.JWTClientIDBaseField = ""
+	api.Scopes.JWT = apidef.ScopeClaim{}
+	api.JWTDefaultPolicies = nil
+	api.JWTIssuedAtValidationSkew = 0
+	api.JWTExpiresAtValidationSkew = 0
+	api.JWTNotBeforeValidationSkew = 0
+
+	// Auth Token
+	api.UseStandardAuth = false
+
+	// Custom
+	api.CustomPluginAuthEnabled = false
+	api.CustomMiddleware.AuthCheck = apidef.MiddlewareDefinition{Disabled: true}
+	api.CustomMiddleware.IdExtractor = apidef.MiddlewareIdExtractor{Disabled: true}
 }
 
 func (s *OAS) fillAPIKeyScheme(ac *apidef.AuthConfig) {

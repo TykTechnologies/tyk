@@ -512,8 +512,12 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 }
 
 type CustomMiddlewareResponseHook struct {
+	BaseTykResponseHandler
 	mw *CoProcessMiddleware
-	Gw *Gateway `json:"-"`
+}
+
+func (h CustomMiddlewareResponseHook) Base() *BaseTykResponseHandler {
+	return &h.BaseTykResponseHandler
 }
 
 func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
@@ -580,7 +584,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	// check if we have changes in headers
 	if !areMapsEqual(object.Response.Headers, retObject.Response.Headers) {
 		// as we have changes we need to synchronize them
-		syncHeadersAndMultiValueHeaders(retObject.Response.Headers, retObject.Response.MultivalueHeaders)
+		retObject.Response.MultivalueHeaders = syncHeadersAndMultiValueHeaders(retObject.Response.Headers, retObject.Response.MultivalueHeaders)
 	}
 
 	// Set headers:

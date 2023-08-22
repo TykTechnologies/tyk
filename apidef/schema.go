@@ -614,6 +614,24 @@ const Schema = `{
                             "required": [
                                 "kind"
                             ]
+                        },
+                        "global_headers": {
+                            "type": [
+                                "array",
+                                "null"
+                            ],
+                            "properties": {
+                                "key": {
+                                    "type": "string"
+                                },
+                                "value": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "key",
+                                "value"
+                            ]
                         }
                     }
                 },
@@ -706,7 +724,10 @@ const Schema = `{
         },
 		"is_oas": {
 			"type": "boolean"
-		}
+		},
+        "detailed_tracing": {
+            "type": "boolean"
+        }
     },
     "required": [
         "name",

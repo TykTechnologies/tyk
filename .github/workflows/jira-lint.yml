@@ -1,0 +1,14 @@
+name: JIRA lint
+
+on:
+  pull_request:
+    branches:
+      - master
+      - release-**
+
+jobs:
+  jira-lint:
+    uses: TykTechnologies/github-actions/.github/workflows/jira-lint.yaml@main
+    secrets:
+      JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}

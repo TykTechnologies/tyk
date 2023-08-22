@@ -30,7 +30,11 @@ type Operation struct {
 
 	// TransformRequestBody allows you to transform request body.
 	// When both `path` and `body` are provided, body would take precedence.
-	TransformRequestBody *TransformRequestBody `bson:"transformRequestBody,omitempty" json:"transformRequestBody,omitempty"`
+	TransformRequestBody *TransformBody `bson:"transformRequestBody,omitempty" json:"transformRequestBody,omitempty"`
+
+	// TransformResponseBody allows you to transform response body.
+	// When both `path` and `body` are provided, body would take precedence.
+	TransformResponseBody *TransformBody `bson:"transformResponseBody,omitempty" json:"transformResponseBody,omitempty"`
 
 	// Cache contains the caching plugin configuration.
 	Cache *CachePlugin `bson:"cache,omitempty" json:"cache,omitempty"`
@@ -116,6 +120,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillAllowance(ep.Ignored, ignoreAuthentication)
 	s.fillTransformRequestMethod(ep.MethodTransforms)
 	s.fillTransformRequestBody(ep.Transform)
+	s.fillTransformResponseBody(ep.TransformResponse)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillOASValidateRequest(ep.ValidateJSON)
@@ -124,6 +129,18 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
+	ep.Ignored = nil
+	ep.WhiteList = nil
+	ep.BlackList = nil
+	ep.AdvanceCacheConfig = nil
+	ep.Transform = nil
+	ep.TransformResponse = nil
+	ep.HardTimeouts = nil
+	ep.Virtual = nil
+	ep.MethodTransforms = nil
+	ep.ValidateRequest = nil
+	ep.GoPlugin = nil
+
 	tykOperations := s.getTykOperations()
 	if len(tykOperations) == 0 {
 		return
@@ -139,6 +156,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
 					tykOp.extractTransformRequestMethodTo(ep, path, method)
 					tykOp.extractTransformRequestBodyTo(ep, path, method)
+					tykOp.extractTransformResponseBodyTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
 					tykOp.extractVirtualEndpointTo(ep, path, method)
@@ -202,12 +220,28 @@ func (s *OAS) fillTransformRequestBody(metas []apidef.TemplateMeta) {
 		operation := s.GetTykExtension().getOperation(operationID)
 
 		if operation.TransformRequestBody == nil {
-			operation.TransformRequestBody = &TransformRequestBody{}
+			operation.TransformRequestBody = &TransformBody{}
 		}
 
 		operation.TransformRequestBody.Fill(meta)
 		if ShouldOmit(operation.TransformRequestBody) {
 			operation.TransformRequestBody = nil
+		}
+	}
+}
+
+func (s *OAS) fillTransformResponseBody(metas []apidef.TemplateMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		if operation.TransformResponseBody == nil {
+			operation.TransformResponseBody = &TransformBody{}
+		}
+
+		operation.TransformResponseBody.Fill(meta)
+		if ShouldOmit(operation.TransformResponseBody) {
+			operation.TransformResponseBody = nil
 		}
 	}
 }
@@ -282,6 +316,16 @@ func (o *Operation) extractTransformRequestBodyTo(ep *apidef.ExtendedPathsSet, p
 	meta := apidef.TemplateMeta{Path: path, Method: method}
 	o.TransformRequestBody.ExtractTo(&meta)
 	ep.Transform = append(ep.Transform, meta)
+}
+
+func (o *Operation) extractTransformResponseBodyTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.TransformResponseBody == nil {
+		return
+	}
+
+	meta := apidef.TemplateMeta{Path: path, Method: method}
+	o.TransformResponseBody.ExtractTo(&meta)
+	ep.TransformResponse = append(ep.TransformResponse, meta)
 }
 
 func (o *Operation) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {

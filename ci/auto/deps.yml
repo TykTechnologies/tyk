@@ -1,0 +1,71 @@
+version: "3.9"
+services:
+  redis:
+    container_name: redis
+    image: bitnami/redis:6.2
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 5s
+      retries: 10
+      start_period: 2s
+      timeout: 10s
+    # command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+
+  bundle-server:
+    container_name: bundle-server
+    build:
+      context: ./bundle-server
+    ports:
+      - "8000:8000"
+
+  federation-server:
+    container_name: federation
+    image: agatawitkowska/federation-example
+    ports:
+      - "4000:4000"
+      - "4001:4001"
+      - "4002:4002"
+      - "4003:4003"
+
+  openldap:
+    container_name: openldap
+    image: osixia/openldap:1.5.0
+    ports:
+      - '389:389'
+      - '636:636'
+    environment:
+      - LDAP_READONLY_USER=true
+      - LDAP_READONLY_USER_USERNAME=read-only-admin
+      - LDAP_READONLY_USER_PASSWORD=password
+
+  graphql-faker:
+    container_name: graphql-faker
+    image: apisguru/graphql-faker:latest
+    volumes:
+      - ./faker-schema.graphql:/workdir/faker-schema.graphql
+    command: "faker-schema.graphql"
+    ports:
+      - "9002:9002"
+
+  upstream:
+    container_name: httpbin.org
+    image: kennethreitz/httpbin
+    restart: always
+
+  restcountries:
+    container_name: restcountries
+    image: bigpapoo/restcountries:1.0
+      
+  trevorblades:
+    container_name: trevorblades
+    image: mangomm/trevorblades-countries
+
+  wait_deps:
+    image: hello-world:linux
+    depends_on:
+        redis:
+            condition: service_healthy

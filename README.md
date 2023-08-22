@@ -130,7 +130,7 @@ All the documentation for Tyk Gateway and other OSS-related topics can be found 
 ## Community
 * [Tyk Community Board](https://community.tyk.io/) - Technical support from the Tyk Community
 * [Write a GitHub Issue](https://github.com/TykTechnologies/tyk/issues/new/choose) - Feature requests & bug reports welcome
-* [Technical blog](https://tyk.io/api-expertise/blog/) - Tyk announcements and updates
+* [Technical blog](https://tyk.io/blog/) - Tyk announcements and updates
 * [Newsletters ](https://pages.tyk.io/newsletter)- Subscribe to our GraphQL & API newsletters
 * If you are using Tyk give us a star ⭐️
 

@@ -31,9 +31,14 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *Middleware into *apidef.APIDefinition.
 func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
-	if m.Global != nil {
-		m.Global.ExtractTo(api)
+	if m.Global == nil {
+		m.Global = &Global{}
+		defer func() {
+			m.Global = nil
+		}()
 	}
+
+	m.Global.ExtractTo(api)
 }
 
 // Global holds configuration applies globally: CORS and caching.
@@ -134,33 +139,68 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *Global into *apidef.APIDefinition.
 func (g *Global) ExtractTo(api *apidef.APIDefinition) {
-	if g.PluginConfig != nil {
-		g.PluginConfig.ExtractTo(api)
+	if g.PluginConfig == nil {
+		g.PluginConfig = &PluginConfig{}
+		defer func() {
+			g.PluginConfig = nil
+		}()
 	}
 
-	if g.CORS != nil {
-		g.CORS.ExtractTo(&api.CORS)
+	g.PluginConfig.ExtractTo(api)
+
+	if g.CORS == nil {
+		g.CORS = &CORS{}
+		defer func() {
+			g.CORS = nil
+		}()
 	}
 
-	if g.PrePlugin != nil {
-		g.PrePlugin.ExtractTo(api)
+	g.CORS.ExtractTo(&api.CORS)
+
+	if g.PrePlugin == nil {
+		g.PrePlugin = &PrePlugin{}
+		defer func() {
+			g.PrePlugin = nil
+		}()
 	}
 
-	if g.PostAuthenticationPlugin != nil {
-		g.PostAuthenticationPlugin.ExtractTo(api)
+	g.PrePlugin.ExtractTo(api)
+
+	if g.PostAuthenticationPlugin == nil {
+		g.PostAuthenticationPlugin = &PostAuthenticationPlugin{}
+		defer func() {
+			g.PostAuthenticationPlugin = nil
+		}()
 	}
 
-	if g.PostPlugin != nil {
-		g.PostPlugin.ExtractTo(api)
+	g.PostAuthenticationPlugin.ExtractTo(api)
+
+	if g.PostPlugin == nil {
+		g.PostPlugin = &PostPlugin{}
+		defer func() {
+			g.PostPlugin = nil
+		}()
 	}
 
-	if g.Cache != nil {
-		g.Cache.ExtractTo(&api.CacheOptions)
+	g.PostPlugin.ExtractTo(api)
+
+	if g.Cache == nil {
+		g.Cache = &Cache{}
+		defer func() {
+			g.Cache = nil
+		}()
 	}
 
-	if g.ResponsePlugin != nil {
-		g.ResponsePlugin.ExtractTo(api)
+	g.Cache.ExtractTo(&api.CacheOptions)
+
+	if g.ResponsePlugin == nil {
+		g.ResponsePlugin = &ResponsePlugin{}
+		defer func() {
+			g.ResponsePlugin = nil
+		}()
 	}
+
+	g.ResponsePlugin.ExtractTo(api)
 }
 
 // PluginConfigData configures config data for custom plugins.
@@ -232,13 +272,23 @@ func (p *PluginConfig) Fill(api apidef.APIDefinition) {
 func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.Driver = p.Driver
 
-	if p.Bundle != nil {
-		p.Bundle.ExtractTo(api)
+	if p.Bundle == nil {
+		p.Bundle = &PluginBundle{}
+		defer func() {
+			p.Bundle = nil
+		}()
 	}
 
-	if p.Data != nil {
-		p.Data.ExtractTo(api)
+	p.Bundle.ExtractTo(api)
+
+	if p.Data == nil {
+		p.Data = &PluginConfigData{}
+		defer func() {
+			p.Data = nil
+		}()
 	}
+
+	p.Data.ExtractTo(api)
 }
 
 // PluginBundle holds configuration for custom plugins.
@@ -781,11 +831,11 @@ func (tm *TransformRequestMethod) ExtractTo(meta *apidef.MethodTransformMeta) {
 	meta.ToMethod = tm.ToMethod
 }
 
-// TransformRequestBody holds configuration about body request transformations.
-type TransformRequestBody struct {
-	// Enabled enables transform request body middleware.
+// TransformBody holds configuration about request/response body transformations.
+type TransformBody struct {
+	// Enabled enables transform request/request body middleware.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// Format of the request body, xml or json.
+	// Format of the request/response body, xml or json.
 	Format apidef.RequestInputType `bson:"format" json:"format"`
 	// Path file path for the template.
 	Path string `bson:"path,omitempty" json:"path,omitempty"`
@@ -793,8 +843,8 @@ type TransformRequestBody struct {
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 }
 
-// Fill fills *TransformRequestBody from apidef.TemplateMeta.
-func (tr *TransformRequestBody) Fill(meta apidef.TemplateMeta) {
+// Fill fills *TransformBody from apidef.TemplateMeta.
+func (tr *TransformBody) Fill(meta apidef.TemplateMeta) {
 	tr.Enabled = !meta.Disabled
 	tr.Format = meta.TemplateData.Input
 	if meta.TemplateData.Mode == apidef.UseBlob {
@@ -804,8 +854,8 @@ func (tr *TransformRequestBody) Fill(meta apidef.TemplateMeta) {
 	}
 }
 
-// ExtractTo extracts data from *TransformRequestBody into *apidef.TemplateMeta.
-func (tr *TransformRequestBody) ExtractTo(meta *apidef.TemplateMeta) {
+// ExtractTo extracts data from *TransformBody into *apidef.TemplateMeta.
+func (tr *TransformBody) ExtractTo(meta *apidef.TemplateMeta) {
 	meta.Disabled = !tr.Enabled
 	meta.TemplateData.Input = tr.Format
 	meta.TemplateData.EnableSession = true
@@ -830,6 +880,9 @@ type CachePlugin struct {
 
 	// CacheResponseCodes contains a list of valid response codes for responses that are okay to add to the cache.
 	CacheResponseCodes []int `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
+
+	// Timeout is the TTL for the endpoint level caching in seconds. 0 means no caching.
+	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 // Fill fills *CachePlugin from apidef.CacheMeta.
@@ -837,6 +890,7 @@ func (a *CachePlugin) Fill(cm apidef.CacheMeta) {
 	a.Enabled = !cm.Disabled
 	a.CacheByRegex = cm.CacheKeyRegex
 	a.CacheResponseCodes = cm.CacheOnlyResponseCodes
+	a.Timeout = cm.Timeout
 }
 
 // ExtractTo extracts *CachePlugin values to *apidef.CacheMeta.
@@ -844,6 +898,7 @@ func (a *CachePlugin) ExtractTo(cm *apidef.CacheMeta) {
 	cm.Disabled = !a.Enabled
 	cm.CacheKeyRegex = a.CacheByRegex
 	cm.CacheOnlyResponseCodes = a.CacheResponseCodes
+	cm.Timeout = a.Timeout
 }
 
 // EnforceTimeout holds the configuration for enforcing request timeouts.

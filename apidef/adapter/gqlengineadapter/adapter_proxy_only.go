@@ -29,6 +29,9 @@ func (p *ProxyOnly) EngineConfig() (*graphql.EngineV2Configuration, error) {
 	}
 
 	staticHeaders := make(http.Header)
+	for key, value := range p.ApiDefinition.GraphQL.Proxy.RequestHeaders {
+		staticHeaders.Set(key, value)
+	}
 
 	url := p.ApiDefinition.Proxy.TargetURL
 	if strings.HasPrefix(url, "tyk://") {

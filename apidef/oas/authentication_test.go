@@ -104,6 +104,26 @@ func TestOIDC(t *testing.T) {
 	emptyOIDC.Fill(convertedAPI)
 
 	assert.Equal(t, emptyOIDC, resultOIDC)
+
+	t.Run("providers", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.OpenIDOptions.Providers = []apidef.OIDProviderConfig{{Issuer: "1234"}}
+
+		var oas OAS
+		xTyk := &XTykAPIGateway{Server: Server{
+			Authentication: &Authentication{
+				OIDC: &OIDC{
+					Providers: []Provider{{Issuer: "5678"}},
+				},
+			},
+		}}
+
+		oas.SetTykExtension(xTyk)
+		oas.ExtractTo(&api)
+
+		assert.Len(t, api.OpenIDOptions.Providers, 1)
+		assert.Equal(t, "5678", api.OpenIDOptions.Providers[0].Issuer)
+	})
 }
 
 func TestCustomPlugin(t *testing.T) {
