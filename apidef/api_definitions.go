@@ -400,15 +400,15 @@ type MiddlewareDefinition struct {
 // IDExtractorConfig specifies the configuration for ID extractor
 type IDExtractorConfig struct {
 	// HeaderName is the header name to extract ID from.
-	HeaderName string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
+	HeaderName string `mapstructure:"header_name" bson:"header_name" json:"header_name,omitempty"`
 	// FormParamName is the form parameter name to extract ID from.
-	FormParamName string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
+	FormParamName string `mapstructure:"param_name" bson:"param_name" json:"param_name,omitempty"`
 	// RegexExpression is the regular expression to match ID.
-	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
+	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression,omitempty"`
 	// RegexMatchIndex is the index from which ID to be extracted after a match.
-	RegexMatchIndex int `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
+	RegexMatchIndex int `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index,omitempty"`
 	// XPathExp is the xpath expression to match ID.
-	XPathExpression string `mapstructure:"xpath_expression" bson:"xpath_expression" json:"xpath_expression"`
+	XPathExpression string `mapstructure:"xpath_expression" bson:"xpath_expression" json:"xpath_expression,omitempty"`
 }
 
 type MiddlewareIdExtractor struct {
