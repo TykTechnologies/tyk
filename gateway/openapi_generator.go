@@ -29,37 +29,40 @@ func GenerateOpenAPIDocument() {
 		// TODO: Implement the specific details to generate the OpenAPI components
 		// Check for any logical errors or incorrect implementations and fix them
 		// TODO: Check for any logical errors or incorrect implementations and fix them
-		// Review the function and ensure that it correctly generates the OpenAPI document
-		// TODO: Review the function and ensure that it correctly generates the OpenAPI document
-		// If necessary, modify the function to correctly generate the OpenAPI document
-		// TODO: If necessary, modify the function to correctly generate the OpenAPI document
-		// Check the function and ensure that it is correctly generating the OpenAPI document from the source code. If there are any issues, fix them.
-		// TODO: Check the function and ensure that it is correctly generating the OpenAPI document from the source code. If there are any issues, fix them.
-		return components
-	}
-
-	// Use reflection to traverse the source code and generate the OpenAPI components
-	components := generateComponents()
-
-	// Generate the OpenAPI document
-	doc := map[string]interface{}{
-		"openapi": "3.0.3",
-		"info": map[string]interface{}{
-			"title":   "Tyk Gateway",
-			"version": "1.0",
-		},
-		"paths": make(map[string]interface{}),
-		"components": map[string]interface{}{
-			"schemas": components,
-		},
-	}
-
-	// Verify the generated OpenAPI components and structure
-	verifyOpenAPIComponents(doc)
-
-	// Write the OpenAPI document to a file
-	writeToFile(doc)
-}
+  // GenerateOpenAPIDocument generates an OpenAPI document from the source code
+  func GenerateOpenAPIDocument() {
+  	// Define the generateComponents function
+  	generateComponents := func() []OpenAPIComponent {
+  		// Implement the function to generate the OpenAPI components
+  		// TODO: Debug and modify this function if it is causing the test failures
+  		components := make([]OpenAPIComponent, 0)
+  		return components
+  	}
+  
+  	// Use reflection to traverse the source code and generate the OpenAPI components
+  	components := generateComponents()
+  
+  	// Generate the OpenAPI document
+  	doc := map[string]interface{}{
+  		"openapi": "3.0.3",
+  		"info": map[string]interface{}{
+  			"title":   "Tyk Gateway",
+  			"version": "1.0",
+  		},
+  		"paths": make(map[string]interface{}),
+  		"components": map[string]interface{}{
+  			"schemas": components,
+  		},
+  	}
+  
+  	// Verify the generated OpenAPI components and structure
+  	// TODO: Review and modify this function if it is not correctly verifying the components
+  	verifyOpenAPIComponents(doc)
+  
+  	// Write the OpenAPI document to a file
+  	// TODO: Review and modify this function if it is not correctly writing the document to a file
+  	writeToFile(doc)
+  }
 
 // verifyOpenAPIComponents verifies the generated OpenAPI components and structure
 func verifyOpenAPIComponents(doc map[string]interface{}) error {
