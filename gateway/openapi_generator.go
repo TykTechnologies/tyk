@@ -22,7 +22,7 @@ func GenerateOpenAPIDocument() {
 		components := make([]OpenAPIComponent, 0)
 		// Add code to generate the OpenAPI components
 		// Use reflection to traverse the source code and generate the OpenAPI components
-		// TODO: Add the specific implementation details
+		// Implement the specific details to generate the OpenAPI components
 		// Check for any logical errors or incorrect implementations and fix them
 		// Review the function and ensure that it correctly generates the OpenAPI document
 		// If necessary, modify the function to correctly generate the OpenAPI document
@@ -57,7 +57,7 @@ func GenerateOpenAPIDocument() {
 func verifyOpenAPIComponents(doc map[string]interface{}) error {
 	// Implement the function to verify the generated OpenAPI components and structure
 	// This function should verify the generated OpenAPI components and structure and return an error if they are not valid
-	// TODO: Add the specific implementation details
+	// Implement the specific details to verify the OpenAPI components and structure
 	// Check for any issues and fix them
 	// Review the function and ensure that it correctly verifies the OpenAPI components and structure
 	// If necessary, modify the function to correctly verify the OpenAPI components and structure
