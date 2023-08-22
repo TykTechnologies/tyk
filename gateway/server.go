@@ -21,6 +21,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/test"
+
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
@@ -112,6 +117,7 @@ type Gateway struct {
 	DashService          DashboardServiceSender
 	CertificateManager   certs.CertificateManager
 	GlobalHostChecker    HostCheckerManager
+	ConnectionWatcher    *httputil.ConnectionWatcher
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
 	TracerProvider       otel.TracerProvider
@@ -219,6 +225,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
 	}
+	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
 	gw.SessionCache = cache.New(10, 5)
 	gw.ExpiryCache = cache.New(600, 10*60)

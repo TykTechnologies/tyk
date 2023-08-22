@@ -385,6 +385,8 @@ type ReverseProxy struct {
 	Gw     *Gateway `json:"-"`
 }
 
+var idleConnTimeout = 90
+
 func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	timeout := 30.0
 	if dialerTimeout > 0 {
@@ -410,7 +412,7 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 		DialContext:           dialContextFunc,
 		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
 		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
-		IdleConnTimeout:       90 * time.Second,
+		IdleConnTimeout:       time.Duration(idleConnTimeout) * time.Second,
 		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
