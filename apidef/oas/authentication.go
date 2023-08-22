@@ -546,6 +546,7 @@ func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 	api.AuthConfigs["oidc"] = authConfig
 
 	api.OpenIDOptions.SegregateByClient = o.SegregateByClientId
+
 	api.OpenIDOptions.Providers = []apidef.OIDProviderConfig{}
 	for _, p := range o.Providers {
 		clientIDs := make(map[string]string)
