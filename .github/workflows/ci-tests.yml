@@ -44,6 +44,12 @@ jobs:
         with:
             python-version: ${{ matrix.python-version }}
 
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: |
+          echo "$GITHUB_CONTEXT"
+
       - name: Install Dependencies and basic hygiene test
         id: hygiene
         run: |
