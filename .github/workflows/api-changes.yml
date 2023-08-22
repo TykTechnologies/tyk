@@ -4,7 +4,8 @@ on:
   pull_request:
     branches:
       - master
+      - release-**
 
 jobs:
   test:
-    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@2c3137261b71f3a55c442ec1b659485170e395d8
+    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@main
