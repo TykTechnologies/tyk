@@ -16,7 +16,7 @@ import (
 type (
 	TracerProvider = tyktrace.Provider
 
-	Config = otelconfig.OpenTelemetry
+	OpenTelemetry = otelconfig.OpenTelemetry
 
 	Sampling = otelconfig.Sampling
 
@@ -50,7 +50,7 @@ func ContextWithSpan(ctx context.Context, span tyktrace.Span) context.Context {
 // InitOpenTelemetry initializes OpenTelemetry - it returns a TracerProvider
 // which can be used to create a tracer. If OpenTelemetry is disabled or misconfigured,
 // a NoopProvider is returned.
-func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *Config, id string, version string,
+func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *OpenTelemetry, id string, version string,
 	useRPC bool, groupID string, isSegmented bool, segmentTags []string) TracerProvider {
 
 	traceLogger := logger.WithFields(logrus.Fields{
