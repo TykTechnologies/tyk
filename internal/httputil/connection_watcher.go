@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 )
 
+// ConnectionWatcher counts http server connections.
 type ConnectionWatcher struct {
 	n int64
 }
