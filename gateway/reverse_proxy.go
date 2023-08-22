@@ -385,15 +385,8 @@ type ReverseProxy struct {
 	Gw     *Gateway `json:"-"`
 }
 
-func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
-	timeout := 30.0
-	if dialerTimeout > 0 {
-		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
-		timeout = dialerTimeout
-	}
-
+func (p *ReverseProxy) defaultTransport() *http.Transport {
 	dialer := &net.Dialer{
-		Timeout:   time.Duration(float64(timeout) * float64(time.Second)),
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}
@@ -407,11 +400,10 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	}
 
 	transport := &http.Transport{
-		DialContext:           dialContextFunc,
-		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
-		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
-		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
+		DialContext:         dialContextFunc,
+		MaxIdleConns:        p.Gw.GetConfig().MaxIdleConns,
+		MaxIdleConnsPerHost: p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
+		TLSHandshakeTimeout: 10 * time.Second,
 	}
 
 	return transport
@@ -535,7 +527,7 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
+func CheckHardTimeoutEnforced(spec *APISpec, req *http.Request, logger *logrus.Entry) (bool, float64) {
 	if !spec.EnforcedTimeoutEnabled {
 		return false, spec.GlobalConfig.ProxyDefaultTimeout
 	}
@@ -545,7 +537,7 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
 		intMeta := meta.(*int)
-		p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
+		logger.Debug("HARD TIMEOUT ENFORCED: ", intMeta)
 		return true, float64(*intMeta)
 	}
 
@@ -662,9 +654,9 @@ func tlsClientConfig(s *APISpec, gw *Gateway) *tls.Config {
 	return config
 }
 
-func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
+func (p *ReverseProxy) httpTransport(rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
 	p.logger.Debug("Creating new transport")
-	transport := p.defaultTransport(timeOut) // modifies a newly created transport
+	transport := p.defaultTransport() // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
@@ -797,7 +789,6 @@ type TykRoundTripper struct {
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
-
 	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
 
 	if r.URL.Scheme == "tyk" || hasInternalHeader {
@@ -806,6 +797,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		}
 
 		handler, _, found := rt.Gw.findInternalHttpHandlerByNameOrID(r.Host)
+
 		if !found {
 			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
 			return nil, errors.New("handler could")
@@ -829,7 +821,22 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return rt.h2ctransport.RoundTrip(r)
 	}
 
-	return rt.transport.RoundTrip(r)
+	apiSpec := r.Context().Value("apiSpec").(*APISpec)
+	exists, timeout := CheckHardTimeoutEnforced(apiSpec, r, rt.logger)
+
+	updatedCtx := context.WithValue(r.Context(), "apiSpec", nil)
+
+	r = r.WithContext(updatedCtx)
+
+	if !exists {
+		return rt.transport.RoundTrip(r)
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	reqWithTimeout := r.WithContext(ctx)
+	return rt.transport.RoundTrip(reqWithTimeout)
 }
 
 const (
@@ -1234,6 +1241,8 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 }
 
 func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, err error) {
+	ctx := context.WithValue(outreq.Context(), "apiSpec", p.TykAPISpec)
+	outreq = outreq.WithContext(ctx)
 	return roundTripper.RoundTrip(outreq)
 }
 
@@ -1355,8 +1364,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if createTransport {
-		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
+		p.TykAPISpec.HTTPTransport = p.httpTransport(rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 	}
 
@@ -1433,6 +1441,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 		if strings.HasPrefix(err.Error(), "mock:") {
 			p.ErrorHandler.HandleError(rw, logreq, err.Error(), res.StatusCode, true)
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
+		}
+
+		if strings.Contains(err.Error(), "context deadline exceeded") {
+			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout", http.StatusGatewayTimeout, true)
 			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
 

@@ -1364,13 +1364,14 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 }
 
 func TestEnforcedTimeout(t *testing.T) {
-	test.Flaky(t) // TODO TT-5222
+	//test.Flaky(t) // TODO TT-5222
 
 	ts := StartTest(nil)
 	defer ts.Close()
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
 	}))
 
 	api := BuildAPI(func(spec *APISpec) {
@@ -1385,6 +1386,11 @@ func TestEnforcedTimeout(t *testing.T) {
 					Path:     "/get",
 					Method:   http.MethodGet,
 					TimeOut:  1,
+				}, {
+					Disabled: false,
+					Path:     "/prct",
+					Method:   http.MethodGet,
+					TimeOut:  3,
 				},
 			}
 		})
@@ -1392,9 +1398,10 @@ func TestEnforcedTimeout(t *testing.T) {
 
 	ts.Gw.LoadAPI(api)
 
-	_, _ = ts.Run(t, test.TestCase{
-		Method: http.MethodGet, Path: "/get", BodyMatch: "Upstream service reached hard timeout", Code: http.StatusGatewayTimeout,
-	})
+	_, _ = ts.Run(t, []test.TestCase{
+		{Method: http.MethodGet, Path: "/get", BodyMatch: "Upstream service reached hard timeout", Code: http.StatusGatewayTimeout},
+		{Method: http.MethodGet, Path: "/prct", Code: http.StatusOK},
+	}...)
 
 	t.Run("disabled", func(t *testing.T) {
 		UpdateAPIVersion(api, "", func(version *apidef.VersionInfo) {
