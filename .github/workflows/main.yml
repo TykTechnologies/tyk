@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Run JIRA Lint
+      uses: cyrus-za/jira-lint@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        jira-token: ${{ secrets.JIRA_TOKEN }}
+        jira-base-url: https://tyktech.atlassian.net/
+        skip-branches: ^(release-[0-9.-]+(lts)?|master|main)$
+        validate_issue_status: true
+        allowed_issue_statuses: In Dev,In Code Review,Ready for Testing,In Test,In Progress,In Review
+        skip-comments: false
+        pr-threshold: 800
+       
+
