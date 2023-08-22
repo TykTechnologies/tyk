@@ -842,7 +842,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	// Test Dashboard
 	tsDash := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
-			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
+			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {"_id": "1"}}]}`))
 		} else {
 			t.Fatal("Unknown dashboard API request", r)
 		}
@@ -851,6 +851,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = make(map[string]*APISpec)
+	ts.Gw.apisChecksums = make(map[string]*APISpec)
 	ts.Gw.apisMu.Unlock()
 
 	globalConf := ts.Gw.GetConfig()
@@ -1189,6 +1190,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = make(map[string]*APISpec)
+	ts.Gw.apisChecksums = make(map[string]*APISpec)
 	ts.Gw.apisMu.Unlock()
 
 	globalConf := ts.Gw.GetConfig()

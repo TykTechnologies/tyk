@@ -1266,6 +1266,7 @@ func (s *Test) RemoveApis() error {
 	defer s.Gw.apisMu.Unlock()
 	s.Gw.apiSpecs = []*APISpec{}
 	s.Gw.apisByID = map[string]*APISpec{}
+	s.Gw.apisChecksums = map[string]*APISpec{}
 
 	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
 	if err != nil {

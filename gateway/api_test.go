@@ -1773,6 +1773,7 @@ func TestGroupResetHandler(t *testing.T) {
 
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = make(map[string]*APISpec)
+	ts.Gw.apisChecksums = make(map[string]*APISpec)
 	ts.Gw.apisMu.Unlock()
 
 	ts.Gw.LoadSampleAPI(apiTestDef)

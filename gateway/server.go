@@ -142,6 +142,7 @@ type Gateway struct {
 	apiSpecs        []*APISpec
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
+	apisChecksums   map[string]*APISpec
 
 	policiesMu   sync.RWMutex
 	policiesByID map[string]user.Policy
@@ -232,6 +233,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.ServiceCache = cache.New(timeout, 15)
 
 	gw.apisByID = map[string]*APISpec{}
+	gw.apisChecksums = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
 
 	gw.policiesByID = map[string]user.Policy{}

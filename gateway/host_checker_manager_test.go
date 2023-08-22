@@ -145,11 +145,13 @@ func TestRecordUptimeAnalytics(t *testing.T) {
 	spec.UptimeTests.Config.ExpireUptimeAnalyticsAfter = 30
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = map[string]*APISpec{spec.APIID: spec}
+	ts.Gw.apisChecksums = map[string]*APISpec{spec.APIID: spec}
 	ts.Gw.apisMu.Unlock()
 
 	defer func() {
 		ts.Gw.apisMu.Lock()
 		ts.Gw.apisByID = make(map[string]*APISpec)
+		ts.Gw.apisChecksums = make(map[string]*APISpec)
 		ts.Gw.apisMu.Unlock()
 	}()
 

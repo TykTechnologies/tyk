@@ -108,6 +108,7 @@ func TestHostChecker(t *testing.T) {
 
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = map[string]*APISpec{spec.APIID: spec}
+	ts.Gw.apisChecksums = map[string]*APISpec{spec.Checksum: spec}
 	ts.Gw.apisMu.Unlock()
 	ts.Gw.GlobalHostChecker.checkerMu.Lock()
 
@@ -119,6 +120,7 @@ func TestHostChecker(t *testing.T) {
 	defer func() {
 		ts.Gw.apisMu.Lock()
 		ts.Gw.apisByID = make(map[string]*APISpec)
+		ts.Gw.apisChecksums = make(map[string]*APISpec)
 		ts.Gw.apisMu.Unlock()
 		ts.Gw.GlobalHostChecker.checkerMu.Lock()
 		ts.Gw.GlobalHostChecker.checker.sampleTriggerLimit = defaultSampletTriggerLimit
@@ -221,6 +223,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = map[string]*APISpec{spec.APIID: spec}
+	ts.Gw.apisChecksums = map[string]*APISpec{spec.Checksum: spec}
 	ts.Gw.apisMu.Unlock()
 	ts.Gw.GlobalHostChecker.checkerMu.Lock()
 	ts.Gw.GlobalHostChecker.checker.sampleTriggerLimit = 1
@@ -228,6 +231,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	defer func() {
 		ts.Gw.apisMu.Lock()
 		ts.Gw.apisByID = make(map[string]*APISpec)
+		ts.Gw.apisChecksums = make(map[string]*APISpec)
 		ts.Gw.apisMu.Unlock()
 		ts.Gw.GlobalHostChecker.checkerMu.Lock()
 		ts.Gw.GlobalHostChecker.checker.sampleTriggerLimit = defaultSampletTriggerLimit
