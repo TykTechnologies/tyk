@@ -7,4 +7,4 @@ on:
 
 jobs:
   test:
-    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@4d0d07710f1c693ab2ff253005a15136f5232b09
+    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@ab09465d0651698509060717d25a97929164cb5a
