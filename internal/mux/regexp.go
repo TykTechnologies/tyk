@@ -81,11 +81,11 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 
 		var name, patt string
 		if colonIdx != -1 {
-		    name = tpl[idxs[i]+1 : idxs[i]+1+colonIdx]
-		    patt = tpl[idxs[i]+1+colonIdx+1 : end-1]
+			name = tpl[idxs[i]+1 : idxs[i]+1+colonIdx]
+			patt = tpl[idxs[i]+1+colonIdx+1 : end-1]
 		} else {
-		    name = tpl[idxs[i]+1 : end-1]
-		    patt = ""
+			name = tpl[idxs[i]+1 : end-1]
+			patt = ""
 		}
 
 		// Name or pattern can't be empty.
