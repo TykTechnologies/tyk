@@ -123,7 +123,7 @@ func (re *Regexp) Copy() *Regexp {
 		FromCache: re.FromCache,
 	}
 	if re.Regexp != nil {
-		reCopy.Regexp = re.Regexp.Copy()
+		reCopy.Regexp = re.Regexp
 	}
 	return reCopy
 }
