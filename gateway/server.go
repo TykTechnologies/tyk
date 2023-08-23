@@ -21,10 +21,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/test"
 
 	"sync/atomic"
 	textTemplate "text/template"
