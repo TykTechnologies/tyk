@@ -32,9 +32,10 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 
-	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/context"
+
+	"github.com/TykTechnologies/tyk/internal/mux"
 
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/uuid"

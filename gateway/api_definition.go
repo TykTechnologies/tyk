@@ -35,8 +35,9 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 
-	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/internal/mux"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 
