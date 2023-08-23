@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/internal/maps"
 )
 
 var (
@@ -24,7 +26,7 @@ func LoadTranslations(thing map[string]interface{}) {
 	formatter.FullTimestamp = true
 	formatter.DisableColors = true
 	log.Formatter = &TranslationFormatter{formatter}
-	translations, _ = Flatten(thing)
+	translations, _ = maps.Flatten(thing)
 }
 
 type TranslationFormatter struct {
