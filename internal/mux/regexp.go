@@ -67,10 +67,8 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 	varsN := make([]string, len(idxs)/2)
 	varsR := make([]*regexp.Regexp, len(idxs)/2)
 
-	pattern := bytes.NewBufferString("")
+	var pattern, reverse strings.Builder
 	pattern.WriteByte('^')
-
-	reverse := bytes.NewBufferString("")
 
 	var end int
 	var err error
@@ -78,19 +76,25 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 		// Set all values we are interested in.
 		raw := tpl[end:idxs[i]]
 		end = idxs[i+1]
-		parts := strings.SplitN(tpl[idxs[i]+1:end-1], ":", 2)
-		name := parts[0]
-		patt := defaultPattern
-		if len(parts) == 2 {
-			patt = parts[1]
+
+		colonIdx := strings.Index(tpl[idxs[i]+1:end-1], ":")
+
+		var name, patt string
+		if colonIdx != -1 {
+		    name = tpl[idxs[i]+1 : idxs[i]+1+colonIdx]
+		    patt = tpl[idxs[i]+1+colonIdx+1 : end-1]
+		} else {
+		    name = tpl[idxs[i]+1 : end-1]
+		    patt = ""
 		}
+
 		// Name or pattern can't be empty.
 		if name == "" || patt == "" {
 			return nil, fmt.Errorf("mux: missing name or pattern in %q",
 				tpl[idxs[i]:end])
 		}
 		// Build the regexp pattern.
-		fmt.Fprintf(pattern, "%s(?P<%s>%s)", regexp.QuoteMeta(raw), varGroupName(i/2), patt)
+		fmt.Fprintf(&pattern, "%s(?P<%s>%s)", regexp.QuoteMeta(raw), varGroupName(i/2), patt)
 
 		// Build the reverse template.
 		reverse.WriteString(raw + "%")
@@ -118,9 +122,11 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 		pattern.WriteByte('$')
 	}
 
+	patternStr := pattern.String()
+
 	var wildcardHostPort bool
 	if typ == regexpTypeHost {
-		if !strings.Contains(pattern.String(), ":") {
+		if !strings.Contains(patternStr, ":") {
 			wildcardHostPort = true
 		}
 	}
@@ -129,9 +135,9 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 		reverse.WriteByte('/')
 	}
 	// Compile full regexp.
-	reg, errCompile := regexp.Compile(pattern.String())
-	if errCompile != nil {
-		return nil, errCompile
+	reg, err := regexp.Compile(patternStr)
+	if err != nil {
+		return nil, err
 	}
 
 	// Check for capturing groups which used to work in older versions
