@@ -792,11 +792,10 @@ type TykRoundTripper struct {
 
 func (rt *TykRoundTripper) EnforceTimeout(r *http.Request) (*http.Request, context.CancelFunc) {
 	timeout := 30.0
-	apiSpec := r.Context().Value("apiSpec").(*APISpec)
-	r = r.WithContext(context.WithValue(r.Context(), "apiSpec", nil))
+	apiSpec := ctxGetAPISpec(r)
 
-	if !apiSpec.EnforcedTimeoutEnabled {
-		return r, nil
+	if apiSpec == nil || !apiSpec.EnforcedTimeoutEnabled {
+		return r, func() {}
 	}
 
 	exists, customTimeout := CheckHardTimeoutEnforced(apiSpec, r, rt.logger)
@@ -811,9 +810,8 @@ func (rt *TykRoundTripper) EnforceTimeout(r *http.Request) (*http.Request, conte
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	reqWithTimeout, cancel := rt.EnforceTimeout(r)
-	if cancel != nil {
-		defer cancel()
-	}
+	defer cancel()
+
 	hasInternalHeader := reqWithTimeout.Header.Get(apidef.TykInternalApiHeader) != ""
 
 	if reqWithTimeout.URL.Scheme == "tyk" || hasInternalHeader {
@@ -1252,8 +1250,7 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 }
 
 func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, err error) {
-	ctx := context.WithValue(outreq.Context(), "apiSpec", p.TykAPISpec)
-	outreq = outreq.WithContext(ctx)
+	ctxSetAPISpec(outreq, p.TykAPISpec)
 	return roundTripper.RoundTrip(outreq)
 }
 

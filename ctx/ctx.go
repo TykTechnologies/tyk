@@ -50,6 +50,7 @@ const (
 	// CacheOptions holds cache options required for cache writer middleware.
 	CacheOptions
 	OASDefinition
+	APISpec
 )
 
 func setContext(r *http.Request, ctx context.Context) {

@@ -3140,6 +3140,17 @@ func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
 	setCtxValue(r, ctx.VersionData, v)
 }
 
+func ctxSetAPISpec(r *http.Request, apiSpec *APISpec) {
+	setCtxValue(r, ctx.APISpec, apiSpec)
+}
+
+func ctxGetAPISpec(r *http.Request) *APISpec {
+	if apiSpec := r.Context().Value(ctx.APISpec); apiSpec != nil {
+		return apiSpec.(*APISpec)
+	}
+	return nil
+}
+
 func ctxGetVersionName(r *http.Request) *string {
 	if v := r.Context().Value(ctx.VersionName); v != nil {
 		return v.(*string)
