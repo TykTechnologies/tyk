@@ -70,34 +70,39 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 	var pattern, reverse strings.Builder
 	pattern.WriteByte('^')
 
-	var end int
+	var end, colonIdx int
 	var err error
+	var patt, param, name string
 	for i := 0; i < len(idxs); i += 2 {
 		// Set all values we are interested in.
 		raw := tpl[end:idxs[i]]
 		end = idxs[i+1]
 
-		colonIdx := strings.Index(tpl[idxs[i]+1:end-1], ":")
-
-		var name, patt string
-		if colonIdx != -1 {
-			name = tpl[idxs[i]+1 : idxs[i]+1+colonIdx]
-			patt = tpl[idxs[i]+1+colonIdx+1 : end-1]
+		param = tpl[idxs[i]+1 : end-1]
+		colonIdx = strings.Index(param, ":")
+		if colonIdx == -1 {
+			name = param
+			patt = defaultPattern
 		} else {
-			name = tpl[idxs[i]+1 : end-1]
-			patt = ""
+			name = param[0:colonIdx]
+			patt = param[colonIdx+1:]
+		}
+		if patt == "" {
+			patt = defaultPattern
 		}
 
 		// Name or pattern can't be empty.
 		if name == "" || patt == "" {
-			return nil, fmt.Errorf("mux: missing name or pattern in %q",
-				tpl[idxs[i]:end])
+			return nil, fmt.Errorf("mux: missing name or pattern in %q", param)
 		}
 		// Build the regexp pattern.
-		fmt.Fprintf(&pattern, "%s(?P<%s>%s)", regexp.QuoteMeta(raw), varGroupName(i/2), patt)
+		groupName := varGroupName(i / 2)
+		pattern.Write([]byte(regexp.QuoteMeta(raw)))
+		pattern.Write([]byte("(?P<" + groupName + ">" + patt + ")"))
 
 		// Build the reverse template.
-		reverse.WriteString(raw + "%")
+		reverse.Write([]byte(raw))
+		reverse.WriteByte('%')
 
 		// Append variable name and compiled pattern.
 		varsN[i/2] = name
@@ -108,16 +113,19 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 	}
 	// Add the remaining.
 	raw := tpl[end:]
-	pattern.WriteString(regexp.QuoteMeta(raw))
+	pattern.Write([]byte(regexp.QuoteMeta(raw)))
+
 	if options.strictSlash {
 		pattern.WriteString("[/]?")
 	}
+
 	if typ == regexpTypeQuery {
 		// Add the default pattern if the query value is empty
 		if queryVal := strings.SplitN(template, "=", 2)[1]; queryVal == "" {
-			pattern.WriteString(defaultPattern)
+			pattern.Write([]byte(defaultPattern))
 		}
 	}
+
 	if typ != regexpTypePrefix {
 		pattern.WriteByte('$')
 	}
@@ -130,10 +138,13 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 			wildcardHostPort = true
 		}
 	}
+
 	reverse.WriteString(raw)
+
 	if endSlash {
 		reverse.WriteByte('/')
 	}
+
 	// Compile full regexp.
 	reg, err := regexp.Compile(patternStr)
 	if err != nil {
