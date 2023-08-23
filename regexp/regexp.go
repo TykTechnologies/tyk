@@ -1,5 +1,5 @@
 /*
-Package regexp implmenets API of Go's native "regexp" but with caching results in memory
+Package regexp implements API of Go's native "regexp" but with caching results in memory
 */
 package regexp
 
