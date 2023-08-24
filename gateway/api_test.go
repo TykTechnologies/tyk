@@ -241,7 +241,7 @@ func TestKeyHandler(t *testing.T) {
 
 	// with policy
 	ts.Gw.policiesMu.Lock()
-	ts.Gw.policiesByID["abc_policy"] = user.Policy{
+	ts.Gw.policiesByID["abc_policy"] = &user.Policy{
 		Active:           true,
 		QuotaMax:         5,
 		QuotaRenewalRate: 300,

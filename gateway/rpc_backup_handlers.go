@@ -82,7 +82,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	return nil
 }
 
-func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]*user.Policy, error) {
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupPolicyKeyBase + tagList
 
@@ -103,7 +103,7 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 		return nil, errors.New("[RPC] --> Failed to get node policy backup (" + checkKey + "): " + err.Error())
 	}
 
-	if policies, err := parsePoliciesFromRPC(listAsString, gw.GetConfig().Policies.AllowExplicitPolicyID); err != nil {
+	if policies, err := parsePoliciesFromRPC(gw, listAsString, gw.GetConfig().Policies.AllowExplicitPolicyID); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
 		}).Error("Failed decode: ", err)

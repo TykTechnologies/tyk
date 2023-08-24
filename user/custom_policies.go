@@ -6,10 +6,10 @@ import (
 	"fmt"
 )
 
-func (s *SessionState) CustomPolicies() (map[string]Policy, error) {
+func (s *SessionState) CustomPolicies() (map[string]*Policy, error) {
 	var (
-		customPolicies []Policy
-		ret            map[string]Policy
+		customPolicies []*Policy
+		ret            map[string]*Policy
 	)
 
 	metadataPolicies, found := s.MetaData["policies"].([]interface{})
@@ -24,7 +24,7 @@ func (s *SessionState) CustomPolicies() (map[string]Policy, error) {
 
 	_ = json.Unmarshal(polJSON, &customPolicies)
 
-	ret = make(map[string]Policy, len(customPolicies))
+	ret = make(map[string]*Policy, len(customPolicies))
 	for i := 0; i < len(customPolicies); i++ {
 		ret[customPolicies[i].ID] = customPolicies[i]
 	}
@@ -32,7 +32,7 @@ func (s *SessionState) CustomPolicies() (map[string]Policy, error) {
 	return ret, nil
 }
 
-func (s *SessionState) SetCustomPolicies(list []Policy) {
+func (s *SessionState) SetCustomPolicies(list []*Policy) {
 	if s.MetaData == nil {
 		s.MetaData = make(map[string]interface{})
 	}
