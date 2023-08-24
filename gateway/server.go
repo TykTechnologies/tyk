@@ -142,9 +142,11 @@ type Gateway struct {
 	apiSpecs        []*APISpec
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
+	apisChecksums   map[string]*APISpec
 
-	policiesMu   sync.RWMutex
-	policiesByID map[string]user.Policy
+	policiesMu    sync.RWMutex
+	policiesByID  map[string]*user.Policy
+	polsChecksums map[string]*user.Policy
 
 	dnsCacheManager dnscache.IDnsCacheManager
 
@@ -232,9 +234,11 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.ServiceCache = cache.New(timeout, 15)
 
 	gw.apisByID = map[string]*APISpec{}
+	gw.apisChecksums = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
 
-	gw.policiesByID = map[string]user.Policy{}
+	gw.policiesByID = map[string]*user.Policy{}
+	gw.polsChecksums = map[string]*user.Policy{}
 
 	// reload
 	gw.reloadQueue = make(chan func())
@@ -303,7 +307,7 @@ func (gw *Gateway) getAPIDefinition(apiID string) (*apidef.APIDefinition, error)
 	return apiSpec.APIDefinition, nil
 }
 
-func (gw *Gateway) getPolicy(polID string) user.Policy {
+func (gw *Gateway) getPolicy(polID string) *user.Policy {
 	gw.policiesMu.RLock()
 	pol := gw.policiesByID[polID]
 	gw.policiesMu.RUnlock()
@@ -527,7 +531,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 }
 
 func (gw *Gateway) syncPolicies() (count int, err error) {
-	var pols map[string]user.Policy
+	var pols map[string]*user.Policy
 
 	mainLog.Info("Loading policies")
 

@@ -45,7 +45,7 @@ tags:
     description:
       Force restart of the Gateway or whole cluster
   - name: Health Checking
-    description: Check health check of the Gateway and loaded APIs
+    description: Check health status of the Gateway and loaded APIs
   - name: Organisation Quotas
     description: |-
       It is possible to force API quota and rate limit across all keys that belong to a specific organisation ID. Rate limiting at an organisation level is useful for creating tiered access levels and trial accounts.

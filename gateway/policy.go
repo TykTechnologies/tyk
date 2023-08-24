@@ -1,12 +1,16 @@
 package gateway
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/buger/jsonparser"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
@@ -48,11 +52,13 @@ func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
 }
 
 type DBPolicy struct {
-	user.Policy
-	AccessRights map[string]DBAccessDefinition `bson:"access_rights" json:"access_rights"`
+	*user.Policy
+	AccessRights  map[string]DBAccessDefinition `bson:"access_rights" json:"access_rights"`
+	checksumMatch bool
+	checksum      string
 }
 
-func (d *DBPolicy) ToRegularPolicy() user.Policy {
+func (d *DBPolicy) ToRegularPolicy() *user.Policy {
 	policy := d.Policy
 	policy.AccessRights = make(map[string]user.AccessDefinition)
 
@@ -62,7 +68,7 @@ func (d *DBPolicy) ToRegularPolicy() user.Policy {
 	return policy
 }
 
-func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
+func LoadPoliciesFromFile(filePath string) map[string]*user.Policy {
 	f, err := os.Open(filePath)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -72,7 +78,7 @@ func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
 	}
 	defer f.Close()
 
-	var policies map[string]user.Policy
+	var policies map[string]*user.Policy
 	if err := json.NewDecoder(f).Decode(&policies); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
@@ -81,8 +87,8 @@ func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
 	return policies
 }
 
-func LoadPoliciesFromDir(dir string) map[string]user.Policy {
-	policies := make(map[string]user.Policy)
+func LoadPoliciesFromDir(dir string) map[string]*user.Policy {
+	policies := make(map[string]*user.Policy)
 	// Grab json files from directory
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
@@ -97,13 +103,13 @@ func LoadPoliciesFromDir(dir string) map[string]user.Policy {
 			log.Errorf("Couldn't unmarshal policy configuration from dir: %v : %v", path, err)
 		}
 		f.Close()
-		policies[pol.ID] = *pol
+		policies[pol.ID] = pol
 	}
 	return policies
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
+func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]*user.Policy {
 
 	// Get the definitions
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -133,8 +139,9 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	}
 	defer resp.Body.Close()
 
+	body, _ := ioutil.ReadAll(resp.Body)
+
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
 		gw.reLogin()
 		return nil
@@ -145,22 +152,54 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 		Message []DBPolicy
 		Nonce   string
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		log.Error("Failed to decode policy body: ", err)
+
+	nonce, err := jsonparser.GetString(body, "Nonce")
+	if err != nil {
+		log.Error("Failed to decode Nonce: ", err)
 		return nil
 	}
+	list.Nonce = nonce
+
+	policiesJSON, _, _, err := jsonparser.Get(body, "Message")
+	if err != nil {
+		log.Error("Failed to decode Message: ", err)
+		return nil
+	}
+
+	jsonparser.ArrayEach(policiesJSON, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		hash := sha256.Sum256(value)
+		checksum := hex.EncodeToString(hash[:])
+
+		dbPolicy := DBPolicy{}
+		if policy, found := gw.polsChecksums[checksum]; !found {
+			json.Unmarshal(value, &dbPolicy)
+		} else {
+			dbPolicy.Policy = policy
+			dbPolicy.checksumMatch = true
+		}
+		dbPolicy.checksum = checksum
+
+		list.Message = append(list.Message, dbPolicy)
+	})
 
 	gw.ServiceNonceMutex.Lock()
 	gw.ServiceNonce = list.Nonce
 	gw.ServiceNonceMutex.Unlock()
 	log.Debug("Loading Policies Finished: Nonce Set: ", list.Nonce)
 
-	policies := make(map[string]user.Policy, len(list.Message))
+	policies := make(map[string]*user.Policy, len(list.Message))
+	gw.polsChecksums = make(map[string]*user.Policy, len(list.Message))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Processing policy list")
 	for _, p := range list.Message {
+		if p.checksumMatch {
+			gw.polsChecksums[p.checksum] = p.Policy
+			policies[p.ID] = p.Policy
+			continue
+		}
+
 		id := p.MID.Hex()
 		if allowExplicit && p.ID != "" {
 			id = p.ID
@@ -175,33 +214,56 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 			continue
 		}
 		policies[id] = p.ToRegularPolicy()
+		gw.polsChecksums[p.checksum] = policies[id]
 	}
 
 	return policies
 }
 
-func parsePoliciesFromRPC(list string, allowExplicit bool) (map[string]user.Policy, error) {
-	var dbPolicyList []user.Policy
+func parsePoliciesFromRPC(gw *Gateway, list string, allowExplicit bool) (map[string]*user.Policy, error) {
+	var dbPolicyList []DBPolicy
 
-	if err := json.Unmarshal([]byte(list), &dbPolicyList); err != nil {
-		return nil, err
-	}
+	jsonparser.ArrayEach([]byte(list), func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		hash := sha256.Sum256(value)
+		checksum := hex.EncodeToString(hash[:])
 
-	policies := make(map[string]user.Policy, len(dbPolicyList))
+		dbPolicy := DBPolicy{}
+		if policy, found := gw.polsChecksums[checksum]; !found {
+			json.Unmarshal(value, &dbPolicy)
+		} else {
+			dbPolicy.Policy = policy
+			dbPolicy.checksumMatch = true
+		}
+		dbPolicy.checksum = checksum
+
+		dbPolicyList = append(dbPolicyList, dbPolicy)
+	})
+
+	policies := make(map[string]*user.Policy, len(dbPolicyList))
+	gw.polsChecksums = make(map[string]*user.Policy, len(dbPolicyList))
 
 	for _, p := range dbPolicyList {
-		id := p.MID.Hex()
-		if allowExplicit && p.ID != "" {
-			id = p.ID
+		pol := p.Policy
+		gw.polsChecksums[p.checksum] = pol
+
+		if p.checksumMatch {
+			policies[p.ID] = pol
+			continue
 		}
-		p.ID = id
-		policies[id] = p
+
+		id := pol.MID.Hex()
+		if allowExplicit && pol.ID != "" {
+			id = pol.ID
+		}
+		pol.ID = id
+		policies[id] = pol
+
 	}
 
 	return policies, nil
 }
 
-func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string, allowExplicit bool) (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string, allowExplicit bool) (map[string]*user.Policy, error) {
 	if rpc.IsEmergencyMode() {
 		return gw.LoadPoliciesFromRPCBackup()
 	}
@@ -212,7 +274,7 @@ func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string, allowE
 
 	rpcPolicies := store.GetPolicies(orgId)
 
-	policies, err := parsePoliciesFromRPC(rpcPolicies, allowExplicit)
+	policies, err := parsePoliciesFromRPC(gw, rpcPolicies, allowExplicit)
 
 	if err != nil {
 		log.WithFields(logrus.Fields{

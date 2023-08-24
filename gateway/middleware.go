@@ -69,6 +69,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	} else if baseMw := tr.Base(); baseMw != nil {
 		cfg := baseMw.Gw.GetConfig()
 		if cfg.OpenTelemetry.Enabled {
+			otel.AddTraceID(r.Context(), w)
 			var span otel.Span
 			if baseMw.Spec.DetailedTracing {
 				var ctx context.Context
@@ -384,7 +385,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 	var (
 		err       error
-		lookupMap map[string]user.Policy
+		lookupMap map[string]*user.Policy
 		policyIDs []string
 	)
 

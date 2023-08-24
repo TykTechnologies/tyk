@@ -885,7 +885,7 @@ func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string
 }
 
 func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
-	if pol := gw.getPolicy(polID); pol.ID != "" {
+	if pol := gw.getPolicy(polID); pol != nil && pol.ID != "" {
 		return pol, http.StatusOK
 	}
 
@@ -899,7 +899,7 @@ func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
 func (gw *Gateway) handleGetPolicyList() (interface{}, int) {
 	gw.policiesMu.RLock()
 	defer gw.policiesMu.RUnlock()
-	polIDList := make([]user.Policy, len(gw.policiesByID))
+	polIDList := make([]*user.Policy, len(gw.policiesByID))
 	c := 0
 	for _, pol := range gw.policiesByID {
 		polIDList[c] = pol

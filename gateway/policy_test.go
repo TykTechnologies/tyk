@@ -66,7 +66,7 @@ type testApplyPoliciesData struct {
 
 func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 	s.Gw.policiesMu.RLock()
-	s.Gw.policiesByID = map[string]user.Policy{
+	s.Gw.policiesByID = map[string]*user.Policy{
 		"nonpart1": {
 			ID:           "p1",
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
@@ -662,7 +662,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				}
 
 				s.Gw.policiesMu.Lock()
-				s.Gw.policiesByID["acl3"] = newPolicy
+				s.Gw.policiesByID["acl3"] = &newPolicy
 				s.Gw.policiesMu.Unlock()
 				err := bmid.ApplyPolicies(ses)
 				if err != nil {
@@ -982,8 +982,8 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			},
 		},
 	}
-	ts.Gw.policiesByID = map[string]user.Policy{
-		"two_of_three_with_api_limit": policy,
+	ts.Gw.policiesByID = map[string]*user.Policy{
+		"two_of_three_with_api_limit": &policy,
 	}
 	ts.Gw.policiesMu.RUnlock()
 
@@ -1187,7 +1187,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 	defer ts.Close()
 
 	ts.Gw.policiesMu.RLock()
-	policy1 := user.Policy{
+	policy1 := &user.Policy{
 		ID:               "policy1",
 		Rate:             1000,
 		Per:              1,
@@ -1201,7 +1201,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 		},
 	}
 
-	policy2 := user.Policy{
+	policy2 := &user.Policy{
 		ID:               "policy2",
 		Rate:             100,
 		Per:              1,
@@ -1218,7 +1218,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 		},
 	}
 
-	ts.Gw.policiesByID = map[string]user.Policy{
+	ts.Gw.policiesByID = map[string]*user.Policy{
 		"policy1": policy1,
 		"policy2": policy2,
 	}
@@ -1379,7 +1379,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 	ts.Gw.DRLManager.SetCurrentTokenValue(100)
 	defer ts.Gw.DRLManager.SetCurrentTokenValue(0)
 
-	ts.Gw.policiesByID = map[string]user.Policy{
+	ts.Gw.policiesByID = map[string]*user.Policy{
 		"policy1": policy1,
 		"policy2": policy2,
 	}
@@ -1400,7 +1400,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 	defer ts.Close()
 
 	ts.Gw.policiesMu.RLock()
-	policy := user.Policy{
+	policy := &user.Policy{
 		ID:    "per_api_policy_with_two_apis",
 		OrgID: "default",
 		Partitions: user.PolicyPartitions{
@@ -1418,7 +1418,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			},
 		},
 	}
-	ts.Gw.policiesByID = map[string]user.Policy{
+	ts.Gw.policiesByID = map[string]*user.Policy{
 		"per_api_policy_with_two_apis": policy,
 	}
 	ts.Gw.policiesMu.RUnlock()
@@ -1495,7 +1495,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 
 	//Update policy
 	ts.Gw.policiesMu.RLock()
-	policy = user.Policy{
+	policy = &user.Policy{
 		ID:    "per_api_policy_with_two_apis",
 		OrgID: "default",
 		Partitions: user.PolicyPartitions{
@@ -1510,7 +1510,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			},
 		},
 	}
-	ts.Gw.policiesByID = map[string]user.Policy{
+	ts.Gw.policiesByID = map[string]*user.Policy{
 		"per_api_policy_with_two_apis": policy,
 	}
 	ts.Gw.policiesMu.RUnlock()
@@ -1545,37 +1545,39 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 }
 
 func TestParsePoliciesFromRPC(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
 
 	objectID := model.NewObjectID()
 	explicitID := "explicit_pol_id"
 	tcs := []struct {
 		testName      string
 		allowExplicit bool
-		policy        user.Policy
+		policy        *user.Policy
 		expectedID    string
 	}{
 		{
 			testName:      "policy with explicit ID - allow_explicit_id false",
 			allowExplicit: false,
-			policy:        user.Policy{MID: objectID, ID: explicitID},
+			policy:        &user.Policy{MID: objectID, ID: explicitID},
 			expectedID:    objectID.Hex(),
 		},
 		{
 			testName:      "policy with explicit ID - allow_explicit_id true",
 			allowExplicit: true,
-			policy:        user.Policy{MID: objectID, ID: explicitID},
+			policy:        &user.Policy{MID: objectID, ID: explicitID},
 			expectedID:    explicitID,
 		},
 		{
 			testName:      "policy without explicit ID - allow_explicit_id false",
 			allowExplicit: false,
-			policy:        user.Policy{MID: objectID, ID: ""},
+			policy:        &user.Policy{MID: objectID, ID: ""},
 			expectedID:    objectID.Hex(),
 		},
 		{
 			testName:      "policy without explicit ID - allow_explicit_id true",
 			allowExplicit: true,
-			policy:        user.Policy{MID: objectID, ID: ""},
+			policy:        &user.Policy{MID: objectID, ID: ""},
 			expectedID:    objectID.Hex(),
 		},
 	}
@@ -1583,10 +1585,10 @@ func TestParsePoliciesFromRPC(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.testName, func(t *testing.T) {
 
-			policyList, err := json.Marshal([]user.Policy{tc.policy})
+			policyList, err := json.Marshal([]*user.Policy{tc.policy})
 			assert.NoError(t, err, "error unmarshalling policies")
 
-			polMap, errParsing := parsePoliciesFromRPC(string(policyList), tc.allowExplicit)
+			polMap, errParsing := parsePoliciesFromRPC(ts.Gw, string(policyList), tc.allowExplicit)
 			assert.NoError(t, errParsing, "error parsing policies from RPC:", errParsing)
 
 			_, ok := polMap[tc.expectedID]

@@ -900,6 +900,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
 	tmpSpecRegister := make(map[string]*APISpec)
+	tmpSpecChecksum := make(map[string]*APISpec)
 	tmpSpecHandles := new(sync.Map)
 
 	// sort by listen path from longer to shorter, so that /foo
@@ -953,6 +954,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				tmpSpecRegister[spec.APIID] = spec
 			}
 
+			tmpSpecChecksum[spec.Checksum] = spec
+
 			switch spec.Protocol {
 			case "", "http", "https", "h2c":
 				if shouldTrace {
@@ -993,6 +996,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	}
 
 	gw.apisByID = tmpSpecRegister
+	gw.apisChecksums = tmpSpecChecksum
 	gw.apisHandlesByID = tmpSpecHandles
 
 	gw.apisMu.Unlock()
