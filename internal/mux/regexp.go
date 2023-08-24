@@ -74,7 +74,7 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 	var patt, param, name string
 	for i := 0; i < len(idxs); i += 2 {
 		// Set all values we are interested in.
-		groupIdx = i/2
+		groupIdx = i / 2
 
 		raw := tpl[end:idxs[i]]
 		end = idxs[i+1]
@@ -99,10 +99,10 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 		// Build the regexp pattern.
 		groupName := varGroupName(groupIdx)
 
-		pattern.WriteString(regexp.QuoteMeta(raw)+"(?P<" + groupName + ">" + patt + ")")
+		pattern.WriteString(regexp.QuoteMeta(raw) + "(?P<" + groupName + ">" + patt + ")")
 
 		// Build the reverse template.
-		reverse.WriteString(raw+"%s")
+		reverse.WriteString(raw + "%s")
 
 		// Append variable name and compiled pattern.
 		varsN[groupIdx] = name
