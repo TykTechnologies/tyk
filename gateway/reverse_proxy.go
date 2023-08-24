@@ -540,7 +540,7 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-func CheckHardTimeoutEnforced(spec *APISpec, req *http.Request, logger *logrus.Entry) (bool, float64) {
+func checkHardTimeoutEnforced(spec *APISpec, req *http.Request, logger *logrus.Entry) (bool, float64) {
 	if !spec.EnforcedTimeoutEnabled {
 		return false, spec.GlobalConfig.ProxyDefaultTimeout
 	}
@@ -806,7 +806,7 @@ func (rt *TykRoundTripper) getApiSpecEnforcedTimeout(r *http.Request, apiSpec *A
 		return 30.0
 	}
 
-	exists, customTimeout := CheckHardTimeoutEnforced(apiSpec, r, rt.logger)
+	exists, customTimeout := checkHardTimeoutEnforced(apiSpec, r, rt.logger)
 	if exists && customTimeout > 0 {
 		return customTimeout
 	}
@@ -814,7 +814,7 @@ func (rt *TykRoundTripper) getApiSpecEnforcedTimeout(r *http.Request, apiSpec *A
 	return 30.0
 }
 
-func (rt *TykRoundTripper) EnforceTimeout(r *http.Request, timeout float64) (*http.Request, context.CancelFunc) {
+func (rt *TykRoundTripper) enforceTimeout(r *http.Request, timeout float64) (*http.Request, context.CancelFunc) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(timeout)*time.Second)
 
 	return r.WithContext(ctx), cancel
@@ -823,7 +823,7 @@ func (rt *TykRoundTripper) EnforceTimeout(r *http.Request, timeout float64) (*ht
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	apiSpec := ctxGetAPISpec(r)
 	timeout := rt.getApiSpecEnforcedTimeout(r, apiSpec)
-	reqWithTimeout, cancel := rt.EnforceTimeout(r, timeout)
+	reqWithTimeout, cancel := rt.enforceTimeout(r, timeout)
 	defer cancel()
 	r = reqWithTimeout
 
