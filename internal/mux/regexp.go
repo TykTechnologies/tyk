@@ -9,10 +9,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/TykTechnologies/tyk/regexp"
 )
 
 type routeRegexpOptions struct {
@@ -23,10 +22,10 @@ type routeRegexpOptions struct {
 type regexpType int
 
 const (
-	regexpTypePath   regexpType = 0
-	regexpTypeHost   regexpType = 1
-	regexpTypePrefix regexpType = 2
-	regexpTypeQuery  regexpType = 3
+	regexpTypePath regexpType = iota
+	regexpTypeHost
+	regexpTypePrefix
+	regexpTypeQuery
 )
 
 // newRouteRegexp parses a route template and returns a routeRegexp,
@@ -70,11 +69,13 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 	var pattern, reverse strings.Builder
 	pattern.WriteByte('^')
 
-	var end, colonIdx int
+	var end, colonIdx, groupIdx int
 	var err error
 	var patt, param, name string
 	for i := 0; i < len(idxs); i += 2 {
 		// Set all values we are interested in.
+		groupIdx = i/2
+
 		raw := tpl[end:idxs[i]]
 		end = idxs[i+1]
 
@@ -96,24 +97,23 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 			return nil, fmt.Errorf("mux: missing name or pattern in %q", param)
 		}
 		// Build the regexp pattern.
-		groupName := varGroupName(i / 2)
-		pattern.Write([]byte(regexp.QuoteMeta(raw)))
-		pattern.Write([]byte("(?P<" + groupName + ">" + patt + ")"))
+		groupName := varGroupName(groupIdx)
+
+		pattern.WriteString(regexp.QuoteMeta(raw)+"(?P<" + groupName + ">" + patt + ")")
 
 		// Build the reverse template.
-		reverse.Write([]byte(raw))
-		reverse.WriteByte('%')
+		reverse.WriteString(raw+"%s")
 
 		// Append variable name and compiled pattern.
-		varsN[i/2] = name
-		varsR[i/2], err = regexp.Compile("^" + patt + "$")
+		varsN[groupIdx] = name
+		varsR[groupIdx], err = RegexpCompileFunc("^" + patt + "$")
 		if err != nil {
 			return nil, err
 		}
 	}
 	// Add the remaining.
 	raw := tpl[end:]
-	pattern.Write([]byte(regexp.QuoteMeta(raw)))
+	pattern.WriteString(regexp.QuoteMeta(raw))
 
 	if options.strictSlash {
 		pattern.WriteString("[/]?")
@@ -122,7 +122,7 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 	if typ == regexpTypeQuery {
 		// Add the default pattern if the query value is empty
 		if queryVal := strings.SplitN(template, "=", 2)[1]; queryVal == "" {
-			pattern.Write([]byte(defaultPattern))
+			pattern.WriteString(defaultPattern)
 		}
 	}
 
@@ -146,9 +146,9 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 	}
 
 	// Compile full regexp.
-	reg, err := regexp.Compile(patternStr)
-	if err != nil {
-		return nil, err
+	reg, errCompile := RegexpCompileFunc(patternStr)
+	if errCompile != nil {
+		return nil, errCompile
 	}
 
 	// Check for capturing groups which used to work in older versions

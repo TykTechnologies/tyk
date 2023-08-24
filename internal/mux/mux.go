@@ -19,6 +19,10 @@ var (
 	ErrMethodMismatch = errors.New("method is not allowed")
 	// ErrNotFound is returned when no route match is found.
 	ErrNotFound = errors.New("no matching route was found")
+	// RegexpCompileFunc aliases regexp.Compile and enables overriding it.
+	// Do not run this function from `init()` in importable packages.
+	// Changing this value is not safe for concurrent use.
+	RegexpCompileFunc = regexp.Compile
 )
 
 // NewRouter returns a new router instance.
@@ -46,9 +50,11 @@ func NewRouter() *Router {
 // This will send all incoming requests to the router.
 type Router struct {
 	// Configurable Handler to be used when no route matches.
+	// This can be used to render your own 404 Not Found errors.
 	NotFoundHandler http.Handler
 
 	// Configurable Handler to be used when the request method does not match the route.
+	// This can be used to render your own 405 Method Not Allowed errors.
 	MethodNotAllowedHandler http.Handler
 
 	// Routes to be matched, in order.
@@ -522,7 +528,7 @@ func mapFromPairsToRegex(pairs ...string) (map[string]*regexp.Regexp, error) {
 	}
 	m := make(map[string]*regexp.Regexp, length/2)
 	for i := 0; i < length; i += 2 {
-		regex, err := regexp.Compile(pairs[i+1])
+		regex, err := RegexpCompileFunc(pairs[i+1])
 		if err != nil {
 			return nil, err
 		}
