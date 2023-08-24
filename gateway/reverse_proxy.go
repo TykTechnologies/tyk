@@ -385,7 +385,7 @@ type ReverseProxy struct {
 	Gw     *Gateway `json:"-"`
 }
 
-func getDialerContext(gw *Gateway, timeout float64) func(ctx context.Context, network string, address string) (net.Conn, error) {
+func (p *ReverseProxy) getDialerContext(timeout float64) func(ctx context.Context, network string, address string) (net.Conn, error) {
 	defaultTimeout := 30 * time.Second
 
 	if timeout > 0 {
@@ -400,20 +400,20 @@ func getDialerContext(gw *Gateway, timeout float64) func(ctx context.Context, ne
 
 	dialContextFunc := dialer.DialContext
 
-	if gw.dnsCacheManager.IsCacheEnabled() {
-		dialContextFunc = gw.dnsCacheManager.WrapDialer(dialer)
+	if p.Gw.dnsCacheManager.IsCacheEnabled() {
+		dialContextFunc = p.Gw.dnsCacheManager.WrapDialer(dialer)
 	}
 
-	if gw.dialCtxFn != nil {
-		dialContextFunc = gw.dialCtxFn
+	if p.Gw.dialCtxFn != nil {
+		dialContextFunc = p.Gw.dialCtxFn
 	}
 
 	return dialContextFunc
 }
 
-func (p *ReverseProxy) defaultTransport() *http.Transport {
+func (p *ReverseProxy) defaultTransport(timeout float64) *http.Transport {
 	transport := &http.Transport{
-		DialContext:         getDialerContext(p.Gw, 0),
+		DialContext:         p.getDialerContext(timeout),
 		MaxIdleConns:        p.Gw.GetConfig().MaxIdleConns,
 		MaxIdleConnsPerHost: p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
 		TLSHandshakeTimeout: 10 * time.Second,
@@ -667,9 +667,9 @@ func tlsClientConfig(s *APISpec, gw *Gateway) *tls.Config {
 	return config
 }
 
-func (p *ReverseProxy) httpTransport(rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
+func (p *ReverseProxy) httpTransport(timeout float64, rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
 	p.logger.Debug("Creating new transport")
-	transport := p.defaultTransport() // modifies a newly created transport
+	transport := p.defaultTransport(timeout) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
@@ -801,17 +801,17 @@ type TykRoundTripper struct {
 	Gw           *Gateway `json:"-"`
 }
 
-func (rt *TykRoundTripper) getApiSpecEnforcedTimeout(r *http.Request, apiSpec *APISpec) (bool, float64) {
+func (rt *TykRoundTripper) getApiSpecEnforcedTimeout(r *http.Request, apiSpec *APISpec) float64 {
 	if apiSpec == nil || !apiSpec.EnforcedTimeoutEnabled {
-		return false, 30.0
+		return 30.0
 	}
 
 	exists, customTimeout := CheckHardTimeoutEnforced(apiSpec, r, rt.logger)
 	if exists && customTimeout > 0 {
-		return true, customTimeout
+		return customTimeout
 	}
 
-	return true, 30.0
+	return 30.0
 }
 
 func (rt *TykRoundTripper) EnforceTimeout(r *http.Request, timeout float64) (*http.Request, context.CancelFunc) {
@@ -822,13 +822,9 @@ func (rt *TykRoundTripper) EnforceTimeout(r *http.Request, timeout float64) (*ht
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	apiSpec := ctxGetAPISpec(r)
-	enforcedTimeoutEnabled, timeout := rt.getApiSpecEnforcedTimeout(r, apiSpec)
+	timeout := rt.getApiSpecEnforcedTimeout(r, apiSpec)
 	reqWithTimeout, cancel := rt.EnforceTimeout(r, timeout)
 	defer cancel()
-
-	if enforcedTimeoutEnabled {
-		rt.transport.DialContext = getDialerContext(rt.Gw, timeout)
-	}
 
 	hasInternalHeader := reqWithTimeout.Header.Get(apidef.TykInternalApiHeader) != ""
 
@@ -1272,6 +1268,24 @@ func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outr
 	return roundTripper.RoundTrip(outreq)
 }
 
+func getMaxEnforcedTimeout(apiSpec *APISpec) int {
+	maxHardTimeout := 0
+	apiSpecVersions := apiSpec.APIDefinition.VersionData.Versions
+	if apiSpecVersions != nil && len(apiSpecVersions) > 0 {
+		for _, versionInfo := range apiSpecVersions {
+			if versionInfo.ExtendedPaths.HardTimeouts != nil && len(versionInfo.ExtendedPaths.HardTimeouts) > 0 {
+				for _, ht := range versionInfo.ExtendedPaths.HardTimeouts {
+					if ht.TimeOut > maxHardTimeout {
+						maxHardTimeout = ht.TimeOut
+					}
+				}
+			}
+		}
+	}
+
+	return maxHardTimeout
+}
+
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
 	if trace.IsEnabled() {
 		span, ctx := trace.Span(req.Context(), req.URL.Path)
@@ -1390,7 +1404,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if createTransport {
-		p.TykAPISpec.HTTPTransport = p.httpTransport(rw, req, outreq)
+		maxEnforcedTimeout := getMaxEnforcedTimeout(p.TykAPISpec)
+		p.TykAPISpec.HTTPTransport = p.httpTransport(float64(maxEnforcedTimeout), rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 	}
 
