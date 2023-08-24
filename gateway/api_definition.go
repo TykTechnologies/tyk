@@ -546,7 +546,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 		return nil, fmt.Errorf("failed to decode Message: %v", err)
 	}
 
-	jsonparser.ArrayEach(apisJSON, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	_, err = jsonparser.ArrayEach(apisJSON, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
 		apiHash := sha256.Sum256(value)
 		checksum := hex.EncodeToString(apiHash[:])
 
@@ -557,11 +557,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 			nestedApiDefinition.TagsDisabled = apiDef.TagsDisabled
 			nestedApiDefinition.Tags = apiDef.Tags
 		}
+
 		nestedApiDefinition.Checksum = checksum
 		list.Message = append(list.Message, nestedApiDefinition)
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode Message: %v", err)
+	}
 
-	log.Info("Loading APIS Finished: Nonce Set: ", nonce)
 	log.Info("Loading APIS count: ", len(list.Message))
 
 	// Extract tagged entries only
@@ -574,7 +577,9 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	a.Gw.ServiceNonceMutex.Lock()
 	a.Gw.ServiceNonce = nonce
 	a.Gw.ServiceNonceMutex.Unlock()
-	log.Debug("Loading APIS Finished: Nonce Set: ", nonce)
+
+	log.Info("Loading APIS Finished: Nonce Set: ", nonce)
+	log.Info("Loading APIS count: ", len(specs))
 
 	return specs, nil
 }
@@ -647,7 +652,7 @@ func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfi
 	var specs []*APISpec
 
 	for _, def := range apiDefs {
-		if len(def.Id) == 0 {
+		if len(def.APIID) == 0 {
 			if apiDef, found := a.Gw.apisChecksums[def.Checksum]; found {
 				specs = append(specs, apiDef)
 			}
