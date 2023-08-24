@@ -186,29 +186,59 @@ func randomPoint(r *rand.Rand) *pb.Point {
 
 func testGRPCStreamClient(t *testing.T, addr string, opts ...grpc.DialOption) {
 	opts = append(opts, grpc.WithBlock())
-	conn, err := grpc.Dial(addr, opts...)
-	if err != nil {
-		t.Fatalf("fail to dial: %v", err)
-	}
-	defer conn.Close()
-	client := pb.NewRouteGuideClient(conn)
+
 	t.Run("Valid feature", func(t *testing.T) {
+		conn, err := grpc.Dial(addr, opts...)
+		if err != nil {
+			t.Fatalf("fail to dial: %v", err)
+		}
+		defer conn.Close()
+		client := pb.NewRouteGuideClient(conn)
+
 		printFeature(t, client, &pb.Point{Latitude: 409146138, Longitude: -746188906})
 	})
+
 	t.Run("Feature missing.", func(t *testing.T) {
+		conn, err := grpc.Dial(addr, opts...)
+		if err != nil {
+			t.Fatalf("fail to dial: %v", err)
+		}
+		defer conn.Close()
+		client := pb.NewRouteGuideClient(conn)
 		printFeature(t, client, &pb.Point{Latitude: 0, Longitude: 0})
 	})
+
 	t.Run("Range features", func(t *testing.T) {
+
+		conn, err := grpc.Dial(addr, opts...)
+		if err != nil {
+			t.Fatalf("fail to dial: %v", err)
+		}
+		defer conn.Close()
+		client := pb.NewRouteGuideClient(conn)
 		// Looking for features between 40, -75 and 42, -73.
 		printFeatures(t, client, &pb.Rectangle{
 			Lo: &pb.Point{Latitude: 400000000, Longitude: -750000000},
 			Hi: &pb.Point{Latitude: 420000000, Longitude: -730000000},
 		})
 	})
+
 	t.Run("RecordRoute", func(t *testing.T) {
+		conn, err := grpc.Dial(addr, opts...)
+		if err != nil {
+			t.Fatalf("fail to dial: %v", err)
+		}
+		defer conn.Close()
+		client := pb.NewRouteGuideClient(conn)
 		runRecordRoute(t, client)
 	})
 	t.Run("RouteChat", func(t *testing.T) {
+		conn, err := grpc.Dial(addr, opts...)
+		if err != nil {
+			t.Fatalf("fail to dial: %v", err)
+		}
+		defer conn.Close()
+		client := pb.NewRouteGuideClient(conn)
 		runRouteChat(t, client)
 	})
 }

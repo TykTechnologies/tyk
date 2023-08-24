@@ -55,6 +55,7 @@ import (
 )
 
 var defaultUserAgent = "Tyk/" + VERSION
+
 const defaultEnforcedTimeout = 30
 
 var corsHeaders = []string{
@@ -387,8 +388,10 @@ type ReverseProxy struct {
 }
 
 func (p *ReverseProxy) defaultTransport(timeout int) *http.Transport {
+	dialContext := p.getDialerContext(timeout)
+
 	transport := &http.Transport{
-		DialContext:         p.getDialerContext(timeout),
+		DialContext:         dialContext,
 		MaxIdleConns:        p.Gw.GetConfig().MaxIdleConns,
 		MaxIdleConnsPerHost: p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
 		TLSHandshakeTimeout: 10 * time.Second,
@@ -397,23 +400,27 @@ func (p *ReverseProxy) defaultTransport(timeout int) *http.Transport {
 	return transport
 }
 
+func (p *ReverseProxy) newDialer(timeout int) *net.Dialer {
+	duration := seconds(timeout)
+
+	return &net.Dialer{
+		DualStack: true,
+		KeepAlive: duration,
+		Timeout:   duration,
+	}
+}
+
 func (p *ReverseProxy) getDialerContext(timeout int) func(ctx context.Context, network string, address string) (net.Conn, error) {
+	if p.Gw.dialCtxFn != nil {
+		return p.Gw.dialCtxFn
+	}
+
 	var enforcedTimeout int
 	if enforcedTimeout = defaultEnforcedTimeout; timeout > 0 {
 		enforcedTimeout = timeout
 	}
 
-	duration := seconds(enforcedTimeout)
-
-	dialer := &net.Dialer{
-		KeepAlive: duration,
-		DualStack: true,
-		Timeout:   duration,
-	}
-
-	if p.Gw.dialCtxFn != nil {
-		return p.Gw.dialCtxFn
-	}
+	dialer := p.newDialer(enforcedTimeout)
 
 	if p.Gw.dnsCacheManager.IsCacheEnabled() {
 		return p.Gw.dnsCacheManager.WrapDialer(dialer)
@@ -673,6 +680,7 @@ func tlsClientConfig(s *APISpec, gw *Gateway) *tls.Config {
 
 func (p *ReverseProxy) httpTransport(timeout int, rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
 	p.logger.Debug("Creating new transport")
+
 	transport := p.defaultTransport(timeout) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
@@ -738,8 +746,17 @@ func (p *ReverseProxy) httpTransport(timeout int, rw http.ResponseWriter, req *h
 		p.logger.Info("Enabling h2c mode")
 		h2t := &http2.Transport{
 			// kind of a hack, but for plaintext/H2C requests, pretend to dial TLS
-			DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
-				return net.Dial(network, addr)
+			DialTLS: func(network, addr string, config *tls.Config) (net.Conn, error) {
+				conn, err := transport.Dial(network, addr)
+				if err != nil {
+					return nil, err
+				}
+
+				if config != nil {
+					return tls.Client(conn, config), err
+				}
+
+				return conn, nil
 			},
 			AllowHTTP: true,
 		}
