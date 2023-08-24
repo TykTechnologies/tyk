@@ -825,24 +825,25 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	timeout := rt.getApiSpecEnforcedTimeout(r, apiSpec)
 	reqWithTimeout, cancel := rt.EnforceTimeout(r, timeout)
 	defer cancel()
+	r = reqWithTimeout
 
-	hasInternalHeader := reqWithTimeout.Header.Get(apidef.TykInternalApiHeader) != ""
+	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
 
-	if reqWithTimeout.URL.Scheme == "tyk" || hasInternalHeader {
+	if r.URL.Scheme == "tyk" || hasInternalHeader {
 		if hasInternalHeader {
-			reqWithTimeout.Header.Del(apidef.TykInternalApiHeader)
+			r.Header.Del(apidef.TykInternalApiHeader)
 		}
 
-		handler, _, found := rt.Gw.findInternalHttpHandlerByNameOrID(reqWithTimeout.Host)
+		handler, _, found := rt.Gw.findInternalHttpHandlerByNameOrID(r.Host)
 
 		if !found {
-			rt.logger.WithField("looping_url", "tyk://"+reqWithTimeout.Host).Error("Couldn't detect target")
+			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
 			return nil, errors.New("handler could")
 		}
 
-		rt.logger.WithField("looping_url", "tyk://"+reqWithTimeout.Host).Debug("Executing request on internal route")
+		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
 
-		return handleInMemoryLoop(handler, reqWithTimeout)
+		return handleInMemoryLoop(handler, r)
 	}
 
 	if rt.Gw.GetConfig().OpenTelemetry.Enabled {
@@ -852,14 +853,14 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		}
 
 		tr := otel.HTTPRoundTripper(baseRoundTripper)
-		return tr.RoundTrip(reqWithTimeout)
+		return tr.RoundTrip(r)
 	}
 
 	if rt.h2ctransport != nil {
-		return rt.h2ctransport.RoundTrip(reqWithTimeout)
+		return rt.h2ctransport.RoundTrip(r)
 	}
 
-	return rt.transport.RoundTrip(reqWithTimeout)
+	return rt.transport.RoundTrip(r)
 }
 
 const (
