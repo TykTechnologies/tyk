@@ -20,8 +20,9 @@ import (
 	"text/template"
 	"time"
 
-	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 	"github.com/buger/jsonparser"
+
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 
 	"github.com/getkin/kin-openapi/routers"
 
