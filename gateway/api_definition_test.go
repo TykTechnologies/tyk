@@ -1364,7 +1364,7 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 }
 
 func TestEnforcedTimeout(t *testing.T) {
-	//test.Flaky(t) // TODO TT-5222
+	test.Flaky(t) // TODO TT-5222
 
 	ts := StartTest(nil)
 	defer ts.Close()
