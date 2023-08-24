@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -211,4 +212,9 @@ func containsEscapedChars(str string) bool {
 	}
 
 	return str != unescaped
+}
+
+// seconds returns the integer param as time.Duration in seconds
+func seconds(d int) time.Duration {
+	return time.Duration(d) * time.Second
 }
