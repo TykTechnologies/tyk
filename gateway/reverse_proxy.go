@@ -55,6 +55,7 @@ import (
 )
 
 var defaultUserAgent = "Tyk/" + VERSION
+const defaultEnforcedTimeout = 30
 
 var corsHeaders = []string{
 	"Access-Control-Allow-Origin",
@@ -398,7 +399,7 @@ func (p *ReverseProxy) defaultTransport(timeout int) *http.Transport {
 
 func (p *ReverseProxy) getDialerContext(timeout int) func(ctx context.Context, network string, address string) (net.Conn, error) {
 	var enforcedTimeout int
-	if enforcedTimeout = 30; timeout > 0 {
+	if enforcedTimeout = defaultEnforcedTimeout; timeout > 0 {
 		enforcedTimeout = timeout
 	}
 
@@ -806,7 +807,7 @@ type TykRoundTripper struct {
 
 func (rt *TykRoundTripper) getApiSpecEnforcedTimeout(r *http.Request, apiSpec *APISpec) int {
 	if apiSpec == nil || !apiSpec.EnforcedTimeoutEnabled {
-		return 0
+		return defaultEnforcedTimeout
 	}
 
 	exists, customTimeout := checkHardTimeoutEnforced(apiSpec, r, rt.logger)
@@ -814,27 +815,21 @@ func (rt *TykRoundTripper) getApiSpecEnforcedTimeout(r *http.Request, apiSpec *A
 		return customTimeout
 	}
 
-	return 0
+	return defaultEnforcedTimeout
 }
 
-func (rt *TykRoundTripper) enforceTimeout(r *http.Request, timeout int) context.CancelFunc {
-	if !IsGrpcStreaming(r) {
-		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(timeout)*time.Second)
-		setContext(r, ctx)
-		return cancel
-	}
-	return nil
+func (rt *TykRoundTripper) enforceTimeout(r *http.Request, timeout int) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(r.Context(), time.Duration(timeout)*time.Second)
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	apiSpec := ctxGetAPISpec(r)
 	timeout := rt.getApiSpecEnforcedTimeout(r, apiSpec)
 
-	var cancel context.CancelFunc
-	cancel = rt.enforceTimeout(r, timeout)
-	if cancel != nil {
-		defer cancel()
-	}
+	ctx, cancel := rt.enforceTimeout(r, timeout)
+	defer cancel()
+
+	r = r.WithContext(ctx)
 
 	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
 
