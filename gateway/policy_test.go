@@ -1584,6 +1584,7 @@ func TestParsePoliciesFromRPC(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.testName, func(t *testing.T) {
+			ts.Gw.polsChecksums = map[string]*user.Policy{}
 
 			policyList, err := json.Marshal([]*user.Policy{tc.policy})
 			assert.NoError(t, err, "error unmarshalling policies")
