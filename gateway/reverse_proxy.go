@@ -385,24 +385,35 @@ type ReverseProxy struct {
 	Gw     *Gateway `json:"-"`
 }
 
-func (p *ReverseProxy) defaultTransport() *http.Transport {
-	timeout := 30 * time.Second
+func getDialerContext(gw *Gateway, timeout float64) func(ctx context.Context, network string, address string) (net.Conn, error) {
+	defaultTimeout := 30 * time.Second
+
+	if timeout > 0 {
+		defaultTimeout = time.Duration(timeout) * time.Second
+	}
+
 	dialer := &net.Dialer{
-		KeepAlive: timeout,
+		KeepAlive: defaultTimeout,
 		DualStack: true,
-		Timeout:   timeout,
+		Timeout:   defaultTimeout,
 	}
+
 	dialContextFunc := dialer.DialContext
-	if p.Gw.dnsCacheManager.IsCacheEnabled() {
-		dialContextFunc = p.Gw.dnsCacheManager.WrapDialer(dialer)
+
+	if gw.dnsCacheManager.IsCacheEnabled() {
+		dialContextFunc = gw.dnsCacheManager.WrapDialer(dialer)
 	}
 
-	if p.Gw.dialCtxFn != nil {
-		dialContextFunc = p.Gw.dialCtxFn
+	if gw.dialCtxFn != nil {
+		dialContextFunc = gw.dialCtxFn
 	}
 
+	return dialContextFunc
+}
+
+func (p *ReverseProxy) defaultTransport() *http.Transport {
 	transport := &http.Transport{
-		DialContext:         dialContextFunc,
+		DialContext:         getDialerContext(p.Gw, 0),
 		MaxIdleConns:        p.Gw.GetConfig().MaxIdleConns,
 		MaxIdleConnsPerHost: p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
 		TLSHandshakeTimeout: 10 * time.Second,
@@ -790,27 +801,34 @@ type TykRoundTripper struct {
 	Gw           *Gateway `json:"-"`
 }
 
-func (rt *TykRoundTripper) EnforceTimeout(r *http.Request) (*http.Request, context.CancelFunc) {
-	timeout := 30.0
-	apiSpec := ctxGetAPISpec(r)
-
+func (rt *TykRoundTripper) getApiSpecEnforcedTimeout(r *http.Request, apiSpec *APISpec) (bool, float64) {
 	if apiSpec == nil || !apiSpec.EnforcedTimeoutEnabled {
-		return r, func() {}
+		return false, 30.0
 	}
 
 	exists, customTimeout := CheckHardTimeoutEnforced(apiSpec, r, rt.logger)
 	if exists && customTimeout > 0 {
-		timeout = customTimeout
+		return true, customTimeout
 	}
 
+	return true, 30.0
+}
+
+func (rt *TykRoundTripper) EnforceTimeout(r *http.Request, timeout float64) (*http.Request, context.CancelFunc) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(timeout)*time.Second)
 
 	return r.WithContext(ctx), cancel
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
-	reqWithTimeout, cancel := rt.EnforceTimeout(r)
+	apiSpec := ctxGetAPISpec(r)
+	enforcedTimeoutEnabled, timeout := rt.getApiSpecEnforcedTimeout(r, apiSpec)
+	reqWithTimeout, cancel := rt.EnforceTimeout(r, timeout)
 	defer cancel()
+
+	if enforcedTimeoutEnabled {
+		rt.transport.DialContext = getDialerContext(rt.Gw, timeout)
+	}
 
 	hasInternalHeader := reqWithTimeout.Header.Get(apidef.TykInternalApiHeader) != ""
 
