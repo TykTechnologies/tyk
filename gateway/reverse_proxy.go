@@ -385,6 +385,17 @@ type ReverseProxy struct {
 	Gw     *Gateway `json:"-"`
 }
 
+func (p *ReverseProxy) defaultTransport(timeout float64) *http.Transport {
+	transport := &http.Transport{
+		DialContext:         p.getDialerContext(timeout),
+		MaxIdleConns:        p.Gw.GetConfig().MaxIdleConns,
+		MaxIdleConnsPerHost: p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+
+	return transport
+}
+
 func (p *ReverseProxy) getDialerContext(timeout float64) func(ctx context.Context, network string, address string) (net.Conn, error) {
 	defaultTimeout := 30 * time.Second
 
@@ -409,17 +420,6 @@ func (p *ReverseProxy) getDialerContext(timeout float64) func(ctx context.Contex
 	}
 
 	return dialContextFunc
-}
-
-func (p *ReverseProxy) defaultTransport(timeout float64) *http.Transport {
-	transport := &http.Transport{
-		DialContext:         p.getDialerContext(timeout),
-		MaxIdleConns:        p.Gw.GetConfig().MaxIdleConns,
-		MaxIdleConnsPerHost: p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
-		TLSHandshakeTimeout: 10 * time.Second,
-	}
-
-	return transport
 }
 
 func singleJoiningSlash(targetPath, subPath string, disableStripSlash bool) string {
