@@ -843,10 +843,12 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	apiSpec := ctxGetAPISpec(r)
 	timeout := rt.getApiSpecEnforcedTimeout(r, apiSpec)
 
-	ctx, cancel := rt.enforceTimeout(r, timeout)
-	defer cancel()
+	if !IsGrpcStreaming(r) {
+		ctx, cancel := rt.enforceTimeout(r, timeout)
+		defer cancel()
 
-	r = r.WithContext(ctx)
+		r = r.WithContext(ctx)
+	}
 
 	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
 
