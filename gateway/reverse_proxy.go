@@ -823,9 +823,10 @@ func (rt *TykRoundTripper) enforceTimeout(r *http.Request, timeout float64) (*ht
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	apiSpec := ctxGetAPISpec(r)
 	timeout := rt.getApiSpecEnforcedTimeout(r, apiSpec)
-	reqWithTimeout, cancel := rt.enforceTimeout(r, timeout)
+
+	var cancel context.CancelFunc
+	r, cancel = rt.enforceTimeout(r, timeout)
 	defer cancel()
-	r = reqWithTimeout
 
 	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
 
