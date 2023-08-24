@@ -817,10 +817,13 @@ func (rt *TykRoundTripper) getApiSpecEnforcedTimeout(r *http.Request, apiSpec *A
 	return 0
 }
 
-func (rt *TykRoundTripper) enforceTimeout(r *http.Request, timeout int) (*http.Request, context.CancelFunc) {
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(timeout)*time.Second)
-
-	return r.WithContext(ctx), cancel
+func (rt *TykRoundTripper) enforceTimeout(r *http.Request, timeout int) context.CancelFunc {
+	if !IsGrpcStreaming(r) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(timeout)*time.Second)
+		setContext(r, ctx)
+		return cancel
+	}
+	return nil
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -828,8 +831,10 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	timeout := rt.getApiSpecEnforcedTimeout(r, apiSpec)
 
 	var cancel context.CancelFunc
-	r, cancel = rt.enforceTimeout(r, timeout)
-	defer cancel()
+	cancel = rt.enforceTimeout(r, timeout)
+	if cancel != nil {
+		defer cancel()
+	}
 
 	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
 
