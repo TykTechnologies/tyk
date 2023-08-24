@@ -1807,10 +1807,11 @@ func (gw *Gateway) startServer() {
 	router := mux.NewRouter()
 	gw.loadControlAPIEndpoints(router)
 
-	muxer.setRouter(gw.GetConfig().ControlAPIPort, "", router, gw.GetConfig())
+	gwConf := gw.GetConfig()
+	muxer.setRouter(gw.GetConfig().ControlAPIPort, "", gwConf.EnableProxyProtocolHTTP, router, gw.GetConfig())
 
 	if muxer.router(gw.GetConfig().ListenPort, "", gw.GetConfig()) == nil {
-		muxer.setRouter(gw.GetConfig().ListenPort, "", mux.NewRouter(), gw.GetConfig())
+		muxer.setRouter(gw.GetConfig().ListenPort, "", gwConf.EnableProxyProtocolHTTP, mux.NewRouter(), gw.GetConfig())
 	}
 	gw.DefaultProxyMux.swap(muxer, gw)
 	// handle dashboard registration and nonces if available
