@@ -39,10 +39,6 @@ import (
 	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
 
-	"github.com/TykTechnologies/tyk/internal/mux"
-
-	"github.com/TykTechnologies/tyk/internal/uuid"
-
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/drl"
 	gas "github.com/TykTechnologies/goautosocket"
@@ -66,6 +62,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/mux"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 var (
@@ -1823,7 +1821,12 @@ func (gw *Gateway) startServer() {
 
 	gw.DRLManager = &drl.DRL{}
 	// at this point NodeID is ready to use by DRL
-	gw.drlOnce.Do(gw.startDRL)
+	gw.drlOnce.Do(func() {
+		// Set regex compilation func
+		mux.RegexpCompileFunc = regexp.CompileNative
+
+		gw.startDRL()
+	})
 
 	mainLog.Infof("Tyk Gateway started (%s)", VERSION)
 	address := gw.GetConfig().ListenAddress
