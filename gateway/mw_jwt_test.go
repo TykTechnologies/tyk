@@ -2053,7 +2053,7 @@ func createExpiringPolicy(pGen ...func(p *user.Policy)) string {
 	}
 
 	ts.Gw.policiesMu.Lock()
-	ts.Gw.policiesByID[pID] = *pol
+	ts.Gw.policiesByID[pID] = pol
 	ts.Gw.policiesMu.Unlock()
 
 	return pID

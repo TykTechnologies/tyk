@@ -241,7 +241,7 @@ func TestKeyHandler(t *testing.T) {
 
 	// with policy
 	ts.Gw.policiesMu.Lock()
-	ts.Gw.policiesByID["abc_policy"] = user.Policy{
+	ts.Gw.policiesByID["abc_policy"] = &user.Policy{
 		Active:           true,
 		QuotaMax:         5,
 		QuotaRenewalRate: 300,
@@ -1773,6 +1773,7 @@ func TestGroupResetHandler(t *testing.T) {
 
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = make(map[string]*APISpec)
+	ts.Gw.apisChecksums = make(map[string]*APISpec)
 	ts.Gw.apisMu.Unlock()
 
 	ts.Gw.LoadSampleAPI(apiTestDef)

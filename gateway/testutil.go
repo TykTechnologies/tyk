@@ -264,7 +264,7 @@ func (s *Test) reloadSimulation(ctx context.Context, gw *Gateway) {
 			return
 		default:
 			gw.policiesMu.Lock()
-			gw.policiesByID["_"] = user.Policy{}
+			gw.policiesByID["_"] = &user.Policy{}
 			delete(gw.policiesByID, "_")
 			gw.policiesMu.Unlock()
 
@@ -836,7 +836,7 @@ func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
 	}
 
 	s.Gw.policiesMu.Lock()
-	s.Gw.policiesByID[pol.ID] = *pol
+	s.Gw.policiesByID[pol.ID] = pol
 	s.Gw.policiesMu.Unlock()
 
 	return pol.ID
@@ -1266,6 +1266,7 @@ func (s *Test) RemoveApis() error {
 	defer s.Gw.apisMu.Unlock()
 	s.Gw.apiSpecs = []*APISpec{}
 	s.Gw.apisByID = map[string]*APISpec{}
+	s.Gw.apisChecksums = map[string]*APISpec{}
 
 	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
 	if err != nil {
@@ -1373,7 +1374,7 @@ func (s *Test) StopRPCClient() {
 	rpc.Reset()
 }
 
-func (s *Test) GetPolicyById(policyId string) (user.Policy, bool) {
+func (s *Test) GetPolicyById(policyId string) (*user.Policy, bool) {
 	s.Gw.policiesMu.Lock()
 	defer s.Gw.policiesMu.Unlock()
 	pol, found := s.Gw.policiesByID[policyId]

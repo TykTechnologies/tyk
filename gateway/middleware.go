@@ -385,7 +385,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 	var (
 		err       error
-		lookupMap map[string]user.Policy
+		lookupMap map[string]*user.Policy
 		policyIDs []string
 	)
 

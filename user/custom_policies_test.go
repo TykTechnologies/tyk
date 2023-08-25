@@ -87,7 +87,7 @@ func TestSessionState_CustomPolicies(t *testing.T) {
 
 func TestSessionState_SetCustomPolicies(t *testing.T) {
 
-	policies := []Policy{{ID: "test"}}
+	policies := []*Policy{{ID: "test"}}
 
 	t.Run("nil-metadata", func(t *testing.T) {
 		s := &SessionState{}

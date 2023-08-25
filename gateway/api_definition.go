@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,8 @@ import (
 	"sync/atomic"
 	"text/template"
 	"time"
+
+	"github.com/buger/jsonparser"
 
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 
@@ -270,6 +273,12 @@ func (s *APISpec) Release() {
 	if s.JSVM.VM != nil {
 		s.JSVM.DeInit()
 	}
+
+	if s.HTTPTransport != nil {
+		// Prevent new idle connections to be generated.
+		s.HTTPTransport.transport.DisableKeepAlives = true
+		s.HTTPTransport.transport.CloseIdleConnections()
+	}
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
@@ -451,6 +460,7 @@ type nestedApiDefinitionList struct {
 type nestedApiDefinition struct {
 	*apidef.APIDefinition `json:"api_definition,inline"`
 	OAS                   *oas.OAS `json:"oas"`
+	Checksum              string
 }
 
 func (f *nestedApiDefinitionList) set(defs []*apidef.APIDefinition) {
@@ -480,7 +490,7 @@ func (f *nestedApiDefinitionList) filter(enabled bool, tags ...string) []nestedA
 		}
 		for _, tag := range v.Tags {
 			if ok := tagMap[tag]; ok {
-				result = append(result, nestedApiDefinition{v.APIDefinition, v.OAS})
+				result = append(result, nestedApiDefinition{v.APIDefinition, v.OAS, v.Checksum})
 				break
 			}
 		}
@@ -512,26 +522,56 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	if err != nil {
 		return nil, err
 	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to read body: %v", err)
+	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
-		body, _ := ioutil.ReadAll(resp.Body)
 		a.Gw.reLogin()
 		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
 		a.Gw.reLogin()
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
-	// Extract tagged APIs#
 	list := &nestedApiDefinitionList{}
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
+
+	nonce, err := jsonparser.GetString(body, "Nonce")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode nonce: %v", err)
 	}
+
+	apisJSON, _, _, err := jsonparser.Get(body, "Message")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode Message: %v", err)
+	}
+
+	_, err = jsonparser.ArrayEach(apisJSON, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		apiHash := sha256.Sum256(value)
+		checksum := hex.EncodeToString(apiHash[:])
+
+		nestedApiDefinition := nestedApiDefinition{}
+		if apiDef, found := a.Gw.apisChecksums[checksum]; !found {
+			json.Unmarshal(value, &nestedApiDefinition)
+		} else {
+			nestedApiDefinition.TagsDisabled = apiDef.TagsDisabled
+			nestedApiDefinition.Tags = apiDef.Tags
+		}
+
+		nestedApiDefinition.Checksum = checksum
+		list.Message = append(list.Message, nestedApiDefinition)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode Message: %v", err)
+	}
+
+	log.Info("Loading APIS count: ", len(list.Message))
 
 	// Extract tagged entries only
 	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
@@ -541,9 +581,11 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 
 	// Set the nonce
 	a.Gw.ServiceNonceMutex.Lock()
-	a.Gw.ServiceNonce = list.Nonce
+	a.Gw.ServiceNonce = nonce
 	a.Gw.ServiceNonceMutex.Unlock()
-	log.Debug("Loading APIS Finished: Nonce Set: ", list.Nonce)
+
+	log.Info("Loading APIS Finished: Nonce Set: ", nonce)
+	log.Info("Loading APIS count: ", len(specs))
 
 	return specs, nil
 }
@@ -585,9 +627,22 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 		return nil, err
 	}
 
-	list := &nestedApiDefinitionList{
-		Message: payload,
-	}
+	list := &nestedApiDefinitionList{}
+
+	jsonparser.ArrayEach([]byte(apiCollection), func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		apiHash := sha256.Sum256(value)
+		checksum := hex.EncodeToString(apiHash[:])
+
+		nestedApiDefinition := nestedApiDefinition{}
+		if apiDef, found := a.Gw.apisChecksums[checksum]; !found {
+			json.Unmarshal(value, &nestedApiDefinition)
+		} else {
+			nestedApiDefinition.TagsDisabled = apiDef.TagsDisabled
+			nestedApiDefinition.Tags = apiDef.Tags
+		}
+		nestedApiDefinition.Checksum = checksum
+		list.Message = append(list.Message, nestedApiDefinition)
+	})
 
 	gwConfig := a.Gw.GetConfig()
 
@@ -603,6 +658,14 @@ func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfi
 	var specs []*APISpec
 
 	for _, def := range apiDefs {
+		if len(def.APIID) == 0 {
+			if apiDef, found := a.Gw.apisChecksums[def.Checksum]; found {
+				specs = append(specs, apiDef)
+			}
+
+			continue
+		}
+
 		if fromRPC {
 			def.DecodeFromDB()
 
