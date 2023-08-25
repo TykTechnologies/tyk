@@ -227,7 +227,11 @@ jobs:
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
         run: |
-          echo CI tags: $t
+          # Get the ci test env in a temp dir
+          cd $(mktemp -d autoXXX)
+          gh release download v1 --pattern '*.tgz' -R TykTechnologies/tyk-ci
+          tar --strip-components=1 -xvf ci-env.tgz
+          ${{ runner.debug }} && echo CI tags: $t
           tags=($t)
           echo First tag: ${tags[0]}
           echo "registry=${{ steps.ecr.outputs.registry }}
@@ -244,10 +248,6 @@ jobs:
           " > versions.env
           # Add Tyk component config variations to $env_file
           cat confs/${{ matrix.conf }}.env >> local-${{ matrix.db }}.env
-          # Get the ci test env in a temp dir
-          cd $(mktemp -d autoXXX)
-          gh release download v1 --pattern '*.tgz' -R TykTechnologies/tyk-ci
-          tar --strip-components=1 -xvf ci-env.tgz
           # bring up env
           docker compose -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env up --quiet-pull -d
 
