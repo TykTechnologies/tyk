@@ -1534,3 +1534,12 @@ func TestAPISpec_setHasMock(t *testing.T) {
 	s.setHasMock()
 	assert.True(t, s.HasMock)
 }
+
+func Benchmark_getExtendedPathSpecs(b *testing.B) {
+	a, vInfo, spec, conf := APIDefinitionLoader{}, apidef.VersionInfo{}, &APISpec{}, config.Config{}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = a.getExtendedPathSpecs(vInfo, spec, conf)
+	}
+
+}

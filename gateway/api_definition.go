@@ -1272,7 +1272,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	// TODO: New compiler here, needs to put data into a different structure
 
 	whiteListSpecs := false
-	combinedPath := []URLSpec{}
+	var combinedPath []URLSpec
 	if len(apiVersionDef.ExtendedPaths.MockResponse) > 0 {
 		mockResponsePaths := a.compileMockResponsePathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.MockResponse, MockResponse, conf)
 		combinedPath = append(combinedPath, mockResponsePaths...)
