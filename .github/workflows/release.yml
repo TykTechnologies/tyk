@@ -226,6 +226,7 @@ jobs:
           sink_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-sink' && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
+          GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
         run: |
           # Get the ci test env in a temp dir
           cd $(mktemp -d autoXXX)
