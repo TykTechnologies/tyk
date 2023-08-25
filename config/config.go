@@ -944,7 +944,7 @@ type Config struct {
 	// Deprecated: use OpenTelemetry instead.
 	Tracer Tracer `json:"tracing"`
 
-	// Section for configuring OpenTelemetry
+	// Section for configuring OpenTelemetry.
 	OpenTelemetry otel.OpenTelemetry `json:"opentelemetry"`
 
 	NewRelic NewRelicConfig `json:"newrelic"`
