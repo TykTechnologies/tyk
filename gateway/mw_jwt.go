@@ -332,7 +332,7 @@ func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
 
 func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	polIDs := []string{}
-
+	polErrors := ""
 	// add all policies matched from scope-policy mapping
 	policiesToApply := map[string]bool{}
 	for _, scopeItem := range scope {
@@ -340,9 +340,11 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 			policiesToApply[policyID] = true
 			log.Debugf("Found a matching policy for scope item: %s", scopeItem)
 		} else {
-			log.Errorf("Couldn't find a matching policy for scope item: %s", scopeItem)
+			polErrors = polErrors + policyID + ", "
 		}
 	}
+	log.Warnf("Couldn't find a matching policy for scope item: %s", polErrors[:len(polErrors)-1])
+
 	for id := range policiesToApply {
 		polIDs = append(polIDs, id)
 	}

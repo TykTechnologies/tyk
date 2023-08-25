@@ -46,12 +46,7 @@ func (s *ServiceDiscovery) Init(spec *apidef.ServiceDiscoveryConfiguration) {
 
 func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
 	log.Debug("Getting ", name)
-
-	client := &http.Client{}
-	req, _ := http.NewRequest("GET", name, nil)
-	req.Header.Add("Accept", "application/json")
-	resp, err := client.Do(req)
-	//resp, err := http.Get(name)
+	resp, err := http.Get(name)
 	if err != nil {
 		return "", err
 	}
