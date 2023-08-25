@@ -232,9 +232,10 @@ jobs:
           cd $(mktemp -d autoXXX)
           gh release download v1 --pattern '*.tgz' -R TykTechnologies/tyk-ci
           tar --strip-components=1 -xvf ci-env.tgz
-          ${{ runner.debug }} && echo CI tags: $t
+          echo CI tags: $t
           tags=($t)
           echo First tag: ${tags[0]}
+          # Start customising env
           echo "registry=${{ steps.ecr.outputs.registry }}
           tyk_image=\${registry}/tyk:${gw_dash_image_tag}
           tyk_analytics_image=\${registry}/tyk-analytics:${gw_dash_image_tag}
