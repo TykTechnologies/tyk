@@ -1271,56 +1271,125 @@ func (a APIDefinitionLoader) compileInternalPathspathSpec(paths []apidef.Interna
 func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
-	mockResponsePaths := a.compileMockResponsePathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.MockResponse, MockResponse, conf)
-	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.Ignored, Ignored, conf)
-	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.BlackList, BlackList, conf)
-	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.WhiteList, WhiteList, conf)
-	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached, apiVersionDef.ExtendedPaths.AdvanceCacheConfig, conf)
-	transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform, Transformed, conf)
-	transformResponsePaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.TransformResponse, TransformedResponse, conf)
-	transformJQPaths := a.compileTransformJQPathSpec(apiVersionDef.ExtendedPaths.TransformJQ, TransformedJQ)
-	transformJQResponsePaths := a.compileTransformJQPathSpec(apiVersionDef.ExtendedPaths.TransformJQResponse, TransformedJQResponse)
-	headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader, HeaderInjected, conf)
-	headerTransformPathsOnResponse := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformResponseHeader, HeaderInjectedResponse, conf)
-	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout, conf)
-	circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec, conf)
-	urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite, conf)
-	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec, conf)
-	requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit, conf)
-	methodTransforms := a.compileMethodTransformSpec(apiVersionDef.ExtendedPaths.MethodTransforms, MethodTransformed, conf)
-	trackedPaths := a.compileTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked, conf)
-	unTrackedPaths := a.compileUnTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked, conf)
-	validateJSON := a.compileValidateJSONPathspathSpec(apiVersionDef.ExtendedPaths.ValidateJSON, ValidateJSONRequest, conf)
-	internalPaths := a.compileInternalPathspathSpec(apiVersionDef.ExtendedPaths.Internal, Internal, conf)
-	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
-	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
-
+	whiteListSpecs := false
 	combinedPath := []URLSpec{}
-	combinedPath = append(combinedPath, mockResponsePaths...)
-	combinedPath = append(combinedPath, ignoredPaths...)
-	combinedPath = append(combinedPath, blackListPaths...)
-	combinedPath = append(combinedPath, whiteListPaths...)
-	combinedPath = append(combinedPath, cachedPaths...)
-	combinedPath = append(combinedPath, transformPaths...)
-	combinedPath = append(combinedPath, transformResponsePaths...)
-	combinedPath = append(combinedPath, transformJQPaths...)
-	combinedPath = append(combinedPath, transformJQResponsePaths...)
-	combinedPath = append(combinedPath, headerTransformPaths...)
-	combinedPath = append(combinedPath, headerTransformPathsOnResponse...)
-	combinedPath = append(combinedPath, hardTimeouts...)
-	combinedPath = append(combinedPath, circuitBreakers...)
-	combinedPath = append(combinedPath, urlRewrites...)
-	combinedPath = append(combinedPath, requestSizes...)
-	combinedPath = append(combinedPath, goPlugins...)
-	combinedPath = append(combinedPath, persistGraphQL...)
-	combinedPath = append(combinedPath, virtualPaths...)
-	combinedPath = append(combinedPath, methodTransforms...)
-	combinedPath = append(combinedPath, trackedPaths...)
-	combinedPath = append(combinedPath, unTrackedPaths...)
-	combinedPath = append(combinedPath, validateJSON...)
-	combinedPath = append(combinedPath, internalPaths...)
+	if len(apiVersionDef.ExtendedPaths.MockResponse) > 0 {
+		mockResponsePaths := a.compileMockResponsePathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.MockResponse, MockResponse, conf)
+		combinedPath = append(combinedPath, mockResponsePaths...)
+	}
 
-	return combinedPath, len(whiteListPaths) > 0
+	if len(apiVersionDef.ExtendedPaths.Ignored) > 0 {
+		ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.Ignored, Ignored, conf)
+		combinedPath = append(combinedPath, ignoredPaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.BlackList) > 0 {
+		blackListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.BlackList, BlackList, conf)
+		combinedPath = append(combinedPath, blackListPaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.WhiteList) > 0 {
+		whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.WhiteList, WhiteList, conf)
+		whiteListSpecs = true
+		combinedPath = append(combinedPath, whiteListPaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.Cached) > 0 || len(apiVersionDef.ExtendedPaths.AdvanceCacheConfig) > 0 {
+		cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached, apiVersionDef.ExtendedPaths.AdvanceCacheConfig, conf)
+		combinedPath = append(combinedPath, cachedPaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.Transform) > 0 {
+		transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform, Transformed, conf)
+		combinedPath = append(combinedPath, transformPaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.TransformResponse) > 0 {
+		transformResponsePaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.TransformResponse, TransformedResponse, conf)
+		combinedPath = append(combinedPath, transformResponsePaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.TransformJQ) > 0 {
+		transformJQPaths := a.compileTransformJQPathSpec(apiVersionDef.ExtendedPaths.TransformJQ, TransformedJQ)
+		combinedPath = append(combinedPath, transformJQPaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.TransformJQResponse) > 0 {
+		transformJQResponsePaths := a.compileTransformJQPathSpec(apiVersionDef.ExtendedPaths.TransformJQResponse, TransformedJQResponse)
+		combinedPath = append(combinedPath, transformJQResponsePaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.TransformHeader) > 0 {
+		headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader, HeaderInjected, conf)
+		combinedPath = append(combinedPath, headerTransformPaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.TransformResponseHeader) > 0 {
+		headerTransformPathsOnResponse := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformResponseHeader, HeaderInjectedResponse, conf)
+		combinedPath = append(combinedPath, headerTransformPathsOnResponse...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.HardTimeouts) > 0 {
+		hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout, conf)
+		combinedPath = append(combinedPath, hardTimeouts...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.CircuitBreaker) > 0 {
+		circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec, conf)
+		combinedPath = append(combinedPath, circuitBreakers...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.URLRewrite) > 0 {
+		urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite, conf)
+		combinedPath = append(combinedPath, urlRewrites...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.Virtual) > 0 {
+		virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec, conf)
+		combinedPath = append(combinedPath, virtualPaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.SizeLimit) > 0 {
+		requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit, conf)
+		combinedPath = append(combinedPath, requestSizes...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.MethodTransforms) > 0 {
+		methodTransforms := a.compileMethodTransformSpec(apiVersionDef.ExtendedPaths.MethodTransforms, MethodTransformed, conf)
+		combinedPath = append(combinedPath, methodTransforms...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.TrackEndpoints) > 0 {
+		trackedPaths := a.compileTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked, conf)
+		combinedPath = append(combinedPath, trackedPaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints) > 0 {
+		unTrackedPaths := a.compileUnTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked, conf)
+		combinedPath = append(combinedPath, unTrackedPaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.ValidateJSON) > 0 {
+		validateJSON := a.compileValidateJSONPathspathSpec(apiVersionDef.ExtendedPaths.ValidateJSON, ValidateJSONRequest, conf)
+		combinedPath = append(combinedPath, validateJSON...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.Internal) > 0 {
+		internalPaths := a.compileInternalPathspathSpec(apiVersionDef.ExtendedPaths.Internal, Internal, conf)
+		combinedPath = append(combinedPath, internalPaths...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.GoPlugin) > 0 {
+		goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
+		combinedPath = append(combinedPath, goPlugins...)
+	}
+
+	if len(apiVersionDef.ExtendedPaths.PersistGraphQL) > 0 {
+		persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
+		combinedPath = append(combinedPath, persistGraphQL...)
+	}
+
+	return combinedPath, whiteListSpecs
 }
 
 func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
