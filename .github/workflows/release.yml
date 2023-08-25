@@ -228,13 +228,13 @@ jobs:
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
         run: |
+          echo CI tags: $t
+          tags=($t)
+          echo First tag: ${tags[0]}
           # Get the ci test env in a temp dir
           cd $(mktemp -d autoXXX)
           gh release download v1 --pattern '*.tgz' -R TykTechnologies/tyk-ci
           tar --strip-components=1 -xvf ci-env.tgz
-          echo CI tags: $t
-          tags=($t)
-          echo First tag: ${tags[0]}
           # Start customising env
           echo "registry=${{ steps.ecr.outputs.registry }}
           tyk_image=\${registry}/tyk:${gw_dash_image_tag}
@@ -250,8 +250,8 @@ jobs:
           " > versions.env
           # Add Tyk component config variations to $env_file
           cat confs/${{ matrix.conf }}.env >> local-${{ matrix.db }}.env
-          # bring up env
-          docker compose -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env up --quiet-pull -d
+          # bring up env, the project name is important
+          docker compose -p auto -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env up --quiet-pull -d
 
       - name: Run tests
         run: |
