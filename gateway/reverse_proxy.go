@@ -747,16 +747,7 @@ func (p *ReverseProxy) httpTransport(timeout int, rw http.ResponseWriter, req *h
 		h2t := &http2.Transport{
 			// kind of a hack, but for plaintext/H2C requests, pretend to dial TLS
 			DialTLS: func(network, addr string, config *tls.Config) (net.Conn, error) {
-				conn, err := transport.Dial(network, addr)
-				if err != nil {
-					return nil, err
-				}
-
-				if config != nil {
-					return tls.Client(conn, config), err
-				}
-
-				return conn, nil
+				return net.Dial(network, addr)
 			},
 			AllowHTTP: true,
 		}
