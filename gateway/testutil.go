@@ -33,6 +33,11 @@ import (
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/context"
 
+<<<<<<< HEAD
+=======
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/otel"
+>>>>>>> 3b1379e4... [TT-9284] Ensure that old transport will close idle connections (#5231)
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
@@ -1018,10 +1023,16 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 	}
 	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 
+<<<<<<< HEAD
 	s.gwMu.Lock()
 	s.Gw = NewGateway(gwConfig, ctx, cancelFn)
 	s.Gw.setTestMode(true)
 	s.gwMu.Unlock()
+=======
+	gw := NewGateway(gwConfig, s.ctx)
+	gw.setTestMode(true)
+	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
+>>>>>>> 3b1379e4... [TT-9284] Ensure that old transport will close idle connections (#5231)
 
 	s.MockHandle = MockHandle
 
@@ -1067,6 +1078,7 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 		Handler:        s.TestServerRouter,
 		ReadTimeout:    1 * time.Second,
 		WriteTimeout:   1 * time.Second,
+		ConnState:      gw.ConnectionWatcher.OnStateChange,
 		MaxHeaderBytes: 1 << 20,
 	}
 
