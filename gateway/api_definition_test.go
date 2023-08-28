@@ -15,6 +15,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/assert"
 
 	redis "github.com/go-redis/redis/v8"
@@ -1423,4 +1424,13 @@ func TestAPISpec_GetSessionLifetimeRespectsKeyExpiration(t *testing.T) {
 		a.SessionLifetimeRespectsKeyExpiration = true
 		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
 	})
+}
+
+func Benchmark_getExtendedPathSpecs(b *testing.B) {
+	a, vInfo, spec, conf := APIDefinitionLoader{}, apidef.VersionInfo{}, &APISpec{}, config.Config{}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = a.getExtendedPathSpecs(vInfo, spec, conf)
+	}
+
 }
