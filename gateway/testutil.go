@@ -36,6 +36,11 @@ import (
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/context"
 
+<<<<<<< HEAD
+=======
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/otel"
+>>>>>>> 3b1379e4... [TT-9284] Ensure that old transport will close idle connections (#5231)
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
@@ -1076,6 +1081,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	gw := NewGateway(gwConfig, s.ctx)
 	gw.setTestMode(true)
+	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
 	s.MockHandle = MockHandle
 
@@ -1121,6 +1127,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 		Handler:        s.TestServerRouter,
 		ReadTimeout:    1 * time.Second,
 		WriteTimeout:   1 * time.Second,
+		ConnState:      gw.ConnectionWatcher.OnStateChange,
 		MaxHeaderBytes: 1 << 20,
 	}
 

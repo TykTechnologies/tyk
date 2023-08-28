@@ -21,8 +21,12 @@ import (
 	"strings"
 	"sync"
 
+<<<<<<< HEAD
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/test"
+=======
+	"github.com/TykTechnologies/tyk/internal/httputil"
+>>>>>>> 3b1379e4... [TT-9284] Ensure that old transport will close idle connections (#5231)
 
 	"sync/atomic"
 	textTemplate "text/template"
@@ -111,6 +115,7 @@ type Gateway struct {
 	DashService          DashboardServiceSender
 	CertificateManager   certs.CertificateManager
 	GlobalHostChecker    HostCheckerManager
+	ConnectionWatcher    *httputil.ConnectionWatcher
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
 
@@ -217,6 +222,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
 	}
+	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
 	gw.SessionCache = cache.New(10, 5)
 	gw.ExpiryCache = cache.New(600, 10*60)
