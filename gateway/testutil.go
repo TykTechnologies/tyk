@@ -36,11 +36,7 @@ import (
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/context"
 
-<<<<<<< HEAD
-=======
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/otel"
->>>>>>> 3b1379e4... [TT-9284] Ensure that old transport will close idle connections (#5231)
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
