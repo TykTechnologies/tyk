@@ -15,8 +15,9 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	redis "github.com/go-redis/redis/v8"
 
