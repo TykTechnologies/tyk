@@ -26,7 +26,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 
-	"github.com/TykTechnologies/tyk/internal/mux"
+	"github.com/TykTechnologies/tyk/internal/_vendor/mux"
 )
 
 // handleWrapper's only purpose is to allow router to be dynamically replaced

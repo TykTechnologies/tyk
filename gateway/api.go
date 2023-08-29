@@ -54,7 +54,7 @@ import (
 
 	"github.com/lonelycode/osin"
 
-	"github.com/TykTechnologies/tyk/internal/mux"
+	"github.com/TykTechnologies/tyk/internal/_vendor/mux"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"

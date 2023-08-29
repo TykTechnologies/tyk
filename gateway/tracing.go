@@ -10,7 +10,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/internal/mux"
+	"github.com/TykTechnologies/tyk/internal/_vendor/mux"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )

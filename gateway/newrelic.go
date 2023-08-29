@@ -5,10 +5,10 @@ import (
 	"strconv"
 
 	"github.com/gocraft/health"
-	newrelic "github.com/newrelic/go-agent"
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/internal/mux"
+	"github.com/TykTechnologies/tyk/internal/_vendor/mux"
+	"github.com/TykTechnologies/tyk/internal/_vendor/newrelic"
 )
 
 // SetupNewRelic creates new newrelic.Application instance
@@ -44,7 +44,7 @@ func (gw *Gateway) SetupNewRelic() (app newrelic.Application) {
 // AddNewRelicInstrumentation adds NewRelic instrumentation to the router
 func AddNewRelicInstrumentation(app newrelic.Application, r *mux.Router) {
 	if app != nil {
-		//nrgorilla.InstrumentRoutes(r, app)
+		newrelic.InstrumentRoutes(r, app)
 	}
 }
 

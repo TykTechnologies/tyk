@@ -61,8 +61,8 @@ import (
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 
+	"github.com/TykTechnologies/tyk/internal/_vendor/mux"
 	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/internal/mux"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
