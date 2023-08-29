@@ -52,8 +52,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
-	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
+
+	"github.com/TykTechnologies/tyk/internal/mux"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"

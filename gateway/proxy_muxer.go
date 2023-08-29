@@ -23,9 +23,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/tcp"
 
-	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
+
+	"github.com/TykTechnologies/tyk/internal/mux"
 )
 
 // handleWrapper's only purpose is to allow router to be dynamically replaced

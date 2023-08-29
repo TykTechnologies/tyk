@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/TykTechnologies/tyk/internal/mux"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 

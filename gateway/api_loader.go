@@ -15,10 +15,11 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/internal/mux"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -729,7 +730,7 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux,
 
 // loadHTTPService has two responsibilities:
 //
-// - register gorilla/mux routing handless with proxyMux directly (wrapped),
+// - register TykTechnologies/tyk/internal/mux routing handless with proxyMux directly (wrapped),
 // - return a raw http.Handler for tyk://ID urls.
 func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) *ChainObject {
 	gwConfig := gw.GetConfig()
