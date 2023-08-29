@@ -1349,12 +1349,12 @@
     },
     "cloud": {
       "type": "boolean"
+    },
+    "resource_reload_attempts": {
+      "type": "integer"
+    },
+    "resource_reload_interval": {
+      "type": "integer"
     }
-  },
-  "resource_reload_attempts": {
-    "type": "integer"
-  },
-  "resource_reload_interval": {
-    "type": "integer"
   }
 }
