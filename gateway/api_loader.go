@@ -762,9 +762,8 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 	}
 
-	httpHandler := explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, gwConfig.HttpServerOptions.EnableStrictRoutes)
-	subrouter.NewRoute().Handler(httpHandler)
-	chainObj.ThisHandler = httpHandler
+	chainObj.ThisHandler = explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, gwConfig.HttpServerOptions.EnableStrictRoutes)
+	subrouter.Handle(spec.Proxy.ListenPath, chainObj.ThisHandler)
 
 	return chainObj
 }
