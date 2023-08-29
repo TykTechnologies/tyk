@@ -764,6 +764,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 	httpHandler := explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, gwConfig.HttpServerOptions.EnableStrictRoutes)
 	subrouter.NewRoute().Handler(httpHandler)
+	chainObj.ThisHandler = httpHandler
 
 	return chainObj
 }
