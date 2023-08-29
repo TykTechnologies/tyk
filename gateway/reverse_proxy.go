@@ -413,11 +413,7 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 		DialContext:           dialContextFunc,
 		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
 		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
-<<<<<<< HEAD
-		IdleConnTimeout:       90 * time.Second,
-=======
 		IdleConnTimeout:       time.Duration(idleConnTimeout) * time.Second,
->>>>>>> e8738a69... Merging to release-5-lts: [TT-9284] Ensure that old transport will close idle connections (#5231) (#5472)
 		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
