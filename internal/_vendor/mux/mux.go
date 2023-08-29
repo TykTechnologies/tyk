@@ -287,6 +287,15 @@ func (r *Router) NewRoute() *Route {
 	return route
 }
 
+// Add adds a named route.
+func (r *Router) Add(route *Route) {
+	r.routes = append(r.routes, route)
+	if route.name != "" {
+		r.namedRoutes[route.name] = route
+	}
+	route.namedRoutes = r.namedRoutes
+}
+
 // Name registers a new route with a name.
 // See Route.Name().
 func (r *Router) Name(name string) *Route {
