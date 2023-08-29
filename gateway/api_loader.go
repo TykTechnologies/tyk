@@ -681,6 +681,7 @@ type explicitRouteHandler struct {
 	prefix  string
 	handler http.Handler
 	muxer   *proxyMux
+	router  *mux.Router
 }
 
 func (h *explicitRouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -691,7 +692,7 @@ func (h *explicitRouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	h.muxer.handle404(w, r)
 }
 
-func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux, enabled bool) http.Handler {
+func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux, router *mux.Router, enabled bool) http.Handler {
 	// feature is enabled via config option
 	if !enabled {
 		return handler
@@ -710,6 +711,7 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux,
 		prefix:  prefix,
 		handler: handler,
 		muxer:   muxer,
+		router:  router,
 	}
 }
 
@@ -762,8 +764,8 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 	}
 
-	httpHandler := explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, gwConfig.HttpServerOptions.EnableStrictRoutes)
-	subrouter.NewRoute().Handler(httpHandler)
+	chainObj.ThisHandler = explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, subrouter, gwConfig.HttpServerOptions.EnableStrictRoutes)
+	subrouter.NewRoute().Handler(chainObj.ThisHandler)
 
 	return chainObj
 }
