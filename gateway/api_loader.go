@@ -679,13 +679,13 @@ func (gw *Gateway) fuzzyFindAPI(search string) *APISpec {
 
 type explicitRouteHandler struct {
 	prefix  string
-	handler http.Handler
+	handler *http.Handler
 	muxer   *proxyMux
 }
 
 func (h *explicitRouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == h.prefix || strings.HasPrefix(r.URL.Path, h.prefix+"/") {
-		h.handler.ServeHTTP(w, r)
+		(*h.handler).ServeHTTP(w, r)
 		return
 	}
 	h.muxer.handle404(w, r)
@@ -708,7 +708,7 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux,
 
 	return &explicitRouteHandler{
 		prefix:  prefix,
-		handler: handler,
+		handler: &handler,
 		muxer:   muxer,
 	}
 }
