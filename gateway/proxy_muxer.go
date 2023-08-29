@@ -252,7 +252,7 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 	}
 }
 
-//nolint
+// nolint
 func (gw *Gateway) recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
 	if doNotTrack {
 		return nil
@@ -372,6 +372,10 @@ func (m *proxyMux) swap(new *proxyMux, gw *Gateway) {
 					e.router = newP.router
 				case *h2cWrapper:
 					e.w.router = newP.router
+				case *explicitRouteHandler:
+					e.router = newP.router
+				default:
+					log.Error("something to avoid missing this again?")
 				}
 			}
 		}
