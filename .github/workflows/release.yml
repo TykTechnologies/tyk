@@ -187,16 +187,9 @@ jobs:
       matrix:
         conf: [ "sha256", "murmur64" ]
         db: [ "mongo44", "postgres15" ]
-        flavour: [ "pro", "pro-ha" ]
+        flavour: [ "pro-ha" ]
         include:
           - db: postgres15
-            flavour: pro
-            markers: "and not mdcb and not sql"
-          - db: mongo44
-            flavour: pro
-            markers: "and not mdcb"
-          - db: postgres15
-            flavour: pro-ha
             markers: "and not sql"
 
     steps:
@@ -228,6 +221,7 @@ jobs:
         shell: bash
         env:
           t: ${{ needs.goreleaser.outputs.tags }}
+          tyk_ci_version: 'v1.1-alpha1'
           # gw and dash use the same branch names
           gw_dash_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk' || github.repository == 'TykTechnologies/tyk-analytics') && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
           pump_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-pump' && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
@@ -241,7 +235,7 @@ jobs:
           echo First tag: ${tags[0]}
           # Get the ci test env in a temp dir
           cd $(mktemp -d autoXXX)
-          gh release download v1.1-alpha0 --pattern '*.tgz' -R TykTechnologies/tyk-ci
+          gh release download ${tyk_ci_version} --pattern '*.tgz' -R TykTechnologies/tyk-ci
           tar --strip-components=1 -xvf ci-env.tgz
           # Start customising env
           echo "registry=${{ steps.ecr.outputs.registry }}
@@ -260,22 +254,16 @@ jobs:
           " > versions.env
           # Add Tyk component config variations to $env_file
           cat confs/${{ matrix.conf }}.env >> local-${{ matrix.db }}.env
-          if [[ "${{ matrix.flavour }}" == "pro" ]];then
-            # bring up env, the project name is important
-            docker compose -p auto -f "${{ matrix.flavour }}".yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile all up --quiet-pull -d
-          fi
-          if [[ "${{ matrix.flavour }}" == "pro-ha" ]];then
-            # bring up env, the project name is important
-            docker compose -p auto -f "${{ matrix.flavour }}".yml -f deps_"${{ matrix.flavour }}".yml -f ${{ matrix.db }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
-            ./dash-bootstrap.sh http://localhost:3000
-            docker compose -p auto -f "${{ matrix.flavour }}".yml -f deps_"${{ matrix.flavour }}".yml -f ${{ matrix.db }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
-          fi
+          # bring up env, the project name is important
+          docker compose -p auto -f "${{ matrix.flavour }}".yml -f deps_"${{ matrix.flavour }}".yml -f ${{ matrix.db }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
+          ./dash-bootstrap.sh http://localhost:3000
+          docker compose -p auto -f "${{ matrix.flavour }}".yml -f deps_"${{ matrix.flavour }}".yml -f ${{ matrix.db }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
 
       - name: Run tests
         run: |
           docker run --rm --network auto_default \
           754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'release-mdcb-compliant' }} \
-          pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}"
+          pytest -c pytest_ci.ini --env-file pytest.env --ci -m "not local and not dind ${{ matrix.markers }}"
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
 
