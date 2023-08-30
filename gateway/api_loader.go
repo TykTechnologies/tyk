@@ -678,44 +678,6 @@ func (gw *Gateway) fuzzyFindAPI(search string) *APISpec {
 	return nil
 }
 
-type explicitRouteHandler struct {
-	prefix  string
-	handler http.Handler
-	muxer   *proxyMux
-	router  *mux.Router
-}
-
-func (h *explicitRouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == h.prefix || strings.HasPrefix(r.URL.Path, h.prefix+"/") {
-		h.handler.ServeHTTP(w, r)
-		return
-	}
-	h.muxer.handle404(w, r)
-}
-
-func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux, router *mux.Router, enabled bool) http.Handler {
-	// feature is enabled via config option
-	if !enabled {
-		return handler
-	}
-
-	// keep trailing slash paths as-is
-	if strings.HasSuffix(prefix, "/") {
-		return handler
-	}
-	// keep paths with params as-is
-	if strings.Contains(prefix, "{") && strings.Contains(prefix, "}") {
-		return handler
-	}
-
-	return &explicitRouteHandler{
-		prefix:  prefix,
-		handler: handler,
-		muxer:   muxer,
-		router:  router,
-	}
-}
-
 // loadHTTPService has two responsibilities:
 //
 // - register gorilla/mux routing handless with proxyMux directly (wrapped),
@@ -765,7 +727,6 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 	}
 
-	//chainObj.ThisHandler = explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, subrouter, gwConfig.HttpServerOptions.EnableStrictRoutes)
 	subrouter.NewRoute().Handler(chainObj.ThisHandler)
 
 	return chainObj
