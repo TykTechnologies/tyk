@@ -959,9 +959,6 @@
     "suppress_redis_signal_reload": {
       "type": "boolean"
     },
-    "reload_interval": {
-      "type": "integer"
-    },
     "syslog_network_addr": {
       "type": "string"
     },
