@@ -972,13 +972,13 @@ func (gw *Gateway) DoReload() {
 	}
 
 	// Load the API Policies
-	if _, err := gw.syncResourcesWithReload("policies", gw.syncPolicies); err != nil {
+	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
 		mainLog.Error("Error during syncing policies")
 		return
 	}
 
 	// load the specs
-	if count, err := gw.syncResourcesWithReload("apis", gw.syncAPISpecs); err != nil {
+	if count, err := syncResourcesWithReload("apis", gw.GetConfig(), gw.syncAPISpecs); err != nil {
 		mainLog.Error("Error during syncing apis")
 		return
 	} else {
@@ -995,7 +995,7 @@ func (gw *Gateway) DoReload() {
 	mainLog.Info("API reload complete")
 }
 
-func (gw *Gateway) syncResourcesWithReload(resource string, syncFunc func() (int, error)) (int, error) {
+func syncResourcesWithReload(resource string, conf config.Config, syncFunc func() (int, error)) (int, error) {
 	var (
 		err   error
 		count int
@@ -1005,7 +1005,6 @@ func (gw *Gateway) syncResourcesWithReload(resource string, syncFunc func() (int
 		return 0, ErrSyncResourceNotKnown
 	}
 
-	conf := gw.GetConfig()
 	for i := 1; i <= conf.ResourceSync.RetryAttempts+1; i++ {
 		count, err = syncFunc()
 		if err == nil {
