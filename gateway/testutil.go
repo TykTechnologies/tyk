@@ -1651,7 +1651,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 		}
 
 		specFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
-		if err := os.WriteFile(specFilePath, specBytes, 0644); err != nil {
+		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
 			panic(err)
 		}
 
@@ -1662,7 +1662,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 		}
 
 		oasSpecFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+"-oas.json")
-		if err := os.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
+		if err := ioutil.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
 			panic(err)
 		}
 	}

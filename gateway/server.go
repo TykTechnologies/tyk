@@ -579,7 +579,7 @@ func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.
 	})
 }
 
-func (gw *Gateway) getControlAPIHandler() *mux.Router {
+func (gw *Gateway) getControlAPIRouter() *mux.Router {
 	if gw.controlAPIRouter != nil {
 		return gw.controlAPIRouter
 	}
@@ -666,7 +666,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 
 	muxer.HandleFunc("/"+gw.GetConfig().HealthCheckEndpointName, gw.liveCheckHandler)
 
-	controlAPIRouter := gw.getControlAPIHandler()
+	controlAPIRouter := gw.getControlAPIRouter()
 	controlAPIHandler := http.StripPrefix(
 		"/tyk",
 		stripSlashes(
