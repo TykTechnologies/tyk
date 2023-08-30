@@ -156,6 +156,7 @@ nfpms:
     maintainer: "Tyk <info@tyk.io>"
     description: Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
     package_name: tyk-gateway
+    release: 1
     file_name_template: "{{ .ConventionalFileName }}"
     builds:
       - std-linux
