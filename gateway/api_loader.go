@@ -750,7 +750,9 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 	gw.generateSubRoutes(spec, router)
 	corsHandlerFunc := getCORSHandler(spec)
-	chainObj.ThisHandler = alice.New(corsHandlerFunc).Then(chainObj.ThisHandler)
+	if corsHandlerFunc != nil {
+		chainObj.ThisHandler = alice.New(corsHandlerFunc).Then(chainObj.ThisHandler)
+	}
 
 	if chainObj.Skip {
 		return chainObj
