@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 )
@@ -24,10 +23,7 @@ func (s *StrictRoutesMW) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	}
 
 	listenPath := s.Spec.Proxy.ListenPath
-	// keep trailing slash paths as-is
-	if strings.HasSuffix(listenPath, "/") {
-		return nil, http.StatusOK
-	}
+
 	// keep paths with params as-is
 	if strings.Contains(listenPath, "{") && strings.Contains(listenPath, "}") {
 		return nil, http.StatusOK
@@ -37,5 +33,7 @@ func (s *StrictRoutesMW) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 		return nil, http.StatusOK
 	}
 
-	return errors.New(http.StatusText(http.StatusNotFound)), http.StatusNotFound
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = w.Write([]byte(http.StatusText(http.StatusNotFound)))
+	return nil, mwStatusRespond
 }

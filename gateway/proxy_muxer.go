@@ -372,8 +372,6 @@ func (m *proxyMux) swap(new *proxyMux, gw *Gateway) {
 					e.router = newP.router
 				case *h2cWrapper:
 					e.w.router = newP.router
-				case *explicitRouteHandler:
-					e.router = newP.router
 				default:
 					log.Error("something to avoid missing this again?")
 				}
