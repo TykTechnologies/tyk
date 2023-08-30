@@ -1047,8 +1047,8 @@ type Config struct {
 	// Skip TLS verification for JWT JWKs url validation
 	JWTSSLInsecureSkipVerify bool `json:"jwt_ssl_insecure_skip_verify"`
 
-	// ResourceSync configures resource syncing behaviour.
-	ResourceSync ResourceSyncConfig
+	// ResourceSync configures mitigation strategy in case sync fails.
+	ResourceSync ResourceSyncConfig `json:"resource_sync"`
 }
 
 type ResourceSyncConfig struct {
