@@ -1350,11 +1350,16 @@
     "cloud": {
       "type": "boolean"
     },
-    "resource_reload_attempts": {
-      "type": "integer"
-    },
-    "resource_reload_interval": {
-      "type": "integer"
+    "resource_sync": {
+      "type": "object",
+      "properties": {
+        "retry_attempts": {
+          "type": "integer"
+        },
+        "interval": {
+          "type": "integer"
+        }
+      }
     }
   }
 }

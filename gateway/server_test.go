@@ -156,10 +156,10 @@ func TestGateway_policiesByIDLen(t *testing.T) {
 }
 
 func TestGateway_SyncResourcesWithReload(t *testing.T) {
-	reloadAttempts := 2
+	retryAttempts := 2
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.ResourceReloadAttempts = reloadAttempts
-		globalConf.ResourceReloadInterval = 1
+		globalConf.ResourceSync.RetryAttempts = retryAttempts
+		globalConf.ResourceSync.Interval = 1
 	})
 
 	var syncErr = errors.New("sync error")

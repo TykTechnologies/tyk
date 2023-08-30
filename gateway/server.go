@@ -1006,14 +1006,14 @@ func (gw *Gateway) syncResourcesWithReload(resource string, syncFunc func() (int
 	}
 
 	conf := gw.GetConfig()
-	for i := 1; i <= conf.ResourceReloadAttempts+1; i++ {
+	for i := 1; i <= conf.ResourceSync.RetryAttempts+1; i++ {
 		count, err = syncFunc()
 		if err == nil {
 			return count, nil
 		}
 
 		mainLog.Errorf("Error during syncing %s: %s, attempt count %d", resource, err.Error(), i)
-		time.Sleep(time.Duration(conf.ResourceReloadInterval) * time.Second)
+		time.Sleep(time.Duration(conf.ResourceSync.Interval) * time.Second)
 	}
 
 	return 0, fmt.Errorf("syncing %s failed %w", resource, err)
