@@ -1082,7 +1082,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	rootPath := filepath.Dir(gatewayPath)
 
 	gwConfig.AnalyticsConfig.GeoIPDBLocation = filepath.Join(rootPath, "testdata", "MaxMind-DB-test-ipv4-24.mmdb")
-	gwConfig.EnableJSVM = true
+	gwConfig.EnableJSVM = false
 	gwConfig.HashKeyFunction = storage.HashMurmur64
 	gwConfig.Monitor.EnableTriggerMonitors = true
 	gwConfig.AnalyticsConfig.NormaliseUrls.Enabled = true
@@ -1651,7 +1651,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 		}
 
 		specFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
-		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
+		if err := os.WriteFile(specFilePath, specBytes, 0644); err != nil {
 			panic(err)
 		}
 
@@ -1662,7 +1662,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 		}
 
 		oasSpecFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+"-oas.json")
-		if err := ioutil.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
+		if err := os.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
 			panic(err)
 		}
 	}

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	pprof_http "net/http/pprof"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
@@ -189,6 +190,8 @@ type Gateway struct {
 	healthCheckInfo atomic.Value
 
 	dialCtxFn test.DialContext
+
+	controlAPIRouter *mux.Router
 }
 
 type hostDetails struct {
@@ -421,7 +424,9 @@ func (gw *Gateway) setupGlobals() {
 		NewRelicApplication = gw.SetupNewRelic()
 	}
 
-	gw.readGraphqlPlaygroundTemplate()
+	if playgroundTemplate == nil {
+		gw.readGraphqlPlaygroundTemplate()
+	}
 }
 
 func (gw *Gateway) buildDashboardConnStr(resource string) string {
@@ -574,40 +579,12 @@ func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.
 	})
 }
 
-// loadControlAPIEndpoints loads the endpoints used for controlling the Gateway.
-func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
-	hostname := gw.GetConfig().HostName
-	if gw.GetConfig().ControlAPIHostname != "" {
-		hostname = gw.GetConfig().ControlAPIHostname
+func (gw *Gateway) getControlAPIHandler() *mux.Router {
+	if gw.controlAPIRouter != nil {
+		return gw.controlAPIRouter
 	}
-
-	if muxer == nil {
-		cp := gw.GetConfig().ControlAPIPort
-		muxer = gw.DefaultProxyMux.router(cp, "", gw.GetConfig())
-		if muxer == nil {
-			if cp != 0 {
-				log.Error("Can't find control API router")
-			}
-			return
-		}
-	}
-
-	muxer.HandleFunc("/"+gw.GetConfig().HealthCheckEndpointName, gw.liveCheckHandler)
 
 	r := mux.NewRouter()
-	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
-		stripSlashes(gw.checkIsAPIOwner(gw.controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
-	))
-
-	if hostname != "" {
-		muxer = muxer.Host(hostname).Subrouter()
-		mainLog.Info("Control API hostname set: ", hostname)
-	}
-
-	if *cli.HTTPProfile || gw.GetConfig().HTTPProfile {
-		muxer.HandleFunc("/debug/pprof/profile", pprof_http.Profile)
-		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
-	}
 
 	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
 
@@ -665,6 +642,55 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 
 	r.HandleFunc("/schema", gw.schemaHandler).Methods(http.MethodGet)
 
+	gw.controlAPIRouter = r
+	return r
+}
+
+// loadControlAPIEndpoints loads the endpoints used for controlling the Gateway.
+func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
+	hostname := gw.GetConfig().HostName
+	if gw.GetConfig().ControlAPIHostname != "" {
+		hostname = gw.GetConfig().ControlAPIHostname
+	}
+
+	if muxer == nil {
+		cp := gw.GetConfig().ControlAPIPort
+		muxer = gw.DefaultProxyMux.router(cp, "", gw.GetConfig())
+		if muxer == nil {
+			if cp != 0 {
+				log.Error("Can't find control API router")
+			}
+			return
+		}
+	}
+
+	muxer.HandleFunc("/"+gw.GetConfig().HealthCheckEndpointName, gw.liveCheckHandler)
+
+	controlAPIRouter := gw.getControlAPIHandler()
+	controlAPIHandler := http.StripPrefix(
+		"/tyk",
+		stripSlashes(
+			gw.checkIsAPIOwner(
+				gw.controlAPICheckClientCertificate(
+					"/gateway/client",
+					InstrumentationMW(controlAPIRouter),
+				),
+			),
+		),
+	)
+
+	muxer.PathPrefix("/tyk/").Handler(controlAPIHandler)
+
+	if hostname != "" {
+		muxer = muxer.Host(hostname).Subrouter()
+		mainLog.Info("Control API hostname set: ", hostname)
+	}
+
+	if *cli.HTTPProfile || gw.GetConfig().HTTPProfile {
+		muxer.HandleFunc("/debug/pprof/profile", pprof_http.Profile)
+		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
+	}
+
 	mainLog.Debug("Loaded API Endpoints")
 }
 
@@ -694,11 +720,14 @@ func generateOAuthPrefix(apiID string) string {
 // Create API-specific OAuth handlers and respective auth servers
 func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 
-	apiAuthorizePath := "/tyk/oauth/authorize-client{_:/?}"
-	clientAuthPath := "/oauth/authorize{_:/?}"
-	clientAccessPath := "/oauth/token{_:/?}"
-	revokeToken := "/oauth/revoke"
-	revokeAllTokens := "/oauth/revoke_all"
+	prefixedWithListenPath := func(endpoint string) string {
+		return path.Join(spec.Proxy.ListenPath, endpoint)
+	}
+	apiAuthorizePath := prefixedWithListenPath("/tyk/oauth/authorize-client{_:/?}")
+	clientAuthPath := prefixedWithListenPath("/oauth/authorize{_:/?}")
+	clientAccessPath := prefixedWithListenPath("/oauth/token{_:/?}")
+	revokeToken := prefixedWithListenPath("/oauth/revoke")
+	revokeAllTokens := prefixedWithListenPath("/oauth/revoke_all")
 
 	serverConfig := osin.NewServerConfig()
 
@@ -740,7 +769,7 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 func (gw *Gateway) addBatchEndpoint(spec *APISpec, subrouter *mux.Router) {
 	mainLog.Debug("Batch requests enabled for API")
 	batchHandler := BatchRequestHandler{API: spec, Gw: gw}
-	subrouter.HandleFunc("/tyk/batch/", batchHandler.HandleBatchRequest)
+	subrouter.HandleFunc(path.Join(spec.Proxy.ListenPath, "/tyk/batch/"), batchHandler.HandleBatchRequest)
 }
 
 func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
@@ -910,6 +939,26 @@ func handleCORS(router *mux.Router, spec *APISpec) {
 
 		router.Use(c.Handler)
 	}
+}
+
+func getCORSHandler(spec *APISpec) func(h http.Handler) http.Handler {
+
+	if spec.CORS.Enable {
+		mainLog.Debug("CORS ENABLED")
+		c := cors.New(cors.Options{
+			AllowedOrigins:     spec.CORS.AllowedOrigins,
+			AllowedMethods:     spec.CORS.AllowedMethods,
+			AllowedHeaders:     spec.CORS.AllowedHeaders,
+			ExposedHeaders:     spec.CORS.ExposedHeaders,
+			AllowCredentials:   spec.CORS.AllowCredentials,
+			MaxAge:             spec.CORS.MaxAge,
+			OptionsPassthrough: spec.CORS.OptionsPassthrough,
+			Debug:              spec.CORS.Debug,
+		})
+		return c.Handler
+	}
+
+	return nil
 }
 
 func (gw *Gateway) isRPCMode() bool {

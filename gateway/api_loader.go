@@ -104,7 +104,7 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
-func (gw *Gateway) generateSubRoutes(spec *APISpec, subRouter *mux.Router, logger *logrus.Entry) {
+func (gw *Gateway) generateSubRoutes(spec *APISpec, subRouter *mux.Router) {
 	if spec.GraphQL.GraphQLPlayground.Enabled {
 		gw.loadGraphQLPlayground(spec, subRouter)
 	}
@@ -114,12 +114,9 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, subRouter *mux.Router, logge
 	}
 
 	if spec.UseOauth2 {
-		logger.Debug("Loading OAuth Manager")
 		oauthManager := gw.addOAuthHandlers(spec, subRouter)
-		logger.Debug("-- Added OAuth Handlers")
 
 		spec.OAuthManager = oauthManager
-		logger.Debug("Done loading OAuth Manager")
 	}
 }
 
@@ -739,7 +736,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		router = router.Host(hostname).Subrouter()
 	}
 
-	subrouter := router.PathPrefix(spec.Proxy.ListenPath).Subrouter()
+	//subrouter := router.PathPrefix(spec.Proxy.ListenPath).Subrouter()
 
 	var chainObj *ChainObject
 
@@ -751,20 +748,25 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		chainObj = gw.processSpec(spec, apisByListen, gs, logrus.NewEntry(log))
 	}
 
-	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(log))
-	handleCORS(subrouter, spec)
-
+	gw.generateSubRoutes(spec, router)
+	//handleCORS(subrouter, spec)
+	corsHandlerFunc := getCORSHandler(spec)
+	alice.New(corsHandlerFunc, func(handler http.Handler) http.Handler {
+		return chainObj.ThisHandler
+	})
 	if chainObj.Skip {
 		return chainObj
 	}
 
 	if !chainObj.Open {
-		subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
+		router.PathPrefix(path.Join(spec.Proxy.ListenPath, rateLimitEndpoint)).Handler(chainObj.RateLimitChain)
 	}
 
 	httpHandler := explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, gwConfig.HttpServerOptions.EnableStrictRoutes)
-	subrouter.NewRoute().Handler(httpHandler)
-
+	//chainObj.ThisHandler = httpHandler
+	//subrouter.NewRoute().Handler(httpHandler)
+	//router.NewRoute().PathPrefix(spec.Proxy.ListenPath)
+	router.PathPrefix(spec.Proxy.ListenPath).Handler(httpHandler)
 	return chainObj
 }
 
@@ -835,7 +837,7 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	// endpoint is a graphql server url to which a playground makes the request.
 
 	endpoint := spec.Proxy.ListenPath
-	playgroundPath := path.Join("/", spec.GraphQL.GraphQLPlayground.Path)
+	playgroundPath := path.Join(spec.Proxy.ListenPath, spec.GraphQL.GraphQLPlayground.Path)
 
 	// If tyk-cloud is enabled, listen path will be api id and slug is mapped to listen path in nginx config.
 	// So, requests should be sent to slug endpoint, nginx will route them to internal gateway's listen path.

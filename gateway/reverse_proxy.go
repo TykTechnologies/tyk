@@ -340,7 +340,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		},
 		sp: sync.Pool{
 			New: func() interface{} {
-				buffer := make([]byte, 32*1024)
+				buffer := make([]byte, 2*1024)
 				return &buffer
 			},
 		},

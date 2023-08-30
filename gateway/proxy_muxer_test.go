@@ -311,63 +311,87 @@ func TestHandle404(t *testing.T) {
 	}...)
 }
 
-func TestHandleSubroutes(t *testing.T) {
+func testHandleSubRoutes(tb testing.TB, ts *Test, testCases []test.TestCase, loadFuncs []func(spec *APISpec)) {
+	ts.Gw.BuildAndLoadAPI(loadFuncs...)
+	_, _ = ts.Run(tb, testCases...)
+}
+
+func getSubRoutesTestParams(t testing.TB) ([]test.TestCase, []func(spec *APISpec)) {
+	t.Helper()
+	return []test.TestCase{
+			{Path: "/", Code: http.StatusUnauthorized},
+			{Path: "/app", Code: http.StatusUnauthorized},
+			{Path: "/apple", Code: http.StatusOK},
+			{Path: "/apple/", Code: http.StatusOK},
+			{Path: "/apple/bot", Code: http.StatusOK},
+			{Path: "/apple/bottom", Code: http.StatusUnauthorized},
+			{Path: "/apple/bottom/", Code: http.StatusUnauthorized},
+			{Path: "/apple/bottom/jeans", Code: http.StatusUnauthorized},
+			{Path: "/applebottomjeans", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
+			{Path: "/apple-bottom-jeans", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
+			{Path: "/apple/bottom-jeans", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
+			{Path: "/bob", Code: http.StatusUnauthorized},
+			{Path: "/bob/", Code: http.StatusOK},
+			{Path: "/bob/name", Code: http.StatusOK},
+			{Path: "/bob/name/surname", Code: http.StatusOK},
+			{Path: "/bob/name/patronym/surname", Code: http.StatusOK},
+
+			// This one is a particular re2/gorilla implementation detail,
+			// the .* regex should match "", and .+ should match length >= 1.
+			// The reality doesn't reflect the route definition.
+			{Path: "/charlie//suffix/", Code: http.StatusUnauthorized},
+
+			// Regex paths will behave as they did before
+			{Path: "/charlie/name/suffix", Code: http.StatusOK},
+			{Path: "/charlie/name/suffix/", Code: http.StatusOK},
+			{Path: "/charlie/name/suffix/foo", Code: http.StatusOK},
+			{Path: "/charlie/name/suffixfoo", Code: http.StatusOK},
+			{Path: "/charlie/name/name/suffix/foo", Code: http.StatusOK},
+			{Path: "/charlie/name/name/name/suffix/foo", Code: http.StatusOK},
+		}, []func(spec *APISpec){
+			func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				spec.UseKeylessAccess = false
+			},
+			func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/apple"
+				spec.UseKeylessAccess = true
+			},
+			func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/apple/bottom"
+				spec.UseKeylessAccess = false
+			},
+			func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/bob/{name:.*}"
+				spec.UseKeylessAccess = true
+			},
+			func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/charlie/{name:.*}/suffix"
+				spec.UseKeylessAccess = true
+			},
+		}
+}
+
+func TestHandleSubRoutes(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.HttpServerOptions.EnableStrictRoutes = true
 	})
 	defer ts.Close()
+	testCases, loadFuncs := getSubRoutesTestParams(t)
+	testHandleSubRoutes(t, ts, testCases, loadFuncs)
+}
 
-	ts.Gw.BuildAndLoadAPI(
-		func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.UseKeylessAccess = false
-		},
-		func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/apple"
-			spec.UseKeylessAccess = true
-		},
-		func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/apple/bottom"
-			spec.UseKeylessAccess = false
-		},
-		func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/bob/{name:.*}"
-			spec.UseKeylessAccess = true
-		},
-		func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/charlie/{name:.*}/suffix"
-			spec.UseKeylessAccess = true
-		},
-	)
-	_, _ = ts.Run(t, []test.TestCase{
-		{Path: "/", Code: http.StatusUnauthorized},
-		{Path: "/app", Code: http.StatusUnauthorized},
-		{Path: "/apple", Code: http.StatusOK},
-		{Path: "/apple/", Code: http.StatusOK},
-		{Path: "/apple/bot", Code: http.StatusOK},
-		{Path: "/apple/bottom", Code: http.StatusUnauthorized},
-		{Path: "/apple/bottom/", Code: http.StatusUnauthorized},
-		{Path: "/apple/bottom/jeans", Code: http.StatusUnauthorized},
-		{Path: "/applebottomjeans", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
-		{Path: "/apple-bottom-jeans", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
-		{Path: "/apple/bottom-jeans", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
-		{Path: "/bob", Code: http.StatusUnauthorized},
-		{Path: "/bob/", Code: http.StatusOK},
-		{Path: "/bob/name", Code: http.StatusOK},
-		{Path: "/bob/name/surname", Code: http.StatusOK},
-		{Path: "/bob/name/patronym/surname", Code: http.StatusOK},
+func BenchmarkHandleSubRoutes(b *testing.B) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.EnableStrictRoutes = true
+		globalConf.EnableJSVM = false
+		globalConf.LogLevel = "error"
+	})
+	defer ts.Close()
+	testCases, loadFuncs := getSubRoutesTestParams(b)
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		testHandleSubRoutes(b, ts, testCases, loadFuncs)
+	}
 
-		// This one is a particular re2/gorilla implementation detail,
-		// the .* regex should match "", and .+ should match length >= 1.
-		// The reality doesn't reflect the route definition.
-		{Path: "/charlie//suffix/", Code: http.StatusUnauthorized},
-
-		// Regex paths will behave as they did before
-		{Path: "/charlie/name/suffix", Code: http.StatusOK},
-		{Path: "/charlie/name/suffix/", Code: http.StatusOK},
-		{Path: "/charlie/name/suffix/foo", Code: http.StatusOK},
-		{Path: "/charlie/name/suffixfoo", Code: http.StatusOK},
-		{Path: "/charlie/name/name/suffix/foo", Code: http.StatusOK},
-		{Path: "/charlie/name/name/name/suffix/foo", Code: http.StatusOK},
-	}...)
 }
