@@ -738,8 +738,6 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		router = router.Host(hostname).Subrouter()
 	}
 
-	//subrouter := router.PathPrefix(spec.Proxy.ListenPath).Subrouter()
-
 	var chainObj *ChainObject
 
 	if curSpec := gw.getApiSpec(spec.APIID); curSpec != nil && curSpec.Checksum == spec.Checksum {
@@ -751,11 +749,9 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	}
 
 	gw.generateSubRoutes(spec, router)
-	//handleCORS(subrouter, spec)
 	corsHandlerFunc := getCORSHandler(spec)
-	alice.New(corsHandlerFunc, func(handler http.Handler) http.Handler {
-		return chainObj.ThisHandler
-	})
+	chainObj.ThisHandler = alice.New(corsHandlerFunc).Then(chainObj.ThisHandler)
+
 	if chainObj.Skip {
 		return chainObj
 	}
@@ -764,14 +760,9 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		router.PathPrefix(path.Join(spec.Proxy.ListenPath, rateLimitEndpoint)).Handler(chainObj.RateLimitChain)
 	}
 
-	httpHandler := explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, gwConfig.HttpServerOptions.EnableStrictRoutes)
-	//chainObj.ThisHandler = httpHandler
-	//subrouter.NewRoute().Handler(httpHandler)
-	//router.NewRoute().PathPrefix(spec.Proxy.ListenPath)
-	
-	chainObj.ThisHandler = explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, subrouter, gwConfig.HttpServerOptions.EnableStrictRoutes)
-  router.PathPrefix(spec.Proxy.ListenPath).Handler(httpHandler)
-  
+	chainObj.ThisHandler = explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, router, gwConfig.HttpServerOptions.EnableStrictRoutes)
+	router.PathPrefix(spec.Proxy.ListenPath).Handler(chainObj.ThisHandler)
+
 	return chainObj
 }
 
