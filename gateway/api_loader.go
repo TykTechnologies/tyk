@@ -304,6 +304,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		logger.Info("Checking security policy: Open")
 	}
 
+	gw.mwAppendEnabled(&chainArray, &StrictRoutesMW{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 
 	for _, obj := range mwPreFuncs {
@@ -764,7 +765,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 	}
 
-	chainObj.ThisHandler = explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, subrouter, gwConfig.HttpServerOptions.EnableStrictRoutes)
+	//chainObj.ThisHandler = explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, muxer, subrouter, gwConfig.HttpServerOptions.EnableStrictRoutes)
 	subrouter.NewRoute().Handler(chainObj.ThisHandler)
 
 	return chainObj
