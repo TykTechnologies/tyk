@@ -151,7 +151,7 @@ dockers:
     - dnscache
     - gateway
     - goplugin
-    - header
+    - headers
     - internal
     - log
     - regexp
