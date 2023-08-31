@@ -1707,7 +1707,8 @@ func (gw *Gateway) start() {
 		go gw.startPubSubLoop()
 	}
 
-	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
+	conf := gw.GetConfig()
+	if slaveOptions := conf.SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
 		gw.RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
@@ -1721,9 +1722,14 @@ func (gw *Gateway) start() {
 		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
 
+	reloadInterval := time.Second
+	if conf.ReloadInterval > 0 {
+		reloadInterval = time.Duration(conf.ReloadInterval) * time.Second
+	}
+
 	// 1s is the minimum amount of time between hot reloads. The
 	// interval counts from the start of one reload to the next.
-	go gw.reloadLoop(time.Tick(time.Second))
+	go gw.reloadLoop(time.Tick(reloadInterval))
 	go gw.reloadQueueLoop()
 }
 
