@@ -111,12 +111,6 @@ type RPCStorageHandler struct {
 	Gw               *Gateway `json:"-"`
 }
 
-type RPCDataLoader interface {
-	Connect() bool
-	GetApiDefinitions(orgId string, tags []string) string
-	GetPolicies(orgId string) string
-}
-
 // Connect will establish a connection to the RPC
 func (r *RPCStorageHandler) Connect() bool {
 	slaveOptions := r.Gw.GetConfig().SlaveOptions
