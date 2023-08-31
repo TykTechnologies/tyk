@@ -1,8 +1,10 @@
 package gateway
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -453,7 +455,69 @@ func TestAnalytics_Write(t *testing.T) {
 				assert.Equal(t, key, record.APIKey)
 
 			})
+			t.Run("Chunked response analytics", func(t *testing.T) {
+				defer func() {
+					ts.Gw.SetConfig(base)
+				}()
+				globalConf := ts.Gw.GetConfig()
+				globalConf.AnalyticsConfig.EnableDetailedRecording = true
+				ts.Gw.SetConfig(globalConf)
 
+				// Since we changed config, we need to force all APIs be reloaded
+				ts.Gw.BuildAndLoadAPI()
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+				})
+
+				key := CreateSession(ts.Gw)
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				_, err := ts.Run(t, test.TestCase{
+					Path: "/chunked", Headers: authHeaders, Code: 200,
+				})
+				if err != nil {
+					t.Error("Error executing test case")
+				}
+				// let records to to be sent
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				if len(results) != 1 {
+					t.Error("Should return 1 record: ", len(results))
+				}
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
+				if record.ResponseCode != 200 {
+					t.Error("Analytics record do not match", record)
+				}
+
+				if record.RawRequest == "" {
+					t.Error("Detailed request info not found", record)
+				}
+
+				if record.RawResponse == "" {
+					t.Error("Detailed response info not found", record)
+				}
+
+				rawResponse, err := base64.StdEncoding.DecodeString(record.RawResponse)
+				if err != nil {
+					t.Error("error decoding response")
+				}
+
+				decoded := string(rawResponse)
+				if strings.Contains(decoded, "1a") {
+					t.Error("Response should not have chunked characters")
+				}
+			})
 		})
 	}
 
