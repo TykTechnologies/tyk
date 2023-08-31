@@ -1354,10 +1354,12 @@
       "type": "object",
       "properties": {
         "retry_attempts": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 0
         },
         "interval": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 0
         }
       }
     }
