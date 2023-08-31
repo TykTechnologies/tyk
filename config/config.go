@@ -633,7 +633,7 @@ type Config struct {
 	// Disable dynamic API and Policy reloads, e.g. it will load new changes only on procecss start.
 	SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
 
-	// Sets the default interval for how often to reload the gateway when getting reload instructions in seconds.
+	// ReloadInterval defines a duration in seconds within which the gateway responds to a reload event.
 	// Defaults to 1.
 	ReloadInterval int64 `json:"reload_interval"`
 
