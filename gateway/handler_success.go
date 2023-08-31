@@ -12,11 +12,8 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
-<<<<<<< HEAD
-	"github.com/TykTechnologies/tyk/internal/otel"
-=======
 	"github.com/TykTechnologies/tyk/internal/httputil"
->>>>>>> e4b0f9eb... TT-8934 Fix chunked response analytics (#5495)
+	"github.com/TykTechnologies/tyk/internal/otel"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
