@@ -1262,6 +1262,9 @@
     },
     "cloud": {
       "type": "boolean"
+    },
+    "reload_interval": {
+      "type": "integer"
     }
   }
 }
