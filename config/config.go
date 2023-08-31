@@ -634,7 +634,7 @@ type Config struct {
 	SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
 
 	// ReloadInterval defines a duration in seconds within which the gateway responds to a reload event.
-	// Defaults to 1.
+	// The value defaults to 1, values lower than 1 are ignored.
 	ReloadInterval int64 `json:"reload_interval"`
 
 	// Enable Key hashing
