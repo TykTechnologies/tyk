@@ -20,11 +20,7 @@ import (
 	"strings"
 	"sync"
 
-<<<<<<< HEAD
-=======
-	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
->>>>>>> e8738a69... Merging to release-5-lts: [TT-9284] Ensure that old transport will close idle connections (#5231) (#5472)
 	"github.com/TykTechnologies/tyk/test"
 
 	"sync/atomic"

@@ -33,12 +33,8 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
 
-<<<<<<< HEAD
-=======
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/uuid"
 
->>>>>>> e8738a69... Merging to release-5-lts: [TT-9284] Ensure that old transport will close idle connections (#5231) (#5472)
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
