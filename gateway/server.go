@@ -1758,14 +1758,14 @@ func (gw *Gateway) start() {
 		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
 
-	var reloadInterval int64 = 1
+	reloadInterval := time.Second
 	if conf.ReloadInterval > 0 {
-		reloadInterval = conf.ReloadInterval
+		reloadInterval = time.Duration(conf.ReloadInterval) * time.Second
 	}
 
 	// 1s is the minimum amount of time between hot reloads. The
 	// interval counts from the start of one reload to the next.
-	go gw.reloadLoop(time.Tick(time.Second * time.Duration(reloadInterval)))
+	go gw.reloadLoop(time.Tick(reloadInterval))
 	go gw.reloadQueueLoop()
 }
 
