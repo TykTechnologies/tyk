@@ -1022,6 +1022,17 @@ type Config struct {
 
 	// Skip TLS verification for JWT JWKs url validation
 	JWTSSLInsecureSkipVerify bool `json:"jwt_ssl_insecure_skip_verify"`
+
+	// ResourceSync configures mitigation strategy in case sync fails.
+	ResourceSync ResourceSyncConfig `json:"resource_sync"`
+}
+
+type ResourceSyncConfig struct {
+	// RetryAttempts configures the number of retry attempts before returning on a resource sync.
+	RetryAttempts int `json:"retry_attempts"`
+
+	// Interval configures the interval in seconds between each retry on a resource sync error.
+	Interval int `json:"interval"`
 }
 
 type TykError struct {
