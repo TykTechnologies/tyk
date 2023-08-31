@@ -1,4 +1,4 @@
 package gateway
 
-var VERSION = "v4.3.7"
+var VERSION = "v4.3.8"
 var builtBy, Commit, buildDate string
