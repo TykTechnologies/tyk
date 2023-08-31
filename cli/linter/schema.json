@@ -435,6 +435,9 @@
     "hash_keys": {
       "type": "boolean"
     },
+    "reload_interval": {
+      "type": "integer"
+    },
     "hash_key_function": {
       "type": "string",
       "enum": [
