@@ -507,6 +507,9 @@
     "hash_keys": {
       "type": "boolean"
     },
+    "reload_interval": {
+      "type": "integer"
+    },
     "disable_key_actions_by_username": {
       "type": "boolean"
     },
