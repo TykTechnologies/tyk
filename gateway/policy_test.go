@@ -41,11 +41,10 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	defer g.Close()
 
 	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
-	policyMap := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
 
-	if policyMap != nil {
-		t.Error("Should be nil because got back 403 from Dashboard")
-	}
+	assert.Error(t, ErrPoliciesFetchFailed, err)
+	assert.Empty(t, policyMap)
 }
 
 type dummySessionManager struct {

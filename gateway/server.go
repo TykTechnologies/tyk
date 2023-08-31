@@ -86,6 +86,8 @@ var (
 		// TODO: add ~/.config/tyk/tyk.conf here?
 		"/etc/tyk/tyk.conf",
 	}
+
+	ErrSyncResourceNotKnown = errors.New("unknown resource to sync")
 )
 
 const appName = "tyk-gateway"
@@ -545,7 +547,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 
 		mainLog.Info("Using Policies from Dashboard Service")
 
-		pols = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
+		pols, err = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
 		dataLoader := &RPCStorageHandler{
@@ -556,7 +558,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 	default:
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
-			pols = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
+			pols, err = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
 
 		} else if gw.GetConfig().Policies.PolicyRecordName == "" {
 			// old way of doing things before REST Api added
@@ -564,7 +566,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 			mainLog.Debug("No policy record name defined, skipping...")
 			return 0, nil
 		} else {
-			pols = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
+			pols, err = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
 		}
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
@@ -970,14 +972,14 @@ func (gw *Gateway) DoReload() {
 	}
 
 	// Load the API Policies
-	if _, err := gw.syncPolicies(); err != nil {
-		mainLog.Error("Error during syncing policies:", err.Error())
+	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
+		mainLog.Error("Error during syncing policies")
 		return
 	}
 
 	// load the specs
-	if count, err := gw.syncAPISpecs(); err != nil {
-		mainLog.Error("Error during syncing apis:", err.Error())
+	if count, err := syncResourcesWithReload("apis", gw.GetConfig(), gw.syncAPISpecs); err != nil {
+		mainLog.Error("Error during syncing apis")
 		return
 	} else {
 		// skip re-loading only if dashboard service reported 0 APIs
@@ -991,6 +993,29 @@ func (gw *Gateway) DoReload() {
 	gw.loadGlobalApps()
 
 	mainLog.Info("API reload complete")
+}
+
+func syncResourcesWithReload(resource string, conf config.Config, syncFunc func() (int, error)) (int, error) {
+	var (
+		err   error
+		count int
+	)
+
+	if resource != "apis" && resource != "policies" {
+		return 0, ErrSyncResourceNotKnown
+	}
+
+	for i := 1; i <= conf.ResourceSync.RetryAttempts+1; i++ {
+		count, err = syncFunc()
+		if err == nil {
+			return count, nil
+		}
+
+		mainLog.Errorf("Error during syncing %s: %s, attempt count %d", resource, err.Error(), i)
+		time.Sleep(time.Duration(conf.ResourceSync.Interval) * time.Second)
+	}
+
+	return 0, fmt.Errorf("syncing %s failed %w", resource, err)
 }
 
 // shouldReload returns true if we should perform any reload. Reloads happens if
