@@ -12,7 +12,11 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+<<<<<<< HEAD
 	"github.com/TykTechnologies/tyk/internal/otel"
+=======
+	"github.com/TykTechnologies/tyk/internal/httputil"
+>>>>>>> e4b0f9eb... TT-8934 Fix chunked response analytics (#5495)
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
@@ -174,6 +178,9 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			// mw_redis_cache instead? is there a reason not
 			// to include that in the analytics?
 			if responseCopy != nil {
+				// we need to delete the chunked transfer encoding header to avoid malformed body in our rawResponse
+				httputil.RemoveResponseTransferEncoding(responseCopy, "chunked")
+
 				contents, err := ioutil.ReadAll(responseCopy.Body)
 				if err != nil {
 					log.Error("Couldn't read response body", err)
