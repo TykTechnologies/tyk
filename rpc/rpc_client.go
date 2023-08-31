@@ -535,5 +535,11 @@ func ForceConnected(t *testing.T) {
 
 // SetEmergencyMode used in tests to force emergency mode
 func SetEmergencyMode(t *testing.T, value bool) {
+	t.Helper()
 	values.SetEmergencyMode(value)
+}
+
+func SetLoadCounts(t *testing.T, value int) {
+	t.Helper()
+	values.SetLoadCounts(value)
 }
