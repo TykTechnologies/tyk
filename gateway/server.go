@@ -460,12 +460,8 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	} else if gw.GetConfig().SlaveOptions.UseRPC {
 		mainLog.Debug("Using RPC Configuration")
 
-		dataLoader := &RPCStorageHandler{
-			Gw:       gw,
-			DoReload: gw.DoReload,
-		}
 		var err error
-		s, err = loader.FromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw)
+		s, err = loader.FromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw)
 		if err != nil {
 			return 0, err
 		}
@@ -524,11 +520,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		pols = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
-		dataLoader := &RPCStorageHandler{
-			Gw:       gw,
-			DoReload: gw.DoReload,
-		}
-		pols, err = gw.LoadPoliciesFromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
+		pols, err = gw.LoadPoliciesFromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	default:
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
