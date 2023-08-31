@@ -385,6 +385,8 @@ type ReverseProxy struct {
 	Gw     *Gateway `json:"-"`
 }
 
+var idleConnTimeout = 90
+
 func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	timeout := 30.0
 	if dialerTimeout > 0 {
@@ -410,6 +412,7 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 		DialContext:           dialContextFunc,
 		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
 		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
+		IdleConnTimeout:       time.Duration(idleConnTimeout) * time.Second,
 		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
@@ -1355,9 +1358,21 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if createTransport {
+		var oldTransport *http.Transport
+
+		if p.TykAPISpec.HTTPTransport != nil {
+			oldTransport = p.TykAPISpec.HTTPTransport.transport
+			// Prevent new idle connections to be generated.
+			oldTransport.DisableKeepAlives = true
+		}
+
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
+
+		if oldTransport != nil {
+			oldTransport.CloseIdleConnections()
+		}
 	}
 
 	roundTripper = p.TykAPISpec.HTTPTransport
