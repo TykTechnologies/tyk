@@ -219,6 +219,7 @@ jobs:
 
       - name: env up
         shell: bash
+        id: env_up
         env:
           t: ${{ needs.goreleaser.outputs.tags }}
           tyk_ci_version: 'v1.1-alpha4'
@@ -263,6 +264,8 @@ jobs:
           ls -lR
 
       - name: Run tests
+        env:
+          auto_dir: ${{ steps.env_up.outputs.auto_dir	 }}
         run: |
           ls -lR
           docker run --rm --network auto_default --env-file ${auto_dir}/pytest.env \
