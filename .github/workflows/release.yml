@@ -261,13 +261,11 @@ jobs:
           docker compose -p auto -f "${{ matrix.flavour }}".yml -f deps_"${{ matrix.flavour }}".yml -f ${{ matrix.db }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
           ./dash-bootstrap.sh http://localhost:3000
           docker compose -p auto -f "${{ matrix.flavour }}".yml -f deps_"${{ matrix.flavour }}".yml -f ${{ matrix.db }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
-          ls -lR
 
       - name: Run tests
         env:
           auto_dir: ${{ steps.env_up.outputs.auto_dir	 }}
         run: |
-          ls -lR
           docker run --rm --network auto_default --env-file ${auto_dir}/pytest.env \
           754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'release-mdcb-compliant' }} \
           pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}"
