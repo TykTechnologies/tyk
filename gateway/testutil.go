@@ -33,15 +33,9 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
 
-<<<<<<< HEAD
-=======
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/uuid"
-
->>>>>>> 3b1379e4... [TT-9284] Ensure that old transport will close idle connections (#5231)
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
