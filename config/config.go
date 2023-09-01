@@ -76,8 +76,8 @@ type PoliciesConfig struct {
 	// Set this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.
 	PolicyConnectionString string `json:"policy_connection_string"`
 
-	// This option is required if `policies.policy_source` is set to `file`.
-	// Specifies the path of your JSON file containing the available policies.
+	// If `policies.policy_source` is set to `file` and `policies.policy_path` is not set. Then this option is required and will
+	// allow you to specify the path where the Tyk Gateway can find the JSON file containing all available policies.
 	PolicyRecordName string `json:"policy_record_name"`
 
 	// In a Pro installation, Tyk will load Policy IDs and use the internal object-ID as the ID of the policy.
@@ -87,8 +87,9 @@ type PoliciesConfig struct {
 	//
 	// This option should only be used when moving an installation to a new database.
 	AllowExplicitPolicyID bool `json:"allow_explicit_policy_id"`
-	// This option is used for storing a policies  if `policies.policy_source` is set to `file`.
-	// it should be some existing file path on hard drive
+	// If `policies.policy_source` is set to `file` and `policies.policy_path` is set. Then Tyk will load policies from the
+	// directory specified by the `policies.policy_path` value. Setting this option will also enable the user to manage
+	// the policies through the Tyk Gateway API.
 	PolicyPath string `json:"policy_path"`
 }
 
