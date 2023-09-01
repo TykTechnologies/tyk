@@ -5,6 +5,11 @@ on:
     branches:
       - master
       - release-**
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
 
 env:
   TYK_DB_REDISHOST: localhost
@@ -89,7 +94,7 @@ jobs:
           ./bin/ci-tests.sh 2>&1
 
       - name: Notify status
-        if: ${{ failure() && github.event.pull_request.number }}
+        if: ${{ failure() && github.event.pull_request.number && !github.event.pull_request.draft }}
         uses: peter-evans/create-or-update-comment@v1
         with:
           issue-number: ${{ github.event.pull_request.number }}

@@ -633,6 +633,10 @@ type Config struct {
 	// Disable dynamic API and Policy reloads, e.g. it will load new changes only on procecss start.
 	SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
 
+	// ReloadInterval defines a duration in seconds within which the gateway responds to a reload event.
+	// The value defaults to 1, values lower than 1 are ignored.
+	ReloadInterval int64 `json:"reload_interval"`
+
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
 
@@ -944,8 +948,8 @@ type Config struct {
 	// Deprecated: use OpenTelemetry instead.
 	Tracer Tracer `json:"tracing"`
 
-	// Section for configuring Opentelemetry
-	OpenTelemetry otel.Config `json:"opentelemetry"`
+	// Section for configuring OpenTelemetry.
+	OpenTelemetry otel.OpenTelemetry `json:"opentelemetry"`
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 
@@ -1046,6 +1050,17 @@ type Config struct {
 
 	// Skip TLS verification for JWT JWKs url validation
 	JWTSSLInsecureSkipVerify bool `json:"jwt_ssl_insecure_skip_verify"`
+
+	// ResourceSync configures mitigation strategy in case sync fails.
+	ResourceSync ResourceSyncConfig `json:"resource_sync"`
+}
+
+type ResourceSyncConfig struct {
+	// RetryAttempts configures the number of retry attempts before returning on a resource sync.
+	RetryAttempts int `json:"retry_attempts"`
+
+	// Interval configures the interval in seconds between each retry on a resource sync error.
+	Interval int `json:"interval"`
 }
 
 type TykError struct {

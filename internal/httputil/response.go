@@ -23,3 +23,11 @@ func InternalServerError(w http.ResponseWriter, _ *http.Request) {
 	status := http.StatusInternalServerError
 	http.Error(w, http.StatusText(status), status)
 }
+
+func RemoveResponseTransferEncoding(response *http.Response, encoding string) {
+	for i, value := range response.TransferEncoding {
+		if value == encoding {
+			response.TransferEncoding = append(response.TransferEncoding[:i], response.TransferEncoding[i+1:]...)
+		}
+	}
+}
