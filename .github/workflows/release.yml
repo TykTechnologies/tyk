@@ -234,7 +234,9 @@ jobs:
           tags=($t)
           echo First tag: ${tags[0]}
           # Get the ci test env in a temp dir
-          cd $(mktemp -d autoXXX)
+          auto_dir=$(mktemp -d autoXXX)
+          echo "auto_dir=$auto_dir" >> $GITHUB_OUTPUT
+          cd ${auto_dir}
           gh release download ${tyk_ci_version} --pattern '*.tgz' -R TykTechnologies/tyk-ci
           tar --strip-components=1 -xvf ci-env.tgz
           # Start customising env
@@ -263,7 +265,7 @@ jobs:
       - name: Run tests
         run: |
           ls -lR
-          docker run --rm --network auto_default --env-file pytest.env \
+          docker run --rm --network auto_default --env-file ${auto_dir}/pytest.env \
           754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'release-mdcb-compliant' }} \
           pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}"
 
