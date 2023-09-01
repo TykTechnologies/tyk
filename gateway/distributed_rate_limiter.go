@@ -9,14 +9,6 @@ import (
 	"github.com/TykTechnologies/drl"
 )
 
-func (gw *Gateway) setupDRL() {
-	drlManager := &drl.DRL{}
-	drlManager.Init(gw.ctx)
-	drlManager.ThisServerID = gw.GetNodeID() + "|" + gw.hostDetails.Hostname
-	log.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
-	gw.DRLManager = drlManager
-}
-
 func (gw *Gateway) startRateLimitNotifications() {
 	notificationFreq := gw.GetConfig().DRLNotificationFrequency
 	if notificationFreq == 0 {
@@ -84,9 +76,12 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 }
 
 func (gw *Gateway) onServerStatusReceivedHandler(payload string) {
-	if gw.DRLManager == nil || !gw.DRLManager.Ready() {
-		log.Warning("DRL not ready, skipping this notification")
+	if !gw.startDRL() {
+		return
+	}
 
+	if !gw.DRLManager.Ready() {
+		log.Warning("DRL not ready, skipping this notification")
 		return
 	}
 

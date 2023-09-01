@@ -1799,16 +1799,28 @@ func handleDashboardRegistration(gw *Gateway) {
 	}()
 }
 
-func (gw *Gateway) startDRL() {
+func (gw *Gateway) startDRL() bool {
 	switch {
 	case gw.GetConfig().ManagementNode:
-		return
+		return false
 	case gw.GetConfig().EnableSentinelRateLimiter, gw.GetConfig().EnableRedisRollingLimiter:
-		return
+		return false
 	}
-	mainLog.Info("Initialising distributed rate limiter")
-	gw.setupDRL()
-	gw.startRateLimitNotifications()
+	gw.drlOnce.Do(func() {
+		mainLog.Info("Initialising distributed rate limiter")
+
+		nodeID := gw.GetNodeID() + "|" + gw.hostDetails.Hostname
+
+		drlManager := &drl.DRL{}
+		drlManager.ThisServerID = nodeID
+		drlManager.Init(gw.ctx)
+
+		log.Debug("DRL: Setting node ID: ", nodeID)
+		gw.DRLManager = drlManager
+
+		gw.startRateLimitNotifications()
+	})
+	return true
 }
 
 func (gw *Gateway) setupPortsWhitelist() {
@@ -1853,7 +1865,9 @@ func (gw *Gateway) startServer() {
 
 	gw.DRLManager = &drl.DRL{}
 	// at this point NodeID is ready to use by DRL
-	gw.drlOnce.Do(gw.startDRL)
+	if !gw.startDRL() {
+		mainLog.Info("DRL is disabled")
+	}
 
 	mainLog.Infof("Tyk Gateway started (%s)", VERSION)
 	address := gw.GetConfig().ListenAddress
