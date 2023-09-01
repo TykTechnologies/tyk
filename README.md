@@ -164,9 +164,9 @@ Compile from Source
 git clone https://github.com/TykTechnologies/tyk
 go build
 ```
-Go version 1.12 is required to build `master`, the current development version. Tyk is officially supported on `Linux/amd64`, `Linux/i386` and `Linux/arm64`.
+Go version 1.19 is required to build `master`, the current development version. Tyk is officially supported on `Linux/amd64`, `Linux/i386` and `Linux/arm64`.
 
-Tests are run against both Go versions 1.12, 1.13, 1.14 and 1.15, however at present, only Go 1.12 is officially supported. In order to run tests locally use the following command:
+To run tests locally use the following command:
 ```console
 go test ./...
 ```
