@@ -20,13 +20,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
-<<<<<<< HEAD
 	"github.com/TykTechnologies/tyk/headers"
-=======
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/rpc"
->>>>>>> 3b6aa955... TT-9013 Fix RPCStorageHandler init when loading policies from RPC (#5059)
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1549,7 +1544,7 @@ func (s *RPCDataLoaderMock) GetPolicies(orgId string) string {
 func Test_LoadPoliciesFromRPC(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	objectID := model.NewObjectID()
+	objectID := apidef.NewObjectId()
 
 	t.Run("load policies from RPC - success", func(t *testing.T) {
 		mockedStorage := &RPCDataLoaderMock{
