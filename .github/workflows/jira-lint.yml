@@ -13,7 +13,7 @@ on:
 
 jobs:
   jira-lint:
-    if: github.event.pull_request.draft == false
+    if: ${{ !github.event.pull_request.draft }}
     uses: TykTechnologies/github-actions/.github/workflows/jira-lint.yaml@main
     secrets:
       JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}

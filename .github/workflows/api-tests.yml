@@ -146,7 +146,7 @@ jobs:
          path: ./tyk-automated-tests/reports/
 
     - name: Notify slack
-      if: github.event.pull_request.draft == false
+      if: ${{ always() && !github.event.pull_request.draft }}
       uses: rtCamp/action-slack-notify@v2
       env:
         SLACK_WEBHOOK: ${{ secrets.GW_SLACK_WEBHOOK }}
@@ -156,7 +156,7 @@ jobs:
         SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
   
     - name: Comment on PR
-      if: github.event.pull_request.draft == false
+      if: ${{ always() && !github.event.pull_request.draft }}
       uses: mshick/add-pr-comment@v1
       with:
         message: |
