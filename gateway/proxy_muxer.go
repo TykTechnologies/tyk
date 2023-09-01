@@ -432,9 +432,6 @@ func (m *proxyMux) serve(gw *Gateway) {
 				WriteTimeout: writeTimeout,
 				Handler:      h,
 			}
-			if gw.ConnectionWatcher != nil {
-				p.httpServer.ConnState = gw.ConnectionWatcher.OnStateChange
-			}
 
 			if conf.CloseConnections {
 				p.httpServer.SetKeepAlivesEnabled(false)

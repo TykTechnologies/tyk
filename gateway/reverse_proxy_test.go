@@ -372,21 +372,13 @@ func (s *Test) TestNewWrappedServeHTTP() *ReverseProxy {
 }
 
 func TestWrappedServeHTTP(t *testing.T) {
-	idleConnTimeout = 1
-
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	for i := 0; i < 10; i++ {
-		proxy := ts.TestNewWrappedServeHTTP()
-		recorder := httptest.NewRecorder()
-		req, _ := http.NewRequest(http.MethodGet, "/", nil)
-		proxy.WrappedServeHTTP(recorder, req, false)
-	}
-
-	assert.Equal(t, 10, ts.Gw.ConnectionWatcher.Count())
-	time.Sleep(time.Second * 2)
-	assert.Equal(t, 0, ts.Gw.ConnectionWatcher.Count())
+	proxy := ts.TestNewWrappedServeHTTP()
+	recorder := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	proxy.WrappedServeHTTP(recorder, req, false)
 }
 
 func TestCircuitBreaker5xxs(t *testing.T) {
