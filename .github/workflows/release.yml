@@ -107,14 +107,16 @@ jobs:
             *.txt
       - name: Fix vendor
         run: |
-          mkdir -p /go/src
+          export GOPATH=/go
+          mkdir -p /go/src || true
+          whereis go
           go mod tidy
           go mod vendor
-          cp -r -f vendor/* /go/src
+          echo "Moving vendor"
+          cp -r -f vendor/* $GOPATH/src
+          rm -rf vendor
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
-          find /go/src -name vendor | xargs --no-run-if-empty -d'\n' rm -rf
-          rm -rf vendor
 
       - uses: goreleaser/goreleaser-action@v3
         with:
