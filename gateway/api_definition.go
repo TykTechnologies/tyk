@@ -275,7 +275,6 @@ func (s *APISpec) Release() {
 		// Prevent new idle connections to be generated.
 		s.HTTPTransport.transport.DisableKeepAlives = true
 		s.HTTPTransport.transport.CloseIdleConnections()
-		s.HTTPTransport = nil
 	}
 }
 
