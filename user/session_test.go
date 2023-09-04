@@ -33,6 +33,9 @@ func TestSessionState_Lifetime(t *testing.T) {
 
 			s.SessionLifetime = 0
 			assert.Equal(t, int64(0), s.Lifetime(false, -1, false, 3))
+
+			assert.Equal(t, int64(1), s.Lifetime(false, 1, false, 0))
+			assert.Equal(t, int64(0), s.Lifetime(false, 0, false, 0))
 		})
 
 		t.Run("respectExpiration=true", func(t *testing.T) {
@@ -48,6 +51,13 @@ func TestSessionState_Lifetime(t *testing.T) {
 
 			s.SessionLifetime = 0
 			assert.Equal(t, int64(0), s.Lifetime(true, -1, false, 3))
+
+			assert.Equal(t, int64(6), s.Lifetime(true, 6, false, 7))
+			assert.Equal(t, int64(0), s.Lifetime(true, 0, false, 7))
+			assert.Equal(t, int64(5), s.Lifetime(true, 1, false, 0))
+
+			s.Expires = 0
+			assert.Equal(t, int64(0), s.Lifetime(true, 2, false, 3))
 		})
 	})
 
@@ -61,6 +71,7 @@ func TestSessionState_Lifetime(t *testing.T) {
 
 			s.SessionLifetime = 0
 			assert.Equal(t, int64(3), s.Lifetime(false, 0, true, 3))
+			assert.Equal(t, int64(0), s.Lifetime(false, 1, true, 0))
 		})
 
 		t.Run("respectExpiration=true", func(t *testing.T) {
