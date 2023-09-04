@@ -13,10 +13,10 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 
-	"github.com/domsolutions/tyk/apidef"
-	"github.com/domsolutions/tyk/internal/otel"
-	logger "github.com/domsolutions/tyk/log"
-	"github.com/domsolutions/tyk/regexp"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 type IPsHandleStrategy string

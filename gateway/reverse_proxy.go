@@ -45,13 +45,13 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
 	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
-	"github.com/domsolutions/tyk/apidef"
-	"github.com/domsolutions/tyk/ctx"
-	"github.com/domsolutions/tyk/header"
-	"github.com/domsolutions/tyk/internal/otel"
-	"github.com/domsolutions/tyk/regexp"
-	"github.com/domsolutions/tyk/trace"
-	"github.com/domsolutions/tyk/user"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/trace"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 var defaultUserAgent = "Tyk/" + VERSION
