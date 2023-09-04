@@ -633,6 +633,10 @@ type Config struct {
 	// Disable dynamic API and Policy reloads, e.g. it will load new changes only on procecss start.
 	SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
 
+	// ReloadInterval defines a duration in seconds within which the gateway responds to a reload event.
+	// The value defaults to 1, values lower than 1 are ignored.
+	ReloadInterval int64 `json:"reload_interval"`
+
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
 
@@ -1051,6 +1055,17 @@ type Config struct {
 	// Handle request with and without proxy protocol if true
 	// Handle only requests without proxy protocol if false
 	EnableProxyProtocolHTTP bool `json:"enable_proxy_protocol_http"`
+
+	// ResourceSync configures mitigation strategy in case sync fails.
+	ResourceSync ResourceSyncConfig `json:"resource_sync"`
+}
+
+type ResourceSyncConfig struct {
+	// RetryAttempts configures the number of retry attempts before returning on a resource sync.
+	RetryAttempts int `json:"retry_attempts"`
+
+	// Interval configures the interval in seconds between each retry on a resource sync error.
+	Interval int `json:"interval"`
 }
 
 type TykError struct {

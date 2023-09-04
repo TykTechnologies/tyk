@@ -694,7 +694,6 @@ func (gw *Gateway) fuzzyFindAPI(search string) *APISpec {
 type explicitRouteHandler struct {
 	prefix  string
 	handler http.Handler
-	muxer   *proxyMux
 }
 
 func (h *explicitRouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -702,10 +701,12 @@ func (h *explicitRouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		h.handler.ServeHTTP(w, r)
 		return
 	}
-	h.muxer.handle404(w, r)
+
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = fmt.Fprint(w, http.StatusText(http.StatusNotFound))
 }
 
-func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux, enabled bool) http.Handler {
+func explicitRouteSubpaths(prefix string, handler http.Handler, enabled bool) http.Handler {
 	// feature is enabled via config option
 	if !enabled {
 		return handler
@@ -723,7 +724,6 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, muxer *proxyMux,
 	return &explicitRouteHandler{
 		prefix:  prefix,
 		handler: handler,
-		muxer:   muxer,
 	}
 }
 
@@ -784,7 +784,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 			subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 		}
 
-		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, muxer, gwConfig.HttpServerOptions.EnableStrictRoutes)
+		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, gwConfig.HttpServerOptions.EnableStrictRoutes)
 
 		// Attach handlers
 		subrouter.NewRoute().Handler(httpHandler)

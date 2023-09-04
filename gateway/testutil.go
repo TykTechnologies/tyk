@@ -36,6 +36,7 @@ import (
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/context"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
@@ -1077,6 +1078,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	gw := NewGateway(gwConfig, s.ctx)
 	gw.setTestMode(true)
+	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
 	s.MockHandle = MockHandle
 
@@ -1122,6 +1124,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 		Handler:        s.TestServerRouter,
 		ReadTimeout:    1 * time.Second,
 		WriteTimeout:   1 * time.Second,
+		ConnState:      gw.ConnectionWatcher.OnStateChange,
 		MaxHeaderBytes: 1 << 20,
 	}
 

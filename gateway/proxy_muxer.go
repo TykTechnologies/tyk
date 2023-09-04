@@ -420,6 +420,7 @@ func (m *proxyMux) swap(new *proxyMux, gw *Gateway) {
 }
 
 func (m *proxyMux) serve(gw *Gateway) {
+	conf := gw.GetConfig()
 	for _, p := range m.proxies {
 		if p.listener == nil {
 			listener, err := m.generateListener(p.port, p.protocol, gw)
@@ -448,10 +449,16 @@ func (m *proxyMux) serve(gw *Gateway) {
 				mainLog.WithError(err).Error("Can't start listener")
 				continue
 			}
+			if conf.CloseConnections {
+				p.httpServer.SetKeepAlivesEnabled(false)
+			}
 			go p.httpServer.Serve(listener)
 		case "http":
 			mainLog.Warning("Starting HTTP server on:", p.listener.Addr().String())
 			p.SetupServer(gw)
+			if conf.CloseConnections {
+				p.httpServer.SetKeepAlivesEnabled(false)
+			}
 			go p.httpServer.Serve(p.listener)
 		}
 		p.started = true

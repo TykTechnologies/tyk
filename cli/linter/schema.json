@@ -507,6 +507,9 @@
     "hash_keys": {
       "type": "boolean"
     },
+    "reload_interval": {
+      "type": "integer"
+    },
     "disable_key_actions_by_username": {
       "type": "boolean"
     },
@@ -1349,6 +1352,19 @@
     },
     "cloud": {
       "type": "boolean"
+    },
+    "resource_sync": {
+      "type": "object",
+      "properties": {
+        "retry_attempts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "interval": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     }
   }
 }
