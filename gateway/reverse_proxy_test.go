@@ -373,13 +373,21 @@ func (s *Test) TestNewWrappedServeHTTP() *ReverseProxy {
 }
 
 func TestWrappedServeHTTP(t *testing.T) {
+	idleConnTimeout = 1
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	proxy := ts.TestNewWrappedServeHTTP()
-	recorder := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
-	proxy.WrappedServeHTTP(recorder, req, false)
+	for i := 0; i < 10; i++ {
+		proxy := ts.TestNewWrappedServeHTTP()
+		recorder := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/", nil)
+		proxy.WrappedServeHTTP(recorder, req, false)
+	}
+
+	assert.Equal(t, 10, ts.Gw.ConnectionWatcher.Count())
+	time.Sleep(time.Second * 2)
+	assert.Equal(t, 0, ts.Gw.ConnectionWatcher.Count())
 }
 
 func TestCircuitBreaker5xxs(t *testing.T) {
@@ -853,15 +861,30 @@ func TestNopCloseResponseBody(t *testing.T) {
 	}
 }
 
-func TestGraphQL_HeadersInjection(t *testing.T) {
+func TestGraphQL_UDGHeaders(t *testing.T) {
 	g := StartTest(nil)
 	t.Cleanup(g.Close)
 
 	composedAPI := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
+		spec.EnableContextVars = true
 		spec.GraphQL.Enabled = true
 		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		spec.GraphQL.Engine.GlobalHeaders = []apidef.UDGGlobalHeader{
+			{
+				Key:   "Global-Static",
+				Value: "foobar",
+			},
+			{
+				Key:   "Global-Context",
+				Value: "$tyk_context.headers_Global_From_Request",
+			},
+			{
+				Key:   "Does-Exist-Already",
+				Value: "global-does-exist-already",
+			},
+		}
 
 		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
 			generateRESTDataSourceV2(func(ds *apidef.GraphQLEngineDataSource, restConfig *apidef.GraphQLEngineDataSourceConfigREST) {
@@ -881,20 +904,28 @@ func TestGraphQL_HeadersInjection(t *testing.T) {
 
 	_, _ = g.Run(t, []test.TestCase{
 		{
-			Data:    headers,
-			Headers: map[string]string{"injected": "FOO"},
-			Code:    http.StatusOK,
+			Data: headers,
+			Headers: map[string]string{
+				"injected":            "FOO",
+				"From-Request":        "request-context",
+				"Global-From-Request": "request-global-context",
+			},
+			Code: http.StatusOK,
 
 			BodyMatchFunc: func(b []byte) bool {
 				return strings.Contains(string(b), `"headers":`) &&
 					strings.Contains(string(b), `{"name":"Injected","value":"FOO"}`) &&
-					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`)
+					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`) &&
+					strings.Contains(string(b), `{"name":"Context","value":"request-context"}`) &&
+					strings.Contains(string(b), `{"name":"Global-Static","value":"foobar"}`) &&
+					strings.Contains(string(b), `{"name":"Global-Context","value":"request-global-context"}`) &&
+					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`)
 			},
 		},
 	}...)
 }
 
-func TestGraphql_Headers(t *testing.T) {
+func TestGraphQL_ProxyOnlyHeaders(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
 

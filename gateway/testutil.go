@@ -36,6 +36,7 @@ import (
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/context"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
@@ -914,10 +915,7 @@ func TestReqBody(t testing.TB, body interface{}) io.Reader {
 	case nil:
 		return nil
 	default: // JSON objects (structs)
-		bs, err := json.Marshal(x)
-		if err != nil {
-			t.Fatal(err)
-		}
+		bs := test.MarshalJSON(t)(x)
 		return bytes.NewReader(bs)
 	}
 }
@@ -1080,6 +1078,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	gw := NewGateway(gwConfig, s.ctx)
 	gw.setTestMode(true)
+	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
 	s.MockHandle = MockHandle
 
@@ -1125,6 +1124,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 		Handler:        s.TestServerRouter,
 		ReadTimeout:    1 * time.Second,
 		WriteTimeout:   1 * time.Second,
+		ConnState:      gw.ConnectionWatcher.OnStateChange,
 		MaxHeaderBytes: 1 << 20,
 	}
 
@@ -1201,7 +1201,13 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	go s.reloadSimulation(s.ctx, gw)
 
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry)
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		gw.GetConfig().SlaveOptions.UseRPC,
+		gw.GetConfig().SlaveOptions.GroupID,
+		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
+		gw.GetConfig().DBAppConfOptions.Tags)
 
 	return gw
 }
@@ -1490,7 +1496,9 @@ const testRESTHeadersDataSourceConfigurationV2 = `
 		"method": "GET",
 		"headers": {
 			"static": "barbaz",
-			"injected": "{{ .request.headers.injected }}"
+			"injected": "{{ .request.headers.injected }}",
+			"context": "$tyk_context.headers_From_Request",
+			"does-exist-already": "ds-does-exist-already"
 		},
 		"query": [],
 		"body": ""

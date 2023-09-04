@@ -21,13 +21,15 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/test"
 
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
@@ -84,6 +86,8 @@ var (
 		// TODO: add ~/.config/tyk/tyk.conf here?
 		"/etc/tyk/tyk.conf",
 	}
+
+	ErrSyncResourceNotKnown = errors.New("unknown resource to sync")
 )
 
 const appName = "tyk-gateway"
@@ -112,6 +116,7 @@ type Gateway struct {
 	DashService          DashboardServiceSender
 	CertificateManager   certs.CertificateManager
 	GlobalHostChecker    HostCheckerManager
+	ConnectionWatcher    *httputil.ConnectionWatcher
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
 	TracerProvider       otel.TracerProvider
@@ -219,6 +224,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
 	}
+	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
 	gw.SessionCache = cache.New(10, 5)
 	gw.ExpiryCache = cache.New(600, 10*60)
@@ -541,7 +547,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 
 		mainLog.Info("Using Policies from Dashboard Service")
 
-		pols = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
+		pols, err = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
 		dataLoader := &RPCStorageHandler{
@@ -552,7 +558,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 	default:
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
-			pols = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
+			pols, err = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
 
 		} else if gw.GetConfig().Policies.PolicyRecordName == "" {
 			// old way of doing things before REST Api added
@@ -560,7 +566,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 			mainLog.Debug("No policy record name defined, skipping...")
 			return 0, nil
 		} else {
-			pols = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
+			pols, err = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
 		}
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
@@ -888,33 +894,31 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 // Create the response processor chain
 func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
-	// Prealloc size
-	chainLen := len(spec.ResponseProcessors)
-	// Append capacity
-	chainCapacity := chainLen + 1 + len(responseFuncs)
-
-	responseChain := make([]TykResponseHandler, chainLen, chainCapacity)
-
-	for i, processorDetail := range spec.ResponseProcessors {
-		processor := gw.responseProcessorByName(processorDetail.Name)
+	var (
+		responseMWChain []TykResponseHandler
+		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
+	)
+	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler})
+	for _, processorDetail := range spec.ResponseProcessors {
+		processor := gw.responseProcessorByName(processorDetail.Name, baseHandler)
 		if processor == nil {
 			mainLog.Error("No such processor: ", processorDetail.Name)
-			return
+			continue
 		}
 		if err := processor.Init(processorDetail.Options, spec); err != nil {
 			mainLog.Debug("Failed to init processor: ", err)
 		}
 		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
-		responseChain[i] = processor
+		responseMWChain = append(responseMWChain, processor)
 	}
 
 	for _, mw := range responseFuncs {
 		var processor TykResponseHandler
 		//is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
-			processor = gw.responseProcessorByName("goplugin_res_hook")
+			processor = gw.responseProcessorByName("goplugin_res_hook", baseHandler)
 		} else {
-			processor = gw.responseProcessorByName("custom_mw_res_hook")
+			processor = gw.responseProcessorByName("custom_mw_res_hook", baseHandler)
 		}
 
 		// TODO: perhaps error when plugin support is disabled?
@@ -926,7 +930,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		if err := processor.Init(mw, spec); err != nil {
 			mainLog.WithError(err).Debug("Failed to init processor")
 		}
-		responseChain = append(responseChain, processor)
+		responseMWChain = append(responseMWChain, processor)
 	}
 
 	keyPrefix := "cache-" + spec.APIID
@@ -934,14 +938,14 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	cacheStore.Connect()
 
 	// Add cache writer as the final step of the response middleware chain
-	processor := &ResponseCacheMiddleware{store: cacheStore}
+	processor := &ResponseCacheMiddleware{BaseTykResponseHandler: baseHandler, store: cacheStore}
 	if err := processor.Init(nil, spec); err != nil {
 		mainLog.WithError(err).Debug("Failed to init processor")
 	}
 
-	responseChain = append(responseChain, processor)
+	responseMWChain = append(responseMWChain, processor)
 
-	spec.ResponseChain = responseChain
+	spec.ResponseChain = responseMWChain
 }
 
 func (gw *Gateway) isRPCMode() bool {
@@ -968,14 +972,14 @@ func (gw *Gateway) DoReload() {
 	}
 
 	// Load the API Policies
-	if _, err := gw.syncPolicies(); err != nil {
-		mainLog.Error("Error during syncing policies:", err.Error())
+	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
+		mainLog.Error("Error during syncing policies")
 		return
 	}
 
 	// load the specs
-	if count, err := gw.syncAPISpecs(); err != nil {
-		mainLog.Error("Error during syncing apis:", err.Error())
+	if count, err := syncResourcesWithReload("apis", gw.GetConfig(), gw.syncAPISpecs); err != nil {
+		mainLog.Error("Error during syncing apis")
 		return
 	} else {
 		// skip re-loading only if dashboard service reported 0 APIs
@@ -989,6 +993,29 @@ func (gw *Gateway) DoReload() {
 	gw.loadGlobalApps()
 
 	mainLog.Info("API reload complete")
+}
+
+func syncResourcesWithReload(resource string, conf config.Config, syncFunc func() (int, error)) (int, error) {
+	var (
+		err   error
+		count int
+	)
+
+	if resource != "apis" && resource != "policies" {
+		return 0, ErrSyncResourceNotKnown
+	}
+
+	for i := 1; i <= conf.ResourceSync.RetryAttempts+1; i++ {
+		count, err = syncFunc()
+		if err == nil {
+			return count, nil
+		}
+
+		mainLog.Errorf("Error during syncing %s: %s, attempt count %d", resource, err.Error(), i)
+		time.Sleep(time.Duration(conf.ResourceSync.Interval) * time.Second)
+	}
+
+	return 0, fmt.Errorf("syncing %s failed %w", resource, err)
 }
 
 // shouldReload returns true if we should perform any reload. Reloads happens if
@@ -1572,12 +1599,19 @@ func Start() {
 	}
 
 	if tr := gwConfig.Tracer; tr.Enabled {
+		mainLog.Warn("OpenTracing is deprecated, use OpenTelemetry instead.")
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)
 		defer trace.Close()
 	}
 
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry)
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		gw.GetConfig().SlaveOptions.UseRPC,
+		gw.GetConfig().SlaveOptions.GroupID,
+		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
+		gw.GetConfig().DBAppConfOptions.Tags)
 
 	gw.start()
 	configs := gw.GetConfig()
@@ -1709,7 +1743,8 @@ func (gw *Gateway) start() {
 		go gw.startPubSubLoop()
 	}
 
-	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
+	conf := gw.GetConfig()
+	if slaveOptions := conf.SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
 		gw.RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
@@ -1723,9 +1758,14 @@ func (gw *Gateway) start() {
 		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
 
+	reloadInterval := time.Second
+	if conf.ReloadInterval > 0 {
+		reloadInterval = time.Duration(conf.ReloadInterval) * time.Second
+	}
+
 	// 1s is the minimum amount of time between hot reloads. The
 	// interval counts from the start of one reload to the next.
-	go gw.reloadLoop(time.Tick(time.Second))
+	go gw.reloadLoop(time.Tick(reloadInterval))
 	go gw.reloadQueueLoop()
 }
 

@@ -183,20 +183,20 @@ func TestExtendedPaths(t *testing.T) {
 	})
 }
 
-func TestTransformRequestBody(t *testing.T) {
+func TestTransformBody(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		var emptyTransformRequestBody TransformRequestBody
+		var emptyTransformBody TransformBody
 
-		var convertedTransformRequestBody apidef.TemplateMeta
-		emptyTransformRequestBody.ExtractTo(&convertedTransformRequestBody)
+		var convertedTransformBody apidef.TemplateMeta
+		emptyTransformBody.ExtractTo(&convertedTransformBody)
 
-		var resultTransformRequestBody TransformRequestBody
-		resultTransformRequestBody.Fill(convertedTransformRequestBody)
+		var resultTransformBody TransformBody
+		resultTransformBody.Fill(convertedTransformBody)
 
-		assert.Equal(t, emptyTransformRequestBody, resultTransformRequestBody)
+		assert.Equal(t, emptyTransformBody, resultTransformBody)
 	})
 	t.Run("blob", func(t *testing.T) {
-		transformReqBody := TransformRequestBody{
+		transformReqBody := TransformBody{
 			Body:    "test body",
 			Format:  apidef.RequestJSON,
 			Enabled: true,
@@ -214,13 +214,13 @@ func TestTransformRequestBody(t *testing.T) {
 			},
 		}, meta)
 
-		newTransformReqBody := TransformRequestBody{}
+		newTransformReqBody := TransformBody{}
 		newTransformReqBody.Fill(meta)
 		assert.Equal(t, transformReqBody, newTransformReqBody)
 	})
 
 	t.Run("path", func(t *testing.T) {
-		transformReqBody := TransformRequestBody{
+		transformReqBody := TransformBody{
 			Path:    "/opt/tyk-gateway/template.tmpl",
 			Format:  apidef.RequestJSON,
 			Enabled: false,
@@ -238,13 +238,13 @@ func TestTransformRequestBody(t *testing.T) {
 			},
 		}, meta)
 
-		newTransformReqBody := TransformRequestBody{}
+		newTransformReqBody := TransformBody{}
 		newTransformReqBody.Fill(meta)
 		assert.Equal(t, transformReqBody, newTransformReqBody)
 	})
 
 	t.Run("blob should have precedence", func(t *testing.T) {
-		transformReqBody := TransformRequestBody{
+		transformReqBody := TransformBody{
 			Path:    "/opt/tyk-gateway/template.tmpl",
 			Body:    "test body",
 			Format:  apidef.RequestJSON,
@@ -263,7 +263,7 @@ func TestTransformRequestBody(t *testing.T) {
 			},
 		}, meta)
 
-		newTransformReqBody := TransformRequestBody{}
+		newTransformReqBody := TransformBody{}
 		newTransformReqBody.Fill(meta)
 		expectedTransformReqBody := transformReqBody
 		expectedTransformReqBody.Path = ""

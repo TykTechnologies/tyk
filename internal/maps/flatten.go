@@ -1,14 +1,14 @@
-package log
+package maps
 
 import (
 	"fmt"
 	"reflect"
 )
 
-// FlatMap is alias of map[string]string
+// FlatMap is alias of map[string]string.
 type FlatMap map[string]string
 
-// Flatten transform complex map to flatten map
+// Flatten transforms deep map to flat map.
 func Flatten(data map[string]interface{}) (flatmap FlatMap, err error) {
 	flatmap = make(FlatMap)
 	for k, raw := range data {

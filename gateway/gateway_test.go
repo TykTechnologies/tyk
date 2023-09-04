@@ -593,7 +593,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		}
 		n.Sign()
 		msg := redis.Message{}
-		payload, _ := json.Marshal(n)
+		payload := test.MarshalJSON(t)(n)
 		msg.Payload = string(payload)
 
 		callbackRun := false
@@ -1296,6 +1296,52 @@ func TestOldCachePlugin(t *testing.T) {
 
 		check(t)
 	})
+}
+
+func TestAdvanceCacheTimeoutPerEndpoint(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+	defer cache.DeleteScanMatch("*")
+
+	extendedPaths := apidef.ExtendedPathsSet{
+		AdvanceCacheConfig: []apidef.CacheMeta{
+			{
+				Method: http.MethodGet,
+				Path:   "/my-cached-endpoint",
+			},
+		},
+	}
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout: 0,
+			EnableCache:  true,
+		}
+
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.ExtendedPaths = extendedPaths
+		})
+	})[0]
+
+	ts.Gw.LoadAPI(api)
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Method: http.MethodGet, Path: "/my-cached-endpoint", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/my-cached-endpoint", HeadersNotMatch: headerCache},
+	}...)
+
+	// endpoint level cache timeout should override
+	extendedPaths.AdvanceCacheConfig[0].Timeout = 120
+	ts.Gw.LoadAPI(api)
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Method: http.MethodGet, Path: "/my-cached-endpoint", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/my-cached-endpoint", HeadersMatch: headerCache},
+	}...)
 }
 
 func TestWebsocketsSeveralOpenClose(t *testing.T) {

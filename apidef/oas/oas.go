@@ -87,21 +87,21 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *OAS into *apidef.APIDefinition.
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
-	if s.GetTykExtension() != nil {
-		s.GetTykExtension().ExtractTo(api)
+	if s.GetTykExtension() == nil {
+		s.SetTykExtension(&XTykAPIGateway{})
+		defer func() {
+			delete(s.Extensions, ExtensionTykAPIGateway)
+		}()
 	}
+
+	s.GetTykExtension().ExtractTo(api)
 
 	s.extractSecurityTo(api)
 
-	var ep apidef.ExtendedPathsSet
-	s.extractPathsAndOperations(&ep)
-
-	api.VersionData.Versions = map[string]apidef.VersionInfo{
-		Main: {
-			UseExtendedPaths: true,
-			ExtendedPaths:    ep,
-		},
-	}
+	vInfo := api.VersionData.Versions[Main]
+	vInfo.UseExtendedPaths = true
+	s.extractPathsAndOperations(&vInfo.ExtendedPaths)
+	api.VersionData.Versions[Main] = vInfo
 }
 
 // SetTykExtension populates our OAS schema extension inside *OAS.
@@ -150,6 +150,22 @@ func (s *OAS) RemoveTykExtension() {
 	}
 
 	delete(s.Extensions, ExtensionTykAPIGateway)
+}
+
+// Clone creates a deep copy of the OAS object and returns a new instance.
+func (s *OAS) Clone() (*OAS, error) {
+	oasInBytes, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	var retOAS OAS
+	_ = json.Unmarshal(oasInBytes, &retOAS)
+
+	// convert Tyk extension from map to struct
+	retOAS.GetTykExtension()
+
+	return &retOAS, nil
 }
 
 func (s *OAS) getTykAuthentication() (authentication *Authentication) {
@@ -267,7 +283,8 @@ func (s *OAS) getTykSecurityScheme(name string) interface{} {
 	return securitySchemes[name]
 }
 
-func (s *OAS) getTykMiddleware() (middleware *Middleware) {
+// GetTykMiddleware returns middleware section from XTykAPIGateway.
+func (s *OAS) GetTykMiddleware() (middleware *Middleware) {
 	if s.GetTykExtension() != nil {
 		middleware = s.GetTykExtension().Middleware
 	}
@@ -276,8 +293,8 @@ func (s *OAS) getTykMiddleware() (middleware *Middleware) {
 }
 
 func (s *OAS) getTykOperations() (operations Operations) {
-	if s.getTykMiddleware() != nil {
-		operations = s.getTykMiddleware().Operations
+	if s.GetTykMiddleware() != nil {
+		operations = s.GetTykMiddleware().Operations
 	}
 
 	return

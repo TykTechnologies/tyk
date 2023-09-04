@@ -33,16 +33,17 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
-
 	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
+	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
@@ -384,6 +385,8 @@ type ReverseProxy struct {
 	Gw     *Gateway `json:"-"`
 }
 
+var idleConnTimeout = 90
+
 func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	timeout := 30.0
 	if dialerTimeout > 0 {
@@ -409,6 +412,7 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 		DialContext:           dialContextFunc,
 		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
 		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
+		IdleConnTimeout:       time.Duration(idleConnTimeout) * time.Second,
 		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
@@ -1058,7 +1062,7 @@ func (p *ReverseProxy) handleGraphQLIntrospection(gqlRequest *graphql.Request) (
 
 func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoundTripper, r *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	conn, err := p.wsUpgrader.Upgrade(w, r, http.Header{
-		header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+		header.SecWebSocketProtocol: {r.Header.Get(header.SecWebSocketProtocol)},
 	})
 	if err != nil {
 		p.logger.Error("websocket upgrade for GraphQL engine failed: ", err)
@@ -1095,6 +1099,14 @@ func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWrite
 	return err
 }
 
+func headerStructToHeaderMap(headers []apidef.UDGGlobalHeader) map[string]string {
+	headerMap := make(map[string]string)
+	for _, header := range headers {
+		headerMap[header.Key] = header.Value
+	}
+	return headerMap
+}
+
 func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
 
@@ -1122,9 +1134,10 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		}
 
 		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
-		reqCtx := context.Background()
+		span := otel.SpanFromContext(outreq.Context())
+		reqCtx := otel.ContextWithSpan(context.Background(), span)
 		if isProxyOnly {
-			reqCtx = NewGraphQLProxyOnlyContext(context.Background(), outreq)
+			reqCtx = NewGraphQLProxyOnlyContext(reqCtx, outreq)
 		}
 
 		resultWriter := graphql.NewEngineResultWriter()
@@ -1133,27 +1146,18 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			graphql.WithAfterFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.AfterFetchHook),
 		}
 
-		// if this context vars are enabled and this is a supergraph, inject the sub request id header
-		upstreamHeaders := http.Header{}
-		if p.TykAPISpec.EnableContextVars && p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph {
-			ctxData := ctxGetData(outreq)
-			if reqID, exists := ctxData["request_id"]; !exists {
-				log.Warn("context variables enabled but request_id missing")
-			} else if requestID, ok := reqID.(string); ok {
-				upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
+		upstreamHeaders := p.graphqlEngineAdditionalUpstreamHeaders(outreq)
+		execOptions = append(execOptions, graphql.WithHeaderModifier(p.graphqlEngineHeaderModifier(outreq, upstreamHeaders)))
+
+		if p.TykAPISpec.GraphQLExecutor.OtelExecutor != nil {
+			if err = p.TykAPISpec.GraphQLExecutor.OtelExecutor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
+				return
 			}
-		}
-
-		// append the request headers if any
-		for h, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeaders {
-			val := p.Gw.replaceTykVariables(outreq, value, false)
-			upstreamHeaders.Set(h, val)
-		}
-		execOptions = append(execOptions, graphql.WithUpstreamHeaders(upstreamHeaders))
-
-		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
-		if err != nil {
-			return
+		} else {
+			err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
+			if err != nil {
+				return
+			}
 		}
 
 		httpStatus := http.StatusOK
@@ -1209,10 +1213,22 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 			return
 		}
 		initialRequestContext := subscription.NewInitialHttpRequestContext(req)
-		executorPool = subscription.NewExecutorV2Pool(p.TykAPISpec.GraphQLExecutor.EngineV2, initialRequestContext)
+		upstreamHeaders := p.graphqlEngineAdditionalUpstreamHeaders(req)
+		executorPool = subscription.NewExecutorV2Pool(
+			p.TykAPISpec.GraphQLExecutor.EngineV2,
+			initialRequestContext,
+			subscription.WithExecutorV2HeaderModifier(p.graphqlEngineHeaderModifier(req, upstreamHeaders)),
+		)
 	}
 
-	go gqlhttp.HandleWebsocket(done, errChan, conn, executorPool, absLogger)
+	go gqlwebsocket.Handle(
+		done,
+		errChan,
+		conn,
+		executorPool,
+		gqlwebsocket.WithLogger(absLogger),
+		gqlwebsocket.WithProtocolFromRequestHeaders(req),
+	)
 	select {
 	case err := <-errChan:
 		log.Error("could not start graphql websocket handler: ", err)
@@ -1342,9 +1358,21 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if createTransport {
+		var oldTransport *http.Transport
+
+		if p.TykAPISpec.HTTPTransport != nil {
+			oldTransport = p.TykAPISpec.HTTPTransport.transport
+			// Prevent new idle connections to be generated.
+			oldTransport.DisableKeepAlives = true
+		}
+
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
+
+		if oldTransport != nil {
+			oldTransport.CloseIdleConnections()
+		}
 	}
 
 	roundTripper = p.TykAPISpec.HTTPTransport
@@ -1506,7 +1534,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 }
 
 func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) error {
-
 	// Remove hop-by-hop headers listed in the
 	// "Connection" header of the response.
 	if c := res.Header.Get(header.Connection); c != "" {
@@ -2003,6 +2030,45 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 	}
 
 	return false, ""
+}
+
+func (p *ReverseProxy) graphqlEngineAdditionalUpstreamHeaders(outreq *http.Request) http.Header {
+	upstreamHeaders := http.Header{}
+	switch p.TykAPISpec.GraphQL.ExecutionMode {
+	case apidef.GraphQLExecutionModeSupergraph:
+		// if this context vars are enabled and this is a supergraph, inject the sub request id header
+		if !p.TykAPISpec.EnableContextVars {
+			break
+		}
+		ctxData := ctxGetData(outreq)
+		if reqID, exists := ctxData["request_id"]; !exists {
+			log.Warn("context variables enabled but request_id missing")
+		} else if requestID, ok := reqID.(string); ok {
+			upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
+		}
+	case apidef.GraphQLExecutionModeExecutionEngine:
+		globalHeaders := headerStructToHeaderMap(p.TykAPISpec.GraphQL.Engine.GlobalHeaders)
+		for key, value := range globalHeaders {
+			upstreamHeaders.Set(key, value)
+		}
+	}
+
+	return upstreamHeaders
+}
+
+func (p *ReverseProxy) graphqlEngineHeaderModifier(outreq *http.Request, additionalHeaders http.Header) postprocess.HeaderModifier {
+	return func(header http.Header) {
+		for key := range additionalHeaders {
+			if header.Get(key) == "" {
+				header.Set(key, additionalHeaders.Get(key))
+			}
+		}
+
+		for key := range header {
+			val := p.Gw.replaceTykVariables(outreq, header.Get(key), false)
+			header.Set(key, val)
+		}
+	}
 }
 
 // IsGrpcStreaming  determines wether a request represents a grpc streaming req

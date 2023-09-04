@@ -487,3 +487,28 @@ func TestAreMapsEqual(t *testing.T) {
 		})
 	}
 }
+
+func TestContainsEscapedCharacters(t *testing.T) {
+	tests := []struct {
+		value    string
+		expected bool
+	}{
+		{
+			value:    "payment%2Dintents",
+			expected: true,
+		},
+		{
+			value:    "payment-intents",
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.value, func(t *testing.T) {
+			result := containsEscapedChars(test.value)
+			if result != test.expected {
+				t.Errorf("containsEscapedChars() = %v, want %v", result, test.expected)
+			}
+		})
+	}
+}

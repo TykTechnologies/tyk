@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -66,17 +67,27 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
 	} else if baseMw := tr.Base(); baseMw != nil {
-		if cfg := baseMw.Gw.GetConfig(); cfg.OpenTelemetry.Enabled {
-			ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
-			defer span.End()
-
-			setContext(r, ctx)
+		cfg := baseMw.Gw.GetConfig()
+		if cfg.OpenTelemetry.Enabled {
+			otel.AddTraceID(r.Context(), w)
+			var span otel.Span
+			if baseMw.Spec.DetailedTracing {
+				var ctx context.Context
+				ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
+				defer span.End()
+				setContext(r, ctx)
+			} else {
+				span = otel.SpanFromContext(r.Context())
+			}
 
 			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
 			if err != nil {
 				span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
-			} else {
-				span.SetStatus(otel.SPAN_STATUS_OK, "")
+			}
+
+			attrs := ctxGetSpanAttributes(r, tr.TykMiddleware.Name())
+			if len(attrs) > 0 {
+				span.SetAttributes(attrs...)
 			}
 
 			return err, i
@@ -192,6 +203,15 @@ func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware)
 		*chain = append(*chain, gw.createMiddleware(mw))
 		return true
 	}
+	return false
+}
+
+func (gw *Gateway) responseMWAppendEnabled(chain *[]TykResponseHandler, responseMW TykResponseHandler) bool {
+	if responseMW.Enabled() {
+		*chain = append(*chain, responseMW)
+		return true
+	}
+
 	return false
 }
 
@@ -362,16 +382,33 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	t.clearSession(session)
 
 	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
-	policies := session.PolicyIDs()
 
-	for _, polID := range policies {
+	var (
+		err       error
+		lookupMap map[string]user.Policy
+		policyIDs []string
+	)
+
+	customPolicies, err := session.CustomPolicies()
+	if err != nil {
+		policyIDs = session.PolicyIDs()
 		t.Gw.policiesMu.RLock()
-		policy, ok := t.Gw.policiesByID[polID]
-		t.Gw.policiesMu.RUnlock()
+		lookupMap = t.Gw.policiesByID
+		defer t.Gw.policiesMu.RUnlock()
+	} else {
+		lookupMap = customPolicies
+		policyIDs = make([]string, 0, len(customPolicies))
+		for _, val := range customPolicies {
+			policyIDs = append(policyIDs, val.ID)
+		}
+	}
+
+	for _, polID := range policyIDs {
+		policy, ok := lookupMap[polID]
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
-			if len(policies) > 1 {
+			if len(policyIDs) > 1 {
 				continue
 			}
 
@@ -635,7 +672,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		session.Tags = appendIfMissing(session.Tags, tag)
 	}
 
-	if len(policies) == 0 {
+	if len(policyIDs) == 0 {
 		for apiID, accessRight := range session.AccessRights {
 			// check if the api in the session has per api limit
 			if !accessRight.Limit.IsEmpty() {
@@ -889,10 +926,12 @@ func (b BaseMiddleware) generateSessionID(id string) string {
 }
 
 type TykResponseHandler interface {
+	Enabled() bool
 	Init(interface{}, *APISpec) error
 	Name() string
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
 	HandleError(http.ResponseWriter, *http.Request)
+	Base() *BaseTykResponseHandler
 }
 
 type TykGoPluginResponseHandler interface {
@@ -900,26 +939,30 @@ type TykGoPluginResponseHandler interface {
 	HandleGoPluginResponse(http.ResponseWriter, *http.Response, *http.Request) error
 }
 
-func (gw *Gateway) responseProcessorByName(name string) TykResponseHandler {
+func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykResponseHandler) TykResponseHandler {
 	switch name {
 	case "header_injector":
-		return &HeaderInjector{Gw: gw}
-	case "response_body_transform":
-		return &ResponseTransformMiddleware{}
+		return &HeaderInjector{BaseTykResponseHandler: baseHandler}
 	case "response_body_transform_jq":
-		return &ResponseTransformJQMiddleware{Gw: gw}
+		return &ResponseTransformJQMiddleware{BaseTykResponseHandler: baseHandler}
 	case "header_transform":
-		return &HeaderTransform{Gw: gw}
+		return &HeaderTransform{BaseTykResponseHandler: baseHandler}
 	case "custom_mw_res_hook":
-		return &CustomMiddlewareResponseHook{Gw: gw}
+		return &CustomMiddlewareResponseHook{BaseTykResponseHandler: baseHandler}
 	case "goplugin_res_hook":
-		return &ResponseGoPluginMiddleware{}
+		return &ResponseGoPluginMiddleware{BaseTykResponseHandler: baseHandler}
 	}
 
 	return nil
 }
 
 func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
+
+	if res.Request != nil {
+		// res.Request context contains otel information from the otel roundtripper
+		setContext(req, res.Request.Context())
+	}
+
 	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
@@ -939,8 +982,54 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		span, ctx := trace.Span(req.Context(), rh.Name())
 		defer span.Finish()
 		req = req.WithContext(ctx)
+	} else if rh.Base().Gw.GetConfig().OpenTelemetry.Enabled {
+		return handleOtelTracedResponse(rh, rw, res, req, ses)
 	}
 	return rh.HandleResponse(rw, res, req, ses)
+}
+
+// handleOtelTracedResponse handles the tracing for the response middlewares when
+// otel is enabled in the gateway
+func handleOtelTracedResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	var span otel.Span
+	var err error
+
+	baseMw := rh.Base()
+	if baseMw == nil {
+		return errors.New("unsupported base middleware")
+	}
+
+	// ResponseCacheMiddleware always executes but not always caches,so check if we must create the span
+	shouldTrace := shouldPerformTracing(rh, baseMw)
+	ctx := req.Context()
+	if shouldTrace {
+		if baseMw.Spec.DetailedTracing {
+			ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
+			defer span.End()
+			setContext(req, ctx)
+		} else {
+			span = otel.SpanFromContext(ctx)
+		}
+
+		err = rh.HandleResponse(rw, res, req, ses)
+
+		if err != nil {
+			span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
+		}
+
+		attrs := ctxGetSpanAttributes(req, rh.Name())
+		if len(attrs) > 0 {
+			span.SetAttributes(attrs...)
+		}
+	} else {
+		err = rh.HandleResponse(rw, res, req, ses)
+	}
+
+	return err
+}
+
+func shouldPerformTracing(rh TykResponseHandler, baseMw *BaseTykResponseHandler) bool {
+	return rh.Name() != "ResponseCacheMiddleware" || baseMw.Spec.CacheOptions.EnableCache
 }
 
 func parseForm(r *http.Request) {
@@ -959,3 +1048,26 @@ func parseForm(r *http.Request) {
 
 	r.ParseForm()
 }
+
+type BaseTykResponseHandler struct {
+	Spec *APISpec `json:"-"`
+	Gw   *Gateway `json:"-"`
+}
+
+func (b *BaseTykResponseHandler) Enabled() bool {
+	return true
+}
+
+func (b *BaseTykResponseHandler) Init(i interface{}, spec *APISpec) error {
+	return nil
+}
+
+func (b *BaseTykResponseHandler) Name() string {
+	return "BaseTykResponseHandler"
+}
+
+func (b *BaseTykResponseHandler) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	return nil
+}
+
+func (b *BaseTykResponseHandler) HandleError(writer http.ResponseWriter, h *http.Request) {}

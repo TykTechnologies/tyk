@@ -44,9 +44,14 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	x.Upstream.ExtractTo(api)
 	x.Server.ExtractTo(api)
 
-	if x.Middleware != nil {
-		x.Middleware.ExtractTo(api)
+	if x.Middleware == nil {
+		x.Middleware = &Middleware{}
+		defer func() {
+			x.Middleware = nil
+		}()
 	}
+
+	x.Middleware.ExtractTo(api)
 }
 
 // Info contains the main metadata about the API definition.
@@ -99,15 +104,22 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	api.Expiration = i.Expiration
 	i.State.ExtractTo(api)
 
-	if i.Versioning != nil {
-		i.Versioning.ExtractTo(api)
+	if i.Versioning == nil {
+		i.Versioning = &Versioning{}
+		defer func() {
+			i.Versioning = nil
+		}()
 	}
+
+	i.Versioning.ExtractTo(api)
 
 	// everytime
 	api.VersionData.NotVersioned = true
 	api.VersionData.DefaultVersion = ""
-	api.VersionData.Versions = map[string]apidef.VersionInfo{
-		"": {},
+	if len(api.VersionData.Versions) == 0 {
+		api.VersionData.Versions = map[string]apidef.VersionInfo{
+			"": {},
+		}
 	}
 }
 
@@ -187,12 +199,14 @@ func (v *Versioning) ExtractTo(api *apidef.APIDefinition) {
 	api.VersionDefinition.Default = v.Default
 	api.VersionDefinition.Location = v.Location
 	api.VersionDefinition.Key = v.Key
-	if api.VersionDefinition.Versions == nil {
-		api.VersionDefinition.Versions = make(map[string]string)
-	}
 
-	for _, val := range v.Versions {
-		api.VersionDefinition.Versions[val.Name] = val.ID
+	if len(v.Versions) > 0 {
+		api.VersionDefinition.Versions = make(map[string]string)
+		for _, val := range v.Versions {
+			api.VersionDefinition.Versions[val.Name] = val.ID
+		}
+	} else {
+		api.VersionDefinition.Versions = nil
 	}
 
 	api.VersionDefinition.StripVersioningData = v.StripVersioningData
