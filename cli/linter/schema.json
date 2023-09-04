@@ -920,7 +920,10 @@
       }
     },
     "proxy_default_timeout": {
-      "type": "integer"
+      "type": "number"
+    },
+    "proxy_dialer_timeout": {
+      "type": "number"
     },
     "proxy_enable_http2": {
       "type": "boolean"

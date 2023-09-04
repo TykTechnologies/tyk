@@ -45,13 +45,13 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
 	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/TykTechnologies/tyk/trace"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/domsolutions/tyk/apidef"
+	"github.com/domsolutions/tyk/ctx"
+	"github.com/domsolutions/tyk/header"
+	"github.com/domsolutions/tyk/internal/otel"
+	"github.com/domsolutions/tyk/regexp"
+	"github.com/domsolutions/tyk/trace"
+	"github.com/domsolutions/tyk/user"
 )
 
 var defaultUserAgent = "Tyk/" + VERSION
@@ -385,17 +385,21 @@ type ReverseProxy struct {
 	Gw     *Gateway `json:"-"`
 }
 
-var idleConnTimeout = 90
+var (
+	idleConnTimeout         = 90
+	dialerTimeout   float64 = 30
+)
 
-func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
-	timeout := 30.0
-	if dialerTimeout > 0 {
-		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
-		timeout = dialerTimeout
+func (p *ReverseProxy) defaultTransport(respTimeout float64) *http.Transport {
+	log.Debug("Setting timeout for outbound request to: ", respTimeout)
+
+	if proxyDialerTimeout := p.Gw.GetConfig().ProxyDialerTimeout; proxyDialerTimeout > 0 {
+		dialerTimeout = proxyDialerTimeout
 	}
+	log.Debug("Setting timeout for establishing connection to : ", dialerTimeout)
 
 	dialer := &net.Dialer{
-		Timeout:   time.Duration(float64(timeout) * float64(time.Second)),
+		Timeout:   time.Duration(dialerTimeout * float64(time.Second)),
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}
@@ -413,7 +417,7 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
 		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
 		IdleConnTimeout:       time.Duration(idleConnTimeout) * time.Second,
-		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
+		ResponseHeaderTimeout: time.Duration(respTimeout) * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
 
