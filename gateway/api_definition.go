@@ -266,6 +266,12 @@ func (s *APISpec) Release() {
 	if s.JSVM.VM != nil {
 		s.JSVM.DeInit()
 	}
+
+	if s.HTTPTransport != nil {
+		// Prevent new idle connections to be generated.
+		s.HTTPTransport.transport.DisableKeepAlives = true
+		s.HTTPTransport.transport.CloseIdleConnections()
+	}
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
