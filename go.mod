@@ -13,7 +13,7 @@ require (
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
 	github.com/TykTechnologies/gorpc v0.0.0-20210624160652-fe65bda0ccb9
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230831145026-212f2d526061
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20230904131208-4dacf4871685
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
@@ -100,7 +100,6 @@ require (
 	github.com/asyncapi/spec-json-schemas/v2 v2.14.0 // indirect
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/dave/jennifer v1.4.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/eapache/go-resiliency v1.4.0 // indirect
@@ -110,7 +109,6 @@ require (
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
-	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
@@ -137,7 +135,6 @@ require (
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/iancoleman/strcase v0.2.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/invopop/yaml v0.1.0 // indirect
 	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
 	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
@@ -151,13 +148,11 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // indirect
-	github.com/magiconair/properties v1.8.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mavricknz/asn1-ber v0.0.0-20151103223136-b9df1c2f4213 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
-	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/perimeterx/marshmallow v1.1.4 // indirect
 	github.com/peterbourgon/g2s v0.0.0-20170223122336-d4e7ad98afea // indirect
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
@@ -171,10 +166,6 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.0 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
-	github.com/spf13/cobra v0.0.5 // indirect
-	github.com/spf13/jwalterweatherman v1.0.0 // indirect
-	github.com/spf13/pflag v1.0.3 // indirect
-	github.com/spf13/viper v1.3.2 // indirect
 	github.com/tidwall/gjson v1.11.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
