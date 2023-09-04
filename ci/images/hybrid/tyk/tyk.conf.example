@@ -18,12 +18,8 @@
   },
   "enable_analytics": false,
   "analytics_config": {
-    "type": "csv",
-    "csv_dir": "/tmp",
-    "mongo_url": "",
-    "mongo_db_name": "",
-    "mongo_collection": "",
-    "purge_delay": -1,
+    "type": "",
+    "purge_interval": -1,
     "ignored_ips": []
   },
   "health_check": {
