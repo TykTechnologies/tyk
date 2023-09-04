@@ -975,7 +975,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	for _, spec := range specs {
 		curSpec, ok := gw.apisByID[spec.APIID]
-		if ok && curSpec.Checksum != spec.Checksum {
+		if ok && shouldReloadSpec(curSpec, spec) {
 			curSpec.Release()
 		}
 
