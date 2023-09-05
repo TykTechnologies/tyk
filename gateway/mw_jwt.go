@@ -188,14 +188,33 @@ func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
 func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.Token) (interface{}, error) {
 	config := k.Spec.APIDefinition
 	// Check for central JWT source
-	if config.JWTSource != "" {
+	JWTSource := config.JWTSource
+	if JWTSource != "" {
+
+		if strings.Contains(JWTSource, vaultLabel) {
+			key := vaultMatch.FindString(JWTSource)
+
+			if err := k.Gw.setUpVault(); err != nil {
+				// error
+				return nil, err
+			}
+
+			val, err := k.Gw.vaultKVStore.Get(key)
+			if err != nil {
+				// error key isn't found
+				return nil, err
+			}
+
+			JWTSource = val
+		}
+
 		// Is it a URL?
-		if httpScheme.MatchString(config.JWTSource) {
-			return k.getSecretFromURL(config.JWTSource, token.Header[KID], k.Spec.JWTSigningMethod)
+		if httpScheme.MatchString(JWTSource) {
+			return k.getSecretFromURL(JWTSource, token.Header[KID], k.Spec.JWTSigningMethod)
 		}
 
 		// If not, return the actual value
-		decodedCert, err := base64.StdEncoding.DecodeString(config.JWTSource)
+		decodedCert, err := base64.StdEncoding.DecodeString(JWTSource)
 		if err != nil {
 			return nil, err
 		}
