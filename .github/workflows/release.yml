@@ -222,7 +222,7 @@ jobs:
         id: env_up
         env:
           t: ${{ needs.goreleaser.outputs.tags }}
-          tyk_ci_version: 'v1.1-alpha4'
+          tyk_ci_version: 'v1.1'
           # gw and dash use the same branch names
           gw_dash_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk' || github.repository == 'TykTechnologies/tyk-analytics') && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
           pump_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-pump' && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
@@ -267,7 +267,7 @@ jobs:
           auto_dir: ${{ steps.env_up.outputs.auto_dir	 }}
         run: |
           docker run --rm --network auto_default --env-file ${auto_dir}/pytest.env \
-          754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'release-mdcb-compliant' }} \
+          754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
           pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}"
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
