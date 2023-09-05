@@ -31,7 +31,7 @@ func (tp *TransportPool) Put(key string, transport *http.Transport) *http.Transp
 
 	if ok {
 		defer func() {
-			go prev.CloseIdleConnections()
+			go tp.closeTransport(prev)
 		}()
 	}
 
@@ -41,7 +41,7 @@ func (tp *TransportPool) Put(key string, transport *http.Transport) *http.Transp
 // Get returns a transport for a key. Returns nil if no transport found.
 func (tp *TransportPool) Get(key string) *http.Transport {
 	tp.mu.RLock()
-	val, _ := tp.pool[key]
+	val := tp.pool[key]
 	tp.mu.RUnlock()
 	return val
 }
@@ -56,10 +56,14 @@ func (tp *TransportPool) CloseIdleConnections() {
 
 func (tp *TransportPool) closeIdleConnections() {
 	for _, conn := range tp.pool {
-		// Prevent new idle connections to be generated.
-		conn.DisableKeepAlives = true
-		conn.CloseIdleConnections()
+		tp.closeTransport(conn)
 	}
+}
+
+func (*TransportPool) closeTransport(conn *http.Transport) {
+	// Prevent new idle connections to be generated.
+	conn.DisableKeepAlives = true
+	conn.CloseIdleConnections()
 }
 
 // Clear clears the pool invoking CloseIdleConnections as it goes.
@@ -73,7 +77,7 @@ func (tp *TransportPool) Clear() {
 func (tp *TransportPool) clear() {
 	tp.closeIdleConnections()
 
-	for key, _ := range tp.pool {
+	for key := range tp.pool {
 		delete(tp.pool, key)
 	}
 }
