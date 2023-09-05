@@ -44,7 +44,7 @@ func (gw *Gateway) getTagHash() string {
 }
 
 func (gw *Gateway) NotifyCurrentServerStatus() {
-	if gw.DRLManager == nil || !gw.DRLManager.Ready() {
+	if !gw.DRLManager.Ready() {
 		return
 	}
 
@@ -76,9 +76,7 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 }
 
 func (gw *Gateway) onServerStatusReceivedHandler(payload string) {
-	if !gw.startDRL() {
-		return
-	}
+	gw.startDRL()
 
 	if !gw.DRLManager.Ready() {
 		log.Warning("DRL not ready, skipping this notification")
