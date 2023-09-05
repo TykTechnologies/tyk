@@ -387,15 +387,15 @@ type ReverseProxy struct {
 
 var idleConnTimeout = 90
 
-func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
-	timeout := 30.0
+func (p *ReverseProxy) defaultTransport(dialerTimeout int) *http.Transport {
+	timeout := 30
 	if dialerTimeout > 0 {
 		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
 		timeout = dialerTimeout
 	}
 
 	dialer := &net.Dialer{
-		Timeout:   time.Duration(float64(timeout) * float64(time.Second)),
+		Timeout:   time.Duration(timeout) * time.Second,
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}
@@ -538,21 +538,24 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
+func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, int) {
+	defaultTimeout := int(spec.GlobalConfig.ProxyDefaultTimeout)
 	if !spec.EnforcedTimeoutEnabled {
-		return false, spec.GlobalConfig.ProxyDefaultTimeout
+		return false, defaultTimeout
 	}
 
 	vInfo, _ := spec.Version(req)
 	versionPaths := spec.RxPaths[vInfo.Name]
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
-		intMeta := meta.(*int)
-		p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
-		return true, float64(*intMeta)
+		intMeta, ok := meta.(*int)
+		if ok {
+			p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
+			return true, *intMeta
+		}
 	}
 
-	return false, spec.GlobalConfig.ProxyDefaultTimeout
+	return false, defaultTimeout
 }
 
 func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *http.Request) bool {
@@ -665,9 +668,9 @@ func tlsClientConfig(s *APISpec, gw *Gateway) *tls.Config {
 	return config
 }
 
-func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
+func (p *ReverseProxy) httpTransport(timeout int, rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
 	p.logger.Debug("Creating new transport")
-	transport := p.defaultTransport(timeOut) // modifies a newly created transport
+	transport := p.defaultTransport(timeout) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
