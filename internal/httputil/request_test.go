@@ -20,4 +20,8 @@ func TestTransferEncoding(t *testing.T) {
 	assert.True(t, checkTransferEncoding([]string{"chunked"}))
 	assert.False(t, checkTransferEncoding([]string{}))
 	assert.False(t, checkTransferEncoding(nil))
+
+	r, err := http.NewRequest("GET", "/", nil)
+	assert.NoError(t, err)
+	assert.False(t, httputil.IsGrpcStreaming(r))
 }

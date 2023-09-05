@@ -17,6 +17,9 @@ import (
 
 type Key uint
 
+// These values hold the context keys. As the value is an iota,
+// values may never be removed or changed. Add new values to
+// the end of the list.
 const (
 	SessionData Key = iota
 	UpdateSession
@@ -46,10 +49,9 @@ const (
 	GraphQLRequest
 	GraphQLIsWebSocketUpgrade
 	OASOperation
-
-	// CacheOptions holds cache options required for cache writer middleware.
-	CacheOptions
+	CacheOptions // CacheOptions holds options required for cache writer middleware.
 	OASDefinition
+	APISpec
 )
 
 func setContext(r *http.Request, ctx context.Context) {

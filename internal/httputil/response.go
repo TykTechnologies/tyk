@@ -24,6 +24,7 @@ func InternalServerError(w http.ResponseWriter, _ *http.Request) {
 	http.Error(w, http.StatusText(status), status)
 }
 
+// RemoveResponseTransferEncoding clears a value from http.Response TransferEncoding slice.
 func RemoveResponseTransferEncoding(response *http.Response, encoding string) {
 	for i, value := range response.TransferEncoding {
 		if value == encoding {
