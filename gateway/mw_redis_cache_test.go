@@ -169,13 +169,6 @@ func TestRedisCacheMiddleware(t *testing.T) {
 }
 
 func TestRedisCacheMiddlewareV2(t *testing.T) {
-	type params struct {
-		path             string
-		bodyMatch        string
-		uncompressed     bool
-		transferEncoding []string
-	}
-
 	const compressed = "/compressed"
 	const chunked = "/chunked"
 
