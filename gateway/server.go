@@ -1800,23 +1800,26 @@ func handleDashboardRegistration(gw *Gateway) {
 }
 
 func (gw *Gateway) startDRL() bool {
-	switch {
-	case gw.GetConfig().ManagementNode:
-		return false
-	case gw.GetConfig().EnableSentinelRateLimiter, gw.GetConfig().EnableRedisRollingLimiter:
-		return false
-	}
+	gwConfig := gw.GetConfig()
+
+	disabled := gwConfig.ManagementNode || gwConfig.EnableSentinelRateLimiter || gw.GetConfig().EnableRedisRollingLimiter
+
 	gw.drlOnce.Do(func() {
+		drlManager := &drl.DRL{}
+		gw.DRLManager = drlManager
+
+		if disabled {
+			return
+		}
+
 		mainLog.Info("Initialising distributed rate limiter")
 
 		nodeID := gw.GetNodeID() + "|" + gw.hostDetails.Hostname
 
-		drlManager := &drl.DRL{}
 		drlManager.ThisServerID = nodeID
 		drlManager.Init(gw.ctx)
 
 		log.Debug("DRL: Setting node ID: ", nodeID)
-		gw.DRLManager = drlManager
 
 		gw.startRateLimitNotifications()
 	})
@@ -1863,7 +1866,6 @@ func (gw *Gateway) startServer() {
 	// handle dashboard registration and nonces if available
 	handleDashboardRegistration(gw)
 
-	gw.DRLManager = &drl.DRL{}
 	// at this point NodeID is ready to use by DRL
 	if !gw.startDRL() {
 		mainLog.Info("DRL is disabled")
