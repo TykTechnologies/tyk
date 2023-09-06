@@ -547,18 +547,19 @@ func proxyDefaultTimeout(spec *APISpec) float64 {
 	return 30
 }
 
-// This legitimately returns float64 to use for sub-second durations.
-// It's used in tests, configuring a 0.1sec timeout via the config.
-// Converting to int is a breaking change.
+// CheckHardTimeoutEnforced checks APISpec versions for a fine grained timeout
+// value. The value is defined in seconds, but we're using float64 to enable
+// sub-second durations for tests. Changing to int would break that behaviour.
 func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
 	return checkHardTimeoutEnforced(spec, req)
 }
 
+// This function returns if the request should have a hard timeout enforced.
+// If the request doesn't have a hard timeout enforced, then the transport
+// has a secondary timeout based on proxyDefaultTimeout return value.
 func checkHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
-	defaultTimeout := proxyDefaultTimeout(spec)
-
 	if !spec.EnforcedTimeoutEnabled {
-		return false, defaultTimeout
+		return false, 0
 	}
 
 	vInfo, _ := spec.Version(req)
@@ -571,7 +572,7 @@ func checkHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) 
 		}
 	}
 
-	return false, defaultTimeout
+	return false, 0
 }
 
 func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *http.Request) bool {
