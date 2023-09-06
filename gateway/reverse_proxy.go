@@ -538,21 +538,31 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
+func (*ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
+	return checkHardTimeoutEnforced(spec, req)
+}
+
+func checkHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
+	var defaultTimeout float64 = 30
+	if spec.GlobalConfig.ProxyDefaultTimeout > 0 {
+		defaultTimeout = spec.GlobalConfig.ProxyDefaultTimeout
+	}
+
 	if !spec.EnforcedTimeoutEnabled {
-		return false, spec.GlobalConfig.ProxyDefaultTimeout
+		return false, defaultTimeout
 	}
 
 	vInfo, _ := spec.Version(req)
 	versionPaths := spec.RxPaths[vInfo.Name]
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
-		intMeta := meta.(*int)
-		p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
-		return true, float64(*intMeta)
+		intMeta, ok := meta.(*int)
+		if ok && *intMeta > 0 {
+			return true, float64(*intMeta)
+		}
 	}
 
-	return false, spec.GlobalConfig.ProxyDefaultTimeout
+	return false, defaultTimeout
 }
 
 func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *http.Request) bool {
@@ -1349,6 +1359,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.TykAPISpec.Lock()
 
+	_, enforcedTimeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, outreq)
+
 	// create HTTP transport
 	createTransport := p.TykAPISpec.HTTPTransport == nil
 
@@ -1366,8 +1378,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			oldTransport.DisableKeepAlives = true
 		}
 
-		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
+		p.TykAPISpec.HTTPTransport = p.httpTransport(enforcedTimeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
 		if oldTransport != nil {
@@ -1409,6 +1420,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		upstreamLatency time.Duration
 		err             error
 	)
+
+	// limit request time with context timeout
+	timeoutContext, cancel := context.WithTimeout(outreq.Context(), time.Duration(enforcedTimeout)*time.Second)
+	defer cancel()
+
+	outreq = outreq.WithContext(timeoutContext)
 
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
