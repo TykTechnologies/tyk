@@ -554,9 +554,7 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	return checkHardTimeoutEnforced(spec, req)
 }
 
-// This function returns if the request should have a hard timeout enforced.
-// If the request doesn't have a hard timeout enforced, then the transport
-// has a secondary timeout based on proxyDefaultTimeout return value.
+// Returns if the request should have a hard timeout enforced and the timeout value configured.
 func checkHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
 	if !spec.EnforcedTimeoutEnabled {
 		return false, 0
