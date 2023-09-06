@@ -538,15 +538,24 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-func (*ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
+// This returns the expected 30 second default timeout in case
+// the ProxyDefaultTimeout value is undefined.
+func proxyDefaultTimeout(spec *APISpec) float64 {
+	if spec.GlobalConfig.ProxyDefaultTimeout > 0 {
+		return spec.GlobalConfig.ProxyDefaultTimeout
+	}
+	return 30
+}
+
+// This legitimately returns float64 to use for sub-second durations.
+// It's used in tests, configuring a 0.1sec timeout via the config.
+// Converting to int is a breaking change.
+func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
 	return checkHardTimeoutEnforced(spec, req)
 }
 
 func checkHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
-	var defaultTimeout float64 = 30
-	if spec.GlobalConfig.ProxyDefaultTimeout > 0 {
-		defaultTimeout = spec.GlobalConfig.ProxyDefaultTimeout
-	}
+	defaultTimeout := proxyDefaultTimeout(spec)
 
 	if !spec.EnforcedTimeoutEnabled {
 		return false, defaultTimeout
@@ -1359,7 +1368,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.TykAPISpec.Lock()
 
-	_, enforcedTimeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, outreq)
+	isTimeoutEnforced, enforcedTimeout := checkHardTimeoutEnforced(p.TykAPISpec, outreq)
+
+	// limit request time with context timeout
+	if isTimeoutEnforced {
+		timeoutContext, cancel := context.WithTimeout(outreq.Context(), time.Duration(enforcedTimeout)*time.Second)
+		defer cancel()
+
+		outreq = outreq.WithContext(timeoutContext)
+	}
 
 	// create HTTP transport
 	createTransport := p.TykAPISpec.HTTPTransport == nil
@@ -1378,7 +1395,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			oldTransport.DisableKeepAlives = true
 		}
 
-		p.TykAPISpec.HTTPTransport = p.httpTransport(enforcedTimeout, rw, req, outreq)
+		timeout := proxyDefaultTimeout(p.TykAPISpec)
+
+		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
 		if oldTransport != nil {
@@ -1420,12 +1439,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		upstreamLatency time.Duration
 		err             error
 	)
-
-	// limit request time with context timeout
-	timeoutContext, cancel := context.WithTimeout(outreq.Context(), time.Duration(enforcedTimeout)*time.Second)
-	defer cancel()
-
-	outreq = outreq.WithContext(timeoutContext)
 
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
