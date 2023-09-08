@@ -538,8 +538,8 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-// This returns the expected 30 second default timeout in case
-// the ProxyDefaultTimeout value is undefined.
+// proxyDefaultTimeout returns the default timeout of 30 seconds
+// if the global ProxyDefaultTimeout value is undefined.
 func proxyDefaultTimeout(spec *APISpec) float64 {
 	if spec.GlobalConfig.ProxyDefaultTimeout > 0 {
 		return spec.GlobalConfig.ProxyDefaultTimeout
