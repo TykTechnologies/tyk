@@ -538,21 +538,35 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
+const defaultProxyTimeout float64 = 30
+
+func proxyTimeout(spec *APISpec) float64 {
+	if spec.GlobalConfig.ProxyDefaultTimeout > 0 {
+		return spec.GlobalConfig.ProxyDefaultTimeout
+	}
+	return defaultProxyTimeout
+}
+
+// CheckHardTimeoutEnforced checks APISpec versions for a fine grained timeout
+// value. The value is defined in seconds, but we're using float64 to enable
+// sub-second durations for tests. Changing to int would break that behaviour.
 func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
 	if !spec.EnforcedTimeoutEnabled {
-		return false, spec.GlobalConfig.ProxyDefaultTimeout
+		return false, 0
 	}
 
 	vInfo, _ := spec.Version(req)
 	versionPaths := spec.RxPaths[vInfo.Name]
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
-		intMeta := meta.(*int)
-		p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
-		return true, float64(*intMeta)
+		intMeta, ok := meta.(*int)
+		if ok && *intMeta > 0 {
+			p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
+			return true, float64(*intMeta)
+		}
 	}
 
-	return false, spec.GlobalConfig.ProxyDefaultTimeout
+	return false, 0
 }
 
 func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *http.Request) bool {
@@ -1317,6 +1331,16 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.TykAPISpec.Lock()
 
+	isTimeoutEnforced, enforcedTimeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, outreq)
+
+	// limit request time with context timeout
+	if isTimeoutEnforced {
+		timeoutContext, cancel := context.WithTimeout(outreq.Context(), time.Duration(enforcedTimeout)*time.Second)
+		defer cancel()
+
+		outreq = outreq.WithContext(timeoutContext)
+	}
+
 	// create HTTP transport
 	createTransport := p.TykAPISpec.HTTPTransport == nil
 
@@ -1334,7 +1358,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			oldTransport.DisableKeepAlives = true
 		}
 
-		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+		timeout := proxyTimeout(p.TykAPISpec)
+
 		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
@@ -1419,7 +1444,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
 
-		if strings.Contains(err.Error(), "timeout awaiting response headers") {
+		if strings.Contains(err.Error(), "timeout awaiting response headers") || strings.Contains(err.Error(), "context deadline exceeded") {
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", http.StatusGatewayTimeout, true)
 
 			if p.TykAPISpec.Proxy.ServiceDiscovery.UseDiscoveryService {
