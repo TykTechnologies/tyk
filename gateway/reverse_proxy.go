@@ -538,24 +538,19 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-// proxyDefaultTimeout returns the default timeout of 30 seconds
-// if the global ProxyDefaultTimeout value is undefined.
-func proxyDefaultTimeout(spec *APISpec) float64 {
+const defaultProxyTimeout float64 = 30
+
+func proxyTimeout(spec *APISpec) float64 {
 	if spec.GlobalConfig.ProxyDefaultTimeout > 0 {
 		return spec.GlobalConfig.ProxyDefaultTimeout
 	}
-	return 30
+	return defaultProxyTimeout
 }
 
 // CheckHardTimeoutEnforced checks APISpec versions for a fine grained timeout
 // value. The value is defined in seconds, but we're using float64 to enable
 // sub-second durations for tests. Changing to int would break that behaviour.
 func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
-	return checkHardTimeoutEnforced(spec, req)
-}
-
-// Returns if the request should have a hard timeout enforced and the timeout value configured.
-func checkHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
 	if !spec.EnforcedTimeoutEnabled {
 		return false, 0
 	}
@@ -566,6 +561,7 @@ func checkHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) 
 	if found {
 		intMeta, ok := meta.(*int)
 		if ok && *intMeta > 0 {
+			p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
 			return true, float64(*intMeta)
 		}
 	}
@@ -1367,7 +1363,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.TykAPISpec.Lock()
 
-	isTimeoutEnforced, enforcedTimeout := checkHardTimeoutEnforced(p.TykAPISpec, outreq)
+	isTimeoutEnforced, enforcedTimeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, outreq)
 
 	// limit request time with context timeout
 	if isTimeoutEnforced {
@@ -1394,7 +1390,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			oldTransport.DisableKeepAlives = true
 		}
 
-		timeout := proxyDefaultTimeout(p.TykAPISpec)
+		timeout := proxyTimeout(p.TykAPISpec)
 
 		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
