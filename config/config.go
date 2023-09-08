@@ -729,9 +729,9 @@ type Config struct {
 	DRLNotificationFrequency int `json:"drl_notification_frequency"`
 
 	// A distributed rate limiter is inaccurate on small rate limits, and it will fallback to a Redis or Sentinel rate limiter on an individual user basis, if its rate limiter lower then threshold.
-	// A Rate limiter threshold calculated using the following formula: `rate_threshold = drl_threshold * number_of_gateways`.
+	// A Rate limiter threshold is calculated using the following formula: `rate_threshold = drl_threshold * number_of_gateways`.
 	// So you have 2 Gateways, and your threshold is set to 5, if a user rate limit is larger than 10, it will use the distributed rate limiter algorithm.
-	// Default: 5
+	// If the threashold value is set to lower than 0 then the fallback is disabled and DRL will be used regardless of the rate limit. Default: 5.
 	DRLThreshold float64 `json:"drl_threshold"`
 
 	// Controls which algorthm to use as a fallback when your distributed rate limiter can't be used.
