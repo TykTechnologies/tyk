@@ -514,7 +514,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 			s[i].SessionProvider = gw.GetConfig().AuthOverride.SessionProvider
 		}
 	}
-	var filter []*APISpec
+	filter := make([]*APISpec, 0, len(s))
 	for _, v := range s {
 		if err := v.Validate(); err != nil {
 			mainLog.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")

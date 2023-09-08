@@ -606,7 +606,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 }
 
 func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfig config.Config, fromRPC bool) []*APISpec {
-	var specs []*APISpec
+	specs := make([]*APISpec, 0, len(apiDefs))
 
 	for _, def := range apiDefs {
 		if fromRPC {
@@ -653,9 +653,9 @@ func (a APIDefinitionLoader) GetOASFilepath(path string) string {
 // FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
 func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
-	var specs []*APISpec
 	// Grab json files from directory
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
+	specs := make([]*APISpec, 0, len(paths))
 	for _, path := range paths {
 		if strings.HasSuffix(path, "-oas.json") {
 			continue
@@ -774,7 +774,7 @@ func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, pa
 }
 
 func (a APIDefinitionLoader) compileMockResponsePathSpec(ignoreEndpointCase bool, paths []apidef.MockResponseMeta, specType URLStatus, conf config.Config) []URLSpec {
-	var urlSpec []URLSpec
+	urlSpec := make([]URLSpec, 0, len(paths))
 
 	for _, stringSpec := range paths {
 		if stringSpec.Disabled {
@@ -1104,7 +1104,7 @@ func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPlugi
 
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
-	var urlSpec []URLSpec
+	urlSpec := make([]URLSpec, 0, len(paths))
 
 	for _, stringSpec := range paths {
 		if stringSpec.Disabled {
@@ -1170,7 +1170,7 @@ func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.
 }
 
 func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.ValidatePathMeta, stat URLStatus, conf config.Config) []URLSpec {
-	var urlSpec []URLSpec
+	urlSpec := make([]URLSpec, 0, len(paths))
 
 	for _, stringSpec := range paths {
 		if stringSpec.Disabled {
