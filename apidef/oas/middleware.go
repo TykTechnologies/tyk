@@ -396,11 +396,12 @@ func (c *CORS) ExtractTo(cors *apidef.CORSConfig) {
 
 // Cache holds configuration for caching the requests.
 type Cache struct {
+	Ref string `bson:"$ref,omitempty" json:"$ref,omitempty"`
 	// Enabled turns global cache middleware on or off. It is still possible to enable caching on a per-path basis
 	// by explicitly setting the endpoint cache middleware.
 	//
 	// Tyk classic API definition: `cache_options.enable_cache`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
 
 	// Timeout is the TTL for a cached object in seconds.
 	//
