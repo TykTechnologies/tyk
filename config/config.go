@@ -86,7 +86,7 @@ type PoliciesConfig struct {
 	//
 	// This option should only be used when moving an installation to a new database.
 	AllowExplicitPolicyID bool `json:"allow_explicit_policy_id"`
-	// This option only applies in OSS deployment when the `policies.policy_source` is either set to `file` or an empty string. If `policies.policy_path` is set. Tyk will load policies from all the JSON files under the directory specified by the `policies.policy_path` option. When in this configuration. Tyk Gateway will allow policy management through the Gateway API.
+	// This option only applies in OSS deployment when the `policies.policy_source` is either set to `file` or an empty string. If `policies.policy_path` is set then Tyk will load policies from all the JSON files under the directory specified by the `policies.policy_path` option. In this configuration, Tyk Gateway will allow policy management through the Gateway API.
 	PolicyPath string `json:"policy_path"`
 }
 
