@@ -196,6 +196,14 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Checkout of tyk-automated-tests
+        uses: actions/checkout@v3
+        with:
+          repository: TykTechnologies/tyk-automated-tests
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref_name || 'master' }}
+          path: tyk-automated-tests
+
       - uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
@@ -216,8 +224,13 @@ jobs:
           detached: true
           limit-access-to-actor: true
 
+      - name: debug
+        shell: bash
+        run: ls -R
+
       - name: env up
         shell: bash
+        working-directory: tyk-automated-tests/ci/auto
         env:
           t: ${{ needs.goreleaser.outputs.tags }}
           # gw and dash use the same branch names
@@ -231,10 +244,6 @@ jobs:
           echo CI tags: $t
           tags=($t)
           echo First tag: ${tags[0]}
-          # Get the ci test env in a temp dir
-          cd $(mktemp -d autoXXX)
-          gh release download v1 --pattern '*.tgz' -R TykTechnologies/tyk-ci
-          tar --strip-components=1 -xvf ci-env.tgz
           # Start customising env
           echo "registry=${{ steps.ecr.outputs.registry }}
           tyk_image=\${registry}/tyk:${gw_dash_image_tag}
@@ -254,6 +263,7 @@ jobs:
           docker compose -p auto -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env up --quiet-pull -d
 
       - name: Run tests
+        working-directory: tyk-automated-tests/ci/auto
         run: |
           docker run --rm --network auto_default \
           754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
