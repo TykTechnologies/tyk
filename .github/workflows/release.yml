@@ -187,6 +187,7 @@ jobs:
       matrix:
         conf: [ "sha256", "murmur64" ]
         db: [ "mongo44", "postgres15" ]
+        flavour: [ "pro-ha" ]
         include:
           - db: postgres15
             markers: "and not sql"
@@ -224,15 +225,14 @@ jobs:
           detached: true
           limit-access-to-actor: true
 
-      - name: debug
-        shell: bash
-        run: ls -R
-
       - name: env up
         shell: bash
-        working-directory: ./tyk-automated-tests/ci/auto
+        working-directory: tyk-automated-tests/ci/auto
+        id: env_up
         env:
           t: ${{ needs.goreleaser.outputs.tags }}
+          tyk_ci_version: 'v1.1'
+          pull_policy: 'if_not_present'
           # gw and dash use the same branch names
           gw_dash_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk' || github.repository == 'TykTechnologies/tyk-analytics') && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
           pump_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-pump' && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
@@ -260,22 +260,27 @@ jobs:
           tyk_pump_image=\${registry}/tyk-pump:${pump_image_tag}
           # override default with just built tag
           tyk_image=${tags[0]}
+          tyk_alfa_image=${tags[0]}
+          tyk_beta_image=${tags[0]}
           # base dir for config files
-          confs_dir=./pro
+          confs_dir=./"${{ matrix.flavour }}"
           # pick database
           env_file=local-${{ matrix.db }}.env
           " > versions.env
           # Add Tyk component config variations to $env_file
           cat confs/${{ matrix.conf }}.env >> local-${{ matrix.db }}.env
           # bring up env, the project name is important
-          docker compose -p auto -f pro.yml -f deps.yml -f ${{ matrix.db }}.yml --env-file versions.env up --quiet-pull -d
+          docker compose -p auto -f "${{ matrix.flavour }}".yml -f deps_"${{ matrix.flavour }}".yml -f ${{ matrix.db }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
+          ./dash-bootstrap.sh http://localhost:3000
+          docker compose -p auto -f "${{ matrix.flavour }}".yml -f deps_"${{ matrix.flavour }}".yml -f ${{ matrix.db }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
 
       - name: Run tests
-        working-directory: ./tyk-automated-tests/ci/auto
+        env:
+          working-directory: tyk-automated-tests/ci/auto
         run: |
-          docker run --rm --network auto_default \
+          docker run --rm --network auto_default --env-file ${auto_dir}/pytest.env \
           754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
-          pytest -c pytest_ci.ini -m "not local and not mdcb and not dind ${{ matrix.markers }}"
+          pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}"
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
 
@@ -440,4 +445,3 @@ jobs:
                   cd -
               fi
           done
-
