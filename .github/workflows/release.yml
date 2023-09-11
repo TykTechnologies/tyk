@@ -200,7 +200,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: TykTechnologies/tyk-automated-tests
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.ORG_GH_TOKEN }}
           ref: 'TD-2240/add-auto-folder-back'
           path: tyk-automated-tests
 
