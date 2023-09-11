@@ -223,7 +223,7 @@ jobs:
         env:
           t: ${{ needs.goreleaser.outputs.tags }}
           tyk_ci_version: 'v1.1'
-          pull_image: 'if_not_present'
+          pull_policy: 'if_not_present'
           # gw and dash use the same branch names
           gw_dash_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk' || github.repository == 'TykTechnologies/tyk-analytics') && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
           pump_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-pump' && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
