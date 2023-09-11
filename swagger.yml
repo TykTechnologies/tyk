@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Tyk Gateway API
-  version: 5.1.0
+  version: 5.2.0
   description: |-
     The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway system. This API is very small, and has no granular permissions system. It is intended to be used purely for internal automation and integration.
 
@@ -26,8 +26,8 @@ info:
     <br/>
     <b>The Tyk Gateway API is subsumed by the Tyk Dashboard API in Pro installations.</b>
 servers:
-  - url: 'http://localhost/'
-  - url: 'https://localhost/'
+  - url: "http://localhost/"
+  - url: "https://localhost/"
 tags:
   - name: Keys
     description: |-
@@ -42,8 +42,7 @@ tags:
     description: |-
       Sometimes a cache might contain stale data, or it may just need to be cleared because of an invalid configuration. This call will purge all keys associated with a cache on an API-by-API basis.
   - name: Hot Reload
-    description:
-      Force restart of the Gateway or whole cluster
+    description: Force restart of the Gateway or whole cluster
   - name: Health Checking
     description: Check health status of the Gateway and loaded APIs
   - name: Organisation Quotas
@@ -215,9 +214,9 @@ tags:
       * `cache_options.cache_timeout`: The amount of time, in seconds, to keep cached objects, defaults to `60` seconds.
 
       * `cache_options.cache_all_safe_requests`: Set this to `true` if you want all *safe* requests (GET, HEAD, OPTIONS) to be cached. This is a blanket setting for APIs where caching is required but you don't want to set individual paths up in the definition.
-      
+
       * `cache_options.enable_upstream_cache_control`: Set this to `true` if you want your application to control the cache options for Tyk (TTL and whether to cache or not). See [Caching](/docs/basic-config-and-security/reduce-latency/caching/) for more details.
-      
+
       * `response_processors`: Response processors need to be specifically defined so they are loaded on API creation, otherwise the middleware will not fire. In order to have the two main response middleware components fire, the following configuration object should be supplied.
 
       ```{json}
@@ -237,7 +236,6 @@ tags:
       ```
       The options for the `header_injector` are global, and will apply to all outbound requests.
 
-
   - name: APIs
     description: |-
       **Note: Applies only to Tyk Gateway Community Edition**
@@ -248,7 +246,7 @@ tags:
 
       These methods only work on a single API node. If updating a cluster, it is important to ensure that all nodes are updated before initiating a reload.
 paths:
-  '/tyk/apis':
+  "/tyk/apis":
     get:
       description: |-
         List APIs
@@ -257,14 +255,14 @@ paths:
         - APIs
       operationId: listApis
       responses:
-        '200':
+        "200":
           description: List of API definitions
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/APIDefinition'
+                  $ref: "#/components/schemas/APIDefinition"
               example:
                 - name: "TestAPI"
                   use_keyless: true
@@ -315,7 +313,7 @@ paths:
               proxy:
                 listen_path: "/test"
       responses:
-        '200':
+        "200":
           description: API created
           content:
             application/json:
@@ -325,7 +323,7 @@ paths:
                 status: "ok"
                 action: "created"
                 key: "{...API JSON definition...}"
-        '400':
+        "400":
           description: Malformed data
           content:
             application/json:
@@ -337,12 +335,12 @@ paths:
   /tyk/apis/oas:
     get:
       description: |-
-         List all OAS format APIs, when used without the Tyk Dashboard.
+        List all OAS format APIs, when used without the Tyk Dashboard.
       tags:
         - OAS APIs
       operationId: listApisOAS
       parameters:
-        - description: |- 
+        - description: |-
             Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. 
             When mode=public, OAS spec excluding Tyk extension will be returned in the response
           name: mode
@@ -351,14 +349,14 @@ paths:
             type: string
           example: public
       responses:
-        '200':
+        "200":
           description: List of API definitions in OAS format
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/OASSchemaResponse'
+                  $ref: "#/components/schemas/OASSchemaResponse"
     post:
       description: |-
         Create API with OAS format
@@ -397,7 +395,7 @@ paths:
             schema:
               $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
       responses:
-        '200':
+        "200":
           description: API created
           content:
             application/json:
@@ -407,7 +405,7 @@ paths:
                 status: "ok"
                 action: "created"
                 key: "{...API JSON definition...}"
-        '400':
+        "400":
           description: Malformed data
           content:
             application/json:
@@ -417,7 +415,7 @@ paths:
                 status: "error"
                 message: "Malformed API data"
 
-  '/tyk/apis/{apiID}':
+  "/tyk/apis/{apiID}":
     parameters:
       - description: The API ID
         name: apiID
@@ -433,7 +431,7 @@ paths:
         - APIs
       operationId: getApi
       responses:
-        '200':
+        "200":
           description: API definition
           content:
             application/json:
@@ -471,7 +469,7 @@ paths:
               proxy:
                 listen_path: "/test"
       responses:
-        '200':
+        "200":
           description: API updated
           content:
             application/json:
@@ -481,7 +479,7 @@ paths:
                 status: "ok"
                 action: "updated"
                 key: "{...API JSON definition...}"
-        '400':
+        "400":
           description: Malformed data
           content:
             application/json:
@@ -498,21 +496,21 @@ paths:
         - APIs
       operationId: deleteApi
       responses:
-        '200':
+        "200":
           description: API deleted
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: API deleted
                 status: ok
-        '400':
+        "400":
           description: No API ID specified
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: API ID not specified
                 status: error
@@ -532,10 +530,10 @@ paths:
         - APIs
       operationId: listApiVersions
       parameters:
-        - $ref: '#/components/parameters/SearchText'
-        - $ref: '#/components/parameters/AccessType'
+        - $ref: "#/components/parameters/SearchText"
+        - $ref: "#/components/parameters/AccessType"
       responses:
-        '200':
+        "200":
           description: API version metas
           content:
             application/json:
@@ -544,9 +542,9 @@ paths:
                   apis:
                     type: array
                     items:
-                      $ref: '#/components/schemas/APIVersionMeta'
+                      $ref: "#/components/schemas/APIVersionMeta"
 
-  '/tyk/apis/oas/{apiID}':
+  "/tyk/apis/oas/{apiID}":
     parameters:
       - description: The API ID
         name: apiID
@@ -571,7 +569,7 @@ paths:
           example: public
       operationId: listApiOAS
       responses:
-        '200':
+        "200":
           description: API definition
           content:
             application/json:
@@ -597,7 +595,7 @@ paths:
             schema:
               $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
       responses:
-        '200':
+        "200":
           description: API updated
           content:
             application/json:
@@ -607,7 +605,7 @@ paths:
                 status: "ok"
                 action: "updated"
                 key: "{...API JSON definition...}"
-        '400':
+        "400":
           description: Malformed data
           content:
             application/json:
@@ -625,20 +623,20 @@ paths:
         - OAS APIs
       operationId: patchApiOAS
       parameters:
-        - $ref: '#/components/parameters/UpstreamURL'
-        - $ref: '#/components/parameters/ListenPath'
-        - $ref: '#/components/parameters/CustomDomain'
-        - $ref: '#/components/parameters/ValidateRequest'
-        - $ref: '#/components/parameters/AllowList'
-        - $ref: '#/components/parameters/MockResponse'
-        - $ref: '#/components/parameters/Authentication'
+        - $ref: "#/components/parameters/UpstreamURL"
+        - $ref: "#/components/parameters/ListenPath"
+        - $ref: "#/components/parameters/CustomDomain"
+        - $ref: "#/components/parameters/ValidateRequest"
+        - $ref: "#/components/parameters/AllowList"
+        - $ref: "#/components/parameters/MockResponse"
+        - $ref: "#/components/parameters/Authentication"
       requestBody:
         content:
           application/json:
             schema:
               $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
       responses:
-        '200':
+        "200":
           description: API patched
           content:
             application/json:
@@ -648,7 +646,7 @@ paths:
                 status: "ok"
                 action: "modified"
                 key: "{updated APIID}"
-        '400':
+        "400":
           description: Bad request
           content:
             application/json:
@@ -693,21 +691,21 @@ paths:
         - OAS APIs
       operationId: deleteOASApi
       responses:
-        '200':
+        "200":
           description: API deleted
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: API deleted
                 status: ok
-        '400':
+        "400":
           description: No API ID specified
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: API ID not specified
                 status: error
@@ -727,10 +725,10 @@ paths:
         - OASAPIs
       operationId: listOASApiVersions
       parameters:
-        - $ref: '#/components/parameters/SearchText'
-        - $ref: '#/components/parameters/AccessType'
+        - $ref: "#/components/parameters/SearchText"
+        - $ref: "#/components/parameters/AccessType"
       responses:
-        '200':
+        "200":
           description: API version metas
           content:
             application/json:
@@ -739,10 +737,9 @@ paths:
                   apis:
                     type: array
                     items:
-                      $ref: '#/components/schemas/APIVersionMeta'
+                      $ref: "#/components/schemas/APIVersionMeta"
 
-
-  '/tyk/apis/oas/{apiID}/export':
+  "/tyk/apis/oas/{apiID}/export":
     parameters:
       - description: The API ID
         name: apiID
@@ -766,7 +763,7 @@ paths:
             type: string
           example: public
       responses:
-        '200':
+        "200":
           description: API definition
           content:
             application/json:
@@ -789,14 +786,14 @@ paths:
             type: string
           example: public
       responses:
-        '200':
+        "200":
           description: API definition
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/OASSchemaResponse'
+                  $ref: "#/components/schemas/OASSchemaResponse"
   /tyk/apis/oas/import:
     post:
       description: |-
@@ -806,21 +803,21 @@ paths:
         - OAS APIs
       operationId: importOAS
       parameters:
-        - $ref: '#/components/parameters/UpstreamURL'
-        - $ref: '#/components/parameters/ListenPath'
-        - $ref: '#/components/parameters/CustomDomain'
-        - $ref: '#/components/parameters/ApiID'
-        - $ref: '#/components/parameters/AllowList'
-        - $ref: '#/components/parameters/MockResponse'
-        - $ref: '#/components/parameters/ValidateRequest'
-        - $ref: '#/components/parameters/Authentication'
+        - $ref: "#/components/parameters/UpstreamURL"
+        - $ref: "#/components/parameters/ListenPath"
+        - $ref: "#/components/parameters/CustomDomain"
+        - $ref: "#/components/parameters/ApiID"
+        - $ref: "#/components/parameters/AllowList"
+        - $ref: "#/components/parameters/MockResponse"
+        - $ref: "#/components/parameters/ValidateRequest"
+        - $ref: "#/components/parameters/Authentication"
       requestBody:
         content:
           application/json:
             schema:
               $ref: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
       responses:
-        '200':
+        "200":
           description: API definition created
           content:
             application/json:
@@ -830,7 +827,7 @@ paths:
                 status: "ok"
                 action: "added"
                 key: "{created APIID}"
-        '400':
+        "400":
           description: Bad request
           content:
             application/json:
@@ -848,8 +845,8 @@ paths:
                     message: "invalid upstream URL"
                     status: "error"
         500:
-         description: When an import request is sent using your Tyk Dashboard app configs
-         content:
+          description: When an import request is sent using your Tyk Dashboard app configs
+          content:
             application/json:
               schema:
                 $ref: "#/components/schemas/apiStatusMessage"
@@ -858,7 +855,7 @@ paths:
                 value:
                   message: "Due to enabled use_db_app_configs, please use the Dashboard API"
                   status: "error"
-  '/tyk/cache/{apiID}':
+  "/tyk/cache/{apiID}":
     parameters:
       - description: The API ID
         name: apiID
@@ -873,16 +870,16 @@ paths:
         - Cache Invalidation
       operationId: invalidateCache
       responses:
-        '200':
+        "200":
           description: Invalidate cache
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: cache invalidated
                 status: ok
-  '/tyk/reload/':
+  "/tyk/reload/":
     get:
       summary: Hot-reload a single node
       description: Tyk is capable of reloading configurations without having to stop serving requests. This means that API configurations can be added at runtime, or even modified at runtime and those rules applied immediately without any downtime.
@@ -898,15 +895,15 @@ paths:
         - Hot Reload
       operationId: hotReload
       responses:
-        '200':
+        "200":
           description: Reload gateway
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 status: ok
-  '/tyk/reload/group':
+  "/tyk/reload/group":
     get:
       summary: Hot-reload a Tyk group
       description: To reload a whole group of Tyk nodes (without using the Dashboard or host manager). You can send an API request to a single node, this node will then send a notification through the pub/sub infrastructure to all other listening nodes (including the host manager if it is being used to manage NginX) which will then trigger a global reload.
@@ -914,33 +911,33 @@ paths:
         - Hot Reload
       operationId: hotReloadGroup
       responses:
-        '200':
+        "200":
           description: Reload the Tyk Gateway
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 status: ok
-  '/tyk/hello':
+  "/tyk/hello":
     get:
       summary: Check the Health of the Tyk Gateway
       description: |
         From v2.7.5 you can now rename the `/hello`  endpoint by using the `health_check_endpoint_name` option
-        
+
         Returns 200 response in case of success
       tags:
         - Health Checking
       operationId: hello
       responses:
-        '200':
+        "200":
           description: Success
           content:
             text/html:
               schema:
                 type: string
               example: "Hello Tiki"
-  '/tyk/certs':
+  "/tyk/certs":
     get:
       parameters:
         - description: Organisation ID to list the certificates
@@ -955,31 +952,31 @@ paths:
           required: false
           schema:
             type: string
-          example: 'detailed'
+          example: "detailed"
         - description: Comma separated list of certificates to list
           name: certID
           in: query
           required: false
           schema:
             type: string
-          example: 'e6ce2b49-3e31-44de-95a7-12f054724283,234a37ac-28d1-4f12-b936-ffb4211b79f1'
+          example: "e6ce2b49-3e31-44de-95a7-12f054724283,234a37ac-28d1-4f12-b936-ffb4211b79f1"
       summary: List Certificates
       description: List All Certificates in the Tyk Gateway
       tags:
         - Certs
       operationId: listCerts
       responses:
-        '200':
+        "200":
           description: List of all Certificates
           content:
             application/json:
               schema:
                 oneOf:
-                  - $ref: '#/components/schemas/APIAllCertificates'
-                  - $ref: '#/components/schemas/APIAllCertificateBasics'
+                  - $ref: "#/components/schemas/APIAllCertificates"
+                  - $ref: "#/components/schemas/APIAllCertificateBasics"
                   - type: array
                     items:
-                      $ref: '#/components/schemas/CertificateMeta'
+                      $ref: "#/components/schemas/CertificateMeta"
     post:
       summary: Add a certificate
       description: Add a certificate to the Tyk Gateway
@@ -999,22 +996,22 @@ paths:
             schema:
               type: string
       responses:
-        '200':
+        "200":
           description: New Key added
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APICertificateStatusMessage'
+                $ref: "#/components/schemas/APICertificateStatusMessage"
               example:
-                id: 'e6ce2b49-3e31-44de-95a7-12f054724283'
-                message: 'Certificate added'
+                id: "e6ce2b49-3e31-44de-95a7-12f054724283"
+                message: "Certificate added"
                 status: ok
-        '403':
+        "403":
           description: Malformed data
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: Malformed cert data
                 status: error
@@ -1038,17 +1035,17 @@ paths:
         - Certs
       operationId: deleteCerts
       responses:
-        '200':
+        "200":
           description: Deleted certificate
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: removed
                 status: ok
 
-  '/tyk/keys':
+  "/tyk/keys":
     get:
       summary: List Keys
       description: You can retrieve all the keys in your Tyk instance. Returns an array of Key IDs.
@@ -1056,7 +1053,7 @@ paths:
         - Keys
       operationId: listKeys
       responses:
-        '200':
+        "200":
           description: List of all API keys
           content:
             application/json:
@@ -1085,26 +1082,26 @@ paths:
               per: 5
               org_id: 53ac07777cbb8c2d53000002
       responses:
-        '200':
+        "200":
           description: New Key added
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiModifyKeySuccess'
+                $ref: "#/components/schemas/apiModifyKeySuccess"
               example:
                 action: created
-                key: '{...KEY JSON definition...}'
+                key: "{...KEY JSON definition...}"
                 status: ok
-        '400':
+        "400":
           description: Malformed data
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: Malformed Key data
                 status: error
-  '/tyk/keys/{keyID}':
+  "/tyk/keys/{keyID}":
     parameters:
       - description: The Key ID
         name: keyID
@@ -1125,12 +1122,12 @@ paths:
         - Keys
       operationId: getKey
       responses:
-        '200':
+        "200":
           description: Key object
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SessionState'
+                $ref: "#/components/schemas/SessionState"
               example:
                 quota_max: 60
                 quota_renews: 1406121006
@@ -1169,21 +1166,21 @@ paths:
             type: string
             enum: ["1"]
       responses:
-        '200':
+        "200":
           description: Key updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiModifyKeySuccess'
+                $ref: "#/components/schemas/apiModifyKeySuccess"
               example:
                 action: updated
                 status: ok
-        '400':
+        "400":
           description: No or incorrect Key ID specified
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: Key ID not specified
                 status: error
@@ -1275,21 +1272,21 @@ paths:
             type: string
             enum: ["1"]
       responses:
-        '200':
+        "200":
           description: Key updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiModifyKeySuccess'
+                $ref: "#/components/schemas/apiModifyKeySuccess"
               example:
                 action: updated
                 status: ok
-        '400':
+        "400":
           description: No or incorrect Key ID specified
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: Key ID not specified
                 status: error
@@ -1300,16 +1297,16 @@ paths:
         - Keys
       operationId: deleteKey
       responses:
-        '200':
+        "200":
           description: Key deleted
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 action: Key deleted
                 status: ok
-  '/tyk/policies':
+  "/tyk/policies":
     get:
       summary: List Policies
       description: You can retrieve all the policies in your Tyk instance. Returns an array policies.
@@ -1317,7 +1314,7 @@ paths:
         - Policies
       operationId: listPolicies
       responses:
-        '200':
+        "200":
           description: List of all policies
           content:
             application/json:
@@ -1345,34 +1342,34 @@ paths:
               per: 5
               org_id: 53ac07777cbb8c2d53000002
       responses:
-        '200':
+        "200":
           description: Policy created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiModifyKeySuccess'
+                $ref: "#/components/schemas/apiModifyKeySuccess"
               example:
                 action: created
                 status: ok
-        '400':
+        "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: Request malformed
                 status: error
-        '500':
+        "500":
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: Failed to create file!
                 status: error
-  '/tyk/policies/{polID}':
+  "/tyk/policies/{polID}":
     parameters:
       - description: The policy ID
         name: polID
@@ -1387,18 +1384,18 @@ paths:
         - Policies
       operationId: getPolicy
       responses:
-        '200':
+        "200":
           description: Get details of a single Policy
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Policy"
-        '404':
+        "404":
           description: Policy not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: Policy not found
                 status: error
@@ -1422,30 +1419,30 @@ paths:
               per: 5
               org_id: 53ac07777cbb8c2d53000002
       responses:
-        '200':
+        "200":
           description: Policy updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiModifyKeySuccess'
+                $ref: "#/components/schemas/apiModifyKeySuccess"
               example:
                 action: updated
                 status: ok
-        '400':
+        "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: PUT operation on different IDs
                 status: error
-        '500':
+        "500":
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: Failed to create file!
                 status: error
@@ -1456,32 +1453,32 @@ paths:
         - Policies
       operationId: deletePolicy
       responses:
-        '200':
+        "200":
           description: Delete policy by ID
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiModifyKeySuccess'
+                $ref: "#/components/schemas/apiModifyKeySuccess"
               example:
                 action: deleted
                 status: ok
-        '500':
+        "500":
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 message: Delete failed
                 status: error
-  '/tyk/oauth/clients/create':
+  "/tyk/oauth/clients/create":
     post:
       summary: Create new OAuth client
-      description: Any OAuth keys must be generated with the help of a client ID. These need to be pre-registered with Tyk before they can be used (in a similar vein to how you would register your app with Twitter before attempting to ask user permissions using their API).
+      description:
+        Any OAuth keys must be generated with the help of a client ID. These need to be pre-registered with Tyk before they can be used (in a similar vein to how you would register your app with Twitter before attempting to ask user permissions using their API).
         <br/><br/>
         <h3>Creating OAuth clients with Access to Multiple APIs</h3>
         New from Tyk Gateway 2.6.0 is the ability to create OAuth clients with access to more than one API. If you provide the api_id it works the same as in previous releases. If you don't provide the api_id the request uses policy access rights and enumerates APIs from their setting in the newly created OAuth-client.
-
 
       tags:
         - OAuth
@@ -1496,17 +1493,17 @@ paths:
               api_id: id
               policy_id: policy
       responses:
-        '200':
+        "200":
           description: Client created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NewClientRequest'
+                $ref: "#/components/schemas/NewClientRequest"
               example:
                 client_id: test
                 api_id: id
                 policy_id: policy
-  '/tyk/oauth/clients/{apiID}':
+  "/tyk/oauth/clients/{apiID}":
     put:
       summary: Update OAuth metadata and Policy ID
       description: Allows you to update the metadata and Policy ID for an OAuth client.
@@ -1521,14 +1518,14 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: OAuth client metadata updated
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/NewClientRequest'
+                  $ref: "#/components/schemas/NewClientRequest"
     get:
       summary: List oAuth clients
       description: OAuth Clients are organised by API ID, and therefore are queried as such.
@@ -1543,15 +1540,15 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Get OAuth client details or a list of OAuth clients
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/NewClientRequest'
-  '/tyk/oauth/clients/{apiID}/{keyName}':
+                  $ref: "#/components/schemas/NewClientRequest"
+  "/tyk/oauth/clients/{apiID}/{keyName}":
     get:
       summary: Get OAuth client
       tags:
@@ -1572,12 +1569,12 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Get OAuth client details or a list of OAuth clients
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NewClientRequest'
+                $ref: "#/components/schemas/NewClientRequest"
               example:
                 client_id: test
                 api_id: id
@@ -1603,19 +1600,20 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: OAuth client deleted
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiModifyKeySuccess'
+                $ref: "#/components/schemas/apiModifyKeySuccess"
               example:
                 action: deleted
                 status: ok
-  '/tyk/oauth/clients/{apiID}/{keyName}/tokens':
+  "/tyk/oauth/clients/{apiID}/{keyName}/tokens":
     get:
       summary: List tokens
-      description: This endpoint allows you to retrieve a list of all current tokens and their expiry date for a provided API ID and OAuth-client ID in the following format. This endpoint will work only for newly created tokens.
+      description:
+        This endpoint allows you to retrieve a list of all current tokens and their expiry date for a provided API ID and OAuth-client ID in the following format. This endpoint will work only for newly created tokens.
         <br/>
         <br/>
         You can control how long you want to store expired tokens in this list using `oauth_token_expired_retain_period` gateway option, which specifies retain period for expired tokens stored in Redis. By default expired token not get removed. See <a href="https://tyk.io/docs/configure/tyk-gateway-configuration-options/#a-name-oauth-token-expired-retain-period-a-oauth-token-expired-retain-period" target="_blank">here</a> for more details.
@@ -1637,7 +1635,7 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Get a list of tokens
           content:
             application/json:
@@ -1648,7 +1646,7 @@ paths:
               example:
                 - "tok1"
                 - "tok2"
-  '/tyk/oauth/revoke':
+  "/tyk/oauth/revoke":
     post:
       description: revoke a single token
       summary: revoke token
@@ -1675,9 +1673,9 @@ paths:
         - OAuth
       operationId: revokeSingleToken
       responses:
-        '200':
+        "200":
           description: Succesful response
-  '/tyk/oauth/revoke_all':
+  "/tyk/oauth/revoke_all":
     post:
       description: revoke all the tokens for a given oauth client
       summary: revoke all client's tokens
@@ -1701,14 +1699,14 @@ paths:
         - OAuth
       operationId: revokeAllTokens
       responses:
-        '200':
+        "200":
           description: Succesful response
-        '400':
+        "400":
           description: Bad request, form malformed or client secret and client id doesn't match
-        '404':
+        "404":
           description: oauth client doesn't have any api related
 
-  '/tyk/oauth/refresh/{keyName}':
+  "/tyk/oauth/refresh/{keyName}":
     delete:
       summary: Invalidate OAuth refresh token
       description: It is possible to invalidate refresh tokens in order to manage OAuth client access more robustly.
@@ -1729,13 +1727,13 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Deleted
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiModifyKeySuccess'
-  '/tyk/oauth/authorize-client/':
+                $ref: "#/components/schemas/apiModifyKeySuccess"
+  "/tyk/oauth/authorize-client/":
     post:
       description: With the OAuth flow you will need to create authorisation or access tokens for your clients, in order to do this, Tyk provides a private API endpoint for your application to generate these codes and redirect the end-user back to the API Client.
       summary: Authorize client
@@ -1762,12 +1760,12 @@ paths:
               response_type: code
               client_id: 21e2baf424674f6461faca6d45285bbb
               redirect_uri: http%3A%2F%2Foauth.com%2Fredirect
-              key_rules: '%7B+++++%22allowance%22%3A+999%2C+++++%22rate%22%3A+1000%2C+++++%22per%22%3A+60%2C+++++%22expires%22%3A+0%2C+++++%22quota_max%22%3A+-1%2C+++++%22quota_renews%22%3A+1406121006%2C+++++%22quota_remaining%22%3A+0%2C+++++%22quota_renewal_rate%22%3A+60%2C+++++%22access_rights%22%3A+%7B+++++++++%22528a67c1ac9940964f9a41ae79235fcc%22%3A+%7B+++++++++++++%22api_name%22%3A+%22OAuth+Test+API%22%2C+++++++++++++%22api_id%22%3A+%22528a67c1ac9940964f9a41ae79235fcc%22%2C+++++++++++++%22versions%22%3A+%5B+++++++++++++++++%22Default%22+++++++++++++%5D+++++++++%7D+++++%7D%2C+++++%22org_id%22%3A+%2253ac07777cbb8c2d53000002%22+%7D'
+              key_rules: "%7B+++++%22allowance%22%3A+999%2C+++++%22rate%22%3A+1000%2C+++++%22per%22%3A+60%2C+++++%22expires%22%3A+0%2C+++++%22quota_max%22%3A+-1%2C+++++%22quota_renews%22%3A+1406121006%2C+++++%22quota_remaining%22%3A+0%2C+++++%22quota_renewal_rate%22%3A+60%2C+++++%22access_rights%22%3A+%7B+++++++++%22528a67c1ac9940964f9a41ae79235fcc%22%3A+%7B+++++++++++++%22api_name%22%3A+%22OAuth+Test+API%22%2C+++++++++++++%22api_id%22%3A+%22528a67c1ac9940964f9a41ae79235fcc%22%2C+++++++++++++%22versions%22%3A+%5B+++++++++++++++++%22Default%22+++++++++++++%5D+++++++++%7D+++++%7D%2C+++++%22org_id%22%3A+%2253ac07777cbb8c2d53000002%22+%7D"
       tags:
         - OAuth
       operationId: authorizeClient
       responses:
-        '200':
+        "200":
           description: Succesful response
           content:
             application/json:
@@ -1775,8 +1773,8 @@ paths:
                 type: object
               example:
                 code: MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk
-                redirect_to: 'http://client-app.com/oauth-redirect/?code=MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk'
-  '/tyk/org/keys':
+                redirect_to: "http://client-app.com/oauth-redirect/?code=MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk"
+  "/tyk/org/keys":
     get:
       summary: List Organisation Keys
       description: |-
@@ -1785,7 +1783,7 @@ paths:
         - Organisation Quotas
       operationId: listOrgKeys
       responses:
-        '200':
+        "200":
           description: List of all API keys
           content:
             application/json:
@@ -1800,7 +1798,7 @@ paths:
                 keys:
                   - "key1"
                   - "key2"
-  '/tyk/org/keys/{keyID}':
+  "/tyk/org/keys/{keyID}":
     parameters:
       - description: The Key ID
         name: keyID
@@ -1815,12 +1813,12 @@ paths:
         - Organisation Quotas
       operationId: getOrgKey
       responses:
-        '200':
+        "200":
           description: Key object
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SessionState'
+                $ref: "#/components/schemas/SessionState"
     post:
       summary: Create an organisation key
       description: |-
@@ -1842,15 +1840,15 @@ paths:
               per: 5
               org_id: 53ac07777cbb8c2d53000002
       responses:
-        '200':
+        "200":
           description: New Key added
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiModifyKeySuccess'
+                $ref: "#/components/schemas/apiModifyKeySuccess"
               example:
                 action: created
-                key: '{...KEY JSON definition...}'
+                key: "{...KEY JSON definition...}"
                 status: ok
     put:
       summary: Update Organisation Key
@@ -1884,12 +1882,12 @@ paths:
             type: string
             enum: ["1"]
       responses:
-        '200':
+        "200":
           description: Key updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiModifyKeySuccess'
+                $ref: "#/components/schemas/apiModifyKeySuccess"
               example:
                 action: updated
                 status: ok
@@ -1900,16 +1898,16 @@ paths:
         - Organisation Quotas
       operationId: deleteOrgKey
       responses:
-        '200':
+        "200":
           description: Key deleted
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
+                $ref: "#/components/schemas/apiStatusMessage"
               example:
                 action: Key deleted
                 status: ok
-  '/{listen_path}/tyk/batch':
+  "/{listen_path}/tyk/batch":
     parameters:
       - name: listen_path
         in: path
@@ -1923,13 +1921,13 @@ paths:
         - Batch requests
       operationId: batch
       responses:
-        '200':
+        "200":
           description: Success
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/apiStatusMessage'
-  '/tyk/schema':
+                $ref: "#/components/schemas/apiStatusMessage"
+  "/tyk/schema":
     get:
       description: |-
         Get OAS schema
@@ -1943,33 +1941,33 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: OAS schema response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OASSchemaResponse'
+                $ref: "#/components/schemas/OASSchemaResponse"
               example:
                 status: Success
                 schema: <open api 3.0.3 schema>
-        '400':
+        "400":
           description: The response when the parameter oasVersion is missing
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OASSchemaResponse'
+                $ref: "#/components/schemas/OASSchemaResponse"
               example:
-                message: 'Should provide a value for parameter oasVersion'
-                status: 'Failed'
-        '404':
+                message: "Should provide a value for parameter oasVersion"
+                status: "Failed"
+        "404":
           description: The response when the requested OAS schema is not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OASSchemaResponse'
+                $ref: "#/components/schemas/OASSchemaResponse"
               example:
-                message: 'Schema not found for version 5.0.0'
-                status: 'Failed'
+                message: "Schema not found for version 5.0.0"
+                status: "Failed"
 
 components:
   responses:
@@ -1977,7 +1975,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/OAuthClientToken'
+            $ref: "#/components/schemas/OAuthClientToken"
       description: parameterBodies
   schemas:
     APIDefinition:
@@ -2038,11 +2036,11 @@ components:
           type: string
           x-go-name: APIID
         auth:
-          $ref: '#/components/schemas/Auth'
+          $ref: "#/components/schemas/Auth"
         auth_provider:
-          $ref: '#/components/schemas/AuthProviderMeta'
+          $ref: "#/components/schemas/AuthProviderMeta"
         base_identity_provided_by:
-          $ref: '#/components/schemas/AuthTypeEnum'
+          $ref: "#/components/schemas/AuthTypeEnum"
         basic_auth:
           properties:
             body_password_regexp:
@@ -2069,7 +2067,7 @@ components:
           type: array
           x-go-name: BlacklistedIPs
         cache_options:
-          $ref: '#/components/schemas/CacheOptions'
+          $ref: "#/components/schemas/CacheOptions"
         certificates:
           items:
             type: string
@@ -2086,7 +2084,7 @@ components:
           type: object
           x-go-name: ConfigData
         custom_middleware:
-          $ref: '#/components/schemas/MiddlewareSection'
+          $ref: "#/components/schemas/MiddlewareSection"
         custom_middleware_bundle:
           type: string
           x-go-name: CustomMiddlewareBundle
@@ -2140,13 +2138,13 @@ components:
           type: boolean
           x-go-name: EnableSignatureChecking
         event_handlers:
-          $ref: '#/components/schemas/EventHandlerMetaConfig'
+          $ref: "#/components/schemas/EventHandlerMetaConfig"
         expire_analytics_after:
           format: int64
           type: integer
           x-go-name: ExpireAnalyticsAfter
         global_rate_limit:
-          $ref: '#/components/schemas/GlobalRateLimit'
+          $ref: "#/components/schemas/GlobalRateLimit"
         hmac_allowed_algorithms:
           items:
             type: string
@@ -2157,7 +2155,7 @@ components:
           type: number
           x-go-name: HmacAllowedClockSkew
         id:
-          $ref: '#/components/schemas/ObjectId'
+          $ref: "#/components/schemas/ObjectId"
         internal:
           type: boolean
           x-go-name: Internal
@@ -2203,17 +2201,17 @@ components:
           type: string
           x-go-name: Name
         notifications:
-          $ref: '#/components/schemas/NotificationsManager'
+          $ref: "#/components/schemas/NotificationsManager"
         oauth_meta:
           properties:
             allowed_access_types:
               items:
-                $ref: '#/components/schemas/AccessRequestType'
+                $ref: "#/components/schemas/AccessRequestType"
               type: array
               x-go-name: AllowedAccessTypes
             allowed_authorize_types:
               items:
-                $ref: '#/components/schemas/AuthorizeRequestType'
+                $ref: "#/components/schemas/AuthorizeRequestType"
               type: array
               x-go-name: AllowedAuthorizeTypes
             auth_login_redirect:
@@ -2222,7 +2220,7 @@ components:
           type: object
           x-go-name: Oauth2Meta
         openid_options:
-          $ref: '#/components/schemas/OpenIDOptions'
+          $ref: "#/components/schemas/OpenIDOptions"
         org_id:
           type: string
           x-go-name: OrgID
@@ -2249,7 +2247,7 @@ components:
               type: boolean
               x-go-name: PreserveHostHeader
             service_discovery:
-              $ref: '#/components/schemas/ServiceDiscoveryConfiguration'
+              $ref: "#/components/schemas/ServiceDiscoveryConfiguration"
             strip_listen_path:
               type: boolean
               x-go-name: StripListenPath
@@ -2284,7 +2282,7 @@ components:
           x-go-name: Proxy
         response_processors:
           items:
-            $ref: '#/components/schemas/ResponseProcessor'
+            $ref: "#/components/schemas/ResponseProcessor"
           type: array
           x-go-name: ResponseProcessors
         session_lifetime:
@@ -2292,7 +2290,7 @@ components:
           type: integer
           x-go-name: SessionLifetime
         session_provider:
-          $ref: '#/components/schemas/SessionProviderMeta'
+          $ref: "#/components/schemas/SessionProviderMeta"
         slug:
           type: string
           x-go-name: Slug
@@ -2313,7 +2311,7 @@ components:
           properties:
             check_list:
               items:
-                $ref: '#/components/schemas/HostCheckObject'
+                $ref: "#/components/schemas/HostCheckObject"
               type: array
               x-go-name: CheckList
             config:
@@ -2327,7 +2325,7 @@ components:
                   type: integer
                   x-go-name: RecheckWait
                 service_discovery:
-                  $ref: '#/components/schemas/ServiceDiscoveryConfiguration'
+                  $ref: "#/components/schemas/ServiceDiscoveryConfiguration"
               type: object
               x-go-name: Config
           type: object
@@ -2360,7 +2358,7 @@ components:
               x-go-name: NotVersioned
             versions:
               additionalProperties:
-                $ref: '#/components/schemas/VersionInfo'
+                $ref: "#/components/schemas/VersionInfo"
               type: object
               x-go-name: Versions
           type: object
@@ -2415,7 +2413,7 @@ components:
       properties:
         allowed_urls:
           items:
-            $ref: '#/components/schemas/AccessSpec'
+            $ref: "#/components/schemas/AccessSpec"
           type: array
           x-go-name: AllowedURLs
         api_id:
@@ -2425,7 +2423,7 @@ components:
           type: string
           x-go-name: APIName
         limit:
-          $ref: '#/components/schemas/APILimit'
+          $ref: "#/components/schemas/APILimit"
         versions:
           items:
             type: string
@@ -2464,7 +2462,7 @@ components:
           type: string
           x-go-name: ParamName
         signature:
-          $ref: '#/components/schemas/SignatureConfig'
+          $ref: "#/components/schemas/SignatureConfig"
         use_certificate:
           type: boolean
           x-go-name: UseCertificate
@@ -2490,9 +2488,9 @@ components:
           type: object
           x-go-name: Meta
         name:
-          $ref: '#/components/schemas/AuthProviderCode'
+          $ref: "#/components/schemas/AuthProviderCode"
         storage_engine:
-          $ref: '#/components/schemas/StorageEngineCode'
+          $ref: "#/components/schemas/StorageEngineCode"
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
     AuthTypeEnum:
@@ -2573,7 +2571,7 @@ components:
       properties:
         method_actions:
           additionalProperties:
-            $ref: '#/components/schemas/EndpointMethodMeta'
+            $ref: "#/components/schemas/EndpointMethodMeta"
           type: object
           x-go-name: MethodActions
         path:
@@ -2587,7 +2585,7 @@ components:
     EndpointMethodMeta:
       properties:
         action:
-          $ref: '#/components/schemas/EndpointMethodAction'
+          $ref: "#/components/schemas/EndpointMethodAction"
         code:
           format: int64
           type: integer
@@ -2612,12 +2610,12 @@ components:
       properties:
         advance_cache_config:
           items:
-            $ref: '#/components/schemas/CacheMeta'
+            $ref: "#/components/schemas/CacheMeta"
           type: array
           x-go-name: AdvanceCacheConfig
         black_list:
           items:
-            $ref: '#/components/schemas/EndPointMeta'
+            $ref: "#/components/schemas/EndPointMeta"
           type: array
           x-go-name: BlackList
         cache:
@@ -2627,92 +2625,92 @@ components:
           x-go-name: Cached
         circuit_breakers:
           items:
-            $ref: '#/components/schemas/CircuitBreakerMeta'
+            $ref: "#/components/schemas/CircuitBreakerMeta"
           type: array
           x-go-name: CircuitBreaker
         do_not_track_endpoints:
           items:
-            $ref: '#/components/schemas/TrackEndpointMeta'
+            $ref: "#/components/schemas/TrackEndpointMeta"
           type: array
           x-go-name: DoNotTrackEndpoints
         hard_timeouts:
           items:
-            $ref: '#/components/schemas/HardTimeoutMeta'
+            $ref: "#/components/schemas/HardTimeoutMeta"
           type: array
           x-go-name: HardTimeouts
         ignored:
           items:
-            $ref: '#/components/schemas/EndPointMeta'
+            $ref: "#/components/schemas/EndPointMeta"
           type: array
           x-go-name: Ignored
         internal:
           items:
-            $ref: '#/components/schemas/InternalMeta'
+            $ref: "#/components/schemas/InternalMeta"
           type: array
           x-go-name: Internal
         method_transforms:
           items:
-            $ref: '#/components/schemas/MethodTransformMeta'
+            $ref: "#/components/schemas/MethodTransformMeta"
           type: array
           x-go-name: MethodTransforms
         size_limits:
           items:
-            $ref: '#/components/schemas/RequestSizeMeta'
+            $ref: "#/components/schemas/RequestSizeMeta"
           type: array
           x-go-name: SizeLimit
         track_endpoints:
           items:
-            $ref: '#/components/schemas/TrackEndpointMeta'
+            $ref: "#/components/schemas/TrackEndpointMeta"
           type: array
           x-go-name: TrackEndpoints
         transform:
           items:
-            $ref: '#/components/schemas/TemplateMeta'
+            $ref: "#/components/schemas/TemplateMeta"
           type: array
           x-go-name: Transform
         transform_headers:
           items:
-            $ref: '#/components/schemas/HeaderInjectionMeta'
+            $ref: "#/components/schemas/HeaderInjectionMeta"
           type: array
           x-go-name: TransformHeader
         transform_jq:
           items:
-            $ref: '#/components/schemas/TransformJQMeta'
+            $ref: "#/components/schemas/TransformJQMeta"
           type: array
           x-go-name: TransformJQ
         transform_jq_response:
           items:
-            $ref: '#/components/schemas/TransformJQMeta'
+            $ref: "#/components/schemas/TransformJQMeta"
           type: array
           x-go-name: TransformJQResponse
         transform_response:
           items:
-            $ref: '#/components/schemas/TemplateMeta'
+            $ref: "#/components/schemas/TemplateMeta"
           type: array
           x-go-name: TransformResponse
         transform_response_headers:
           items:
-            $ref: '#/components/schemas/HeaderInjectionMeta'
+            $ref: "#/components/schemas/HeaderInjectionMeta"
           type: array
           x-go-name: TransformResponseHeader
         url_rewrites:
           items:
-            $ref: '#/components/schemas/URLRewriteMeta'
+            $ref: "#/components/schemas/URLRewriteMeta"
           type: array
           x-go-name: URLRewrite
         validate_json:
           items:
-            $ref: '#/components/schemas/ValidatePathMeta'
+            $ref: "#/components/schemas/ValidatePathMeta"
           type: array
           x-go-name: ValidateJSON
         virtual:
           items:
-            $ref: '#/components/schemas/VirtualMeta'
+            $ref: "#/components/schemas/VirtualMeta"
           type: array
           x-go-name: Virtual
         white_list:
           items:
-            $ref: '#/components/schemas/EndPointMeta'
+            $ref: "#/components/schemas/EndPointMeta"
           type: array
           x-go-name: WhiteList
       type: object
@@ -2838,9 +2836,9 @@ components:
     MiddlewareIdExtractor:
       properties:
         extract_from:
-          $ref: '#/components/schemas/IdExtractorSource'
+          $ref: "#/components/schemas/IdExtractorSource"
         extract_with:
-          $ref: '#/components/schemas/IdExtractorType'
+          $ref: "#/components/schemas/IdExtractorType"
         extractor_config:
           additionalProperties:
             type: object
@@ -2851,29 +2849,29 @@ components:
     MiddlewareSection:
       properties:
         auth_check:
-          $ref: '#/components/schemas/MiddlewareDefinition'
+          $ref: "#/components/schemas/MiddlewareDefinition"
         driver:
-          $ref: '#/components/schemas/MiddlewareDriver'
+          $ref: "#/components/schemas/MiddlewareDriver"
         id_extractor:
-          $ref: '#/components/schemas/MiddlewareIdExtractor'
+          $ref: "#/components/schemas/MiddlewareIdExtractor"
         post:
           items:
-            $ref: '#/components/schemas/MiddlewareDefinition'
+            $ref: "#/components/schemas/MiddlewareDefinition"
           type: array
           x-go-name: Post
         post_key_auth:
           items:
-            $ref: '#/components/schemas/MiddlewareDefinition'
+            $ref: "#/components/schemas/MiddlewareDefinition"
           type: array
           x-go-name: PostKeyAuth
         pre:
           items:
-            $ref: '#/components/schemas/MiddlewareDefinition'
+            $ref: "#/components/schemas/MiddlewareDefinition"
           type: array
           x-go-name: Pre
         response:
           items:
-            $ref: '#/components/schemas/MiddlewareDefinition'
+            $ref: "#/components/schemas/MiddlewareDefinition"
           type: array
           x-go-name: Response
       type: object
@@ -2907,7 +2905,7 @@ components:
       type: object
       x-go-package: github.com/TykTechnologies/tyk
     NotificationsManager:
-      description: 'TODO: Make this more generic'
+      description: "TODO: Make this more generic"
       properties:
         oauth_on_keychange_url:
           type: string
@@ -2944,7 +2942,7 @@ components:
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
     ObjectId:
-      description: 'http://www.mongodb.org/display/DOCS/Object+IDs'
+      description: "http://www.mongodb.org/display/DOCS/Object+IDs"
       title: >-
         ObjectId is a unique ID identifying a BSON value. It must be exactly 12
         bytes
@@ -2958,7 +2956,7 @@ components:
       properties:
         providers:
           items:
-            $ref: '#/components/schemas/OIDProviderConfig'
+            $ref: "#/components/schemas/OIDProviderConfig"
           type: array
           x-go-name: Providers
         segregate_by_client:
@@ -2969,7 +2967,7 @@ components:
     Policy:
       properties:
         _id:
-          $ref: '#/components/schemas/ObjectId'
+          $ref: "#/components/schemas/ObjectId"
           type: object
           x-go-name: ID
         id:
@@ -3011,7 +3009,7 @@ components:
           type: object
           x-go-name: AccessRights
           additionalProperties:
-              $ref: '#/components/schemas/AccessDefinition'
+            $ref: "#/components/schemas/AccessDefinition"
         hmac_enabled:
           type: boolean
           x-go-name: HMACEnabled
@@ -3034,7 +3032,7 @@ components:
           type: number
           x-go-name: KeyExpiresIn
         partitions:
-          $ref: '#/components/schemas/PolicyPartitions'
+          $ref: "#/components/schemas/PolicyPartitions"
           type: object
           x-go-name: Partitions
         last_updated:
@@ -3044,7 +3042,7 @@ components:
           type: object
           x-go-name: MetaData
         graphql_access_rights:
-          $ref: '#/components/schemas/GraphAccessDefinition'
+          $ref: "#/components/schemas/GraphAccessDefinition"
       type: object
       x-go-package: github.com/TykTechnologies/tyk/user
     PolicyPartitions:
@@ -3102,10 +3100,10 @@ components:
       x-go-package: github.com/TykTechnologies/tyk/apidef
     RoutingTrigger:
       properties:
-        'on':
-          $ref: '#/components/schemas/RoutingTriggerOnType'
+        "on":
+          $ref: "#/components/schemas/RoutingTriggerOnType"
         options:
-          $ref: '#/components/schemas/RoutingTriggerOptions'
+          $ref: "#/components/schemas/RoutingTriggerOptions"
         rewrite_to:
           type: string
           x-go-name: RewriteTo
@@ -3118,29 +3116,29 @@ components:
       properties:
         header_matches:
           additionalProperties:
-            $ref: '#/components/schemas/StringRegexMap'
+            $ref: "#/components/schemas/StringRegexMap"
           type: object
           x-go-name: HeaderMatches
         path_part_matches:
           additionalProperties:
-            $ref: '#/components/schemas/StringRegexMap'
+            $ref: "#/components/schemas/StringRegexMap"
           type: object
           x-go-name: PathPartMatches
         payload_matches:
-          $ref: '#/components/schemas/StringRegexMap'
+          $ref: "#/components/schemas/StringRegexMap"
         query_val_matches:
           additionalProperties:
-            $ref: '#/components/schemas/StringRegexMap'
+            $ref: "#/components/schemas/StringRegexMap"
           type: object
           x-go-name: QueryValMatches
         request_context_matches:
           additionalProperties:
-            $ref: '#/components/schemas/StringRegexMap'
+            $ref: "#/components/schemas/StringRegexMap"
           type: object
           x-go-name: RequestContextMatches
         session_meta_matches:
           additionalProperties:
-            $ref: '#/components/schemas/StringRegexMap'
+            $ref: "#/components/schemas/StringRegexMap"
           type: object
           x-go-name: SessionMetaMatches
       type: object
@@ -3191,9 +3189,9 @@ components:
           type: object
           x-go-name: Meta
         name:
-          $ref: '#/components/schemas/SessionProviderCode'
+          $ref: "#/components/schemas/SessionProviderCode"
         storage_engine:
-          $ref: '#/components/schemas/StorageEngineCode'
+          $ref: "#/components/schemas/StorageEngineCode"
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
     SessionState:
@@ -3210,7 +3208,7 @@ components:
           x-go-name: Tags
         access_rights:
           additionalProperties:
-            $ref: '#/components/schemas/AccessDefinition'
+            $ref: "#/components/schemas/AccessDefinition"
           type: object
           x-go-name: AccessRights
         alias:
@@ -3231,7 +3229,7 @@ components:
         basic_auth_data:
           properties:
             hash_type:
-              $ref: '#/components/schemas/HashType'
+              $ref: "#/components/schemas/HashType"
             password:
               type: string
               x-go-name: Password
@@ -3388,9 +3386,9 @@ components:
           type: boolean
           x-go-name: EnableSession
         input_type:
-          $ref: '#/components/schemas/RequestInputType'
+          $ref: "#/components/schemas/RequestInputType"
         template_mode:
-          $ref: '#/components/schemas/TemplateMode'
+          $ref: "#/components/schemas/TemplateMode"
         template_source:
           type: string
           x-go-name: TemplateSource
@@ -3405,7 +3403,7 @@ components:
           type: string
           x-go-name: Path
         template_data:
-          $ref: '#/components/schemas/TemplateData'
+          $ref: "#/components/schemas/TemplateData"
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
     TemplateMode:
@@ -3437,7 +3435,7 @@ components:
     URLRewriteMeta:
       properties:
         MatchRegexp:
-          $ref: '#/components/schemas/Regexp'
+          $ref: "#/components/schemas/Regexp"
         match_pattern:
           type: string
           x-go-name: MatchPattern
@@ -3452,7 +3450,7 @@ components:
           x-go-name: RewriteTo
         triggers:
           items:
-            $ref: '#/components/schemas/RoutingTrigger'
+            $ref: "#/components/schemas/RoutingTrigger"
           type: array
           x-go-name: Triggers
       type: object
@@ -3507,7 +3505,7 @@ components:
           type: string
           x-go-name: Expires
         extended_paths:
-          $ref: '#/components/schemas/ExtendedPathsSet'
+          $ref: "#/components/schemas/ExtendedPathsSet"
         global_headers:
           additionalProperties:
             type: string
@@ -3575,7 +3573,7 @@ components:
           type: string
           x-go-name: Action
         key:
-          description: 'in:body'
+          description: "in:body"
           type: string
           x-go-name: Key
         key_hash:
@@ -3599,7 +3597,7 @@ components:
       type: object
       x-go-package: github.com/TykTechnologies/tyk
     APIAllCertificates:
-      description:  APIAllCertificates represents a list of certificates
+      description: APIAllCertificates represents a list of certificates
       properties:
         certs:
           items:
@@ -3613,7 +3611,7 @@ components:
       properties:
         certs:
           items:
-            $ref: '#/components/schemas/CertificateBasics'
+            $ref: "#/components/schemas/CertificateBasics"
           type: array
           x-go-name: Certs
       type: object
@@ -3659,9 +3657,9 @@ components:
           type: string
           x-go-name: HasPrivateKey
         issuer:
-          $ref: '#/components/schemas/pkixName'
+          $ref: "#/components/schemas/pkixName"
         subject:
-          $ref: '#/components/schemas/pkixName'
+          $ref: "#/components/schemas/pkixName"
         not_before:
           type: string
           x-go-name: NotBefore
@@ -3713,11 +3711,11 @@ components:
         Names:
           type: array
           items:
-            $ref: '#/components/schemas/pkixAttributeTypeAndValue'
+            $ref: "#/components/schemas/pkixAttributeTypeAndValue"
         ExtraNames:
           type: array
           items:
-            $ref: '#/components/schemas/pkixAttributeTypeAndValueSET'
+            $ref: "#/components/schemas/pkixAttributeTypeAndValueSET"
     pkixAttributeTypeAndValue:
       description: AttributeTypeAndValue mirrors the ASN.1 structure of the same name in RFC 5280, Section 4.1.2.4.
       properties:
@@ -3739,7 +3737,7 @@ components:
           items:
             type: array
             items:
-              $ref: '#/components/schemas/pkixAttributeTypeAndValue'
+              $ref: "#/components/schemas/pkixAttributeTypeAndValue"
     APICertificateStatusMessage:
       description: Status message when certificate is added
       properties:
@@ -3769,7 +3767,7 @@ components:
           description: <OAS schema definition>
     BooleanQueryParam:
       type: string
-      enum: [ true, false ]
+      enum: [true, false]
       example: true
     APIVersionMeta:
       description: API version meta
@@ -3822,27 +3820,27 @@ components:
       description: Enable validateRequest middleware for all endpoints having a request body with media type application/json
       required: false
       schema:
-        $ref: '#/components/schemas/BooleanQueryParam'
+        $ref: "#/components/schemas/BooleanQueryParam"
     AllowList:
       name: allowList
       in: query
       description: Enable allowList middleware for all endpoints
       required: false
       schema:
-        $ref: '#/components/schemas/BooleanQueryParam'
+        $ref: "#/components/schemas/BooleanQueryParam"
     MockResponse:
       name: mockResponse
       in: query
       description: Enable mockResponse middleware for all endpoints having responses configured.
       required: false
       schema:
-        $ref: '#/components/schemas/BooleanQueryParam'
+        $ref: "#/components/schemas/BooleanQueryParam"
     Authentication:
       name: authentication
       in: query
       description: Enable or disable authentication in your Tyk Gateway as per your OAS document.
       schema:
-        $ref: '#/components/schemas/BooleanQueryParam'
+        $ref: "#/components/schemas/BooleanQueryParam"
     SearchText:
       name: searchText
       schema:
@@ -3854,7 +3852,7 @@ components:
       name: accessType
       schema:
         type: string
-        enum: [ "internal", "external" ]
+        enum: ["internal", "external"]
       description: Filter for internal or external API versions
       in: query
       required: false
