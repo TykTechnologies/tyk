@@ -76,7 +76,9 @@ type PoliciesConfig struct {
 	// Set this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.
 	PolicyConnectionString string `json:"policy_connection_string"`
 
-	// This option only applies in OSS deployment when the `policies.policy_source` is either set to `file` or an empty string. If `policies.policy_path` is not set then Tyk will load policies from the JSON file specified by `policies.policy_record_name`.
+	// This option only applies in OSS deployment when the `policies.policy_source` is either set 
+  // to `file` or an empty string. If `policies.policy_path` is not set then Tyk will load policies 
+  // from the JSON file specified by `policies.policy_record_name`.
 	PolicyRecordName string `json:"policy_record_name"`
 
 	// In a Pro installation, Tyk will load Policy IDs and use the internal object-ID as the ID of the policy.
@@ -86,7 +88,10 @@ type PoliciesConfig struct {
 	//
 	// This option should only be used when moving an installation to a new database.
 	AllowExplicitPolicyID bool `json:"allow_explicit_policy_id"`
-	// This option only applies in OSS deployment when the `policies.policy_source` is either set to `file` or an empty string. If `policies.policy_path` is set then Tyk will load policies from all the JSON files under the directory specified by the `policies.policy_path` option. In this configuration, Tyk Gateway will allow policy management through the Gateway API.
+	// This option only applies in OSS deployment when the `policies.policy_source` is either set 
+  // to `file` or an empty string. If `policies.policy_path` is set then Tyk will load policies 
+  // from all the JSON files under the directory specified by the `policies.policy_path` option. 
+  // In this configuration, Tyk Gateway will allow policy management through the Gateway API.
 	PolicyPath string `json:"policy_path"`
 }
 
@@ -631,6 +636,10 @@ type Config struct {
 	// Disable dynamic API and Policy reloads, e.g. it will load new changes only on procecss start.
 	SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
 
+	// ReloadInterval defines a duration in seconds within which the gateway responds to a reload event.
+	// The value defaults to 1, values lower than 1 are ignored.
+	ReloadInterval int64 `json:"reload_interval"`
+
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
 
@@ -1044,6 +1053,17 @@ type Config struct {
 
 	// Skip TLS verification for JWT JWKs url validation
 	JWTSSLInsecureSkipVerify bool `json:"jwt_ssl_insecure_skip_verify"`
+
+	// ResourceSync configures mitigation strategy in case sync fails.
+	ResourceSync ResourceSyncConfig `json:"resource_sync"`
+}
+
+type ResourceSyncConfig struct {
+	// RetryAttempts configures the number of retry attempts before returning on a resource sync.
+	RetryAttempts int `json:"retry_attempts"`
+
+	// Interval configures the interval in seconds between each retry on a resource sync error.
+	Interval int `json:"interval"`
 }
 
 type TykError struct {

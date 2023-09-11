@@ -168,6 +168,111 @@ func TestRedisCacheMiddleware(t *testing.T) {
 	})
 }
 
+func TestRedisCacheMiddlewareV2(t *testing.T) {
+	const compressed = "/compressed"
+	const chunked = "/chunked"
+
+	type testcase struct {
+		title         string
+		useCaching    bool
+		useCompressed bool
+		useChunked    bool
+	}
+
+	bools := []bool{false, true}
+
+	testcases := make([]testcase, 0, 1<<3)
+	for _, useCaching := range bools {
+		for _, useCompressed := range bools {
+			for _, useChunked := range bools {
+				if useChunked == useCompressed {
+					continue
+				}
+
+				testcases = append(testcases, testcase{
+					title:         fmt.Sprintf("cache=%v, chunked=%v, compressed=%v", useCaching, useChunked, useCompressed),
+					useCaching:    useCaching,
+					useChunked:    useChunked,
+					useCompressed: useCompressed,
+				})
+			}
+		}
+	}
+
+	for _, tc := range testcases {
+		tc := tc
+
+		t.Run(tc.title, func(t *testing.T) {
+			conf := func(globalConf *config.Config) {
+				globalConf.AnalyticsConfig.EnableDetailedRecording = true
+			}
+			ts := StartTest(conf)
+			defer ts.Close()
+
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				spec.CacheOptions.CacheTimeout = 60
+				spec.CacheOptions.EnableCache = tc.useCaching
+
+				if tc.useCaching {
+					UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+						v.ExtendedPaths.Cached = []string{compressed, chunked}
+					})
+				}
+			})
+
+			var url, bodyMatch string
+			var wantHeaders map[string]string
+
+			if tc.useChunked {
+				url = "/chunked"
+				bodyMatch = "This is a chunked response"
+			}
+			if tc.useCompressed {
+				url = "/compressed"
+				bodyMatch = "This is a compressed response"
+			}
+			if tc.useCaching {
+				wantHeaders = map[string]string{
+					"x-tyk-cached-response": "1",
+				}
+			}
+
+			assert.NotEmpty(t, url)
+
+			ts.Gw.Analytics.mockEnabled = true
+			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
+				response, err := base64.StdEncoding.DecodeString(record.RawResponse)
+				assert.NoError(t, err)
+
+				assert.Contains(t, string(response), bodyMatch)
+			}
+
+			defer func() {
+				ts.Gw.Analytics.mockEnabled = false
+			}()
+
+			resp, _ := ts.Run(t, []test.TestCase{
+				{Path: url, BodyMatch: bodyMatch, Code: http.StatusOK},
+				{Path: url, HeadersMatch: wantHeaders, BodyMatch: bodyMatch, Code: http.StatusOK},
+			}...)
+
+			if tc.useChunked {
+				if tc.useCaching {
+					var empty []string
+					assert.Equal(t, empty, resp.TransferEncoding)
+				} else {
+					assert.Equal(t, []string{"chunked"}, resp.TransferEncoding)
+				}
+			}
+
+			if tc.useCompressed {
+				assert.True(t, resp.Uncompressed)
+			}
+		})
+	}
+}
+
 func Test_isSafeMethod(t *testing.T) {
 	tests := []struct {
 		name     string
