@@ -231,7 +231,6 @@ jobs:
         id: env_up
         env:
           t: ${{ needs.goreleaser.outputs.tags }}
-          tyk_ci_version: 'v1.1'
           pull_policy: 'if_not_present'
           # gw and dash use the same branch names
           gw_dash_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk' || github.repository == 'TykTechnologies/tyk-analytics') && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
@@ -241,15 +240,6 @@ jobs:
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
         run: |
-          echo "WORKSPACE .var"
-          echo ${{ github.workspace }}
-          echo "WORKSPACE"
-          echo $GITHUB_WORKSPACE
-          echo "PWD"
-          pwd
-          echo "LS -LR"
-          ls -lR
-          echo CI tags: $t
           tags=($t)
           echo First tag: ${tags[0]}
           # Start customising env
@@ -278,7 +268,7 @@ jobs:
         env:
           working-directory: tyk-automated-tests/ci/auto
         run: |
-          docker run --rm --network auto_default --env-file ${auto_dir}/pytest.env \
+          docker run --rm --network auto_default --env-file pytest.env \
           754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
           pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}"
 
