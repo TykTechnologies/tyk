@@ -201,7 +201,7 @@ jobs:
         with:
           repository: TykTechnologies/tyk-automated-tests
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.ref_name || 'master' }}
+          ref: 'TD-2240/add-auto-folder-back'
           path: tyk-automated-tests
 
       - uses: aws-actions/configure-aws-credentials@v2
