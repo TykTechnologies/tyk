@@ -88,7 +88,7 @@ type PoliciesConfig struct {
 	// This option should only be used when moving an installation to a new database.
 	AllowExplicitPolicyID bool `json:"allow_explicit_policy_id"`
 	// This option is used for storing a policies  if `policies.policy_source` is set to `file`.
-	// it should be some existing file path on hard drive
+	// it should be some existing directory path on hard drive
 	PolicyPath string `json:"policy_path"`
 }
 
