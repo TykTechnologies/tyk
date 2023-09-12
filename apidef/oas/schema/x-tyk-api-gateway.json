@@ -656,10 +656,7 @@
             "enabled"
           ]
         }
-      },
-      "required": [
-        "enabled"
-      ]
+      }
     },
     "X-Tyk-VirtualEndpoint": {
       "type": "object",

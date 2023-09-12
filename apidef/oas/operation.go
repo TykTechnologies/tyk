@@ -604,8 +604,9 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 
 // MockResponse configures the mock responses.
 type MockResponse struct {
+	Ref string `bson:"$ref,omitempty" json:"$ref,omitempty"`
 	// Enabled enables the mock response middleware.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
 	// Code is the HTTP response code that will be returned.
 	Code int `bson:"code,omitempty" json:"code,omitempty"`
 	// Body is the HTTP response body that will be returned.
