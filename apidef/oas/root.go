@@ -2,6 +2,7 @@ package oas
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/TykTechnologies/storage/persistent/model"
 
@@ -52,6 +53,35 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	x.Middleware.ExtractTo(api)
+}
+
+func (x *XTykAPIGateway) ResolveRef(valueByRef func(name string) *Cache) {
+	if valueByRef == nil {
+		return
+	}
+
+	middleware := x.Middleware
+	if middleware == nil {
+		return
+	}
+
+	global := middleware.Global
+	if global == nil {
+		return
+	}
+
+	cache := global.Cache
+	if cache == nil {
+		return
+	}
+
+	if cache.Ref == "" {
+		return
+	}
+
+	partialName := strings.TrimPrefix(cache.Ref, "/partials/")
+	resolved := valueByRef(partialName)
+	global.Cache = resolved
 }
 
 // Info contains the main metadata about the API definition.
