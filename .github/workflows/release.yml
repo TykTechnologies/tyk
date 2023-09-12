@@ -202,7 +202,7 @@ jobs:
         with:
           repository: TykTechnologies/tyk-automated-tests
           token: ${{ secrets.ORG_GH_TOKEN }}
-          ref: 'TD-2240/add-auto-folder-back'
+          ref: ${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
           path: tyk-automated-tests
 
       - uses: aws-actions/configure-aws-credentials@v2
@@ -267,7 +267,6 @@ jobs:
       - name: Run tests
         working-directory: tyk-automated-tests/ci/auto
         run: |
-          ls -lR
           docker run --rm --network auto_default --env-file pytest.env \
           754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
           pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}"
