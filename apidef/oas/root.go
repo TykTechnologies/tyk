@@ -55,33 +55,62 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	x.Middleware.ExtractTo(api)
 }
 
-func (x *XTykAPIGateway) ResolveRef(valueByRef func(name string) *Cache) {
+func (x *XTykAPIGateway) ResolveRef(valueByRef func(name string, target interface{})) {
 	if valueByRef == nil {
 		return
 	}
 
-	middleware := x.Middleware
-	if middleware == nil {
+	r := resolver{valueByRef: valueByRef}
+	r.resolveMiddleware(x.Middleware)
+}
+
+type resolver struct {
+	valueByRef func(name string, target interface{})
+}
+
+func (r *resolver) resolveMiddleware(m *Middleware) {
+	if m == nil {
 		return
 	}
 
-	global := middleware.Global
-	if global == nil {
+	r.resolveGlobal(m.Global)
+	r.resolveOperations(m.Operations)
+}
+
+func (r *resolver) resolveGlobal(g *Global) {
+	if g == nil {
 		return
 	}
 
-	cache := global.Cache
-	if cache == nil {
+	r.resolveCache(g.Cache)
+}
+
+func (r *resolver) resolveCache(c *Cache) {
+	if c == nil || c.Ref == "" {
 		return
 	}
 
-	if cache.Ref == "" {
+	partialName := strings.TrimPrefix(c.Ref, "/partials/")
+	r.valueByRef(partialName, c)
+}
+
+func (r *resolver) resolveOperations(ops Operations) {
+	for _, op := range ops {
+		r.resolveMockResponse(op.MockResponse)
+	}
+}
+
+func (r *resolver) resolveMockResponse(mr *MockResponse) {
+	if mr == nil {
 		return
 	}
 
-	partialName := strings.TrimPrefix(cache.Ref, "/partials/")
-	resolved := valueByRef(partialName)
-	global.Cache = resolved
+	if mr.Ref == "" {
+		return
+	}
+
+	partialName := strings.TrimPrefix(mr.Ref, "/partials/")
+	r.valueByRef(partialName, mr)
 }
 
 // Info contains the main metadata about the API definition.
