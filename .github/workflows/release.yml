@@ -265,8 +265,7 @@ jobs:
           docker compose -p auto -f "${{ matrix.flavour }}".yml -f deps_"${{ matrix.flavour }}".yml -f ${{ matrix.db }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
 
       - name: Run tests
-        env:
-          working-directory: tyk-automated-tests/ci/auto
+        working-directory: tyk-automated-tests/ci/auto
         run: |
           ls -lR
           docker run --rm --network auto_default --env-file pytest.env \
