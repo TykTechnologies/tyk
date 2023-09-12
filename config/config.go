@@ -945,7 +945,7 @@ type Config struct {
 	Tracer Tracer `json:"tracing"`
 
 	// Section for configuring Opentelemetry
-	OpenTelemetry otel.Config `json:"opentelemetry"`
+	OpenTelemetry otel.OpenTelemetry `json:"opentelemetry"`
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 
