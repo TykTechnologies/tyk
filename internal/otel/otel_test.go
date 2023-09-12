@@ -297,13 +297,8 @@ func TestAddTraceID(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
 
-<<<<<<< HEAD
-			otelConfig := Config{
-				Enabled:  tt.enabled,
-=======
 			otelConfig := OpenTelemetry{
 				Enabled:  true,
->>>>>>> ca30b8fd... TT-9849 rename otel config to be exported as opentelemetry (#5442)
 				Exporter: "http",
 				Endpoint: "http://localhost:4317",
 			}
