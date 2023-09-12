@@ -187,7 +187,6 @@ jobs:
       matrix:
         conf: [ "sha256", "murmur64" ]
         db: [ "mongo44", "postgres15" ]
-        flavour: [ "pro-ha" ]
         include:
           - db: postgres15
             markers: "and not sql"
@@ -253,16 +252,16 @@ jobs:
           tyk_alfa_image=${tags[0]}
           tyk_beta_image=${tags[0]}
           # base dir for config files
-          confs_dir=./"${{ matrix.flavour }}"
+          confs_dir=./pro-ha
           # pick database
           env_file=local-${{ matrix.db }}.env
           " > versions.env
           # Add Tyk component config variations to $env_file
           cat confs/${{ matrix.conf }}.env >> local-${{ matrix.db }}.env
           # bring up env, the project name is important
-          docker compose -p auto -f "${{ matrix.flavour }}".yml -f deps_"${{ matrix.flavour }}".yml -f ${{ matrix.db }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
+          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
           ./dash-bootstrap.sh http://localhost:3000
-          docker compose -p auto -f "${{ matrix.flavour }}".yml -f deps_"${{ matrix.flavour }}".yml -f ${{ matrix.db }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
+          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
 
       - name: Run tests
         working-directory: tyk-automated-tests/ci/auto
