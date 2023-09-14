@@ -10,7 +10,7 @@ RUN apt-get update \
 
 RUN apt-get install -y --no-install-recommends \
         build-essential \
-        python3-setuptools=v68.2.2 \
+        python3-setuptools \
         libpython3.7 \
         python3.7-dev \
         python3-pip \
