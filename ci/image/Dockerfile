@@ -10,11 +10,10 @@ RUN apt-get update \
 
 RUN apt-get install -y --no-install-recommends \
         build-essential \
-        python3-setuptools=v68.2.2 \
         libpython3.7 \
         python3.7-dev \
         python3-pip \
-        && pip3 install protobuf==3.20.2 grpcio==1.24.0 \
+        && pip3 install protobuf==3.20.2 grpcio==1.24.0 setuptools==v68.2.2 \
         && apt-get purge -y build-essential \
         && rm -rf /root/.cache
 RUN apt-get autoremove -y 
