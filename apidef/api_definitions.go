@@ -395,6 +395,7 @@ type MiddlewareDefinition struct {
 	Path           string `bson:"path" json:"path"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
 	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
+	Timeout        int    `bson:"timeout" json:"timeout"`
 }
 
 // IDExtractorConfig specifies the configuration for ID extractor
