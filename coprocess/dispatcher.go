@@ -1,13 +1,15 @@
 package coprocess
 
 import (
+	context "context"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // Dispatcher defines a basic interface for the CP dispatcher, check PythonDispatcher for reference.
 type Dispatcher interface {
 	// Dispatch takes and returns a pointer to a CoProcessMessage struct, see coprocess/api.h for details. This is used by CP bindings.
-	Dispatch(*Object) (*Object, error)
+	Dispatch(context.Context, *Object) (*Object, error)
 
 	// DispatchEvent takes an event JSON, as bytes. Doesn't return.
 	DispatchEvent([]byte)

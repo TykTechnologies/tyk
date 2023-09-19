@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/url"
 	"reflect"
@@ -34,6 +35,7 @@ type CoProcessMiddleware struct {
 	HookName         string
 	MiddlewareDriver apidef.MiddlewareDriver
 	RawBodyOnly      bool
+	Timeout          int
 
 	successHandler *SuccessHandler
 }
@@ -642,7 +644,19 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 		err := fmt.Errorf("Couldn't dispatch request, driver '%s' isn't available", c.Middleware.MiddlewareDriver)
 		return nil, err
 	}
-	newObject, err := dispatcher.Dispatch(object)
+	// Load CoProcess timeout
+	timeout := c.Middleware.Timeout
+	var ctx context.Context
+	var cancel context.CancelFunc
+	// Initialize context depending if the CoProcess has a configured timeout
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
+	defer cancel()
+
+	newObject, err := dispatcher.Dispatch(ctx, object)
 	if err != nil {
 		return nil, err
 	}
