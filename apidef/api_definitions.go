@@ -348,15 +348,16 @@ type VersionData struct {
 	Versions       map[string]VersionInfo `bson:"versions" json:"versions"`
 }
 
+type VersionPath struct {
+	Ignored   []string `bson:"ignored" json:"ignored"`
+	WhiteList []string `bson:"white_list" json:"white_list"`
+	BlackList []string `bson:"black_list" json:"black_list"`
+}
 type VersionInfo struct {
-	Name      string    `bson:"name" json:"name"`
-	Expires   string    `bson:"expires" json:"expires"`
-	ExpiresTs time.Time `bson:"-" json:"-"`
-	Paths     struct {
-		Ignored   []string `bson:"ignored" json:"ignored"`
-		WhiteList []string `bson:"white_list" json:"white_list"`
-		BlackList []string `bson:"black_list" json:"black_list"`
-	} `bson:"paths" json:"paths"`
+	Name                        string            `bson:"name" json:"name"`
+	Expires                     string            `bson:"expires" json:"expires"`
+	ExpiresTs                   time.Time         `bson:"-" json:"-"`
+	Paths                       VersionPath       `bson:"paths" json:"paths"`
 	UseExtendedPaths            bool              `bson:"use_extended_paths" json:"use_extended_paths"`
 	ExtendedPaths               ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
 	GlobalHeaders               map[string]string `bson:"global_headers" json:"global_headers"`
@@ -499,42 +500,46 @@ type Scopes struct {
 	OIDC ScopeClaim `bson:"oidc" json:"oidc,omitempty"`
 }
 
+type OAuth2 struct {
+	AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
+	AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
+	AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
+}
+
+type BasicAuth struct {
+	DisableCaching     bool   `bson:"disable_caching" json:"disable_caching"`
+	CacheTTL           int    `bson:"cache_ttl" json:"cache_ttl"`
+	ExtractFromBody    bool   `bson:"extract_from_body" json:"extract_from_body"`
+	BodyUserRegexp     string `bson:"body_user_regexp" json:"body_user_regexp"`
+	BodyPasswordRegexp string `bson:"body_password_regexp" json:"body_password_regexp"`
+}
+
 // APIDefinition represents the configuration for a single proxied API and it's versions.
 //
 // swagger:model
 type APIDefinition struct {
-	Id                  model.ObjectID `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
-	Name                string         `bson:"name" json:"name"`
-	Expiration          string         `bson:"expiration" json:"expiration,omitempty"`
-	ExpirationTs        time.Time      `bson:"-" json:"-"`
-	Slug                string         `bson:"slug" json:"slug"`
-	ListenPort          int            `bson:"listen_port" json:"listen_port"`
-	Protocol            string         `bson:"protocol" json:"protocol"`
-	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
-	APIID               string         `bson:"api_id" json:"api_id"`
-	OrgID               string         `bson:"org_id" json:"org_id"`
-	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2           bool           `bson:"use_oauth2" json:"use_oauth2"`
-	ExternalOAuth       ExternalOAuth  `bson:"external_oauth" json:"external_oauth"`
-	UseOpenID           bool           `bson:"use_openid" json:"use_openid"`
-	OpenIDOptions       OpenIDOptions  `bson:"openid_options" json:"openid_options"`
-	Oauth2Meta          struct {
-		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
-		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
-		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
-	} `bson:"oauth_meta" json:"oauth_meta"`
-	Auth         AuthConfig            `bson:"auth" json:"auth"` // Deprecated: Use AuthConfigs instead.
-	AuthConfigs  map[string]AuthConfig `bson:"auth_configs" json:"auth_configs"`
-	UseBasicAuth bool                  `bson:"use_basic_auth" json:"use_basic_auth"`
-	BasicAuth    struct {
-		DisableCaching     bool   `bson:"disable_caching" json:"disable_caching"`
-		CacheTTL           int    `bson:"cache_ttl" json:"cache_ttl"`
-		ExtractFromBody    bool   `bson:"extract_from_body" json:"extract_from_body"`
-		BodyUserRegexp     string `bson:"body_user_regexp" json:"body_user_regexp"`
-		BodyPasswordRegexp string `bson:"body_password_regexp" json:"body_password_regexp"`
-	} `bson:"basic_auth" json:"basic_auth"`
-	UseMutualTLSAuth   bool     `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
-	ClientCertificates []string `bson:"client_certificates" json:"client_certificates"`
+	Id                  model.ObjectID        `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
+	Name                string                `bson:"name" json:"name"`
+	Expiration          string                `bson:"expiration" json:"expiration,omitempty"`
+	ExpirationTs        time.Time             `bson:"-" json:"-"`
+	Slug                string                `bson:"slug" json:"slug"`
+	ListenPort          int                   `bson:"listen_port" json:"listen_port"`
+	Protocol            string                `bson:"protocol" json:"protocol"`
+	EnableProxyProtocol bool                  `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	APIID               string                `bson:"api_id" json:"api_id"`
+	OrgID               string                `bson:"org_id" json:"org_id"`
+	UseKeylessAccess    bool                  `bson:"use_keyless" json:"use_keyless"`
+	UseOauth2           bool                  `bson:"use_oauth2" json:"use_oauth2"`
+	ExternalOAuth       ExternalOAuth         `bson:"external_oauth" json:"external_oauth"`
+	UseOpenID           bool                  `bson:"use_openid" json:"use_openid"`
+	OpenIDOptions       OpenIDOptions         `bson:"openid_options" json:"openid_options"`
+	Oauth2Meta          OAuth2                `bson:"oauth_meta" json:"oauth_meta"`
+	Auth                AuthConfig            `bson:"auth" json:"auth"` // Deprecated: Use AuthConfigs instead.
+	AuthConfigs         map[string]AuthConfig `bson:"auth_configs" json:"auth_configs"`
+	UseBasicAuth        bool                  `bson:"use_basic_auth" json:"use_basic_auth"`
+	BasicAuth           BasicAuth             `bson:"basic_auth" json:"basic_auth"`
+	UseMutualTLSAuth    bool                  `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
+	ClientCertificates  []string              `bson:"client_certificates" json:"client_certificates"`
 
 	// UpstreamCertificates stores the domain to certificate mapping for upstream mutualTLS
 	UpstreamCertificates map[string]string `bson:"upstream_certificates" json:"upstream_certificates"`
@@ -683,6 +688,14 @@ type RequestSigningMeta struct {
 	CertificateId   string   `bson:"certificate_id" json:"certificate_id"`
 	SignatureHeader string   `bson:"signature_header" json:"signature_header"`
 }
+type ProxyTransportConfig struct {
+	SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
+	SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
+	SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
+	SSLMaxVersion           uint16   `bson:"ssl_max_version" json:"ssl_max_version"`
+	SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
+	ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
+}
 
 type ProxyConfig struct {
 	PreserveHostHeader          bool                          `bson:"preserve_host_header" json:"preserve_host_header"`
@@ -695,14 +708,7 @@ type ProxyConfig struct {
 	StructuredTargetList        *HostList                     `bson:"-" json:"-"`
 	CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 	ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-	Transport                   struct {
-		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
-		SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
-		SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
-		SSLMaxVersion           uint16   `bson:"ssl_max_version" json:"ssl_max_version"`
-		SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
-		ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
-	} `bson:"transport" json:"transport"`
+	Transport                   ProxyTransportConfig          `bson:"transport" json:"transport"`
 }
 
 type CORSConfig struct {
