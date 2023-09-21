@@ -547,3 +547,34 @@ func TestGoPlugin_AccessingOASAPIDef(t *testing.T) {
 		},
 	}...)
 }
+
+func TestGoPlugin_PreventDoubleError(t *testing.T) {
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.Proxy.ListenPath = "/my-goplugin/"
+		spec.UseKeylessAccess = true
+		spec.UseStandardAuth = false
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+			Pre: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPluginReturningError",
+					Path: "../test/goplugins/goplugins.so",
+				},
+			},
+		}
+	})
+
+	ts.Run(t, []test.TestCase{
+		{
+			Path: "/my-goplugin/get",
+			Code: http.StatusTeapot,
+			BodyMatchFunc: func(bytes []byte) bool {
+				assert.Equal(t, http.StatusText(http.StatusTeapot), string(bytes))
+				return true
+			},
+		},
+	}...)
+}
