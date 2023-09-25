@@ -5,7 +5,7 @@ LABEL Description="Tyk Hybrid Gateway image" Vendor="Tyk"
 
 RUN apt-get update \
  && apt-get dist-upgrade -y --no-install-recommends redis-server nginx \
-            libpython3-dev python3.9-dev curl ca-certificates  \
+            libpython3-dev python3 curl ca-certificates  \
  && curl https://bootstrap.pypa.io/get-pip.py | python3 \
  && pip3 install --only-binary ":all:" grpcio protobuf==3.20.2 \
  && apt-get autoremove -y \
