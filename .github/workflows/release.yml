@@ -35,9 +35,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        golang_cross: [ 1.19-bullseye ]
+        golang_cross: [ 1.19-ibm ]
         include:
-          - golang_cross: 1.19-bullseye
+          - golang_cross: 1.19-ibm
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             rpmvers: 'el/8 el/9 amazon/2023'
             debvers: 'ubuntu/bionic ubuntu/focal ubuntu/jammy debian/buster debian/bullseye debian/bookworm'
