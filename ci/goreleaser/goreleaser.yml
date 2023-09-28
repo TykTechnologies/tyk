@@ -156,60 +156,60 @@ dockers:
 
   - ids:
      - std
-   image_templates:
-     - "tykio/tyk-gateway:{{ .Tag }}-s390x"
-     - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-s390x"
-   build_flag_templates:
-     - "--build-arg=PORTS=8080"
-     - "--platform=linux/s390x"
-     - "--label=org.opencontainers.image.created={{.Date}}"
-     - "--label=org.opencontainers.image.title={{.ProjectName}}"
-     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-     - "--label=org.opencontainers.image.version={{.Version}}"
-   use: buildx
-   goarch: s390x
-   goos: linux
-   dockerfile: ci/Dockerfile.std
-   extra_files:
-     - "ci/install/"
-     - "README.md"
-     - "LICENSE.md"
-     - "apps/app_sample.json"
-     - "templates"
-     - "middleware"
-     - "event_handlers/sample"
-     - "policies"
-     - "coprocess"
-     - "tyk.conf.example"
+    image_templates:
+      - "tykio/tyk-gateway:{{ .Tag }}-s390x"
+      - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-s390x"
+    build_flag_templates:
+      - "--build-arg=PORTS=8080"
+      - "--platform=linux/s390x"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    use: buildx
+    goarch: s390x
+    goos: linux
+    dockerfile: ci/Dockerfile.std
+    extra_files:
+      - "ci/install/"
+      - "README.md"
+      - "LICENSE.md"
+      - "apps/app_sample.json"
+      - "templates"
+      - "middleware"
+      - "event_handlers/sample"
+      - "policies"
+      - "coprocess"
+      - "tyk.conf.example"
      
   - ids:
      - std
-   image_templates:
-     - "tykio/tyk-gateway:{{ .Tag }}-ppc64le"
-     - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-ppc64le"
-   build_flag_templates:
-     - "--build-arg=PORTS=8080"
-     - "--platform=linux/ppc64le"
-     - "--label=org.opencontainers.image.created={{.Date}}"
-     - "--label=org.opencontainers.image.title={{.ProjectName}}"
-     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-     - "--label=org.opencontainers.image.version={{.Version}}"
-     - "--build-arg=TARGETARCH=ppc64el"
-   use: buildx
-   goarch: ppc64le
-   goos: linux
-   dockerfile: ci/Dockerfile.std
-   extra_files:
-     - "ci/install/"
-     - "README.md"
-     - "LICENSE.md"
-     - "apps/app_sample.json"
-     - "templates"
-     - "middleware"
-     - "event_handlers/sample"
-     - "policies"
-     - "coprocess"
-     - "tyk.conf.example"
+    image_templates:
+      - "tykio/tyk-gateway:{{ .Tag }}-ppc64le"
+      - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-ppc64le"
+    build_flag_templates:
+      - "--build-arg=PORTS=8080"
+      - "--platform=linux/ppc64le"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--build-arg=TARGETARCH=ppc64el"
+    use: buildx
+    goarch: ppc64le
+    goos: linux
+    dockerfile: ci/Dockerfile.std
+    extra_files:
+      - "ci/install/"
+      - "README.md"
+      - "LICENSE.md"
+      - "apps/app_sample.json"
+      - "templates"
+      - "middleware"
+      - "event_handlers/sample"
+      - "policies"
+      - "coprocess"
+      - "tyk.conf.example"
 
   # The plugin compiler image is built outside of goreleaser in a
   # plugin-compiler-build workflow.
