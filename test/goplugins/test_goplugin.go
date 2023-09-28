@@ -194,3 +194,16 @@ func MyAnalyticsPluginMaskJSONLoginBody(record *analytics.AnalyticsRecord) {
 		}
 	}
 }
+<<<<<<< HEAD
+=======
+
+func MyPluginAccessingOASAPI(rw http.ResponseWriter, r *http.Request) {
+	oas := ctx.GetOASDefinition(r)
+	rw.Header().Add("X-OAS-Doc-Title", oas.Info.Title)
+}
+
+func MyPluginReturningError(rw http.ResponseWriter, r *http.Request) {
+	rw.WriteHeader(http.StatusTeapot)
+	rw.Write([]byte(http.StatusText(http.StatusTeapot)))
+}
+>>>>>>> ac1ea094... [TT-9231] Prevent double error in GoPlugin calls (#5562)
