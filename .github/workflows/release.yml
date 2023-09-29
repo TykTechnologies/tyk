@@ -209,7 +209,6 @@ jobs:
     needs: ci
     uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@main
     secrets:
-      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
       DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
       DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
       ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
