@@ -13,8 +13,10 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 
 RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
-RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby-dev python3 \
+RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby-dev openssh-client \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
+
+RUN apt purge python3 python2
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
