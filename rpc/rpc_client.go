@@ -72,8 +72,10 @@ type rpcOpts struct {
 
 func (r rpcOpts) ClientIsConnected() bool {
 	if v := r.clientIsConnected.Load(); v != nil {
-		return v.(bool)
+		Log.WithField("EmergencyMode", v.(bool)).Debug("ClientIsConnected")
+		return v.(bool) && !r.GetEmergencyMode()
 	}
+
 	return false
 }
 
@@ -466,8 +468,10 @@ func recoverOp(fn func() error) func() error {
 func FuncClientSingleton(funcName string, request interface{}) (result interface{}, err error) {
 	be := backoff.Retry(func() error {
 		if !values.ClientIsConnected() {
+			Log.WithField("funcName", funcName).Debug("RPC is down, retrying")
 			return ErrRPCIsDown
 		}
+		Log.WithField("funcName", funcName).Debug("calling RPC")
 		result, err = funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
 		return nil
 	}, backoff.WithMaxRetries(
