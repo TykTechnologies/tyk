@@ -21,7 +21,7 @@ require (
 	github.com/TykTechnologies/storage v1.0.5
 	github.com/TykTechnologies/tyk-pump v1.8.0-rc4
 	github.com/akutz/memconn v0.1.0
-	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
+	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
 	github.com/buger/jsonparser v1.1.1
 	github.com/cenk/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.0.2
