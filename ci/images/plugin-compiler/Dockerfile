@@ -16,8 +16,8 @@ RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby-dev openssh-client \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
-RUN apt -y auto-remove python3.7
-RUN apt -y auto-remove python2.7
+RUN apt-get -y purge --auto-remove python3.7
+RUN apt-get -y purge --auto-remove python2.7
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
