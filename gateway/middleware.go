@@ -133,8 +133,14 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
+				writeResponse := true
+				// Prevent double error write
+				if goPlugin, isGoPlugin := actualMW.(*GoPluginMiddleware); isGoPlugin && goPlugin.handler != nil {
+					writeResponse = false
+				}
+
 				handler := ErrorHandler{*mw.Base()}
-				handler.HandleError(w, r, err.Error(), errCode, true)
+				handler.HandleError(w, r, err.Error(), errCode, writeResponse)
 
 				meta["error"] = err.Error()
 

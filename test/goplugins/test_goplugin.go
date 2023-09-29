@@ -194,3 +194,8 @@ func MyAnalyticsPluginMaskJSONLoginBody(record *analytics.AnalyticsRecord) {
 		}
 	}
 }
+
+func MyPluginReturningError(rw http.ResponseWriter, r *http.Request) {
+	rw.WriteHeader(http.StatusTeapot)
+	rw.Write([]byte(http.StatusText(http.StatusTeapot)))
+}
