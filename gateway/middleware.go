@@ -373,6 +373,11 @@ func (t BaseMiddleware) clearSession(session *user.SessionState) {
 		if policy.Partitions.Complexity || all {
 			session.MaxQueryDepth = 0
 		}
+
+		if policy.Partitions.Acl || all {
+			session.AccessRights = nil
+			session.SetHasACL()
+		}
 	}
 }
 

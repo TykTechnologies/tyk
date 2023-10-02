@@ -343,3 +343,90 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	sendReqAndCheckQuota(t, apis[2].APIID, 24, false)
 	sendReqAndCheckQuota(t, apis[2].APIID, 23, false)
 }
+
+func TestSessionShouldNotAccessToPreviousAPI(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		api1 = "api1"
+		api2 = "api2"
+	)
+
+	// 1. Create api1, api2 and a policy with api1 and a key with the policy
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = api1
+		spec.APIID = api1
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/api1/"
+	}, func(spec *APISpec) {
+		spec.Name = api2
+		spec.APIID = api2
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/api2/"
+	})
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{api1: {
+			APIName: api1,
+			APIID:   api1,
+		}}
+	})
+
+	_, key := ts.CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{pID}
+	})
+
+	headers := map[string]string{
+		"Authorization": key,
+	}
+
+	// so far so good
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/api1/", Headers: headers, Code: http.StatusOK},
+	}...)
+
+	// 2. Change the pol access rights to api2
+	pol, _ := ts.GetPolicyById(pID)
+	pol.AccessRights = map[string]user.AccessDefinition{api2: {
+		APIName: api2,
+		APIID:   api2,
+	}}
+
+	ts.SetPolicy(pID, pol)
+
+	// ok, the key doesn't work for api1 and works for api2
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/api2/", Headers: headers, Code: http.StatusOK},
+		{Path: "/api1/", Headers: headers, Code: http.StatusForbidden},
+	}...)
+
+	// 3. Remove api2 from the system
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.APIID = api1
+		spec.Proxy.ListenPath = "/api1/"
+	})
+
+	delete(pol.AccessRights, api2)
+	ts.SetPolicy(pID, pol)
+
+	// api1 is not in the pol so not accessible, and api2 is not in the system so not found
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/api2/", Headers: headers, Code: http.StatusNotFound},
+		{Path: "/api1/", Headers: headers, Code: http.StatusForbidden},
+	}...)
+
+	// session object returned should not have any access rights
+	_, _ = ts.Run(t, test.TestCase{
+		AdminAuth: true, Path: "/tyk/keys/" + key, BodyMatchFunc: func(bytes []byte) bool {
+			var s user.SessionState
+			err := json.Unmarshal(bytes, &s)
+			assert.NoError(t, err)
+
+			assert.Len(t, s.AccessRights, 0)
+
+			return true
+		}, Code: http.StatusOK,
+	})
+}

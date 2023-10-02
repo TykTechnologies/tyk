@@ -147,6 +147,7 @@ type SessionState struct {
 	// Used to store token hash
 	keyHash string
 	KeyID   string `json:"-"`
+	hasACL  bool
 }
 
 func NewSessionState() *SessionState {
@@ -332,4 +333,14 @@ func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, 
 // IsBasicAuth returns whether the key is basic auth or not.
 func (s *SessionState) IsBasicAuth() bool {
 	return s.BasicAuthData.Password != ""
+}
+
+// HasACL returns whether the session has any ACL partitioned policy.
+func (s *SessionState) HasACL() bool {
+	return s.hasACL
+}
+
+// SetHasACL marks the session as having at least one ACL partitioned policy applied.
+func (s *SessionState) SetHasACL() {
+	s.hasACL = true
 }

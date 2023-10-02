@@ -56,6 +56,9 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			a.Logger().Info("Attempted access to unauthorised API version.")
 			return errors.New("Access to this API has been disallowed"), http.StatusForbidden
 		}
+	} else if session.HasACL() {
+		a.Logger().Info("Attempted access to unauthorised API version.")
+		return errors.New("Access to this API has been disallowed"), http.StatusForbidden
 	}
 
 	return nil, 200

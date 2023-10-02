@@ -1383,6 +1383,12 @@ func (s *Test) GetPolicyById(policyId string) (user.Policy, bool) {
 	return pol, found
 }
 
+func (s *Test) SetPolicy(policyId string, pol user.Policy) {
+	s.Gw.policiesMu.Lock()
+	defer s.Gw.policiesMu.Unlock()
+	s.Gw.policiesByID[policyId] = pol
+}
+
 const sampleAPI = `{
     "api_id": "test",
 	"org_id": "default",
