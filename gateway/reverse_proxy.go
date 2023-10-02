@@ -48,6 +48,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
@@ -329,18 +330,13 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		Director:      director,
 		TykAPISpec:    spec,
 		FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
+		BufferPool:    httputil.NewSyncBufferPool(32 * 1024),
 		logger:        logger,
 		wsUpgrader: websocket.Upgrader{
 			// CheckOrigin is not needed for the upgrader as tyk already provides
 			// its own middlewares for that.
 			CheckOrigin: func(r *http.Request) bool {
 				return true
-			},
-		},
-		sp: sync.Pool{
-			New: func() interface{} {
-				buffer := make([]byte, 32*1024)
-				return &buffer
 			},
 		},
 		Gw: gw,
@@ -368,6 +364,11 @@ type ReverseProxy struct {
 	// response body.
 	// If zero, no periodic flushing is done.
 	FlushInterval time.Duration
+
+	// BufferPool optionally specifies a buffer pool to
+	// get byte slices for use by io.CopyBuffer when
+	// copying HTTP response bodies.
+	BufferPool httputil.BufferPool
 
 	// TLSClientConfig specifies the TLS configuration to use for 'wss'.
 	// If nil, the default configuration is used.
@@ -1649,11 +1650,18 @@ func (p *ReverseProxy) flushInterval(res *http.Response) time.Duration {
 }
 
 func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) {
+	var w io.Writer = dst
+
+	if closer, ok := dst.(io.Closer); ok {
+		defer closer.Close()
+	}
 
 	if flushInterval != 0 {
-		if wf, ok := dst.(writeFlusher); ok {
+		wf, isFlusher := dst.(writeFlusher)
+		if isFlusher {
 			mlw := &maxLatencyWriter{
 				dst:     wf,
+				flush:   wf.Flush,
 				latency: flushInterval,
 			}
 			defer mlw.stop()
@@ -1662,21 +1670,30 @@ func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval 
 			mlw.flushPending = true
 			mlw.t = time.AfterFunc(flushInterval, mlw.delayedFlush)
 
-			dst = mlw
+			w = mlw
 		}
 	}
 
-	p.copyBuffer(dst, src)
+	var buf []byte
+	if p.BufferPool != nil {
+		buf = p.BufferPool.Get()
+		defer p.BufferPool.Put(buf)
+	}
+	_, err := p.copyBuffer(w, src, buf)
+	if err != nil {
+		log.WithError(err).Error("Error making a copy of the response")
+	}
 }
 
-func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
-
-	buf := p.sp.Get().(*[]byte)
-	defer p.sp.Put(buf)
-
+// copyBuffer returns any write errors or non-EOF read errors, and the amount
+// of bytes written.
+func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader, buf []byte) (int64, error) {
+	if len(buf) == 0 {
+		buf = make([]byte, 32*1024)
+	}
 	var written int64
 	for {
-		nr, rerr := src.Read(*buf)
+		nr, rerr := src.Read(buf)
 		if rerr != nil && rerr != io.EOF && rerr != context.Canceled {
 			p.logger.WithFields(logrus.Fields{
 				"prefix": "proxy",
@@ -1685,7 +1702,7 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
 			}).Error("http: proxy error during body copy: ", rerr)
 		}
 		if nr > 0 {
-			nw, werr := dst.Write((*buf)[:nr])
+			nw, werr := dst.Write(buf[:nr])
 			if nw > 0 {
 				written += int64(nw)
 			}
@@ -1697,6 +1714,9 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
 			}
 		}
 		if rerr != nil {
+			if rerr == io.EOF {
+				rerr = nil
+			}
 			return written, rerr
 		}
 	}
@@ -1777,7 +1797,8 @@ type writeFlusher interface {
 }
 
 type maxLatencyWriter struct {
-	dst     writeFlusher
+	dst     io.Writer
+	flush   func()
 	latency time.Duration // non-zero; negative means to flush immediately
 
 	mu           sync.Mutex // protects t, flushPending, and dst.Flush
@@ -1790,7 +1811,7 @@ func (m *maxLatencyWriter) Write(p []byte) (n int, err error) {
 	defer m.mu.Unlock()
 	n, err = m.dst.Write(p)
 	if m.latency < 0 {
-		m.dst.Flush()
+		m.flush()
 		return
 	}
 	if m.flushPending {
@@ -1811,7 +1832,7 @@ func (m *maxLatencyWriter) delayedFlush() {
 	if !m.flushPending { // if stop was called but AfterFunc already started this goroutine
 		return
 	}
-	m.dst.Flush()
+	m.flush()
 	m.flushPending = false
 }
 

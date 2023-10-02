@@ -8,7 +8,10 @@ import (
 // BufferPool is an interface for temporary buffer allocations.
 type BufferPool = httputil.BufferPool
 
-// NewSyncBufferPool creates a BufferPool backed with a sync.Pool.
+// NewSyncBufferPool creates a BufferPool backed with a sync.Pool. It's
+// used by the reverse proxy, reusing the buffers to lower garbage
+// collector pressure. Even without configuring the size, the allocations
+// of the temporary buffers are reused.
 func NewSyncBufferPool(size int) *SyncBufferPool {
 	return &SyncBufferPool{
 		pool: sync.Pool{
