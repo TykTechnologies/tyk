@@ -330,7 +330,6 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		Director:      director,
 		TykAPISpec:    spec,
 		FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
-		BufferPool:    httputil.NewSyncBufferPool(32 * 1024),
 		logger:        logger,
 		wsUpgrader: websocket.Upgrader{
 			// CheckOrigin is not needed for the upgrader as tyk already provides
@@ -339,7 +338,8 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 				return true
 			},
 		},
-		Gw: gw,
+		BufferPool: httputil.NewSyncBufferPool(32 * 1024),
+		Gw:         gw,
 	}
 	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy, Gw: gw}
 	return proxy
