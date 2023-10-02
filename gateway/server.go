@@ -21,10 +21,11 @@ import (
 	"strings"
 	"sync"
 
+	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
+
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/test"
-	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 
 	"sync/atomic"
 	textTemplate "text/template"
