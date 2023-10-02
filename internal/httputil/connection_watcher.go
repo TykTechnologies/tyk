@@ -29,7 +29,6 @@ func (cw *ConnectionWatcher) OnStateChange(_ net.Conn, state http.ConnState) {
 }
 
 // Count returns the number of connections at the time the call.
-
 func (cw *ConnectionWatcher) Count() int {
 	return int(atomic.LoadInt64(&cw.n))
 }
