@@ -1652,10 +1652,6 @@ func (p *ReverseProxy) flushInterval(res *http.Response) time.Duration {
 func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) {
 	var w io.Writer = dst
 
-	if closer, ok := dst.(io.Closer); ok {
-		defer closer.Close()
-	}
-
 	if flushInterval != 0 {
 		wf, isFlusher := dst.(writeFlusher)
 		if isFlusher {
