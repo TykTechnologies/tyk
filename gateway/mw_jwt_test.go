@@ -543,7 +543,9 @@ func BenchmarkJWTSessionRSAWithRawSourceOnWithClientID(b *testing.B) {
 
 func (ts *Test) prepareJWTSessionRSAWithRawSource() string {
 
+	const apiID = "apiID"
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiID
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -553,7 +555,11 @@ func (ts *Test) prepareJWTSessionRSAWithRawSource() string {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	pID := ts.CreatePolicy()
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			apiID: {APIID: apiID},
+		}
+	})
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
@@ -716,7 +722,24 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	pID := ts.CreatePolicy()
+	const apiID = "apiID"
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = apiID
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = "rsa"
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			apiID: {},
+		}
+	})
 	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
 		jwtToken := CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["policy_id"] = pID
@@ -726,16 +749,6 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 
 		return map[string]string{"authorization": jwtToken}
 	}
-
-	spec := BuildAPI(func(spec *APISpec) {
-		spec.UseKeylessAccess = false
-		spec.EnableJWT = true
-		spec.JWTSigningMethod = "rsa"
-		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
-		spec.JWTIdentityBaseField = "user_id"
-		spec.JWTPolicyFieldName = "policy_id"
-		spec.Proxy.ListenPath = "/"
-	})[0]
 
 	// This test is successful by definition
 	t.Run("IssuedAt_Before_now-no_skew--Valid_jwt", func(t *testing.T) {

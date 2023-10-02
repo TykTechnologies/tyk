@@ -645,6 +645,7 @@ func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 
 					pID := ts.CreatePolicy(func(p *user.Policy) {
 						p.QuotaMax = 1
+						p.Partitions.Quota = true
 					})
 
 					_, key := ts.CreateSession(func(s *user.SessionState) {
@@ -685,7 +686,6 @@ func TestUpdateKeyWithCert(t *testing.T) {
 	defer ts.Close()
 
 	apiId := "MTLSApi"
-	pID := ts.CreatePolicy(func(p *user.Policy) {})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = apiId
@@ -711,7 +711,6 @@ func TestUpdateKeyWithCert(t *testing.T) {
 
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {
-			s.ApplyPolicies = []string{pID}
 			s.AccessRights = map[string]user.AccessDefinition{apiId: {
 				APIID: apiId, Versions: []string{"v1"},
 			}}
@@ -733,7 +732,6 @@ func TestUpdateKeyWithCert(t *testing.T) {
 
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {
-			s.ApplyPolicies = []string{pID}
 			s.AccessRights = map[string]user.AccessDefinition{apiId: {
 				APIID: apiId, Versions: []string{"v1"},
 			}}
@@ -756,7 +754,6 @@ func TestUpdateKeyWithCert(t *testing.T) {
 
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {
-			s.ApplyPolicies = []string{pID}
 			s.AccessRights = map[string]user.AccessDefinition{apiId: {
 				APIID: apiId, Versions: []string{"v1"},
 			}}
