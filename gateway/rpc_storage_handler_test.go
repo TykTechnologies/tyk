@@ -525,6 +525,7 @@ func TestGetRawKey(t *testing.T) {
 
 		// we override the key in the cache
 		rpcListener.Gw.RPCGlobalCache.Set(givenKey, "test-value", -1)
+		defer rpcListener.Gw.RPCGlobalCache.Delete(givenKey)
 
 		// third call should succeed
 		value, err := rpcListener.GetRawKey(givenKey)
@@ -556,6 +557,7 @@ func TestGetRawKey(t *testing.T) {
 
 		// we override the key in the cache
 		rpcListener.Gw.RPCCertCache.Set(givenKey, "test-value", -1)
+		defer rpcListener.Gw.RPCCertCache.Delete(givenKey)
 
 		// third call should succeed
 		value, err := rpcListener.GetRawKey(givenKey)
