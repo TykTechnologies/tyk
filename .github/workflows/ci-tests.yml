@@ -37,7 +37,9 @@ jobs:
       - name: Install Dependencies
         run: |
           go get golang.org/x/tools/cmd/goimports@v0.8.0
-
+#          ignore go.mod and go.sum changes made by goimports installation.
+          git checkout go.mod go.sum
+          
           python -m pip install --upgrade pip
           pip install setuptools
           pip install google
