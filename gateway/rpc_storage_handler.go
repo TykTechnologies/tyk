@@ -268,7 +268,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		}
 		if cacheEnabled {
 			// Errors, and key not found, should be cached for a small amount of time
-			cacheStore.Set(keyName, err, 1)
+			cacheStore.Set(keyName, storage.ErrKeyNotFound, 1)
 		}
 		return "", storage.ErrKeyNotFound
 	}
