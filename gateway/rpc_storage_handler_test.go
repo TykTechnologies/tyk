@@ -329,3 +329,222 @@ func TestGetGroupLoginCallback(t *testing.T) {
 	}
 
 }
+<<<<<<< HEAD
+=======
+
+func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
+	tcs := []struct {
+		testName         string
+		givenTs          func() *Test
+		expectedNodeInfo apidef.NodeData
+	}{
+		{
+			testName: "base",
+			givenTs: func() *Test {
+				ts := StartTest(func(globalConf *config.Config) {
+				})
+				return ts
+			},
+			expectedNodeInfo: apidef.NodeData{
+				NodeID:      "",
+				GroupID:     "",
+				APIKey:      "",
+				TTL:         0,
+				Tags:        nil,
+				NodeVersion: VERSION,
+				Stats: apidef.GWStats{
+					APIsCount:     0,
+					PoliciesCount: 0,
+				},
+			},
+		},
+		{
+			testName: "custom conf",
+			givenTs: func() *Test {
+				ts := StartTest(func(globalConf *config.Config) {
+					globalConf.SlaveOptions.GroupID = "group"
+					globalConf.DBAppConfOptions.Tags = []string{"tag1"}
+					globalConf.LivenessCheck.CheckDuration = 1
+					globalConf.SlaveOptions.APIKey = "apikey-test"
+				})
+
+				return ts
+			},
+			expectedNodeInfo: apidef.NodeData{
+				NodeID:      "",
+				GroupID:     "group",
+				APIKey:      "apikey-test",
+				TTL:         1,
+				Tags:        []string{"tag1"},
+				NodeVersion: VERSION,
+				Stats: apidef.GWStats{
+					APIsCount:     0,
+					PoliciesCount: 0,
+				},
+			},
+		},
+		{
+			testName: "with loaded apis and policies",
+			givenTs: func() *Test {
+				ts := StartTest(func(globalConf *config.Config) {
+					globalConf.SlaveOptions.GroupID = "group"
+					globalConf.DBAppConfOptions.Tags = []string{"tag1"}
+					globalConf.LivenessCheck.CheckDuration = 1
+				})
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.APIID = "test"
+					spec.UseKeylessAccess = false
+					spec.Auth.UseParam = true
+					spec.OrgID = "default"
+				})
+
+				ts.CreatePolicy(func(p *user.Policy) {
+					p.Partitions.RateLimit = true
+					p.Tags = []string{"p1-tag"}
+					p.MetaData = map[string]interface{}{
+						"p1-meta": "p1-value",
+					}
+				})
+
+				return ts
+			},
+			expectedNodeInfo: apidef.NodeData{
+				NodeID:      "",
+				GroupID:     "group",
+				TTL:         1,
+				Tags:        []string{"tag1"},
+				NodeVersion: VERSION,
+				Stats: apidef.GWStats{
+					APIsCount:     1,
+					PoliciesCount: 1,
+				},
+			},
+		},
+		{
+			testName: "with node_id",
+			givenTs: func() *Test {
+				ts := StartTest(func(globalConf *config.Config) {
+					globalConf.SlaveOptions.GroupID = "group"
+					globalConf.DBAppConfOptions.Tags = []string{"tag1", "tag2"}
+					globalConf.LivenessCheck.CheckDuration = 1
+				})
+
+				ts.Gw.SetNodeID("test-node-id")
+				return ts
+			},
+			expectedNodeInfo: apidef.NodeData{
+				NodeID:      "test-node-id",
+				GroupID:     "group",
+				TTL:         1,
+				Tags:        []string{"tag1", "tag2"},
+				NodeVersion: VERSION,
+				Stats: apidef.GWStats{
+					APIsCount:     0,
+					PoliciesCount: 0,
+				},
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.testName, func(t *testing.T) {
+			ts := tc.givenTs()
+			defer ts.Close()
+
+			r := &RPCStorageHandler{Gw: ts.Gw}
+
+			tc.expectedNodeInfo.Health = ts.Gw.getHealthCheckInfo()
+
+			expected, err := json.Marshal(tc.expectedNodeInfo)
+			assert.Nil(t, err)
+
+			result := r.buildNodeInfo()
+
+			assert.Equal(t, expected, result)
+		})
+	}
+}
+
+func TestRPCStorageHandler_Disconnect(t *testing.T) {
+	t.Run("disconnect error", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		r := &RPCStorageHandler{Gw: ts.Gw}
+
+		err := r.Disconnect()
+		expectedErr := errors.New("RPCStorageHandler: rpc is either down or was not configured")
+		assert.EqualError(t, err, expectedErr.Error())
+	})
+}
+
+func TestGetRawKey(t *testing.T) {
+
+	t.Run("rpc cache enabled - normal key", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.SlaveOptions.EnableRPCCache = true
+		})
+		defer ts.Close()
+
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               ts.Gw,
+		}
+
+		// first call should fail - key not found
+		givenKey := "test-key"
+		_, err := rpcListener.GetRawKey(givenKey)
+		assert.NotNil(t, err)
+		assert.Equal(t, "key not found", err.Error())
+
+		// second call still fail but from cache
+		_, err = rpcListener.GetRawKey(givenKey)
+		assert.NotNil(t, err)
+		assert.Equal(t, "key not found", err.Error())
+
+		// we override the key in the cache
+		rpcListener.Gw.RPCGlobalCache.Set(givenKey, "test-value", -1)
+		defer rpcListener.Gw.RPCGlobalCache.Delete(givenKey)
+
+		// third call should succeed
+		value, err := rpcListener.GetRawKey(givenKey)
+		assert.Nil(t, err)
+		assert.Equal(t, "test-value", value)
+	})
+	t.Run("rpc cache enabled - cert key", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.SlaveOptions.EnableRPCCache = true
+		})
+		defer ts.Close()
+
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               ts.Gw,
+		}
+
+		// first call should fail - key not found
+		givenKey := "cert-test-key"
+		_, err := rpcListener.GetRawKey(givenKey)
+		assert.NotNil(t, err)
+		assert.Equal(t, "key not found", err.Error())
+
+		// second call still fail but from cache
+		_, err = rpcListener.GetRawKey(givenKey)
+		assert.NotNil(t, err)
+		assert.Equal(t, "key not found", err.Error())
+
+		// we override the key in the cache
+		rpcListener.Gw.RPCCertCache.Set(givenKey, "test-value", -1)
+		defer rpcListener.Gw.RPCCertCache.Delete(givenKey)
+
+		// third call should succeed
+		value, err := rpcListener.GetRawKey(givenKey)
+		assert.Nil(t, err)
+		assert.Equal(t, "test-value", value)
+	})
+
+}
+>>>>>>> 6dcc3222... TT-9957 Fix timeouts when getting keys when mdcb is down (#5574)
