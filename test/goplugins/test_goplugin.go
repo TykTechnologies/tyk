@@ -199,3 +199,8 @@ func MyPluginAccessingOASAPI(rw http.ResponseWriter, r *http.Request) {
 	oas := ctx.GetOASDefinition(r)
 	rw.Header().Add("X-OAS-Doc-Title", oas.Info.Title)
 }
+
+func MyPluginReturningError(rw http.ResponseWriter, r *http.Request) {
+	rw.WriteHeader(http.StatusTeapot)
+	rw.Write([]byte(http.StatusText(http.StatusTeapot)))
+}
