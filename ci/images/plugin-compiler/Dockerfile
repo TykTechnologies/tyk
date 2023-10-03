@@ -14,7 +14,7 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
 RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby-dev \
-    && apt-get -y purge --auto-remove python3.7 python2.7 openssh-client libssh2-1 setuptools protobuf || true \
+    && apt-get -y purge --auto-remove 'python*' openssh-client libssh2-1 setuptools protobuf || true \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
