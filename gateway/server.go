@@ -21,6 +21,8 @@ import (
 	"strings"
 	"sync"
 
+	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
+
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/test"
@@ -29,7 +31,6 @@ import (
 	textTemplate "text/template"
 	"time"
 
-	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
@@ -1147,25 +1148,23 @@ func (gw *Gateway) setupLogger() {
 	if gwConfig.UseLogstash {
 		mainLog.Debug("Enabling Logstash support")
 
-		var hook *logstashHook.Hook
+		var hook logrus.Hook
 		var err error
 		var conn net.Conn
 		if gwConfig.LogstashTransport == "udp" {
 			mainLog.Debug("Connecting to Logstash with udp")
-			hook, err = logstashHook.NewHook(gwConfig.LogstashTransport,
-				gwConfig.LogstashNetworkAddr,
-				appName)
+			conn, err = net.Dial(gwConfig.LogstashTransport, gwConfig.LogstashNetworkAddr)
 		} else {
 			mainLog.Debugf("Connecting to Logstash with %s", gwConfig.LogstashTransport)
 			conn, err = gas.Dial(gwConfig.LogstashTransport, gwConfig.LogstashNetworkAddr)
-			if err == nil {
-				hook, err = logstashHook.NewHookWithConn(conn, appName)
-			}
 		}
 
 		if err != nil {
 			log.Errorf("Error making connection for logstash: %v", err)
 		} else {
+			hook = logstashHook.New(conn, logstashHook.DefaultFormatter(logrus.Fields{
+				"type": appName,
+			}))
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
 			mainLog.Debug("Logstash hook active")

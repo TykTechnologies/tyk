@@ -21,7 +21,7 @@ require (
 	github.com/TykTechnologies/storage v1.0.5
 	github.com/TykTechnologies/tyk-pump v1.8.0-rc4
 	github.com/akutz/memconn v0.1.0
-	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
+	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
 	github.com/buger/jsonparser v1.1.1
 	github.com/cenk/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.0.2
@@ -54,7 +54,7 @@ require (
 	github.com/lonelycode/osin v0.0.0-20160423095202-da239c9dacb6
 	github.com/mavricknz/asn1-ber v0.0.0-20151103223136-b9df1c2f4213 // indirect
 	github.com/mavricknz/ldap v0.0.0-20160227184754-f5a958005e43
-	github.com/miekg/dns v1.0.14
+	github.com/miekg/dns v1.1.3
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/newrelic/go-agent v2.13.0+incompatible
@@ -64,7 +64,7 @@ require (
 	github.com/oschwald/maxminddb-golang v1.5.0
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/peterbourgon/g2s v0.0.0-20170223122336-d4e7ad98afea // indirect
-	github.com/pires/go-proxyproto v0.0.0-20190615163442-2c19fd512994
+	github.com/pires/go-proxyproto v0.6.2
 	github.com/pmylund/go-cache v2.1.0+incompatible
 	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d
 	github.com/rs/cors v1.7.0
