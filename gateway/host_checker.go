@@ -248,7 +248,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		}
 		if toCheck.EnableProxyProtocol {
 			log.Debug("using proxy protocol")
-			ls = proxyproto.NewConn(ls, 0)
+			ls = proxyproto.NewConn(ls)
 		}
 		defer ls.Close()
 		for _, cmd := range toCheck.Commands {
