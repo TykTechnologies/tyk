@@ -602,20 +602,9 @@ func TestURLReplacer(t *testing.T) {
 		t.Error(recordUUID4.Path)
 	}
 
-	if recordULID1.Path != "/posts/{ulid}/comments" {
-		t.Error("Path not altered, is:")
-		t.Error(recordULID1.Path)
-	}
-
-	if recordULID2.Path != "/posts/{ulid}/comments" {
-		t.Error("Path not altered, is:")
-		t.Error(recordULID2.Path)
-	}
-
-	if recordULID3.Path != "/posts/{ulid}/comments" {
-		t.Error("Path not altered, is:")
-		t.Error(recordULID3.Path)
-	}
+	assert.Equal(t, "/posts/{ulid}/comments", recordULID1.Path, "Path not altered, is: ", recordULID1.Path)
+	assert.Equal(t, "/posts/{ulid}/comments", recordULID2.Path, "Path not altered, is: ", recordULID2.Path)
+	assert.Equal(t, "/posts/{ulid}/comments", recordULID3.Path, "Path not altered, is: ", recordULID3.Path)
 
 	if recordID1.Path != "/widgets/{id}/getParams" {
 		t.Error("Path not altered, is:")
