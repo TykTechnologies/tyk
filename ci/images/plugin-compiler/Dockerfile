@@ -14,6 +14,7 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
 RUN apt-get purge -y --allow-remove-essential --auto-remove mercurial ruby-dev 'python*' 'libpython*' openssh-client libssh2-1
+RUN apt update && apt upgrade -y
 RUN rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
