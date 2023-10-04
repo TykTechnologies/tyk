@@ -178,6 +178,7 @@ dockers:
     - tcp
     - templates
     - test
+    - testdata
     - trace
     - user
     - go.mod
