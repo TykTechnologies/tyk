@@ -14,7 +14,13 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
 RUN apt-get purge -y --allow-remove-essential --auto-remove mercurial ruby-dev 'python*' 'libpython*' openssh-client libssh2-1
-RUN apt update && apt upgrade -y
+
+# Update sources list to point to archive.debian.org (EOL)
+# COPY ci/images/plugin-compiler /tmp/plugin-compiler
+# RUN bash -c "cp /tmp/plugin-compiler/sources.list/$(lsb_release -cs) /etc/apt/sources.list"
+
+RUN if [[ "$(lsb_release -sc)" != "stretch" ]]; then apt-get -y update && apt-get -y upgrade; fi
+
 RUN rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
