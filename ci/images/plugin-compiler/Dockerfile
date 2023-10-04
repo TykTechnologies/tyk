@@ -14,6 +14,7 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
 RUN apt-get purge -y --allow-remove-essential --auto-remove mercurial ruby-dev 'python*' 'libpython*' openssh-client libssh2-1
+RUN apt-get install -y git
 
 # Update sources list to point to archive.debian.org (EOL)
 # COPY ci/images/plugin-compiler /tmp/plugin-compiler
@@ -30,4 +31,3 @@ COPY . $TYK_GW_PATH
 RUN cd $TYK_GW_PATH && go mod vendor
 
 ENTRYPOINT ["/build.sh"]
-
