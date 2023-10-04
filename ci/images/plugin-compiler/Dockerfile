@@ -13,8 +13,10 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 
 RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
-RUN apt-get purge -y --allow-remove-essential --auto-remove mercurial ruby-dev 'python*' 'libpython*' openssh-client libssh2-1
-RUN apt-get install -y git
+RUN apt-get purge -y mercurial ruby-dev 'python*' 'libpython*' openssh-client
+
+# Ensure git remains installed (required)
+RUN git --version
 
 # Update sources list to point to archive.debian.org (EOL)
 # COPY ci/images/plugin-compiler /tmp/plugin-compiler
