@@ -1268,10 +1268,10 @@ func (gw *Gateway) initialiseSystem() error {
 		mainLog.Error("Failed to write PIDFile: ", err)
 	}
 
-	if gw.GetConfig().UseDBAppConfigs && gw.GetConfig().Policies.PolicySource != config.DefaultDashPolicySource {
+	if gwConfig.UseDBAppConfigs && gwConfig.Policies.PolicySource != config.DefaultDashPolicySource {
 		gwConfig.Policies.PolicySource = config.DefaultDashPolicySource
 		gwConfig.Policies.PolicyConnectionString = gwConfig.DBAppConfOptions.ConnectionString
-		if gw.GetConfig().Policies.PolicyRecordName == "" {
+		if gwConfig.Policies.PolicyRecordName == "" {
 			gwConfig.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
 		}
 	}
@@ -1290,14 +1290,6 @@ func (gw *Gateway) initialiseSystem() error {
 
 	if gwConfig.HttpServerOptions.MinVersion > gwConfig.HttpServerOptions.MaxVersion {
 		gwConfig.HttpServerOptions.MaxVersion = gwConfig.HttpServerOptions.MinVersion
-	}
-
-	if gwConfig.UseDBAppConfigs && gwConfig.Policies.PolicySource != config.DefaultDashPolicySource {
-		gwConfig.Policies.PolicySource = config.DefaultDashPolicySource
-		gwConfig.Policies.PolicyConnectionString = gwConfig.DBAppConfOptions.ConnectionString
-		if gwConfig.Policies.PolicyRecordName == "" {
-			gwConfig.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
-		}
 	}
 
 	gw.SetConfig(gwConfig)
