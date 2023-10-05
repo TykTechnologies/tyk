@@ -9,7 +9,7 @@ env:
 jobs:
   test:
     name: Go ${{ matrix.go }} Redis ${{ matrix.redis-version }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
       matrix:
@@ -36,7 +36,8 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          go get golang.org/x/tools/cmd/goimports
+          go get -u golang.org/x/tools/cmd/goimports@v0.8.0
+          git checkout -- go.mod go.sum
 
           python -m pip install --upgrade pip
           pip install setuptools
