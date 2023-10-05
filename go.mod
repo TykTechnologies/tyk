@@ -81,7 +81,7 @@ require (
 
 require (
 	github.com/TykTechnologies/kin-openapi v0.90.0
-	github.com/TykTechnologies/opentelemetry v0.0.19-0.20231005133917-060bfffd776d
+	github.com/TykTechnologies/opentelemetry v0.0.19
 )
 
 require (
