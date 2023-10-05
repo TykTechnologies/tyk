@@ -217,14 +217,10 @@ dockers:
     - testdata
     - trace
     - user
-<<<<<<< HEAD
-
-=======
     - go.mod
     - go.sum
     - main.go
     - ci/images/plugin-compiler
->>>>>>> 77a13622... [TT-9987] [4-lts] Fix plugin compiler cves (#5578)
 
 docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}
