@@ -27,6 +27,7 @@ const (
 
 func (gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
+	pats.ULIDs = regexp.MustCompile(`(?i)[0-7][0-9A-HJKMNP-TV-Z]{25}`)
 	pats.IDs = regexp.MustCompile(`\/(\d+)`)
 
 	for _, pattern := range gw.GetConfig().AnalyticsConfig.NormaliseUrls.Custom {
@@ -236,6 +237,10 @@ func NormalisePath(a *analytics.AnalyticsRecord, globalConfig *config.Config) {
 
 	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
 		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
+	}
+
+	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseULIDs {
+		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.ULIDs.ReplaceAllString(a.Path, "{ulid}")
 	}
 
 	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
