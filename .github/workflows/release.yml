@@ -135,6 +135,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha
+            type=full_sha
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern=v{{version}}
 
