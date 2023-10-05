@@ -156,13 +156,16 @@ func (m *GoPluginMiddleware) goPluginFromRequest(r *http.Request) (*GoPluginMidd
 	return perPathPerMethodGoPlugin.(*GoPluginMiddleware), found
 }
 func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (err error, respCode int) {
-	// if a Go plugin is found for this path, override the base handler and logger:
 	logger := m.logger
 	handler := m.handler
+	successHandler := m.successHandler
+
 	if !m.APILevel {
+		// if a Go plugin is found for this path, override the base handler and logger
 		if pluginMw, found := m.goPluginFromRequest(r); found {
 			logger = pluginMw.logger
 			handler = pluginMw.handler
+			successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
 		} else {
 			return nil, http.StatusOK // next middleware
 		}
@@ -226,7 +229,11 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			m.logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
 		default:
 			// record 2XX to analytics
+<<<<<<< HEAD
 			m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
+=======
+			successHandler.RecordHit(r, analytics.Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
+>>>>>>> 921bdc50... [TT-7127] Fix goplugin invalid memory address or nil pointer dereference (#5589)
 
 			// no need to continue passing this request down to reverse proxy
 			respCode = mwStatusRespond
