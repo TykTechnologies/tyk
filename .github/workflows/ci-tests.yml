@@ -37,6 +37,7 @@ jobs:
       - name: Install Dependencies
         run: |
           go get -u golang.org/x/tools/cmd/goimports@v0.8.0
+          git checkout -- go.mod go.sum
 
           python -m pip install --upgrade pip
           pip install setuptools
