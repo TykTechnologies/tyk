@@ -154,6 +154,15 @@ type NormalisedURLConfig struct {
 	// Each UUID will be replaced with a placeholder {uuid}
 	NormaliseUUIDs bool `json:"normalise_uuids"`
 
+	// Set this to true to have Tyk automatically clean up ULIDs. It will match the following style:
+	//
+	// * `/posts/01G9HHNKWGBHCQX7VG3JKSZ055/comments`
+	// * `/posts/01g9hhnkwgbhcqx7vg3jksz055/comments`
+	// * `/posts/01g9HHNKwgbhcqx7vg3JKSZ055/comments`
+
+	// Each ULID will be replaced with a placeholder {ulid}
+	NormaliseULIDs bool `json:"normalise_ulids"`
+
 	// Set this to true to have Tyk automatically match for numeric IDs, it will match with a preceding slash so as not to capture actual numbers:
 	NormaliseNumbers bool `json:"normalise_numbers"`
 
@@ -165,6 +174,7 @@ type NormalisedURLConfig struct {
 
 type NormaliseURLPatterns struct {
 	UUIDs  *regexp.Regexp
+	ULIDs  *regexp.Regexp
 	IDs    *regexp.Regexp
 	Custom []*regexp.Regexp
 }
