@@ -1,0 +1,20 @@
+---
+version: "3"
+
+tasks:
+  plugin-compiler:
+    desc: "Build and test plugin compiler"
+    cmds:
+      - task: plugin-compiler:build
+      - task: plugin-compiler:test
+
+  plugin-compiler:build:
+    desc: "Build plugin compiler"
+    cmds:
+      - docker build --progress=plain --no-cache --build-arg GOLANG_CROSS=1.15-el7 -t internal/plugin-compiler-el7 -f ci/images/plugin-compiler/Dockerfile .
+      - docker build --progress=plain --no-cache --build-arg GOLANG_CROSS=1.15 -t internal/plugin-compiler -f ci/images/plugin-compiler/Dockerfile .
+
+  plugin-compiler:test:
+    desc: "Test plugin compiler"
+    cmds:
+      - echo "Not implemented"
