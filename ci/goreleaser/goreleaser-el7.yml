@@ -156,8 +156,6 @@ dockers:
   goos: linux
   dockerfile: ci/images/plugin-compiler/Dockerfile
   extra_files:
-    - ci/images/plugin-compiler
-    - go.mod
     - apidef
     - certs
     - checkup
@@ -170,6 +168,7 @@ dockers:
     - gateway
     - goplugin
     - headers
+    - internal
     - log
     - regexp
     - request
@@ -182,7 +181,10 @@ dockers:
     - testdata
     - trace
     - user
-    - internal
+    - go.mod
+    - go.sum
+    - main.go
+    - ci/images/plugin-compiler
 
 checksum:
   disable: true
