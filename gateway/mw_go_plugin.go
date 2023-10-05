@@ -229,11 +229,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			m.logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
 		default:
 			// record 2XX to analytics
-<<<<<<< HEAD
-			m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
-=======
-			successHandler.RecordHit(r, analytics.Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
->>>>>>> 921bdc50... [TT-7127] Fix goplugin invalid memory address or nil pointer dereference (#5589)
+			successHandler.RecordHit(r, Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
 
 			// no need to continue passing this request down to reverse proxy
 			respCode = mwStatusRespond
