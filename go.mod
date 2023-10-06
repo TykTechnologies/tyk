@@ -81,11 +81,7 @@ require (
 
 require (
 	github.com/TykTechnologies/kin-openapi v0.90.0
-<<<<<<< HEAD
-	github.com/TykTechnologies/opentelemetry v0.0.17
-=======
 	github.com/TykTechnologies/opentelemetry v0.0.19
->>>>>>> f380a393... TT-10153 Fix OTel memory leak (#5587)
 )
 
 require (
