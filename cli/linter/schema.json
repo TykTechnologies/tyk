@@ -224,9 +224,6 @@
             },
             "normalise_uuids": {
               "type": "boolean"
-            },
-            "normalise_ulids": {
-              "type": "boolean"
             }
           }
         },
