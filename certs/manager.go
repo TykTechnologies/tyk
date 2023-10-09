@@ -181,6 +181,10 @@ func publicKey(priv interface{}) interface{} {
 	}
 }
 
+func IsPublicKey(cert *tls.Certificate) bool {
+	return cert.Leaf != nil && strings.HasPrefix(cert.Leaf.Subject.CommonName, "Public Key: ")
+}
+
 func ParsePEMCertificate(data []byte, secret string) (*tls.Certificate, error) {
 	var cert tls.Certificate
 
@@ -595,7 +599,7 @@ func (c *certificateManager) CertPool(certIDs []string) *x509.CertPool {
 	pool := x509.NewCertPool()
 
 	for _, cert := range c.List(certIDs, CertificatePublic) {
-		if cert != nil {
+		if cert != nil && !IsPublicKey(cert) {
 			pool.AddCert(cert.Leaf)
 		}
 	}

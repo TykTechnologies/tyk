@@ -418,7 +418,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 					certIDs := append(spec.ClientCertificates, gwConfig.Security.Certificates.API...)
 
 					for _, cert := range gw.CertificateManager.List(certIDs, certs.CertificatePublic) {
-						if cert != nil {
+						if cert != nil && !certs.IsPublicKey(cert) {
 							newConfig.ClientCAs.AddCert(cert.Leaf)
 						}
 					}

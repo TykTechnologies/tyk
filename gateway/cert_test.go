@@ -1,10 +1,13 @@
 package gateway
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -1608,6 +1611,28 @@ func TestStaticMTLSAPI(t *testing.T) {
 		return ts, clientCertID, clientCert
 	}
 
+	generatePublicKey := func() []byte {
+		// Generate a private key.
+		priv, _ := rsa.GenerateKey(rand.Reader, 1024)
+
+		// Derive the public key from the private key.
+		publicKey := &priv.PublicKey
+
+		// Save the public key in PEM format.
+		publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+		if err != nil {
+			log.Fatalf("Failed to marshal public key: %v", err)
+		}
+
+		publicKeyBlock := &pem.Block{
+			Type:  "PUBLIC KEY",
+			Bytes: publicKeyBytes,
+		}
+
+		publicKeyPEM := pem.EncodeToMemory(publicKeyBlock)
+		return publicKeyPEM
+	}
+
 	t.Run("control API is not affected", func(t *testing.T) {
 		ts, _, _ := setup()
 		defer ts.Close()
@@ -1672,6 +1697,48 @@ func TestStaticMTLSAPI(t *testing.T) {
 			Client:    expiredClient,
 			Path:      "/static-mtls",
 			BodyMatch: tykcrypto.ErrCertExpired.Error(),
+		})
+	})
+
+	t.Run("only public key in client certificate", func(t *testing.T) {
+		ts, _, clientCert := setup()
+		defer ts.Close()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		// generate a public key
+		publicKeyPEM := generatePublicKey()
+
+		certID, err := ts.Gw.CertificateManager.Add(publicKeyPEM, "")
+		assert.NoError(t, err)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "apiID-2"
+			spec.BaseIdentityProvidedBy = "auth_token"
+			spec.UseKeylessAccess = true
+			spec.UseMutualTLSAuth = true
+			spec.Proxy.ListenPath = "/public-key-mtls"
+			spec.ClientCertificates = []string{certID}
+		})
+
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: true,
+			GetClientCertificate: func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+				assert.Zero(t, info.AcceptableCAs)
+				return &clientCert, nil
+			},
+		}
+
+		transport := &http.Transport{TLSClientConfig: tlsConfig}
+
+		httpClient := &http.Client{Transport: transport}
+
+		_, _ = ts.Run(t, test.TestCase{
+			Domain:    "localhost",
+			Client:    httpClient,
+			AdminAuth: true,
+			Path:      "/tyk/apis",
+			Code:      http.StatusOK,
 		})
 	})
 }
