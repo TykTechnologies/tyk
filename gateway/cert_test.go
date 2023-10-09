@@ -1613,7 +1613,7 @@ func TestStaticMTLSAPI(t *testing.T) {
 
 	generatePublicKey := func() []byte {
 		// Generate a private key.
-		priv, _ := rsa.GenerateKey(rand.Reader, 1024)
+		priv, _ := rsa.GenerateKey(rand.Reader, 2048)
 
 		// Derive the public key from the private key.
 		publicKey := &priv.PublicKey

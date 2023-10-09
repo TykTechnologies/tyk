@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -114,4 +115,9 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 	}
 
 	return errors.New("Certificate with SHA256 " + certID + " not allowed")
+}
+
+// IsPublicKey verifies if given certificate is a public key only.
+func IsPublicKey(cert *tls.Certificate) bool {
+	return cert.Leaf != nil && strings.HasPrefix(cert.Leaf.Subject.CommonName, "Public Key: ")
 }
