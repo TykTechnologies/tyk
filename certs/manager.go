@@ -181,6 +181,7 @@ func publicKey(priv interface{}) interface{} {
 	}
 }
 
+// IsPublicKey verifies if given certificate is a public key only.
 func IsPublicKey(cert *tls.Certificate) bool {
 	return cert.Leaf != nil && strings.HasPrefix(cert.Leaf.Subject.CommonName, "Public Key: ")
 }
