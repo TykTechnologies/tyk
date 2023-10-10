@@ -1591,6 +1591,1606 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 	orgID := r.URL.Query().Get("org_id")
 
 	// check if passed key is user name and convert it to real key with respect to current hashing algorithm
+// Tyk Gateway API
+//
+// The code below describes the Tyk Gateway API
+// Version: 2.8.0
+//
+//	Schemes: https, http
+//	Host: localhost
+//	BasePath: /tyk/
+//
+//	Consumes:
+//	- application/json
+//
+//	Produces:
+//	- application/json
+//
+//	Security:
+//	- api_key:
+//
+//	SecurityDefinitions:
+//	api_key:
+//	     type: apiKey
+//	     name: X-Tyk-Authorization
+//	     in: header
+//
+// swagger:meta
+package gateway
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/config"
+
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/uuid"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
+
+	"github.com/gorilla/mux"
+	"github.com/lonelycode/osin"
+
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
+	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
+
+	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+)
+
+var (
+	ErrRequestMalformed = errors.New("request malformed")
+)
+
+// apiModifyKeySuccess represents when a Key modification was successful
+//
+// swagger:model apiModifyKeySuccess
+type apiModifyKeySuccess struct {
+	// in:body
+	Key     string `json:"key"`
+	Status  string `json:"status"`
+	Action  string `json:"action"`
+	KeyHash string `json:"key_hash,omitempty"`
+}
+
+// apiStatusMessage represents an API status message
+//
+// swagger:model apiStatusMessage
+type apiStatusMessage struct {
+	Status string `json:"status"`
+	// Response details
+	Message string `json:"message"`
+}
+
+func apiOk(msg string) apiStatusMessage {
+	return apiStatusMessage{"ok", msg}
+}
+
+func apiError(msg string) apiStatusMessage {
+	return apiStatusMessage{"error", msg}
+}
+
+// paginationStatus provides more information about a paginated data set
+type paginationStatus struct {
+	PageNum   int `json:"page_num"`
+	PageTotal int `json:"page_total"`
+	PageSize  int `json:"page_size"`
+}
+
+type paginatedOAuthClientTokens struct {
+	Pagination paginationStatus
+	Tokens     []OAuthClientToken
+}
+
+type VersionMetas struct {
+	Status string        `json:"status"`
+	Metas  []VersionMeta `json:"apis"`
+}
+
+type VersionMeta struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	VersionName      string `json:"versionName"`
+	Internal         bool   `json:"internal"`
+	ExpirationDate   string `json:"expirationDate"`
+	IsDefaultVersion bool   `json:"isDefaultVersion"`
+}
+
+func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
+	w.WriteHeader(code)
+	if err := json.NewEncoder(w).Encode(obj); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	if code != http.StatusOK {
+		job := instrument.NewJob("SystemAPIError")
+		job.Event(strconv.Itoa(code))
+	}
+}
+
+func doJSONExport(w http.ResponseWriter, code int, obj interface{}, fileName string) {
+
+	if code != http.StatusOK {
+		doJSONWrite(w, code, obj)
+		return
+	}
+
+	stream, err := json.MarshalIndent(obj, "", "  ")
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=%q", fileName))
+	w.WriteHeader(code)
+	_, err = w.Write(stream)
+
+	if err != nil {
+		job := instrument.NewJob("SystemAPIError")
+		job.Event(err.Error())
+	}
+
+}
+
+type MethodNotAllowedHandler struct{}
+
+func (m MethodNotAllowedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	doJSONWrite(w, http.StatusMethodNotAllowed, apiError("Method not supported"))
+}
+
+func addSecureAndCacheHeaders(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Setting OWASP Secure Headers
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+
+		// Avoid Caching of tokens
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		next(w, r)
+	}
+}
+
+func allowMethods(next http.HandlerFunc, methods ...string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		for _, method := range methods {
+			if r.Method == method {
+				next(w, r)
+				return
+			}
+		}
+		doJSONWrite(w, http.StatusMethodNotAllowed, apiError("Method not supported"))
+	}
+}
+
+func (gw *Gateway) getSpecForOrg(orgID string) *APISpec {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+	for _, v := range gw.apisByID {
+		if v.OrgID == orgID {
+			return v
+		}
+	}
+
+	// If we can't find a spec, it doesn't matter, because we default to Redis anyway, grab whatever you can find
+	for _, v := range gw.apisByID {
+		return v
+	}
+	return nil
+}
+
+func (gw *Gateway) getApisIdsForOrg(orgID string) []string {
+	result := []string{}
+
+	showAll := orgID == ""
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+	for _, v := range gw.apisByID {
+		if v.OrgID == orgID || showAll {
+			result = append(result, v.APIID)
+		}
+	}
+
+	return result
+}
+
+func (gw *Gateway) checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isHashed bool) {
+	// Check the policies to see if we are forcing an expiry on the key
+	for _, polID := range newSession.PolicyIDs() {
+		gw.policiesMu.RLock()
+		policy, ok := gw.policiesByID[polID]
+		gw.policiesMu.RUnlock()
+		if !ok {
+			continue
+		}
+		// Are we foring an expiry?
+		if policy.KeyExpiresIn > 0 {
+			// We are, does the key exist?
+			_, found := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
+			if !found {
+				// this is a new key, lets expire it
+				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
+			}
+		}
+	}
+}
+
+func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APISpec, isHashed bool) error {
+	// use basic middleware to apply policies to key/session (it also saves it)
+	mw := BaseMiddleware{
+		Spec: spec,
+		Gw:   gw,
+	}
+
+	if err := mw.ApplyPolicies(session); err != nil {
+		return err
+	}
+
+	// calculate lifetime considering access rights
+	lifetime := gw.ApplyLifetime(session, spec)
+	if err := gw.GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetApiSpecsFromAccessRights from the session.AccessRights returns the collection of api specs
+func (gw *Gateway) GetApiSpecsFromAccessRights(sess *user.SessionState) []*APISpec {
+	var apis []*APISpec
+	if sess != nil && len(sess.AccessRights) > 0 {
+		for apiID := range sess.AccessRights {
+			spec := gw.getApiSpec(apiID)
+			if spec != nil {
+				apis = append(apis, spec)
+			}
+		}
+	}
+
+	return apis
+}
+
+// ApplyLifetime calculates the lifetime for the key. It considers the access rights and the bigger lifetime will be used
+func (gw *Gateway) ApplyLifetime(sess *user.SessionState, specs ...*APISpec) int64 {
+	var lifetime int64
+
+	if len(sess.AccessRights) > 0 {
+		specs = gw.GetApiSpecsFromAccessRights(sess)
+	}
+
+	for _, spec := range specs {
+		if spec != nil {
+			sessionLifeTime := sess.Lifetime(spec.GetSessionLifetimeRespectsKeyExpiration(), spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
+			// uses the greater lifetime
+			if sessionLifeTime > lifetime {
+				lifetime = sessionLifeTime
+			}
+		}
+	}
+
+	return lifetime
+}
+
+func resetAPILimits(accessRights map[string]user.AccessDefinition) {
+	for apiID := range accessRights {
+		// reset API-level limit to nil if it has a zero-value
+		if access := accessRights[apiID]; !access.Limit.IsEmpty() && access.Limit == (user.APILimit{}) {
+			access.Limit = user.APILimit{}
+			accessRights[apiID] = access
+		}
+	}
+}
+
+func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool, isHashed bool) error {
+	// field last_updated plays an important role in in-mem rate limiter
+	// so update last_updated to current timestamp only if suppress_reset wasn't set to 1
+	if !dontReset {
+		newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+	}
+
+	if len(newSession.AccessRights) > 0 {
+		// reset API-level limit to empty APILimit if any has a zero-value
+		resetAPILimits(newSession.AccessRights)
+		// We have a specific list of access rules, only add / update those
+		for apiId := range newSession.AccessRights {
+			apiSpec := gw.getApiSpec(apiId)
+			if apiSpec == nil {
+				log.WithFields(logrus.Fields{
+					"prefix":      "api",
+					"key":         keyName,
+					"org_id":      newSession.OrgID,
+					"api_id":      apiId,
+					"user_id":     "system",
+					"user_ip":     "--",
+					"path":        "--",
+					"server_name": "system",
+				}).Error("Could not add key for this API ID, API doesn't exist.")
+				return errors.New("API must be active to add keys")
+			}
+			gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
+
+			// Lets reset keys if they are edited by admin
+			if !apiSpec.DontSetQuotasOnCreate {
+				// Reset quote by default
+				if !dontReset {
+					gw.GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
+					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+				}
+
+				// apply polices (if any) and save key
+				if err := gw.applyPoliciesAndSave(keyName, newSession, apiSpec, isHashed); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		// nothing defined, add key to ALL
+		if !gw.GetConfig().AllowMasterKeys {
+			log.Error("Master keys disallowed in configuration, key not added.")
+			return errors.New("Master keys not allowed")
+		}
+		log.Warning("No API Access Rights set, adding key to ALL.")
+		gw.apisMu.RLock()
+		defer gw.apisMu.RUnlock()
+
+		for _, spec := range gw.apisByID {
+			if !dontReset {
+				gw.GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
+				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+			}
+			gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
+			// apply polices (if any) and save key
+			if err := gw.applyPoliciesAndSave(keyName, newSession, spec, isHashed); err != nil {
+				return err
+			}
+		}
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix":      "api",
+		"key":         gw.obfuscateKey(keyName),
+		"expires":     newSession.Expires,
+		"org_id":      newSession.OrgID,
+		"api_id":      "--",
+		"user_id":     "system",
+		"user_ip":     "--",
+		"path":        "--",
+		"server_name": "system",
+	}).Info("Key added or updated.")
+	return nil
+}
+
+// ---- TODO: This changes the URL structure of the API completely ----
+// ISSUE: If Session stores are stored with API specs, then managing keys will need to be done per store, i.e. add to all stores,
+// remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
+// need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
+
+func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
+	basicAuthHashAlgo := gw.basicAuthHashAlgo()
+
+	if basicAuthHashAlgo == string(user.HashBCrypt) {
+		session.BasicAuthData.Hash = user.HashBCrypt
+		hashedPassBytes, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
+		if err != nil {
+			log.WithError(err).Error("Could not hash password, setting to plaintext")
+			session.BasicAuthData.Hash = user.HashPlainText
+			return
+		}
+
+		session.BasicAuthData.Password = string(hashedPassBytes)
+		return
+	}
+
+	session.BasicAuthData.Password = storage.HashStr(session.BasicAuthData.Password, basicAuthHashAlgo)
+	session.BasicAuthData.Hash = user.HashType(basicAuthHashAlgo)
+}
+
+func (gw *Gateway) basicAuthHashAlgo() string {
+	config := gw.GetConfig()
+
+	// Use `basic_auth_hash_key_function` if set;
+	algo := config.BasicAuthHashKeyFunction
+
+	// If hash function name is empty/invalid
+	if ok := user.IsHashType(algo); !ok {
+		// set default basic auth hash to bcrypt
+		return string(user.HashBCrypt)
+	}
+
+	// Algo is validated at this point
+	return algo
+}
+
+func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
+	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
+
+	// decode payload
+	newSession := &user.SessionState{}
+
+	contents, _ := ioutil.ReadAll(r.Body)
+	r.Body = ioutil.NopCloser(bytes.NewReader(contents))
+
+	if err := json.Unmarshal(contents, newSession); err != nil {
+		log.Error("Couldn't decode new session object: ", err)
+		return apiError("Request malformed"), http.StatusBadRequest
+	}
+
+	mw := BaseMiddleware{Gw: gw}
+	// TODO: handle apply policies error
+	mw.ApplyPolicies(newSession)
+	// DO ADD OR UPDATE
+
+	// get original session in case of update and preserve fields that SHOULD NOT be updated
+	originalKey := user.SessionState{}
+	if r.Method == http.MethodPut {
+		key, found := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
+		keyName = key.KeyID
+		if !found {
+			log.Error("Could not find key when updating")
+			return apiError("Key is not found"), http.StatusNotFound
+		}
+		originalKey = key.Clone()
+
+		isCertificateChanged := newSession.Certificate != originalKey.Certificate
+		if isCertificateChanged {
+			if newSession.Certificate == "" {
+				log.Error("Key must contain a certificate")
+				return apiError("Key cannot be used without a certificate"), http.StatusBadRequest
+			}
+
+			// check that the certificate exists in the system
+			_, err := gw.CertificateManager.GetRaw(newSession.Certificate)
+			if err != nil {
+				log.Error("Key must contain an existing certificate")
+				return apiError("Key must be used with an existent certificate"), http.StatusBadRequest
+			}
+		}
+
+		// preserve the creation date
+		newSession.DateCreated = originalKey.DateCreated
+
+		// don't change fields related to quota and rate limiting if was passed as "suppress_reset=1"
+		if suppressReset {
+			// save existing quota_renews and last_updated if suppress_reset was passed
+			// (which means don't reset quota or rate counters)
+			// - leaving quota_renews as 0 will force quota limiter to start new renewal period
+			// - setting new last_updated with force rate limiter to start new "per" rating period
+
+			// on session level
+			newSession.QuotaRenews = originalKey.QuotaRenews
+			newSession.LastUpdated = originalKey.LastUpdated
+
+			// on ACL API limit level
+			for apiID, access := range originalKey.AccessRights {
+				if access.Limit.IsEmpty() {
+					continue
+				}
+				if newAccess, ok := newSession.AccessRights[apiID]; ok && !newAccess.Limit.IsEmpty() {
+					newAccess.Limit.QuotaRenews = access.Limit.QuotaRenews
+					newSession.AccessRights[apiID] = newAccess
+				}
+			}
+		}
+	} else {
+		newSession.DateCreated = time.Now()
+		keyName = gw.generateToken(newSession.OrgID, keyName)
+	}
+
+	//set the original expiry if the content in payload is a past time
+	if time.Now().After(time.Unix(newSession.Expires, 0)) && newSession.Expires > 1 {
+		newSession.Expires = originalKey.Expires
+	}
+
+	// Update our session object (create it)
+	if newSession.IsBasicAuth() {
+		// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
+		// Only if it's NEW
+		switch r.Method {
+		case http.MethodPost:
+			// It's a create, so lets hash the password
+			gw.setBasicAuthSessionPassword(newSession)
+		case http.MethodPut:
+			if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
+				// passwords dont match assume it's new, lets hash it
+				log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
+				log.Debug("New: newSession.BasicAuthData.Password")
+				log.Debug("Changing password")
+				gw.setBasicAuthSessionPassword(newSession)
+			}
+		}
+	} else if originalKey.IsBasicAuth() {
+		// preserve basic auth data
+		newSession.BasicAuthData.Hash = originalKey.BasicAuthData.Hash
+		newSession.BasicAuthData.Password = originalKey.BasicAuthData.Password
+	}
+
+	if r.Method == http.MethodPost || storage.TokenOrg(keyName) != "" {
+		// use new key format if key gets created or updating key with new format
+		if err := gw.doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
+			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
+		}
+	} else {
+
+		newFormatKey := gw.generateToken(newSession.OrgID, keyName)
+		// search as a custom key
+		_, err := gw.GlobalSessionManager.Store().GetKey(newFormatKey)
+
+		if err == nil {
+			// update new format key for custom keys, as it was found then its a customKey
+			keyName = newFormatKey
+		}
+
+		if err := gw.doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
+			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
+		}
+	}
+
+	action := "modified"
+	event := EventTokenUpdated
+	if r.Method == http.MethodPost {
+		action = "added"
+		event = EventTokenCreated
+	}
+	gw.FireSystemEvent(event, EventTokenMeta{
+		EventMetaDefault: EventMetaDefault{Message: "Key modified."},
+		Org:              newSession.OrgID,
+		Key:              keyName,
+	})
+
+	response := apiModifyKeySuccess{
+		Key:    keyName,
+		Status: "ok",
+		Action: action,
+	}
+
+	// add key hash for newly created key
+	if gw.GetConfig().HashKeys && r.Method == http.MethodPost {
+		if newSession.IsBasicAuth() {
+			response.Key = ""
+		}
+
+		if isHashed {
+			response.KeyHash = keyName
+		} else {
+			response.KeyHash = storage.HashKey(keyName, gw.GetConfig().HashKeys)
+		}
+	}
+
+	return response, http.StatusOK
+}
+
+func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{}, int) {
+	if byHash && !gw.GetConfig().HashKeys {
+		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
+	}
+
+	spec := gw.getApiSpec(apiID)
+	if spec != nil {
+		orgID = spec.OrgID
+	}
+
+	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
+	sessionKey = session.KeyID
+	if !ok {
+		return apiError("Key not found"), http.StatusNotFound
+	}
+
+	mw := BaseMiddleware{Spec: spec, Gw: gw}
+	// TODO: handle apply policies error
+	mw.ApplyPolicies(&session)
+
+	if session.QuotaMax != -1 {
+		quotaKey := QuotaKeyPrefix + storage.HashKey(sessionKey, gw.GetConfig().HashKeys)
+		if byHash {
+			quotaKey = QuotaKeyPrefix + sessionKey
+		}
+
+		if usedQuota, err := gw.GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil {
+			qInt, _ := strconv.Atoi(usedQuota)
+			remaining := session.QuotaMax - int64(qInt)
+
+			if remaining < 0 {
+				session.QuotaRemaining = 0
+			} else {
+				session.QuotaRemaining = remaining
+			}
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix":  "api",
+				"key":     gw.obfuscateKey(quotaKey),
+				"message": err,
+				"status":  "ok",
+			}).Info("Can't retrieve key quota")
+		}
+	}
+
+	// populate remaining quota for API limits (if any)
+	for id, access := range session.AccessRights {
+		if access.Limit.IsEmpty() || access.Limit.QuotaMax == -1 || access.Limit.QuotaMax == 0 {
+			continue
+		}
+
+		quotaScope := ""
+		if access.AllowanceScope != "" {
+			quotaScope = access.AllowanceScope + "-"
+		}
+
+		limQuotaKey := QuotaKeyPrefix + quotaScope + storage.HashKey(sessionKey, gw.GetConfig().HashKeys)
+		if byHash {
+			limQuotaKey = QuotaKeyPrefix + quotaScope + sessionKey
+		}
+
+		if usedQuota, err := gw.GlobalSessionManager.Store().GetRawKey(limQuotaKey); err == nil {
+			qInt, _ := strconv.Atoi(usedQuota)
+			remaining := access.Limit.QuotaMax - int64(qInt)
+
+			if remaining < 0 {
+				access.Limit.QuotaRemaining = 0
+			} else {
+				access.Limit.QuotaRemaining = remaining
+			}
+			session.AccessRights[id] = access
+		} else {
+			access.Limit.QuotaRemaining = access.Limit.QuotaMax
+			session.AccessRights[id] = access
+
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  id,
+				"key":    gw.obfuscateKey(sessionKey),
+				"error":  err,
+			}).Info("Can't retrieve api limit quota")
+		}
+	}
+
+	// If it's a basic auth key and a valid Base64 string, use it as the key ID:
+	if session.IsBasicAuth() {
+		if storage.TokenOrg(sessionKey) != "" {
+			session.KeyID = sessionKey
+		}
+		session.BasicAuthData.Password = ""
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"key":    gw.obfuscateKey(sessionKey),
+		"status": "ok",
+	}).Info("Retrieved key detail.")
+
+	return session.Clone(), http.StatusOK
+}
+
+// apiAllKeys represents a list of keys in the memory store
+// swagger:model
+type apiAllKeys struct {
+	APIKeys []string `json:"keys"`
+}
+
+func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
+	sessions := gw.GlobalSessionManager.Sessions(filter)
+	if filter != "" {
+		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
+		// Remove last 2 digits to look exact match
+		filterB64 = filterB64[0 : len(filterB64)-2]
+		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
+		sessions = append(sessions, orgIDB64Sessions...)
+	}
+
+	fixedSessions := make([]string, 0)
+	for _, s := range sessions {
+		if !strings.HasPrefix(s, QuotaKeyPrefix) && !strings.HasPrefix(s, RateLimitKeyPrefix) {
+			fixedSessions = append(fixedSessions, s)
+		}
+	}
+
+	sessionsObj := apiAllKeys{fixedSessions}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"status": "ok",
+	}).Info("Retrieved key list.")
+
+	return sessionsObj, http.StatusOK
+}
+
+func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
+	sess := &user.SessionState{}
+	json.Unmarshal([]byte(sessionString), sess)
+	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+
+	if sess.OrgID != orgId {
+		return
+	}
+
+	lifetime := gw.ApplyLifetime(sess, nil)
+	err := gw.GlobalSessionManager.UpdateSession(keyName, sess, lifetime, gw.GetConfig().HashKeys)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    gw.obfuscateKey(keyName),
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to update key.")
+	}
+	log.WithFields(logrus.Fields{
+		"prefix": "RPC",
+		"key":    gw.obfuscateKey(keyName),
+		"status": "ok",
+	}).Info("Updated hashed key in slave storage.")
+}
+
+func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, false)
+	if !ok {
+		return apiError("There is no such key found"), http.StatusNotFound
+	}
+	keyName = session.KeyID
+
+	if resetQuota {
+		gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
+	}
+
+	if apiID == "-1" {
+		// Go through ALL managed API's and delete the key
+		gw.apisMu.RLock()
+		removed := gw.GlobalSessionManager.RemoveSession(orgID, keyName, false)
+		gw.apisMu.RUnlock()
+
+		if !removed {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"key":    gw.obfuscateKey(keyName),
+				"status": "fail",
+			}).Error("Failed to remove the key")
+			return apiError("Failed to remove the key"), http.StatusBadRequest
+		}
+
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    gw.obfuscateKey(keyName),
+			"status": "ok",
+		}).Info("Deleted key across all APIs.")
+
+		return nil, http.StatusOK
+	}
+
+	if !gw.GlobalSessionManager.RemoveSession(orgID, keyName, false) {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    gw.obfuscateKey(keyName),
+			"status": "fail",
+		}).Error("Failed to remove the key")
+		return apiError("Failed to remove the key"), http.StatusBadRequest
+	}
+
+	statusObj := apiModifyKeySuccess{
+		Key:    keyName,
+		Status: "ok",
+		Action: "deleted",
+	}
+
+	gw.FireSystemEvent(EventTokenDeleted, EventTokenMeta{
+		EventMetaDefault: EventMetaDefault{Message: "Key deleted."},
+		Org:              orgID,
+		Key:              keyName,
+	})
+
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"key":    gw.obfuscateKey(keyName),
+		"status": "ok",
+	}).Info("Deleted key.")
+
+	return statusObj, http.StatusOK
+}
+
+// handleDeleteHashedKeyWithLogs is a wrapper for handleDeleteHashedKey with logs
+func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+	res, code := gw.handleDeleteHashedKey(keyName, orgID, apiID, resetQuota)
+
+	if code != http.StatusOK {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    gw.obfuscateKey(keyName),
+			"status": "fail",
+		}).Error(res)
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"key":    gw.obfuscateKey(keyName),
+		"status": "ok",
+	}).Info("Deleted hashed key across all APIs.")
+
+	return res, code
+}
+
+func (gw *Gateway) handleDeleteHashedKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+
+	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, true)
+	keyName = session.KeyID
+	if !ok {
+		return apiError("There is no such key found"), http.StatusNotFound
+
+	}
+
+	if apiID == "-1" {
+		// Go through ALL managed API's and delete the key
+		gw.apisMu.RLock()
+		removed := gw.GlobalSessionManager.RemoveSession(orgID, keyName, true)
+		gw.apisMu.RUnlock()
+
+		if !removed {
+			return apiError("Failed to remove the key"), http.StatusBadRequest
+		}
+
+		return nil, http.StatusOK
+	}
+
+	if !gw.GlobalSessionManager.RemoveSession(orgID, keyName, true) {
+		return apiError("Failed to remove the key"), http.StatusBadRequest
+	}
+
+	if resetQuota {
+		gw.GlobalSessionManager.ResetQuota(keyName, &session, true)
+	}
+
+	statusObj := apiModifyKeySuccess{
+		Key:    keyName,
+		Status: "ok",
+		Action: "deleted",
+	}
+
+	return statusObj, http.StatusOK
+}
+
+func (gw *Gateway) handleGlobalAddToSortedSet(keyName, value string, score float64) {
+	gw.GlobalSessionManager.Store().AddToSortedSet(keyName, value, score)
+}
+
+func (gw *Gateway) handleGetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
+	return gw.GlobalSessionManager.Store().GetSortedSetRange(keyName, scoreFrom, scoreTo)
+}
+
+func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
+	return gw.GlobalSessionManager.Store().RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
+}
+
+func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
+	if pol := gw.getPolicy(polID); pol.ID != "" {
+		return pol, http.StatusOK
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+		"polID":  polID,
+	}).Error("Policy doesn't exist.")
+	return apiError("Policy not found"), http.StatusNotFound
+}
+
+func (gw *Gateway) handleGetPolicyList() (interface{}, int) {
+	gw.policiesMu.RLock()
+	defer gw.policiesMu.RUnlock()
+	polIDList := make([]user.Policy, len(gw.policiesByID))
+	c := 0
+	for _, pol := range gw.policiesByID {
+		polIDList[c] = pol
+		c++
+	}
+	return polIDList, http.StatusOK
+}
+
+func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
+	if gw.GetConfig().Policies.PolicySource == "service" {
+		log.Error("Rejected new policy due to PolicySource = service")
+		return apiError("Due to enabled service policy source, please use the Dashboard API"), http.StatusInternalServerError
+	}
+
+	newPol := &user.Policy{}
+	if err := json.NewDecoder(r.Body).Decode(newPol); err != nil {
+		log.Error("Couldn't decode new policy object: ", err)
+		return apiError("Request malformed"), http.StatusBadRequest
+	}
+
+	if polID != "" && newPol.ID != polID && r.Method == http.MethodPut {
+		log.Error("PUT operation on different IDs")
+		return apiError("Request ID does not match that in policy! For Update operations these must match."), http.StatusBadRequest
+	}
+
+	// Create a filename
+	polFilePath := filepath.Join(gw.GetConfig().Policies.PolicyPath, newPol.ID+".json")
+
+	asByte, err := json.MarshalIndent(newPol, "", "  ")
+	if err != nil {
+		log.Error("Marshalling of policy failed: ", err)
+		return apiError("Marshalling failed"), http.StatusInternalServerError
+	}
+
+	if err := ioutil.WriteFile(polFilePath, asByte, 0644); err != nil {
+		log.Error("Failed to create file! - ", err)
+		return apiError("Failed to create file!"), http.StatusInternalServerError
+	}
+
+	action := "modified"
+	if r.Method == http.MethodPost {
+		action = "added"
+	}
+
+	response := apiModifyKeySuccess{
+		Key:    newPol.ID,
+		Status: "ok",
+		Action: action,
+	}
+
+	return response, http.StatusOK
+}
+
+func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
+	// Generate a filename
+	defFilePath := filepath.Join(gw.GetConfig().Policies.PolicyPath, polID+".json")
+
+	// If it exists, delete it
+	if _, err := os.Stat(defFilePath); err != nil {
+		log.Warningf("Error describing named file: %v ", err)
+		return apiError("Delete failed"), http.StatusInternalServerError
+	}
+
+	if err := os.Remove(defFilePath); err != nil {
+		log.Warningf("Delete failed: %v", err)
+		return apiError("Delete failed"), http.StatusInternalServerError
+	}
+
+	response := apiModifyKeySuccess{
+		Key:    polID,
+		Status: "ok",
+		Action: "deleted",
+	}
+
+	return response, http.StatusOK
+}
+
+func (gw *Gateway) handleGetAPIList() (interface{}, int) {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+	apiIDList := make([]*apidef.APIDefinition, len(gw.apisByID))
+	c := 0
+	for _, apiSpec := range gw.apisByID {
+		apiIDList[c] = apiSpec.APIDefinition
+		c++
+	}
+	return apiIDList, http.StatusOK
+}
+
+func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	apisList := []oas.OAS{}
+
+	for _, apiSpec := range gw.apisByID {
+		if apiSpec.IsOAS {
+			apiSpec.OAS.Fill(*apiSpec.APIDefinition)
+			if modePublic {
+				apiSpec.OAS.RemoveTykExtension()
+			}
+			apisList = append(apisList, apiSpec.OAS)
+		}
+	}
+
+	return apisList, http.StatusOK
+}
+
+func (gw *Gateway) handleGetAPI(apiID string, oasEndpoint bool) (interface{}, int) {
+	if spec := gw.getApiSpec(apiID); spec != nil {
+		if oasEndpoint && spec.IsOAS {
+			spec.OAS.Fill(*spec.APIDefinition)
+			return &spec.OAS, http.StatusOK
+		} else if oasEndpoint && !spec.IsOAS {
+			return apiError(apidef.ErrOASGetForOldAPI.Error()), http.StatusBadRequest
+		}
+
+		return spec.APIDefinition, http.StatusOK
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"apiID":  fmt.Sprintf("%q", apiID),
+	}).Error("API doesn't exist.")
+
+	return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
+}
+
+func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, int) {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	obj, code := gw.handleGetAPI(apiID, true)
+	if apiOAS, ok := obj.(*oas.OAS); ok && modePublic {
+		apiOAS.RemoveTykExtension()
+	}
+	return obj, code
+
+}
+
+func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
+	var (
+		newDef             apidef.APIDefinition
+		oasObj             oas.OAS
+		baseAPIID          = r.FormValue("base_api_id")
+		baseAPIVersionName = r.FormValue("base_api_version_name")
+		newVersionName     = r.FormValue("new_version_name")
+		setDefault         = r.FormValue("set_default") == "true"
+	)
+
+	if oasEndpoint {
+		if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
+			log.Error("Couldn't decode new OAS object: ", err)
+			return apiError("Request malformed"), http.StatusBadRequest
+		}
+
+		oasObj.ExtractTo(&newDef)
+	} else {
+		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
+			log.Error("Couldn't decode new API Definition object: ", err)
+			return apiError("Request malformed"), http.StatusBadRequest
+		}
+	}
+
+	if validationErr := validateAPIDef(&newDef); validationErr != nil {
+		return *validationErr, http.StatusBadRequest
+	}
+
+	if newDef.APIID == "" {
+		newDef.GenerateAPIID()
+	}
+
+	if oasEndpoint {
+		newAPIURL := getAPIURL(newDef, gw.GetConfig())
+		oasObj.AddServers(newAPIURL)
+
+		newDef.IsOAS = true
+		oasObj.GetTykExtension().Info.ID = newDef.APIID
+		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
+		if err != nil {
+			return apiError(err.Error()), errCode
+		}
+
+	} else {
+		newDef.IsOAS = false
+
+		err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
+		if err != nil {
+			return apiError(err.Error()), errCode
+		}
+	}
+
+	if baseAPIID != "" {
+		if baseAPIPtr := gw.getApiSpec(baseAPIID); baseAPIPtr == nil {
+			log.Errorf("Couldn't find a base API to bind with the given API id: %s", baseAPIID)
+		} else {
+			apiInBytes, err := json.Marshal(baseAPIPtr)
+			if err != nil {
+				log.WithError(err).Error("Couldn't marshal API spec")
+			}
+
+			var baseAPI APISpec
+			err = json.Unmarshal(apiInBytes, &baseAPI)
+			if err != nil {
+				log.WithError(err).Error("Couldn't unmarshal API spec")
+			}
+
+			baseAPI.VersionDefinition.Enabled = true
+			if baseAPIVersionName != "" {
+				baseAPI.VersionDefinition.Name = baseAPIVersionName
+				baseAPI.VersionDefinition.Default = baseAPIVersionName
+			}
+
+			if baseAPI.VersionDefinition.Key == "" {
+				baseAPI.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+			}
+
+			if baseAPI.VersionDefinition.Location == "" {
+				baseAPI.VersionDefinition.Location = apidef.HeaderLocation
+			}
+
+			if baseAPI.VersionDefinition.Default == "" {
+				baseAPI.VersionDefinition.Default = apidef.Self
+			}
+
+			if baseAPI.VersionDefinition.Versions == nil {
+				baseAPI.VersionDefinition.Versions = make(map[string]string)
+			}
+
+			baseAPI.VersionDefinition.Versions[newVersionName] = newDef.APIID
+
+			if setDefault {
+				baseAPI.VersionDefinition.Default = newVersionName
+			}
+
+			if baseAPI.IsOAS {
+				baseAPI.OAS.Fill(*baseAPI.APIDefinition)
+				err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
+				if err != nil {
+					log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
+				}
+			} else {
+				err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
+				if err != nil {
+					log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
+				}
+			}
+		}
+	}
+
+	response := apiModifyKeySuccess{
+		Key:    newDef.APIID,
+		Status: "ok",
+		Action: "added",
+	}
+
+	return response, http.StatusOK
+}
+
+func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
+	spec := gw.getApiSpec(apiID)
+	if spec == nil {
+		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
+	}
+
+	var (
+		newDef apidef.APIDefinition
+		oasObj oas.OAS
+	)
+
+	if oasEndpoint {
+		if !spec.IsOAS {
+			return apiError(apidef.ErrAPINotMigrated.Error()), http.StatusBadRequest
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
+			log.Error("Couldn't decode new OAS object: ", err)
+			return apiError("Request malformed"), http.StatusBadRequest
+		}
+
+		oasObj.ExtractTo(&newDef)
+	} else {
+		if spec.IsOAS {
+			return apiError(apidef.ErrAPIMigrated.Error()), http.StatusBadRequest
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
+			log.Error("Couldn't decode new API Definition object: ", err)
+			return apiError("Request malformed"), http.StatusBadRequest
+		}
+
+	}
+
+	if apiID != "" && newDef.APIID != apiID {
+		log.Error("PUT operation on different APIIDs")
+		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
+	}
+
+	if validationErr := validateAPIDef(&newDef); validationErr != nil {
+		return *validationErr, http.StatusBadRequest
+	}
+
+	if oasEndpoint && spec.IsOAS {
+		updateOASServers(spec, gw.GetConfig(), &newDef, &oasObj)
+		newDef.IsOAS = true
+
+		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
+		if err != nil {
+			return apiError(err.Error()), errCode
+		}
+
+	} else if !oasEndpoint {
+		newDef.IsOAS = false
+
+		err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
+		if err != nil {
+			return apiError(err.Error()), errCode
+		}
+	}
+
+	response := apiModifyKeySuccess{
+		Key:    newDef.APIID,
+		Status: "ok",
+		Action: "modified",
+	}
+
+	return response, http.StatusOK
+}
+
+func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefinition, oasObj *oas.OAS) (err error, errCode int) {
+	err, errCode = gw.writeToFile(fs, apiDef, apiDef.APIID)
+	if err != nil {
+		return
+	}
+
+	err, errCode = gw.writeToFile(fs, oasObj, apiDef.APIID+"-oas")
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string) (err error, errCode int) {
+	// Create a filename
+	defFilePath := filepath.Join(gw.GetConfig().AppPath, filename+".json")
+
+	log.Infof("App path: %v", gw.GetConfig().AppPath)
+	// If it exists, delete it
+	if _, err := fs.Stat(defFilePath); err == nil {
+		log.Warning("API Definition with this ID already exists, deleting file...")
+		fs.Remove(defFilePath)
+	}
+
+	// unmarshal the object into the file
+	asByte, err := json.MarshalIndent(newDef, "", "  ")
+	if err != nil {
+		log.Error("Marshalling of API Definition failed: ", err)
+		return errors.New("marshalling failed"), http.StatusInternalServerError
+	}
+
+	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
+		log.Infof("EL file path: %v", defFilePath)
+		log.Error("Failed to create file! - ", err)
+		return errors.New("file object creation failed, write error"), http.StatusInternalServerError
+	}
+
+	return nil, 0
+}
+
+func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
+	spec := gw.getApiSpec(apiID)
+	if spec == nil {
+		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
+	}
+
+	// Generate a filename
+	defFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+".json")
+	defFilePath = filepath.Clean(defFilePath)
+	defOASFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+"-oas.json")
+	defOASFilePath = filepath.Clean(defOASFilePath)
+
+	// If it exists, delete it
+	if _, err := os.Stat(defFilePath); err != nil {
+		log.Warning("File does not exist! ", err)
+		return apiError("Delete failed"), http.StatusInternalServerError
+	}
+
+	if _, err := os.Stat(defFilePath); spec.IsOAS && err != nil {
+		log.Warning("File does not exist! ", err)
+		return apiError("Delete failed"), http.StatusInternalServerError
+	}
+
+	os.Remove(defFilePath)
+	if spec.IsOAS {
+		os.Remove(defOASFilePath)
+	}
+
+	if spec.VersionDefinition.BaseID != "" {
+		baseAPIPtr := gw.getApiSpec(spec.VersionDefinition.BaseID)
+		apiInBytes, err := json.Marshal(baseAPIPtr)
+		if err != nil {
+			log.WithError(err).Error("Couldn't marshal API spec")
+		}
+
+		var baseAPI APISpec
+		err = json.Unmarshal(apiInBytes, &baseAPI)
+		if err != nil {
+			log.WithError(err).Error("Couldn't unmarshal API spec")
+		}
+
+		for versionName, versionAPIID := range baseAPI.VersionDefinition.Versions {
+			if apiID == versionAPIID {
+				delete(baseAPI.VersionDefinition.Versions, versionName)
+				if baseAPI.VersionDefinition.Default == versionName {
+					baseAPI.VersionDefinition.Default = baseAPI.VersionDefinition.Name
+				}
+
+				break
+			}
+		}
+
+		fs := afero.NewOsFs()
+		if baseAPI.IsOAS {
+			baseAPI.OAS.Fill(*baseAPI.APIDefinition)
+			err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
+			if err != nil {
+				log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
+			}
+		} else {
+			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
+			if err != nil {
+				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
+			}
+		}
+	}
+
+	response := apiModifyKeySuccess{
+		Key:    apiID,
+		Status: "ok",
+		Action: "deleted",
+	}
+
+	return response, http.StatusOK
+}
+
+func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
+	polID := mux.Vars(r)["polID"]
+
+	var obj interface{}
+	var code int
+
+	switch r.Method {
+	case http.MethodGet:
+		if polID != "" {
+			log.Debug("Requesting policy for", polID)
+			obj, code = gw.handleGetPolicy(polID)
+		} else {
+			log.Debug("Requesting Policy list")
+			obj, code = gw.handleGetPolicyList()
+		}
+	case http.MethodPost:
+		log.Debug("Creating new definition file")
+		obj, code = gw.handleAddOrUpdatePolicy(polID, r)
+	case http.MethodPut:
+		if polID != "" {
+			log.Debug("Updating existing Policy: ", polID)
+			obj, code = gw.handleAddOrUpdatePolicy(polID, r)
+		} else {
+			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
+		}
+	case http.MethodDelete:
+		if polID != "" {
+			log.Debug("Deleting policy for: ", polID)
+			obj, code = gw.handleDeletePolicy(polID)
+		} else {
+			obj, code = apiError("Must specify an apiID to delete"), http.StatusBadRequest
+		}
+	}
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
+	apiID := mux.Vars(r)["apiID"]
+
+	var obj interface{}
+	var code int
+
+	switch r.Method {
+	case http.MethodGet:
+		if apiID != "" {
+			log.Debugf("Requesting API definition for %q", apiID)
+			obj, code = gw.handleGetAPI(apiID, false)
+		} else {
+			log.Debug("Requesting API list")
+			obj, code = gw.handleGetAPIList()
+		}
+
+		if api, ok := obj.(*apidef.APIDefinition); ok {
+			if api.VersionDefinition.BaseID != "" {
+				w.Header().Set(apidef.HeaderBaseAPIID, api.VersionDefinition.BaseID)
+			}
+		}
+	case http.MethodPost:
+		log.Debug("Creating new definition file")
+		obj, code = gw.handleAddApi(r, afero.NewOsFs(), false)
+	case http.MethodPut:
+		if apiID != "" {
+			log.Debugf("Updating existing API: %q", apiID)
+			obj, code = gw.handleUpdateApi(apiID, r, afero.NewOsFs(), false)
+		} else {
+			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
+		}
+	case http.MethodDelete:
+		if apiID != "" {
+			log.Debug("Deleting API definition for: ", apiID)
+			obj, code = gw.handleDeleteAPI(apiID)
+		} else {
+			obj, code = apiError("Must specify an apiID to delete"), http.StatusBadRequest
+		}
+	}
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		apiID       = mux.Vars(r)["apiID"]
+		scopePublic = r.URL.Query().Get("mode") == "public"
+		obj         interface{}
+		code        int
+	)
+	if apiID != "" {
+		log.Debugf("Requesting API definition for %q", apiID)
+		obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
+	} else {
+		log.Debug("Requesting API list")
+		obj, code = gw.handleGetAPIListOAS(scopePublic)
+	}
+
+	if oasAPI, ok := obj.(*oas.OAS); ok {
+		api := gw.getApiSpec(oasAPI.GetTykExtension().Info.ID)
+		if api != nil && api.VersionDefinition.BaseID != "" {
+			w.Header().Set(apidef.HeaderBaseAPIID, api.VersionDefinition.BaseID)
+		}
+	}
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		obj  interface{}
+		code int
+	)
+
+	log.Debug("Creating new definition file")
+	obj, code = gw.handleAddApi(r, afero.NewOsFs(), true)
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		apiID = mux.Vars(r)["apiID"]
+		obj   interface{}
+		code  int
+	)
+	if apiID != "" {
+		log.Debugf("Updating existing API: %q", apiID)
+		obj, code = gw.handleUpdateApi(apiID, r, afero.NewOsFs(), true)
+	} else {
+		obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
+	}
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
+	apiID := strings.TrimSpace(mux.Vars(r)["apiID"])
+	if apiID == "" {
+		doJSONWrite(w, http.StatusBadRequest, apiError("Must specify an apiID to patch"))
+		return
+	}
+
+	existingAPISpec := gw.getApiSpec(apiID)
+	if existingAPISpec == nil {
+		doJSONWrite(w, http.StatusNotFound, apiError(apidef.ErrAPINotFound.Error()))
+		return
+	}
+
+	if !existingAPISpec.IsOAS {
+		doJSONWrite(w, http.StatusBadRequest, apiError(apidef.ErrAPINotMigrated.Error()))
+		return
+	}
+
+	reqBodyInBytes, oasObj, err := extractOASObjFromReq(r.Body)
+
+	if err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+		return
+	}
+
+	tykExtensionConfigParams := oas.GetTykExtensionConfigParams(r)
+
+	if oasObj.GetTykExtension() != nil && tykExtensionConfigParams == nil {
+		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
+		obj, code := gw.handleUpdateApi(apiID, r, afero.NewOsFs(), true)
+		doJSONWrite(w, code, obj)
+		return
+	}
+
+	var oasObjToPatch oas.OAS
+	existingAPISpec.OAS.Fill(*existingAPISpec.APIDefinition)
+	oasObjToPatch = existingAPISpec.OAS
+
+	var tykExtToPatch *oas.XTykAPIGateway
+
+	if oasObj.GetTykExtension() != nil {
+		tykExtToPatch = oasObj.GetTykExtension()
+	} else {
+		tykExtToPatch = oasObjToPatch.GetTykExtension()
+	}
+
+	oasObj.Servers = oas.RetainOldServerURL(oasObjToPatch.Servers, oasObj.Servers)
+
+	oasObjToPatch.T = oasObj.T
+
+	oasObjToPatch.SetTykExtension(tykExtToPatch)
+
+	if tykExtensionConfigParams != nil {
+		err = oasObjToPatch.BuildDefaultTykExtension(*tykExtensionConfigParams, false)
+		if err != nil {
+			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+			return
+		}
+	}
+
+	oasAPIInBytes, err := oasObj.MarshalJSON()
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
+		return
+	}
+
+	r.Body = ioutil.NopCloser(bytes.NewReader(oasAPIInBytes))
+
+	log.Debugf("PATCHing API: %q", apiID)
+	obj, code := gw.handleUpdateApi(apiID, r, afero.NewOsFs(), true)
+
+	doJSONWrite(w, code, obj)
+}
+
+func (gw *Gateway) apiOASExportHandler(w http.ResponseWriter, r *http.Request) {
+	const (
+		baseFileName       = "TykOasApiDef"
+		baseFileNamePublic = "oas"
+		fileTypeJSON       = "json"
+	)
+	var (
+		apiID       = mux.Vars(r)["apiID"]
+		fileName    = baseFileName
+		scopePublic = r.URL.Query().Get("mode") == "public"
+		obj         interface{}
+		code        int
+	)
+
+	if scopePublic {
+		fileName = baseFileNamePublic
+	}
+
+	if apiID != "" {
+		log.Debugf("Requesting API definition for %q", apiID)
+		obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
+		fileName += "-" + apiID
+	} else {
+		log.Debug("Requesting API list")
+		obj, code = gw.handleGetAPIListOAS(scopePublic)
+	}
+
+	doJSONExport(w, code, obj, fmt.Sprintf("%s.%s", fileName, fileTypeJSON))
+}
+
+func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
+	keyName := mux.Vars(r)["keyName"]
+	apiID := r.URL.Query().Get("api_id")
+	isHashed := r.URL.Query().Get("hashed") != ""
+	isUserName := r.URL.Query().Get("username") == "true"
+	orgID := r.URL.Query().Get("org_id")
+
+	// check if passed key is user name and convert it to real key with respect to current hashing algorithm
 	origKeyName := keyName
 	gwConfig := gw.GetConfig()
 

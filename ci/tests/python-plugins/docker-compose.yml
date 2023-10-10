@@ -2,8 +2,14 @@ version: "3"
 services:
   redis:
     image: redis
+    command: bash -c "mkdir -p /etc && echo ID=$(uuidgen) > /etc/release"
     ports:
       - "0.0.0.0:6379:6379"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500k"
+        max-file: "10"
     healthcheck:
       test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
       interval: 5s

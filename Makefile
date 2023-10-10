@@ -20,14 +20,14 @@ BENCH_RUN=NONE
 
 .PHONY: test
 test:
-	$(GOTEST) -run=$(TEST_REGEX) -count=$(TEST_COUNT) ./...
+    $(GOTEST) -run=$(TEST_REGEX) -count=$(TEST_COUNT) ./...
 
 # lint runs all local linters that must pass before pushing
 .PHONY: lint lint-install lint-fast
 lint: lint-fast
-	goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
-	gofmt -w .
-	faillint -ignore-tests -paths "$(shell grep -v '^#' .faillint | xargs echo | sed 's/ /,/g')" ./...
+	@goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
+	@gofmt -w .
+	@faillint -ignore-tests -paths "$(shell grep -v '^#' .faillint | xargs echo | sed 's/ /,/g')" ./...
 
 lint-fast: lint-install
 	go generate ./...
@@ -106,4 +106,3 @@ docker:
 
 docker-std: build
 	docker build --platform ${BUILD_PLATFORM} --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .
-

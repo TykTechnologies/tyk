@@ -1,6 +1,7 @@
 services:
   redis:
     image: redis:6.0-alpine
+    command: bash -c "mkdir -p /etc && echo ID=$(uuidgen) > /etc/release"
     networks: [ test-api-functionality ]
     healthcheck:
       test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
