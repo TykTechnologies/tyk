@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsPublicKey(t *testing.T) {
@@ -36,4 +38,9 @@ func TestIsPublicKey(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGenerateRSAPublicKey(t *testing.T) {
+	pubKey := GenerateRSAPublicKey(t)
+	assert.Contains(t, string(pubKey), "PUBLIC KEY")
 }

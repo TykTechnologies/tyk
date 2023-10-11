@@ -15,7 +15,10 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -126,4 +129,27 @@ func IsPublicKey(cert *tls.Certificate) bool {
 // WrapPublicKeyInDummyX509Cert wraps given blockBytes in x509.Certificate with CommonName prefixed with `Public Key: `
 func WrapPublicKeyInDummyX509Cert(blockBytes []byte) *x509.Certificate {
 	return &x509.Certificate{Subject: pkix.Name{CommonName: "Public Key: " + HexSHA256(blockBytes)}}
+}
+
+// GenerateRSAPublicKey generates an RSA public key.
+func GenerateRSAPublicKey(tb testing.TB) []byte {
+	tb.Helper()
+	// Generate a private key.
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.NoError(tb, err)
+
+	// Derive the public key from the private key.
+	publicKey := &priv.PublicKey
+
+	// Save the public key in PEM format.
+	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	assert.NoError(tb, err)
+
+	publicKeyBlock := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: publicKeyBytes,
+	}
+
+	publicKeyPEM := pem.EncodeToMemory(publicKeyBlock)
+	return publicKeyPEM
 }
