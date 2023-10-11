@@ -126,9 +126,13 @@ func IsPublicKey(cert *tls.Certificate) bool {
 	return cert.Leaf != nil && strings.HasPrefix(cert.Leaf.Subject.CommonName, "Public Key: ")
 }
 
-// WrapPublicKeyInDummyX509Cert wraps given blockBytes in x509.Certificate with CommonName prefixed with `Public Key: `
+// WrapPublicKeyInDummyX509Cert wraps given blockBytes in x509.Certificate with CommonName prefixed with `Public Key:`.
 func WrapPublicKeyInDummyX509Cert(blockBytes []byte) *x509.Certificate {
-	return &x509.Certificate{Subject: pkix.Name{CommonName: "Public Key: " + HexSHA256(blockBytes)}}
+	return &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName: "Public Key: " + HexSHA256(blockBytes),
+		},
+	}
 }
 
 // GenerateRSAPublicKey generates an RSA public key.
