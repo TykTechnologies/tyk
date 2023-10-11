@@ -1708,7 +1708,7 @@ func TestStaticMTLSAPI(t *testing.T) {
 		defer ctrl.Finish()
 
 		// generate a public key
-		publicKeyPEM := generatePublicKey()
+		publicKeyPEM := generatePublicKey(t)
 
 		certID, err := ts.Gw.CertificateManager.Add(publicKeyPEM, "")
 		assert.NoError(t, err)

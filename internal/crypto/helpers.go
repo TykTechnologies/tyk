@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
@@ -120,4 +121,9 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 // IsPublicKey verifies if given certificate is a public key only.
 func IsPublicKey(cert *tls.Certificate) bool {
 	return cert.Leaf != nil && strings.HasPrefix(cert.Leaf.Subject.CommonName, "Public Key: ")
+}
+
+// WrapPublicKeyInDummyX509Cert wraps given blockBytes in x509.Certificate with CommonName prefixed with `Public Key: `
+func WrapPublicKeyInDummyX509Cert(blockBytes []byte) *x509.Certificate {
+	return &x509.Certificate{Subject: pkix.Name{CommonName: "Public Key: " + HexSHA256(blockBytes)}}
 }
