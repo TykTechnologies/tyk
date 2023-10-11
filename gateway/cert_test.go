@@ -32,7 +32,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
-	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -484,7 +483,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 
 				loadAPIS()
 
-				certNotAllowedErr := `Certificate with SHA256 ` + tykcrypto.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
+				certNotAllowedErr := `Certificate with SHA256 ` + crypto.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
 
 				_, _ = ts.Run(t, test.TestCase{
 					Path:      "/with_mutual",
@@ -601,7 +600,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 							Domain:    domain,
 							Client:    client,
 							Code:      403,
-							BodyMatch: `"error": "` + `Certificate with SHA256 ` + tykcrypto.HexSHA256(clientCert.Certificate[0]) + ` not allowed`,
+							BodyMatch: `"error": "` + `Certificate with SHA256 ` + crypto.HexSHA256(clientCert.Certificate[0]) + ` not allowed`,
 						},
 						{
 							Path:   "/with_mutual_2",
@@ -614,7 +613,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 							Domain:    domain,
 							Client:    client2,
 							Code:      403,
-							BodyMatch: `"error": "` + `Certificate with SHA256 ` + tykcrypto.HexSHA256(clientCert2.Certificate[0]) + ` not allowed`,
+							BodyMatch: `"error": "` + `Certificate with SHA256 ` + crypto.HexSHA256(clientCert2.Certificate[0]) + ` not allowed`,
 						},
 					}...,
 				)
@@ -684,7 +683,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 				loadAPIS()
 
 				if domain == "" {
-					certNotAllowedErr := `Certificate with SHA256 ` + tykcrypto.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
+					certNotAllowedErr := `Certificate with SHA256 ` + crypto.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
 					_, _ = ts.Run(t, test.TestCase{
 						Path:      "/with_mutual",
 						Client:    client,
@@ -777,7 +776,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 				loadAPIS()
 
 				if domain == "" {
-					certNotAllowedErr := `Certificate with SHA256 ` + tykcrypto.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
+					certNotAllowedErr := `Certificate with SHA256 ` + crypto.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
 					_, _ = ts.Run(t, test.TestCase{
 						Path:      "/with_mutual",
 						Client:    client,
@@ -1305,13 +1304,13 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		Subject:     pkix.Name{CommonName: "localhost"},
 		Issuer:      pkix.Name{CommonName: "localhost"},
 	}, true)
-	serverCertID := tykcrypto.HexSHA256(serverCert.Certificate[0])
+	serverCertID := crypto.HexSHA256(serverCert.Certificate[0])
 	clientPEM, _, _, clientCert := crypto.GenCertificate(&x509.Certificate{
 		DNSNames: []string{"localhost"},
 		Subject:  pkix.Name{CommonName: "localhost"},
 		Issuer:   pkix.Name{CommonName: "localhost"},
 	}, true)
-	clientCertID := tykcrypto.HexSHA256(clientCert.Certificate[0])
+	clientCertID := crypto.HexSHA256(clientCert.Certificate[0])
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -1644,7 +1643,7 @@ func TestStaticMTLSAPI(t *testing.T) {
 		}, false)
 
 		// generate expected certID from the returned certificate.
-		expectedCertID := tykcrypto.HexSHA256(expiredClientCert.Certificate[0])
+		expectedCertID := crypto.HexSHA256(expiredClientCert.Certificate[0])
 		leaf := &x509.Certificate{
 			Raw: expiredClientCert.Certificate[0],
 			Extensions: []pkix.Extension{
@@ -1671,7 +1670,49 @@ func TestStaticMTLSAPI(t *testing.T) {
 			Code:      http.StatusForbidden,
 			Client:    expiredClient,
 			Path:      "/static-mtls",
-			BodyMatch: tykcrypto.ErrCertExpired.Error(),
+			BodyMatch: crypto.ErrCertExpired.Error(),
+		})
+	})
+
+	t.Run("only public key in client certificate", func(t *testing.T) {
+		ts, _, clientCert := setup()
+		defer ts.Close()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		// generate a public key
+		publicKeyPEM := crypto.GenerateRSAPublicKey(t)
+
+		certID, err := ts.Gw.CertificateManager.Add(publicKeyPEM, "")
+		assert.NoError(t, err)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "apiID-2"
+			spec.BaseIdentityProvidedBy = "auth_token"
+			spec.UseKeylessAccess = true
+			spec.UseMutualTLSAuth = true
+			spec.Proxy.ListenPath = "/public-key-mtls"
+			spec.ClientCertificates = []string{certID}
+		})
+
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: true,
+			GetClientCertificate: func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+				assert.Zero(t, info.AcceptableCAs)
+				return &clientCert, nil
+			},
+		}
+
+		transport := &http.Transport{TLSClientConfig: tlsConfig}
+
+		httpClient := &http.Client{Transport: transport}
+
+		_, _ = ts.Run(t, test.TestCase{
+			Domain:    "localhost",
+			Client:    httpClient,
+			AdminAuth: true,
+			Path:      "/tyk/apis",
+			Code:      http.StatusOK,
 		})
 	})
 }
