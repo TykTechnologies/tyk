@@ -1069,7 +1069,9 @@ type Config struct {
 }
 
 type ResourceSyncConfig struct {
-	// RetryAttempts configures the number of retry attempts before returning on a resource sync.
+	// RetryAttempts defines the number of retries that the Gateway should
+	// perform during a resource sync (APIs or policies), defaulting to zero
+	// which means no retries are attempted.
 	RetryAttempts int `json:"retry_attempts"`
 
 	// Interval configures the interval in seconds between each retry on a resource sync error.
