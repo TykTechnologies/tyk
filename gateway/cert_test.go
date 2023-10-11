@@ -1611,7 +1611,8 @@ func TestStaticMTLSAPI(t *testing.T) {
 		return ts, clientCertID, clientCert
 	}
 
-	generatePublicKey := func() []byte {
+	generatePublicKey := func(tb testing.TB) []byte {
+		tb.Helper()
 		// Generate a private key.
 		priv, _ := rsa.GenerateKey(rand.Reader, 2048)
 
