@@ -126,8 +126,9 @@ func IsPublicKey(cert *tls.Certificate) bool {
 	return cert.Leaf != nil && strings.HasPrefix(cert.Leaf.Subject.CommonName, "Public Key: ")
 }
 
-// WrapPublicKeyInDummyX509Cert wraps given blockBytes in x509.Certificate with CommonName prefixed with `Public Key:`.
-func WrapPublicKeyInDummyX509Cert(blockBytes []byte) *x509.Certificate {
+// PrefixPublicKeyCommonName returns x509.Certificate with prefixed CommonName.
+// This is used in UI/response to hint the type certificate during listing.
+func PrefixPublicKeyCommonName(blockBytes []byte) *x509.Certificate {
 	return &x509.Certificate{
 		Subject: pkix.Name{
 			CommonName: "Public Key: " + HexSHA256(blockBytes),

@@ -27,7 +27,7 @@ func TestIsPublicKey(t *testing.T) {
 		},
 		{
 			name: "public key",
-			cert: &tls.Certificate{Leaf: WrapPublicKeyInDummyX509Cert([]byte("dummy-value"))},
+			cert: &tls.Certificate{Leaf: PrefixPublicKeyCommonName([]byte("dummy-value"))},
 			want: true,
 		},
 	}

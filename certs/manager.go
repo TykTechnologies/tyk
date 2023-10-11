@@ -209,7 +209,7 @@ func ParsePEMCertificate(data []byte, secret string) (*tls.Certificate, error) {
 		if block.Type == "PUBLIC KEY" {
 			// Create a dummny cert just for listing purpose
 			cert.Certificate = append(cert.Certificate, block.Bytes)
-			cert.Leaf = tykcrypto.WrapPublicKeyInDummyX509Cert(block.Bytes)
+			cert.Leaf = tykcrypto.PrefixPublicKeyCommonName(block.Bytes)
 		}
 	}
 
