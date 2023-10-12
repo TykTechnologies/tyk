@@ -10,6 +10,11 @@
 
 Run it as `./test.sh <version>`. Depends on `<version>` being available in Docker Hub. See `plugin-compiler/test.sh`.
 
+It's possible to override the docker images used with:
+
+- `GATEWAY_IMAGE` - if not provided, `tykio/tyk-gateway:<version>` is used.
+- `PLUGIN_COMPILER_IMAGE` - if not provided, `tykio/tyk-plugin-compiler:<version>` is used.
+
 The plugin adds a header `Foo: Bar` to all requests.
 
 ## Python plugins
