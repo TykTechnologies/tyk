@@ -43,7 +43,7 @@ jobs:
             debvers: 'ubuntu/bionic ubuntu/focal ubuntu/jammy debian/buster debian/bullseye debian/bookworm'
     outputs:
       tags: ${{ steps.metadata.outputs.tags }}
-      gateway: ${{ steps.metadata.outputs.tags[0] }}
+      gateway: tykio/tyk-gateway:${{ startswith(github.ref, 'refs/tags') && github.ref_name || 'v0.0.0' }}-amd64
 
     steps:
       - name: Fix private module deps
@@ -397,22 +397,32 @@ jobs:
     needs:
       - goreleaser
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # AWS OIDC JWT
+      contents: read    # actions/checkout
 
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 1
 
-      - name: Login to AWS ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: cipush
+          aws-region: eu-central-1
+          # Don't mask to pass it across job boundaries
+          mask-aws-account-id: false
+
+      - uses: aws-actions/amazon-ecr-login@v1
+        id: ecr
 
       - name: Run tests
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
           GATEWAY_IMAGE: ${{ needs.goreleaser.outputs.gateway }}
-          PLUGIN_COMPILER_IMAGE: ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:${{ github.sha }}
+          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk-plugin-compiler:${{ github.sha }}
         run: |
           set -eaxo pipefail
           if [ ! -d smoke-tests ]; then
