@@ -16,11 +16,7 @@ if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
     GOARCH=$(go env GOARCH)
 fi
 
-compose='docker-compose'
-# composev2 is a client plugin
-[[ $(docker version --format='{{ .Client.Version }}') =~ "20.10" ]] && compose='docker compose'
-
-trap "$compose down" EXIT
+trap "docker compose down --remove-orphans" EXIT
 
 PLUGIN_SOURCE_PATH=$PWD/testplugin
 rm -fv $PLUGIN_SOURCE_PATH/*.so || true
@@ -28,7 +24,7 @@ rm -fv $PLUGIN_SOURCE_PATH/*.so || true
 docker run --rm -v $PLUGIN_SOURCE_PATH:/plugin-source $PLUGIN_COMPILER_IMAGE testplugin.so
 cp $PLUGIN_SOURCE_PATH/*.so $PLUGIN_SOURCE_PATH/testplugin.so 
 
-$compose up -d
+docker compose up --wait --force-recreate
 
 curl -vvv http://localhost:8080/goplugin/headers
 curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"' || { $compose logs gw; exit 1; }

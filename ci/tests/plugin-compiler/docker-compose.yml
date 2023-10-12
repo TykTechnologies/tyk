@@ -32,11 +32,3 @@ services:
       retries: 10
       start_period: 4s
       timeout: 10s
-
-  wait:
-    image: hello-world:linux
-    depends_on:
-        redis:
-            condition: service_healthy
-        gw-checker:
-            condition: service_healthy
