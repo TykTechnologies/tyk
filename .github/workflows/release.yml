@@ -396,6 +396,7 @@ jobs:
   smoke-tests:
     needs:
       - goreleaser
+      - docker-build
     runs-on: ubuntu-latest
 
     steps:
