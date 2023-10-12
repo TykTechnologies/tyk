@@ -9,11 +9,9 @@ set -eo pipefail
 
 setup $1
 
-compose='docker-compose'
-# composev2 is a client plugin
-[[ $(docker version --format='{{ .Client.Version }}') == "20.10.11" ]] && compose='docker compose'
+trap "docker compose down --remove-orphans" EXIT
 
-trap "$compose down" EXIT
+set -x
+docker compose up -d --wait --force-recreate
 
-$compose up -d
 ./api_test.sh || { $compose logs gw; exit 1; }
