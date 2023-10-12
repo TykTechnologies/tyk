@@ -43,7 +43,6 @@ jobs:
             debvers: 'ubuntu/bionic ubuntu/focal ubuntu/jammy debian/buster debian/bullseye debian/bookworm'
     outputs:
       tags: ${{ steps.metadata.outputs.tags }}
-      gateway: tykio/tyk-gateway:${{ startswith(github.ref, 'refs/tags') && github.ref_name || 'v0.0.0' }}-amd64
 
     steps:
       - name: Fix private module deps
