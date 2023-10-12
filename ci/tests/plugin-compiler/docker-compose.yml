@@ -10,12 +10,12 @@ services:
       timeout: 10s
       
   gw:
-    image: tykio/tyk-gateway:${tag}
+    image: ${GATEWAY_IMAGE:-tykio/tyk-gateway:${tag}}
     networks: [ test-plugin-compiler ]
     depends_on:
       - redis
     volumes:
-      - ./testplugin/testplugin_${plugin_version}_${plugin_os}_${plugin_arch}.so:/opt/tyk-gateway/middleware/testplugin.so
+      - ./testplugin/testplugin.so:/opt/tyk-gateway/middleware/testplugin.so
       - ./testplugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
     ports:
       - "0.0.0.0:8080:8080"
