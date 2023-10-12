@@ -396,7 +396,6 @@ jobs:
   smoke-tests:
     needs:
       - goreleaser
-      - docker-build
     runs-on: ubuntu-latest
 
     steps:
@@ -404,12 +403,16 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Login to AWS ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
       - name: Run tests
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
           GATEWAY_IMAGE: ${{ needs.goreleaser.outputs.gateway }}
-          PLUGIN_COMPILER_IMAGE: ${{ needs.docker-build.outputs.plugin-compiler }}
+          PLUGIN_COMPILER_IMAGE: ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:${{ github.sha }}
         run: |
           set -eaxo pipefail
           if [ ! -d smoke-tests ]; then

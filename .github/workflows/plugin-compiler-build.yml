@@ -15,8 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
-    outputs:
-      plugin-compiler: ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:${{ github.sha }}
 
     steps:
       - name: Checkout
