@@ -405,7 +405,7 @@ jobs:
       - name: Run tests
         shell: bash
         env:
-          GITHUB_TAG: ${{ github.ref }}
+          GITHUB_TAG: ${{ needs.goreleaser.outputs.tag || 'v6.0.0' }}
         run: |
           set -eaxo pipefail
           if [ ! -d smoke-tests ]; then
@@ -420,7 +420,7 @@ jobs:
               echo Attempting to test $d
               if [ -d $d ] && [ -e $d/test.sh ]; then
                   cd $d
-                  ./test.sh ${{ needs.goreleaser.outputs.tag }}
+                  ./test.sh $GITHUB_TAG
                   cd -
               fi
           done
@@ -429,7 +429,7 @@ jobs:
               echo Attempting to test $d
               if [ -d $d ] && [ -e $d/test.sh ]; then
                   cd $d
-                  ./test.sh ${{ needs.goreleaser.outputs.tag }}
+                  ./test.sh $GITHUB_TAG
                   cd -
               fi
           done
