@@ -25,9 +25,6 @@ trap "$compose down" EXIT
 PLUGIN_SOURCE_PATH=$PWD/testplugin
 rm -fv $PLUGIN_SOURCE_PATH/*.so || true
 
-set -x
-echo "Hi"
-
 docker run --rm -v $PLUGIN_SOURCE_PATH:/plugin-source $PLUGIN_COMPILER_IMAGE testplugin.so
 cp $PLUGIN_SOURCE_PATH/*.so $PLUGIN_SOURCE_PATH/testplugin.so 
 
