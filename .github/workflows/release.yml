@@ -43,6 +43,7 @@ jobs:
             debvers: 'ubuntu/bionic ubuntu/focal ubuntu/jammy debian/buster debian/bullseye debian/bookworm'
     outputs:
       tags: ${{ steps.metadata.outputs.tags }}
+      gateway: tykio/tyk:${{ steps.metadata.outputs.tags }}
 
     steps:
       - name: Fix private module deps
@@ -405,7 +406,9 @@ jobs:
       - name: Run tests
         shell: bash
         env:
-          GITHUB_TAG: ${{ needs.goreleaser.outputs.tag || 'v6.0.0' }}
+          GITHUB_TAG: ${{ github.ref }}
+          GATEWAY_IMAGE: ${{ needs.goreleaser.outputs.gateway }}
+          PLUGIN_COMPILER_IMAGE: ${{ needs.docker-build.outputs.plugin-compiler }}
         run: |
           set -eaxo pipefail
           if [ ! -d smoke-tests ]; then
@@ -420,7 +423,7 @@ jobs:
               echo Attempting to test $d
               if [ -d $d ] && [ -e $d/test.sh ]; then
                   cd $d
-                  ./test.sh $GITHUB_TAG
+                  ./test.sh ${{ needs.goreleaser.outputs.tag }}
                   cd -
               fi
           done
@@ -429,7 +432,7 @@ jobs:
               echo Attempting to test $d
               if [ -d $d ] && [ -e $d/test.sh ]; then
                   cd $d
-                  ./test.sh $GITHUB_TAG
+                  ./test.sh ${{ needs.goreleaser.outputs.tag }}
                   cd -
               fi
           done
