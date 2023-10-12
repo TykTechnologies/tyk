@@ -421,7 +421,7 @@ jobs:
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
-          GATEWAY_IMAGE: ${{ needs.goreleaser.outputs.gateway }}
+          GATEWAY_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk:${{ github.sha }}
           PLUGIN_COMPILER_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk-plugin-compiler:${{ github.sha }}
         run: |
           set -eaxo pipefail
