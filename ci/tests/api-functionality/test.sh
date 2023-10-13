@@ -2,7 +2,7 @@
 set -eo pipefail
 
 function setup {
-	local tag=${1:-"v6.0.0"}
+	local tag=${1:-"v0.0.0"}
 	# Setup required env vars for docker compose
 	export GATEWAY_IMAGE=${GATEWAY_IMAGE:-"tykio/tyk-gateway:${tag}"}
 
