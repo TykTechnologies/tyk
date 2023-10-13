@@ -1,8 +1,12 @@
 # How to write a test
 
 - Create a sub-directory for your test
-- Implement a script `test.sh` in your directory which will run the test and signal failure via exit code
+- Implement a script `test.sh` in your directory
 - Document the test in this file (if needed)
+
+When invoking `test.sh`, the first argument needs to be the release
+version being tested, e.g. `v5.2.0`. If the test fails, it should exit
+with a non-zero exit code.
 
 # How it works
 
@@ -16,6 +20,34 @@ latest docker and docker compose versions installed.
 For some extra tests, you'll also need https://taskfile.dev ; whenever
 you see a Taskfile.yml, invoking `task` would either run the default
 action, or print the available commands.
+
+## Linting
+
+The Taskfile.yml in this directory serves to ensure that the bash scripts
+are linted for common issues. The only issue that's excluded is the
+following:
+
+```
+In ./api-functionality/test.sh line 12:
+setup $1
+      ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+```
+
+Other issues may appear, but you should be aware of the above. It's
+turned off mainly for readability purposes, as we control the scripts
+inputs and are not likely to cause harm from a test suite.
+
+To run the linter, invoke `task lint`.
+
+## Run tests offline
+
+To run tests offline, it's done with `task run`. To pass the gateway
+release to use, run it as `task tag=v5.2.0 run`, or temporarily modify
+the default version in the Taskfile. This is a generic test runner, if
+you need to test against particular local docker images, read the
+individual test suite details below.
+
+# Test suites
 
 ## Plugin compiler
 
@@ -68,21 +100,3 @@ It's possible to override the docker images used with:
 
 - `GATEWAY_IMAGE` - if not provided, `tykio/tyk-gateway:<version>` is used.
 
-
-## Linting
-
-The Taskfile.yml in this directory serves to ensure that the bash scripts
-are linted for common issues. The only issue that's excluded is the
-following:
-
-```
-In ./api-functionality/test.sh line 12:
-setup $1
-      ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
-```
-
-Other issues may appear, but you should be aware of the above. It's
-turned off mainly for readability purposes, as we control the scripts
-inputs and are not likely to cause harm from a test suite.
-
-To run the linter, invoke `task lint`.
