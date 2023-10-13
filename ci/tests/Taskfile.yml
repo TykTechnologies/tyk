@@ -16,7 +16,10 @@ tasks:
     deps:
       - install:shellcheck
     cmds:
-      - find -name '*.sh' | xargs -n1 shellcheck -e SC2086
+      - cmd: find -name '*.sh' | xargs -n1 shellcheck -e SC2086
+        platforms: [linux]
+      - cmd: find . -name '*.sh' | xargs -n1 shellcheck -e SC2086
+        platforms: [ darwin ]
 
   install:shellcheck:
     desc: "Install shellcheck"
@@ -24,4 +27,7 @@ tasks:
     status:
       - type shellcheck
     cmds:
-      - apt install shellcheck
+      - cmd: brew install shellcheck
+        platforms: [darwin]
+      - cmd: apt install shellcheck
+        platforms: [linux]
