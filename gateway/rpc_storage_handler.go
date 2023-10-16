@@ -236,20 +236,22 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 }
 
 func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
-	// Check the cache first
+	cacheEnabled := r.Gw.GetConfig().SlaveOptions.EnableRPCCache
 
-	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
-		log.Debug("Using cache for: ", keyName)
-
-		cacheStore := r.Gw.RPCGlobalCache
+	var cacheStore cache.Repository
+	if cacheEnabled {
+		cacheStore = r.Gw.RPCGlobalCache
 		if strings.Contains(keyName, "cert-") {
 			cacheStore = r.Gw.RPCCertCache
 		}
 
-		cachedVal, found := cacheStore.Get(keyName)
-		log.Debug("--> Found? ", found)
-		if found {
-			return cachedVal.(string), nil
+		if cachedVal, found := cacheStore.Get(keyName); found {
+			switch typedVal := cachedVal.(type) {
+			case string:
+				return typedVal, nil
+			case error:
+				return "", typedVal
+			}
 		}
 	}
 
@@ -259,27 +261,22 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 			rpc.FuncClientSingletonCall,
 			"GetKey",
 			err,
-			map[string]string{
-				"keyName": keyName,
-			},
+			map[string]string{"keyName": keyName},
 		)
-		if r.IsRetriableError(err) {
-			if rpc.Login() {
-				return r.GetRawKey(keyName)
-			}
+		if r.IsRetriableError(err) && rpc.Login() {
+			return r.GetRawKey(keyName)
 		}
-		log.Debug("Error trying to get value:", err)
+		if cacheEnabled {
+			// Errors, and key not found, should be cached for a small amount of time
+			cacheStore.Set(keyName, storage.ErrKeyNotFound, 1)
+		}
 		return "", storage.ErrKeyNotFound
 	}
-	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
-		// Cache key
-		cacheStore := r.Gw.RPCGlobalCache
-		if strings.Contains(keyName, "cert-") {
-			cacheStore = r.Gw.RPCCertCache
-		}
+
+	if cacheEnabled {
 		cacheStore.Set(keyName, value, cache.DefaultExpiration)
 	}
-	//return hash key without prefix so it doesnt get double prefixed in redis
+
 	return value.(string), nil
 }
 

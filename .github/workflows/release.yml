@@ -135,6 +135,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha
+            type=sha,format=long,prefix=
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern=v{{version}}
 
@@ -146,7 +147,7 @@ jobs:
         run: |
           set +e
           IFS=$'\n' tags=($t)
-          for tag in $tags; do
+          for tag in "${tags[@]}"; do
              for arch in amd64 arm64; do 
                 docker tag tykio/tyk-gateway:${build_tag}-${arch} ${tag}-${arch} && docker push ${tag}-${arch}
              done
