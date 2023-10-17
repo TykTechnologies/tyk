@@ -450,7 +450,7 @@ jobs:
         env:
           GITHUB_TAG: ${{ github.ref }}
           GATEWAY_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk:${{ github.sha }}
-          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk-plugin-compiler:${{ github.sha }}
+          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
         run: |
           set -eaxo pipefail
           for d in smoke-tests/*/
