@@ -371,29 +371,39 @@ jobs:
           docker run --network ${{ job.container.network }} --rm test-${{ matrix.distro }}
 
   smoke-tests:
-    if: startsWith(github.ref, 'refs/tags')
     needs:
       - goreleaser
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # AWS OIDC JWT
+      contents: read    # actions/checkout
 
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 1
 
-      - name: Run tests
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: cipush
+          aws-region: eu-central-1
+          # Don't mask to pass it across job boundaries
+          mask-aws-account-id: false
+
+      - uses: aws-actions/amazon-ecr-login@v1
+        id: ecr
+        with:
+          mask-password: 'true'
+
+      - name: "Run ci/tests"
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
+          GATEWAY_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk:${{ github.sha }}
+          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
         run: |
           set -eaxo pipefail
-          if [ ! -d smoke-tests ]; then
-             echo "::warning No repo specific smoke tests defined"
-          fi
-          if [ ! -d ci/tests ]; then
-             echo "::warning No ci tests defined"
-             exit 0
-          fi
           for d in ci/tests/*/
           do
               echo Attempting to test $d
@@ -403,6 +413,24 @@ jobs:
                   cd -
               fi
           done
+
+      - name: "Run smoke-tests"
+
+        # This job only runs whenever a tag is created. A tag is required
+        # for a functional plugin compiler build for when the GO_GET=1 env
+        # is provided. The plugin compiler cannot fetch the referenced
+        # commit from a PR, but requires a /heads or /tags reference.
+        #
+        # See https://github.com/golang/go/issues/31191 for more info.
+
+        if: startsWith(github.ref, 'refs/tags')
+        shell: bash
+        env:
+          GITHUB_TAG: ${{ github.ref }}
+          GATEWAY_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk:${{ github.sha }}
+          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
+        run: |
+          set -eaxo pipefail
           for d in smoke-tests/*/
           do
               echo Attempting to test $d
