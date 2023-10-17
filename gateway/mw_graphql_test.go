@@ -739,8 +739,15 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 							err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id":"1","type":"start","payload":{"query":"subscription { subscribe }"}}`))
 							require.NoError(t, err)
 
-							_, msg, err = wsConn.ReadMessage()
-							require.Equal(t, `{"id":"1","type":"error","payload":[{"message":"failed to WebSocket dial: expected handshake response status code 101 but got 200"}]}`, string(msg))
+							for {
+								_, msg, err = wsConn.ReadMessage()
+								require.NoError(t, err)
+								if string(msg) == `{"type":"ka"}` {
+									continue
+								}
+								require.Equal(t, `{"id":"1","type":"error","payload":[{"message":"error executing subscription: failed to WebSocket dial: expected handshake response status code 101 but got 200"}]}`, string(msg))
+								break
+							}
 						}
 					}
 
