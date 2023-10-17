@@ -42,6 +42,7 @@ jobs:
             org.opencontainers.image.title=tyk-plugin-compiler
             org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway
           tags: |
+            type=ref,event=pr
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern={{raw}}
