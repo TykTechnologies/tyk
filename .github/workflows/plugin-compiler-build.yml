@@ -4,6 +4,9 @@ name: Plugin-compiler build
 on:
   pull_request:
   push:
+    branches:
+      - master
+      - release-**
     tags:
       - 'v*'
 
