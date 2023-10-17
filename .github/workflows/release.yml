@@ -422,8 +422,8 @@ jobs:
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
-          GATEWAY_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk:pr-${{ github.event.number }}
-          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk-plugin-compiler:pr-${{ github.event.number }}
+          GATEWAY_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk:${{ github.sha }}
+          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
         run: |
           set -eaxo pipefail
           for d in ci/tests/*/
