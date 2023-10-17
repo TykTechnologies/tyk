@@ -415,6 +415,8 @@ jobs:
 
       - uses: aws-actions/amazon-ecr-login@v1
         id: ecr
+        with:
+          mask-password: 'true'
 
       - name: "Run ci/tests"
         shell: bash
