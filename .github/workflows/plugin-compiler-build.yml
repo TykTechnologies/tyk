@@ -45,7 +45,7 @@ jobs:
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern={{raw}}
-           type=sha,format=long
+            type=sha,format=long
 
       - name: Login to Dockerhub
         uses: docker/login-action@v2
