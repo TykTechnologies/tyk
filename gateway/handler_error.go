@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/otel"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
@@ -226,8 +225,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	var alias string
 
 	ip := request.RealIP(r)
-
-	otel.AddTraceID(w, r, e.Spec.GlobalConfig.OpenTelemetry.Enabled)
 
 	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
 
