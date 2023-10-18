@@ -49,7 +49,7 @@ tasks:
     vars:
       plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/test-plugin'
       symbol: AddFooBarHeader
-      args: --rm -v {{.plugin_path}}:/plugin-source -w /plugin-source --env TIDY=1
+      args: --rm -v {{.plugin_path}}:/plugin-source -w /plugin-source
     cmds:
       - rm -f {{.plugin_path}}/*.so
       - docker run {{.args}} {{.image}} plugin.so
