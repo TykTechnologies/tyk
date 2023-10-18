@@ -2,7 +2,7 @@
 version: "3"
 
 vars:
-  tag: v5.2.1-dev
+  tag: v0.0.0
   base: tykio/golang-cross:1.19-bullseye
   sha:
     sh: git rev-parse HEAD
