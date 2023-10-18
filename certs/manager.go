@@ -210,7 +210,7 @@ func ParsePEMCertificate(data []byte, secret string) (*tls.Certificate, error) {
 		if block.Type == "PUBLIC KEY" {
 			// Create a dummny cert just for listing purpose
 			cert.Certificate = append(cert.Certificate, block.Bytes)
-			cert.Leaf = &x509.Certificate{Subject: pkix.Name{CommonName: "Public Key: " + tykcrypto.HexSHA256(block.Bytes)}}
+			cert.Leaf = tykcrypto.PrefixPublicKeyCommonName(block.Bytes)
 		}
 	}
 
@@ -596,7 +596,7 @@ func (c *certificateManager) CertPool(certIDs []string) *x509.CertPool {
 	pool := x509.NewCertPool()
 
 	for _, cert := range c.List(certIDs, CertificatePublic) {
-		if cert != nil {
+		if cert != nil && !tykcrypto.IsPublicKey(cert) {
 			pool.AddCert(cert.Leaf)
 		}
 	}
