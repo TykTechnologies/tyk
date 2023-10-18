@@ -13,8 +13,8 @@ services:
     depends_on:
       - redis
     volumes:
-      - ./testplugin/testplugin.so:/opt/tyk-gateway/middleware/testplugin.so
-      - ./testplugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
+      - ./testdata/test-plugin/plugin.so:/opt/tyk-gateway/middleware/plugin.so
+      - ./testdata/test-plugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
     ports:
       - "0.0.0.0:8080:8080"
     environment:
