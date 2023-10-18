@@ -7,10 +7,13 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	// Example of package which is not part of Gateway
 	"github.com/kr/pretty"
+	jose "github.com/go-jose/go-jose"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/log"
 )
+
+type encrypter jose.Encrypter
 
 var logger = log.Get()
 
