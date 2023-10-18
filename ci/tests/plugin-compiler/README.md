@@ -65,7 +65,7 @@ Example:
 ./test.sh v5.2.1
 ```
 
-The test takes optional `GATEWAY_IMAGE` and `PLUGIN_COMPILE_IMAGE` from
+The test takes optional `GATEWAY_IMAGE` and `PLUGIN_COMPILER_IMAGE` from
 the environment, enabling testing on images that are not published to
 docker hub. This functionality is used in the CI, to run smoke tests on
 the docker images built from the release pipeline.
