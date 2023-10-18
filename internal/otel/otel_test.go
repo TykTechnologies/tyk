@@ -288,7 +288,7 @@ func TestAddTraceID(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
 
-			otelConfig := Config{
+			otelConfig := OpenTelemetry{
 				Enabled:  true,
 				Exporter: "http",
 				Endpoint: "http://localhost:4317",
