@@ -12,10 +12,11 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
-	"github.com/TykTechnologies/tyk/rpc"
 	"io/ioutil"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/sirupsen/logrus"
 
