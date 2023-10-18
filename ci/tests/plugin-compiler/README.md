@@ -29,7 +29,7 @@ The following variables are set as defaults:
 
 | Variable name | Default value                        |
 | ------------- | ------------------------------------ |
-| tag           | v6.0.0                               |
+| tag           | v0.0.0                               |
 | base          | tykio/golang-cross:1.19-bullseye     |
 | dockerfile    | ci/images/plugin-compiler/Dockerfile |
 | image         | internal/plugin-compiler             |
