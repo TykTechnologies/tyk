@@ -253,6 +253,10 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		}
 	}
 
+	if rpc.IsEmergencyMode() {
+		return "", storage.ErrMDCBConnectionLost
+	}
+
 	value, err := rpc.FuncClientSingleton("GetKey", keyName)
 	if err != nil {
 		rpc.EmitErrorEventKv(

@@ -1529,6 +1529,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 				Gw:        gw,
 			},
 			logger,
+			rpc.IsEmergencyMode,
 		)
 	}
 	return localStorage

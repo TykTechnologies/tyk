@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"github.com/TykTechnologies/tyk/rpc"
 	"io/ioutil"
 	"strings"
 	"time"
@@ -101,7 +102,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 		return err
 	}
 
-	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log)
+	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, rpc.IsEmergencyMode)
 	mdcbStorage.CallbackonPullfromRPC = &callbackOnPullCertFromRPC
 
 	cm.storage = mdcbStorage

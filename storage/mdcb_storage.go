@@ -11,14 +11,17 @@ type MdcbStorage struct {
 	rpc                   Handler
 	logger                *logrus.Entry
 	CallbackonPullfromRPC *func(key string, val string) error
+	IsInEmergency         func() bool
 }
 
-func NewMdcbStorage(local, rpc Handler, log *logrus.Entry) *MdcbStorage {
+func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, isInEmergency func() bool) *MdcbStorage {
 	return &MdcbStorage{
-		local:  local,
-		rpc:    rpc,
-		logger: log,
+		local:         local,
+		rpc:           rpc,
+		logger:        log,
+		IsInEmergency: isInEmergency,
 	}
+
 }
 
 func (m MdcbStorage) GetKey(key string) (string, error) {
