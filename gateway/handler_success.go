@@ -12,11 +12,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
-<<<<<<< HEAD
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/otel"
-=======
->>>>>>> a923516e... [TT-9504] Moving AddTraceID call to ProcessRequest function (#5425)
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"

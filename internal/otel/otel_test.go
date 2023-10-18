@@ -288,13 +288,8 @@ func TestAddTraceID(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
 
-<<<<<<< HEAD
-			otelConfig := OpenTelemetry{
-				Enabled:  tt.enabled,
-=======
 			otelConfig := Config{
 				Enabled:  true,
->>>>>>> a923516e... [TT-9504] Moving AddTraceID call to ProcessRequest function (#5425)
 				Exporter: "http",
 				Endpoint: "http://localhost:4317",
 			}
