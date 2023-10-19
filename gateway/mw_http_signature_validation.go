@@ -184,8 +184,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 
 		if !matchPass {
 			logger.WithFields(logrus.Fields{
-				"expected": encodedSignature,
-				"got":      fieldValues.Signature,
+				"got": fieldValues.Signature,
 			}).Error("Signature string does not match!")
 			return hm.authorizationError(r)
 		}
