@@ -135,8 +135,8 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,format=long
-            type=semver,pattern=v{{major}}.{{minor}}
-            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}},prefix=v
+            type=semver,pattern=v{{version}},prefix=v
 
       - name: CI push
         shell: bash
