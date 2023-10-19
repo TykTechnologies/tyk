@@ -134,8 +134,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=sha
-            type=sha,format=long,prefix=
+            type=sha,format=long
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern=v{{version}}
 
