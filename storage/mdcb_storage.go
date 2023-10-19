@@ -14,12 +14,11 @@ type MdcbStorage struct {
 	IsInEmergency         func() bool
 }
 
-func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, isInEmergency func() bool) *MdcbStorage {
+func NewMdcbStorage(local, rpc Handler, log *logrus.Entry) *MdcbStorage {
 	return &MdcbStorage{
-		local:         local,
-		rpc:           rpc,
-		logger:        log,
-		IsInEmergency: isInEmergency,
+		local:  local,
+		rpc:    rpc,
+		logger: log,
 	}
 
 }

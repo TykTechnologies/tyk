@@ -16,8 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
@@ -103,7 +101,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 		return err
 	}
 
-	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, rpc.IsEmergencyMode)
+	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log)
 	mdcbStorage.CallbackonPullfromRPC = &callbackOnPullCertFromRPC
 
 	cm.storage = mdcbStorage
