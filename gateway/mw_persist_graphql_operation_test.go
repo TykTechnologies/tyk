@@ -1,7 +1,10 @@
 package gateway
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -381,5 +384,66 @@ func TestGraphqlPersist_MultipleVersions(t *testing.T) {
 			return testResp.Body == string(gqlRequestContinent)
 		}},
 	)
+	assert.NoError(t, err)
+}
+
+func TestGraphQLPersist_TransformResponse(t *testing.T) {
+	// See TT-9227
+	ts := StartTest(nil)
+	t.Cleanup(func() {
+		ts.Close()
+	})
+	expectedResponse := "{\"test\": \"response\"}"
+	templateSource := base64.StdEncoding.EncodeToString([]byte(expectedResponse))
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "gql-rest"
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/gql-rest/"
+		spec.Proxy.TargetURL = TestHttpAny
+		spec.ResponseProcessors = []apidef.ResponseProcessor{
+			{
+				Name: "response_body_transform",
+			},
+		}
+		spec.EnableContextVars = true
+		spec.VersionData.NotVersioned = false
+		spec.VersionData.Versions["Default"] = apidef.VersionInfo{
+			Name:             "Default",
+			Expires:          "3000-01-02 00:00",
+			UseExtendedPaths: true,
+			ExtendedPaths: apidef.ExtendedPathsSet{
+				TransformResponse: []apidef.TemplateMeta{
+					{
+						Disabled: false,
+						TemplateData: apidef.TemplateData{
+							Input:          apidef.RequestJSON,
+							Mode:           apidef.UseBlob,
+							EnableSession:  false,
+							TemplateSource: templateSource,
+						},
+						Path:   "/getCountryByCode/{countryCode}",
+						Method: http.MethodGet,
+					},
+				},
+				PersistGraphQL: []apidef.PersistGraphQLMeta{
+					{
+						Path:      "/getCountryByCode/{countryCode}",
+						Method:    "GET",
+						Operation: testGQLQueryCountryCode,
+						Variables: map[string]interface{}{
+							"countryCode": "$path.countryCode",
+						},
+					},
+				},
+			},
+		}
+	})
+
+	_, err := ts.Run(t,
+		test.TestCase{Path: "/gql-rest/getCountryByCode/NG", Method: "GET", BodyMatchFunc: func(body []byte) bool {
+			return bytes.Equal(body, []byte(expectedResponse))
+		}},
+	)
+
 	assert.NoError(t, err)
 }
