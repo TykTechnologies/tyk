@@ -6,9 +6,15 @@ import (
 	"os"
 	"testing"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
+	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
+	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -21,6 +27,15 @@ import (
 var request = graphql.Request{
 	Query: `{
   country(code: "NG"){
+    name
+  }
+}`,
+}
+
+var namedRequest = graphql.Request{
+	OperationName: "MyQuery",
+	Query: `query MyQuery {
+  country(code: "TR"){
     name
   }
 }`,
@@ -278,3 +293,129 @@ func TestOtelGraphqlEngineV2_Execute(t *testing.T) {
 		assert.ErrorIs(t, err, expectedErr)
 	})
 }
+
+func TestOtelGraphqlEngineV2_ValidateForSchema_SemanticConventionAttributes(t *testing.T) {
+	checkStringAttribute := func(attributes []attribute.KeyValue, name attribute.Key, expectedValue string) {
+		for _, attr := range attributes {
+			if attr.Key == name {
+				assert.Equal(t, attr.Value.AsString(), expectedValue)
+				return
+			}
+		}
+		assert.Failf(t, "attribute not found", string(name))
+	}
+
+	t.Run("successfully validate", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockExecutor := NewMockExecutionEngineI(ctrl)
+		mockExecutor.EXPECT().ValidateForSchema(gomock.Any()).MaxTimes(1).Return(nil)
+
+		wrappedTraceProvider := newTracerProviderWrapper(tracerProvider)
+		engine, err := NewOtelGraphqlEngineV2(wrappedTraceProvider, mockExecutor)
+		assert.NoError(t, err)
+		engine.SetContext(context.Background())
+
+		err = engine.ValidateForSchema(&namedRequest)
+		assert.NoError(t, err)
+
+		attributes := wrappedTraceProvider.spanAttributes["ValidateRequest"]
+		assert.NotNil(t, attributes)
+
+		checkStringAttribute(attributes, semconv.GraphQLOperationNameKey, namedRequest.OperationName)
+		checkStringAttribute(attributes, semconv.GraphQLOperationTypeKey, "query")
+		checkStringAttribute(attributes, semconv.GraphQLDocumentKey, namedRequest.Query)
+
+	})
+}
+
+type tracerProviderWrapper struct {
+	provider       tyktrace.Provider
+	spanAttributes map[string][]attribute.KeyValue
+}
+
+func newTracerProviderWrapper(provider tyktrace.Provider) *tracerProviderWrapper {
+	return &tracerProviderWrapper{
+		provider:       provider,
+		spanAttributes: make(map[string][]attribute.KeyValue),
+	}
+}
+
+func (t *tracerProviderWrapper) Shutdown(ctx context.Context) error {
+	return t.provider.Shutdown(ctx)
+}
+
+func (t *tracerProviderWrapper) Tracer() tyktrace.Tracer {
+	return &tracerWrapper{
+		tracer:         t.provider.Tracer(),
+		spanAttributes: t.spanAttributes,
+	}
+}
+
+func (t *tracerProviderWrapper) Type() string {
+	return t.provider.Type()
+}
+
+var _ tyktrace.Provider = (*tracerProviderWrapper)(nil)
+
+type tracerWrapper struct {
+	tracer         tyktrace.Tracer
+	spanAttributes map[string][]attribute.KeyValue
+}
+
+func (t *tracerWrapper) Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+	tracerCtx, span := t.tracer.Start(ctx, spanName, opts...)
+	return tracerCtx, &spanWrapper{
+		name:       spanName,
+		span:       span,
+		attributes: t.spanAttributes,
+	}
+}
+
+var _ tyktrace.Tracer = (*tracerWrapper)(nil)
+
+type spanWrapper struct {
+	name       string
+	span       trace.Span
+	attributes map[string][]attribute.KeyValue
+}
+
+func (s *spanWrapper) End(options ...trace.SpanEndOption) {
+	s.span.End(options...)
+}
+
+func (s *spanWrapper) AddEvent(name string, options ...trace.EventOption) {
+	s.span.AddEvent(name, options...)
+}
+
+func (s *spanWrapper) IsRecording() bool {
+	return s.span.IsRecording()
+}
+
+func (s *spanWrapper) RecordError(err error, options ...trace.EventOption) {
+	s.span.RecordError(err, options...)
+}
+
+func (s *spanWrapper) SpanContext() trace.SpanContext {
+	return s.span.SpanContext()
+}
+
+func (s *spanWrapper) SetStatus(code codes.Code, description string) {
+	s.span.SetStatus(code, description)
+}
+
+func (s *spanWrapper) SetName(name string) {
+	s.span.SetName(name)
+}
+
+func (s *spanWrapper) SetAttributes(kv ...attribute.KeyValue) {
+	s.span.SetAttributes(kv...)
+	s.attributes[s.name] = append(s.attributes[s.name], kv...)
+}
+
+func (s *spanWrapper) TracerProvider() trace.TracerProvider {
+	return s.span.TracerProvider()
+}
+
+var _ trace.Span = (*spanWrapper)(nil)
