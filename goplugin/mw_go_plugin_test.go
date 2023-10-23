@@ -7,17 +7,12 @@ import (
 	"net/http"
 	"testing"
 
-<<<<<<< HEAD
-=======
-	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/getkin/kin-openapi/openapi3"
->>>>>>> 1f110d81... [TT-7414] Call ApplyPolicies after go plugin (#5642)
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 /*func TestMain(m *testing.M) {
