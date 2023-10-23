@@ -7,6 +7,12 @@ import (
 	"net/http"
 	"testing"
 
+<<<<<<< HEAD
+=======
+	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/getkin/kin-openapi/openapi3"
+>>>>>>> 1f110d81... [TT-7414] Call ApplyPolicies after go plugin (#5642)
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -527,4 +533,40 @@ func TestGoPlugin_PreventDoubleError(t *testing.T) {
 			},
 		},
 	}...)
+}
+
+func TestGoPlugin_ApplyPolicy(t *testing.T) {
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "my-pol"
+		p.Rate = 114
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.Proxy.ListenPath = "/my-goplugin/"
+		spec.UseKeylessAccess = true
+		spec.UseStandardAuth = false
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+			Pre: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPluginApplyingPolicy",
+					Path: "../test/goplugins/goplugins.so",
+				},
+			},
+		}
+	})
+
+	ts.Run(t, []test.TestCase{
+		{
+			Path: "/my-goplugin/get",
+			Code: http.StatusOK,
+		},
+	}...)
+
+	session, found := ts.Gw.GlobalSessionManager.SessionDetail("", "my-key", false)
+	assert.True(t, found)
+	assert.Equal(t, float64(114), session.Rate)
 }

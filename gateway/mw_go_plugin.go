@@ -222,6 +222,12 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	// Inject definition into request context:
 	ctx.SetDefinition(r, m.Spec.APIDefinition)
 	handler(rw, r)
+	if session := ctxGetSession(r); session != nil {
+		if err := m.ApplyPolicies(session); err != nil {
+			m.Logger().WithError(err).Error("Could not apply policy to session")
+			return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
+		}
+	}
 
 	// calculate latency
 	ms := DurationToMillisecond(time.Since(t1))
