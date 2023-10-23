@@ -941,7 +941,10 @@ func createMemConnProviderIfNeeded(handler http.Handler, r *http.Request) error 
 	// start http server with in mem listener
 	// Note: do not try to use http.Server it is working only with mux
 	mux := http.NewServeMux()
-	mux.Handle("/", handler)
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, wrappingHandlerReq *http.Request) {
+		reqWithPropagatedContext := wrappingHandlerReq.WithContext(r.Context())
+		handler.ServeHTTP(w, reqWithPropagatedContext)
+	}))
 
 	go func() { _ = http.Serve(lis, mux) }()
 
