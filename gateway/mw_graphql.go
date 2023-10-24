@@ -6,15 +6,12 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/internal/graphql"
-
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
-	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter"
@@ -32,6 +29,10 @@ const (
 	SchemaDataSource     = "SchemaDataSource"
 	TykRESTDataSource    = "TykRESTDataSource"
 	TykGraphQLDataSource = "TykGraphQLDataSource"
+)
+
+const (
+	GraphQLWebSocketProtocol = "graphql-ws"
 )
 
 var (
@@ -176,25 +177,16 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 		return
 	}
 	engineConfig.SetWebsocketBeforeStartHook(m)
-	specCtx, cancel := context.WithCancel(context.Background())
 
+	specCtx, cancel := context.WithCancel(context.Background())
 	engine, err := gql.NewExecutionEngineV2(specCtx, logger, *engineConfig)
 	if err != nil {
 		m.Logger().WithError(err).Error("could not create execution engine v2")
 		cancel()
 		return
 	}
+
 	m.Spec.GraphQLExecutor.EngineV2 = engine
-	conf := m.Gw.GetConfig()
-	if conf.OpenTelemetry.Enabled {
-		executor, err := graphql.NewOtelGraphqlEngineV2(m.Gw.TracerProvider, engine)
-		if err != nil {
-			m.Logger().WithError(err).Error("error creating custom execution engine v2")
-			cancel()
-			return
-		}
-		m.Spec.GraphQLExecutor.OtelExecutor = executor
-	}
 	m.Spec.GraphQLExecutor.CancelV2 = cancel
 	m.Spec.GraphQLExecutor.HooksV2.BeforeFetchHook = m
 	m.Spec.GraphQLExecutor.HooksV2.AfterFetchHook = m
@@ -241,17 +233,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	defer ctxSetGraphQLRequest(r, &gqlRequest)
-	if conf := m.Gw.GetConfig(); conf.OpenTelemetry.Enabled {
-		ctx, span := m.Gw.TracerProvider.Tracer().Start(r.Context(), "GraphqlMiddleware Validation")
-		defer span.End()
-		*r = *r.WithContext(ctx)
-		return m.validateRequestWithOtel(r.Context(), w, &gqlRequest)
-	} else {
-		return m.validateRequest(w, &gqlRequest)
-	}
-}
 
-func (m *GraphQLMiddleware) validateRequest(w http.ResponseWriter, gqlRequest *gql.Request) (error, int) {
 	normalizationResult, err := gqlRequest.Normalize(m.Spec.GraphQLExecutor.Schema)
 	if err != nil {
 		m.Logger().Errorf("Error while normalizing GraphQL request: '%s'", err)
@@ -280,44 +262,7 @@ func (m *GraphQLMiddleware) validateRequest(w http.ResponseWriter, gqlRequest *g
 	if inputValidationResult.Errors != nil && inputValidationResult.Errors.Count() > 0 {
 		return m.writeGraphQLError(w, inputValidationResult.Errors)
 	}
-	return nil, http.StatusOK
-}
 
-func (m *GraphQLMiddleware) validateRequestWithOtel(ctx context.Context, w http.ResponseWriter, req *gql.Request) (error, int) {
-	m.Spec.GraphQLExecutor.OtelExecutor.SetContext(ctx)
-
-	// normalization
-	err := m.Spec.GraphQLExecutor.OtelExecutor.Normalize(req)
-	if err != nil {
-		m.Logger().Errorf("Error while normalizing GraphqlRequest: %v", err)
-		var reqErr gql.RequestErrors
-		if errors.As(err, &reqErr) {
-			return m.writeGraphQLError(w, reqErr)
-		}
-		return ProxyingRequestFailedErr, http.StatusInternalServerError
-	}
-
-	// validation
-	err = m.Spec.GraphQLExecutor.OtelExecutor.ValidateForSchema(req)
-	if err != nil {
-		m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
-		var reqErr gql.RequestErrors
-		if errors.As(err, &reqErr) {
-			return m.writeGraphQLError(w, reqErr)
-		}
-		return ProxyingRequestFailedErr, http.StatusInternalServerError
-	}
-
-	// input validation
-	err = m.Spec.GraphQLExecutor.OtelExecutor.InputValidation(req)
-	if err != nil {
-		m.Logger().Errorf("Error while validating variables for request: %v", err)
-		var reqErr gql.RequestErrors
-		if errors.As(err, &reqErr) {
-			return m.writeGraphQLError(w, reqErr)
-		}
-		return ProxyingRequestFailedErr, http.StatusInternalServerError
-	}
 	return nil, http.StatusOK
 }
 
@@ -331,8 +276,7 @@ func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.
 
 func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request) bool {
 	websocketProtocol := r.Header.Get(header.SecWebSocketProtocol)
-	return websocketProtocol == string(gqlwebsocket.ProtocolGraphQLWS) ||
-		websocketProtocol == string(gqlwebsocket.ProtocolGraphQLTransportWS)
+	return websocketProtocol == GraphQLWebSocketProtocol
 }
 
 func (m *GraphQLMiddleware) checkForUnsupportedUsage() error {

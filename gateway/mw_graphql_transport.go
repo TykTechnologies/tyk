@@ -55,17 +55,11 @@ type GraphQLEngineTransport struct {
 	transportType     GraphQLEngineTransportType
 }
 
-type GraphqlEngineTransportOption func(transport *GraphQLEngineTransport)
-
-func NewGraphQLEngineTransport(transportType GraphQLEngineTransportType, originalTransport http.RoundTripper, options ...GraphqlEngineTransportOption) *GraphQLEngineTransport {
-	transport := &GraphQLEngineTransport{
+func NewGraphQLEngineTransport(transportType GraphQLEngineTransportType, originalTransport http.RoundTripper) *GraphQLEngineTransport {
+	return &GraphQLEngineTransport{
 		originalTransport: originalTransport,
 		transportType:     transportType,
 	}
-	for i := range options {
-		options[i](transport)
-	}
-	return transport
 }
 
 func (g *GraphQLEngineTransport) RoundTrip(request *http.Request) (res *http.Response, err error) {

@@ -168,7 +168,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					{testSSMyAuth: []string{}, testSSMyAuthWithAnd: []string{}},
 					{testSSMyAuthWithOR: []string{}},
 				},
-				Components: &openapi3.Components{
+				Components: openapi3.Components{
 					SecuritySchemes: openapi3.SecuritySchemes{
 						testSSMyAuth: &openapi3.SecuritySchemeRef{
 							Value: openapi3.NewSecurityScheme().WithType(typeAPIKey).WithIn(header).WithName(testHeader),
@@ -1383,14 +1383,12 @@ func TestOAS_importAuthentication(t *testing.T) {
 			jwtScheme.Scheme = schemeBearer
 			jwtScheme.BearerFormat = bearerFormatJWT
 
-			oas.Components = &openapi3.Components{
-				SecuritySchemes: openapi3.SecuritySchemes{
-					testSecurityNameToken: &openapi3.SecuritySchemeRef{
-						Value: tokenScheme,
-					},
-					testSecurityNameJWT: &openapi3.SecuritySchemeRef{
-						Value: jwtScheme,
-					},
+			oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+				testSecurityNameToken: &openapi3.SecuritySchemeRef{
+					Value: tokenScheme,
+				},
+				testSecurityNameJWT: &openapi3.SecuritySchemeRef{
+					Value: jwtScheme,
 				},
 			}
 
@@ -1438,11 +1436,9 @@ func TestOAS_importAuthentication(t *testing.T) {
 		securityScheme.In = cookie
 		securityScheme.Name = testCookieName
 
-		oas.Components = &openapi3.Components{
-			SecuritySchemes: openapi3.SecuritySchemes{
-				testSecurityNameToken: &openapi3.SecuritySchemeRef{
-					Value: securityScheme,
-				},
+		oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+			testSecurityNameToken: &openapi3.SecuritySchemeRef{
+				Value: securityScheme,
 			},
 		}
 
@@ -1508,14 +1504,12 @@ func TestOAS_importAuthentication(t *testing.T) {
 			jwtScheme.Scheme = schemeBearer
 			jwtScheme.BearerFormat = bearerFormatJWT
 
-			oas.Components = &openapi3.Components{
-				SecuritySchemes: openapi3.SecuritySchemes{
-					testSecurityNameToken: &openapi3.SecuritySchemeRef{
-						Value: tokenScheme,
-					},
-					testSecurityNameJWT: &openapi3.SecuritySchemeRef{
-						Value: jwtScheme,
-					},
+			oas.Components.SecuritySchemes = openapi3.SecuritySchemes{
+				testSecurityNameToken: &openapi3.SecuritySchemeRef{
+					Value: tokenScheme,
+				},
+				testSecurityNameJWT: &openapi3.SecuritySchemeRef{
+					Value: jwtScheme,
 				},
 			}
 

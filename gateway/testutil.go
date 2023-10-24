@@ -37,7 +37,6 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
@@ -1200,14 +1199,6 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	}
 
 	go s.reloadSimulation(s.ctx, gw)
-
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
-		gw.GetNodeID(),
-		VERSION,
-		gw.GetConfig().SlaveOptions.UseRPC,
-		gw.GetConfig().SlaveOptions.GroupID,
-		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
-		gw.GetConfig().DBAppConfOptions.Tags)
 
 	return gw
 }

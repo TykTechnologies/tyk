@@ -5,7 +5,7 @@ FROM debian:bullseye AS assets
 # If you need to tweak the environment for testing, you can override the
 # `GO_VERSION` and `PYTHON_VERSION` as docker build arguments.
 
-ARG GO_VERSION=1.19.5
+ARG GO_VERSION=1.16
 ARG PYTHON_VERSION=3.7.13
 
 WORKDIR /assets
@@ -16,7 +16,7 @@ RUN	apt update && apt install wget -y && \
 
 FROM debian:bullseye
 
-ARG GO_VERSION=1.19.5
+ARG GO_VERSION=1.16
 ARG PYTHON_VERSION=3.7.13
 
 COPY --from=assets /assets/ /tmp/
@@ -36,6 +36,7 @@ RUN apt update && apt install build-essential zlib1g-dev libncurses5-dev libgdbm
 # Install $PYTHON_VERSION
 
 ## This just installs whatever is is bullseye, makes docker build (fast/small)-(er)
+
 RUN	apt install python3 -y
 
 ## This runs python code slower, but the process finishes quicker
@@ -53,16 +54,15 @@ RUN	apt install python3 -y
 #	ldconfig $PWD
 
 # Clean up build assets
+
 RUN find /tmp -type f -delete
 
 # Build gateway
+
 RUN mkdir /opt/tyk-gateway
 WORKDIR /opt/tyk-gateway
-ADD go.mod go.sum /opt/tyk-gateway/
-RUN go mod download
 ADD . /opt/tyk-gateway
-
-RUN make build
+RUN make build && go clean -modcache
 
 COPY tyk.conf.example tyk.conf
 

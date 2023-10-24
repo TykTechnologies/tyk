@@ -20,15 +20,12 @@ type HeaderTransformOptions struct {
 }
 
 type HeaderTransform struct {
-	BaseTykResponseHandler
+	Spec   *APISpec
 	config HeaderTransformOptions
+	Gw     *Gateway `json:"-"`
 }
 
-func (h *HeaderTransform) Base() *BaseTykResponseHandler {
-	return &h.BaseTykResponseHandler
-}
-
-func (h *HeaderTransform) Name() string {
+func (HeaderTransform) Name() string {
 	return "HeaderTransform"
 }
 

@@ -193,7 +193,7 @@ Tyk classic API definition: `service_discovery.use_target_list`.
 **Field: `cacheTimeout` (`int`)**
 CacheTimeout is the timeout of a cache value when a new data is loaded from a discovery service.
 Setting it too low will cause Tyk to call the SD service too often, setting it too high could mean that failures are not recovered from quickly enough.
-Deprecated: The field is deprecated. Use `service_discovery` to configure service discovery cache options.
+Deprecated: The field is deprecated, usage needs to be updated to configure caching.
 
 Tyk classic API definition: `service_discovery.cache_timeout`.
 
@@ -853,12 +853,8 @@ IgnoreAuthentication ignores authentication on request by allowance.
 **Field: `transformRequestMethod` ([TransformRequestMethod](#transformrequestmethod))**
 TransformRequestMethod allows you to transform the method of a request.
 
-**Field: `transformRequestBody` ([TransformBody](#transformbody))**
+**Field: `transformRequestBody` ([TransformRequestBody](#transformrequestbody))**
 TransformRequestBody allows you to transform request body.
-When both `path` and `body` are provided, body would take precedence.
-
-**Field: `transformResponseBody` ([TransformBody](#transformbody))**
-TransformResponseBody allows you to transform response body.
 When both `path` and `body` are provided, body would take precedence.
 
 **Field: `cache` ([CachePlugin](#cacheplugin))**
@@ -898,13 +894,13 @@ Enabled enables Method Transform for the given path and method.
 ToMethod is the http method value to which the method of an incoming request will be transformed.
 
 
-### **TransformBody**
+### **TransformRequestBody**
 
 **Field: `enabled` (`boolean`)**
-Enabled enables transform request/request body middleware.
+Enabled enables transform request body middleware.
 
 **Field: `format` (`object`)**
-Format of the request/response body, xml or json.
+Format of the request body, xml or json.
 
 **Field: `path` (`string`)**
 Path file path for the template.
@@ -924,9 +920,6 @@ Example value: `\"id\":[^,]*` (quoted json value).
 
 **Field: `cacheResponseCodes` (`[]int`)**
 CacheResponseCodes contains a list of valid response codes for responses that are okay to add to the cache.
-
-**Field: `timeout` (`int`)**
-Timeout is the TTL for the endpoint level caching in seconds. 0 means no caching.
 
 
 ### **EnforceTimeout**

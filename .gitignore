@@ -55,4 +55,3 @@ tyk_linux_*
 /dist/
 
 .terraform**
-.task/

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/buger/jsonparser"
@@ -95,20 +96,45 @@ func encodeKafkaDataSourceConfig(cfg kafka_datasource.GraphQLSubscriptionOptions
 	return json.Marshal(localConfig)
 }
 
-func (a *asyncAPI) prepareGraphQLEngineConfig() error {
-	serverConfig, err := prepareKafkaDataSourceConfig(a.document)
+func ImportAsyncAPIDocument(input []byte) (apidef.APIDefinition, error) {
+	def := apidef.DummyAPI()
+
+	parsed, err := asyncapi.ParseAsyncAPIDocument(input)
 	if err != nil {
-		return err
+		return def, err
 	}
 
-	for channelName, channelItem := range a.document.Channels {
+	report := operationreport.Report{}
+	doc := asyncapi.ImportParsedAsyncAPIDocument(parsed, &report)
+	if report.HasErrors() {
+		return def, report
+	}
+
+	w := &bytes.Buffer{}
+	err = astprinter.PrintIndent(doc, nil, []byte("  "), w)
+	if err != nil {
+		return def, err
+	}
+
+	def.Name = fmt.Sprintf("%s - %s", parsed.Info.Title, parsed.Info.Version)
+	def.GraphQL.Enabled = true
+	def.Active = true
+	def.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+	def.GraphQL.Schema = w.String()
+
+	serverConfig, err := prepareKafkaDataSourceConfig(parsed)
+	if err != nil {
+		return def, err
+	}
+
+	for channelName, channelItem := range parsed.Channels {
 		channelName = processArgumentSection(channelName)
 		fieldConfig := apidef.GraphQLFieldConfig{
 			TypeName:  "Subscription",
 			FieldName: channelItem.OperationID,
 			Path:      []string{channelItem.OperationID},
 		}
-		a.apiDefinition.GraphQL.Engine.FieldConfigs = append(a.apiDefinition.GraphQL.Engine.FieldConfigs, fieldConfig)
+		def.GraphQL.Engine.FieldConfigs = append(def.GraphQL.Engine.FieldConfigs, fieldConfig)
 		rootFields := []apidef.GraphQLTypeFields{
 			{
 				Type: "Subscription",
@@ -129,7 +155,7 @@ func (a *asyncAPI) prepareGraphQLEngineConfig() error {
 			for _, cfg := range serverConfig {
 				marshalConfig, err := encodeKafkaDataSourceConfig(cfg, channelName)
 				if err != nil {
-					return err
+					return def, err
 				}
 				dataSourceConfig.Config = marshalConfig
 				break
@@ -139,7 +165,7 @@ func (a *asyncAPI) prepareGraphQLEngineConfig() error {
 				if cfg, ok := serverConfig[server]; ok {
 					encodedConfig, err := encodeKafkaDataSourceConfig(cfg, channelName)
 					if err != nil {
-						return err
+						return def, err
 					}
 					dataSourceConfig.Config = encodedConfig
 					break
@@ -147,60 +173,20 @@ func (a *asyncAPI) prepareGraphQLEngineConfig() error {
 			}
 		}
 
-		a.apiDefinition.GraphQL.Engine.DataSources = append(a.apiDefinition.GraphQL.Engine.DataSources, dataSourceConfig)
-	}
-
-	return nil
-}
-
-func (a *asyncAPI) Import() (*apidef.APIDefinition, error) {
-	document, err := asyncapi.ParseAsyncAPIDocument(a.input)
-	if err != nil {
-		return nil, err
-	}
-
-	a.document = document
-	a.apiDefinition = newApiDefinition(document.Info.Title, a.orgId)
-
-	if err := a.prepareGraphQLEngineConfig(); err != nil {
-		return nil, err
+		def.GraphQL.Engine.DataSources = append(def.GraphQL.Engine.DataSources, dataSourceConfig)
 	}
 
 	// We iterate over the maps to create a new API definition. This leads to the random placement of
 	// items in various arrays in the resulting JSON document. In order to test the AsyncAPI converter
 	// with fixtures and prevent randomness, we sort various data structures here.
-	sortFieldConfigsByName(a.apiDefinition)
-	sortDataSourcesByName(a.apiDefinition)
 
-	gqlDocument := asyncapi.ImportParsedAsyncAPIDocument(a.document, a.report)
-	if a.report.HasErrors() {
-		return nil, a.report
-	}
+	sort.Slice(def.GraphQL.Engine.FieldConfigs, func(i, j int) bool {
+		return def.GraphQL.Engine.FieldConfigs[i].FieldName < def.GraphQL.Engine.FieldConfigs[j].FieldName
+	})
 
-	w := &bytes.Buffer{}
-	err = astprinter.PrintIndent(gqlDocument, nil, []byte("  "), w)
-	if err != nil {
-		return nil, err
-	}
-	a.apiDefinition.GraphQL.Schema = w.String()
+	sort.Slice(def.GraphQL.Engine.DataSources, func(i, j int) bool {
+		return def.GraphQL.Engine.DataSources[i].Name < def.GraphQL.Engine.DataSources[j].Name
+	})
 
-	return a.apiDefinition, nil
+	return def, nil
 }
-
-type asyncAPI struct {
-	orgId         string
-	input         []byte
-	report        *operationreport.Report
-	apiDefinition *apidef.APIDefinition
-	document      *asyncapi.AsyncAPI
-}
-
-func NewAsyncAPIAdapter(orgId string, input []byte) ImportAdapter {
-	return &asyncAPI{
-		orgId:  orgId,
-		input:  input,
-		report: &operationreport.Report{},
-	}
-}
-
-var _ ImportAdapter = (*asyncAPI)(nil)

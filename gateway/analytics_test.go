@@ -551,7 +551,6 @@ func TestURLReplacer(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
 		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
-		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseULIDs = true
 		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
 		globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
 	})
@@ -562,9 +561,6 @@ func TestURLReplacer(t *testing.T) {
 	recordUUID2 := analytics.AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
 	recordUUID3 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
 	recordUUID4 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-	recordULID1 := analytics.AnalyticsRecord{Path: "/posts/01G9HHNKWGBHCQX7VG3JKSZ055/comments"}
-	recordULID2 := analytics.AnalyticsRecord{Path: "/posts/01g9hhnkwgbhcqx7vg3jksz055/comments"}
-	recordULID3 := analytics.AnalyticsRecord{Path: "/posts/01g9HHNKwgbhcqx7vg3JKSZ055/comments"}
 	recordID1 := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams"}
 	recordCust := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
@@ -575,9 +571,6 @@ func TestURLReplacer(t *testing.T) {
 	NormalisePath(&recordUUID2, &globalConf)
 	NormalisePath(&recordUUID3, &globalConf)
 	NormalisePath(&recordUUID4, &globalConf)
-	NormalisePath(&recordULID1, &globalConf)
-	NormalisePath(&recordULID2, &globalConf)
-	NormalisePath(&recordULID3, &globalConf)
 	NormalisePath(&recordID1, &globalConf)
 	NormalisePath(&recordCust, &globalConf)
 
@@ -602,10 +595,6 @@ func TestURLReplacer(t *testing.T) {
 		t.Error(recordUUID4.Path)
 	}
 
-	assert.Equal(t, "/posts/{ulid}/comments", recordULID1.Path, "Path not altered, is: ", recordULID1.Path)
-	assert.Equal(t, "/posts/{ulid}/comments", recordULID2.Path, "Path not altered, is: ", recordULID2.Path)
-	assert.Equal(t, "/posts/{ulid}/comments", recordULID3.Path, "Path not altered, is: ", recordULID3.Path)
-
 	if recordID1.Path != "/widgets/{id}/getParams" {
 		t.Error("Path not altered, is:")
 		t.Error(recordID1.Path)
@@ -622,7 +611,6 @@ func BenchmarkURLReplacer(b *testing.B) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
 		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
-		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseULIDs = true
 		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
 		globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
 	})
@@ -637,9 +625,6 @@ func BenchmarkURLReplacer(b *testing.B) {
 		recordUUID2 := analytics.AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
 		recordUUID3 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
 		recordUUID4 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
-		recordULID1 := analytics.AnalyticsRecord{Path: "/posts/01G9HHNKWGBHCQX7VG3JKSZ055/comments"}
-		recordULID2 := analytics.AnalyticsRecord{Path: "/posts/01g9hhnkwgbhcqx7vg3jksz055/comments"}
-		recordULID3 := analytics.AnalyticsRecord{Path: "/posts/01g9HHNKwgbhcqx7vg3JKSZ055/comments"}
 		recordID1 := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams"}
 		recordCust := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
@@ -647,9 +632,6 @@ func BenchmarkURLReplacer(b *testing.B) {
 		NormalisePath(&recordUUID2, &globalConf)
 		NormalisePath(&recordUUID3, &globalConf)
 		NormalisePath(&recordUUID4, &globalConf)
-		NormalisePath(&recordULID1, &globalConf)
-		NormalisePath(&recordULID2, &globalConf)
-		NormalisePath(&recordULID3, &globalConf)
 		NormalisePath(&recordID1, &globalConf)
 		NormalisePath(&recordCust, &globalConf)
 	}

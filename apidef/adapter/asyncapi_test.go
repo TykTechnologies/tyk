@@ -317,8 +317,7 @@ const expectedGraphqlConfig = `{
                     }
                 }
             }
-        ],
-        "global_headers": null
+        ]
     },
     "proxy": {
         "auth_headers": {},
@@ -339,12 +338,10 @@ const expectedGraphqlConfig = `{
 }`
 
 func TestGraphQLConfigAdapter_AsyncAPI(t *testing.T) {
-	importer := NewAsyncAPIAdapter("my-org-id", []byte(streetlightsKafkaAsyncAPI))
-
-	actualApiDefinition, err := importer.Import()
+	actualApiDefinition, err := ImportAsyncAPIDocument([]byte(streetlightsKafkaAsyncAPI))
 	require.NoError(t, err)
 
-	require.Equal(t, "Streetlights Kafka API", actualApiDefinition.Name)
+	require.Equal(t, "Streetlights Kafka API - 1.0.0", actualApiDefinition.Name)
 	require.True(t, actualApiDefinition.GraphQL.Enabled)
 	require.True(t, actualApiDefinition.Active)
 	require.Equal(t, apidef.GraphQLExecutionModeExecutionEngine, actualApiDefinition.GraphQL.ExecutionMode)

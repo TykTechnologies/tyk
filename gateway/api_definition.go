@@ -19,8 +19,6 @@ import (
 	"text/template"
 	"time"
 
-	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
-
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
@@ -168,7 +166,6 @@ type EndPointCacheMeta struct {
 	Method                 string
 	CacheKeyRegex          string
 	CacheOnlyResponseCodes []int
-	Timeout                int64
 }
 
 type TransformSpec struct {
@@ -219,11 +216,10 @@ type APISpec struct {
 	network analytics.NetworkStats
 
 	GraphQLExecutor struct {
-		Engine       *graphql.ExecutionEngine
-		CancelV2     context.CancelFunc
-		EngineV2     *graphql.ExecutionEngineV2
-		OtelExecutor *graphqlinternal.OtelGraphqlEngineV2
-		HooksV2      struct {
+		Engine   *graphql.ExecutionEngine
+		CancelV2 context.CancelFunc
+		EngineV2 *graphql.ExecutionEngineV2
+		HooksV2  struct {
 			BeforeFetchHook resolve.BeforeFetchHook
 			AfterFetchHook  resolve.AfterFetchHook
 		}
@@ -690,8 +686,6 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 	nestDef := nestedApiDefinition{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
-		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.
-		loader.ReadFromURIFunc = openapi3.ReadFromFile
 		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(filePath))
 		if err == nil {
 			nestDef.OAS = &oas.OAS{T: *oasDoc}
@@ -815,7 +809,6 @@ func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths [
 		newSpec.CacheConfig.Method = spec.Method
 		newSpec.CacheConfig.CacheKeyRegex = spec.CacheKeyRegex
 		newSpec.CacheConfig.CacheOnlyResponseCodes = spec.CacheOnlyResponseCodes
-		newSpec.CacheConfig.Timeout = spec.Timeout
 		// Extend with method actions
 		urlSpec = append(urlSpec, newSpec)
 	}

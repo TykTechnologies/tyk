@@ -512,12 +512,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 }
 
 type CustomMiddlewareResponseHook struct {
-	BaseTykResponseHandler
 	mw *CoProcessMiddleware
-}
-
-func (h CustomMiddlewareResponseHook) Base() *BaseTykResponseHandler {
-	return &h.BaseTykResponseHandler
+	Gw *Gateway `json:"-"`
 }
 
 func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {

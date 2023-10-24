@@ -5,11 +5,6 @@ on:
     branches:
       - master
       - release-**
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
 
 env:
   TYK_DB_REDISHOST: localhost
@@ -19,14 +14,14 @@ env:
 
 jobs:
   test:
-    name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
+    name: Go ${{ matrix.go }} Redis ${{ matrix.redis-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
       matrix:
         redis-version: [5]
         python-version: ['3.9']
-        go-version: [1.19.x]
+        go: [1.16]
 
     steps:
       - name: Checkout Tyk
@@ -37,7 +32,7 @@ jobs:
       - name: Setup Golang
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: ${{ matrix.go }}
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -57,17 +52,13 @@ jobs:
           make lint
           
           git add --all
-
           git diff HEAD > git-state.log
+          echo "git-state=$(sed -ze 's/%/%25/g;s/\n/%0A/g' git-state.log)" >> $GITHUB_OUTPUT
 
           git_state_count=$(wc -l < git-state.log)
           
           if [[ $git_state_count -ne 0 ]]
           then 
-            echo "git-state<<EOF" >> $GITHUB_OUTPUT
-            cat git-state.log >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-
             echo "make lint made git state dirty, please run make lint locally and update PR"
             exit 1
           fi
@@ -80,6 +71,7 @@ jobs:
         with:
           redis-version: ${{ matrix.redis-version }}
 
+
       - name: Cache
         uses: actions/cache@v2
         with:
@@ -91,10 +83,13 @@ jobs:
       - name: Run Gateway Tests
         id: ci-tests
         run: |
-          ./bin/ci-tests.sh 2>&1
+          ./bin/ci-tests.sh 2>&1 | tee test.log
+          result_code=${PIPESTATUS[0]}
+          echo "log=$(sed -ze 's/%/%25/g;s/\n/%0A/g' test.log)" >> $GITHUB_OUTPUT
+          exit $result_code
 
       - name: Notify status
-        if: ${{ failure() && github.event.pull_request.number && !github.event.pull_request.draft }}
+        if: ${{ failure() && github.event.pull_request.number }}
         uses: peter-evans/create-or-update-comment@v1
         with:
           issue-number: ${{ github.event.pull_request.number }}

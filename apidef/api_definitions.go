@@ -155,7 +155,6 @@ type CacheMeta struct {
 	Path                   string `bson:"path" json:"path"`
 	CacheKeyRegex          string `bson:"cache_key_regex" json:"cache_key_regex"`
 	CacheOnlyResponseCodes []int  `bson:"cache_response_codes" json:"cache_response_codes"`
-	Timeout                int64  `bson:"timeout" json:"timeout"`
 }
 
 type RequestInputType string
@@ -617,8 +616,6 @@ type APIDefinition struct {
 	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
 	IsOAS       bool   `bson:"is_oas" json:"is_oas,omitempty"`
 	VersionName string `bson:"-" json:"-"`
-
-	DetailedTracing bool `bson:"detailed_tracing" json:"detailed_tracing"`
 }
 
 type AnalyticsPluginConfig struct {
@@ -785,14 +782,8 @@ type GraphQLSubgraphEntity struct {
 }
 
 type GraphQLEngineConfig struct {
-	FieldConfigs  []GraphQLFieldConfig      `bson:"field_configs" json:"field_configs"`
-	DataSources   []GraphQLEngineDataSource `bson:"data_sources" json:"data_sources"`
-	GlobalHeaders []UDGGlobalHeader         `bson:"global_headers" json:"global_headers"`
-}
-
-type UDGGlobalHeader struct {
-	Key   string `bson:"key" json:"key"`
-	Value string `bson:"value" json:"value"`
+	FieldConfigs []GraphQLFieldConfig      `bson:"field_configs" json:"field_configs"`
+	DataSources  []GraphQLEngineDataSource `bson:"data_sources" json:"data_sources"`
 }
 
 type GraphQLFieldConfig struct {
@@ -836,9 +827,6 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 	Method           string            `bson:"method" json:"method"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
 	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
-	HasOperation     bool              `bson:"has_operation" json:"has_operation"`
-	Operation        string            `bson:"operation" json:"operation"`
-	Variables        json.RawMessage   `bson:"variables" json:"variables"`
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {

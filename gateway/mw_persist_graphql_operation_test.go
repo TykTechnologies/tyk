@@ -400,6 +400,11 @@ func TestGraphQLPersist_TransformResponse(t *testing.T) {
 		spec.OrgID = "default"
 		spec.Proxy.ListenPath = "/gql-rest/"
 		spec.Proxy.TargetURL = TestHttpAny
+		spec.ResponseProcessors = []apidef.ResponseProcessor{
+			{
+				Name: "response_body_transform",
+			},
+		}
 		spec.EnableContextVars = true
 		spec.VersionData.NotVersioned = false
 		spec.VersionData.Versions["Default"] = apidef.VersionInfo{

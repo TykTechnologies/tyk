@@ -58,7 +58,7 @@
 	"post": [
 	 {
 	    "name": "AddFooBarHeader",
-	    "path": "/opt/tyk-gateway/middleware/plugin.so",
+	    "path": "/opt/tyk-gateway/middleware/testplugin.so",
 	    "require_session": false
 	}
 	],

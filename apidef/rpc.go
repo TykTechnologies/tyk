@@ -19,23 +19,6 @@ type GroupLoginRequest struct {
 	UserKey   string
 	GroupID   string
 	ForceSync bool
-	Node      []byte
-}
-
-type NodeData struct {
-	NodeID      string                     `json:"node_id"`
-	APIKey      string                     `json:"api_key"`
-	GroupID     string                     `json:"group_id"`
-	NodeVersion string                     `json:"node_version"`
-	TTL         int64                      `json:"ttl"`
-	Tags        []string                   `json:"tags"`
-	Health      map[string]HealthCheckItem `json:"health"`
-	Stats       GWStats                    `json:"stats"`
-}
-
-type GWStats struct {
-	APIsCount     int `json:"apis_count"`
-	PoliciesCount int `json:"policies_count"`
 }
 
 type GroupKeySpaceRequest struct {

@@ -14,15 +14,11 @@ import (
 )
 
 type ResponseGoPluginMiddleware struct {
-	BaseTykResponseHandler
 	Path       string // path to .so file
 	SymbolName string // function symbol to look up
 	logger     *logrus.Entry
+	Spec       *APISpec
 	ResHandler func(rw http.ResponseWriter, res *http.Response, req *http.Request)
-}
-
-func (h ResponseGoPluginMiddleware) Base() *BaseTykResponseHandler {
-	return &h.BaseTykResponseHandler
 }
 
 func (ResponseGoPluginMiddleware) Name() string {

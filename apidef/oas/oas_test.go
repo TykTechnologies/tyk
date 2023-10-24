@@ -20,7 +20,6 @@ func TestOAS(t *testing.T) {
 		t.Parallel()
 
 		var emptyOASPaths OAS
-		emptyOASPaths.Components = &openapi3.Components{}
 		emptyOASPaths.Paths = make(openapi3.Paths)
 		emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
 
@@ -39,7 +38,6 @@ func TestOAS(t *testing.T) {
 		t.Parallel()
 
 		var nilOASPaths OAS
-		nilOASPaths.Components = &openapi3.Components{}
 		nilOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 		var convertedAPI apidef.APIDefinition
@@ -59,7 +57,6 @@ func TestOAS(t *testing.T) {
 		t.Parallel()
 
 		var oasWithPaths OAS
-		oasWithPaths.Components = &openapi3.Components{}
 		oasWithPaths.SetTykExtension(&XTykAPIGateway{
 			Middleware: &Middleware{
 				Operations: Operations{
@@ -319,8 +316,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.GraphQL.Engine.DataSources[0].RootFields[0].Type",
 		"APIDefinition.GraphQL.Engine.DataSources[0].RootFields[0].Fields[0]",
 		"APIDefinition.GraphQL.Engine.DataSources[0].Config[0]",
-		"APIDefinition.GraphQL.Engine.GlobalHeaders[0].Key",
-		"APIDefinition.GraphQL.Engine.GlobalHeaders[0].Value",
 		"APIDefinition.GraphQL.Proxy.AuthHeaders[0]",
 		"APIDefinition.GraphQL.Proxy.SubscriptionType",
 		"APIDefinition.GraphQL.Proxy.RequestHeaders[0]",
@@ -338,7 +333,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.AnalyticsPlugin.Enabled",
 		"APIDefinition.AnalyticsPlugin.PluginPath",
 		"APIDefinition.AnalyticsPlugin.FuncName",
-		"APIDefinition.DetailedTracing",
 	}
 
 	assert.Equal(t, expectedFields, noOASSupportFields)
@@ -651,10 +645,12 @@ func TestOAS_MarshalJSON(t *testing.T) {
 				Info: &openapi3.Info{
 					Title: "OAS Doc",
 				},
-				Extensions: map[string]interface{}{
-					ExtensionTykAPIGateway: XTykAPIGateway{
-						Info: Info{
-							Name: "OAS API",
+				ExtensionProps: openapi3.ExtensionProps{
+					Extensions: map[string]interface{}{
+						ExtensionTykAPIGateway: XTykAPIGateway{
+							Info: Info{
+								Name: "OAS API",
+							},
 						},
 					},
 				},
@@ -665,7 +661,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 			copyOAS := s
 			intVal := 9
 			byteRep, _ := json.Marshal(intVal)
-			copyOAS.Extensions["x-abcd"] = byteRep
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = byteRep
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -676,7 +672,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 			copyOAS := s
 			floatVal := 9.5
 			byteRep, _ := json.Marshal(floatVal)
-			copyOAS.Extensions["x-abcd"] = byteRep
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = byteRep
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -687,7 +683,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 			copyOAS := s
 			boolVal := false
 			byteRep, _ := json.Marshal(boolVal)
-			copyOAS.Extensions["x-abcd"] = byteRep
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = byteRep
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -696,7 +692,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 
 		t.Run("nil", func(t *testing.T) {
 			copyOAS := s
-			copyOAS.Extensions["x-abcd"] = nil
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = nil
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -705,7 +701,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 
 		t.Run("string", func(t *testing.T) {
 			copyOAS := s
-			copyOAS.Extensions["x-abcd"] = []byte(`"hello"`)
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = []byte(`"hello"`)
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -714,7 +710,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 
 		t.Run("map", func(t *testing.T) {
 			copyOAS := s
-			copyOAS.Extensions["x-abcd"] = []byte(`{"key":"value"}`)
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = []byte(`{"key":"value"}`)
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
@@ -723,61 +719,13 @@ func TestOAS_MarshalJSON(t *testing.T) {
 
 		t.Run("array", func(t *testing.T) {
 			copyOAS := s
-			copyOAS.Extensions["x-abcd"] = []byte(`[{"key":"value"},{"key":"value"}]`)
+			copyOAS.ExtensionProps.Extensions["x-abcd"] = []byte(`[{"key":"value"},{"key":"value"}]`)
 
 			data, err := copyOAS.MarshalJSON()
 			assert.NoError(t, err)
 			assert.Contains(t, string(data), `"x-abcd":[{"key":"value"},{"key":"value"}]`)
 		})
 	})
-}
-
-func TestOAS_Clone(t *testing.T) {
-	s := &OAS{}
-	s.SetTykExtension(&XTykAPIGateway{Info: Info{
-		Name: "my-api",
-	}})
-
-	clonedOAS, err := s.Clone()
-	assert.NoError(t, err)
-	assert.Equal(t, s, clonedOAS)
-
-	s.GetTykExtension().Info.Name = "my-api-modified"
-	assert.NotEqual(t, s, clonedOAS)
-
-	t.Run("marshal error", func(t *testing.T) {
-		s.Extensions["weird extension"] = make(chan int)
-		_, err = s.Clone()
-		assert.ErrorContains(t, err, "unsupported type: chan int")
-	})
-}
-
-func BenchmarkOAS_Clone(b *testing.B) {
-	oas := &OAS{
-		T: openapi3.T{
-			Info: &openapi3.Info{
-				Title: "my-oas-doc",
-			},
-			Paths: map[string]*openapi3.PathItem{
-				"/get": {
-					Get: &openapi3.Operation{
-						Responses: openapi3.Responses{
-							"200": &openapi3.ResponseRef{
-								Value: &openapi3.Response{
-									Description: getStrPointer("some example endpoint"),
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for i := 0; i < b.N; i++ {
-		_, err := oas.Clone()
-		assert.NoError(b, err)
-	}
 }
 
 func TestMigrateAndFillOAS(t *testing.T) {

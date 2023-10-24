@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -86,9 +85,6 @@ var (
 		"Ping": func() bool {
 			return false
 		},
-		"Disconnect": func(clientAddr string, groupData *apidef.GroupLoginRequest) error {
-			return nil
-		},
 	}
 )
 
@@ -150,52 +146,15 @@ func (r *RPCStorageHandler) Connect() bool {
 	)
 }
 
-func (r *RPCStorageHandler) buildNodeInfo() []byte {
-	config := r.Gw.GetConfig()
-	node := apidef.NodeData{
-		NodeID:      r.Gw.GetNodeID(),
-		GroupID:     config.SlaveOptions.GroupID,
-		APIKey:      config.SlaveOptions.APIKey,
-		NodeVersion: VERSION,
-		TTL:         int64(config.LivenessCheck.CheckDuration),
-		Tags:        config.DBAppConfOptions.Tags,
-		Health:      r.Gw.getHealthCheckInfo(),
-		Stats: apidef.GWStats{
-			APIsCount:     r.Gw.apisByIDLen(),
-			PoliciesCount: r.Gw.policiesByIDLen(),
-		},
-	}
-
-	data, err := json.Marshal(node)
-	if err != nil {
-		log.Error("Error marshalling node info", err)
-		return nil
-	}
-
-	return data
-}
-
-func (r *RPCStorageHandler) Disconnect() error {
-	request := apidef.GroupLoginRequest{
-		UserKey: r.Gw.GetConfig().SlaveOptions.APIKey,
-		GroupID: r.Gw.GetConfig().SlaveOptions.GroupID,
-		Node:    r.buildNodeInfo(),
-	}
-
-	_, err := rpc.FuncClientSingleton("Disconnect", request)
-	return err
-}
-
 func (r *RPCStorageHandler) getGroupLoginCallback(synchroniserEnabled bool) func(userKey string, groupID string) interface{} {
 	groupLoginCallbackFn := func(userKey string, groupID string) interface{} {
 		return apidef.GroupLoginRequest{
 			UserKey: userKey,
 			GroupID: groupID,
-			Node:    r.buildNodeInfo(),
 		}
 	}
 	if synchroniserEnabled {
-		forcer := rpc.NewSyncForcer(r.Gw.RedisController, r.buildNodeInfo)
+		forcer := rpc.NewSyncForcer(r.Gw.RedisController)
 		groupLoginCallbackFn = forcer.GroupLoginCallback
 	}
 	return groupLoginCallbackFn

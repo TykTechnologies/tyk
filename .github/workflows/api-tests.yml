@@ -5,11 +5,6 @@ on:
     branches:
       - master
       - release-**
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
 
 env:
   GOPRIVATE: github.com/TykTechnologies
@@ -18,7 +13,7 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.19.x]
+        go-version: [1.16.x]
         platform: [ubuntu-latest]
         arch: [amd64]
         node-version: [15.x]
@@ -146,7 +141,7 @@ jobs:
          path: ./tyk-automated-tests/reports/
 
     - name: Notify slack
-      if: ${{ always() && !github.event.pull_request.draft }}
+      if: ${{ always() }}
       uses: rtCamp/action-slack-notify@v2
       env:
         SLACK_WEBHOOK: ${{ secrets.GW_SLACK_WEBHOOK }}
@@ -156,7 +151,7 @@ jobs:
         SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
   
     - name: Comment on PR
-      if: ${{ always() && !github.event.pull_request.draft }}
+      if: ${{ always() }} && github.event.issue.pull_request
       uses: mshick/add-pr-comment@v1
       with:
         message: |
@@ -181,7 +176,3 @@ jobs:
         CLIENT_ID: ${{secrets.XRAY_CLIENT_ID}}
         CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
         BRANCH: ${{ github.ref }}
-
-    - name: Getting gateway logs on failure
-      if: ${{ failure() }}
-      run: docker logs tyk-gateway

@@ -4,17 +4,16 @@ name: Plugin-compiler build
 on:
   pull_request:
   push:
-    branches:
-      - master
-      - release-**
     tags:
       - 'v*'
 
-env:
-  GOLANG_CROSS: 1.19-bullseye
-
 jobs:
   docker-build:
+    strategy:
+      matrix:
+        golang_cross:
+          - 1.16-bullseye
+          - 1.16-el7
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -45,11 +44,14 @@ jobs:
             org.opencontainers.image.title=tyk-plugin-compiler
             org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway
           tags: |
-            type=ref,event=pr
-            type=semver,pattern=v{{version}}
-            type=semver,pattern=v{{major}}.{{minor}}
-            type=semver,pattern={{raw}}
-            type=sha,format=long
+            type=semver,pattern=v{{version}},enable=${{ !endsWith(matrix.golang_cross, 'el7') }}
+            type=semver,pattern=v{{major}}.{{minor}},enable=${{ !endsWith(matrix.golang_cross, 'el7') }}
+            type=semver,pattern={{raw}},enable=${{ !endsWith(matrix.golang_cross, 'el7') }}
+            type=raw,value=${{ github.sha }},enable=${{ !startsWith(github.ref, 'refs/tags') && !endsWith(matrix.golang_cross, 'el7') }}
+            type=semver,pattern=v{{version}},suffix=-el7,enable=${{ endsWith(matrix.golang_cross, 'el7') }}
+            type=semver,pattern=v{{major}}.{{minor}},suffix=-el7,enable=${{ endsWith(matrix.golang_cross, 'el7') }}
+            type=semver,pattern={{raw}},suffix=-el7,enable=${{ endsWith(matrix.golang_cross, 'el7') }}
+            type=raw,value=${{ github.sha }},suffix=-el7,enable=${{ !startsWith(github.ref, 'refs/tags') && endsWith(matrix.golang_cross, 'el7') }}
 
       - name: Login to Dockerhub
         uses: docker/login-action@v2
@@ -67,6 +69,6 @@ jobs:
           labels: ${{ steps.set-metadata.outputs.labels }}
           tags: ${{ steps.set-metadata.outputs.tags }}
           build-args: |
-            BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            BASE_IMAGE=tykio/golang-cross:${{ matrix.golang_cross }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}

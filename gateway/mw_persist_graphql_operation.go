@@ -98,7 +98,6 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 	nopCloseRequestBody(r)
 
 	r.Header.Set("Content-Type", "application/json")
-
 	ctxSetUrlRewritePath(r, r.URL.Path)
 	r.URL.Path = "/"
 

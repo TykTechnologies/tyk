@@ -11,10 +11,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
-const (
-	ResponseProcessorResponseBodyTransform = "response_body_transform"
-)
-
 var (
 	ErrMigrationNewVersioningEnabled = errors.New("not migratable - new versioning is already enabled")
 )
@@ -237,7 +233,6 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateIDExtractor()
 	a.migrateCustomDomain()
 	a.migrateScopeToPolicy()
-	a.migrateResponseProcessors()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -447,16 +442,4 @@ func (a *APIDefinition) migrateScopeToPolicy() {
 	}
 
 	a.Scopes.JWT = scopeClaim
-}
-
-func (a *APIDefinition) migrateResponseProcessors() {
-	var responseProcessors []ResponseProcessor
-	for i := range a.ResponseProcessors {
-		if a.ResponseProcessors[i].Name == ResponseProcessorResponseBodyTransform {
-			continue
-		}
-		responseProcessors = append(responseProcessors, a.ResponseProcessors[i])
-	}
-
-	a.ResponseProcessors = responseProcessors
 }

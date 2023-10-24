@@ -871,20 +871,6 @@ func TestGraphQL_UDGHeaders(t *testing.T) {
 		spec.GraphQL.Enabled = true
 		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
-		spec.GraphQL.Engine.GlobalHeaders = []apidef.UDGGlobalHeader{
-			{
-				Key:   "Global-Static",
-				Value: "foobar",
-			},
-			{
-				Key:   "Global-Context",
-				Value: "$tyk_context.headers_Global_From_Request",
-			},
-			{
-				Key:   "Does-Exist-Already",
-				Value: "global-does-exist-already",
-			},
-		}
 
 		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
 			generateRESTDataSourceV2(func(ds *apidef.GraphQLEngineDataSource, restConfig *apidef.GraphQLEngineDataSourceConfigREST) {
@@ -917,8 +903,6 @@ func TestGraphQL_UDGHeaders(t *testing.T) {
 					strings.Contains(string(b), `{"name":"Injected","value":"FOO"}`) &&
 					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`) &&
 					strings.Contains(string(b), `{"name":"Context","value":"request-context"}`) &&
-					strings.Contains(string(b), `{"name":"Global-Static","value":"foobar"}`) &&
-					strings.Contains(string(b), `{"name":"Global-Context","value":"request-global-context"}`) &&
 					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`)
 			},
 		},
@@ -1538,8 +1522,8 @@ func BenchmarkCopyRequestResponse(b *testing.B) {
 		req.Body = ioutil.NopCloser(strings.NewReader(str))
 		res.Body = ioutil.NopCloser(strings.NewReader(str))
 		for j := 0; j < 10; j++ {
-			req, _ = copyRequest(req)
-			res, _ = copyResponse(res)
+			req = copyRequest(req)
+			res = copyResponse(res)
 		}
 	}
 }
@@ -1800,30 +1784,4 @@ func TestSetCustomHeaderMultipleValues(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestCreateMemConnProviderIfNeeded(t *testing.T) {
-	t.Run("should propagate context", func(t *testing.T) {
-		propagationContext := context.WithValue(context.Background(), "parentContextKey", "parentContextValue")
-		propagationContextWithCancel, cancel := context.WithCancel(propagationContext)
-		internalReq, err := http.NewRequest(http.MethodGet, "http://memoryhost/", nil)
-		require.NoError(t, err)
-
-		handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			assert.Equal(t, "parentContextValue", req.Context().Value("parentContextKey"))
-			cancel()
-		})
-
-		err = createMemConnProviderIfNeeded(handler, internalReq.WithContext(propagationContextWithCancel))
-		require.NoError(t, err)
-
-		assert.Eventuallyf(t, func() bool {
-			testReq, err := http.NewRequest(http.MethodGet, "http://memoryhost/", nil)
-			require.NoError(t, err)
-			_, err = memConnClient.Do(testReq)
-			require.NoError(t, err)
-			<-propagationContextWithCancel.Done()
-			return true
-		}, time.Second, time.Millisecond*25, "context was not canceled")
-	})
 }

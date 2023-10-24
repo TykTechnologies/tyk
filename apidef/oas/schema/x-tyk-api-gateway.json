@@ -526,7 +526,7 @@
         "toMethod"
       ]
     },
-    "X-Tyk-TransformBody": {
+    "X-Tyk-TransformRequestBody": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -546,19 +546,10 @@
           "type": "string"
         }
       },
-      "anyOf": [
-        {
-          "required": ["body"]
-        },
-        {
-          "required": ["path"]
-        }
-      ],
       "required": [
         "enabled",
         "format"
-      ],
-      "minProperties": 3
+      ]
     },
     "X-Tyk-CachePlugin": {
       "type": "object",
@@ -576,11 +567,6 @@
               "type": "integer"
             }
           ]
-        },
-        "timeout": {
-          "type": "integer",
-          "format": "int64",
-          "minimum": 0
         }
       },
       "required": [
@@ -723,10 +709,7 @@
           "$ref": "#/definitions/X-Tyk-TransformRequestMethod"
         },
         "transformRequestBody": {
-          "$ref": "#/definitions/X-Tyk-TransformBody"
-        },
-        "transformResponseBody": {
-          "$ref": "#/definitions/X-Tyk-TransformBody"
+          "$ref": "#/definitions/X-Tyk-TransformRequestBody"
         },
         "virtualEndpoint": {
           "$ref": "#/definitions/X-Tyk-VirtualEndpoint"

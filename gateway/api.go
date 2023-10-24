@@ -47,7 +47,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -3354,22 +3353,6 @@ func ctxTraceEnabled(r *http.Request) bool {
 
 func ctxSetTrace(r *http.Request) {
 	setCtxValue(r, ctx.Trace, true)
-}
-
-func ctxSetSpanAttributes(r *http.Request, mwName string, attrs ...otel.SpanAttribute) {
-	if len(attrs) > 0 {
-		setCtxValue(r, mwName, attrs)
-	}
-}
-
-func ctxGetSpanAttributes(r *http.Request, mwName string) (attrs []otel.SpanAttribute) {
-	if v := r.Context().Value(mwName); v != nil {
-		got, ok := v.([]otel.SpanAttribute)
-		if ok {
-			attrs = got
-		}
-	}
-	return
 }
 
 func ctxSetRequestStatus(r *http.Request, stat RequestStatus) {
