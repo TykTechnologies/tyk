@@ -204,3 +204,12 @@ func MyPluginReturningError(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusTeapot)
 	rw.Write([]byte(http.StatusText(http.StatusTeapot)))
 }
+
+func MyPluginApplyingPolicy(rw http.ResponseWriter, r *http.Request) {
+	session := &user.SessionState{
+		KeyID:         "my-key",
+		ApplyPolicies: []string{"my-pol"},
+	}
+
+	ctx.SetSession(r, session, true)
+}
