@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"mime/multipart"
@@ -112,20 +111,6 @@ func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*c
 		}
 	case "testResponseHook":
 		object.Response.RawBody = []byte("newbody")
-	case "testConfigDataResponseHook":
-		if _, ok := object.Spec["config_data"]; ok {
-			object.Response.Headers["x-config-data"] = "true"
-			object.Response.MultivalueHeaders = append(object.Response.MultivalueHeaders, &coprocess.Header{
-				Key:    "x-config-data",
-				Values: []string{"true"},
-			})
-		} else {
-			object.Response.Headers["x-config-data"] = "false"
-			object.Response.MultivalueHeaders = append(object.Response.MultivalueHeaders, &coprocess.Header{
-				Key:    "x-config-data",
-				Values: []string{"false"},
-			})
-		}
 	case "testAuthHook1":
 		req := object.Request
 		token := req.Headers["Authorization"]
@@ -245,208 +230,82 @@ func loadTestGRPCAPIs(s *gateway.Test) {
 			},
 			Driver: apidef.GrpcDriver,
 		}
-	}, func(spec *gateway.APISpec) {
-		spec.APIID = "4"
-		spec.OrgID = "default"
-		spec.Auth = apidef.AuthConfig{
-			AuthHeaderName: "authorization",
-		}
-		spec.UseKeylessAccess = false
-		spec.VersionData = struct {
-			NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
-			DefaultVersion string                        `bson:"default_version" json:"default_version"`
-			Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
-		}{
-			NotVersioned: true,
-			Versions: map[string]apidef.VersionInfo{
-				"v1": {
-					Name: "v1",
+	},
+		func(spec *gateway.APISpec) {
+			spec.APIID = "4"
+			spec.OrgID = "default"
+			spec.Auth = apidef.AuthConfig{
+				AuthHeaderName: "authorization",
+			}
+			spec.UseKeylessAccess = false
+			spec.VersionData = struct {
+				NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
+				DefaultVersion string                        `bson:"default_version" json:"default_version"`
+				Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
+			}{
+				NotVersioned: true,
+				Versions: map[string]apidef.VersionInfo{
+					"v1": {
+						Name: "v1",
+					},
 				},
-			},
-		}
-		spec.Proxy.ListenPath = "/grpc-test-api-4/"
-		spec.Proxy.StripListenPath = true
-		spec.CustomMiddleware = apidef.MiddlewareSection{
-			Response: []apidef.MiddlewareDefinition{
-				{Name: "testResponseHook"},
-			},
-			Driver: apidef.GrpcDriver,
-		}
-	}, func(spec *gateway.APISpec) {
-		spec.APIID = "ignore_plugin"
-		spec.OrgID = gateway.MockOrgID
-		spec.Auth = apidef.AuthConfig{
-			AuthHeaderName: "authorization",
-		}
-		spec.UseKeylessAccess = false
-		spec.EnableCoProcessAuth = true
-		spec.VersionData = struct {
-			NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
-			DefaultVersion string                        `bson:"default_version" json:"default_version"`
-			Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
-		}{
-			DefaultVersion: "v1",
-			Versions: map[string]apidef.VersionInfo{
-				"v1": {
-					Name:             "v1",
-					UseExtendedPaths: true,
-					ExtendedPaths: apidef.ExtendedPathsSet{
-						Ignored: []apidef.EndPointMeta{
-							{
-								Path:       "/anything",
-								IgnoreCase: true,
-								MethodActions: map[string]apidef.EndpointMethodMeta{
-									http.MethodGet: {
-										Action: apidef.NoAction,
-										Code:   http.StatusOK,
+			}
+			spec.Proxy.ListenPath = "/grpc-test-api-4/"
+			spec.Proxy.StripListenPath = true
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Response: []apidef.MiddlewareDefinition{
+					{Name: "testResponseHook"},
+				},
+				Driver: apidef.GrpcDriver,
+			}
+		},
+		func(spec *gateway.APISpec) {
+			spec.APIID = "ignore_plugin"
+			spec.OrgID = gateway.MockOrgID
+			spec.Auth = apidef.AuthConfig{
+				AuthHeaderName: "authorization",
+			}
+			spec.UseKeylessAccess = false
+			spec.EnableCoProcessAuth = true
+			spec.VersionData = struct {
+				NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
+				DefaultVersion string                        `bson:"default_version" json:"default_version"`
+				Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
+			}{
+				DefaultVersion: "v1",
+				Versions: map[string]apidef.VersionInfo{
+					"v1": {
+						Name:             "v1",
+						UseExtendedPaths: true,
+						ExtendedPaths: apidef.ExtendedPathsSet{
+							Ignored: []apidef.EndPointMeta{
+								{
+									Path:       "/anything",
+									IgnoreCase: true,
+									MethodActions: map[string]apidef.EndpointMethodMeta{
+										http.MethodGet: {
+											Action: apidef.NoAction,
+											Code:   http.StatusOK,
+										},
 									},
 								},
 							},
 						},
 					},
 				},
-			},
-		}
-		spec.Proxy.ListenPath = "/grpc-test-api-ignore/"
-		spec.Proxy.StripListenPath = true
-		spec.CustomMiddleware = apidef.MiddlewareSection{
-			Driver: apidef.GrpcDriver,
-			IdExtractor: apidef.MiddlewareIdExtractor{
-				ExtractFrom: apidef.HeaderSource,
-				ExtractWith: apidef.ValueExtractor,
-				ExtractorConfig: map[string]interface{}{
-					"header_name": "Authorization",
-				},
-			},
-		}
-	}, func(spec *gateway.APISpec) {
-		spec.APIID = "6"
-		spec.OrgID = "default"
-		spec.Auth = apidef.AuthConfig{
-			AuthHeaderName: "Authorization",
-		}
-		spec.CustomPluginAuthEnabled = true
-		spec.UseKeylessAccess = false
-		spec.VersionData = struct {
-			NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
-			DefaultVersion string                        `bson:"default_version" json:"default_version"`
-			Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
-		}{
-			NotVersioned: true,
-			Versions: map[string]apidef.VersionInfo{
-				"v1": {
-					Name: "v1",
-				},
-			},
-		}
-		spec.Proxy.ListenPath = "/grpc-auth-hook-test-api-1/"
-		spec.Proxy.StripListenPath = true
-		spec.CustomMiddleware = apidef.MiddlewareSection{
-			Driver: apidef.GrpcDriver,
-			AuthCheck: apidef.MiddlewareDefinition{
-				Name: "testAuthHook1",
-			},
-			IdExtractor: apidef.MiddlewareIdExtractor{
-				Disabled:        false,
-				ExtractFrom:     apidef.HeaderSource,
-				ExtractWith:     apidef.ValueExtractor,
-				ExtractorConfig: map[string]interface{}{"header_name": "Authorization"},
-			},
-		}
-	}, func(spec *gateway.APISpec) {
-		spec.APIID = "7"
-		spec.OrgID = "default"
-		spec.Auth = apidef.AuthConfig{
-			AuthHeaderName: "Authorization",
-		}
-		spec.CustomPluginAuthEnabled = true
-		spec.UseKeylessAccess = false
-		spec.VersionData = struct {
-			NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
-			DefaultVersion string                        `bson:"default_version" json:"default_version"`
-			Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
-		}{
-			NotVersioned: true,
-			Versions: map[string]apidef.VersionInfo{
-				"v1": {
-					Name: "v1",
-				},
-			},
-		}
-		spec.Proxy.ListenPath = "/grpc-auth-hook-test-api-2/"
-		spec.Proxy.StripListenPath = true
-		spec.CustomMiddleware = apidef.MiddlewareSection{
-			Driver: apidef.GrpcDriver,
-			AuthCheck: apidef.MiddlewareDefinition{
-				Name: "testAuthHook1",
-			},
-			IdExtractor: apidef.MiddlewareIdExtractor{
-				Disabled:        true,
-				ExtractFrom:     apidef.HeaderSource,
-				ExtractWith:     apidef.ValueExtractor,
-				ExtractorConfig: map[string]interface{}{"header_name": "Authorization"},
-			},
-		}
-	},
-		func(spec *gateway.APISpec) {
-			spec.APIID = "8"
-			spec.OrgID = "default"
-			spec.Auth = apidef.AuthConfig{
-				AuthHeaderName: "Authorization",
 			}
-			spec.UseKeylessAccess = true
-			spec.VersionData = struct {
-				NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
-				DefaultVersion string                        `bson:"default_version" json:"default_version"`
-				Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
-			}{
-				NotVersioned: true,
-				Versions: map[string]apidef.VersionInfo{
-					"v1": {
-						Name: "v1",
+			spec.Proxy.ListenPath = "/grpc-test-api-ignore/"
+			spec.Proxy.StripListenPath = true
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GrpcDriver,
+				IdExtractor: apidef.MiddlewareIdExtractor{
+					ExtractFrom: apidef.HeaderSource,
+					ExtractWith: apidef.ValueExtractor,
+					ExtractorConfig: map[string]interface{}{
+						"header_name": "Authorization",
 					},
 				},
 			}
-			spec.Proxy.ListenPath = "/grpc-config-data-1/"
-			spec.Proxy.StripListenPath = true
-			spec.CustomMiddleware = apidef.MiddlewareSection{
-				Response: []apidef.MiddlewareDefinition{
-					{Name: "testConfigDataResponseHook"},
-				},
-				Driver: apidef.GrpcDriver,
-			}
-			spec.ConfigData = map[string]interface{}{"key": "value"}
-			spec.ConfigDataDisabled = false
-		},
-		func(spec *gateway.APISpec) {
-			spec.APIID = "9"
-			spec.OrgID = "default"
-			spec.Auth = apidef.AuthConfig{
-				AuthHeaderName: "Authorization",
-			}
-			spec.UseKeylessAccess = true
-			spec.VersionData = struct {
-				NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
-				DefaultVersion string                        `bson:"default_version" json:"default_version"`
-				Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
-			}{
-				NotVersioned: true,
-				Versions: map[string]apidef.VersionInfo{
-					"v1": {
-						Name: "v1",
-					},
-				},
-			}
-			spec.Proxy.ListenPath = "/grpc-config-data-2/"
-			spec.Proxy.StripListenPath = true
-			spec.CustomMiddleware = apidef.MiddlewareSection{
-				Response: []apidef.MiddlewareDefinition{
-					{Name: "testConfigDataResponseHook"},
-				},
-				Driver: apidef.GrpcDriver,
-			}
-			spec.ConfigData = map[string]interface{}{"key": "value"}
-			spec.ConfigDataDisabled = true
 		},
 	)
 }
@@ -465,10 +324,7 @@ func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
 		GRPCSendMaxSize:     grpcTestMaxSize,
 		GRPCAuthority:       grpcAuthority,
 	}
-	ts := gateway.StartTest(nil, gateway.TestConfig{
-		CoprocessConfig:   cfg,
-		EnableTestDNSMock: false,
-	})
+	ts := gateway.StartTest(nil, gateway.TestConfig{CoprocessConfig: cfg})
 
 	// Load test APIs:
 	loadTestGRPCAPIs(ts)
@@ -571,8 +427,6 @@ func TestGRPCDispatch(t *testing.T) {
 	})
 
 	t.Run("Post Hook with allowed message length", func(t *testing.T) {
-		test.Flaky(t)
-
 		s := randStringBytes(20000000)
 		ts.Run(t, test.TestCase{
 			Path:    "/grpc-test-api-3/",
@@ -584,8 +438,6 @@ func TestGRPCDispatch(t *testing.T) {
 	})
 
 	t.Run("Post Hook with with unallowed message length", func(t *testing.T) {
-		test.Flaky(t)
-
 		s := randStringBytes(150000000)
 		ts.Run(t, test.TestCase{
 			Path:    "/grpc-test-api-3/",
@@ -622,7 +474,13 @@ func BenchmarkGRPCDispatch(b *testing.B) {
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 func randStringBytes(n int) string {
-	return strings.Repeat(string(letters[rand.Intn(len(letters))]), n)
+	b := make([]byte, n)
+
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+
+	return string(b)
 }
 
 func TestGRPCIgnore(t *testing.T) {
@@ -665,40 +523,6 @@ func TestGRPCIgnore(t *testing.T) {
 	})
 }
 
-func TestGRPCAuthHook(t *testing.T) {
-	ts, grpcServer := startTykWithGRPC()
-	defer ts.Close()
-	defer grpcServer.Stop()
-
-	t.Run("id extractor enabled", func(t *testing.T) {
-		path := "/grpc-auth-hook-test-api-1/"
-		baseMW := gateway.BaseMiddleware{
-			Gw: ts.Gw,
-			Spec: &gateway.APISpec{
-				APIDefinition: &apidef.APIDefinition{
-					OrgID: "default",
-				},
-			}}
-		baseExtractor := gateway.BaseExtractor{
-			BaseMiddleware: baseMW,
-		}
-		expectedSessionID := baseExtractor.GenerateSessionID("abc", baseMW)
-		_, _ = ts.Run(t, []test.TestCase{
-			{Method: http.MethodGet, Path: path, Headers: map[string]string{"Authorization": "abc"}, Code: http.StatusOK},
-			{Method: http.MethodGet, Path: fmt.Sprintf("/tyk/keys/%s", expectedSessionID), AdminAuth: true, Code: http.StatusOK},
-		}...)
-	})
-
-	// won't extract id and a session with sessionID as token is created
-	t.Run("id extractor disabled", func(t *testing.T) {
-		path := "/grpc-auth-hook-test-api-2/"
-		_, _ = ts.Run(t, []test.TestCase{
-			{Method: http.MethodGet, Path: path, Headers: map[string]string{"Authorization": "abc"}, Code: http.StatusOK},
-			{Method: http.MethodGet, Path: "/tyk/keys/abc", AdminAuth: true, Code: http.StatusOK},
-		}...)
-	})
-}
-
 func TestGRPC_MultiAuthentication(t *testing.T) {
 	ts, grpcServer := startTykWithGRPC()
 	defer ts.Close()
@@ -722,7 +546,7 @@ func TestGRPC_MultiAuthentication(t *testing.T) {
 		spec.UseKeylessAccess = false
 		spec.EnableCoProcessAuth = true
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			apidef.AuthTokenType: {
+			"authToken": {
 				AuthHeaderName: "AuthToken",
 			},
 		}
@@ -772,29 +596,4 @@ func TestGRPC_MultiAuthentication(t *testing.T) {
 	t.Run("auth token base identity", func(t *testing.T) {
 		check(t, apidef.AuthToken, authTokenSessionID, authTokenSessionMetaValue, authTokenSessionRate)
 	})
-}
-
-func TestGRPCConfigData(t *testing.T) {
-	ts, grpcServer := startTykWithGRPC()
-	defer ts.Close()
-	defer grpcServer.Stop()
-
-	t.Run("config data disabled", func(t *testing.T) {
-		path := "/grpc-config-data-1/"
-		_, _ = ts.Run(t, []test.TestCase{
-			{Method: http.MethodGet, Path: path, Code: http.StatusOK,
-				HeadersMatch: map[string]string{"x-config-data": "true"},
-			},
-		}...)
-	})
-
-	t.Run("config data disabled", func(t *testing.T) {
-		path := "/grpc-config-data-2/"
-		_, _ = ts.Run(t, []test.TestCase{
-			{Method: http.MethodGet, Path: path, Code: http.StatusOK,
-				HeadersMatch: map[string]string{"x-config-data": "false"},
-			},
-		}...)
-	})
-
 }

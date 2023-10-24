@@ -3,7 +3,6 @@ package apidef
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,8 +43,7 @@ func TestValidationResult_ErrorStrings(t *testing.T) {
 func runValidationTest(apiDef *APIDefinition, ruleSet ValidationRuleSet, expectedValidationResult ValidationResult) func(t *testing.T) {
 	return func(t *testing.T) {
 		result := Validate(apiDef, ruleSet)
-		assert.Equal(t, expectedValidationResult.IsValid, result.IsValid)
-		assert.ElementsMatch(t, expectedValidationResult.Errors, result.Errors)
+		assert.Equal(t, expectedValidationResult, result)
 	}
 }
 
@@ -121,102 +119,6 @@ func TestRuleUniqueDataSourceNames_Validate(t *testing.T) {
 		},
 	))
 
-}
-
-func TestRuleAtLeastEnableOneAuthConfig_Validate(t *testing.T) {
-	ruleSet := ValidationRuleSet{
-		&RuleAtLeastEnableOneAuthSource{},
-	}
-	t.Run("should return invalid when all sources are disabled for enabled auth mechanisms", runValidationTest(
-		&APIDefinition{
-			UseStandardAuth: true,
-			UseOauth2:       true,
-			AuthConfigs: map[string]AuthConfig{
-				"authToken": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"oauth": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"jwt": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"oidc": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"hmac": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"coprocess": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-			},
-		},
-		ruleSet,
-		ValidationResult{
-			IsValid: false,
-			Errors: []error{
-				fmt.Errorf(ErrAllAuthSourcesDisabled, "authToken"),
-				fmt.Errorf(ErrAllAuthSourcesDisabled, "oauth"),
-			},
-		},
-	))
-
-	t.Run("should return valid when at least one source is enabled for enabled auth mechanisms", runValidationTest(
-		&APIDefinition{
-			UseStandardAuth: true,
-			UseOauth2:       true,
-			AuthConfigs: map[string]AuthConfig{
-				"authToken": {
-					UseParam:      true,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"oauth": {
-					UseParam:      false,
-					DisableHeader: false,
-					UseCookie:     false,
-				},
-				"jwt": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"oidc": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"hmac": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-				"coprocess": {
-					UseParam:      false,
-					DisableHeader: true,
-					UseCookie:     false,
-				},
-			},
-		},
-		ruleSet,
-		ValidationResult{
-			IsValid: true,
-			Errors:  nil,
-		},
-	))
 }
 
 func TestRuleValidateIPList_Validate(t *testing.T) {
@@ -331,87 +233,4 @@ func TestRuleValidateIPList_Validate(t *testing.T) {
 			},
 		},
 	))
-}
-
-func TestRuleValidateEnforceTimeout_Validate(t *testing.T) {
-	ruleSet := ValidationRuleSet{
-		&RuleValidateEnforceTimeout{},
-	}
-
-	getAPIDef := func(hardTimeouts []HardTimeoutMeta) *APIDefinition {
-		return &APIDefinition{
-			VersionData: VersionData{
-				Versions: map[string]VersionInfo{
-					"Default": {
-						Name: "Default",
-						ExtendedPaths: ExtendedPathsSet{
-							HardTimeouts: hardTimeouts,
-						},
-					},
-				},
-			},
-		}
-	}
-
-	testCases := []struct {
-		name   string
-		apiDef *APIDefinition
-		result ValidationResult
-	}{
-		{
-			name: "negative timeout",
-			apiDef: getAPIDef([]HardTimeoutMeta{
-				{
-					Disabled: false,
-					Path:     "/get",
-					Method:   http.MethodGet,
-					TimeOut:  -1,
-				},
-			}),
-			result: ValidationResult{
-				IsValid: false,
-				Errors:  []error{ErrInvalidTimeoutValue},
-			},
-		},
-		{
-			name: "negative timeout for one among multiple paths",
-			apiDef: getAPIDef([]HardTimeoutMeta{
-				{
-					Disabled: false,
-					Path:     "/post",
-					Method:   http.MethodGet,
-					TimeOut:  -1,
-				},
-				{
-					Disabled: false,
-					Path:     "/get",
-					Method:   http.MethodGet,
-					TimeOut:  10,
-				},
-			}),
-			result: ValidationResult{
-				IsValid: false,
-				Errors:  []error{ErrInvalidTimeoutValue},
-			},
-		},
-		{
-			name: "positive timeout",
-			apiDef: getAPIDef([]HardTimeoutMeta{
-				{
-					Disabled: true,
-					Path:     "/post",
-					Method:   http.MethodGet,
-					TimeOut:  10,
-				},
-			}),
-			result: ValidationResult{
-				IsValid: true,
-				Errors:  nil,
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
-	}
 }

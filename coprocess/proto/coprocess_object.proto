@@ -7,8 +7,6 @@ import "coprocess_common.proto";
 
 package coprocess;
 
-option go_package = "/coprocess";
-
 message Object {
   HookType hook_type = 1;
   string hook_name = 2;

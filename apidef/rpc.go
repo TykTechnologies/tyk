@@ -10,15 +10,13 @@ type InboundData struct {
 }
 
 type DefRequest struct {
-	OrgId   string
-	Tags    []string
-	LoadOAS bool
+	OrgId string
+	Tags  []string
 }
 
 type GroupLoginRequest struct {
-	UserKey   string
-	GroupID   string
-	ForceSync bool
+	UserKey string
+	GroupID string
 }
 
 type GroupKeySpaceRequest struct {

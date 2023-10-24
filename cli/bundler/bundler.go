@@ -101,6 +101,7 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 			ch := text[0:1]
 			if ch != "y" {
 				log.Fatal("Aborting")
+				os.Exit(1)
 			}
 		}
 	} else {

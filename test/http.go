@@ -33,15 +33,14 @@ type TestCase struct {
 	Cookies         []*http.Cookie    `json:",omitempty"`
 	Delay           time.Duration     `json:",omitempty"`
 	BodyMatch       string            `json:",omitempty"` // regex
+	BodyMatchFunc   func([]byte) bool `json:",omitempty"`
 	BodyNotMatch    string            `json:",omitempty"`
 	HeadersMatch    map[string]string `json:",omitempty"`
 	HeadersNotMatch map[string]string `json:",omitempty"`
 	JSONMatch       map[string]string `json:",omitempty"`
 	ErrorMatch      string            `json:",omitempty"`
-
-	BodyMatchFunc func([]byte) bool `json:"-"`
-	BeforeFn      func()            `json:"-"`
-	Client        *http.Client      `json:"-"`
+	BeforeFn        func()            `json:"-"`
+	Client          *http.Client      `json:"-"`
 
 	AdminAuth      bool `json:",omitempty"`
 	ControlRequest bool `json:",omitempty"`
@@ -162,8 +161,6 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 		req.Header.Add(k, v)
 	}
 
-	req.Header.Add("Content-Type", "application/json")
-
 	for _, c := range tc.Cookies {
 		req.AddCookie(c)
 	}
@@ -276,9 +273,7 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 	}
 
 	for ti, tc := range testCases {
-		var tc *TestCase = &tc
-
-		req, err := r.RequestBuilder(tc)
+		req, err := r.RequestBuilder(&tc)
 		if err != nil {
 			t.Errorf("[%d] Request build error: %s", ti, err.Error())
 			continue
@@ -287,7 +282,7 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 		retryCount := 0
 	retry:
 
-		lastResponse, lastError = r.Do(req, tc)
+		lastResponse, lastError = r.Do(req, &tc)
 		tcJSON, _ := json.Marshal(tc)
 
 		if lastError != nil {
@@ -310,11 +305,13 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 		}
 
 		respCopy := copyResponse(lastResponse)
-		if lastError = r.Assert(respCopy, tc); lastError != nil {
+		if lastError = r.Assert(respCopy, &tc); lastError != nil {
 			t.Errorf("[%d] %s. %s\n", ti, lastError.Error(), string(tcJSON))
 		}
 
-		if delay := tc.Delay; delay > 0 {
+		delay := tc.Delay
+
+		if delay > 0 {
 			time.Sleep(delay)
 		}
 	}

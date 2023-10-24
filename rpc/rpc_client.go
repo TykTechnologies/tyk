@@ -16,7 +16,6 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/gorpc"
-	"github.com/TykTechnologies/tyk-pump/serializer"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
@@ -48,8 +47,6 @@ var (
 
 	// UseSyncLoginRPC for tests where we dont need to execute as a goroutine
 	UseSyncLoginRPC bool
-
-	AnalyticsSerializers []serializer.AnalyticsSerializer
 )
 
 // ErrRPCIsDown this is returned when we can't reach rpc server.
@@ -72,9 +69,8 @@ type rpcOpts struct {
 
 func (r rpcOpts) ClientIsConnected() bool {
 	if v := r.clientIsConnected.Load(); v != nil {
-		return v.(bool) && !r.GetEmergencyMode()
+		return v.(bool)
 	}
-
 	return false
 }
 
@@ -254,11 +250,10 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 
 	clientSingleton.Conns = values.Config().RPCPoolSize
 	if clientSingleton.Conns == 0 {
-		clientSingleton.Conns = 5
+		clientSingleton.Conns = 20
 	}
 
 	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
-
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -480,25 +475,11 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 	return
 }
 
-var rpcConnectionsPool []net.Conn
-
 func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
 	values.clientIsConnected.Store(true)
 	remoteAddr := conn.RemoteAddr().String()
 	Log.WithField("remoteAddr", remoteAddr).Debug("connected to RPC server")
-	rpcConnectionsPool = append(rpcConnectionsPool, conn)
 	return conn, remoteAddr, nil
-}
-
-func CloseConnections() {
-	for k, v := range rpcConnectionsPool {
-		err := v.Close()
-		if err != nil {
-			Log.WithError(err).Error("closing connection")
-		} else {
-			rpcConnectionsPool = append(rpcConnectionsPool[:k], rpcConnectionsPool[k+1:]...)
-		}
-	}
 }
 
 func Disconnect() bool {
@@ -536,11 +517,5 @@ func ForceConnected(t *testing.T) {
 
 // SetEmergencyMode used in tests to force emergency mode
 func SetEmergencyMode(t *testing.T, value bool) {
-	t.Helper()
 	values.SetEmergencyMode(value)
-}
-
-func SetLoadCounts(t *testing.T, value int) {
-	t.Helper()
-	values.SetLoadCounts(value)
 }

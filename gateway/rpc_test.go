@@ -135,7 +135,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	}()
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
-		// the first time called is when we start the slave gateway
+		// the firts time called is when we start the slave gateway
 		return a()
 	})
 	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
@@ -217,6 +217,10 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		if GetKeyCounter != 2 {
 			t.Errorf("getKey should have been called 2 times, instead, was called %v times", GetKeyCounter)
 		}
+
+		if GetKeyCounter != 2 {
+			t.Error("getKey should have been called 2 times")
+		}
 	})
 
 	t.Run("RPC down, cold start, load backup", func(t *testing.T) {
@@ -232,7 +236,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 
 		GetKeyCounter = 0
 		// RPC layer is down,
-		ts := StartTest(conf, TestConfig{})
+		ts := StartTest(conf, TestConfig{SkipEmptyRedis: true})
 		defer ts.Close()
 
 		// Wait for backup to load

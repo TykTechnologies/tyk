@@ -12,13 +12,12 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-
-	"github.com/TykTechnologies/tyk/certs"
-
-	"github.com/valyala/fasthttp"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/valyala/fasthttp"
 )
 
 const testBatchRequest = `{
@@ -160,7 +159,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "batchTest",
-			FunctionSourceType:   apidef.UseBlob,
+			FunctionSourceType:   "blob",
 			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
 			Path:                 "/virt",
 			Method:               "GET",
@@ -227,7 +226,7 @@ func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "batchTest",
-			FunctionSourceType:   apidef.UseBlob,
+			FunctionSourceType:   "blob",
 			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
 			Path:                 "/virt",
 			Method:               "GET",
@@ -239,6 +238,9 @@ func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 			}
 		})
 	})
+
+	// Let the server start
+	time.Sleep(500 * time.Millisecond)
 
 	ts.Run(t, test.TestCase{Path: "/virt", Code: 202})
 	got := header.Load().(string)

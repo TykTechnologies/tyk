@@ -3,7 +3,6 @@ package gateway
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,7 +11,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -21,10 +19,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -134,7 +131,7 @@ type configTestReverseProxyDnsCache struct {
 	dnsConfig   config.DnsCacheConfig
 }
 
-func (s *Test) flakySetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
+func (s *Test) SetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
 	pullDomains := s.MockHandle.PushDomains(cfg.etcHostsMap, nil)
 	s.Gw.dnsCacheManager.InitDNSCaching(
 		time.Duration(cfg.dnsConfig.TTL)*time.Second, time.Duration(cfg.dnsConfig.CheckInterval)*time.Second)
@@ -155,7 +152,6 @@ func (s *Test) flakySetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDns
 
 func TestReverseProxyDnsCache(t *testing.T) {
 	test.Flaky(t) // TODO: TT-5251
-
 	const (
 		host   = "orig-host.com."
 		host2  = "orig-host2.com."
@@ -189,7 +185,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		_ = ts.MockHandle.ShutdownDnsMock()
 	}()
 
-	tearDown := ts.flakySetupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
+	tearDown := ts.SetupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
 		config.DnsCacheConfig{
 			Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval,
 			MultipleIPsHandleStrategy: config.NoCacheStrategy}})
@@ -373,21 +369,13 @@ func (s *Test) TestNewWrappedServeHTTP() *ReverseProxy {
 }
 
 func TestWrappedServeHTTP(t *testing.T) {
-	idleConnTimeout = 1
-
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	for i := 0; i < 10; i++ {
-		proxy := ts.TestNewWrappedServeHTTP()
-		recorder := httptest.NewRecorder()
-		req, _ := http.NewRequest(http.MethodGet, "/", nil)
-		proxy.WrappedServeHTTP(recorder, req, false)
-	}
-
-	assert.Equal(t, 10, ts.Gw.ConnectionWatcher.Count())
-	time.Sleep(time.Second * 2)
-	assert.Equal(t, 0, ts.Gw.ConnectionWatcher.Count())
+	proxy := ts.TestNewWrappedServeHTTP()
+	recorder := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	proxy.WrappedServeHTTP(recorder, req, false)
 }
 
 func TestCircuitBreaker5xxs(t *testing.T) {
@@ -861,13 +849,12 @@ func TestNopCloseResponseBody(t *testing.T) {
 	}
 }
 
-func TestGraphQL_UDGHeaders(t *testing.T) {
+func TestGraphQL_HeadersInjection(t *testing.T) {
 	g := StartTest(nil)
 	t.Cleanup(g.Close)
 
 	composedAPI := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
-		spec.EnableContextVars = true
 		spec.GraphQL.Enabled = true
 		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
@@ -890,101 +877,21 @@ func TestGraphQL_UDGHeaders(t *testing.T) {
 
 	_, _ = g.Run(t, []test.TestCase{
 		{
-			Data: headers,
-			Headers: map[string]string{
-				"injected":            "FOO",
-				"From-Request":        "request-context",
-				"Global-From-Request": "request-global-context",
-			},
-			Code: http.StatusOK,
+			Data:    headers,
+			Headers: map[string]string{"injected": "FOO"},
+			Code:    http.StatusOK,
 
 			BodyMatchFunc: func(b []byte) bool {
 				return strings.Contains(string(b), `"headers":`) &&
 					strings.Contains(string(b), `{"name":"Injected","value":"FOO"}`) &&
-					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`) &&
-					strings.Contains(string(b), `{"name":"Context","value":"request-context"}`) &&
-					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`)
+					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`)
 			},
 		},
 	}...)
 }
 
-func TestGraphQL_ProxyOnlyHeaders(t *testing.T) {
-	g := StartTest(nil)
-	defer g.Close()
-
-	defaultSpec := BuildAPI(func(spec *APISpec) {
-		spec.Name = "tyk-api"
-		spec.APIID = "tyk-api"
-		spec.GraphQL.Enabled = true
-		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
-		spec.GraphQL.Schema = gqlCountriesSchema
-		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
-		spec.Proxy.TargetURL = TestHttpAny + "/dynamic"
-		spec.Proxy.ListenPath = "/"
-	})[0]
-
-	headerCheck := func(key, value string, headers map[string][]string) bool {
-		val, ok := headers[key]
-		return ok && len(val) > 0 && val[0] == value
-	}
-
-	t.Run("test introspection header", func(t *testing.T) {
-		spec := defaultSpec
-		spec.GraphQL.Proxy.AuthHeaders = map[string]string{
-			"Test-Header": "test-value",
-		}
-		spec.GraphQL.Proxy.RequestHeaders = map[string]string{
-			"Test-Request": "test-value",
-		}
-		g.Gw.LoadAPI(spec)
-		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
-			if !headerCheck("Test-Request", "test-value", r.Header) {
-				t.Error("request header missing")
-			}
-			if headerCheck("Test-Header", "test-value", r.Header) {
-				t.Error("auth header missing")
-			}
-		})
-		_, err := g.Run(t,
-			test.TestCase{
-				Path:   "/",
-				Method: http.MethodPost,
-				Data: graphql.Request{
-					Query: gqlContinentQuery,
-				},
-			},
-		)
-		assert.NoError(t, err)
-	})
-
-	t.Run("test context variable request headers", func(t *testing.T) {
-		spec := defaultSpec
-		spec.GraphQL.Proxy.RequestHeaders = map[string]string{
-			"Test-Request-Header": "$tyk_context.headers_Test_Header",
-		}
-		spec.EnableContextVars = true
-		g.Gw.LoadAPI(spec)
-		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
-			if !headerCheck("Test-Request-Header", "test-value", r.Header) {
-				t.Error("context variable header missing/incorrect")
-			}
-		})
-		_, err := g.Run(t, test.TestCase{
-			Path: "/",
-			Headers: map[string]string{
-				"Test-Header": "test-value",
-			},
-			Method: http.MethodPost,
-			Data: graphql.Request{
-				Query: gqlContinentQuery,
-			},
-		})
-		assert.NoError(t, err)
-	})
-}
-
 func TestGraphQL_InternalDataSource(t *testing.T) {
+
 	g := StartTest(nil)
 	defer g.Close()
 
@@ -1089,7 +996,6 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 		})[0]
 
 		g.Gw.LoadAPI(tykGraphQL, tykREST, composedAPI)
-
 		countries := graphql.Request{
 			Query: "query Query { countries { name } }",
 		}
@@ -1137,148 +1043,6 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 			// REST Data Source
 			{Data: people, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
 		}...)
-	})
-}
-
-func TestGraphQL_SubgraphBatchRequest(t *testing.T) {
-	g := StartTest(nil)
-	t.Cleanup(func() {
-		g.Close()
-	})
-
-	bankAccountSubgraphPath := "/subgraph-bank-accounts"
-	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
-		spec.Name = "subgraph-accounts-modified"
-		spec.APIID = "subgraph-accounts-modified"
-		spec.Proxy.TargetURL = testSubgraphAccountsModified
-		spec.Proxy.ListenPath = "/tyk-subgraph-accounts-modified"
-		spec.GraphQL = apidef.GraphQLConfig{
-			Enabled:       true,
-			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
-			Version:       apidef.GraphQLConfigVersion2,
-			Schema:        gqlSubgraphSchemaAccounts,
-			Subgraph: apidef.GraphQLSubgraphConfig{
-				SDL: gqlSubgraphSDLAccounts,
-			},
-		}
-	})[0]
-	tykSubgraphBankAccounts := BuildAPI(func(spec *APISpec) {
-		spec.Name = "subgraph-bank-accounts"
-		spec.APIID = "subgraph-bank-accounts"
-		spec.Proxy.TargetURL = TestHttpAny + bankAccountSubgraphPath
-		spec.Proxy.ListenPath = "/subgraph-bank-accounts"
-		spec.GraphQL = apidef.GraphQLConfig{
-			Enabled:       true,
-			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
-			Version:       apidef.GraphQLConfigVersion2,
-			Schema:        gqlSubgraphSchemaBankAccounts,
-			Subgraph: apidef.GraphQLSubgraphConfig{
-				SDL: gqlSubgraphSDLBankAccounts,
-			},
-		}
-	})[0]
-
-	t.Run("should batch requests", func(t *testing.T) {
-		supergraph := BuildAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/batched-supergraph"
-			spec.APIID = "batched-supergraph"
-			spec.GraphQL = apidef.GraphQLConfig{
-				Enabled:       true,
-				Version:       apidef.GraphQLConfigVersion2,
-				ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
-				Supergraph: apidef.GraphQLSupergraphConfig{
-					Subgraphs: []apidef.GraphQLSubgraphEntity{
-						{
-							APIID: "subgraph-accounts-modified",
-							URL:   "tyk://" + tykSubgraphAccounts.Name,
-							SDL:   gqlSubgraphSDLAccounts,
-						},
-						{
-							APIID: "subgraph-bank-accounts",
-							URL:   "tyk://" + tykSubgraphBankAccounts.Name,
-							SDL:   gqlSubgraphSDLBankAccounts,
-						},
-					},
-					MergedSDL: gqlMergedSupergraphSDL,
-				},
-				Schema: gqlMergedSupergraphSDL,
-			}
-		})[0]
-		g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphBankAccounts, supergraph)
-		handlerCtx, cancel := context.WithCancel(context.Background())
-		g.AddDynamicHandler(bankAccountSubgraphPath, func(writer http.ResponseWriter, r *http.Request) {
-			select {
-			case <-handlerCtx.Done():
-				assert.Fail(t, "Called twice time")
-			default:
-			}
-			cancel()
-		})
-
-		q := graphql.Request{
-			Query: `query Query { allUsers { id username account { number } } }`,
-		}
-
-		_, _ = g.Run(t, []test.TestCase{
-			{
-				Data: q, Path: "/batched-supergraph",
-			},
-		}...)
-	})
-
-	t.Run("shouldn't batch requests", func(t *testing.T) {
-		supergraph := BuildAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/unbatched-supergraph"
-			spec.APIID = "unbatched-supergraph"
-			spec.GraphQL = apidef.GraphQLConfig{
-				Enabled:       true,
-				Version:       apidef.GraphQLConfigVersion2,
-				ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
-				Supergraph: apidef.GraphQLSupergraphConfig{
-					DisableQueryBatching: true,
-					Subgraphs: []apidef.GraphQLSubgraphEntity{
-						{
-							APIID: "subgraph-accounts-modified",
-							URL:   "tyk://" + tykSubgraphAccounts.Name,
-							SDL:   gqlSubgraphSDLAccounts,
-						},
-						{
-							APIID: "subgraph-bank-accounts",
-							URL:   "tyk://" + tykSubgraphBankAccounts.Name,
-							SDL:   gqlSubgraphSDLBankAccounts,
-						},
-					},
-					MergedSDL: gqlMergedSupergraphSDL,
-				},
-				Schema: gqlMergedSupergraphSDL,
-			}
-		})[0]
-		g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphBankAccounts, supergraph)
-		timesHit := 0
-		lock := sync.Mutex{}
-		g.AddDynamicHandler(bankAccountSubgraphPath, func(writer http.ResponseWriter, r *http.Request) {
-			lock.Lock()
-			timesHit++
-			lock.Unlock()
-		})
-
-		q := graphql.Request{
-			Query: `query Query { allUsers { id username account { number } } }`,
-		}
-		// run this in a goroutine to prevent blocking, we don't actually need the test to match body or response
-		go func() {
-			_, _ = g.Run(t, []test.TestCase{
-				{
-					Data: q, Path: "/unbatched-supergraph",
-				},
-			}...)
-		}()
-
-		assert.Eventually(t, func() bool {
-			lock.Lock()
-			defer lock.Unlock()
-			return timesHit == 2
-		}, time.Second*5, time.Millisecond*100)
 	})
 }
 
@@ -1469,6 +1233,7 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 		})
 	})
 	t.Run("Supergraph should not pass through", func(t *testing.T) {
+
 		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.GraphQL.Enabled = true
 			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
@@ -1528,158 +1293,7 @@ func BenchmarkCopyRequestResponse(b *testing.B) {
 	}
 }
 
-func TestEnsureTransport(t *testing.T) {
-	cases := []struct {
-		host, protocol, expect string
-	}{
-		{"https://httpbin.org ", "https", "https://httpbin.org"},
-		{"httpbin.org ", "https", "https://httpbin.org"},
-		{"http://httpbin.org ", "https", "http://httpbin.org"},
-		{"httpbin.org ", "tls", "tls://httpbin.org"},
-		{"httpbin.org ", "", "http://httpbin.org"},
-	}
-	for i, v := range cases {
-		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
-			g := EnsureTransport(v.host, v.protocol)
-			if g != v.expect {
-				t.Errorf("expected %q got %q", v.expect, g)
-			}
-		})
-	}
-}
-
-func TestReverseProxyWebSocketCancelation(t *testing.T) {
-	conf := func(globalConf *config.Config) {
-		globalConf.HttpServerOptions.EnableWebSockets = true
-	}
-	ts := StartTest(conf)
-	defer ts.Close()
-
-	n := 5
-	triggerCancelCh := make(chan bool, n)
-	nthResponse := func(i int) string {
-		return fmt.Sprintf("backend response #%d\n", i)
-	}
-	terminalMsg := "final message"
-
-	cst := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if g, ws := upgradeType(r.Header), "websocket"; g != ws {
-			t.Errorf("Unexpected upgrade type %q, want %q", g, ws)
-			http.Error(w, "Unexpected request", 400)
-			return
-		}
-		conn, bufrw, err := w.(http.Hijacker).Hijack()
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		defer conn.Close()
-
-		upgradeMsg := "HTTP/1.1 101 Switching Protocols\r\nConnection: upgrade\r\nUpgrade: WebSocket\r\n\r\n"
-		if _, err := io.WriteString(conn, upgradeMsg); err != nil {
-			t.Error(err)
-			return
-		}
-		if _, _, err := bufrw.ReadLine(); err != nil {
-			t.Errorf("Failed to read line from client: %v", err)
-			return
-		}
-
-		for i := 0; i < n; i++ {
-			if _, err := bufrw.WriteString(nthResponse(i)); err != nil {
-				select {
-				case <-triggerCancelCh:
-				default:
-					t.Errorf("Writing response #%d failed: %v", i, err)
-				}
-				return
-			}
-			bufrw.Flush()
-			time.Sleep(20 * time.Millisecond)
-		}
-		if _, err := bufrw.WriteString(terminalMsg); err != nil {
-			select {
-			case <-triggerCancelCh:
-			default:
-				t.Errorf("Failed to write terminal message: %v", err)
-			}
-		}
-		bufrw.Flush()
-	}))
-	defer cst.Close()
-
-	backendURL, _ := url.Parse(cst.URL)
-	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
-	rproxy := ts.Gw.TykNewSingleHostReverseProxy(backendURL, spec, nil)
-
-	handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		rw.Header().Set("X-Header", "X-Value")
-		ctx, cancel := context.WithCancel(req.Context())
-		go func() {
-			<-triggerCancelCh
-			cancel()
-		}()
-		rproxy.ServeHTTP(rw, req.WithContext(ctx))
-	})
-
-	frontendProxy := httptest.NewServer(handler)
-	defer frontendProxy.Close()
-
-	req, _ := http.NewRequest("GET", frontendProxy.URL, nil)
-	req.Header.Set("Connection", "Upgrade")
-	req.Header.Set("Upgrade", "websocket")
-
-	res, err := frontendProxy.Client().Do(req)
-	if err != nil {
-		t.Fatalf("Dialing to frontend proxy: %v", err)
-	}
-	defer res.Body.Close()
-	if g, w := res.StatusCode, 101; g != w {
-		t.Fatalf("Switching protocols failed, got: %d, want: %d", g, w)
-	}
-
-	if g, w := res.Header.Get("X-Header"), "X-Value"; g != w {
-		t.Errorf("X-Header mismatch\n\tgot:  %q\n\twant: %q", g, w)
-	}
-
-	if g, w := upgradeType(res.Header), "websocket"; g != w {
-		t.Fatalf("Upgrade header mismatch\n\tgot:  %q\n\twant: %q", g, w)
-	}
-
-	rwc, ok := res.Body.(io.ReadWriteCloser)
-	if !ok {
-		t.Fatalf("Response body type mismatch, got %T, want io.ReadWriteCloser", res.Body)
-	}
-
-	if _, err := io.WriteString(rwc, "Hello\n"); err != nil {
-		t.Fatalf("Failed to write first message: %v", err)
-	}
-
-	// Read loop.
-
-	br := bufio.NewReader(rwc)
-	for {
-		line, err := br.ReadString('\n')
-		switch {
-		case line == terminalMsg: // this case before "err == io.EOF"
-			t.Fatalf("The websocket request was not canceled, unfortunately!")
-
-		case err == io.EOF:
-			return
-
-		case err != nil:
-			t.Fatalf("Unexpected error: %v", err)
-
-		case line == nthResponse(0): // We've gotten the first response back
-			// Let's trigger a cancel.
-			close(triggerCancelCh)
-		}
-	}
-}
-
 func TestSSE(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5250
-
 	// send and receive should be in order
 	var wg sync.WaitGroup
 
@@ -1747,41 +1361,4 @@ func TestSSE(t *testing.T) {
 	t.Run("websockets enabled", func(t *testing.T) {
 		stream(true)
 	})
-}
-
-func TestSetCustomHeaderMultipleValues(t *testing.T) {
-	tests := []struct {
-		name            string
-		headers         http.Header
-		key             string
-		values          []string
-		ignoreCanonical bool
-		want            http.Header
-	}{
-		{
-			name:            "Add multiple values without canonical form",
-			headers:         http.Header{},
-			key:             "X-Test",
-			values:          []string{"value1", "value2"},
-			ignoreCanonical: true,
-			want:            http.Header{"X-Test": {"value1", "value2"}},
-		},
-		{
-			name:            "Add multiple values with canonical form",
-			headers:         http.Header{},
-			key:             "X-Test",
-			values:          []string{"value1", "value2"},
-			ignoreCanonical: false,
-			want:            http.Header{"X-Test": {"value1", "value2"}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			setCustomHeaderMultipleValues(tt.headers, tt.key, tt.values, tt.ignoreCanonical)
-			if !reflect.DeepEqual(tt.headers, tt.want) {
-				t.Errorf("setCustomHeaderMultipleValues() got = %v, want %v", tt.headers, tt.want)
-			}
-		})
-	}
 }

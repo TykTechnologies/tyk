@@ -76,8 +76,9 @@ go build
 ```
 
 
-Go version 1.16 is required to build `master`, the current development version. Tyk is officially supported on `linux/amd64`, `linux/i386` and `linux/arm64`.
+Go version 1.12 is required to build `master`, the current development version. Tyk is officially supported on `linux/amd64`, `linux/i386` and `linux/arm64`.
 
+Tests are run against both Go versions 1.12, 1.13, 1.14 and 1.15, however at present, only Go 1.12 is officially supported.
 In order to run tests locally use the following command:
 
 ```
@@ -130,4 +131,3 @@ All the documentation for Tyk Gateway and other OSS can be found at [https://tyk
 Tyk is released under the MPL v2.0; please see [LICENSE.md](https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md) for a full version of the license.
 
 ![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=large)
-

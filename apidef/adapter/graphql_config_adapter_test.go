@@ -1,7 +1,6 @@
 package adapter
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -11,10 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	kafkaDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -31,12 +29,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		}
 
 		httpClient := &http.Client{}
-		streamingClient := &http.Client{}
-		adapter := NewGraphQLConfigAdapter(apiDef,
-			WithHttpClient(httpClient),
-			WithStreamingClient(streamingClient),
-			withGraphQLSubscriptionClientFactory(&MockSubscriptionClientFactory{}),
-		)
+		adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
 
 		engineV2Config, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
@@ -50,19 +43,18 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 			},
 			ChildNodes: []plan.TypeField{},
 			Factory: &graphqlDataSource.Factory{
-				BatchFactory:       graphqlDataSource.NewBatchFactory(),
-				HTTPClient:         httpClient,
-				StreamingClient:    streamingClient,
-				SubscriptionClient: mockSubscriptionClient,
+				BatchFactory: graphqlDataSource.NewBatchFactory(),
+				HTTPClient:   httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
-					URL:    "http://localhost:8080",
-					Header: map[string][]string{},
+					URL: "http://localhost:8080",
+					Header: http.Header{
+						"Authorization": []string{"123abc"},
+					},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
-					URL:    "http://localhost:8080",
-					UseSSE: true,
+					URL: "http://localhost:8080",
 				},
 			}),
 		}
@@ -94,13 +86,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		}
 
 		httpClient := &http.Client{}
-		streamingClient := &http.Client{}
-		adapter := NewGraphQLConfigAdapter(
-			apiDef,
-			WithHttpClient(httpClient),
-			WithStreamingClient(streamingClient),
-			withGraphQLSubscriptionClientFactory(&MockSubscriptionClientFactory{}),
-		)
+		adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
 
 		engineV2Config, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
@@ -114,21 +100,19 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 			},
 			ChildNodes: []plan.TypeField{},
 			Factory: &graphqlDataSource.Factory{
-				BatchFactory:       graphqlDataSource.NewBatchFactory(),
-				HTTPClient:         httpClient,
-				StreamingClient:    streamingClient,
-				SubscriptionClient: mockSubscriptionClient,
+				BatchFactory: graphqlDataSource.NewBatchFactory(),
+				HTTPClient:   httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
 					URL: "http://api-name",
 					Header: http.Header{
+						"Authorization":  []string{"123abc"},
 						"X-Tyk-Internal": []string{"true"},
 					},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
-					URL:    "http://api-name",
-					UseSSE: true,
+					URL: "http://api-name",
 				},
 			}),
 		}
@@ -187,13 +171,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		apiDef.GraphQL.Supergraph.DisableQueryBatching = true
 
 		httpClient := &http.Client{}
-		streamingClient := &http.Client{}
-		adapter := NewGraphQLConfigAdapter(
-			apiDef,
-			WithHttpClient(httpClient),
-			WithStreamingClient(streamingClient),
-			withGraphQLSubscriptionClientFactory(&MockSubscriptionClientFactory{}),
-		)
+		adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
 
 		v2Config, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
@@ -215,9 +193,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
-				HTTPClient:         httpClient,
-				StreamingClient:    streamingClient,
-				SubscriptionClient: mockSubscriptionClient,
+				HTTPClient: httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
@@ -231,8 +207,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 					},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
-					URL:    "http://accounts.service",
-					UseSSE: true,
+					URL: "http://accounts.service",
 				},
 				Federation: graphqlDataSource.FederationConfiguration{
 					Enabled:    true,
@@ -256,13 +231,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		}
 
 		httpClient := &http.Client{}
-		streamingClient := &http.Client{}
-		adapter := NewGraphQLConfigAdapter(
-			apiDef,
-			WithHttpClient(httpClient),
-			WithStreamingClient(streamingClient),
-			withGraphQLSubscriptionClientFactory(&MockSubscriptionClientFactory{}),
-		)
+		adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
 
 		engineV2Config, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
@@ -285,19 +254,18 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
-				BatchFactory:       graphqlDataSource.NewBatchFactory(),
-				HTTPClient:         httpClient,
-				StreamingClient:    streamingClient,
-				SubscriptionClient: mockSubscriptionClient,
+				BatchFactory: graphqlDataSource.NewBatchFactory(),
+				HTTPClient:   httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
-					URL:    "http://localhost:8080",
-					Header: http.Header{},
+					URL: "http://localhost:8080",
+					Header: http.Header{
+						"Authorization": []string{"123abc"},
+					},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
-					URL:    "http://localhost:8080",
-					UseSSE: false,
+					URL: "http://localhost:8080",
 				},
 			}),
 		}
@@ -347,8 +315,7 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				},
 			},
 			Subscription: graphqlDataSource.SubscriptionConfiguration{
-				URL:    "http://accounts.service",
-				UseSSE: true,
+				URL: "http://accounts.service",
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
@@ -474,16 +441,6 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 				},
 			},
 		},
-		{
-			TypeName:  "Subscription",
-			FieldName: "foobarTopicWithVariable",
-			Arguments: []plan.ArgumentConfiguration{
-				{
-					Name:       "name",
-					SourceType: plan.FieldArgumentSource,
-				},
-			},
-		},
 	}
 
 	var gqlConfig apidef.GraphQLConfig
@@ -502,7 +459,6 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 
 func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 	httpClient := &http.Client{}
-	streamingClient := &http.Client{}
 
 	expectedDataSources := []plan.DataSourceConfiguration{
 		{
@@ -549,9 +505,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
-				HTTPClient:         httpClient,
-				StreamingClient:    streamingClient,
-				SubscriptionClient: mockSubscriptionClient,
+				HTTPClient: httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
@@ -562,8 +516,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 					},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
-					URL:    "http://graphql-example",
-					UseSSE: true,
+					URL: "http://graphql-example",
 				},
 			}),
 		},
@@ -572,6 +525,12 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				{
 					TypeName:   "Query",
 					FieldNames: []string{"withChildren"},
+				},
+			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "WithChildren",
+					FieldNames: []string{"id", "name"},
 				},
 			},
 			Factory: &restDataSource.Factory{
@@ -589,6 +548,12 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				{
 					TypeName:   "WithChildren",
 					FieldNames: []string{"nested"},
+				},
+			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "Nested",
+					FieldNames: []string{"id", "name"},
 				},
 			},
 			Factory: &restDataSource.Factory{
@@ -611,17 +576,15 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			ChildNodes: []plan.TypeField{
 				{
 					TypeName:   "MultiRoot1",
-					FieldNames: []string{"id", "__typename"},
+					FieldNames: []string{"id"},
 				},
 				{
 					TypeName:   "MultiRoot2",
-					FieldNames: []string{"name", "__typename"},
+					FieldNames: []string{"name"},
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
-				HTTPClient:         httpClient,
-				StreamingClient:    streamingClient,
-				SubscriptionClient: mockSubscriptionClient,
+				HTTPClient: httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
@@ -632,8 +595,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 					},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
-					URL:    "https://graphql.example.com",
-					UseSSE: false,
+					URL: "https://graphql.example.com",
 				},
 			}),
 		},
@@ -653,12 +615,12 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 					Method: "POST",
 					Query: []restDataSource.QueryConfiguration{
 						{
-							Name:  "order",
-							Value: "{{.arguments.order}}",
-						},
-						{
 							Name:  "q",
 							Value: "{{.arguments.q}}",
+						},
+						{
+							Name:  "order",
+							Value: "{{.arguments.order}}",
 						},
 						{
 							Name:  "limit",
@@ -712,17 +674,15 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			ChildNodes: []plan.TypeField{
 				{
 					TypeName:   "WithChildren",
-					FieldNames: []string{"id", "name", "__typename"},
+					FieldNames: []string{"id", "name"},
 				},
 				{
 					TypeName:   "IDType",
-					FieldNames: []string{"id", "__typename"},
+					FieldNames: []string{"id"},
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
-				HTTPClient:         httpClient,
-				StreamingClient:    streamingClient,
-				SubscriptionClient: mockSubscriptionClient,
+				HTTPClient: httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
@@ -733,60 +693,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 					},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
-					URL:    "https://graphql.example.com",
-					UseSSE: false,
-				},
-			}),
-		},
-		{
-			RootNodes: []plan.TypeField{
-				{
-					TypeName:   "Subscription",
-					FieldNames: []string{"foobar"},
-				},
-			},
-			Factory: &kafkaDataSource.Factory{},
-			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
-				Subscription: kafkaDataSource.SubscriptionConfiguration{
-					BrokerAddresses:      []string{"localhost:9092"},
-					Topics:               []string{"test.topic"},
-					GroupID:              "test.consumer.group",
-					ClientID:             "test.client.id",
-					KafkaVersion:         "V2_8_0_0",
-					StartConsumingLatest: true,
-					BalanceStrategy:      kafkaDataSource.BalanceStrategySticky,
-					IsolationLevel:       kafkaDataSource.IsolationLevelReadCommitted,
-					SASL: kafkaDataSource.SASL{
-						Enable:   true,
-						User:     "admin",
-						Password: "admin-secret",
-					},
-				},
-			}),
-		},
-		{
-			RootNodes: []plan.TypeField{
-				{
-					TypeName:   "Subscription",
-					FieldNames: []string{"foobarTopicWithVariable"},
-				},
-			},
-			Factory: &kafkaDataSource.Factory{},
-			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
-				Subscription: kafkaDataSource.SubscriptionConfiguration{
-					BrokerAddresses:      []string{"localhost:9092"},
-					Topics:               []string{"test.topic.{{.arguments.name}}"},
-					GroupID:              "test.consumer.group",
-					ClientID:             "test.client.id",
-					KafkaVersion:         "V2_8_0_0",
-					StartConsumingLatest: true,
-					BalanceStrategy:      kafkaDataSource.BalanceStrategySticky,
-					IsolationLevel:       kafkaDataSource.IsolationLevelReadCommitted,
-					SASL: kafkaDataSource.SASL{
-						Enable:   true,
-						User:     "admin",
-						Password: "admin-secret",
-					},
+					URL: "https://graphql.example.com",
 				},
 			}),
 		},
@@ -799,77 +706,12 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 		GraphQL: gqlConfig,
 	}
 
-	adapter := NewGraphQLConfigAdapter(
-		apiDef, WithHttpClient(httpClient),
-		WithStreamingClient(streamingClient),
-		withGraphQLSubscriptionClientFactory(&MockSubscriptionClientFactory{}),
-	)
+	adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
 	require.NoError(t, adapter.parseSchema())
 
 	actualDataSources, err := adapter.engineConfigV2DataSources()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedDataSources, actualDataSources)
-	//assert.ElementsMatch(t, expectedDataSources, actualDataSources)
-}
-
-func TestGraphQLConfigAdapter_GraphqlDataSourceWebSocketProtocol(t *testing.T) {
-	run := func(subscriptionType apidef.SubscriptionType, expectedWebSocketProtocol string) func(t *testing.T) {
-		return func(t *testing.T) {
-			adapter := NewGraphQLConfigAdapter(nil)
-			actualProtocol := adapter.graphqlDataSourceWebSocketProtocol(subscriptionType)
-			assert.Equal(t, expectedWebSocketProtocol, actualProtocol)
-		}
-	}
-
-	t.Run("should return 'graphql-ws' for undefined subscription type",
-		run(apidef.GQLSubscriptionUndefined, graphqlDataSource.ProtocolGraphQLWS),
-	)
-
-	t.Run("should return 'graphql-ws' for graphql-ws subscription type",
-		run(apidef.GQLSubscriptionWS, graphqlDataSource.ProtocolGraphQLWS),
-	)
-
-	t.Run("should return 'graphql-ws' for sse subscription type as websocket protocol is irrelevant in that case",
-		run(apidef.GQLSubscriptionSSE, graphqlDataSource.ProtocolGraphQLWS),
-	)
-
-	t.Run("should return 'graphql-transport-ws' for graphql-transport-ws subscription type",
-		run(apidef.GQLSubscriptionTransportWS, graphqlDataSource.ProtocolGraphQLTWS),
-	)
-}
-
-func TestGraphQLConfigAdapter_GraphqlSubscriptionType(t *testing.T) {
-	run := func(subscriptionType apidef.SubscriptionType, expectedGraphQLSubscriptionType graphql.SubscriptionType) func(t *testing.T) {
-		return func(t *testing.T) {
-			adapter := NewGraphQLConfigAdapter(nil)
-			actualSubscriptionType := adapter.graphqlSubscriptionType(subscriptionType)
-			assert.Equal(t, expectedGraphQLSubscriptionType, actualSubscriptionType)
-		}
-	}
-
-	t.Run("should return 'Unknown' for undefined subscription type",
-		run(apidef.GQLSubscriptionUndefined, graphql.SubscriptionTypeUnknown),
-	)
-
-	t.Run("should return 'SSE' for sse subscription type as websocket protocol is irrelevant in that case",
-		run(apidef.GQLSubscriptionSSE, graphql.SubscriptionTypeSSE),
-	)
-
-	t.Run("should return 'GraphQLWS' for graphql-ws subscription type",
-		run(apidef.GQLSubscriptionWS, graphql.SubscriptionTypeGraphQLWS),
-	)
-
-	t.Run("should return 'GraphQLTransportWS' for graphql-transport-ws subscription type",
-		run(apidef.GQLSubscriptionTransportWS, graphql.SubscriptionTypeGraphQLTransportWS),
-	)
-}
-
-var mockSubscriptionClient = &graphqlDataSource.SubscriptionClient{}
-
-type MockSubscriptionClientFactory struct{}
-
-func (m *MockSubscriptionClientFactory) NewSubscriptionClient(httpClient, streamingClient *http.Client, engineCtx context.Context, options ...graphqlDataSource.Options) graphqlDataSource.GraphQLSubscriptionClient {
-	return mockSubscriptionClient
 }
 
 const graphqlEngineV1ConfigJson = `{
@@ -912,10 +754,6 @@ type MultiRoot2 {
 }
 type DeepGQL {
   query(code: String!): String
-}
-type Subscription {
-  foobar: Int
-  foobarTopicWithVariable(name: String): Int
 }`)
 
 var graphqlEngineV2ConfigJson = `{
@@ -973,8 +811,7 @@ var graphqlEngineV2ConfigJson = `{
 				],
 				"config": {
 					"url": "tyk://graphql-example",
-					"method": "POST",
-					"subscription_type": "sse"
+					"method": "POST"
 				}
 			},
 		   	{
@@ -1084,58 +921,6 @@ var graphqlEngineV2ConfigJson = `{
 						"Auth": "123"
 					}
 				}
-			},
-			{
-				"kind": "Kafka",
-				"name": "kafka-consumer-group",
-				"internal": false,
-				"root_fields": [{
-					"type": "Subscription",
-					"fields": [
-						"foobar"
-					]
-				}],
-				"config": {
-					"broker_addresses": ["localhost:9092"],
-					"topics": ["test.topic"],
-					"group_id": "test.consumer.group",
-					"client_id": "test.client.id",
-					"kafka_version": "V2_8_0_0",
-					"start_consuming_latest": true,
-					"balance_strategy": "BalanceStrategySticky",
-					"isolation_level": "ReadCommitted",
-					"sasl": {
-						"enable": true,
-						"user": "admin",
-						"password": "admin-secret"
-					}
-				}
-			},
-			{
-				"kind": "Kafka",
-				"name": "kafka-consumer-group-with-variable",
-				"internal": false,
-				"root_fields": [{
-					"type": "Subscription",
-					"fields": [
-						"foobarTopicWithVariable"
-					]
-				}],
-				"config": {
-					"broker_addresses": ["localhost:9092"],
-					"topics": ["test.topic.{{.arguments.name}}"],
-					"group_id": "test.consumer.group",
-					"client_id": "test.client.id",
-					"kafka_version": "V2_8_0_0",
-					"start_consuming_latest": true,
-					"balance_strategy": "BalanceStrategySticky",
-					"isolation_level": "ReadCommitted",
-					"sasl": {
-						"enable": true,
-						"user": "admin",
-						"password": "admin-secret"
-					}
-				}
 			}
 		]
 	},
@@ -1166,8 +951,7 @@ var graphqlEngineV2SupergraphConfigJson = `{
 				"headers": {
 					"header1": "override_global",
 					"Auth": "appended_header"
-				},
-				"subscription_type": "sse"
+				}
 			},
 			{
 				"api_id": "",
@@ -1208,8 +992,7 @@ var graphqlProxyOnlyConfig = `{
 	"proxy": {
 		"auth_headers": {
 			"Authorization": "123abc"
-		},
-		"subscription_type": "sse"
+		}
 	},
 	"engine": {
 		"field_configs": [],
@@ -1239,8 +1022,7 @@ var graphqlSubgraphConfig = `{
 		"data_sources": []
 	},
 	"subgraph": {
-		"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `,
-		"subscription_type": "graphql-transport-ws"
+		"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `
 	},
 	"playground": {}
 }`

@@ -1,13 +1,9 @@
 package apidef
 
 import (
-	"encoding/base64"
-	"encoding/json"
-	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 	schema "github.com/xeipuuv/gojsonschema"
 )
 
@@ -26,52 +22,6 @@ func TestSchema(t *testing.T) {
 			t.Error(err)
 		}
 	}
-}
-
-func TestEncodeForDB(t *testing.T) {
-	t.Run("EncodeForDB persist schema objects from extended path", func(t *testing.T) {
-		spec := DummyAPI()
-		spec.EncodeForDB()
-		var schemaNotEmpty bool
-		for _, version := range spec.VersionData.Versions {
-			for _, validateObj := range version.ExtendedPaths.ValidateJSON {
-				schemaNotEmpty = schemaNotEmpty || (validateObj.Schema != nil)
-			}
-		}
-		assert.True(t, schemaNotEmpty, "expected EncodeForDB to persist schema objects")
-	})
-}
-
-func TestDecodeFromDB(t *testing.T) {
-	t.Run("json schema validation middleware", func(t *testing.T) {
-		apiDef := DummyAPI()
-		var (
-			bodySchema map[string]interface{}
-			v1         = "v1"
-			v1B64      = base64.StdEncoding.EncodeToString([]byte(v1))
-		)
-		err := json.Unmarshal([]byte(`{"$schema":"http://json-schema.org/draft-04/schema#","properties":{"id":{"type":"integer"}},"required":["id"],"type":"object"}`),
-			&bodySchema)
-		assert.NoError(t, err)
-		apiDef.VersionData.Versions[v1] = VersionInfo{
-			ExtendedPaths: ExtendedPathsSet{
-				ValidateJSON: []ValidatePathMeta{
-					{
-						Path:   "/",
-						Method: http.MethodPost,
-						Schema: bodySchema,
-					},
-				},
-			},
-		}
-		apiDef.EncodeForDB()
-		copyAPIDef := apiDef
-		copyAPIDef.DecodeFromDB()
-
-		assert.Equal(t, apiDef.VersionData.Versions[v1B64].ExtendedPaths.ValidateJSON[0].Schema,
-			copyAPIDef.VersionData.Versions[v1].ExtendedPaths.ValidateJSON[0].Schema)
-		assert.Empty(t, copyAPIDef.VersionData.Versions[v1].ExtendedPaths.ValidateJSON[0].SchemaB64)
-	})
 }
 
 func TestSchemaGraphqlConfig(t *testing.T) {
@@ -116,32 +66,16 @@ func TestAPIDefinition_DecodeFromDB_AuthDeprecation(t *testing.T) {
 
 }
 
-func TestAPIDefinition_GenerateAPIID(t *testing.T) {
-	a := APIDefinition{}
-	a.GenerateAPIID()
-	assert.NotEmpty(t, a.APIID)
-}
-
 func TestAPIDefinition_GetScopeClaimName(t *testing.T) {
 	var (
-		scopeName        = "scope"
-		oidcScopeName    = "oidc_scope"
-		newScopeName     = "new_scope"
-		newOIDCScopeName = "new_oidc_scope"
+		scopeName     = "scope"
+		oidcScopeName = "oidc_scope"
 	)
 
 	getAPIDef := func(deprecatedScopeName, jwtScopeName, oidcScopeName string, useOIDC bool) APIDefinition {
 		return APIDefinition{
 			UseOpenID:         useOIDC,
 			JWTScopeClaimName: deprecatedScopeName,
-			Scopes: Scopes{
-				JWT: ScopeClaim{
-					ScopeClaimName: jwtScopeName,
-				},
-				OIDC: ScopeClaim{
-					ScopeClaimName: oidcScopeName,
-				},
-			},
 		}
 	}
 
@@ -154,52 +88,15 @@ func TestAPIDefinition_GetScopeClaimName(t *testing.T) {
 		expectedScopeName   string
 	}{
 		{
-			name:                "jwt: only deprecated fields",
+			name:                "jwt",
 			deprecatedScopeName: scopeName,
 			expectedScopeName:   scopeName,
 		},
-		{
-			name:              "jwt: only scopes.jwt",
-			jwtScopeName:      newScopeName,
-			expectedScopeName: newScopeName,
-		},
-		{
-			name:              "jwt: both scopes.jwt and scopes.oidc",
-			jwtScopeName:      newScopeName,
-			oidcScopeName:     newOIDCScopeName,
-			expectedScopeName: newScopeName,
-		},
-		{
-			name:                "jwt: deprecated field and jwt.scopes",
-			deprecatedScopeName: scopeName,
-			jwtScopeName:        newScopeName,
-			expectedScopeName:   newScopeName,
-		},
 
 		{
-			name:                "oidc: only deprecated fields",
+			name:                "oidc",
 			deprecatedScopeName: oidcScopeName,
 			expectedScopeName:   oidcScopeName,
-			useOIDC:             true,
-		},
-		{
-			name:              "oidc: only scopes.oidc",
-			oidcScopeName:     newOIDCScopeName,
-			expectedScopeName: newOIDCScopeName,
-			useOIDC:           true,
-		},
-		{
-			name:              "oidc: both scopes.jwt and scopes.oidc",
-			jwtScopeName:      newScopeName,
-			oidcScopeName:     newOIDCScopeName,
-			expectedScopeName: newOIDCScopeName,
-			useOIDC:           true,
-		},
-		{
-			name:                "oidc: deprecated field and oidc.scopes",
-			deprecatedScopeName: oidcScopeName,
-			oidcScopeName:       newOIDCScopeName,
-			expectedScopeName:   newOIDCScopeName,
 			useOIDC:             true,
 		},
 	}
@@ -214,24 +111,14 @@ func TestAPIDefinition_GetScopeClaimName(t *testing.T) {
 
 func TestAPIDefinition_GetScopeToPolicyMapping(t *testing.T) {
 	var (
-		scopeToPolicyMapping        = map[string]string{"jwtClaim": "pol1"}
-		newScopeToPolicyMapping     = map[string]string{"jwtClaim1": "pol1"}
-		oidcScopeToPolicyMapping    = map[string]string{"oidcClaim": "pol1"}
-		newOIDCScopeToPolicyMapping = map[string]string{"oidcClaim1": "pol1"}
+		scopeToPolicyMapping     = map[string]string{"jwtClaim": "pol1"}
+		oidcScopeToPolicyMapping = map[string]string{"oidcClaim": "pol1"}
 	)
 
 	getAPIDef := func(deprecatedScopeToPolicy, jwtScopeToPolicy, oidcScopeToPolicy map[string]string, useOIDC bool) APIDefinition {
 		return APIDefinition{
 			UseOpenID:               useOIDC,
 			JWTScopeToPolicyMapping: deprecatedScopeToPolicy,
-			Scopes: Scopes{
-				JWT: ScopeClaim{
-					ScopeToPolicy: jwtScopeToPolicy,
-				},
-				OIDC: ScopeClaim{
-					ScopeToPolicy: oidcScopeToPolicy,
-				},
-			},
 		}
 	}
 
@@ -244,52 +131,15 @@ func TestAPIDefinition_GetScopeToPolicyMapping(t *testing.T) {
 		expectedScopeToPolicy   map[string]string
 	}{
 		{
-			name:                    "jwt: only deprecated fields",
+			name:                    "jwt",
 			deprecatedScopeToPolicy: scopeToPolicyMapping,
 			expectedScopeToPolicy:   scopeToPolicyMapping,
 		},
-		{
-			name:                  "jwt: only scopes.jwt",
-			jwtScopeToPolicy:      scopeToPolicyMapping,
-			expectedScopeToPolicy: scopeToPolicyMapping,
-		},
-		{
-			name:                  "jwt: both scopes.jwt and scopes.oidc",
-			jwtScopeToPolicy:      scopeToPolicyMapping,
-			oidcScopeToPolicy:     oidcScopeToPolicyMapping,
-			expectedScopeToPolicy: scopeToPolicyMapping,
-		},
-		{
-			name:                    "jwt: deprecated field and jwt.scopes",
-			deprecatedScopeToPolicy: scopeToPolicyMapping,
-			jwtScopeToPolicy:        newScopeToPolicyMapping,
-			expectedScopeToPolicy:   newScopeToPolicyMapping,
-		},
 
 		{
-			name:                    "oidc: only deprecated fields",
+			name:                    "oidc",
 			deprecatedScopeToPolicy: oidcScopeToPolicyMapping,
 			expectedScopeToPolicy:   oidcScopeToPolicyMapping,
-			useOIDC:                 true,
-		},
-		{
-			name:                  "oidc: only scopes.oidc",
-			oidcScopeToPolicy:     newOIDCScopeToPolicyMapping,
-			expectedScopeToPolicy: newOIDCScopeToPolicyMapping,
-			useOIDC:               true,
-		},
-		{
-			name:                  "oidc: both scopes.jwt and scopes.oidc",
-			jwtScopeToPolicy:      scopeToPolicyMapping,
-			oidcScopeToPolicy:     oidcScopeToPolicyMapping,
-			expectedScopeToPolicy: oidcScopeToPolicyMapping,
-			useOIDC:               true,
-		},
-		{
-			name:                    "oidc: deprecated field and oidc.scopes",
-			deprecatedScopeToPolicy: oidcScopeToPolicyMapping,
-			oidcScopeToPolicy:       newOIDCScopeToPolicyMapping,
-			expectedScopeToPolicy:   newOIDCScopeToPolicyMapping,
 			useOIDC:                 true,
 		},
 	}

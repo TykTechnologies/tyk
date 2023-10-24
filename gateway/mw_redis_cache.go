@@ -14,10 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-
 	"github.com/TykTechnologies/murmur3"
-	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
@@ -153,7 +151,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	var cacheKeyRegex string
 	var cacheMeta *EndPointCacheMeta
 
-	version, _ := m.Spec.Version(r)
+	version, _, _, _ := m.Spec.Version(r)
 	versionPaths := m.Spec.RxPaths[version.Name]
 
 	// Lets see if we can throw a sledgehammer at this
@@ -238,9 +236,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	// Only add ratelimit data to keyed sessions
 	if session != nil {
 		quotaMax, quotaRemaining, _, quotaRenews := session.GetQuotaLimitByAPIID(m.Spec.APIID)
-		newRes.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		newRes.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		newRes.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+		newRes.Header.Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		newRes.Header.Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		newRes.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 	newRes.Header.Set(cachedResponseHeader, "1")
 
@@ -262,7 +260,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	// Record analytics
 	if !m.Spec.DoNotTrack {
 		ms := DurationToMillisecond(time.Since(t1))
-		m.sh.RecordHit(r, analytics.Latency{Total: int64(ms)}, newRes.StatusCode, newRes)
+		m.sh.RecordHit(r, Latency{Total: int64(ms)}, newRes.StatusCode, newRes)
 	}
 
 	// Stop any further execution after we wrote cache out

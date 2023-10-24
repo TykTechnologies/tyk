@@ -1,0 +1,44 @@
+---
+name: Basic build checks
+
+on: pull_request
+
+jobs:
+  test:
+    name: Go ${{ matrix.go }} Redis ${{ matrix.redis-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        go: [1.15]
+        redis-version: [6]
+
+    steps:
+      - name: Checkout Tyk
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      - name: Setup Golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Start Redis
+        uses: supercharge/redis-github-action@1.1.0
+        with:
+          redis-version: ${{ matrix.redis-version }}
+
+      - name: Cache
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build
+        run: go build .
+
+      - name: Build tests, runs init funcs
+        run: go test -run=^$ ./...

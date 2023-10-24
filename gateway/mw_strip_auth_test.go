@@ -87,7 +87,7 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 
 		key = "NonDefaultName"
 		sa.Spec.AuthConfigs = map[string]apidef.AuthConfig{
-			apidef.AuthTokenType: {CookieName: key},
+			authTokenType: {CookieName: key},
 		}
 		stripFromCookieTest(t, req, key, sa, "Dummy=DUMMY;NonDefaultName=AUTHORIZATION;Dummy2=DUMMY2", "Dummy=DUMMY;Dummy2=DUMMY2")
 		// whitespace between cookies
@@ -97,7 +97,7 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 
 func stripFromCookieTest(t *testing.T, req *http.Request, key string, sa StripAuth, value string, expected string) {
 	req.Header.Set("Cookie", value)
-	config := sa.Spec.AuthConfigs[apidef.AuthTokenType]
+	config := sa.Spec.AuthConfigs[authTokenType]
 	sa.stripFromHeaders(req, &config)
 
 	actual := req.Header.Get("Cookie")

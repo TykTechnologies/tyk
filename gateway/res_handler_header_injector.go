@@ -35,10 +35,9 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 	// TODO: This should only target specific paths
 
 	ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
-	vInfo, _ := h.Spec.Version(req)
-	versionPaths := h.Spec.RxPaths[vInfo.Name]
-
+	vInfo, versionPaths, _, _ := h.Spec.Version(req)
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjectedResponse)
+
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
 		for _, dKey := range hmeta.DeleteHeaders {
@@ -64,6 +63,7 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 	for _, n := range h.config.RemoveHeaders {
 		res.Header.Del(n)
 	}
+
 	for header, v := range h.config.AddHeaders {
 		setCustomHeader(res.Header, header, h.Gw.replaceTykVariables(req, v, false), ignoreCanonical)
 	}

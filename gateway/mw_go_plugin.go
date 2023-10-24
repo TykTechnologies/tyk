@@ -8,14 +8,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/TykTechnologies/tyk/request"
+	"github.com/sirupsen/logrus"
 )
 
 // customResponseWriter is a wrapper around standard http.ResponseWriter
@@ -110,20 +108,14 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 
 	// per path go plugins
 	for _, version := range m.Spec.VersionData.Versions {
-		for _, p := range version.ExtendedPaths.GoPlugin {
-			if !p.Disabled {
-				return true
-			}
+		if len(version.ExtendedPaths.GoPlugin) > 0 {
+			return true
 		}
 	}
 
 	return false
 }
 
-// loadPlugin loads the plugin file from m.Path, it will try
-// converting it to the tyk version aware format: {plugin_name}_{tyk_version}_{os}_{arch}.so
-// if the file doesn't exist then it will again but with a gw version that is not prefixed by 'v'
-// later, it will try with m.path which can be {plugin_name}.so
 func (m *GoPluginMiddleware) loadPlugin() bool {
 	m.logger = log.WithFields(logrus.Fields{
 		"mwPath":       m.Path,
@@ -137,15 +129,6 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 
 	// try to load plugin
 	var err error
-
-	newPath, err := goplugin.GetPluginFileNameToLoad(goplugin.FileSystemStorage{}, m.Path, VERSION)
-	if err != nil {
-		m.logger.WithError(err).Error("plugin file not found")
-		return false
-	}
-	if m.Path != newPath {
-		m.Path = newPath
-	}
 
 	defer func() {
 		if e := recover(); e != nil {
@@ -165,9 +148,7 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 }
 
 func (m *GoPluginMiddleware) goPluginFromRequest(r *http.Request) (*GoPluginMiddleware, bool) {
-	version, _ := m.Spec.Version(r)
-	versionPaths := m.Spec.RxPaths[version.Name]
-
+	_, versionPaths, _, _ := m.Spec.Version(r)
 	found, perPathPerMethodGoPlugin := m.Spec.CheckSpecMatchesStatus(r, versionPaths, GoPlugin)
 	if !found {
 		return nil, false
@@ -194,6 +175,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		respCode = http.StatusInternalServerError
 		err = errors.New(http.StatusText(respCode))
 		return
+
 	}
 
 	// make sure tyk recover in case Go-plugin function panics
@@ -222,12 +204,6 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	// Inject definition into request context:
 	ctx.SetDefinition(r, m.Spec.APIDefinition)
 	handler(rw, r)
-	if session := ctxGetSession(r); session != nil {
-		if err := m.ApplyPolicies(session); err != nil {
-			m.Logger().WithError(err).Error("Could not apply policy to session")
-			return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
-		}
-	}
 
 	// calculate latency
 	ms := DurationToMillisecond(time.Since(t1))
@@ -238,7 +214,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		// check if response code was an error one
 		switch {
 		case rw.statusCodeSent == http.StatusForbidden:
-			logger.WithError(err).Error("Authentication error in Go-plugin middleware func")
+			m.logger.WithError(err).Error("Authentication error in Go-plugin middleware func")
 			m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 				Path:             r.URL.Path,
@@ -250,10 +226,10 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			// base middleware will report this error to analytics if needed
 			respCode = rw.statusCodeSent
 			err = fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
-			logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
+			m.logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
 		default:
 			// record 2XX to analytics
-			successHandler.RecordHit(r, analytics.Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
+			successHandler.RecordHit(r, Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
 
 			// no need to continue passing this request down to reverse proxy
 			respCode = mwStatusRespond

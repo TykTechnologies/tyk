@@ -5,59 +5,92 @@ import coprocess_object_pb2 as coprocess__object__pb2
 
 
 class DispatcherStub(object):
-  # missing associated documentation comment in .proto file
-  pass
+    """Missing associated documentation comment in .proto file"""
 
-  def __init__(self, channel):
-    """Constructor.
+    def __init__(self, channel):
+        """Constructor.
 
-    Args:
-      channel: A grpc.Channel.
-    """
-    self.Dispatch = channel.unary_unary(
-        '/coprocess.Dispatcher/Dispatch',
-        request_serializer=coprocess__object__pb2.Object.SerializeToString,
-        response_deserializer=coprocess__object__pb2.Object.FromString,
-        )
-    self.DispatchEvent = channel.unary_unary(
-        '/coprocess.Dispatcher/DispatchEvent',
-        request_serializer=coprocess__object__pb2.Event.SerializeToString,
-        response_deserializer=coprocess__object__pb2.EventReply.FromString,
-        )
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.Dispatch = channel.unary_unary(
+                '/coprocess.Dispatcher/Dispatch',
+                request_serializer=coprocess__object__pb2.Object.SerializeToString,
+                response_deserializer=coprocess__object__pb2.Object.FromString,
+                )
+        self.DispatchEvent = channel.unary_unary(
+                '/coprocess.Dispatcher/DispatchEvent',
+                request_serializer=coprocess__object__pb2.Event.SerializeToString,
+                response_deserializer=coprocess__object__pb2.EventReply.FromString,
+                )
 
 
 class DispatcherServicer(object):
-  # missing associated documentation comment in .proto file
-  pass
+    """Missing associated documentation comment in .proto file"""
 
-  def Dispatch(self, request, context):
-    # missing associated documentation comment in .proto file
-    pass
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
+    def Dispatch(self, request, context):
+        """Missing associated documentation comment in .proto file"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
-  def DispatchEvent(self, request, context):
-    # missing associated documentation comment in .proto file
-    pass
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
+    def DispatchEvent(self, request, context):
+        """Missing associated documentation comment in .proto file"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
 
 def add_DispatcherServicer_to_server(servicer, server):
-  rpc_method_handlers = {
-      'Dispatch': grpc.unary_unary_rpc_method_handler(
-          servicer.Dispatch,
-          request_deserializer=coprocess__object__pb2.Object.FromString,
-          response_serializer=coprocess__object__pb2.Object.SerializeToString,
-      ),
-      'DispatchEvent': grpc.unary_unary_rpc_method_handler(
-          servicer.DispatchEvent,
-          request_deserializer=coprocess__object__pb2.Event.FromString,
-          response_serializer=coprocess__object__pb2.EventReply.SerializeToString,
-      ),
-  }
-  generic_handler = grpc.method_handlers_generic_handler(
-      'coprocess.Dispatcher', rpc_method_handlers)
-  server.add_generic_rpc_handlers((generic_handler,))
+    rpc_method_handlers = {
+            'Dispatch': grpc.unary_unary_rpc_method_handler(
+                    servicer.Dispatch,
+                    request_deserializer=coprocess__object__pb2.Object.FromString,
+                    response_serializer=coprocess__object__pb2.Object.SerializeToString,
+            ),
+            'DispatchEvent': grpc.unary_unary_rpc_method_handler(
+                    servicer.DispatchEvent,
+                    request_deserializer=coprocess__object__pb2.Event.FromString,
+                    response_serializer=coprocess__object__pb2.EventReply.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'coprocess.Dispatcher', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+
+
+ # This class is part of an EXPERIMENTAL API.
+class Dispatcher(object):
+    """Missing associated documentation comment in .proto file"""
+
+    @staticmethod
+    def Dispatch(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/coprocess.Dispatcher/Dispatch',
+            coprocess__object__pb2.Object.SerializeToString,
+            coprocess__object__pb2.Object.FromString,
+            options, channel_credentials,
+            call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def DispatchEvent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/coprocess.Dispatcher/DispatchEvent',
+            coprocess__object__pb2.Event.SerializeToString,
+            coprocess__object__pb2.EventReply.FromString,
+            options, channel_credentials,
+            call_credentials, compression, wait_for_ready, timeout, metadata)

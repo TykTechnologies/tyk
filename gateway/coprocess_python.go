@@ -18,9 +18,8 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 
-	"github.com/golang/protobuf/proto"
-
 	python "github.com/TykTechnologies/tyk/dlpython"
+	"github.com/golang/protobuf/proto"
 )
 import (
 	"os"
@@ -257,7 +256,7 @@ func PythonSetEnv(pythonPaths ...string) {
 	python.SetPythonPath(pythonPaths)
 }
 
-// nolint getBundlePaths will return an array of the available bundle directories:
+//nolint getBundlePaths will return an array of the available bundle directories:
 func getBundlePaths(conf config.Config) []string {
 	bundlePath := filepath.Join(conf.MiddlewarePath, "bundles")
 	directories := make([]string, 0)

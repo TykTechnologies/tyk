@@ -8,8 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/ctx"
-
 	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -21,16 +19,6 @@ var testRewriterData = []struct {
 	pattern, to string
 	in, want    string
 }{
-	{
-		"Encoded",
-		"/test/payment-intents", "/change/to/me",
-		"/test/payment%2Dintents", "/change/to/me",
-	},
-	{
-		"MatchEncodedChars",
-		"^(.+)%2[Dd](.+)$", "/change/to/me",
-		"/test/payment%2Dintents", "/change/to/me",
-	},
 	{
 		"Straight",
 		"/test/straight/rewrite", "/change/to/me",
@@ -107,7 +95,7 @@ func TestRewriter(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := tc.reqMaker()
-			got, err := ts.Gw.urlRewrite(tc.meta, r, false)
+			got, err := ts.Gw.urlRewrite(tc.meta, r)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
@@ -125,7 +113,7 @@ func BenchmarkRewriter(b *testing.B) {
 	//warm-up regexp caches
 	for _, tc := range cases {
 		r := tc.reqMaker()
-		ts.Gw.urlRewrite(tc.meta, r, false)
+		ts.Gw.urlRewrite(tc.meta, r)
 	}
 
 	b.ReportAllocs()
@@ -135,7 +123,7 @@ func BenchmarkRewriter(b *testing.B) {
 			b.StopTimer()
 			r := tc.reqMaker()
 			b.StartTimer()
-			ts.Gw.urlRewrite(tc.meta, r, false)
+			ts.Gw.urlRewrite(tc.meta, r)
 		}
 	}
 }
@@ -1093,7 +1081,7 @@ func TestRewriterTriggers(t *testing.T) {
 				Triggers:     tc.triggerConf,
 			}
 
-			got, err := ts.Gw.urlRewrite(&testConf, tc.req, false)
+			got, err := ts.Gw.urlRewrite(&testConf, tc.req)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
@@ -1171,7 +1159,7 @@ func TestInitTriggerRx(t *testing.T) {
 		Options.
 		HeaderMatches["abc"]
 	if headerMatch.Check("abc") == "" {
-		t.Errorf("Expected HeaderMatches initialized and matched, received no match")
+		t.Errorf("Expected HeaderMatches initalized and matched, received no match")
 	}
 
 	// assert QueryValMatches
@@ -1186,7 +1174,7 @@ func TestInitTriggerRx(t *testing.T) {
 		Options.
 		QueryValMatches["def"]
 	if queryValMatch.Check("def") == "" {
-		t.Errorf("Expected QueryValMatches initialized and matched, received no match")
+		t.Errorf("Expected QueryValMatches initalized and matched, received no match")
 	}
 
 	// assert PayloadMatches
@@ -1201,7 +1189,7 @@ func TestInitTriggerRx(t *testing.T) {
 		Options.
 		PayloadMatches
 	if payloadMatch.Check("ghi") == "" {
-		t.Errorf("Expected PayloadMatches initialized and matched, received no match")
+		t.Errorf("Expected PayloadMatches initalized and matched, received no match")
 	}
 }
 
@@ -1251,15 +1239,14 @@ func TestURLRewriteCaseSensitivity(t *testing.T) {
 func TestValToStr(t *testing.T) {
 
 	example := []interface{}{
-		"abc",              // string
-		int64(456),         // int64
-		12.22,              // float
-		float64(123452342), // float64
-		"abc,def",          // string url encode
+		"abc",      // string
+		int64(456), // int64
+		12.22,      // float
+		"abc,def",  // string url encode
 	}
 
 	str := valToStr(example)
-	expected := "abc,456,12.22,123452342,abc%2Cdef"
+	expected := "abc,456,12.22,abc%2Cdef"
 
 	if str != expected {
 		t.Errorf("expected (%s) got (%s)", expected, str)
@@ -1278,93 +1265,6 @@ func TestLoopingUrl(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.host, func(t *testing.T) {
 			assert.Equal(t, tc.expectedHost, LoopingUrl(tc.host))
-		})
-	}
-}
-
-func TestURLRewriteMiddleware_CheckHostRewrite(t *testing.T) {
-	type args struct {
-		oldPath   string
-		newTarget string
-	}
-
-	tests := []struct {
-		name          string
-		args          args
-		errExpected   bool
-		retainHostVal interface{}
-	}{
-		{
-			name: "no host rewrite",
-			args: args{
-				oldPath:   "/hello",
-				newTarget: "/status",
-			},
-			errExpected:   false,
-			retainHostVal: nil,
-		},
-		{
-			name: "invalid new path",
-			args: args{
-				oldPath:   "/hello",
-				newTarget: "http:// example.com/status",
-			},
-			errExpected:   true,
-			retainHostVal: nil,
-		},
-		{
-			name: "host rewrite",
-			args: args{
-				oldPath:   "/hello",
-				newTarget: "http://example.com/status",
-			},
-			errExpected:   false,
-			retainHostVal: true,
-		},
-		{
-			name: "scheme in oldPath - host rewrite",
-			args: args{
-				oldPath:   "http://tyk-gateway/hello",
-				newTarget: "http://example.com/status",
-			},
-			errExpected:   false,
-			retainHostVal: true,
-		},
-		{
-			name: "scheme in oldPath - no host rewrite",
-			args: args{
-				oldPath:   "http://tyk-gateway/hello",
-				newTarget: "/status",
-			},
-			errExpected:   false,
-			retainHostVal: nil,
-		},
-		{
-			name: "same host for new and old URL",
-			args: args{
-				oldPath:   "http://tyk-gateway/hello",
-				newTarget: "http://tyk-gateway/status",
-			},
-			errExpected:   false,
-			retainHostVal: nil,
-		},
-		{
-			name: "invalid old URL",
-			args: args{
-				oldPath:   "http://tyk gateway/hello",
-				newTarget: "http://tyk-gateway/status",
-			},
-			errExpected:   true,
-			retainHostVal: nil,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := &URLRewriteMiddleware{}
-			r := &http.Request{}
-			err := m.CheckHostRewrite(tt.args.oldPath, tt.args.newTarget, r)
-			assert.Equal(t, tt.errExpected, err != nil)
-			assert.Equal(t, tt.retainHostVal, r.Context().Value(ctx.RetainHost))
 		})
 	}
 }

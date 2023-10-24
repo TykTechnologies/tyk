@@ -56,15 +56,13 @@ type APILimit struct {
 // in the gateway/policy.go:19
 // TODO: is it possible to share fields?
 type AccessDefinition struct {
-	APIName              string                  `json:"api_name" msg:"api_name"`
-	APIID                string                  `json:"api_id" msg:"api_id"`
-	Versions             []string                `json:"versions" msg:"versions"`
-	AllowedURLs          []AccessSpec            `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
-	RestrictedTypes      []graphql.Type          `json:"restricted_types" msg:"restricted_types"`
-	AllowedTypes         []graphql.Type          `json:"allowed_types" msg:"allowed_types"`
-	Limit                APILimit                `json:"limit" msg:"limit"`
-	FieldAccessRights    []FieldAccessDefinition `json:"field_access_rights" msg:"field_access_rights"`
-	DisableIntrospection bool                    `json:"disable_introspection" msg:"disable_introspection"`
+	APIName           string                  `json:"api_name" msg:"api_name"`
+	APIID             string                  `json:"api_id" msg:"api_id"`
+	Versions          []string                `json:"versions" msg:"versions"`
+	AllowedURLs       []AccessSpec            `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
+	RestrictedTypes   []graphql.Type          `json:"restricted_types" msg:"restricted_types"`
+	Limit             APILimit                `json:"limit" msg:"limit"`
+	FieldAccessRights []FieldAccessDefinition `json:"field_access_rights" msg:"field_access_rights"`
 
 	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
 }
@@ -239,44 +237,20 @@ func (s *SessionState) KeyHashEmpty() bool {
 	return s.keyHash == ""
 }
 
-// Lifetime returns the lifetime of a session. Global session lifetime has always precedence. Then, the session lifetime value
-// in the key level takes precedence. However, if key `respectKeyExpiration` is `true`, when the key expiration has longer than
-// the session lifetime, the key expiration is returned. It means even if the session lifetime finishes, it waits for the key expiration
-// for physical removal.
-func (s *SessionState) Lifetime(respectKeyExpiration bool, fallback int64, forceGlobalSessionLifetime bool, globalSessionLifetime int64) int64 {
+func (s *SessionState) Lifetime(fallback int64, forceGlobalSessionLifetime bool, globalSessionLifetime int64) int64 {
 	if forceGlobalSessionLifetime {
 		return globalSessionLifetime
 	}
 
 	if s.SessionLifetime > 0 {
-		return calculateLifetime(respectKeyExpiration, s.Expires, s.SessionLifetime)
+		return s.SessionLifetime
 	}
 
 	if fallback > 0 {
-		return calculateLifetime(respectKeyExpiration, s.Expires, fallback)
+		return fallback
 	}
 
 	return 0
-}
-
-// calculateLifetime calculates the lifetime of a session. It also sets the value to the key expiration in case of the key expiration
-// value is respected and `lifetime` < `expiration`.
-func calculateLifetime(respectExpiration bool, expiration, lifetime int64) int64 {
-	if !respectExpiration || lifetime <= 0 {
-		return lifetime
-	}
-
-	if expiration <= 0 {
-		return expiration
-	}
-
-	now := time.Now()
-	lifetimeInUnix := now.Add(time.Duration(lifetime) * time.Second).Unix()
-	if expiration > lifetimeInUnix {
-		return expiration - now.Unix()
-	}
-
-	return lifetime
 }
 
 // PolicyIDs returns the IDs of all the policies applied to this
@@ -327,9 +301,4 @@ func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, 
 	}
 
 	return s.QuotaMax, s.QuotaRemaining, s.QuotaRenewalRate, s.QuotaRenews
-}
-
-// IsBasicAuth returns whether the key is basic auth or not.
-func (s *SessionState) IsBasicAuth() bool {
-	return s.BasicAuthData.Password != ""
 }

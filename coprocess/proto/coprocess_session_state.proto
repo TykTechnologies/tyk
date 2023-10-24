@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package coprocess;
 
-option go_package = "/coprocess";
-
 message AccessSpec {
   string url = 1;
   repeated string methods = 2;

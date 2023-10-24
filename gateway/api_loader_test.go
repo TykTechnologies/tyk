@@ -5,14 +5,13 @@ import (
 	"net/http"
 	"path"
 	_ "path"
+
 	"sync/atomic"
 	"testing"
 
-	"github.com/TykTechnologies/storage/persistent/model"
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
@@ -95,7 +94,7 @@ func TestFuzzyFindAPI(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	objectId := model.NewObjectID()
+	objectId := apidef.NewObjectId()
 
 	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
@@ -372,57 +371,4 @@ func TestTykRateLimitsStatusOfAPI(t *testing.T) {
 		quotaMax, quotaRemaining, rate, per)
 
 	_, _ = g.Run(t, test.TestCase{Path: "/my-api/tyk/rate-limits/", Headers: authHeader, BodyMatch: bodyMatch, Code: http.StatusOK})
-}
-
-func TestAllApisAreMTLS(t *testing.T) {
-	// Create a new instance of the Gateway
-	gw := &Gateway{
-		apisByID: make(map[string]*APISpec),
-	}
-
-	// Define API specs
-	spec1 := &APISpec{
-		APIDefinition: &apidef.APIDefinition{
-			UseMutualTLSAuth: true,
-			Active:           true,
-			APIID:            "api1",
-		},
-	}
-	spec2 := &APISpec{
-		APIDefinition: &apidef.APIDefinition{
-			UseMutualTLSAuth: true,
-			Active:           true,
-			APIID:            "api2",
-		},
-	}
-	spec3 := &APISpec{
-		APIDefinition: &apidef.APIDefinition{
-			UseMutualTLSAuth: true,
-			Active:           true,
-			APIID:            "api3",
-		},
-	}
-
-	// Add API specs to the gateway
-	gw.apisByID[spec1.APIID] = spec1
-	gw.apisByID[spec2.APIID] = spec2
-	gw.apisByID[spec3.APIID] = spec3
-
-	result := gw.allApisAreMTLS()
-
-	expected := true
-	if result != expected {
-		t.Errorf("Expected AllApisAreMTLS to return %v, but got %v", expected, result)
-	}
-
-	// Change one API to not use mutual TLS authentication
-	spec3.UseMutualTLSAuth = false
-
-	// Call the method again
-	result = gw.allApisAreMTLS()
-
-	expected = false
-	if result != expected {
-		t.Errorf("Expected AllApisAreMTLS to return %v, but got %v", expected, result)
-	}
 }

@@ -5,16 +5,12 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-
-	"github.com/lonelycode/osin"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/lonelycode/osin"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -150,7 +146,6 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 }
 
 func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
-
 	g := StartTest(nil)
 	defer g.Close()
 
@@ -179,7 +174,7 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 	})
 
 	auth := map[string]string{
-		header.Authorization: key,
+		headers.Authorization: key,
 	}
 
 	// Call 3 times
@@ -208,193 +203,4 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 	quotaCounter, err = g.Gw.GlobalSessionManager.Store().GetRawKey(quotaKey)
 	assert.NoError(t, err)
 	assert.Equal(t, "1", quotaCounter)
-}
-
-// TestRPCUpdateKey check that on update key event the key still exist in worker redis
-func TestRPCUpdateKey(t *testing.T) {
-
-	cases := []struct {
-		TestName     string
-		Hashed       bool
-		EventPostfix string
-	}{
-		{
-			TestName:     "TestRPCUpdateKey unhashed",
-			Hashed:       false,
-			EventPostfix: "",
-		}, {
-			TestName:     "TestRPCUpdateKey hashed",
-			Hashed:       true,
-			EventPostfix: ":hashed",
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.TestName, func(t *testing.T) {
-			g := StartTest(func(globalConf *config.Config) {
-				globalConf.HashKeys = tc.Hashed
-			})
-			defer g.Close()
-
-			rpcListener := RPCStorageHandler{
-				KeyPrefix:        "rpc.listener.",
-				SuppressRegister: true,
-				HashKeys:         tc.Hashed,
-				Gw:               g.Gw,
-			}
-
-			g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-			defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-
-			api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-				spec.UseKeylessAccess = false
-				spec.Proxy.ListenPath = "/api"
-			})[0]
-
-			session, key := g.CreateSession(func(s *user.SessionState) {
-				s.AccessRights = map[string]user.AccessDefinition{api.APIID: {
-					APIID: api.APIID,
-					Limit: user.APILimit{
-						QuotaMax: 30,
-					},
-				}}
-			})
-
-			auth := map[string]string{
-				header.Authorization: key,
-			}
-
-			_, _ = g.Run(t, []test.TestCase{
-				{Path: "/api", Headers: auth, Code: http.StatusOK},
-			}...)
-
-			tags := []string{"test"}
-			session.Tags = tags
-
-			err := g.Gw.GlobalSessionManager.UpdateSession(key, session, 0, tc.Hashed)
-			assert.NoError(t, err)
-
-			rpcListener.ProcessKeySpaceChanges([]string{"apikey-" + key + tc.EventPostfix}, api.OrgID)
-			myUpdatedSession, newSessFound := g.Gw.GlobalSessionManager.SessionDetail(api.OrgID, key, tc.Hashed)
-
-			assert.True(t, newSessFound, "key should be found")
-			assert.Equal(t, tags, myUpdatedSession.Tags)
-		})
-	}
-}
-
-func TestGetGroupLoginCallback(t *testing.T) {
-	tcs := []struct {
-		testName                 string
-		syncEnabled              bool
-		givenKey                 string
-		givenGroup               string
-		expectedCallbackResponse interface{}
-	}{
-		{
-			testName:                 "sync disabled",
-			syncEnabled:              false,
-			givenKey:                 "key",
-			givenGroup:               "group",
-			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group"},
-		},
-		{
-			testName:                 "sync enabled",
-			syncEnabled:              true,
-			givenKey:                 "key",
-			givenGroup:               "group",
-			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group", ForceSync: true},
-		},
-	}
-
-	for _, tc := range tcs {
-		t.Run(tc.testName, func(t *testing.T) {
-			g := StartTest(func(globalConf *config.Config) {
-				globalConf.SlaveOptions.SynchroniserEnabled = tc.syncEnabled
-			})
-			defer g.Close()
-			defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-
-			rpcListener := RPCStorageHandler{
-				KeyPrefix:        "rpc.listener.",
-				SuppressRegister: true,
-				Gw:               g.Gw,
-			}
-
-			fn := rpcListener.getGroupLoginCallback(tc.syncEnabled)
-			groupLogin, ok := fn(tc.givenKey, tc.givenGroup).(apidef.GroupLoginRequest)
-			assert.True(t, ok)
-			assert.Equal(t, tc.expectedCallbackResponse, groupLogin)
-		})
-	}
-
-}
-
-func TestGetRawKey(t *testing.T) {
-
-	t.Run("rpc cache enabled - normal key", func(t *testing.T) {
-		ts := StartTest(func(globalConf *config.Config) {
-			globalConf.SlaveOptions.EnableRPCCache = true
-		})
-		defer ts.Close()
-
-		rpcListener := RPCStorageHandler{
-			KeyPrefix:        "rpc.listener.",
-			SuppressRegister: true,
-			Gw:               ts.Gw,
-		}
-
-		// first call should fail - key not found
-		givenKey := "test-key"
-		_, err := rpcListener.GetRawKey(givenKey)
-		assert.NotNil(t, err)
-		assert.Equal(t, "key not found", err.Error())
-
-		// second call still fail but from cache
-		_, err = rpcListener.GetRawKey(givenKey)
-		assert.NotNil(t, err)
-		assert.Equal(t, "key not found", err.Error())
-
-		// we override the key in the cache
-		rpcListener.Gw.RPCGlobalCache.Set(givenKey, "test-value", -1)
-		defer rpcListener.Gw.RPCGlobalCache.Delete(givenKey)
-
-		// third call should succeed
-		value, err := rpcListener.GetRawKey(givenKey)
-		assert.Nil(t, err)
-		assert.Equal(t, "test-value", value)
-	})
-	t.Run("rpc cache enabled - cert key", func(t *testing.T) {
-		ts := StartTest(func(globalConf *config.Config) {
-			globalConf.SlaveOptions.EnableRPCCache = true
-		})
-		defer ts.Close()
-
-		rpcListener := RPCStorageHandler{
-			KeyPrefix:        "rpc.listener.",
-			SuppressRegister: true,
-			Gw:               ts.Gw,
-		}
-
-		// first call should fail - key not found
-		givenKey := "cert-test-key"
-		_, err := rpcListener.GetRawKey(givenKey)
-		assert.NotNil(t, err)
-		assert.Equal(t, "key not found", err.Error())
-
-		// second call still fail but from cache
-		_, err = rpcListener.GetRawKey(givenKey)
-		assert.NotNil(t, err)
-		assert.Equal(t, "key not found", err.Error())
-
-		// we override the key in the cache
-		rpcListener.Gw.RPCCertCache.Set(givenKey, "test-value", -1)
-		defer rpcListener.Gw.RPCCertCache.Delete(givenKey)
-
-		// third call should succeed
-		value, err := rpcListener.GetRawKey(givenKey)
-		assert.Nil(t, err)
-		assert.Equal(t, "test-value", value)
-	})
-
 }

@@ -21,7 +21,6 @@ const (
 	AuthToken
 	HashedAuthToken
 	VersionData
-	VersionName
 	VersionDefault
 	OrgSessionContext
 	ContextData
@@ -43,7 +42,6 @@ const (
 	RequestStatus
 	GraphQLRequest
 	GraphQLIsWebSocketUpgrade
-	OASOperation
 
 	// CacheOptions holds cache options required for cache writer middleware.
 	CacheOptions

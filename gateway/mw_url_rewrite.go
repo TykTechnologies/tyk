@@ -38,18 +38,8 @@ var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
-func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request, decodeURL bool) (string, error) {
-	rawPath := r.URL.String()
-	path := rawPath
-
-	if decodeURL {
-		var err error
-		path, err = url.PathUnescape(rawPath)
-		if err != nil {
-			return rawPath, fmt.Errorf("failed to decode URL path: %s", rawPath)
-		}
-	}
-
+func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
+	path := r.URL.String()
 	log.Debug("Inbound path: ", path)
 	newpath := path
 
@@ -206,10 +196,6 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request, deco
 
 	newpath = gw.replaceTykVariables(r, newpath, true)
 
-	if rawPath == newpath && containsEscapedChars(rawPath) {
-		newpath, _ = gw.urlRewrite(meta, r, true)
-	}
-
 	return newpath, nil
 }
 
@@ -299,7 +285,6 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 			in = strings.Replace(in, v, val, -1)
 
 		case vaultLabel:
-
 			if err := gw.setUpVault(); err != nil {
 				in = emptyStringFn(key, in, v)
 				continue
@@ -314,7 +299,6 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 			in = strings.Replace(in, v, val, -1)
 
 		case consulLabel:
-
 			if err := gw.setUpConsul(); err != nil {
 				in = emptyStringFn(key, in, v)
 				continue
@@ -354,7 +338,7 @@ func valToStr(v interface{}) string {
 	case string:
 		s = x
 	case float64:
-		s = strconv.FormatFloat(x, 'f', -1, 64)
+		s = strconv.FormatFloat(x, 'f', -1, 32)
 	case int64:
 		s = strconv.FormatInt(x, 10)
 	case []string:
@@ -445,39 +429,23 @@ func (m *URLRewriteMiddleware) EnabledForSpec() bool {
 	return false
 }
 
-func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) error {
+func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) {
 	oldAsURL, errParseOld := url.Parse(oldPath)
 	if errParseOld != nil {
-		return errParseOld
+		log.WithError(errParseOld).WithField("url", oldPath).Error("could not parse")
+		return
 	}
 
 	newAsURL, errParseNew := url.Parse(newTarget)
 	if errParseNew != nil {
-		return errParseNew
+		log.WithError(errParseNew).WithField("url", newTarget).Error("could not parse")
+		return
 	}
 
-	if shouldRewriteHost(oldAsURL, newAsURL) {
+	if newAsURL.Scheme != LoopScheme && oldAsURL.Host != newAsURL.Host {
 		log.Debug("Detected a host rewrite in pattern!")
 		setCtxValue(r, ctx.RetainHost, true)
 	}
-
-	return nil
-}
-
-func shouldRewriteHost(oldURL, newURL *url.URL) bool {
-	if newURL.Scheme == "" {
-		return false
-	}
-
-	if newURL.Scheme == LoopScheme {
-		return false
-	}
-
-	if oldURL.Host == newURL.Host {
-		return false
-	}
-
-	return true
 }
 
 const LoopScheme = "tyk"
@@ -495,8 +463,8 @@ func LoopingUrl(host string) string {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	vInfo, _ := m.Spec.Version(r)
-	found, meta := m.Spec.CheckSpecMatchesStatus(r, m.Spec.RxPaths[vInfo.Name], URLRewrite)
+	_, versionPaths, _, _ := m.Spec.Version(r)
+	found, meta := m.Spec.CheckSpecMatchesStatus(r, versionPaths, URLRewrite)
 
 	if !found {
 		return nil, http.StatusOK
@@ -510,8 +478,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	umeta := meta.(*apidef.URLRewriteMeta)
 	log.Debug(r.URL)
 	oldPath := r.URL.String()
-
-	p, err := m.Gw.urlRewrite(umeta, r, false)
+	p, err := m.Gw.urlRewrite(umeta, r)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError
@@ -526,9 +493,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		})
 	}
 
-	if err = m.CheckHostRewrite(oldPath, p, r); err != nil {
-		log.WithError(err).WithField("from", oldPath).WithField("to", p).Error("Checking Host rewrite: error parsing URL")
-	}
+	m.CheckHostRewrite(oldPath, p, r)
 
 	newURL, err := url.Parse(p)
 	if err != nil {

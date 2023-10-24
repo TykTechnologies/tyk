@@ -6,14 +6,13 @@ import (
 	"errors"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/sirupsen/logrus"
-
-	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/sirupsen/logrus"
 )
 
 type (
@@ -32,12 +31,21 @@ const (
 	System                             = "system"
 )
 
-func (gw *Gateway) setCurrentHealthCheckInfo(h map[string]HealthCheckItem) {
-	gw.healthCheckInfo.Store(h)
+var (
+	healthCheckInfo atomic.Value
+	healthCheckLock sync.Mutex
+)
+
+func setCurrentHealthCheckInfo(h map[string]HealthCheckItem) {
+	healthCheckLock.Lock()
+	healthCheckInfo.Store(h)
+	healthCheckLock.Unlock()
 }
 
-func (gw *Gateway) getHealthCheckInfo() map[string]HealthCheckItem {
-	ret := gw.healthCheckInfo.Load().(map[string]HealthCheckItem)
+func getHealthCheckInfo() map[string]HealthCheckItem {
+	healthCheckLock.Lock()
+	ret := healthCheckInfo.Load().(map[string]HealthCheckItem)
+	healthCheckLock.Unlock()
 	return ret
 }
 
@@ -58,7 +66,7 @@ type HealthCheckItem struct {
 }
 
 func (gw *Gateway) initHealthCheck(ctx context.Context) {
-	gw.setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
+	setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
 
 	go func(ctx context.Context) {
 		var n = gw.GetConfig().LivenessCheck.CheckDuration
@@ -154,7 +162,6 @@ func (gw *Gateway) gatherHealthChecks() {
 	}
 
 	if gw.GetConfig().Policies.PolicySource == "rpc" {
-
 		wg.Add(1)
 
 		go func() {
@@ -182,7 +189,7 @@ func (gw *Gateway) gatherHealthChecks() {
 	wg.Wait()
 
 	allInfos.mux.Lock()
-	gw.setCurrentHealthCheckInfo(allInfos.info)
+	setCurrentHealthCheckInfo(allInfos.info)
 	allInfos.mux.Unlock()
 }
 
@@ -192,7 +199,7 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	checks := gw.getHealthCheckInfo()
+	checks := getHealthCheckInfo()
 
 	res := HealthCheckResponse{
 		Status:      Pass,
@@ -223,8 +230,7 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res.Status = status
-
-	w.Header().Set("Content-Type", header.ApplicationJSON)
+	w.Header().Set("Content-Type", headers.ApplicationJSON)
 
 	// If this option is not set, or is explicitly set to false, add the mascot headers
 	if !gw.GetConfig().HideGeneratorHeader {
