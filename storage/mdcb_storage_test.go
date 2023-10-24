@@ -7,7 +7,7 @@ func TestGetResourceType(t *testing.T) {
 		key      string
 		expected string
 	}{
-		{"oaut-data.1728646271.oauth-clientid.some-client-id", "Oauth Client"},
+		{"oauth-clientid.client-id", "Oauth Client"},
 		{"cert.something", "certificate"},
 		{"apikey.something", "api key"},
 		{"unmatched-key", "key"},

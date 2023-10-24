@@ -54,7 +54,7 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 
 func getResourceType(key string) string {
 	switch {
-	case strings.HasPrefix(key, "oaut-data") && strings.Contains(key, "oauth-client"):
+	case strings.Contains(key, "oauth-clientid."):
 		return "Oauth Client"
 	case strings.HasPrefix(key, "cert"):
 		return "certificate"
