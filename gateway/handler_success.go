@@ -119,6 +119,10 @@ func getSessionTags(session *user.SessionState) []string {
 	return tags
 }
 
+func recordGraphDetila(r *http.Request, response *http.Response) {
+
+}
+
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response) {
 
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
