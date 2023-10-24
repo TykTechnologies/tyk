@@ -1,4 +1,4 @@
-from inspect import getargspec
+from inspect import getfullargspec
 
 
 class HandlerDecorator(object):
@@ -14,7 +14,7 @@ class Hook(object):
     def __init__(self, f):
         self.name = f.__name__
         self.f = f
-        self.arg_count = len(getargspec(f)[0])
+        self.arg_count = len(getfullargspec(f)[0])
 
     def __call__(self, *args, **kwargs):
         if self.arg_count == 3:
