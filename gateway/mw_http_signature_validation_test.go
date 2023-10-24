@@ -27,9 +27,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const hmacAuthDef = `{
@@ -125,6 +124,7 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 }
 
 func testPrepareHMACAuthSessionPass(tb testing.TB, ts *Test, hashFn func() hash.Hash, eventWG *sync.WaitGroup, withHeader bool, isBench bool) (string, *APISpec, *http.Request, string) {
+
 	spec := ts.Gw.LoadSampleAPI(hmacAuthDef)
 
 	session := createHMACAuthSession()
@@ -191,7 +191,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
-		EventAuthFailure: {&testAuthFailEventHandler{cb}},
+		"AuthFailure": {&testAuthFailEventHandler{cb}},
 	}
 
 	sessionKey := ""
@@ -239,14 +239,11 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 }
 
 func TestHMACAuthSessionPass(t *testing.T) {
-
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-
 	ts := StartTest(nil)
 	defer ts.Close()
-
 	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, ts, sha1.New, &eventWG, false, false)
 
 	recorder := httptest.NewRecorder()
@@ -266,14 +263,11 @@ func TestHMACAuthSessionPass(t *testing.T) {
 }
 
 func TestHMACAuthSessionSHA512Pass(t *testing.T) {
-
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-
 	ts := StartTest(nil)
 	defer ts.Close()
-
 	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, ts, sha512.New, &eventWG, false, false)
 
 	recorder := httptest.NewRecorder()
@@ -298,10 +292,8 @@ func BenchmarkHMACAuthSessionPass(b *testing.B) {
 
 	var eventWG sync.WaitGroup
 	eventWG.Add(b.N)
-
 	ts := StartTest(nil)
 	defer ts.Close()
-
 	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(b, ts, sha1.New, &eventWG, false, true)
 
 	recorder := httptest.NewRecorder()
@@ -551,14 +543,11 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 }
 
 func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
-
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-
 	ts := StartTest(nil)
 	defer ts.Close()
-
 	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, ts, sha1.New, &eventWG, true, false)
 
 	recorder := httptest.NewRecorder()
@@ -579,13 +568,11 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 
 func BenchmarkHMACAuthSessionPassWithHeaderField(b *testing.B) {
 	b.ReportAllocs()
-
-	var eventWG sync.WaitGroup
-	eventWG.Add(b.N)
-
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	var eventWG sync.WaitGroup
+	eventWG.Add(b.N)
 	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(b, ts, sha1.New, &eventWG, true, true)
 
 	recorder := httptest.NewRecorder()
@@ -779,9 +766,17 @@ func TestRSAAuthSessionKeyMissing(t *testing.T) {
 	pubID, _ := ts.Gw.CertificateManager.Add(pubPem, "")
 	defer ts.Gw.CertificateManager.Delete(pubID, "")
 
-	// Should receive an AuthFailure events
+	spec := ts.Gw.LoadSampleAPI(hmacAuthDef)
+
+	// Should receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
+	cb := func(em config.EventMessage) {
+		eventWG.Done()
+	}
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+		"AuthFailure": {&testAuthFailEventHandler{cb}},
+	}
 
 	recorder := httptest.NewRecorder()
 	encodedString, spec, req, _ := testPrepareRSAAuthSessionPass(t, &eventWG, privateKey, pubID, false, false, ts)

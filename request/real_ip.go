@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/headers"
 )
 
 // RealIP takes a request object, and returns the real Client IP address.
@@ -15,13 +15,13 @@ func RealIP(r *http.Request) string {
 		return contextIp.(string)
 	}
 
-	if realIPVal := r.Header.Get(header.XRealIP); realIPVal != "" {
+	if realIPVal := r.Header.Get(headers.XRealIP); realIPVal != "" {
 		if realIP := net.ParseIP(realIPVal); realIP != nil {
 			return realIP.String()
 		}
 	}
 
-	if fw := r.Header.Get(header.XForwardFor); fw != "" {
+	if fw := r.Header.Get(headers.XForwardFor); fw != "" {
 		// X-Forwarded-For has no port
 		if i := strings.IndexByte(fw, ','); i >= 0 {
 			fw = fw[:i]

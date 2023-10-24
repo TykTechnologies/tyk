@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -15,19 +14,15 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/stretchr/testify/assert"
-
-	redis "github.com/go-redis/redis/v8"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	redis "github.com/go-redis/redis/v8"
 )
 
 func TestURLRewrites(t *testing.T) {
@@ -208,65 +203,6 @@ func TestWhitelist(t *testing.T) {
 			{Path: "/vegetables/count", Code: http.StatusForbidden},
 		}...)
 	})
-
-	t.Run("Disabled", func(t *testing.T) {
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-				v.UseExtendedPaths = true
-				v.ExtendedPaths.WhiteList = []apidef.EndPointMeta{
-					{Disabled: false, Path: "/foo"},
-					{Disabled: true, Path: "/bar"},
-				}
-			})
-
-			spec.Proxy.ListenPath = "/"
-		})
-
-		_, _ = ts.Run(t, []test.TestCase{
-			{Path: "/foo", Code: http.StatusOK},
-			{Path: "/bar", Code: http.StatusForbidden},
-		}...)
-	})
-}
-
-func TestGatewayTagsFilter(t *testing.T) {
-	t.Parallel()
-
-	newApiWithTags := func(enabled bool, tags []string) *apidef.APIDefinition {
-		return &apidef.APIDefinition{
-			TagsDisabled: !enabled,
-			Tags:         tags,
-		}
-	}
-
-	data := &nestedApiDefinitionList{}
-	data.set([]*apidef.APIDefinition{
-		newApiWithTags(false, []string{}),
-		newApiWithTags(true, []string{}),
-		newApiWithTags(true, []string{"a", "b", "c"}),
-		newApiWithTags(true, []string{"a", "b"}),
-		newApiWithTags(true, []string{"a"}),
-	})
-
-	assert.Len(t, data.Message, 5)
-
-	// Test NodeIsSegmented=true
-	{
-		enabled := true
-		assert.Len(t, data.filter(enabled), 0)
-		assert.Len(t, data.filter(enabled, "a"), 3)
-		assert.Len(t, data.filter(enabled, "b"), 2)
-		assert.Len(t, data.filter(enabled, "c"), 1)
-	}
-
-	// Test NodeIsSegmented=false
-	{
-		enabled := false
-		assert.Len(t, data.filter(enabled), 5)
-		assert.Len(t, data.filter(enabled, "a"), 5)
-		assert.Len(t, data.filter(enabled, "b"), 5)
-		assert.Len(t, data.filter(enabled, "c"), 5)
-	}
 }
 
 func TestBlacklist(t *testing.T) {
@@ -362,25 +298,6 @@ func TestBlacklist(t *testing.T) {
 
 			{Path: "/vegetables/vegetable", Code: http.StatusForbidden},
 			{Path: "/vegetables/count", Code: http.StatusOK},
-		}...)
-	})
-
-	t.Run("Disabled", func(t *testing.T) {
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-				v.UseExtendedPaths = true
-				v.ExtendedPaths.BlackList = []apidef.EndPointMeta{
-					{Disabled: false, Path: "/foo"},
-					{Disabled: true, Path: "/bar"},
-				}
-			})
-
-			spec.Proxy.ListenPath = "/"
-		})
-
-		_, _ = ts.Run(t, []test.TestCase{
-			{Path: "/foo", Code: http.StatusForbidden},
-			{Path: "/bar", Code: http.StatusOK},
 		}...)
 	})
 }
@@ -506,7 +423,6 @@ func TestIgnored(t *testing.T) {
 	})
 
 	t.Run("Case Sensitivity", func(t *testing.T) {
-
 		spec := BuildAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.Ignored = []apidef.EndPointMeta{{Path: "/Foo", IgnoreCase: false}, {Path: "/bar", IgnoreCase: true}}
@@ -578,215 +494,6 @@ func TestIgnored(t *testing.T) {
 			{Path: "/Foo", Code: http.StatusOK},
 			{Path: "/bar", Code: http.StatusOK},
 			{Path: "/Bar", Code: http.StatusOK},
-		}...)
-	})
-
-	t.Run("Disabled", func(t *testing.T) {
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-				v.UseExtendedPaths = true
-				v.ExtendedPaths.Ignored = []apidef.EndPointMeta{
-					{Disabled: false, Path: "/foo"},
-					{Disabled: true, Path: "/bar"},
-				}
-			})
-
-			spec.UseKeylessAccess = false
-			spec.Proxy.ListenPath = "/"
-		})
-
-		_, _ = ts.Run(t, []test.TestCase{
-			{Path: "/foo", Code: http.StatusOK},
-			{Path: "/bar", Code: http.StatusUnauthorized},
-		}...)
-	})
-}
-
-func TestOldMockResponse(t *testing.T) {
-	test.Racy(t) // TODO: TT-5225
-
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	const mockResponse = "this is mock response body"
-	const whiteMockPath = "/white-mock"
-	const blackMockPath = "/black-mock"
-	const ignoredMockPath = "/ignored-mock"
-
-	headers := map[string]string{
-		"mock-header": "mock-value",
-	}
-
-	whiteEndpointMeta := apidef.EndPointMeta{
-		Disabled: false,
-		Path:     whiteMockPath,
-		MethodActions: map[string]apidef.EndpointMethodMeta{
-			"GET": {
-				Action:  apidef.Reply,
-				Code:    http.StatusTeapot,
-				Data:    mockResponse,
-				Headers: headers,
-			},
-			"POST": {
-				Action:  apidef.NoAction,
-				Code:    http.StatusTeapot,
-				Data:    mockResponse,
-				Headers: headers,
-			},
-		},
-	}
-	blackEndpointMeta := whiteEndpointMeta
-	blackEndpointMeta.Path = blackMockPath
-	ignoreEndpointMeta := whiteEndpointMeta
-	ignoreEndpointMeta.Path = ignoredMockPath
-
-	buildAPI := func(keyless bool, st URLStatus) *APISpec {
-		return BuildAPI(func(spec *APISpec) {
-			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-				if st == WhiteList {
-					v.ExtendedPaths.WhiteList = []apidef.EndPointMeta{whiteEndpointMeta}
-				} else if st == BlackList {
-					v.ExtendedPaths.BlackList = []apidef.EndPointMeta{blackEndpointMeta}
-				} else if st == Ignored {
-					v.ExtendedPaths.Ignored = []apidef.EndPointMeta{ignoreEndpointMeta}
-				}
-
-				v.UseExtendedPaths = true
-			})
-
-			spec.Proxy.ListenPath = "/"
-			spec.UseKeylessAccess = keyless
-		})[0]
-	}
-
-	check := func(t *testing.T, api *APISpec, tc []test.TestCase) {
-		ts.Gw.LoadAPI(api)
-		_, _ = ts.Run(t, tc...)
-
-		t.Run("migration", func(t *testing.T) {
-			_, err := api.Migrate()
-			assert.NoError(t, err)
-
-			ts.Gw.LoadAPI(api)
-			_, _ = ts.Run(t, tc...)
-		})
-	}
-
-	t.Run("whitelist", func(t *testing.T) {
-		t.Run("keyless", func(t *testing.T) {
-			check(t, buildAPI(true, WhiteList), []test.TestCase{
-				{Method: http.MethodGet, Path: whiteMockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
-				{Method: http.MethodPost, Path: whiteMockPath, BodyNotMatch: mockResponse, Code: http.StatusOK},
-				{Method: http.MethodPut, Path: whiteMockPath, Code: http.StatusForbidden},
-				{Method: http.MethodGet, Path: "/something", Code: http.StatusForbidden},
-			})
-		})
-
-		t.Run("protected", func(t *testing.T) {
-			check(t, buildAPI(false, WhiteList), []test.TestCase{
-				{Method: http.MethodGet, Path: whiteMockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
-				{Method: http.MethodPost, Path: whiteMockPath, Code: http.StatusUnauthorized},
-				{Method: http.MethodPut, Path: whiteMockPath, Code: http.StatusForbidden},
-				{Method: http.MethodGet, Path: "/something", Code: http.StatusForbidden},
-			})
-		})
-	})
-
-	t.Run("blacklist", func(t *testing.T) {
-		t.Run("keyless", func(t *testing.T) {
-			check(t, buildAPI(true, BlackList), []test.TestCase{
-				{Method: http.MethodGet, Path: blackMockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
-				{Method: http.MethodPost, Path: blackMockPath, Code: http.StatusForbidden},
-				{Method: http.MethodPut, Path: blackMockPath, Code: http.StatusOK},
-				{Method: http.MethodGet, Path: "/something", Code: http.StatusOK},
-			})
-		})
-
-		t.Run("protected", func(t *testing.T) {
-			check(t, buildAPI(false, BlackList), []test.TestCase{
-				{Method: http.MethodGet, Path: blackMockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
-				{Method: http.MethodPost, Path: blackMockPath, Code: http.StatusForbidden},
-				{Method: http.MethodPut, Path: blackMockPath, Code: http.StatusUnauthorized},
-				{Method: http.MethodGet, Path: "/something", Code: http.StatusUnauthorized},
-			})
-		})
-	})
-
-	t.Run("ignored", func(t *testing.T) {
-		t.Run("keyless", func(t *testing.T) {
-			check(t, buildAPI(true, Ignored), []test.TestCase{
-				{Method: http.MethodGet, Path: ignoredMockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
-				{Method: http.MethodPost, Path: ignoredMockPath, BodyNotMatch: mockResponse, Code: http.StatusOK},
-				{Method: http.MethodPut, Path: ignoredMockPath, Code: http.StatusOK},
-				{Method: http.MethodGet, Path: "/something", Code: http.StatusOK},
-			})
-		})
-
-		t.Run("protected", func(t *testing.T) {
-			check(t, buildAPI(false, Ignored), []test.TestCase{
-				{Method: http.MethodGet, Path: ignoredMockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
-				{Method: http.MethodPost, Path: ignoredMockPath, BodyNotMatch: mockResponse, Code: http.StatusOK},
-				{Method: http.MethodPut, Path: ignoredMockPath, Code: http.StatusUnauthorized},
-				{Method: http.MethodGet, Path: "/something", Code: http.StatusUnauthorized},
-			})
-		})
-	})
-}
-
-func TestNewMockResponse(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	const mockResponse = "this is mock response body"
-	const mockPath = "/mock"
-	headers := map[string]string{
-		"mock-header": "mock-value",
-	}
-
-	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-			v.ExtendedPaths.MockResponse = []apidef.MockResponseMeta{
-				{
-					Disabled:   false,
-					Path:       mockPath,
-					IgnoreCase: false,
-					Method:     "GET",
-					Code:       http.StatusTeapot,
-					Body:       mockResponse,
-					Headers:    headers,
-				},
-				{
-					Disabled:   false,
-					Path:       mockPath,
-					IgnoreCase: false,
-					Method:     "POST",
-					Code:       http.StatusInsufficientStorage,
-					Body:       mockResponse,
-					Headers:    headers,
-				},
-			}
-			v.UseExtendedPaths = true
-		})
-
-		spec.UseKeylessAccess = false
-
-		spec.Proxy.ListenPath = "/"
-	})[0]
-
-	t.Run("protected", func(t *testing.T) {
-		_, _ = ts.Run(t, []test.TestCase{
-			{Method: http.MethodGet, Path: mockPath, BodyMatch: mockResponse, Code: http.StatusTeapot},
-		}...)
-	})
-
-	t.Run("keyless", func(t *testing.T) {
-		api.UseKeylessAccess = true
-		ts.Gw.LoadAPI(api)
-		_, _ = ts.Run(t, []test.TestCase{
-			{Method: http.MethodGet, Path: mockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusTeapot},
-			{Method: http.MethodPost, Path: mockPath, BodyMatch: mockResponse, HeadersMatch: headers, Code: http.StatusInsufficientStorage},
-			{Method: http.MethodPut, Path: mockPath, Code: http.StatusOK},
-			{Method: http.MethodGet, Path: "/something", Code: http.StatusOK},
 		}...)
 	})
 }
@@ -867,8 +574,8 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 			t.Fatalf("want %q, got %q", want, got)
 		}
 	}
-	ts.Gw.handleRedisEvent(&msg, handled, wg.Done)
 
+	ts.Gw.handleRedisEvent(&msg, handled, wg.Done)
 	ts.Gw.ReloadTestCase.TickOk(t)
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
@@ -994,7 +701,7 @@ func (ts *Test) testPrepareDefaultVersion() string {
 		v2 := apidef.VersionInfo{Name: "v2"}
 		v2.Paths.WhiteList = []string{"/bar"}
 
-		spec.VersionDefinition.Location = apidef.URLParamLocation
+		spec.VersionDefinition.Location = urlParamLocation
 		spec.VersionDefinition.Key = "v"
 		spec.VersionData.NotVersioned = false
 
@@ -1022,79 +729,59 @@ func TestGetVersionFromRequest(t *testing.T) {
 	t.Run("Header location", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer func() {
+			time.Sleep(1 * time.Second)
 			ts.Close()
 		}()
 
-		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = apidef.HeaderLocation
-			spec.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+			spec.VersionDefinition.Location = headerLocation
+			spec.VersionDefinition.Key = "X-API-Version"
 			spec.VersionData.Versions["v1"] = versionInfo
-		})[0]
+		})
 
-		headers := map[string]string{apidef.DefaultAPIVersionKey: "v1"}
+		headers := map[string]string{"X-API-Version": "v1"}
 
-		_, _ = ts.Run(t, []test.TestCase{
-			{Path: "/foo", Code: http.StatusOK, Headers: headers, BodyMatch: `"X-Api-Version":"v1"`},
+		ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusOK, Headers: headers},
 			{Path: "/bar", Code: http.StatusForbidden, Headers: headers},
 		}...)
-
-		t.Run("strip versioning data", func(t *testing.T) {
-			api.VersionDefinition.StripVersioningData = true
-			ts.Gw.LoadAPI(api)
-
-			_, _ = ts.Run(t, test.TestCase{Path: "/foo", Code: http.StatusOK, Headers: headers, BodyNotMatch: `"X-Api-Version":"v1"`})
-		})
 	})
 
 	t.Run("URL param location", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = apidef.URLParamLocation
+			spec.VersionDefinition.Location = urlParamLocation
 			spec.VersionDefinition.Key = "version"
 			spec.VersionData.Versions["v2"] = versionInfo
-		})[0]
+		})
 
-		_, _ = ts.Run(t, []test.TestCase{
-			{Path: "/foo?version=v2", BodyMatch: `"URI":"/foo\?version=v2"`, Code: http.StatusOK},
+		ts.Run(t, []test.TestCase{
+			{Path: "/foo?version=v2", Code: http.StatusOK},
 			{Path: "/bar?version=v2", Code: http.StatusForbidden},
 		}...)
-
-		t.Run("strip versioning data", func(t *testing.T) {
-			api.VersionDefinition.StripVersioningData = true
-			ts.Gw.LoadAPI(api)
-
-			_, _ = ts.Run(t, test.TestCase{Path: "/foo?version=v2", BodyMatch: `"URI":"/foo"`, Code: http.StatusOK})
-		})
 	})
 
 	t.Run("URL location", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = apidef.URLLocation
+			spec.VersionDefinition.Location = urlLocation
 			spec.VersionData.Versions["v3"] = versionInfo
-		})[0]
+		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/v3/foo", BodyMatch: `"URI":"/v3/foo"`, Code: http.StatusOK},
+			{Path: "/v3/foo", Code: http.StatusOK},
 			{Path: "/v3/bar", Code: http.StatusForbidden},
 		}...)
-
-		t.Run("strip versioning data", func(t *testing.T) {
-			api.VersionDefinition.StripVersioningData = true
-			ts.Gw.LoadAPI(api)
-
-			_, _ = ts.Run(t, test.TestCase{Path: "/v3/foo", BodyMatch: `"URI":"/foo"`, Code: http.StatusOK})
-		})
 	})
 }
 
@@ -1112,12 +799,12 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = apidef.HeaderLocation
-			spec.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+			spec.VersionDefinition.Location = headerLocation
+			spec.VersionDefinition.Key = "X-API-Version"
 			spec.VersionData.Versions["v1"] = versionInfo
 		})
 
-		headers := map[string]string{apidef.DefaultAPIVersionKey: "v1"}
+		headers := map[string]string{"X-API-Version": "v1"}
 
 		for i := 0; i < b.N; i++ {
 			ts.Run(b, []test.TestCase{
@@ -1132,7 +819,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = apidef.URLParamLocation
+			spec.VersionDefinition.Location = urlParamLocation
 			spec.VersionDefinition.Key = "version"
 			spec.VersionData.Versions["v2"] = versionInfo
 		})
@@ -1150,7 +837,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = apidef.URLLocation
+			spec.VersionDefinition.Location = urlLocation
 			spec.VersionData.Versions["v3"] = versionInfo
 		})
 
@@ -1206,7 +893,6 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 		}
 	}
 	ts.Gw.handleRedisEvent(&msg, handled, wg.Done)
-
 	ts.Gw.ReloadTestCase.TickOk(t)
 
 	// Wait for the reload to finish, then check it worked
@@ -1221,6 +907,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 	var wg2 sync.WaitGroup
 	wg2.Add(1)
+
 	ts.Gw.ReloadTestCase.Reset()
 	ts.Gw.handleRedisEvent(&msg, handled, wg2.Done)
 
@@ -1235,7 +922,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 }
 
-func TestAPIDefinitionLoader(t *testing.T) {
+func TestAPIDefinitionLoader_Template(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -1258,18 +945,6 @@ func TestAPIDefinitionLoader(t *testing.T) {
 		assert.Equal(t, "value-2", res["value1"])
 	}
 
-	t.Run("processRPCDefinitions invalid", func(t *testing.T) {
-		specs, err := l.processRPCDefinitions("{invalid json}", ts.Gw)
-		assert.Len(t, specs, 0)
-		assert.Error(t, err)
-	})
-
-	t.Run("processRPCDefinitions zero", func(t *testing.T) {
-		specs, err := l.processRPCDefinitions("[]", ts.Gw)
-		assert.Len(t, specs, 0)
-		assert.NoError(t, err)
-	})
-
 	t.Run("loadFileTemplate", func(t *testing.T) {
 		temp, err := l.loadFileTemplate(testTemplatePath)
 		assert.NoError(t, err)
@@ -1288,40 +963,6 @@ func TestAPIDefinitionLoader(t *testing.T) {
 	})
 }
 
-func TestAPIExpiration(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	api := BuildAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.UseKeylessAccess = true
-		spec.VersionData.NotVersioned = true
-		spec.VersionDefinition.Enabled = true
-	})[0]
-
-	for _, versioned := range []bool{false, true} {
-		api.VersionDefinition.Enabled = versioned
-
-		t.Run(fmt.Sprintf("versioning=%v", versioned), func(t *testing.T) {
-			t.Run("not expired", func(t *testing.T) {
-				api.Expiration = time.Now().AddDate(1, 0, 0).Format(apidef.ExpirationTimeFormat)
-				ts.Gw.LoadAPI(api)
-				resp, _ := ts.Run(t, test.TestCase{Code: http.StatusOK})
-
-				assert.NotEmpty(t, resp.Header.Get(XTykAPIExpires))
-			})
-
-			t.Run("expired", func(t *testing.T) {
-				api.Expiration = apidef.ExpirationTimeFormat
-				ts.Gw.LoadAPI(api)
-				resp, _ := ts.Run(t, test.TestCase{Code: http.StatusForbidden})
-
-				assert.Empty(t, resp.Header.Get(XTykAPIExpires))
-			})
-		})
-	}
-}
-
 func TestStripListenPath(t *testing.T) {
 	assert.Equal(t, "/get", stripListenPath("/listen", "/listen/get"))
 	assert.Equal(t, "/get", stripListenPath("/listen/", "/listen/get"))
@@ -1335,8 +976,6 @@ func TestStripListenPath(t *testing.T) {
 	assert.Equal(t, "/get", stripListenPath("/{_:.*}/", "/listen/get"))
 	assert.Equal(t, "/get", stripListenPath("/pre/{_:.*}/", "/pre/listen/get"))
 	assert.Equal(t, "/", stripListenPath("/{_:.*}", "/listen"))
-	assert.Equal(t, "/get", stripListenPath("/{myPattern:foo|bar}", "/foo/get"))
-	assert.Equal(t, "/anything/get", stripListenPath("/{myPattern:foo|bar}", "/anything/get"))
 }
 
 func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
@@ -1363,74 +1002,6 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 	})
 }
 
-func TestEnforcedTimeout(t *testing.T) {
-	test.Flaky(t) // TODO TT-5222
-
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(2 * time.Second)
-	}))
-
-	api := BuildAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.Proxy.TargetURL = upstream.URL
-		spec.UseKeylessAccess = true
-		UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
-			version.UseExtendedPaths = true
-			version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
-				{
-					Disabled: false,
-					Path:     "/get",
-					Method:   http.MethodGet,
-					TimeOut:  1,
-				},
-			}
-		})
-	})[0]
-
-	ts.Gw.LoadAPI(api)
-
-	_, _ = ts.Run(t, test.TestCase{
-		Method: http.MethodGet, Path: "/get", BodyMatch: "Upstream service reached hard timeout", Code: http.StatusGatewayTimeout,
-	})
-
-	t.Run("disabled", func(t *testing.T) {
-		UpdateAPIVersion(api, "", func(version *apidef.VersionInfo) {
-			version.ExtendedPaths.HardTimeouts[0].Disabled = true
-		})
-
-		ts.Gw.LoadAPI(api)
-
-		_, _ = ts.Run(t, test.TestCase{
-			Method: http.MethodGet, Path: "/get", Code: http.StatusOK,
-		})
-	})
-}
-
-func TestAPISpec_GetSessionLifetimeRespectsKeyExpiration(t *testing.T) {
-	a := APISpec{APIDefinition: &apidef.APIDefinition{}}
-
-	t.Run("GetSessionLifetimeRespectsKeyExpiration=false", func(t *testing.T) {
-		a.GlobalConfig.SessionLifetimeRespectsKeyExpiration = false
-		a.SessionLifetimeRespectsKeyExpiration = false
-		assert.False(t, a.GetSessionLifetimeRespectsKeyExpiration())
-
-		a.SessionLifetimeRespectsKeyExpiration = true
-		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
-	})
-
-	t.Run("GetSessionLifetimeRespectsKeyExpiration=true", func(t *testing.T) {
-		a.GlobalConfig.SessionLifetimeRespectsKeyExpiration = true
-		a.SessionLifetimeRespectsKeyExpiration = false
-		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
-
-		a.SessionLifetimeRespectsKeyExpiration = true
-		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
-	})
-}
-
 func TestAPISpec_isListeningOnPort(t *testing.T) {
 	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
 	cfg := &config.Config{}
@@ -1440,95 +1011,4 @@ func TestAPISpec_isListeningOnPort(t *testing.T) {
 
 	s.ListenPort = 8000
 	assert.True(t, s.isListeningOnPort(8000, cfg))
-}
-
-func Test_LoadAPIsFromRPC(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-	objectID := model.NewObjectID()
-	loader := APIDefinitionLoader{Gw: ts.Gw}
-
-	t.Run("load APIs from RPC - success", func(t *testing.T) {
-		mockedStorage := &RPCDataLoaderMock{
-			ShouldConnect: true,
-			Apis: []nestedApiDefinition{
-				{APIDefinition: &apidef.APIDefinition{Id: objectID, OrgID: "org1", APIID: "api1"}},
-			},
-		}
-
-		apisMap, err := loader.FromRPC(mockedStorage, "org1", ts.Gw)
-
-		assert.NoError(t, err, "error loading APIs from RPC:", err)
-		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC")
-	})
-
-	t.Run("load APIs from RPC - success - then fail", func(t *testing.T) {
-		mockedStorage := &RPCDataLoaderMock{
-			ShouldConnect: true,
-			Apis: []nestedApiDefinition{
-				{APIDefinition: &apidef.APIDefinition{Id: objectID, OrgID: "org1", APIID: "api1"}},
-			},
-		}
-		// we increment the load count by 1, as if we logged in successfully to RPC
-		rpc.SetLoadCounts(t, 1)
-		defer rpc.SetLoadCounts(t, 0)
-
-		// we load the APIs from RPC successfully - it should store the APIs in the backup
-		apisMap, err := loader.FromRPC(mockedStorage, "org1", ts.Gw)
-
-		assert.NoError(t, err, "error loading APIs from RPC:", err)
-		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC")
-
-		// we now simulate a failure to connect to RPC
-		mockedStorage.ShouldConnect = false
-		rpc.SetEmergencyMode(t, true)
-		defer rpc.ResetEmergencyMode()
-
-		// we now try to load the APIs again, and expect it to load the APIs from the backup
-		apisMap, err = loader.FromRPC(mockedStorage, "org1", ts.Gw)
-
-		assert.NoError(t, err, "error loading APIs from RPC:", err)
-		assert.Equal(t, 1, len(apisMap), "expected 0 APIs to be loaded from RPC backup")
-	})
-}
-
-func TestAPISpec_setHasMock(t *testing.T) {
-	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
-
-	s.setHasMock()
-	assert.False(t, s.HasMock)
-
-	s.IsOAS = true
-	s.setHasMock()
-	assert.False(t, s.HasMock)
-
-	s.OAS = oas.OAS{}
-	s.setHasMock()
-	assert.False(t, s.HasMock)
-
-	xTyk := &oas.XTykAPIGateway{}
-	s.OAS.SetTykExtension(xTyk)
-	s.setHasMock()
-	assert.False(t, s.HasMock)
-
-	middleware := &oas.Middleware{}
-	xTyk.Middleware = middleware
-	s.setHasMock()
-	assert.False(t, s.HasMock)
-
-	op := &oas.Operation{}
-	middleware.Operations = oas.Operations{
-		"my-operation": op,
-	}
-	s.setHasMock()
-	assert.False(t, s.HasMock)
-
-	mock := &oas.MockResponse{}
-	op.MockResponse = mock
-	s.setHasMock()
-	assert.False(t, s.HasMock)
-
-	mock.Enabled = true
-	s.setHasMock()
-	assert.True(t, s.HasMock)
 }

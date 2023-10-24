@@ -28,7 +28,7 @@ func (t *TransformHeaders) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	vInfo, _ := t.Spec.Version(r)
+	vInfo, versionPaths, _, _ := t.Spec.Version(r)
 
 	// Manage global headers first - remove
 	for _, gdKey := range vInfo.GlobalHeadersRemove {
@@ -43,7 +43,6 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		setCustomHeader(r.Header, nKey, t.Gw.replaceTykVariables(r, nVal, false), ignoreCanonical)
 	}
 
-	versionPaths := t.Spec.RxPaths[vInfo.Name]
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, HeaderInjected)
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)

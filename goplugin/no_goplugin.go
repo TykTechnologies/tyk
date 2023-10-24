@@ -8,18 +8,10 @@ import (
 	"net/http"
 )
 
-const (
-	errNotImplemented = "goplugin.%s is disabled, use -tags=goplugin to enable"
-)
-
-func GetSymbol(modulePath string, symbol string) (interface{}, error) {
-	return nil, fmt.Errorf(errNotImplemented, "GetSymbol")
-}
-
 func GetHandler(path string, symbol string) (http.HandlerFunc, error) {
-	return nil, fmt.Errorf(errNotImplemented, "GetHandler")
+	return nil, fmt.Errorf("goplugin.GetHandler is disabled, please disable build flag 'nogoplugin'")
 }
 
 func GetResponseHandler(path string, symbol string) (func(rw http.ResponseWriter, res *http.Response, req *http.Request), error) {
-	return nil, fmt.Errorf(errNotImplemented, "GetResponseHandler")
+	return nil, fmt.Errorf("goplugin.GetResponseHandler is disabled, please disable build flag 'nogoplugin'")
 }

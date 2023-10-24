@@ -11,12 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kelseyhightower/envconfig"
-
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/kelseyhightower/envconfig"
 )
 
 type IPsHandleStrategy string
@@ -64,8 +62,6 @@ const (
 
 	DefaultDashPolicySource     = "service"
 	DefaultDashPolicyRecordName = "tyk_policies"
-
-	DefaultOTelResourceName = "tyk-gateway"
 )
 
 type PoliciesConfig struct {
@@ -76,9 +72,8 @@ type PoliciesConfig struct {
 	// Set this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.
 	PolicyConnectionString string `json:"policy_connection_string"`
 
-	// This option only applies in OSS deployment when the `policies.policy_source` is either set
-	// to `file` or an empty string. If `policies.policy_path` is not set, then Tyk will load policies
-	// from the JSON file specified by `policies.policy_record_name`.
+	// This option is required if `policies.policy_source` is set to `file`.
+	// Specifies the path of your JSON file containing the available policies.
 	PolicyRecordName string `json:"policy_record_name"`
 
 	// In a Pro installation, Tyk will load Policy IDs and use the internal object-ID as the ID of the policy.
@@ -88,18 +83,13 @@ type PoliciesConfig struct {
 	//
 	// This option should only be used when moving an installation to a new database.
 	AllowExplicitPolicyID bool `json:"allow_explicit_policy_id"`
-	// This option only applies in OSS deployment when the `policies.policy_source` is either set
-	// to `file` or an empty string. If `policies.policy_path` is set, then Tyk will load policies
-	// from all the JSON files under the directory specified by the `policies.policy_path` option.
-	// In this configuration, Tyk Gateway will allow policy management through the Gateway API.
-	PolicyPath string `json:"policy_path"`
 }
 
 type DBAppConfOptionsConfig struct {
 	// Set the URL to your Dashboard instance (or a load balanced instance). The URL needs to be formatted as: `http://dashboard_host:port`
 	ConnectionString string `json:"connection_string"`
 
-	// Set a timeout value, in seconds, for your Dashboard connection. Default value is 30.
+	// Set the timeout for your Dashboard connection. Defaults to 30 seconds. In seconds.
 	ConnectionTimeout int `json:"connection_timeout"`
 
 	// Set to `true` to enable filtering (sharding) of APIs.
@@ -157,15 +147,6 @@ type NormalisedURLConfig struct {
 	// Each UUID will be replaced with a placeholder {uuid}
 	NormaliseUUIDs bool `json:"normalise_uuids"`
 
-	// Set this to true to have Tyk automatically clean up ULIDs. It will match the following style:
-	//
-	// * `/posts/01G9HHNKWGBHCQX7VG3JKSZ055/comments`
-	// * `/posts/01g9hhnkwgbhcqx7vg3jksz055/comments`
-	// * `/posts/01g9HHNKwgbhcqx7vg3JKSZ055/comments`
-
-	// Each ULID will be replaced with a placeholder {ulid}
-	NormaliseULIDs bool `json:"normalise_ulids"`
-
 	// Set this to true to have Tyk automatically match for numeric IDs, it will match with a preceding slash so as not to capture actual numbers:
 	NormaliseNumbers bool `json:"normalise_numbers"`
 
@@ -177,7 +158,6 @@ type NormalisedURLConfig struct {
 
 type NormaliseURLPatterns struct {
 	UUIDs  *regexp.Regexp
-	ULIDs  *regexp.Regexp
 	IDs    *regexp.Regexp
 	Custom []*regexp.Regexp
 }
@@ -224,9 +204,6 @@ type AnalyticsConfigConfig struct {
 	PurgeInterval float32 `json:"purge_interval"`
 
 	ignoredIPsCompiled map[string]bool
-
-	// Determines the serialization engine for analytics. Available options: msgpack, and protobuf. By default, msgpack.
-	SerializerType string `json:"serializer_type"`
 }
 
 type HealthCheckConfig struct {
@@ -240,7 +217,7 @@ type HealthCheckConfig struct {
 }
 
 type LivenessCheckConfig struct {
-	// Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
+	// Frequence of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
 	CheckDuration time.Duration `json:"check_duration"`
 }
 
@@ -331,7 +308,7 @@ type SlaveOptionsConfig struct {
 	// The maximum time in seconds that a RPC ping can last.
 	PingTimeout int `json:"ping_timeout"`
 
-	// The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed. Defaults to 5.
+	// The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed.
 	RPCPoolSize int `json:"rpc_pool_size"`
 
 	// You can use this to set a period for which the Gateway will check if there are changes in keys that must be synchronized. If this value is not set then it will default to 10 seconds.
@@ -342,9 +319,6 @@ type SlaveOptionsConfig struct {
 
 	// RPCKeysCacheExpiration defines the expiration time of the rpc cache that stores the keys, defined in seconds
 	RPCGlobalCacheExpiration float32 `json:"rpc_global_cache_expiration"`
-
-	// SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources
-	SynchroniserEnabled bool `json:"synchroniser_enabled"`
 }
 
 type LocalSessionCacheConf struct {
@@ -369,14 +343,17 @@ type HttpServerOptionsConfig struct {
 	// No longer used
 	OverrideDefaults bool `json:"-"`
 
-	// API Consumer -> Gateway network read timeout. Not setting this config, or setting this to 0, defaults to 120 seconds
+	// User -> Gateway network read timeout
 	ReadTimeout int `json:"read_timeout"`
 
-	// API Consumer -> Gateway network write timeout. Not setting this config, or setting this to 0, defaults to 120 seconds
+	// User -> Gateway network write timeout
 	WriteTimeout int `json:"write_timeout"`
 
 	// Set to true to enable SSL connections
 	UseSSL bool `json:"use_ssl"`
+
+	// Enable Lets-Encrypt support
+	UseLE_SSL bool `json:"use_ssl_le"`
 
 	// Enable HTTP2 protocol handling
 	EnableHttp2 bool `json:"enable_http2"`
@@ -428,20 +405,6 @@ type HttpServerOptionsConfig struct {
 
 	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
 	Ciphers []string `json:"ssl_ciphers"`
-
-	// MaxRequestBodySize configures a maximum size limit for request body size (in bytes) for all APIs on the Gateway.
-	//
-	// Tyk Gateway will evaluate all API requests against this size limit and will respond with HTTP 413 status code if the body of the request is larger.
-	//
-	// Two methods are used to perform the comparison:
-	//  - If the API Request contains the `Content-Length` header, this is directly compared against `MaxRequestBodySize`.
-	//  - If the `Content-Length` header is not provided, the Request body is read in chunks to compare total size against `MaxRequestBodySize`.
-	//
-	// A value of zero (default) means that no maximum is set and API requests will not be tested.
-	//
-	// See more information about setting request size limits here:
-	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
-	MaxRequestBodySize int64 `json:"max_request_body_size"`
 }
 
 type AuthOverrideConf struct {
@@ -599,10 +562,10 @@ type Config struct {
 	// was written.
 	OriginalPath string `json:"-"`
 
-	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
+	// Force your Gateway to work only on a specifc domain name. Can be overriden by API custom domain.
 	HostName string `json:"hostname"`
 
-	// If your machine has multiple network devices or IPs you can force the Gateway to use the IP address you want.
+	// If your machine has mulitple network devices or IPs you can force the Gateway to use the IP address you want.
 	ListenAddress string `json:"listen_address"`
 
 	// Setting this value will change the port that Tyk listens on. Default: 8080.
@@ -646,18 +609,8 @@ type Config struct {
 	// Disable dynamic API and Policy reloads, e.g. it will load new changes only on procecss start.
 	SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
 
-	// ReloadInterval defines a duration in seconds within which the gateway responds to a reload event.
-	// The value defaults to 1, values lower than 1 are ignored.
-	ReloadInterval int64 `json:"reload_interval"`
-
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
-
-	// DisableKeyActionsByUsername disables key search by username.
-	// When this is set to `true` you are able to search for keys only by keyID or key hash (if `hash_keys` is also set to `true`)
-	// Note that if `hash_keys` is also set to `true` then the keyID will not be provided for APIs secured using basic auth. In this scenario the only search option would be to use key hash
-	// If you are using the Tyk Dashboard, you must configure this setting with the same value in both Gateway and Dashboard
-	DisableKeyActionsByUsername bool `json:"disable_key_actions_by_username"`
 
 	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
 	HashKeyFunction string `json:"hash_key_function"`
@@ -683,7 +636,7 @@ type Config struct {
 	// A policy can be defined in a file (Open Source installations) or from the same database as the Dashboard.
 	Policies PoliciesConfig `json:"policies"`
 
-	// Defines the ports that will be available for the API services to bind to in the following format: `"{“":“”}"`. Remember to escape JSON strings.
+	// Defines the ports that will be available for the API services to bind to in the following format: `{ “": “” }``.
 	// This is a map of protocol to PortWhiteList. This allows per protocol
 	// configurations.
 	PortWhiteList PortsWhiteList `json:"ports_whitelist"`
@@ -735,7 +688,7 @@ type Config struct {
 	// The standard rate limiter offers similar performance as the sentinel-based limiter. This is disabled by default.
 	EnableSentinelRateLimiter bool `json:"enable_sentinel_rate_limiter"`
 
-	// An enhancement for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
+	// An enchancment for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
 	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
 
 	// How frequently a distributed rate limiter synchronises information between the Gateway nodes. Default: 2 seconds.
@@ -958,11 +911,7 @@ type Config struct {
 	LogLevel string `json:"log_level"`
 
 	// Section for configuring OpenTracing support
-	// Deprecated: use OpenTelemetry instead.
 	Tracer Tracer `json:"tracing"`
-
-	// Section for configuring OpenTelemetry.
-	OpenTelemetry otel.OpenTelemetry `json:"opentelemetry"`
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 
@@ -1019,12 +968,11 @@ type Config struct {
 
 	// Enable global API token expiration. Can be needed if all your APIs using JWT or oAuth 2.0 auth methods with dynamically generated keys.
 	ForceGlobalSessionLifetime bool `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
-	// SessionLifetimeRespectsKeyExpiration respects the key expiration time when the session lifetime is less than the key expiration. That is, Redis waits the key expiration for physical removal.
-	SessionLifetimeRespectsKeyExpiration bool `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration"`
+
 	// global session lifetime, in seconds.
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
-	// This section enables the use of the KV capabilities to substitute configuration values.
+	// This section enables the use of the KV capabilites to substitute configuration values.
 	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/
 	KV struct {
 		Consul ConsulConfig `json:"consul"`
@@ -1063,17 +1011,6 @@ type Config struct {
 
 	// Skip TLS verification for JWT JWKs url validation
 	JWTSSLInsecureSkipVerify bool `json:"jwt_ssl_insecure_skip_verify"`
-
-	// ResourceSync configures mitigation strategy in case sync fails.
-	ResourceSync ResourceSyncConfig `json:"resource_sync"`
-}
-
-type ResourceSyncConfig struct {
-	// RetryAttempts configures the number of retry attempts before returning on a resource sync.
-	RetryAttempts int `json:"retry_attempts"`
-
-	// Interval configures the interval in seconds between each retry on a resource sync error.
-	Interval int `json:"interval"`
 }
 
 type TykError struct {
@@ -1230,13 +1167,12 @@ func WriteDefault(path string, conf *Config) error {
 // An error will be returned only if any of the paths existed but was
 // not a valid config file.
 func Load(paths []string, conf *Config) error {
-	var r io.ReadCloser
-	for _, filename := range paths {
-		f, err := os.Open(filename)
+	var r io.Reader
+	for _, path := range paths {
+		f, err := os.Open(path)
 		if err == nil {
 			r = f
-			defer r.Close()
-			conf.OriginalPath = filename
+			conf.OriginalPath = path
 			break
 		}
 		if os.IsNotExist(err) {
@@ -1244,7 +1180,6 @@ func Load(paths []string, conf *Config) error {
 		}
 		return err
 	}
-
 	if r == nil {
 		path := paths[0]
 		log.Warnf("No config file found, writing default to %s", path)
@@ -1254,7 +1189,6 @@ func Load(paths []string, conf *Config) error {
 		log.Info("Loading default configuration...")
 		return Load([]string{path}, conf)
 	}
-
 	if err := json.NewDecoder(r).Decode(&conf); err != nil {
 		return fmt.Errorf("couldn't unmarshal config: %v", err)
 	}

@@ -53,7 +53,7 @@ def MyPreMiddleware(request, session, spec):
 
 ### Authenticating an API with Python
 
-See example: https://tyk.io/docs/plugins/supported-languages/rich-plugins/python/custom-auth-python-tutorial/
+See example: https://tyk.io/docs/customise-tyk/plugins/rich-plugins/python/custom-auth-python-tutorial/
 
 ### Writing events handlers with Python
 
@@ -119,7 +119,7 @@ curl http://127.0.0.1:8080/coprocess-auth-tyk-api-test/ -H 'Authorization: inval
 * [Python 3.x](https://www.python.org/)
 * [Go](https://golang.org)
 * [Cython](http://cython.org/) (required if you need to modify and re-compile the gateway API binding)
-* [protobuf](https://pypi.python.org/pypi/protobuf/3.20.2) (Python module): `pip3 install protobuf==3.20.2`
+* [protobuf](https://pypi.python.org/pypi/protobuf/3.0.0) (Python module): `pip3 install protobuf`
 * [grpc](https://www.grpc.io/) (gRPC module): `pip3 install grpcio`
 
 ## Build steps

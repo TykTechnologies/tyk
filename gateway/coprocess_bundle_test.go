@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -85,26 +86,6 @@ func TestBundleLoader(t *testing.T) {
 			t.Fatalf("Driver doesn't match: got %s, expected %s\n", spec.CustomMiddleware.Driver, "grpc")
 		}
 	})
-
-	t.Run("bundle disabled with bundle value", func(t *testing.T) {
-		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.CustomMiddlewareBundle = "bundle.zip"
-			spec.CustomMiddlewareBundleDisabled = true
-		})[0]
-		err := ts.Gw.loadBundle(spec)
-		assert.Empty(t, spec.CustomMiddleware)
-		assert.NoError(t, err)
-	})
-
-	t.Run("bundle enabled with empty bundle value", func(t *testing.T) {
-		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.CustomMiddlewareBundle = ""
-			spec.CustomMiddlewareBundleDisabled = false
-		})[0]
-		err := ts.Gw.loadBundle(spec)
-		assert.Empty(t, spec.CustomMiddleware)
-		assert.NoError(t, err)
-	})
 }
 
 func TestBundleFetcher(t *testing.T) {
@@ -144,6 +125,7 @@ func TestBundleFetcher(t *testing.T) {
 		})
 		spec := specs[0]
 		bundle, err := ts.Gw.fetchBundle(spec)
+
 		if err != nil {
 			t.Fatalf("Couldn't fetch bundle: %s", err.Error())
 		}
@@ -176,7 +158,7 @@ from tyk.decorators import *
 from gateway import TykGateway as tyk
 
 @Hook
-def MyRequestHook(request, response, session, metadata, spec):
+def MyRequestHook(request, session, spec):
 	request.object.return_overrides.headers['X-Foo'] = 'Bar'
 	request.object.return_overrides.response_code = int(request.object.params["status"])
 
@@ -228,13 +210,11 @@ pre.NewProcessRequest(function(request, session) {
 
 func TestResponseOverride(t *testing.T) {
 	test.Flaky(t)
-	pythonVersion := test.GetPythonVersion()
-
 	ts := StartTest(nil, TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
-			PythonVersion:    pythonVersion,
+			PythonVersion:    "3.5",
 		}})
 	defer ts.Close()
 
@@ -248,6 +228,8 @@ func TestResponseOverride(t *testing.T) {
 			spec.UseKeylessAccess = true
 			spec.CustomMiddlewareBundle = bundle
 		})
+
+		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/test/?status=200", Code: 200, BodyMatch: customError, HeadersMatch: customHeader},

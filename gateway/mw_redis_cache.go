@@ -14,10 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-
 	"github.com/TykTechnologies/murmur3"
-	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
@@ -100,10 +98,7 @@ func addBodyHash(req *http.Request, regex string, h hash.Hash) (err error) {
 }
 
 func readBody(req *http.Request) (bodyBytes []byte, err error) {
-	req.Body, err = copyBody(req.Body, false)
-	if err != nil {
-		return nil, err
-	}
+	req.Body = copyBody(req.Body, false)
 	return ioutil.ReadAll(req.Body)
 }
 
@@ -146,7 +141,6 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 type cacheOptions struct {
 	key                    string
 	cacheOnlyResponseCodes []int
-	timeout                int64
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -157,7 +151,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	var cacheKeyRegex string
 	var cacheMeta *EndPointCacheMeta
 
-	version, _ := m.Spec.Version(r)
+	version, _, _, _ := m.Spec.Version(r)
 	versionPaths := m.Spec.RxPaths[version.Name]
 
 	// Lets see if we can throw a sledgehammer at this
@@ -194,23 +188,14 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	cacheOnlyResponseCodes := m.Spec.CacheOptions.CacheOnlyResponseCodes
-	timeout := m.Spec.CacheOptions.CacheTimeout
-	if cacheMeta != nil {
-		// override api level CacheOnlyResponseCodes by endpoint level if provided
-		if len(cacheMeta.CacheOnlyResponseCodes) > 0 {
-			cacheOnlyResponseCodes = cacheMeta.CacheOnlyResponseCodes
-		}
-
-		// override api level Timout by endpoint level if provided
-		if cacheMeta.Timeout > 0 {
-			timeout = cacheMeta.Timeout
-		}
+	// override api main CacheOnlyResponseCodes by endpoint specific if provided
+	if cacheMeta != nil && len(cacheMeta.CacheOnlyResponseCodes) > 0 {
+		cacheOnlyResponseCodes = cacheMeta.CacheOnlyResponseCodes
 	}
 
 	ctxSetCacheOptions(r, &cacheOptions{
 		key:                    key,
 		cacheOnlyResponseCodes: cacheOnlyResponseCodes,
-		timeout:                timeout,
 	})
 
 	retBlob, err = m.store.GetKey(key)
@@ -251,9 +236,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	// Only add ratelimit data to keyed sessions
 	if session != nil {
 		quotaMax, quotaRemaining, _, quotaRenews := session.GetQuotaLimitByAPIID(m.Spec.APIID)
-		newRes.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		newRes.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		newRes.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+		newRes.Header.Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		newRes.Header.Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		newRes.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 	newRes.Header.Set(cachedResponseHeader, "1")
 
@@ -275,7 +260,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	// Record analytics
 	if !m.Spec.DoNotTrack {
 		ms := DurationToMillisecond(time.Since(t1))
-		m.sh.RecordHit(r, analytics.Latency{Total: int64(ms)}, newRes.StatusCode, newRes)
+		m.sh.RecordHit(r, Latency{Total: int64(ms)}, newRes.StatusCode, newRes)
 	}
 
 	// Stop any further execution after we wrote cache out

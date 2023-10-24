@@ -2,11 +2,10 @@ package signature_validator
 
 import (
 	"encoding/hex"
-	"errors"
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/pkg/errors"
 )
 
 func TestValidateSignature_Init(t *testing.T) {
@@ -41,8 +40,6 @@ func TestValidateSignature_Init(t *testing.T) {
 }
 
 func TestValidateSignature_Validate(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5264
-
 	type tt struct {
 		SignatureAttempt string
 		Error            error

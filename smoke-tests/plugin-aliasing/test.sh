@@ -1,50 +1,42 @@
 #!/bin/bash
 set -eo pipefail
-
-function setup {
-	local tag=${1:-"v0.0.0"}
-
-	# Setup required env vars for docker compose
-	export GATEWAY_IMAGE=${GATEWAY_IMAGE:-"tykio/tyk-gateway:${tag}"}
-	export PLUGIN_COMPILER_IMAGE=${PLUGIN_COMPILER_IMAGE:-"tykio/tyk-plugin-compiler:${tag}"}
-
-	docker pull -q $GATEWAY_IMAGE || true
-	docker pull -q $PLUGIN_COMPILER_IMAGE || true
+function usage {
+    local progname=$1
+    cat <<EOF
+Usage:
+$progname <tag>
+Builds the plugin in testplugin using the supplied tag and tests it in the corresponding gw image.
+Requires docker compose.
+EOF
+    exit 1
 }
 
-setup $1
+compose='docker-compose'
+# composev2 is a client plugin
+[[ $(docker version --format='{{ .Client.Version }}') == "20.10.11" ]] && compose='docker compose'
 
-trap "docker compose down" EXIT
+[[ -z $1 ]] && usage $0
+export tag=$1
 
-GATEWAY_VERSION=$(docker run --rm -t $GATEWAY_IMAGE --version 2>&1)
-GATEWAY_VERSION=$(echo $GATEWAY_VERSION | perl -n -e'/(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"')
+trap "$compose down" EXIT
 
-rm -rfv foobar-plugin/*.so helloworld-plugin/*.so
+rm -fv foobar-plugin/*.so || true
+docker run --rm -v `pwd`/foobar-plugin:/plugin-source tykio/tyk-plugin-compiler:${tag} foobar-plugin.so
 
-docker run --rm -e GO_GET=1 -v `pwd`/foobar-plugin:/plugin-source $PLUGIN_COMPILER_IMAGE foobar-plugin.so
-docker run --rm -e GO_GET=1 -v `pwd`/helloworld-plugin:/plugin-source $PLUGIN_COMPILER_IMAGE helloworld-plugin.so
+rm -fv helloworld-plugin/*.so || true
+docker run --rm -v `pwd`/helloworld-plugin:/plugin-source tykio/tyk-plugin-compiler:${tag} helloworld-plugin.so
 
-# if params were not sent, then attempt to get them from env vars
-if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
-    GOOS=$(go env GOOS)
-    GOARCH=$(go env GOARCH)
-fi
-
-# pass plugin params
-export plugin_version=${GATEWAY_VERSION}
-export plugin_os=${GOOS}
-export plugin_arch=${GOARCH}
-
-docker compose up -d --wait --force-recreate || { docker compose logs gw; exit 1; }
+docker-compose up -d
+sleep 2 # Wait for init
 
 curl -vvv http://localhost:8080/goplugin-helloworld-1/headers
-curl http://localhost:8080/goplugin-helloworld-1/headers | jq -e '.headers.Hello == "World"' || { docker compose logs gw; exit 1; }
+curl http://localhost:8080/goplugin-helloworld-1/headers | jq -e '.headers.Hello == "World"' || { $compose logs gw; exit 1; }
 
 curl -vvv http://localhost:8080/goplugin-helloworld-2/headers
-curl http://localhost:8080/goplugin-helloworld-2/headers | jq -e '.headers.Hello == "World"' || { docker compose logs gw; exit 1; }
+curl http://localhost:8080/goplugin-helloworld-2/headers | jq -e '.headers.Hello == "World"' || { $compose logs gw; exit 1; }
 
 curl -vvv http://localhost:8080/goplugin-foobar-1/headers
-curl http://localhost:8080/goplugin-foobar-1/headers | jq -e '.headers.Foo == "Bar"' || { docker compose logs gw; exit 1; }
+curl http://localhost:8080/goplugin-foobar-1/headers | jq -e '.headers.Foo == "Bar"' || { $compose logs gw; exit 1; }
 
 curl -vvv http://localhost:8080/goplugin-foobar-2/headers
-curl http://localhost:8080/goplugin-foobar-2/headers | jq -e '.headers.Foo == "Bar"' || { docker compose logs gw; exit 1; }
+curl http://localhost:8080/goplugin-foobar-2/headers | jq -e '.headers.Foo == "Bar"' || { $compose logs gw; exit 1; }

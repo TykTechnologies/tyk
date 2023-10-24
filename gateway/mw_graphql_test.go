@@ -1,34 +1,30 @@
 package gateway
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/buger/jsonparser"
 
 	"github.com/gorilla/websocket"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
 	"github.com/TykTechnologies/tyk/test"
 )
 
 // Note: here we test only validation behaviour and do not expect real graphql responses here
 func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
+
 	g := StartTest(nil)
 	defer g.Close()
 
@@ -48,7 +44,6 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 
 	t.Run("Introspection query with custom query type should successfully work", func(t *testing.T) {
 		spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: word } type word { numOfLetters: Int }"
-		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 		g.Gw.LoadAPI(spec)
 
 		request := gql.Request{
@@ -120,11 +115,11 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 		})
 
 		authHeaderWithDirectKey := map[string]string{
-			header.Authorization: directKey,
+			headers.Authorization: directKey,
 		}
 
 		authHeaderWithPolicyAppliedKey := map[string]string{
-			header.Authorization: policyAppliedKey,
+			headers.Authorization: policyAppliedKey,
 		}
 
 		request := gql.Request{
@@ -170,90 +165,10 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 		t.Run("Invalid query should return 403 when auth is failing", func(t *testing.T) {
 			request.Query = "query Hello {"
 			authHeaderWithInvalidDirectKey := map[string]string{
-				header.Authorization: "invalid key",
+				headers.Authorization: "invalid key",
 			}
 			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithInvalidDirectKey, Data: request, BodyMatch: "", Code: http.StatusForbidden})
 		})
-	})
-
-	t.Run("null input on non nullable variable should fail with 400", func(t *testing.T) {
-		testSpec := BuildAPI(func(spec *APISpec) {
-			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
-			spec.GraphQL.Schema = gqlCountriesSchema
-			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
-			spec.Proxy.TargetURL = testGraphQLProxyUpstream
-			spec.Proxy.ListenPath = "/"
-			spec.GraphQL.Enabled = true
-		})[0]
-
-		g.Gw.LoadAPI(testSpec)
-
-		_, err := g.Run(
-			t,
-			test.TestCase{
-				Path:   "/",
-				Method: http.MethodPost,
-				Data: gql.Request{
-					Query:     gqlContinentQueryVariable,
-					Variables: []byte(`{"code":null}`),
-				},
-				Code: 400,
-			},
-			test.TestCase{
-				Path:   "/",
-				Method: http.MethodPost,
-				Data: gql.Request{
-					Query:     gqlStateQueryVariable,
-					Variables: []byte(`{"filter":{"code":{"eq":"filterString"}}}`),
-				},
-				Code: 400,
-				BodyMatchFunc: func(i []byte) bool {
-					return strings.Contains(string(i), `Validation for variable \"filter\" failed`)
-				},
-			})
-		assert.NoError(t, err)
-	})
-
-	t.Run("fail input validation with otel tracing active", func(t *testing.T) {
-		local := StartTest(func(globalConf *config.Config) {
-			globalConf.OpenTelemetry.Enabled = true
-		})
-		defer local.Close()
-		testSpec := BuildAPI(func(spec *APISpec) {
-			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
-			spec.GraphQL.Schema = gqlCountriesSchema
-			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
-			spec.Proxy.TargetURL = testGraphQLProxyUpstream
-			spec.Proxy.ListenPath = "/"
-			spec.GraphQL.Enabled = true
-		})[0]
-
-		local.Gw.LoadAPI(testSpec)
-
-		_, err := local.Run(
-			t,
-			test.TestCase{
-				Path:   "/",
-				Method: http.MethodPost,
-				Data: gql.Request{
-					Query:     gqlContinentQueryVariable,
-					Variables: []byte(`{"code":null}`),
-				},
-				Code: 400,
-			},
-			test.TestCase{
-				Path:   "/",
-				Method: http.MethodPost,
-				Data: gql.Request{
-					Query:     gqlStateQueryVariable,
-					Variables: []byte(`{"filter":{"code":{"eq":"filterString"}}}`),
-				},
-				Code: 400,
-				BodyMatchFunc: func(i []byte) bool {
-					return strings.Contains(string(i), `Validation for variable \"filter\" failed`)
-				},
-			})
-		assert.NoError(t, err)
 	})
 }
 
@@ -293,33 +208,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 	})
 
-	t.Run("Inspect __typename without hitting the upstream", func(t *testing.T) {
-		// See TT-6419
-		g := StartTest(nil)
-		defer g.Close()
-
-		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.UseKeylessAccess = true
-			spec.Proxy.ListenPath = "/"
-			spec.GraphQL.Enabled = true
-			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
-			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
-		})
-
-		request := gql.Request{
-			Variables: nil,
-			Query:     "query { __typename }",
-		}
-
-		expectedBody := []byte(`{"data":{"__typename":"Query"}}`)
-		_, _ = g.Run(t, test.TestCase{
-			Data: request, BodyMatchFunc: func(body []byte) bool {
-				return bytes.Equal(expectedBody, body)
-			},
-			Code: http.StatusOK,
-		})
-	})
-
 	t.Run("graphql engine v2", func(t *testing.T) {
 		g := StartTest(nil)
 		defer g.Close()
@@ -330,7 +218,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 				spec.GraphQL.Schema = gqlProxyUpstreamSchema
-				spec.GraphQL.Proxy.RequestHeaders = map[string]string{
+				spec.GraphQL.Proxy.AuthHeaders = map[string]string{
 					"Authorization": "123abc",
 				}
 				spec.Proxy.ListenPath = "/"
@@ -374,6 +262,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					},
 				},
 			}...)
+
 		})
 
 		t.Run("proxy-only return errors from upstream", func(t *testing.T) {
@@ -401,8 +290,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						return false
 					}
 					return string(value) == "Something went wrong"
-				},
-			})
+				}})
 		})
 
 		t.Run("subgraph", func(t *testing.T) {
@@ -528,7 +416,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.UseKeylessAccess = true
 				spec.Proxy.ListenPath = "/"
 				spec.GraphQL.Enabled = true
-				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 			})[0]
 
@@ -541,11 +429,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
-								header.Connection:           "upgrade",
-								header.Upgrade:              "websocket",
-								header.SecWebSocketProtocol: "graphql-ws",
-								header.SecWebSocketVersion:  "13",
-								header.SecWebSocketKey:      "123abc",
+								headers.Connection:           "upgrade",
+								headers.Upgrade:              "websocket",
+								headers.SecWebSocketProtocol: "graphql-ws",
+								headers.SecWebSocketVersion:  "13",
+								headers.SecWebSocketKey:      "123abc",
 							},
 							Code:      http.StatusUnprocessableEntity,
 							BodyMatch: "websockets are not allowed",
@@ -559,15 +447,15 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				cfg.HttpServerOptions.EnableWebSockets = true
 				g.Gw.SetConfig(cfg)
 
-				t.Run("should deny upgrade with 400 when protocol is not graphql-ws or graphql-transport-ws", func(t *testing.T) {
+				t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
-								header.Connection:           "upgrade",
-								header.Upgrade:              "websocket",
-								header.SecWebSocketProtocol: "invalid",
-								header.SecWebSocketVersion:  "13",
-								header.SecWebSocketKey:      "123abc",
+								headers.Connection:           "upgrade",
+								headers.Upgrade:              "websocket",
+								headers.SecWebSocketProtocol: "invalid",
+								headers.SecWebSocketVersion:  "13",
+								headers.SecWebSocketKey:      "123abc",
 							},
 							Code:      http.StatusBadRequest,
 							BodyMatch: "invalid websocket protocol for upgrading to a graphql websocket connection",
@@ -576,41 +464,21 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				})
 
 				t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
-					t.Run("graphql-ws", func(t *testing.T) {
-						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
-						})
-						require.NoError(t, err)
-						defer wsConn.Close()
-
-						// Send a connection init message to gateway
-						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
-						require.NoError(t, err)
-
-						_, msg, err := wsConn.ReadMessage()
-
-						// Gateway should acknowledge the connection
-						assert.Equal(t, `{"type":"connection_ack"}`, string(msg))
-						assert.NoError(t, err)
+					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+						headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
 					})
-					t.Run("graphql-transport-ws", func(t *testing.T) {
-						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLTransportWS)},
-						})
-						require.NoError(t, err)
-						defer wsConn.Close()
+					require.NoError(t, err)
+					defer wsConn.Close()
 
-						// Send a connection init message to gateway
-						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init"}`))
-						require.NoError(t, err)
+					// Send a connection init message to gateway
+					err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
+					require.NoError(t, err)
 
-						_, msg, err := wsConn.ReadMessage()
+					_, msg, err := wsConn.ReadMessage()
 
-						// Gateway should acknowledge the connection
-						assert.Equal(t, `{"type":"connection_ack"}`, string(msg))
-						assert.NoError(t, err)
-					})
-
+					// Gateway should acknowledge the connection
+					assert.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+					assert.NoError(t, err)
 				})
 
 				t.Run("graphql over websockets", func(t *testing.T) {
@@ -634,8 +502,8 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						})
 
 						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
-							header.Authorization:        {directKey},
+							headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							headers.Authorization:        {directKey},
 						})
 						require.NoError(t, err)
 						defer wsConn.Close()
@@ -647,7 +515,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						_, msg, err := wsConn.ReadMessage()
 
 						// Gateway should acknowledge the connection
-						require.Equal(t, `{"type":"connection_ack"}`, string(msg))
+						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
 						require.NoError(t, err)
 
 						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "{ countries { name } }", "variables": null}}`))
@@ -670,8 +538,8 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						})
 
 						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
-							header.Authorization:        {directKey},
+							headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							headers.Authorization:        {directKey},
 						})
 						require.NoError(t, err)
 						defer wsConn.Close()
@@ -683,7 +551,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						_, msg, err := wsConn.ReadMessage()
 
 						// Gateway should acknowledge the connection
-						require.Equal(t, `{"type":"connection_ack"}`, string(msg))
+						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
 						require.NoError(t, err)
 
 						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "{ countries { name } }", "variables": null}}`))
@@ -695,145 +563,9 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					})
 				})
 
-				t.Run("should send configured headers upstream", func(t *testing.T) {
-					run := func(apiSpec func(testServerURL string) func(apiSpec *APISpec), requestHeaders, expectedHeaders http.Header) func(t *testing.T) {
-						return func(t *testing.T) {
-							wsTestServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-								for expectedHeaderKey := range expectedHeaders {
-									values := r.Header.Values(expectedHeaderKey)
-									headerExists := assert.Greater(t, len(values), 0, fmt.Sprintf("no header values found for header '%s'", expectedHeaderKey))
-									if !headerExists {
-										return
-									}
-									for _, expectedHeaderValue := range expectedHeaders[expectedHeaderKey] {
-										assert.Contains(t, values, expectedHeaderValue, fmt.Sprintf("expected header value '%s' was not found for '%s'", expectedHeaderValue, expectedHeaderKey))
-									}
-								}
-							}))
-							defer wsTestServer.Close()
-
-							g.Gw.BuildAndLoadAPI(apiSpec(wsTestServer.URL))
-
-							wsConnHeaders := http.Header{
-								header.SecWebSocketProtocol: {string(gqlwebsocket.ProtocolGraphQLWS)},
-							}
-
-							for key, value := range requestHeaders {
-								wsConnHeaders.Set(key, value[0])
-							}
-
-							wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, wsConnHeaders)
-							require.NoError(t, err)
-							defer wsConn.Close()
-
-							// Send a connection init message to gateway
-							err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init"}`))
-							require.NoError(t, err)
-
-							// Gateway should acknowledge the connection
-							_, msg, err := wsConn.ReadMessage()
-							require.Equal(t, `{"type":"connection_ack"}`, string(msg))
-							require.NoError(t, err)
-
-							// Start subscription
-							err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id":"1","type":"start","payload":{"query":"subscription { subscribe }"}}`))
-							require.NoError(t, err)
-
-							for {
-								_, msg, err = wsConn.ReadMessage()
-								require.NoError(t, err)
-								if string(msg) == `{"type":"ka"}` {
-									continue
-								}
-								require.Equal(t, `{"id":"1","type":"error","payload":[{"message":"error executing subscription: failed to WebSocket dial: expected handshake response status code 101 but got 200"}]}`, string(msg))
-								break
-							}
-						}
-					}
-
-					t.Run("for proxy-only", run(
-						func(testServerURL string) func(apiSpec *APISpec) {
-							return func(spec *APISpec) {
-								spec.UseKeylessAccess = true
-								spec.Proxy.ListenPath = "/"
-								spec.EnableContextVars = true
-								spec.GraphQL.Enabled = true
-								spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
-								spec.GraphQL.Version = apidef.GraphQLConfigVersion2
-								spec.GraphQL.Schema = `type Query { hello: String } type Subscription { subscribe: String }`
-								spec.GraphQL.Proxy.RequestHeaders = map[string]string{
-									"My-Custom-Header": "custom-value",
-									"From-Request":     "$tyk_context.headers_X_My_Request",
-								}
-								spec.Proxy.TargetURL = testServerURL
-							}
-						},
-						http.Header{
-							"X-My-Request": {"request-value"},
-						},
-						http.Header{
-							"My-Custom-Header": {"custom-value"},
-							"From-Request":     {"request-value"},
-						},
-					))
-
-					t.Run("for udg", run(
-						func(testServerURL string) func(apiSpec *APISpec) {
-							return func(spec *APISpec) {
-								spec.UseKeylessAccess = true
-								spec.Proxy.ListenPath = "/"
-								spec.EnableContextVars = true
-								spec.GraphQL.Enabled = true
-								spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
-								spec.GraphQL.Version = apidef.GraphQLConfigVersion2
-								spec.GraphQL.Schema = `type Query { hello: String } type Subscription { subscribe: String }`
-								spec.GraphQL.Engine.GlobalHeaders = []apidef.UDGGlobalHeader{
-									{
-										Key:   "Global-Key",
-										Value: "global-value",
-									},
-									{
-										Key:   "Already-Used-Key",
-										Value: "global-used-value",
-									},
-								}
-								spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
-									{
-										Kind:     apidef.GraphQLEngineDataSourceKindGraphQL,
-										Name:     "ds",
-										Internal: false,
-										RootFields: []apidef.GraphQLTypeFields{
-											{
-												Type:   "Subscription",
-												Fields: []string{"subscribe"},
-											},
-										},
-										Config: []byte(fmt.Sprintf(`{
-											"url": "%s",
-											"method": "POST",
-											"headers": {
-												"Already-Used-Key": "local-used-value",
-												"Local-Key": "local-value",
-												"Context-Key": "$tyk_context.headers_X_My_Request"
-											}
-										}`, testServerURL)),
-									},
-								}
-							}
-						},
-						http.Header{
-							"X-My-Request": {"request-value"},
-						},
-						http.Header{
-							"Already-Used-Key": {"local-used-value"},
-							"Local-Key":        {"local-value"},
-							"Context-Key":      {"request-value"},
-							"Global-Key":       {"global-value"},
-						},
-					))
-				})
 			})
 		})
+
 	})
 
 	t.Run("graphql engine v1", func(t *testing.T) {
@@ -909,11 +641,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
-								header.Connection:           "upgrade",
-								header.Upgrade:              "websocket",
-								header.SecWebSocketProtocol: "graphql-ws",
-								header.SecWebSocketVersion:  "13",
-								header.SecWebSocketKey:      "123abc",
+								headers.Connection:           "upgrade",
+								headers.Upgrade:              "websocket",
+								headers.SecWebSocketProtocol: "graphql-ws",
+								headers.SecWebSocketVersion:  "13",
+								headers.SecWebSocketKey:      "123abc",
 							},
 							Code:      http.StatusUnprocessableEntity,
 							BodyMatch: "websockets are not allowed",
@@ -931,11 +663,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
-								header.Connection:           "upgrade",
-								header.Upgrade:              "websocket",
-								header.SecWebSocketProtocol: "graphql-ws",
-								header.SecWebSocketVersion:  "13",
-								header.SecWebSocketKey:      "123abc",
+								headers.Connection:           "upgrade",
+								headers.Upgrade:              "websocket",
+								headers.SecWebSocketProtocol: "graphql-ws",
+								headers.SecWebSocketVersion:  "13",
+								headers.SecWebSocketKey:      "123abc",
 							},
 							Code:      http.StatusUnprocessableEntity,
 							BodyMatch: "websockets are not allowed",
@@ -943,8 +675,10 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					}...)
 				})
 			})
+
 		})
 	})
+
 }
 
 func TestNeedsGraphQLExecutionEngine(t *testing.T) {
@@ -1212,11 +946,6 @@ input LanguageFilterInput {
   code: StringQueryOperatorInput
 }
 
-input StateFilterInput{
-  code: StringQueryOperatorInput
-  compulsory: String!
-}
-
 type Query {
   continents(filter: ContinentFilterInput): [Continent!]!
   continent(code: ID!): Continent
@@ -1224,7 +953,6 @@ type Query {
   country(code: ID!): Country
   languages(filter: LanguageFilterInput): [Language!]!
   language(code: ID!): Language
-  state(filter: StateFilterInput): [State!]!
 }
 
 type State {
@@ -1244,29 +972,6 @@ input StringQueryOperatorInput {
 
 scalar Upload`
 
-const (
-	gqlContinentQuery = `
-query {
-    continent(code: "NG"){
-        code
-        name
-    }
-}
-`
-	gqlContinentQueryVariable = `
-query ($code: ID!){
-    continent(code: $code){
-        name
-    }
-}`
-	gqlStateQueryVariable = `
-query ($filter: StateFilterInput) {
-  state(filter: $filter) {
-    name
-  }
-}`
-)
-
 const gqlSubgraphSchemaAccounts = `scalar _Any
 scalar _FieldSet
 union _Entity = User
@@ -1277,7 +982,6 @@ type _Service {
 
 type Query {
   me: User
-  allUsers: [User]
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
 }
@@ -1295,65 +999,12 @@ directive @extends on OBJECT | INTERFACE`
 
 const gqlSubgraphSDLAccounts = `extend type Query {
 	me: User
-	allUsers: [User]
 } 
 
 type User @key(fields: "id") { 
 	id: ID! 
 	username: String!
 }`
-
-const gqlSubgraphSDLBankAccounts = `
-extend type User @key(fields: "id") {
-  id: ID! @extends
-  account: [BankAccount!]
-}
-
-type BankAccount {
-  number: String
-  balance: Float
-}
-`
-
-const gqlSubgraphSchemaBankAccounts = `
-extend type User @key(fields: "id"){
-    id: ID! @extends
-    account: [BankAccount!]
-}
-
-type BankAccount {
-    number: String
-    balance: Float 
-}
-
-scalar _Any
-scalar _FieldSet
-union _Entity = User
-
-type _Service {
-  sdl: String
-}
-
-type Query {
-  _entities(representations: [_Any!]!): [_Entity]!
-  _service: _Service!
-}
-
-type BankAccount {
-    number: String
-    balance: Float 
-}
-
-type User @key(fields: "id"){
-    id: ID! @extends
-    account: [BankAccount!]
-}
-
-directive @external on FIELD_DEFINITION
-directive @requires(fields: _FieldSet!) on FIELD_DEFINITION
-directive @provides(fields: _FieldSet!) on FIELD_DEFINITION
-directive @key(fields: _FieldSet!) on OBJECT | INTERFACE
-directive @extends on OBJECT | INTERFACE`
 
 const gqlSubgraphSchemaReviews = `scalar _Any
 scalar _FieldSet
@@ -1428,7 +1079,6 @@ const gqlSubgraphVariables = `{
 
 const gqlMergedSupergraphSDL = `type Query {
 	me: User
-	allUsers: [User]
 	topProducts(first: Int = 5): [Product]
 }
 
@@ -1440,12 +1090,6 @@ type User {
 	id: ID!
 	username: String!
 	reviews: [Review]
-	account: [BankAccount!]
-}
-
-type BankAccount {
-    number: String
-    balance: Float 
 }
 
 type Product {

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/justinas/alice"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -218,7 +218,7 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 	}
 }
 
-func TestMultiSession_BA_Standard_FailBA(t *testing.T) {
+func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -259,7 +259,7 @@ func TestMultiSession_BA_Standard_FailBA(t *testing.T) {
 	}
 }
 
-func TestMultiSession_BA_Standard_FailStandard(t *testing.T) {
+func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -331,7 +331,6 @@ func TestJWTAuthKeyMultiAuth(t *testing.T) {
 	})[0]
 
 	ts.Gw.LoadAPI(spec)
-
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Claims.(jwt.MapClaims)["user_id"] = "user"
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()

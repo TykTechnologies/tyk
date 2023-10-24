@@ -3,8 +3,6 @@ package importer
 import (
 	"bytes"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestToAPIDefinition_Swagger(t *testing.T) {
@@ -39,10 +37,10 @@ func TestToAPIDefinition_Swagger(t *testing.T) {
 		t.Fatal("Version could not be found")
 	}
 
-	assert.Len(t, v.ExtendedPaths.TrackEndpoints, 3)
-	assert.Len(t, v.ExtendedPaths.WhiteList, 2)
+	if len(v.ExtendedPaths.TrackEndpoints) != 3 {
+		t.Fatalf("Expected 3 endpoints, found %v\n", len(v.ExtendedPaths.TrackEndpoints))
+	}
 
-	assert.Equal(t, len(v.ExtendedPaths.WhiteList[0].MethodActions)+len(v.ExtendedPaths.WhiteList[1].MethodActions), 3)
 }
 
 var petstoreJSON string = `{

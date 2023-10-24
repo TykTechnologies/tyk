@@ -3,75 +3,19 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/test"
 )
-
-func Test_handleRequestLimits(t *testing.T) {
-	t.Parallel()
-
-	testcases := []struct {
-		input  io.Reader
-		method string
-		want   int
-	}{
-		{
-			method: http.MethodGet,
-			input:  nil,
-			want:   http.StatusOK,
-		},
-		{
-			method: http.MethodDelete,
-			input:  nil,
-			want:   http.StatusOK,
-		},
-		{
-			method: http.MethodPost,
-			input:  strings.NewReader("tit petric"),
-			want:   http.StatusOK,
-		},
-		{
-			method: http.MethodPost,
-			input:  strings.NewReader("lorem ipsum dolor sit amet"),
-			want:   http.StatusRequestEntityTooLarge,
-		},
-	}
-
-	for index, testcase := range testcases {
-		testcase := testcase
-		t.Run(fmt.Sprintf("Test #%v", index), func(t *testing.T) {
-			t.Parallel()
-
-			// Create a test request with a request body larger than the limit
-			req := httptest.NewRequest(testcase.method, "/test", testcase.input)
-			req.ContentLength = 0
-
-			// Create a test response recorder
-			w := httptest.NewRecorder()
-
-			handler := &handleWrapper{
-				maxRequestBodySize: 10,
-			}
-			handler.ServeHTTP(w, req)
-
-			// Check the response status code
-			assert.Equal(t, testcase.want, w.Result().StatusCode)
-		})
-	}
-}
 
 func TestTCPDial_with_service_discovery(t *testing.T) {
 	ts := StartTest(nil)
@@ -186,7 +130,9 @@ func TestTCPDial_with_service_discovery(t *testing.T) {
 		return string(buf)
 	}
 	for i := 0; i < 4; i++ {
-		ts.Gw.ServiceCache.Flush()
+		if ServiceCache != nil {
+			ServiceCache.Flush()
+		}
 		result = append(result, dial())
 	}
 	expect := []string{"service2", "service1", "service2", "service1"}
@@ -423,21 +369,5 @@ func TestHandleSubroutes(t *testing.T) {
 		{Path: "/charlie/name/suffixfoo", Code: http.StatusOK},
 		{Path: "/charlie/name/name/suffix/foo", Code: http.StatusOK},
 		{Path: "/charlie/name/name/name/suffix/foo", Code: http.StatusOK},
-	}...)
-}
-
-func TestRequestBodyLimit(t *testing.T) {
-	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.HttpServerOptions.MaxRequestBodySize = 1024
-	})
-	defer ts.Close()
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.UseKeylessAccess = true
-	})
-
-	_, _ = ts.Run(t, []test.TestCase{
-		{Path: "/sample/", Method: "POST", Data: strings.Repeat("a", 1024), Code: http.StatusOK},
-		{Path: "/sample/", Method: "POST", Data: strings.Repeat("a", 1025), Code: http.StatusRequestEntityTooLarge},
 	}...)
 }

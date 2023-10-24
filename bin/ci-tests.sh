@@ -2,35 +2,45 @@
 
 TEST_TIMEOUT=15m
 
-PKGS="$(go list ./...)"
+# print a command and execute it
+show() {
+	echo "$@" >&2
+	eval "$@"
+}
 
-# Support passing custom flags (-json, etc.)
-OPTS="$@"
-if [[ -z "$OPTS" ]]; then
-	OPTS="-race -count=1 -failfast -v"
-fi
+fatal() {
+	echo "$@" >&2
+	exit 1
+}
+
+PKGS="$(go list ./...)"
 
 export PKG_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
 
-# exit on non-zero exit from go test/vet
-set -e
-
 # build Go-plugin used in tests
-echo "Building go plugin"
-go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
+go build -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins || fatal "building Go-plugin failed"
 
 for pkg in ${PKGS}; do
     tags=""
-    if [[ ${pkg} == *"goplugin" ]]; then
+
+    # TODO: Remove skipRace variable after solving race conditions in tests.
+    skipRace=false
+    if [[ ${pkg} == *"grpc" ]]; then
+        skipRace=true
+    elif [[ ${pkg} == *"goplugin" ]]; then
+        skipRace=true
         tags="-tags 'goplugin'"
     fi
 
-    coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
+    race="-race"
 
-    echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
-    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
+    if [[ ${skipRace} = true ]]; then
+        race=""
+    fi
+
+    show go test -v ${race} -timeout ${TEST_TIMEOUT} -coverprofile=test.cov ${pkg} ${tags} || fatal "Test Failed"
 done
 
 # run rpc tests separately
 rpc_tests='SyncAPISpecsRPC|OrgSessionWithRPCDown'
-go test -count=1 -timeout ${TEST_TIMEOUT} -v -coverprofile=gateway-rpc.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"'
+show go test -v -timeout ${TEST_TIMEOUT} -coverprofile=test.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"' || fatal "Test Failed"

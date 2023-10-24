@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 
@@ -20,7 +21,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -38,39 +38,27 @@ func (gw *Gateway) uploadCertPublicKey(serverCert tls.Certificate) (string, erro
 	return pubID, nil
 }
 
-var (
-	handlerEmpty http.HandlerFunc = func(http.ResponseWriter, *http.Request) {}
-	handlerEcho                   = func(message string) http.HandlerFunc {
-		return func(w http.ResponseWriter, _ *http.Request) {
-			_, _ = w.Write([]byte(message))
-		}
-	}
-)
+func TestPublicKeyPinning(t *testing.T) {
 
-func newUpstreamSSL(t *testing.T, gw *Gateway, serverCert tls.Certificate, handler http.HandlerFunc) (*httptest.Server, string, func()) {
-	pubID, err := gw.uploadCertPublicKey(serverCert)
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	_, _, _, serverCert := certs.GenServerCertificate()
+	pubID, err := ts.Gw.uploadCertPublicKey(serverCert)
 	if err != nil {
 		t.Error(err)
 	}
+	defer ts.Gw.CertificateManager.Delete(pubID, "")
 
-	upstream := httptest.NewUnstartedServer(handler)
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	}))
 	upstream.TLS = &tls.Config{
 		InsecureSkipVerify: true,
 		Certificates:       []tls.Certificate{serverCert},
-		MaxVersion:         tls.VersionTLS12,
 	}
 
 	upstream.StartTLS()
-	return upstream, pubID, func() {
-		upstream.Close()
-		gw.CertificateManager.Delete(pubID, "")
-	}
-}
-
-func TestPublicKeyPinning(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5260
-
-	_, _, _, serverCert := certs.GenServerCertificate()
+	defer upstream.Close()
 
 	t.Run("Pub key match", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
@@ -78,9 +66,10 @@ func TestPublicKeyPinning(t *testing.T) {
 			globalConf.ProxySSLInsecureSkipVerify = false
 		})
 		defer ts.Close()
-
-		upstream, pubID, finish := newUpstreamSSL(t, ts.Gw, serverCert, handlerEmpty)
-		defer finish()
+		pubID, err := ts.Gw.uploadCertPublicKey(serverCert)
+		if err != nil {
+			t.Error(err)
+		}
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -94,9 +83,10 @@ func TestPublicKeyPinning(t *testing.T) {
 	t.Run("Pub key not match", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
-
-		upstream, _, finish := newUpstreamSSL(t, ts.Gw, serverCert, handlerEmpty)
-		defer finish()
+		_, err := ts.Gw.uploadCertPublicKey(serverCert)
+		if err != nil {
+			t.Error(err)
+		}
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -107,34 +97,15 @@ func TestPublicKeyPinning(t *testing.T) {
 		ts.Run(t, test.TestCase{Code: 500})
 	})
 
-	t.Run("pinning disabled", func(t *testing.T) {
-		ts := StartTest(func(globalConf *config.Config) {
-			// For host using pinning, it should ignore standard verification in all cases, e.g setting variable below does nothing
-			globalConf.ProxySSLInsecureSkipVerify = false
-		})
-		defer ts.Close()
-
-		upstream, pubID, finish := newUpstreamSSL(t, ts.Gw, serverCert, handlerEmpty)
-		defer finish()
-
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.CertificatePinningDisabled = true
-			spec.PinnedPublicKeys = map[string]string{"127.0.0.1": pubID}
-			spec.Proxy.TargetURL = upstream.URL
-		})
-
-		_, _ = ts.Run(t, test.TestCase{Code: 500})
-	})
-
 	t.Run("Global setting", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
 			globalConf.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
 		})
 		defer ts.Close()
-
-		upstream, _, finish := newUpstreamSSL(t, ts.Gw, serverCert, handlerEmpty)
-		defer finish()
+		_, err := ts.Gw.uploadCertPublicKey(serverCert)
+		if err != nil {
+			t.Error(err)
+		}
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -150,8 +121,10 @@ func TestPublicKeyPinning(t *testing.T) {
 		})
 		defer ts.Close()
 
-		upstream, _, finish := newUpstreamSSL(t, ts.Gw, serverCert, handlerEmpty)
-		defer finish()
+		_, err := ts.Gw.uploadCertPublicKey(serverCert)
+		if err != nil {
+			t.Error(err)
+		}
 
 		_, _, _, proxyCert := certs.GenServerCertificate()
 		proxy := initProxy("https", &tls.Config{
@@ -182,15 +155,30 @@ func TestPublicKeyPinning(t *testing.T) {
 			globalConf.ProxySSLInsecureSkipVerify = true
 		})
 		defer ts.Close()
+		_, err := ts.Gw.uploadCertPublicKey(serverCert)
+		if err != nil {
+			t.Error(err)
+		}
 
 		// start upstream server
 		_, _, _, serverCert := certs.GenCertificate(&x509.Certificate{
 			EmailAddresses: []string{"test@test.com"},
 			Subject:        pkix.Name{CommonName: "localhost"},
 		}, false)
+		serverPubID, err := ts.Gw.uploadCertPublicKey(serverCert)
+		if err != nil {
+			t.Error(err)
+		}
 
-		upstream, serverPubID, finish := newUpstreamSSL(t, ts.Gw, serverCert, handlerEmpty)
-		defer finish()
+		upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+		upstream.TLS = &tls.Config{
+			InsecureSkipVerify: true,
+			Certificates:       []tls.Certificate{serverCert},
+			MaxVersion:         tls.VersionTLS12,
+		}
+
+		upstream.StartTLS()
+		defer upstream.Close()
 
 		// start proxy
 		_, _, _, proxyCert := certs.GenCertificate(&x509.Certificate{
@@ -241,7 +229,10 @@ func TestProxyTransport(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	upstream := httptest.NewUnstartedServer(handlerEcho("test"))
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		w.Write([]byte("test"))
+	}))
 	upstream.TLS = &tls.Config{
 		MaxVersion: tls.VersionTLS12,
 	}

@@ -1,19 +1,23 @@
 #!/bin/bash
+
 set -eo pipefail
 
-function setup {
-	local tag=${1:-"v0.0.0"}
+function usage {
+    local progname=$1
+    cat <<EOF
+Usage:
+$progname <tag>
 
-	# Setup required env vars for docker compose
-	export GATEWAY_IMAGE=${GATEWAY_IMAGE:-"tykio/tyk-gateway:${tag}"}
-
-	docker pull -q $GATEWAY_IMAGE
+Builds the python plugin in src using the supplied tag and tests it in the corresponding gw image.
+Requires docker compose.
+EOF
+    exit 1
 }
 
-setup $1
+[[ -z $1 ]] && usage $0
+export tag=$1
 
-trap "docker compose down --remove-orphans" EXIT
-
-docker compose up -d --wait --force-recreate || { docker compose logs; exit 1; }
-
-curl -s http://localhost:8080/pyplugin/headers | jq -e '.headers.Foo == "Bar"'
+docker-compose build && docker-compose up -d
+sleep 10
+curl http://localhost:8080/pyplugin/headers | jq -e '.headers.Foo == "Bar"'
+docker-compose down

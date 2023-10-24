@@ -18,17 +18,11 @@
         "logSpans": true,
         "password": "",
         "queueSize": 0,
-        "disableAttemptReconnecting":false,
-        "attemptreconnectinterval":"0s",
-        "user": "",
-        "http_headers":{}
+        "user": ""
     },
     "rpc_metrics": false,
     "sampler": {
         "maxOperations": 0,
-        "operationNameLateBinding":false,
-        "options": [
-        ],
         "param": 1,
         "samplingRefreshInterval": "0s",
         "samplingServerURL": "",
@@ -40,6 +34,5 @@
         "hostPort": "",
         "refreshInterval": "0s",
         "synchronousInitialization": false
-    },
-    "traceid_128bit": false
+    }
 }

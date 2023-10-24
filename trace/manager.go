@@ -10,9 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	opentracing "github.com/opentracing/opentracing-go"
-
 	"github.com/TykTechnologies/tyk/request"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // ErrManagerDisabled is returned when trying to use global trace manager when

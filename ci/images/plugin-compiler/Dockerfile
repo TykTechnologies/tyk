@@ -1,7 +1,10 @@
-ARG BASE_IMAGE=tykio/golang-cross:1.19-bullseye
-FROM ${BASE_IMAGE}
+ARG GOLANG_CROSS=1.15
 
+FROM tykio/golang-cross:${GOLANG_CROSS}
 LABEL description="Image for plugin development"
+
+ARG GOLANG_CROSS=1.15
+ENV GOLANG_CROSS ${GOLANG_CROSS}
 
 ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
 
@@ -11,27 +14,25 @@ ENV GO111MODULE=on
 # mounted from the host box by the user using docker volumes
 ENV PLUGIN_SOURCE_PATH=/plugin-source
 
-RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH
+RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
-RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby* python* || true \
-	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
+RUN apt-get purge --auto-remove -y mercurial ruby-dev 'python*' 'libpython*' openssh-client
 
-ADD go.mod go.sum $TYK_GW_PATH
-WORKDIR $TYK_GW_PATH
+# Update sources list to point to archive.debian.org (EOL)
+# COPY ci/images/plugin-compiler /tmp/plugin-compiler
+# RUN bash -c "cp /tmp/plugin-compiler/sources.list/$(lsb_release -cs) /etc/apt/sources.list"
 
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod go mod download
+RUN if [ "${GOLANG_CROSS}" = "1.15" ]; then apt-get update ; apt-get -y dist-upgrade; fi
 
-ADD . $TYK_GW_PATH
+# Ensure git remains installed (required)
+RUN git --version
 
-# Provide a gateway test binary for testing plugin loading.
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod GOBIN=/usr/local/bin go install -tags=goplugin -trimpath .
-
-ARG GITHUB_SHA
-ARG GITHUB_TAG
-ENV GITHUB_SHA ${GITHUB_SHA}
-ENV GITHUB_TAG ${GITHUB_TAG}
+RUN rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
+
+COPY . $TYK_GW_PATH
+RUN cd $TYK_GW_PATH && go mod vendor
 
 ENTRYPOINT ["/build.sh"]

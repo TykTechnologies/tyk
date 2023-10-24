@@ -7,18 +7,13 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"math/big"
 	"net"
 	"net/http"
-	"strings"
-	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -119,42 +114,4 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 	}
 
 	return errors.New("Certificate with SHA256 " + certID + " not allowed")
-}
-
-// IsPublicKey verifies if given certificate is a public key only.
-func IsPublicKey(cert *tls.Certificate) bool {
-	return cert.Leaf != nil && strings.HasPrefix(cert.Leaf.Subject.CommonName, "Public Key: ")
-}
-
-// PrefixPublicKeyCommonName returns x509.Certificate with prefixed CommonName.
-// This is used in UI/response to hint the type certificate during listing.
-func PrefixPublicKeyCommonName(blockBytes []byte) *x509.Certificate {
-	return &x509.Certificate{
-		Subject: pkix.Name{
-			CommonName: "Public Key: " + HexSHA256(blockBytes),
-		},
-	}
-}
-
-// GenerateRSAPublicKey generates an RSA public key.
-func GenerateRSAPublicKey(tb testing.TB) []byte {
-	tb.Helper()
-	// Generate a private key.
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	assert.NoError(tb, err)
-
-	// Derive the public key from the private key.
-	publicKey := &priv.PublicKey
-
-	// Save the public key in PEM format.
-	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
-	assert.NoError(tb, err)
-
-	publicKeyBlock := &pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: publicKeyBytes,
-	}
-
-	publicKeyPEM := pem.EncodeToMemory(publicKeyBlock)
-	return publicKeyPEM
 }

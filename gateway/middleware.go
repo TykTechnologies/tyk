@@ -2,8 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"context"
-	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
@@ -12,16 +10,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/headers"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
+	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
@@ -36,6 +33,14 @@ const (
 	mwStatusRespond                = 666
 	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
 )
+
+const authTokenType = "authToken"
+const jwtType = "jwt"
+const hmacType = "hmac"
+const basicType = "basic"
+const coprocessType = "coprocess"
+const oauthType = "oauth"
+const oidcType = "oidc"
 
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
@@ -66,32 +71,6 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		defer span.Finish()
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
-	} else if baseMw := tr.Base(); baseMw != nil {
-		cfg := baseMw.Gw.GetConfig()
-		if cfg.OpenTelemetry.Enabled {
-			otel.AddTraceID(r.Context(), w)
-			var span otel.Span
-			if baseMw.Spec.DetailedTracing {
-				var ctx context.Context
-				ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
-				defer span.End()
-				setContext(r, ctx)
-			} else {
-				span = otel.SpanFromContext(r.Context())
-			}
-
-			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
-			if err != nil {
-				span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
-			}
-
-			attrs := ctxGetSpanAttributes(r, tr.TykMiddleware.Name())
-			if len(attrs) > 0 {
-				span.SetAttributes(attrs...)
-			}
-
-			return err, i
-		}
 	}
 
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
@@ -161,14 +140,8 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
-				writeResponse := true
-				// Prevent double error write
-				if goPlugin, isGoPlugin := actualMW.(*GoPluginMiddleware); isGoPlugin && goPlugin.handler != nil {
-					writeResponse = false
-				}
-
 				handler := ErrorHandler{*mw.Base()}
-				handler.HandleError(w, r, err.Error(), errCode, writeResponse)
+				handler.HandleError(w, r, err.Error(), errCode, true)
 
 				meta["error"] = err.Error()
 
@@ -209,15 +182,6 @@ func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware)
 		*chain = append(*chain, gw.createMiddleware(mw))
 		return true
 	}
-	return false
-}
-
-func (gw *Gateway) responseMWAppendEnabled(chain *[]TykResponseHandler, responseMW TykResponseHandler) bool {
-	if responseMW.Enabled() {
-		*chain = append(*chain, responseMW)
-		return true
-	}
-
 	return false
 }
 
@@ -327,7 +291,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		return false
 	}
 
-	lifetime := session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
+	lifetime := session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
 	if err := t.Gw.GlobalSessionManager.UpdateSession(token, session, lifetime, false); err != nil {
 		t.Logger().WithError(err).Error("Can't update session")
 		return false
@@ -344,38 +308,6 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	return true
 }
 
-// clearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
-// Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
-func (t BaseMiddleware) clearSession(session *user.SessionState) {
-	policies := session.PolicyIDs()
-	for _, polID := range policies {
-		t.Gw.policiesMu.RLock()
-		policy, ok := t.Gw.policiesByID[polID]
-		t.Gw.policiesMu.RUnlock()
-		if !ok {
-			continue
-		}
-
-		all := !(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity)
-
-		if policy.Partitions.Quota || all {
-			session.QuotaMax = 0
-			session.QuotaRemaining = 0
-		}
-
-		if policy.Partitions.RateLimit || all {
-			session.Rate = 0
-			session.Per = 0
-			session.ThrottleRetryLimit = 0
-			session.ThrottleInterval = 0
-		}
-
-		if policy.Partitions.Complexity || all {
-			session.MaxQueryDepth = 0
-		}
-	}
-}
-
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
@@ -385,39 +317,16 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		session.MetaData = make(map[string]interface{})
 	}
 
-	t.clearSession(session)
-
 	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
+	policies := session.PolicyIDs()
 
-	var (
-		err       error
-		lookupMap map[string]user.Policy
-		policyIDs []string
-	)
-
-	customPolicies, err := session.CustomPolicies()
-	if err != nil {
-		policyIDs = session.PolicyIDs()
+	for _, polID := range policies {
 		t.Gw.policiesMu.RLock()
-		lookupMap = t.Gw.policiesByID
-		defer t.Gw.policiesMu.RUnlock()
-	} else {
-		lookupMap = customPolicies
-		policyIDs = make([]string, 0, len(customPolicies))
-		for _, val := range customPolicies {
-			policyIDs = append(policyIDs, val.ID)
-		}
-	}
-
-	for _, polID := range policyIDs {
-		policy, ok := lookupMap[polID]
+		policy, ok := t.Gw.policiesByID[polID]
+		t.Gw.policiesMu.RUnlock()
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
-			if len(policyIDs) > 1 {
-				continue
-			}
-
 			return err
 		}
 		// Check ownership, policy org owner must be the same as API,
@@ -467,13 +376,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
-				if r, ok := session.AccessRights[apiID]; ok {
-					// If GQL introspection is disabled, keep that configuration.
-					if r.DisableIntrospection {
-						accessRights.DisableIntrospection = r.DisableIntrospection
-					}
-				}
-
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
 
@@ -494,10 +396,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					// Merge ACLs for the same API
 					if r, ok := rights[k]; ok {
-						// If GQL introspection is disabled, keep that configuration.
-						if v.DisableIntrospection {
-							r.DisableIntrospection = v.DisableIntrospection
-						}
 						r.Versions = appendIfMissing(rights[k].Versions, v.Versions...)
 
 						for _, u := range v.AllowedURLs {
@@ -518,14 +416,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							for ri, rt := range r.RestrictedTypes {
 								if t.Name == rt.Name {
 									r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
-								}
-							}
-						}
-
-						for _, t := range v.AllowedTypes {
-							for ri, rt := range r.AllowedTypes {
-								if t.Name == rt.Name {
-									r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
 								}
 							}
 						}
@@ -561,7 +451,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 
 						ar.Limit.QuotaMax = policy.QuotaMax
-						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) {
+						//if partition for quota is set the we must use this value in the global information of the key
+						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) || policy.Partitions.Quota {
 							session.QuotaMax = policy.QuotaMax
 						}
 					}
@@ -579,7 +470,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					if greaterThanFloat64(policy.Rate, ar.Limit.Rate) {
 						ar.Limit.Rate = policy.Rate
-						if greaterThanFloat64(policy.Rate, session.Rate) {
+						//if policy.Partitions.RateLimit then we must set this value in the global data of the key
+						if greaterThanFloat64(policy.Rate, session.Rate) || policy.Partitions.RateLimit {
 							session.Rate = policy.Rate
 						}
 					}
@@ -678,7 +570,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		session.Tags = appendIfMissing(session.Tags, tag)
 	}
 
-	if len(policyIDs) == 0 {
+	if len(policies) == 0 {
 		for apiID, accessRight := range session.AccessRights {
 			// check if the api in the session has per api limit
 			if !accessRight.Limit.IsEmpty() {
@@ -848,7 +740,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 			return session, false
 		}
 
-		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
+		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 		ctxScheduleSessionUpdate(r)
 		return session, found
 	}
@@ -870,30 +762,20 @@ func (b BaseMiddleware) getAuthType() string {
 func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, apidef.AuthConfig) {
 	config, ok := b.Base().Spec.AuthConfigs[authType]
 	// Auth is deprecated. To maintain backward compatibility authToken and jwt cases are added.
-	if !ok && (authType == apidef.AuthTokenType || authType == apidef.JWTType) {
+	if !ok && (authType == authTokenType || authType == jwtType) {
 		config = b.Base().Spec.Auth
 	}
 
-	var (
-		key         string
-		defaultName = header.Authorization
-	)
-
-	headerName := config.AuthHeaderName
-	if !config.DisableHeader {
-		if headerName == "" {
-			headerName = defaultName
-		} else {
-			defaultName = headerName
-		}
-
-		key = r.Header.Get(headerName)
+	if config.AuthHeaderName == "" {
+		config.AuthHeaderName = headers.Authorization
 	}
+
+	key := r.Header.Get(config.AuthHeaderName)
 
 	paramName := config.ParamName
 	if config.UseParam {
 		if paramName == "" {
-			paramName = defaultName
+			paramName = config.AuthHeaderName
 		}
 
 		paramValue := r.URL.Query().Get(paramName)
@@ -907,7 +789,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	cookieName := config.CookieName
 	if config.UseCookie {
 		if cookieName == "" {
-			cookieName = defaultName
+			cookieName = config.AuthHeaderName
 		}
 
 		authCookie, err := r.Cookie(cookieName)
@@ -924,20 +806,11 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	return key, config
 }
 
-func (b BaseMiddleware) generateSessionID(id string) string {
-	// generate a virtual token
-	data := []byte(id)
-	keyID := fmt.Sprintf("%x", md5.Sum(data))
-	return b.Gw.generateToken(b.Spec.OrgID, keyID)
-}
-
 type TykResponseHandler interface {
-	Enabled() bool
 	Init(interface{}, *APISpec) error
 	Name() string
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
 	HandleError(http.ResponseWriter, *http.Request)
-	Base() *BaseTykResponseHandler
 }
 
 type TykGoPluginResponseHandler interface {
@@ -945,30 +818,26 @@ type TykGoPluginResponseHandler interface {
 	HandleGoPluginResponse(http.ResponseWriter, *http.Response, *http.Request) error
 }
 
-func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykResponseHandler) TykResponseHandler {
+func (gw *Gateway) responseProcessorByName(name string) TykResponseHandler {
 	switch name {
 	case "header_injector":
-		return &HeaderInjector{BaseTykResponseHandler: baseHandler}
+		return &HeaderInjector{Gw: gw}
+	case "response_body_transform":
+		return &ResponseTransformMiddleware{}
 	case "response_body_transform_jq":
-		return &ResponseTransformJQMiddleware{BaseTykResponseHandler: baseHandler}
+		return &ResponseTransformJQMiddleware{Gw: gw}
 	case "header_transform":
-		return &HeaderTransform{BaseTykResponseHandler: baseHandler}
+		return &HeaderTransform{Gw: gw}
 	case "custom_mw_res_hook":
-		return &CustomMiddlewareResponseHook{BaseTykResponseHandler: baseHandler}
+		return &CustomMiddlewareResponseHook{Gw: gw}
 	case "goplugin_res_hook":
-		return &ResponseGoPluginMiddleware{BaseTykResponseHandler: baseHandler}
+		return &ResponseGoPluginMiddleware{}
 	}
 
 	return nil
 }
 
 func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
-
-	if res.Request != nil {
-		// res.Request context contains otel information from the otel roundtripper
-		setContext(req, res.Request.Context())
-	}
-
 	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
@@ -988,54 +857,8 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		span, ctx := trace.Span(req.Context(), rh.Name())
 		defer span.Finish()
 		req = req.WithContext(ctx)
-	} else if rh.Base().Gw.GetConfig().OpenTelemetry.Enabled {
-		return handleOtelTracedResponse(rh, rw, res, req, ses)
 	}
 	return rh.HandleResponse(rw, res, req, ses)
-}
-
-// handleOtelTracedResponse handles the tracing for the response middlewares when
-// otel is enabled in the gateway
-func handleOtelTracedResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
-	var span otel.Span
-	var err error
-
-	baseMw := rh.Base()
-	if baseMw == nil {
-		return errors.New("unsupported base middleware")
-	}
-
-	// ResponseCacheMiddleware always executes but not always caches,so check if we must create the span
-	shouldTrace := shouldPerformTracing(rh, baseMw)
-	ctx := req.Context()
-	if shouldTrace {
-		if baseMw.Spec.DetailedTracing {
-			ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
-			defer span.End()
-			setContext(req, ctx)
-		} else {
-			span = otel.SpanFromContext(ctx)
-		}
-
-		err = rh.HandleResponse(rw, res, req, ses)
-
-		if err != nil {
-			span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
-		}
-
-		attrs := ctxGetSpanAttributes(req, rh.Name())
-		if len(attrs) > 0 {
-			span.SetAttributes(attrs...)
-		}
-	} else {
-		err = rh.HandleResponse(rw, res, req, ses)
-	}
-
-	return err
-}
-
-func shouldPerformTracing(rh TykResponseHandler, baseMw *BaseTykResponseHandler) bool {
-	return rh.Name() != "ResponseCacheMiddleware" || baseMw.Spec.CacheOptions.EnableCache
 }
 
 func parseForm(r *http.Request) {
@@ -1054,26 +877,3 @@ func parseForm(r *http.Request) {
 
 	r.ParseForm()
 }
-
-type BaseTykResponseHandler struct {
-	Spec *APISpec `json:"-"`
-	Gw   *Gateway `json:"-"`
-}
-
-func (b *BaseTykResponseHandler) Enabled() bool {
-	return true
-}
-
-func (b *BaseTykResponseHandler) Init(i interface{}, spec *APISpec) error {
-	return nil
-}
-
-func (b *BaseTykResponseHandler) Name() string {
-	return "BaseTykResponseHandler"
-}
-
-func (b *BaseTykResponseHandler) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
-	return nil
-}
-
-func (b *BaseTykResponseHandler) HandleError(writer http.ResponseWriter, h *http.Request) {}

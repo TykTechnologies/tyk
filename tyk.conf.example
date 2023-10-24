@@ -8,7 +8,7 @@
   "middleware_path": "/opt/tyk-gateway/middleware",
   "storage": {
     "type": "redis",
-    "host": "redis",
+    "host": "localhost",
     "port": 6379,
     "username": "",
     "password": "",

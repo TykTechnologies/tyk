@@ -5,7 +5,8 @@ name: Update Config docs
 on:
   push:
     branches:
-      - temporarily-suspended
+      - master
+      - release-**
     paths:
       - config/config.go
 

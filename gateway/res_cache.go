@@ -21,12 +21,8 @@ const (
 
 // ResponseCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type ResponseCacheMiddleware struct {
-	BaseTykResponseHandler
+	spec  *APISpec
 	store storage.Handler
-}
-
-func (m *ResponseCacheMiddleware) Base() *BaseTykResponseHandler {
-	return &m.BaseTykResponseHandler
 }
 
 func (m *ResponseCacheMiddleware) Name() string {
@@ -34,7 +30,7 @@ func (m *ResponseCacheMiddleware) Name() string {
 }
 
 func (h *ResponseCacheMiddleware) Init(c interface{}, spec *APISpec) error {
-	h.Spec = spec
+	h.spec = spec
 	return nil
 }
 
@@ -42,7 +38,7 @@ func (h *ResponseCacheMiddleware) HandleError(rw http.ResponseWriter, req *http.
 }
 
 func (m *ResponseCacheMiddleware) EnabledForSpec() bool {
-	return m.Spec.CacheOptions.EnableCache
+	return m.spec.CacheOptions.EnableCache
 }
 
 func (m *ResponseCacheMiddleware) getTimeTTL(cacheTTL int64) int64 {
@@ -80,7 +76,7 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 	}
 
 	cacheThisRequest := true
-	cacheTTL := options.timeout
+	cacheTTL := m.spec.CacheOptions.CacheTimeout
 
 	// make sure the status codes match if specified
 	if len(options.cacheOnlyResponseCodes) > 0 {
@@ -95,7 +91,7 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 	}
 
 	// Are we using upstream cache control?
-	if m.Spec.CacheOptions.EnableUpstreamCacheControl {
+	if m.spec.CacheOptions.EnableUpstreamCacheControl {
 		// Do we enable cache for this response?
 		if res.Header.Get(upstreamCacheHeader) != "" {
 			cacheThisRequest = true
@@ -103,8 +99,8 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 
 		// Read custom or default cache TTL header name
 		cacheTTLHeader := upstreamCacheTTLHeader
-		if m.Spec.CacheOptions.CacheControlTTLHeader != "" {
-			cacheTTLHeader = m.Spec.CacheOptions.CacheControlTTLHeader
+		if m.spec.CacheOptions.CacheControlTTLHeader != "" {
+			cacheTTLHeader = m.spec.CacheOptions.CacheControlTTLHeader
 		}
 
 		// Get cache TTL from header

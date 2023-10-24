@@ -2,14 +2,11 @@ name: API integration Tests
 
 on:
   pull_request:
+  push:
     branches:
       - master
-      - release-**
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
+      - test/*
+      - release-*
 
 env:
   GOPRIVATE: github.com/TykTechnologies
@@ -18,7 +15,7 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.19.x]
+        go-version: [1.16.x]
         platform: [ubuntu-latest]
         arch: [amd64]
         node-version: [15.x]
@@ -37,7 +34,7 @@ jobs:
         git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
     
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: tyk
         token: ${{ secrets.ORG_GH_TOKEN }}
@@ -60,7 +57,7 @@ jobs:
         fi
 
     - name: Checkout test repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: TykTechnologies/tyk-automated-tests
         token: ${{ secrets.ORG_GH_TOKEN }}
@@ -73,18 +70,18 @@ jobs:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: |
         echo "branch=master" >> $GITHUB_OUTPUT
-        if [ ! -z "${{ github.head_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.head_ref	}}; then
-          echo "branch=${{ github.head_ref	}}" >> $GITHUB_OUTPUT
+        if [ ! -z "${{ github.head_ref }}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.head_ref }}; then
+          echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
         fi
-        if [ ! -z "${{ github.base_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.base_ref	}}; then
-          echo "branch=${{ github.base_ref	}}" >> $GITHUB_OUTPUT
+        if [ ! -z "${{ github.base_ref }}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.base_ref }}; then
+          echo "branch=${{ github.base_ref }}" >> $GITHUB_OUTPUT
         fi
-        if [ ! -z "${{ github.ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.ref }}; then
-          echo "branch=${{ github.ref	}}" >> $GITHUB_OUTPUT
+        if [ ! -z "${{ github.ref }}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.ref }}; then
+          echo "branch=${{ github.ref }}" >> $GITHUB_OUTPUT
         fi
 
     - name: Checkout dashboard
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: TykTechnologies/tyk-analytics
         token: ${{ secrets.ORG_GH_TOKEN }}
@@ -140,13 +137,13 @@ jobs:
 
     - name: Archive Integration tests report
       if: ${{ always() }}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
          name: api-test-report
          path: ./tyk-automated-tests/reports/
 
     - name: Notify slack
-      if: ${{ always() && !github.event.pull_request.draft }}
+      if: ${{ always() }}
       uses: rtCamp/action-slack-notify@v2
       env:
         SLACK_WEBHOOK: ${{ secrets.GW_SLACK_WEBHOOK }}
@@ -156,7 +153,7 @@ jobs:
         SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
   
     - name: Comment on PR
-      if: ${{ always() && !github.event.pull_request.draft }}
+      if: ${{ always() }} && github.event.issue.pull_request
       uses: mshick/add-pr-comment@v1
       with:
         message: |
@@ -182,6 +179,6 @@ jobs:
         CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
         BRANCH: ${{ github.ref }}
 
-    - name: Getting gateway logs on failure
+    - name: Getting docker logs on failure
       if: ${{ failure() }}
-      run: docker logs tyk-gateway
+      run: docker-compose -f ci/ci_testing_env.yml logs

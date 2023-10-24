@@ -1,18 +1,29 @@
 #!/bin/bash
+
 set -eo pipefail
 
-function setup {
-	local tag=${1:-"v0.0.0"}
-	# Setup required env vars for docker compose
-	export GATEWAY_IMAGE=${GATEWAY_IMAGE:-"tykio/tyk-gateway:${tag}"}
+function usage {
+    local progname=$1
+    cat <<EOF
+Usage:
+$progname <tag>
 
-	docker pull -q $GATEWAY_IMAGE
+Runs the tyk-gateway container image with the given tag with a basic api defenition that redirects to
+httpbin and tests if evrything is in order.
+Requires docker compose.
+EOF
+    exit 1
 }
 
-setup $1
+compose='docker-compose'
+# composev2 is a client plugin
+[[ $(docker version --format='{{ .Client.Version }}') == "20.10.11" ]] && compose='docker compose'
 
-trap "docker compose down --remove-orphans" EXIT
+[[ -z $1 ]] && usage $0
+export tag=$1
 
-docker compose up -d --wait --force-recreate || { docker compose logs gw; exit 1; }
+trap "$compose down" EXIT
 
-./api_test.sh || { docker compose logs gw; exit 1; }
+$compose up -d
+sleep 2 # Wait for init
+./api_test.sh || { $compose logs gw; exit 1; }

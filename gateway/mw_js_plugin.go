@@ -98,12 +98,10 @@ func specToJson(spec *APISpec) string {
 	m := map[string]interface{}{
 		"OrgID": spec.OrgID,
 		"APIID": spec.APIID,
+		// For backwards compatibility within 2.x.
+		// TODO: simplify or refactor in 3.x or later.
+		"config_data": spec.ConfigData,
 	}
-
-	if !spec.ConfigDataDisabled {
-		m["config_data"] = spec.ConfigData
-	}
-
 	bs, err := json.Marshal(m)
 	if err != nil {
 		log.Error("Failed to encode configuration data: ", err)
@@ -500,6 +498,7 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 		return returnVal
 	})
+
 	ignoreCanonical := j.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	// Enable the creation of HTTP Requsts
 	j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
