@@ -33,10 +33,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	gqlhttp "github.com/TykTechnologies/graphql-go-tools/pkg/http"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
-
 	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
@@ -44,11 +40,15 @@ import (
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
+	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
@@ -833,9 +833,19 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return handleInMemoryLoop(handler, r)
 	}
 
+	if rt.Gw.GetConfig().OpenTelemetry.Enabled {
+		var baseRoundTripper http.RoundTripper = rt.transport
+		if rt.h2ctransport != nil {
+			baseRoundTripper = rt.h2ctransport
+		}
+
+		tr := otel.HTTPRoundTripper(baseRoundTripper)
+		return tr.RoundTrip(r)
+	}
 	if rt.h2ctransport != nil {
 		return rt.h2ctransport.RoundTrip(r)
 	}
+
 	return rt.transport.RoundTrip(r)
 }
 
@@ -931,7 +941,10 @@ func createMemConnProviderIfNeeded(handler http.Handler, r *http.Request) error 
 	// start http server with in mem listener
 	// Note: do not try to use http.Server it is working only with mux
 	mux := http.NewServeMux()
-	mux.Handle("/", handler)
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, wrappingHandlerReq *http.Request) {
+		reqWithPropagatedContext := wrappingHandlerReq.WithContext(r.Context())
+		handler.ServeHTTP(w, reqWithPropagatedContext)
+	}))
 
 	go func() { _ = http.Serve(lis, mux) }()
 
@@ -1066,7 +1079,7 @@ func (p *ReverseProxy) handleGraphQLIntrospection(gqlRequest *graphql.Request) (
 
 func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoundTripper, r *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	conn, err := p.wsUpgrader.Upgrade(w, r, http.Header{
-		header.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+		header.SecWebSocketProtocol: {r.Header.Get(header.SecWebSocketProtocol)},
 	})
 	if err != nil {
 		p.logger.Error("websocket upgrade for GraphQL engine failed: ", err)
@@ -1103,6 +1116,14 @@ func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWrite
 	return err
 }
 
+func headerStructToHeaderMap(headers []apidef.UDGGlobalHeader) map[string]string {
+	headerMap := make(map[string]string)
+	for _, header := range headers {
+		headerMap[header.Key] = header.Value
+	}
+	return headerMap
+}
+
 func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
 
@@ -1130,9 +1151,10 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		}
 
 		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
-		reqCtx := context.Background()
+		span := otel.SpanFromContext(outreq.Context())
+		reqCtx := otel.ContextWithSpan(context.Background(), span)
 		if isProxyOnly {
-			reqCtx = NewGraphQLProxyOnlyContext(context.Background(), outreq)
+			reqCtx = NewGraphQLProxyOnlyContext(reqCtx, outreq)
 		}
 
 		resultWriter := graphql.NewEngineResultWriter()
@@ -1144,9 +1166,15 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		upstreamHeaders := p.graphqlEngineAdditionalUpstreamHeaders(outreq)
 		execOptions = append(execOptions, graphql.WithHeaderModifier(p.graphqlEngineHeaderModifier(outreq, upstreamHeaders)))
 
-		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
-		if err != nil {
-			return
+		if p.TykAPISpec.GraphQLExecutor.OtelExecutor != nil {
+			if err = p.TykAPISpec.GraphQLExecutor.OtelExecutor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
+				return
+			}
+		} else {
+			err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
+			if err != nil {
+				return
+			}
 		}
 
 		httpStatus := http.StatusOK
@@ -1210,7 +1238,14 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 		)
 	}
 
-	go gqlhttp.HandleWebsocket(done, errChan, conn, executorPool, absLogger)
+	go gqlwebsocket.Handle(
+		done,
+		errChan,
+		conn,
+		executorPool,
+		gqlwebsocket.WithLogger(absLogger),
+		gqlwebsocket.WithProtocolFromRequestHeaders(req),
+	)
 	select {
 	case err := <-errChan:
 		log.Error("could not start graphql websocket handler: ", err)
@@ -1527,7 +1562,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 }
 
 func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) error {
-
 	// Remove hop-by-hop headers listed in the
 	// "Connection" header of the response.
 	if c := res.Header.Get(header.Connection); c != "" {
@@ -1921,61 +1955,75 @@ func (n *nopCloserBuffer) Close() error {
 	return nil
 }
 
-func copyBody(body io.ReadCloser, isClientResponseBody bool) io.ReadCloser {
+func copyBody(body io.ReadCloser, greedy bool) (io.ReadCloser, error) {
 	// check if body was already read and converted into our nopCloser
 	if nc, ok := body.(*nopCloserBuffer); ok {
 		// seek to the beginning to have it ready for next read
 		nc.Seek(0, io.SeekStart)
-		return body
+		return body, nil
 	}
 
 	// body is http's io.ReadCloser - read it up
 	rwc, err := newNopCloserBuffer(body)
 	if err != nil {
 		log.WithError(err).Error("error creating buffered request body")
-		return body
+		return body, nil
 	}
 
 	// Consume reader if it's from a http client response.
 	//
 	// Server would automatically call Close(), we only do it for
 	// the *http.Response struct, but not *http.Request.
-	if isClientResponseBody {
+	if greedy {
 		if err := rwc.copy(); err != nil {
 			log.WithError(err).Error("error reading request body")
-			return body
+			return body, err
 		}
 	}
 
 	// use seek-able reader for further body usage
-	return rwc
+	return rwc, nil
 }
 
-func copyRequest(r *http.Request) *http.Request {
+func copyRequest(r *http.Request) (*http.Request, error) {
+	var err error
 	if r.ContentLength == -1 {
-		return r
+		return r, nil
 	}
 
 	if r.Body != nil {
-		r.Body = copyBody(r.Body, false)
+		r.Body, err = copyBody(r.Body, false)
 	}
 
-	return r
+	return r, err
 }
 
-func copyResponse(r *http.Response) *http.Response {
+func copyResponse(r *http.Response) (*http.Response, error) {
+	var err error
 	// If the response is 101 Switching Protocols then the body will contain a
 	// `*http.readWriteCloserBody` which cannot be copied (see stdlib documentation).
 	// In this case we want to return immediately to avoid a silent crash.
 	if r.StatusCode == http.StatusSwitchingProtocols {
-		return r
+		return r, nil
 	}
 
 	if r.Body != nil {
-		r.Body = copyBody(r.Body, true)
+		r.Body, err = copyBody(r.Body, true)
 	}
 
-	return r
+	return r, err
+}
+
+func nopCloseRequestBodyErr(r *http.Request) (err error) {
+	if r == nil {
+		return nil
+	}
+
+	if r.Body != nil {
+		r.Body, err = copyBody(r.Body, true)
+	}
+
+	return err
 }
 
 func nopCloseRequestBody(r *http.Request) {
@@ -2025,6 +2073,11 @@ func (p *ReverseProxy) graphqlEngineAdditionalUpstreamHeaders(outreq *http.Reque
 			log.Warn("context variables enabled but request_id missing")
 		} else if requestID, ok := reqID.(string); ok {
 			upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
+		}
+	case apidef.GraphQLExecutionModeExecutionEngine:
+		globalHeaders := headerStructToHeaderMap(p.TykAPISpec.GraphQL.Engine.GlobalHeaders)
+		for key, value := range globalHeaders {
+			upstreamHeaders.Set(key, value)
 		}
 	}
 

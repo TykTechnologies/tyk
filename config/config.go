@@ -14,6 +14,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 )
@@ -63,6 +64,8 @@ const (
 
 	DefaultDashPolicySource     = "service"
 	DefaultDashPolicyRecordName = "tyk_policies"
+
+	DefaultOTelResourceName = "tyk-gateway"
 )
 
 type PoliciesConfig struct {
@@ -73,8 +76,9 @@ type PoliciesConfig struct {
 	// Set this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.
 	PolicyConnectionString string `json:"policy_connection_string"`
 
-	// This option is required if `policies.policy_source` is set to `file`.
-	// Specifies the path of your JSON file containing the available policies.
+	// This option only applies in OSS deployment when the `policies.policy_source` is either set
+	// to `file` or an empty string. If `policies.policy_path` is not set, then Tyk will load policies
+	// from the JSON file specified by `policies.policy_record_name`.
 	PolicyRecordName string `json:"policy_record_name"`
 
 	// In a Pro installation, Tyk will load Policy IDs and use the internal object-ID as the ID of the policy.
@@ -84,8 +88,10 @@ type PoliciesConfig struct {
 	//
 	// This option should only be used when moving an installation to a new database.
 	AllowExplicitPolicyID bool `json:"allow_explicit_policy_id"`
-	// This option is used for storing a policies  if `policies.policy_source` is set to `file`.
-	// it should be some existing file path on hard drive
+	// This option only applies in OSS deployment when the `policies.policy_source` is either set
+	// to `file` or an empty string. If `policies.policy_path` is set, then Tyk will load policies
+	// from all the JSON files under the directory specified by the `policies.policy_path` option.
+	// In this configuration, Tyk Gateway will allow policy management through the Gateway API.
 	PolicyPath string `json:"policy_path"`
 }
 
@@ -151,6 +157,15 @@ type NormalisedURLConfig struct {
 	// Each UUID will be replaced with a placeholder {uuid}
 	NormaliseUUIDs bool `json:"normalise_uuids"`
 
+	// Set this to true to have Tyk automatically clean up ULIDs. It will match the following style:
+	//
+	// * `/posts/01G9HHNKWGBHCQX7VG3JKSZ055/comments`
+	// * `/posts/01g9hhnkwgbhcqx7vg3jksz055/comments`
+	// * `/posts/01g9HHNKwgbhcqx7vg3JKSZ055/comments`
+
+	// Each ULID will be replaced with a placeholder {ulid}
+	NormaliseULIDs bool `json:"normalise_ulids"`
+
 	// Set this to true to have Tyk automatically match for numeric IDs, it will match with a preceding slash so as not to capture actual numbers:
 	NormaliseNumbers bool `json:"normalise_numbers"`
 
@@ -162,6 +177,7 @@ type NormalisedURLConfig struct {
 
 type NormaliseURLPatterns struct {
 	UUIDs  *regexp.Regexp
+	ULIDs  *regexp.Regexp
 	IDs    *regexp.Regexp
 	Custom []*regexp.Regexp
 }
@@ -412,6 +428,20 @@ type HttpServerOptionsConfig struct {
 
 	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
 	Ciphers []string `json:"ssl_ciphers"`
+
+	// MaxRequestBodySize configures a maximum size limit for request body size (in bytes) for all APIs on the Gateway.
+	//
+	// Tyk Gateway will evaluate all API requests against this size limit and will respond with HTTP 413 status code if the body of the request is larger.
+	//
+	// Two methods are used to perform the comparison:
+	//  - If the API Request contains the `Content-Length` header, this is directly compared against `MaxRequestBodySize`.
+	//  - If the `Content-Length` header is not provided, the Request body is read in chunks to compare total size against `MaxRequestBodySize`.
+	//
+	// A value of zero (default) means that no maximum is set and API requests will not be tested.
+	//
+	// See more information about setting request size limits here:
+	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
+	MaxRequestBodySize int64 `json:"max_request_body_size"`
 }
 
 type AuthOverrideConf struct {
@@ -624,6 +654,9 @@ type Config struct {
 	HashKeys bool `json:"hash_keys"`
 
 	// DisableKeyActionsByUsername disables key search by username.
+	// When this is set to `true` you are able to search for keys only by keyID or key hash (if `hash_keys` is also set to `true`)
+	// Note that if `hash_keys` is also set to `true` then the keyID will not be provided for APIs secured using basic auth. In this scenario the only search option would be to use key hash
+	// If you are using the Tyk Dashboard, you must configure this setting with the same value in both Gateway and Dashboard
 	DisableKeyActionsByUsername bool `json:"disable_key_actions_by_username"`
 
 	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
@@ -925,7 +958,11 @@ type Config struct {
 	LogLevel string `json:"log_level"`
 
 	// Section for configuring OpenTracing support
+	// Deprecated: use OpenTelemetry instead.
 	Tracer Tracer `json:"tracing"`
+
+	// Section for configuring OpenTelemetry.
+	OpenTelemetry otel.OpenTelemetry `json:"opentelemetry"`
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 

@@ -21,16 +21,17 @@ import (
 	"strings"
 	"sync"
 
-	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
-
-	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/test"
 
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/test"
+
+	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
@@ -118,6 +119,7 @@ type Gateway struct {
 	ConnectionWatcher    *httputil.ConnectionWatcher
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
+	TracerProvider       otel.TracerProvider
 
 	keyGen DefaultKeyGenerator
 
@@ -312,6 +314,12 @@ func (gw *Gateway) getPolicy(polID string) user.Policy {
 	pol := gw.policiesByID[polID]
 	gw.policiesMu.RUnlock()
 	return pol
+}
+
+func (gw *Gateway) policiesByIDLen() int {
+	gw.policiesMu.RLock()
+	defer gw.policiesMu.RUnlock()
+	return len(gw.policiesByID)
 }
 
 func (gw *Gateway) apisByIDLen() int {
@@ -886,33 +894,31 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 // Create the response processor chain
 func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
-	// Prealloc size
-	chainLen := len(spec.ResponseProcessors)
-	// Append capacity
-	chainCapacity := chainLen + 1 + len(responseFuncs)
-
-	responseChain := make([]TykResponseHandler, chainLen, chainCapacity)
-
-	for i, processorDetail := range spec.ResponseProcessors {
-		processor := gw.responseProcessorByName(processorDetail.Name)
+	var (
+		responseMWChain []TykResponseHandler
+		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
+	)
+	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler})
+	for _, processorDetail := range spec.ResponseProcessors {
+		processor := gw.responseProcessorByName(processorDetail.Name, baseHandler)
 		if processor == nil {
 			mainLog.Error("No such processor: ", processorDetail.Name)
-			return
+			continue
 		}
 		if err := processor.Init(processorDetail.Options, spec); err != nil {
 			mainLog.Debug("Failed to init processor: ", err)
 		}
 		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
-		responseChain[i] = processor
+		responseMWChain = append(responseMWChain, processor)
 	}
 
 	for _, mw := range responseFuncs {
 		var processor TykResponseHandler
 		//is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
-			processor = gw.responseProcessorByName("goplugin_res_hook")
+			processor = gw.responseProcessorByName("goplugin_res_hook", baseHandler)
 		} else {
-			processor = gw.responseProcessorByName("custom_mw_res_hook")
+			processor = gw.responseProcessorByName("custom_mw_res_hook", baseHandler)
 		}
 
 		// TODO: perhaps error when plugin support is disabled?
@@ -924,7 +930,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		if err := processor.Init(mw, spec); err != nil {
 			mainLog.WithError(err).Debug("Failed to init processor")
 		}
-		responseChain = append(responseChain, processor)
+		responseMWChain = append(responseMWChain, processor)
 	}
 
 	keyPrefix := "cache-" + spec.APIID
@@ -932,14 +938,14 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	cacheStore.Connect()
 
 	// Add cache writer as the final step of the response middleware chain
-	processor := &ResponseCacheMiddleware{store: cacheStore}
+	processor := &ResponseCacheMiddleware{BaseTykResponseHandler: baseHandler, store: cacheStore}
 	if err := processor.Init(nil, spec); err != nil {
 		mainLog.WithError(err).Debug("Failed to init processor")
 	}
 
-	responseChain = append(responseChain, processor)
+	responseMWChain = append(responseMWChain, processor)
 
-	spec.ResponseChain = responseChain
+	spec.ResponseChain = responseMWChain
 }
 
 func (gw *Gateway) isRPCMode() bool {
@@ -1410,6 +1416,14 @@ func (gw *Gateway) afterConfSetup() {
 		}
 	}
 
+	if conf.OpenTelemetry.Enabled {
+		if conf.OpenTelemetry.ResourceName == "" {
+			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
+		}
+
+		conf.OpenTelemetry.SetDefaults()
+	}
+
 	gw.SetConfig(conf)
 }
 
@@ -1583,10 +1597,20 @@ func Start() {
 	}
 
 	if tr := gwConfig.Tracer; tr.Enabled {
+		mainLog.Warn("OpenTracing is deprecated, use OpenTelemetry instead.")
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)
 		defer trace.Close()
 	}
+
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		gw.GetConfig().SlaveOptions.UseRPC,
+		gw.GetConfig().SlaveOptions.GroupID,
+		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
+		gw.GetConfig().DBAppConfOptions.Tags)
+
 	gw.start()
 	configs := gw.GetConfig()
 	go gw.RedisController.ConnectToRedis(gw.ctx, func() {
@@ -1661,6 +1685,17 @@ func Start() {
 		err := gw.DashService.DeRegister()
 		if err != nil {
 			mainLog.WithError(err).Error("deregistering in dashboard")
+		}
+	}
+	if gwConfig.SlaveOptions.UseRPC {
+		store := RPCStorageHandler{
+			DoReload: gw.DoReload,
+			Gw:       gw,
+		}
+
+		err := store.Disconnect()
+		if err != nil {
+			mainLog.WithError(err).Error("deregistering in MDCB")
 		}
 	}
 

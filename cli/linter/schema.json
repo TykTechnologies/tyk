@@ -96,6 +96,75 @@
           }
         }
       }
+    },
+    "OpenTelemetry":{
+      "type":"object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "exporter":{
+          "type": "string"
+        },
+        "endpoint":{
+          "type": "string"
+        },
+        "connection_timeout":{
+          "type": "integer"
+        },
+        "resource_name":{
+          "type": "string"
+        },
+        "span_processor_type":{
+          "type":"string"
+        },
+        "context_propagation":{
+          "type":"string"
+        },
+        "headers": {
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "sampling": {
+          "type": "object",
+          "sampling_type":{
+              "type": "string"
+          },
+          "rate": {
+              "type": "integer"
+          },
+          "parent_based": {
+              "type": "bool"
+          }
+        },
+        "tls": {
+          "type" :"object",
+          "enable": {
+            "type":"bool"
+          },
+          "insecure_skip_verify": {
+            "type":"bool"
+          },
+          "ca_file": {
+            "type":"string"
+          },
+          "cert_file": {
+            "type":"string"
+          },
+          "key_file": {
+            "type":"string"
+          },
+          "max_version": {
+            "type":"string"
+          },
+          "min_version": {
+            "type":"string"
+          }
+        }
+      }
     }
   },
   "properties": {
@@ -154,6 +223,9 @@
               "type": "boolean"
             },
             "normalise_uuids": {
+              "type": "boolean"
+            },
+            "normalise_ulids": {
               "type": "boolean"
             }
           }
@@ -622,6 +694,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "max_request_body_size": {
+          "type": "integer"
         }
       }
     },
@@ -683,6 +758,9 @@
           ]
         }
       }
+    },
+    "opentelemetry": {
+      "$ref": "#/definitions/OpenTelemetry"
     },
     "logstash_network_addr": {
       "type": "string"

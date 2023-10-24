@@ -1,0 +1,57 @@
+---
+version: "3"
+
+vars:
+  tag: v0.0.0
+  base: tykio/golang-cross:1.19-bullseye
+  dockerfile: ci/images/plugin-compiler/Dockerfile
+  image: internal/plugin-compiler
+  sha:
+    sh: git rev-parse HEAD
+  root:
+    sh: git rev-parse --show-toplevel
+
+tasks:
+  default:
+    desc: "Build and test plugin compiler"
+    cmds:
+      - task: build
+      - task: test
+
+  build:
+    desc: "Build plugin compiler"
+    dir: '{{.root}}'
+    vars:
+      args: --no-cache --progress=plain --build-arg GITHUB_TAG={{.tag}} --build-arg GITHUB_SHA={{.sha}}
+    cmds:
+      - docker build {{.args}} --build-arg BASE_IMAGE={{.base}} -t {{.image}} -f {{.dockerfile}} .
+
+  test:
+    desc: "Run plugin compiler tests"
+    cmds:
+      - task: test:basic-plugin
+      - task: test:test-plugin
+
+  test:basic-plugin:
+    desc: "Test plugin compiler (basic-plugin)"
+    vars:
+      plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/basic-plugin'
+      symbol: MyPluginPre
+      args: --rm -v {{.plugin_path}}:/plugin-source -w /plugin-source
+    cmds:
+      - rm -f {{.plugin_path}}/*.so
+      - docker run {{.args}} {{.image}} plugin.so
+      - cp -f {{.plugin_path}}/*.so {{.plugin_path}}/plugin.so
+      - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin.so -s {{.symbol}}
+
+  test:test-plugin:
+    desc: "Test plugin compiler (test-plugin)"
+    vars:
+      plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/test-plugin'
+      symbol: AddFooBarHeader
+      args: --rm -v {{.plugin_path}}:/plugin-source -w /plugin-source
+    cmds:
+      - rm -f {{.plugin_path}}/*.so
+      - docker run {{.args}} {{.image}} plugin.so
+      - cp -f {{.plugin_path}}/*.so {{.plugin_path}}/plugin.so
+      - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin.so -s {{.symbol}}

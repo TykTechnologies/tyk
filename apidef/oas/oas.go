@@ -152,6 +152,22 @@ func (s *OAS) RemoveTykExtension() {
 	delete(s.Extensions, ExtensionTykAPIGateway)
 }
 
+// Clone creates a deep copy of the OAS object and returns a new instance.
+func (s *OAS) Clone() (*OAS, error) {
+	oasInBytes, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	var retOAS OAS
+	_ = json.Unmarshal(oasInBytes, &retOAS)
+
+	// convert Tyk extension from map to struct
+	retOAS.GetTykExtension()
+
+	return &retOAS, nil
+}
+
 func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 	if s.GetTykExtension() != nil {
 		authentication = s.GetTykExtension().Server.Authentication

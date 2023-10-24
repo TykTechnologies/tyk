@@ -29,7 +29,7 @@ func init() {
 }
 
 func TestNewSyncForcer(t *testing.T) {
-	sf := NewSyncForcer(rc)
+	sf := NewSyncForcer(rc, func() []byte { return []byte{} })
 
 	assert.True(t, sf.store.ControllerInitiated())
 	assert.Equal(t, "synchronizer-group-", sf.store.KeyPrefix)
@@ -38,7 +38,7 @@ func TestNewSyncForcer(t *testing.T) {
 }
 
 func TestGroupLoginCallback(t *testing.T) {
-	sf := NewSyncForcer(rc)
+	sf := NewSyncForcer(rc, func() []byte { return []byte{} })
 	defer sf.store.DeleteAllKeys()
 
 	key := "key"
@@ -57,4 +57,14 @@ func TestGroupLoginCallback(t *testing.T) {
 	assert.Equal(t, false, groupLogin.ForceSync)
 	assert.Equal(t, key, groupLogin.UserKey)
 	assert.Equal(t, groupID, groupLogin.GroupID)
+}
+
+func TestGetNodeDataFunc(t *testing.T) {
+	// Checking if the getNodeDataFunc is returning different values on each call
+	valueToFetch := "foo"
+	sf := NewSyncForcer(rc, func() []byte { return []byte(valueToFetch) })
+	assert.Equal(t, valueToFetch, string(sf.getNodeDataFunc()))
+
+	valueToFetch = "bar"
+	assert.Equal(t, valueToFetch, string(sf.getNodeDataFunc()))
 }

@@ -10,8 +10,11 @@ import (
 )
 
 type ResponseTransformJQMiddleware struct {
-	Spec *APISpec
-	Gw   *Gateway `json:"-"`
+	BaseTykResponseHandler
+}
+
+func (h ResponseTransformJQMiddleware) Base() *BaseTykResponseHandler {
+	return &h.BaseTykResponseHandler
 }
 
 func (ResponseTransformJQMiddleware) Name() string {

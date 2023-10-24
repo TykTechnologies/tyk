@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/otel"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -129,6 +130,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.OAuthKey, apidef.UnsetAuth:
 		ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
+		ctxSetSpanAttributes(r, k.Name(), otel.OAuthClientIDAttribute(session.OauthClientID))
 	}
 
 	// Request is valid, carry on
