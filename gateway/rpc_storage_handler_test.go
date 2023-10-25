@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 
@@ -397,4 +399,19 @@ func TestGetRawKey(t *testing.T) {
 		assert.Equal(t, "test-value", value)
 	})
 
+	t.Run("MDCB down, return mdcb lost connection err", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.SlaveOptions.EnableRPCCache = true
+		})
+		defer ts.Close()
+		rpc.SetEmergencyMode(t, true)
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               ts.Gw,
+		}
+
+		_, err := rpcListener.GetRawKey("any-key")
+		assert.Equal(t, storage.ErrMDCBConnectionLost, err)
+	})
 }
