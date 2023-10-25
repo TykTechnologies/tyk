@@ -70,7 +70,7 @@ require (
 	golang.org/x/crypto v0.13.0
 	golang.org/x/net v0.15.0
 	golang.org/x/sync v0.3.0
-	google.golang.org/grpc v1.58.0
+	google.golang.org/grpc v1.58.3
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
