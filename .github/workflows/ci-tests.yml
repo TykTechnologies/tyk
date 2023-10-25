@@ -30,19 +30,19 @@ jobs:
 
     steps:
       - name: Checkout Tyk
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 2
 
       - name: Setup Golang
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-            python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Install Dependencies and basic hygiene test
         id: hygiene
@@ -81,7 +81,7 @@ jobs:
           redis-version: ${{ matrix.redis-version }}
 
       - name: Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
