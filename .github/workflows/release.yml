@@ -33,10 +33,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        golang_cross:
-          - 1.19-bullseye 
-        include: 
-          - golang_cross: 1.19-bullseye
+        golang_cross: [ 1.21-bookworm ]
+        include:
+          - golang_cross: 1.21-bookworm
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             cgo:  1  
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
