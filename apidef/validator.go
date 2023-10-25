@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 )
 
@@ -53,7 +54,9 @@ type ValidationRuleSet []ValidationRule
 
 var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleUniqueDataSourceNames{},
+	&RuleAtLeastEnableOneAuthSource{},
 	&RuleValidateIPList{},
+	&RuleValidateEnforceTimeout{},
 }
 
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
@@ -95,6 +98,49 @@ func (r *RuleUniqueDataSourceNames) Validate(apiDef *APIDefinition, validationRe
 	}
 }
 
+var ErrAllAuthSourcesDisabled = "all auth sources are disabled for %s, at least one of header/cookie/query must be enabled"
+
+type RuleAtLeastEnableOneAuthSource struct{}
+
+func (r *RuleAtLeastEnableOneAuthSource) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	authConfigs := make([]string, len(apiDef.AuthConfigs))
+	i := 0
+	for name := range apiDef.AuthConfigs {
+		authConfigs[i] = name
+		i++
+	}
+
+	sort.Strings(authConfigs)
+
+	for _, name := range authConfigs {
+		if shouldValidateAuthSource(name, apiDef) &&
+			!(apiDef.AuthConfigs[name].UseParam || apiDef.AuthConfigs[name].UseCookie || !apiDef.AuthConfigs[name].DisableHeader) {
+			validationResult.IsValid = false
+			validationResult.AppendError(fmt.Errorf(ErrAllAuthSourcesDisabled, name))
+		}
+	}
+
+}
+
+func shouldValidateAuthSource(authType string, apiDef *APIDefinition) bool {
+	switch authType {
+	case "authToken":
+		return apiDef.UseStandardAuth
+	case "jwt":
+		return apiDef.EnableJWT
+	case "hmac":
+		return apiDef.EnableSignatureChecking
+	case "oauth":
+		return apiDef.UseOauth2
+	case "oidc":
+		return apiDef.UseOpenID
+	case "coprocess":
+		return apiDef.EnableCoProcessAuth
+	}
+
+	return false
+}
+
 var ErrInvalidIPCIDR = "invalid IP/CIDR %q"
 
 type RuleValidateIPList struct{}
@@ -103,7 +149,7 @@ func (r *RuleValidateIPList) Validate(apiDef *APIDefinition, validationResult *V
 	if apiDef.EnableIpWhiteListing {
 		if errs := r.validateIPAddr(apiDef.AllowedIPs); len(errs) > 0 {
 			validationResult.IsValid = false
-			validationResult.Errors = errs
+			validationResult.Errors = append(validationResult.Errors, errs...)
 		}
 	}
 
@@ -134,4 +180,22 @@ func (r *RuleValidateIPList) validateIPAddr(ips []string) []error {
 	}
 
 	return errs
+}
+
+var ErrInvalidTimeoutValue = errors.New("invalid timeout value")
+
+type RuleValidateEnforceTimeout struct{}
+
+func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	if apiDef.VersionData.Versions != nil {
+		for _, vInfo := range apiDef.VersionData.Versions {
+			for _, hardTimeOutMeta := range vInfo.ExtendedPaths.HardTimeouts {
+				if hardTimeOutMeta.TimeOut < 0 {
+					validationResult.IsValid = false
+					validationResult.AppendError(ErrInvalidTimeoutValue)
+					return
+				}
+			}
+		}
+	}
 }

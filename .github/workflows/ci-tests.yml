@@ -1,6 +1,10 @@
 name: CI tests
 
-on: pull_request
+on: 
+  pull_request:
+    branches:
+      - master
+      - release-**
 
 env:
   TYK_DB_REDISHOST: localhost
@@ -17,11 +21,13 @@ jobs:
       matrix:
         redis-version: [5]
         python-version: ['3.9']
-        go: [1.15]
+        go: [1.16]
 
     steps:
       - name: Checkout Tyk
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
 
       - name: Setup Golang
         uses: actions/setup-go@v2
@@ -33,21 +39,38 @@ jobs:
         with:
             python-version: ${{ matrix.python-version }}
 
-      - name: Setup Lua
-        run:
+      - name: Install Dependencies and basic hygiene test
+        id: hygiene
+        run: |
           sudo apt-get install libluajit-5.1-dev
 
-      - name: Install Dependencies
-        run: |
           python -m pip install --upgrade pip
           pip install setuptools
           pip install google
           pip install protobuf
 
+          make lint
+          
+          git add --all
+          git diff HEAD > git-state.log
+          echo "git-state=$(sed -ze 's/%/%25/g;s/\n/%0A/g' git-state.log)" >> $GITHUB_OUTPUT
+
+          git_state_count=$(wc -l < git-state.log)
+          
+          if [[ $git_state_count -ne 0 ]]
+          then 
+            echo "make lint made git state dirty, please run make lint locally and update PR"
+            exit 1
+          fi
+
+      - name: Fetch base branch
+        if: ${{ github.event_name == 'pull_request' }}
+        run: git fetch origin ${{ github.base_ref }}
       - name: Start Redis
-        uses: supercharge/redis-github-action@1.1.0
+        uses: supercharge/redis-github-action@1.2.0
         with:
           redis-version: ${{ matrix.redis-version }}
+
 
       - name: Cache
         uses: actions/cache@v2
@@ -58,5 +81,49 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Run Gateway Tests
+        id: ci-tests
         run: |
-          ./bin/ci-tests.sh
+          ./bin/ci-tests.sh 2>&1 | tee test.log
+          result_code=${PIPESTATUS[0]}
+          echo "log=$(sed -ze 's/%/%25/g;s/\n/%0A/g' test.log)" >> $GITHUB_OUTPUT
+          exit $result_code
+
+      - name: Notify status
+        if: ${{ failure() && github.event.pull_request.number }}
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            # :boom: CI tests failed :see_no_evil:
+
+            ## git-state
+            ```shellsession
+            ${{ steps.hygiene.outputs.git-state || 'all ok' }}
+            ```
+            
+            Please look at [the run](https://github.com/TykTechnologies/tyk/pull/${{ github.event.pull_request.number }}/checks?check_run_id=${{ github.run_id }}) or in the _Checks_ tab.
+
+      - name: Download golangci-lint
+        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+
+      - name: golangci-lint
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
+
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.organization=tyktechnologies
+            -Dsonar.projectKey=TykTechnologies_tyk
+            -Dsonar.sources=.
+            -Dsonar.exclusions=coprocess/**/*,ci/**,smoke-tests/**,apidef/oas/schema/schema.gen.go
+            -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*
+            -Dsonar.test.inclusions=**/*_test.go
+            -Dsonar.tests=.
+            -Dsonar.go.coverage.reportPaths=*.cov
+            -Dsonar.go.golangci-lint.reportPaths=golanglint.xml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

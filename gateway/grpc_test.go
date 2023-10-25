@@ -17,17 +17,20 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
+
 	"github.com/TykTechnologies/tyk/config"
+
 	"google.golang.org/grpc/metadata"
 
 	"golang.org/x/net/http2/h2c"
 
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	pb "google.golang.org/grpc/examples/helloworld/helloworld"
+
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk in H2C configuration also for insecure grpc over http.
@@ -58,7 +61,6 @@ func TestHTTP2_h2C(t *testing.T) {
 	// upstream protocol should be h2c
 	upstream.URL = strings.Replace(upstream.URL, "http", "h2c", -1)
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
 		spec.Proxy.TargetURL = upstream.URL
@@ -480,7 +482,9 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 }
 
 // server is used to implement helloworld.GreeterServer.
-type server struct{}
+type server struct {
+	pb.UnimplementedGreeterServer
+}
 
 // SayHello implements helloworld.GreeterServer
 func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
@@ -729,7 +733,6 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupStreamSVC)
 	defer target.Close()
-
 	defer func() {
 		t.Log("Will stop grpc server")
 		s.Stop()

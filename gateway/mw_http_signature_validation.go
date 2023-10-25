@@ -48,7 +48,7 @@ func (hm *HTTPSignatureValidationMiddleware) Init() {
 
 // getAuthType overrides BaseMiddleware.getAuthType.
 func (hm *HTTPSignatureValidationMiddleware) getAuthType() string {
-	return hmacType
+	return apidef.HMACType
 }
 
 func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {

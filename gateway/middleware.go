@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
@@ -10,15 +11,15 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
-	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
@@ -33,14 +34,6 @@ const (
 	mwStatusRespond                = 666
 	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
 )
-
-const authTokenType = "authToken"
-const jwtType = "jwt"
-const hmacType = "hmac"
-const basicType = "basic"
-const coprocessType = "coprocess"
-const oauthType = "oauth"
-const oidcType = "oidc"
 
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
@@ -140,8 +133,14 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
+				writeResponse := true
+				// Prevent double error write
+				if goPlugin, isGoPlugin := actualMW.(*GoPluginMiddleware); isGoPlugin && goPlugin.handler != nil {
+					writeResponse = false
+				}
+
 				handler := ErrorHandler{*mw.Base()}
-				handler.HandleError(w, r, err.Error(), errCode, true)
+				handler.HandleError(w, r, err.Error(), errCode, writeResponse)
 
 				meta["error"] = err.Error()
 
@@ -291,7 +290,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		return false
 	}
 
-	lifetime := session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
+	lifetime := session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
 	if err := t.Gw.GlobalSessionManager.UpdateSession(token, session, lifetime, false); err != nil {
 		t.Logger().WithError(err).Error("Can't update session")
 		return false
@@ -308,6 +307,38 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	return true
 }
 
+// clearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
+// Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
+func (t BaseMiddleware) clearSession(session *user.SessionState) {
+	policies := session.PolicyIDs()
+	for _, polID := range policies {
+		t.Gw.policiesMu.RLock()
+		policy, ok := t.Gw.policiesByID[polID]
+		t.Gw.policiesMu.RUnlock()
+		if !ok {
+			continue
+		}
+
+		all := !(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity)
+
+		if policy.Partitions.Quota || all {
+			session.QuotaMax = 0
+			session.QuotaRemaining = 0
+		}
+
+		if policy.Partitions.RateLimit || all {
+			session.Rate = 0
+			session.Per = 0
+			session.ThrottleRetryLimit = 0
+			session.ThrottleInterval = 0
+		}
+
+		if policy.Partitions.Complexity || all {
+			session.MaxQueryDepth = 0
+		}
+	}
+}
+
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
@@ -316,6 +347,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	if session.MetaData == nil {
 		session.MetaData = make(map[string]interface{})
 	}
+
+	t.clearSession(session)
 
 	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
@@ -327,6 +360,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
+			if len(policies) > 1 {
+				continue
+			}
+
 			return err
 		}
 		// Check ownership, policy org owner must be the same as API,
@@ -376,6 +413,13 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
+				if r, ok := session.AccessRights[apiID]; ok {
+					// If GQL introspection is disabled, keep that configuration.
+					if r.DisableIntrospection {
+						accessRights.DisableIntrospection = r.DisableIntrospection
+					}
+				}
+
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
 
@@ -396,6 +440,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					// Merge ACLs for the same API
 					if r, ok := rights[k]; ok {
+						// If GQL introspection is disabled, keep that configuration.
+						if v.DisableIntrospection {
+							r.DisableIntrospection = v.DisableIntrospection
+						}
 						r.Versions = appendIfMissing(rights[k].Versions, v.Versions...)
 
 						for _, u := range v.AllowedURLs {
@@ -416,6 +464,14 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							for ri, rt := range r.RestrictedTypes {
 								if t.Name == rt.Name {
 									r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+								}
+							}
+						}
+
+						for _, t := range v.AllowedTypes {
+							for ri, rt := range r.AllowedTypes {
+								if t.Name == rt.Name {
+									r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
 								}
 							}
 						}
@@ -451,8 +507,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 
 						ar.Limit.QuotaMax = policy.QuotaMax
-						//if partition for quota is set the we must use this value in the global information of the key
-						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) || policy.Partitions.Quota {
+						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) {
 							session.QuotaMax = policy.QuotaMax
 						}
 					}
@@ -470,8 +525,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					if greaterThanFloat64(policy.Rate, ar.Limit.Rate) {
 						ar.Limit.Rate = policy.Rate
-						//if policy.Partitions.RateLimit then we must set this value in the global data of the key
-						if greaterThanFloat64(policy.Rate, session.Rate) || policy.Partitions.RateLimit {
+						if greaterThanFloat64(policy.Rate, session.Rate) {
 							session.Rate = policy.Rate
 						}
 					}
@@ -740,7 +794,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 			return session, false
 		}
 
-		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
+		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 		ctxScheduleSessionUpdate(r)
 		return session, found
 	}
@@ -762,20 +816,30 @@ func (b BaseMiddleware) getAuthType() string {
 func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, apidef.AuthConfig) {
 	config, ok := b.Base().Spec.AuthConfigs[authType]
 	// Auth is deprecated. To maintain backward compatibility authToken and jwt cases are added.
-	if !ok && (authType == authTokenType || authType == jwtType) {
+	if !ok && (authType == apidef.AuthTokenType || authType == apidef.JWTType) {
 		config = b.Base().Spec.Auth
 	}
 
-	if config.AuthHeaderName == "" {
-		config.AuthHeaderName = headers.Authorization
-	}
+	var (
+		key         string
+		defaultName = header.Authorization
+	)
 
-	key := r.Header.Get(config.AuthHeaderName)
+	headerName := config.AuthHeaderName
+	if !config.DisableHeader {
+		if headerName == "" {
+			headerName = defaultName
+		} else {
+			defaultName = headerName
+		}
+
+		key = r.Header.Get(headerName)
+	}
 
 	paramName := config.ParamName
 	if config.UseParam {
 		if paramName == "" {
-			paramName = config.AuthHeaderName
+			paramName = defaultName
 		}
 
 		paramValue := r.URL.Query().Get(paramName)
@@ -789,7 +853,7 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	cookieName := config.CookieName
 	if config.UseCookie {
 		if cookieName == "" {
-			cookieName = config.AuthHeaderName
+			cookieName = defaultName
 		}
 
 		authCookie, err := r.Cookie(cookieName)
@@ -804,6 +868,13 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	}
 
 	return key, config
+}
+
+func (b BaseMiddleware) generateSessionID(id string) string {
+	// generate a virtual token
+	data := []byte(id)
+	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	return b.Gw.generateToken(b.Spec.OrgID, keyID)
 }
 
 type TykResponseHandler interface {

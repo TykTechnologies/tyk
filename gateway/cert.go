@@ -14,14 +14,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/mux"
+
 	"github.com/TykTechnologies/tyk/internal/crypto"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/gorilla/mux"
-	"github.com/pmylund/go-cache"
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
+
+const ListDetailed = "detailed"
 
 type APICertificateStatusMessage struct {
 	CertID  string `json:"id"`
@@ -31,6 +35,10 @@ type APICertificateStatusMessage struct {
 
 type APIAllCertificates struct {
 	CertIDs []string `json:"certs"`
+}
+
+type APIAllCertificateBasics struct {
+	Certs []*certs.CertificateBasics `json:"certs"`
 }
 
 var cipherSuites = map[string]uint16{
@@ -65,7 +73,7 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 
 	certMaps := []map[string]string{gw.GetConfig().Security.Certificates.Upstream}
 
-	if spec != nil && spec.UpstreamCertificates != nil {
+	if spec != nil && !spec.UpstreamCertificatesDisabled && spec.UpstreamCertificates != nil {
 		certMaps = append(certMaps, spec.UpstreamCertificates)
 	}
 
@@ -106,7 +114,8 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 }
 
 func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(gw.GetConfig().Security.PinnedPublicKeys) == 0 {
+	if (spec == nil || spec.CertificatePinningDisabled || len(spec.PinnedPublicKeys) == 0) &&
+		len(gw.GetConfig().Security.PinnedPublicKeys) == 0 {
 		return nil
 	}
 
@@ -183,7 +192,7 @@ func validateCommonName(host string, cert *x509.Certificate) error {
 func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
 	var checkPinnedKeys, checkCommonName bool
 	gwConfig := gw.GetConfig()
-	if (spec != nil && len(spec.PinnedPublicKeys) != 0) || len(gwConfig.Security.PinnedPublicKeys) != 0 {
+	if (spec != nil && !spec.CertificatePinningDisabled && len(spec.PinnedPublicKeys) != 0) || len(gwConfig.Security.PinnedPublicKeys) != 0 {
 		checkPinnedKeys = true
 	}
 
@@ -231,7 +240,7 @@ func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.C
 
 	pinMaps := []map[string]string{conf.Security.PinnedPublicKeys}
 
-	if spec != nil && spec.PinnedPublicKeys != nil {
+	if spec != nil && !spec.CertificatePinningDisabled && spec.PinnedPublicKeys != nil {
 		pinMaps = append(pinMaps, spec.PinnedPublicKeys)
 	}
 
@@ -265,12 +274,12 @@ func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.C
 	return gw.CertificateManager.ListPublicKeys(strings.Split(keyIDs, ","))
 }
 
-// dummyGetCertificate needed because TLSConfig require setting Certificates array or GetCertificate function from start, even if it get overriden by `getTLSConfigForClient`
+// dummyGetCertificate needed because TLSConfig require setting Certificates array or GetCertificate function from start, even if it get overridden by `getTLSConfigForClient`
 func dummyGetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return nil, nil
 }
 
-var tlsConfigCache = cache.New(60*time.Second, 60*time.Minute)
+var tlsConfigCache = cache.New(60, 3600)
 
 var tlsConfigMu sync.Mutex
 
@@ -328,7 +337,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
-
 	for _, cert := range gw.CertificateManager.List(gwConfig.HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
 		if cert != nil {
 			serverCerts = append(serverCerts, *cert)
@@ -361,7 +369,11 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			newConfig.NameToCertificate[name] = cert
 		}
 
-		isControlAPI := (listenPort != 0 && gwConfig.ControlAPIPort == listenPort) || (gwConfig.ControlAPIHostname == hello.ServerName)
+		// not ControlAPIHostname has been configured or the hostName is the same in the hello handshake
+		isControlHostName := gwConfig.ControlAPIHostname == "" || (gwConfig.ControlAPIHostname == hello.ServerName)
+		// target port is the same where control api lives
+		isControlPort := (gwConfig.ControlAPIPort == 0 && listenPort == gwConfig.ListenPort) || (gwConfig.ControlAPIPort == listenPort && listenPort != 0)
+		isControlAPI := isControlHostName && isControlPort
 
 		if isControlAPI && gwConfig.Security.ControlAPIUseMutualTLS {
 			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
@@ -406,12 +418,12 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 					certIDs := append(spec.ClientCertificates, gwConfig.Security.Certificates.API...)
 
 					for _, cert := range gw.CertificateManager.List(certIDs, certs.CertificatePublic) {
-						if cert != nil {
+						if cert != nil && !crypto.IsPublicKey(cert) {
 							newConfig.ClientCAs.AddCert(cert.Leaf)
 						}
 					}
 				}
-			case spec.Auth.UseCertificate, spec.AuthConfigs[authTokenType].UseCertificate:
+			case spec.Auth.UseCertificate, spec.AuthConfigs[apidef.AuthTokenType].UseCertificate:
 				// Dynamic certificate check required, falling back to HTTP level check
 				// TODO: Change to VerifyPeerCertificate hook instead, when possible
 				if domainRequireCert[spec.Domain] < tls.RequestClientCert {
@@ -485,6 +497,11 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			newConfig.ClientAuth = tls.RequestClientCert
 		}
 
+		if newConfig.ClientAuth == tls.RequireAndVerifyClientCert && isControlAPI && !gwConfig.Security.ControlAPIUseMutualTLS {
+
+			newConfig.ClientAuth = tls.RequestClientCert
+		}
+
 		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
 
@@ -514,9 +531,20 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		if certID == "" {
 			orgID := r.URL.Query().Get("org_id")
+			mode := r.URL.Query().Get("mode")
+			certIDs := gw.CertificateManager.ListAllIds(orgID)
+			if mode == ListDetailed {
+				var certificateBasics = make([]*certs.CertificateBasics, len(certIDs))
+				certificates := gw.CertificateManager.List(certIDs, certs.CertificateAny)
+				for ci, certificate := range certificates {
+					certificateBasics[ci] = certs.ExtractCertificateBasics(certificate, certIDs[ci])
+				}
 
-			certIds := gw.CertificateManager.ListAllIds(orgID)
-			doJSONWrite(w, http.StatusOK, &APIAllCertificates{certIds})
+				doJSONWrite(w, http.StatusOK, &APIAllCertificateBasics{Certs: certificateBasics})
+				return
+			}
+
+			doJSONWrite(w, http.StatusOK, &APIAllCertificates{certIDs})
 			return
 		}
 

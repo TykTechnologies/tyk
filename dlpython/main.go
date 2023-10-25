@@ -43,6 +43,8 @@ var (
 
 // FindPythonConfig scans PATH for common python-config locations.
 func FindPythonConfig(customVersion string) (selectedVersion string, err error) {
+	logger.Debugf("Requested python version: %q", customVersion)
+
 	// Not sure if this can be replaced with os.LookPath:
 	if paths == "" {
 		return selectedVersion, errEmptyPath

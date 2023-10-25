@@ -4,7 +4,9 @@ import (
 	"html/template"
 	"net/http"
 
+	// Example of package with different version in go.mod
 	"github.com/Masterminds/sprig/v3"
+
 	// Example of package which is not part of Gateway
 	"github.com/kr/pretty"
 
@@ -15,6 +17,7 @@ import (
 var logger = log.Get()
 
 // AddFooBarHeader adds custom "Foo: Bar" header to the request
+//
 //nolint:deadcode
 func AddFooBarHeader(rw http.ResponseWriter, r *http.Request) {
 	r.Header.Add("Foo", "Bar")

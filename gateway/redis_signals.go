@@ -32,7 +32,6 @@ const (
 	NoticeDashboardConfigRequest NotificationCommand = "NoticeDashboardConfigRequest"
 	NoticeGatewayConfigResponse  NotificationCommand = "NoticeGatewayConfigResponse"
 	NoticeGatewayDRLNotification NotificationCommand = "NoticeGatewayDRLNotification"
-	NoticeGatewayLENotification  NotificationCommand = "NoticeGatewayLENotification"
 	KeySpaceUpdateNotification   NotificationCommand = "KeySpaceUpdateNotification"
 )
 
@@ -54,24 +53,38 @@ func (n *Notification) Sign() {
 func (gw *Gateway) startPubSubLoop() {
 	cacheStore := storage.RedisCluster{RedisController: gw.RedisController}
 	cacheStore.Connect()
-	// On message, synchronise
+
+	message := "Connection to Redis failed, reconnect in 10s"
+
 	for {
+		err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
+			gw.handleRedisEvent(v, nil, nil)
+		})
+
 		select {
 		case <-gw.ctx.Done():
+			pubSubLog.Info("Context cancelled, exiting pubsub loop")
 			return
 		default:
-			err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
-				gw.handleRedisEvent(v, nil, nil)
-			})
-			if err != nil {
-				if err != storage.ErrRedisIsDown {
-					pubSubLog.WithField("err", err).Error("Connection to Redis failed, reconnect in 10s")
-				}
-				time.Sleep(10 * time.Second)
-				pubSubLog.Warning("Reconnecting ", err)
-			}
 		}
+
+		gw.logPubSubError(err, message)
+		gw.addPubSubDelay(10 * time.Second)
 	}
+}
+
+// addPubSubDelay sleeps for duration
+func (gw *Gateway) addPubSubDelay(dur time.Duration) {
+	time.Sleep(dur)
+}
+
+// isPubSubError returns true if err != nil, logs error
+func (gw *Gateway) logPubSubError(err error, message string) bool {
+	if err != nil {
+		pubSubLog.WithError(err).Error(message)
+		return true
+	}
+	return false
 }
 
 func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
@@ -112,8 +125,6 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 			return
 		}
 		gw.onServerStatusReceivedHandler(notif.Payload)
-	case NoticeGatewayLENotification:
-		gw.onLESSLStatusReceivedHandler(notif.Payload)
 	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
 		pubSubLog.Info("Reloading endpoints")
 		gw.reloadURLStructure(reloaded)

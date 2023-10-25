@@ -815,6 +815,8 @@ func TestGetClientTokens(t *testing.T) {
 }
 
 func testGetClientTokens(t *testing.T, hashed bool) {
+	test.Flaky(t) // TODO: TT-5253
+
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second
 		globalConf.OauthTokenExpire = 1
@@ -1237,7 +1239,7 @@ func TestJSONToFormValues(t *testing.T) {
 		"client_secret": "test-client-secret",
 		"grant_type":    "password",
 	}
-	b, _ := json.Marshal(o)
+	b := test.MarshalJSON(t)(o)
 	r, err := http.NewRequest(http.MethodPost, "/token", bytes.NewReader(b))
 	if err != nil {
 		t.Fatal(err)

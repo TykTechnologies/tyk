@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	headers2 "github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/test"
-	cache "github.com/pmylund/go-cache"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	headers2 "github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
@@ -99,13 +100,13 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	oidc := &OpenIDMW{BaseMiddleware: baseMid}
 
 	// test getAuthType
-	assert.Equal(t, authTokenType, authKey.getAuthType())
-	assert.Equal(t, basicType, basic.getAuthType())
-	assert.Equal(t, coprocessType, coprocess.getAuthType())
-	assert.Equal(t, hmacType, hmac.getAuthType())
-	assert.Equal(t, jwtType, jwt.getAuthType())
-	assert.Equal(t, oauthType, oauth.getAuthType())
-	assert.Equal(t, oidcType, oidc.getAuthType())
+	assert.Equal(t, apidef.AuthTokenType, authKey.getAuthType())
+	assert.Equal(t, apidef.BasicType, basic.getAuthType())
+	assert.Equal(t, apidef.CoprocessType, coprocess.getAuthType())
+	assert.Equal(t, apidef.HMACType, hmac.getAuthType())
+	assert.Equal(t, apidef.JWTType, jwt.getAuthType())
+	assert.Equal(t, apidef.OAuthType, oauth.getAuthType())
+	assert.Equal(t, apidef.OIDCType, oidc.getAuthType())
 
 	// test getAuthToken
 	getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {

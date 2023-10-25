@@ -5,13 +5,14 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
+
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	_ "github.com/TykTechnologies/tyk/headers"
-
 	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/test"
@@ -152,7 +153,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			authTokenType: {UseCertificate: false},
+			apidef.AuthTokenType: {UseCertificate: false},
 		}
 	})[0]
 
@@ -189,17 +190,18 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 
 		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
 			Data: session, Client: client, Code: http.StatusOK})
-		testChangeHashFunc(t, map[string]string{headers.Authorization: customKey}, client, http.StatusForbidden)
+
+		testChangeHashFunc(t, map[string]string{header.Authorization: customKey}, client, http.StatusForbidden)
 	})
 
 	t.Run("basic auth key", func(t *testing.T) {
 		api.UseBasicAuth = true
 		api.AuthConfigs = map[string]apidef.AuthConfig{
-			authTokenType: {UseCertificate: true},
+			apidef.AuthTokenType: {UseCertificate: true},
 		}
-
 		ts.Gw.LoadAPI(api)
 		globalConf = ts.Gw.GetConfig()
+
 		session := CreateStandardSession()
 		session.BasicAuthData.Password = "password"
 		session.AccessRights = map[string]user.AccessDefinition{"test": {
@@ -227,7 +229,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	t.Run("client certificate", func(t *testing.T) {
 		api.UseBasicAuth = false
 		api.AuthConfigs = map[string]apidef.AuthConfig{
-			authTokenType: {UseCertificate: true},
+			apidef.AuthTokenType: {UseCertificate: true},
 		}
 		ts.Gw.LoadAPI(api)
 		session := CreateStandardSession()
@@ -244,4 +246,40 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		testChangeHashFunc(t, nil, client, http.StatusForbidden)
 	})
 
+}
+
+func TestResetQuotaObfuscate(t *testing.T) {
+
+	t.Run("Obfuscate key", func(t *testing.T) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HashKeys = false
+			globalConf.EnableKeyLogging = false
+		}
+
+		ts := StartTest(conf)
+		sessionManager := DefaultSessionManager{Gw: ts.Gw}
+		t.Cleanup(func() {
+			ts.Close()
+		})
+
+		actual := sessionManager.ResetQuotaObfuscateKey("481408ygjkbs")
+
+		assert.Equal(t, "****jkbs", actual)
+	})
+	t.Run("Does not Obfuscate key", func(t *testing.T) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HashKeys = true
+			globalConf.EnableKeyLogging = true
+		}
+
+		ts := StartTest(conf)
+		sessionManager := DefaultSessionManager{Gw: ts.Gw}
+		t.Cleanup(func() {
+			ts.Close()
+		})
+
+		actual := sessionManager.ResetQuotaObfuscateKey("481408ygjkbs")
+
+		assert.Equal(t, "481408ygjkbs", actual)
+	})
 }

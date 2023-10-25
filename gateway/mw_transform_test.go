@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/base64"
 	"io/ioutil"
+	"net/http"
 	"strings"
 	"testing"
 	"text/template"
@@ -26,6 +27,8 @@ func testPrepareTransformNonAscii() (*TransformSpec, string) {
 }
 
 func TestTransformNonAscii(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5223
+
 	tmeta, in := testPrepareTransformNonAscii()
 	want := `["Jyväskylä", "Hyvinkää"]`
 
@@ -345,5 +348,43 @@ func TestBodyTransformCaseSensitivity(t *testing.T) {
 	// Matches and transforms
 	t.Run("Relative path upper, requested path upper", func(t *testing.T) {
 		assert("/Get", "/Get", `{"http_method":"GET"}`)
+	})
+}
+
+func TestTransformRequestBody(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+				{
+					Disabled: false,
+					Path:     "/get",
+					Method:   http.MethodGet,
+					TemplateData: apidef.TemplateData{
+						Input:          apidef.RequestJSON,
+						Mode:           apidef.UseBlob,
+						TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{{.engineer | repeat 2}}`)),
+					},
+				}}
+		})
+	})[0]
+
+	ts.Gw.LoadAPI(api)
+
+	body := `{"engineer":"Furkan"}`
+	bodyMatch := `"Body":"FurkanFurkan"`
+
+	_, _ = ts.Run(t, test.TestCase{Path: "/get", Data: body, BodyMatch: bodyMatch, Code: http.StatusOK})
+
+	t.Run("disabled", func(t *testing.T) {
+		UpdateAPIVersion(api, "v1", func(version *apidef.VersionInfo) {
+			version.ExtendedPaths.Transform[0].Disabled = true
+		})
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{Path: "/get", Data: body, BodyNotMatch: bodyMatch, Code: http.StatusOK})
 	})
 }

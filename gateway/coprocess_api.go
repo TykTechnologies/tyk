@@ -14,8 +14,6 @@ import (
 // CoProcessDefaultKeyPrefix is used as a key prefix for this CP.
 const CoProcessDefaultKeyPrefix = "coprocess-data:"
 
-// TODO: implement INCR, DECR?
-
 // TykStoreData is a CoProcess API function for storing data.
 //
 //export TykStoreData
@@ -23,7 +21,7 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	key := C.GoString(CKey)
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
-	rc := storage.NewRedisController(context.Background())
+	rc := storage.NewRedisController(context.TODO())
 	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, RedisController: rc}
 	err := store.SetKey(key, value, ttl)
 	if err != nil {

@@ -3,8 +3,9 @@ package gateway
 import (
 	"net/http"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -78,9 +79,24 @@ func (c *GraphqlComplexityChecker) DepthLimitExceeded(gqlRequest *graphql.Reques
 		return ComplexityFailReasonNone
 	}
 
+	isIntrospectionQuery, err := gqlRequest.IsIntrospectionQuery()
+	if err != nil {
+		c.logger.Debugf("Error while checking for introspection query: '%s'", err.Error())
+		return ComplexityFailReasonInternalError
+	}
+
+	if isIntrospectionQuery {
+		return ComplexityFailReasonNone
+	}
+
 	complexityRes, err := gqlRequest.CalculateComplexity(graphql.DefaultComplexityCalculator, schema)
 	if err != nil {
 		c.logger.Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
+		return ComplexityFailReasonInternalError
+	}
+
+	if complexityRes.Errors != nil && complexityRes.Errors.Count() > 0 {
+		c.logger.Errorf("Error while calculating complexity of GraphQL request: '%s'", complexityRes.Errors.ErrorByIndex(0))
 		return ComplexityFailReasonInternalError
 	}
 

@@ -19,8 +19,10 @@ import (
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/sirupsen/logrus"
@@ -43,7 +45,7 @@ type ResponseObject struct {
 
 type VMResponseObject struct {
 	Response    ResponseObject
-	SessionMeta map[string]string
+	SessionMeta map[string]interface{}
 }
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
@@ -61,7 +63,7 @@ func (gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	// nil.
 	var src interface{}
 	switch meta.FunctionSourceType {
-	case "file":
+	case apidef.UseFile:
 		j.Log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
 		f, err := os.Open(meta.FunctionSourceURI)
 		if err != nil {
@@ -69,7 +71,7 @@ func (gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 			return
 		}
 		src = f
-	case "blob":
+	case apidef.UseBlob:
 		if gw.GetConfig().DisableVirtualPathBlobs {
 			j.Log.Error("[JSVM] Blobs not allowed on this node")
 			return
@@ -100,17 +102,12 @@ func (d *VirtualEndpoint) EnabledForSpec() bool {
 		return false
 	}
 
-	for _, version := range d.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.Virtual) > 0 {
-			return true
-		}
-	}
-
-	return false
+	return d.Spec.hasVirtualEndpoint()
 }
 
 func (d *VirtualEndpoint) getMetaFromRequest(r *http.Request) *apidef.VirtualMeta {
-	_, versionPaths, _, _ := d.Spec.Version(r)
+	version, _ := d.Spec.Version(r)
+	versionPaths := d.Spec.RxPaths[version.Name]
 	found, meta := d.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 	if !found {
 		return nil
@@ -176,6 +173,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Run the middleware
+
 	vm := d.Spec.JSVM.VM.Copy()
 	vm.Interrupt = make(chan func(), 1)
 	d.Logger().Debug("Running: ", vmeta.ResponseFunctionName)
@@ -223,7 +221,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// Save the sesison data (if modified)
 	if vmeta.UseSession {
-		newMeta := mapStrsToIfaces(newResponseData.SessionMeta)
+		newMeta := newResponseData.SessionMeta
 		if !reflect.DeepEqual(session.MetaData, newMeta) {
 			session.MetaData = newMeta
 			ctxSetSession(r, session, true, d.Gw.GetConfig().HashKeys)
@@ -235,7 +233,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	d.Logger().Debug("JSVM Virtual Endpoint execution took: (ms) ", ms)
 
 	if copiedResponse != nil {
-		d.sh.RecordHit(r, Latency{Total: int64(ms)}, copiedResponse.StatusCode, copiedResponse)
+		d.sh.RecordHit(r, analytics.Latency{Total: int64(ms)}, copiedResponse.StatusCode, copiedResponse)
 	}
 
 	return copiedResponse, nil
@@ -267,9 +265,9 @@ func (gw *Gateway) forceResponse(
 		ReadSeeker: bytes.NewReader(responseMessage),
 	}
 	newResponse.StatusCode = newResponseData.Response.Code
-	newResponse.Proto = "HTTP/1.0"
-	newResponse.ProtoMajor = 1
-	newResponse.ProtoMinor = 0
+	newResponse.Proto = r.Proto
+	newResponse.ProtoMajor = r.ProtoMajor
+	newResponse.ProtoMinor = r.ProtoMinor
 	newResponse.Header.Set("Server", "tyk")
 	newResponse.Header.Set("Date", requestTime)
 
@@ -339,9 +337,9 @@ func (gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Respon
 	if ses != nil {
 		// We have found a session, lets report back
 		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(spec.APIID)
-		res.Header.Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		res.Header.Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+		res.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		res.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		res.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header, gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)

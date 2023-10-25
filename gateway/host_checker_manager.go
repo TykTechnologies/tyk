@@ -153,7 +153,6 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("No Primary instance found, assuming control")
-
 		err := hc.store.SetKey(pollerCacheKey, hc.Id, 15)
 		if err != nil {
 			log.WithError(err).Error("cannot set key in pollerCacheKey")
@@ -217,9 +216,7 @@ func (hc *HostCheckerManager) StartPoller(ctx context.Context) {
 
 func (hc *HostCheckerManager) StopPoller() {
 	hc.checkerMu.Lock()
-	if hc.checker != nil {
-		hc.checker.Stop()
-	}
+	hc.checker.Stop()
 	hc.checkerMu.Unlock()
 }
 

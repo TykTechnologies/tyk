@@ -130,9 +130,7 @@ func TestTCPDial_with_service_discovery(t *testing.T) {
 		return string(buf)
 	}
 	for i := 0; i < 4; i++ {
-		if ServiceCache != nil {
-			ServiceCache.Flush()
-		}
+		ts.Gw.ServiceCache.Flush()
 		result = append(result, dial())
 	}
 	expect := []string{"service2", "service1", "service2", "service1"}

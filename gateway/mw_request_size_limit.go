@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 )
 
 // RequestSizeLimitMiddleware is a middleware that will enforce a limit on the request body size. The request has
@@ -33,7 +33,7 @@ func (t *RequestSizeLimitMiddleware) EnabledForSpec() bool {
 }
 
 func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimit int64) (error, int) {
-	statedCL := r.Header.Get(headers.ContentLength)
+	statedCL := r.Header.Get(header.ContentLength)
 	if statedCL == "" {
 		return errors.New("Content length is required for this request"), 411
 	}
@@ -62,7 +62,7 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	logger := t.Logger()
 	logger.Debug("Request size limiter active")
 
-	vInfo, versionPaths, _, _ := t.Spec.Version(r)
+	vInfo, _ := t.Spec.Version(r)
 
 	logger.Debug("Global limit is: ", vInfo.GlobalSizeLimit)
 	// Manage global headers first
@@ -79,6 +79,8 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	if len(vInfo.ExtendedPaths.SizeLimit) == 0 {
 		return nil, http.StatusOK
 	}
+
+	versionPaths := t.Spec.RxPaths[vInfo.Name]
 
 	// If there's a potential match, try to match
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, RequestSizeLimit)

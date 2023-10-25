@@ -11,9 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -115,7 +119,7 @@ func getSessionTags(session *user.SessionState) []string {
 	return tags
 }
 
-func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, responseCopy *http.Response) {
+func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response) {
 
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
@@ -170,6 +174,9 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			// mw_redis_cache instead? is there a reason not
 			// to include that in the analytics?
 			if responseCopy != nil {
+				// we need to delete the chunked transfer encoding header to avoid malformed body in our rawResponse
+				httputil.RemoveResponseTransferEncoding(responseCopy, "chunked")
+
 				contents, err := ioutil.ReadAll(responseCopy.Body)
 				if err != nil {
 					log.Error("Couldn't read response body", err)
@@ -197,43 +204,50 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			host = s.Spec.target.Host
 		}
 
-		record := AnalyticsRecord{
-			r.Method,
-			host,
-			trackedPath,
-			r.URL.Path,
-			r.ContentLength,
-			r.Header.Get(headers.UserAgent),
-			t.Day(),
-			t.Month(),
-			t.Year(),
-			t.Hour(),
-			code,
-			token,
-			t,
-			version,
-			s.Spec.Name,
-			s.Spec.APIID,
-			s.Spec.OrgID,
-			oauthClientID,
-			timing.Total,
-			timing,
-			rawRequest,
-			rawResponse,
-			ip,
-			GeoData{},
-			NetworkStats{},
-			tags,
-			alias,
-			trackEP,
-			t,
+		record := analytics.AnalyticsRecord{
+			Method:        r.Method,
+			Host:          host,
+			Path:          trackedPath,
+			RawPath:       r.URL.Path,
+			ContentLength: r.ContentLength,
+			UserAgent:     r.Header.Get(header.UserAgent),
+			Day:           t.Day(),
+			Month:         t.Month(),
+			Year:          t.Year(),
+			Hour:          t.Hour(),
+			ResponseCode:  code,
+			APIKey:        token,
+			TimeStamp:     t,
+			APIVersion:    version,
+			APIName:       s.Spec.Name,
+			APIID:         s.Spec.APIID,
+			OrgID:         s.Spec.OrgID,
+			OauthID:       oauthClientID,
+			RequestTime:   timing.Total,
+			RawRequest:    rawRequest,
+			RawResponse:   rawResponse,
+			IPAddress:     ip,
+			Geo:           analytics.GeoData{},
+			Network:       analytics.NetworkStats{},
+			Latency:       timing,
+			Tags:          tags,
+			Alias:         alias,
+			TrackPath:     trackEP,
+			ExpireAt:      t,
 		}
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip, s.Gw)
+			record.GetGeo(ip, s.Gw.Analytics.GeoIPDB)
+		}
+
+		// skip tagging subgraph requests for graphpump, it only handles generated supergraph requests
+		if s.Spec.GraphQL.Enabled && s.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
+			record.Tags = append(record.Tags, "tyk-graph-analytics")
+			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(s.Spec.GraphQL.Schema))
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
+
 		if s.Spec.GlobalConfig.EnforceOrgDataAge {
 			orgExpireDataTime := s.OrgSessionExpiry(s.Spec.OrgID)
 
@@ -245,10 +259,18 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 		record.SetExpiry(expiresAfter)
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-			record.NormalisePath(&s.Spec.GlobalConfig)
+			NormalisePath(&record, &s.Spec.GlobalConfig)
 		}
 
-		err := s.Gw.analytics.RecordHit(&record)
+		if s.Spec.AnalyticsPlugin.Enabled {
+
+			//send to plugin
+			_ = s.Spec.AnalyticsPluginConfig.processRecord(&record)
+
+		}
+
+		err := s.Gw.Analytics.RecordHit(&record)
+
 		if err != nil {
 			log.WithError(err).Error("could not store analytic record")
 		}
@@ -300,16 +322,6 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	log.Debug("Started proxy")
 	defer s.Base().UpdateRequestSession(r)
 
-	versionDef := s.Spec.VersionDefinition
-	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
-		part := s.Spec.getVersionFromRequest(r)
-
-		log.Debug("Stripping version from url: ", part)
-
-		r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
-		r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
-	}
-
 	// Make sure we get the correct target URL
 	s.Spec.SanitizeProxyPaths(r)
 
@@ -322,7 +334,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
-		latency := Latency{
+		latency := analytics.Latency{
 			Total:    int64(millisec),
 			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
 		}
@@ -337,16 +349,6 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 // Spec states the path is Ignored Itwill also return a response object for the cache
 func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) ProxyResponse {
 
-	versionDef := s.Spec.VersionDefinition
-	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
-		part := s.Spec.getVersionFromRequest(r)
-
-		log.Debug("Stripping version from URL: ", part)
-
-		r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
-		r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
-	}
-
 	// Make sure we get the correct target URL
 	s.Spec.SanitizeProxyPaths(r)
 
@@ -359,7 +361,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {
-		latency := Latency{
+		latency := analytics.Latency{
 			Total:    int64(millisec),
 			Upstream: int64(DurationToMillisecond(inRes.UpstreamLatency)),
 		}

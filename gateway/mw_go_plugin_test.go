@@ -3,9 +3,9 @@ package gateway
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // TestLoadPlugin test the function to load a middleware goplugin
@@ -37,10 +37,17 @@ func TestGoPluginMiddleware_EnabledForSpec(t *testing.T) {
 	})
 
 	t.Run("per path go plugin", func(t *testing.T) {
+		ep := apidef.ExtendedPathsSet{GoPlugin: make([]apidef.GoPluginMeta, 1)}
 		apiSpec.VersionData.Versions = map[string]apidef.VersionInfo{"v1": {
-			ExtendedPaths: apidef.ExtendedPathsSet{GoPlugin: make([]apidef.GoPluginMeta, 1)},
+			ExtendedPaths: ep,
 		}}
 
 		assert.True(t, gpm.EnabledForSpec())
+
+		t.Run("disabled", func(t *testing.T) {
+			ep.GoPlugin[0].Disabled = true
+
+			assert.False(t, gpm.EnabledForSpec())
+		})
 	})
 }

@@ -10,11 +10,11 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Jeffail/tunny"
 	proxyproto "github.com/pires/go-proxyproto"
-	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -22,6 +22,14 @@ import (
 const (
 	defaultTimeout             = 10
 	defaultSampletTriggerLimit = 3
+)
+
+const (
+	// Zero value - the service is open and ready to use
+	OPEN = 0
+
+	// Closed value - the service shouldn't be used
+	CLOSED = 1
 )
 
 var defaultWorkerPoolSize = runtime.NumCPU()
@@ -45,6 +53,11 @@ type HostHealthReport struct {
 	IsTCPError   bool
 }
 
+type HostSample struct {
+	count        int
+	reachedLimit bool
+}
+
 type HostUptimeChecker struct {
 	cb                 HostCheckCallBacks
 	workerPoolSize     int
@@ -52,30 +65,24 @@ type HostUptimeChecker struct {
 	checkTimeout       int
 	HostList           map[string]HostData
 	unHealthyList      map[string]bool
-	pool               *tunny.WorkPool
+	pool               *tunny.Pool
 
-	errorChan   chan HostHealthReport
-	okChan      chan HostHealthReport
-	sampleCache *cache.Cache
-	stopLoop    bool
-	muStopLoop  sync.RWMutex
+	errorChan  chan HostHealthReport
+	okChan     chan HostHealthReport
+	samples    *sync.Map
+	stopLoop   bool
+	muStopLoop sync.RWMutex
 
 	resetListMu sync.Mutex
 	doResetList bool
 	newList     map[string]HostData
 	Gw          *Gateway `json:"-"`
+
+	isClosed int32
 }
 
-func (h *HostUptimeChecker) getStopLoop() bool {
-	h.muStopLoop.RLock()
-	defer h.muStopLoop.RUnlock()
-	return h.stopLoop
-}
-
-func (h *HostUptimeChecker) setStopLoop(newValue bool) {
-	h.muStopLoop.Lock()
-	h.stopLoop = newValue
-	h.muStopLoop.Unlock()
+func (h *HostUptimeChecker) isOpen() bool {
+	return atomic.LoadInt32(&h.isClosed) == OPEN
 }
 
 func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
@@ -129,7 +136,7 @@ func (h *HostUptimeChecker) execCheck() {
 	}
 	h.resetListMu.Unlock()
 	for _, host := range h.HostList {
-		_, err := h.pool.SendWork(host)
+		_, err := h.pool.ProcessCtx(h.Gw.ctx, host)
 		if err != nil && err != tunny.ErrPoolNotRunning {
 			log.Warnf("[HOST CHECKER] could not send work, error: %v", err)
 		}
@@ -140,30 +147,29 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			if !h.getStopLoop() {
-				h.Stop()
-				log.Debug("[HOST CHECKER] Received cancel signal")
-			}
+			h.Stop()
+			log.Debug("[HOST CHECKER] Received cancel signal")
 			return
 		case okHost := <-h.okChan:
-			// Clear host from unhealthylist if it exists
-			if h.unHealthyList[okHost.CheckURL] {
-				newVal := 1
-				if count, found := h.sampleCache.Get(okHost.CheckURL); found {
-					newVal = count.(int) - 1
-				}
+			// check if the the host url is in the sample map
+			if hostSample, found := h.samples.Load(okHost.CheckURL); found {
+				sample := hostSample.(HostSample)
+				//if it reached the h.sampleTriggerLimit, we're going to start decreasing the count value
+				if sample.reachedLimit {
+					newCount := sample.count - 1
 
-				if newVal <= 0 {
-					// Reset the count
-					h.sampleCache.Delete(okHost.CheckURL)
-					log.Warning("[HOST CHECKER] [HOST UP]: ", okHost.CheckURL)
-					if h.cb.Up != nil {
+					if newCount <= 0 {
+						//if the count-1 is equals to zero, it means that the host is fully up.
+
+						h.samples.Delete(okHost.CheckURL)
+						log.Warning("[HOST CHECKER] [HOST UP]: ", okHost.CheckURL)
 						go h.cb.Up(ctx, okHost)
+					} else {
+						//in another case, we are one step closer. We just update the count number
+						sample.count = newCount
+						log.Warning("[HOST CHECKER] [HOST UP BUT NOT REACHED LIMIT]: ", okHost.CheckURL)
+						h.samples.Store(okHost.CheckURL, sample)
 					}
-					delete(h.unHealthyList, okHost.CheckURL)
-				} else {
-					log.Warning("[HOST CHECKER] [HOST UP BUT NOT REACHED LIMIT]: ", okHost.CheckURL)
-					h.sampleCache.Set(okHost.CheckURL, newVal, cache.DefaultExpiration)
 				}
 			}
 			if h.cb.Ping != nil {
@@ -171,23 +177,36 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 			}
 
 		case failedHost := <-h.errorChan:
-			newVal := 1
-			if count, found := h.sampleCache.Get(failedHost.CheckURL); found {
-				newVal = count.(int) + 1
+			sample := HostSample{
+				count: 1,
 			}
 
-			if newVal >= h.sampleTriggerLimit {
-				log.Warning("[HOST CHECKER] [HOST DOWN]: ", failedHost.CheckURL)
-				// track it
-				h.unHealthyList[failedHost.CheckURL] = true
-				// Call the custom callback hook
-				if h.cb.Fail != nil {
-					go h.cb.Fail(ctx, failedHost)
-				}
-			} else {
-				log.Warning("[HOST CHECKER] [HOST DOWN BUT NOT REACHED LIMIT]: ", failedHost.CheckURL)
-				h.sampleCache.Set(failedHost.CheckURL, newVal, cache.DefaultExpiration)
+			//If a host fails, we check if it has failed already
+			if hostSample, found := h.samples.Load(failedHost.CheckURL); found {
+				sample = hostSample.(HostSample)
+				// we add THIS failure to the count
+				sample.count = sample.count + 1
 			}
+
+			if sample.count >= h.sampleTriggerLimit {
+				// if it reached the h.sampleTriggerLimit, it means the host is down for us. We update the reachedLimit flag and store it in the sample map
+				log.Warning("[HOST CHECKER] [HOST DOWN]: ", failedHost.CheckURL)
+
+				//if this is the first time it reached the h.sampleTriggerLimit, the value of the reachedLimit flag is stored with the new count
+				if sample.reachedLimit == false {
+					sample.reachedLimit = true
+					h.samples.Store(failedHost.CheckURL, sample)
+				}
+
+				//we call the failureCallback to keep the redis key and the host checker manager updated
+				go h.cb.Fail(ctx, failedHost)
+
+			} else {
+				//if it failed but not reached the h.sampleTriggerLimit yet, we just add the counter to the map.
+				log.Warning("[HOST CHECKER] [HOST DOWN BUT NOT REACHED LIMIT]: ", failedHost.CheckURL)
+				h.samples.Store(failedHost.CheckURL, sample)
+			}
+
 			if h.cb.Ping != nil {
 				go h.cb.Ping(ctx, failedHost)
 			}
@@ -229,7 +248,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		}
 		if toCheck.EnableProxyProtocol {
 			log.Debug("using proxy protocol")
-			ls = proxyproto.NewConn(ls, 0)
+			ls = proxyproto.NewConn(ls)
 		}
 		defer ls.Close()
 		for _, cmd := range toCheck.Commands {
@@ -270,7 +289,6 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			log.Error("Could not create request: ", err)
 			return
 		}
-
 		ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 		for headerName, headerValue := range toCheck.Headers {
 			setCustomHeader(req.Header, headerName, headerValue, ignoreCanonical)
@@ -325,7 +343,7 @@ type HostCheckCallBacks struct {
 }
 
 func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, cb HostCheckCallBacks) {
-	h.sampleCache = cache.New(30*time.Second, 30*time.Second)
+	h.samples = new(sync.Map)
 	h.errorChan = make(chan HostHealthReport)
 	h.okChan = make(chan HostHealthReport)
 	h.HostList = hostList
@@ -352,11 +370,11 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 	log.Debug("[HOST CHECKER] Config:WorkerPool: ", h.workerPoolSize)
 
 	var err error
-	h.pool, err = tunny.CreatePool(h.workerPoolSize, func(hostData interface{}) interface{} {
+	h.pool = tunny.NewFunc(h.workerPoolSize, func(hostData interface{}) interface{} {
 		input, _ := hostData.(HostData)
 		h.CheckHost(input)
 		return nil
-	}).Open()
+	})
 
 	log.Debug("[HOST CHECKER] Init complete")
 
@@ -367,7 +385,6 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 
 func (h *HostUptimeChecker) Start(ctx context.Context) {
 	// Start the loop that checks for bum hosts
-	h.setStopLoop(false)
 	log.Debug("[HOST CHECKER] Starting...")
 	go h.HostCheckLoop(ctx)
 	log.Debug("[HOST CHECKER] Check loop started...")
@@ -375,11 +392,25 @@ func (h *HostUptimeChecker) Start(ctx context.Context) {
 	log.Debug("[HOST CHECKER] Host reporter started...")
 }
 
+// eraseSyncMap uses native sync.Map functions to clear the map
+// without needing to unsafely modify the value to nil.
+func eraseSyncMap(m *sync.Map) {
+	m.Range(func(k, _ interface{}) bool {
+		m.Delete(k)
+		return true
+	})
+}
+
 func (h *HostUptimeChecker) Stop() {
-	if !h.getStopLoop() {
-		h.setStopLoop(true)
+	was := atomic.SwapInt32(&h.isClosed, CLOSED)
+	if was == OPEN {
+		eraseSyncMap(h.samples)
+
 		log.Info("[HOST CHECKER] Stopping poller")
-		h.pool.Close()
+
+		if h.pool != nil && h.pool.GetSize() > 0 {
+			h.pool.Close()
+		}
 	}
 }
 

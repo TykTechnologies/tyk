@@ -12,13 +12,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"golang.org/x/net/http2/h2c"
+
+	proxyproto "github.com/pires/go-proxyproto"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/tcp"
-	proxyproto "github.com/pires/go-proxyproto"
-	cache "github.com/pmylund/go-cache"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -172,7 +174,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, gw *Gate
 	conf := gw.GetConfig()
 	hostname := spec.GlobalConfig.HostName
 	if spec.GlobalConfig.EnableCustomDomains {
-		hostname = spec.Domain
+		hostname = spec.GetAPIDomain()
 	} else {
 		hostname = ""
 	}
@@ -229,7 +231,7 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 				if spec.DoNotTrack {
 					continue
 				}
-				record := AnalyticsRecord{
+				record := analytics.AnalyticsRecord{
 					Network:      spec.network.Flush(),
 					Day:          t.Day(),
 					Month:        t.Month(),
@@ -242,14 +244,14 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 					OrgID:        spec.OrgID,
 				}
 				record.SetExpiry(spec.ExpireAnalyticsAfter)
-				gw.analytics.RecordHit(&record)
+				_ = gw.Analytics.RecordHit(&record)
 			}
 			gw.apisMu.RUnlock()
 		}
 	}
 }
 
-//nolint
+// nolint
 func (gw *Gateway) recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
 	if doNotTrack {
 		return nil
@@ -278,26 +280,14 @@ func (gw *Gateway) dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 	if dial == nil {
 		return nil
 	}
-	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-		log.Debug("[PROXY] Service discovery enabled")
-		if ServiceCache == nil {
-			log.Debug("[PROXY] Service cache initialising")
-			expiry := 120
-			if spec.Proxy.ServiceDiscovery.CacheTimeout > 0 {
-				expiry = int(spec.Proxy.ServiceDiscovery.CacheTimeout)
-			} else if spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout > 0 {
-				expiry = spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout
-			}
-			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
-		}
-	}
+
 	return func(network, address string) (net.Conn, error) {
 		hostList := spec.Proxy.StructuredTargetList
 		target := address
 		switch {
 		case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
 			var err error
-			hostList, err = urlFromService(spec)
+			hostList, err = urlFromService(spec, gw)
 			if err != nil {
 				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 				break
@@ -421,12 +411,16 @@ func (m *proxyMux) serve(gw *Gateway) {
 				w: h.(*handleWrapper),
 				h: h2c.NewHandler(h, h2s),
 			}
+
 			addr := conf.ListenAddress + ":" + strconv.Itoa(p.port)
 			p.httpServer = &http.Server{
 				Addr:         addr,
 				ReadTimeout:  readTimeout,
 				WriteTimeout: writeTimeout,
 				Handler:      h,
+			}
+			if gw.ConnectionWatcher != nil {
+				p.httpServer.ConnState = gw.ConnectionWatcher.OnStateChange
 			}
 
 			if conf.CloseConnections {
@@ -489,6 +483,7 @@ func (m *proxyMux) generateListener(listenPort int, protocol string, gw *Gateway
 
 		tlsConfig.GetConfigForClient = gw.getTLSConfigForClient(&tlsConfig, listenPort)
 		l, err = tls.Listen("tcp", targetPort, &tlsConfig)
+
 	default:
 		mainLog.WithField("port", targetPort).Infof("--> Standard listener (%s)", protocol)
 		l, err = net.Listen("tcp", targetPort)

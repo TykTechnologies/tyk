@@ -75,7 +75,7 @@ func (n NotificationsManager) SendRequest(wait bool, count int, notification int
 	if err != nil {
 		log.Error("Request failed, trying again in 10s. Error was: ", err)
 		count++
-		go n.SendRequest(true, count, notification)
+		n.SendRequest(true, count, notification)
 		return
 	}
 	defer resp.Body.Close()
@@ -90,7 +90,7 @@ func (n NotificationsManager) SendRequest(wait bool, count int, notification int
 	if resp.StatusCode != 200 {
 		log.Error("Request returned non-200 status, trying again in 10s.")
 		count++
-		go n.SendRequest(true, count, notification)
+		n.SendRequest(true, count, notification)
 		return
 	}
 }

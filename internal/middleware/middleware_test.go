@@ -13,9 +13,31 @@ func TestEnabled(t *testing.T) {
 		want bool
 	}{
 		{
-			name: "empty name and path",
+			name: "disabled",
 			mws: []apidef.MiddlewareDefinition{
-				{},
+				{
+					Disabled: true,
+					Name:     "mwFunc",
+					Path:     "path",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "enabled with empty name and path",
+			mws: []apidef.MiddlewareDefinition{
+				{
+					Disabled: false,
+				},
+			},
+			want: false,
+		},
+		{
+			name: "enabled with empty name and path",
+			mws: []apidef.MiddlewareDefinition{
+				{
+					Disabled: false,
+				},
 			},
 			want: false,
 		},
@@ -23,7 +45,8 @@ func TestEnabled(t *testing.T) {
 			name: "enabled",
 			mws: []apidef.MiddlewareDefinition{
 				{
-					Name: "mwFunc",
+					Disabled: false,
+					Name:     "mwFunc",
 				},
 			},
 			want: true,

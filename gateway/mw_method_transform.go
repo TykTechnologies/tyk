@@ -28,7 +28,8 @@ func (t *TransformMethod) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformMethod) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	_, versionPaths, _, _ := t.Spec.Version(r)
+	version, _ := t.Spec.Version(r)
+	versionPaths := t.Spec.RxPaths[version.Name]
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, MethodTransformed)
 	if !found {
 		return nil, http.StatusOK

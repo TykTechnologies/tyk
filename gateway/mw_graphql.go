@@ -17,7 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/adapter"
 
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -73,6 +73,10 @@ func (m *GraphQLMiddleware) Init() {
 	if needsGraphQLExecutionEngine(m.Spec) {
 		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
 		m.Spec.GraphQLExecutor.Client = &http.Client{
+			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
+		}
+		m.Spec.GraphQLExecutor.StreamingClient = &http.Client{
+			Timeout:   0,
 			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
 		}
 
@@ -163,6 +167,7 @@ func (m *GraphQLMiddleware) initGraphQLEngineV1(logger *abstractlogger.LogrusLog
 func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLogger) {
 	configAdapter := adapter.NewGraphQLConfigAdapter(m.Spec.APIDefinition,
 		adapter.WithHttpClient(m.Spec.GraphQLExecutor.Client),
+		adapter.WithStreamingClient(m.Spec.GraphQLExecutor.StreamingClient),
 		adapter.WithSchema(m.Spec.GraphQLExecutor.Schema),
 	)
 
@@ -249,11 +254,20 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return m.writeGraphQLError(w, validationResult.Errors)
 	}
 
+	inputValidationResult, err := gqlRequest.ValidateInput(m.Spec.GraphQLExecutor.Schema)
+	if err != nil {
+		m.Logger().Errorf("Error while validating variables for request: %v", err)
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+	if inputValidationResult.Errors != nil && inputValidationResult.Errors.Count() > 0 {
+		return m.writeGraphQLError(w, inputValidationResult.Errors)
+	}
+
 	return nil, http.StatusOK
 }
 
 func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.Errors) (error, int) {
-	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(http.StatusBadRequest)
 	_, _ = errors.WriteResponse(w)
 	m.Logger().Debugf("Error while validating GraphQL request: '%s'", errors)
@@ -261,7 +275,7 @@ func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.
 }
 
 func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request) bool {
-	websocketProtocol := r.Header.Get(headers.SecWebSocketProtocol)
+	websocketProtocol := r.Header.Get(header.SecWebSocketProtocol)
 	return websocketProtocol == GraphQLWebSocketProtocol
 }
 
@@ -357,7 +371,6 @@ func (m *GraphQLMiddleware) OnError(ctx resolve.HookContext, output []byte, sing
 }
 
 func (m *GraphQLMiddleware) websocketUpgradeAllowed() bool {
-
 	if !m.Gw.GetConfig().HttpServerOptions.EnableWebSockets {
 		return false
 	}

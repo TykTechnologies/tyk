@@ -12,8 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/request"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/request"
 
 	"github.com/lonelycode/osin"
 	"golang.org/x/crypto/bcrypt"
@@ -22,7 +23,7 @@ import (
 
 	"strconv"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -180,7 +181,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 // returns a response to the client and notifies the provider of the access request (in order to track identity against
 // OAuth tokens without revealing tokens before they are requested).
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	// Handle response
 	resp := o.Manager.HandleAccess(r)
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
@@ -232,8 +233,8 @@ const (
 	refreshToken = "refresh_token"
 )
 
-//in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
-//ToDo: set an authentication mechanism
+// in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
+// ToDo: set an authentication mechanism
 func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
@@ -486,7 +487,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			keyName := o.Gw.generateToken(o.API.OrgID, username)
 
 			log.Debug("Updating user:", keyName)
-			err := o.Gw.GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime, o.Gw.GetConfig().ForceGlobalSessionLifetime, o.Gw.GetConfig().GlobalSessionLifetime), false)
+			err := o.Gw.GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.GetSessionLifetimeRespectsKeyExpiration(), o.API.SessionLifetime, o.Gw.GetConfig().ForceGlobalSessionLifetime, o.Gw.GetConfig().GlobalSessionLifetime), false)
 			if err != nil {
 				log.Error(err)
 			}
@@ -899,9 +900,6 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 	log.Debug("Saving auth code: ", key)
 
 	err = r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -939,7 +937,6 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	if err != nil {
 		return err
 	}
-
 	key := prefixAccess + storage.HashKey(accessData.AccessToken, r.Gw.GetConfig().HashKeys)
 	log.Debug("Saving ACCESS key: ", key)
 

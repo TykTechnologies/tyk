@@ -1,10 +1,12 @@
 package gateway
 
 import (
-	"errors"
-	"os"
+	"net"
+	"net/url"
+	"strconv"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
 
@@ -112,11 +114,40 @@ func greaterThanInt(first, second int) bool {
 	return first > second
 }
 
-func FileExist(filepath string) bool {
-	if _, err := os.Stat(filepath); errors.Is(err, os.ErrNotExist) {
-		return false
+func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
+	var result = url.URL{
+		Scheme: "http",
+		Host:   apiDef.GetAPIDomain(),
+		Path:   apiDef.Proxy.ListenPath,
 	}
-	return true
+
+	if gwConfig.HttpServerOptions.UseSSL {
+		result.Scheme = "https"
+	}
+
+	// apiDef has priority
+	if result.Host != "" {
+		return result.String()
+	}
+
+	result.Host = gwConfig.ListenAddress
+	if gwConfig.HostName != "" {
+		result.Host = gwConfig.HostName
+	}
+
+	if result.Host == "" {
+		result.Host = "127.0.0.1"
+	}
+
+	// Skip adding ListenPort for http/80, https/443
+	if result.Scheme == "http" && gwConfig.ListenPort == 80 ||
+		result.Scheme == "https" && gwConfig.ListenPort == 443 {
+		return result.String()
+	}
+
+	result.Host = net.JoinHostPort(result.Host, strconv.Itoa(gwConfig.ListenPort))
+
+	return result.String()
 }
 
 func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
@@ -157,4 +188,27 @@ func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
 	}
 
 	return false
+}
+
+// check if 2 maps are the same
+func areMapsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
+// checks if a string contains escaped characters
+func containsEscapedChars(str string) bool {
+	unescaped, err := url.PathUnescape(str)
+	if err != nil {
+		return true
+	}
+
+	return str != unescaped
 }

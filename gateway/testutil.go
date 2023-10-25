@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
@@ -24,15 +25,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
+
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/go-redis/redis/v8"
+	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"golang.org/x/net/context"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
@@ -48,6 +52,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+const jsonContentType = "application/json"
+
 var (
 	// to register to, but never used
 	discardMuxer = mux.NewRouter()
@@ -56,9 +62,8 @@ var (
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
 
 	defaultTestConfig config.Config
-	EnableTestDNSMock = true
-
-	MockHandle *test.DnsMockHandle
+	EnableTestDNSMock = false
+	MockHandle        *test.DnsMockHandle
 )
 
 // ReloadMachinery is a helper struct to use when writing tests that do manual
@@ -72,6 +77,7 @@ type ReloadMachinery struct {
 	// to simulate time ticks for tests that do reloads
 	reloadTick chan time.Time
 	stop       chan struct{}
+	started    bool
 }
 
 func NewReloadMachinery() *ReloadMachinery {
@@ -82,6 +88,7 @@ func NewReloadMachinery() *ReloadMachinery {
 
 func (r *ReloadMachinery) StartTicker() {
 	r.stop = make(chan struct{})
+	r.started = true
 
 	go func() {
 		for {
@@ -96,7 +103,10 @@ func (r *ReloadMachinery) StartTicker() {
 }
 
 func (r *ReloadMachinery) StopTicker() {
-	close(r.stop)
+	if r.started {
+		close(r.stop)
+		r.started = false
+	}
 }
 
 func (r *ReloadMachinery) ReloadTicker() <-chan time.Time {
@@ -123,7 +133,7 @@ func (r *ReloadMachinery) OnReload() {
 	}
 }
 
-// Reloaded returns true if a read has occured since r was enabled
+// Reloaded returns true if a read has occurred since r was enabled
 func (r *ReloadMachinery) Reloaded() bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -164,15 +174,19 @@ func (r *ReloadMachinery) Queued() bool {
 // EnsureQueued this will block until any queue happens. It will timeout after
 // 100ms
 func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
-	deadline := time.NewTimer(100 * time.Millisecond)
-	defer deadline.Stop()
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
+
 	for {
+		timeout := time.NewTimer(100 * time.Millisecond)
+
 		select {
-		case <-deadline.C:
-			t.Fatal("Timedout waiting for reload to be queue")
+		case <-timeout.C:
+			t.Fatal("Timedout waiting for reload to be queued")
 		case <-tick.C:
+			if !timeout.Stop() {
+				<-timeout.C
+			}
 			if r.Queued() {
 				return
 			}
@@ -183,15 +197,18 @@ func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
 // EnsureReloaded this will block until any reload happens. It will timeout after
 // 200ms
 func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
-	deadline := time.NewTimer(200 * time.Millisecond)
-	defer deadline.Stop()
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 	for {
+		timeout := time.NewTimer(200 * time.Millisecond)
+
 		select {
-		case <-deadline.C:
-			t.Fatal("Timedout waiting for reload to be queue")
+		case <-timeout.C:
+			t.Fatal("Timedout waiting for reload to be queued")
 		case <-tick.C:
+			if !timeout.Stop() {
+				<-timeout.C
+			}
 			if r.Reloaded() {
 				return
 			}
@@ -204,7 +221,7 @@ func (r *ReloadMachinery) Tick() {
 	r.reloadTick <- time.Time{}
 }
 
-// TickOk triggers a reload and ensures a queue happend and a reload cycle
+// TickOk triggers a reload and ensures a queue happened and a reload cycle
 // happens. This will block until all the cases are met.
 func (r *ReloadMachinery) TickOk(t *testing.T) {
 	r.EnsureQueued(t)
@@ -213,13 +230,13 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 }
 
 func InitTestMain(ctx context.Context, m *testing.M) int {
-
 	if EnableTestDNSMock {
 		var errMock error
 		MockHandle, errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
 		if errMock != nil {
 			panic(errMock)
 		}
+
 		defer MockHandle.ShutdownDnsMock()
 	}
 
@@ -237,45 +254,25 @@ func (s *Test) ResetTestConfig() {
 	s.Gw.SetConfig(defaultTestConfig)
 }
 
-func (s *Test) emptyRedis() error {
-	ctx := context.Background()
-	//addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
-	gwConfig := s.Gw.GetConfig()
-	addr := gwConfig.Storage.Host + ":" + strconv.Itoa(gwConfig.Storage.Port)
-	c := redis.NewClient(&redis.Options{Addr: addr})
-	defer c.Close()
-	dbName := strconv.Itoa(gwConfig.Storage.Database)
-	if err := c.Do(ctx, "SELECT", dbName).Err(); err != nil {
-		return err
-	}
-	err := c.FlushDB(ctx).Err()
-	return err
-}
-
 // simulate reloads in the background, i.e. writes to
 // global variables that should not be accessed in a
 // racy way like the policies and api specs maps.
-func (s *Test) reloadSimulation() {
+func (s *Test) reloadSimulation(ctx context.Context, gw *Gateway) {
 	for {
 		select {
-		case <-s.Gw.ctx.Done():
+		case <-ctx.Done():
 			return
 		default:
-			s.gwMu.Lock()
-			s.Gw.policiesMu.Lock()
+			gw.policiesMu.Lock()
+			gw.policiesByID["_"] = user.Policy{}
+			delete(gw.policiesByID, "_")
+			gw.policiesMu.Unlock()
 
-			s.Gw.policiesByID["_"] = user.Policy{}
-			delete(s.Gw.policiesByID, "_")
-			s.Gw.policiesMu.Unlock()
+			gw.apisMu.Lock()
+			gw.apisByID["_"] = nil
+			delete(gw.apisByID, "_")
+			gw.apisMu.Unlock()
 
-			s.Gw.apisMu.Lock()
-			//	old := s.Gw.apiSpecs
-			//	s.Gw.apiSpecs = append(old, nil)
-			//	s.Gw.apiSpecs = old
-			s.Gw.apisByID["_"] = nil
-			delete(s.Gw.apisByID, "_")
-			s.Gw.apisMu.Unlock()
-			s.gwMu.Unlock()
 			time.Sleep(5 * time.Millisecond)
 		}
 	}
@@ -384,6 +381,7 @@ func (s *Test) getMainRouter(m *proxyMux) *mux.Router {
 type TestHttpResponse struct {
 	Method  string
 	URI     string
+	Path    string
 	Url     string
 	Body    string
 	Headers map[string]string
@@ -407,6 +405,7 @@ const (
 	handlerPathGraphQLDataSource         = "/graphql-data-source"
 	handlerPathHeadersRestDataSource     = "/rest-headers-data-source"
 	handlerSubgraphAccounts              = "/subgraph-accounts"
+	handlerSubgraphAccountsModified      = "/subgraph-accounts-modified"
 	handlerSubgraphReviews               = "/subgraph-reviews"
 
 	// We need a static port so that the urls can be used in static
@@ -424,6 +423,7 @@ const (
 	testRESTDataSource            = TestHttpAny + handlerPathRestDataSource
 	testRESTHeadersDataSource     = TestHttpAny + handlerPathHeadersRestDataSource
 	testSubgraphAccounts          = TestHttpAny + handlerSubgraphAccounts
+	testSubgraphAccountsModified  = TestHttpAny + handlerSubgraphAccountsModified
 	testSubgraphReviews           = TestHttpAny + handlerSubgraphReviews
 	testHttpJWK                   = TestHttpAny + "/jwk.json"
 	testHttpJWKLegacy             = TestHttpAny + "/jwk-legacy.json"
@@ -438,7 +438,7 @@ const (
 	NonCanonicalHeaderKey = "X-CertificateOuid"
 )
 
-func (s *Test) testHttpHandler() *mux.Router {
+func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -477,6 +477,7 @@ func (s *Test) testHttpHandler() *mux.Router {
 		err := json.NewEncoder(w).Encode(TestHttpResponse{
 			Method:  r.Method,
 			URI:     r.RequestURI,
+			Path:    r.URL.Path,
 			Url:     r.URL.String(),
 			Headers: firstVals(r.Header),
 			Form:    firstVals(r.Form),
@@ -495,6 +496,15 @@ func (s *Test) testHttpHandler() *mux.Router {
 			}
 		}
 	}
+	dynamicHandler := func(w http.ResponseWriter, req *http.Request) {
+		path, varOk := mux.Vars(req)["rest"]
+		handler, handlerOk := s.dynamicHandlers[path]
+		if !varOk || !handlerOk {
+			handleMethod("")(w, req)
+			return
+		}
+		handler(w, req)
+	}
 
 	// use gorilla's mux as it allows to cancel URI cleaning
 	// (it is not configurable in standard http mux)
@@ -509,6 +519,7 @@ func (s *Test) testHttpHandler() *mux.Router {
 	r.HandleFunc(handlerPathRestDataSource, restDataSourceHandler)
 	r.HandleFunc(handlerPathHeadersRestDataSource, restHeadersDataSourceHandler)
 	r.HandleFunc(handlerSubgraphAccounts, subgraphAccountsHandler)
+	r.HandleFunc(handlerSubgraphAccountsModified, subGraphAccountsHandlerAllAccounts)
 	r.HandleFunc(handlerSubgraphReviews, subgraphReviewsHandler)
 
 	r.HandleFunc("/ws", wsHandler)
@@ -521,13 +532,13 @@ func (s *Test) testHttpHandler() *mux.Router {
 
 	r.HandleFunc("/compressed", compressedResponseHandler)
 	r.HandleFunc("/chunked", chunkedResponseHandler)
-	r.HandleFunc("/groupReload", s.Gw.groupResetHandler)
+	r.HandleFunc("/groupReload", gw.groupResetHandler)
 	r.HandleFunc("/bundles/{rest:.*}", s.BundleHandleFunc)
 	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
 		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
 		httpError(w, statusCode)
 	})
-	r.HandleFunc("/{rest:.*}", handleMethod(""))
+	r.HandleFunc("/{rest:.*}", dynamicHandler)
 
 	return r
 }
@@ -615,7 +626,7 @@ func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`{
 			"data": {
 				"countries": [
-					{	
+					{
 						"code": "TR",
 						"name": "Turkey"
 					},
@@ -690,6 +701,24 @@ func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}`))
+}
+
+func subGraphAccountsHandlerAllAccounts(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", jsonContentType)
+	_, _ = w.Write([]byte(`{
+  "data": {
+    "allUsers": [
+      {
+        "id": "1",
+        "username": "tyk"
+      },
+      {
+        "id": "2",
+        "username": "kofo"
+      }
+    ]
+  }
+}`))
 }
 
 func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
@@ -885,10 +914,7 @@ func TestReqBody(t testing.TB, body interface{}) io.Reader {
 	case nil:
 		return nil
 	default: // JSON objects (structs)
-		bs, err := json.Marshal(x)
-		if err != nil {
-			t.Fatal(err)
-		}
+		bs := test.MarshalJSON(t)(x)
 		return bytes.NewReader(bs)
 	}
 }
@@ -900,7 +926,7 @@ func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Reques
 func (gw *Gateway) CreateDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{Gw: gw}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
-	spec := loader.MakeSpec(&def, nil)
+	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: &def}, nil)
 	return spec
 }
 
@@ -924,9 +950,7 @@ type TestConfig struct {
 	HotReload          bool
 	overrideDefaults   bool
 	CoprocessConfig    config.CoProcessConfig
-	// SkipEmptyRedis to avoid restart the storage
-	SkipEmptyRedis    bool
-	EnableTestDNSMock bool
+	EnableTestDNSMock  bool
 }
 
 type Test struct {
@@ -935,11 +959,15 @@ type Test struct {
 	// GlobalConfig deprecate this and instead use GW.getConfig()
 	GlobalConfig     config.Config
 	config           TestConfig
-	gwMu             sync.Mutex
 	Gw               *Gateway `json:"-"`
 	HttpHandler      *http.Server
 	TestServerRouter *mux.Router
 	MockHandle       *test.DnsMockHandle
+
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	dynamicHandlers map[string]http.HandlerFunc
 }
 
 type SlaveDataCenter struct {
@@ -947,29 +975,53 @@ type SlaveDataCenter struct {
 	Redis        config.StorageOptionsConf
 }
 
-func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
-	// init and create gw
-	ctx, cancel := context.WithCancel(context.Background())
-	s.BootstrapGw(ctx, cancel, genConf)
-
-	s.Gw.setupPortsWhitelist()
-	s.Gw.startServer()
-	s.Gw.setupGlobals()
-
-	// Set up a default org manager so we can traverse non-live paths
-	if !s.Gw.GetConfig().SupressDefaultOrgStore {
-		s.Gw.DefaultOrgStore.Init(s.Gw.getGlobalStorageHandler("orgkey.", false))
-		s.Gw.DefaultQuotaStore.Init(s.Gw.getGlobalStorageHandler("orgkey.", false))
+func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
+	t := &Test{
+		dynamicHandlers: make(map[string]http.HandlerFunc),
 	}
 
-	s.GlobalConfig = s.Gw.GetConfig()
+	// DNS mock enabled by default
+	t.config.EnableTestDNSMock = false
+	if len(testConfig) > 0 {
+		t.config = testConfig[0]
+	}
+
+	t.Gw = t.start(genConf)
+
+	return t
+}
+
+func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
+	// init and create gw
+	ctx, cancel := context.WithCancel(context.Background())
+
+	log.Info("starting test")
+
+	s.ctx = ctx
+	s.cancel = func() {
+		cancel()
+		log.Info("Cancelling test context")
+	}
+
+	gw := s.newGateway(genConf)
+	gw.setupPortsWhitelist()
+	gw.startServer()
+	gw.setupGlobals()
+
+	// Set up a default org manager so we can traverse non-live paths
+	if !gw.GetConfig().SupressDefaultOrgStore {
+		gw.DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
+		gw.DefaultQuotaStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
+	}
+
+	s.GlobalConfig = gw.GetConfig()
 
 	scheme := "http://"
 	if s.GlobalConfig.HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
 
-	s.URL = scheme + s.Gw.DefaultProxyMux.getProxy(s.Gw.GetConfig().ListenPort, s.Gw.GetConfig()).listener.Addr().String()
+	s.URL = scheme + gw.DefaultProxyMux.getProxy(gw.GetConfig().ListenPort, gw.GetConfig()).listener.Addr().String()
 
 	s.testRunner = &test.HTTPTestRunner{
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
@@ -996,10 +1048,15 @@ func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 		Do: test.HttpServerRunner(),
 	}
 
-	return s.Gw
+	return gw
 }
 
-func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, genConf func(globalConf *config.Config)) {
+func (s *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
+	path = strings.Trim(path, "/")
+	s.dynamicHandlers[path] = handlerFunc
+}
+
+func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	var gwConfig config.Config
 	if err := config.WriteDefault("", &gwConfig); err != nil {
 		panic(err)
@@ -1018,15 +1075,14 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 	}
 	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 
-	s.gwMu.Lock()
-	s.Gw = NewGateway(gwConfig, ctx, cancelFn)
-	s.Gw.setTestMode(true)
-	s.gwMu.Unlock()
+	gw := NewGateway(gwConfig, s.ctx)
+	gw.setTestMode(true)
+	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
 	s.MockHandle = MockHandle
 
 	var err error
-	gwConfig.Storage.Database = 1
+	gwConfig.Storage.Database = rand.Intn(15)
 	gwConfig.AppPath, err = ioutil.TempDir("", "tyk-test-")
 
 	if err != nil {
@@ -1058,7 +1114,7 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 		genConf(&gwConfig)
 	}
 
-	s.TestServerRouter = s.testHttpHandler()
+	s.TestServerRouter = s.testHttpHandler(gw)
 
 	skip := gwConfig.HttpServerOptions.SkipURLCleaning
 	s.TestServerRouter.SkipClean(skip)
@@ -1067,6 +1123,7 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 		Handler:        s.TestServerRouter,
 		ReadTimeout:    1 * time.Second,
 		WriteTimeout:   1 * time.Second,
+		ConnState:      gw.ConnectionWatcher.OnStateChange,
 		MaxHeaderBytes: 1 << 20,
 	}
 
@@ -1076,71 +1133,74 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 		}
 	}()
 
-	s.Gw.keyGen = DefaultKeyGenerator{Gw: s.Gw}
-	s.Gw.CoProcessInit()
-	s.Gw.afterConfSetup()
+	gw.keyGen = DefaultKeyGenerator{Gw: gw}
+	gw.CoProcessInit()
+	gw.afterConfSetup()
 
 	defaultTestConfig = gwConfig
-	s.Gw.SetConfig(gwConfig)
+	gw.SetConfig(gwConfig)
 
 	cli.Init(VERSION, confPaths)
 
-	err = s.Gw.initialiseSystem()
+	err = gw.initialiseSystem()
 	if err != nil {
 		panic(err)
 	}
 
-	if s.Gw.GetConfig().EnableAnalytics && s.Gw.analytics.GeoIPDB == nil {
+	if gw.GetConfig().EnableAnalytics && gw.Analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
 
-	configs := s.Gw.GetConfig()
+	configs := gw.GetConfig()
 
-	go s.Gw.RedisController.ConnectToRedis(ctx, func() {
-		if s.Gw.OnConnect != nil {
-			s.Gw.OnConnect()
+	go gw.RedisController.ConnectToRedis(s.ctx, func() {
+		if gw.OnConnect != nil {
+			gw.OnConnect()
 		}
 	}, &configs)
 
-	for {
-		if s.Gw.RedisController.Connected() {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	timeout, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
-	if !s.config.SkipEmptyRedis {
-		if err := s.emptyRedis(); err != nil {
-			panic(err)
-		}
+	connected := gw.RedisController.WaitConnect(timeout)
+	if !connected {
+		panic("can't connect to redis, timeout")
 	}
 
 	// Start listening for reload messages
-	if !s.Gw.GetConfig().SuppressRedisSignalReload {
-		go s.Gw.startPubSubLoop()
+	if !gw.GetConfig().SuppressRedisSignalReload {
+		go gw.startPubSubLoop()
 	}
 
-	if slaveOptions := s.Gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
+	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
-		s.Gw.RPCListener = RPCStorageHandler{
+		gw.RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
 			SuppressRegister: true,
-			Gw:               s.Gw,
+			Gw:               gw,
 		}
 
-		s.Gw.RPCListener.Connect()
-		go s.Gw.rpcReloadLoop(slaveOptions.RPCKey)
-		go s.Gw.RPCListener.StartRPCKeepaliveWatcher()
-		go s.Gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
+		gw.RPCListener.Connect()
+		go gw.rpcReloadLoop(slaveOptions.RPCKey)
+		go gw.RPCListener.StartRPCKeepaliveWatcher()
+		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 
-		go s.Gw.reloadLoop(time.Tick(time.Second))
-		go s.Gw.reloadQueueLoop()
+		ticker := time.NewTicker(time.Second)
+		go func() {
+			<-s.ctx.Done()
+			ticker.Stop()
+		}()
+
+		go gw.reloadLoop(ticker.C)
+		go gw.reloadQueueLoop()
 	} else {
-		go s.Gw.reloadLoop(s.Gw.ReloadTestCase.ReloadTicker(), s.Gw.ReloadTestCase.OnReload)
-		go s.Gw.reloadQueueLoop(s.Gw.ReloadTestCase.OnQueued)
+		go gw.reloadLoop(gw.ReloadTestCase.ReloadTicker(), gw.ReloadTestCase.OnReload)
+		go gw.reloadQueueLoop(gw.ReloadTestCase.OnQueued)
 	}
 
-	go s.reloadSimulation()
+	go s.reloadSimulation(s.ctx, gw)
+
+	return gw
 }
 
 func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
@@ -1149,16 +1209,12 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *Test) ReloadGatewayProxy() {
-	s.gwMu.Lock()
 	s.Gw.DefaultProxyMux.swap(&proxyMux{}, s.Gw)
 	s.Gw.startServer()
-	s.gwMu.Unlock()
 }
 
 func (s *Test) Close() {
-	if s.Gw.cancelFn != nil {
-		s.Gw.cancelFn()
-	}
+	defer s.cancel()
 
 	for _, p := range s.Gw.DefaultProxyMux.proxies {
 		if p.listener != nil {
@@ -1188,11 +1244,9 @@ func (s *Test) Close() {
 		log.Info("server exited properly")
 	}
 
-	s.gwMu.Lock()
-	s.Gw.analytics.Stop()
+	s.Gw.Analytics.Stop()
+	s.Gw.ReloadTestCase.StopTicker()
 	s.Gw.GlobalHostChecker.StopPoller()
-	s.gwMu.Unlock()
-	os.RemoveAll(s.Gw.GetConfig().AppPath)
 
 	err = s.RemoveApis()
 	if err != nil {
@@ -1320,20 +1374,6 @@ func (s *Test) GetPolicyById(policyId string) (user.Policy, bool) {
 	return pol, found
 }
 
-func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
-	t := &Test{}
-
-	// DNS mock enabled by default
-	t.config.EnableTestDNSMock = true
-	if len(testConfig) > 0 {
-		t.config = testConfig[0]
-	}
-
-	t.Start(genConf)
-
-	return t
-}
-
 const sampleAPI = `{
     "api_id": "test",
 	"org_id": "default",
@@ -1447,7 +1487,9 @@ const testRESTHeadersDataSourceConfigurationV2 = `
 		"method": "GET",
 		"headers": {
 			"static": "barbaz",
-			"injected": "{{ .request.headers.injected }}"
+			"injected": "{{ .request.headers.injected }}",
+			"context": "$tyk_context.headers_From_Request",
+			"does-exist-already": "ds-does-exist-already"
 		},
 		"query": [],
 		"body": ""
@@ -1588,6 +1630,55 @@ func jsonMarshalString(i interface{}) (out string) {
 	return string(b)
 }
 
+func BuildOASAPI(oasGens ...func(oasDef *oas.OAS)) (specs []*APISpec) {
+	for _, gen := range oasGens {
+		oasAPI := getSampleOASAPI()
+		gen(&oasAPI)
+
+		var nativeAPIDefinition apidef.APIDefinition
+		oasAPI.ExtractTo(&nativeAPIDefinition)
+		nativeAPIDefinition.IsOAS = true
+		spec := &APISpec{APIDefinition: &nativeAPIDefinition, OAS: oasAPI}
+		specs = append(specs, spec)
+	}
+
+	return specs
+}
+
+func getSampleOASAPI() oas.OAS {
+	tykExtension := &oas.XTykAPIGateway{
+		Info: oas.Info{
+			Name: randStringBytes(8),
+			ID:   randStringBytes(8),
+			State: oas.State{
+				Active: false,
+			},
+		},
+		Upstream: oas.Upstream{
+			URL: TestHttpAny,
+		},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{
+				Value: "/oas-api/",
+				Strip: false,
+			},
+		},
+	}
+
+	oasAPI := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "oas doc",
+				Version: "1",
+			},
+			Paths: make(openapi3.Paths),
+		}}
+
+	oasAPI.SetTykExtension(tykExtension)
+	return oasAPI
+}
+
 func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	if len(apiGens) == 0 {
 		apiGens = append(apiGens, func(spec *APISpec) {})
@@ -1627,12 +1718,23 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 
 		specBytes, err := json.Marshal(spec.APIDefinition)
 		if err != nil {
-			fmt.Printf(" \n %+v \n", spec)
+			log.WithError(err).Errorf("API Spec Marshal failed: %+v", spec)
 			panic(err)
 		}
 
 		specFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
 		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
+			panic(err)
+		}
+
+		oasSpecBytes, err := json.Marshal(&spec.OAS)
+		if err != nil {
+			log.WithError(err).Errorf("OAS Marshal failed: %+v", spec)
+			panic(err)
+		}
+
+		oasSpecFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+"-oas.json")
+		if err := ioutil.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
 			panic(err)
 		}
 	}

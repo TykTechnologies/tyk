@@ -1,38 +1,49 @@
-ARG GOLANG_CROSS=1.15
+ARG BASE_IMAGE=tykio/golang-cross:1.16-bullseye
+FROM ${BASE_IMAGE}
 
-FROM tykio/golang-cross:${GOLANG_CROSS}
 LABEL description="Image for plugin development"
 
-ARG GOLANG_CROSS=1.15
-ENV GOLANG_CROSS ${GOLANG_CROSS}
-
-ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
-
-ENV GO111MODULE=on
 
 # This directory will contain the plugin source and will be
 # mounted from the host box by the user using docker volumes
 ENV PLUGIN_SOURCE_PATH=/plugin-source
 
-RUN mkdir -p  $TYK_GW_PATH $PLUGIN_SOURCE_PATH
+RUN mkdir -p $PLUGIN_SOURCE_PATH
 
-RUN apt-get purge --auto-remove -y mercurial ruby-dev 'python*' 'libpython*' openssh-client
+# remove for avoiding CVEs
+RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby-dev \
+	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
-# Update sources list to point to archive.debian.org (EOL)
-# COPY ci/images/plugin-compiler /tmp/plugin-compiler
-# RUN bash -c "cp /tmp/plugin-compiler/sources.list/$(lsb_release -cs) /etc/apt/sources.list"
+# remove python 3.9 if exists.
+RUN apt-get remove -y --allow-remove-essential --auto-remove python3.9 || true
 
-RUN if [ "${GOLANG_CROSS}" = "1.15" ]; then apt-get update ; apt-get -y dist-upgrade; fi
+# This is already vendored from release pipeline
+WORKDIR /opt/tyk-gateway/src
+ADD . /opt/tyk-gateway/src
 
-# Ensure git remains installed (required)
-RUN git --version
+# TYK_GW_PATH points to the GOHOME source for gateway.
+ENV TYK_GW_PATH /go/src/github.com/TykTechnologies/tyk
 
-RUN rm /usr/bin/passwd && rm /usr/sbin/adduser
+# This has to mirror the before goreleaser step in release.yml;
+# It builds the go source tree for $GOHOME builds from gw.
+
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod true && \
+          mkdir -p /go/src && \
+          go mod tidy && \
+          go mod vendor && \
+          cp -r -f vendor/* /go/src && \
+          mkdir -p $TYK_GW_PATH && \
+          cp -r ./* $TYK_GW_PATH && \
+          find /go/src -name vendor | xargs --no-run-if-empty -d '\n' rm -rf
+
+ENV GO111MODULE=off
+
+ARG GITHUB_SHA
+ARG GITHUB_TAG
+ENV GITHUB_SHA ${GITHUB_SHA}
+ENV GITHUB_TAG ${GITHUB_TAG}
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
-
-COPY . $TYK_GW_PATH
-RUN cd $TYK_GW_PATH && go mod vendor
 
 ENTRYPOINT ["/build.sh"]
