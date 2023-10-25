@@ -1257,7 +1257,7 @@ func Load(paths []string, conf *Config) error {
 
 	if r != nil {
 		if err := json.NewDecoder(r).Decode(&conf); err != nil {
-			return fmt.Errorf("couldn't unmarshal config: %v", err)
+			return fmt.Errorf("couldn't unmarshal config: %w", err)
 		}
 	}
 
