@@ -12,10 +12,8 @@ RUN echo http://deb.debian.org/debian/ bookworm main >> /etc/apt/sources.list.d/
 RUN apt-get update \
     && apt-get dist-upgrade -y ca-certificates
 # Install curl and python3
-RUN apt-get install -y curl python3-setuptools libpython3.11 python3.11-dev \
-    && curl https://bootstrap.pypa.io/get-pip.py | python3 \
-    && pip3 install --only-binary ":all:" grpcio protobuf==3.20.2 \
-    && pip3 install --upgrade setuptools
+
+RUN apt-get install -y curl python3-setuptools libpython3.11 python3.11-dev python3-grpcio
 
 # Remove some things to decrease CVE surface
 RUN dpkg --purge --force-remove-essential curl ncurses-base \
