@@ -88,6 +88,9 @@ Versions contains a list of versions that map to individual API IDs.
 **Field: `stripVersioningData` (`boolean`)**
 StripVersioningData is a boolean flag, if set to `true`, the API responses will be stripped of versioning data.
 
+**Field: `fallbackToDefault` (`boolean`)**
+FallbackToDefault controls whether the default API is invoked when the requested version can't be found.
+
 
 ### **VersionToID**
 
