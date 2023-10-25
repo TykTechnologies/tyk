@@ -27,7 +27,7 @@ RUN rm -rf /root/.cache \
     && find /usr/lib -type f -name '*.a' -delete \
     && find /usr/lib -type f -name '*.o' -delete
 # Print included pip/python versions
-RUN pip3 --version && python3 --version
+RUN python3 --version
 
 # Comment this to test in dev
 COPY *${TARGETARCH}.deb /
