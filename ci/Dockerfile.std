@@ -6,6 +6,9 @@ ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+RUN echo http://deb.debian.org/debian/ bookworm main >> /etc/apt/sources.list.d/debian.sources && \
+    echo deb http://deb.debian.org/debian/ bookworm-updates main >> /etc/apt/sources.list.d/debian.sources
+
 RUN apt-get update \
     && apt-get dist-upgrade -y ca-certificates
 # Install curl and python3
