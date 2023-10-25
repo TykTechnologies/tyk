@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -35,7 +36,8 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 		val, err = m.rpc.GetKey(key)
 
 		if err != nil {
-			m.logger.Error("cannot retrieve key from rpc:" + err.Error())
+			resourceType := getResourceType(key)
+			m.logger.Errorf("cannot retrieve %v from rpc: %v", resourceType, err.Error())
 			return val, err
 		}
 
@@ -48,6 +50,19 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 	}
 
 	return val, err
+}
+
+func getResourceType(key string) string {
+	switch {
+	case strings.Contains(key, "oauth-clientid."):
+		return "Oauth Client"
+	case strings.HasPrefix(key, "cert"):
+		return "certificate"
+	case strings.HasPrefix(key, "apikey"):
+		return "api key"
+	default:
+		return "key"
+	}
 }
 
 func (m MdcbStorage) GetMultiKey([]string) ([]string, error) {
