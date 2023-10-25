@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 ARG TARGETARCH
 
 LABEL Description="Tyk Hybrid Gateway image" Vendor="Tyk"
