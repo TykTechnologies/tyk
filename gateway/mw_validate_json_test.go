@@ -25,9 +25,13 @@ var testJsonSchema = `{
             "type": "integer",
             "minimum": 0
         },
-		"objs":{
-			"enum":["a","b","c"],
-			"type":"string"
+		"objs": {
+			"enum": ["a", "b", "c"],
+			"type": "string"
+		},
+		"regex": {
+			"type": "string",
+			"pattern": "^[a-z]+[0-9]+$"
 		}
     },
     "required": ["firstName", "lastName"]
@@ -61,9 +65,11 @@ func TestValidateJSONSchema(t *testing.T) {
 		{Method: http.MethodPost, Path: "/without_validation", Data: "{not_valid}", Code: http.StatusOK},
 		{Method: http.MethodPost, Path: "/v", Data: `{"age":23}`, BodyMatch: `firstName: firstName is required; lastName: lastName is required`, Code: http.StatusUnprocessableEntity},
 		{Method: http.MethodPost, Path: "/v", Data: `[]`, BodyMatch: `Expected: object, given: array`, Code: http.StatusUnprocessableEntity},
-		{Method: http.MethodPost, Path: "/v", Data: `not_json`, Code: http.StatusBadRequest},
+		{Method: http.MethodPost, Path: "/v", Data: `not_json`, Code: http.StatusBadRequest, BodyMatch: `JSON parsing error: invalid character 'o' in literal null \(expecting 'u'\)`},
 		{Method: http.MethodPost, Path: "/v", Data: `{"age":23, "firstName": "Harry", "lastName": "Potter"}`, Code: http.StatusOK},
 		{Method: http.MethodPost, Path: "/v", Data: `{"age":23, "firstName": "Harry", "lastName": "Potter", "objs": "d"}`, Code: http.StatusUnprocessableEntity, BodyMatch: `objs: objs must be one of the following: \\"a\\", \\"b\\", \\"c\\"`},
+		{Method: http.MethodPost, Path: "/v", Data: `{"age":23, "firstName": "dummy", "lastName": "dummy", "regex": "d1"}`, Code: http.StatusOK},
+		{Method: http.MethodPost, Path: "/v", Data: `{"age":23, "firstName": "dummy", "lastName": "dummy", "regex": "D1"}`, Code: http.StatusUnprocessableEntity, BodyMatch: `regex: Does not match pattern '\^\[a-z\]\+\[0-9\]\+\$'`},
 	}...)
 
 	t.Run("disabled", func(t *testing.T) {
