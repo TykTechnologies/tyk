@@ -791,6 +791,9 @@ type Config struct {
 	MaxIdleConns int `bson:"max_idle_connections" json:"max_idle_connections"`
 	// Maximum idle connections, per API, per upstream, between Tyk and Upstream. Default:100
 	MaxIdleConnsPerHost int `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
+	// Limits the total number of connections per host, including connections in the dialing, active and idele states.
+	// On limit violations, dials will block.
+	MaxConnsPerHost int `bson:"max_connections_per_host" json:"max_connections_per_host"`
 	// Maximum connection time. If set it will force gateway reconnect to the upstream.
 	MaxConnTime int64 `json:"max_conn_time"`
 
