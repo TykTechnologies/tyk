@@ -16,10 +16,13 @@ import (
 var rc *RedisController
 
 func init() {
-	conf := config.Default
+	conf, err := config.New()
+	if err != nil {
+		panic(err)
+	}
 
 	rc = NewRedisController(context.Background())
-	go rc.ConnectToRedis(context.Background(), nil, &conf)
+	go rc.ConnectToRedis(context.Background(), nil, conf)
 	for {
 		if rc.Connected() {
 			break
@@ -225,19 +228,17 @@ func TestSingleton(t *testing.T) {
 }
 
 func TestCheckIsOpen(t *testing.T) {
-	conf := config.Default
-	rc := NewRedisController(context.Background())
+	conf, err := config.New()
+	assert.NoError(t, err)
 
+	rc := NewRedisController(context.Background())
 	cluster := RedisCluster{
 		RedisController: rc,
 	}
-	err := cluster.checkIsOpen()
-	assert.Error(t, err)
-	assert.EqualError(t, err, ErrRedisIsDown.Error())
-	ok := rc.connectSingleton(false, false, conf)
-	assert.True(t, ok)
 
 	err = cluster.checkIsOpen()
-	assert.NoError(t, err)
-
+	assert.Error(t, err)
+	assert.EqualError(t, err, ErrRedisIsDown.Error())
+	assert.True(t, rc.connectSingleton(false, false, *conf))
+	assert.NoError(t, cluster.checkIsOpen())
 }
