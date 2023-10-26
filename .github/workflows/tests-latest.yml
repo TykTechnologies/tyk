@@ -1,0 +1,12 @@
+name: Tests latest
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  gateway-ci:
+    uses: TykTechnologies/tyk-github-actions/.github/workflows/latest-gateway.yml@main
+    secrets:
+      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
