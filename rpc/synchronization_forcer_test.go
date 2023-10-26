@@ -15,16 +15,20 @@ import (
 var rc *storage.RedisController
 
 func init() {
-	conf := config.Default
+	conf, err := config.New()
+	if err != nil {
+		panic(err)
+	}
 
 	rc = storage.NewRedisController(context.Background())
-	go rc.ConnectToRedis(context.Background(), nil, &conf)
-	for {
-		if rc.Connected() {
-			break
-		}
+	go rc.ConnectToRedis(context.Background(), nil, conf)
 
-		time.Sleep(10 * time.Millisecond)
+	timeout, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	connected := rc.WaitConnect(timeout)
+	if !connected {
+		panic("can't connect to redis '" + conf.Storage.Host + "', timeout")
 	}
 }
 
