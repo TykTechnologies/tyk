@@ -70,8 +70,6 @@ func TestRLOpen(t *testing.T) {
 
 	spec := ts.Gw.LoadSampleAPI(openRLDefSmall)
 
-	req := TestReq(t, "GET", "/rl_test/", nil)
-
 	ts.Gw.DRLManager.SetCurrentTokenValue(1)
 	ts.Gw.DRLManager.RequestTokenValue = 1
 
@@ -79,7 +77,10 @@ func TestRLOpen(t *testing.T) {
 	chain := ts.getRLOpenChain(spec)
 	for a := 0; a <= 10; a++ {
 		recorder := httptest.NewRecorder()
+
+		req := TestReq(t, "GET", "/rl_test/", nil)
 		chain.ServeHTTP(recorder, req)
+
 		if a < 3 {
 			if recorder.Code != 200 {
 				t.Fatalf("Rate limit kicked in too early, after only %v requests", a)
@@ -222,8 +223,6 @@ func TestRLClosed(t *testing.T) {
 
 	spec := ts.Gw.LoadSampleAPI(closedRLDefSmall)
 
-	req := TestReq(t, "GET", "/rl_closed_test/", nil)
-
 	session := createRLSession()
 	customToken := uuid.New()
 
@@ -232,7 +231,6 @@ func TestRLClosed(t *testing.T) {
 	if err != nil {
 		t.Error("could not update session in Session Manager. " + err.Error())
 	}
-	req.Header.Set("authorization", "Bearer "+customToken)
 
 	ts.Gw.DRLManager.SetCurrentTokenValue(1)
 	ts.Gw.DRLManager.RequestTokenValue = 1
@@ -240,7 +238,11 @@ func TestRLClosed(t *testing.T) {
 	chain := ts.getGlobalRLAuthKeyChain(spec)
 	for a := 0; a <= 10; a++ {
 		recorder := httptest.NewRecorder()
+
+		req := TestReq(t, "GET", "/rl_closed_test/", nil)
+		req.Header.Set("authorization", "Bearer "+customToken)
 		chain.ServeHTTP(recorder, req)
+
 		if a < 3 {
 			if recorder.Code != 200 {
 				t.Fatalf("Rate limit kicked in too early, after only %v requests", a)
@@ -263,15 +265,16 @@ func TestRLOpenWithReload(t *testing.T) {
 
 	spec := ts.Gw.LoadSampleAPI(openRLDefSmall)
 
-	req := TestReq(t, "GET", "/rl_test/", nil)
-
 	ts.Gw.DRLManager.SetCurrentTokenValue(1)
 	ts.Gw.DRLManager.RequestTokenValue = 1
 
 	chain := ts.getRLOpenChain(spec)
 	for a := 0; a <= 10; a++ {
 		recorder := httptest.NewRecorder()
+
+		req := TestReq(t, "GET", "/rl_test/", nil)
 		chain.ServeHTTP(recorder, req)
+
 		if a < 3 {
 			if recorder.Code != 200 {
 				t.Fatalf("Rate limit (pre change) kicked in too early, after only %v requests", a)
@@ -290,7 +293,10 @@ func TestRLOpenWithReload(t *testing.T) {
 	chain = ts.getRLOpenChain(spec)
 	for a := 0; a <= 30; a++ {
 		recorder := httptest.NewRecorder()
+
+		req := TestReq(t, "GET", "/rl_test/", nil)
 		chain.ServeHTTP(recorder, req)
+
 		if a < 20 {
 			if recorder.Code != 200 {
 				t.Fatalf("Rate limit (post change) kicked in too early, after only %v requests", a)

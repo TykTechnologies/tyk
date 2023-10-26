@@ -21,6 +21,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
@@ -84,6 +86,8 @@ var (
 		// TODO: add ~/.config/tyk/tyk.conf here?
 		"/etc/tyk/tyk.conf",
 	}
+
+	ErrSyncResourceNotKnown = errors.New("unknown resource to sync")
 )
 
 const appName = "tyk-gateway"
@@ -112,6 +116,7 @@ type Gateway struct {
 	DashService          DashboardServiceSender
 	CertificateManager   certs.CertificateManager
 	GlobalHostChecker    HostCheckerManager
+	ConnectionWatcher    *httputil.ConnectionWatcher
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
 	TracerProvider       otel.TracerProvider
@@ -219,6 +224,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
 	}
+	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
 	gw.SessionCache = cache.New(10, 5)
 	gw.ExpiryCache = cache.New(600, 10*60)
@@ -541,7 +547,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 
 		mainLog.Info("Using Policies from Dashboard Service")
 
-		pols = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
+		pols, err = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
 		dataLoader := &RPCStorageHandler{
@@ -552,7 +558,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 	default:
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
-			pols = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
+			pols, err = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
 
 		} else if gw.GetConfig().Policies.PolicyRecordName == "" {
 			// old way of doing things before REST Api added
@@ -560,7 +566,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 			mainLog.Debug("No policy record name defined, skipping...")
 			return 0, nil
 		} else {
-			pols = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
+			pols, err = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
 		}
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
@@ -966,14 +972,14 @@ func (gw *Gateway) DoReload() {
 	}
 
 	// Load the API Policies
-	if _, err := gw.syncPolicies(); err != nil {
-		mainLog.Error("Error during syncing policies:", err.Error())
+	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
+		mainLog.Error("Error during syncing policies")
 		return
 	}
 
 	// load the specs
-	if count, err := gw.syncAPISpecs(); err != nil {
-		mainLog.Error("Error during syncing apis:", err.Error())
+	if count, err := syncResourcesWithReload("apis", gw.GetConfig(), gw.syncAPISpecs); err != nil {
+		mainLog.Error("Error during syncing apis")
 		return
 	} else {
 		// skip re-loading only if dashboard service reported 0 APIs
@@ -987,6 +993,29 @@ func (gw *Gateway) DoReload() {
 	gw.loadGlobalApps()
 
 	mainLog.Info("API reload complete")
+}
+
+func syncResourcesWithReload(resource string, conf config.Config, syncFunc func() (int, error)) (int, error) {
+	var (
+		err   error
+		count int
+	)
+
+	if resource != "apis" && resource != "policies" {
+		return 0, ErrSyncResourceNotKnown
+	}
+
+	for i := 1; i <= conf.ResourceSync.RetryAttempts+1; i++ {
+		count, err = syncFunc()
+		if err == nil {
+			return count, nil
+		}
+
+		mainLog.Errorf("Error during syncing %s: %s, attempt count %d", resource, err.Error(), i)
+		time.Sleep(time.Duration(conf.ResourceSync.Interval) * time.Second)
+	}
+
+	return 0, fmt.Errorf("syncing %s failed %w", resource, err)
 }
 
 // shouldReload returns true if we should perform any reload. Reloads happens if
@@ -1125,25 +1154,23 @@ func (gw *Gateway) setupLogger() {
 	if gwConfig.UseLogstash {
 		mainLog.Debug("Enabling Logstash support")
 
-		var hook *logstashHook.Hook
+		var hook logrus.Hook
 		var err error
 		var conn net.Conn
 		if gwConfig.LogstashTransport == "udp" {
 			mainLog.Debug("Connecting to Logstash with udp")
-			hook, err = logstashHook.NewHook(gwConfig.LogstashTransport,
-				gwConfig.LogstashNetworkAddr,
-				appName)
+			conn, err = net.Dial(gwConfig.LogstashTransport, gwConfig.LogstashNetworkAddr)
 		} else {
 			mainLog.Debugf("Connecting to Logstash with %s", gwConfig.LogstashTransport)
 			conn, err = gas.Dial(gwConfig.LogstashTransport, gwConfig.LogstashNetworkAddr)
-			if err == nil {
-				hook, err = logstashHook.NewHookWithConn(conn, appName)
-			}
 		}
 
 		if err != nil {
 			log.Errorf("Error making connection for logstash: %v", err)
 		} else {
+			hook = logstashHook.New(conn, logstashHook.DefaultFormatter(logrus.Fields{
+				"type": appName,
+			}))
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
 			mainLog.Debug("Logstash hook active")
@@ -1714,7 +1741,8 @@ func (gw *Gateway) start() {
 		go gw.startPubSubLoop()
 	}
 
-	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
+	conf := gw.GetConfig()
+	if slaveOptions := conf.SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
 		gw.RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
@@ -1728,9 +1756,14 @@ func (gw *Gateway) start() {
 		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
 
+	reloadInterval := time.Second
+	if conf.ReloadInterval > 0 {
+		reloadInterval = time.Duration(conf.ReloadInterval) * time.Second
+	}
+
 	// 1s is the minimum amount of time between hot reloads. The
 	// interval counts from the start of one reload to the next.
-	go gw.reloadLoop(time.Tick(time.Second))
+	go gw.reloadLoop(time.Tick(reloadInterval))
 	go gw.reloadQueueLoop()
 }
 
@@ -1765,15 +1798,29 @@ func handleDashboardRegistration(gw *Gateway) {
 }
 
 func (gw *Gateway) startDRL() {
-	switch {
-	case gw.GetConfig().ManagementNode:
-		return
-	case gw.GetConfig().EnableSentinelRateLimiter, gw.GetConfig().EnableRedisRollingLimiter:
-		return
-	}
-	mainLog.Info("Initialising distributed rate limiter")
-	gw.setupDRL()
-	gw.startRateLimitNotifications()
+	gwConfig := gw.GetConfig()
+
+	disabled := gwConfig.ManagementNode || gwConfig.EnableSentinelRateLimiter || gw.GetConfig().EnableRedisRollingLimiter
+
+	gw.drlOnce.Do(func() {
+		drlManager := &drl.DRL{}
+		gw.DRLManager = drlManager
+
+		if disabled {
+			return
+		}
+
+		mainLog.Info("Initialising distributed rate limiter")
+
+		nodeID := gw.GetNodeID() + "|" + gw.hostDetails.Hostname
+
+		drlManager.ThisServerID = nodeID
+		drlManager.Init(gw.ctx)
+
+		log.Debug("DRL: Setting node ID: ", nodeID)
+
+		gw.startRateLimitNotifications()
+	})
 }
 
 func (gw *Gateway) setupPortsWhitelist() {
@@ -1816,9 +1863,8 @@ func (gw *Gateway) startServer() {
 	// handle dashboard registration and nonces if available
 	handleDashboardRegistration(gw)
 
-	gw.DRLManager = &drl.DRL{}
 	// at this point NodeID is ready to use by DRL
-	gw.drlOnce.Do(gw.startDRL)
+	gw.startDRL()
 
 	mainLog.Infof("Tyk Gateway started (%s)", VERSION)
 	address := gw.GetConfig().ListenAddress

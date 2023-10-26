@@ -1,8 +1,10 @@
 package gateway
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -453,7 +455,69 @@ func TestAnalytics_Write(t *testing.T) {
 				assert.Equal(t, key, record.APIKey)
 
 			})
+			t.Run("Chunked response analytics", func(t *testing.T) {
+				defer func() {
+					ts.Gw.SetConfig(base)
+				}()
+				globalConf := ts.Gw.GetConfig()
+				globalConf.AnalyticsConfig.EnableDetailedRecording = true
+				ts.Gw.SetConfig(globalConf)
 
+				// Since we changed config, we need to force all APIs be reloaded
+				ts.Gw.BuildAndLoadAPI()
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+				})
+
+				key := CreateSession(ts.Gw)
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				_, err := ts.Run(t, test.TestCase{
+					Path: "/chunked", Headers: authHeaders, Code: 200,
+				})
+				if err != nil {
+					t.Error("Error executing test case")
+				}
+				// let records to to be sent
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				if len(results) != 1 {
+					t.Error("Should return 1 record: ", len(results))
+				}
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
+				if record.ResponseCode != 200 {
+					t.Error("Analytics record do not match", record)
+				}
+
+				if record.RawRequest == "" {
+					t.Error("Detailed request info not found", record)
+				}
+
+				if record.RawResponse == "" {
+					t.Error("Detailed response info not found", record)
+				}
+
+				rawResponse, err := base64.StdEncoding.DecodeString(record.RawResponse)
+				if err != nil {
+					t.Error("error decoding response")
+				}
+
+				decoded := string(rawResponse)
+				if strings.Contains(decoded, "1a") {
+					t.Error("Response should not have chunked characters")
+				}
+			})
 		})
 	}
 
@@ -487,6 +551,7 @@ func TestURLReplacer(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
 		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
+		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseULIDs = true
 		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
 		globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
 	})
@@ -497,6 +562,9 @@ func TestURLReplacer(t *testing.T) {
 	recordUUID2 := analytics.AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
 	recordUUID3 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
 	recordUUID4 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+	recordULID1 := analytics.AnalyticsRecord{Path: "/posts/01G9HHNKWGBHCQX7VG3JKSZ055/comments"}
+	recordULID2 := analytics.AnalyticsRecord{Path: "/posts/01g9hhnkwgbhcqx7vg3jksz055/comments"}
+	recordULID3 := analytics.AnalyticsRecord{Path: "/posts/01g9HHNKwgbhcqx7vg3JKSZ055/comments"}
 	recordID1 := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams"}
 	recordCust := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
@@ -507,6 +575,9 @@ func TestURLReplacer(t *testing.T) {
 	NormalisePath(&recordUUID2, &globalConf)
 	NormalisePath(&recordUUID3, &globalConf)
 	NormalisePath(&recordUUID4, &globalConf)
+	NormalisePath(&recordULID1, &globalConf)
+	NormalisePath(&recordULID2, &globalConf)
+	NormalisePath(&recordULID3, &globalConf)
 	NormalisePath(&recordID1, &globalConf)
 	NormalisePath(&recordCust, &globalConf)
 
@@ -531,6 +602,10 @@ func TestURLReplacer(t *testing.T) {
 		t.Error(recordUUID4.Path)
 	}
 
+	assert.Equal(t, "/posts/{ulid}/comments", recordULID1.Path, "Path not altered, is: ", recordULID1.Path)
+	assert.Equal(t, "/posts/{ulid}/comments", recordULID2.Path, "Path not altered, is: ", recordULID2.Path)
+	assert.Equal(t, "/posts/{ulid}/comments", recordULID3.Path, "Path not altered, is: ", recordULID3.Path)
+
 	if recordID1.Path != "/widgets/{id}/getParams" {
 		t.Error("Path not altered, is:")
 		t.Error(recordID1.Path)
@@ -547,6 +622,7 @@ func BenchmarkURLReplacer(b *testing.B) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
 		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
+		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseULIDs = true
 		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
 		globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
 	})
@@ -561,6 +637,9 @@ func BenchmarkURLReplacer(b *testing.B) {
 		recordUUID2 := analytics.AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
 		recordUUID3 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
 		recordUUID4 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+		recordULID1 := analytics.AnalyticsRecord{Path: "/posts/01G9HHNKWGBHCQX7VG3JKSZ055/comments"}
+		recordULID2 := analytics.AnalyticsRecord{Path: "/posts/01g9hhnkwgbhcqx7vg3jksz055/comments"}
+		recordULID3 := analytics.AnalyticsRecord{Path: "/posts/01g9HHNKwgbhcqx7vg3JKSZ055/comments"}
 		recordID1 := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams"}
 		recordCust := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
@@ -568,6 +647,9 @@ func BenchmarkURLReplacer(b *testing.B) {
 		NormalisePath(&recordUUID2, &globalConf)
 		NormalisePath(&recordUUID3, &globalConf)
 		NormalisePath(&recordUUID4, &globalConf)
+		NormalisePath(&recordULID1, &globalConf)
+		NormalisePath(&recordULID2, &globalConf)
+		NormalisePath(&recordULID3, &globalConf)
 		NormalisePath(&recordID1, &globalConf)
 		NormalisePath(&recordCust, &globalConf)
 	}

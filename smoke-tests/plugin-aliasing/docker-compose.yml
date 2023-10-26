@@ -4,7 +4,7 @@ services:
     image: redis
 
   gw:
-    image: tykio/tyk-gateway:${tag}
+    image: ${GATEWAY_IMAGE}
     volumes:
       - ./foobar-plugin/foobar-plugin_${plugin_version}_${plugin_os}_${plugin_arch}.so:/opt/tyk-gateway/middleware/foobar-plugin.so
       - ./helloworld-plugin/helloworld-plugin_${plugin_version}_${plugin_os}_${plugin_arch}.so:/opt/tyk-gateway/middleware/helloworld-plugin.so
@@ -16,3 +16,4 @@ services:
       - "0.0.0.0:8080:8080"
     environment:
       - TYK_LOGLEVEL=debug
+      - TYK_DB_REDISHOST=redis

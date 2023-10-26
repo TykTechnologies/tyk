@@ -193,7 +193,7 @@ Tyk classic API definition: `service_discovery.use_target_list`.
 **Field: `cacheTimeout` (`int`)**
 CacheTimeout is the timeout of a cache value when a new data is loaded from a discovery service.
 Setting it too low will cause Tyk to call the SD service too often, setting it too high could mean that failures are not recovered from quickly enough.
-Deprecated: The field is deprecated, usage needs to be updated to configure caching.
+Deprecated: The field is deprecated. Use `service_discovery` to configure service discovery cache options.
 
 Tyk classic API definition: `service_discovery.cache_timeout`.
 

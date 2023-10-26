@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 
@@ -495,5 +497,89 @@ func TestRPCStorageHandler_Disconnect(t *testing.T) {
 		err := r.Disconnect()
 		expectedErr := errors.New("RPCStorageHandler: rpc is either down or was not configured")
 		assert.EqualError(t, err, expectedErr.Error())
+	})
+}
+
+func TestGetRawKey(t *testing.T) {
+
+	t.Run("rpc cache enabled - normal key", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.SlaveOptions.EnableRPCCache = true
+		})
+		defer ts.Close()
+
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               ts.Gw,
+		}
+
+		// first call should fail - key not found
+		givenKey := "test-key"
+		_, err := rpcListener.GetRawKey(givenKey)
+		assert.NotNil(t, err)
+		assert.Equal(t, "key not found", err.Error())
+
+		// second call still fail but from cache
+		_, err = rpcListener.GetRawKey(givenKey)
+		assert.NotNil(t, err)
+		assert.Equal(t, "key not found", err.Error())
+
+		// we override the key in the cache
+		rpcListener.Gw.RPCGlobalCache.Set(givenKey, "test-value", -1)
+		defer rpcListener.Gw.RPCGlobalCache.Delete(givenKey)
+
+		// third call should succeed
+		value, err := rpcListener.GetRawKey(givenKey)
+		assert.Nil(t, err)
+		assert.Equal(t, "test-value", value)
+	})
+	t.Run("rpc cache enabled - cert key", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.SlaveOptions.EnableRPCCache = true
+		})
+		defer ts.Close()
+
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               ts.Gw,
+		}
+
+		// first call should fail - key not found
+		givenKey := "cert-test-key"
+		_, err := rpcListener.GetRawKey(givenKey)
+		assert.NotNil(t, err)
+		assert.Equal(t, "key not found", err.Error())
+
+		// second call still fail but from cache
+		_, err = rpcListener.GetRawKey(givenKey)
+		assert.NotNil(t, err)
+		assert.Equal(t, "key not found", err.Error())
+
+		// we override the key in the cache
+		rpcListener.Gw.RPCCertCache.Set(givenKey, "test-value", -1)
+		defer rpcListener.Gw.RPCCertCache.Delete(givenKey)
+
+		// third call should succeed
+		value, err := rpcListener.GetRawKey(givenKey)
+		assert.Nil(t, err)
+		assert.Equal(t, "test-value", value)
+	})
+
+	t.Run("MDCB down, return mdcb lost connection err", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.SlaveOptions.EnableRPCCache = true
+		})
+		defer ts.Close()
+		rpc.SetEmergencyMode(t, true)
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               ts.Gw,
+		}
+
+		_, err := rpcListener.GetRawKey("any-key")
+		assert.Equal(t, storage.ErrMDCBConnectionLost, err)
 	})
 }
