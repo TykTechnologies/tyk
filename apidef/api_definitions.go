@@ -338,6 +338,7 @@ type VersionDefinition struct {
 	Key                 string            `bson:"key" json:"key"`
 	StripPath           bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
 	StripVersioningData bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
+	FallbackToDefault   bool              `bson:"fallback_to_default" json:"fallback_to_default"`
 	Versions            map[string]string `bson:"versions" json:"versions"`
 	BaseID              string            `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
