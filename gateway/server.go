@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
+	htmlTemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
 	"log/syslog"
@@ -187,7 +187,7 @@ type Gateway struct {
 	TestBundles  map[string]map[string]string
 	TestBundleMu sync.Mutex
 
-	templates    *template.Template
+	templates    *htmlTemplate.Template
 	templatesRaw *textTemplate.Template
 
 	// RedisController keeps track of redis connection and singleton
@@ -407,7 +407,7 @@ func (gw *Gateway) setupGlobals() {
 	// Load all the files that have the "error" prefix.
 	//	gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
 	templatesDir := filepath.Join(gwConfig.TemplatePath, "error*")
-	gw.templates = template.Must(template.ParseGlob(templatesDir))
+	gw.templates = htmlTemplate.Must(htmlTemplate.ParseGlob(templatesDir))
 	gw.templatesRaw = textTemplate.Must(textTemplate.ParseGlob(templatesDir))
 	gw.CoProcessInit()
 

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/internal/graphql"
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
@@ -187,7 +187,7 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 	m.Spec.GraphQLExecutor.EngineV2 = engine
 	conf := m.Gw.GetConfig()
 	if conf.OpenTelemetry.Enabled {
-		executor, err := graphql.NewOtelGraphqlEngineV2(m.Gw.TracerProvider, engine)
+		executor, err := graphqlinternal.NewOtelGraphqlEngineV2(m.Gw.TracerProvider, engine)
 		if err != nil {
 			m.Logger().WithError(err).Error("error creating custom execution engine v2")
 			cancel()
