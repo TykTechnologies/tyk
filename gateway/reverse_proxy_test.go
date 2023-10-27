@@ -664,7 +664,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 		GlobalHeadersRemove   []string
 		ExtendedDeleteHeaders []string
 	}
-	tpl, err := template.New("test_tpl").Parse(`{
+	tpl, err := textTemplate.New("test_tpl").Parse(`{
 		"api_id": "1",
 		"version_data": {
 			"not_versioned": true,

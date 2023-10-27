@@ -77,7 +77,7 @@ func TestHostChecker(t *testing.T) {
 	})
 	defer ts.Close()
 
-	specTmpl := template.Must(template.New("spec").Parse(sampleUptimeTestAPI))
+	specTmpl := textTemplate.Must(textTemplate.New("spec").Parse(sampleUptimeTestAPI))
 
 	tmplData := struct {
 		Host1, Host2 string
@@ -185,7 +185,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	})
 	defer ts.Close()
 
-	specTmpl := template.Must(template.New("spec").Parse(sampleUptimeTestAPI))
+	specTmpl := textTemplate.Must(textTemplate.New("spec").Parse(sampleUptimeTestAPI))
 
 	tmplData := struct {
 		Host1, Host2 string
