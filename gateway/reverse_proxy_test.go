@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
+	mathRand "math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1305,7 +1305,7 @@ func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
 	// tests run in parallel and memConnProviders is a global struct.
 	// For consistency, we use unique names for the subgraphs.
 	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
-		spec.Name = fmt.Sprintf("subgraph-accounts-%d", rand.Intn(1000))
+		spec.Name = fmt.Sprintf("subgraph-accounts-%d", mathRand.Intn(1000))
 		spec.APIID = "subgraph1"
 		spec.Proxy.TargetURL = testSubgraphAccounts
 		spec.Proxy.ListenPath = "/tyk-subgraph-accounts"
@@ -1321,7 +1321,7 @@ func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
 	})[0]
 
 	tykSubgraphReviews := BuildAPI(func(spec *APISpec) {
-		spec.Name = fmt.Sprintf("subgraph-reviews-%d", rand.Intn(1000))
+		spec.Name = fmt.Sprintf("subgraph-reviews-%d", mathRand.Intn(1000))
 		spec.APIID = "subgraph2"
 		spec.Proxy.TargetURL = testSubgraphReviews
 		spec.Proxy.ListenPath = "/tyk-subgraph-reviews"
