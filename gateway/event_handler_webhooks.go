@@ -5,7 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
-	"html/template"
+	htmlTemplate "html/template"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -37,7 +37,7 @@ const (
 // WebHookHandler is an event handler that triggers web hooks
 type WebHookHandler struct {
 	conf     config.WebHookHandlerConf
-	template *template.Template // non-nil if Init is run without error
+	template *htmlTemplate.Template // non-nil if Init is run without error
 	store    storage.Handler
 
 	contentType      string
@@ -77,7 +77,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 
 	// Pre-load template on init
 	if w.conf.TemplatePath != "" {
-		w.template, err = template.ParseFiles(w.conf.TemplatePath)
+		w.template, err = htmlTemplate.ParseFiles(w.conf.TemplatePath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
@@ -98,7 +98,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 			"target": w.conf.TargetPath,
 		}).Info("Loading default template.")
 		defaultPath := filepath.Join(w.Gw.GetConfig().TemplatePath, "default_webhook.json")
-		w.template, err = template.ParseFiles(defaultPath)
+		w.template, err = htmlTemplate.ParseFiles(defaultPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",

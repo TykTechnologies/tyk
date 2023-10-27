@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"html/template"
+	htmlTemplate "html/template"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -114,7 +114,7 @@ func overrideTykErrors(gw *Gateway) {
 
 // APIError is generic error object returned if there is something wrong with the request
 type APIError struct {
-	Message template.HTML
+	Message htmlTemplate.HTML
 }
 
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
@@ -194,10 +194,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			var tmplExecutor TemplateExecutor
 			tmplExecutor = tmpl
 
-			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+			apiError := APIError{htmlTemplate.HTML(htmlTemplate.JSEscapeString(errMsg))}
 
 			if contentType == header.ApplicationXML || contentType == header.TextXML {
-				apiError.Message = template.HTML(errMsg)
+				apiError.Message = htmlTemplate.HTML(errMsg)
 
 				//we look up in the last defined templateName to obtain the template.
 				rawTmpl := e.Gw.templatesRaw.Lookup(templateName)

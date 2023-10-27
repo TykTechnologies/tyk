@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"crypto"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -14,6 +13,7 @@ import (
 	"github.com/go-redis/redis/v8"
 
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
