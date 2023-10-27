@@ -250,6 +250,15 @@ func TestGatewayTagsFilter(t *testing.T) {
 
 	assert.Len(t, data.Message, 5)
 
+	// Test NodeIsSegmented=false
+	{
+		enabled := false
+		assert.Len(t, data.filter(enabled), 5)
+		assert.Len(t, data.filter(enabled, "a"), 5)
+		assert.Len(t, data.filter(enabled, "b"), 5)
+		assert.Len(t, data.filter(enabled, "c"), 5)
+	}
+
 	// Test NodeIsSegmented=true
 	{
 		enabled := true
@@ -259,13 +268,12 @@ func TestGatewayTagsFilter(t *testing.T) {
 		assert.Len(t, data.filter(enabled, "c"), 1)
 	}
 
-	// Test NodeIsSegmented=false
+	// Test NodeIsSegmented=true, multiple gw tags
 	{
-		enabled := false
-		assert.Len(t, data.filter(enabled), 5)
-		assert.Len(t, data.filter(enabled, "a"), 5)
-		assert.Len(t, data.filter(enabled, "b"), 5)
-		assert.Len(t, data.filter(enabled, "c"), 5)
+		enabled := true
+		assert.Len(t, data.filter(enabled), 0)
+		assert.Len(t, data.filter(enabled, "a", "b"), 3)
+		assert.Len(t, data.filter(enabled, "b", "c"), 2)
 	}
 }
 
