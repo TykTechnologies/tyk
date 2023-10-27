@@ -1,13 +1,13 @@
 package gateway
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/url"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	"github.com/TykTechnologies/tyk/apidef"

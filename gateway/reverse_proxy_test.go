@@ -1801,3 +1801,29 @@ func TestSetCustomHeaderMultipleValues(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateMemConnProviderIfNeeded(t *testing.T) {
+	t.Run("should propagate context", func(t *testing.T) {
+		propagationContext := context.WithValue(context.Background(), "parentContextKey", "parentContextValue")
+		propagationContextWithCancel, cancel := context.WithCancel(propagationContext)
+		internalReq, err := http.NewRequest(http.MethodGet, "http://memoryhost/", nil)
+		require.NoError(t, err)
+
+		handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "parentContextValue", req.Context().Value("parentContextKey"))
+			cancel()
+		})
+
+		err = createMemConnProviderIfNeeded(handler, internalReq.WithContext(propagationContextWithCancel))
+		require.NoError(t, err)
+
+		assert.Eventuallyf(t, func() bool {
+			testReq, err := http.NewRequest(http.MethodGet, "http://memoryhost/", nil)
+			require.NoError(t, err)
+			_, err = memConnClient.Do(testReq)
+			require.NoError(t, err)
+			<-propagationContextWithCancel.Done()
+			return true
+		}, time.Second, time.Millisecond*25, "context was not canceled")
+	})
+}
