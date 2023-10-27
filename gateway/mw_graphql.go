@@ -6,6 +6,11 @@ import (
 	"errors"
 	"net/http"
 
+<<<<<<< HEAD
+=======
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+
+>>>>>>> 0a78cef4... [TT-10370] Alias imports (#5691)
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
@@ -187,6 +192,19 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 	}
 
 	m.Spec.GraphQLExecutor.EngineV2 = engine
+<<<<<<< HEAD
+=======
+	conf := m.Gw.GetConfig()
+	if conf.OpenTelemetry.Enabled {
+		executor, err := graphqlinternal.NewOtelGraphqlEngineV2(m.Gw.TracerProvider, engine)
+		if err != nil {
+			m.Logger().WithError(err).Error("error creating custom execution engine v2")
+			cancel()
+			return
+		}
+		m.Spec.GraphQLExecutor.OtelExecutor = executor
+	}
+>>>>>>> 0a78cef4... [TT-10370] Alias imports (#5691)
 	m.Spec.GraphQLExecutor.CancelV2 = cancel
 	m.Spec.GraphQLExecutor.HooksV2.BeforeFetchHook = m
 	m.Spec.GraphQLExecutor.HooksV2.AfterFetchHook = m

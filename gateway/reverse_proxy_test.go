@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
+	mathRand "math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"text/template"
+	textTemplate "text/template"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -664,7 +664,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 		GlobalHeadersRemove   []string
 		ExtendedDeleteHeaders []string
 	}
-	tpl, err := template.New("test_tpl").Parse(`{
+	tpl, err := textTemplate.New("test_tpl").Parse(`{
 		"api_id": "1",
 		"version_data": {
 			"not_versioned": true,
@@ -1289,7 +1289,7 @@ func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
 	// tests run in parallel and memConnProviders is a global struct.
 	// For consistency, we use unique names for the subgraphs.
 	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
-		spec.Name = fmt.Sprintf("subgraph-accounts-%d", rand.Intn(1000))
+		spec.Name = fmt.Sprintf("subgraph-accounts-%d", mathRand.Intn(1000))
 		spec.APIID = "subgraph1"
 		spec.Proxy.TargetURL = testSubgraphAccounts
 		spec.Proxy.ListenPath = "/tyk-subgraph-accounts"
@@ -1305,7 +1305,7 @@ func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
 	})[0]
 
 	tykSubgraphReviews := BuildAPI(func(spec *APISpec) {
-		spec.Name = fmt.Sprintf("subgraph-reviews-%d", rand.Intn(1000))
+		spec.Name = fmt.Sprintf("subgraph-reviews-%d", mathRand.Intn(1000))
 		spec.APIID = "subgraph2"
 		spec.Proxy.TargetURL = testSubgraphReviews
 		spec.Proxy.ListenPath = "/tyk-subgraph-reviews"
