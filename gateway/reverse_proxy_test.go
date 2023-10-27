@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"text/template"
+	textTemplate "text/template"
 	"time"
 
 	"github.com/stretchr/testify/assert"

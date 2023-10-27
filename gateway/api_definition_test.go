@@ -12,7 +12,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
-	"text/template"
+	textTemplate "text/template"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"

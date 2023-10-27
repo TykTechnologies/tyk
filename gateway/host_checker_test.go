@@ -11,7 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"text/template"
+	textTemplate "text/template"
 	"time"
 
 	proxyproto "github.com/pires/go-proxyproto"

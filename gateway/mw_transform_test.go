@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"text/template"
+	textTemplate "text/template"
 
 	"github.com/TykTechnologies/tyk/test"
 
