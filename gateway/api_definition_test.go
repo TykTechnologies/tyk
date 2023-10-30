@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"text/template"
+	textTemplate "text/template"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -1302,9 +1302,9 @@ func TestAPIDefinitionLoader(t *testing.T) {
 
 	l := APIDefinitionLoader{Gw: ts.Gw}
 
-	executeAndAssert := func(t *testing.T, template *template.Template) {
+	executeAndAssert := func(t *testing.T, tpl *textTemplate.Template) {
 		var bodyBuffer bytes.Buffer
-		err := template.Execute(&bodyBuffer, map[string]string{
+		err := tpl.Execute(&bodyBuffer, map[string]string{
 			"value1": "value-1",
 			"value2": "value-2",
 		})
