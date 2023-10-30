@@ -70,10 +70,14 @@ Install
 
 Compile from Source
 
+<<<<<<< HEAD
 ```
 git clone https://github.com/TykTechnologies/tyk
 go build
 ```
+=======
+[Blocklist](https://tyk.io/docs/advanced-configuration/transform-traffic/endpoint-designer/#blocklist)/[Allowlist](https://tyk.io/docs/advanced-configuration/transform-traffic/endpoint-designer/#allowlist)/[Ignore](https://tyk.io/docs/advanced-configuration/transform-traffic/endpoint-designer/#ignore) endpoint access - Enforce strict security models on a version-by-version basis to your access points.
+>>>>>>> 22ea4197... Fix link issues in README.md (#5701)
 
 
 Go version 1.16 is required to build `master`, the current development version. Tyk is officially supported on `linux/amd64`, `linux/i386` and `linux/arm64`.
