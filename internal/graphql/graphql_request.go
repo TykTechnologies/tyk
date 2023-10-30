@@ -69,12 +69,63 @@ func (g *GraphRequest) RootFields() []string {
 }
 
 func (g *GraphRequest) TypesAndFields() map[string][]string {
-	//operationType, err := g.OperationType()
-	//if err != nil {
-	//	return nil
-	//}
-	//g.requestDoc.Index.IsRootOperationTypeNameString()
-	return nil
+	rootOperationTypeName := g.SchemaRootOperationTypeName()
+	typesAndFields := make(map[string][]string)
+	operationDefRef := g.findOperationRef()
+	if !g.requestDoc.OperationDefinitions[operationDefRef].HasSelections {
+		return nil
+	}
+	g.recursivelyExtractTypeAndFieldsDefinition(rootOperationTypeName, g.requestDoc.OperationDefinitions[operationDefRef].SelectionSet, typesAndFields, false)
+	return typesAndFields
+}
+
+// recursivelyExtractTypeAndFieldsDefinition extracts the Type name and field name from the selectionSet passed
+// and adds it to the typesAndFields map
+func (g *GraphRequest) recursivelyExtractTypeAndFieldsDefinition(name string, selectionSetRef int, typesFields map[string][]string, shouldRecord bool) {
+	fields := make([]string, 0)
+	node, found := g.schema.Index.FirstNodeByNameStr(name)
+	if !found {
+		return
+	}
+	if node.Kind != ast.NodeKindObjectTypeDefinition || node.Ref == ast.InvalidRef {
+		return
+	}
+	objTypeDefRef := node.Ref
+	if !g.schema.ObjectTypeDefinitions[objTypeDefRef].HasFieldDefinitions {
+		return
+	}
+
+	// loop through selection set fields ad match to fields in field definition
+	for _, selection := range g.requestDoc.SelectionSets[selectionSetRef].SelectionRefs {
+		if g.requestDoc.Selections[selection].Kind != ast.SelectionKindField {
+			continue
+		}
+		fieldRef := g.requestDoc.Selections[selection].Ref
+		fieldName := g.requestDoc.FieldNameString(fieldRef)
+		// check the objecttypedef for the field and check if it exists
+		if !g.schema.ObjectTypeDefinitionHasField(objTypeDefRef, []byte(fieldName)) {
+			continue
+		}
+
+		for _, fieldDefinitionRef := range g.schema.ObjectTypeDefinitions[objTypeDefRef].FieldsDefinition.Refs {
+			if g.schema.FieldDefinitionNameString(fieldDefinitionRef) != fieldName {
+				continue
+			}
+			fields = append(fields, fieldName)
+			// check type and recursively call function
+			typeRef := g.schema.FieldDefinitions[fieldDefinitionRef].Type
+			underlyingType := g.schema.ResolveUnderlyingType(typeRef)
+			if !g.schema.TypeIsScalar(underlyingType, g.schema) && g.requestDoc.Fields[fieldRef].HasSelections {
+				typeName := g.schema.ResolveTypeNameString(typeRef)
+				g.recursivelyExtractTypeAndFieldsDefinition(typeName, g.requestDoc.Fields[fieldRef].SelectionSet, typesFields, true)
+			}
+		}
+	}
+
+	if shouldRecord {
+		typesFields[name] = append(typesFields[name], fields...)
+	}
+	return
 }
 
 func (g *GraphRequest) SchemaRootOperationTypeName() string {
@@ -111,5 +162,3 @@ func (g *GraphRequest) findOperationRef() int {
 	}
 	return ast.InvalidRef
 }
-
-//func (g *GraphRequest)

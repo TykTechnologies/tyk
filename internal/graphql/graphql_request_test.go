@@ -99,9 +99,10 @@ func TestGraphRequest_TypesAndFields(t *testing.T) {
 	}{
 		{
 			name:    "should get all types and fields single",
-			request: `{"query":"query {\n  characters(filter: {}) {\n    \n  }\n}\n\n"}`,
+			request: `{"query":"query {\n  characters {\n    info {\n      count\n    }\n  }\n}"}`,
 			expectedResponse: map[string][]string{
-				"Character": []string{},
+				"Characters": []string{"info"},
+				"Info":       []string{"count"},
 			},
 		},
 	}
