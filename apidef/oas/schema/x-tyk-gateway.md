@@ -89,7 +89,8 @@ Versions contains a list of versions that map to individual API IDs.
 StripVersioningData is a boolean flag, if set to `true`, the API responses will be stripped of versioning data.
 
 **Field: `fallbackToDefault` (`boolean`)**
-FallbackToDefault controls whether the default API is invoked when the requested version can't be found.
+FallbackToDefault controls the behaviour of Tyk when a versioned API is called with a nonexistent version name.
+If set to `true` then the default API version will be invoked; if set to `false` Tyk will return an HTTP 404 `This API version does not seem to exist` error in this scenario.
 
 
 ### **VersionToID**
