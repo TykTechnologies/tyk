@@ -68,6 +68,32 @@ func (g *GraphRequest) RootFields() []string {
 	return rootFields
 }
 
+func (g *GraphRequest) TypesAndFields() map[string][]string {
+	//operationType, err := g.OperationType()
+	//if err != nil {
+	//	return nil
+	//}
+	//g.requestDoc.Index.IsRootOperationTypeNameString()
+	return nil
+}
+
+func (g *GraphRequest) SchemaRootOperationTypeName() string {
+	operationType, err := g.OperationType()
+	if err != nil {
+		return ""
+	}
+	switch operationType {
+	case graphql.OperationTypeQuery:
+		return g.schema.Index.QueryTypeName.String()
+	case graphql.OperationTypeMutation:
+		return g.schema.Index.MutationTypeName.String()
+	case graphql.OperationTypeSubscription:
+		return g.schema.Index.SubscriptionTypeName.String()
+	default:
+		return ""
+	}
+}
+
 func (g *GraphRequest) findOperationRef() int {
 	if g.operationRef != ast.InvalidRef {
 		return g.operationRef

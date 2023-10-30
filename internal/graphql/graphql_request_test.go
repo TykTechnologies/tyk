@@ -8,12 +8,17 @@ import (
 )
 
 const sampleSchema = `
+schema {
+  query: Query
+  mutation: CustomMutation
+}
+
 type Query {
   characters(filter: FilterCharacter, page: Int): Characters
   listCharacters(): [Characters]!
 }
 
-type Mutation {
+type CustomMutation {
   changeCharacter(): String
 }
 
@@ -81,6 +86,64 @@ func TestGraphRequest_RootFields(t *testing.T) {
 			req, err := NewRequestFromBodySchema(test.request, sampleSchema)
 			require.NoError(t, err)
 			gotten := req.RootFields()
+			assert.Equal(t, test.expectedResponse, gotten)
+		})
+	}
+}
+
+func TestGraphRequest_TypesAndFields(t *testing.T) {
+	testCases := []struct {
+		name             string
+		request          string
+		expectedResponse map[string][]string
+	}{
+		{
+			name:    "should get all types and fields single",
+			request: `{"query":"query {\n  characters(filter: {}) {\n    \n  }\n}\n\n"}`,
+			expectedResponse: map[string][]string{
+				"Character": []string{},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := NewRequestFromBodySchema(test.request, sampleSchema)
+			require.NoError(t, err)
+			gotten := req.TypesAndFields()
+			assert.Equal(t, test.expectedResponse, gotten)
+		})
+	}
+}
+
+func TestGraphRequest_SchemaRootOperationTypeName(t *testing.T) {
+	testCases := []struct {
+		name             string
+		request          string
+		expectedResponse string
+	}{
+		{
+			name:             "should return query",
+			request:          `{"query":"query {\n  characters(filter: {}) {\n    \n  }\n}\n\n"}`,
+			expectedResponse: "Query",
+		},
+		{
+			name:             "should return mutation",
+			request:          `{"query":"mutation {\n  changeCharacter\n}"}`,
+			expectedResponse: "CustomMutation",
+		},
+		{
+			name:             "should return subscription",
+			request:          `{"query":"subscription {\n  listenCharacter {\n    secondInfo\n  }\n}"}`,
+			expectedResponse: "Subscription",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := NewRequestFromBodySchema(test.request, sampleSchema)
+			require.NoError(t, err)
+			gotten := req.SchemaRootOperationTypeName()
 			assert.Equal(t, test.expectedResponse, gotten)
 		})
 	}
