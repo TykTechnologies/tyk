@@ -12,8 +12,8 @@ import (
 	"github.com/TykTechnologies/tyk/cli/bundler"
 	"github.com/TykTechnologies/tyk/cli/importer"
 	"github.com/TykTechnologies/tyk/cli/linter"
-	"github.com/TykTechnologies/tyk/cli/version"
 	"github.com/TykTechnologies/tyk/cli/plugin"
+	"github.com/TykTechnologies/tyk/cli/version"
 	"github.com/TykTechnologies/tyk/internal/build"
 	logger "github.com/TykTechnologies/tyk/log"
 )
@@ -100,7 +100,7 @@ func Init(confPaths []string) {
 	})
 
 	// Add version command:
-     	version.AddTo(app)
+	version.AddTo(app)
 
 	// Add import command:
 	importer.AddTo(app)
