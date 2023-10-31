@@ -7,7 +7,7 @@ var (
 	Version = "v5.3.0-dev"
 
 	// BuiltBy contains the environment name from the build (goreleaser).
-	BuiltBy string
+	BuiltBy string = "dev"
 
 	// BuildDate is the date the build was made at.
 	BuildDate string
