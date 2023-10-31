@@ -39,25 +39,6 @@ builds:
     goarch:
       - arm64
     binary: tyk
-<<<<<<< HEAD
-=======
-  - id: std-s390x
-    flags:
-      - -trimpath
-      - -tags=goplugin 
-    ldflags:
-      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
-      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
-    env:
-      - CC=s390x-linux-gnu-gcc
-    goos:
-      - linux
-    goarch:
-      - s390x
-    binary: tyk
->>>>>>> ded68078... [TT-7971] share version internally (#5705)
 
 dockers:
   # Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway (amd64)
