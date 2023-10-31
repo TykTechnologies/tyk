@@ -48,6 +48,7 @@ func (v *versionInfo) String() string {
 	return output.String()
 }
 
+// Run is the entry point for printing out version information.
 func (v *versionInfo) Run(ctx *kingpin.ParseContext) (err error) {
 	if *v.asJson {
 		out, err := json.MarshalIndent(v, "", "    ")
