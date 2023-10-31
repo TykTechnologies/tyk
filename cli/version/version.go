@@ -63,7 +63,7 @@ func (v *versionInfo) Run(ctx *kingpin.ParseContext) (err error) {
 	return nil
 }
 
-// AddTo initializes an importer object.
+// AddTo initializes a version info object.
 func AddTo(app *kingpin.Application) {
 	cmd := app.Command(cmdName, cmdDesc)
 
