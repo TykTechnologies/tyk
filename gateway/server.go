@@ -1547,7 +1547,7 @@ func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cli.Init(VERSION, confPaths)
+	cli.Init(confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
 	if !cli.DefaultMode {
