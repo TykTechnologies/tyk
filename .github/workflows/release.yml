@@ -236,9 +236,9 @@ jobs:
       - name: Check if related CI images exists for this PR
         shell: bash
         id: check-docker-images
-        if: github.event_name == 'pull_request' && needs.goreleaser.outputs.capture-tag.captured-tag != ''
+        if: github.event_name == 'pull_request' && needs.goreleaser.outputs.captured-tag != ''
         env:
-          captured-tag: needs.goreleaser.outputs.capture-tag.captured-tag
+          captured-tag: needs.goreleaser.outputs.captured-tag
         run: |
           # Check if the image exists
           if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk:${env.captured-tag}" &> /dev/null; then
@@ -253,7 +253,7 @@ jobs:
         working-directory: tyk-automated-tests/ci/auto
         id: env_up
         env:
-          captured-tag: ${{ needs.goreleaser.outputs.capture-tag.captured-tag || '' }}
+          captured-tag: ${{ needs.goreleaser.outputs.captured-tag || '' }}
           t: ${{ needs.goreleaser.outputs.tags }}
           pull_policy: 'if_not_present'
           # gw and dash use the same branch names
@@ -292,7 +292,7 @@ jobs:
       - name: Run tests
         working-directory: tyk-automated-tests/ci/auto
         env:
-          captured-tag: ${{ needs.goreleaser.outputs.capture-tag.captured-tag || '' }}
+          captured-tag: ${{ needs.goreleaser.outputs.captured-tag || '' }}
         run: |
           docker run --rm --network auto_default --env-file pytest.env \
           ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || env.captured-tag || 'master' }} \
