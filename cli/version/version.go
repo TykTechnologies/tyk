@@ -37,6 +37,7 @@ type runtimeInfo struct {
 	Version string
 }
 
+// String implements fmt.Stringer for the version info.
 func (v *versionInfo) String() string {
 	var output strings.Builder
 	output.WriteString("Release version: " + v.Version + "\n")
