@@ -1140,7 +1140,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	defaultTestConfig = gwConfig
 	gw.SetConfig(gwConfig)
 
-	cli.Init(VERSION, confPaths)
+	cli.Init(confPaths)
 
 	err = gw.initialiseSystem()
 	if err != nil {
