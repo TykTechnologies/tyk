@@ -43,6 +43,7 @@ jobs:
             debvers: 'ubuntu/xenial ubuntu/bionic ubuntu/focal ubuntu/jammy debian/jessie debian/buster debian/bullseye debian/bookworm' 
     outputs:
       tags: ${{ steps.metadata.outputs.tags }}
+      captured-tag: ${{ steps.capture-tag.outputs.captured-tag }}
 
     steps:
       - name: Fix private module deps
@@ -135,6 +136,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
+            type=raw,event=pr,value=${{ github.head_ref }},prefix=pr-
             type=sha,format=long
             type=semver,pattern=v{{major}}.{{minor}},prefix=v
             type=semver,pattern=v{{version}},prefix=v
@@ -169,6 +171,20 @@ jobs:
           path: |
             dist/*.rpm
             !dist/*PAYG*.rpm
+
+      - name: Capture branch name on PR
+        if: ${{ github.event_name == 'pull_request' }}
+        id: capture-tag
+        shell: bash
+        run: |
+          echo "Capture normalized tag"
+          echo "${{ steps.metadata.outputs.tags }}" | while IFS= read -r line; do
+            if echo "$line" | grep -q "pr-name-"; then
+              tag=${line#*:}
+              echo "captured-tag=$tag" >> $GITHUB_OUTPUT
+            fi
+          done
+
   api-tests:
     needs: goreleaser
     runs-on: ubuntu-latest
@@ -217,6 +233,21 @@ jobs:
           detached: true
           limit-access-to-actor: true
 
+      - name: Check if related CI images exists for this PR
+        shell: bash
+        id: check-docker-images
+        if: github.event_name == 'pull_request' && needs.goreleaser.outputs.capture-tag.captured-tag != ''
+        env:
+          captured-tag: needs.goreleaser.outputs.capture-tag.captured-tag
+        run: |
+          # Check if the image exists
+          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk:${env.captured-tag}" &> /dev/null; then
+            echo "Image exists."
+            echo "gw_dash_image_captured_tag=${env.captured-tag}"
+          else
+            echo "Image does not exist."
+          fi
+
       - name: env up
         shell: bash
         working-directory: tyk-automated-tests/ci/auto
@@ -226,8 +257,8 @@ jobs:
           pull_policy: 'if_not_present'
           # gw and dash use the same branch names
           gw_dash_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk' || github.repository == 'TykTechnologies/tyk-analytics') && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
-          pump_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-pump' && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
-          sink_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-sink' && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
+          pump_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-pump' && startsWith(github.ref_name, 'release-') ) && github.ref_name || env.captured-tag || 'master' }}
+          sink_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-sink' && startsWith(github.ref_name, 'release-') ) && github.ref_name || env.captured-tag ||'master' }}
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
@@ -259,9 +290,11 @@ jobs:
 
       - name: Run tests
         working-directory: tyk-automated-tests/ci/auto
+        env:
+          captured-tag: needs.goreleaser.outputs.capture-tag.captured-tag
         run: |
           docker run --rm --network auto_default --env-file pytest.env \
-          ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
+          ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || env.captured-tag || 'master' }} \
           pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}" 
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
