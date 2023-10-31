@@ -13,6 +13,9 @@ schema {
   mutation: CustomMutation
 }
 
+input Characters{
+}
+
 type Query {
   characters(filter: FilterCharacter, page: Int): Characters
   listCharacters(): [Characters]!
@@ -100,6 +103,14 @@ func TestGraphRequest_TypesAndFields(t *testing.T) {
 		{
 			name:    "should get all types and fields single",
 			request: `{"query":"query {\n  characters {\n    info {\n      count\n    }\n  }\n}"}`,
+			expectedResponse: map[string][]string{
+				"Characters": []string{"info"},
+				"Info":       []string{"count"},
+			},
+		},
+		{
+			request: `{"query":"mutation second{\n changeCharacter\n}\n\n query main{\n characters{\n info{\n count\n }\n }\n}","operationName":"main"}`,
+			name:    "should get all types for multiple operations",
 			expectedResponse: map[string][]string{
 				"Characters": []string{"info"},
 				"Info":       []string{"count"},

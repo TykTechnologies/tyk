@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"github.com/TykTechnologies/tyk/internal/graphql"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -119,8 +120,27 @@ func getSessionTags(session *user.SessionState) []string {
 	return tags
 }
 
-func recordGraphDetila(r *http.Request, response *http.Response) {
+func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, schema string, response *http.Response) {
+	body, err := io.ReadAll(r.Body)
+	defer func() {
+		r.Body.Close()
+		r.Body = io.NopCloser(bytes.NewBuffer(body))
+	}()
+	if err != nil {
+		log.WithError(err).Error("error recording graph analytics")
+		return
+	}
 
+	graphReq, err := graphql.NewRequestFromBodySchema(string(body), schema)
+	if err != nil {
+		log.WithError(err).Error("error recording graph analytics")
+		return
+	}
+
+	rec.GraphQLStats.IsGraphQL = true
+	rec.GraphQLStats.Types = graphReq.TypesAndFields()
+	rec.GraphQLStats.OperationType = graphReq.AnalyticsOperationType()
+	rec.GraphQLStats.RootFields = graphReq.RootFields()
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response) {
@@ -250,6 +270,9 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(s.Spec.GraphQL.Schema))
 		}
 
+		if s.Spec.GraphQL.Enabled {
+			recordGraphDetails(&record, r, s.Spec.GraphQL.Schema, responseCopy)
+		}
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 
 		if s.Spec.GlobalConfig.EnforceOrgDataAge {

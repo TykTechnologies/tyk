@@ -4,6 +4,7 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astparser"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"strings"
 )
 
@@ -142,6 +143,24 @@ func (g *GraphRequest) SchemaRootOperationTypeName() string {
 		return g.schema.Index.SubscriptionTypeName.String()
 	default:
 		return ""
+	}
+}
+
+func (g *GraphRequest) AnalyticsOperationType() analytics.GraphQLOperations {
+	t, err := g.OperationType()
+	if err != nil {
+		return analytics.OperationUnknown
+	}
+
+	switch t {
+	case graphql.OperationTypeQuery:
+		return analytics.OperationQuery
+	case graphql.OperationTypeMutation:
+		return analytics.OperationMutation
+	case graphql.OperationTypeSubscription:
+		return analytics.OperationSubscription
+	default:
+		return analytics.OperationUnknown
 	}
 }
 
