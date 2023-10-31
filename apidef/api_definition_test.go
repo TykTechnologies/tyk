@@ -212,6 +212,11 @@ func TestAPIDefinition_GetScopeClaimName(t *testing.T) {
 	}
 }
 
+// TestAPIDefinition_GetScopeToPolicyMapping Go evaluates the function for mapping scopes to policies within an API definition.
+// It defines various scenarios with different mappings of deprecated and current fields for JWT and OIDC scopes.
+// Test cases cover scenarios where only deprecated fields, JWT scopes, OIDC scopes, or a combination of them are used,
+// and it ensures the correct mapping is returned for each case. The test verifies that the mapping of scopes to policies
+// behaves as expected, taking into account both deprecated and current field configurations in API definitions.
 func TestAPIDefinition_GetScopeToPolicyMapping(t *testing.T) {
 	var (
 		scopeToPolicyMapping        = map[string]string{"jwtClaim": "pol1"}

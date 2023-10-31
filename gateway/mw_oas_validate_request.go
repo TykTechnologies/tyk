@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"fmt"
+	"github.com/getkin/kin-openapi/openapi3"
 	"net/http"
 
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -61,16 +62,29 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		errResponseCode = validateRequest.ErrorResponseCode
 	}
 
+	opts := &openapi3filter.Options{
+		AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+			return nil
+		},
+	}
+
+	opts.WithCustomSchemaErrorFunc(func(err *openapi3.SchemaError) string {
+
+	})
+
+	/*opts.WithCustomSchemaErrorFunc(func(err *openapi3.SchemaError) string {
+
+		return "elma"
+	})*/
+
+	// SetSchemaErrorMessageCustomizer
+
 	// Validate request
 	requestValidationInput := &openapi3filter.RequestValidationInput{
 		Request:    r,
 		PathParams: operation.pathParams,
 		Route:      operation.route,
-		Options: &openapi3filter.Options{
-			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
-				return nil
-			},
-		},
+		Options:    opts,
 	}
 
 	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)

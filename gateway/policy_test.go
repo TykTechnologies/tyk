@@ -27,6 +27,8 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
+// TestLoadPoliciesFromDashboardReLogin checks the policy loading process from a dashboard that returns a 403 status code.
+// It verifies that the test function correctly identifies this situation, resulting in an error and an empty policy map, as expected.
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	// Test Dashboard
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -893,6 +895,9 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 	return bmid, tests
 }
 
+// TestApplyPolicies verifies different policy application scenarios, where each test case simulates various policy
+// application scenarios. It checks for expected error messages and verifies whether the session state aligns with
+// the expected result for each specific scenario.
 func TestApplyPolicies(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -939,6 +944,9 @@ func BenchmarkApplyPolicies(b *testing.B) {
 	}
 }
 
+// TestApplyPoliciesQuotaAPILimit sets up test policies, APIs, and sessions. It creates keys and sends requests to different APIs,
+// checking if API limit quotas decrease as expected. The test also verifies that session keys correctly reflect API limits
+// and tests resetting the API quotas.
 func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1181,6 +1189,12 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 
 }
 
+// TestApplyMultiPolicies configures a testing environment with multiple policies and APIs. It defines two policies,
+// "policy1" and "policy2," each with specific rate limits and access rights. Test cases validate the effect of applying
+// these policies to a test session. The test covers various aspects, including policy enforcement, API rate limits, quota handling,
+// and policy updates. It verifies that the policies correctly impact API usage and that policy updates are reflected in rate limits.
+// The test ensures that the policies are applied as expected, and rate limits are enforced according to the policies,
+// maintaining API access control and quotas.
 func TestApplyMultiPolicies(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1394,6 +1408,10 @@ func TestApplyMultiPolicies(t *testing.T) {
 	})
 }
 
+// The "TestPerAPIPolicyUpdate" Go test focuses on updating a specific policy applied to multiple APIs. It starts by
+// setting up an environment with policies applied to two APIs. A test session with this policy is created, and its key is added.
+// The test then checks the key session and verifies that both APIs are present in the session. The policy is updated to
+// only apply to one API, and the test ensures that the session now reflects this change with only one API in the session access rights.
 func TestPerAPIPolicyUpdate(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1543,6 +1561,9 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 	}...)
 }
 
+// TestParsePoliciesFromRPC checks if policies with or without explicit IDs are parsed correctly from RPC data.
+// It verifies that the parsed policies are mapped appropriately, considering whether explicit IDs should be allowed or not.
+// The test ensures that the expected policy IDs are present in the parsed policy map.
 func TestParsePoliciesFromRPC(t *testing.T) {
 
 	objectID := model.NewObjectID()
@@ -1620,6 +1641,9 @@ func (s *RPCDataLoaderMock) GetPolicies(orgId string) string {
 	return string(policyList)
 }
 
+// Test_LoadPoliciesFromRPC evaluates the policy loading process from a remote RPC service. It verifies both successful
+// policy retrieval from the RPC service and the system's ability to seamlessly switch to backup policies in the event of
+// an RPC connection failure. This test ensures the system's robustness and continuous policy availability.
 func Test_LoadPoliciesFromRPC(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

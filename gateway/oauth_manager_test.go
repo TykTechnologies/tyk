@@ -611,6 +611,10 @@ func TestDeleteOauthClient(t *testing.T) {
 
 }
 
+// TestAPIClientAuthorizeTokenWithPolicy involves authorizing a client with a policy token in an OAuth flow. It creates
+// an OAuth client, initiates an OAuth request, and validates that the resulting token contains the expected policy.
+// The test checks whether the policy has been correctly associated with the token, ensuring that the authorization process
+// works as expected for clients with specific policies.
 func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

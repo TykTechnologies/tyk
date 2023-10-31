@@ -581,6 +581,9 @@ func TestGoPlugin_PreventDoubleError(t *testing.T) {
 	}...)
 }
 
+// TestGoPlugin_ApplyPolicy configures a test environment with policies and a custom API that includes a Go plugin middleware
+// to apply a policy. The test then sends a request to the "/my-goplugin/get" endpoint, verifies the response with a 200 status code,
+// and ensures that the session's rate is correctly set to 114.
 func TestGoPlugin_ApplyPolicy(t *testing.T) {
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
