@@ -58,8 +58,10 @@ func (g *GraphRequest) GraphErrors(response []byte) ([]string, error) {
 	errors := make([]string, 0)
 	errBytes, t, _, err := jsonparser.Get(response, "errors")
 	// check if the errors key exists in the response
-	if err != nil && err != jsonparser.KeyPathNotFoundError {
-		// we got an unexpected error parsing te response
+	if err != nil {
+		if err == jsonparser.KeyPathNotFoundError {
+			return nil, nil
+		}
 		return nil, err
 	}
 	if t != jsonparser.NotExist {
@@ -93,7 +95,7 @@ func (g *GraphRequest) RootFields() []string {
 }
 
 func (g *GraphRequest) TypesAndFields() map[string][]string {
-	rootOperationTypeName := g.SchemaRootOperationTypeName()
+	rootOperationTypeName := g.schemaRootOperationTypeName()
 	typesAndFields := make(map[string][]string)
 	operationDefRef := g.findOperationRef()
 	if !g.requestDoc.OperationDefinitions[operationDefRef].HasSelections {
@@ -152,11 +154,8 @@ func (g *GraphRequest) recursivelyExtractTypeAndFieldsDefinition(name string, se
 	return
 }
 
-func (g *GraphRequest) SchemaRootOperationTypeName() string {
-	operationType, err := g.OperationType()
-	if err != nil {
-		return ""
-	}
+func (g *GraphRequest) schemaRootOperationTypeName() string {
+	operationType, _ := g.Request.OperationType()
 	switch operationType {
 	case graphql.OperationTypeQuery:
 		return g.schema.Index.QueryTypeName.String()
@@ -169,12 +168,8 @@ func (g *GraphRequest) SchemaRootOperationTypeName() string {
 	}
 }
 
-func (g *GraphRequest) AnalyticsOperationType() analytics.GraphQLOperations {
-	t, err := g.OperationType()
-	if err != nil {
-		return analytics.OperationUnknown
-	}
-
+func (g *GraphRequest) OperationType() analytics.GraphQLOperations {
+	t, _ := g.Request.OperationType()
 	switch t {
 	case graphql.OperationTypeQuery:
 		return analytics.OperationQuery
