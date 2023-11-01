@@ -7,13 +7,11 @@ import (
 	"testing"
 )
 
+// TODO fix when input named character
 const sampleSchema = `
 schema {
   query: Query
   mutation: CustomMutation
-}
-
-input Characters{
 }
 
 type Query {
@@ -124,6 +122,36 @@ func TestGraphRequest_TypesAndFields(t *testing.T) {
 			require.NoError(t, err)
 			gotten := req.TypesAndFields()
 			assert.Equal(t, test.expectedResponse, gotten)
+		})
+	}
+}
+
+func TestGraphRequest_GraphErrors(t *testing.T) {
+	testCases := []struct {
+		name     string
+		response string
+		expected []string
+	}{
+		{
+			name:     "only errors in response",
+			response: `{"errors":[{"message":"Name for character with ID 1002 could not be fetched.","locations":[{"line":6,"column":7}],"path":["hero","heroFriends",1,"name"]}]}`,
+			expected: []string{"Name for character with ID 1002 could not be fetched."},
+		},
+		{
+			name:     "error and data in response",
+			response: `{"errors":[{"message":"Name for character with ID 1002 could not be fetched.","locations":[{"line":6,"column":7}],"path":["hero","heroFriends",1,"name"]}],"data":{"hero":{"name":"R2-D2","heroFriends":[{"id":"1000","name":"Luke Skywalker"},{"id":"1002","name":null},{"id":"1003","name":"Leia Organa"}]}}}`,
+			expected: []string{"Name for character with ID 1002 could not be fetched."},
+		},
+	}
+
+	request := `{"query":"query {\n  characters(filter: {}) {\n    \n  }\n}\n\n"}`
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := NewRequestFromBodySchema(request, sampleSchema)
+			require.NoError(t, err)
+			gotten, err := req.GraphErrors([]byte(test.response))
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, gotten)
 		})
 	}
 }

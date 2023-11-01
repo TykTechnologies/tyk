@@ -5,6 +5,7 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astparser"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/buger/jsonparser"
 	"strings"
 )
 
@@ -51,6 +52,28 @@ func NewRequestFromBodySchema(rawRequest, schema string) (*GraphRequest, error) 
 		requestDoc:   &requestDoc,
 		schema:       &schemaDoc,
 	}, nil
+}
+
+func (g *GraphRequest) GraphErrors(response []byte) ([]string, error) {
+	errors := make([]string, 0)
+	errBytes, t, _, err := jsonparser.Get(response, "errors")
+	// check if the errors key exists in the response
+	if err != nil && err != jsonparser.KeyPathNotFoundError {
+		// we got an unexpected error parsing te response
+		return nil, err
+	}
+	if t != jsonparser.NotExist {
+		if _, err := jsonparser.ArrayEach(errBytes, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+			message, err := jsonparser.GetString(value, "message")
+			if err != nil {
+				return
+			}
+			errors = append(errors, message)
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return errors, nil
 }
 
 func (g *GraphRequest) RootFields() []string {

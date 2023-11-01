@@ -120,20 +120,21 @@ func getSessionTags(session *user.SessionState) []string {
 	return tags
 }
 
-func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, schema string, response *http.Response) {
+func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, schema string, response []byte) {
+	logger := log.WithField("location", "recordGraphDetails")
 	body, err := io.ReadAll(r.Body)
 	defer func() {
 		r.Body.Close()
 		r.Body = io.NopCloser(bytes.NewBuffer(body))
 	}()
 	if err != nil {
-		log.WithError(err).Error("error recording graph analytics")
+		logger.WithError(err).Error("error recording graph analytics")
 		return
 	}
 
 	graphReq, err := graphql.NewRequestFromBodySchema(string(body), schema)
 	if err != nil {
-		log.WithError(err).Error("error recording graph analytics")
+		logger.WithError(err).Error("error recording graph analytics")
 		return
 	}
 
@@ -141,6 +142,19 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, schema 
 	rec.GraphQLStats.Types = graphReq.TypesAndFields()
 	rec.GraphQLStats.OperationType = graphReq.AnalyticsOperationType()
 	rec.GraphQLStats.RootFields = graphReq.RootFields()
+	graphErr, err := graphReq.GraphErrors(response)
+	if err != nil {
+		logger.WithError(err).Error("error reading graph errors")
+	}
+	if len(graphErr) > 0 {
+		rec.GraphQLStats.HasErrors = true
+		rec.GraphQLStats.Errors = make([]analytics.GraphError, len(graphErr))
+		for i, e := range graphErr {
+			rec.GraphQLStats.Errors[i] = analytics.GraphError{
+				Message: e,
+			}
+		}
+	}
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response) {
@@ -185,6 +199,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		rawRequest := ""
 		rawResponse := ""
 
+		var responseContent []byte
 		if recordDetail(r, s.Spec) {
 			// Get the wire format representation
 			var wireFormatReq bytes.Buffer
@@ -201,7 +216,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 				// we need to delete the chunked transfer encoding header to avoid malformed body in our rawResponse
 				httputil.RemoveResponseTransferEncoding(responseCopy, "chunked")
 
-				contents, err := ioutil.ReadAll(responseCopy.Body)
+				responseContent, err := io.ReadAll(responseCopy.Body)
 				if err != nil {
 					log.Error("Couldn't read response body", err)
 				}
@@ -211,7 +226,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 				// Get the wire format representation
 				var wireFormatRes bytes.Buffer
 				responseCopy.Write(&wireFormatRes)
-				responseCopy.Body = ioutil.NopCloser(bytes.NewBuffer(contents))
+				responseCopy.Body = ioutil.NopCloser(bytes.NewBuffer(responseContent))
 				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 			}
 		}
@@ -271,7 +286,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		}
 
 		if s.Spec.GraphQL.Enabled {
-			recordGraphDetails(&record, r, s.Spec.GraphQL.Schema, responseCopy)
+			recordGraphDetails(&record, r, s.Spec.GraphQL.Schema, responseContent)
 		}
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 
