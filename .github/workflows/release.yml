@@ -43,7 +43,7 @@ jobs:
             debvers: 'ubuntu/xenial ubuntu/bionic ubuntu/focal ubuntu/jammy debian/jessie debian/buster debian/bullseye debian/bookworm' 
     outputs:
       tags: ${{ steps.metadata.outputs.tags }}
-      captured-tag: ${{ steps.capture-tag.outputs.captured-tag }}
+      captured_tag: ${{ steps.capture-tag.outputs.captured_tag }}
 
     steps:
       - name: Fix private module deps
@@ -181,7 +181,7 @@ jobs:
           echo "${{ steps.metadata.outputs.tags }}" | while IFS= read -r line; do
             if echo "$line" | grep -q "pr-name-"; then
               tag=${line#*:}
-              echo "captured-tag=$tag" >> $GITHUB_OUTPUT
+              echo "captured_tag=$tag" >> $GITHUB_OUTPUT
             fi
           done
 
@@ -236,29 +236,29 @@ jobs:
       - name: Check if related CI images exists for this PR
         shell: bash
         id: check-docker-images
-        if: github.event_name == 'pull_request' && needs.goreleaser.outputs.captured-tag != ''
+        if: github.event_name == 'pull_request' && needs.goreleaser.outputs.captured_tag != ''
         env:
-          captured-tag: ${{ needs.goreleaser.outputs.captured-tag }}
+          captured_tag: ${{ needs.goreleaser.outputs.captured_tag }}
         run: |
           # Check if Tyk-Anaytics image twin PR exists
-          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-analytics:${captured-tag}" &> /dev/null; then
+          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-analytics:${captured_tag}" &> /dev/null; then
             echo "Dashboard Image exists."
-            echo "dash_twin_pr_tag=${captured-tag}" >> $GITHUB_ENV
+            echo "dash_twin_pr_tag=${captured_tag}" >> $GITHUB_ENV
           fi
           # Check if Tyk-Pump image twin PR exists
-          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-pump:${captured-tag}" &> /dev/null; then
+          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-pump:${captured_tag}" &> /dev/null; then
             echo "Pump Image exists."
-            echo "pump_twin_pr_tag=${captured-tag}" >> $GITHUB_ENV
+            echo "pump_twin_pr_tag=${captured_tag}" >> $GITHUB_ENV
           fi
           # Check if Tyk-Sink image twin PR exists
-          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-pump:${captured-tag}" &> /dev/null; then
+          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-pump:${captured_tag}" &> /dev/null; then
             echo "MDCB Image exists."
-            echo "sink_twin_pr_tag=${captured-tag}" >> $GITHUB_ENV
+            echo "sink_twin_pr_tag=${captured_tag}" >> $GITHUB_ENV
           fi
           # Check if Tyk-Automated-tests image twin PR exists
-          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${captured-tag}" &> /dev/null; then
+          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${captured_tag}" &> /dev/null; then
             echo "Tyk Automated Tests Image exists."
-            echo "tat_twin_pr_tag=${captured-tag}" >> $GITHUB_ENV
+            echo "tat_twin_pr_tag=${captured_tag}" >> $GITHUB_ENV
           fi
 
 
