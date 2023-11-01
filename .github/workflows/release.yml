@@ -238,7 +238,7 @@ jobs:
         id: check-docker-images
         if: github.event_name == 'pull_request' && needs.goreleaser.outputs.captured-tag != ''
         env:
-          captured-tag: needs.goreleaser.outputs.captured-tag
+          captured-tag: ${{ needs.goreleaser.outputs.captured-tag }}
         run: |
           # Check if Tyk-Anaytics image twin PR exists
           if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-analytics:${captured-tag}" &> /dev/null; then
