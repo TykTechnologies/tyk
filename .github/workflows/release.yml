@@ -240,26 +240,40 @@ jobs:
         env:
           captured-tag: needs.goreleaser.outputs.captured-tag
         run: |
-          # Check if the image exists
-          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk:${env.captured-tag}" &> /dev/null; then
-            echo "Image exists."
-            echo "gw_dash_image_captured_tag=${env.captured-tag}"
-          else
-            echo "Image does not exist."
+          # Check if Tyk-Anaytics image twin PR exists
+          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-analytics:${captured-tag}" &> /dev/null; then
+            echo "Dashboard Image exists."
+            echo "dash_twin_pr_tag=${captured-tag}" >> $GITHUB_ENV
           fi
+          # Check if Tyk-Pump image twin PR exists
+          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-pump:${captured-tag}" &> /dev/null; then
+            echo "Pump Image exists."
+            echo "pump_twin_pr_tag=${captured-tag}" >> $GITHUB_ENV
+          fi
+          # Check if Tyk-Sink image twin PR exists
+          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-pump:${captured-tag}" &> /dev/null; then
+            echo "MDCB Image exists."
+            echo "sink_twin_pr_tag=${captured-tag}" >> $GITHUB_ENV
+          fi
+          # Check if Tyk-Automated-tests image twin PR exists
+          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${captured-tag}" &> /dev/null; then
+            echo "Tyk Automated Tests Image exists."
+            echo "tat_twin_pr_tag=${captured-tag}" >> $GITHUB_ENV
+          fi
+
 
       - name: env up
         shell: bash
         working-directory: tyk-automated-tests/ci/auto
         id: env_up
         env:
-          captured-tag: ${{ needs.goreleaser.outputs.captured-tag || '' }}
           t: ${{ needs.goreleaser.outputs.tags }}
           pull_policy: 'if_not_present'
           # gw and dash use the same branch names
-          gw_dash_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk' || github.repository == 'TykTechnologies/tyk-analytics') && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
-          pump_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-pump' && startsWith(github.ref_name, 'release-') ) && github.ref_name || env.captured-tag || 'master' }}
-          sink_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-sink' && startsWith(github.ref_name, 'release-') ) && github.ref_name || env.captured-tag ||'master' }}
+          gw_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk' ) && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
+          dash_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk-analytics') && startsWith(github.ref_name, 'release-') ) && github.ref_name || env.dash_twin_pr_tag || 'master' }}
+          pump_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-pump' && startsWith(github.ref_name, 'release-') ) && github.ref_name || env.pump_twin_pr_tag || 'master' }}
+          sink_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-sink' && startsWith(github.ref_name, 'release-') ) && github.ref_name || env.sink_twin_pr_tag ||'master' }}
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
@@ -269,8 +283,8 @@ jobs:
           echo First tag: ${tags[0]}
           # Start customising the env
           echo "registry=${{ steps.ecr.outputs.registry }}
-          tyk_image=\${registry}/tyk:${gw_dash_image_tag}
-          tyk_analytics_image=\${registry}/tyk-analytics:${gw_dash_image_tag}
+          tyk_image=\${registry}/tyk:${gw_image_tag}
+          tyk_analytics_image=\${registry}/tyk-analytics:${dash_image_tag}
           tyk_sink_image=\${registry}/tyk-sink:${sink_image_tag}
           tyk_pump_image=\${registry}/tyk-pump:${pump_image_tag}
           # override default above with just built tag
@@ -291,11 +305,9 @@ jobs:
 
       - name: Run tests
         working-directory: tyk-automated-tests/ci/auto
-        env:
-          captured-tag: ${{ needs.goreleaser.outputs.captured-tag || '' }}
         run: |
           docker run --rm --network auto_default --env-file pytest.env \
-          ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || env.captured-tag || 'master' }} \
+          ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || env.tat_twin_pr_tag || 'master' }} \
           pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}" 
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
