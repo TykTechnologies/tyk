@@ -258,6 +258,7 @@ jobs:
           docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
 
       - name: Run tests
+        id: test_execution
         working-directory: tyk-automated-tests/ci/auto
         run: |
           docker run --rm --network auto_default --env-file pytest.env -v ${{ github.workspace }}/reports:/app/reports \
