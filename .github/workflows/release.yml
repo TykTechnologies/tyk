@@ -182,7 +182,20 @@ jobs:
         db: [ "mongo44", "postgres15" ]
         include:
           - db: postgres15
+            conf: "sha256"
             markers: "and not sql"
+            msgid: "1"
+          - db: postgres15
+            conf: "murmur64"
+            markers: "and not sql"
+            msgid: "2"            
+          - db: mongo44
+            conf: "sha256"
+            msgid: "3"
+          - db: mongo44
+            conf: "murmur64"
+            msgid: "4"          
+          
 
     steps:
       - uses: actions/checkout@v3
@@ -293,6 +306,8 @@ jobs:
             Triggered by: ${{ github.event_name }} (@${{ github.actor }})
             [Execution page](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
           repo-token: ${{ secrets.ORG_GH_TOKEN }}
+          message-id: ${{ matrix.msgid }}
+          
         env:
           STATUS: "${{ steps.test_execution.outcome == 'success' && ':white_check_mark:' || ':no_entry_sign:' }}"
           
@@ -315,6 +330,13 @@ jobs:
       - name: Getting dashboard logs on failure
         if: ${{ failure() }}
         run: docker logs tyk-analytics
+
+  xray:
+    needs: api-tests
+    runs-on: ubuntu-latest
+
+    steps:
+
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
 
