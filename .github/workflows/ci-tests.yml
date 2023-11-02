@@ -32,7 +32,7 @@ jobs:
       - name: Checkout Tyk
         uses: actions/checkout@v2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Setup Golang
         uses: actions/setup-go@v2
