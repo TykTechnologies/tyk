@@ -25,7 +25,7 @@ jobs:
       fail-fast: true
       matrix:
         redis-version: [5]
-        python-version: ['3.9.17']
+        python-version: ['3.9']
         go-version: [1.19.x]
 
     steps:
@@ -52,7 +52,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install setuptools
           pip install google
-          pip install protobuf
+          pip install 'protobuf==4.24.4'
 
           make lint
           
