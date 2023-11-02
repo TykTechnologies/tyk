@@ -13,6 +13,8 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
+//TODO test error handler and check how error handler tests are written
+
 func (s *Test) TestHandleError_text_xml(t *testing.T) {
 	file := filepath.Join(s.Gw.GetConfig().TemplatePath, "error_500.xml")
 	xml := `<?xml version = "1.0" encoding = "UTF-8"?>

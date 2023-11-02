@@ -121,8 +121,14 @@ func getSessionTags(session *user.SessionState) []string {
 	return tags
 }
 
-func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *http.Response, schema string) {
+func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *http.Response, spec *APISpec) {
+	if !spec.GraphQL.Enabled || spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph {
+		return
+	}
 	logger := log.WithField("location", "recordGraphDetails")
+	if r.Body == nil {
+		return
+	}
 	body, err := io.ReadAll(r.Body)
 	defer func() {
 		_ = r.Body.Close()
@@ -132,17 +138,22 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 		logger.WithError(err).Error("error recording graph analytics")
 		return
 	}
-
-	respBody, err := io.ReadAll(resp.Body)
-	defer func() {
-		_ = resp.Body.Close()
-		r.Body = io.NopCloser(bytes.NewBuffer(respBody))
-	}()
-	if err != nil {
-		logger.WithError(err).Error("error recording graph analytics")
-		return
+	var (
+		respBody []byte
+	)
+	if resp.Body != nil {
+		httputil.RemoveResponseTransferEncoding(resp, "chunked")
+		respBody, err = io.ReadAll(resp.Body)
+		defer func() {
+			_ = resp.Body.Close()
+			resp.Body = respBodyReader(r, resp)
+		}()
+		if err != nil {
+			logger.WithError(err).Error("error recording graph analytics")
+			return
+		}
 	}
-	graphReq, err := graphql.NewRequestFromBodySchema(string(body), schema)
+	graphReq, err := graphql.NewRequestFromBodySchema(string(body), spec.GraphQL.Schema)
 	if err != nil {
 		logger.WithError(err).Error("error recording graph analytics")
 		return
@@ -289,15 +300,13 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			record.GetGeo(ip, s.Gw.Analytics.GeoIPDB)
 		}
 
+		recordGraphDetails(&record, r, responseCopy, s.Spec)
 		// skip tagging subgraph requests for graphpump, it only handles generated supergraph requests
 		if s.Spec.GraphQL.Enabled && s.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
 			record.Tags = append(record.Tags, "tyk-graph-analytics")
 			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(s.Spec.GraphQL.Schema))
 		}
 
-		if s.Spec.GraphQL.Enabled {
-			recordGraphDetails(&record, r, responseCopy, s.Spec.GraphQL.Schema)
-		}
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 
 		if s.Spec.GlobalConfig.EnforceOrgDataAge {

@@ -259,24 +259,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if len(e.Spec.Tags) > 0 {
 			tags = append(tags, e.Spec.Tags...)
 		}
-
-		rawRequest := ""
-		rawResponse := ""
-
-		if recordDetail(r, e.Spec) {
-
-			// Get the wire format representation
-
-			var wireFormatReq bytes.Buffer
-			r.Write(&wireFormatReq)
-			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
-
-			var wireFormatRes bytes.Buffer
-			response.Write(&wireFormatRes)
-			rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
-
-		}
-
 		trackEP := false
 		trackedPath := r.URL.Path
 
@@ -312,8 +294,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			OauthID:       oauthClientID,
 			RequestTime:   0,
 			Latency:       analytics.Latency{},
-			RawRequest:    rawRequest,
-			RawResponse:   rawResponse,
 			IPAddress:     ip,
 			Geo:           analytics.GeoData{},
 			Network:       analytics.NetworkStats{},
@@ -322,6 +302,26 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			TrackPath:     trackEP,
 			ExpireAt:      t,
 		}
+		recordGraphDetails(&record, r, response, e.Spec)
+
+		rawRequest := ""
+		rawResponse := ""
+		if recordDetail(r, e.Spec) {
+
+			// Get the wire format representation
+
+			var wireFormatReq bytes.Buffer
+			r.Write(&wireFormatReq)
+			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
+
+			var wireFormatRes bytes.Buffer
+			response.Write(&wireFormatRes)
+			rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+
+		}
+
+		record.RawRequest = rawRequest
+		record.RawResponse = rawResponse
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
 			record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)

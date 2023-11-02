@@ -164,7 +164,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 			},
 		},
 		{
-			name: "should read response and request with detailed recording",
+			name: "should read response and error response request with detailed recording",
 			code: http.StatusInternalServerError,
 			request: graphql.Request{
 				Query:     `{ hello(name: "World") httpMethod }`,
@@ -261,6 +261,7 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 		spec.Name = "supergraph"
 		spec.APIID = "supergraph"
 		spec.Proxy.ListenPath = "/supergraph"
+		spec.EnableDetailedRecording = true
 		spec.GraphQL = apidef.GraphQLConfig{
 			Enabled:       true,
 			ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
@@ -297,6 +298,7 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 		if record.ApiSchema != "" && found {
 			t.Error("subgraph request should not tagged or have schema")
 		}
+		assert.False(t, record.GraphQLStats.IsGraphQL)
 	}
 
 	_, err := ts.Run(t,
