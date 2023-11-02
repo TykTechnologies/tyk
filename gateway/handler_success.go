@@ -120,11 +120,11 @@ func getSessionTags(session *user.SessionState) []string {
 	return tags
 }
 
-func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, schema string, response []byte) {
+func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *http.Response, schema string) {
 	logger := log.WithField("location", "recordGraphDetails")
 	body, err := io.ReadAll(r.Body)
 	defer func() {
-		r.Body.Close()
+		_ = r.Body.Close()
 		r.Body = io.NopCloser(bytes.NewBuffer(body))
 	}()
 	if err != nil {
@@ -132,6 +132,15 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, schema 
 		return
 	}
 
+	respBody, err := io.ReadAll(resp.Body)
+	defer func() {
+		_ = resp.Body.Close()
+		r.Body = io.NopCloser(bytes.NewBuffer(respBody))
+	}()
+	if err != nil {
+		logger.WithError(err).Error("error recording graph analytics")
+		return
+	}
 	graphReq, err := graphql.NewRequestFromBodySchema(string(body), schema)
 	if err != nil {
 		logger.WithError(err).Error("error recording graph analytics")
@@ -143,7 +152,7 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, schema 
 	rec.GraphQLStats.OperationType = graphReq.OperationType()
 	rec.GraphQLStats.RootFields = graphReq.RootFields()
 	rec.GraphQLStats.Variables = string(graphReq.OriginalVariables)
-	graphErr, err := graphReq.GraphErrors(response)
+	graphErr, err := graphReq.GraphErrors(respBody)
 	if err != nil {
 		logger.WithError(err).Error("error reading graph errors")
 	}
@@ -200,7 +209,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		rawRequest := ""
 		rawResponse := ""
 
-		var responseContent []byte
 		if recordDetail(r, s.Spec) {
 			// Get the wire format representation
 			var wireFormatReq bytes.Buffer
@@ -287,7 +295,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		}
 
 		if s.Spec.GraphQL.Enabled {
-			recordGraphDetails(&record, r, s.Spec.GraphQL.Schema, responseContent)
+			recordGraphDetails(&record, r, responseCopy, s.Spec.GraphQL.Schema)
 		}
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 
@@ -313,7 +321,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		}
 
 		err := s.Gw.Analytics.RecordHit(&record)
-
 		if err != nil {
 			log.WithError(err).Error("could not store analytic record")
 		}

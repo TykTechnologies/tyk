@@ -515,7 +515,7 @@ var hopHeaders = []string{
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) ProxyResponse {
 	startTime := time.Now()
 	p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
-	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, p.TykAPISpec))
+	resp := p.WrappedServeHTTP(rw, req, true)
 
 	finishTime := time.Since(startTime)
 	p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
