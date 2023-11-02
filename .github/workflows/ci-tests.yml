@@ -30,9 +30,9 @@ jobs:
 
     steps:
       - name: Checkout Tyk
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Setup Golang
         uses: actions/setup-go@v2
@@ -52,7 +52,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install setuptools
           pip install google
-          pip install protobuf
+          pip install 'protobuf==4.24.4'
 
           make lint
           
