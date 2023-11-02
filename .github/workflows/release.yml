@@ -260,9 +260,60 @@ jobs:
       - name: Run tests
         working-directory: tyk-automated-tests/ci/auto
         run: |
-          docker run --rm --network auto_default --env-file pytest.env \
-          ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
-          pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}" 
+          docker run --rm --network auto_default --env-file pytest.env -v ${{ github.workspace }}/reports:/app/reports \
+          754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
+          pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}"
+
+      - name: Archive Integration tests report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+            name: api-test-report
+            path: ${{ github.workspace }}/reports
+    
+      # - name: Notify slack
+      #   if: ${{ always() && !github.event.pull_request.draft }}
+      #   uses: rtCamp/action-slack-notify@v2
+      #   env:
+      #     SLACK_WEBHOOK: ${{ secrets.GW_SLACK_WEBHOOK }}
+      #     SLACK_COLOR: ${{ job.status }}
+      #     SLACK_TITLE: "Result: ${{ steps.test_execution.outcome }}"
+      #     SLACK_USERNAME: API GW test automation
+      #     SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
+      
+      - name: Comment on PR
+        if: ${{ always() && !github.event.pull_request.draft }}
+        uses: mshick/add-pr-comment@v2
+        with:
+          message: |
+            **API tests result - ${{ matrix.db }}-${{ matrix.conf }} env: ${{ steps.test_execution.outcome }}** ${{ env.STATUS }} 
+            Branch used: ${{ github.ref }}
+            Commit: ${{ github.event.after }} ${{ github.event.commits[0].message }}
+            Triggered by: ${{ github.event_name }} (@${{ github.actor }})
+            [Execution page](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          repo-token: ${{ secrets.ORG_GH_TOKEN }}
+        env:
+          STATUS: "${{ steps.test_execution.outcome == 'success' && ':white_check_mark:' || ':no_entry_sign:' }}"
+          
+      # - name: Xray update
+      #   if: ${{ always() }} && github.event_name != 'pull_request'
+      #   run: |
+      #     ./update_xray.sh
+      #   working-directory: tyk-automated-tests
+      #   env:
+      #     TEST: "QA-901"
+      #     STATUS: "${{ steps.test_execution.outcome }}"
+      #     CLIENT_ID: ${{secrets.XRAY_CLIENT_ID}}
+      #     CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
+      #     BRANCH: ${{ github.ref }}
+  
+      - name: Getting gateway logs on failure
+        if: ${{ failure() }}
+        run: docker logs tyk
+
+      - name: Getting dashboard logs on failure
+        if: ${{ failure() }}
+        run: docker logs tyk-analytics
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
 
