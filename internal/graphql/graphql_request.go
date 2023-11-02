@@ -1,12 +1,14 @@
 package graphql
 
 import (
+	"strings"
+
+	"github.com/buger/jsonparser"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astparser"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/buger/jsonparser"
-	"strings"
 )
 
 type GraphRequest struct {

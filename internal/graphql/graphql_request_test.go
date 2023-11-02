@@ -1,11 +1,13 @@
 package graphql
 
 import (
-	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
-	"github.com/TykTechnologies/tyk-pump/analytics"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
+	"github.com/TykTechnologies/tyk-pump/analytics"
 )
 
 // TODO fix when input named character
