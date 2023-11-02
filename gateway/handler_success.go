@@ -140,8 +140,9 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, schema 
 
 	rec.GraphQLStats.IsGraphQL = true
 	rec.GraphQLStats.Types = graphReq.TypesAndFields()
-	rec.GraphQLStats.OperationType = graphReq.AnalyticsOperationType()
+	rec.GraphQLStats.OperationType = graphReq.OperationType()
 	rec.GraphQLStats.RootFields = graphReq.RootFields()
+	rec.GraphQLStats.Variables = string(graphReq.OriginalVariables)
 	graphErr, err := graphReq.GraphErrors(response)
 	if err != nil {
 		logger.WithError(err).Error("error reading graph errors")

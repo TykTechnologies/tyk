@@ -111,6 +111,76 @@ func TestRecordDetail(t *testing.T) {
 	}
 }
 
+func TestAnalyticRecord_GraphStats(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiDef := BuildAPI(func(spec *APISpec) {
+		spec.Name = "graphql API"
+		spec.APIID = "graphql-api"
+		spec.Proxy.TargetURL = testGraphQLProxyUpstream
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeProxyOnly,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlProxyUpstreamSchema,
+		}
+	})[0]
+
+	testCases := []struct {
+		name      string
+		request   graphql.Request
+		checkFunc func(*testing.T, *analytics.AnalyticsRecord)
+	}{
+		{
+			name: "successfully generate stats",
+			request: graphql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			},
+			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				assert.True(t, record.GraphQLStats.IsGraphQL)
+				assert.False(t, record.GraphQLStats.HasErrors)
+				assert.Equal(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
+				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
+				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
+			},
+		},
+		{
+			name: "should have variables",
+			request: graphql.Request{
+				Query:     `{ hello(name: "World") httpMethod }`,
+				Variables: []byte(`{"in":"hello"}`),
+			},
+			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				assert.True(t, record.GraphQLStats.IsGraphQL)
+				assert.False(t, record.GraphQLStats.HasErrors)
+				assert.Equal(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
+				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
+				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
+				assert.Equal(t, `{"in":"hello"}`, record.GraphQLStats.Variables)
+			},
+		},
+	}
+
+	// TODO add test case for errors by checking if there is an available target url that returns graph errorrs in the gql_tests file
+	ts.Gw.Analytics.mockEnabled = true
+	ts.Gw.LoadAPI(apiDef)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
+				tc.checkFunc(t, record)
+			}
+			_, err := ts.Run(t, test.TestCase{
+				Data:   tc.request,
+				Method: http.MethodPost,
+				Code:   http.StatusOK,
+			})
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

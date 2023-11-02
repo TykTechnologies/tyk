@@ -12,9 +12,10 @@ import (
 type GraphRequest struct {
 	graphql.Request
 
-	operationRef int
-	requestDoc   *ast.Document
-	schema       *ast.Document
+	operationRef      int
+	requestDoc        *ast.Document
+	schema            *ast.Document
+	OriginalVariables []byte
 }
 
 func NewRequestFromBodySchema(rawRequest, schema string) (*GraphRequest, error) {
@@ -22,6 +23,7 @@ func NewRequestFromBodySchema(rawRequest, schema string) (*GraphRequest, error) 
 	if err := graphql.UnmarshalRequest(strings.NewReader(rawRequest), &gqlRequest); err != nil {
 		return nil, err
 	}
+	originalVariables := gqlRequest.Variables
 
 	requestDoc, opReport := astparser.ParseGraphqlDocumentString(gqlRequest.Query)
 	if opReport.HasErrors() {
@@ -47,10 +49,11 @@ func NewRequestFromBodySchema(rawRequest, schema string) (*GraphRequest, error) 
 	}
 
 	return &GraphRequest{
-		Request:      gqlRequest,
-		operationRef: ast.InvalidRef,
-		requestDoc:   &requestDoc,
-		schema:       &schemaDoc,
+		Request:           gqlRequest,
+		operationRef:      ast.InvalidRef,
+		requestDoc:        &requestDoc,
+		schema:            &schemaDoc,
+		OriginalVariables: originalVariables,
 	}, nil
 }
 
