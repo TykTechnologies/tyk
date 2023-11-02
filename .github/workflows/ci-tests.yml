@@ -31,6 +31,8 @@ jobs:
     steps:
       - name: Checkout Tyk
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Setup Golang
         uses: actions/setup-go@v2
