@@ -146,6 +146,9 @@ func (g *GraphStatsExtractionVisitor) ExtractStats(rawRequest, response, schema 
 }
 
 func (g *GraphStatsExtractionVisitor) AnalyticsOperationTypes() analytics.GraphQLOperations {
+	if g.gqlRequest == nil {
+		return analytics.OperationUnknown
+	}
 	op, _ := g.gqlRequest.OperationType()
 	switch op {
 	case graphql.OperationTypeQuery:

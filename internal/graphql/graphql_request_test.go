@@ -252,12 +252,10 @@ func TestGraphRequest_GraphErrors(t *testing.T) {
 		},
 	}
 
-	request := `{"query":"query {\n  characters(filter: {}) {\n    \n  }\n}\n\n"}`
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			req, err := NewRequestFromBodySchema(request, validSchema)
-			require.NoError(t, err)
-			gotten, err := req.GraphErrors([]byte(test.response))
+			extractor := NewGraphStatsExtractor()
+			gotten, err := extractor.GraphErrors([]byte(test.response))
 			if test.hasError {
 				assert.Error(t, err)
 			} else {
@@ -303,9 +301,10 @@ func TestGraphRequest_OperationType(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			req, err := NewRequestFromBodySchema(test.request, validSchema)
+			extractor := NewGraphStatsExtractor()
+			_, err := extractor.ExtractStats(test.request, "", validSchema)
 			require.NoError(t, err)
-			gotten := req.OperationType()
+			gotten := extractor.AnalyticsOperationTypes()
 			assert.Equal(t, test.expected, gotten)
 		})
 	}
