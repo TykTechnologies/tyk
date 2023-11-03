@@ -1703,6 +1703,13 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 			// Load Version Data - General
 			var ok bool
 			if version, ok = a.VersionData.Versions[vName]; !ok {
+				if a.VersionDefinition.FallbackToDefault {
+					log.Debugf("fallback to default version: %s", a.VersionData.DefaultVersion)
+					if version, ok = a.VersionData.Versions[a.VersionData.DefaultVersion]; ok {
+						return &version, StatusOk
+					}
+				}
+
 				return &version, VersionDoesNotExist
 			}
 		}
