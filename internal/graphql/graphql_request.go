@@ -2,10 +2,11 @@ package graphql
 
 import (
 	"bytes"
+	"strings"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astnormalization"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astvisitor"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
-	"strings"
 
 	"github.com/buger/jsonparser"
 
