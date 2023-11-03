@@ -82,6 +82,7 @@ require (
 require (
 	github.com/TykTechnologies/kin-openapi v0.90.0
 	github.com/TykTechnologies/opentelemetry v0.0.20
+	github.com/google/go-cmp v0.5.9
 	go.opentelemetry.io/otel v1.19.0
 	go.opentelemetry.io/otel/trace v1.19.0
 )

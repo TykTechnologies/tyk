@@ -142,6 +142,7 @@ func (g *GraphStatsExtractionVisitor) ExtractStats(rawRequest, response, schema 
 		})
 	}
 	stats.HasErrors = len(stats.Errors) > 0
+	stats.Variables = string(g.gqlRequest.Variables)
 	return stats, nil
 }
 

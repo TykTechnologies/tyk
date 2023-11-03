@@ -1,6 +1,8 @@
 package graphql
 
 import (
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -123,7 +125,7 @@ func TestGraphStatsExtractionVisitor_ExtractStats(t *testing.T) {
 		{
 			name:     "should successfully parse",
 			schema:   validSchema,
-			request:  `{"query":"query{\n  characters(filter: {\n    \n  }){\n    info{\n      count\n    }\n  }\n}"}`,
+			request:  `{"query":"query{\n  characters(filter: {\n    \n  }){\n    info{\n      count\n    }\n  }\n}","variables":{"in":"hello"}}`,
 			response: `{"errors":[{"message":"Name for character with ID 1002 could not be fetched.","locations":[{"line":6,"column":7}],"path":["hero","heroFriends",1,"name"]}]}`,
 			expected: analytics.GraphQLStats{
 				Types: map[string][]string{
@@ -139,6 +141,7 @@ func TestGraphStatsExtractionVisitor_ExtractStats(t *testing.T) {
 					},
 				},
 				IsGraphQL: true,
+				Variables: `{"in":"hello"}`,
 			},
 		},
 		{
@@ -211,8 +214,10 @@ func TestGraphStatsExtractionVisitor_ExtractStats(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, test.expected, stats)
-
+			assert.True(t, stats.IsGraphQL)
+			if diff := cmp.Diff(test.expected, stats, cmpopts.SortSlices(func(a, b string) bool { return a < b })); diff != "" {
+				t.Fatal(diff)
+			}
 		})
 	}
 }

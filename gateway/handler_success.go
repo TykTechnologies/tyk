@@ -153,30 +153,14 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 			return
 		}
 	}
-	graphReq, err := graphql.NewRequestFromBodySchema(string(body), spec.GraphQL.Schema)
+
+	extractor := graphql.NewGraphStatsExtractor()
+	stats, err := extractor.ExtractStats(string(body), string(respBody), spec.GraphQL.Schema)
 	if err != nil {
 		logger.WithError(err).Error("error recording graph analytics")
 		return
 	}
-
-	rec.GraphQLStats.IsGraphQL = true
-	rec.GraphQLStats.Types = graphReq.TypesAndFields()
-	rec.GraphQLStats.OperationType = graphReq.OperationType()
-	rec.GraphQLStats.RootFields = graphReq.RootFields()
-	rec.GraphQLStats.Variables = string(graphReq.OriginalVariables)
-	graphErr, err := graphReq.GraphErrors(respBody)
-	if err != nil {
-		logger.WithError(err).Error("error reading graph errors")
-	}
-	if len(graphErr) > 0 {
-		rec.GraphQLStats.HasErrors = true
-		rec.GraphQLStats.Errors = make([]analytics.GraphError, len(graphErr))
-		for i, e := range graphErr {
-			rec.GraphQLStats.Errors[i] = analytics.GraphError{
-				Message: e,
-			}
-		}
-	}
+	rec.GraphQLStats = stats
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response) {
