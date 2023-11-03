@@ -1,6 +1,10 @@
 package graphql
 
 import (
+	"bytes"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/astnormalization"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/astvisitor"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"strings"
 
 	"github.com/buger/jsonparser"
@@ -10,6 +14,108 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk-pump/analytics"
 )
+
+type GraphStatsExtractionVisitor struct {
+	OriginalVariables []byte
+
+	walker *astvisitor.Walker
+
+	gqlRequest *graphql.Request
+	operation  *ast.Document
+	schema     *ast.Document
+
+	skipOperation bool
+
+	typesFields map[string][]string
+	rootFields  map[string]struct{}
+}
+
+func (g *GraphStatsExtractionVisitor) EnterOperationDefinition(ref int) {
+	if g.gqlRequest.OperationName == "" && ref == 0 {
+		g.skipOperation = false
+		return
+	} else if g.gqlRequest.OperationName == "" && ref != 0 {
+		g.skipOperation = true
+		return
+	}
+
+	opName := g.operation.OperationDefinitionNameBytes(ref)
+	g.skipOperation = !bytes.Equal(opName, []byte(g.gqlRequest.OperationName))
+}
+
+func NewGraphStatsExtractor() *GraphStatsExtractionVisitor {
+	walker := astvisitor.NewWalker(48)
+	extractor := &GraphStatsExtractionVisitor{
+		walker:      &walker,
+		typesFields: make(map[string][]string),
+		rootFields:  make(map[string]struct{}),
+	}
+	walker.RegisterEnterOperationVisitor(extractor)
+	walker.RegisterEnterFieldVisitor(extractor)
+	return extractor
+}
+
+func (g *GraphStatsExtractionVisitor) ExtractStats(rawRequest, schema string) (analytics.GraphQLStats, error) {
+	var stats analytics.GraphQLStats
+	var gqlRequest graphql.Request
+	if err := graphql.UnmarshalRequest(strings.NewReader(rawRequest), &gqlRequest); err != nil {
+		return stats, err
+	}
+	g.gqlRequest = &gqlRequest
+
+	// generate request and schema doc
+	requestDoc, opReport := astparser.ParseGraphqlDocumentString(g.gqlRequest.Query)
+	if opReport.HasErrors() {
+		return stats, opReport
+	}
+	g.operation = &requestDoc
+
+	sh, err := graphql.NewSchemaFromString(schema)
+	if err != nil {
+		return stats, err
+	}
+	schemaDoc, opReport := astparser.ParseGraphqlDocumentBytes(sh.Document())
+	if opReport.HasErrors() {
+		return stats, opReport
+	}
+	g.schema = &schemaDoc
+
+	// normalize and extract fragments
+	var report operationreport.Report
+	normalizer := astnormalization.NewNormalizer(true, false)
+	if g.gqlRequest.OperationName != "" {
+		normalizer.NormalizeNamedOperation(g.operation, g.schema, []byte(g.gqlRequest.OperationName), &report)
+	} else {
+		normalizer.NormalizeOperation(g.operation, g.schema, &report)
+	}
+	if report.HasErrors() {
+		return stats, report
+	}
+
+	g.walker.Walk(g.operation, g.schema, &report)
+	if report.HasErrors() {
+		return stats, report
+	}
+
+	stats.Types = g.typesFields
+	for key := range g.rootFields {
+		stats.RootFields = append(stats.RootFields, key)
+	}
+	return stats, nil
+}
+
+func (g *GraphStatsExtractionVisitor) EnterField(ref int) {
+	if g.skipOperation {
+		return
+	}
+	fieldName := g.operation.FieldNameString(ref)
+	parent := g.schema.NodeNameBytes(g.walker.EnclosingTypeDefinition)
+	if bytes.Equal(parent, g.schema.Index.QueryTypeName) || bytes.Equal(parent, g.schema.Index.MutationTypeName) || bytes.Equal(parent, g.schema.Index.SubscriptionTypeName) {
+		g.rootFields[fieldName] = struct{}{}
+		return
+	}
+	g.typesFields[string(parent)] = append(g.typesFields[string(parent)], fieldName)
+}
 
 type GraphRequest struct {
 	graphql.Request

@@ -13,11 +13,11 @@ import (
 // TODO fix when input named character
 const validSchema = `
 schema {
-  query: Query
+  query: Que
   mutation: CustomMutation
 }
 
-type Query {
+type Que {
   characters(filter: FilterCharacter, page: Int): Characters
   listCharacters(): [Characters]!
 }
@@ -111,6 +111,38 @@ schema {
   query: Query
   mutation: CustomMutation
 `
+
+func TestGraphStatsExtractionVisitor_ExtractStats(t *testing.T) {
+	testCases := []struct {
+		name               string
+		request            string
+		schema             string
+		expectedFields     map[string][]string
+		expectedRootFields []string
+	}{
+		{
+			name:    "should successfully parse",
+			schema:  validSchema,
+			request: `{"query":"query{\n  characters(filter: {\n    \n  }){\n    info{\n      count\n    }\n  }\n}"}`,
+			expectedFields: map[string][]string{
+				"Characters": {"info"},
+				"Info":       {"count"},
+			},
+			expectedRootFields: []string{"characters"},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			extractor := NewGraphStatsExtractor()
+			stats, err := extractor.ExtractStats(test.request, test.schema)
+			require.NoError(t, err)
+			assert.Equal(t, test.expectedFields, stats.Types)
+			assert.Equal(t, test.expectedRootFields, stats.RootFields)
+
+		})
+	}
+}
 
 func TestNewRequestFromBodySchema(t *testing.T) {
 	testCases := []struct {
