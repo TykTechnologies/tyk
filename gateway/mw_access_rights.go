@@ -51,6 +51,14 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
+	if a.Spec.VersionDefinition.FallbackToDefault && targetVersion != a.Spec.VersionData.DefaultVersion {
+		for _, vName := range versionList.Versions {
+			if vName == a.Spec.VersionData.DefaultVersion {
+				return nil, http.StatusOK
+			}
+		}
+	}
+
 	a.Logger().Info("Attempted access to unauthorised API version.")
 	return errors.New("Access to this API has been disallowed"), http.StatusForbidden
 }
