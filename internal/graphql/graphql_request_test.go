@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
 	"github.com/TykTechnologies/tyk-pump/analytics"
 )
 
@@ -114,48 +113,33 @@ schema {
 
 func TestGraphStatsExtractionVisitor_ExtractStats(t *testing.T) {
 	testCases := []struct {
-		name               string
-		request            string
-		schema             string
-		expectedFields     map[string][]string
-		expectedRootFields []string
-	}{
-		{
-			name:    "should successfully parse",
-			schema:  validSchema,
-			request: `{"query":"query{\n  characters(filter: {\n    \n  }){\n    info{\n      count\n    }\n  }\n}"}`,
-			expectedFields: map[string][]string{
-				"Characters": {"info"},
-				"Info":       {"count"},
-			},
-			expectedRootFields: []string{"characters"},
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			extractor := NewGraphStatsExtractor()
-			stats, err := extractor.ExtractStats(test.request, test.schema)
-			require.NoError(t, err)
-			assert.Equal(t, test.expectedFields, stats.Types)
-			assert.Equal(t, test.expectedRootFields, stats.RootFields)
-
-		})
-	}
-}
-
-func TestNewRequestFromBodySchema(t *testing.T) {
-	testCases := []struct {
 		name        string
-		expectError bool
 		request     string
+		response    string
 		schema      string
+		expectError bool
+		expected    analytics.GraphQLStats
 	}{
 		{
-			name:        "successfully generate request",
-			expectError: false,
-			request:     `{"query":"query{\n  characters(filter: {\n    \n  }){\n    info{\n      count\n    }\n  }\n}"}`,
-			schema:      validSchema,
+			name:     "should successfully parse",
+			schema:   validSchema,
+			request:  `{"query":"query{\n  characters(filter: {\n    \n  }){\n    info{\n      count\n    }\n  }\n}"}`,
+			response: `{"errors":[{"message":"Name for character with ID 1002 could not be fetched.","locations":[{"line":6,"column":7}],"path":["hero","heroFriends",1,"name"]}]}`,
+			expected: analytics.GraphQLStats{
+				Types: map[string][]string{
+					"Characters": {"info"},
+					"Info":       {"count"},
+				},
+				RootFields:    []string{"characters"},
+				OperationType: analytics.OperationQuery,
+				HasErrors:     true,
+				Errors: []analytics.GraphError{
+					{
+						Message: "Name for character with ID 1002 could not be fetched.",
+					},
+				},
+				IsGraphQL: true,
+			},
 		},
 		{
 			name:        "error for invalid request",
@@ -164,7 +148,7 @@ func TestNewRequestFromBodySchema(t *testing.T) {
 			schema:      validSchema,
 		},
 		{
-			name:        "error from invalid schema",
+			name:        "error for invalid schema",
 			request:     `{"query":"query{\n  characters(filter: {\n    \n  }){\n    info{\n      count\n    }\n  }\n}"}`,
 			expectError: true,
 			schema:      invalidSchema,
@@ -187,86 +171,48 @@ func TestNewRequestFromBodySchema(t *testing.T) {
 			expectError: true,
 			schema:      noSchema,
 		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			req, err := NewRequestFromBodySchema(test.request, test.schema)
-			if test.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, req.schema)
-				assert.NotNil(t, req.requestDoc)
-				assert.Equal(t, req.operationRef, ast.InvalidRef)
-			}
-		})
-	}
-	t.Run("error from incomplete schema", func(t *testing.T) {
-		rawRequest := `{"query":"query{\n  characters(filter: {\n    \n  }){\n    info{\n      count\n    }\n  }\n}"}`
-		_, err := NewRequestFromBodySchema(rawRequest, noSchema)
-		assert.Error(t, err)
-	})
-}
-
-func TestGraphRequest_RootFields(t *testing.T) {
-	testCases := []struct {
-		name             string
-		request          string
-		expectedResponse []string
-	}{
 		{
-			name:             "should return root fields",
-			request:          `{"query":"query {\n  characters(filter: {}) {\n    \n  }\n}\n\n"}`,
-			expectedResponse: []string{"characters"},
-		},
-		{
-			name:             "should return multiple root fields",
-			request:          `{"query":"query {\n  characters(filter: {}) {\n    info {\n      count\n    }\n  }\n  listCharacters {\n    secondInfo\n  }\n}\n\n"}`,
-			expectedResponse: []string{"characters", "listCharacters"},
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			req, err := NewRequestFromBodySchema(test.request, validSchema)
-			require.NoError(t, err)
-			gotten := req.RootFields()
-			assert.Equal(t, test.expectedResponse, gotten)
-		})
-	}
-}
-
-func TestGraphRequest_TypesAndFields(t *testing.T) {
-	testCases := []struct {
-		name             string
-		request          string
-		expectedResponse map[string][]string
-	}{
-		{
-			name:    "should get all types and fields single",
-			request: `{"query":"query {\n  characters {\n    info {\n      count\n    }\n  }\n}"}`,
-			expectedResponse: map[string][]string{
-				"Characters": []string{"info"},
-				"Info":       []string{"count"},
+			name:    "should return multiple root fields",
+			request: `{"query":"query {\n  characters(filter: {}) {\n    info {\n      count\n    }\n  }\n  listCharacters {\n    secondInfo\n  }\n}\n\n"}`,
+			expected: analytics.GraphQLStats{
+				RootFields: []string{"listCharacters", "characters"},
+				Types: map[string][]string{
+					"Characters": {"info", "secondInfo"},
+					"Info":       {"count"},
+				},
+				IsGraphQL:     true,
+				OperationType: analytics.OperationQuery,
 			},
+			schema: validSchema,
 		},
 		{
 			request: `{"query":"mutation second{\n changeCharacter\n}\n\n query main{\n characters{\n info{\n count\n }\n }\n}","operationName":"main"}`,
 			name:    "should get all types for multiple operations",
-			expectedResponse: map[string][]string{
-				"Characters": []string{"info"},
-				"Info":       []string{"count"},
+			expected: analytics.GraphQLStats{
+				Types: map[string][]string{
+					"Characters": []string{"info"},
+					"Info":       []string{"count"},
+				},
+				RootFields:    []string{"characters"},
+				OperationType: analytics.OperationQuery,
+				IsGraphQL:     true,
+				HasErrors:     false,
 			},
+			schema: validSchema,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			req, err := NewRequestFromBodySchema(test.request, validSchema)
+			extractor := NewGraphStatsExtractor()
+			stats, err := extractor.ExtractStats(test.request, test.response, test.schema)
+			if test.expectError {
+				assert.Error(t, err)
+				return
+			}
 			require.NoError(t, err)
-			gotten := req.TypesAndFields()
-			assert.Equal(t, test.expectedResponse, gotten)
+			assert.Equal(t, test.expected, stats)
+
 		})
 	}
 }
@@ -361,39 +307,6 @@ func TestGraphRequest_OperationType(t *testing.T) {
 			require.NoError(t, err)
 			gotten := req.OperationType()
 			assert.Equal(t, test.expected, gotten)
-		})
-	}
-}
-
-func TestGraphRequest_SchemaRootOperationTypeName(t *testing.T) {
-	testCases := []struct {
-		name             string
-		request          string
-		expectedResponse string
-	}{
-		{
-			name:             "should return query",
-			request:          `{"query":"query {\n  characters(filter: {}) {\n    \n  }\n}\n\n"}`,
-			expectedResponse: "Query",
-		},
-		{
-			name:             "should return mutation",
-			request:          `{"query":"mutation {\n  changeCharacter\n}"}`,
-			expectedResponse: "CustomMutation",
-		},
-		{
-			name:             "should return subscription",
-			request:          `{"query":"subscription {\n  listenCharacter {\n    secondInfo\n  }\n}"}`,
-			expectedResponse: "Subscription",
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			req, err := NewRequestFromBodySchema(test.request, validSchema)
-			require.NoError(t, err)
-			gotten := req.schemaRootOperationTypeName()
-			assert.Equal(t, test.expectedResponse, gotten)
 		})
 	}
 }

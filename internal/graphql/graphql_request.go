@@ -25,6 +25,7 @@ type GraphStatsExtractionVisitor struct {
 	schema     *ast.Document
 
 	skipOperation bool
+	operationRef  int
 
 	typesFields map[string][]string
 	rootFields  map[string]struct{}
@@ -33,6 +34,7 @@ type GraphStatsExtractionVisitor struct {
 func (g *GraphStatsExtractionVisitor) EnterOperationDefinition(ref int) {
 	if g.gqlRequest.OperationName == "" && ref == 0 {
 		g.skipOperation = false
+		g.operationRef = ref
 		return
 	} else if g.gqlRequest.OperationName == "" && ref != 0 {
 		g.skipOperation = true
@@ -40,22 +42,52 @@ func (g *GraphStatsExtractionVisitor) EnterOperationDefinition(ref int) {
 	}
 
 	opName := g.operation.OperationDefinitionNameBytes(ref)
-	g.skipOperation = !bytes.Equal(opName, []byte(g.gqlRequest.OperationName))
+	if bytes.Equal(opName, []byte(g.gqlRequest.OperationName)) {
+		g.skipOperation = false
+		g.operationRef = ref
+	} else {
+		g.skipOperation = true
+	}
 }
 
 func NewGraphStatsExtractor() *GraphStatsExtractionVisitor {
 	walker := astvisitor.NewWalker(48)
 	extractor := &GraphStatsExtractionVisitor{
-		walker:      &walker,
-		typesFields: make(map[string][]string),
-		rootFields:  make(map[string]struct{}),
+		walker:       &walker,
+		typesFields:  make(map[string][]string),
+		rootFields:   make(map[string]struct{}),
+		operationRef: ast.InvalidRef,
 	}
 	walker.RegisterEnterOperationVisitor(extractor)
 	walker.RegisterEnterFieldVisitor(extractor)
 	return extractor
 }
 
-func (g *GraphStatsExtractionVisitor) ExtractStats(rawRequest, schema string) (analytics.GraphQLStats, error) {
+func (g *GraphStatsExtractionVisitor) GraphErrors(response []byte) ([]string, error) {
+	errors := make([]string, 0)
+	errBytes, t, _, err := jsonparser.Get(response, "errors")
+	// check if the errors key exists in the response
+	if err != nil {
+		if err == jsonparser.KeyPathNotFoundError {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if t != jsonparser.NotExist {
+		if _, err := jsonparser.ArrayEach(errBytes, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+			message, err := jsonparser.GetString(value, "message")
+			if err != nil {
+				return
+			}
+			errors = append(errors, message)
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return errors, nil
+}
+
+func (g *GraphStatsExtractionVisitor) ExtractStats(rawRequest, response, schema string) (analytics.GraphQLStats, error) {
 	var stats analytics.GraphQLStats
 	var gqlRequest graphql.Request
 	if err := graphql.UnmarshalRequest(strings.NewReader(rawRequest), &gqlRequest); err != nil {
@@ -97,11 +129,34 @@ func (g *GraphStatsExtractionVisitor) ExtractStats(rawRequest, schema string) (a
 		return stats, report
 	}
 
+	stats.IsGraphQL = true
 	stats.Types = g.typesFields
 	for key := range g.rootFields {
 		stats.RootFields = append(stats.RootFields, key)
 	}
+	stats.OperationType = g.AnalyticsOperationTypes()
+	graphErrors, err := g.GraphErrors([]byte(response))
+	for _, e := range graphErrors {
+		stats.Errors = append(stats.Errors, analytics.GraphError{
+			Message: e,
+		})
+	}
+	stats.HasErrors = len(stats.Errors) > 0
 	return stats, nil
+}
+
+func (g *GraphStatsExtractionVisitor) AnalyticsOperationTypes() analytics.GraphQLOperations {
+	op, _ := g.gqlRequest.OperationType()
+	switch op {
+	case graphql.OperationTypeQuery:
+		return analytics.OperationQuery
+	case graphql.OperationTypeMutation:
+		return analytics.OperationMutation
+	case graphql.OperationTypeSubscription:
+		return analytics.OperationSubscription
+	default:
+		return analytics.OperationUnknown
+	}
 }
 
 func (g *GraphStatsExtractionVisitor) EnterField(ref int) {
