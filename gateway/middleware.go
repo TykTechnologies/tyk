@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -410,7 +411,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 
 	for _, polID := range policyIDs {
-		policy, ok := lookupMap[polID]
+		originalPolicy, ok := lookupMap[polID]
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
@@ -420,6 +421,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 			return err
 		}
+
+		policyInBytes, _ := json.Marshal(originalPolicy)
+		var policy user.Policy
+		_ = json.Unmarshal(policyInBytes, &policy)
+
 		// Check ownership, policy org owner must be the same as API,
 		// otherwise you could overwrite a session key with a policy from a different org!
 		if t.Spec != nil && policy.OrgID != t.Spec.OrgID {
