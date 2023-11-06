@@ -33,6 +33,7 @@ import (
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/context"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
@@ -1018,10 +1019,9 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 	}
 	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 
-	s.gwMu.Lock()
 	s.Gw = NewGateway(gwConfig, ctx, cancelFn)
 	s.Gw.setTestMode(true)
-	s.gwMu.Unlock()
+	s.Gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
 	s.MockHandle = MockHandle
 
@@ -1067,6 +1067,7 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 		Handler:        s.TestServerRouter,
 		ReadTimeout:    1 * time.Second,
 		WriteTimeout:   1 * time.Second,
+		ConnState:      s.Gw.ConnectionWatcher.OnStateChange,
 		MaxHeaderBytes: 1 << 20,
 	}
 
