@@ -20,11 +20,8 @@ import (
 	"strings"
 	"sync"
 
-<<<<<<< HEAD
 	"github.com/TykTechnologies/tyk/internal/crypto"
-=======
 	"github.com/TykTechnologies/tyk/internal/httputil"
->>>>>>> 3b1379e4... [TT-9284] Ensure that old transport will close idle connections (#5231)
 
 	"sync/atomic"
 	textTemplate "text/template"
