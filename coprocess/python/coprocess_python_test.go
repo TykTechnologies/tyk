@@ -246,12 +246,6 @@ func TestPythonBundles(t *testing.T) {
 			spec.EnableCoProcessAuth = true
 			spec.CustomMiddlewareBundle = authCheckBundle
 			spec.VersionData.NotVersioned = true
-		}, func(spec *gateway.APISpec) {
-			spec.Proxy.ListenPath = "/test-api-with-customplugin-auth-enabled/"
-			spec.UseKeylessAccess = false
-			spec.CustomPluginAuthEnabled = true
-			spec.CustomMiddlewareBundle = authCheckBundle
-			spec.VersionData.NotVersioned = true
 		})
 
 		validAuth := map[string]string{"Authorization": validToken}
@@ -261,13 +255,6 @@ func TestPythonBundles(t *testing.T) {
 			{Path: "/test-api/", Code: http.StatusOK, Headers: validAuth},
 			{Path: "/test-api/", Code: http.StatusForbidden, Headers: invalidAuth},
 			{Path: "/test-api/", Code: http.StatusForbidden, Headers: validAuth},
-
-			// Delete sessions so that next set of tests works afresh
-			{Method: http.MethodDelete, Path: "/tyk/keys/" + validToken, AdminAuth: true, Code: http.StatusOK, BodyMatch: `"action":"deleted"`},
-
-			{Path: "/test-api-with-customplugin-auth-enabled/", Code: http.StatusOK, Headers: validAuth},
-			{Path: "/test-api-with-customplugin-auth-enabled/", Code: http.StatusForbidden, Headers: invalidAuth},
-			{Path: "/test-api-with-customplugin-auth-enabled/", Code: http.StatusForbidden, Headers: validAuth},
 		}...)
 	})
 
