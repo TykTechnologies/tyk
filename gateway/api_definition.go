@@ -222,7 +222,7 @@ type APISpec struct {
 		Engine       *graphql.ExecutionEngine
 		CancelV2     context.CancelFunc
 		EngineV2     *graphql.ExecutionEngineV2
-		OtelExecutor *graphqlinternal.OtelGraphqlEngineV2
+		OtelExecutor graphqlinternal.TykOtelExecutorI
 		HooksV2      struct {
 			BeforeFetchHook resolve.BeforeFetchHook
 			AfterFetchHook  resolve.AfterFetchHook

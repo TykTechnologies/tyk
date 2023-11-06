@@ -20,7 +20,17 @@ type ExecutionEngineI interface {
 	graphql.ExecutionEngineV2Executor
 }
 
-type OtelGraphqlEngineV2 struct {
+// TykOtelExecutorI is an interface that inherits ExecutionEngineI and defines Tyk/UDG
+// specific methods.
+type TykOtelExecutorI interface {
+	ExecutionEngineI
+
+	// SetContext sets the current OTel tracer context.
+	SetContext(ctx context.Context)
+}
+
+// otelGraphqlEngineV2Common is a struct that implements the common/default methods of TykOtelExecutorI interface.
+type otelGraphqlEngineV2Common struct {
 	mutex          sync.Mutex
 	traceContext   context.Context
 	tracerProvider otel.TracerProvider
@@ -29,13 +39,19 @@ type OtelGraphqlEngineV2 struct {
 	executor graphql.ExecutionEngineV2Executor
 }
 
-func (o *OtelGraphqlEngineV2) SetContext(ctx context.Context) {
+func (o *otelGraphqlEngineV2Common) SetContext(ctx context.Context) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
+
 	o.traceContext = ctx
 }
 
-func (o *OtelGraphqlEngineV2) Normalize(operation *graphql.Request) error {
+// OtelGraphqlEngineV2Detailed defines an execution engine that can be used for detailed tracing with OTel.
+type OtelGraphqlEngineV2Detailed struct {
+	otelGraphqlEngineV2Common
+}
+
+func (o *OtelGraphqlEngineV2Detailed) Normalize(operation *graphql.Request) error {
 	var operationName = "NormalizeRequest"
 	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
@@ -47,7 +63,7 @@ func (o *OtelGraphqlEngineV2) Normalize(operation *graphql.Request) error {
 	return nil
 }
 
-func (o *OtelGraphqlEngineV2) ValidateForSchema(operation *graphql.Request) error {
+func (o *OtelGraphqlEngineV2Detailed) ValidateForSchema(operation *graphql.Request) error {
 	var operationName = "ValidateRequest"
 	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
@@ -72,14 +88,14 @@ func (o *OtelGraphqlEngineV2) ValidateForSchema(operation *graphql.Request) erro
 	return nil
 }
 
-func (o *OtelGraphqlEngineV2) Setup(ctx context.Context, postProcessor *postprocess.Processor, resolveContext *resolve.Context, operation *graphql.Request, options ...graphql.ExecutionOptionsV2) {
+func (o *OtelGraphqlEngineV2Detailed) Setup(ctx context.Context, postProcessor *postprocess.Processor, resolveContext *resolve.Context, operation *graphql.Request, options ...graphql.ExecutionOptionsV2) {
 	var operationName = "SetupResolver"
 	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
 	o.engine.Setup(ctx, postProcessor, resolveContext, operation, options...)
 }
 
-func (o *OtelGraphqlEngineV2) Plan(postProcessor *postprocess.Processor, operation *graphql.Request, report *operationreport.Report) (plan.Plan, error) {
+func (o *OtelGraphqlEngineV2Detailed) Plan(postProcessor *postprocess.Processor, operation *graphql.Request, report *operationreport.Report) (plan.Plan, error) {
 	var operationName = "GeneratePlan"
 	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
@@ -91,7 +107,7 @@ func (o *OtelGraphqlEngineV2) Plan(postProcessor *postprocess.Processor, operati
 	return p, nil
 }
 
-func (o *OtelGraphqlEngineV2) Resolve(resolveContext *resolve.Context, planResult plan.Plan, writer resolve.FlushWriter) error {
+func (o *OtelGraphqlEngineV2Detailed) Resolve(resolveContext *resolve.Context, planResult plan.Plan, writer resolve.FlushWriter) error {
 	var operationName = "ResolvePlan"
 	ctx, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
@@ -103,10 +119,10 @@ func (o *OtelGraphqlEngineV2) Resolve(resolveContext *resolve.Context, planResul
 	return nil
 }
 
-func (o *OtelGraphqlEngineV2) Teardown() {
+func (o *OtelGraphqlEngineV2Detailed) Teardown() {
 }
 
-func (o *OtelGraphqlEngineV2) InputValidation(operation *graphql.Request) error {
+func (o *OtelGraphqlEngineV2Detailed) InputValidation(operation *graphql.Request) error {
 	var operationName = "InputValidation"
 	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
@@ -117,7 +133,7 @@ func (o *OtelGraphqlEngineV2) InputValidation(operation *graphql.Request) error 
 	return nil
 }
 
-func (o *OtelGraphqlEngineV2) Execute(inCtx context.Context, operation *graphql.Request, writer resolve.FlushWriter, options ...graphql.ExecutionOptionsV2) error {
+func (o *OtelGraphqlEngineV2Detailed) Execute(inCtx context.Context, operation *graphql.Request, writer resolve.FlushWriter, options ...graphql.ExecutionOptionsV2) error {
 	ctx, span := o.tracerProvider.Tracer().Start(inCtx, "GraphqlEngine")
 	defer span.End()
 	o.SetContext(ctx)
@@ -128,10 +144,12 @@ func (o *OtelGraphqlEngineV2) Execute(inCtx context.Context, operation *graphql.
 	return nil
 }
 
-func NewOtelGraphqlEngineV2(tracerProvider otel.TracerProvider, engine ExecutionEngineI) (*OtelGraphqlEngineV2, error) {
-	otelEngine := &OtelGraphqlEngineV2{
-		tracerProvider: tracerProvider,
-		engine:         engine,
+func NewOtelGraphqlEngineV2Detailed(tracerProvider otel.TracerProvider, engine ExecutionEngineI) (*OtelGraphqlEngineV2Detailed, error) {
+	otelEngine := &OtelGraphqlEngineV2Detailed{
+		otelGraphqlEngineV2Common{
+			tracerProvider: tracerProvider,
+			engine:         engine,
+		},
 	}
 	executor, err := graphql.NewCustomExecutionEngineV2Executor(otelEngine)
 	if err != nil {
@@ -156,3 +174,5 @@ func printOperationType(operationType ast.OperationType) string {
 		return "unknown"
 	}
 }
+
+var _ TykOtelExecutorI = (*OtelGraphqlEngineV2Detailed)(nil)
