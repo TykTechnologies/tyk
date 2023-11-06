@@ -5,10 +5,11 @@ import (
 	"errors"
 	"testing"
 
-	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel/attribute"
+
+	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 )
 
 func TestOtelGraphqlEngineV2Basic_Execute(t *testing.T) {
