@@ -751,7 +751,6 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		spec.Proxy.ListenPath,
 	}
 
-<<<<<<< HEAD
 	// Register routes for each prefixe
 	for _, prefix := range prefixes {
 		subrouter := router.PathPrefix(prefix).Subrouter()
@@ -767,10 +766,6 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		// Attach handlers
 		subrouter.NewRoute().Handler(httpHandler)
 	}
-=======
-	httpHandler := explicitRouteSubpaths(spec.Proxy.ListenPath, chainObj.ThisHandler, gwConfig.HttpServerOptions.EnableStrictRoutes)
-	subrouter.NewRoute().Handler(httpHandler)
->>>>>>> 213ac5b3... [TT-9924]remove muxer, proxy from explicitRouteHandler (#5482)
 
 	return chainObj
 }
