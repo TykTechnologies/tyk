@@ -25,6 +25,7 @@ require (
 	github.com/cenk/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/clbanning/mxj v1.8.4
+	github.com/dlclark/regexp2 v1.10.0 // indirect
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
 	github.com/getkin/kin-openapi v0.115.0
