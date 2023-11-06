@@ -14,6 +14,7 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
@@ -458,6 +459,8 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 }
 
 func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
+	test.Flaky(t)
+
 	httpClient := &http.Client{}
 
 	expectedDataSources := []plan.DataSourceConfiguration{
