@@ -1,66 +1,30 @@
 package graphql
 
 import (
-	"bytes"
 	"strings"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/astnormalization"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/astvisitor"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/astparser"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 
 	"github.com/buger/jsonparser"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/astparser"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk-pump/analytics"
 )
 
 type GraphStatsExtractionVisitor struct {
-	OriginalVariables []byte
-
-	walker *astvisitor.Walker
+	extractor *graphql.Extractor
 
 	gqlRequest *graphql.Request
-	operation  *ast.Document
 	schema     *ast.Document
-
-	skipOperation bool
-	operationRef  int
-
-	typesFields map[string][]string
-	rootFields  map[string]struct{}
-}
-
-func (g *GraphStatsExtractionVisitor) EnterOperationDefinition(ref int) {
-	if g.gqlRequest.OperationName == "" && ref == 0 {
-		g.skipOperation = false
-		g.operationRef = ref
-		return
-	} else if g.gqlRequest.OperationName == "" && ref != 0 {
-		g.skipOperation = true
-		return
-	}
-
-	opName := g.operation.OperationDefinitionNameBytes(ref)
-	if bytes.Equal(opName, []byte(g.gqlRequest.OperationName)) {
-		g.skipOperation = false
-		g.operationRef = ref
-	} else {
-		g.skipOperation = true
-	}
 }
 
 func NewGraphStatsExtractor() *GraphStatsExtractionVisitor {
-	walker := astvisitor.NewWalker(48)
 	extractor := &GraphStatsExtractionVisitor{
-		walker:       &walker,
-		typesFields:  make(map[string][]string),
-		rootFields:   make(map[string]struct{}),
-		operationRef: ast.InvalidRef,
+		extractor: graphql.NewExtractor(),
 	}
-	walker.RegisterEnterOperationVisitor(extractor)
-	walker.RegisterEnterFieldVisitor(extractor)
 	return extractor
 }
 
@@ -90,18 +54,14 @@ func (g *GraphStatsExtractionVisitor) GraphErrors(response []byte) ([]string, er
 
 func (g *GraphStatsExtractionVisitor) ExtractStats(rawRequest, response, schema string) (analytics.GraphQLStats, error) {
 	var stats analytics.GraphQLStats
+	stats.IsGraphQL = true
 	var gqlRequest graphql.Request
 	if err := graphql.UnmarshalRequest(strings.NewReader(rawRequest), &gqlRequest); err != nil {
 		return stats, err
 	}
 	g.gqlRequest = &gqlRequest
 
-	// generate request and schema doc
-	requestDoc, opReport := astparser.ParseGraphqlDocumentString(g.gqlRequest.Query)
-	if opReport.HasErrors() {
-		return stats, opReport
-	}
-	g.operation = &requestDoc
+	stats.Variables = string(g.gqlRequest.Variables)
 
 	sh, err := graphql.NewSchemaFromString(schema)
 	if err != nil {
@@ -113,28 +73,31 @@ func (g *GraphStatsExtractionVisitor) ExtractStats(rawRequest, response, schema 
 	}
 	g.schema = &schemaDoc
 
-	// normalize and extract fragments
+	requestTypes := make(graphql.RequestTypes)
 	var report operationreport.Report
-	normalizer := astnormalization.NewNormalizer(true, false)
-	if g.gqlRequest.OperationName != "" {
-		normalizer.NormalizeNamedOperation(g.operation, g.schema, []byte(g.gqlRequest.OperationName), &report)
-	} else {
-		normalizer.NormalizeOperation(g.operation, g.schema, &report)
-	}
+	g.extractor.ExtractFieldsFromRequestSingleOperation(g.gqlRequest, sh, &report, requestTypes)
 	if report.HasErrors() {
 		return stats, report
 	}
 
-	g.walker.Walk(g.operation, g.schema, &report)
-	if report.HasErrors() {
-		return stats, report
+	var typesFields = make(map[string][]string)
+	var rootFields []string
+	for t, fields := range requestTypes {
+		isRootOperationType := false
+		if t == string(g.schema.Index.QueryTypeName) || t == string(g.schema.Index.MutationTypeName) || t == string(g.schema.Index.SubscriptionTypeName) {
+			isRootOperationType = true
+		}
+		for field, _ := range fields {
+			if isRootOperationType {
+				rootFields = append(rootFields, field)
+			} else {
+				typesFields[t] = append(typesFields[t], field)
+			}
+		}
 	}
 
-	stats.IsGraphQL = true
-	stats.Types = g.typesFields
-	for key := range g.rootFields {
-		stats.RootFields = append(stats.RootFields, key)
-	}
+	stats.Types = typesFields
+	stats.RootFields = rootFields
 	stats.OperationType = g.AnalyticsOperationTypes()
 	graphErrors, err := g.GraphErrors([]byte(response))
 	for _, e := range graphErrors {
@@ -143,7 +106,6 @@ func (g *GraphStatsExtractionVisitor) ExtractStats(rawRequest, response, schema 
 		})
 	}
 	stats.HasErrors = len(stats.Errors) > 0
-	stats.Variables = string(g.gqlRequest.Variables)
 	return stats, nil
 }
 
@@ -162,17 +124,4 @@ func (g *GraphStatsExtractionVisitor) AnalyticsOperationTypes() analytics.GraphQ
 	default:
 		return analytics.OperationUnknown
 	}
-}
-
-func (g *GraphStatsExtractionVisitor) EnterField(ref int) {
-	if g.skipOperation {
-		return
-	}
-	fieldName := g.operation.FieldNameString(ref)
-	parent := g.schema.NodeNameBytes(g.walker.EnclosingTypeDefinition)
-	if bytes.Equal(parent, g.schema.Index.QueryTypeName) || bytes.Equal(parent, g.schema.Index.MutationTypeName) || bytes.Equal(parent, g.schema.Index.SubscriptionTypeName) {
-		g.rootFields[fieldName] = struct{}{}
-		return
-	}
-	g.typesFields[string(parent)] = append(g.typesFields[string(parent)], fieldName)
 }
