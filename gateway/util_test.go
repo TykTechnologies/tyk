@@ -215,8 +215,6 @@ func Test_shouldReloadSpec(t *testing.T) {
 		assertionHelper(t, tcs)
 	})
 }
-<<<<<<< HEAD
-=======
 
 func TestAreMapsEqual(t *testing.T) {
 	tests := []struct {
@@ -279,4 +277,3 @@ func TestContainsEscapedCharacters(t *testing.T) {
 		})
 	}
 }
->>>>>>> 4346303f... [TT-9327] Decoding the URL request first, before handling any additional logic (#5345)

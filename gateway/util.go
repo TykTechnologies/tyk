@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"net/url"
 	"os"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -158,8 +159,6 @@ func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
 
 	return false
 }
-<<<<<<< HEAD
-=======
 
 // check if 2 maps are the same
 func areMapsEqual(a, b map[string]string) bool {
@@ -183,4 +182,3 @@ func containsEscapedChars(str string) bool {
 
 	return str != unescaped
 }
->>>>>>> 4346303f... [TT-9327] Decoding the URL request first, before handling any additional logic (#5345)
