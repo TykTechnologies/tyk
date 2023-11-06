@@ -194,7 +194,9 @@ jobs:
             msgid: "3"
           - db: mongo44
             conf: "murmur64"
-            msgid: "4"          
+            msgid: "4"
+    outputs:
+        api_test_result: ${{ steps.test_result.outputs.pytest_run }} 
           
 
     steps:
@@ -278,6 +280,11 @@ jobs:
           754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
           pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}"
 
+      - name: Set test result
+        id: test_result
+        if: always() && steps.test_execution.outcome != 'success'
+        run: echo "pytest_run=${{ steps.test_execution.outcome }}" >> $GITHUB_OUTPUT
+
       - name: Archive Integration tests report
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
@@ -310,18 +317,6 @@ jobs:
           
         env:
           STATUS: "${{ steps.test_execution.outcome == 'success' && ':white_check_mark:' || ':no_entry_sign:' }}"
-          
-      # - name: Xray update
-      #   if: ${{ always() }} && github.event_name != 'pull_request'
-      #   run: |
-      #     ./update_xray.sh
-      #   working-directory: tyk-automated-tests
-      #   env:
-      #     TEST: "QA-901"
-      #     STATUS: "${{ steps.test_execution.outcome }}"
-      #     CLIENT_ID: ${{secrets.XRAY_CLIENT_ID}}
-      #     CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
-      #     BRANCH: ${{ github.ref }}
   
       - name: Getting gateway logs on failure
         if: ${{ failure() }}
@@ -334,9 +329,28 @@ jobs:
   xray:
     needs: api-tests
     runs-on: ubuntu-latest
+    if: always()
+    # if: always() && github.event_name != 'pull_request'
 
     steps:
+      - name: Collect tests results
+        id: test_results 
+        run: |
+          echo "This is outcome for ${{ needs.api-tests.outputs.api_test_result }}"
 
+      - run: ${{ tojson(needs.api-tests) }}
+        shell: cat {0}
+
+      - name: Xray update
+        run: |
+          ./update_xray.sh
+        working-directory: tyk-automated-tests
+        env:
+          TEST: "QA-901"
+          STATUS: ${{ needs.api-tests.outputs.api_test_result || 'success' }}
+          CLIENT_ID: ${{secrets.XRAY_CLIENT_ID}}
+          CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
+          BRANCH: ${{ github.ref }}
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
 
