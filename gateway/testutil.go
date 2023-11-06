@@ -1019,7 +1019,7 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 	}
 	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 
-	s.Gw := NewGateway(gwConfig, ctx, cancelFn)
+	s.Gw = NewGateway(gwConfig, ctx, cancelFn)
 	s.Gw.setTestMode(true)
 	s.Gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
@@ -1067,7 +1067,7 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 		Handler:        s.TestServerRouter,
 		ReadTimeout:    1 * time.Second,
 		WriteTimeout:   1 * time.Second,
-		ConnState:      gw.ConnectionWatcher.OnStateChange,
+		ConnState:      s.Gw.ConnectionWatcher.OnStateChange,
 		MaxHeaderBytes: 1 << 20,
 	}
 
