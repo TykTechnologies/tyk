@@ -1019,9 +1019,9 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 	}
 	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 
-	gw := NewGateway(gwConfig, ctx, cancelFn)
-	gw.setTestMode(true)
-	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
+	s.Gw := NewGateway(gwConfig, ctx, cancelFn)
+	s.Gw.setTestMode(true)
+	s.Gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
 	s.MockHandle = MockHandle
 
