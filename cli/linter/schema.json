@@ -432,15 +432,9 @@
     "hash_keys": {
       "type": "boolean"
     },
-<<<<<<< HEAD
-=======
     "reload_interval": {
       "type": "integer"
     },
-    "disable_key_actions_by_username": {
-      "type": "boolean"
-    },
->>>>>>> 1032b17e... [TT-9761] Add reload interval (#5418)
     "hash_key_function": {
       "type": "string",
       "enum": [
