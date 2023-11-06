@@ -333,6 +333,14 @@ jobs:
     # if: always() && github.event_name != 'pull_request'
 
     steps:
+      - name: Checkout of tyk-automated-tests
+        uses: actions/checkout@v3
+        with:
+          repository: TykTechnologies/tyk-automated-tests
+          token: ${{ secrets.ORG_GH_TOKEN }}
+          ref: ${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
+          path: tyk-automated-tests
+
       - name: Collect tests results
         id: test_results 
         run: |
