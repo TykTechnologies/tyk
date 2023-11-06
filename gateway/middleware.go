@@ -400,7 +400,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		policyIDs = session.PolicyIDs()
 		t.Gw.policiesMu.RLock()
 		lookupMap = t.Gw.policiesByID
-		defer t.Gw.policiesMu.RUnlock()
+		t.Gw.policiesMu.RUnlock()
 	} else {
 		lookupMap = customPolicies
 		policyIDs = make([]string, 0, len(customPolicies))
