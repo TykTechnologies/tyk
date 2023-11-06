@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -411,7 +410,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 
 	for _, polID := range policyIDs {
-		originalPolicy, ok := lookupMap[polID]
+		policy, ok := lookupMap[polID]
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
@@ -421,11 +420,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 			return err
 		}
-
-		policyInBytes, _ := json.Marshal(originalPolicy)
-		var policy user.Policy
-		_ = json.Unmarshal(policyInBytes, &policy)
-
 		// Check ownership, policy org owner must be the same as API,
 		// otherwise you could overwrite a session key with a policy from a different org!
 		if t.Spec != nil && policy.OrgID != t.Spec.OrgID {
@@ -497,6 +491,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				if !usePartitions || policy.Partitions.Acl {
 					didACL[k] = true
+
+					ar.AllowedURLs = copyAllowedURLs(v.AllowedURLs)
 
 					// Merge ACLs for the same API
 					if r, ok := rights[k]; ok {
@@ -764,6 +760,26 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 
 	return nil
+}
+
+func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
+	if input == nil {
+		return nil
+	}
+
+	copied := make([]user.AccessSpec, len(input))
+
+	for i, as := range input {
+		copied[i] = user.AccessSpec{
+			URL: as.URL,
+		}
+		if as.Methods != nil {
+			copied[i].Methods = make([]string, len(as.Methods))
+			copy(copied[i].Methods, as.Methods)
+		}
+	}
+
+	return copied
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
