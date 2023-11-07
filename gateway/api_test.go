@@ -187,6 +187,12 @@ func TestKeyHandler(t *testing.T) {
 	}
 	withBadPolicyJSON := test.MarshalJSON(t)(withBadPolicy)
 
+	withUnknownAPI := CreateStandardSession()
+	withUnknownAPI.AccessRights = map[string]user.AccessDefinition{"unknown": {
+		APIID: "unknown", Versions: []string{"v1"},
+	}}
+	withUnknownAPIJSON := test.MarshalJSON(t)(withUnknownAPI)
+
 	t.Run("Create key", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			// Master keys should be disabled by default
@@ -323,6 +329,7 @@ func TestKeyHandler(t *testing.T) {
 			// Without data
 			{Method: "PUT", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 400},
 			{Method: "PUT", Path: "/tyk/keys/" + knownKey, Data: string(withAccessJSON), AdminAuth: true, Code: 200},
+			{Method: "PUT", Path: "/tyk/keys/" + knownKey, Data: string(withUnknownAPIJSON), AdminAuth: true, Code: 200},
 			{Method: "PUT", Path: "/tyk/keys/" + knownKey + "?api_id=test", Data: string(withAccessJSON), AdminAuth: true, Code: 200},
 			{Method: "PUT", Path: "/tyk/keys/" + knownKey + "?api_id=none", Data: string(withAccessJSON), AdminAuth: true, Code: 200},
 		}...)
