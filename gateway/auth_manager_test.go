@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
@@ -244,4 +246,40 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		testChangeHashFunc(t, nil, client, http.StatusForbidden)
 	})
 
+}
+
+func TestResetQuotaObfuscate(t *testing.T) {
+
+	t.Run("Obfuscate key", func(t *testing.T) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HashKeys = false
+			globalConf.EnableKeyLogging = false
+		}
+
+		ts := StartTest(conf)
+		sessionManager := DefaultSessionManager{Gw: ts.Gw}
+		t.Cleanup(func() {
+			ts.Close()
+		})
+
+		actual := sessionManager.ResetQuotaObfuscateKey("481408ygjkbs")
+
+		assert.Equal(t, "****jkbs", actual)
+	})
+	t.Run("Does not Obfuscate key", func(t *testing.T) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HashKeys = true
+			globalConf.EnableKeyLogging = true
+		}
+
+		ts := StartTest(conf)
+		sessionManager := DefaultSessionManager{Gw: ts.Gw}
+		t.Cleanup(func() {
+			ts.Close()
+		})
+
+		actual := sessionManager.ResetQuotaObfuscateKey("481408ygjkbs")
+
+		assert.Equal(t, "481408ygjkbs", actual)
+	})
 }
