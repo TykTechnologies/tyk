@@ -295,8 +295,8 @@ jobs:
           # Start customising the env
           echo "registry=${{ steps.ecr.outputs.registry }}
           tyk_image=\${registry}/tyk:${gw_image_tag}
-          tyk_alfa_image=${tyk_image}
-          tyk_beta_image=${tyk_image}
+          tyk_alfa_image=\${registry}/tyk:${gw_image_tag}
+          tyk_beta_image=\${registry}/tyk:${gw_image_tag}
           tyk_analytics_image=\${registry}/tyk-analytics:${dash_image_tag}
           tyk_sink_image=\${registry}/tyk-sink:${sink_image_tag}
           tyk_pump_image=\${registry}/tyk-pump:${pump_image_tag}
