@@ -1343,13 +1343,8 @@ func TestCreateOAuthClient(t *testing.T) {
 
 	for testName, testData := range tests {
 		t.Run(testName, func(t *testing.T) {
-<<<<<<< HEAD
-			requestData, _ := json.Marshal(testData.req)
-			ts.Run(
-=======
 			requestData := test.MarshalJSON(t)(testData.req)
 			_, _ = ts.Run(
->>>>>>> c985ee42... [TT-9829] Fix checking json.Marshal errors in tests (#5426)
 				t,
 				test.TestCase{
 					Method:    http.MethodPost,
