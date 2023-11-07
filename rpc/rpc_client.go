@@ -250,7 +250,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 
 	clientSingleton.Conns = values.Config().RPCPoolSize
 	if clientSingleton.Conns == 0 {
-		clientSingleton.Conns = 20
+		clientSingleton.Conns = 5
 	}
 
 	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
