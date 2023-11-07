@@ -1,20 +1,21 @@
 package gateway
 
 import (
-<<<<<<< HEAD
-=======
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strings"
->>>>>>> e4b0f9eb... TT-8934 Fix chunked response analytics (#5495)
 	"testing"
+	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
+	"github.com/stretchr/testify/assert"
 )
 
-<<<<<<< HEAD
-=======
 func TestAnalytics_Write(t *testing.T) {
 	test.Flaky(t)
 	tcs := []struct {
@@ -521,7 +522,6 @@ func TestAnalytics_Write(t *testing.T) {
 
 }
 
->>>>>>> e4b0f9eb... TT-8934 Fix chunked response analytics (#5495)
 func TestGeoIPLookup(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

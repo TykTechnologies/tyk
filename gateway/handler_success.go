@@ -11,13 +11,8 @@ import (
 	"strings"
 	"time"
 
-<<<<<<< HEAD
-=======
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
->>>>>>> e4b0f9eb... TT-8934 Fix chunked response analytics (#5495)
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
