@@ -285,8 +285,6 @@ jobs:
           pull_policy: 'if_not_present'
           # gw and dash use the same branch names
           gw_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk' && env.current_tag ) || env.gw_twin_pr_tag || 'master' }}
-          tyk_alfa_image: ${{ ( github.repository == 'TykTechnologies/tyk' && env.current_tag ) || env.gw_twin_pr_tag || 'master' }}
-          tyk_beta_image: ${{ ( github.repository == 'TykTechnologies/tyk' && env.current_tag ) || env.gw_twin_pr_tag || 'master' }}
           dash_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk-analytics') && env.current_tag ) || env.dash_twin_pr_tag || 'master' }}
           pump_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-pump' && env.current_tag ) || env.pump_twin_pr_tag || 'master' }}
           sink_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-sink' && env.current_tag ) || env.sink_twin_pr_tag ||'master' }}
@@ -297,6 +295,8 @@ jobs:
           # Start customising the env
           echo "registry=${{ steps.ecr.outputs.registry }}
           tyk_image=\${registry}/tyk:${gw_image_tag}
+          tyk_alfa_image=${tyk_image}
+          tyk_beta_image=${tyk_image}
           tyk_analytics_image=\${registry}/tyk-analytics:${dash_image_tag}
           tyk_sink_image=\${registry}/tyk-sink:${sink_image_tag}
           tyk_pump_image=\${registry}/tyk-pump:${pump_image_tag}
