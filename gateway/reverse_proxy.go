@@ -1389,9 +1389,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			"org_id":      p.TykAPISpec.OrgID,
 			"api_id":      p.TykAPISpec.APIID,
 		}).Error("http: proxy error: ", err)
-<<<<<<< HEAD
-		if strings.Contains(err.Error(), "timeout awaiting response headers") {
-=======
 
 		if strings.HasPrefix(err.Error(), "mock:") {
 			p.ErrorHandler.HandleError(rw, logreq, err.Error(), res.StatusCode, true)
@@ -1399,7 +1396,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 
 		if strings.Contains(err.Error(), "timeout awaiting response headers") || strings.Contains(err.Error(), "context deadline exceeded") {
->>>>>>> 3f8d94de... [TT-6446] Minimal approach to setting a context-enforced timeout (#5541)
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", http.StatusGatewayTimeout, true)
 
 			if p.TykAPISpec.Proxy.ServiceDiscovery.UseDiscoveryService {
