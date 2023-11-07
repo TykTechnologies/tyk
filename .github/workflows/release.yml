@@ -240,6 +240,11 @@ jobs:
         env:
           captured_tag: ${{ needs.goreleaser.outputs.captured_tag }}
         run: |
+          # Check if Tyk image twin PR exists
+          if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk:${captured_tag}" &> /dev/null; then
+            echo "Tyk Image exists."
+            echo "gw_twin_pr_tag=${captured_tag}" >> $GITHUB_ENV
+          fi
           # Check if Tyk-Anaytics image twin PR exists
           if docker manifest inspect "${{ steps.ecr.outputs.registry }}/tyk-analytics:${captured_tag}" &> /dev/null; then
             echo "Dashboard Image exists."
@@ -261,36 +266,40 @@ jobs:
             echo "tat_twin_pr_tag=${captured_tag}" >> $GITHUB_ENV
           fi
 
+      - name: Export Current Tag
+        id: export-tag
+        env:
+          t: ${{ needs.goreleaser.outputs.tags }}      
+        run: |
+          echo CI tags: $t
+          tags=($t)
+          echo First tag: ${tags[0]}
+          echo "current_tag=${tags[0]#*:}" >> $GITHUB_ENV
+
 
       - name: env up
         shell: bash
         working-directory: tyk-automated-tests/ci/auto
         id: env_up
         env:
-          t: ${{ needs.goreleaser.outputs.tags }}
           pull_policy: 'if_not_present'
           # gw and dash use the same branch names
-          gw_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk' ) && startsWith(github.ref_name, 'release-') ) && github.ref_name || 'master' }}
-          dash_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk-analytics') && startsWith(github.ref_name, 'release-') ) && github.ref_name || env.dash_twin_pr_tag || 'master' }}
-          pump_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-pump' && startsWith(github.ref_name, 'release-') ) && github.ref_name || env.pump_twin_pr_tag || 'master' }}
-          sink_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-sink' && startsWith(github.ref_name, 'release-') ) && github.ref_name || env.sink_twin_pr_tag ||'master' }}
+          gw_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk' && env.current_tag ) || env.gw_twin_pr_tag || 'master' }}
+          tyk_alfa_image: ${{ ( github.repository == 'TykTechnologies/tyk' && env.current_tag ) || env.gw_twin_pr_tag || 'master' }}
+          tyk_beta_image: ${{ ( github.repository == 'TykTechnologies/tyk' && env.current_tag ) || env.gw_twin_pr_tag || 'master' }}
+          dash_image_tag: ${{ ( (github.repository == 'TykTechnologies/tyk-analytics') && env.current_tag ) || env.dash_twin_pr_tag || 'master' }}
+          pump_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-pump' && env.current_tag ) || env.pump_twin_pr_tag || 'master' }}
+          sink_image_tag: ${{ ( github.repository == 'TykTechnologies/tyk-sink' && env.current_tag ) || env.sink_twin_pr_tag ||'master' }}
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
         run: |
-          echo CI tags: $t
-          tags=($t)
-          echo First tag: ${tags[0]}
           # Start customising the env
           echo "registry=${{ steps.ecr.outputs.registry }}
           tyk_image=\${registry}/tyk:${gw_image_tag}
           tyk_analytics_image=\${registry}/tyk-analytics:${dash_image_tag}
           tyk_sink_image=\${registry}/tyk-sink:${sink_image_tag}
           tyk_pump_image=\${registry}/tyk-pump:${pump_image_tag}
-          # override default above with just built tag
-          tyk_image=${tags[0]}
-          tyk_alfa_image=${tags[0]}
-          tyk_beta_image=${tags[0]}
           # base dir for config files
           confs_dir=./pro-ha
           # pick database to use
