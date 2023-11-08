@@ -502,3 +502,6 @@ runner.Run(t, testCases...)
 This package already exports functions for cases mentioned above:
  - `func TestHttpServer(t testing.TB, baseURL string, testCases ...TestCase)`
  - `func TestHttpHandler(t testing.TB, handle http.HandlerFunc, testCases ...TestCase)`
+
+
+kk
