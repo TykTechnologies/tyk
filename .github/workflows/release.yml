@@ -291,16 +291,25 @@ jobs:
         with:
             name: api-test-report
             path: ${{ github.workspace }}/reports
+
+      - name: Fetch commit author
+        run: echo "GIT_USER_EMAIL=$(git show -s --format='%ae' HEAD)" >> $GITHUB_ENV
+
+      - name: Fetch slack user
+        uses: TykTechnologies/github-actions/.github/workflows/github_to_slack.yaml@main
+        with:
+          github_email: ${{ env.GIT_USER_EMAIL }}
+
     
-      # - name: Notify slack
-      #   if: ${{ always() && !github.event.pull_request.draft }}
-      #   uses: rtCamp/action-slack-notify@v2
-      #   env:
-      #     SLACK_WEBHOOK: ${{ secrets.GW_SLACK_WEBHOOK }}
-      #     SLACK_COLOR: ${{ job.status }}
-      #     SLACK_TITLE: "Result: ${{ steps.test_execution.outcome }}"
-      #     SLACK_USERNAME: API GW test automation
-      #     SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
+      - name: Notify slack
+        if: ${{ failure() && !github.event.pull_request.draft }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.ALARM_PLAYGROUND_SLACK_WEBHOOK }}
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: "Result: ${{ steps.test_execution.outcome }}, Author: ${{steps.}}"
+          SLACK_USERNAME: API GW test automation
+          SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
       
       - name: Comment on PR
         if: ${{ always() && !github.event.pull_request.draft }}
@@ -329,8 +338,7 @@ jobs:
   xray:
     needs: api-tests
     runs-on: ubuntu-latest
-    if: always()
-    # if: always() && github.event_name != 'pull_request'
+    if: always() && github.event_name == 'push'
 
     steps:
       - name: Checkout of tyk-automated-tests
@@ -340,14 +348,6 @@ jobs:
           token: ${{ secrets.ORG_GH_TOKEN }}
           ref: ${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
           path: tyk-automated-tests
-
-      - name: Collect tests results
-        id: test_results 
-        run: |
-          echo "This is outcome for ${{ needs.api-tests.outputs.api_test_result }}"
-
-      - run: ${{ tojson(needs.api-tests) }}
-        shell: cat {0}
 
       - name: Xray update
         run: |
