@@ -293,16 +293,18 @@ jobs:
             path: ${{ github.workspace }}/reports
 
       - name: Fetch commit author
+        #if: ${{ failure() && !github.event.pull_request.draft }}            
         run: echo "GIT_USER_EMAIL=$(git show -s --format='%ae' HEAD)" >> $GITHUB_ENV
 
       - name: Fetch slack user
+        #if: ${{ failure() && !github.event.pull_request.draft }}      
         id: fetch_slack_user
         uses: TykTechnologies/github-actions/.github/actions/github-to-slack@main
         with:
           github_email: ${{ env.GIT_USER_EMAIL }}
     
       - name: Notify slack
-        if: ${{ failure() && !github.event.pull_request.draft }}
+        #if: ${{ failure() && !github.event.pull_request.draft }}
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_WEBHOOK: ${{ secrets.ALARM_PLAYGROUND_SLACK_WEBHOOK }}
