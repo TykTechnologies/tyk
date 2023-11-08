@@ -438,8 +438,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				if !usePartitions || policy.Partitions.Acl {
 					didACL[k] = true
 
-					ar.AllowedURLs = copyAllowedURLs(v.AllowedURLs)
-
 					// Merge ACLs for the same API
 					if r, ok := rights[k]; ok {
 						// If GQL introspection is disabled, keep that configuration.
@@ -706,26 +704,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 
 	return nil
-}
-
-func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
-	if input == nil {
-		return nil
-	}
-
-	copied := make([]user.AccessSpec, len(input))
-
-	for i, as := range input {
-		copied[i] = user.AccessSpec{
-			URL: as.URL,
-		}
-		if as.Methods != nil {
-			copied[i].Methods = make([]string, len(as.Methods))
-			copy(copied[i].Methods, as.Methods)
-		}
-	}
-
-	return copied
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
