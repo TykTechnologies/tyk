@@ -309,9 +309,10 @@ jobs:
         env:
           SLACK_WEBHOOK: ${{ secrets.ALARM_PLAYGROUND_SLACK_WEBHOOK }}
           SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: "Result: ${{ steps.test_execution.outcome }}, Author: ${{ steps.fetch_slack_user.outputs.slack-user-name }}"
-          SLACK_USERNAME: API GW test automation
-          SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
+          SLACK_TITLE: "Result: ${{ steps.test_execution.outcome }}"
+          SLACK_USERNAME: API INTEGRATION TESTS
+          SLACK_MESSAGE: "*Test*: ${{ matrix.db }}-${{ matrix.conf }}, *Author*: ${{ steps.fetch_slack_user.outputs.slack-user-name }}"
+          SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|SEE EXECUTION DETAILS HERE>"
       
       - name: Comment on PR
         if: ${{ always() && !github.event.pull_request.draft }}
