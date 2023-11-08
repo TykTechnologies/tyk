@@ -295,22 +295,22 @@ jobs:
       - name: Fetch commit author
         run: echo "GIT_USER_EMAIL=$(git show -s --format='%ae' HEAD)" >> $GITHUB_ENV
 
-      # - name: Fetch slack user
-      #   id: fetch_slack_user
-      #   uses: TykTechnologies/github-actions/.github/workflows/github_to_slack.yaml@main
-      #   with:
-      #     github_email: ${{ env.GIT_USER_EMAIL }}
+      - name: Fetch slack user
+        id: fetch_slack_user
+        uses: TykTechnologies/github-actions/.github/workflows/github-to-slack.yaml@main
+        with:
+          github_email: ${{ env.GIT_USER_EMAIL }}
 
     
-      # - name: Notify slack
-      #   if: ${{ failure() && !github.event.pull_request.draft }}
-      #   uses: rtCamp/action-slack-notify@v2
-      #   env:
-      #     SLACK_WEBHOOK: ${{ secrets.ALARM_PLAYGROUND_SLACK_WEBHOOK }}
-      #     SLACK_COLOR: ${{ job.status }}
-      #     SLACK_TITLE: "Result: ${{ steps.test_execution.outcome }}, Author: ${{ steps.fetch_slack_user.outputs.slack_user_name }}"
-      #     SLACK_USERNAME: API GW test automation
-      #     SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
+      - name: Notify slack
+        if: ${{ failure() && !github.event.pull_request.draft }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.ALARM_PLAYGROUND_SLACK_WEBHOOK }}
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: "Result: ${{ steps.test_execution.outcome }}, Author: ${{ steps.fetch_slack_user.outputs.slack_user_name }}"
+          SLACK_USERNAME: API GW test automation
+          SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
       
       - name: Comment on PR
         if: ${{ always() && !github.event.pull_request.draft }}
