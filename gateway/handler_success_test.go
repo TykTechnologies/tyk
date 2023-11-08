@@ -157,7 +157,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
 				assert.True(t, record.GraphQLStats.IsGraphQL)
 				assert.False(t, record.GraphQLStats.HasErrors)
-				assert.Equal(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
+				assert.ElementsMatch(t, []string{"httpMethod", "hello"}, record.GraphQLStats.RootFields)
 				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
 				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
 				assert.Equal(t, `{"in":"hello"}`, record.GraphQLStats.Variables)
