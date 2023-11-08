@@ -292,8 +292,8 @@ jobs:
             name: api-test-report
             path: ${{ github.workspace }}/reports
 
-      # - name: Fetch commit author
-      #   run: echo "GIT_USER_EMAIL=$(git show -s --format='%ae' HEAD)" >> $GITHUB_ENV
+      - name: Fetch commit author
+        run: echo "GIT_USER_EMAIL=$(git show -s --format='%ae' HEAD)" >> $GITHUB_ENV
 
       # - name: Fetch slack user
       #   id: fetch_slack_user
