@@ -297,7 +297,7 @@ jobs:
 
       - name: Fetch slack user
         id: fetch_slack_user
-        uses: TykTechnologies/github-actions/.github/actions/github-to-slack.yaml@main
+        uses: TykTechnologies/github-actions/.github/actions/github-to-slack@main
         with:
           github_email: ${{ env.GIT_USER_EMAIL }}
     
