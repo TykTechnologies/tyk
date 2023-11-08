@@ -182,7 +182,22 @@ jobs:
         db: [ "mongo44", "postgres15" ]
         include:
           - db: postgres15
+            conf: "sha256"
             markers: "and not sql"
+            msgid: "1"
+          - db: postgres15
+            conf: "murmur64"
+            markers: "and not sql"
+            msgid: "2"            
+          - db: mongo44
+            conf: "sha256"
+            msgid: "3"
+          - db: mongo44
+            conf: "murmur64"
+            msgid: "4"
+    outputs:
+        api_test_result: ${{ steps.test_result.outputs.pytest_run }} 
+          
 
     steps:
       - uses: actions/checkout@v3
@@ -258,11 +273,92 @@ jobs:
           docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
 
       - name: Run tests
+        id: test_execution
         working-directory: tyk-automated-tests/ci/auto
         run: |
-          docker run --rm --network auto_default --env-file pytest.env \
-          ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
-          pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}" 
+          docker run --rm --network auto_default --env-file pytest.env -v ${{ github.workspace }}/reports:/app/reports \
+          754489498669.dkr.ecr.eu-central-1.amazonaws.com/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
+          pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}"
+
+      - name: Set test result
+        id: test_result
+        if: always() && steps.test_execution.outcome != 'success'
+        run: echo "pytest_run=${{ steps.test_execution.outcome }}" >> $GITHUB_OUTPUT
+
+      - name: Archive Integration tests report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+            name: api-test-report
+            path: ${{ github.workspace }}/reports
+
+      - name: Fetch commit author
+        run: echo "GIT_USER_EMAIL=$(git show -s --format='%ae' HEAD)" >> $GITHUB_ENV
+
+      - name: Fetch slack user
+        uses: TykTechnologies/github-actions/.github/workflows/github_to_slack.yaml@main
+        with:
+          github_email: ${{ env.GIT_USER_EMAIL }}
+
+    
+      - name: Notify slack
+        if: ${{ failure() && !github.event.pull_request.draft }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.ALARM_PLAYGROUND_SLACK_WEBHOOK }}
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: "Result: ${{ steps.test_execution.outcome }}, Author: ${{steps.}}"
+          SLACK_USERNAME: API GW test automation
+          SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
+      
+      - name: Comment on PR
+        if: ${{ always() && !github.event.pull_request.draft }}
+        uses: mshick/add-pr-comment@v2
+        with:
+          message: |
+            **API tests result - ${{ matrix.db }}-${{ matrix.conf }} env: ${{ steps.test_execution.outcome }}** ${{ env.STATUS }} 
+            Branch used: ${{ github.ref }}
+            Commit: ${{ github.event.after }} ${{ github.event.commits[0].message }}
+            Triggered by: ${{ github.event_name }} (@${{ github.actor }})
+            [Execution page](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          repo-token: ${{ secrets.ORG_GH_TOKEN }}
+          message-id: ${{ matrix.msgid }}
+          
+        env:
+          STATUS: "${{ steps.test_execution.outcome == 'success' && ':white_check_mark:' || ':no_entry_sign:' }}"
+  
+      - name: Getting gateway logs on failure
+        if: ${{ failure() }}
+        run: docker logs tyk
+
+      - name: Getting dashboard logs on failure
+        if: ${{ failure() }}
+        run: docker logs tyk-analytics
+
+  xray:
+    needs: api-tests
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'push'
+
+    steps:
+      - name: Checkout of tyk-automated-tests
+        uses: actions/checkout@v3
+        with:
+          repository: TykTechnologies/tyk-automated-tests
+          token: ${{ secrets.ORG_GH_TOKEN }}
+          ref: ${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
+          path: tyk-automated-tests
+
+      - name: Xray update
+        run: |
+          ./update_xray.sh
+        working-directory: tyk-automated-tests
+        env:
+          TEST: "QA-901"
+          STATUS: ${{ needs.api-tests.outputs.api_test_result || 'success' }}
+          CLIENT_ID: ${{secrets.XRAY_CLIENT_ID}}
+          CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
+          BRANCH: ${{ github.ref }}
 
 # TODO: PR comment, using just one comment and updating, not a new comment each time
 
