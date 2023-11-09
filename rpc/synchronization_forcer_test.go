@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 
 var rc *storage.RedisController
 
-func init() {
+func TestMain(m *testing.M) {
 	conf, err := config.New()
 	if err != nil {
 		panic(err)
@@ -30,6 +31,8 @@ func init() {
 	if !connected {
 		panic("can't connect to redis '" + conf.Storage.Host + "', timeout")
 	}
+
+	os.Exit(m.Run())
 }
 
 func TestNewSyncForcer(t *testing.T) {

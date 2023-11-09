@@ -30,7 +30,7 @@ var (
 	}
 )
 
-func init() {
+func TestMain(m *testing.M) {
 	testApp = kingpin.New("tyk-cli", "")
 	AddTo(testApp)
 
@@ -39,6 +39,8 @@ func init() {
 	bundler.bundlePath = &bundlePath
 	manifestPath := defaultManifestPath
 	bundler.manifestPath = &manifestPath
+
+	os.Exit(m.Run())
 }
 
 func writeManifestFile(t testing.TB, manifest interface{}, filename string) *string {
@@ -69,6 +71,7 @@ func TestCommands(t *testing.T) {
 		t.Fatalf("Command not found")
 	}
 }
+
 func TestBuild(t *testing.T) {
 	defer os.Remove(defaultManifestPath)
 

@@ -169,7 +169,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		ts := gateway.StartTest(nil, gateway.TestConfig{
 			CoprocessConfig: config.CoProcessConfig{
 				EnableCoProcess:  true,
-				PythonPathPrefix: pkgPath,
+				PythonPathPrefix: pkgPath(),
 			},
 		})
 		defer ts.Close()
@@ -195,7 +195,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		ts := gateway.StartTest(nil, gateway.TestConfig{
 			CoprocessConfig: config.CoProcessConfig{
 				EnableCoProcess:  true,
-				PythonPathPrefix: pkgPath,
+				PythonPathPrefix: pkgPath(),
 			},
 		})
 		defer ts.Close()
@@ -223,7 +223,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		ts := gateway.StartTest(nil, gateway.TestConfig{
 			CoprocessConfig: config.CoProcessConfig{
 				EnableCoProcess:  true,
-				PythonPathPrefix: pkgPath,
+				PythonPathPrefix: pkgPath(),
 			},
 		})
 		defer ts.Close()

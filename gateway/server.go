@@ -325,6 +325,8 @@ func (gw *Gateway) setupGlobals() {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
+	defaultTykErrors()
+
 	gwConfig := gw.GetConfig()
 	checkup.Run(&gwConfig)
 
