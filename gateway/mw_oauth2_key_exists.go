@@ -22,24 +22,24 @@ const (
 	ErrOAuthClientDeleted               = "oauth.client_deleted"
 )
 
-func init() {
+func initOauth2KeyExistsErrors() {
 	TykErrors[ErrOAuthAuthorizationFieldMissing] = config.TykError{
-		Message: "Authorization field missing",
+		Message: MsgAuthFieldMissing,
 		Code:    http.StatusBadRequest,
 	}
 
 	TykErrors[ErrOAuthAuthorizationFieldMalformed] = config.TykError{
-		Message: "Bearer token malformed",
+		Message: MsgBearerMailformed,
 		Code:    http.StatusBadRequest,
 	}
 
 	TykErrors[ErrOAuthKeyNotFound] = config.TykError{
-		Message: "Key not authorised",
+		Message: MsgKeyNotAuthorized,
 		Code:    http.StatusForbidden,
 	}
 
 	TykErrors[ErrOAuthClientDeleted] = config.TykError{
-		Message: "Key not authorised. OAuth client access was revoked",
+		Message: MsgOauthClientRevoked,
 		Code:    http.StatusForbidden,
 	}
 }

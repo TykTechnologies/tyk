@@ -33,7 +33,7 @@ tasks:
     status:
       - type golangci-lint
     cmds:
-      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.0
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
 
   faillint:
     internal: true

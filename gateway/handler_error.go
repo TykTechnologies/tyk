@@ -47,50 +47,9 @@ func errorAndStatusCode(errType string) (error, int) {
 
 func defaultTykErrors() {
 	TykErrors = make(map[string]config.TykError)
-	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
-		Message: MsgAuthFieldMissing,
-		Code:    http.StatusUnauthorized,
-	}
 
-	TykErrors[ErrAuthKeyNotFound] = config.TykError{
-		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrAuthCertNotFound] = config.TykError{
-		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrAuthCertExpired] = config.TykError{
-		Message: MsgCertificateExpired,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
-		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrOAuthAuthorizationFieldMissing] = config.TykError{
-		Message: MsgAuthFieldMissing,
-		Code:    http.StatusBadRequest,
-	}
-
-	TykErrors[ErrOAuthAuthorizationFieldMalformed] = config.TykError{
-		Message: MsgBearerMailformed,
-		Code:    http.StatusBadRequest,
-	}
-
-	TykErrors[ErrOAuthKeyNotFound] = config.TykError{
-		Message: MsgKeyNotAuthorized,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrOAuthClientDeleted] = config.TykError{
-		Message: MsgOauthClientRevoked,
-		Code:    http.StatusForbidden,
-	}
+	initAuthKeyErrors()
+	initOauth2KeyExistsErrors()
 }
 
 func overrideTykErrors(gw *Gateway) {
