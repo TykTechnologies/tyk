@@ -23,14 +23,14 @@ func TestMain(m *testing.M) {
 	}
 
 	rc = NewRedisController(context.Background())
-
-	ctx, cancel := context.WithTimeout(rc.ctx, 5*time.Second)
-	defer cancel()
-
 	go rc.ConnectToRedis(context.Background(), nil, conf)
 
-	if !rc.WaitConnect(ctx) {
-		panic("storage TestMain: Can't reconnect to redis")
+	timeout, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	connected := rc.WaitConnect(timeout)
+	if !connected {
+		panic("can't connect to redis '" + conf.Storage.Host + "', timeout")
 	}
 
 	os.Exit(m.Run())
