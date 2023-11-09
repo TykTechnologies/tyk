@@ -19,11 +19,9 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-var pkgPath string
-
-func init() {
+func pkgPath() string {
 	_, filename, _, _ := runtime.Caller(0)
-	pkgPath = filepath.Dir(filename) + "./../../"
+	return filepath.Dir(filename) + "./../../"
 }
 
 var pythonBundleWithAuthCheck = func(token1, token2 string) map[string]string {
@@ -224,7 +222,7 @@ func setupGateway() *gateway.Test {
 	ts := gateway.StartTest(nil, gateway.TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
-			PythonPathPrefix: pkgPath,
+			PythonPathPrefix: pkgPath(),
 		}})
 
 	return ts

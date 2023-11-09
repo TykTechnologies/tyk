@@ -22,7 +22,7 @@ const (
 	ErrOAuthClientDeleted               = "oauth.client_deleted"
 )
 
-func init() {
+func initOauth2KeyExistsErrors() {
 	TykErrors[ErrOAuthAuthorizationFieldMissing] = config.TykError{
 		Message: "Authorization field missing",
 		Code:    http.StatusBadRequest,

@@ -91,6 +91,9 @@ func defaultTykErrors() {
 		Message: MsgOauthClientRevoked,
 		Code:    http.StatusForbidden,
 	}
+
+	initAuthKeyErrors()
+	initOauth2KeyExistsErrors()
 }
 
 func overrideTykErrors(gw *Gateway) {
