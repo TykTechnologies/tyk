@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -15,21 +16,24 @@ import (
 
 var rc *RedisController
 
-func init() {
+func TestMain(m *testing.M) {
 	conf, err := config.New()
 	if err != nil {
 		panic(err)
 	}
 
 	rc = NewRedisController(context.Background())
-	go rc.ConnectToRedis(context.Background(), nil, conf)
-	for {
-		if rc.Connected() {
-			break
-		}
 
-		time.Sleep(10 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(rc.ctx, 5*time.Second)
+	defer cancel()
+
+	go rc.ConnectToRedis(context.Background(), nil, conf)
+
+	if !rc.WaitConnect(ctx) {
+		panic("storage TestMain: Can't reconnect to redis")
 	}
+
+	os.Exit(m.Run())
 }
 
 func TestHandleMessage(t *testing.T) {
