@@ -47,9 +47,6 @@ var (
 	defaultVersion string
 )
 
-func init() {
-}
-
 func loadOASSchema() error {
 	load := func() error {
 		xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykAPIGateway))
