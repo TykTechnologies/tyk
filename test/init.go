@@ -1,19 +1,20 @@
 package test
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
+	"testing"
 
 	_ "net/http/pprof"
 )
 
 var initOnce sync.Once
 
-//nolint:gochecknoinits
-func init() {
+func InitTestMain(_ context.Context, m *testing.M) {
 	if interval := os.Getenv("TEST_MONITOR_INTERVAL"); interval != "" {
 		initOnce.Do(func() {
 			val, _ := strconv.Atoi(interval)
