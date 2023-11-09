@@ -12,6 +12,7 @@ import (
 
 var initOnce sync.Once
 
+//nolint:gochecknoinits
 func init() {
 	if interval := os.Getenv("TEST_MONITOR_INTERVAL"); interval != "" {
 		initOnce.Do(func() {
