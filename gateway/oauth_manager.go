@@ -556,6 +556,9 @@ type ExtendedOsinStorageInterface interface {
 
 	// SetUser updates a Basic Access user token type in the key store
 	SetUser(string, *user.SessionState, int64) error
+
+	// PurgeExpiredTokens purges expired tokens after retain period for a client.
+	PurgeExpiredTokens(id string) error
 }
 
 // TykOsinServer subclasses osin.Server so we can add the SetClient method without wrecking the lbrary
@@ -807,6 +810,20 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 	}
 
 	return tokensData, nil
+}
+
+func (r *RedisOsinStorageInterface) PurgeExpiredTokens(id string) error {
+	key := prefixClientTokens + id
+
+	nowTs := time.Now().Unix()
+
+	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
+	if r.Gw.GetConfig().OauthTokenExpiredRetainPeriod > 0 {
+		cleanupStartScore := strconv.FormatInt(nowTs-int64(r.Gw.GetConfig().OauthTokenExpiredRetainPeriod), 10)
+		return r.redisStore.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
+	}
+
+	return nil
 }
 
 // SetClient creates client data

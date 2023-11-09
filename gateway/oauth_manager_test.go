@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1270,4 +1271,79 @@ func TestJSONToFormValues(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestPurgeExpiredTokens(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		// set tokens to be expired after 1 second
+		globalConf.OauthTokenExpire = 1
+		// cleanup tokens older than 2 seconds
+		globalConf.OauthTokenExpiredRetainPeriod = 2
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	spec := ts.LoadTestOAuthSpec()
+
+	clientID := uuid.New()
+
+	ts.createTestOAuthClient(spec, clientID)
+
+	param := make(url.Values)
+	param.Set("response_type", "token")
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", clientID)
+	param.Set("client_secret", authClientSecret)
+	param.Set("key_rules", keyRules)
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	for i := 0; i < 3; i++ {
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      "/APIID/tyk/oauth/authorize-client/",
+			Data:      param.Encode(),
+			AdminAuth: true,
+			Headers:   headers,
+			Method:    http.MethodPost,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+
+		response := map[string]interface{}{}
+		if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	storageKey := fmt.Sprintf("%s%s", prefixClientTokens, clientID)
+
+	storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix("999999"), false)
+	storageManager.Connect()
+	// verify keys are present
+	nowTs := time.Now().Unix()
+	startScore := strconv.FormatInt(nowTs, 10)
+
+	log.Info("Getting client tokens sorted list:", storageKey)
+
+	tokens, _, err := storageManager.GetSortedSetRange(storageKey, startScore, "+inf")
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(tokens))
+
+	time.Sleep(time.Second * 3)
+	ts.Run(t, test.TestCase{
+		ControlRequest: true,
+		AdminAuth:      true,
+		Path:           fmt.Sprintf("/tyk/oauth/clients/%s/%s/tokens", "999999", clientID),
+		Method:         http.MethodDelete,
+		Code:           http.StatusOK,
+	})
+
+	tokens, _, err = storageManager.GetSortedSetRange(storageKey, startScore, "+inf")
+	assert.NoError(t, err)
+	assert.Empty(t, tokens)
 }

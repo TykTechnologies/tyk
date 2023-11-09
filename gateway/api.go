@@ -2559,6 +2559,25 @@ func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	switch r.Method {
+	case http.MethodGet:
+		handleGetOAuthTokenForClients(w, r, keyName, apiSpec)
+	case http.MethodDelete:
+		handleDeleteExpiredTokensForClients(w, keyName, apiSpec)
+	}
+}
+
+func handleDeleteExpiredTokensForClients(w http.ResponseWriter, keyName string, apiSpec *APISpec) {
+	err := apiSpec.OAuthManager.OsinServer.Storage.PurgeExpiredTokens(keyName)
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError("purging expired tokens failed"))
+		return
+	}
+
+	doJSONWrite(w, http.StatusOK, apiOk("expired tokens purged"))
+}
+
+func handleGetOAuthTokenForClients(w http.ResponseWriter, r *http.Request, keyName string, apiSpec *APISpec) {
 	if p := r.URL.Query().Get("page"); p != "" {
 		page := 1
 
