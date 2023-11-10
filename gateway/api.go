@@ -1183,7 +1183,7 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		oasObj.ExtractTo(&newDef)
 	} else {
 		if spec.IsOAS {
-			return apiError(apidef.ErrAPIMigrated.Error()), http.StatusBadRequest
+			return apiError(apidef.ErrClassicAPIExpected.Error()), http.StatusBadRequest
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
