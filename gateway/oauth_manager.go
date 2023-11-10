@@ -13,12 +13,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/uuid"
-	"github.com/TykTechnologies/tyk/request"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lonelycode/osin"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/request"
 
 	"strconv"
 
@@ -1223,9 +1224,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	}
 
 	for err := range errs {
-		if err != nil {
-			combinedErr = multierror.Append(combinedErr, err)
-		}
+		combinedErr = multierror.Append(combinedErr, err)
 	}
 
 	return combinedErr.ErrorOrNil()
