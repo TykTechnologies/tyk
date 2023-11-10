@@ -823,7 +823,12 @@ type Config struct {
 	ProxySSLCipherSuites []string `json:"proxy_ssl_ciphers"`
 
 	// This can specify a default timeout in seconds for upstream API requests.
+	// Default 0
 	ProxyDefaultTimeout float64 `json:"proxy_default_timeout"`
+
+	// This can specify a default timeout in seconds for establishing an upstream connection.
+	// Default 30
+	ProxyDialerTimeout float64 `json:"proxy_dialer_timeout"`
 
 	// Disable TLS renegotiation.
 	ProxySSLDisableRenegotiation bool `json:"proxy_ssl_disable_renegotiation"`
