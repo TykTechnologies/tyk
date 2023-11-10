@@ -6,7 +6,8 @@ spec:
     type: http
     httpRequest:
       method: GET
-      url: tyk:8080/versioned-not-detailed/ip?version=v1
+      url: tyk:8080/versioned-not-detailed/ip?version=v2
+      timeout: 5000
       headers:
         - key: Content-Type
           value: application/json
@@ -14,8 +15,8 @@ spec:
     - selector: span[tracetest.span.type="http" name="GET /versioned-not-detailed/ip" http.method="GET"]
       name: Checking API attributes + version
       assertions:
-        - attr:tyk.api.id   =   7
-        - attr:tyk.api.name   =   "VersionedNotDetailedAPI"
-        - attr:tyk.api.orgid   =   "default"
-        - attr:tyk.api.path   =   "/versioned-not-detailed/"
-        - attr:tyk.api.version = "v1"
+    - attr:tyk.api.id   =   8
+    - attr:tyk.api.name   =   "VersionedNotDetailedAPI"
+    - attr:tyk.api.orgid   =   "default"
+    - attr:tyk.api.path   =   "/versioned-not-detailed/"
+    - attr:tyk.api.version = "v2"
