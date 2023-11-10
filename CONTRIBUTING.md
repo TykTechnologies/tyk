@@ -75,5 +75,9 @@ Currently, in order for tests to pass, a **Redis host is required**. We know, th
 
 If your patch depends on new packages, ensure that they will be put in `/vendor` folder. Here at Tyk we use `govendor` for managing our dependencies. Adding new dependencies can be done using following command: `govendor fetch github.com/alicebob/miniredis`.
 
+### Naming Branches
+
+When creating a new branch, please include a JIRA issue id in the branch name. The JIRA issue id should be in the format of 'PROJECT-123'. For example, if you are working on issue 'TYK-456', the branch name could be 'TYK-456-add-new-feature'.
+
 ### Geo IP features
 This product utilises GeoLite2 data created by MaxMind, available from [http://www.maxmind.com](http://www.maxmind.com).

@@ -19,21 +19,922 @@ func TestOAS(t *testing.T) {
 	t.Run("empty paths", func(t *testing.T) {
 		t.Parallel()
 
-		var emptyOASPaths OAS
-		emptyOASPaths.Components = &openapi3.Components{}
-		emptyOASPaths.Paths = make(openapi3.Paths)
-		emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
+		// Update the test case to fix the failure
+	var emptyOASPaths OAS
+	emptyOASPaths.Components = &openapi3.Components{}
+	emptyOASPaths.Paths = make(openapi3.Paths)
+	emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
+
+	var convertedAPI apidef.APIDefinition
+	emptyOASPaths.ExtractTo(&convertedAPI)
+
+	var resultOAS OAS
+	resultOAS.Fill(convertedAPI)
+
+	emptyOASPaths.Extensions = nil
+	emptyOASPaths.Extensions = nil
+	assert.Equal(t, emptyOASPaths, resultOAS)
+		assert.Equal(t, emptyOASPaths, resultOAS)
+	})
+
+	t.Run("generate OpenAPI document", func(t *testing.T) {
+		t.Parallel()
+
+		// Call the GenerateOpenAPIDocument function
+		GenerateOpenAPIDocument()
+
+		// Read the generated OpenAPI document from the file
+		data, err := ioutil.ReadFile("openapi.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Unmarshal the data into an OpenAPI object
+		var doc map[string]interface{}
+		err = json.Unmarshal(data, &doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Verify the OpenAPI document
+		verifyOpenAPIComponents(doc)
+	})
+}
+
+	t.Run("nil paths", func(t *testing.T) {
+		t.Parallel()
+
+		var nilOASPaths OAS
+		nilOASPaths.Components = &openapi3.Components{}
+		nilOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 		var convertedAPI apidef.APIDefinition
-		emptyOASPaths.ExtractTo(&convertedAPI)
+		nilOASPaths.ExtractTo(&convertedAPI)
 
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
 
-		// This tests that zero-value extensions are cleared
-		emptyOASPaths.Extensions = nil
+		// No paths in base OAS produce empty paths{} when converted back
+		nilOASPaths.Paths = make(openapi3.Paths)
+		nilOASPaths.Extensions = nil
+		assert.Equal(t, nilOASPaths, resultOAS)
+	})
+
+	t.Run("extract paths", func(t *testing.T) {
+		const operationID = "userGET"
+		t.Parallel()
+
+		var oasWithPaths OAS
+		oasWithPaths.Components = &openapi3.Components{}
+		oasWithPaths.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: Operations{
+					operationID: {
+						Allow: &Allowance{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+		oasWithPaths.Paths = openapi3.Paths{
+			"/user": {
+				Get: &openapi3.Operation{
+					OperationID: operationID,
+					Responses:   openapi3.NewResponses(),
+				},
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		oasWithPaths.ExtractTo(&convertedAPI)
+
+		var resultOAS OAS
+		resultOAS.Fill(convertedAPI)
+
+		assert.Equal(t, oasWithPaths, resultOAS)
+	})
+
+	t.Run("auth configs", func(t *testing.T) {
+		t.Parallel()
+
+		var api apidef.APIDefinition
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+
+		a := apidef.AuthConfig{}
+		Fill(t, &a, 0)
+		api.AuthConfigs[apidef.AuthTokenType] = a
+
+		sw := &OAS{}
+		sw.Fill(api)
+
+		var converted apidef.APIDefinition
+		sw.ExtractTo(&converted)
+
+		assert.Equal(t, api.AuthConfigs, converted.AuthConfigs)
+	})
+}
+
+	t.Run("nil paths", func(t *testing.T) {
+		t.Parallel()
+
+		var nilOASPaths OAS
+		nilOASPaths.Components = &openapi3.Components{}
+		nilOASPaths.SetTykExtension(&XTykAPIGateway{})
+
+		var convertedAPI apidef.APIDefinition
+		nilOASPaths.ExtractTo(&convertedAPI)
+
+		var resultOAS OAS
+		resultOAS.Fill(convertedAPI)
+
+		// No paths in base OAS produce empty paths{} when converted back
+		nilOASPaths.Paths = make(openapi3.Paths)
+		nilOASPaths.Extensions = nil
+		assert.Equal(t, nilOASPaths, resultOAS)
+	})
+
+	t.Run("extract paths", func(t *testing.T) {
+		const operationID = "userGET"
+		t.Parallel()
+
+		var oasWithPaths OAS
+		oasWithPaths.Components = &openapi3.Components{}
+		oasWithPaths.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: Operations{
+					operationID: {
+						Allow: &Allowance{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+		oasWithPaths.Paths = openapi3.Paths{
+			"/user": {
+				Get: &openapi3.Operation{
+					OperationID: operationID,
+					Responses:   openapi3.NewResponses(),
+				},
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		oasWithPaths.ExtractTo(&convertedAPI)
+
+		var resultOAS OAS
+		resultOAS.Fill(convertedAPI)
+
+		assert.Equal(t, oasWithPaths, resultOAS)
+	})
+
+	t.Run("auth configs", func(t *testing.T) {
+		t.Parallel()
+
+		var api apidef.APIDefinition
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+
+		a := apidef.AuthConfig{}
+		Fill(t, &a, 0)
+		api.AuthConfigs[apidef.AuthTokenType] = a
+
+		sw := &OAS{}
+		sw.Fill(api)
+
+		var converted apidef.APIDefinition
+		sw.ExtractTo(&converted)
+
+		assert.Equal(t, api.AuthConfigs, converted.AuthConfigs)
+	})
+}
+
+func TestOAS_ExtractTo_DontTouchExistingClassicFields(t *testing.T) {
+	var api apidef.APIDefinition
+	api.VersionData.Versions = map[string]apidef.VersionInfo{
+		Main: {
+			ExtendedPaths: apidef.ExtendedPathsSet{
+				TransformHeader: []apidef.HeaderInjectionMeta{
+					{},
+				},
+			},
+		},
+	}
+
+	var s OAS
+	s.ExtractTo(&api)
+
+	assert.Len(t, api.VersionData.Versions[Main].ExtendedPaths.TransformHeader, 1)
+}
+
+func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
+	var a apidef.APIDefinition
+	Fill(t, &a, 0)
+
+	var vInfo apidef.VersionInfo
+	Fill(t, &vInfo, 0)
+	a.VersionData.Versions = map[string]apidef.VersionInfo{
+		Main: vInfo,
+	}
+
+	var s OAS
+	s.ExtractTo(&a)
+
+	a.UseKeylessAccess = false
+	a.UpstreamCertificatesDisabled = false
+	a.CertificatePinningDisabled = false
+	a.Proxy.ServiceDiscovery.CacheDisabled = false
+	a.CustomMiddlewareBundleDisabled = false
+	a.DomainDisabled = false
+	a.ConfigDataDisabled = false
+	a.CustomMiddleware.AuthCheck.Disabled = false
+	a.CustomMiddleware.IdExtractor.Disabled = false
+	a.TagsDisabled = false
+	a.IsOAS = false
+
+	// deprecated fields
+	a.Auth = apidef.AuthConfig{}
+	a.VersionDefinition.StripPath = false
+	a.UseGoPluginAuth = false
+	a.EnableCoProcessAuth = false
+	a.JWTScopeToPolicyMapping = nil
+	a.JWTScopeClaimName = ""
+	a.VersionData.NotVersioned = false
+	vInfo = a.VersionData.Versions[""]
+	vInfo.Name = ""
+	vInfo.Expires = ""
+	vInfo.Paths.Ignored = nil
+	vInfo.Paths.WhiteList = nil
+	vInfo.Paths.BlackList = nil
+	vInfo.OverrideTarget = ""
+	vInfo.UseExtendedPaths = false
+	vInfo.ExtendedPaths.MockResponse = nil
+	vInfo.ExtendedPaths.Cached = nil
+	vInfo.ExtendedPaths.ValidateJSON = nil
+	a.VersionData.Versions[""] = vInfo
+
+	assert.Empty(t, a.Name)
+
+	noOASSupportFields := getNonEmptyFields(a, "APIDefinition")
+
+	expectedFields := []string{
+		"APIDefinition.ListenPort",
+		"APIDefinition.Protocol",
+		"APIDefinition.EnableProxyProtocol",
+		"APIDefinition.RequestSigning.IsEnabled",
+		"APIDefinition.RequestSigning.Secret",
+		"APIDefinition.RequestSigning.KeyId",
+		"APIDefinition.RequestSigning.Algorithm",
+		"APIDefinition.RequestSigning.HeaderList[0]",
+		"APIDefinition.RequestSigning.CertificateId",
+		"APIDefinition.RequestSigning.SignatureHeader",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Filter",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Filter",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].DeleteHeaders[0]",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].AddHeaders[0]",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].ActOnResponse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].DeleteHeaders[0]",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].AddHeaders[0]",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].ActOnResponse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].ThresholdPercent",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Samples",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].ReturnToServiceAfter",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].DisableHalfOpenState",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].RewriteTo",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].On",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.HeaderMatches[0].MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.HeaderMatches[0].Reverse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.QueryValMatches[0].MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.QueryValMatches[0].Reverse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PathPartMatches[0].MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PathPartMatches[0].Reverse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.SessionMetaMatches[0].MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.SessionMetaMatches[0].Reverse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.RequestContextMatches[0].MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.RequestContextMatches[0].Reverse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PayloadMatches.MatchPattern",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PayloadMatches.Reverse",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].RewriteTo",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].SizeLimit",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TrackEndpoints[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TrackEndpoints[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.DoNotTrackEndpoints[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.DoNotTrackEndpoints[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.Internal[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.Internal[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Path",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Variables[0]",
+		"APIDefinition.VersionData.Versions[0].GlobalHeaders[0]",
+		"APIDefinition.VersionData.Versions[0].GlobalHeadersRemove[0]",
+		"APIDefinition.VersionData.Versions[0].GlobalResponseHeaders[0]",
+		"APIDefinition.VersionData.Versions[0].GlobalResponseHeadersRemove[0]",
+		"APIDefinition.VersionData.Versions[0].IgnoreEndpointCase",
+		"APIDefinition.VersionData.Versions[0].GlobalSizeLimit",
+		"APIDefinition.UptimeTests.CheckList[0].CheckURL",
+		"APIDefinition.UptimeTests.CheckList[0].Protocol",
+		"APIDefinition.UptimeTests.CheckList[0].Timeout",
+		"APIDefinition.UptimeTests.CheckList[0].EnableProxyProtocol",
+		"APIDefinition.UptimeTests.CheckList[0].Commands[0].Name",
+		"APIDefinition.UptimeTests.CheckList[0].Commands[0].Message",
+		"APIDefinition.UptimeTests.CheckList[0].Method",
+		"APIDefinition.UptimeTests.CheckList[0].Headers[0]",
+		"APIDefinition.UptimeTests.CheckList[0].Body",
+		"APIDefinition.UptimeTests.Config.ExpireUptimeAnalyticsAfter",
+		"APIDefinition.UptimeTests.Config.ServiceDiscovery.CacheDisabled",
+		"APIDefinition.UptimeTests.Config.RecheckWait",
+		"APIDefinition.Proxy.PreserveHostHeader",
+		"APIDefinition.Proxy.DisableStripSlash",
+		"APIDefinition.Proxy.EnableLoadBalancing",
+		"APIDefinition.Proxy.Targets[0]",
+		"APIDefinition.Proxy.CheckHostAgainstUptimeTests",
+		"APIDefinition.Proxy.Transport.SSLInsecureSkipVerify",
+		"APIDefinition.Proxy.Transport.SSLCipherSuites[0]",
+		"APIDefinition.Proxy.Transport.SSLMinVersion",
+		"APIDefinition.Proxy.Transport.SSLMaxVersion",
+		"APIDefinition.Proxy.Transport.SSLForceCommonNameCheck",
+		"APIDefinition.Proxy.Transport.ProxyURL",
+		"APIDefinition.DisableRateLimit",
+		"APIDefinition.DisableQuota",
+		"APIDefinition.SessionLifetimeRespectsKeyExpiration",
+		"APIDefinition.SessionLifetime",
+		"APIDefinition.AuthProvider.Name",
+		"APIDefinition.AuthProvider.StorageEngine",
+		"APIDefinition.AuthProvider.Meta[0]",
+		"APIDefinition.SessionProvider.Name",
+		"APIDefinition.SessionProvider.StorageEngine",
+		"APIDefinition.SessionProvider.Meta[0]",
+		"APIDefinition.EventHandlers.Events[0]",
+		"APIDefinition.EnableBatchRequestSupport",
+		"APIDefinition.EnableIpWhiteListing",
+		"APIDefinition.AllowedIPs[0]",
+		"APIDefinition.EnableIpBlacklisting",
+		"APIDefinition.BlacklistedIPs[0]",
+		"APIDefinition.DontSetQuotasOnCreate",
+		"APIDefinition.ExpireAnalyticsAfter",
+		"APIDefinition.ResponseProcessors[0].Name",
+		"APIDefinition.ResponseProcessors[0].Options",
+		"APIDefinition.Certificates[0]",
+		"APIDefinition.DoNotTrack",
+		"APIDefinition.EnableContextVars",
+		"APIDefinition.TagHeaders[0]",
+		"APIDefinition.GlobalRateLimit.Rate",
+		"APIDefinition.GlobalRateLimit.Per",
+		"APIDefinition.EnableDetailedRecording",
+		"APIDefinition.GraphQL.Enabled",
+		"APIDefinition.GraphQL.ExecutionMode",
+		"APIDefinition.GraphQL.Version",
+		"APIDefinition.GraphQL.Schema",
+		"APIDefinition.GraphQL.TypeFieldConfigurations[0].TypeName",
+		"APIDefinition.GraphQL.TypeFieldConfigurations[0].FieldName",
+		"APIDefinition.GraphQL.TypeFieldConfigurations[0].Mapping.Disabled",
+		"APIDefinition.GraphQL.TypeFieldConfigurations[0].Mapping.Path",
+		"APIDefinition.GraphQL.TypeFieldConfigurations[0].DataSource.Name",
+		"APIDefinition.GraphQL.TypeFieldConfigurations[0].DataSource.Config[0]",
+		"APIDefinition.GraphQL.GraphQLPlayground.Enabled",
+		"APIDefinition.GraphQL.GraphQLPlayground.Path",
+		"APIDefinition.GraphQL.Engine.FieldConfigs[0].TypeName",
+		"APIDefinition.GraphQL.Engine.FieldConfigs[0].FieldName",
+		"APIDefinition.GraphQL.Engine.FieldConfigs[0].DisableDefaultMapping",
+		"APIDefinition.GraphQL.Engine.FieldConfigs[0].Path[0]",
+		"APIDefinition.GraphQL.Engine.DataSources[0].Kind",
+		"APIDefinition.GraphQL.Engine.DataSources[0].Name",
+		"APIDefinition.GraphQL.Engine.DataSources[0].Internal",
+		"APIDefinition.GraphQL.Engine.DataSources[0].RootFields[0].Type",
+		"APIDefinition.GraphQL.Engine.DataSources[0].RootFields[0].Fields[0]",
+		"APIDefinition.GraphQL.Engine.DataSources[0].Config[0]",
+		"APIDefinition.GraphQL.Engine.GlobalHeaders[0].Key",
+		"APIDefinition.GraphQL.Engine.GlobalHeaders[0].Value",
+		"APIDefinition.GraphQL.Proxy.AuthHeaders[0]",
+		"APIDefinition.GraphQL.Proxy.SubscriptionType",
+		"APIDefinition.GraphQL.Proxy.RequestHeaders[0]",
+		"APIDefinition.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding",
+		"APIDefinition.GraphQL.Subgraph.SDL",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].APIID",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].Name",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].URL",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].SDL",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].Headers[0]",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].SubscriptionType",
+		"APIDefinition.GraphQL.Supergraph.MergedSDL",
+		"APIDefinition.GraphQL.Supergraph.GlobalHeaders[0]",
+		"APIDefinition.GraphQL.Supergraph.DisableQueryBatching",
+		"APIDefinition.AnalyticsPlugin.Enabled",
+		"APIDefinition.AnalyticsPlugin.PluginPath",
+		"APIDefinition.AnalyticsPlugin.FuncName",
+		"APIDefinition.DetailedTracing",
+	}
+
+	assert.Equal(t, expectedFields, noOASSupportFields)
+}
+
+func TestOAS_AddServers(t *testing.T) {
+	t.Parallel()
+	type fields struct {
+		T openapi3.T
+	}
+	type args struct {
+		apiURLs []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+	}{
+		{
+			name:   "empty servers",
+			fields: fields{T: openapi3.T{}},
+			args:   args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+		},
+		{
+			name: "non-empty servers",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			}},
+			args: args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+		},
+		{
+			name: "non-empty servers having same URL that of apiURL",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+					{
+						URL: "http://legacy-upstream.org/api",
+					},
+					{
+						URL: "http://127.0.0.1:8080/api",
+					},
+				},
+			}},
+			args: args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+		},
+		{
+			name: "non-empty servers having same URL that of apiURL",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://127.0.0.1:8080/api",
+					},
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			}},
+			args: args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &OAS{
+				T: tt.fields.T,
+			}
+			s.AddServers(tt.args.apiURLs...)
+			addedServerURLs := make([]string, len(tt.args.apiURLs))
+			for i, server := range s.Servers[:len(tt.args.apiURLs)] {
+				addedServerURLs[i] = server.URL
+			}
+
+			assert.ElementsMatch(t, tt.args.apiURLs, addedServerURLs)
+		})
+	}
+}
+
+func TestOAS_UpdateServers(t *testing.T) {
+	t.Parallel()
+	type fields struct {
+		T openapi3.T
+	}
+	type args struct {
+		apiURL    string
+		oldAPIURL string
+	}
+	tests := []struct {
+		name        string
+		fields      fields
+		args        args
+		expectedURL string
+	}{
+		{
+			name:        "empty servers",
+			fields:      fields{T: openapi3.T{}},
+			args:        args{apiURL: "http://127.0.0.1:8080/api", oldAPIURL: ""},
+			expectedURL: "http://127.0.0.1:8080/api",
+		},
+		{
+			name: "non-empty servers replace with new",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			}},
+			args:        args{apiURL: "http://127.0.0.1:8080/api", oldAPIURL: "http://example-upstream.org/api"},
+			expectedURL: "http://127.0.0.1:8080/api",
+		},
+		{
+			name: "non-empty servers not replace",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			}},
+			args:        args{apiURL: "http://127.0.0.1:8080/api", oldAPIURL: "http://localhost/api"},
+			expectedURL: "http://example-upstream.org/api",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &OAS{
+				T: tt.fields.T,
+			}
+			s.UpdateServers(tt.args.apiURL, tt.args.oldAPIURL)
+			assert.Equal(t, tt.expectedURL, s.Servers[0].URL)
+		})
+	}
+}
+
+func TestOAS_ReplaceServers(t *testing.T) {
+	t.Parallel()
+	type fields struct {
+		T openapi3.T
+	}
+
+	type args struct {
+		apiURLs    []string
+		oldAPIURLs []string
+	}
+
+	tests := []struct {
+		name               string
+		fields             fields
+		args               args
+		expectedServerURls []string
+	}{
+		{
+			name:               "empty servers",
+			fields:             fields{T: openapi3.T{}},
+			args:               args{apiURLs: []string{"http://127.0.0.1:8080/api"}, oldAPIURLs: nil},
+			expectedServerURls: []string{"http://127.0.0.1:8080/api"},
+		},
+		{
+			name: "non-empty servers - remove old and add new",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://tyk.gateway-1.com/api",
+					},
+					{
+						URL: "http://tyk.gateway-2.com/api",
+					},
+				},
+			}},
+			args: args{apiURLs: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"},
+				oldAPIURLs: []string{"http://tyk.gateway-1.com/api", "http://tyk.gateway-2.com/api"}},
+			expectedServerURls: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"},
+		},
+		{
+			name: "non-empty servers - remove old and add new, retain userAdded ones",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://tyk.gateway-1.com/api",
+					},
+					{
+						URL: "http://tyk.gateway-2.com/api",
+					},
+					{
+						URL: "http://upstream.org/api",
+					},
+				},
+			}},
+			args: args{apiURLs: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"},
+				oldAPIURLs: []string{"http://tyk.gateway-1.com/api", "http://tyk.gateway-2.com/api"}},
+			expectedServerURls: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api", "http://upstream.org/api"},
+		},
+		{
+			name: "retain user added servers",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://upstream.org/api",
+					},
+				},
+			}},
+			args: args{apiURLs: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api"},
+				oldAPIURLs: []string{"http://tyk.gateway-1.com/api", "http://tyk.gateway-2.com/api"}},
+			expectedServerURls: []string{"http://tyk.gateway-4.com/api", "http://tyk.gateway-2.com/api", "http://upstream.org/api"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &OAS{
+				T: tt.fields.T,
+			}
+			s.ReplaceServers(tt.args.apiURLs, tt.args.oldAPIURLs)
+			var serverURLs []string
+			for _, server := range s.Servers {
+				serverURLs = append(serverURLs, server.URL)
+			}
+			assert.Equal(t, tt.expectedServerURls, serverURLs)
+		})
+	}
+}
+
+func TestOAS_GetSecuritySchemes(t *testing.T) {
+	token := Token{}
+	Fill(t, &token, 0)
+
+	jwt := JWT{}
+	Fill(t, &jwt, 0)
+
+	oauth := OAuth{}
+	Fill(t, &oauth, 0)
+
+	basic := Basic{}
+	Fill(t, &basic, 0)
+
+	expectedSS := SecuritySchemes{
+		"my_auth":  &token,
+		"my_jwt":   &jwt,
+		"my_oauth": &oauth,
+		"my_basic": &basic,
+	}
+
+	oas := OAS{}
+	xTykAPIGateway := XTykAPIGateway{
+		Server: Server{
+			Authentication: &Authentication{
+				SecuritySchemes: expectedSS,
+			},
+		},
+	}
+
+	oas.SetTykExtension(&xTykAPIGateway)
+
+	oasInBytes, err := json.Marshal(&oas)
+	assert.NoError(t, err)
+
+	var resOAS OAS
+	err = json.Unmarshal(oasInBytes, &resOAS)
+	assert.NoError(t, err)
+
+	assert.Equal(t, &token, resOAS.getTykTokenAuth("my_auth"))
+	assert.Equal(t, &jwt, resOAS.getTykJWTAuth("my_jwt"))
+	assert.Equal(t, &basic, resOAS.getTykBasicAuth("my_basic"))
+	assert.Equal(t, &oauth, resOAS.getTykOAuthAuth("my_oauth"))
+}
+
+func Test_toStructIfMap(t *testing.T) {
+	token := &Token{}
+	Fill(t, token, 0)
+
+	resToken := &Token{}
+	toStructIfMap(token, resToken)
+	assert.Equal(t, &Token{}, resToken)
+
+	tokenInBytes, _ := json.Marshal(token)
+
+	var mapToken map[string]interface{}
+	_ = json.Unmarshal(tokenInBytes, &mapToken)
+
+	toStructIfMap(mapToken, resToken)
+
+	assert.Equal(t, token, resToken)
+}
+
+func TestOAS_MarshalJSON(t *testing.T) {
+	t.Run("nil license and extenalDocs", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Info: &openapi3.Info{
+					License: &openapi3.License{},
+				},
+				ExternalDocs: &openapi3.ExternalDocs{},
+			},
+		}
+
+		inBytes, err := json.Marshal(s)
+		assert.NoError(t, err)
+
+		assert.NotContains(t, string(inBytes), "license")
+		assert.NotContains(t, string(inBytes), "externalDocs")
+	})
+
+	t.Run("should not base64 encode extension values when it's slice of bytes", func(t *testing.T) {
+		s := OAS{
+			openapi3.T{
+				Info: &openapi3.Info{
+					Title: "OAS Doc",
+				},
+				Extensions: map[string]interface{}{
+					ExtensionTykAPIGateway: XTykAPIGateway{
+						Info: Info{
+							Name: "OAS API",
+						},
+					},
+				},
+			},
+		}
+
+		t.Run("int", func(t *testing.T) {
+			copyOAS := s
+			intVal := 9
+			byteRep, _ := json.Marshal(intVal)
+			copyOAS.Extensions["x-abcd"] = byteRep
+
+			data, err := copyOAS.MarshalJSON()
+			assert.NoError(t, err)
+			assert.Contains(t, string(data), `"x-abcd":9`)
+		})
+
+		t.Run("float", func(t *testing.T) {
+			copyOAS := s
+			floatVal := 9.5
+			byteRep, _ := json.Marshal(floatVal)
+			copyOAS.Extensions["x-abcd"] = byteRep
+
+			data, err := copyOAS.MarshalJSON()
+			assert.NoError(t, err)
+			assert.Contains(t, string(data), `"x-abcd":9.5`)
+		})
+
+		t.Run("bool", func(t *testing.T) {
+			copyOAS := s
+			boolVal := false
+			byteRep, _ := json.Marshal(boolVal)
+			copyOAS.Extensions["x-abcd"] = byteRep
+
+			data, err := copyOAS.MarshalJSON()
+			assert.NoError(t, err)
+			assert.Contains(t, string(data), `"x-abcd":false`)
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			copyOAS := s
+			copyOAS.Extensions["x-abcd"] = nil
+
+package oas
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"testing"
+
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
+)
+
+func TestOAS(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty paths", func(t *testing.T) {
+		t.Parallel()
+
+		// Update the test case to fix the failure
+	var emptyOASPaths OAS
+	emptyOASPaths.Components = &openapi3.Components{}
+	emptyOASPaths.Paths = make(openapi3.Paths)
+	emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
+
+	var convertedAPI apidef.APIDefinition
+	emptyOASPaths.ExtractTo(&convertedAPI)
+
+	var resultOAS OAS
+	resultOAS.Fill(convertedAPI)
+
+	emptyOASPaths.Extensions = nil
+	emptyOASPaths.Extensions = nil
+	assert.Equal(t, emptyOASPaths, resultOAS)
 		assert.Equal(t, emptyOASPaths, resultOAS)
 	})
+
+	t.Run("generate OpenAPI document", func(t *testing.T) {
+		t.Parallel()
+
+		// Call the GenerateOpenAPIDocument function
+		GenerateOpenAPIDocument()
+
+		// Read the generated OpenAPI document from the file
+		data, err := ioutil.ReadFile("openapi.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Unmarshal the data into an OpenAPI object
+		var doc map[string]interface{}
+		err = json.Unmarshal(data, &doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Verify the OpenAPI document
+		// TODO: Implement this function
+		verifyOpenAPIComponents(doc)
+	})
+}
+
+	t.Run("nil paths", func(t *testing.T) {
+		t.Parallel()
+
+		var nilOASPaths OAS
+		nilOASPaths.Components = &openapi3.Components{}
+		nilOASPaths.SetTykExtension(&XTykAPIGateway{})
+
+		var convertedAPI apidef.APIDefinition
+		nilOASPaths.ExtractTo(&convertedAPI)
+
+		var resultOAS OAS
+		resultOAS.Fill(convertedAPI)
+
+		// No paths in base OAS produce empty paths{} when converted back
+		nilOASPaths.Paths = make(openapi3.Paths)
+		nilOASPaths.Extensions = nil
+		assert.Equal(t, nilOASPaths, resultOAS)
+	})
+
+	t.Run("extract paths", func(t *testing.T) {
+		const operationID = "userGET"
+		t.Parallel()
+
+		var oasWithPaths OAS
+		oasWithPaths.Components = &openapi3.Components{}
+		oasWithPaths.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: Operations{
+					operationID: {
+						Allow: &Allowance{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+		oasWithPaths.Paths = openapi3.Paths{
+			"/user": {
+				Get: &openapi3.Operation{
+					OperationID: operationID,
+					Responses:   openapi3.NewResponses(),
+				},
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		oasWithPaths.ExtractTo(&convertedAPI)
+
+		var resultOAS OAS
+		resultOAS.Fill(convertedAPI)
+
+		assert.Equal(t, oasWithPaths, resultOAS)
+	})
+
+	t.Run("auth configs", func(t *testing.T) {
+		t.Parallel()
+
+		var api apidef.APIDefinition
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+
+		a := apidef.AuthConfig{}
+		Fill(t, &a, 0)
+		api.AuthConfigs[apidef.AuthTokenType] = a
+
+		sw := &OAS{}
+		sw.Fill(api)
+
+		var converted apidef.APIDefinition
+		sw.ExtractTo(&converted)
+
+		assert.Equal(t, api.AuthConfigs, converted.AuthConfigs)
+	})
+}
 
 	t.Run("nil paths", func(t *testing.T) {
 		t.Parallel()
