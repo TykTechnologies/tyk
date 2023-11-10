@@ -1148,7 +1148,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 	return intVal, result
 }
 
-func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
+func (r *RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
 	if err := r.up(); err != nil {
 		log.Debug(err)
 		return 0, nil
@@ -1297,4 +1297,68 @@ func (r *RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) 
 
 func (r *RedisCluster) ControllerInitiated() bool {
 	return r.RedisController != nil
+}
+
+// ScanKeys will return all keys according to the pattern.
+func (r *RedisCluster) ScanKeys(pattern string) ([]string, error) {
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return nil, err
+	}
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	log.Debug("[STORE] scanning keys by: ", pattern)
+
+	fnFetchKeys := func(client *redis.Client) ([]string, error) {
+		values := make([]string, 0)
+
+		iter := client.Scan(r.RedisController.ctx, 0, pattern, 0).Iterator()
+		for iter.Next(r.RedisController.ctx) {
+			values = append(values, iter.Val())
+		}
+
+		if err := iter.Err(); err != nil {
+			return nil, err
+		}
+
+		return values, nil
+	}
+
+	keys := make([]string, 0)
+
+	switch v := singleton.(type) {
+	case *redis.ClusterClient:
+		ch := make(chan []string)
+
+		go func() {
+			err = v.ForEachMaster(r.RedisController.ctx, func(ctx context.Context, client *redis.Client) error {
+				values, err := fnFetchKeys(client)
+				if err != nil {
+					return err
+				}
+
+				ch <- values
+				return nil
+			})
+			close(ch)
+		}()
+
+		for res := range ch {
+			keys = append(keys, res...)
+		}
+	case *redis.Client:
+		keys, err = fnFetchKeys(v)
+	}
+
+	if err != nil {
+		log.Error("Error while scanning for keys:", err)
+		return nil, err
+	}
+
+	return keys, nil
 }
