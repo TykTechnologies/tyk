@@ -10,6 +10,10 @@ on:
       - reopened
       - synchronize
       - ready_for_review
+  push:
+    branches:
+      - master
+      - release-**
 
 env:
   TYK_DB_REDISHOST: localhost
