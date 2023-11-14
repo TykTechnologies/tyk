@@ -293,18 +293,18 @@ jobs:
             path: ${{ github.workspace }}/reports
 
       - name: Fetch commit author
-        #if: ${{ failure() && !github.event.pull_request.draft }}            
+        if: ${{ steps.test_execution.outcome != 'success' && !github.event.pull_request.draft }}            
         run: echo "GIT_USER_EMAIL=$(git show -s --format='%ae' HEAD)" >> $GITHUB_ENV
 
       - name: Fetch slack user
-        #if: ${{ failure() && !github.event.pull_request.draft }}      
+        if: ${{ steps.test_execution.outcome != 'success' && !github.event.pull_request.draft }}      
         id: fetch_slack_user
         uses: TykTechnologies/github-actions/.github/actions/github-to-slack@main
         with:
           github_email: ${{ env.GIT_USER_EMAIL }}
     
       - name: Notify slack
-        #if: ${{ failure() && !github.event.pull_request.draft }}
+        if: ${{ steps.test_execution.outcome != 'success' && !github.event.pull_request.draft }}
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_WEBHOOK: ${{ secrets.ALARM_PLAYGROUND_SLACK_WEBHOOK }}
@@ -315,6 +315,7 @@ jobs:
           SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|SEE EXECUTION DETAILS HERE>"
       
       - name: Comment on PR
+        if: ${{ always() && !github.event.pull_request.draft }}
         uses: mshick/add-pr-comment@v2
         with:
           message: |
@@ -325,7 +326,6 @@ jobs:
             [Execution page](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
           repo-token: ${{ secrets.ORG_GH_TOKEN }}
           message-id: ${{ matrix.msgid }}
-          
         env:
           STATUS: "${{ steps.test_execution.outcome == 'success' && ':white_check_mark:' || ':no_entry_sign:' }}"
   
@@ -340,6 +340,7 @@ jobs:
   xray:
     needs: api-tests
     runs-on: ubuntu-latest
+    if: always() && github.event_name == 'push'
 
     steps:
       - name: Checkout of tyk-automated-tests
@@ -360,8 +361,6 @@ jobs:
           CLIENT_ID: ${{secrets.XRAY_CLIENT_ID}}
           CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
           BRANCH: ${{ github.ref }}
-
-# TODO: PR comment, using just one comment and updating, not a new comment each time
 
   upgrade-deb:
     if: startsWith(github.ref, 'refs/tags')
