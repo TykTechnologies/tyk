@@ -452,6 +452,15 @@
     "enable_sentinel_rate_limiter": {
       "type": "boolean"
     },
+    "redis_rolling_limiter_drl_request_batching": {
+      "type": "boolean"
+    },
+    "redis_rolling_limiter_drl_request_batch_size": {
+      "type": "integer"
+    },
+    "redis_rolling_limiter_drl_request_batch_soft_limit": {
+      "type": "boolean"
+    },
     "enable_separate_cache_store": {
       "type": "boolean"
     },
