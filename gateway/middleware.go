@@ -242,10 +242,14 @@ type BaseMiddleware struct {
 }
 
 func (t *BaseMiddleware) Base() *BaseMiddleware {
+	t.loggerMu.Lock()
+	defer t.loggerMu.Unlock()
+
 	return &BaseMiddleware{
-		Spec:  t.Spec,
-		Proxy: t.Proxy,
-		Gw:    t.Gw,
+		Spec:   t.Spec,
+		Proxy:  t.Proxy,
+		Gw:     t.Gw,
+		logger: t.logger,
 	}
 }
 
