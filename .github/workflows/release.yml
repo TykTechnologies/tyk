@@ -315,7 +315,6 @@ jobs:
           SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|SEE EXECUTION DETAILS HERE>"
       
       - name: Comment on PR
-        if: ${{ always() && !github.event.pull_request.draft }}
         uses: mshick/add-pr-comment@v2
         with:
           message: |
