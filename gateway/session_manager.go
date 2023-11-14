@@ -36,6 +36,47 @@ const (
 type SessionLimiter struct {
 	bucketStore leakybucket.Storage
 	Gw          *Gateway `json:"-"`
+	hack        int32
+}
+
+func (l *SessionLimiter) shouldSendRedisBatch(rateLimiterKey string,
+	currentSession *user.SessionState,
+	globalConf *config.Config,
+	dryRun bool, per float64) bool {
+	// In-memory limiter
+	if l.bucketStore == nil {
+		l.bucketStore = memorycache.New()
+	}
+
+	bucketKey := rateLimiterKey + currentSession.LastUpdated + string(l.hack)
+
+	// DRL will always overflow with more servers on low rates
+	bucketRate := uint(float64(globalConf.RedisRollingLimiterDRLRequestBatchSize) * float64(l.Gw.DRLManager.RequestTokenValue))
+	if bucketRate < uint(l.Gw.DRLManager.CurrentTokenValue()) {
+		bucketRate = uint(l.Gw.DRLManager.CurrentTokenValue())
+	}
+	userBucket, err := l.bucketStore.Create(bucketKey, bucketRate, time.Duration(per)*time.Second)
+	if err != nil {
+		log.Error("Failed to create bucket!")
+		return true
+	}
+
+	if dryRun {
+		// if userBucket is full and not expired.
+		if userBucket.Remaining() == 0 && time.Now().Before(userBucket.Reset()) {
+			// Cannot delete bucket, so we will change the name for the time being, this will case more memory consumption for the time being
+			l.hack = l.hack + 1
+			return true
+		}
+	} else {
+		_, errF := userBucket.Add(uint(l.Gw.DRLManager.CurrentTokenValue()))
+		if errF != nil {
+			// Cannot delete bucket, so we will change the name for the time being, this will case more memory consumption for the time being
+			l.hack = l.hack + 1
+			return true
+		}
+	}
+	return false
 }
 
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
@@ -54,6 +95,22 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		rate = currentSession.Rate
 	}
 
+	shouldBatch := globalConf.RedisRollingLimiterDRLRequestBatching
+	var batchSize int
+	var shouldSendBatch bool
+
+	if shouldBatch {
+		shouldSendBatch = l.shouldSendRedisBatch(rateLimiterKey, currentSession, globalConf, dryRun, per)
+		batchSize = globalConf.RedisRollingLimiterDRLRequestBatchSize
+
+		if batchSize < 1 {
+			batchSize = 1
+		}
+		if !shouldSendBatch && globalConf.RedisRollingLimiterDRLRequestBatchSoftLimit {
+			return false
+		}
+	}
+
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	pipeline := globalConf.EnableNonTransactionalRateLimiter
@@ -62,7 +119,9 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	if dryRun {
 		ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
 	} else {
-		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+		if (shouldBatch && shouldSendBatch) || !shouldBatch {
+			ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+		}
 	}
 
 	//log.Info("Num Requests: ", ratePerPeriodNow)
@@ -73,6 +132,11 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
 	}
+
+	if shouldBatch {
+		ratePerPeriodNow = ratePerPeriodNow * batchSize
+	}
+
 	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
 	// will only work with ththese two lines here
 	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
@@ -154,7 +218,7 @@ func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string,
 	}
 
 	if dryRun {
-		// if userBucket is empty and not expired.
+		// if userBucket is full and not expired.
 		if userBucket.Remaining() == 0 && time.Now().Before(userBucket.Reset()) {
 			return true
 		}

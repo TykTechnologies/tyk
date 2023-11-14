@@ -732,6 +732,23 @@ type Config struct {
 	// The standard rate limiter offers similar performance as the sentinel-based limiter. This is disabled by default.
 	EnableSentinelRateLimiter bool `json:"enable_sentinel_rate_limiter"`
 
+	// Enabling this option will allow the redis rate limiter to utilize a
+	// leaky bucket algorithm in-memory per gateway to minimize redis overhead.
+	// This should be set to a small value, and in the worst case scenario will
+	// violate the rate limit by the (batch size - 1) * number of gateways.
+	RedisRollingLimiterDRLRequestBatching bool `json:"redis_rolling_limiter_drl_request_batching"`
+
+	// This option allows you to set the batch size for the rolling limiter
+	// leaky bucket.
+	RedisRollingLimiterDRLRequestBatchSize int `json:"redis_rolling_limiter_drl_request_batch_size"`
+
+	// To decrease the load on Redis further, you can choose to set the batch
+	// soft limit to true which will only query Redis when the batch size is
+	// reached. If you set this option to false, Tyk will continue to query
+	// Redis every call, but will only set Redis when the batch size is
+	// reached.
+	RedisRollingLimiterDRLRequestBatchSoftLimit bool `json:"redis_rolling_limiter_drl_request_batch_soft_limit"`
+
 	// An enhancement for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
 	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
 
