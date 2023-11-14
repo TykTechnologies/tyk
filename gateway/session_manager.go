@@ -118,15 +118,9 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	var ratePerPeriodNow int
 	if dryRun {
-		if shouldBatch {
-			ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per/float64(batchSize)), pipeline)
-		} else {
-			ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
-		}
+		ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
 	} else {
-		if shouldBatch && shouldSendBatch {
-			ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per/float64(batchSize)), "-1", pipeline)
-		} else {
+		if (shouldBatch && shouldSendBatch) || !shouldBatch {
 			ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
 		}
 	}
