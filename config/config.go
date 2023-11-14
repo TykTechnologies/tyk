@@ -739,13 +739,6 @@ type Config struct {
 	// leaky bucket.
 	RedisRollingLimiterDRLRequestBatchSize int `json:"redis_rolling_limiter_drl_request_batch_size"`
 
-	// To decrease the load on Redis further, you can choose to set the batch
-	// soft limit to true which will only query Redis when the batch size is
-	// reached. If you set this option to false, Tyk will continue to query
-	// Redis every call, but will only set Redis when the batch size is
-	// reached.
-	RedisRollingLimiterDRLRequestBatchSoftLimit bool `json:"redis_rolling_limiter_drl_request_batch_soft_limit"`
-
 	// To enable, set to `true`. The sentinel-based rate limiter delivers a smoother performance curve as rate-limit calculations happen off-thread, but a stricter time-out based cool-down for clients. For example, when a throttling action is triggered, they are required to cool-down for the period of the rate limit.
 	// Disabling the sentinel based rate limiter will make rate-limit calculations happen on-thread and therefore offers a staggered cool-down and a smoother rate-limit experience for the client.
 	// For example, you can slow your connection throughput to regain entry into your rate limit. This is more of a “throttle” than a “block”.

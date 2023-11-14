@@ -48,13 +48,9 @@ func (l *SessionLimiter) shouldSendRedisBatch(rateLimiterKey string,
 		l.bucketStore = memorycache.New()
 	}
 
-	bucketKey := rateLimiterKey + currentSession.LastUpdated + string(l.hack)
+	bucketKey := fmt.Sprintf("%s%s-%d", rateLimiterKey, currentSession.LastUpdated, l.hack)
 
-	// DRL will always overflow with more servers on low rates
-	bucketRate := uint(float64(globalConf.RedisRollingLimiterDRLRequestBatchSize) * float64(l.Gw.DRLManager.RequestTokenValue))
-	if bucketRate < uint(l.Gw.DRLManager.CurrentTokenValue()) {
-		bucketRate = uint(l.Gw.DRLManager.CurrentTokenValue())
-	}
+	bucketRate := uint(globalConf.RedisRollingLimiterDRLRequestBatchSize)
 	userBucket, err := l.bucketStore.Create(bucketKey, bucketRate, time.Duration(per)*time.Second)
 	if err != nil {
 		log.Error("Failed to create bucket!")
@@ -69,7 +65,7 @@ func (l *SessionLimiter) shouldSendRedisBatch(rateLimiterKey string,
 			return true
 		}
 	} else {
-		_, errF := userBucket.Add(uint(l.Gw.DRLManager.CurrentTokenValue()))
+		_, errF := userBucket.Add(1)
 		if errF != nil {
 			// Cannot delete bucket, so we will change the name for the time being, this will case more memory consumption for the time being
 			l.hack = l.hack + 1
@@ -106,10 +102,6 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		if batchSize < 1 {
 			batchSize = 1
 		}
-
-		if !shouldSendBatch && globalConf.RedisRollingLimiterDRLRequestBatchSoftLimit {
-			return false
-		}
 	}
 
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
@@ -122,6 +114,8 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	} else {
 		if (shouldBatch && shouldSendBatch) || !shouldBatch {
 			ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+		} else if shouldBatch {
+			ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
 		}
 	}
 
