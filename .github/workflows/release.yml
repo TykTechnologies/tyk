@@ -340,7 +340,6 @@ jobs:
   xray:
     needs: api-tests
     runs-on: ubuntu-latest
-    if: always() && github.event_name == 'push'
 
     steps:
       - name: Checkout of tyk-automated-tests
