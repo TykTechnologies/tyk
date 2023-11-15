@@ -113,7 +113,7 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 
 	if !result.Valid() {
 		combinedErr := &multierror.Error{}
-		combinedErr.ErrorFormat = tykerrors.ErrorFormatter
+		combinedErr.ErrorFormat = tykerrors.Formatter
 
 		validationErrs := result.Errors()
 		for _, validationErr := range validationErrs {

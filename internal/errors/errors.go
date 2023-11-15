@@ -2,7 +2,7 @@ package errors
 
 import "strings"
 
-func ErrorFormatter(errs []error) string {
+func Formatter(errs []error) string {
 	var result strings.Builder
 	for i, err := range errs {
 		result.WriteString(err.Error())

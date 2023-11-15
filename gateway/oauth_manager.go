@@ -1220,7 +1220,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	close(errs)
 
 	combinedErr := &multierror.Error{
-		ErrorFormat: tykerrors.ErrorFormatter,
+		ErrorFormat: tykerrors.Formatter,
 	}
 
 	for err := range errs {

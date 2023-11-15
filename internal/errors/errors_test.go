@@ -30,9 +30,9 @@ func TestErrorFormatter(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := ErrorFormatter(tc.errs)
+			result := Formatter(tc.errs)
 			if result != tc.expected {
-				t.Errorf("ErrorFormatter() = %v, want %v", result, tc.expected)
+				t.Errorf("Formatter() = %v, want %v", result, tc.expected)
 			}
 		})
 	}
