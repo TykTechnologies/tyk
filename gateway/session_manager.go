@@ -37,7 +37,35 @@ const (
 type SessionLimiter struct {
 	bucketStore         leakybucket.Storage
 	Gw                  *Gateway `json:"-"`
+	hack                int32
 	nextAvailableRateAt *time.Time
+}
+
+func (l *SessionLimiter) shouldSendRedisBatch(rateLimiterKey string,
+	currentSession *user.SessionState,
+	batchSize uint,
+	per float64) bool {
+
+	// In-memory limiter
+	if l.bucketStore == nil {
+		l.bucketStore = memorycache.New()
+	}
+
+	bucketKey := fmt.Sprintf("%s%s-%d", rateLimiterKey, currentSession.LastUpdated, l.hack)
+	userBucket, err := l.bucketStore.Create(bucketKey, batchSize, time.Duration(per)*time.Second)
+	if err != nil {
+		log.Error("Failed to create bucket!")
+		return true
+	}
+
+	_, errF := userBucket.Add(1)
+	if errF != nil {
+		// Cannot delete bucket, so we will change the name for the time being, this will case more memory consumption for the time being
+		l.hack = l.hack + 1
+		return true
+	}
+
+	return false
 }
 
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
@@ -67,6 +95,19 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		}
 	}
 
+	shouldBatch := globalConf.RedisRollingLimiterDRLRequestBatching
+	var batchSize uint
+	var shouldSendBatch bool
+
+	if shouldBatch {
+		batchSize = uint(globalConf.RedisRollingLimiterDRLRequestBatchSize)
+		if batchSize < 1 {
+			batchSize = 1
+		}
+
+		shouldSendBatch = l.shouldSendRedisBatch(rateLimiterKey, currentSession, batchSize, per)
+	}
+
 	var ratePerPeriodNow int
 	var timestamps []interface{}
 	pipeline := globalConf.EnableNonTransactionalRateLimiter
@@ -74,7 +115,11 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	if dryRun {
 		ratePerPeriodNow, timestamps = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
 	} else {
-		ratePerPeriodNow, timestamps = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+		if !shouldBatch || (shouldBatch && shouldSendBatch) {
+			ratePerPeriodNow, timestamps = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+		} else if shouldBatch {
+			ratePerPeriodNow, timestamps = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
+		}
 	}
 
 	//log.Info("Num Requests: ", ratePerPeriodNow)
@@ -84,6 +129,10 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	if globalConf.EnableSentinelRateLimiter || globalConf.DRLEnableSentinelRateLimiter {
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
+	}
+
+	if shouldBatch {
+		ratePerPeriodNow = ratePerPeriodNow * int(batchSize)
 	}
 
 	if ratePerPeriodNow >= int(rate) {
@@ -103,8 +152,6 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		nextAvailableRateAt := windowStartTimestamp.Add(time.Duration(per * float64(time.Second)))
 		log.Debug(fmt.Sprintf("Rate limit exceeded, next available limit at %s", nextAvailableRateAt))
 		l.nextAvailableRateAt = &nextAvailableRateAt
-	} else {
-		l.nextAvailableRateAt = nil
 	}
 
 	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
@@ -121,6 +168,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		return true
 	}
 
+	l.nextAvailableRateAt = nil
 	return false
 }
 
