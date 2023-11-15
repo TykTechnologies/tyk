@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/TykTechnologies/leakybucket"
@@ -34,45 +35,36 @@ const (
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
 type SessionLimiter struct {
-	bucketStore leakybucket.Storage
-	Gw          *Gateway `json:"-"`
-	hack        int32
+	bucketStore         leakybucket.Storage
+	Gw                  *Gateway `json:"-"`
+	hack                int32
+	nextAvailableRateAt *time.Time
 }
 
 func (l *SessionLimiter) shouldSendRedisBatch(rateLimiterKey string,
 	currentSession *user.SessionState,
-	globalConf *config.Config,
-	dryRun bool, per float64) bool {
+	batchSize uint,
+	per float64) bool {
+
 	// In-memory limiter
 	if l.bucketStore == nil {
 		l.bucketStore = memorycache.New()
 	}
 
 	bucketKey := fmt.Sprintf("%s%s-%d", rateLimiterKey, currentSession.LastUpdated, l.hack)
-
-	// DRL will always overflow with more servers on low rates
-	bucketRate := uint(globalConf.RedisRollingLimiterDRLRequestBatchSize)
-	userBucket, err := l.bucketStore.Create(bucketKey, bucketRate, time.Duration(per)*time.Second)
+	userBucket, err := l.bucketStore.Create(bucketKey, batchSize, time.Duration(per)*time.Second)
 	if err != nil {
 		log.Error("Failed to create bucket!")
 		return true
 	}
 
-	if dryRun {
-		// if userBucket is full and not expired.
-		if userBucket.Remaining() == 0 && time.Now().Before(userBucket.Reset()) {
-			// Cannot delete bucket, so we will change the name for the time being, this will case more memory consumption for the time being
-			l.hack = l.hack + 1
-			return true
-		}
-	} else {
-		_, errF := userBucket.Add(1)
-		if errF != nil {
-			// Cannot delete bucket, so we will change the name for the time being, this will case more memory consumption for the time being
-			l.hack = l.hack + 1
-			return true
-		}
+	_, errF := userBucket.Add(1)
+	if errF != nil {
+		// Cannot delete bucket, so we will change the name for the time being, this will case more memory consumption for the time being
+		l.hack = l.hack + 1
+		return true
 	}
+
 	return false
 }
 
@@ -92,31 +84,41 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		rate = currentSession.Rate
 	}
 
-	shouldBatch := globalConf.RedisRollingLimiterDRLRequestBatching
-	var batchSize int
-	var shouldSendBatch bool
+	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
+	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 
-	if shouldBatch {
-		shouldSendBatch = l.shouldSendRedisBatch(rateLimiterKey, currentSession, globalConf, dryRun, per)
-		batchSize = globalConf.RedisRollingLimiterDRLRequestBatchSize
-
-		if batchSize < 1 {
-			batchSize = 1
+	// Short circuit if rolling window start has not been dropped yet.
+	if l.nextAvailableRateAt != nil {
+		if !time.Now().After(*l.nextAvailableRateAt) {
+			log.Debug("[RATELIMIT] Rolling Window limit is still not available, next available at ", *l.nextAvailableRateAt)
+			return true
 		}
 	}
 
-	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
-	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
-	pipeline := globalConf.EnableNonTransactionalRateLimiter
+	shouldBatch := globalConf.RedisRollingLimiterDRLRequestBatching
+	var batchSize uint
+	var shouldSendBatch bool
+
+	if shouldBatch {
+		batchSize = uint(globalConf.RedisRollingLimiterDRLRequestBatchSize)
+		if batchSize < 1 {
+			batchSize = 1
+		}
+
+		shouldSendBatch = l.shouldSendRedisBatch(rateLimiterKey, currentSession, batchSize, per)
+	}
 
 	var ratePerPeriodNow int
+	var timestamps []interface{}
+	pipeline := globalConf.EnableNonTransactionalRateLimiter
+
 	if dryRun {
-		ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
+		ratePerPeriodNow, timestamps = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
 	} else {
-		if (shouldBatch && shouldSendBatch) || !shouldBatch {
-			ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+		if !shouldBatch || (shouldBatch && shouldSendBatch) {
+			ratePerPeriodNow, timestamps = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
 		} else if shouldBatch {
-			ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
+			ratePerPeriodNow, timestamps = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
 		}
 	}
 
@@ -130,7 +132,26 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	}
 
 	if shouldBatch {
-		ratePerPeriodNow = ratePerPeriodNow * batchSize
+		ratePerPeriodNow = ratePerPeriodNow * int(batchSize)
+	}
+
+	if ratePerPeriodNow >= int(rate) {
+		// Get the first timestamp inserted which would be the beginning of the rolling window
+		unixTimestamp, err := strconv.ParseInt(timestamps[0].(string), 10, 64)
+		if err != nil {
+			log.Error("Error parsing Unix timestamp:", err)
+			return true
+		}
+
+		// Convert nanoseconds to seconds and remaining nanoseconds
+		seconds := unixTimestamp / int64(time.Second)
+		nanoseconds := unixTimestamp % int64(time.Second)
+
+		// Create a time.Time from the Unix timestamp
+		windowStartTimestamp := time.Unix(seconds, nanoseconds)
+		nextAvailableRateAt := windowStartTimestamp.Add(time.Duration(per * float64(time.Second)))
+		log.Debug(fmt.Sprintf("Rate limit exceeded, next available limit at %s", nextAvailableRateAt))
+		l.nextAvailableRateAt = &nextAvailableRateAt
 	}
 
 	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
@@ -143,9 +164,11 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 				store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
 			}
 		}
+
 		return true
 	}
 
+	l.nextAvailableRateAt = nil
 	return false
 }
 
