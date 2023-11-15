@@ -152,6 +152,8 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		nextAvailableRateAt := windowStartTimestamp.Add(time.Duration(per * float64(time.Second)))
 		log.Debug(fmt.Sprintf("Rate limit exceeded, next available limit at %s", nextAvailableRateAt))
 		l.nextAvailableRateAt = &nextAvailableRateAt
+	} else {
+		l.nextAvailableRateAt = nil
 	}
 
 	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
@@ -168,7 +170,6 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		return true
 	}
 
-	l.nextAvailableRateAt = nil
 	return false
 }
 
