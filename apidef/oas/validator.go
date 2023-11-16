@@ -14,6 +14,7 @@ import (
 	pkgver "github.com/hashicorp/go-version"
 	"github.com/xeipuuv/gojsonschema"
 
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -32,17 +33,6 @@ var (
 	schemaOnce sync.Once
 
 	oasJSONSchemas map[string][]byte
-	errorFormatter = func(errs []error) string {
-		var result strings.Builder
-		for i, err := range errs {
-			result.WriteString(err.Error())
-			if i < len(errs)-1 {
-				result.WriteString("\n")
-			}
-		}
-
-		return result.String()
-	}
 
 	defaultVersion string
 )
@@ -123,7 +113,7 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 
 	if !result.Valid() {
 		combinedErr := &multierror.Error{}
-		combinedErr.ErrorFormat = errorFormatter
+		combinedErr.ErrorFormat = tykerrors.Formatter
 
 		validationErrs := result.Errors()
 		for _, validationErr := range validationErrs {
