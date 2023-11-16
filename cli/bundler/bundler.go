@@ -30,7 +30,7 @@ const (
 )
 
 var (
-	bundler *Bundler
+	bundler *Bundler = &Bundler{}
 
 	errNoHooks      = errors.New("No hooks defined")
 	errNoDriver     = errors.New("No driver specified")
@@ -47,10 +47,6 @@ type Bundler struct {
 	bundlePath   *string
 	skipSigning  *bool
 	manifestPath *string
-}
-
-func init() {
-	bundler = &Bundler{}
 }
 
 // Bundle is the entrypoint function for this subcommand.

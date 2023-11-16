@@ -23,7 +23,8 @@ const (
 )
 
 var (
-	imp            *Importer
+	imp *Importer = &Importer{}
+
 	errUnknownMode = errors.New("Unknown mode")
 )
 
@@ -40,10 +41,6 @@ type Importer struct {
 	asMock         *bool
 	forAPI         *string
 	asVersion      *string
-}
-
-func init() {
-	imp = &Importer{}
 }
 
 // AddTo initializes an importer object.

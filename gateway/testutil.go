@@ -230,6 +230,8 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 }
 
 func InitTestMain(ctx context.Context, m *testing.M) int {
+	test.InitTestMain(ctx, m)
+
 	if EnableTestDNSMock {
 		var errMock error
 		MockHandle, errMock = test.InitDNSMock(test.DomainsToAddresses, nil)

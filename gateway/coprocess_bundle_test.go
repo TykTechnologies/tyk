@@ -22,11 +22,9 @@ var (
 	testBundlesPath = filepath.Join(testMiddlewarePath, "bundles")
 )
 
-var pkgPath string
-
-func init() {
+func pkgPath() string {
 	_, filename, _, _ := runtime.Caller(0)
-	pkgPath = filepath.Dir(filename) + "./.."
+	return filepath.Dir(filename) + "./.."
 }
 
 var grpcBundleWithAuthCheck = map[string]string{
@@ -233,7 +231,7 @@ func TestResponseOverride(t *testing.T) {
 	ts := StartTest(nil, TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
-			PythonPathPrefix: pkgPath,
+			PythonPathPrefix: pkgPath(),
 			PythonVersion:    pythonVersion,
 		}})
 	defer ts.Close()

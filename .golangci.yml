@@ -75,6 +75,7 @@ linters:
     - ireturn
     - goerr113
   enable:
+    - gochecknoinits
     - thelper
     - errcheck
     - errorlint
