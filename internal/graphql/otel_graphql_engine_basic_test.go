@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel/attribute"
+	"go.uber.org/mock/gomock"
 
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 )
