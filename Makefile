@@ -36,7 +36,7 @@ lint-fast: lint-install
 	go mod tidy
 
 lint-install:
-	go install golang.org/x/tools/cmd/goimports@latest
+	go install golang.org/x/tools/cmd/goimports@v0.10.0
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.0
 	go install github.com/fatih/faillint@latest
 	go install github.com/golang/mock/mockgen@v1.6.0
