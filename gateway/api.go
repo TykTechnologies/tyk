@@ -68,6 +68,10 @@ import (
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 )
 
+const (
+	oAuthClientTokensKeyPattern = "oauth-data.*oauth-client-tokens.*"
+)
+
 var (
 	ErrRequestMalformed = errors.New("request malformed")
 )
@@ -2650,6 +2654,26 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 	}).Info("Retrieved OAuth client ID")
 
 	return reportableClientData, http.StatusOK
+}
+
+func (gw *Gateway) oAuthTokensHandler(w http.ResponseWriter, r *http.Request) {
+	if !r.URL.Query().Has("scope") {
+		doJSONWrite(w, http.StatusUnprocessableEntity, apiError("scope parameter is required"))
+		return
+	}
+
+	if r.URL.Query().Get("scope") != "lapsed" {
+		doJSONWrite(w, http.StatusBadRequest, apiError("unknown scope"))
+		return
+	}
+
+	err := gw.purgeLapsedOAuthTokens()
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError("error purging lapsed tokens"))
+		return
+	}
+
+	doJSONWrite(w, http.StatusOK, apiOk("lapsed tokens purged"))
 }
 
 // Delete Client
