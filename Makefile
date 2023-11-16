@@ -39,7 +39,7 @@ lint-install:
 	go install golang.org/x/tools/cmd/goimports@latest
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.0
 	go install github.com/fatih/faillint@latest
-	go install github.com/golang/mock/mockgen@v1.6.0
+	go install go.uber.org/mock/mockgen@v0.3.0
 
 .PHONY: bench
 bench:
