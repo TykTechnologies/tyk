@@ -78,7 +78,7 @@ if [[ "$GO_GET" == "1" ]]; then
 	go get github.com/TykTechnologies/tyk@${GITHUB_SHA}
 fi
 
-CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
+CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -ldflags "-pluginpath=${PLUGIN_BUILD_PATH}" -o $plugin_name
 set +x
 
 mv $plugin_name $PLUGIN_SOURCE_PATH
