@@ -67,6 +67,14 @@ go work use ./$(basename $PLUGIN_BUILD_PATH)
 # Go to plugin build path
 cd $PLUGIN_BUILD_PATH
 
+if [ -n "${plugin_id}" ]; then
+	for filename in $(find ./ -name "*.go"); do
+		path=$(dirname $filename)
+		name=$(basename $filename)
+		mv $filename $path/${plugin_id}_$name
+	done
+fi
+
 # Dump settings for inspection
 
 echo "PLUGIN_BUILD_PATH: ${PLUGIN_BUILD_PATH}"
@@ -78,10 +86,11 @@ if [[ "$GO_GET" == "1" ]]; then
 	go get github.com/TykTechnologies/tyk@${GITHUB_SHA}
 fi
 
-CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -ldflags "-pluginpath=${PLUGIN_BUILD_PATH}" -o $plugin_name
+CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
+
 set +x
 
-mv $plugin_name $PLUGIN_SOURCE_PATH
+mv *.so $PLUGIN_SOURCE_PATH
 
 # Clean up workspace
 rm -f $WORKSPACE_ROOT/go.work
