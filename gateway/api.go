@@ -35,7 +35,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -47,9 +46,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/TykTechnologies/tyk/internal/uuid"
-
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/url"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
@@ -2656,7 +2655,7 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 }
 
 func (gw *Gateway) oAuthTokensHandler(w http.ResponseWriter, r *http.Request) {
-	if !r.URL.Query().Has("scope") {
+	if !url.QueryHas(r.URL.Query(), "scope") {
 		doJSONWrite(w, http.StatusUnprocessableEntity, apiError("scope parameter is required"))
 		return
 	}
