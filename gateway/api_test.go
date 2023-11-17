@@ -3881,3 +3881,71 @@ func TestOrgKeyHandler_LastUpdated(t *testing.T) {
 		}},
 	}...)
 }
+
+func TestPurgeOAuthClientTokens(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		// set tokens to be expired after 1 second
+		globalConf.OauthTokenExpire = 1
+		// cleanup tokens older than 2 seconds
+		globalConf.OauthTokenExpiredRetainPeriod = 2
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	t.Run("scope validation", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				AdminAuth: true,
+				Path:      "/tyk/oauth/tokens/",
+				Method:    http.MethodDelete,
+				Code:      http.StatusUnprocessableEntity,
+			},
+			{
+				AdminAuth:   true,
+				Path:        "/tyk/oauth/tokens/",
+				QueryParams: map[string]string{"scope": "expired"},
+				Method:      http.MethodDelete,
+				Code:        http.StatusBadRequest,
+			},
+		}...)
+	})
+
+	assertTokensLen := func(t *testing.T, storageManager storage.Handler, storageKey string, expectedTokensLen int) {
+		nowTs := time.Now().Unix()
+		startScore := strconv.FormatInt(nowTs, 10)
+		tokens, _, err := storageManager.GetSortedSetRange(storageKey, startScore, "+inf")
+		assert.NoError(t, err)
+		assert.Equal(t, expectedTokensLen, len(tokens))
+	}
+
+	t.Run("scope=lapsed", func(t *testing.T) {
+		spec := ts.LoadTestOAuthSpec()
+
+		clientID1, clientID2 := uuid.New(), uuid.New()
+
+		ts.createOAuthClientIDAndTokens(t, spec, clientID1)
+		ts.createOAuthClientIDAndTokens(t, spec, clientID2)
+		storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
+			fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
+
+		storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+		storageManager.Connect()
+
+		assertTokensLen(t, storageManager, storageKey1, 3)
+		assertTokensLen(t, storageManager, storageKey2, 3)
+
+		time.Sleep(time.Second * 3)
+		ts.Run(t, test.TestCase{
+			ControlRequest: true,
+			AdminAuth:      true,
+			Path:           "/tyk/oauth/tokens",
+			QueryParams:    map[string]string{"scope": "lapsed"},
+			Method:         http.MethodDelete,
+			Code:           http.StatusOK,
+		})
+
+		assertTokensLen(t, storageManager, storageKey1, 0)
+		assertTokensLen(t, storageManager, storageKey2, 0)
+	})
+}

@@ -697,6 +697,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/oauth/clients/{apiID}", gw.oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", gw.oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", gw.oAuthClientTokensHandler).Methods("GET")
+	r.HandleFunc("/oauth/tokens", gw.oAuthTokensHandler).Methods(http.MethodDelete)
 
 	r.HandleFunc("/schema", gw.schemaHandler).Methods(http.MethodGet)
 
