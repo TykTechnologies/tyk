@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
+	htmlTemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
 	"log/syslog"
@@ -187,7 +187,7 @@ type Gateway struct {
 	TestBundles  map[string]map[string]string
 	TestBundleMu sync.Mutex
 
-	templates    *template.Template
+	templates    *htmlTemplate.Template
 	templatesRaw *textTemplate.Template
 
 	// RedisController keeps track of redis connection and singleton
@@ -333,6 +333,8 @@ func (gw *Gateway) setupGlobals() {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
+	defaultTykErrors()
+
 	gwConfig := gw.GetConfig()
 	checkup.Run(&gwConfig)
 
@@ -407,7 +409,7 @@ func (gw *Gateway) setupGlobals() {
 	// Load all the files that have the "error" prefix.
 	//	gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
 	templatesDir := filepath.Join(gwConfig.TemplatePath, "error*")
-	gw.templates = template.Must(template.ParseGlob(templatesDir))
+	gw.templates = htmlTemplate.Must(htmlTemplate.ParseGlob(templatesDir))
 	gw.templatesRaw = textTemplate.Must(textTemplate.ParseGlob(templatesDir))
 	gw.CoProcessInit()
 
@@ -703,6 +705,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/oauth/clients/{apiID}", gw.oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", gw.oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", gw.oAuthClientTokensHandler).Methods("GET")
+	r.HandleFunc("/oauth/tokens", gw.oAuthTokensHandler).Methods(http.MethodDelete)
 
 	r.HandleFunc("/schema", gw.schemaHandler).Methods(http.MethodGet)
 
@@ -1547,7 +1550,7 @@ func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cli.Init(VERSION, confPaths)
+	cli.Init(confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
 	if !cli.DefaultMode {

@@ -12,7 +12,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
-	"text/template"
+	textTemplate "text/template"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -958,7 +958,7 @@ func TestDefaultVersion(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	key := ts.testPrepareDefaultVersion()
+	key, api := ts.testPrepareDefaultVersion()
 	authHeaders := map[string]string{"authorization": key}
 
 	ts.Run(t, []test.TestCase{
@@ -967,6 +967,19 @@ func TestDefaultVersion(t *testing.T) {
 		{Path: "/foo?v=v1", Headers: authHeaders, Code: http.StatusOK},        // Allowed for v1
 		{Path: "/bar?v=v1", Headers: authHeaders, Code: http.StatusForbidden}, // Not allowed for v1
 	}...)
+
+	t.Run("fallback to default", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/bar?v=notFound", Headers: authHeaders, BodyMatch: string(VersionDoesNotExist), Code: http.StatusForbidden,
+		})
+
+		api.VersionDefinition.FallbackToDefault = true
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/bar?v=notFound", Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
 }
 
 func BenchmarkDefaultVersion(b *testing.B) {
@@ -975,7 +988,7 @@ func BenchmarkDefaultVersion(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	key := ts.testPrepareDefaultVersion()
+	key, _ := ts.testPrepareDefaultVersion()
 
 	authHeaders := map[string]string{"authorization": key}
 
@@ -992,9 +1005,9 @@ func BenchmarkDefaultVersion(b *testing.B) {
 	}
 }
 
-func (ts *Test) testPrepareDefaultVersion() string {
+func (ts *Test) testPrepareDefaultVersion() (string, *APISpec) {
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		v1 := apidef.VersionInfo{Name: "v1"}
 		v1.Name = "v1"
 		v1.Paths.WhiteList = []string{"/foo"}
@@ -1012,13 +1025,13 @@ func (ts *Test) testPrepareDefaultVersion() string {
 		spec.Proxy.ListenPath = "/"
 
 		spec.UseKeylessAccess = false
-	})
+	})[0]
 
 	return CreateSession(ts.Gw, func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2"},
 		}}
-	})
+	}), api
 }
 
 func TestGetVersionFromRequest(t *testing.T) {
@@ -1251,9 +1264,9 @@ func TestAPIDefinitionLoader(t *testing.T) {
 
 	l := APIDefinitionLoader{Gw: ts.Gw}
 
-	executeAndAssert := func(t *testing.T, template *template.Template) {
+	executeAndAssert := func(t *testing.T, tpl *textTemplate.Template) {
 		var bodyBuffer bytes.Buffer
-		err := template.Execute(&bodyBuffer, map[string]string{
+		err := tpl.Execute(&bodyBuffer, map[string]string{
 			"value1": "value-1",
 			"value2": "value-2",
 		})

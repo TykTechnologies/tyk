@@ -14,6 +14,7 @@ import (
 	pkgver "github.com/hashicorp/go-version"
 	"github.com/xeipuuv/gojsonschema"
 
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -27,83 +28,72 @@ const (
 )
 
 var (
-	log            = logger.Get()
-	oasJSONSchemas map[string][]byte
-	mu             sync.Mutex
-	errorFormatter = func(errs []error) string {
-		var result strings.Builder
-		for i, err := range errs {
-			result.WriteString(err.Error())
-			if i < len(errs)-1 {
-				result.WriteString("\n")
-			}
-		}
+	log = logger.Get()
 
-		return result.String()
-	}
+	schemaOnce sync.Once
+
+	oasJSONSchemas map[string][]byte
 
 	defaultVersion string
 )
 
-func init() {
-	if err := loadOASSchema(); err != nil {
-		log.WithError(err).Error("loadOASSchema failed!")
-		return
-	}
-
-	setDefaultVersion()
-}
-
 func loadOASSchema() error {
-	mu.Lock()
-	defer mu.Unlock()
+	load := func() error {
+		xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykAPIGateway))
+		if err != nil {
+			return fmt.Errorf("%s loading failed: %w", ExtensionTykAPIGateway, err)
+		}
 
-	xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykAPIGateway))
-	if err != nil {
-		return fmt.Errorf("%s loading failed: %w", ExtensionTykAPIGateway, err)
+		xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
+		oasJSONSchemas = make(map[string][]byte)
+		members, err := schemaDir.ReadDir("schema")
+		for _, member := range members {
+			if member.IsDir() {
+				continue
+			}
+
+			fileName := member.Name()
+			if !strings.HasSuffix(fileName, ".json") {
+				continue
+			}
+
+			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) {
+				continue
+			}
+
+			var data []byte
+			data, err = schemaDir.ReadFile(filepath.Join("schema/", fileName))
+			if err != nil {
+				return err
+			}
+
+			data, err = jsonparser.Set(data, xTykAPIGwSchemaWithoutDefs, keyProperties, ExtensionTykAPIGateway)
+			if err != nil {
+				return err
+			}
+
+			err = jsonparser.ObjectEach(xTykAPIGwSchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+				data, err = jsonparser.Set(data, value, keyDefinitions, string(key))
+				return err
+			}, keyDefinitions)
+			if err != nil {
+				return err
+			}
+
+			oasVersion := strings.TrimSuffix(fileName, ".json")
+			oasJSONSchemas[oasVersion] = data
+		}
+
+		setDefaultVersion()
+
+		return nil
 	}
 
-	xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
-	oasJSONSchemas = make(map[string][]byte)
-	members, err := schemaDir.ReadDir("schema")
-	for _, member := range members {
-		if member.IsDir() {
-			continue
-		}
-
-		fileName := member.Name()
-		if !strings.HasSuffix(fileName, ".json") {
-			continue
-		}
-
-		if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) {
-			continue
-		}
-
-		var data []byte
-		data, err = schemaDir.ReadFile(filepath.Join("schema/", fileName))
-		if err != nil {
-			return err
-		}
-
-		data, err = jsonparser.Set(data, xTykAPIGwSchemaWithoutDefs, keyProperties, ExtensionTykAPIGateway)
-		if err != nil {
-			return err
-		}
-
-		err = jsonparser.ObjectEach(xTykAPIGwSchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
-			data, err = jsonparser.Set(data, value, keyDefinitions, string(key))
-			return err
-		}, keyDefinitions)
-		if err != nil {
-			return err
-		}
-
-		oasVersion := strings.TrimSuffix(fileName, ".json")
-		oasJSONSchemas[oasVersion] = data
-	}
-
-	return nil
+	var err error
+	schemaOnce.Do(func() {
+		err = load()
+	})
+	return err
 }
 
 // ValidateOASObject validates an OAS document against a particular OAS version.
@@ -123,7 +113,7 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 
 	if !result.Valid() {
 		combinedErr := &multierror.Error{}
-		combinedErr.ErrorFormat = errorFormatter
+		combinedErr.ErrorFormat = tykerrors.Formatter
 
 		validationErrs := result.Errors()
 		for _, validationErr := range validationErrs {
@@ -137,8 +127,9 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 
 // GetOASSchema returns an oas schema for a particular version.
 func GetOASSchema(version string) ([]byte, error) {
-	mu.Lock()
-	defer mu.Unlock()
+	if err := loadOASSchema(); err != nil {
+		return nil, fmt.Errorf("loadOASSchema failed: %w", err)
+	}
 
 	if version == "" {
 		return oasJSONSchemas[defaultVersion], nil
@@ -171,8 +162,6 @@ func findDefaultVersion(rawVersions []string) string {
 }
 
 func setDefaultVersion() {
-	mu.Lock()
-	defer mu.Unlock()
 	var versions []string
 	for k := range oasJSONSchemas {
 		versions = append(versions, k)

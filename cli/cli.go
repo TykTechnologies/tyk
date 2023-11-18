@@ -13,6 +13,8 @@ import (
 	"github.com/TykTechnologies/tyk/cli/importer"
 	"github.com/TykTechnologies/tyk/cli/linter"
 	"github.com/TykTechnologies/tyk/cli/plugin"
+	"github.com/TykTechnologies/tyk/cli/version"
+	"github.com/TykTechnologies/tyk/internal/build"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -50,10 +52,10 @@ var (
 )
 
 // Init sets all flags and subcommands.
-func Init(version string, confPaths []string) {
+func Init(confPaths []string) {
 	app = kingpin.New(appName, appDesc)
 	app.HelpFlag.Short('h')
-	app.Version(version)
+	app.Version(build.Version)
 
 	// Start/default command:
 	startCmd := app.Command("start", "Starts the Tyk Gateway")
@@ -96,6 +98,9 @@ func Init(version string, confPaths []string) {
 		os.Exit(1)
 		return nil
 	})
+
+	// Add version command:
+	version.AddTo(app)
 
 	// Add import command:
 	importer.AddTo(app)

@@ -8,11 +8,13 @@ import (
 
 var testVersion = "3.5"
 
-func init() {
+func TestMain(m *testing.M) {
 	if versionOverride := os.Getenv("PYTHON_VERSION"); versionOverride != "" {
 		testVersion = versionOverride
 	}
 	fmt.Printf("Using Python %s for tests\n", testVersion)
+
+	os.Exit(m.Run())
 }
 
 func TestFindPythonConfig(t *testing.T) {

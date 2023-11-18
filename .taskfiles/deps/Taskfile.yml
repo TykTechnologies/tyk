@@ -13,11 +13,11 @@ tasks:
 
   mockgen:
     internal: true
-    desc: 'Install golang/mock mockgen'
+    desc: 'Install go.uber.org/mock mockgen'
     status:
       - type mockgen
     cmds:
-      - go install github.com/golang/mock/mockgen@v1.6.0
+      - go install go.uber.org/mock/mockgen@v0.3.0
 
   goimports:
     internal: true
@@ -33,7 +33,7 @@ tasks:
     status:
       - type golangci-lint
     cmds:
-      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.0
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
 
   faillint:
     internal: true

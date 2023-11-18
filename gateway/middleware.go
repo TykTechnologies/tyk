@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
@@ -232,15 +233,30 @@ func (gw *Gateway) mwList(mws ...TykMiddleware) []alice.Constructor {
 // BaseMiddleware wraps up the ApiSpec and Proxy objects to be included in a
 // middleware handler, this can probably be handled better.
 type BaseMiddleware struct {
-	Spec   *APISpec
-	Proxy  ReturningHttpHandler
-	logger *logrus.Entry
-	Gw     *Gateway `json:"-"`
+	Spec  *APISpec
+	Proxy ReturningHttpHandler
+	Gw    *Gateway `json:"-"`
+
+	loggerMu sync.Mutex
+	logger   *logrus.Entry
 }
 
-func (t BaseMiddleware) Base() *BaseMiddleware { return &t }
+func (t *BaseMiddleware) Base() *BaseMiddleware {
+	t.loggerMu.Lock()
+	defer t.loggerMu.Unlock()
 
-func (t BaseMiddleware) Logger() (logger *logrus.Entry) {
+	return &BaseMiddleware{
+		Spec:   t.Spec,
+		Proxy:  t.Proxy,
+		Gw:     t.Gw,
+		logger: t.logger,
+	}
+}
+
+func (t *BaseMiddleware) Logger() (logger *logrus.Entry) {
+	t.loggerMu.Lock()
+	defer t.loggerMu.Unlock()
+
 	if t.logger == nil {
 		t.logger = logrus.NewEntry(log)
 	}
@@ -249,11 +265,21 @@ func (t BaseMiddleware) Logger() (logger *logrus.Entry) {
 }
 
 func (t *BaseMiddleware) SetName(name string) {
-	t.logger = t.Logger().WithField("mw", name)
+	logger := t.Logger()
+
+	t.loggerMu.Lock()
+	defer t.loggerMu.Unlock()
+
+	t.logger = logger.WithField("mw", name)
 }
 
 func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
-	t.logger = t.Gw.getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
+	logger := t.Logger()
+
+	t.loggerMu.Lock()
+	defer t.loggerMu.Unlock()
+
+	t.logger = t.Gw.getLogEntryForRequest(logger, r, ctxGetAuthToken(r), nil)
 }
 
 func (t BaseMiddleware) Init() {}
@@ -491,6 +517,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				if !usePartitions || policy.Partitions.Acl {
 					didACL[k] = true
+
+					ar.AllowedURLs = copyAllowedURLs(v.AllowedURLs)
 
 					// Merge ACLs for the same API
 					if r, ok := rights[k]; ok {
@@ -758,6 +786,26 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 
 	return nil
+}
+
+func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
+	if input == nil {
+		return nil
+	}
+
+	copied := make([]user.AccessSpec, len(input))
+
+	for i, as := range input {
+		copied[i] = user.AccessSpec{
+			URL: as.URL,
+		}
+		if as.Methods != nil {
+			copied[i].Methods = make([]string, len(as.Methods))
+			copy(copied[i].Methods, as.Methods)
+		}
+	}
+
+	return copied
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try

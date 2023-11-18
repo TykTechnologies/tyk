@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"text/template"
+	textTemplate "text/template"
 	"time"
 
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
@@ -173,7 +173,7 @@ type EndPointCacheMeta struct {
 
 type TransformSpec struct {
 	apidef.TemplateMeta
-	Template *template.Template
+	Template *textTemplate.Template
 }
 
 type ExtendedCircuitBreakerMeta struct {
@@ -222,7 +222,7 @@ type APISpec struct {
 		Engine       *graphql.ExecutionEngine
 		CancelV2     context.CancelFunc
 		EngineV2     *graphql.ExecutionEngineV2
-		OtelExecutor *graphqlinternal.OtelGraphqlEngineV2
+		OtelExecutor graphqlinternal.TykOtelExecutorI
 		HooksV2      struct {
 			BeforeFetchHook resolve.BeforeFetchHook
 			AfterFetchHook  resolve.AfterFetchHook
@@ -823,21 +823,21 @@ func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths [
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) filterSprigFuncs() template.FuncMap {
+func (a APIDefinitionLoader) filterSprigFuncs() textTemplate.FuncMap {
 	tmp := sprig.GenericFuncMap()
 	delete(tmp, "env")
 	delete(tmp, "expandenv")
 
-	return template.FuncMap(tmp)
+	return textTemplate.FuncMap(tmp)
 }
 
-func (a APIDefinitionLoader) loadFileTemplate(path string) (*template.Template, error) {
+func (a APIDefinitionLoader) loadFileTemplate(path string) (*textTemplate.Template, error) {
 	log.Debug("-- Loading template: ", path)
 	tmpName := filepath.Base(path)
 	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(path)
 }
 
-func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, error) {
+func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Template, error) {
 	log.Debug("-- Loading blob")
 	uDec, err := base64.StdEncoding.DecodeString(blob)
 	if err != nil {
@@ -1703,6 +1703,13 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 			// Load Version Data - General
 			var ok bool
 			if version, ok = a.VersionData.Versions[vName]; !ok {
+				if a.VersionDefinition.FallbackToDefault {
+					log.Debugf("fallback to default version: %s", a.VersionData.DefaultVersion)
+					if version, ok = a.VersionData.Versions[a.VersionData.DefaultVersion]; ok {
+						return &version, StatusOk
+					}
+				}
+
 				return &version, VersionDoesNotExist
 			}
 		}

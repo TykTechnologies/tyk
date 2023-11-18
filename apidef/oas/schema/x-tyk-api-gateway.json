@@ -548,10 +548,14 @@
       },
       "anyOf": [
         {
-          "required": ["body"]
+          "required": [
+            "body"
+          ]
         },
         {
-          "required": ["path"]
+          "required": [
+            "path"
+          ]
         }
       ],
       "required": [
@@ -1054,6 +1058,9 @@
           ]
         },
         "stripVersioningData": {
+          "type": "boolean"
+        },
+        "fallbackToDefault": {
           "type": "boolean"
         }
       },

@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"text/template"
+	textTemplate "text/template"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -827,7 +827,7 @@ type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
-var playgroundTemplate *template.Template
+var playgroundTemplate *textTemplate.Template
 
 func (gw *Gateway) readGraphqlPlaygroundTemplate() {
 	playgroundPath := filepath.Join(gw.GetConfig().TemplatePath, "playground")
@@ -843,7 +843,7 @@ func (gw *Gateway) readGraphqlPlaygroundTemplate() {
 		paths = append(paths, filepath.Join(playgroundPath, file.Name()))
 	}
 
-	playgroundTemplate, err = template.ParseFiles(paths...)
+	playgroundTemplate, err = textTemplate.ParseFiles(paths...)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "playground",

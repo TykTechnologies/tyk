@@ -35,7 +35,7 @@ const (
 	MsgInvalidKey      = "Attempted access with invalid key."
 )
 
-func init() {
+func initAuthKeyErrors() {
 	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
 		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,

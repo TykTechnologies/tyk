@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"html/template"
+	htmlTemplate "html/template"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -47,50 +47,9 @@ func errorAndStatusCode(errType string) (error, int) {
 
 func defaultTykErrors() {
 	TykErrors = make(map[string]config.TykError)
-	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
-		Message: MsgAuthFieldMissing,
-		Code:    http.StatusUnauthorized,
-	}
 
-	TykErrors[ErrAuthKeyNotFound] = config.TykError{
-		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrAuthCertNotFound] = config.TykError{
-		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrAuthCertExpired] = config.TykError{
-		Message: MsgCertificateExpired,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
-		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrOAuthAuthorizationFieldMissing] = config.TykError{
-		Message: MsgAuthFieldMissing,
-		Code:    http.StatusBadRequest,
-	}
-
-	TykErrors[ErrOAuthAuthorizationFieldMalformed] = config.TykError{
-		Message: MsgBearerMailformed,
-		Code:    http.StatusBadRequest,
-	}
-
-	TykErrors[ErrOAuthKeyNotFound] = config.TykError{
-		Message: MsgKeyNotAuthorized,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrOAuthClientDeleted] = config.TykError{
-		Message: MsgOauthClientRevoked,
-		Code:    http.StatusForbidden,
-	}
+	initAuthKeyErrors()
+	initOauth2KeyExistsErrors()
 }
 
 func overrideTykErrors(gw *Gateway) {
@@ -114,7 +73,7 @@ func overrideTykErrors(gw *Gateway) {
 
 // APIError is generic error object returned if there is something wrong with the request
 type APIError struct {
-	Message template.HTML
+	Message htmlTemplate.HTML
 }
 
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
@@ -194,10 +153,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			var tmplExecutor TemplateExecutor
 			tmplExecutor = tmpl
 
-			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+			apiError := APIError{htmlTemplate.HTML(htmlTemplate.JSEscapeString(errMsg))}
 
 			if contentType == header.ApplicationXML || contentType == header.TextXML {
-				apiError.Message = template.HTML(errMsg)
+				apiError.Message = htmlTemplate.HTML(errMsg)
 
 				//we look up in the last defined templateName to obtain the template.
 				rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
@@ -259,24 +218,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if len(e.Spec.Tags) > 0 {
 			tags = append(tags, e.Spec.Tags...)
 		}
-
-		rawRequest := ""
-		rawResponse := ""
-
-		if recordDetail(r, e.Spec) {
-
-			// Get the wire format representation
-
-			var wireFormatReq bytes.Buffer
-			r.Write(&wireFormatReq)
-			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
-
-			var wireFormatRes bytes.Buffer
-			response.Write(&wireFormatRes)
-			rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
-
-		}
-
 		trackEP := false
 		trackedPath := r.URL.Path
 
@@ -312,8 +253,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			OauthID:       oauthClientID,
 			RequestTime:   0,
 			Latency:       analytics.Latency{},
-			RawRequest:    rawRequest,
-			RawResponse:   rawResponse,
 			IPAddress:     ip,
 			Geo:           analytics.GeoData{},
 			Network:       analytics.NetworkStats{},
@@ -322,6 +261,26 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			TrackPath:     trackEP,
 			ExpireAt:      t,
 		}
+		recordGraphDetails(&record, r, response, e.Spec)
+
+		rawRequest := ""
+		rawResponse := ""
+		if recordDetail(r, e.Spec) {
+
+			// Get the wire format representation
+
+			var wireFormatReq bytes.Buffer
+			r.Write(&wireFormatReq)
+			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
+
+			var wireFormatRes bytes.Buffer
+			response.Write(&wireFormatRes)
+			rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+
+		}
+
+		record.RawRequest = rawRequest
+		record.RawResponse = rawResponse
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
 			record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)
