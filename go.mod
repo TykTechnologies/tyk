@@ -13,7 +13,7 @@ require (
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
 	github.com/TykTechnologies/gorpc v0.0.0-20210624160652-fe65bda0ccb9
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20231120113533-90b772abd0d9
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20231121123800-70500778ba66
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
