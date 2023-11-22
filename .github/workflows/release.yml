@@ -465,12 +465,13 @@ jobs:
       - name: Run ci/tests
         shell: bash
         env:        
-          GITHUB_SHA: ${{ github.event.pull_request.head.ref || github.sha }}
+          REF: ${{ github.event.pull_request.head.ref || github.sha }}
           GITHUB_TAG: ${{ github.ref }}
           GATEWAY_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk:sha-${{ github.sha }}
           PLUGIN_COMPILER_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
         run: |
-          echo "GITHUB_SHA: ${GITHUB_SHA}"
+          echo "REF: ${REF}"
+          export GITHUB_SHA=${REF}
           set -eaxo pipefail
           if [ ! -d smoke-tests ]; then
              echo "::warning No repo specific smoke tests defined"
