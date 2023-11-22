@@ -689,6 +689,14 @@ const Schema = `{
                         }
                     }
                 },
+                "introspection": {
+                    "type": ["object", "null"],
+                    "properties: {
+                        "disabled": {
+                            "type": "boolean"
+                        }
+                     }
+                },
                 "playground": {
                     "type": ["object", "null"],
                     "properties": {
