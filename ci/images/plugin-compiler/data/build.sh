@@ -75,7 +75,11 @@ echo "PLUGIN_SOURCE_PATH: ${PLUGIN_SOURCE_PATH}"
 set -x
 
 if [[ "$GO_GET" == "1" ]]; then
-	go get github.com/TykTechnologies/tyk@${GITHUB_SHA}
+  git clone https://github.com/TykTechnologies/tyk
+  cd tyk
+  git checkout ${GITHUB_SHA}
+	go get .
+  cd -
 fi
 
 CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
