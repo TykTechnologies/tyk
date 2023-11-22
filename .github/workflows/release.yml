@@ -470,7 +470,7 @@ jobs:
           GATEWAY_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk:sha-${{ github.sha }}
           PLUGIN_COMPILER_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
         run: |
-          echo "GITHUB_SHA: ${GITHUB_SHA}""
+          echo "GITHUB_SHA: ${GITHUB_SHA}"
           set -eaxo pipefail
           if [ ! -d smoke-tests ]; then
              echo "::warning No repo specific smoke tests defined"
