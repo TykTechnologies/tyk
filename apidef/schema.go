@@ -691,11 +691,11 @@ const Schema = `{
                 },
                 "introspection": {
                     "type": ["object", "null"],
-                    "properties: {
+                    "properties": {
                         "disabled": {
                             "type": "boolean"
                         }
-                     }
+                    }
                 },
                 "playground": {
                     "type": ["object", "null"],
