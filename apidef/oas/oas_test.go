@@ -335,6 +335,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.GraphQL.Supergraph.MergedSDL",
 		"APIDefinition.GraphQL.Supergraph.GlobalHeaders[0]",
 		"APIDefinition.GraphQL.Supergraph.DisableQueryBatching",
+		"APIDefinition.GraphQL.Introspection.Disabled",
 		"APIDefinition.AnalyticsPlugin.Enabled",
 		"APIDefinition.AnalyticsPlugin.PluginPath",
 		"APIDefinition.AnalyticsPlugin.FuncName",
