@@ -26,8 +26,10 @@ ADD . $TYK_GW_PATH
 # Provide a gateway test binary for testing plugin loading.
 RUN --mount=type=cache,mode=0755,target=/go/pkg/mod GOBIN=/usr/local/bin go install -tags=goplugin -trimpath .
 
+ARG OVERRIDE_SHA
 ARG GITHUB_SHA
 ARG GITHUB_TAG
+ENV OVERRIDE_SHA ${OVERRIDE_SHA}
 ENV GITHUB_SHA ${GITHUB_SHA}
 ENV GITHUB_TAG ${GITHUB_TAG}
 
