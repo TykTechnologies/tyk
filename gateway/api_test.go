@@ -2730,7 +2730,7 @@ func TestOAS(t *testing.T) {
 
 					_, _ = ts.Run(t, []test.TestCase{
 						{AdminAuth: true, Method: http.MethodPut, Path: updatePath, Data: &oasAPIInOld,
-							BodyMatch: apidef.ErrAPIMigrated.Error(), Code: http.StatusBadRequest},
+							BodyMatch: apidef.ErrClassicAPIExpected.Error(), Code: http.StatusBadRequest},
 					}...)
 				})
 			})
