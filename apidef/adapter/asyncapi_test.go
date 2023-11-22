@@ -335,6 +335,9 @@ const expectedGraphqlConfig = `{
         "merged_sdl": "",
         "global_headers": null,
         "disable_query_batching": false
+    },
+    "introspection": {
+        "disabled": false
     }
 }`
 

@@ -742,6 +742,8 @@ type GraphQLConfig struct {
 	Subgraph GraphQLSubgraphConfig `bson:"subgraph" json:"subgraph"`
 	// Supergraph holds the configuration for a GraphQL federation supergraph.
 	Supergraph GraphQLSupergraphConfig `bson:"supergraph" json:"supergraph"`
+	// Introspection holds the configuration for GraphQL Introspection
+	Introspection GraphQLIntrospectionConfig `bson:"introspection" json:"introspection"`
 }
 
 type GraphQLConfigVersion string
@@ -751,6 +753,10 @@ const (
 	GraphQLConfigVersion1    GraphQLConfigVersion = "1"
 	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
 )
+
+type GraphQLIntrospectionConfig struct {
+	Disabled bool `bson:"disabled" json:"disabled"`
+}
 
 type GraphQLResponseExtensions struct {
 	OnErrorForwarding bool `bson:"on_error_forwarding" json:"on_error_forwarding"`

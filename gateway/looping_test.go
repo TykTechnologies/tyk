@@ -1,5 +1,5 @@
-//go:build !race
-// +build !race
+//go:build !race || unstable
+// +build !race unstable
 
 // Looping by itself has race nature
 package gateway
@@ -185,6 +185,8 @@ func TestLooping(t *testing.T) {
 	})
 
 	t.Run("VirtualEndpoint or plugins", func(t *testing.T) {
+		test.Flaky(t) // TT-10511
+
 		ts.testPrepareVirtualEndpoint(`
             function testVirtData(request, session, config) {
                 var loopLocation = "/default"
@@ -326,6 +328,8 @@ func TestLooping(t *testing.T) {
 }
 
 func TestConcurrencyReloads(t *testing.T) {
+	test.Racy(t) // TT-10510
+
 	var wg sync.WaitGroup
 
 	ts := StartTest(nil)

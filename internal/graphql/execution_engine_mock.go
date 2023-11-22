@@ -8,7 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 
 	plan "github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 	resolve "github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
