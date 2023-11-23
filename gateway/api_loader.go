@@ -410,6 +410,11 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 		chainArray = append(chainArray, authArray...)
 
+		if gw.GetConfig().SlaveOptions.UseRPC {
+			// if gw is edge, then prefetch any existent org session expiry
+			baseMid.OrgSessionExpiry(spec.OrgID)
+		}
+
 		for _, obj := range mwPostAuthCheckFuncs {
 			if mwDriver == apidef.GoPluginDriver {
 				gw.mwAppendEnabled(
