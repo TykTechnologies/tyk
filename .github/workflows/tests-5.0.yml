@@ -8,6 +8,6 @@ on:
 
 jobs:
   gateway-ci:
-    uses: TykTechnologies/tyk-github-actions/.github/workflows/5.0-gateway.yml@main
+    uses: TykTechnologies/tyk-github-actions/.github/workflows/gateway-5.0.yml@main
     secrets:
       ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
