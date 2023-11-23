@@ -3,6 +3,7 @@ package gateway
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/TykTechnologies/tyk/rpc"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -410,9 +411,12 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 		chainArray = append(chainArray, authArray...)
 
+		// if gw is edge, then prefetch any existent org session expiry
 		if gw.GetConfig().SlaveOptions.UseRPC {
-			// if gw is edge, then prefetch any existent org session expiry
-			baseMid.OrgSessionExpiry(spec.OrgID)
+			// if not in emergency so load from backup is not blocked
+			if !rpc.IsEmergencyMode() {
+				baseMid.OrgSessionExpiry(spec.OrgID)
+			}
 		}
 
 		for _, obj := range mwPostAuthCheckFuncs {
