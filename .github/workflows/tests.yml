@@ -1,0 +1,13 @@
+name: Tests 5.2
+
+on:
+  pull_request:
+    branches:
+      - master
+      - release-5.2**
+
+jobs:
+  gateway-ci:
+    uses: TykTechnologies/tyk-github-actions/.github/workflows/gateway-5.2.yml@main
+    secrets:
+      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
