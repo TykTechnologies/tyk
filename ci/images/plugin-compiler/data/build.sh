@@ -78,6 +78,7 @@ go work use ./$(basename $PLUGIN_BUILD_PATH)
 cd $PLUGIN_BUILD_PATH
 
 if [[ "$DEBUG" == "1" ]] ; then
+	git config --global init.defaultBranch main
 	git config --global user.name "Tit Petric"
 	git config --global user.email "tit@tyk.io"
 	git init
@@ -87,11 +88,27 @@ fi
 
 if [ -f "go.mod" ] ; then
 	OLD_MODULE=$(go list .)
+
+	case "$OLD_MODULE" in
+		# module has a domain, less chance of conflicts
+		*.*)
+		;;
+
+		# warn if module doesn't have a domain or path
+		*)
+		echo "WARN: Plugin go.mod module doesn't contain a dot, consider amending it to prevent conflicts"
+		echo "      Current value: $OLD_MODULE"
+		echo "    Suggested value: github.com/org/plugin-repo"
+		;;
+	esac
+
 	NEW_MODULE=${OLD_MODULE}/plugin${plugin_id}
 
+	# Replace go.mod module
 	go mod edit -module $NEW_MODULE
 
-	find ./ -type f -name '*.go' -exec sed -i -e "s,${OLD_MODULE},${NEW_MODULE},g" {} \;
+	# Replace import paths
+	find ./ -type f -name '*.go' -exec sed -i -e "s,\"${OLD_MODULE},\"${NEW_MODULE},g" {} \;
 else
 	go mod init tyk_plugin${plugin_id}
 fi

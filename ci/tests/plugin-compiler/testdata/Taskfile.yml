@@ -1,7 +1,10 @@
 # This taskfile aims to test the package replacement from a go.mod package.
 # To support "plugin_id", the package name in the go.mod for a plugin is amended,
 # and the imports in the plugin corrected to the new import path.
-
+#
+# For the plugin compiler, the test is replicated one folder up:
+#
+# - `task test:complex-plugin`
 ---
 version: "3"
 
@@ -11,13 +14,7 @@ env:
 
 tasks:
   default:
-    desc: "Test govers import replacement (dry run)"
-    dir: ./complex-plugin
-    cmds:
-      - govers -m example.com/basic-plugin -d -n example.com/basic-plugin/v123
-
-  replace:
-    desc: "Test govers import replacement (real)"
+    desc: "Test import replacement"
     deps: [ complex-plugin-test ]
     dir: ./complex-plugin-test
     cmds:
@@ -28,7 +25,7 @@ tasks:
       - go test -count=1 -race -v ./...
 
   complex-plugin-test:
-    desc: "Prepare a complex plugin test folder"
+    desc: "Prepare complex-plugin-test/"
     internal: true
     cmds:
       - rsync -a --del ./complex-plugin/ ./complex-plugin-test/
