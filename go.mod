@@ -68,13 +68,8 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/net v0.17.0
-<<<<<<< HEAD
-	golang.org/x/sync v0.3.0
-	google.golang.org/grpc v1.58.0
-=======
 	golang.org/x/sync v0.4.0
 	google.golang.org/grpc v1.59.0
->>>>>>> 1e62e5b8... [TT-10619] upgrade grpc to v1.59.0 (#5801)
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
