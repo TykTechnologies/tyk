@@ -1202,8 +1202,10 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		upstreamHeaders := p.graphqlEngineAdditionalUpstreamHeaders(outreq)
 		execOptions = append(execOptions, graphql.WithHeaderModifier(p.graphqlEngineHeaderModifier(outreq, upstreamHeaders)))
 
+		// set apiID in context for use by the custom executors
+		ctxWithID := context.WithValue(reqCtx, ctx.APIID, p.TykAPISpec.APIID)
 		if p.TykAPISpec.GraphQLExecutor.OtelExecutor != nil {
-			if err = p.TykAPISpec.GraphQLExecutor.OtelExecutor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
+			if err = p.TykAPISpec.GraphQLExecutor.OtelExecutor.Execute(ctxWithID, gqlRequest, &resultWriter, execOptions...); err != nil {
 				return
 			}
 		} else {

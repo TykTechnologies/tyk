@@ -1,0 +1,23 @@
+type: Test
+spec:
+  id: UsQnoFHSg
+  name: Test UDG internal route
+  description: This asserts the spans generated when a request is made to a UDG API, and ensures upstream requests are to the proper URL
+  trigger:
+    type: http
+    httpRequest:
+      method: POST
+      url: tyk:8080/test-udg-tracing/test-udg-tracing
+      body: "{\"query\":\"{\\n  country(code: \\\"NG\\\") {\\n    name\\n    capital\\n    capitalCoordinates {\\n      latt\\n      longt\\n    }\\n  }\\n}\"}"
+      headers:
+        - key: Content-Type
+          value: application/json
+  specs:
+    - selector: span[name="GraphqlEngine" tyk.api.id = "2ee01659975f443a7d025909dc9858b1"] span[tracetest.span.type="http" name="POST /" http.method="POST" tyk.api.id = "2ee01659975f443a7d025909dc9858b0"]
+      name: Ensure the POST request to the internal API exists
+      assertions:
+        - attr:name = "POST /"
+    - selector: span[name="GraphqlEngine" tyk.api.id = "2ee01659975f443a7d025909dc9858b0"] span[name = "ResolvePlan"] span[tracetest.span.type="http" name="HTTP POST" http.method="POST" http.url = "https://countries.trevorblades.com/"]
+      name: Second upstream request span
+      assertions:
+        - attr:name  =  "HTTP POST"

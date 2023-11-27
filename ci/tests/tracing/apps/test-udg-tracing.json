@@ -1,11 +1,11 @@
 {
-  "id": "64be29f27217230c0ac74eaa",
-  "name": "Test Graphql Tracing",
-  "slug": "test-graphql-tracing",
+  "id": "6540d328b1821e852ad56a8a",
+  "name": "Test UDG Tracing",
+  "slug": "test-udg-tracing",
   "listen_port": 0,
   "protocol": "",
   "enable_proxy_protocol": false,
-  "api_id": "2ee01659975f443a7d025909dc9858b0",
+  "api_id": "2ee01659975f443a7d025909dc9858b1",
   "org_id": "6495413e7217232b4a9127d2",
   "use_keyless": true,
   "use_oauth2": false,
@@ -233,7 +233,6 @@
   "enable_signature_checking": false,
   "hmac_allowed_clock_skew": -1,
   "hmac_allowed_algorithms": [],
-  "detailed_tracing": true,
   "request_signing": {
     "is_enabled": false,
     "secret": "",
@@ -252,6 +251,7 @@
     "key": "x-api-version",
     "strip_path": false,
     "strip_versioning_data": false,
+    "fallback_to_default": false,
     "versions": {}
   },
   "version_data": {
@@ -302,8 +302,8 @@
   },
   "proxy": {
     "preserve_host_header": false,
-    "listen_path": "/test-graphql-tracing/",
-    "target_url": "https://countries.trevorblades.com/",
+    "listen_path": "/test-udg-tracing/",
+    "target_url": "",
     "disable_strip_slash": true,
     "strip_listen_path": true,
     "enable_load_balancing": false,
@@ -426,18 +426,164 @@
   "enable_detailed_recording": false,
   "graphql": {
     "enabled": true,
-    "execution_mode": "proxyOnly",
+    "execution_mode": "executionEngine",
     "version": "2",
-    "schema": "type Continent {\n  code: ID!\n  countries: [Country!]!\n  name: String!\n}\n\ninput ContinentFilterInput {\n  code: StringQueryOperatorInput\n}\n\ntype Country {\n  awsRegion: String!\n  capital: String\n  code: ID!\n  continent: Continent!\n  currencies: [String!]!\n  currency: String\n  emoji: String!\n  emojiU: String!\n  languages: [Language!]!\n  name(lang: String): String!\n  native: String!\n  phone: String!\n  phones: [String!]!\n  states: [State!]!\n  subdivisions: [Subdivision!]!\n}\n\ninput CountryFilterInput {\n  code: StringQueryOperatorInput\n  continent: StringQueryOperatorInput\n  currency: StringQueryOperatorInput\n}\n\ntype Language {\n  code: ID!\n  name: String!\n  native: String!\n  rtl: Boolean!\n}\n\ninput LanguageFilterInput {\n  code: StringQueryOperatorInput\n}\n\ntype Query {\n  continent(code: ID!): Continent\n  continents(filter: ContinentFilterInput = {}): [Continent!]!\n  countries(filter: CountryFilterInput = {}): [Country!]!\n  country(code: ID!): Country\n  language(code: ID!): Language\n  languages(filter: LanguageFilterInput = {}): [Language!]!\n}\n\ntype State {\n  code: String\n  country: Country!\n  name: String!\n}\n\ninput StringQueryOperatorInput {\n  eq: String\n  in: [String!]\n  ne: String\n  nin: [String!]\n  regex: String\n}\n\ntype Subdivision {\n  code: ID!\n  emoji: String\n  name: String!\n}",
-    "last_schema_update": "2023-07-24T08:36:18.871+01:00",
+    "schema": "type Country {\n  code: ID!\n  name: String!\n  native: String!\n  phone: String!\n  continent: Continent!\n  capital: String\n  capitalCoordinates: Coordinates\n  currency: String\n  languages: [Language!]!\n  emoji: String!\n  emojiU: String!\n  states: [State!]!\n}\ntype Coordinates {\n  latt: String\n  longt: String\n}\ntype Continent {\n  code: ID!\n  name: String!\n  countries: [Country!]!\n}\n\ntype Language {\n  code: ID!\n  name: String\n  native: String\n  rtl: Boolean!\n}\n\ntype State {\n  code: String\n  name: String!\n  country: Country!\n}\n\ntype Query {\n  countries(filter: CountryFilterInput): [Country!]!\n  country(code: ID!): Country\n  continents(filter: ContinentFilterInput): [Continent!]!\n  continent(code: ID!): Continent\n}\n\ninput CountryFilterInput {\n  code: StringQueryOperatorInput\n  currency: StringQueryOperatorInput\n  continent: StringQueryOperatorInput\n}\n\ninput ContinentFilterInput {\n  code: StringQueryOperatorInput\n}\n\ninput StringQueryOperatorInput {\n  eq: String\n  ne: String\n  in: [String]\n  nin: [String]\n  regex: String\n  glob: String\n}",
+    "last_schema_update": "2023-11-20T14:02:25.95+01:00",
     "type_field_configurations": [],
     "playground": {
       "enabled": false,
       "path": ""
     },
     "engine": {
-      "field_configs": [],
-      "data_sources": [],
+      "field_configs": [
+        {
+          "type_name": "Query",
+          "field_name": "countries",
+          "disable_default_mapping": false,
+          "path": [
+            "countries"
+          ]
+        },
+        {
+          "type_name": "Query",
+          "field_name": "continents",
+          "disable_default_mapping": false,
+          "path": [
+            "continents"
+          ]
+        },
+        {
+          "type_name": "Query",
+          "field_name": "continent",
+          "disable_default_mapping": false,
+          "path": [
+            "continent"
+          ]
+        },
+        {
+          "type_name": "Country",
+          "field_name": "area",
+          "disable_default_mapping": false,
+          "path": [
+            "[0]"
+          ]
+        },
+        {
+          "type_name": "Country",
+          "field_name": "capitalCoordinates",
+          "disable_default_mapping": true,
+          "path": [
+            ""
+          ]
+        },
+        {
+          "type_name": "Query",
+          "field_name": "country",
+          "disable_default_mapping": false,
+          "path": [
+            "country"
+          ]
+        }
+      ],
+      "data_sources": [
+        {
+          "kind": "GraphQL",
+          "name": "countries",
+          "internal": false,
+          "root_fields": [
+            {
+              "type": "Query",
+              "fields": [
+                "countries"
+              ]
+            }
+          ],
+          "config": {
+            "url": "https://countries.trevorblades.com/",
+            "method": "POST",
+            "body": "",
+            "headers": {}
+          }
+        },
+        {
+          "kind": "GraphQL",
+          "name": "continents",
+          "internal": false,
+          "root_fields": [
+            {
+              "type": "Query",
+              "fields": [
+                "continents",
+                "continent"
+              ]
+            }
+          ],
+          "config": {
+            "url": "https://countries.trevorblades.com/",
+            "method": "POST",
+            "body": "",
+            "headers": {}
+          }
+        },
+        {
+          "kind": "REST",
+          "name": "area",
+          "internal": false,
+          "root_fields": [
+            {
+              "type": "Country",
+              "fields": [
+                "area"
+              ]
+            }
+          ],
+          "config": {
+            "url": "https://restcountries.com/v3.1/name/{{.object.name}}",
+            "method": "GET",
+            "body": "",
+            "headers": {}
+          }
+        },
+        {
+          "kind": "REST",
+          "name": "capitalCoordinates",
+          "internal": false,
+          "root_fields": [
+            {
+              "type": "Country",
+              "fields": [
+                "capitalCoordinates"
+              ]
+            }
+          ],
+          "config": {
+            "url": "https://geocode.xyz/?locate={{.object.capital}}\u0026geoit=JSON",
+            "method": "GET",
+            "body": "",
+            "headers": {}
+          }
+        },
+        {
+          "kind": "GraphQL",
+          "name": "country_Query",
+          "internal": true,
+          "root_fields": [
+            {
+              "type": "Query",
+              "fields": [
+                "country"
+              ]
+            }
+          ],
+          "config": {
+            "url": "tyk://2ee01659975f443a7d025909dc9858b0/",
+            "method": "POST",
+            "body": "",
+            "headers": {}
+          }
+        }
+      ],
       "global_headers": []
     },
     "proxy": {
@@ -451,20 +597,16 @@
       "sdl": ""
     },
     "supergraph": {
-      "subgraphs": [
-        {
-          "api_id": "",
-          "name": "",
-          "url": "",
-          "sdl": "",
-          "headers": {}
-        }
-      ],
+      "subgraphs": [],
       "merged_sdl": "",
       "global_headers": {},
       "disable_query_batching": false
+    },
+    "introspection": {
+      "disabled": false
     }
   },
   "analytics_plugin": {},
-  "tags": []
+  "tags": [],
+  "detailed_tracing": false
 }

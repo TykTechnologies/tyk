@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"context"
+	tykctx "github.com/TykTechnologies/tyk/ctx"
 	"sync"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
@@ -141,6 +142,14 @@ func (o *OtelGraphqlEngineV2Detailed) Execute(inCtx context.Context, operation *
 		span.SetStatus(otel.SPAN_STATUS_ERROR, "failed to execute")
 		return err
 	}
+
+	var apiID string
+	if v := inCtx.Value(tykctx.APIID); v != nil {
+		apiID, _ = v.(string)
+	}
+	span.SetAttributes(
+		semconv.TykAPIID(apiID),
+	)
 	return nil
 }
 
