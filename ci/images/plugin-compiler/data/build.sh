@@ -39,7 +39,7 @@ To build a plugin:
 EOF
 }
 
-if [ -z "$plugin_name" ]; then
+if [ -z "$plugin_name" ] ; then
     usage
     exit 1
 fi
@@ -51,13 +51,23 @@ if [[ $GOARCH == "arm64" ]] && [[ $GOOS == "linux" ]] ; then
 fi
 
 # if arch and os present then update the name of file with those params
-if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]]; then
+if [[ $GOOS != "" ]] && [[ $GOARCH != "" ]] ; then
   plugin_name="${plugin_name%.*}_${GATEWAY_VERSION}_${GOOS}_${GOARCH}.so"
 fi
 
 # Copy plugin source into plugin build folder.
 mkdir -p $PLUGIN_BUILD_PATH
 yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
+
+
+# Dump settings for inspection
+
+echo "PLUGIN_BUILD_PATH: ${PLUGIN_BUILD_PATH}"
+echo "PLUGIN_SOURCE_PATH: ${PLUGIN_SOURCE_PATH}"
+
+if [[ "$DEBUG" == "1" ]] ; then
+	set -x
+fi
 
 # Create worspace
 cd $WORKSPACE_ROOT
@@ -67,21 +77,57 @@ go work use ./$(basename $PLUGIN_BUILD_PATH)
 # Go to plugin build path
 cd $PLUGIN_BUILD_PATH
 
-# Dump settings for inspection
+if [[ "$DEBUG" == "1" ]] ; then
+	git config --global init.defaultBranch main
+	git config --global user.name "Tit Petric"
+	git config --global user.email "tit@tyk.io"
+	git init
+	git add .
+	git commit -m "initial import" .
+fi
 
-echo "PLUGIN_BUILD_PATH: ${PLUGIN_BUILD_PATH}"
-echo "PLUGIN_SOURCE_PATH: ${PLUGIN_SOURCE_PATH}"
+if [ -f "go.mod" ] ; then
+	OLD_MODULE=$(go list .)
 
-set -x
+	case "$OLD_MODULE" in
+		# module has a domain, less chance of conflicts
+		*.*)
+		;;
 
-if [[ "$GO_GET" == "1" ]]; then
+		# warn if module doesn't have a domain or path
+		*)
+		echo "WARN: Plugin go.mod module doesn't contain a dot, consider amending it to prevent conflicts"
+		echo "      Current value: $OLD_MODULE"
+		echo "    Suggested value: github.com/org/plugin-repo"
+		;;
+	esac
+
+	NEW_MODULE=${OLD_MODULE}/plugin${plugin_id}
+
+	# Replace go.mod module
+	go mod edit -module $NEW_MODULE
+
+	# Replace import paths
+	find ./ -type f -name '*.go' -exec sed -i -e "s,\"${OLD_MODULE},\"${NEW_MODULE},g" {} \;
+else
+	go mod init tyk_plugin${plugin_id}
+fi
+
+if [[ "$DEBUG" == "1" ]] ; then
+	git add .
+	git diff --cached
+fi
+
+
+if [[ "$GO_GET" == "1" ]] ; then
 	go get github.com/TykTechnologies/tyk@${GITHUB_SHA}
 fi
 
 CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
+
 set +x
 
-mv $plugin_name $PLUGIN_SOURCE_PATH
+mv *.so $PLUGIN_SOURCE_PATH
 
 # Clean up workspace
 rm -f $WORKSPACE_ROOT/go.work
