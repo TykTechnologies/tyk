@@ -1,0 +1,18 @@
+---
+version: "3"
+
+tasks:
+  test:
+    desc: "Build plugin and run tests"
+    cmds:
+      - task: build
+      - goimports -w .
+      - go fmt ./...
+      - go test -cover -count=100 -tags plugins_native_test -race ./...
+
+  build:
+    internal: true
+    desc: "Build testdata plugin"
+    dir: ./native/testdata
+    cmds:
+      - go build -buildmode=plugin -race -o plugin.so .
