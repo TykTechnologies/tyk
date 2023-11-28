@@ -1,5 +1,8 @@
 name: Run CI tests and smoke tests
 
+on:
+  workflow_call:
+
 jobs:
   smoke-tests:
     runs-on: ubuntu-latest
