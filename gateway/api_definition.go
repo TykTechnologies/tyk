@@ -534,9 +534,18 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 
 	// Extract tagged APIs#
 	list := &nestedApiDefinitionList{}
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
+	inBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Error("Couldn't read api definition list")
+		return nil, err
+	}
+
+	inBytes = a.replaceSecrets(inBytes)
+
+	err = json.Unmarshal(inBytes, &list)
+	if err != nil {
+		log.Error("Couldn't unmarshal api definition list")
+		return nil, err
 	}
 
 	// Extract tagged entries only
@@ -552,6 +561,34 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	log.Debug("Loading APIS Finished: Nonce Set: ", list.Nonce)
 
 	return specs, nil
+}
+
+var envRegex = regexp.MustCompile(`env://([^"]+)`)
+
+const (
+	prefixEnv = "env://"
+)
+
+func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
+	input := string(in)
+
+	if strings.Contains(input, prefixEnv) {
+		matches := envRegex.FindAllStringSubmatch(input, -1)
+		uniqueWords := map[string]bool{}
+		for _, m := range matches {
+			if uniqueWords[m[0]] {
+				continue
+			}
+
+			uniqueWords[m[0]] = true
+			val := os.Getenv(m[1])
+			if val != "" {
+				input = strings.Replace(input, m[0], val, -1)
+			}
+		}
+	}
+
+	return []byte(input)
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
@@ -572,6 +609,7 @@ func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gate
 	}
 
 	apiCollection := store.GetApiDefinitions(orgId, tags)
+	apiCollection = string(a.replaceSecrets([]byte(apiCollection)))
 
 	//store.Disconnect()
 
@@ -673,20 +711,22 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 }
 func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, error) {
 	log.Info("Loading API Specification from ", filePath)
-	f, err := os.Open(filePath)
-	defer func() {
-		err = f.Close()
-		if err != nil {
-			log.WithError(err).Error("error while closing file ", filePath)
-		}
-	}()
 
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		log.Error("Couldn't open api configuration file: ", err)
+		log.Error("Couldn't read api configuration file: ", err)
 		return nil, err
 	}
 
-	def := a.ParseDefinition(f)
+	data = a.replaceSecrets(data)
+
+	var def apidef.APIDefinition
+	err = json.Unmarshal(data, &def)
+	if err != nil {
+		log.Error("Couldn't unmarshal read file: ", err)
+		return nil, err
+	}
+
 	nestDef := nestedApiDefinition{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
