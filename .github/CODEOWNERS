@@ -3,3 +3,5 @@
 .github/workflows/sync-automation.yml @TykTechnologies/devops
 .github/workflows/pac.yml @TykTechnologies/devops
 /repo-policy/ @TykTechnologies/devops
+swagger.yml @letzya @Keithwachira
+config/config.go @letzya @Keithwachira
