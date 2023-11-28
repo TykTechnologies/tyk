@@ -438,7 +438,7 @@ jobs:
         run: |
           docker run --network ${{ job.container.network }} --rm test-${{ matrix.distro }}
   
-  smoke-tests:
+  release-tests:
     needs:
       - goreleaser
     permissions:
