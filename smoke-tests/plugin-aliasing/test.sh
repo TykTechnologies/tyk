@@ -26,8 +26,13 @@ GATEWAY_VERSION=$(echo $GATEWAY_VERSION | perl -n -e'/(\d+).(\d+).(\d+)/'' && pr
 
 rm -rfv foobar-plugin/*.so helloworld-plugin/*.so
 
-docker run --rm -e GO_GET=1 -v `pwd`/foobar-plugin:/plugin-source $PLUGIN_COMPILER_IMAGE foobar-plugin.so
-docker run --rm -e GO_GET=1 -v `pwd`/helloworld-plugin:/plugin-source $PLUGIN_COMPILER_IMAGE helloworld-plugin.so
+docker volume create plugin-aliasing-go-mod-cache
+docker volume create plugin-aliasing-go-build-cache
+
+cache_args="-v plugin-aliasing-go-mod-cache:/go/pkg/mod -v plugin-aliasing-go-build-cache:/root/.cache/go-build"
+
+docker run --rm -e GO_GET=1 $cache_args -v `pwd`/foobar-plugin:/plugin-source $PLUGIN_COMPILER_IMAGE foobar-plugin.so
+docker run --rm -e GO_GET=1 $cache_args -v `pwd`/helloworld-plugin:/plugin-source $PLUGIN_COMPILER_IMAGE helloworld-plugin.so
 
 # if params were not sent, then attempt to get them from env vars
 if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
