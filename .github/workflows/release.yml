@@ -139,15 +139,17 @@ jobs:
             type=semver,pattern=v{{version}},prefix=v
 
       - name: CI push
+        if: ${{ matrix.golang_cross == '1.19-bullseye' }}
         shell: bash
         env:
           t: ${{ steps.metadata.outputs.tags }}
+          build_tag: ${{ startswith(github.ref, 'refs/tags') && github.ref_name || 'v0.0.0' }}
         run: |
           set +e
           IFS=$'\n' tags=($t)
           for tag in "${tags[@]}"; do
-             for arch in amd64 arm64; do 
-                docker tag tykio/tyk-gateway:v0.0.0-${arch} ${tag}-${arch} && docker push ${tag}-${arch}
+             for arch in amd64 arm64; do
+                 docker tag tykio/tyk-gateway:${build_tag}-${arch} ${tag}-${arch} && docker push ${tag}-${arch}
              done
              docker manifest create ${tag} ${tag}-amd64 ${tag}-arm64 && docker manifest push ${tag}
           done
