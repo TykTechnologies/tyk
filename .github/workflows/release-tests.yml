@@ -36,7 +36,7 @@ jobs:
               echo Attempting to test $d
               if [ -d $d ] && [ -e $d/test.sh ]; then
                   cd $d
-                  ./test.sh ${{ steps.ecr.outputs.registry }}/tyk:sha-${{ github.sha }}
+                  ./test.sh
                   cd -
               fi
           done
@@ -82,7 +82,7 @@ jobs:
               echo Attempting to test $d
               if [ -d $d ] && [ -e $d/test.sh ]; then
                   cd $d
-                  ./test.sh ${{ steps.ecr.outputs.registry }}/tyk:sha-${{ github.sha }}
+                  ./test.sh
                   cd -
               fi
           done
