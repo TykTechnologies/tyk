@@ -5,13 +5,8 @@ function setup {
 	local tag=${1:-"v0.0.0"}
 
 	# Setup required env vars for docker compose
-	if [[ $tag =~ ":" ]];then #it means is not a tag but complete image url
-		export GATEWAY_IMAGE=${tag}
-		export PLUGIN_COMPILER_IMAGE=${PLUGIN_COMPILER_IMAGE:-"754489498669.dkr.ecr.eu-central-1.amazonaws.com:sha-${tag#*:}"}
-	else
-		export GATEWAY_IMAGE=${GATEWAY_IMAGE:-"tykio/tyk-gateway:${tag}"}
-		export PLUGIN_COMPILER_IMAGE=${PLUGIN_COMPILER_IMAGE:-"tykio/tyk-plugin-compiler:${tag}"}
-	fi
+	export GATEWAY_IMAGE=${GATEWAY_IMAGE:-"tykio/tyk-gateway:${tag}"}
+	export PLUGIN_COMPILER_IMAGE=${PLUGIN_COMPILER_IMAGE:-"tykio/tyk-plugin-compiler:${tag}"}
 
 	docker pull -q $GATEWAY_IMAGE
 	docker pull -q $PLUGIN_COMPILER_IMAGE
