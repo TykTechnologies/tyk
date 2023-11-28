@@ -86,8 +86,25 @@ if [[ "$DEBUG" == "1" ]] ; then
 	git commit -m "initial import" .
 fi
 
-if [ -f "go.mod" ] ; then
-	OLD_MODULE=$(go list .)
+# ensureGoMod rewrites a go module based on plugin_id if available.
+function ensureGoMod {
+	NEW_MODULE=tyk.internal/tyk_plugin${plugin_id}
+
+	# Create go.mod if it doesn't exist.
+	if [ ! -f "go.mod" ] ; then
+		echo "INFO: Creating go.mod"
+		go mod init $NEW_MODULE
+		return
+	fi
+
+	# Keep go.mod as is if plugin_id is empty.
+	if [ -z "${plugin_id}" ] ; then
+		echo "INFO: No plugin id provided, keeping go.mod as is"
+		return
+	fi
+
+	# Replace provided go.mod module path with plugin id path
+	OLD_MODULE=$(go mod edit -json | jq .Module.Path -r)
 
 	case "$OLD_MODULE" in
 		# module has a domain, less chance of conflicts
@@ -102,16 +119,15 @@ if [ -f "go.mod" ] ; then
 		;;
 	esac
 
-	NEW_MODULE=${OLD_MODULE}/plugin${plugin_id}
-
 	# Replace go.mod module
 	go mod edit -module $NEW_MODULE
 
 	# Replace import paths
 	find ./ -type f -name '*.go' -exec sed -i -e "s,\"${OLD_MODULE},\"${NEW_MODULE},g" {} \;
-else
-	go mod init tyk_plugin${plugin_id}
-fi
+
+}
+
+ensureGoMod
 
 if [[ "$DEBUG" == "1" ]] ; then
 	git add .
