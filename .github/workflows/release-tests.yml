@@ -4,7 +4,7 @@ on:
   workflow_call:
 
 jobs:
-  smoke-tests:
+  ci-tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -23,7 +23,7 @@ jobs:
         with:
           mask-password: 'true'
 
-      - name: Run ci/tests
+      - name: Run /ci/tests
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
@@ -41,7 +41,27 @@ jobs:
               fi
           done
 
-      - name: Run smoke-tests
+  smoke-tests:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags')
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: cipush
+          aws-region: eu-central-1
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: 'true'
+
+      - name: Run /smoke-tests
 
         # This job only runs whenever a tag is created. A tag is required
         # for a functional plugin compiler build for when the GO_GET=1 env
@@ -50,7 +70,6 @@ jobs:
         #
         # See https://github.com/golang/go/issues/31191 for more info.
 
-        if: startsWith(github.ref, 'refs/tags')
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
