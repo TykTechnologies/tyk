@@ -69,11 +69,6 @@ if [[ "$DEBUG" == "1" ]] ; then
 	set -x
 fi
 
-# Create worspace
-cd $WORKSPACE_ROOT
-go work init ./tyk
-go work use ./$(basename $PLUGIN_BUILD_PATH)
-
 # Go to plugin build path
 cd $PLUGIN_BUILD_PATH
 
@@ -129,14 +124,25 @@ function ensureGoMod {
 
 ensureGoMod
 
-if [[ "$DEBUG" == "1" ]] ; then
-	git add .
-	git diff --cached
-fi
+# Create worspace after ensuring go.mod exists
+cd $WORKSPACE_ROOT
+go work init ./tyk
+go work use ./$(basename $PLUGIN_BUILD_PATH)
 
+# Go to plugin build path
+cd $PLUGIN_BUILD_PATH
 
 if [[ "$GO_GET" == "1" ]] ; then
 	go get github.com/TykTechnologies/tyk@${GITHUB_SHA}
+fi
+
+if [[ "$GO_TIDY" == "1" ]] ; then
+	go mod tidy
+fi
+
+if [[ "$DEBUG" == "1" ]] ; then
+	git add .
+	git diff --cached
 fi
 
 CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
