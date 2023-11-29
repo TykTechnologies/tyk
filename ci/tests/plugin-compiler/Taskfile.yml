@@ -123,3 +123,17 @@ tasks:
       - cp -f {{.plugin_path}}/*.so {{.plugin_path}}/plugin.so
       - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin.so -s {{.symbol}}
       - strings {{.plugin_path}}/plugin.so | grep main.go
+
+  test:test-plugin-no-mod:
+    desc: "Test plugin compiler (test-plugin)"
+    vars:
+      plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/test-plugin-no-mod'
+      symbol: AddFooBarHeader
+      args: --rm -e DEBUG=1 -v {{.plugin_path}}:/plugin-source -w /plugin-source
+    cmds:
+      - rm -f {{.plugin_path}}/*.so
+      - docker run {{.args}} {{.image}} plugin.so
+      - cp -f {{.plugin_path}}/*.so {{.plugin_path}}/plugin.so
+      - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin.so -s {{.symbol}}
+      - strings {{.plugin_path}}/plugin.so | grep main.go
+
