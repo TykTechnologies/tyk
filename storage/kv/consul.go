@@ -36,6 +36,10 @@ func newConsul(conf config.ConsulConfig) (Store, error) {
 		defaultCfg.Address = conf.Address
 	}
 
+	if conf.Scheme != "" {
+		defaultCfg.Scheme = conf.Scheme
+	}
+
 	if conf.Datacenter != "" {
 		defaultCfg.Datacenter = conf.Datacenter
 	}
