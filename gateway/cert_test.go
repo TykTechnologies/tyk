@@ -202,8 +202,8 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			{Client: clientWithoutCert},
 			// Should raise error for ControlAPI without certificate
 			{ControlRequest: true, ErrorMatch: unknownErr},
-			// Should raise error for for unknown certificate
-			{ControlRequest: true, ErrorMatch: badcertErr, Client: clientWithCert},
+			// Should raise error for unknown certificate
+			{ControlRequest: true, ErrorMatch: "unknown certificate authority", Client: clientWithCert},
 		}...)
 	})
 
@@ -255,7 +255,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 
 		// Should fail as no valid cert IDs exist in Certificates.ControlAPI
 		_, _ = ts.Run(t, test.TestCase{
-			Path: "/tyk/certs", Code: http.StatusForbidden, ErrorMatch: badcertErr, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
+			Path: "/tyk/certs", Code: http.StatusForbidden, ErrorMatch: "unknown certificate authority", ControlRequest: true, AdminAuth: true, Client: clientWithCert,
 		})
 	})
 
