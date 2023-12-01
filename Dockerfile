@@ -6,7 +6,7 @@ FROM debian:bookworm AS assets
 # `GO_VERSION` and `PYTHON_VERSION` as docker build arguments.
 
 ARG GO_VERSION=1.21
-ARG PYTHON_VERSION=3.7.13
+ARG PYTHON_VERSION=3.11
 
 WORKDIR /assets
 
@@ -17,7 +17,7 @@ RUN	apt update && apt install wget -y && \
 FROM debian:bookworm
 
 ARG GO_VERSION=1.21
-ARG PYTHON_VERSION=3.7.13
+ARG PYTHON_VERSION=3.11
 
 COPY --from=assets /assets/ /tmp/
 WORKDIR /tmp
