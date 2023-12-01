@@ -1,0 +1,25 @@
+---
+version: "3"
+
+tasks:
+  default:
+    desc: "Run tests"
+    cmds:
+      - goimports -w .
+      - go fmt ./...
+      - go test -tags unit -count=1 -cover -coverprofile=rate.cov .
+      - task: cover
+
+  cover:
+    desc: "Show source coverage"
+    aliases: [coverage, cov, uncover]
+    cmds:
+      - go tool cover -func=rate.cov
+      - uncover rate.cov
+
+  install:uncover:
+    desc: "Install uncover"
+    env:
+      GOBIN: /usr/local/bin
+    cmds:
+      - go install github.com/gregoryv/uncover/...@latest
