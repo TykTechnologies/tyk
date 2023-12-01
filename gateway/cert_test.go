@@ -173,7 +173,6 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	t.Run("Separate domain", func(t *testing.T) {
-		t.SkipNow()
 		conf := func(globalConf *config.Config) {
 			globalConf.HttpServerOptions.UseSSL = true
 			globalConf.Security.ControlAPIUseMutualTLS = true
