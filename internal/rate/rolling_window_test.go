@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/rate"
 	redis "github.com/go-redis/redis/v8"
 	redismock "github.com/go-redis/redismock/v8"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/rate"
 )
 
 func Test_GetRollingWindow(t *testing.T) {
