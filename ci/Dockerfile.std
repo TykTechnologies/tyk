@@ -12,8 +12,7 @@ RUN apt-get update \
     && apt-get dist-upgrade -y ca-certificates
 # Plugins only need libpython, but installing grpc needs full Python
 RUN apt-get install -y python3-setuptools libpython3-dev curl ca-certificates python3-grpcio \
-    && pip3 install protobuf==3.20.2 \
-    && pip3 install --upgrade setuptools
+    && python3-protobuf
 
 # Remove some things to decrease CVE surface
 RUN dpkg --purge --force-remove-essential curl ncurses-base \
