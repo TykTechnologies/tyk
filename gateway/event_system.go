@@ -1,11 +1,8 @@
 package gateway
 
 import (
-	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -13,51 +10,40 @@ import (
 	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/gateway/model"
 )
 
 // The name for event handlers as defined in the API Definition JSON/BSON format
 const EH_LogHandler apidef.TykEventHandlerName = "eh_log_handler"
 
-// Register new event types here, the string is the code used to hook at the Api Deifnititon JSON/BSON level
+// Alias the event types (refactoring shim).
 const (
-	EventQuotaExceeded        apidef.TykEvent = "QuotaExceeded"
-	EventRateLimitExceeded    apidef.TykEvent = "RatelimitExceeded"
-	EventAuthFailure          apidef.TykEvent = "AuthFailure"
-	EventKeyExpired           apidef.TykEvent = "KeyExpired"
-	EventVersionFailure       apidef.TykEvent = "VersionFailure"
-	EventOrgQuotaExceeded     apidef.TykEvent = "OrgQuotaExceeded"
-	EventOrgRateLimitExceeded apidef.TykEvent = "OrgRateLimitExceeded"
-	EventTriggerExceeded      apidef.TykEvent = "TriggerExceeded"
-	EventBreakerTriggered     apidef.TykEvent = "BreakerTriggered"
-	EventBreakerTripped       apidef.TykEvent = "BreakerTripped"
-	EventBreakerReset         apidef.TykEvent = "BreakerReset"
-	EventHOSTDOWN             apidef.TykEvent = "HostDown"
-	EventHOSTUP               apidef.TykEvent = "HostUp"
-	EventTokenCreated         apidef.TykEvent = "TokenCreated"
-	EventTokenUpdated         apidef.TykEvent = "TokenUpdated"
-	EventTokenDeleted         apidef.TykEvent = "TokenDeleted"
+	EventQuotaExceeded        = apidef.EventQuotaExceeded
+	EventRateLimitExceeded    = apidef.EventRateLimitExceeded
+	EventAuthFailure          = apidef.EventAuthFailure
+	EventKeyExpired           = apidef.EventKeyExpired
+	EventVersionFailure       = apidef.EventVersionFailure
+	EventOrgQuotaExceeded     = apidef.EventOrgQuotaExceeded
+	EventOrgRateLimitExceeded = apidef.EventOrgRateLimitExceeded
+	EventTriggerExceeded      = apidef.EventTriggerExceeded
+	EventBreakerTriggered     = apidef.EventBreakerTriggered
+	EventBreakerTripped       = apidef.EventBreakerTripped
+	EventBreakerReset         = apidef.EventBreakerReset
+	EventHOSTDOWN             = apidef.EventHOSTDOWN
+	EventHOSTUP               = apidef.EventHOSTUP
+	EventTokenCreated         = apidef.EventTokenCreated
+	EventTokenUpdated         = apidef.EventTokenUpdated
+	EventTokenDeleted         = apidef.EventTokenDeleted
 )
 
-// EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
-// easily extending event metadata objects
-type EventMetaDefault struct {
-	Message            string
-	OriginatingRequest string
-}
+type EventMetaDefault = model.EventMetaDefault
 
 type EventHostStatusMeta struct {
 	EventMetaDefault
 	HostInfo HostHealthReport
 }
 
-// EventKeyFailureMeta is the metadata structure for any failure related
-// to a key, such as quota or auth failures.
-type EventKeyFailureMeta struct {
-	EventMetaDefault
-	Path   string
-	Origin string
-	Key    string
-}
+type EventKeyFailureMeta = model.EventKeyFailureMeta
 
 // EventCurcuitBreakerMeta is the event status for a circuit breaker tripping
 type EventCurcuitBreakerMeta struct {
@@ -88,15 +74,6 @@ type EventTokenMeta struct {
 	EventMetaDefault
 	Org string
 	Key string
-}
-
-// EncodeRequestToEvent will write the request out in wire protocol and
-// encode it to base64 and store it in an Event object
-func EncodeRequestToEvent(r *http.Request) string {
-	var asBytes bytes.Buffer
-	r.Write(&asBytes)
-
-	return base64.StdEncoding.EncodeToString(asBytes.Bytes())
 }
 
 // EventHandlerByName is a convenience function to get event handler instances from an API Definition

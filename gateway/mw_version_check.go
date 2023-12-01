@@ -9,6 +9,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -120,7 +121,7 @@ outside:
 		v.FireEvent(EventVersionFailure, EventVersionFailureMeta{
 			EventMetaDefault: EventMetaDefault{
 				Message:            "Attempted access to disallowed version / path.",
-				OriginatingRequest: EncodeRequestToEvent(r),
+				OriginatingRequest: httputil.EncodeRequest(r),
 			},
 			Path:   r.URL.Path,
 			Origin: request.RealIP(r),

@@ -241,6 +241,20 @@ type BaseMiddleware struct {
 	logger   *logrus.Entry
 }
 
+func (t *BaseMiddleware) NewSession(keyName string) *user.SessionState {
+	sess := &user.SessionState{
+		Rate:        t.Spec.GlobalRateLimit.Rate,
+		Per:         t.Spec.GlobalRateLimit.Per,
+		LastUpdated: strconv.Itoa(int(time.Now().UnixNano())),
+	}
+	sess.SetKeyHash(storage.HashKey(keyName, t.Gw.GetConfig().HashKeys))
+	return sess
+}
+
+func (t *BaseMiddleware) ObfuscateKey(token string) string {
+	return t.Gw.obfuscateKey(token)
+}
+
 func (t *BaseMiddleware) Base() *BaseMiddleware {
 	t.loggerMu.Lock()
 	defer t.loggerMu.Unlock()
