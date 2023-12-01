@@ -11,8 +11,8 @@ RUN echo http://deb.debian.org/debian/ bookworm main >> /etc/apt/sources.list.d/
 RUN apt-get update \
     && apt-get dist-upgrade -y ca-certificates
 # Plugins only need libpython, but installing grpc needs full Python
-RUN apt-get install -y python3-setuptools libpython3-dev curl ca-certificates python3-grpcio \
-    && python3-protobuf
+RUN apt-get install -y python3-setuptools libpython3-dev curl ca-certificates python3-grpcio pip \
+    && pip install --break-system-packages protobuf==3.20.2
 
 # Remove some things to decrease CVE surface
 RUN dpkg --purge --force-remove-essential curl ncurses-base \
