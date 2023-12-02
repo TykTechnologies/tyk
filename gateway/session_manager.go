@@ -247,7 +247,6 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 	}
 
 	return sessionFailNone
-
 }
 
 func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, scope string, limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
