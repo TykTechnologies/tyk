@@ -1,260 +1,148 @@
-//go:build unit
-// +build unit
+//go:build integration
+// +build integration
 
 package rate_test
 
 import (
 	"context"
-	"errors"
-	"strconv"
 	"testing"
 	"time"
 
-	redis "github.com/go-redis/redis/v8"
-	redismock "github.com/go-redis/redismock/v8"
-	"github.com/stretchr/testify/assert"
-
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/rate"
+	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestRollingWindow_MockGet(t *testing.T) {
+// TestRollingWindow is an integration test that tests Get/Set behaviour.
+func TestRollingWindow(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	var (
-		transactionOn        = false
-		transactionOff       = true
-		per            int64 = 60
-		key                  = "test-key"
-	)
+	cfg, err := config.New()
+	assert.NoError(t, err)
 
-	now := time.Now()
-	wantErr := errors.New("Test error return")
+	conn := storage.NewRedisClusterPool(false, false, *cfg)
 
-	previousPeriod := now.Add(time.Duration(-1*per) * time.Second)
-	previousVal := strconv.Itoa(int(previousPeriod.UnixNano()))
+	rl := rate.NewRollingWindow(conn)
 
-	t.Logf("Current time: %s\nPrevious val: %s", now, previousVal)
+	per := int64(5)
+	for _, tx := range []bool{true, false} {
+		key := uuid.New()
 
-	expectPipeline := func(mock redismock.ClientMock, values []string, err error) {
-		mock.ExpectZRemRangeByScore(key, "-inf", previousVal).SetVal(0)
-		if err != nil {
-			mock.ExpectZRange(key, 0, -1).SetErr(err)
-		} else {
-			mock.ExpectZRange(key, 0, -1).SetVal(values)
-		}
+		// Issue 3 adds
+		rl.Set(ctx, time.Now(), key, per, "-1", tx)
+		rl.Set(ctx, time.Now(), key, per, "-1", tx)
+		got, err := rl.Set(ctx, time.Now(), key, per, "-1", tx)
+
+		// Assert value of last set / last value.
+		assert.NoError(t, err)
+		assert.Len(t, got, 3)
+
+		// pipelinedTx get
+		final, err := rl.Get(ctx, time.Now(), key, per, tx)
+
+		assert.NoError(t, err)
+		assert.Equal(t, got, final)
 	}
-
-	expectTxPipeline := func(mock redismock.ClientMock, values []string, err error) {
-		mock.ExpectTxPipeline()
-		expectPipeline(mock, values, err)
-		if err == nil {
-			mock.ExpectTxPipelineExec()
-		}
-	}
-
-	t.Run("no-transaction", func(t *testing.T) {
-		tx := transactionOff
-		expect := expectPipeline
-
-		t.Run("value", func(t *testing.T) {
-			conn, mock := redismock.NewClientMock()
-
-			want := []string{"a", "b", "c"}
-			expect(mock, want, nil)
-
-			rl := rate.NewRollingWindow(conn)
-			got, err := rl.Get(ctx, now, key, per, tx)
-
-			assert.NoError(t, mock.ExpectationsWereMet())
-
-			assert.NoError(t, err)
-			assert.Equal(t, want, got)
-		})
-
-		t.Run("error", func(t *testing.T) {
-			conn, mock := redismock.NewClientMock()
-
-			want := []string{"a", "b", "c"}
-			expect(mock, want, wantErr)
-
-			rl := rate.NewRollingWindow(conn)
-			got, err := rl.Get(ctx, now, key, per, tx)
-
-			assert.NoError(t, mock.ExpectationsWereMet())
-			assert.ErrorIs(t, err, wantErr)
-			assert.Nil(t, got)
-		})
-	})
-
-	t.Run("transaction", func(t *testing.T) {
-		tx := transactionOn
-		expect := expectTxPipeline
-
-		t.Run("value", func(t *testing.T) {
-			conn, mock := redismock.NewClientMock()
-
-			want := []string{"a", "b", "c"}
-			expect(mock, want, nil)
-
-			rl := rate.NewRollingWindow(conn)
-			got, err := rl.Get(ctx, now, key, per, tx)
-
-			assert.NoError(t, mock.ExpectationsWereMet())
-			assert.NoError(t, err)
-			assert.Equal(t, want, got)
-		})
-
-		t.Run("error", func(t *testing.T) {
-			conn, mock := redismock.NewClientMock()
-
-			want := []string{"a", "b", "c"}
-			expect(mock, want, wantErr)
-
-			rl := rate.NewRollingWindow(conn)
-			got, err := rl.Get(ctx, now, key, per, tx)
-
-			assert.NoError(t, mock.ExpectationsWereMet())
-			assert.ErrorIs(t, err, wantErr)
-			assert.Nil(t, got)
-		})
-	})
 }
 
-func TestRollingWindow_MockSet(t *testing.T) {
+// TestRollingWindow is an integration test that tests Count behaviour.
+func TestRollingWindow_Count(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	var (
-		transactionOn        = false
-		transactionOff       = true
-		key                  = "test-key"
-		per            int64 = 60
+	cfg, err := config.New()
+	assert.NoError(t, err)
 
-		perDuration time.Duration = time.Duration(per) * time.Second
-	)
+	conn := storage.NewRedisClusterPool(false, false, *cfg)
 
-	now := time.Now()
-	wantErr := errors.New("Test error return")
-	previousPeriod := now.Add(time.Duration(-1*per) * time.Second)
+	rl := rate.NewRollingWindow(conn)
 
-	nowVal := strconv.Itoa(int(now.UnixNano()))
-	previousVal := strconv.Itoa(int(previousPeriod.UnixNano()))
+	for _, tx := range []bool{true, false} {
+		assertRateCount(ctx, t, rl, tx)
+	}
+}
 
-	expectPipeline := func(mock redismock.ClientMock, member string, values []string, err error) {
-		mock.ExpectZRemRangeByScore(key, "-inf", previousVal).SetVal(0)
+const testRequestCount int64 = 100
 
-		if err != nil {
-			mock.ExpectZRange(key, 0, -1).SetErr(err)
-			return
-		} else {
-			mock.ExpectZRange(key, 0, -1).SetVal(values)
-		}
+func assertRateCount(ctx context.Context, tb testing.TB, rl *rate.RollingWindow, tx bool) {
+	key, per := uuid.New(), int64(5)
 
-		mock.ExpectZAdd(key, &redis.Z{
-			Member: member,
-			Score:  float64(now.UnixNano()),
-		}).SetVal(1)
-
-		mock.ExpectExpire(key, perDuration).SetVal(true)
+	for i := int64(0); i < testRequestCount; i++ {
+		_, err := rl.Set(ctx, time.Now(), key, per, "-1", tx)
+		assert.NoError(tb, err)
 	}
 
-	expectTxPipeline := func(mock redismock.ClientMock, member string, values []string, err error) {
-		mock.ExpectTxPipeline()
-		expectPipeline(mock, member, values, err)
-		if err == nil {
-			mock.ExpectTxPipelineExec()
-		}
+	// verify rl.Count implementation
+	count, err := rl.Count(ctx, key, time.Now(), per)
+
+	assert.NoError(tb, err)
+	assert.Equal(tb, int64(testRequestCount), count)
+}
+
+func assertRateCountV2(ctx context.Context, tb testing.TB, rl *rate.RollingWindow) {
+	key, per := uuid.New(), int64(5)
+
+	for i := int64(0); i < testRequestCount; i++ {
+		assert.NoError(tb, rl.Add(ctx, key, time.Now(), per))
 	}
 
-	before := []string{"a", "b"}
-	want := []string{"a", "b", nowVal}
+	// verify rl.Count implementation
+	count, err := rl.Count(ctx, key, time.Now(), per)
 
-	t.Run("no-transaction", func(t *testing.T) {
-		tx := transactionOff
-		expect := expectPipeline
+	assert.NoError(tb, err)
+	assert.Equal(tb, testRequestCount, count)
+}
 
-		t.Run("default", func(t *testing.T) {
-			conn, mock := redismock.NewClientMock()
+func assertRateCountV3(ctx context.Context, tb testing.TB, rl *rate.RollingWindow) {
+	key, per := uuid.New(), int64(5)
 
-			expect(mock, nowVal, before, nil)
+	for i := int64(0); i < testRequestCount; i++ {
+		assert.NoError(tb, rl.Increment(ctx, key, time.Now(), per))
+	}
 
-			rl := rate.NewRollingWindow(conn)
-			got, err := rl.Set(ctx, now, key, per, "-1", tx)
+	// verify rl.Count implementation
+	count, err := rl.GetCount(ctx, key, time.Now(), per)
 
-			assert.NoError(t, err)
-			assert.Equal(t, want, got)
-			assert.NoError(t, mock.ExpectationsWereMet())
-		})
+	assert.NoError(tb, err)
+	assert.Equal(tb, testRequestCount, count)
+}
 
-		t.Run("value", func(t *testing.T) {
-			conn, mock := redismock.NewClientMock()
+func BenchmarkRollingWindow_Count(b *testing.B) {
+	ctx := context.Background()
 
-			expect(mock, "123", before, nil)
+	cfg, err := config.New()
+	assert.NoError(b, err)
 
-			rl := rate.NewRollingWindow(conn)
-			got, err := rl.Set(ctx, now, key, per, "123", tx)
+	conn := storage.NewRedisClusterPool(false, false, *cfg)
 
-			assert.NoError(t, err)
-			assert.Equal(t, want, got)
-			assert.NoError(t, mock.ExpectationsWereMet())
-		})
+	rl := rate.NewRollingWindow(conn)
 
-		t.Run("error", func(t *testing.T) {
-			conn, mock := redismock.NewClientMock()
+	b.ResetTimer()
 
-			expect(mock, "123", before, wantErr)
-
-			rl := rate.NewRollingWindow(conn)
-			got, err := rl.Set(ctx, now, key, per, "123", tx)
-
-			assert.NoError(t, mock.ExpectationsWereMet())
-			assert.ErrorIs(t, err, wantErr)
-			assert.Nil(t, got)
-		})
+	b.Run("count v2", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			assertRateCountV3(ctx, b, rl)
+		}
 	})
 
-	t.Run("transaction", func(t *testing.T) {
-		tx := transactionOn
-		expect := expectTxPipeline
+	b.Run("count", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			assertRateCountV2(ctx, b, rl)
+		}
+	})
 
-		t.Run("default", func(t *testing.T) {
-			conn, mock := redismock.NewClientMock()
+	b.Run("pipelineTx", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			assertRateCount(ctx, b, rl, false)
+		}
+	})
 
-			expect(mock, nowVal, before, nil)
-
-			rl := rate.NewRollingWindow(conn)
-			got, err := rl.Set(ctx, now, key, per, "-1", tx)
-
-			assert.NoError(t, err)
-			assert.Equal(t, want, got)
-			assert.NoError(t, mock.ExpectationsWereMet())
-		})
-
-		t.Run("value", func(t *testing.T) {
-			conn, mock := redismock.NewClientMock()
-
-			expect(mock, "123", before, nil)
-
-			rl := rate.NewRollingWindow(conn)
-			got, err := rl.Set(ctx, now, key, per, "123", tx)
-
-			assert.NoError(t, mock.ExpectationsWereMet())
-			assert.NoError(t, err)
-			assert.Equal(t, want, got)
-		})
-
-		t.Run("error", func(t *testing.T) {
-			conn, mock := redismock.NewClientMock()
-
-			expect(mock, "123", before, wantErr)
-
-			rl := rate.NewRollingWindow(conn)
-			got, err := rl.Set(ctx, now, key, per, "123", tx)
-
-			assert.NoError(t, mock.ExpectationsWereMet())
-			assert.ErrorIs(t, err, wantErr)
-			assert.Nil(t, got)
-		})
+	b.Run("pipeline", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			assertRateCount(ctx, b, rl, true)
+		}
 	})
 }

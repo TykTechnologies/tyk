@@ -22,19 +22,22 @@ func NewRollingWindow(redis redis.UniversalClient) *RollingWindow {
 	}
 }
 
+func (rw *RollingWindow) StartPeriod(now time.Time, per int64) string {
+	period := time.Duration(per) * time.Second
+	ts := now.Add(-period).UnixNano()
+	return strconv.FormatInt(ts, 10)
+}
+
 // Set will append to a sorted set in redis and extract a timed window of values.
 func (rw *RollingWindow) Set(ctx context.Context, now time.Time, keyName string, per int64, value_override string, pipeline bool) ([]string, error) {
-	cur := strconv.FormatInt(int64(now.UnixNano()), 10)
-	prevPeriod := now.Add(time.Duration(-1*per) * time.Second)
-	period := strconv.FormatInt(int64(prevPeriod.UnixNano()), 10)
-	expire := time.Duration(per) * time.Second
+	startPeriod := rw.StartPeriod(now, per)
 
-	element := &redis.Z{
-		Score:  float64(now.UnixNano()),
-		Member: value_override,
-	}
+	var (
+		score  = float64(now.UnixNano())
+		member = value_override
+	)
 	if value_override == "-1" {
-		element.Member = cur
+		member = strconv.FormatInt(int64(now.UnixNano()), 10)
 	}
 
 	var zrange *redis.StringSliceCmd
@@ -45,10 +48,11 @@ func (rw *RollingWindow) Set(ctx context.Context, now time.Time, keyName string,
 	}
 
 	pipeFn := func(pipe redis.Pipeliner) error {
-		pipe.ZRemRangeByScore(ctx, keyName, "-inf", period)
-		zrange = pipe.ZRange(ctx, keyName, 0, -1)
-		pipe.ZAdd(ctx, keyName, element)
-		pipe.Expire(ctx, keyName, expire)
+		zset := NewRollingWindowStorage(rw.redis, pipe, keyName)
+		zset.ZRemRangeByScore(ctx, "-inf", startPeriod)
+		zset.ZAdd(ctx, member, score)
+		zrange = zset.ZRangeAll(ctx)
+		zset.Expire(ctx, per)
 		return nil
 	}
 
@@ -57,15 +61,14 @@ func (rw *RollingWindow) Set(ctx context.Context, now time.Time, keyName string,
 		return nil, err
 	}
 
-	result, err := zrange.Result()
-	result = append(result, cur)
-	return result, err
+	result, _ := zrange.Result()
+	//	result = append(result, member)
+	return result, nil
 }
 
 // Get will remove part of a sorted set in redis and extract a timed window of values.
 func (rw *RollingWindow) Get(ctx context.Context, now time.Time, keyName string, per int64, pipeline bool) ([]string, error) {
-	prevPeriod := now.Add(time.Duration(-1*per) * time.Second)
-	period := strconv.FormatInt(int64(prevPeriod.UnixNano()), 10)
+	startPeriod := rw.StartPeriod(now, per)
 
 	var zrange *redis.StringSliceCmd
 
@@ -75,8 +78,9 @@ func (rw *RollingWindow) Get(ctx context.Context, now time.Time, keyName string,
 	}
 
 	pipeFn := func(pipe redis.Pipeliner) error {
-		pipe.ZRemRangeByScore(ctx, keyName, "-inf", period)
-		zrange = pipe.ZRange(ctx, keyName, 0, -1)
+		zset := NewRollingWindowStorage(rw.redis, pipe, keyName)
+		zset.ZRemRangeByScore(ctx, "-inf", startPeriod)
+		zrange = zset.ZRangeAll(ctx)
 		return nil
 	}
 
@@ -86,4 +90,44 @@ func (rw *RollingWindow) Get(ctx context.Context, now time.Time, keyName string,
 	}
 
 	return zrange.Result()
+}
+
+// Count returns a count of requests made in a time window. This is enough for
+// using the count for a rate limiter decision.
+func (rw *RollingWindow) Count(ctx context.Context, keyName string, now time.Time, per int64) (int64, error) {
+	startPeriod := rw.StartPeriod(now, per)
+
+	zset := NewRollingWindowStorage(rw.redis, nil, keyName)
+	return zset.ZCount(ctx, startPeriod, "+inf").Result()
+}
+
+// Add adds a member to a ZSET for a given time window.
+func (rw *RollingWindow) Add(ctx context.Context, keyName string, now time.Time, per int64) error {
+	var (
+		member = strconv.FormatInt(int64(now.UnixNano()), 10)
+		score  = float64(now.UnixNano())
+	)
+
+	zset := NewRollingWindowStorage(rw.redis, nil, keyName)
+
+	return zset.ZAdd(ctx, member, score).Err()
+}
+
+func (rw *RollingWindow) GetCount(ctx context.Context, keyName string, now time.Time, per int64) (int64, error) {
+	conn := NewRollingWindowStorage(rw.redis, nil, keyName)
+
+	// TODO: key window
+
+	result, err := conn.Get(ctx).Result()
+	if err != nil {
+		return 0, err
+	}
+
+	return strconv.ParseInt(result, 10, 0)
+}
+
+func (rw *RollingWindow) Increment(ctx context.Context, keyName string, now time.Time, per int64) error {
+	conn := NewRollingWindowStorage(rw.redis, nil, keyName)
+
+	return conn.Increment(ctx).Err()
 }

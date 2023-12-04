@@ -13,9 +13,16 @@ tasks:
 
   integration:
     desc: "Run integration tests"
+    aliases: [ int, e2e ]
     cmds:
       - task: fmt
       - go test {{.testArgs}} -count=1 -cover -coverprofile=rate.cov -tags integration .
+
+  bench:
+    desc: "Run benchmarks"
+    cmds:
+      - task: fmt
+      - go test {{.testArgs}} -count=1 -cover -coverprofile=rate.cov -tags integration -bench=. -benchtime=5s -benchmem .
 
   fmt:
     internal: true
