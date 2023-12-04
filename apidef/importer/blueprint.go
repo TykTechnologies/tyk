@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
-
 	"github.com/TykTechnologies/tyk/apidef"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 const ApiaryBluePrint APIImporterSource = "blueprint"
@@ -164,7 +164,7 @@ func (b *BluePrintAST) ToAPIDefinition(orgID, upstreamURL string, asMock bool) (
 		Name:             b.Name,
 		Active:           true,
 		UseKeylessAccess: true,
-		APIID:            uuid.NewV4().String(),
+		APIID:            uuid.NewHex(),
 		OrgID:            orgID,
 	}
 	ad.VersionDefinition.Key = "version"

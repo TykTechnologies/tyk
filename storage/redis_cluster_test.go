@@ -3,29 +3,37 @@ package storage
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 var rc *RedisController
 
-func init() {
-	conf := config.Default
+func TestMain(m *testing.M) {
+	conf, err := config.New()
+	if err != nil {
+		panic(err)
+	}
 
 	rc = NewRedisController(context.Background())
-	go rc.ConnectToRedis(context.Background(), nil, &conf)
-	for {
-		if rc.Connected() {
-			break
-		}
+	go rc.ConnectToRedis(context.Background(), nil, conf)
 
-		time.Sleep(10 * time.Millisecond)
+	timeout, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	connected := rc.WaitConnect(timeout)
+	if !connected {
+		panic("can't connect to redis '" + conf.Storage.Host + "', timeout")
 	}
+
+	os.Exit(m.Run())
 }
 
 func TestHandleMessage(t *testing.T) {
@@ -177,4 +185,64 @@ func TestRedisExpirationTime(t *testing.T) {
 	assert.Equal(t, int64(40), ttl)
 	assert.Equal(t, nil, errGetExp)
 
+}
+
+func TestSingleton(t *testing.T) {
+	r := &RedisCluster{}
+	instance, err := r.singleton()
+	assert.NotNil(t, err)
+	assert.EqualError(t, err, "Error trying to get singleton instance: RedisController is nil")
+	assert.Nil(t, instance)
+
+	r.RedisController = rc
+
+	instance, err = r.singleton()
+	assert.Nil(t, err)
+	assert.NotNil(t, instance)
+	cmd := instance.Ping(context.Background())
+	assert.NotNil(t, cmd)
+	assert.NoError(t, cmd.Err())
+
+	r.IsAnalytics = true
+	analyticsInstance, err := r.singleton()
+	assert.Nil(t, err)
+	assert.NotNil(t, analyticsInstance)
+	cmd = analyticsInstance.Ping(context.Background())
+	assert.NotNil(t, cmd)
+	assert.NoError(t, cmd.Err())
+	assert.NotEqual(t, instance, analyticsInstance)
+
+	r.IsCache = true
+	cacheInstance, err := r.singleton()
+	assert.Nil(t, err)
+	assert.NotNil(t, cacheInstance)
+	cmd = cacheInstance.Ping(context.Background())
+	assert.NotNil(t, cmd)
+	assert.NoError(t, cmd.Err())
+	assert.NotEqual(t, instance, cacheInstance)
+	assert.NotEqual(t, analyticsInstance, cacheInstance)
+
+	cacheInstance2, err := r.singleton()
+	assert.Nil(t, err)
+	assert.NotNil(t, cacheInstance)
+	cmd = cacheInstance.Ping(context.Background())
+	assert.NotNil(t, cmd)
+	assert.NoError(t, cmd.Err())
+	assert.Equal(t, cacheInstance, cacheInstance2)
+}
+
+func TestCheckIsOpen(t *testing.T) {
+	conf, err := config.New()
+	assert.NoError(t, err)
+
+	rc := NewRedisController(context.Background())
+	cluster := RedisCluster{
+		RedisController: rc,
+	}
+
+	err = cluster.checkIsOpen()
+	assert.Error(t, err)
+	assert.EqualError(t, err, ErrRedisIsDown.Error())
+	assert.True(t, rc.connectSingleton(false, false, *conf))
+	assert.NoError(t, cluster.checkIsOpen())
 }

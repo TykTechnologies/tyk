@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
@@ -96,10 +98,12 @@ func specToJson(spec *APISpec) string {
 	m := map[string]interface{}{
 		"OrgID": spec.OrgID,
 		"APIID": spec.APIID,
-		// For backwards compatibility within 2.x.
-		// TODO: simplify or refactor in 3.x or later.
-		"config_data": spec.ConfigData,
 	}
+
+	if !spec.ConfigDataDisabled {
+		m["config_data"] = spec.ConfigData
+	}
+
 	bs, err := json.Marshal(m)
 	if err != nil {
 		log.Error("Failed to encode configuration data: ", err)
@@ -204,7 +208,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	case returnRaw = <-ret:
 		if err := <-errRet; err != nil {
 			logger.WithError(err).Error("Failed to run JS middleware")
-			return nil, http.StatusOK
+			return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
 		}
 		t.Stop()
 	case <-t.C:
@@ -215,7 +219,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			// that panics.
 			panic("stop")
 		}
-		return nil, http.StatusOK
+		return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
 	}
 	returnDataStr, _ := returnRaw.ToString()
 
@@ -223,7 +227,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	newRequestData := VMReturnObject{}
 	if err := json.Unmarshal([]byte(returnDataStr), &newRequestData); err != nil {
 		logger.WithError(err).Error("Failed to decode middleware request data on return from VM. Returned data: ", returnDataStr)
-		return nil, http.StatusOK
+		return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
 	}
 
 	// Reconstruct the request parts
@@ -298,7 +302,11 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	if d.Auth {
 		newRequestData.Session.KeyID = newRequestData.AuthValue
-		ctxSetSession(r, &newRequestData.Session, true, d.Gw.GetConfig().HashKeys)
+
+		switch d.Spec.BaseIdentityProvidedBy {
+		case apidef.CustomAuth, apidef.UnsetAuth:
+			ctxSetSession(r, &newRequestData.Session, true, d.Gw.GetConfig().HashKeys)
+		}
 	}
 
 	return nil, http.StatusOK
@@ -369,6 +377,13 @@ func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 
 	j.Log = logger // use the global logger by default
 	j.RawLog = rawLog
+}
+
+func (j *JSVM) DeInit() {
+	j.Spec = nil
+	j.Log = nil
+	j.RawLog = nil
+	j.Gw = nil
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file

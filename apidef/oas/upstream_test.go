@@ -3,14 +3,102 @@ package oas
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
+
+func TestCacheOptions(t *testing.T) {
+	t.Parallel()
+
+	emptyCache := &ServiceDiscoveryCache{}
+	enabledCache := &ServiceDiscoveryCache{
+		Enabled: true,
+		Timeout: 123,
+	}
+
+	var disabled bool
+	enabled := !disabled
+
+	testcases := []struct {
+		title   string
+		obj     *ServiceDiscovery
+		timeout int64
+		enabled bool
+	}{
+		{
+			"new",
+			&ServiceDiscovery{
+				Enabled: true,
+				Cache:   enabledCache,
+			},
+			123,
+			enabled,
+		},
+		{
+			"new and old",
+			&ServiceDiscovery{
+				Enabled:      true,
+				CacheTimeout: 10,
+				Cache:        enabledCache,
+			},
+			123,
+			enabled,
+		},
+		{
+			// This test case is particular to the behaviour of
+			// timeouts; if the new cache config value is set but
+			// is empty, we use that for the config. In practice,
+			// removing cache options on encoding with omitempty
+			// ensures that we rarely hit this case.
+			"new disabled and old",
+			&ServiceDiscovery{
+				Enabled:      true,
+				CacheTimeout: 10,
+				Cache:        emptyCache,
+			},
+			0,
+			disabled,
+		},
+		{
+			"new nil and old",
+			&ServiceDiscovery{
+				Enabled:      true,
+				CacheTimeout: 10,
+			},
+			10,
+			enabled,
+		},
+		{
+			"empty",
+			&ServiceDiscovery{
+				Enabled: true,
+			},
+			0,
+			disabled,
+		},
+		{
+			"nothing",
+			&ServiceDiscovery{},
+			0,
+			disabled,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.title, func(t *testing.T) {
+			timeout, ok := tc.obj.CacheOptions()
+			assert.Equal(t, tc.timeout, timeout)
+			assert.Equal(t, tc.enabled, ok)
+		})
+	}
+}
 
 func TestUpstream(t *testing.T) {
 	var emptyUpstream Upstream
 
 	var convertedAPI apidef.APIDefinition
+	convertedAPI.SetDisabledFlags()
 	emptyUpstream.ExtractTo(&convertedAPI)
 
 	var resultUpstream Upstream

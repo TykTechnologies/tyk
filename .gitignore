@@ -4,8 +4,6 @@
 .vscode/
 temp/
 /middleware/bundles
-/middleware/e1d21f942ec746ed416ab97fe1bf07e8/
-/middleware/e1d21f942ec746ed416ab97fe1bf07e8_IGNORED/
 testapps/
 
 /vendor
@@ -15,8 +13,8 @@ testapps/
 /utils/build_hybrid.sh
 /utils/cloud_release.sh
 
-build_tools/
-build/
+/build_tools
+/build
 
 /*.conf
 /*.json
@@ -53,3 +51,6 @@ tyk-gateway.pid
 
 tyk_linux_*
 /dist/
+
+.terraform**
+.task/

@@ -14,30 +14,47 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 type ResponseTransformMiddleware struct {
-	Spec *APISpec
+	BaseTykResponseHandler
 }
 
-func (ResponseTransformMiddleware) Name() string {
+func (r *ResponseTransformMiddleware) Base() *BaseTykResponseHandler {
+	return &r.BaseTykResponseHandler
+}
+
+func (r *ResponseTransformMiddleware) Enabled() bool {
+	for _, version := range r.Spec.VersionData.Versions {
+		if len(version.ExtendedPaths.TransformResponse) > 0 {
+			for _, transformResponse := range version.ExtendedPaths.TransformResponse {
+				if !transformResponse.Disabled {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (r *ResponseTransformMiddleware) Name() string {
 	return "ResponseTransformMiddleware"
 }
 
-func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
-	h.Spec = spec
+func (r *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
+	r.Spec = spec
 	return nil
 }
 
 func respBodyReader(req *http.Request, resp *http.Response) io.ReadCloser {
 
-	if req.Header.Get(headers.AcceptEncoding) == "" {
+	if req.Header.Get(header.AcceptEncoding) == "" {
 		return resp.Body
 	}
 
-	switch resp.Header.Get(headers.ContentEncoding) {
+	switch resp.Header.Get(header.ContentEncoding) {
 	case "gzip":
 		reader, err := gzip.NewReader(resp.Body)
 		if err != nil {
@@ -76,21 +93,20 @@ func compressBuffer(in bytes.Buffer, encoding string) (out bytes.Buffer) {
 	return out
 }
 
-func (h *ResponseTransformMiddleware) HandleError(rw http.ResponseWriter, req *http.Request) {
+func (r *ResponseTransformMiddleware) HandleError(rw http.ResponseWriter, req *http.Request) {
 }
 
-func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
-
+func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	logger := log.WithFields(logrus.Fields{
 		"prefix":      "outbound-transform",
-		"server_name": h.Spec.Proxy.TargetURL,
-		"api_id":      h.Spec.APIID,
+		"server_name": r.Spec.Proxy.TargetURL,
+		"api_id":      r.Spec.APIID,
 		"path":        req.URL.Path,
 	})
 
-	versionInfo, _ := h.Spec.Version(req)
-	versionPaths := h.Spec.RxPaths[versionInfo.Name]
-	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, TransformedResponse)
+	versionInfo, _ := r.Spec.Version(req)
+	versionPaths := r.Spec.RxPaths[versionInfo.Name]
+	found, meta := r.Spec.CheckSpecMatchesStatus(req, versionPaths, TransformedResponse)
 	if !found {
 		return nil
 	}
@@ -140,7 +156,7 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		}
 	}
 
-	if h.Spec.EnableContextVars {
+	if r.Spec.EnableContextVars {
 		bodyData["_tyk_context"] = ctxGetData(req)
 	}
 

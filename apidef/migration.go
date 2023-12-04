@@ -7,12 +7,21 @@ import (
 	"sort"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/TykTechnologies/tyk/internal/uuid"
+)
+
+const (
+	ResponseProcessorResponseBodyTransform = "response_body_transform"
+)
+
+var (
+	ErrMigrationNewVersioningEnabled = errors.New("not migratable - new versioning is already enabled")
 )
 
 func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error) {
 	if a.VersionDefinition.Enabled || len(a.VersionDefinition.Versions) != 0 {
-		return nil, errors.New("not migratable - new versioning is enabled")
+		return nil, ErrMigrationNewVersioningEnabled
 	}
 
 	if a.VersionData.NotVersioned && len(a.VersionData.Versions) > 1 {
@@ -46,6 +55,7 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 	}
 
 	delete(a.VersionData.Versions, base)
+	a.VersionName = base
 
 	if a.VersionDefinition.Enabled {
 		a.VersionDefinition.Name = base
@@ -53,15 +63,15 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 		for vName, vInfo := range a.VersionData.Versions {
 			newAPI := *a
 
-			newID := uuid.NewV4()
-			apiID := strings.Replace(newID.String(), "-", "", -1)
+			apiID := uuid.NewHex()
 
 			newAPI.APIID = apiID
 			newAPI.Id = ""
 			newAPI.Name += "-" + url.QueryEscape(vName)
 			newAPI.Internal = true
 			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
-			newAPI.VersionDefinition = VersionDefinition{}
+			newAPI.VersionDefinition = VersionDefinition{BaseID: a.APIID}
+			newAPI.VersionName = vName
 
 			// Version API Expires migration
 			newAPI.Expiration = vInfo.Expires
@@ -88,6 +98,10 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 
 			versions = append(versions, newAPI)
 		}
+
+		sort.Slice(versions, func(i, j int) bool {
+			return versions[i].VersionName < versions[j].VersionName
+		})
 	}
 
 	// Base API StripPath migration
@@ -115,6 +129,11 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 		Versions: map[string]VersionInfo{
 			"": baseVInfo,
 		},
+	}
+
+	// If versioning is not enabled and versions list are empty at this point, ignore key and location and drop them too.
+	if !a.VersionDefinition.Enabled && len(versions) == 0 {
+		a.VersionDefinition = VersionDefinition{}
 	}
 
 	return
@@ -207,6 +226,19 @@ func (a *APIDefinition) migrateEndpointMetaByType(typ int) {
 }
 
 func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
+	a.migrateCustomPluginAuth()
+	a.MigrateAuthentication()
+	a.migratePluginBundle()
+	a.migratePluginConfigData()
+	a.migrateMutualTLS()
+	a.migrateCertificatePinning()
+	a.migrateGatewayTags()
+	a.migrateAuthenticationPlugin()
+	a.migrateIDExtractor()
+	a.migrateCustomDomain()
+	a.migrateScopeToPolicy()
+	a.migrateResponseProcessors()
+
 	versions, err = a.MigrateVersioning()
 	if err != nil {
 		return nil, err
@@ -214,18 +246,69 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 
 	a.MigrateEndpointMeta()
 	a.MigrateCachePlugin()
-
-	for k, v := range a.AuthConfigs {
-		v.Name = k
-		a.AuthConfigs[k] = v
-	}
-
 	for i := 0; i < len(versions); i++ {
 		versions[i].MigrateEndpointMeta()
-		a.MigrateCachePlugin()
+		versions[i].MigrateCachePlugin()
 	}
 
 	return versions, nil
+}
+
+func (a *APIDefinition) migratePluginBundle() {
+	if !a.CustomMiddlewareBundleDisabled && a.CustomMiddlewareBundle == "" {
+		a.CustomMiddlewareBundleDisabled = true
+	}
+}
+
+func (a *APIDefinition) migratePluginConfigData() {
+	if reflect.IsEmpty(a.ConfigData) {
+		a.ConfigDataDisabled = true
+	}
+}
+
+// migrateCustomPluginAuth deprecates UseGoPluginAuth and EnableCoProcessAuth in favour of CustomPluginAuthEnabled.
+func (a *APIDefinition) migrateCustomPluginAuth() {
+	if a.UseGoPluginAuth || a.EnableCoProcessAuth {
+		a.CustomPluginAuthEnabled = true
+		a.UseGoPluginAuth = false
+		a.EnableCoProcessAuth = false
+	}
+}
+
+func (a *APIDefinition) migrateMutualTLS() {
+	if !a.UpstreamCertificatesDisabled && len(a.UpstreamCertificates) == 0 {
+		a.UpstreamCertificatesDisabled = true
+	}
+}
+
+func (a *APIDefinition) migrateCertificatePinning() {
+	if !a.CertificatePinningDisabled && len(a.PinnedPublicKeys) == 0 {
+		a.CertificatePinningDisabled = true
+	}
+}
+
+func (a *APIDefinition) migrateGatewayTags() {
+	if !a.TagsDisabled && len(a.Tags) == 0 {
+		a.TagsDisabled = true
+	}
+}
+
+func (a *APIDefinition) migrateAuthenticationPlugin() {
+	if reflect.IsEmpty(a.CustomMiddleware.AuthCheck) {
+		a.CustomMiddleware.AuthCheck.Disabled = true
+	}
+}
+
+func (a *APIDefinition) migrateIDExtractor() {
+	if reflect.IsEmpty(a.CustomMiddleware.IdExtractor) {
+		a.CustomMiddleware.IdExtractor.Disabled = true
+	}
+}
+
+func (a *APIDefinition) migrateCustomDomain() {
+	if !a.DomainDisabled && a.Domain == "" {
+		a.DomainDisabled = true
+	}
 }
 
 func (a *APIDefinition) MigrateCachePlugin() {
@@ -256,4 +339,124 @@ func (a *APIDefinition) MigrateCachePlugin() {
 	}
 
 	a.VersionData.Versions[""] = vInfo
+}
+
+func (a *APIDefinition) MigrateAuthentication() {
+	a.deleteAuthConfigsNotUsed()
+	for k, v := range a.AuthConfigs {
+		v.Name = k
+		a.AuthConfigs[k] = v
+	}
+}
+
+func (a *APIDefinition) deleteAuthConfigsNotUsed() {
+	if !a.isAuthTokenEnabled() {
+		delete(a.AuthConfigs, AuthTokenType)
+	}
+
+	if !a.EnableJWT {
+		delete(a.AuthConfigs, JWTType)
+	}
+
+	if !a.EnableSignatureChecking {
+		delete(a.AuthConfigs, HMACType)
+	}
+
+	if !a.UseBasicAuth {
+		delete(a.AuthConfigs, BasicType)
+	}
+
+	if !a.CustomPluginAuthEnabled || (a.CustomPluginAuthEnabled && a.CustomMiddleware.Driver == GoPluginDriver) {
+		delete(a.AuthConfigs, CoprocessType)
+	}
+
+	if !a.UseOauth2 {
+		delete(a.AuthConfigs, OAuthType)
+	}
+
+	if !a.ExternalOAuth.Enabled {
+		delete(a.AuthConfigs, ExternalOAuthType)
+	}
+
+	if !a.UseOpenID {
+		delete(a.AuthConfigs, OIDCType)
+	}
+}
+
+func (a *APIDefinition) isAuthTokenEnabled() bool {
+	return a.UseStandardAuth ||
+		(!a.UseKeylessAccess &&
+			!a.EnableJWT &&
+			!a.EnableSignatureChecking &&
+			!a.UseBasicAuth &&
+			!a.CustomPluginAuthEnabled &&
+			!a.UseOauth2 &&
+			!a.ExternalOAuth.Enabled &&
+			!a.UseOpenID)
+}
+
+// SetDisabledFlags set disabled flags to true, since by default they are not enabled in OAS API definition.
+func (a *APIDefinition) SetDisabledFlags() {
+	a.CustomMiddleware.AuthCheck.Disabled = true
+	a.TagsDisabled = true
+	a.UpstreamCertificatesDisabled = true
+	a.CertificatePinningDisabled = true
+	a.DomainDisabled = true
+	a.CustomMiddlewareBundleDisabled = true
+	a.CustomMiddleware.IdExtractor.Disabled = true
+	a.ConfigDataDisabled = true
+	a.Proxy.ServiceDiscovery.CacheDisabled = true
+	a.UptimeTests.Config.ServiceDiscovery.CacheDisabled = true
+
+	for i := 0; i < len(a.CustomMiddleware.Pre); i++ {
+		a.CustomMiddleware.Pre[i].Disabled = true
+	}
+
+	for i := 0; i < len(a.CustomMiddleware.PostKeyAuth); i++ {
+		a.CustomMiddleware.PostKeyAuth[i].Disabled = true
+	}
+
+	for i := 0; i < len(a.CustomMiddleware.Post); i++ {
+		a.CustomMiddleware.Post[i].Disabled = true
+	}
+
+	for i := 0; i < len(a.CustomMiddleware.Response); i++ {
+		a.CustomMiddleware.Response[i].Disabled = true
+	}
+
+	for version := range a.VersionData.Versions {
+		for i := 0; i < len(a.VersionData.Versions[version].ExtendedPaths.Virtual); i++ {
+			a.VersionData.Versions[version].ExtendedPaths.Virtual[i].Disabled = true
+			a.VersionData.Versions[version].ExtendedPaths.GoPlugin[i].Disabled = true
+		}
+	}
+}
+
+func (a *APIDefinition) migrateScopeToPolicy() {
+	scopeClaim := ScopeClaim{
+		ScopeClaimName: a.JWTScopeClaimName,
+		ScopeToPolicy:  a.JWTScopeToPolicyMapping,
+	}
+
+	a.JWTScopeToPolicyMapping = nil
+	a.JWTScopeClaimName = ""
+
+	if a.UseOpenID {
+		a.Scopes.OIDC = scopeClaim
+		return
+	}
+
+	a.Scopes.JWT = scopeClaim
+}
+
+func (a *APIDefinition) migrateResponseProcessors() {
+	var responseProcessors []ResponseProcessor
+	for i := range a.ResponseProcessors {
+		if a.ResponseProcessors[i].Name == ResponseProcessorResponseBodyTransform {
+			continue
+		}
+		responseProcessors = append(responseProcessors, a.ResponseProcessors[i])
+	}
+
+	a.ResponseProcessors = responseProcessors
 }

@@ -1,10 +1,14 @@
 package gateway
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -14,7 +18,7 @@ import (
 )
 
 func TestAnalytics_Write(t *testing.T) {
-
+	test.Flaky(t)
 	tcs := []struct {
 		TestName            string
 		analyticsSerializer string
@@ -40,22 +44,23 @@ func TestAnalytics_Write(t *testing.T) {
 			defer ts.Close()
 			base := ts.Gw.GetConfig()
 
-			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-				spec.UseKeylessAccess = false
-				spec.Proxy.ListenPath = "/"
-			})
-
 			redisAnalyticsKeyName := analyticsKeyName + ts.Gw.Analytics.analyticsSerializer.GetSuffix()
 
 			// Cleanup before test
-			// let records to to be sent
+			// let records to be sent
 			ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 
 			t.Run("Log errors", func(t *testing.T) {
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+				})
+
 				_, err := ts.Run(t, []test.TestCase{
 					{Path: "/", Code: 401},
 					{Path: "/", Code: 401},
 				}...)
+
 				if err != nil {
 					t.Error("Error executing test case")
 				}
@@ -64,9 +69,7 @@ func TestAnalytics_Write(t *testing.T) {
 				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
-				if len(results) != 2 {
-					t.Error("Should return 2 record", len(results))
-				}
+				assert.Equal(t, 2, len(results), "Should return 2 records")
 
 				var record analytics.AnalyticsRecord
 				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
@@ -79,6 +82,11 @@ func TestAnalytics_Write(t *testing.T) {
 			})
 
 			t.Run("Log success", func(t *testing.T) {
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+				})
+
 				key := CreateSession(ts.Gw)
 
 				authHeaders := map[string]string{
@@ -114,6 +122,7 @@ func TestAnalytics_Write(t *testing.T) {
 				defer func() {
 					ts.Gw.SetConfig(base)
 				}()
+
 				globalConf := ts.Gw.GetConfig()
 				globalConf.AnalyticsConfig.EnableDetailedRecording = false
 				ts.Gw.SetConfig(globalConf)
@@ -217,6 +226,7 @@ func TestAnalytics_Write(t *testing.T) {
 					t.Error("Detailed response info not found", record)
 				}
 			})
+
 			t.Run("Detailed analytics", func(t *testing.T) {
 				defer func() {
 					ts.Gw.SetConfig(base)
@@ -224,6 +234,9 @@ func TestAnalytics_Write(t *testing.T) {
 				globalConf := ts.Gw.GetConfig()
 				globalConf.AnalyticsConfig.EnableDetailedRecording = true
 				ts.Gw.SetConfig(globalConf)
+
+				// Since we changed config, we need to force all APIs be reloaded
+				ts.Gw.BuildAndLoadAPI()
 
 				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 					spec.UseKeylessAccess = false
@@ -282,6 +295,7 @@ func TestAnalytics_Write(t *testing.T) {
 					time.Sleep(2 * time.Millisecond)
 				}))
 				defer ls.Close()
+
 				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 					spec.UseKeylessAccess = false
 					spec.Proxy.ListenPath = "/"
@@ -368,13 +382,11 @@ func TestAnalytics_Write(t *testing.T) {
 					t.Error("Error executing test case")
 				}
 
-				// let records to to be sent
+				// let records to be sent
 				ts.Gw.Analytics.Flush()
 
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
-				if len(results) != 2 {
-					t.Fatal("Should return 1 record: ", len(results))
-				}
+				assert.Equal(t, 2, len(results))
 
 				// Take second cached request
 				var record analytics.AnalyticsRecord
@@ -395,6 +407,117 @@ func TestAnalytics_Write(t *testing.T) {
 				}
 			})
 
+			t.Run("Upstream error analytics", func(t *testing.T) {
+				defer func() {
+					ts.Gw.SetConfig(base)
+				}()
+				ls := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					time.Sleep(2 * time.Millisecond)
+					w.WriteHeader(http.StatusOK)
+				}))
+				defer ls.Close()
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+					spec.Proxy.TargetURL = ls.URL
+				})
+
+				key := CreateSession(ts.Gw)
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				client := http.Client{
+					Timeout: 1 * time.Millisecond,
+				}
+				_, err := ts.Run(t, test.TestCase{
+					Path: "/", Headers: authHeaders, Code: 499, Client: &client, ErrorMatch: "context deadline exceeded",
+				})
+				assert.NotNil(t, err)
+
+				// we wait until the request finish
+				time.Sleep(3 * time.Millisecond)
+				// let records to to be sent
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				assert.Len(t, results, 1)
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				assert.Nil(t, err)
+
+				// expect a status 499 (context canceled) from the request
+				assert.Equal(t, 499, record.ResponseCode)
+				// expect that the analytic record maintained the APIKey
+				assert.Equal(t, key, record.APIKey)
+
+			})
+			t.Run("Chunked response analytics", func(t *testing.T) {
+				defer func() {
+					ts.Gw.SetConfig(base)
+				}()
+				globalConf := ts.Gw.GetConfig()
+				globalConf.AnalyticsConfig.EnableDetailedRecording = true
+				ts.Gw.SetConfig(globalConf)
+
+				// Since we changed config, we need to force all APIs be reloaded
+				ts.Gw.BuildAndLoadAPI()
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = false
+					spec.Proxy.ListenPath = "/"
+				})
+
+				key := CreateSession(ts.Gw)
+
+				authHeaders := map[string]string{
+					"authorization": key,
+				}
+
+				_, err := ts.Run(t, test.TestCase{
+					Path: "/chunked", Headers: authHeaders, Code: 200,
+				})
+				if err != nil {
+					t.Error("Error executing test case")
+				}
+				// let records to to be sent
+				ts.Gw.Analytics.Flush()
+
+				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+				if len(results) != 1 {
+					t.Error("Should return 1 record: ", len(results))
+				}
+
+				var record analytics.AnalyticsRecord
+				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+				if err != nil {
+					t.Error("Error decoding analytics")
+				}
+				if record.ResponseCode != 200 {
+					t.Error("Analytics record do not match", record)
+				}
+
+				if record.RawRequest == "" {
+					t.Error("Detailed request info not found", record)
+				}
+
+				if record.RawResponse == "" {
+					t.Error("Detailed response info not found", record)
+				}
+
+				rawResponse, err := base64.StdEncoding.DecodeString(record.RawResponse)
+				if err != nil {
+					t.Error("error decoding response")
+				}
+
+				decoded := string(rawResponse)
+				if strings.Contains(decoded, "1a") {
+					t.Error("Response should not have chunked characters")
+				}
+			})
 		})
 	}
 
@@ -428,6 +551,7 @@ func TestURLReplacer(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
 		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
+		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseULIDs = true
 		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
 		globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
 	})
@@ -438,6 +562,9 @@ func TestURLReplacer(t *testing.T) {
 	recordUUID2 := analytics.AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
 	recordUUID3 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
 	recordUUID4 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+	recordULID1 := analytics.AnalyticsRecord{Path: "/posts/01G9HHNKWGBHCQX7VG3JKSZ055/comments"}
+	recordULID2 := analytics.AnalyticsRecord{Path: "/posts/01g9hhnkwgbhcqx7vg3jksz055/comments"}
+	recordULID3 := analytics.AnalyticsRecord{Path: "/posts/01g9HHNKwgbhcqx7vg3JKSZ055/comments"}
 	recordID1 := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams"}
 	recordCust := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
@@ -448,6 +575,9 @@ func TestURLReplacer(t *testing.T) {
 	NormalisePath(&recordUUID2, &globalConf)
 	NormalisePath(&recordUUID3, &globalConf)
 	NormalisePath(&recordUUID4, &globalConf)
+	NormalisePath(&recordULID1, &globalConf)
+	NormalisePath(&recordULID2, &globalConf)
+	NormalisePath(&recordULID3, &globalConf)
 	NormalisePath(&recordID1, &globalConf)
 	NormalisePath(&recordCust, &globalConf)
 
@@ -472,6 +602,10 @@ func TestURLReplacer(t *testing.T) {
 		t.Error(recordUUID4.Path)
 	}
 
+	assert.Equal(t, "/posts/{ulid}/comments", recordULID1.Path, "Path not altered, is: ", recordULID1.Path)
+	assert.Equal(t, "/posts/{ulid}/comments", recordULID2.Path, "Path not altered, is: ", recordULID2.Path)
+	assert.Equal(t, "/posts/{ulid}/comments", recordULID3.Path, "Path not altered, is: ", recordULID3.Path)
+
 	if recordID1.Path != "/widgets/{id}/getParams" {
 		t.Error("Path not altered, is:")
 		t.Error(recordID1.Path)
@@ -488,6 +622,7 @@ func BenchmarkURLReplacer(b *testing.B) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
 		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
+		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseULIDs = true
 		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
 		globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
 	})
@@ -502,6 +637,9 @@ func BenchmarkURLReplacer(b *testing.B) {
 		recordUUID2 := analytics.AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
 		recordUUID3 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
 		recordUUID4 := analytics.AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+		recordULID1 := analytics.AnalyticsRecord{Path: "/posts/01G9HHNKWGBHCQX7VG3JKSZ055/comments"}
+		recordULID2 := analytics.AnalyticsRecord{Path: "/posts/01g9hhnkwgbhcqx7vg3jksz055/comments"}
+		recordULID3 := analytics.AnalyticsRecord{Path: "/posts/01g9HHNKwgbhcqx7vg3JKSZ055/comments"}
 		recordID1 := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams"}
 		recordCust := analytics.AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
@@ -509,6 +647,9 @@ func BenchmarkURLReplacer(b *testing.B) {
 		NormalisePath(&recordUUID2, &globalConf)
 		NormalisePath(&recordUUID3, &globalConf)
 		NormalisePath(&recordUUID4, &globalConf)
+		NormalisePath(&recordULID1, &globalConf)
+		NormalisePath(&recordULID2, &globalConf)
+		NormalisePath(&recordULID3, &globalConf)
 		NormalisePath(&recordID1, &globalConf)
 		NormalisePath(&recordCust, &globalConf)
 	}

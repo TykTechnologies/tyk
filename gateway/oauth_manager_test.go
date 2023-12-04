@@ -8,9 +8,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/url"
+	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -21,7 +25,8 @@ import (
 	"time"
 
 	"github.com/lonelycode/osin"
-	uuid "github.com/satori/go.uuid"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -147,6 +152,41 @@ func (ts *Test) createTestOAuthClient(spec *APISpec, clientID string) OAuthClien
 	return testClient
 }
 
+func (ts *Test) createOAuthClientIDAndTokens(t *testing.T, spec *APISpec, clientID string) {
+	t.Helper()
+	ts.createTestOAuthClient(spec, clientID)
+
+	param := make(url.Values)
+	param.Set("response_type", "token")
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", clientID)
+	param.Set("client_secret", authClientSecret)
+	param.Set("key_rules", keyRules)
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	for i := 0; i < 3; i++ {
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      path.Join(spec.Proxy.ListenPath, "/tyk/oauth/authorize-client/"),
+			Data:      param.Encode(),
+			AdminAuth: true,
+			Headers:   headers,
+			Method:    http.MethodPost,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+
+		response := map[string]interface{}{}
+		if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestOauthMultipleAPIs(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -235,6 +275,69 @@ func TestOauthMultipleAPIs(t *testing.T) {
 			Code:    http.StatusOK,
 		},
 	)
+}
+
+func TestOAuthTokenExpiration(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.OauthTokenExpire = 1
+	globalConf.LocalSessionCache.DisableCacheSessionState = true // don't let cache to hide reality
+	ts.Gw.SetConfig(globalConf)
+
+	spec := buildTestOAuthSpec(func(spec *APISpec) {
+		spec.APIID = "oauth2"
+		spec.UseOauth2 = true
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/listen/"
+	})
+
+	apis := ts.Gw.LoadAPI(spec)
+	spec = apis[0]
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			"oauth2": {
+				APIID: "oauth2",
+			},
+		}
+	})
+
+	testClient := OAuthClient{
+		ClientID:          authClientID,
+		ClientSecret:      authClientSecret,
+		ClientRedirectURI: authRedirectUri,
+		PolicyID:          pID,
+	}
+	err := spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
+	assert.NoError(t, err)
+
+	param := make(url.Values)
+	param.Set("response_type", "token")
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
+	param.Set("key_rules", keyRules)
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+	resp, err := ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/listen/tyk/oauth/authorize-client/",
+		Data: param.Encode(), Headers: headers, BodyMatch: `"access_token"`, Code: http.StatusOK})
+	assert.NoError(t, err)
+
+	token := tokenData{}
+	json.NewDecoder(resp.Body).Decode(&token)
+	authHeader := map[string]string{
+		"Authorization": "Bearer " + token.AccessToken,
+	}
+
+	assert.True(t, globalConf.LocalSessionCache.DisableCacheSessionState) // to fixate that the cache is disabled
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/listen/get", Headers: authHeader, Method: http.MethodGet, Code: http.StatusOK, Delay: time.Second},
+		{Path: "/listen/get", Headers: authHeader, Method: http.MethodGet, BodyMatch: "Key has expired, please renew",
+			Code: http.StatusUnauthorized},
+	}...)
 }
 
 func TestAuthCodeRedirect(t *testing.T) {
@@ -631,12 +734,14 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 		// cleanup tokens older than 300 seconds
 		globalConf.OauthTokenExpiredRetainPeriod = 300
 	}
-	ts := StartTest(conf)
-	defer ts.Close()
 	testPagination := func(pageParam int, expectedPageNumber int, tokenRequestCount int, expectedRes int) {
+		ts := StartTest(conf)
+		defer ts.Close()
+
 		spec := ts.LoadTestOAuthSpec()
 
-		clientID := uuid.NewV4().String()
+		clientID := uuid.New()
+
 		ts.createTestOAuthClient(spec, clientID)
 
 		tokensID := map[string]bool{}
@@ -762,7 +867,8 @@ func testGetClientTokens(t *testing.T, hashed bool) {
 
 	spec := ts.LoadTestOAuthSpec()
 
-	clientID := uuid.NewV4().String()
+	clientID := uuid.New()
+
 	ts.createTestOAuthClient(spec, clientID)
 
 	// make three tokens
@@ -1170,7 +1276,7 @@ func TestJSONToFormValues(t *testing.T) {
 		"client_secret": "test-client-secret",
 		"grant_type":    "password",
 	}
-	b, _ := json.Marshal(o)
+	b := test.MarshalJSON(t)(o)
 	r, err := http.NewRequest(http.MethodPost, "/token", bytes.NewReader(b))
 	if err != nil {
 		t.Fatal(err)
@@ -1201,4 +1307,53 @@ func TestJSONToFormValues(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestPurgeOAuthClientTokensEvent(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		// set tokens to be expired after 1 second
+		globalConf.OauthTokenExpire = 1
+		// cleanup tokens older than 2 seconds
+		globalConf.OauthTokenExpiredRetainPeriod = 2
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	assertTokensLen := func(t *testing.T, storageManager storage.Handler, storageKey string, expectedTokensLen int) {
+		nowTs := time.Now().Unix()
+		startScore := strconv.FormatInt(nowTs, 10)
+		tokens, _, err := storageManager.GetSortedSetRange(storageKey, startScore, "+inf")
+		assert.NoError(t, err)
+		assert.Equal(t, expectedTokensLen, len(tokens))
+	}
+
+	spec := ts.LoadTestOAuthSpec()
+
+	clientID1, clientID2 := uuid.New(), uuid.New()
+
+	ts.createOAuthClientIDAndTokens(t, spec, clientID1)
+	ts.createOAuthClientIDAndTokens(t, spec, clientID2)
+	storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
+		fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
+
+	storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+	storageManager.Connect()
+
+	assertTokensLen(t, storageManager, storageKey1, 3)
+	assertTokensLen(t, storageManager, storageKey2, 3)
+
+	time.Sleep(time.Second * 3)
+
+	// emit event
+
+	n := Notification{
+		Command: OAuthPurgeLapsedTokens,
+		Gw:      ts.Gw,
+	}
+	ts.Gw.MainNotifier.Notify(n)
+
+	assertTokensLen(t, storageManager, storageKey1, 0)
+	assertTokensLen(t, storageManager, storageKey2, 0)
+
 }

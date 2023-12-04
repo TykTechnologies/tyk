@@ -10,18 +10,21 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/request"
-	"github.com/sirupsen/logrus"
-
+	"github.com/hashicorp/go-multierror"
 	"github.com/lonelycode/osin"
-	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/request"
 
 	"strconv"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -179,7 +182,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 // returns a response to the client and notifies the provider of the access request (in order to track identity against
 // OAuth tokens without revealing tokens before they are requested).
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	// Handle response
 	resp := o.Manager.HandleAccess(r)
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
@@ -231,8 +234,8 @@ const (
 	refreshToken = "refresh_token"
 )
 
-//in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
-//ToDo: set an authentication mechanism
+// in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
+// ToDo: set an authentication mechanism
 func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
@@ -603,16 +606,16 @@ func (r *RedisOsinStorageInterface) Close() {}
 func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 	key := prefixClient + id
 
-	log.Info("Getting client ID:", id)
+	log.Debug("Getting client ID:", id)
 	clientJSON, err := r.store.GetKey(key)
 	if err != nil {
-		log.Errorf("Failure retrieving client ID key %q: %v", key, err)
+		log.Debugf("Failure retrieving client ID key %q: %v", key, err)
 		return nil, err
 	}
 
 	client := new(OAuthClient)
 	if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
-		log.Error("Couldn't unmarshal OAuth client object: ", err)
+		log.Debug("Couldn't unmarshal OAuth client object: ", err)
 	}
 	return client, nil
 }
@@ -1003,8 +1006,10 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		}
 	}
 
+	sessionLifetime := r.Gw.ApplyLifetime(newSession)
+
 	// Use the default session expiry here as this is OAuth
-	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, int64(accessData.ExpiresIn), false)
+	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, sessionLifetime, false)
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
@@ -1137,8 +1142,7 @@ func (a accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefre
 
 	accesstoken = a.Gw.keyGen.GenerateAuthKey(newSession.OrgID)
 	if generaterefresh {
-		u6 := uuid.NewV4()
-		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))
+		refreshtoken = base64.StdEncoding.EncodeToString([]byte(uuid.New()))
 	}
 	return
 }
@@ -1179,4 +1183,49 @@ func (r *RedisOsinStorageInterface) SetUser(username string, session *user.Sessi
 
 	return nil
 
+}
+
+func (gw *Gateway) purgeLapsedOAuthTokens() error {
+	if gw.GetConfig().OauthTokenExpiredRetainPeriod <= 0 {
+		return nil
+	}
+
+	redisCluster := &storage.RedisCluster{KeyPrefix: "", HashKeys: false, RedisController: gw.RedisController}
+	keys, err := redisCluster.ScanKeys(oAuthClientTokensKeyPattern)
+
+	if err != nil {
+		log.WithError(err).Debug("error while scanning for tokens")
+		return err
+	}
+
+	nowTs := time.Now().Unix()
+	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
+	cleanupStartScore := strconv.FormatInt(nowTs-int64(gw.GetConfig().OauthTokenExpiredRetainPeriod), 10)
+
+	var wg sync.WaitGroup
+
+	errs := make(chan error, len(keys))
+	for _, key := range keys {
+		wg.Add(1)
+		go func(k string) {
+			defer wg.Done()
+			if err := redisCluster.RemoveSortedSetRange(k, "-inf", cleanupStartScore); err != nil {
+				errs <- err
+			}
+		}(key)
+	}
+
+	// Wait for all goroutines to finish
+	wg.Wait()
+	close(errs)
+
+	combinedErr := &multierror.Error{
+		ErrorFormat: tykerrors.Formatter,
+	}
+
+	for err := range errs {
+		combinedErr = multierror.Append(combinedErr, err)
+	}
+
+	return combinedErr.ErrorOrNil()
 }

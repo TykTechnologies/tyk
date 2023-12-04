@@ -8,6 +8,7 @@ GOINSTALL=$(GOCMD) install
 
 BINARY_NAME=tyk
 BINARY_LINUX=tyk
+BUILD_PLATFORM=linux/amd64
 TAGS=coprocess grpc goplugin
 CONF=tyk.conf
 
@@ -20,6 +21,25 @@ BENCH_RUN=NONE
 .PHONY: test
 test:
 	$(GOTEST) -run=$(TEST_REGEX) -count=$(TEST_COUNT) ./...
+
+# lint runs all local linters that must pass before pushing
+.PHONY: lint lint-install lint-fast
+lint: lint-fast
+	goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
+	gofmt -w .
+	faillint -ignore-tests -paths "$(shell grep -v '^#' .faillint | xargs echo | sed 's/ /,/g')" ./...
+
+lint-fast: lint-install
+	go generate ./...
+	go test -count 1 -v ./cli/linter/...
+	go fmt ./...
+	go mod tidy
+
+lint-install:
+	go install golang.org/x/tools/cmd/goimports@latest
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.0
+	go install github.com/fatih/faillint@latest
+	go install go.uber.org/mock/mockgen@v0.3.0
 
 .PHONY: bench
 bench:
@@ -37,7 +57,7 @@ dev:
 
 .PHONY: build
 build:
-	$(GOBUILD) -tags "$(TAGS)" -o $(BINARY_NAME) -v .
+	$(GOBUILD) -tags "$(TAGS)" -o $(BINARY_NAME) -trimpath -v .
 
 .PHONY: build-linux
 build-linux:
@@ -82,8 +102,8 @@ mongo-shell:
 .PHONY: docker docker-std
 
 docker:
-	docker build --no-cache --rm -t internal/tyk-gateway --squash .
+	docker build --platform ${BUILD_PLATFORM} --rm -t internal/tyk-gateway --squash .
 
 docker-std: build
-	docker build --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .
+	docker build --platform ${BUILD_PLATFORM} --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .
 

@@ -3,6 +3,7 @@ package apidef
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -216,4 +217,201 @@ func TestRuleAtLeastEnableOneAuthConfig_Validate(t *testing.T) {
 			Errors:  nil,
 		},
 	))
+}
+
+func TestRuleValidateIPList_Validate(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleValidateIPList{},
+	}
+
+	t.Run("valid IP and CIDR", runValidationTest(
+		&APIDefinition{
+			EnableIpWhiteListing: true,
+			AllowedIPs: []string{
+				"192.168.0.10",
+				"192.168.2.1/24",
+			},
+			EnableIpBlacklisting: true,
+			BlacklistedIPs: []string{
+				"192.168.0.20",
+				"192.168.3.1/24",
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: true,
+			Errors:  nil,
+		},
+	))
+
+	t.Run("invalid CIDR", runValidationTest(
+		&APIDefinition{
+			EnableIpWhiteListing: true,
+			AllowedIPs: []string{
+				"192.168.2.1/bob",
+			},
+			EnableIpBlacklisting: true,
+			BlacklistedIPs: []string{
+				"192.168.3.1/blah",
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: false,
+			Errors: []error{
+				fmt.Errorf(ErrInvalidIPCIDR, "192.168.2.1/bob"),
+				fmt.Errorf(ErrInvalidIPCIDR, "192.168.3.1/blah"),
+			},
+		},
+	))
+
+	t.Run("invalid IP and CIDR", runValidationTest(
+		&APIDefinition{
+			EnableIpWhiteListing: true,
+			AllowedIPs: []string{
+				"bob",
+				"192.168.2.1/24",
+			},
+			EnableIpBlacklisting: true,
+			BlacklistedIPs: []string{
+				"blah",
+				"192.168.3.1/24",
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: false,
+			Errors: []error{
+				fmt.Errorf(ErrInvalidIPCIDR, "bob"),
+				fmt.Errorf(ErrInvalidIPCIDR, "blah"),
+			},
+		},
+	))
+
+	t.Run("do not validate allowed IPs when whitelisting not enabled", runValidationTest(
+		&APIDefinition{
+			EnableIpWhiteListing: false,
+			AllowedIPs: []string{
+				"bob",
+				"192.168.2.1/24",
+			},
+			EnableIpBlacklisting: true,
+			BlacklistedIPs: []string{
+				"blah",
+				"192.168.3.1/24",
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: false,
+			Errors: []error{
+				fmt.Errorf(ErrInvalidIPCIDR, "blah"),
+			},
+		},
+	))
+
+	t.Run("do not validate blacklist when not enabled", runValidationTest(
+		&APIDefinition{
+			EnableIpWhiteListing: true,
+			AllowedIPs: []string{
+				"bob",
+				"192.168.2.1/24",
+			},
+			EnableIpBlacklisting: false,
+			BlacklistedIPs: []string{
+				"blah",
+				"192.168.3.1/24",
+			},
+		},
+		ruleSet,
+		ValidationResult{
+			IsValid: false,
+			Errors: []error{
+				fmt.Errorf(ErrInvalidIPCIDR, "bob"),
+			},
+		},
+	))
+}
+
+func TestRuleValidateEnforceTimeout_Validate(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleValidateEnforceTimeout{},
+	}
+
+	getAPIDef := func(hardTimeouts []HardTimeoutMeta) *APIDefinition {
+		return &APIDefinition{
+			VersionData: VersionData{
+				Versions: map[string]VersionInfo{
+					"Default": {
+						Name: "Default",
+						ExtendedPaths: ExtendedPathsSet{
+							HardTimeouts: hardTimeouts,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name   string
+		apiDef *APIDefinition
+		result ValidationResult
+	}{
+		{
+			name: "negative timeout",
+			apiDef: getAPIDef([]HardTimeoutMeta{
+				{
+					Disabled: false,
+					Path:     "/get",
+					Method:   http.MethodGet,
+					TimeOut:  -1,
+				},
+			}),
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidTimeoutValue},
+			},
+		},
+		{
+			name: "negative timeout for one among multiple paths",
+			apiDef: getAPIDef([]HardTimeoutMeta{
+				{
+					Disabled: false,
+					Path:     "/post",
+					Method:   http.MethodGet,
+					TimeOut:  -1,
+				},
+				{
+					Disabled: false,
+					Path:     "/get",
+					Method:   http.MethodGet,
+					TimeOut:  10,
+				},
+			}),
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidTimeoutValue},
+			},
+		},
+		{
+			name: "positive timeout",
+			apiDef: getAPIDef([]HardTimeoutMeta{
+				{
+					Disabled: true,
+					Path:     "/post",
+					Method:   http.MethodGet,
+					TimeOut:  10,
+				},
+			}),
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
+	}
 }

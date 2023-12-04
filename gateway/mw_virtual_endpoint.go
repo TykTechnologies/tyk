@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -15,12 +16,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/sirupsen/logrus"
@@ -61,7 +63,7 @@ func (gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	// nil.
 	var src interface{}
 	switch meta.FunctionSourceType {
-	case "file":
+	case apidef.UseFile:
 		j.Log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
 		f, err := os.Open(meta.FunctionSourceURI)
 		if err != nil {
@@ -69,11 +71,12 @@ func (gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 			return
 		}
 		src = f
-	case "blob":
+	case apidef.UseBlob:
 		if gw.GetConfig().DisableVirtualPathBlobs {
 			j.Log.Error("[JSVM] Blobs not allowed on this node")
 			return
 		}
+
 		j.Log.Debug("Loading JS blob")
 		js, err := base64.StdEncoding.DecodeString(meta.FunctionSourceURI)
 		if err != nil {
@@ -98,12 +101,8 @@ func (d *VirtualEndpoint) EnabledForSpec() bool {
 	if !d.Spec.GlobalConfig.EnableJSVM {
 		return false
 	}
-	for _, version := range d.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.Virtual) > 0 {
-			return true
-		}
-	}
-	return false
+
+	return d.Spec.hasVirtualEndpoint()
 }
 
 func (d *VirtualEndpoint) getMetaFromRequest(r *http.Request) *apidef.VirtualMeta {
@@ -122,19 +121,18 @@ func (d *VirtualEndpoint) getMetaFromRequest(r *http.Request) *apidef.VirtualMet
 	return vmeta
 }
 
-func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Request, vmeta *apidef.VirtualMeta) *http.Response {
+func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Request, vmeta *apidef.VirtualMeta) (*http.Response, error) {
 	t1 := time.Now()
 	if vmeta == nil {
 		if vmeta = d.getMetaFromRequest(r); vmeta == nil {
-			return nil
+			return nil, errors.New("No request info")
 		}
 	}
 
 	// Create the proxy object
 	originalBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		d.Logger().WithError(err).Error("Failed to read request body!")
-		return nil
+		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
 	defer r.Body.Close()
 
@@ -156,8 +154,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	requestAsJson, err := json.Marshal(requestData)
 	if err != nil {
-		d.Logger().WithError(err).Error("Failed to encode request object for virtual endpoint")
-		return nil
+		return nil, fmt.Errorf("failed to encode request object for virtual endpoint: %w", err)
 	}
 
 	// Encode the configuration data too
@@ -172,8 +169,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	sessionAsJson, err := json.Marshal(session)
 	if err != nil {
-		d.Logger().WithError(err).Error("Failed to encode session for VM")
-		return nil
+		return nil, fmt.Errorf("failed to encode session for VM: %w", err)
 	}
 
 	// Run the middleware
@@ -201,8 +197,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	select {
 	case returnRaw = <-ret:
 		if err := <-errRet; err != nil {
-			d.Logger().WithError(err).Error("Failed to run JS middleware")
-			return nil
+			return nil, fmt.Errorf("Failed to run JS middleware: %w", err)
 		}
 		t.Stop()
 	case <-t.C:
@@ -213,16 +208,15 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 			// that panics.
 			panic("stop")
 		}
-		return nil
+		return nil, fmt.Errorf("JS middleware timed out after %s", d.Spec.JSVM.Timeout)
 	}
 	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
 	newResponseData := VMResponseObject{}
 	if err := json.Unmarshal([]byte(returnDataStr), &newResponseData); err != nil {
-		d.Logger().WithError(err).Error("Failed to decode virtual endpoint response data on return from VM: ",
-			"; Returned: ", returnDataStr)
-		return nil
+		d.Logger().WithError(err).WithField("return_data", returnDataStr).Errorf("Failed to decode virtual endpoint response data on return from VM")
+		return nil, fmt.Errorf("Failed to decode virtual endpoint response: %w", err)
 	}
 
 	// Save the sesison data (if modified)
@@ -242,14 +236,18 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		d.sh.RecordHit(r, analytics.Latency{Total: int64(ms)}, copiedResponse.StatusCode, copiedResponse)
 	}
 
-	return copiedResponse
+	return copiedResponse, nil
 }
 
-func (gw *Gateway) forceResponse(w http.ResponseWriter,
+func (gw *Gateway) forceResponse(
+	w http.ResponseWriter,
 	r *http.Request,
 	newResponseData *VMResponseObject,
 	spec *APISpec,
-	session *user.SessionState, isPre bool, logger *logrus.Entry) *http.Response {
+	session *user.SessionState,
+	isPre bool,
+	logger *logrus.Entry,
+) *http.Response {
 	responseMessage := []byte(newResponseData.Response.Body)
 
 	// Create an http.Response object so we can send it tot he cache middleware
@@ -308,12 +306,15 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return nil, http.StatusOK
 	}
 
-	if res := d.ServeHTTPForCache(w, r, vmeta); res == nil {
+	if _, err := d.ServeHTTPForCache(w, r, vmeta); err != nil {
+		message := "Error during virtual endpoint execution. Contact Administrator for more details."
+		d.Logger().WithError(err).WithField("vmeta", vmeta).Error(message)
+
 		if vmeta.ProxyOnError {
 			return nil, http.StatusOK
-		} else {
-			return errors.New("Error during virtual endpoint execution. Contact Administrator for more details."), http.StatusInternalServerError
 		}
+
+		return errors.New(message), http.StatusInternalServerError
 	}
 
 	return nil, mwStatusRespond
@@ -336,9 +337,9 @@ func (gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Respon
 	if ses != nil {
 		// We have found a session, lets report back
 		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(spec.APIID)
-		res.Header.Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		res.Header.Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+		res.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		res.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		res.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header, gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)

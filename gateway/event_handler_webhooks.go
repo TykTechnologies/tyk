@@ -5,7 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
-	"html/template"
+	htmlTemplate "html/template"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -17,7 +17,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -37,7 +37,7 @@ const (
 // WebHookHandler is an event handler that triggers web hooks
 type WebHookHandler struct {
 	conf     config.WebHookHandlerConf
-	template *template.Template // non-nil if Init is run without error
+	template *htmlTemplate.Template // non-nil if Init is run without error
 	store    storage.Handler
 
 	contentType      string
@@ -77,7 +77,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 
 	// Pre-load template on init
 	if w.conf.TemplatePath != "" {
-		w.template, err = template.ParseFiles(w.conf.TemplatePath)
+		w.template, err = htmlTemplate.ParseFiles(w.conf.TemplatePath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
@@ -86,7 +86,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		}
 
 		if strings.HasSuffix(w.conf.TemplatePath, ".json") {
-			w.contentType = headers.ApplicationJSON
+			w.contentType = header.ApplicationJSON
 		}
 	}
 
@@ -98,14 +98,14 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 			"target": w.conf.TargetPath,
 		}).Info("Loading default template.")
 		defaultPath := filepath.Join(w.Gw.GetConfig().TemplatePath, "default_webhook.json")
-		w.template, err = template.ParseFiles(defaultPath)
+		w.template, err = htmlTemplate.ParseFiles(defaultPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
 			}).Error("Could not load the default template: ", err)
 			return err
 		}
-		w.contentType = headers.ApplicationJSON
+		w.contentType = header.ApplicationJSON
 	}
 
 	log.WithFields(logrus.Fields{
@@ -193,15 +193,15 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 		return nil, err
 	}
 
-	req.Header.Set(headers.UserAgent, headers.TykHookshot)
+	req.Header.Set(header.UserAgent, header.TykHookshot)
 
 	ignoreCanonical := w.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for key, val := range w.conf.HeaderList {
 		setCustomHeader(req.Header, key, val, ignoreCanonical)
 	}
 
-	if req.Header.Get(headers.ContentType) == "" {
-		req.Header.Set(headers.ContentType, w.contentType)
+	if req.Header.Get(header.ContentType) == "" {
+		req.Header.Set(header.ContentType, w.contentType)
 	}
 
 	return req, nil

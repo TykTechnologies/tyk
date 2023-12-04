@@ -63,6 +63,9 @@ const Schema = `{
         "enable_coprocess_auth": {
             "type": "boolean"
         },
+		"custom_plugin_auth_enabled": {
+            "type": "boolean"
+        },
         "jwt_skip_kid": {
             "type": "boolean"
         },
@@ -77,6 +80,9 @@ const Schema = `{
         },
         "custom_middleware_bundle": {
             "type": "string"
+        },
+		"custom_middleware_bundle_disabled": {
+           	"type": "boolean"
         },
         "jwt_policy_field_name": {
             "type": "string"
@@ -190,6 +196,9 @@ const Schema = `{
             "type": "boolean"
         },
         "oauth_meta": {
+            "type":["object", "null"]
+        },
+		"external_oauth": {
             "type":["object", "null"]
         },
         "cache_options": {
@@ -447,6 +456,9 @@ const Schema = `{
         "config_data": {
             "type": ["object", "null"]
         },
+		"config_data_disabled": {
+			"type": "boolean"	
+		},
         "global_rate_limit": {
           "type": ["object", "null"],
            "properties": {
@@ -602,6 +614,24 @@ const Schema = `{
                             "required": [
                                 "kind"
                             ]
+                        },
+                        "global_headers": {
+                            "type": [
+                                "array",
+                                "null"
+                            ],
+                            "properties": {
+                                "key": {
+                                    "type": "string"
+                                },
+                                "value": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "key",
+                                "value"
+                            ]
                         }
                     }
                 },
@@ -659,6 +689,14 @@ const Schema = `{
                         }
                     }
                 },
+                "introspection": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "disabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
                 "playground": {
                     "type": ["object", "null"],
                     "properties": {
@@ -694,7 +732,10 @@ const Schema = `{
         },
 		"is_oas": {
 			"type": "boolean"
-		}
+		},
+        "detailed_tracing": {
+            "type": "boolean"
+        }
     },
     "required": [
         "name",

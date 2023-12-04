@@ -4,9 +4,10 @@ import (
 	"reflect"
 	"testing"
 
-	tykconf "github.com/TykTechnologies/tyk/config"
 	jaeger "github.com/uber/jaeger-client-go"
 	"github.com/uber/jaeger-client-go/config"
+
+	tykconf "github.com/TykTechnologies/tyk/config"
 )
 
 func TestLoad(t *testing.T) {
@@ -26,6 +27,9 @@ func TestLoad(t *testing.T) {
 		Reporter: &config.ReporterConfig{
 			LogSpans:           true,
 			LocalAgentHostPort: "jaeger:6831",
+			HTTPHeaders: map[string]string{
+				"test": "1",
+			},
 		},
 	}
 
@@ -48,4 +52,5 @@ func TestLoad(t *testing.T) {
 			t.Errorf("%v: expected %#v got %#v", v.field, v.expect, v.got)
 		}
 	}
+
 }

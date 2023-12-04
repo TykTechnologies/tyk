@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"html/template"
+	htmlTemplate "html/template"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -13,17 +13,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 )
 
 const (
 	defaultTemplateName   = "error"
 	defaultTemplateFormat = "json"
-	defaultContentType    = headers.ApplicationJSON
+	defaultContentType    = header.ApplicationJSON
 
 	MsgAuthFieldMissing                        = "Authorization field missing"
 	MsgApiAccessDisallowed                     = "Access to this API has been disallowed"
@@ -31,6 +33,7 @@ const (
 	MsgKeyNotAuthorized                        = "Key not authorised"
 	MsgOauthClientRevoked                      = "Key not authorised. OAuth client access was revoked"
 	MsgKeyNotAuthorizedUnexpectedSigningMethod = "Key not authorized: Unexpected signing method"
+	MsgCertificateExpired                      = "Certificate has expired"
 )
 
 var errCustomBodyResponse = errors.New("errCustomBodyResponse")
@@ -44,45 +47,9 @@ func errorAndStatusCode(errType string) (error, int) {
 
 func defaultTykErrors() {
 	TykErrors = make(map[string]config.TykError)
-	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
-		Message: MsgAuthFieldMissing,
-		Code:    http.StatusUnauthorized,
-	}
 
-	TykErrors[ErrAuthKeyNotFound] = config.TykError{
-		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrAuthCertNotFound] = config.TykError{
-		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
-		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrOAuthAuthorizationFieldMissing] = config.TykError{
-		Message: MsgAuthFieldMissing,
-		Code:    http.StatusBadRequest,
-	}
-
-	TykErrors[ErrOAuthAuthorizationFieldMalformed] = config.TykError{
-		Message: MsgBearerMailformed,
-		Code:    http.StatusBadRequest,
-	}
-
-	TykErrors[ErrOAuthKeyNotFound] = config.TykError{
-		Message: MsgKeyNotAuthorized,
-		Code:    http.StatusForbidden,
-	}
-
-	TykErrors[ErrOAuthClientDeleted] = config.TykError{
-		Message: MsgOauthClientRevoked,
-		Code:    http.StatusForbidden,
-	}
+	initAuthKeyErrors()
+	initOauth2KeyExistsErrors()
 }
 
 func overrideTykErrors(gw *Gateway) {
@@ -106,7 +73,7 @@ func overrideTykErrors(gw *Gateway) {
 
 // APIError is generic error object returned if there is something wrong with the request
 type APIError struct {
-	Message template.HTML
+	Message htmlTemplate.HTML
 }
 
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
@@ -128,24 +95,24 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	if writeResponse {
 		var templateExtension string
-		contentType := r.Header.Get(headers.ContentType)
+		contentType := r.Header.Get(header.ContentType)
 		contentType = strings.Split(contentType, ";")[0]
 
 		switch contentType {
-		case headers.ApplicationXML:
+		case header.ApplicationXML:
 			templateExtension = "xml"
-			contentType = headers.ApplicationXML
-		case headers.TextXML:
+			contentType = header.ApplicationXML
+		case header.TextXML:
 			templateExtension = "xml"
-			contentType = headers.TextXML
+			contentType = header.TextXML
 		default:
 			templateExtension = "json"
-			contentType = headers.ApplicationJSON
+			contentType = header.ApplicationJSON
 		}
 
-		w.Header().Set(headers.ContentType, contentType)
+		w.Header().Set(header.ContentType, contentType)
 		response.Header = http.Header{}
-		response.Header.Set(headers.ContentType, contentType)
+		response.Header.Set(header.ContentType, contentType)
 		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
@@ -161,21 +128,21 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if tmpl == nil {
 			templateName = defaultTemplateName + "." + defaultTemplateFormat
 			tmpl = e.Gw.templates.Lookup(templateName)
-			w.Header().Set(headers.ContentType, defaultContentType)
-			response.Header.Set(headers.ContentType, defaultContentType)
+			w.Header().Set(header.ContentType, defaultContentType)
+			response.Header.Set(header.ContentType, defaultContentType)
 
 		}
 
 		//If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
-			w.Header().Add(headers.XGenerator, "tyk.io")
-			response.Header.Add(headers.XGenerator, "tyk.io")
+			w.Header().Add(header.XGenerator, "tyk.io")
+			response.Header.Add(header.XGenerator, "tyk.io")
 		}
 
 		// Close connections
 		if e.Spec.GlobalConfig.CloseConnections {
-			w.Header().Add(headers.Connection, "close")
-			response.Header.Add(headers.Connection, "close")
+			w.Header().Add(header.Connection, "close")
+			response.Header.Add(header.Connection, "close")
 
 		}
 
@@ -186,10 +153,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			var tmplExecutor TemplateExecutor
 			tmplExecutor = tmpl
 
-			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+			apiError := APIError{htmlTemplate.HTML(htmlTemplate.JSEscapeString(errMsg))}
 
-			if contentType == headers.ApplicationXML || contentType == headers.TextXML {
-				apiError.Message = template.HTML(errMsg)
+			if contentType == header.ApplicationXML || contentType == header.TextXML {
+				apiError.Message = htmlTemplate.HTML(errMsg)
 
 				//we look up in the last defined templateName to obtain the template.
 				rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
@@ -251,24 +218,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if len(e.Spec.Tags) > 0 {
 			tags = append(tags, e.Spec.Tags...)
 		}
-
-		rawRequest := ""
-		rawResponse := ""
-
-		if recordDetail(r, e.Spec) {
-
-			// Get the wire format representation
-
-			var wireFormatReq bytes.Buffer
-			r.Write(&wireFormatReq)
-			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
-
-			var wireFormatRes bytes.Buffer
-			response.Write(&wireFormatRes)
-			rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
-
-		}
-
 		trackEP := false
 		trackedPath := r.URL.Path
 
@@ -289,7 +238,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			Path:          trackedPath,
 			RawPath:       r.URL.Path,
 			ContentLength: r.ContentLength,
-			UserAgent:     r.Header.Get(headers.UserAgent),
+			UserAgent:     r.Header.Get(header.UserAgent),
 			Day:           t.Day(),
 			Month:         t.Month(),
 			Year:          t.Year(),
@@ -304,8 +253,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			OauthID:       oauthClientID,
 			RequestTime:   0,
 			Latency:       analytics.Latency{},
-			RawRequest:    rawRequest,
-			RawResponse:   rawResponse,
 			IPAddress:     ip,
 			Geo:           analytics.GeoData{},
 			Network:       analytics.NetworkStats{},
@@ -314,9 +261,33 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			TrackPath:     trackEP,
 			ExpireAt:      t,
 		}
+		recordGraphDetails(&record, r, response, e.Spec)
+
+		rawRequest := ""
+		rawResponse := ""
+		if recordDetail(r, e.Spec) {
+
+			// Get the wire format representation
+
+			var wireFormatReq bytes.Buffer
+			r.Write(&wireFormatReq)
+			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
+
+			var wireFormatRes bytes.Buffer
+			response.Write(&wireFormatRes)
+			rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+
+		}
+
+		record.RawRequest = rawRequest
+		record.RawResponse = rawResponse
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
 			record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)
+		}
+		if e.Spec.GraphQL.Enabled && e.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
+			record.Tags = append(record.Tags, "tyk-graph-analytics")
+			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(e.Spec.GraphQL.Schema))
 		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter

@@ -1,19 +1,32 @@
 package oas
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/getkin/kin-openapi/openapi3"
 )
 
-const ExtensionTykAPIGateway = "x-tyk-api-gateway"
-const Main = ""
+const (
+	// ExtensionTykAPIGateway is the OAS schema key for the Tyk extension.
+	ExtensionTykAPIGateway = "x-tyk-api-gateway"
 
+	// Main holds the default version value (empty).
+	Main = ""
+
+	// DefaultOpenAPI is the default open API version which is set to migrated APIs.
+	DefaultOpenAPI = "3.0.6"
+)
+
+// OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
 type OAS struct {
 	openapi3.T
 }
 
+// MarshalJSON implements json.Marshaller.
 func (s *OAS) MarshalJSON() ([]byte, error) {
 	if ShouldOmit(s.ExternalDocs) { // for sql case
 		s.ExternalDocs = nil
@@ -46,6 +59,7 @@ func (s *OAS) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// Fill fills *OAS definition from apidef.APIDefinition.
 func (s *OAS) Fill(api apidef.APIDefinition) {
 	xTykAPIGateway := s.GetTykExtension()
 	if xTykAPIGateway == nil {
@@ -71,24 +85,26 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// ExtractTo extracts *OAS into *apidef.APIDefinition.
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
-	if s.GetTykExtension() != nil {
-		s.GetTykExtension().ExtractTo(api)
+	if s.GetTykExtension() == nil {
+		s.SetTykExtension(&XTykAPIGateway{})
+		defer func() {
+			delete(s.Extensions, ExtensionTykAPIGateway)
+		}()
 	}
+
+	s.GetTykExtension().ExtractTo(api)
 
 	s.extractSecurityTo(api)
 
-	var ep apidef.ExtendedPathsSet
-	s.extractPathsAndOperations(&ep)
-
-	api.VersionData.Versions = map[string]apidef.VersionInfo{
-		Main: {
-			UseExtendedPaths: true,
-			ExtendedPaths:    ep,
-		},
-	}
+	vInfo := api.VersionData.Versions[Main]
+	vInfo.UseExtendedPaths = true
+	s.extractPathsAndOperations(&vInfo.ExtendedPaths)
+	api.VersionData.Versions[Main] = vInfo
 }
 
+// SetTykExtension populates our OAS schema extension inside *OAS.
 func (s *OAS) SetTykExtension(xTykAPIGateway *XTykAPIGateway) {
 	if s.Extensions == nil {
 		s.Extensions = make(map[string]interface{})
@@ -97,6 +113,7 @@ func (s *OAS) SetTykExtension(xTykAPIGateway *XTykAPIGateway) {
 	s.Extensions[ExtensionTykAPIGateway] = xTykAPIGateway
 }
 
+// GetTykExtension returns our OAS schema extension from inside *OAS.
 func (s *OAS) GetTykExtension() *XTykAPIGateway {
 	if s.Extensions == nil {
 		return nil
@@ -126,13 +143,29 @@ func (s *OAS) GetTykExtension() *XTykAPIGateway {
 	return nil
 }
 
+// RemoveTykExtension clears the Tyk extensions from *OAS.
 func (s *OAS) RemoveTykExtension() {
-
 	if s.Extensions == nil {
 		return
 	}
 
 	delete(s.Extensions, ExtensionTykAPIGateway)
+}
+
+// Clone creates a deep copy of the OAS object and returns a new instance.
+func (s *OAS) Clone() (*OAS, error) {
+	oasInBytes, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	var retOAS OAS
+	_ = json.Unmarshal(oasInBytes, &retOAS)
+
+	// convert Tyk extension from map to struct
+	retOAS.GetTykExtension()
+
+	return &retOAS, nil
 }
 
 func (s *OAS) getTykAuthentication() (authentication *Authentication) {
@@ -215,6 +248,24 @@ func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
 	return
 }
 
+func (s *OAS) getTykExternalOAuthAuth(name string) (externalOAuth *ExternalOAuth) {
+	securityScheme := s.getTykSecurityScheme(name)
+	if securityScheme == nil {
+		return
+	}
+
+	externalOAuth = &ExternalOAuth{}
+	if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
+		externalOAuth = oauthVal
+	} else {
+		toStructIfMap(securityScheme, externalOAuth)
+	}
+
+	s.getTykSecuritySchemes()[name] = externalOAuth
+
+	return
+}
+
 func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
 	if s.getTykAuthentication() != nil {
 		securitySchemes = s.getTykAuthentication().SecuritySchemes
@@ -232,7 +283,8 @@ func (s *OAS) getTykSecurityScheme(name string) interface{} {
 	return securitySchemes[name]
 }
 
-func (s *OAS) getTykMiddleware() (middleware *Middleware) {
+// GetTykMiddleware returns middleware section from XTykAPIGateway.
+func (s *OAS) GetTykMiddleware() (middleware *Middleware) {
 	if s.GetTykExtension() != nil {
 		middleware = s.GetTykExtension().Middleware
 	}
@@ -241,40 +293,42 @@ func (s *OAS) getTykMiddleware() (middleware *Middleware) {
 }
 
 func (s *OAS) getTykOperations() (operations Operations) {
-	if s.getTykMiddleware() != nil {
-		operations = s.getTykMiddleware().Operations
+	if s.GetTykMiddleware() != nil {
+		operations = s.GetTykMiddleware().Operations
 	}
 
 	return
 }
 
-func (s *OAS) AddServers(apiURL string) {
-	if len(s.Servers) == 0 {
-		s.Servers = openapi3.Servers{
-			{
-				URL: apiURL,
-			},
-		}
-		return
+// AddServers adds a server into the servers definition if not already present.
+func (s *OAS) AddServers(apiURLs ...string) {
+	apiURLSet := make(map[string]struct{})
+	newServers := openapi3.Servers{}
+	for _, apiURL := range apiURLs {
+		newServers = append(newServers, &openapi3.Server{
+			URL: apiURL,
+		})
+		apiURLSet[apiURL] = struct{}{}
 	}
 
-	newServers := openapi3.Servers{
-		{
-			URL: apiURL,
-		},
+	if len(s.Servers) == 0 {
+		s.Servers = newServers
+		return
 	}
 
 	// check if apiURL already exists in servers object
 	for i := 0; i < len(s.Servers); i++ {
-		if s.Servers[i].URL == apiURL {
+		if _, ok := apiURLSet[s.Servers[i].URL]; ok {
 			continue
 		}
+
 		newServers = append(newServers, s.Servers[i])
 	}
 
 	s.Servers = newServers
 }
 
+// UpdateServers sets or updates the first servers URL if it matches oldAPIURL.
 func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
 	if len(s.Servers) == 0 {
 		s.Servers = openapi3.Servers{
@@ -288,4 +342,108 @@ func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
 	if len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL {
 		s.Servers[0].URL = apiURL
 	}
+}
+
+// ReplaceServers replaces OAS servers entry having oldAPIURLs with new apiURLs .
+func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
+	if len(s.Servers) == 0 && len(apiURLs) == 1 {
+		s.Servers = openapi3.Servers{
+			{
+				URL: apiURLs[0],
+			},
+		}
+		return
+	}
+
+	oldAPIURLSet := make(map[string]struct{})
+	for _, apiURL := range oldAPIURLs {
+		oldAPIURLSet[apiURL] = struct{}{}
+	}
+
+	newServers := openapi3.Servers{}
+	for _, apiURL := range apiURLs {
+		newServers = append(newServers, &openapi3.Server{URL: apiURL})
+	}
+
+	userAddedServers := openapi3.Servers{}
+	for _, server := range s.Servers {
+		if _, ok := oldAPIURLSet[server.URL]; ok {
+			continue
+		}
+		userAddedServers = append(userAddedServers, server)
+	}
+
+	s.Servers = append(newServers, userAddedServers...)
+}
+
+// APIDef is struct to hold both OAS and Classic forms of an API definition.
+type APIDef struct {
+	OAS     *OAS
+	Classic *apidef.APIDefinition
+}
+
+// MigrateAndFillOAS migrates classic APIs to OAS-compatible forms. Then, it fills an OAS with it. To be able to make it
+// a valid OAS, it adds some required fields. It returns base API and its versions if any.
+func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
+	baseAPIDef := APIDef{Classic: api}
+
+	versions, err := api.Migrate()
+	if err != nil {
+		return baseAPIDef, nil, err
+	}
+
+	baseAPIDef.OAS, err = newOASFromClassicAPIDefinition(api)
+	if err != nil {
+		return baseAPIDef, nil, fmt.Errorf("base API %s migrated OAS is not valid: %w", api.Name, err)
+	}
+
+	versionAPIDefs := make([]APIDef, len(versions))
+	for i := 0; i < len(versions); i++ {
+		versionOAS, err := newOASFromClassicAPIDefinition(&versions[i])
+		if err != nil {
+			return baseAPIDef, nil, fmt.Errorf("version API %s migrated OAS is not valid: %w", versions[i].Name, err)
+		}
+		versionAPIDefs[i] = APIDef{versionOAS, &versions[i]}
+	}
+
+	return baseAPIDef, versionAPIDefs, err
+}
+
+func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
+	api.IsOAS = true
+	var oas OAS
+	oas.Fill(*api)
+	oas.setRequiredFields(api.Name, api.VersionName)
+	clearClassicAPIForSomeFeatures(api)
+
+	err := oas.Validate(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := oas.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	return &oas, ValidateOASObject(bytes, oas.OpenAPI)
+}
+
+// setRequiredFields sets some required fields to make OAS object a valid one.
+func (s *OAS) setRequiredFields(name string, versionName string) {
+	s.OpenAPI = DefaultOpenAPI
+	s.Info = &openapi3.Info{
+		Title:   name,
+		Version: versionName,
+	}
+}
+
+// clearClassicAPIForSomeFeatures clears some features that will be OAS-only.
+// For example, the new validate request will just be valid for OAS APIs so after migrating from classic API definition
+// the existing feature should be cleared to prevent ValidateJSON middleware interference.
+func clearClassicAPIForSomeFeatures(api *apidef.APIDefinition) {
+	// clear ValidateJSON after migration to OAS-only ValidateRequest
+	vInfo := api.VersionData.Versions[Main]
+	vInfo.ExtendedPaths.ValidateJSON = nil
+	api.VersionData.Versions[Main] = vInfo
 }

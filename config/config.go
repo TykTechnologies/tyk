@@ -11,10 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kelseyhightower/envconfig"
+
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/kelseyhightower/envconfig"
 )
 
 type IPsHandleStrategy string
@@ -62,6 +64,8 @@ const (
 
 	DefaultDashPolicySource     = "service"
 	DefaultDashPolicyRecordName = "tyk_policies"
+
+	DefaultOTelResourceName = "tyk-gateway"
 )
 
 type PoliciesConfig struct {
@@ -72,8 +76,9 @@ type PoliciesConfig struct {
 	// Set this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.
 	PolicyConnectionString string `json:"policy_connection_string"`
 
-	// This option is required if `policies.policy_source` is set to `file`.
-	// Specifies the path of your JSON file containing the available policies.
+	// This option only applies in OSS deployment when the `policies.policy_source` is either set
+	// to `file` or an empty string. If `policies.policy_path` is not set, then Tyk will load policies
+	// from the JSON file specified by `policies.policy_record_name`.
 	PolicyRecordName string `json:"policy_record_name"`
 
 	// In a Pro installation, Tyk will load Policy IDs and use the internal object-ID as the ID of the policy.
@@ -83,14 +88,19 @@ type PoliciesConfig struct {
 	//
 	// This option should only be used when moving an installation to a new database.
 	AllowExplicitPolicyID bool `json:"allow_explicit_policy_id"`
-	// This option is used for storing a policies  if `policies.policy_source` is set to `file`.
-	// it should be some existing file path on hard drive
+	// This option only applies in OSS deployment when the `policies.policy_source` is either set
+	// to `file` or an empty string. If `policies.policy_path` is set, then Tyk will load policies
+	// from all the JSON files under the directory specified by the `policies.policy_path` option.
+	// In this configuration, Tyk Gateway will allow policy management through the Gateway API.
 	PolicyPath string `json:"policy_path"`
 }
 
 type DBAppConfOptionsConfig struct {
 	// Set the URL to your Dashboard instance (or a load balanced instance). The URL needs to be formatted as: `http://dashboard_host:port`
 	ConnectionString string `json:"connection_string"`
+
+	// Set a timeout value, in seconds, for your Dashboard connection. Default value is 30.
+	ConnectionTimeout int `json:"connection_timeout"`
 
 	// Set to `true` to enable filtering (sharding) of APIs.
 	NodeIsSegmented bool `json:"node_is_segmented"`
@@ -147,6 +157,15 @@ type NormalisedURLConfig struct {
 	// Each UUID will be replaced with a placeholder {uuid}
 	NormaliseUUIDs bool `json:"normalise_uuids"`
 
+	// Set this to true to have Tyk automatically clean up ULIDs. It will match the following style:
+	//
+	// * `/posts/01G9HHNKWGBHCQX7VG3JKSZ055/comments`
+	// * `/posts/01g9hhnkwgbhcqx7vg3jksz055/comments`
+	// * `/posts/01g9HHNKwgbhcqx7vg3JKSZ055/comments`
+
+	// Each ULID will be replaced with a placeholder {ulid}
+	NormaliseULIDs bool `json:"normalise_ulids"`
+
 	// Set this to true to have Tyk automatically match for numeric IDs, it will match with a preceding slash so as not to capture actual numbers:
 	NormaliseNumbers bool `json:"normalise_numbers"`
 
@@ -158,6 +177,7 @@ type NormalisedURLConfig struct {
 
 type NormaliseURLPatterns struct {
 	UUIDs  *regexp.Regexp
+	ULIDs  *regexp.Regexp
 	IDs    *regexp.Regexp
 	Custom []*regexp.Regexp
 }
@@ -220,7 +240,7 @@ type HealthCheckConfig struct {
 }
 
 type LivenessCheckConfig struct {
-	// Frequence of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
+	// Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
 	CheckDuration time.Duration `json:"check_duration"`
 }
 
@@ -233,7 +253,7 @@ type DnsCacheConfig struct {
 	TTL int64 `json:"ttl"`
 
 	CheckInterval int64 `json:"-" ignored:"true"`
-	//controls cache cleanup interval. By convention this shouldn't be exposed to a config or env_variable_setup
+	// controls cache cleanup interval. By convention this shouldn't be exposed to a config or env_variable_setup
 
 	// A strategy which will be used when a DNS query will reply with more than 1 IP Address per single host.
 	// As a DNS query response IP Addresses can have a changing order depending on DNS server balancing strategy (eg: round robin, geographically dependent origin-ip ordering, etc) this option allows you to not to limit the connection to the first host in a cached response list or prevent response caching.
@@ -311,7 +331,7 @@ type SlaveOptionsConfig struct {
 	// The maximum time in seconds that a RPC ping can last.
 	PingTimeout int `json:"ping_timeout"`
 
-	// The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed.
+	// The number of RPC connections in the pool. Basically it creates a set of connections that you can re-use as needed. Defaults to 5.
 	RPCPoolSize int `json:"rpc_pool_size"`
 
 	// You can use this to set a period for which the Gateway will check if there are changes in keys that must be synchronized. If this value is not set then it will default to 10 seconds.
@@ -349,17 +369,14 @@ type HttpServerOptionsConfig struct {
 	// No longer used
 	OverrideDefaults bool `json:"-"`
 
-	// User -> Gateway network read timeout
+	// API Consumer -> Gateway network read timeout. Not setting this config, or setting this to 0, defaults to 120 seconds
 	ReadTimeout int `json:"read_timeout"`
 
-	// User -> Gateway network write timeout
+	// API Consumer -> Gateway network write timeout. Not setting this config, or setting this to 0, defaults to 120 seconds
 	WriteTimeout int `json:"write_timeout"`
 
 	// Set to true to enable SSL connections
 	UseSSL bool `json:"use_ssl"`
-
-	// Enable Lets-Encrypt support
-	UseLE_SSL bool `json:"use_ssl_le"`
 
 	// Enable HTTP2 protocol handling
 	EnableHttp2 bool `json:"enable_http2"`
@@ -393,6 +410,11 @@ type HttpServerOptionsConfig struct {
 	// Maximum TLS version.
 	MaxVersion uint16 `json:"max_version"`
 
+	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
+	// This option is useful when you have a lot of ClientCAs and you want to reduce the handshake overhead, as some clients can hit TLS handshake limits.
+	// This option does not give any hints to the client, on which certificate to pick (but this is very rare situation when it is required)
+	SkipClientCAAnnouncement bool `json:"skip_client_ca_announcement"`
+
 	// Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.
 	// This option needed be set for streaming protocols like Server Side Events, or gRPC streaming.
 	FlushInterval int `json:"flush_interval"`
@@ -406,6 +428,20 @@ type HttpServerOptionsConfig struct {
 
 	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
 	Ciphers []string `json:"ssl_ciphers"`
+
+	// MaxRequestBodySize configures a maximum size limit for request body size (in bytes) for all APIs on the Gateway.
+	//
+	// Tyk Gateway will evaluate all API requests against this size limit and will respond with HTTP 413 status code if the body of the request is larger.
+	//
+	// Two methods are used to perform the comparison:
+	//  - If the API Request contains the `Content-Length` header, this is directly compared against `MaxRequestBodySize`.
+	//  - If the `Content-Length` header is not provided, the Request body is read in chunks to compare total size against `MaxRequestBodySize`.
+	//
+	// A value of zero (default) means that no maximum is set and API requests will not be tested.
+	//
+	// See more information about setting request size limits here:
+	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
+	MaxRequestBodySize int64 `json:"max_request_body_size"`
 }
 
 type AuthOverrideConf struct {
@@ -451,6 +487,9 @@ type CoProcessConfig struct {
 	// Maximum message which can be sent to gRPC server
 	GRPCSendMaxSize int `json:"grpc_send_max_size"`
 
+	// Authority used in GRPC connection
+	GRPCAuthority string `json:"grpc_authority"`
+
 	// Sets the path to built-in Tyk modules. This will be part of the Python module lookup path. The value used here is the default one for most installations.
 	PythonPathPrefix string `json:"python_path_prefix"`
 
@@ -488,6 +527,8 @@ type NewRelicConfig struct {
 	AppName string `json:"app_name"`
 	// New Relic License key
 	LicenseKey string `json:"license_key"`
+	// Enable distributed tracing
+	EnableDistributedTracing bool `json:"enable_distributed_tracing"`
 }
 
 type Tracer struct {
@@ -558,10 +599,10 @@ type Config struct {
 	// was written.
 	OriginalPath string `json:"-"`
 
-	// Force your Gateway to work only on a specifc domain name. Can be overriden by API custom domain.
+	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
 	HostName string `json:"hostname"`
 
-	// If your machine has mulitple network devices or IPs you can force the Gateway to use the IP address you want.
+	// If your machine has multiple network devices or IPs you can force the Gateway to use the IP address you want.
 	ListenAddress string `json:"listen_address"`
 
 	// Setting this value will change the port that Tyk listens on. Default: 8080.
@@ -605,8 +646,18 @@ type Config struct {
 	// Disable dynamic API and Policy reloads, e.g. it will load new changes only on procecss start.
 	SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
 
+	// ReloadInterval defines a duration in seconds within which the gateway responds to a reload event.
+	// The value defaults to 1, values lower than 1 are ignored.
+	ReloadInterval int64 `json:"reload_interval"`
+
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
+
+	// DisableKeyActionsByUsername disables key search by username.
+	// When this is set to `true` you are able to search for keys only by keyID or key hash (if `hash_keys` is also set to `true`)
+	// Note that if `hash_keys` is also set to `true` then the keyID will not be provided for APIs secured using basic auth. In this scenario the only search option would be to use key hash
+	// If you are using the Tyk Dashboard, you must configure this setting with the same value in both Gateway and Dashboard
+	DisableKeyActionsByUsername bool `json:"disable_key_actions_by_username"`
 
 	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
 	HashKeyFunction string `json:"hash_key_function"`
@@ -632,7 +683,7 @@ type Config struct {
 	// A policy can be defined in a file (Open Source installations) or from the same database as the Dashboard.
 	Policies PoliciesConfig `json:"policies"`
 
-	// Defines the ports that will be available for the API services to bind to in the following format: `{ “": “” }``.
+	// Defines the ports that will be available for the API services to bind to in the following format: `"{“":“”}"`. Remember to escape JSON strings.
 	// This is a map of protocol to PortWhiteList. This allows per protocol
 	// configurations.
 	PortWhiteList PortsWhiteList `json:"ports_whitelist"`
@@ -684,7 +735,7 @@ type Config struct {
 	// The standard rate limiter offers similar performance as the sentinel-based limiter. This is disabled by default.
 	EnableSentinelRateLimiter bool `json:"enable_sentinel_rate_limiter"`
 
-	// An enchancment for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
+	// An enhancement for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
 	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
 
 	// How frequently a distributed rate limiter synchronises information between the Gateway nodes. Default: 2 seconds.
@@ -907,7 +958,11 @@ type Config struct {
 	LogLevel string `json:"log_level"`
 
 	// Section for configuring OpenTracing support
+	// Deprecated: use OpenTelemetry instead.
 	Tracer Tracer `json:"tracing"`
+
+	// Section for configuring OpenTelemetry.
+	OpenTelemetry otel.OpenTelemetry `json:"opentelemetry"`
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 
@@ -969,7 +1024,7 @@ type Config struct {
 	// global session lifetime, in seconds.
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
-	// This section enables the use of the KV capabilites to substitute configuration values.
+	// This section enables the use of the KV capabilities to substitute configuration values.
 	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/
 	KV struct {
 		Consul ConsulConfig `json:"consul"`
@@ -1008,6 +1063,19 @@ type Config struct {
 
 	// Skip TLS verification for JWT JWKs url validation
 	JWTSSLInsecureSkipVerify bool `json:"jwt_ssl_insecure_skip_verify"`
+
+	// ResourceSync configures mitigation strategy in case sync fails.
+	ResourceSync ResourceSyncConfig `json:"resource_sync"`
+}
+
+type ResourceSyncConfig struct {
+	// RetryAttempts defines the number of retries that the Gateway
+	// should perform during a resource sync (APIs or policies), defaulting
+	// to zero which means no retries are attempted.
+	RetryAttempts int `json:"retry_attempts"`
+
+	// Interval configures the interval in seconds between each retry on a resource sync error.
+	Interval int `json:"interval"`
 }
 
 type TykError struct {
@@ -1179,20 +1247,32 @@ func Load(paths []string, conf *Config) error {
 		return err
 	}
 
-	if r == nil {
-		path := paths[0]
-		log.Warnf("No config file found, writing default to %s", path)
-		if err := WriteDefault(path, conf); err != nil {
+	if len(paths) > 0 && r == nil {
+		filename := paths[0]
+		log.Warnf("No config file found, writing default to %s", filename)
+		if err := WriteDefault(filename, conf); err != nil {
 			return err
 		}
 		log.Info("Loading default configuration...")
-		return Load([]string{path}, conf)
+		return Load([]string{filename}, conf)
 	}
 
-	if err := json.NewDecoder(r).Decode(&conf); err != nil {
-		return fmt.Errorf("couldn't unmarshal config: %v", err)
+	if r != nil {
+		if err := json.NewDecoder(r).Decode(&conf); err != nil {
+			return fmt.Errorf("couldn't unmarshal config: %w", err)
+		}
 	}
 
+	if err := FillEnv(conf); err != nil {
+		log.WithError(err).Error("Failed to process environment variables after config file load")
+		return err
+	}
+
+	return nil
+}
+
+// FillEnv will inspect the environment and fill the config.
+func FillEnv(conf *Config) error {
 	shouldOmit, omitEnvExist := os.LookupEnv(envPrefix + "_OMITCONFIGFILE")
 	if omitEnvExist && strings.ToLower(shouldOmit) == "true" {
 		*conf = Config{}

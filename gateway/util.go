@@ -1,14 +1,13 @@
 package gateway
 
 import (
-	"errors"
 	"net"
 	"net/url"
-	"os"
 	"strconv"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 )
 
 // appendIfMissing ensures dest slice is unique with new items.
@@ -115,13 +114,6 @@ func greaterThanInt(first, second int) bool {
 	return first > second
 }
 
-func FileExist(filepath string) bool {
-	if _, err := os.Stat(filepath); errors.Is(err, os.ErrNotExist) {
-		return false
-	}
-	return true
-}
-
 func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 	var result = url.URL{
 		Scheme: "http",
@@ -156,4 +148,67 @@ func getAPIURL(apiDef apidef.APIDefinition, gwConfig config.Config) string {
 	result.Host = net.JoinHostPort(result.Host, strconv.Itoa(gwConfig.ListenPort))
 
 	return result.String()
+}
+
+func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
+	if existingSpec == nil {
+		return true
+	}
+
+	if existingSpec.Checksum != newSpec.Checksum {
+		return true
+	}
+
+	if newSpec.hasVirtualEndpoint() {
+		return true
+	}
+
+	if newSpec.CustomMiddleware.Driver == apidef.GrpcDriver {
+		return false
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.AuthCheck) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Pre...) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.PostKeyAuth...) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Post...) {
+		return true
+	}
+
+	if middleware.Enabled(newSpec.CustomMiddleware.Response...) {
+		return true
+	}
+
+	return false
+}
+
+// check if 2 maps are the same
+func areMapsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
+// checks if a string contains escaped characters
+func containsEscapedChars(str string) bool {
+	unescaped, err := url.PathUnescape(str)
+	if err != nil {
+		return true
+	}
+
+	return str != unescaped
 }

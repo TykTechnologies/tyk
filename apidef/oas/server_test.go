@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestServer(t *testing.T) {
@@ -14,6 +15,7 @@ func TestServer(t *testing.T) {
 	var emptyServer Server
 
 	var convertedAPI apidef.APIDefinition
+	convertedAPI.SetDisabledFlags()
 	emptyServer.ExtractTo(&convertedAPI)
 
 	var resultServer Server
@@ -46,12 +48,12 @@ func TestGatewayTags(t *testing.T) {
 	}{
 		{
 			input: GatewayTags{},
-			want:  GatewayTags{Tags: []string{}},
+			want:  GatewayTags{},
 			omit:  true,
 		},
 		{
 			input: GatewayTags{Enabled: true},
-			want:  GatewayTags{Enabled: true, Tags: []string{}},
+			want:  GatewayTags{Enabled: true},
 		},
 		{
 			input: GatewayTags{Enabled: true, Tags: []string{}},
@@ -72,9 +74,6 @@ func TestGatewayTags(t *testing.T) {
 	}
 
 	t.Run("Fill GatewayTags from APIDef", func(t *testing.T) {
-		// We currently don't match APIDef direct fill with OAS
-		t.Skip() // TODO: TT-5720
-
 		t.Parallel()
 
 		for idx, tc := range testcases {
@@ -134,7 +133,7 @@ func TestCustomDomain(t *testing.T) {
 			{
 				"enabled=false, name=nil",
 				Domain{Enabled: false, Name: ""},
-				apidef.APIDefinition{},
+				apidef.APIDefinition{DomainDisabled: true},
 			},
 			{
 				"enabled=false, name=(valid-domain)",
@@ -156,7 +155,6 @@ func TestCustomDomain(t *testing.T) {
 		for _, tc := range testcases {
 			t.Run(tc.title, func(t *testing.T) {
 				var apiDef apidef.APIDefinition
-
 				tc.input.ExtractTo(&apiDef)
 
 				assert.Equal(t, tc.expectValue, apiDef)
@@ -172,7 +170,7 @@ func TestCustomDomain(t *testing.T) {
 			{
 				"disabled=false, name=nil",
 				apidef.APIDefinition{DomainDisabled: false, Domain: ""},
-				Domain{},
+				Domain{Enabled: true},
 			},
 			{
 				"disabled=false, name=(valid-domain)",
@@ -238,7 +236,7 @@ func TestTagsExportServer(t *testing.T) {
 			apidef.APIDefinition{},
 			&GatewayTags{
 				Enabled: true,
-				Tags:    []string{},
+				Tags:    nil,
 			},
 		},
 	}

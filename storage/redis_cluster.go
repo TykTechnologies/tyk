@@ -9,13 +9,12 @@ import (
 	"strings"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
-
 	redis "github.com/go-redis/redis/v8"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/config"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
@@ -116,9 +115,11 @@ func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
-
 	c := cluster.RedisController.singleton(cluster.IsCache, cluster.IsAnalytics)
-	testKey := "redis-test-" + uuid.NewV4().String()
+	if c == nil {
+		return false
+	}
+	testKey := "redis-test-" + uuid.New()
 	if err := c.Set(cluster.RedisController.ctx, testKey, "test", time.Second).Err(); err != nil {
 		return false
 	}
@@ -134,8 +135,24 @@ func (r *RedisCluster) Connect() bool {
 	return true
 }
 
-func (r *RedisCluster) singleton() redis.UniversalClient {
-	return r.RedisController.singleton(r.IsCache, r.IsAnalytics)
+func (r *RedisCluster) singleton() (redis.UniversalClient, error) {
+	if r.RedisController == nil {
+		return nil, fmt.Errorf("Error trying to get singleton instance: RedisController is nil")
+	}
+	instance := r.RedisController.singleton(r.IsCache, r.IsAnalytics)
+	if instance == nil {
+		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
+	}
+	return instance, nil
+}
+
+// checkIsOpen checks if the connection is open. This method is using for backoff retry.
+func (r *RedisCluster) checkIsOpen() error {
+	isOpen := clusterConnectionIsOpen(r)
+	if !isOpen {
+		return ErrRedisIsDown
+	}
+	return nil
 }
 
 func (r *RedisCluster) hashKey(in string) string {
@@ -167,9 +184,13 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	if err := r.up(); err != nil {
 		return "", err
 	}
-	cluster := r.singleton()
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return "", err
+	}
 
-	value, err := cluster.Get(r.RedisController.ctx, r.fixKey(keyName)).Result()
+	value, err := singleton.Get(r.RedisController.ctx, r.fixKey(keyName)).Result()
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
 		return "", ErrKeyNotFound
@@ -183,7 +204,12 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 	if err := r.up(); err != nil {
 		return nil, err
 	}
-	cluster := r.singleton()
+
+	cluster, err := r.singleton()
+	if err != nil {
+		return nil, err
+	}
+
 	keyNames := make([]string, len(keys))
 	copy(keyNames, keys)
 	for index, val := range keyNames {
@@ -239,7 +265,13 @@ func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
 	if err = r.up(); err != nil {
 		return 0, err
 	}
-	duration, err := r.singleton().TTL(r.RedisController.ctx, r.fixKey(keyName)).Result()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		return 0, err
+	}
+
+	duration, err := singleton.TTL(r.RedisController.ctx, r.fixKey(keyName)).Result()
 	return int64(duration.Seconds()), err
 }
 
@@ -247,7 +279,13 @@ func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 	if err := r.up(); err != nil {
 		return "", err
 	}
-	value, err := r.singleton().Get(r.RedisController.ctx, keyName).Result()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		return "", err
+	}
+
+	value, err := singleton.Get(r.RedisController.ctx, keyName).Result()
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
 		return "", ErrKeyNotFound
@@ -262,7 +300,12 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 		return 0, err
 	}
 
-	value, err := r.singleton().TTL(r.RedisController.ctx, r.fixKey(keyName)).Result()
+	singleton, err := r.singleton()
+	if err != nil {
+		return 0, err
+	}
+
+	value, err := singleton.TTL(r.RedisController.ctx, r.fixKey(keyName)).Result()
 	if err != nil {
 		log.Error("Error trying to get TTL: ", err)
 		return 0, ErrKeyNotFound
@@ -279,7 +322,13 @@ func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
 	if err := r.up(); err != nil {
 		return err
 	}
-	err := r.singleton().Expire(r.RedisController.ctx, r.fixKey(keyName), time.Duration(timeout)*time.Second).Err()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		return err
+	}
+
+	err = singleton.Expire(r.RedisController.ctx, r.fixKey(keyName), time.Duration(timeout)*time.Second).Err()
 	if err != nil {
 		log.Error("Could not EXPIRE key: ", err)
 	}
@@ -294,7 +343,13 @@ func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
 	if err := r.up(); err != nil {
 		return err
 	}
-	err := r.singleton().Set(r.RedisController.ctx, r.fixKey(keyName), session, time.Duration(timeout)*time.Second).Err()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		return err
+	}
+
+	err = singleton.Set(r.RedisController.ctx, r.fixKey(keyName), session, time.Duration(timeout)*time.Second).Err()
 	if err != nil {
 		log.Error("Error trying to set value: ", err)
 		return err
@@ -306,7 +361,13 @@ func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 	if err := r.up(); err != nil {
 		return err
 	}
-	err := r.singleton().Set(r.RedisController.ctx, keyName, session, time.Duration(timeout)*time.Second).Err()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		return err
+	}
+
+	err = singleton.Set(r.RedisController.ctx, keyName, session, time.Duration(timeout)*time.Second).Err()
 	if err != nil {
 		log.Error("Error trying to set value: ", err)
 		return err
@@ -322,7 +383,14 @@ func (r *RedisCluster) Decrement(keyName string) {
 		log.Debug(err)
 		return
 	}
-	err := r.singleton().Decr(r.RedisController.ctx, keyName).Err()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	err = singleton.Decr(r.RedisController.ctx, keyName).Err()
 	if err != nil {
 		log.Error("Error trying to decrement value:", err)
 	}
@@ -337,7 +405,14 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 	}
 	// This function uses a raw key, so we shouldn't call fixKey
 	fixedKey := keyName
-	val, err := r.singleton().Incr(r.RedisController.ctx, fixedKey).Result()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return 0
+	}
+
+	val, err := singleton.Incr(r.RedisController.ctx, fixedKey).Result()
 
 	if err != nil {
 		log.Error("Error trying to increment value:", err)
@@ -347,7 +422,7 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 
 	if val == 1 && expire > 0 {
 		log.Debug("--> Setting Expire")
-		r.singleton().Expire(r.RedisController.ctx, fixedKey, time.Duration(expire)*time.Second)
+		singleton.Expire(r.RedisController.ctx, fixedKey, time.Duration(expire)*time.Second)
 	}
 
 	return val
@@ -355,60 +430,15 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
 func (r *RedisCluster) GetKeys(filter string) []string {
-	if err := r.up(); err != nil {
-		log.Debug(err)
-		return nil
-	}
-	client := r.singleton()
-
 	filterHash := ""
 	if filter != "" {
 		filterHash = r.hashKey(filter)
 	}
+
 	searchStr := r.KeyPrefix + filterHash + "*"
 	log.Debug("[STORE] Getting list by: ", searchStr)
 
-	fnFetchKeys := func(client *redis.Client) ([]string, error) {
-		values := make([]string, 0)
-
-		iter := client.Scan(r.RedisController.ctx, 0, searchStr, 0).Iterator()
-		for iter.Next(r.RedisController.ctx) {
-			values = append(values, iter.Val())
-		}
-
-		if err := iter.Err(); err != nil {
-			return nil, err
-		}
-
-		return values, nil
-	}
-
-	var err error
-	sessions := make([]string, 0)
-
-	switch v := client.(type) {
-	case *redis.ClusterClient:
-		ch := make(chan []string)
-
-		go func() {
-			err = v.ForEachMaster(r.RedisController.ctx, func(ctx context.Context, client *redis.Client) error {
-				values, err := fnFetchKeys(client)
-				if err != nil {
-					return err
-				}
-
-				ch <- values
-				return nil
-			})
-			close(ch)
-		}()
-
-		for res := range ch {
-			sessions = append(sessions, res...)
-		}
-	case *redis.Client:
-		sessions, err = fnFetchKeys(v)
-	}
+	sessions, err := r.ScanKeys(searchStr)
 
 	if err != nil {
 		log.Error("Error while fetching keys:", err)
@@ -442,10 +472,14 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 		keys[i] = r.KeyPrefix + v
 	}
 
-	client := r.singleton()
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
 	values := make([]string, 0)
 
-	switch v := client.(type) {
+	switch v := singleton.(type) {
 	case *redis.ClusterClient:
 		{
 			getCmds := make([]*redis.StringCmd, 0)
@@ -501,9 +535,14 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 		log.Debug(err)
 		return false
 	}
-	log.Debug("DEL Key was: ", keyName)
-	log.Debug("DEL Key became: ", r.fixKey(keyName))
-	n, err := r.singleton().Del(r.RedisController.ctx, r.fixKey(keyName)).Result()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+
+	n, err := singleton.Del(r.RedisController.ctx, r.fixKey(keyName)).Result()
 	if err != nil {
 		log.WithError(err).Error("Error trying to delete key")
 	}
@@ -517,7 +556,14 @@ func (r *RedisCluster) DeleteAllKeys() bool {
 		log.Debug(err)
 		return false
 	}
-	n, err := r.singleton().FlushAll(r.RedisController.ctx).Result()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+
+	n, err := singleton.FlushAll(r.RedisController.ctx).Result()
 	if err != nil {
 		log.WithError(err).Error("Error trying to delete keys")
 	}
@@ -535,7 +581,14 @@ func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 		log.Debug(err)
 		return false
 	}
-	n, err := r.singleton().Del(r.RedisController.ctx, keyName).Result()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+
+	n, err := singleton.Del(r.RedisController.ctx, keyName).Result()
 	if err != nil {
 		log.WithError(err).Error("Error trying to delete key")
 	}
@@ -549,7 +602,11 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 		log.Debug(err)
 		return false
 	}
-	client := r.singleton()
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return false
+	}
 	log.Debug("Deleting: ", pattern)
 
 	fnScan := func(client *redis.Client) ([]string, error) {
@@ -567,10 +624,9 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 		return values, nil
 	}
 
-	var err error
 	var keys []string
 
-	switch v := client.(type) {
+	switch v := singleton.(type) {
 	case *redis.ClusterClient:
 		ch := make(chan []string)
 		go func() {
@@ -601,7 +657,7 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	if len(keys) > 0 {
 		for _, name := range keys {
 			log.Info("Deleting: ", name)
-			err := client.Del(r.RedisController.ctx, name).Err()
+			err := singleton.Del(r.RedisController.ctx, name).Err()
 			if err != nil {
 				log.Error("Error trying to delete key: ", name, " - ", err)
 			}
@@ -626,8 +682,13 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 		}
 
 		log.Debug("Deleting: ", keys)
-		client := r.singleton()
-		switch v := client.(type) {
+		singleton, err := r.singleton()
+		if err != nil {
+			log.Error(err)
+			return false
+		}
+
+		switch v := singleton.(type) {
 		case *redis.ClusterClient:
 			pipe := v.Pipeline()
 			for _, k := range keys {
@@ -656,12 +717,13 @@ func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channel string, c
 	if err := r.up(); err != nil {
 		return err
 	}
-	client := r.singleton()
-	if client == nil {
-		return errors.New("Redis connection failed")
+
+	singleton, err := r.singleton()
+	if err != nil {
+		return err
 	}
 
-	pubsub := client.Subscribe(ctx, channel)
+	pubsub := singleton.Subscribe(ctx, channel)
 	defer pubsub.Close()
 
 	for {
@@ -701,7 +763,13 @@ func (r *RedisCluster) Publish(channel, message string) error {
 	if err := r.up(); err != nil {
 		return err
 	}
-	err := r.singleton().Publish(r.RedisController.ctx, channel, message).Err()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		return err
+	}
+
+	err = singleton.Publish(r.RedisController.ctx, channel, message).Err()
 	if err != nil {
 		log.Error("Error trying to publish message: ", err)
 		return err
@@ -719,10 +787,14 @@ func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 	fixedKey := r.fixKey(keyName)
 	log.Debug("Fixed keyname is: ", fixedKey)
 
-	client := r.singleton()
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
 
 	var lrange *redis.StringSliceCmd
-	_, err := client.TxPipelined(r.RedisController.ctx, func(pipe redis.Pipeliner) error {
+	_, err = singleton.TxPipelined(r.RedisController.ctx, func(pipe redis.Pipeliner) error {
 		lrange = pipe.LRange(r.RedisController.ctx, fixedKey, 0, -1)
 		pipe.Del(r.RedisController.ctx, fixedKey)
 		return nil
@@ -755,17 +827,30 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 		log.Debug(err)
 		return
 	}
-	if err := r.singleton().RPush(r.RedisController.ctx, fixedKey, value).Err(); err != nil {
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	if err := singleton.RPush(r.RedisController.ctx, fixedKey, value).Err(); err != nil {
 		log.WithError(err).Error("Error trying to append to set keys")
 	}
 }
 
-//Exists check if keyName exists
+// Exists check if keyName exists
 func (r *RedisCluster) Exists(keyName string) (bool, error) {
 	fixedKey := r.fixKey(keyName)
 	log.WithField("keyName", fixedKey).Debug("Checking if exists")
 
-	exists, err := r.singleton().Exists(r.RedisController.ctx, fixedKey).Result()
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return false, err
+	}
+
+	exists, err := singleton.Exists(r.RedisController.ctx, fixedKey).Result()
 	if err != nil {
 		log.Error("Error trying to check if key exists: ", err)
 		return false, err
@@ -786,7 +871,13 @@ func (r *RedisCluster) RemoveFromList(keyName, value string) error {
 	}
 	log.WithFields(logEntry).Debug("Removing value from list")
 
-	if err := r.singleton().LRem(r.RedisController.ctx, fixedKey, 0, value).Err(); err != nil {
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	if err := singleton.LRem(r.RedisController.ctx, fixedKey, 0, value).Err(); err != nil {
 		log.WithFields(logEntry).WithError(err).Error("LREM command failed")
 		return err
 	}
@@ -805,7 +896,13 @@ func (r *RedisCluster) GetListRange(keyName string, from, to int64) ([]string, e
 	}
 	log.WithFields(logEntry).Debug("Getting list range")
 
-	elements, err := r.singleton().LRange(r.RedisController.ctx, fixedKey, from, to).Result()
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	elements, err := singleton.LRange(r.RedisController.ctx, fixedKey, from, to).Result()
 	if err != nil {
 		log.WithFields(logEntry).WithError(err).Error("LRANGE command failed")
 		return nil, err
@@ -824,9 +921,13 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 		log.Debug(err)
 		return
 	}
-	client := r.singleton()
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return
+	}
 
-	pipe := client.Pipeline()
+	pipe := singleton.Pipeline()
 	for _, val := range values {
 		pipe.RPush(r.RedisController.ctx, fixedKey, val)
 	}
@@ -842,7 +943,14 @@ func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
 	if err := r.up(); err != nil {
 		return nil, err
 	}
-	val, err := r.singleton().SMembers(r.RedisController.ctx, r.fixKey(keyName)).Result()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	val, err := singleton.SMembers(r.RedisController.ctx, r.fixKey(keyName)).Result()
 	if err != nil {
 		log.Error("Error trying to get key set:", err)
 		return nil, err
@@ -863,7 +971,14 @@ func (r *RedisCluster) AddToSet(keyName, value string) {
 		log.Debug(err)
 		return
 	}
-	err := r.singleton().SAdd(r.RedisController.ctx, r.fixKey(keyName), value).Err()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	err = singleton.SAdd(r.RedisController.ctx, r.fixKey(keyName), value).Err()
 	if err != nil {
 		log.Error("Error trying to append keys: ", err)
 	}
@@ -876,7 +991,14 @@ func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 		log.Debug(err)
 		return
 	}
-	err := r.singleton().SRem(r.RedisController.ctx, r.fixKey(keyName), value).Err()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	err = singleton.SRem(r.RedisController.ctx, r.fixKey(keyName), value).Err()
 	if err != nil {
 		log.Error("Error trying to remove keys: ", err)
 	}
@@ -887,10 +1009,17 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 		log.Debug(err)
 		return false
 	}
-	val, err := r.singleton().SIsMember(r.RedisController.ctx, r.fixKey(keyName), value).Result()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+
+	val, err := singleton.SIsMember(r.RedisController.ctx, r.fixKey(keyName), value).Result()
 
 	if err != nil {
-		log.Error("Error trying to check set memeber: ", err)
+		log.Error("Error trying to check set member: ", err)
 		return false
 	}
 
@@ -912,7 +1041,12 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 	log.Debug("Then is: ", onePeriodAgo)
 
-	client := r.singleton()
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return 0, nil
+	}
+
 	var zrange *redis.StringSliceCmd
 
 	pipeFn := func(pipe redis.Pipeliner) error {
@@ -935,11 +1069,10 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 		return nil
 	}
 
-	var err error
 	if pipeline {
-		_, err = client.Pipelined(r.RedisController.ctx, pipeFn)
+		_, err = singleton.Pipelined(r.RedisController.ctx, pipeFn)
 	} else {
-		_, err = client.TxPipelined(r.RedisController.ctx, pipeFn)
+		_, err = singleton.TxPipelined(r.RedisController.ctx, pipeFn)
 	}
 
 	if err != nil {
@@ -966,7 +1099,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 	return intVal, result
 }
 
-func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
+func (r *RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
 	if err := r.up(); err != nil {
 		log.Debug(err)
 		return 0, nil
@@ -974,7 +1107,12 @@ func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool)
 	now := time.Now()
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
-	client := r.singleton()
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return 0, nil
+	}
+
 	var zrange *redis.StringSliceCmd
 
 	pipeFn := func(pipe redis.Pipeliner) error {
@@ -984,11 +1122,10 @@ func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool)
 		return nil
 	}
 
-	var err error
 	if pipeline {
-		_, err = client.Pipelined(r.RedisController.ctx, pipeFn)
+		_, err = singleton.Pipelined(r.RedisController.ctx, pipeFn)
 	} else {
-		_, err = client.TxPipelined(r.RedisController.ctx, pipeFn)
+		_, err = singleton.TxPipelined(r.RedisController.ctx, pipeFn)
 	}
 	if err != nil {
 		log.Error("Multi command failed: ", err)
@@ -1032,7 +1169,14 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 		return
 	}
 	member := redis.Z{Score: score, Member: value}
-	if err := r.singleton().ZAdd(r.RedisController.ctx, fixedKey, &member).Err(); err != nil {
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	if err := singleton.ZAdd(r.RedisController.ctx, fixedKey, &member).Err(); err != nil {
 		log.WithFields(logEntry).WithError(err).Error("ZADD command failed")
 	}
 }
@@ -1049,7 +1193,14 @@ func (r *RedisCluster) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]
 	log.WithFields(logEntry).Debug("Getting sorted set range")
 
 	args := redis.ZRangeBy{Min: scoreFrom, Max: scoreTo}
-	values, err := r.singleton().ZRangeByScoreWithScores(r.RedisController.ctx, fixedKey, &args).Result()
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return nil, nil, err
+	}
+
+	values, err := singleton.ZRangeByScoreWithScores(r.RedisController.ctx, fixedKey, &args).Result()
 	if err != nil {
 		log.WithFields(logEntry).WithError(err).Error("ZRANGEBYSCORE command failed")
 		return nil, nil, err
@@ -1081,7 +1232,13 @@ func (r *RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) 
 	}
 	log.WithFields(logEntry).Debug("Removing sorted set range")
 
-	if err := r.singleton().ZRemRangeByScore(r.RedisController.ctx, fixedKey, scoreFrom, scoreTo).Err(); err != nil {
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	if err := singleton.ZRemRangeByScore(r.RedisController.ctx, fixedKey, scoreFrom, scoreTo).Err(); err != nil {
 		log.WithFields(logEntry).WithError(err).Error("ZREMRANGEBYSCORE command failed")
 		return err
 	}
@@ -1091,4 +1248,68 @@ func (r *RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) 
 
 func (r *RedisCluster) ControllerInitiated() bool {
 	return r.RedisController != nil
+}
+
+// ScanKeys will return all keys according to the pattern.
+func (r *RedisCluster) ScanKeys(pattern string) ([]string, error) {
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return nil, err
+	}
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	log.Debug("[STORE] scanning keys by: ", pattern)
+
+	fnFetchKeys := func(client *redis.Client) ([]string, error) {
+		values := make([]string, 0)
+
+		iter := client.Scan(r.RedisController.ctx, 0, pattern, 0).Iterator()
+		for iter.Next(r.RedisController.ctx) {
+			values = append(values, iter.Val())
+		}
+
+		if err := iter.Err(); err != nil {
+			return nil, err
+		}
+
+		return values, nil
+	}
+
+	keys := make([]string, 0)
+
+	switch v := singleton.(type) {
+	case *redis.ClusterClient:
+		ch := make(chan []string)
+
+		go func() {
+			err = v.ForEachMaster(r.RedisController.ctx, func(ctx context.Context, client *redis.Client) error {
+				values, err := fnFetchKeys(client)
+				if err != nil {
+					return err
+				}
+
+				ch <- values
+				return nil
+			})
+			close(ch)
+		}()
+
+		for res := range ch {
+			keys = append(keys, res...)
+		}
+	case *redis.Client:
+		keys, err = fnFetchKeys(v)
+	}
+
+	if err != nil {
+		log.Error("Error while scanning for keys:", err)
+		return nil, err
+	}
+
+	return keys, nil
 }

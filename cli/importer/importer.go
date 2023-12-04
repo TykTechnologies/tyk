@@ -1,5 +1,7 @@
 package importer
 
+//lint:file-ignore faillint This file should be ignored by faillint (fmt in use).
+
 import (
 	"encoding/json"
 	"errors"
@@ -21,7 +23,8 @@ const (
 )
 
 var (
-	imp            *Importer
+	imp *Importer = &Importer{}
+
 	errUnknownMode = errors.New("Unknown mode")
 )
 
@@ -38,10 +41,6 @@ type Importer struct {
 	asMock         *bool
 	forAPI         *string
 	asVersion      *string
-}
-
-func init() {
-	imp = &Importer{}
 }
 
 // AddTo initializes an importer object.

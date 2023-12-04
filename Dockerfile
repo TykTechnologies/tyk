@@ -1,12 +1,12 @@
-FROM debian:bullseye as assets
+FROM debian:bookworm AS assets
 
 # This Dockerfile facilitates bleeding edge development docker image builds
 # directly from source. To build a development image, run `make docker`.
 # If you need to tweak the environment for testing, you can override the
 # `GO_VERSION` and `PYTHON_VERSION` as docker build arguments.
 
-ARG GO_VERSION=1.15.15
-ARG PYTHON_VERSION=3.7.13
+ARG GO_VERSION=1.21.4
+ARG PYTHON_VERSION=3.11.6
 
 WORKDIR /assets
 
@@ -14,10 +14,10 @@ RUN	apt update && apt install wget -y && \
  	wget -q https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz && \
 	wget -q https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz
 
-FROM debian:bullseye
+FROM debian:bookworm
 
-ARG GO_VERSION=1.15.15
-ARG PYTHON_VERSION=3.7.13
+ARG GO_VERSION=1.21.4
+ARG PYTHON_VERSION=3.11.6
 
 COPY --from=assets /assets/ /tmp/
 WORKDIR /tmp
@@ -56,12 +56,13 @@ RUN	apt install python3 -y
 RUN find /tmp -type f -delete
 
 # Build gateway
-
 RUN mkdir /opt/tyk-gateway
 WORKDIR /opt/tyk-gateway
+ADD go.mod go.sum /opt/tyk-gateway/
+RUN go mod download
 ADD . /opt/tyk-gateway
 
-RUN make build && go clean -modcache
+RUN make build
 
 COPY tyk.conf.example tyk.conf
 

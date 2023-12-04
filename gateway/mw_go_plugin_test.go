@@ -1,53 +1,53 @@
 package gateway
 
 import (
-	"fmt"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
-func TestGoPluginFromTykVersion(t *testing.T) {
-	t.Parallel()
-
-	m := GoPluginMiddleware{
-		BaseMiddleware: BaseMiddleware{},
-		Path:           "",
-		SymbolName:     "test-symbol",
+// TestLoadPlugin test the function to load a middleware goplugin
+// ToDo: find out how to successfully load a plugin for testing
+func TestLoadPlugin(t *testing.T) {
+	plugin := GoPluginMiddleware{
+		Path: "/any-fake-path",
 	}
 
-	type testCase struct {
-		version, userDefinedName, inferredName string
-	}
-	goos := runtime.GOOS
-	goarch := runtime.GOARCH
+	pluginLoaded := plugin.loadPlugin()
+	assert.Equal(t, false, pluginLoaded)
+}
 
-	testcases := []testCase{
-		{"", "", ""},
-	}
+func TestGoPluginMiddleware_EnabledForSpec(t *testing.T) {
+	gpm := GoPluginMiddleware{}
+	apiSpec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	gpm.Spec = apiSpec
 
-	// Go middleware compiler only reads the pre-injected
-	// VERSION value from version.go, expecting to search
-	// plugin with clean version in filename (no -rc16).
-	expectVersion := "v4.1.0"
+	assert.False(t, gpm.EnabledForSpec())
 
-	for _, version := range []string{expectVersion, expectVersion + "-rc16"} {
-		testcases = append(testcases, []testCase{
-			{version, "plugin.so", fmt.Sprintf("./plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
-			{version, "/some/path/plugin.so", fmt.Sprintf("/some/path/plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
-			{version, "/some/path/plugin", fmt.Sprintf("/some/path/plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
-			{version, "./plugin.so", fmt.Sprintf("./plugin_%v_%v_%v.so", expectVersion, goos, goarch)},
-		}...)
-	}
+	t.Run("global go plugin", func(t *testing.T) {
+		gpm.Path = "plugin.so"
+		gpm.SymbolName = "name"
 
-	for idx, tc := range testcases {
-		t.Run(fmt.Sprintf("Test case: %d", idx), func(t *testing.T) {
-			t.Parallel()
+		assert.True(t, gpm.EnabledForSpec())
 
-			m.Path = tc.userDefinedName
-			newPluginPath := m.goPluginFromTykVersion(tc.version)
-			assert.Equal(t, tc.inferredName, newPluginPath)
+		gpm.Path = ""
+		gpm.SymbolName = ""
+	})
+
+	t.Run("per path go plugin", func(t *testing.T) {
+		ep := apidef.ExtendedPathsSet{GoPlugin: make([]apidef.GoPluginMeta, 1)}
+		apiSpec.VersionData.Versions = map[string]apidef.VersionInfo{"v1": {
+			ExtendedPaths: ep,
+		}}
+
+		assert.True(t, gpm.EnabledForSpec())
+
+		t.Run("disabled", func(t *testing.T) {
+			ep.GoPlugin[0].Disabled = true
+
+			assert.False(t, gpm.EnabledForSpec())
 		})
-	}
+	})
 }

@@ -1,13 +1,14 @@
 package kv
 
 import (
+	consulApi "github.com/hashicorp/consul/api"
+
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/hashicorp/consul/api"
 )
 
 // Consul is an implementation of a KV store which uses Consul as it's backend
 type Consul struct {
-	store *api.KV
+	store *consulApi.KV
 }
 
 // NewConsul returns a configured consul KV store adapter
@@ -29,7 +30,7 @@ func (c *Consul) Get(key string) (string, error) {
 }
 
 func newConsul(conf config.ConsulConfig) (Store, error) {
-	defaultCfg := api.DefaultConfig()
+	defaultCfg := consulApi.DefaultConfig()
 
 	if conf.Address != "" {
 		defaultCfg.Address = conf.Address
@@ -71,7 +72,7 @@ func newConsul(conf config.ConsulConfig) (Store, error) {
 		defaultCfg.TLSConfig.InsecureSkipVerify = conf.TLSConfig.InsecureSkipVerify
 	}
 
-	client, err := api.NewClient(defaultCfg)
+	client, err := consulApi.NewClient(defaultCfg)
 	if err != nil {
 		return nil, err
 	}

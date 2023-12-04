@@ -1,0 +1,31 @@
+# This taskfile aims to test the package replacement from a go.mod package.
+# To support "plugin_id", the package name in the go.mod for a plugin is amended,
+# and the imports in the plugin corrected to the new import path.
+#
+# For the plugin compiler, the test is replicated one folder up:
+#
+# - `task test:complex-plugin`
+---
+version: "3"
+
+env:
+  OLD_MODULE: example.com/basic-plugin
+  NEW_MODULE: example.com/basic-plugin/v123
+
+tasks:
+  default:
+    desc: "Test import replacement"
+    deps: [ complex-plugin-test ]
+    dir: ./complex-plugin-test
+    cmds:
+      - go get github.com/TykTechnologies/tyk@master
+      - go mod edit -module $NEW_MODULE
+      - find ./ -type f -name '*.go' -exec sed -i -e "s,\"${OLD_MODULE},\"${NEW_MODULE},g" {} \;
+      - go build -buildmode=plugin -trimpath .
+      - go test -count=1 -race -v ./...
+
+  complex-plugin-test:
+    desc: "Prepare complex-plugin-test/"
+    internal: true
+    cmds:
+      - rsync -a --del ./complex-plugin/ ./complex-plugin-test/

@@ -10,15 +10,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/serializer"
-
 	"github.com/cenkalti/backoff/v4"
 	"github.com/gocraft/health"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/gorpc"
+	"github.com/TykTechnologies/tyk-pump/serializer"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 var (
@@ -74,6 +74,7 @@ func (r rpcOpts) ClientIsConnected() bool {
 	if v := r.clientIsConnected.Load(); v != nil {
 		return v.(bool)
 	}
+
 	return false
 }
 
@@ -226,7 +227,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	// Set up the cache
 	Log.Info("Setting new RPC connection!")
 
-	connID := uuid.NewV4().String()
+	connID := uuid.New()
 
 	// Length should fit into 1 byte. Protection if we decide change uuid in future.
 	if len(connID) > 255 {
@@ -253,7 +254,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 
 	clientSingleton.Conns = values.Config().RPCPoolSize
 	if clientSingleton.Conns == 0 {
-		clientSingleton.Conns = 20
+		clientSingleton.Conns = 5
 	}
 
 	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
@@ -506,7 +507,7 @@ func Disconnect() bool {
 }
 
 func register() {
-	id = uuid.NewV4().String()
+	id = uuid.New()
 	Log.Debug("RPC Client registered")
 }
 
@@ -535,5 +536,11 @@ func ForceConnected(t *testing.T) {
 
 // SetEmergencyMode used in tests to force emergency mode
 func SetEmergencyMode(t *testing.T, value bool) {
+	t.Helper()
 	values.SetEmergencyMode(value)
+}
+
+func SetLoadCounts(t *testing.T, value int) {
+	t.Helper()
+	values.SetLoadCounts(value)
 }

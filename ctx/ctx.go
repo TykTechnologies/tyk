@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
+
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -43,6 +45,11 @@ const (
 	RequestStatus
 	GraphQLRequest
 	GraphQLIsWebSocketUpgrade
+	OASOperation
+
+	// CacheOptions holds cache options required for cache writer middleware.
+	CacheOptions
+	OASDefinition
 )
 
 func setContext(r *http.Request, ctx context.Context) {
@@ -128,4 +135,24 @@ func GetDefinition(r *http.Request) *apidef.APIDefinition {
 		}
 	}
 	return nil
+}
+
+// GetOASDefinition returns a deep copy of the OAS definition of the called API.
+func GetOASDefinition(r *http.Request) *oas.OAS {
+	v := r.Context().Value(OASDefinition)
+	if v == nil {
+		return nil
+	}
+
+	val, ok := v.(*oas.OAS)
+	if !ok {
+		return nil
+	}
+
+	ret, err := val.Clone()
+	if err != nil {
+		logger.Get().WithError(err).Error("Cloning OAS object in the request context")
+	}
+
+	return ret
 }

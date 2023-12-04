@@ -8,26 +8,24 @@ require 'coprocess_response_object_pb'
 require 'coprocess_session_state_pb'
 require 'coprocess_common_pb'
 Google::Protobuf::DescriptorPool.generated_pool.build do
-  add_file("coprocess_object.proto", :syntax => :proto3) do
-    add_message "coprocess.Object" do
-      optional :hook_type, :enum, 1, "coprocess.HookType"
-      optional :hook_name, :string, 2
-      optional :request, :message, 3, "coprocess.MiniRequestObject"
-      optional :session, :message, 4, "coprocess.SessionState"
-      map :metadata, :string, :string, 5
-      map :spec, :string, :string, 6
-      optional :response, :message, 7, "coprocess.ResponseObject"
-    end
-    add_message "coprocess.Event" do
-      optional :payload, :string, 1
-    end
-    add_message "coprocess.EventReply" do
-    end
+  add_message "coprocess.Object" do
+    optional :hook_type, :enum, 1, "coprocess.HookType"
+    optional :hook_name, :string, 2
+    optional :request, :message, 3, "coprocess.MiniRequestObject"
+    optional :session, :message, 4, "coprocess.SessionState"
+    map :metadata, :string, :string, 5
+    map :spec, :string, :string, 6
+    optional :response, :message, 7, "coprocess.ResponseObject"
+  end
+  add_message "coprocess.Event" do
+    optional :payload, :string, 1
+  end
+  add_message "coprocess.EventReply" do
   end
 end
 
 module Coprocess
-  Object = ::Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.Object").msgclass
-  Event = ::Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.Event").msgclass
-  EventReply = ::Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.EventReply").msgclass
+  Object = Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.Object").msgclass
+  Event = Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.Event").msgclass
+  EventReply = Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.EventReply").msgclass
 end

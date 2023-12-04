@@ -1,0 +1,22 @@
+type: Test
+spec:
+  id: p1BLP4q4g
+  name: Versioned not detailed error
+  trigger:
+    type: http
+    httpRequest:
+      method: GET
+      url: tyk:8080/versioned-not-detailed/ip?version=v3
+      headers:
+        - key: Content-Type
+          value: application/json
+  specs:
+    - selector: span[tracetest.span.type="http" name="GET /versioned-not-detailed/ip" http.method="GET"]
+      name: Checking attributes + wrong version in attributes
+      assertions:
+        - attr:tyk.api.version = "v3"
+        - attr:http.status_code = 403
+        - attr:tyk.api.id = 7
+        - attr:tyk.api.name = "VersionedNotDetailedAPI"
+        - attr:tyk.api.orgid = "default"
+        - attr:tyk.api.path = "/versioned-not-detailed/"

@@ -1,0 +1,20 @@
+name: JIRA lint
+
+on:
+  pull_request:
+    branches:
+      - master
+      - release-**
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+jobs:
+  jira-lint:
+    if: ${{ !github.event.pull_request.draft }}
+    uses: TykTechnologies/github-actions/.github/workflows/jira-lint.yaml@main
+    secrets:
+      JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}

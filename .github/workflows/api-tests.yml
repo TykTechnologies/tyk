@@ -2,11 +2,14 @@ name: API integration Tests
 
 on:
   pull_request:
-  push:
     branches:
       - master
-      - test/*
-      - release-*
+      - release-**
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
 
 env:
   GOPRIVATE: github.com/TykTechnologies
@@ -15,7 +18,7 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.16.x]
+        go-version: [1.21.x]
         platform: [ubuntu-latest]
         arch: [amd64]
         node-version: [15.x]
@@ -23,7 +26,7 @@ jobs:
     
     steps:
     - name: Set up Python 3.7
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: 3.7
 
@@ -45,15 +48,15 @@ jobs:
       env:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: |
-        echo "::set-output name=branch::master"
+        echo "branch=master" >> $GITHUB_OUTPUT
         if [ ! -z "${{ github.head_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.head_ref	}}; then
-          echo "::set-output name=branch::${{ github.head_ref	}}"
+          echo "branch=${{ github.head_ref	}}" >> $GITHUB_OUTPUT
         fi
         if [ ! -z "${{ github.base_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.base_ref	}}; then
-          echo "::set-output name=branch::${{ github.base_ref	}}"
+          echo "branch=${{ github.base_ref	}}" >> $GITHUB_OUTPUT
         fi
         if [ ! -z "${{ github.ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.ref }}; then
-          echo "::set-output name=branch::${{ github.ref	}}"
+          echo "branch=${{ github.ref	}}" >> $GITHUB_OUTPUT
         fi
 
     - name: Checkout test repository
@@ -69,15 +72,15 @@ jobs:
       env:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: |
-        echo "::set-output name=branch::master"
+        echo "branch=master" >> $GITHUB_OUTPUT
         if [ ! -z "${{ github.head_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.head_ref	}}; then
-          echo "::set-output name=branch::${{ github.head_ref	}}"
+          echo "branch=${{ github.head_ref	}}" >> $GITHUB_OUTPUT
         fi
         if [ ! -z "${{ github.base_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.base_ref	}}; then
-          echo "::set-output name=branch::${{ github.base_ref	}}"
+          echo "branch=${{ github.base_ref	}}" >> $GITHUB_OUTPUT
         fi
         if [ ! -z "${{ github.ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.ref }}; then
-          echo "::set-output name=branch::${{ github.ref	}}"
+          echo "branch=${{ github.ref	}}" >> $GITHUB_OUTPUT
         fi
 
     - name: Checkout dashboard
@@ -129,9 +132,11 @@ jobs:
         TYK_TEST_REDIS: "tyk-redis"
         TYK_TEST_DB_ADMIN: "12345"
         TYK_TEST_GW_SECRET: "352d20ee67be67f6340b4c0605b044b7"
+        TYK_TEST_FEDERATION_HOST: federation
       run: |
         pytest
       working-directory: tyk-automated-tests
+      timeout-minutes: 30
 
     - name: Archive Integration tests report
       if: ${{ always() }}
@@ -141,7 +146,7 @@ jobs:
          path: ./tyk-automated-tests/reports/
 
     - name: Notify slack
-      if: ${{ always() }}
+      if: ${{ always() && !github.event.pull_request.draft }}
       uses: rtCamp/action-slack-notify@v2
       env:
         SLACK_WEBHOOK: ${{ secrets.GW_SLACK_WEBHOOK }}
@@ -151,7 +156,7 @@ jobs:
         SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
   
     - name: Comment on PR
-      if: ${{ always() }} && github.event.issue.pull_request
+      if: ${{ always() && !github.event.pull_request.draft }}
       uses: mshick/add-pr-comment@v1
       with:
         message: |
@@ -176,3 +181,7 @@ jobs:
         CLIENT_ID: ${{secrets.XRAY_CLIENT_ID}}
         CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
         BRANCH: ${{ github.ref }}
+
+    - name: Getting gateway logs on failure
+      if: ${{ failure() }}
+      run: docker logs tyk-gateway

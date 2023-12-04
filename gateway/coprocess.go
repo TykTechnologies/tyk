@@ -124,7 +124,7 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 	// Append spec data:
 	if c.Middleware != nil {
 		configDataAsJSON := []byte("{}")
-		if len(c.Middleware.Spec.ConfigData) > 0 {
+		if shouldAddConfigData(c.Middleware.Spec) {
 			var err error
 			configDataAsJSON, err = json.Marshal(c.Middleware.Spec.ConfigData)
 			if err != nil {
@@ -140,8 +140,11 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 		object.Spec = map[string]string{
 			"OrgID":       c.Middleware.Spec.OrgID,
 			"APIID":       c.Middleware.Spec.APIID,
-			"config_data": string(configDataAsJSON),
 			"bundle_hash": bundleHash,
+		}
+
+		if shouldAddConfigData(c.Middleware.Spec) {
+			object.Spec["config_data"] = string(configDataAsJSON)
 		}
 	}
 
@@ -160,7 +163,15 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 			Headers: make(map[string]string, len(res.Header)),
 		}
 		for k, v := range res.Header {
+			// set univalue header
 			resObj.Headers[k] = v[0]
+
+			// set multivalue header
+			currentHeader := coprocess.Header{
+				Key:    k,
+				Values: v,
+			}
+			resObj.MultivalueHeaders = append(resObj.MultivalueHeaders, &currentHeader)
 		}
 		resObj.StatusCode = int32(res.StatusCode)
 		rawBody, err := ioutil.ReadAll(res.Body)
@@ -313,10 +324,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	originalURL := r.URL
 	authToken, _ := m.getAuthToken(apidef.CoprocessType, r)
 
-	var extractor IdExtractor
-	if m.Spec.EnableCoProcessAuth && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
-		extractor = m.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
-	}
+	extractor := getIDExtractor(m.Spec)
 
 	var returnOverrides ReturnOverrides
 	var sessionID string
@@ -441,7 +449,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Is this a CP authentication middleware?
-	if m.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
+	if coprocessAuthEnabled(m.Spec) && m.HookType == coprocess.HookType_CustomKeyCheck {
 		if extractor == nil {
 			sessionID = token
 		}
@@ -493,15 +501,23 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 
 		returnedSession.KeyID = sessionID
-		ctxSetSession(r, returnedSession, true, m.Gw.GetConfig().HashKeys)
+
+		switch m.Spec.BaseIdentityProvidedBy {
+		case apidef.CustomAuth, apidef.UnsetAuth:
+			ctxSetSession(r, returnedSession, true, m.Gw.GetConfig().HashKeys)
+		}
 	}
 
 	return nil, http.StatusOK
 }
 
 type CustomMiddlewareResponseHook struct {
+	BaseTykResponseHandler
 	mw *CoProcessMiddleware
-	Gw *Gateway `json:"-"`
+}
+
+func (h CustomMiddlewareResponseHook) Base() *BaseTykResponseHandler {
+	return &h.BaseTykResponseHandler
 }
 
 func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
@@ -560,10 +576,21 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		return errors.New("Middleware error")
 	}
 
+	// Clear all response headers before populating from coprocess response object:
+	for k := range res.Header {
+		delete(res.Header, k)
+	}
+
+	// check if we have changes in headers
+	if !areMapsEqual(object.Response.Headers, retObject.Response.Headers) {
+		// as we have changes we need to synchronize them
+		retObject.Response.MultivalueHeaders = syncHeadersAndMultiValueHeaders(retObject.Response.Headers, retObject.Response.MultivalueHeaders)
+	}
+
 	// Set headers:
 	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
-	for k, v := range retObject.Response.Headers {
-		setCustomHeader(res.Header, k, v, ignoreCanonical)
+	for _, v := range retObject.Response.MultivalueHeaders {
+		setCustomHeaderMultipleValues(res.Header, v.Key, v.Values, ignoreCanonical)
 	}
 
 	// Set response body:
@@ -572,6 +599,41 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 
 	res.StatusCode = int(retObject.Response.StatusCode)
 	return nil
+}
+
+// syncHeadersAndMultiValueHeaders synchronizes the content of 'headers' and 'multiValueHeaders'.
+// If a key is updated or added in 'headers', the corresponding key in 'multiValueHeaders' is also updated or added.
+// If a key is removed from 'headers', the corresponding key in 'multiValueHeaders' is also removed.
+func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeaders []*coprocess.Header) []*coprocess.Header {
+	updatedMultiValueHeaders := []*coprocess.Header{}
+
+	for k, v := range headers {
+		found := false
+		for _, header := range multiValueHeaders {
+			if header.Key == k {
+				found = true
+				header.Values = []string{v}
+				break
+			}
+		}
+
+		if !found {
+			newHeader := &coprocess.Header{
+				Key:    k,
+				Values: []string{v},
+			}
+			updatedMultiValueHeaders = append(updatedMultiValueHeaders, newHeader)
+		}
+	}
+
+	// Append any existing headers that are still in the headers map
+	for _, header := range multiValueHeaders {
+		if _, ok := headers[header.Key]; ok {
+			updatedMultiValueHeaders = append(updatedMultiValueHeaders, header)
+		}
+	}
+
+	return updatedMultiValueHeaders
 }
 
 func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
@@ -585,4 +647,28 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 		return nil, err
 	}
 	return newObject, nil
+}
+
+func coprocessAuthEnabled(spec *APISpec) bool {
+	return spec.EnableCoProcessAuth || spec.CustomPluginAuthEnabled
+}
+
+func getIDExtractor(spec *APISpec) IdExtractor {
+	if !coprocessAuthEnabled(spec) {
+		return nil
+	}
+
+	if spec.CustomMiddleware.IdExtractor.Disabled {
+		return nil
+	}
+
+	if extractor, ok := spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor); ok {
+		return extractor
+	}
+
+	return nil
+}
+
+func shouldAddConfigData(spec *APISpec) bool {
+	return !spec.ConfigDataDisabled && len(spec.ConfigData) > 0
 }

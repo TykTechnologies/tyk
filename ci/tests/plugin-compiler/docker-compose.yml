@@ -1,14 +1,34 @@
-version: "3"
 services:
   redis:
-    image: redis
+    image: redis:6.0-alpine
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 5s
+      retries: 10
+      start_period: 2s
+      timeout: 10s
       
   gw:
-    image: tykio/tyk-gateway:${tag}
+    image: ${GATEWAY_IMAGE}
+    depends_on:
+      - redis
     volumes:
-      - ./testplugin/testplugin_${plugin_version}_${plugin_os}_${plugin_arch}.so:/opt/tyk-gateway/middleware/testplugin.so
-      - ./testplugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
+      - ./testdata/test-plugin/plugin.so:/opt/tyk-gateway/middleware/plugin.so
+      - ./testdata/test-plugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
     ports:
       - "0.0.0.0:8080:8080"
     environment:
+      - TYK_DB_REDISHOST=redis
       - TYK_LOGLEVEL=debug
+
+  gw-checker:
+    image: badouralix/curl-jq
+    command: tail -f /dev/null
+    depends_on:
+      - gw
+    healthcheck:
+      test: curl -s --fail http://gw:8080/hello | jq --exit-status -n 'inputs | if has("status") then .status=="pass" else false end' > /dev/null || exit 1
+      interval: 5s
+      retries: 10
+      start_period: 4s
+      timeout: 10s

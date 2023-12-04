@@ -1,5 +1,5 @@
-//go:build !race
-// +build !race
+//go:build !race || unstable
+// +build !race unstable
 
 package gateway
 
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
@@ -17,7 +17,8 @@ import (
 func (ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[string]interface{}) {
 
 	// load API
-	orgID := "test-org-" + uuid.NewV4().String()
+	orgID := "test-org-" + uuid.New()
+
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.OrgID = orgID

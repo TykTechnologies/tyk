@@ -1,16 +1,20 @@
 package cli
 
+//lint:file-ignore faillint This file should be ignored by faillint (fmt in use).
+
 import (
 	"fmt"
 	"io/ioutil"
 	"os"
 
-	"github.com/TykTechnologies/tyk/cli/linter"
-
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/TykTechnologies/tyk/cli/bundler"
 	"github.com/TykTechnologies/tyk/cli/importer"
+	"github.com/TykTechnologies/tyk/cli/linter"
+	"github.com/TykTechnologies/tyk/cli/plugin"
+	"github.com/TykTechnologies/tyk/cli/version"
+	"github.com/TykTechnologies/tyk/internal/build"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -48,10 +52,10 @@ var (
 )
 
 // Init sets all flags and subcommands.
-func Init(version string, confPaths []string) {
+func Init(confPaths []string) {
 	app = kingpin.New(appName, appDesc)
 	app.HelpFlag.Short('h')
-	app.Version(version)
+	app.Version(build.Version)
 
 	// Start/default command:
 	startCmd := app.Command("start", "Starts the Tyk Gateway")
@@ -63,7 +67,7 @@ func Init(version string, confPaths []string) {
 	MutexProfile = startCmd.Flag("mutexprofile", "generate a mutex profile").Bool()
 	HTTPProfile = startCmd.Flag("httpprofile", "expose runtime profiling data via HTTP").Bool()
 	DebugMode = startCmd.Flag("debug", "enable debug mode").Bool()
-	LogInstrumentation = startCmd.Flag("log-intrumentation", "output intrumentation output to stdout").Bool()
+	LogInstrumentation = startCmd.Flag("log-instrumentation", "output instrumentation output to stdout").Bool()
 
 	startCmd.Action(func(ctx *kingpin.ParseContext) error {
 		DefaultMode = true
@@ -95,11 +99,17 @@ func Init(version string, confPaths []string) {
 		return nil
 	})
 
+	// Add version command:
+	version.AddTo(app)
+
 	// Add import command:
 	importer.AddTo(app)
 
 	// Add bundler commands:
 	bundler.AddTo(app)
+
+	// Add plugin commands:
+	plugin.AddTo(app)
 }
 
 // Parse parses the command-line arguments.

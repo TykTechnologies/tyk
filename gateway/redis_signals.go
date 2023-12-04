@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"crypto"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -14,6 +13,7 @@ import (
 	"github.com/go-redis/redis/v8"
 
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -32,8 +32,8 @@ const (
 	NoticeDashboardConfigRequest NotificationCommand = "NoticeDashboardConfigRequest"
 	NoticeGatewayConfigResponse  NotificationCommand = "NoticeGatewayConfigResponse"
 	NoticeGatewayDRLNotification NotificationCommand = "NoticeGatewayDRLNotification"
-	NoticeGatewayLENotification  NotificationCommand = "NoticeGatewayLENotification"
 	KeySpaceUpdateNotification   NotificationCommand = "KeySpaceUpdateNotification"
+	OAuthPurgeLapsedTokens       NotificationCommand = "OAuthPurgeLapsedTokens"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
@@ -126,13 +126,15 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 			return
 		}
 		gw.onServerStatusReceivedHandler(notif.Payload)
-	case NoticeGatewayLENotification:
-		gw.onLESSLStatusReceivedHandler(notif.Payload)
 	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
 		pubSubLog.Info("Reloading endpoints")
 		gw.reloadURLStructure(reloaded)
 	case KeySpaceUpdateNotification:
 		gw.handleKeySpaceEventCacheFlush(notif.Payload)
+	case OAuthPurgeLapsedTokens:
+		if err := gw.purgeLapsedOAuthTokens(); err != nil {
+			log.WithError(err).Errorf("error while purging tokens for event %s", OAuthPurgeLapsedTokens)
+		}
 	default:
 		pubSubLog.Warnf("Unknown notification command: %q", notif.Command)
 		return

@@ -4,8 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"html/template"
+	htmlTemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
 	"log/syslog"
@@ -20,11 +21,26 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/test"
+
+	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/evalphobia/logrus_sentry"
+	graylogHook "github.com/gemnasium/logrus-graylog-hook"
+	"github.com/gorilla/mux"
+	"github.com/lonelycode/osin"
+	newrelic "github.com/newrelic/go-agent"
+	"github.com/sirupsen/logrus"
+	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/drl"
@@ -32,18 +48,6 @@ import (
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk-pump/serializer"
-	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/evalphobia/logrus_sentry"
-	graylogHook "github.com/gemnasium/logrus-graylog-hook"
-	"github.com/gorilla/mux"
-	"github.com/lonelycode/osin"
-	newrelic "github.com/newrelic/go-agent"
-	"github.com/pmylund/go-cache"
-	"github.com/rs/cors"
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
-	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
-	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
@@ -51,7 +55,7 @@ import (
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -59,6 +63,8 @@ import (
 	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 var (
@@ -80,6 +86,8 @@ var (
 		// TODO: add ~/.config/tyk/tyk.conf here?
 		"/etc/tyk/tyk.conf",
 	}
+
+	ErrSyncResourceNotKnown = errors.New("unknown resource to sync")
 )
 
 const appName = "tyk-gateway"
@@ -106,10 +114,12 @@ type Gateway struct {
 	MonitoringHandler    config.TykEventHandler
 	RPCListener          RPCStorageHandler
 	DashService          DashboardServiceSender
-	CertificateManager   *certs.CertificateManager
+	CertificateManager   certs.CertificateManager
 	GlobalHostChecker    HostCheckerManager
+	ConnectionWatcher    *httputil.ConnectionWatcher
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
+	TracerProvider       otel.TracerProvider
 
 	keyGen DefaultKeyGenerator
 
@@ -117,15 +127,17 @@ type Gateway struct {
 	SessionMonitor Monitor
 
 	// RPCGlobalCache stores keys
-	RPCGlobalCache *cache.Cache
+	RPCGlobalCache cache.Repository
 	// RPCCertCache stores certificates
-	RPCCertCache *cache.Cache
+	RPCCertCache cache.Repository
 	// key session memory cache
-	SessionCache *cache.Cache
+	SessionCache cache.Repository
 	// org session memory cache
-	ExpiryCache *cache.Cache
+	ExpiryCache cache.Repository
 	// memory cache to store arbitrary items
-	UtilCache *cache.Cache
+	UtilCache cache.Repository
+	// ServiceCache is the service discovery cache
+	ServiceCache cache.Repository
 
 	// Nonce to use when interacting with the dashboard service
 	ServiceNonce      string
@@ -143,9 +155,6 @@ type Gateway struct {
 
 	consulKVStore kv.Store
 	vaultKVStore  kv.Store
-
-	LE_MANAGER  letsencrypt.Manager
-	LE_FIRSTRUN bool
 
 	NotificationVerifier goverify.Verifier
 
@@ -178,7 +187,7 @@ type Gateway struct {
 	TestBundles  map[string]map[string]string
 	TestBundleMu sync.Mutex
 
-	templates    *template.Template
+	templates    *htmlTemplate.Template
 	templatesRaw *textTemplate.Template
 
 	// RedisController keeps track of redis connection and singleton
@@ -215,10 +224,18 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
 	}
+	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
-	gw.SessionCache = cache.New(10*time.Second, 5*time.Second)
-	gw.ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
-	gw.UtilCache = cache.New(time.Hour, 10*time.Minute)
+	gw.SessionCache = cache.New(10, 5)
+	gw.ExpiryCache = cache.New(600, 10*60)
+	gw.UtilCache = cache.New(3600, 10*60)
+
+	var timeout = int64(config.ServiceDiscovery.DefaultCacheTimeout)
+	if timeout <= 0 {
+		timeout = 120 // 2 minutes
+	}
+
+	gw.ServiceCache = cache.New(timeout, 15)
 
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
@@ -245,8 +262,8 @@ func (gw *Gateway) MarshalJSON() ([]byte, error) {
 
 func (gw *Gateway) InitializeRPCCache() {
 	conf := gw.GetConfig()
-	gw.RPCGlobalCache = cache.New(time.Duration(conf.SlaveOptions.RPCGlobalCacheExpiration)*time.Second, 15*time.Second)
-	gw.RPCCertCache = cache.New(time.Duration(conf.SlaveOptions.RPCCertCacheExpiration)*time.Second, 15*time.Second)
+	gw.RPCGlobalCache = cache.New(int64(conf.SlaveOptions.RPCGlobalCacheExpiration), 15)
+	gw.RPCCertCache = cache.New(int64(conf.SlaveOptions.RPCCertCacheExpiration), 15)
 }
 
 // SetNodeID writes NodeID safely.
@@ -283,11 +300,26 @@ func (gw *Gateway) getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
+func (gw *Gateway) getAPIDefinition(apiID string) (*apidef.APIDefinition, error) {
+	apiSpec := gw.getApiSpec(apiID)
+	if apiSpec == nil {
+		return nil, errors.New("API not found")
+	}
+
+	return apiSpec.APIDefinition, nil
+}
+
 func (gw *Gateway) getPolicy(polID string) user.Policy {
 	gw.policiesMu.RLock()
 	pol := gw.policiesByID[polID]
 	gw.policiesMu.RUnlock()
 	return pol
+}
+
+func (gw *Gateway) policiesByIDLen() int {
+	gw.policiesMu.RLock()
+	defer gw.policiesMu.RUnlock()
+	return len(gw.policiesByID)
 }
 
 func (gw *Gateway) apisByIDLen() int {
@@ -300,6 +332,8 @@ func (gw *Gateway) apisByIDLen() int {
 func (gw *Gateway) setupGlobals() {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
+
+	defaultTykErrors()
 
 	gwConfig := gw.GetConfig()
 	checkup.Run(&gwConfig)
@@ -375,7 +409,7 @@ func (gw *Gateway) setupGlobals() {
 	// Load all the files that have the "error" prefix.
 	//	gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
 	templatesDir := filepath.Join(gwConfig.TemplatePath, "error*")
-	gw.templates = template.Must(template.ParseGlob(templatesDir))
+	gw.templates = htmlTemplate.Must(htmlTemplate.ParseGlob(templatesDir))
 	gw.templatesRaw = textTemplate.Must(textTemplate.ParseGlob(templatesDir))
 	gw.CoProcessInit()
 
@@ -439,7 +473,7 @@ func (gw *Gateway) buildDashboardConnStr(resource string) string {
 }
 
 func (gw *Gateway) syncAPISpecs() (int, error) {
-	loader := APIDefinitionLoader{gw}
+	loader := APIDefinitionLoader{Gw: gw}
 
 	var s []*APISpec
 	if gw.GetConfig().UseDBAppConfigs {
@@ -456,8 +490,12 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	} else if gw.GetConfig().SlaveOptions.UseRPC {
 		mainLog.Debug("Using RPC Configuration")
 
+		dataLoader := &RPCStorageHandler{
+			Gw:       gw,
+			DoReload: gw.DoReload,
+		}
 		var err error
-		s, err = loader.FromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw)
+		s, err = loader.FromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw)
 		if err != nil {
 			return 0, err
 		}
@@ -511,14 +549,18 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 
 		mainLog.Info("Using Policies from Dashboard Service")
 
-		pols = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
+		pols, err = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
-		pols, err = gw.LoadPoliciesFromRPC(gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
+		dataLoader := &RPCStorageHandler{
+			Gw:       gw,
+			DoReload: gw.DoReload,
+		}
+		pols, err = gw.LoadPoliciesFromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	default:
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
-			pols = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
+			pols, err = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
 
 		} else if gw.GetConfig().Policies.PolicyRecordName == "" {
 			// old way of doing things before REST Api added
@@ -526,7 +568,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 			mainLog.Debug("No policy record name defined, skipping...")
 			return 0, nil
 		} else {
-			pols = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
+			pols, err = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
 		}
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
@@ -561,7 +603,8 @@ func stripSlashes(next http.Handler) http.Handler {
 func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if gw.GetConfig().Security.ControlAPIUseMutualTLS {
-			if err := gw.CertificateManager.ValidateRequestCertificate(gw.GetConfig().Security.Certificates.ControlAPI, r); err != nil {
+			gwCerts := gw.CertificateManager.List(gw.GetConfig().Security.Certificates.ControlAPI, certs.CertificatePublic)
+			if err := crypto.ValidateRequestCerts(r, gwCerts); err != nil {
 				doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 				return
 			}
@@ -615,6 +658,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/reload", gw.resetHandler(nil)).Methods("GET")
 
 	if !gw.isRPCMode() {
+		versionsHandler := NewVersionHandler(gw.getAPIDefinition)
 		r.HandleFunc("/org/keys", gw.orgHandler).Methods("GET")
 		r.HandleFunc("/org/keys/{keyName:[^/]*}", gw.orgHandler).Methods("POST", "PUT", "GET", "DELETE")
 		r.HandleFunc("/keys/policy/{keyName}", gw.policyUpdateHandler).Methods("POST")
@@ -627,12 +671,14 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/apis/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodPost)
 		r.HandleFunc("/apis/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodPut)
 		r.HandleFunc("/apis/{apiID}", gw.apiHandler).Methods(http.MethodDelete)
+		r.HandleFunc("/apis/{apiID}/versions", versionsHandler.ServeHTTP).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/export", gw.apiOASExportHandler).Methods("GET")
 		r.HandleFunc("/apis/oas/import", gw.blockInDashboardMode(gw.validateOAS(gw.makeImportedOASTykAPI(gw.apiOASPostHandler)))).Methods(http.MethodPost)
 		r.HandleFunc("/apis/oas/{apiID}", gw.apiOASGetHandler).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.validateOAS(gw.apiOASPutHandler))).Methods(http.MethodPut)
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.validateOAS(gw.apiOASPatchHandler))).Methods(http.MethodPatch)
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodDelete)
+		r.HandleFunc("/apis/oas/{apiID}/versions", versionsHandler.ServeHTTP).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/{apiID}/export", gw.apiOASExportHandler).Methods("GET")
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
@@ -659,6 +705,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/oauth/clients/{apiID}", gw.oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", gw.oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", gw.oAuthClientTokensHandler).Methods("GET")
+	r.HandleFunc("/oauth/tokens", gw.oAuthTokensHandler).Methods(http.MethodDelete)
 
 	r.HandleFunc("/schema", gw.schemaHandler).Methods(http.MethodGet)
 
@@ -672,7 +719,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 func (gw *Gateway) checkIsAPIOwner(next http.Handler) http.Handler {
 	secret := gw.GetConfig().Secret
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tykAuthKey := r.Header.Get(headers.XTykAuthorization)
+		tykAuthKey := r.Header.Get(header.XTykAuthorization)
 		if tykAuthKey != secret {
 			// Error
 			mainLog.Warning("Attempted administrative access with invalid or missing key!")
@@ -747,10 +794,10 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	mwPostFuncs := []apidef.MiddlewareDefinition{}
 	mwPostKeyAuthFuncs := []apidef.MiddlewareDefinition{}
 	mwResponseFuncs := []apidef.MiddlewareDefinition{}
-	mwDriver := apidef.OttoDriver
+	mwDriver := apidef.MiddlewareDriver("")
 
 	// Set AuthCheck hook
-	if spec.CustomMiddleware.AuthCheck.Name != "" {
+	if !spec.CustomMiddleware.AuthCheck.Disabled && spec.CustomMiddleware.AuthCheck.Name != "" {
 		mwAuthCheckFunc = spec.CustomMiddleware.AuthCheck
 		if spec.CustomMiddleware.AuthCheck.Path != "" {
 			// Feed a JS file to Otto
@@ -760,11 +807,19 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 	// Load from the configuration
 	for _, mwObj := range spec.CustomMiddleware.Pre {
+		if mwObj.Disabled {
+			continue
+		}
+
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPreFuncs = append(mwPreFuncs, mwObj)
 		mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
 	for _, mwObj := range spec.CustomMiddleware.Post {
+		if mwObj.Disabled {
+			continue
+		}
+
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPostFuncs = append(mwPostFuncs, mwObj)
 		mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
@@ -816,6 +871,10 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 	// Load PostAuthCheck hooks
 	for _, mwObj := range spec.CustomMiddleware.PostKeyAuth {
+		if mwObj.Disabled {
+			continue
+		}
+
 		if mwObj.Path != "" {
 			// Otto files are specified here
 			mwPaths = append(mwPaths, mwObj.Path)
@@ -825,6 +884,10 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 	// Load response hooks
 	for _, mw := range spec.CustomMiddleware.Response {
+		if mw.Disabled {
+			continue
+		}
+
 		mwResponseFuncs = append(mwResponseFuncs, mw)
 	}
 
@@ -832,30 +895,33 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 
 }
 
+// Create the response processor chain
 func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
-	// Create the response processors
-
-	responseChain := make([]TykResponseHandler, len(spec.ResponseProcessors))
-	for i, processorDetail := range spec.ResponseProcessors {
-		processor := gw.responseProcessorByName(processorDetail.Name)
+	var (
+		responseMWChain []TykResponseHandler
+		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
+	)
+	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler})
+	for _, processorDetail := range spec.ResponseProcessors {
+		processor := gw.responseProcessorByName(processorDetail.Name, baseHandler)
 		if processor == nil {
 			mainLog.Error("No such processor: ", processorDetail.Name)
-			return
+			continue
 		}
 		if err := processor.Init(processorDetail.Options, spec); err != nil {
 			mainLog.Debug("Failed to init processor: ", err)
 		}
 		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
-		responseChain[i] = processor
+		responseMWChain = append(responseMWChain, processor)
 	}
 
 	for _, mw := range responseFuncs {
 		var processor TykResponseHandler
 		//is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
-			processor = gw.responseProcessorByName("goplugin_res_hook")
+			processor = gw.responseProcessorByName("goplugin_res_hook", baseHandler)
 		} else {
-			processor = gw.responseProcessorByName("custom_mw_res_hook")
+			processor = gw.responseProcessorByName("custom_mw_res_hook", baseHandler)
 		}
 
 		// TODO: perhaps error when plugin support is disabled?
@@ -865,31 +931,24 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		}
 
 		if err := processor.Init(mw, spec); err != nil {
-			mainLog.Debug("Failed to init processor: ", err)
+			mainLog.WithError(err).Debug("Failed to init processor")
 		}
-		responseChain = append(responseChain, processor)
+		responseMWChain = append(responseMWChain, processor)
 	}
 
-	spec.ResponseChain = responseChain
-}
+	keyPrefix := "cache-" + spec.APIID
+	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, RedisController: gw.RedisController}
+	cacheStore.Connect()
 
-func handleCORS(router *mux.Router, spec *APISpec) {
-
-	if spec.CORS.Enable {
-		mainLog.Debug("CORS ENABLED")
-		c := cors.New(cors.Options{
-			AllowedOrigins:     spec.CORS.AllowedOrigins,
-			AllowedMethods:     spec.CORS.AllowedMethods,
-			AllowedHeaders:     spec.CORS.AllowedHeaders,
-			ExposedHeaders:     spec.CORS.ExposedHeaders,
-			AllowCredentials:   spec.CORS.AllowCredentials,
-			MaxAge:             spec.CORS.MaxAge,
-			OptionsPassthrough: spec.CORS.OptionsPassthrough,
-			Debug:              spec.CORS.Debug,
-		})
-
-		router.Use(c.Handler)
+	// Add cache writer as the final step of the response middleware chain
+	processor := &ResponseCacheMiddleware{BaseTykResponseHandler: baseHandler, store: cacheStore}
+	if err := processor.Init(nil, spec); err != nil {
+		mainLog.WithError(err).Debug("Failed to init processor")
 	}
+
+	responseMWChain = append(responseMWChain, processor)
+
+	spec.ResponseChain = responseMWChain
 }
 
 func (gw *Gateway) isRPCMode() bool {
@@ -911,18 +970,19 @@ func (gw *Gateway) DoReload() {
 
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
+		gw.GlobalEventsJSVM.DeInit()
 		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
 	}
 
 	// Load the API Policies
-	if _, err := gw.syncPolicies(); err != nil {
-		mainLog.Error("Error during syncing policies:", err.Error())
+	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
+		mainLog.Error("Error during syncing policies")
 		return
 	}
 
 	// load the specs
-	if count, err := gw.syncAPISpecs(); err != nil {
-		mainLog.Error("Error during syncing apis:", err.Error())
+	if count, err := syncResourcesWithReload("apis", gw.GetConfig(), gw.syncAPISpecs); err != nil {
+		mainLog.Error("Error during syncing apis")
 		return
 	} else {
 		// skip re-loading only if dashboard service reported 0 APIs
@@ -932,9 +992,33 @@ func (gw *Gateway) DoReload() {
 			return
 		}
 	}
+
 	gw.loadGlobalApps()
 
 	mainLog.Info("API reload complete")
+}
+
+func syncResourcesWithReload(resource string, conf config.Config, syncFunc func() (int, error)) (int, error) {
+	var (
+		err   error
+		count int
+	)
+
+	if resource != "apis" && resource != "policies" {
+		return 0, ErrSyncResourceNotKnown
+	}
+
+	for i := 1; i <= conf.ResourceSync.RetryAttempts+1; i++ {
+		count, err = syncFunc()
+		if err == nil {
+			return count, nil
+		}
+
+		mainLog.Errorf("Error during syncing %s: %s, attempt count %d", resource, err.Error(), i)
+		time.Sleep(time.Duration(conf.ResourceSync.Interval) * time.Second)
+	}
+
+	return 0, fmt.Errorf("syncing %s failed %w", resource, err)
 }
 
 // shouldReload returns true if we should perform any reload. Reloads happens if
@@ -1038,9 +1122,8 @@ func (gw *Gateway) setupLogger() {
 
 		hook, err := logrus_sentry.NewSentryHook(gwConfig.SentryCode, logLevel)
 
-		hook.Timeout = 0
-
 		if err == nil {
+			hook.Timeout = 0
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
 		}
@@ -1074,25 +1157,23 @@ func (gw *Gateway) setupLogger() {
 	if gwConfig.UseLogstash {
 		mainLog.Debug("Enabling Logstash support")
 
-		var hook *logstashHook.Hook
+		var hook logrus.Hook
 		var err error
 		var conn net.Conn
 		if gwConfig.LogstashTransport == "udp" {
 			mainLog.Debug("Connecting to Logstash with udp")
-			hook, err = logstashHook.NewHook(gwConfig.LogstashTransport,
-				gwConfig.LogstashNetworkAddr,
-				appName)
+			conn, err = net.Dial(gwConfig.LogstashTransport, gwConfig.LogstashNetworkAddr)
 		} else {
 			mainLog.Debugf("Connecting to Logstash with %s", gwConfig.LogstashTransport)
 			conn, err = gas.Dial(gwConfig.LogstashTransport, gwConfig.LogstashNetworkAddr)
-			if err == nil {
-				hook, err = logstashHook.NewHookWithConn(conn, appName)
-			}
 		}
 
 		if err != nil {
 			log.Errorf("Error making connection for logstash: %v", err)
 		} else {
+			hook = logstashHook.New(conn, logstashHook.DefaultFormatter(logrus.Fields{
+				"type": appName,
+			}))
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
 			mainLog.Debug("Logstash hook active")
@@ -1228,10 +1309,6 @@ func (gw *Gateway) initialiseSystem() error {
 	gw.InitializeRPCCache()
 	gw.setupInstrumentation()
 
-	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
-		go gw.StartPeriodicStateBackup(&gw.LE_MANAGER)
-	}
-
 	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
@@ -1259,25 +1336,32 @@ func readPIDFromFile(file string) (int, error) {
 // timeouts) and sets up a few globals that depend on the config.
 func (gw *Gateway) afterConfSetup() {
 	conf := gw.GetConfig()
-	if conf.SlaveOptions.CallTimeout == 0 {
-		conf.SlaveOptions.CallTimeout = 30
-	}
 
-	if conf.SlaveOptions.PingTimeout == 0 {
-		conf.SlaveOptions.PingTimeout = 60
-	}
+	if conf.SlaveOptions.UseRPC {
+		if conf.SlaveOptions.GroupID == "" {
+			conf.SlaveOptions.GroupID = "ungrouped"
+		}
 
-	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
-		conf.SlaveOptions.KeySpaceSyncInterval = 10
-	}
+		if conf.SlaveOptions.CallTimeout == 0 {
+			conf.SlaveOptions.CallTimeout = 30
+		}
 
-	if conf.SlaveOptions.RPCCertCacheExpiration == 0 {
-		// defaults to 1 hr
-		conf.SlaveOptions.RPCCertCacheExpiration = 3600
-	}
+		if conf.SlaveOptions.PingTimeout == 0 {
+			conf.SlaveOptions.PingTimeout = 60
+		}
 
-	if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
-		conf.SlaveOptions.RPCGlobalCacheExpiration = 30
+		if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
+			conf.SlaveOptions.KeySpaceSyncInterval = 10
+		}
+
+		if conf.SlaveOptions.RPCCertCacheExpiration == 0 {
+			// defaults to 1 hr
+			conf.SlaveOptions.RPCCertCacheExpiration = 3600
+		}
+
+		if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
+			conf.SlaveOptions.RPCGlobalCacheExpiration = 30
+		}
 	}
 
 	if conf.AnalyticsConfig.PurgeInterval == 0 {
@@ -1333,6 +1417,14 @@ func (gw *Gateway) afterConfSetup() {
 		if err != nil {
 			log.Fatalf("Could not fetch policy connection string... %v", err)
 		}
+	}
+
+	if conf.OpenTelemetry.Enabled {
+		if conf.OpenTelemetry.ResourceName == "" {
+			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
+		}
+
+		conf.OpenTelemetry.SetDefaults()
 	}
 
 	gw.SetConfig(conf)
@@ -1458,7 +1550,7 @@ func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cli.Init(VERSION, confPaths)
+	cli.Init(confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
 	if !cli.DefaultMode {
@@ -1467,9 +1559,10 @@ func Start() {
 
 	// ToDo:Config replace for get default conf
 	gw := NewGateway(config.Default, ctx)
-	gw.SetNodeID("solo-" + uuid.NewV4().String())
+	gw.SetNodeID("solo-" + uuid.New())
 
-	gw.SessionID = uuid.NewV4().String()
+	gw.SessionID = uuid.New()
+
 	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
@@ -1507,27 +1600,44 @@ func Start() {
 	}
 
 	if tr := gwConfig.Tracer; tr.Enabled {
+		mainLog.Warn("OpenTracing is deprecated, use OpenTelemetry instead.")
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)
 		defer trace.Close()
 	}
+
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		gw.GetConfig().SlaveOptions.UseRPC,
+		gw.GetConfig().SlaveOptions.GroupID,
+		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
+		gw.GetConfig().DBAppConfOptions.Tags)
+
 	gw.start()
 	configs := gw.GetConfig()
 	go gw.RedisController.ConnectToRedis(gw.ctx, func() {
 		gw.reloadURLStructure(func() {})
 	}, &configs)
 
+	unix := time.Now().Unix()
+
+	var (
+		memprofile = fmt.Sprintf("tyk.%d.mprof", unix)
+		cpuprofile = fmt.Sprintf("tyk.%d.prof", unix)
+	)
+
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")
 		var err error
-		if memProfFile, err = os.Create("tyk.mprof"); err != nil {
+		if memProfFile, err = os.Create(memprofile); err != nil {
 			panic(err)
 		}
 		defer memProfFile.Close()
 	}
 	if *cli.CPUProfile {
 		mainLog.Info("Cpu profiling active")
-		cpuProfFile, err := os.Create("tyk.prof")
+		cpuProfFile, err := os.Create(cpuprofile)
 		if err != nil {
 			panic(err)
 		}
@@ -1580,6 +1690,17 @@ func Start() {
 			mainLog.WithError(err).Error("deregistering in dashboard")
 		}
 	}
+	if gwConfig.SlaveOptions.UseRPC {
+		store := RPCStorageHandler{
+			DoReload: gw.DoReload,
+			Gw:       gw,
+		}
+
+		err := store.Disconnect()
+		if err != nil {
+			mainLog.WithError(err).Error("deregistering in MDCB")
+		}
+	}
 
 	mainLog.Info("Terminating.")
 
@@ -1623,7 +1744,8 @@ func (gw *Gateway) start() {
 		go gw.startPubSubLoop()
 	}
 
-	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
+	conf := gw.GetConfig()
+	if slaveOptions := conf.SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
 		gw.RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
@@ -1637,9 +1759,14 @@ func (gw *Gateway) start() {
 		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
 
+	reloadInterval := time.Second
+	if conf.ReloadInterval > 0 {
+		reloadInterval = time.Duration(conf.ReloadInterval) * time.Second
+	}
+
 	// 1s is the minimum amount of time between hot reloads. The
 	// interval counts from the start of one reload to the next.
-	go gw.reloadLoop(time.Tick(time.Second))
+	go gw.reloadLoop(time.Tick(reloadInterval))
 	go gw.reloadQueueLoop()
 }
 
@@ -1674,15 +1801,29 @@ func handleDashboardRegistration(gw *Gateway) {
 }
 
 func (gw *Gateway) startDRL() {
-	switch {
-	case gw.GetConfig().ManagementNode:
-		return
-	case gw.GetConfig().EnableSentinelRateLimiter, gw.GetConfig().EnableRedisRollingLimiter:
-		return
-	}
-	mainLog.Info("Initialising distributed rate limiter")
-	gw.setupDRL()
-	gw.startRateLimitNotifications()
+	gwConfig := gw.GetConfig()
+
+	disabled := gwConfig.ManagementNode || gwConfig.EnableSentinelRateLimiter || gw.GetConfig().EnableRedisRollingLimiter
+
+	gw.drlOnce.Do(func() {
+		drlManager := &drl.DRL{}
+		gw.DRLManager = drlManager
+
+		if disabled {
+			return
+		}
+
+		mainLog.Info("Initialising distributed rate limiter")
+
+		nodeID := gw.GetNodeID() + "|" + gw.hostDetails.Hostname
+
+		drlManager.ThisServerID = nodeID
+		drlManager.Init(gw.ctx)
+
+		log.Debug("DRL: Setting node ID: ", nodeID)
+
+		gw.startRateLimitNotifications()
+	})
 }
 
 func (gw *Gateway) setupPortsWhitelist() {
@@ -1725,9 +1866,8 @@ func (gw *Gateway) startServer() {
 	// handle dashboard registration and nonces if available
 	handleDashboardRegistration(gw)
 
-	gw.DRLManager = &drl.DRL{}
 	// at this point NodeID is ready to use by DRL
-	gw.drlOnce.Do(gw.startDRL)
+	gw.startDRL()
 
 	mainLog.Infof("Tyk Gateway started (%s)", VERSION)
 	address := gw.GetConfig().ListenAddress
@@ -1747,8 +1887,8 @@ func (gw *Gateway) GetConfig() config.Config {
 	return gw.config.Load().(config.Config)
 }
 
-func (gw *Gateway) SetConfig(conf config.Config) {
+func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
-	defer gw.configMu.Unlock()
 	gw.config.Store(conf)
+	gw.configMu.Unlock()
 }

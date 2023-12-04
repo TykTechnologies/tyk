@@ -18,19 +18,14 @@
   },
   "enable_analytics": false,
   "analytics_config": {
-    "type": "csv",
-    "csv_dir": "/tmp",
-    "mongo_url": "",
-    "mongo_db_name": "",
-    "mongo_collection": "",
-    "purge_delay": -1,
+    "type": "",
+    "purge_interval": -1,
     "ignored_ips": []
   },
   "health_check": {
     "enable_health_checks": false,
     "health_check_value_timeouts": 60
   },
-  "optimisations_use_async_session_write": true,
   "allow_master_keys": false,
   "policies": {
     	"policy_source": "mongo",

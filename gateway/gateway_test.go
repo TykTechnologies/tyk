@@ -13,11 +13,6 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-
-	"github.com/TykTechnologies/tyk-pump/analytics"
-
-	"github.com/stretchr/testify/assert"
-
 	"strings"
 	"sync"
 	"testing"
@@ -26,8 +21,10 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
+	"github.com/stretchr/testify/assert"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -293,6 +290,8 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
+			// change name to change checksum and reload
+			spec.Name = t.Name()
 		})
 
 		_, _ = ts.Run(t, []test.TestCase{
@@ -311,6 +310,8 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
+			// change name to change checksum and reload
+			spec.Name = t.Name()
 		})
 
 		_, _ = ts.Run(t, []test.TestCase{
@@ -592,7 +593,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		}
 		n.Sign()
 		msg := redis.Message{}
-		payload, _ := json.Marshal(n)
+		payload := test.MarshalJSON(t)(n)
 		msg.Payload = string(payload)
 
 		callbackRun := false
@@ -1118,7 +1119,7 @@ func TestAdvanceCachePutRequest(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-			json.Unmarshal([]byte(`[{
+			err := json.Unmarshal([]byte(`[{
 						"method":"PUT",
 						"path":"/put/",
 						"cache_key_regex":"\"id\":[^,]*",
@@ -1139,6 +1140,7 @@ func TestAdvanceCachePutRequest(t *testing.T) {
 						"cache_key_regex":".*"
 					}
                                 ]`), &v.ExtendedPaths.AdvanceCacheConfig)
+			assert.NoError(t, err)
 		})
 		spec.Proxy.ListenPath = "/"
 	})
@@ -1294,6 +1296,52 @@ func TestOldCachePlugin(t *testing.T) {
 
 		check(t)
 	})
+}
+
+func TestAdvanceCacheTimeoutPerEndpoint(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+	defer cache.DeleteScanMatch("*")
+
+	extendedPaths := apidef.ExtendedPathsSet{
+		AdvanceCacheConfig: []apidef.CacheMeta{
+			{
+				Method: http.MethodGet,
+				Path:   "/my-cached-endpoint",
+			},
+		},
+	}
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout: 0,
+			EnableCache:  true,
+		}
+
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.ExtendedPaths = extendedPaths
+		})
+	})[0]
+
+	ts.Gw.LoadAPI(api)
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Method: http.MethodGet, Path: "/my-cached-endpoint", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/my-cached-endpoint", HeadersNotMatch: headerCache},
+	}...)
+
+	// endpoint level cache timeout should override
+	extendedPaths.AdvanceCacheConfig[0].Timeout = 120
+	ts.Gw.LoadAPI(api)
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Method: http.MethodGet, Path: "/my-cached-endpoint", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/my-cached-endpoint", HeadersMatch: headerCache},
+	}...)
 }
 
 func TestWebsocketsSeveralOpenClose(t *testing.T) {

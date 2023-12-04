@@ -96,6 +96,75 @@
           }
         }
       }
+    },
+    "OpenTelemetry":{
+      "type":"object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "exporter":{
+          "type": "string"
+        },
+        "endpoint":{
+          "type": "string"
+        },
+        "connection_timeout":{
+          "type": "integer"
+        },
+        "resource_name":{
+          "type": "string"
+        },
+        "span_processor_type":{
+          "type":"string"
+        },
+        "context_propagation":{
+          "type":"string"
+        },
+        "headers": {
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "sampling": {
+          "type": "object",
+          "sampling_type":{
+              "type": "string"
+          },
+          "rate": {
+              "type": "integer"
+          },
+          "parent_based": {
+              "type": "bool"
+          }
+        },
+        "tls": {
+          "type" :"object",
+          "enable": {
+            "type":"bool"
+          },
+          "insecure_skip_verify": {
+            "type":"bool"
+          },
+          "ca_file": {
+            "type":"string"
+          },
+          "cert_file": {
+            "type":"string"
+          },
+          "key_file": {
+            "type":"string"
+          },
+          "max_version": {
+            "type":"string"
+          },
+          "min_version": {
+            "type":"string"
+          }
+        }
+      }
     }
   },
   "properties": {
@@ -154,6 +223,9 @@
               "type": "boolean"
             },
             "normalise_uuids": {
+              "type": "boolean"
+            },
+            "normalise_ulids": {
               "type": "boolean"
             }
           }
@@ -270,6 +342,9 @@
         "coprocess_grpc_server": {
           "type": "string"
         },
+        "grpc_authority": {
+          "type": "string"
+        },
         "enable_coprocess": {
           "type": "boolean"
         },
@@ -302,6 +377,9 @@
       "properties": {
         "connection_string": {
           "type": "string"
+        },
+        "connection_timeout": {
+          "type": "integer"
         },
         "node_is_segmented": {
           "type": "boolean"
@@ -430,6 +508,12 @@
       "type": "string"
     },
     "hash_keys": {
+      "type": "boolean"
+    },
+    "reload_interval": {
+      "type": "integer"
+    },
+    "disable_key_actions_by_username": {
       "type": "boolean"
     },
     "hash_key_function": {
@@ -563,6 +647,9 @@
         "override_defaults": {
           "type": "boolean"
         },
+        "skip_client_ca_announcement": {
+          "type": "boolean"
+        },
         "read_timeout": {
           "type": "integer"
         },
@@ -607,6 +694,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "max_request_body_size": {
+          "type": "integer"
         }
       }
     },
@@ -668,6 +758,9 @@
           ]
         }
       }
+    },
+    "opentelemetry": {
+      "$ref": "#/definitions/OpenTelemetry"
     },
     "logstash_network_addr": {
       "type": "string"
@@ -1117,6 +1210,9 @@
         },
         "license_key": {
           "type": "string"
+        },
+        "enable_distributed_tracing": {
+          "type": "boolean"
         }
       }
     },
@@ -1259,6 +1355,19 @@
     },
     "cloud": {
       "type": "boolean"
+    },
+    "resource_sync": {
+      "type": "object",
+      "properties": {
+        "retry_attempts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "interval": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     }
   }
 }
