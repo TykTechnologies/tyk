@@ -743,12 +743,13 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 			"status": "fail",
 			"err":    err,
 		}).Error("Failed to update key.")
+		return
 	}
 	log.WithFields(logrus.Fields{
 		"prefix": "RPC",
 		"key":    gw.obfuscateKey(keyName),
 		"status": "ok",
-	}).Info("Updated hashed key in slave storage.")
+	}).Info("Updated key in slave storage.")
 }
 
 func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
