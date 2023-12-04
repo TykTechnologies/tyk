@@ -17,7 +17,7 @@ RUN	apt update && apt install wget -y && \
 FROM debian:bookworm
 
 ARG GO_VERSION=1.21.4
-ARG PYTHON_VERSION=3.11.6q
+ARG PYTHON_VERSION=3.11.6
 
 COPY --from=assets /assets/ /tmp/
 WORKDIR /tmp
