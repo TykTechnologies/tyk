@@ -1,20 +1,39 @@
 ---
 version: "3"
 
+vars:
+  testArgs: -v
+
 tasks:
-  default:
-    desc: "Run tests"
+  unit:
+    desc: "Run unit tests"
+    cmds:
+      - task: fmt
+      - go test {{.testArgs}} -count=1 -cover -coverprofile=rate.cov -tags unit .
+
+  integration:
+    desc: "Run integration tests"
+    cmds:
+      - task: fmt
+      - go test {{.testArgs}} -count=1 -cover -coverprofile=rate.cov -tags integration .
+
+  fmt:
+    internal: true
+    desc: "Invoke fmt"
     cmds:
       - goimports -w .
       - go fmt ./...
-      - go test -tags unit -count=1 -cover -coverprofile=rate.cov .
-      - task: cover
 
   cover:
     desc: "Show source coverage"
-    aliases: [coverage, cov, uncover]
+    aliases: [coverage, cov]
     cmds:
       - go tool cover -func=rate.cov
+
+  uncover:
+    desc: "Show uncovered source"
+    deps: [ install:uncover ]
+    cmds:
       - uncover rate.cov
 
   install:uncover:

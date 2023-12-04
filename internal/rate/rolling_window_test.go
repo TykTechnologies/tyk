@@ -17,7 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/rate"
 )
 
-func Test_GetRollingWindow(t *testing.T) {
+func TestRollingWindow_MockGet(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
@@ -33,6 +33,8 @@ func Test_GetRollingWindow(t *testing.T) {
 
 	previousPeriod := now.Add(time.Duration(-1*per) * time.Second)
 	previousVal := strconv.Itoa(int(previousPeriod.UnixNano()))
+
+	t.Logf("Current time: %s\nPrevious val: %s", now, previousVal)
 
 	expectPipeline := func(mock redismock.ClientMock, values []string, err error) {
 		mock.ExpectZRemRangeByScore(key, "-inf", previousVal).SetVal(0)
@@ -62,7 +64,7 @@ func Test_GetRollingWindow(t *testing.T) {
 			expect(mock, want, nil)
 
 			rl := rate.NewRollingWindow(conn)
-			got, err := rl.GetRollingWindow(ctx, now, key, per, tx)
+			got, err := rl.Get(ctx, now, key, per, tx)
 
 			assert.NoError(t, mock.ExpectationsWereMet())
 
@@ -77,7 +79,7 @@ func Test_GetRollingWindow(t *testing.T) {
 			expect(mock, want, wantErr)
 
 			rl := rate.NewRollingWindow(conn)
-			got, err := rl.GetRollingWindow(ctx, now, key, per, tx)
+			got, err := rl.Get(ctx, now, key, per, tx)
 
 			assert.NoError(t, mock.ExpectationsWereMet())
 			assert.ErrorIs(t, err, wantErr)
@@ -96,7 +98,7 @@ func Test_GetRollingWindow(t *testing.T) {
 			expect(mock, want, nil)
 
 			rl := rate.NewRollingWindow(conn)
-			got, err := rl.GetRollingWindow(ctx, now, key, per, tx)
+			got, err := rl.Get(ctx, now, key, per, tx)
 
 			assert.NoError(t, mock.ExpectationsWereMet())
 			assert.NoError(t, err)
@@ -110,7 +112,7 @@ func Test_GetRollingWindow(t *testing.T) {
 			expect(mock, want, wantErr)
 
 			rl := rate.NewRollingWindow(conn)
-			got, err := rl.GetRollingWindow(ctx, now, key, per, tx)
+			got, err := rl.Get(ctx, now, key, per, tx)
 
 			assert.NoError(t, mock.ExpectationsWereMet())
 			assert.ErrorIs(t, err, wantErr)
@@ -119,7 +121,7 @@ func Test_GetRollingWindow(t *testing.T) {
 	})
 }
 
-func Test_SetRollingWindow(t *testing.T) {
+func TestRollingWindow_MockSet(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
@@ -165,6 +167,9 @@ func Test_SetRollingWindow(t *testing.T) {
 		}
 	}
 
+	before := []string{"a", "b"}
+	want := []string{"a", "b", nowVal}
+
 	t.Run("no-transaction", func(t *testing.T) {
 		tx := transactionOff
 		expect := expectPipeline
@@ -172,11 +177,10 @@ func Test_SetRollingWindow(t *testing.T) {
 		t.Run("default", func(t *testing.T) {
 			conn, mock := redismock.NewClientMock()
 
-			want := []string{"a", "b", "c"}
-			expect(mock, nowVal, want, nil)
+			expect(mock, nowVal, before, nil)
 
 			rl := rate.NewRollingWindow(conn)
-			got, err := rl.SetRollingWindow(ctx, now, key, per, "-1", tx)
+			got, err := rl.Set(ctx, now, key, per, "-1", tx)
 
 			assert.NoError(t, err)
 			assert.Equal(t, want, got)
@@ -186,11 +190,10 @@ func Test_SetRollingWindow(t *testing.T) {
 		t.Run("value", func(t *testing.T) {
 			conn, mock := redismock.NewClientMock()
 
-			want := []string{"a", "b", "c"}
-			expect(mock, "123", want, nil)
+			expect(mock, "123", before, nil)
 
 			rl := rate.NewRollingWindow(conn)
-			got, err := rl.SetRollingWindow(ctx, now, key, per, "123", tx)
+			got, err := rl.Set(ctx, now, key, per, "123", tx)
 
 			assert.NoError(t, err)
 			assert.Equal(t, want, got)
@@ -200,11 +203,10 @@ func Test_SetRollingWindow(t *testing.T) {
 		t.Run("error", func(t *testing.T) {
 			conn, mock := redismock.NewClientMock()
 
-			want := []string{"a", "b", "c"}
-			expect(mock, "123", want, wantErr)
+			expect(mock, "123", before, wantErr)
 
 			rl := rate.NewRollingWindow(conn)
-			got, err := rl.SetRollingWindow(ctx, now, key, per, "123", tx)
+			got, err := rl.Set(ctx, now, key, per, "123", tx)
 
 			assert.NoError(t, mock.ExpectationsWereMet())
 			assert.ErrorIs(t, err, wantErr)
@@ -219,11 +221,10 @@ func Test_SetRollingWindow(t *testing.T) {
 		t.Run("default", func(t *testing.T) {
 			conn, mock := redismock.NewClientMock()
 
-			want := []string{"a", "b", "c"}
-			expect(mock, nowVal, want, nil)
+			expect(mock, nowVal, before, nil)
 
 			rl := rate.NewRollingWindow(conn)
-			got, err := rl.SetRollingWindow(ctx, now, key, per, "-1", tx)
+			got, err := rl.Set(ctx, now, key, per, "-1", tx)
 
 			assert.NoError(t, err)
 			assert.Equal(t, want, got)
@@ -233,11 +234,10 @@ func Test_SetRollingWindow(t *testing.T) {
 		t.Run("value", func(t *testing.T) {
 			conn, mock := redismock.NewClientMock()
 
-			want := []string{"a", "b", "c"}
-			expect(mock, "123", want, nil)
+			expect(mock, "123", before, nil)
 
 			rl := rate.NewRollingWindow(conn)
-			got, err := rl.SetRollingWindow(ctx, now, key, per, "123", tx)
+			got, err := rl.Set(ctx, now, key, per, "123", tx)
 
 			assert.NoError(t, mock.ExpectationsWereMet())
 			assert.NoError(t, err)
@@ -247,11 +247,10 @@ func Test_SetRollingWindow(t *testing.T) {
 		t.Run("error", func(t *testing.T) {
 			conn, mock := redismock.NewClientMock()
 
-			want := []string{"a", "b", "c"}
-			expect(mock, "123", want, wantErr)
+			expect(mock, "123", before, wantErr)
 
 			rl := rate.NewRollingWindow(conn)
-			got, err := rl.SetRollingWindow(ctx, now, key, per, "123", tx)
+			got, err := rl.Set(ctx, now, key, per, "123", tx)
 
 			assert.NoError(t, mock.ExpectationsWereMet())
 			assert.ErrorIs(t, err, wantErr)

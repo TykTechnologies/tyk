@@ -22,10 +22,11 @@ func NewRollingWindow(redis redis.UniversalClient) *RollingWindow {
 	}
 }
 
-// SetRollingWindow will append to a sorted set in redis and extract a timed window of values.
-func (rw *RollingWindow) SetRollingWindow(ctx context.Context, now time.Time, keyName string, per int64, value_override string, pipeline bool) ([]string, error) {
+// Set will append to a sorted set in redis and extract a timed window of values.
+func (rw *RollingWindow) Set(ctx context.Context, now time.Time, keyName string, per int64, value_override string, pipeline bool) ([]string, error) {
+	cur := strconv.FormatInt(int64(now.UnixNano()), 10)
 	prevPeriod := now.Add(time.Duration(-1*per) * time.Second)
-	period := strconv.Itoa(int(prevPeriod.UnixNano()))
+	period := strconv.FormatInt(int64(prevPeriod.UnixNano()), 10)
 	expire := time.Duration(per) * time.Second
 
 	element := &redis.Z{
@@ -33,7 +34,7 @@ func (rw *RollingWindow) SetRollingWindow(ctx context.Context, now time.Time, ke
 		Member: value_override,
 	}
 	if value_override == "-1" {
-		element.Member = strconv.Itoa(int(now.UnixNano()))
+		element.Member = cur
 	}
 
 	var zrange *redis.StringSliceCmd
@@ -56,13 +57,15 @@ func (rw *RollingWindow) SetRollingWindow(ctx context.Context, now time.Time, ke
 		return nil, err
 	}
 
-	return zrange.Result()
+	result, err := zrange.Result()
+	result = append(result, cur)
+	return result, err
 }
 
-// GetRollingWindow will remove part of a sorted set in redis and extract a timed window of values.
-func (rw *RollingWindow) GetRollingWindow(ctx context.Context, now time.Time, keyName string, per int64, pipeline bool) ([]string, error) {
+// Get will remove part of a sorted set in redis and extract a timed window of values.
+func (rw *RollingWindow) Get(ctx context.Context, now time.Time, keyName string, per int64, pipeline bool) ([]string, error) {
 	prevPeriod := now.Add(time.Duration(-1*per) * time.Second)
-	period := strconv.Itoa(int(prevPeriod.UnixNano()))
+	period := strconv.FormatInt(int64(prevPeriod.UnixNano()), 10)
 
 	var zrange *redis.StringSliceCmd
 
