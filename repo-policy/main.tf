@@ -49,7 +49,7 @@ module "tyk" {
     { branch    = "master",
       reviewers = "1",
       convos    = "false",
-    required_tests = ["Go 1.19.x Redis 5", "1.19-bullseye"] },
+    required_tests = ["Go 1.21.x Redis 5", "1.21-bookworm"] },
     { branch        = "release-4-lts",
       reviewers     = "0",
       convos        = "false",
