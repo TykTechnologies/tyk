@@ -36,9 +36,10 @@ import (
 )
 
 const (
-	internalTLSErr  = "tls: unrecognized name"
-	badcertErr      = "tls: bad certificate"
-	certNotMatchErr = "Client TLS certificate is required"
+	internalTLSErr          = "tls: unrecognized name"
+	badcertErr              = "tls: bad certificate"
+	certNotMatchErr         = "Client TLS certificate is required"
+	unknownCertAuthorityErr = "unknown certificate authority"
 )
 
 func TestGatewayTLS(t *testing.T) {
@@ -202,8 +203,8 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			{Client: clientWithoutCert},
 			// Should raise error for ControlAPI without certificate
 			{ControlRequest: true, ErrorMatch: unknownErr},
-			// Should raise error for for unknown certificate
-			{ControlRequest: true, ErrorMatch: badcertErr, Client: clientWithCert},
+			// Should raise error for unknown certificate
+			{ControlRequest: true, ErrorMatch: unknownCertAuthorityErr, Client: clientWithCert},
 		}...)
 	})
 
@@ -255,7 +256,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 
 		// Should fail as no valid cert IDs exist in Certificates.ControlAPI
 		_, _ = ts.Run(t, test.TestCase{
-			Path: "/tyk/certs", Code: http.StatusForbidden, ErrorMatch: badcertErr, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
+			Path: "/tyk/certs", Code: http.StatusForbidden, ErrorMatch: unknownCertAuthorityErr, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
 		})
 	})
 
@@ -302,6 +303,11 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 
 	serverCertPem, _, combinedPEM, _ := crypto.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
+
+	expectedCertErr := unknownCertAuthorityErr
+	if skipCAAnnounce {
+		expectedCertErr = badcertErr
+	}
 
 	conf := func(globalConf *config.Config) {
 		globalConf.EnableCustomDomains = true
@@ -412,7 +418,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 
 			client = GetTLSClient(&clientCert, serverCertPem)
 			_, _ = ts.Run(t, test.TestCase{
-				Client: client, Domain: "localhost", ErrorMatch: badcertErr,
+				Client: client, Domain: "localhost", ErrorMatch: expectedCertErr,
 			})
 		})
 
@@ -431,7 +437,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 			})
 
 			_, _ = ts.Run(t, test.TestCase{
-				Client: client, ErrorMatch: badcertErr, Domain: "localhost",
+				Client: client, ErrorMatch: expectedCertErr, Domain: "localhost",
 			})
 		})
 	})
@@ -571,14 +577,14 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 					Path:       "/with_mutual",
 					Client:     client,
 					Domain:     domain,
-					ErrorMatch: badcertErr,
+					ErrorMatch: expectedCertErr,
 				})
 
 				_, _ = ts.Run(t, test.TestCase{
 					Path:       "/with_mutual_2",
 					Client:     client,
 					Domain:     domain,
-					ErrorMatch: badcertErr,
+					ErrorMatch: expectedCertErr,
 				})
 			})
 
@@ -696,7 +702,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 						Path:       "/with_mutual",
 						Client:     client,
 						Domain:     domain,
-						ErrorMatch: badcertErr,
+						ErrorMatch: expectedCertErr,
 					})
 				}
 			})
@@ -787,7 +793,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 					_, _ = ts.Run(t, test.TestCase{
 						Path:       "/with_mutual",
 						Client:     client,
-						ErrorMatch: badcertErr,
+						ErrorMatch: expectedCertErr,
 					})
 				}
 			})
