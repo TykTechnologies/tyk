@@ -6,23 +6,23 @@ import (
 	"strings"
 )
 
+/*
 type ResourceProcessor interface {
 	Process(map[string]string)
-}
+}*/
 
 // StandardKeysProcessor process the messages from MDCB that corresponds to standard key changes
 type StandardKeysProcessor struct {
 	synchronizerEnabled bool
-	keysToReset         map[string]bool
 	orgId               string
 	rpcStorageHandler   *RPCStorageHandler
 }
 
 // Process the standard keys changes
-func (s *StandardKeysProcessor) Process(keys map[string]string) {
+func (s *StandardKeysProcessor) Process(keys map[string]string, keysToReset map[string]bool) {
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
-		_, resetQuota := s.keysToReset[splitKeys[0]]
+		_, resetQuota := keysToReset[splitKeys[0]]
 		isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
 		var status int
 		if isHashed {
@@ -42,7 +42,7 @@ func (s *StandardKeysProcessor) Process(keys map[string]string) {
 		if status == http.StatusNotFound && !s.synchronizerEnabled {
 			continue
 		}
-		s.rpcStorageHandler.Gw.getSessionAndCreate(splitKeys[0], s.rpcStorageHandler, isHashed, s.orgId)
+		s.rpcStorageHandler.Gw.getSessionAndCreate(key, s.rpcStorageHandler, isHashed, s.orgId)
 		s.rpcStorageHandler.Gw.SessionCache.Delete(key)
 		s.rpcStorageHandler.Gw.RPCGlobalCache.Delete(s.rpcStorageHandler.KeyPrefix + key)
 	}

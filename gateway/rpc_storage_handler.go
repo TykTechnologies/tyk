@@ -986,21 +986,26 @@ func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
 
 	var df DefaultRPCResourceClassifier
-	keysToReset, TokensToBeRevoked, ClientsToBeRevoked, standardKeys, Certificates, OauthClients := df.classify(keys)
 
+	standardKeys, keysToReset, TokensToBeRevoked, ClientsToBeRevoked, Certificates, OauthClients := df.classify(keys)
+
+	//----1 keysss-------------------------------------
 	keyProcessor := StandardKeysProcessor{
 		synchronizerEnabled: r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled,
-		keysToReset:         keysToReset,
 		orgId:               orgId,
 		rpcStorageHandler:   r,
 	}
-	keyProcessor.Process(standardKeys)
+	keyProcessor.Process(standardKeys, keysToReset)
+	//++++++++++++++++++++++++++++++++++++++
 
+	//--------------2 oauth clients---------------------
 	oauthClientProcessor := OauthClientsProcessor{
 		gw: r.Gw,
 	}
 	oauthClientProcessor.Process(OauthClients)
+	//+++++++++++++++++++++++++++++++++++++++++++++++++++
 
+	//------------------3 oauth clients to revoke tokens---------------
 	for clientId, key := range ClientsToBeRevoked {
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[0]
@@ -1012,7 +1017,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		_, tokens, _ := RevokeAllTokens(storage, clientId, clientSecret)
 		keys = append(keys, tokens...)
 	}
+	//+++++++++++++++++++++++++++++++++++++++++++++
 
+	//----------------4 single oauth tokens-----------------------
 	//single and specific tokens
 	for token, key := range TokensToBeRevoked {
 		//key formed as: token:apiId:tokenActionTypeHint
@@ -1041,12 +1048,15 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		r.Gw.SessionCache.Delete(token)
 		r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
+	//++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+	//================5 certificates------------------------
 	certificatesProcessor := CertificateProcessor{
 		orgId: orgId,
 		gw:    r.Gw,
 	}
 	certificatesProcessor.Process(Certificates)
+	//+++++++++++++++++++++++++++++++++++++++++++++++++++
 
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{

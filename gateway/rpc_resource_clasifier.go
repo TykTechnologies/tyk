@@ -10,10 +10,10 @@ type DefaultRPCResourceClassifier struct {
 }
 
 func (d *DefaultRPCResourceClassifier) classify(keys []string) (
+	standardKeys map[string]string,
 	keysToReset map[string]bool,
 	TokensToBeRevoked,
 	ClientsToBeRevoked,
-	standardKeys,
 	Certificates,
 	OauthClients map[string]string) {
 
