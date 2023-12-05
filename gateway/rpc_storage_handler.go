@@ -989,23 +989,21 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 	standardKeys, keysToReset, TokensToBeRevoked, ClientsToBeRevoked, Certificates, OauthClients := df.classify(keys)
 
-	//----1 keysss-------------------------------------
+	// standard keys
 	keyProcessor := StandardKeysProcessor{
 		synchronizerEnabled: r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled,
 		orgId:               orgId,
 		rpcStorageHandler:   r,
 	}
 	keyProcessor.Process(standardKeys, keysToReset)
-	//++++++++++++++++++++++++++++++++++++++
 
-	//--------------2 oauth clients---------------------
+	// oauth clients
 	oauthClientProcessor := OauthClientsProcessor{
 		gw: r.Gw,
 	}
 	oauthClientProcessor.Process(OauthClients)
-	//+++++++++++++++++++++++++++++++++++++++++++++++++++
 
-	//------------------3 oauth clients to revoke tokens---------------
+	// oauth clients to revoke tokens
 	for clientId, key := range ClientsToBeRevoked {
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[0]
@@ -1017,10 +1015,8 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		_, tokens, _ := RevokeAllTokens(storage, clientId, clientSecret)
 		keys = append(keys, tokens...)
 	}
-	//+++++++++++++++++++++++++++++++++++++++++++++
 
-	//----------------4 single oauth tokens-----------------------
-	//single and specific tokens
+	// single oauth tokens
 	for token, key := range TokensToBeRevoked {
 		//key formed as: token:apiId:tokenActionTypeHint
 		//but hashed as: token#hashed:apiId:tokenActionTypeHint
@@ -1048,15 +1044,13 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		r.Gw.SessionCache.Delete(token)
 		r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
-	//++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-	//================5 certificates------------------------
+	// certs
 	certificatesProcessor := CertificateProcessor{
 		orgId: orgId,
 		gw:    r.Gw,
 	}
 	certificatesProcessor.Process(Certificates)
-	//+++++++++++++++++++++++++++++++++++++++++++++++++++
 
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{

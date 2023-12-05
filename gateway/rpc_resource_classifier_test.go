@@ -66,33 +66,3 @@ func TestDefaultRPCResourceClassifier_classify(t *testing.T) {
 		})
 	}
 }
-
-/*
-A key that triggers the ResetQuota action:
-
-"key1:resetQuota"
-A key that indicates a HashedKey action:
-
-"key2:hashed"
-Keys for both CertificateRemoved and CertificateAdded actions:
-
-"cert1:CertificateRemoved"
-"cert2:CertificateAdded"
-Keys for OAuth token actions (OAuthRevokeToken, OAuthRevokeAccessToken, OAuthRevokeRefreshToken, OAuthRevokeAllTokens):
-
-"token1:OAuthRevokeToken"
-"token2:OAuthRevokeAccessToken"
-"token3:OAuthRevokeRefreshToken"
-"client1:revoke_all_tokens"
-Keys for Oauth client actions (OauthClientAdded, OauthClientRemoved, OauthClientUpdated):
-
-"client2:OauthClientAdded"
-"client3:OauthClientRemoved"
-"client4:OauthClientUpdated"
-A key that does not match any case in the switch statement (to test the default case):
-
-"unknownAction"
-A key without a colon to test the else branch outside the switch:
-
-"simpleKey"
-*/

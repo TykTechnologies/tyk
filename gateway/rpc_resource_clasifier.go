@@ -2,12 +2,13 @@ package gateway
 
 import "strings"
 
+/*
 type Classifier interface {
 	classify([]string) map[string]interface{}
 }
+*/
 
-type DefaultRPCResourceClassifier struct {
-}
+type DefaultRPCResourceClassifier struct{}
 
 func (d *DefaultRPCResourceClassifier) classify(keys []string) (
 	standardKeys map[string]string,
