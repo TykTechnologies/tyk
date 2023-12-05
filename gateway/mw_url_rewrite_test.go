@@ -42,6 +42,11 @@ var testRewriterData = []struct {
 		"/test/val/VALUE", "change/to/VALUE",
 	},
 	{
+		"OneVal Special Case",
+		"test/val/(.*)", "/test/val/$1",
+		"/test/val/VALUE%2C", "/test/val/VALUE%2C",
+	},
+	{
 		"ThreeVals",
 		"/test/val/(.*)/space/(.*)/and/then/(.*)", "/change/to/$1/$2/$3",
 		"/test/val/ONE/space/TWO/and/then/THREE", "/change/to/ONE/TWO/THREE",
@@ -125,7 +130,10 @@ func BenchmarkRewriter(b *testing.B) {
 	//warm-up regexp caches
 	for _, tc := range cases {
 		r := tc.reqMaker()
-		ts.Gw.urlRewrite(tc.meta, r)
+		_, err := ts.Gw.urlRewrite(tc.meta, r)
+		if err != nil {
+			b.Errorf("benchmark failed %s", err.Error())
+		}
 	}
 
 	b.ReportAllocs()
@@ -135,7 +143,10 @@ func BenchmarkRewriter(b *testing.B) {
 			b.StopTimer()
 			r := tc.reqMaker()
 			b.StartTimer()
-			ts.Gw.urlRewrite(tc.meta, r)
+			_, err := ts.Gw.urlRewrite(tc.meta, r)
+			if err != nil {
+				b.Errorf("benchmark failed %s", err.Error())
+			}
 		}
 	}
 }
