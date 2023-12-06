@@ -40,6 +40,16 @@ var testRewriterData = []struct {
 		"/test/val/VALUE", "change/to/VALUE",
 	},
 	{
+		"OneVal Special Case",
+		"test/val/(.*)", "/test/val/$1",
+		"/test/val/VALUE%2C", "/test/val/VALUE%2C",
+	},
+	{
+		"OneVal Special Case With Query Param Encoded",
+		"test/val/(.*)", "/test/val/$1",
+		"/test/val/VALUE%2C?a=te%2Cst", "/test/val/VALUE%2C?a=te%2Cst",
+	},
+	{
 		"ThreeVals",
 		"/test/val/(.*)/space/(.*)/and/then/(.*)", "/change/to/$1/$2/$3",
 		"/test/val/ONE/space/TWO/and/then/THREE", "/change/to/ONE/TWO/THREE",
@@ -105,7 +115,7 @@ func TestRewriter(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := tc.reqMaker()
-			got, err := ts.Gw.urlRewrite(tc.meta, r, false)
+			got, err := ts.Gw.urlRewrite(tc.meta, r)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
@@ -123,7 +133,10 @@ func BenchmarkRewriter(b *testing.B) {
 	//warm-up regexp caches
 	for _, tc := range cases {
 		r := tc.reqMaker()
-		ts.Gw.urlRewrite(tc.meta, r, false)
+		_, err := ts.Gw.urlRewrite(tc.meta, r)
+		if err != nil {
+			b.Errorf("benchmark failed %s", err.Error())
+		}
 	}
 
 	b.ReportAllocs()
@@ -133,7 +146,10 @@ func BenchmarkRewriter(b *testing.B) {
 			b.StopTimer()
 			r := tc.reqMaker()
 			b.StartTimer()
-			ts.Gw.urlRewrite(tc.meta, r, false)
+			_, err := ts.Gw.urlRewrite(tc.meta, r)
+			if err != nil {
+				b.Errorf("benchmark failed %s", err.Error())
+			}
 		}
 	}
 }
@@ -1091,7 +1107,7 @@ func TestRewriterTriggers(t *testing.T) {
 				Triggers:     tc.triggerConf,
 			}
 
-			got, err := ts.Gw.urlRewrite(&testConf, tc.req, false)
+			got, err := ts.Gw.urlRewrite(&testConf, tc.req)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
