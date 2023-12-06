@@ -38,17 +38,9 @@ var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
-func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request, decodeURL bool) (string, error) {
+func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	rawPath := r.URL.String()
 	path := rawPath
-
-	if decodeURL {
-		var err error
-		path, err = url.PathUnescape(rawPath)
-		if err != nil {
-			return rawPath, fmt.Errorf("failed to decode URL path: %s", rawPath)
-		}
-	}
 
 	log.Debug("Inbound path: ", path)
 	newpath := path
@@ -176,6 +168,14 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request, deco
 	}
 
 	matchGroups := meta.MatchRegexp.FindAllStringSubmatch(path, -1)
+	if len(matchGroups) == 0 && containsEscapedChars(rawPath) {
+		unescapedPath, err := url.PathUnescape(rawPath)
+		if err != nil {
+			return unescapedPath, fmt.Errorf("failed to decode URL path: %s", rawPath)
+		}
+
+		matchGroups = meta.MatchRegexp.FindAllStringSubmatch(unescapedPath, -1)
+	}
 
 	// Make sure it matches the string
 	log.Debug("Rewriter checking matches, len is: ", len(matchGroups))
@@ -205,10 +205,6 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request, deco
 	}
 
 	newpath = gw.replaceTykVariables(r, newpath, true)
-
-	if rawPath == newpath && containsEscapedChars(rawPath) {
-		newpath, _ = gw.urlRewrite(meta, r, true)
-	}
 
 	return newpath, nil
 }
@@ -511,7 +507,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	log.Debug(r.URL)
 	oldPath := r.URL.String()
 
-	p, err := m.Gw.urlRewrite(umeta, r, false)
+	p, err := m.Gw.urlRewrite(umeta, r)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError
