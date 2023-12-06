@@ -47,6 +47,11 @@ var testRewriterData = []struct {
 		"/test/val/VALUE%2C", "/test/val/VALUE%2C",
 	},
 	{
+		"OneVal Special Case With Query Param Encoded",
+		"test/val/(.*)", "/test/val/$1",
+		"/test/val/VALUE%2C?a=te%2Cst", "/test/val/VALUE%2C?a=te%2Cst",
+	},
+	{
 		"ThreeVals",
 		"/test/val/(.*)/space/(.*)/and/then/(.*)", "/change/to/$1/$2/$3",
 		"/test/val/ONE/space/TWO/and/then/THREE", "/change/to/ONE/TWO/THREE",
