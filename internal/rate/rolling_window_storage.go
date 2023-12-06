@@ -25,6 +25,10 @@ func (s *RollingWindowStorage) ZCount(ctx context.Context, min, max string) *red
 	return s.redis.ZCount(ctx, s.keyName, min, max)
 }
 
+func (s *RollingWindowStorage) ZCard(ctx context.Context) *redis.IntCmd {
+	return s.redis.ZCard(ctx, s.keyName)
+}
+
 func (s *RollingWindowStorage) ZRemRangeByScore(ctx context.Context, min, max string) *redis.IntCmd {
 	return s.pipe.ZRemRangeByScore(ctx, s.keyName, min, max)
 }

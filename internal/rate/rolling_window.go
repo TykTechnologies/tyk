@@ -95,10 +95,11 @@ func (rw *RollingWindow) Get(ctx context.Context, now time.Time, keyName string,
 // Count returns a count of requests made in a time window. This is enough for
 // using the count for a rate limiter decision.
 func (rw *RollingWindow) Count(ctx context.Context, keyName string, now time.Time, per int64) (int64, error) {
-	startPeriod := rw.StartPeriod(now, per)
+	//	startPeriod := rw.StartPeriod(now, per)
 
 	zset := NewRollingWindowStorage(rw.redis, nil, keyName)
-	return zset.ZCount(ctx, startPeriod, "+inf").Result()
+	return zset.ZCard(ctx).Result()
+	// return zset.ZCount(ctx, startPeriod, "+inf").Result()
 }
 
 // Add adds a member to a ZSET for a given time window.
