@@ -227,7 +227,9 @@ jobs:
           t: ${{ needs.goreleaser.outputs.tags }}
           pull_policy: 'if_not_present'
           # default tag to use
-          default_image_tag: ${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }}
+          tyk_image_tag: ${{ startsWith(github.base_ref, 'release-') && github.base_ref || 'master' }}
+          tyk_analytics_image_tag: ${{ startsWith(github.base_ref, 'release-') && github.base_ref || 'master' }}
+          default_image_tag: 'master'
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
@@ -237,8 +239,8 @@ jobs:
           echo First tag: ${tags[0]}
           # Start customising the env
           echo "registry=${{ steps.ecr.outputs.registry }}
-          tyk_image=\${registry}/tyk:${default_image_tag}
-          tyk_analytics_image=\${registry}/tyk-analytics:${default_image_tag}
+          tyk_image=\${registry}/tyk:${tyk_image_tag}
+          tyk_analytics_image=\${registry}/tyk-analytics:${tyk_analytics_image_tag}
           tyk_sink_image=\${registry}/tyk-sink:${default_image_tag}
           tyk_pump_image=\${registry}/tyk-pump:${default_image_tag}
           # override default above with just built tag
