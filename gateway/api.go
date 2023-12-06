@@ -864,6 +864,7 @@ func (gw *Gateway) handleDeleteHashedKey(keyName, orgID, apiID string, resetQuot
 	}
 
 	if resetQuota {
+		log.Info("Resetting quota")
 		gw.GlobalSessionManager.ResetQuota(keyName, &session, true)
 	}
 

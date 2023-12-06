@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"encoding/json"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -94,6 +93,7 @@ var (
 
 const (
 	ResetQuota              string = "resetQuota"
+	HashedKey               string = "hashed"
 	CertificateRemoved      string = "CertificateRemoved"
 	CertificateAdded        string = "CertificateAdded"
 	OAuthRevokeToken        string = "oAuthRevokeToken"
@@ -984,42 +984,26 @@ func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 // management layer, they could be: regular keys (hashed, unhashed), revoke oauth client, revoke single oauth token,
 // certificates (added, removed), oauth client (added, updated, removed)
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
-	keysToReset := map[string]bool{}
-	TokensToBeRevoked := map[string]string{}
-	ClientsToBeRevoked := map[string]string{}
-	notRegularKeys := map[string]bool{}
-	CertificatesToRemove := map[string]string{}
-	CertificatesToAdd := map[string]string{}
-	OauthClients := map[string]string{}
 
-	for _, key := range keys {
-		splitKeys := strings.Split(key, ":")
-		if len(splitKeys) > 1 {
-			action := splitKeys[len(splitKeys)-1]
-			switch action {
-			case ResetQuota:
-				keysToReset[splitKeys[0]] = true
-			case CertificateRemoved:
-				CertificatesToRemove[key] = splitKeys[0]
-				notRegularKeys[key] = true
-			case CertificateAdded:
-				CertificatesToAdd[key] = splitKeys[0]
-				notRegularKeys[key] = true
-			case OAuthRevokeToken, OAuthRevokeAccessToken, OAuthRevokeRefreshToken:
-				TokensToBeRevoked[splitKeys[0]] = key
-				notRegularKeys[key] = true
-			case OAuthRevokeAllTokens:
-				ClientsToBeRevoked[splitKeys[1]] = key
-				notRegularKeys[key] = true
-			case OauthClientAdded, OauthClientUpdated, OauthClientRemoved:
-				OauthClients[splitKeys[0]] = action
-				notRegularKeys[key] = true
-			default:
-				log.Debug("ignoring processing of action:", action)
-			}
-		}
+	var df DefaultRPCResourceClassifier
+
+	standardKeys, keysToReset, TokensToBeRevoked, ClientsToBeRevoked, Certificates, OauthClients := df.classify(keys)
+
+	// standard keys
+	keyProcessor := StandardKeysProcessor{
+		synchronizerEnabled: r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled,
+		orgId:               orgId,
+		rpcStorageHandler:   r,
 	}
-	r.Gw.ProcessOauthClientsOps(OauthClients)
+	keyProcessor.Process(standardKeys, keysToReset)
+
+	// oauth clients
+	oauthClientProcessor := OauthClientsProcessor{
+		gw: r.Gw,
+	}
+	oauthClientProcessor.Process(OauthClients)
+
+	// oauth clients to revoke tokens
 	for clientId, key := range ClientsToBeRevoked {
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[0]
@@ -1032,7 +1016,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		keys = append(keys, tokens...)
 	}
 
-	//single and specific tokens
+	// single oauth tokens
 	for token, key := range TokensToBeRevoked {
 		//key formed as: token:apiId:tokenActionTypeHint
 		//but hashed as: token#hashed:apiId:tokenActionTypeHint
@@ -1061,53 +1045,12 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
 
-	// remove certs
-	for _, certId := range CertificatesToRemove {
-		log.Debugf("Removing certificate: %v", certId)
-		r.Gw.CertificateManager.Delete(certId, orgId)
-		r.Gw.RPCCertCache.Delete("cert-raw-" + certId)
+	// certs
+	certificatesProcessor := CertificateProcessor{
+		orgId: orgId,
+		gw:    r.Gw,
 	}
-
-	for _, certId := range CertificatesToAdd {
-		log.Debugf("Adding certificate: %v", certId)
-		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally
-		content, err := r.Gw.CertificateManager.GetRaw(certId)
-		if content == "" && err != nil {
-			log.Debugf("Error getting certificate content")
-		}
-	}
-
-	synchronizerEnabled := r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled
-	for _, key := range keys {
-		_, isOauthTokenKey := notRegularKeys[key]
-		if !isOauthTokenKey {
-			splitKeys := strings.Split(key, ":")
-			_, resetQuota := keysToReset[splitKeys[0]]
-
-			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
-			var status int
-			if isHashed {
-				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
-				key = splitKeys[0]
-				_, status = r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
-			} else {
-				log.Info("--> removing cached key: ", r.Gw.obfuscateKey(key))
-				// in case it's an username (basic auth) then generate the token
-				if storage.TokenOrg(key) == "" {
-					key = r.Gw.generateToken(orgId, key)
-				}
-				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
-			}
-
-			// if key not found locally and synchroniser disabled then we should not pull it from management layer
-			if status == http.StatusNotFound && !synchronizerEnabled {
-				continue
-			}
-			r.Gw.getSessionAndCreate(splitKeys[0], r, isHashed, orgId)
-			r.Gw.SessionCache.Delete(key)
-			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
-		}
-	}
+	certificatesProcessor.Process(Certificates)
 
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
