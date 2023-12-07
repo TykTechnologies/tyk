@@ -1708,32 +1708,6 @@ paths:
         '404':
           description: oauth client doesn't have any api related
 
-  '/tyk/oauth/tokens':
-    delete:
-      description: Delete lapsed OAuth tokens from Redis.
-      summary: Delete lapsed OAuth tokens(expired tokens which are past `oauth_token_expired_retain_period`)
-      parameters:
-        - description: scope in which tokens are to be deleted.
-          name: scope
-          in: query
-          required: true
-          schema:
-            type: string
-            enum: [lapsed]
-            example: lapsed
-      tags:
-        - OAuth
-      operationId: purgeLapsedTokens
-      responses:
-        '200':
-          description: Lapsed tokens purged.
-        '400':
-          description: Bad request, value of scope parameter is not valid.
-        '422':
-          description: Cannot process request when scope parameter is missing.
-        '500':
-          description: Internal server error while purging lapsed tokens.
-
   '/tyk/oauth/refresh/{keyName}':
     delete:
       summary: Invalidate OAuth refresh token
