@@ -836,7 +836,7 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 	}
 }
 
-// CheckForKeyspaceChanges will poll for keysace changes
+// CheckForKeyspaceChanges will poll for keyspace changes
 func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	log.Debug("Checking for keyspace changes...")
 
@@ -986,8 +986,7 @@ func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
 
 	var df DefaultRPCResourceClassifier
-
-	standardKeys, keysToReset, TokensToBeRevoked, ClientsToBeRevoked, Certificates, OauthClients := df.classify(keys)
+	standardKeysEvents, oauthEvents, certificatesEvents := df.classify(keys)
 
 	// standard keys
 	keyProcessor := StandardKeysProcessor{
@@ -995,66 +994,27 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		orgId:               orgId,
 		rpcStorageHandler:   r,
 	}
-	keyProcessor.Process(standardKeys, keysToReset)
+	keyProcessor.Process(standardKeysEvents)
 
 	// oauth clients
 	oauthClientProcessor := OauthClientsProcessor{
-		gw: r.Gw,
+		gw:                r.Gw,
+		orgId:             orgId,
+		rpcStorageHandler: r,
 	}
-	oauthClientProcessor.Process(OauthClients)
-
-	// oauth clients to revoke tokens
-	for clientId, key := range ClientsToBeRevoked {
-		splitKeys := strings.Split(key, ":")
-		apiId := splitKeys[0]
-		clientSecret := splitKeys[2]
-		storage, _, err := r.Gw.GetStorageForApi(apiId)
-		if err != nil {
-			continue
-		}
-		_, tokens, _ := RevokeAllTokens(storage, clientId, clientSecret)
-		keys = append(keys, tokens...)
-	}
-
-	// single oauth tokens
-	for token, key := range TokensToBeRevoked {
-		//key formed as: token:apiId:tokenActionTypeHint
-		//but hashed as: token#hashed:apiId:tokenActionTypeHint
-		splitKeys := strings.Split(key, ":")
-		apiId := splitKeys[1]
-		tokenActionTypeHint := splitKeys[2]
-		hashedKey := strings.Contains(token, "#hashed")
-		if !hashedKey {
-			storage, _, err := r.Gw.GetStorageForApi(apiId)
-			if err != nil {
-				continue
-			}
-			var tokenTypeHint string
-			switch tokenActionTypeHint {
-			case OAuthRevokeAccessToken:
-				tokenTypeHint = "access_token"
-			case OAuthRevokeRefreshToken:
-				tokenTypeHint = "refresh_token"
-			}
-			RevokeToken(storage, token, tokenTypeHint)
-		} else {
-			token = strings.Split(token, "#")[0]
-			r.Gw.handleDeleteHashedKey(token, orgId, apiId, false)
-		}
-		r.Gw.SessionCache.Delete(token)
-		r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + token)
-	}
+	oauthClientProcessor.Process(oauthEvents)
 
 	// certs
 	certificatesProcessor := CertificateProcessor{
 		orgId: orgId,
 		gw:    r.Gw,
 	}
-	certificatesProcessor.Process(Certificates)
+	certificatesProcessor.Process(certificatesEvents)
 
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
+		// ToDo: add revoked tokens to keys so they are flushed in the other gws
 		Payload: strings.Join(keys, ","),
 		Gw:      r.Gw,
 	}

@@ -6,11 +6,6 @@ import (
 	"strings"
 )
 
-/*
-type ResourceProcessor interface {
-	Process(map[string]string)
-}*/
-
 // StandardKeysProcessor process the messages from MDCB that corresponds to standard key changes
 type StandardKeysProcessor struct {
 	synchronizerEnabled bool
@@ -19,51 +14,78 @@ type StandardKeysProcessor struct {
 }
 
 // Process the standard keys changes
-func (s *StandardKeysProcessor) Process(keys map[string]string, keysToReset map[string]bool) {
-	for _, key := range keys {
-		splitKeys := strings.Split(key, ":")
-		_, resetQuota := keysToReset[splitKeys[0]]
-		isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
+func (s *StandardKeysProcessor) Process(events map[string]KeyEvent) {
+	rpcHandler := s.rpcStorageHandler
+	for _, event := range events {
 		var status int
-		if isHashed {
-			log.Info("--> removing cached (hashed) key: ", splitKeys[0])
-			key = splitKeys[0]
-			_, status = s.rpcStorageHandler.Gw.handleDeleteHashedKey(key, s.orgId, "", resetQuota)
+		if event.Hashed {
+			log.Info("--> removing cached (hashed) key: ", event.KeyID)
+			_, status = s.rpcStorageHandler.Gw.handleDeleteHashedKey(event.KeyID, s.orgId, "", event.ResetQuota)
 		} else {
-			log.Info("--> removing cached key: ", key)
+			log.Info("--> removing cached key: ", event.KeyID)
 			// in case it's an username (basic auth) then generate the token
-			if storage.TokenOrg(key) == "" {
-				key = s.rpcStorageHandler.Gw.generateToken(s.orgId, key)
+			if storage.TokenOrg(event.KeyID) == "" {
+				event.KeyID = rpcHandler.Gw.generateToken(s.orgId, event.KeyID)
 			}
-			_, status = s.rpcStorageHandler.Gw.handleDeleteKey(key, s.orgId, "-1", resetQuota)
+			_, status = rpcHandler.Gw.handleDeleteKey(event.KeyID, s.orgId, "-1", event.ResetQuota)
 		}
 
 		// if key not found locally and synchroniser disabled then we should not pull it from management layer
 		if status == http.StatusNotFound && !s.synchronizerEnabled {
 			continue
 		}
-		s.rpcStorageHandler.Gw.getSessionAndCreate(key, s.rpcStorageHandler, isHashed, s.orgId)
-		s.rpcStorageHandler.Gw.SessionCache.Delete(key)
-		s.rpcStorageHandler.Gw.RPCGlobalCache.Delete(s.rpcStorageHandler.KeyPrefix + key)
+		rpcHandler.Gw.getSessionAndCreate(event.KeyID, rpcHandler, event.Hashed, s.orgId)
+		flushKey(event.KeyID, s.rpcStorageHandler)
 	}
-
 }
 
 type OauthClientsProcessor struct {
-	gw *Gateway
+	gw                *Gateway
+	orgId             string
+	rpcStorageHandler *RPCStorageHandler
 }
 
-// Process performs the appropiate action for the received clients
-// it can be any of the Create,Update and Delete operations
-func (o *OauthClientsProcessor) Process(oauthClients map[string]string) {
-	for clientInfo, action := range oauthClients {
-		// clientInfo is: APIID.ClientID.OrgID
-		eventValues := strings.Split(clientInfo, ".")
-		apiId := eventValues[0]
-		oauthClientId := eventValues[1]
-		orgID := eventValues[2]
+// Process performs the appropiate action for the received oauth events (tokens/clients)
+func (o *OauthClientsProcessor) Process(oauthEvents []OauthEvent) {
 
-		o.processSingleOauthClientEvent(apiId, oauthClientId, orgID, action)
+	for _, v := range oauthEvents {
+		switch v.EventType {
+		case OAuthRevokeToken, OAuthRevokeAccessToken, OAuthRevokeRefreshToken:
+			//key formed as: token:apiId:tokenActionTypeHint
+			//but hashed as: token#hashed:apiId:tokenActionTypeHint
+			hashedKey := strings.Contains(v.Token, "#hashed")
+			if !hashedKey {
+				storage, _, err := o.gw.GetStorageForApi(v.ApiId)
+				if err != nil {
+					continue
+				}
+				var tokenTypeHint string
+				switch v.EventType {
+				case OAuthRevokeAccessToken:
+					tokenTypeHint = "access_token"
+				case OAuthRevokeRefreshToken:
+					tokenTypeHint = "refresh_token"
+				}
+				RevokeToken(storage, v.Token, tokenTypeHint)
+			} else {
+				v.Token = strings.Split(v.Token, "#")[0]
+				o.gw.handleDeleteHashedKey(v.Token, o.orgId, v.ApiId, false)
+			}
+			flushKey(v.Token, o.rpcStorageHandler)
+		case OAuthRevokeAllTokens:
+			storage, _, err := o.gw.GetStorageForApi(v.ApiId)
+			if err != nil {
+				continue
+			}
+
+			_, tokens, _ := RevokeAllTokens(storage, v.ClientId, v.ClientSecret)
+			for _, token := range tokens {
+				flushKey(token, o.rpcStorageHandler)
+			}
+
+		case OauthClientAdded, OauthClientUpdated, OauthClientRemoved:
+			o.processSingleOauthClientEvent(v.ApiId, v.ClientId, v.OrgId, v.EventType)
+		}
 	}
 }
 
@@ -153,4 +175,9 @@ func (c *CertificateProcessor) Process(certificates map[string]string) {
 			log.Debugf("ignoring certificate action: %v", action)
 		}
 	}
+}
+
+func flushKey(keyID string, handler *RPCStorageHandler) {
+	handler.Gw.SessionCache.Delete(keyID)
+	handler.Gw.RPCGlobalCache.Delete(handler.KeyPrefix + keyID)
 }
