@@ -1,6 +1,6 @@
 module github.com/TykTechnologies/tyk
 
-go 1.21
+go 1.21.0
 
 require (
 	github.com/Jeffail/gabs v1.4.0
@@ -79,9 +79,12 @@ require (
 )
 
 require (
+	github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231208125921-71a7859a0340
 	github.com/TykTechnologies/kin-openapi v0.90.0
 	github.com/TykTechnologies/opentelemetry v0.0.20
+	github.com/go-redsync/redsync/v4 v4.11.0
 	github.com/google/go-cmp v0.5.9
+	github.com/redis/go-redis/v9 v9.3.0
 	go.opentelemetry.io/otel v1.19.0
 	go.opentelemetry.io/otel/trace v1.19.0
 	go.uber.org/mock v0.3.0
@@ -125,7 +128,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/btree v1.0.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
-	github.com/hashicorp/errwrap v1.0.0 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.1 // indirect
 	github.com/hashicorp/go-immutable-radix v1.0.0 // indirect
 	github.com/hashicorp/go-retryablehttp v0.5.4 // indirect
