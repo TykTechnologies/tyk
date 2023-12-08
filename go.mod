@@ -1,6 +1,6 @@
 module github.com/TykTechnologies/tyk
 
-go 1.21
+go 1.21.0
 
 require (
 	github.com/Jeffail/tunny v0.1.4
@@ -73,6 +73,12 @@ require (
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.2
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
 	gopkg.in/yaml.v3 v3.0.1
+)
+
+require (
+	github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231208125921-71a7859a0340
+	github.com/go-redsync/redsync/v4 v4.11.0
+	github.com/redis/go-redis/v9 v9.3.0
 )
 
 require (
