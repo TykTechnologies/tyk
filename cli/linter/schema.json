@@ -449,6 +449,12 @@
     "enable_token_bucket_rate_limiter": {
       "type": "boolean"
     },
+    "enable_fixed_window_rate_limiter": {
+      "type": "boolean"
+    },
+    "enable_sliding_window_rate_limiter": {
+      "type": "boolean"
+    },
     "enable_non_transactional_rate_limiter": {
       "type": "boolean"
     },
