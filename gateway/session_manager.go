@@ -1,10 +1,14 @@
 package gateway
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
@@ -12,6 +16,8 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/exp/pkg/limiters"
 )
 
 type PublicSession struct {
@@ -36,6 +42,96 @@ const (
 type SessionLimiter struct {
 	bucketStore leakybucket.Storage
 	Gw          *Gateway `json:"-"`
+
+	redis     *redis.Client
+	redisLock limiters.DistLocker
+	localLock limiters.DistLocker
+	logger    limiters.Logger
+}
+
+// NewSessionLimiter initializes the session limiter.
+//
+// The session limiter initializes the storage required for rate limiters.
+// It supports two storage types: `redis` and `local`. If redis storage is
+// configured, then redis will be used. If local storage is configured, then
+// in-memory counters will be used. If no storage is configured, it falls
+// back onto the default gateway storage configuration.
+//
+// Redis clusters (EnableCluster) has no effect here.
+func NewSessionLimiter(gateway *Gateway) SessionLimiter {
+	sessionLimiter := SessionLimiter{
+		Gw:        gateway,
+		localLock: limiters.NewLockNoop(),
+		logger:    limiters.NewStdLogger(),
+	}
+
+	cfg := gateway.GetConfig()
+
+	// Use default storage if rate limiter storage is unconfigured.
+	storageConf := &cfg.Storage
+	if cfg.RateLimiterStorage != nil {
+		storageConf = cfg.RateLimiterStorage
+	}
+
+	switch storageConf.Type {
+	case "redis":
+		sessionLimiter.redis = sessionLimiter.newRedisClient(storageConf)
+		sessionLimiter.redisLock = limiters.NewLockRedis(goredis.NewPool(sessionLimiter.redis), "distributed-lock")
+	}
+
+	return sessionLimiter
+}
+
+// newRedisClient is a typed copy of storage.NewRedisClusterPool.
+func (*SessionLimiter) newRedisClient(cfg *config.StorageOptionsConf) *redis.Client {
+	// poolSize applies per cluster node and not for the whole cluster.
+	poolSize := 500
+	if cfg.MaxActive > 0 {
+		poolSize = cfg.MaxActive
+	}
+
+	timeout := 5 * time.Second
+
+	if cfg.Timeout > 0 {
+		timeout = time.Duration(cfg.Timeout) * time.Second
+	}
+
+	var tlsConfig *tls.Config
+
+	if cfg.UseSSL {
+		tlsConfig = &tls.Config{
+			InsecureSkipVerify: cfg.SSLInsecureSkipVerify,
+		}
+	}
+
+	opts := &redis.UniversalOptions{
+		Addrs:            cfg.HostAddrs(),
+		MasterName:       cfg.MasterName,
+		SentinelPassword: cfg.SentinelPassword,
+		Username:         cfg.Username,
+		Password:         cfg.Password,
+		DB:               cfg.Database,
+		DialTimeout:      timeout,
+		ReadTimeout:      timeout,
+		WriteTimeout:     timeout,
+		//		IdleTimeout:      240 * timeout,
+		PoolSize:  poolSize,
+		TLSConfig: tlsConfig,
+	}
+
+	if opts.MasterName != "" {
+		log.Info("--> [REDIS] Creating sentinel-backed failover client")
+		return redis.NewFailoverClient(opts.Failover())
+	}
+
+	// Locker takes a *redis.Client, not a *ClusterClient
+	// if cfg.EnableCluster {
+	//	log.Info("--> [REDIS] Creating cluster client")
+	//	return redis.NewClusterClient(opts.Cluster())
+	// }
+
+	log.Info("--> [REDIS] Creating single-node client")
+	return redis.NewClient(opts.Simple())
 }
 
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
@@ -202,15 +298,80 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		if allowanceScope != "" {
 			rateScope = allowanceScope + "-"
 		}
-		if globalConf.EnableSentinelRateLimiter {
+
+		switch {
+		case globalConf.EnableLeakyBucketRateLimiter:
+			var (
+				storage limiters.LeakyBucketStateBackend
+				locker  limiters.DistLocker
+			)
+
+			var (
+				rate      = int64(accessDef.Limit.Rate)
+				per       = accessDef.Limit.Per
+				ttl       = time.Duration(per) * time.Second
+				raceCheck = false
+			)
+
+			if l.redis != nil {
+				locker = l.redisLock
+				storage = limiters.NewLeakyBucketRedis(l.redis, key, ttl, raceCheck)
+			} else {
+				// TODO: this won't work nicely as it should be allocated per-key.
+				// It needs a utility method to manage the per-key storage.
+				locker = l.localLock
+				storage = limiters.NewLeakyBucketInMemory()
+			}
+
+			limiter := limiters.NewLeakyBucket(rate, time.Duration(per)*time.Second, locker, storage, limiters.NewSystemClock(), l.logger)
+
+			// Rate limiter returns a duration for how long to queue the request, or ErrLimitExhausted.
+			res, err := limiter.Limit(r.Context())
+			if errors.Is(err, limiters.ErrLimitExhausted) {
+				return sessionFailRateLimit
+			}
+			time.Sleep(res)
+
+		case globalConf.EnableTokenBucketRateLimiter:
+			var (
+				storage limiters.TokenBucketStateBackend
+				locker  limiters.DistLocker
+			)
+
+			var (
+				rate      = int64(accessDef.Limit.Rate)
+				per       = accessDef.Limit.Per
+				ttl       = time.Duration(per) * time.Second
+				raceCheck = false
+			)
+
+			if l.redis != nil {
+				locker = l.redisLock
+				storage = limiters.NewTokenBucketRedis(l.redis, key, ttl, raceCheck)
+			} else {
+				// TODO: this won't work nicely as it should be allocated per-key.
+				// It needs a utility method to manage the per-key storage.
+				locker = l.localLock
+				storage = limiters.NewTokenBucketInMemory()
+			}
+
+			limiter := limiters.NewTokenBucket(rate, time.Duration(per)*time.Second, locker, storage, limiters.NewSystemClock(), l.logger)
+
+			// Rate limiter returns a zero duration and a possible ErrLimitExhausted when no tokens are available.
+			_, err := limiter.Limit(r.Context())
+			if errors.Is(err, limiters.ErrLimitExhausted) {
+				return sessionFailRateLimit
+			}
+
+		case globalConf.EnableSentinelRateLimiter:
 			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
-		} else if globalConf.EnableRedisRollingLimiter {
+		case globalConf.EnableRedisRollingLimiter:
 			if l.limitRedis(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
-		} else {
+		default:
 			var n float64
 			if l.Gw.DRLManager.Servers != nil {
 				n = float64(l.Gw.DRLManager.Servers.Count())

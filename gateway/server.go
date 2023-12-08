@@ -218,7 +218,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
 	gw.DefaultOrgStore = DefaultSessionManager{Gw: &gw}
 	gw.DefaultQuotaStore = DefaultSessionManager{Gw: &gw}
-	gw.SessionLimiter = SessionLimiter{Gw: &gw}
+	gw.SessionLimiter = NewSessionLimiter(&gw)
 	gw.SessionMonitor = Monitor{Gw: &gw}
 	gw.HostCheckTicker = make(chan struct{})
 	gw.HostCheckerClient = &http.Client{
