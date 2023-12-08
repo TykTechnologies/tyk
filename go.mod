@@ -76,7 +76,7 @@ require (
 )
 
 require (
-	github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231208125921-71a7859a0340
+	github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231208135812-fdcac798637c
 	github.com/go-redsync/redsync/v4 v4.11.0
 	github.com/redis/go-redis/v9 v9.3.0
 )

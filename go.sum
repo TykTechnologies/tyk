@@ -37,8 +37,8 @@ github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible h1:UgJdsV/fBL5Ctx4
 github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible/go.mod h1:f2+J36wN08/zLudMnO+QaqaBhTdQuIqemtaeEQbhMEM=
 github.com/TykTechnologies/drl v0.0.0-20231218155806-88e4363884a2 h1:jsQNOqSUq4nTzqTlZ7pCsn6g1H8ZYFbORhdmkprxx7M=
 github.com/TykTechnologies/drl v0.0.0-20231218155806-88e4363884a2/go.mod h1:F3Ff6Ih4t1i/etqNJHI2K3jverRhNl759J/ra95/3Hk=
-github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231208125921-71a7859a0340 h1:XGND4vz4IKH0O2cFyKZPCj5N5ghsh8llmQf0Xl6Iuu8=
-github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231208125921-71a7859a0340/go.mod h1:vazgWNe4klgg3peJ/TDzwPIYPhq9X0CtjXyJHvfiTcI=
+github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231208135812-fdcac798637c h1:e+QmnQQ3M0qWfD7Dqvf/PZUvGAGxHT+lxgYsXDApN+g=
+github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231208135812-fdcac798637c/go.mod h1:vazgWNe4klgg3peJ/TDzwPIYPhq9X0CtjXyJHvfiTcI=
 github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481 h1:fPcSnu5/IBgyqf73GHA99QuwMDbfWH+L4BEX9EZ5kUo=
 github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481/go.mod h1:CtF8OunV123VfKa8Z9kKcIPHgcd67hSAwFMLlS7FvS4=
 github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990 h1:CJRTgg13M3vJG9S7k7kpnvDRMGMywm5OsN6eUE8VwJE=

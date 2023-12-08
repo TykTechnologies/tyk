@@ -333,13 +333,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				locker = l.redisLock
 				storage = limiters.NewLeakyBucketRedis(l.redis, key, ttl, raceCheck)
 			} else {
-				// TODO: this won't work nicely as it should be allocated per-key.
-				// It needs a utility method to manage the per-key storage.
 				locker = l.localLock
-				storage = limiters.NewLeakyBucketInMemory()
+				storage = limiters.LocalLeakyBucket(key)
 			}
 
-			limiter := limiters.NewLeakyBucket(rate, time.Duration(per)*time.Second, locker, storage, limiters.NewSystemClock(), l.logger)
+			limiter := limiters.NewLeakyBucket(rate, ttl, locker, storage, limiters.NewSystemClock(), l.logger)
 
 			// Rate limiter returns a duration for how long to queue the request, or ErrLimitExhausted.
 			res, err := limiter.Limit(r.Context())
@@ -365,13 +363,67 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				locker = l.redisLock
 				storage = limiters.NewTokenBucketRedis(l.redis, key, ttl, raceCheck)
 			} else {
-				// TODO: this won't work nicely as it should be allocated per-key.
-				// It needs a utility method to manage the per-key storage.
 				locker = l.localLock
-				storage = limiters.NewTokenBucketInMemory()
+				storage = limiters.LocalTokenBucket(key)
 			}
 
-			limiter := limiters.NewTokenBucket(rate, time.Duration(per)*time.Second, locker, storage, limiters.NewSystemClock(), l.logger)
+			limiter := limiters.NewTokenBucket(rate, ttl, locker, storage, limiters.NewSystemClock(), l.logger)
+
+			// Rate limiter returns a zero duration and a possible ErrLimitExhausted when no tokens are available.
+			_, err := limiter.Limit(r.Context())
+			if errors.Is(err, limiters.ErrLimitExhausted) {
+				return sessionFailRateLimit
+			}
+
+		case globalConf.EnableFixedWindowRateLimiter:
+			var (
+				storage limiters.FixedWindowIncrementer
+			)
+
+			var (
+				rate = int64(accessDef.Limit.Rate)
+				per  = accessDef.Limit.Per
+				ttl  = time.Duration(per) * time.Second
+			)
+
+			if l.redis != nil {
+				storage = limiters.NewFixedWindowRedis(l.redis, key)
+			} else {
+				storage = limiters.LocalFixedWindow(key)
+			}
+
+			limiter := limiters.NewFixedWindow(rate, ttl, storage, limiters.NewSystemClock())
+
+			// Rate limiter returns a zero duration and a possible ErrLimitExhausted when no tokens are available.
+			_, err := limiter.Limit(r.Context())
+			if errors.Is(err, limiters.ErrLimitExhausted) {
+				return sessionFailRateLimit
+			}
+
+		case globalConf.EnableSlidingWindowRateLimiter:
+			var (
+				storage limiters.SlidingWindowIncrementer
+			)
+
+			var (
+				rate = int64(accessDef.Limit.Rate)
+				per  = accessDef.Limit.Per
+				ttl  = time.Duration(per) * time.Second
+			)
+
+			if l.redis != nil {
+				storage = limiters.NewSlidingWindowRedis(l.redis, key)
+			} else {
+				storage = limiters.LocalSlidingWindow(key)
+			}
+
+			// TODO: when doing rate sliding rate limits, the counts for two windows are
+			//       used, the full count of the current window, and based on % of window
+			//       time that has elapsed, a reduced previous window count.
+			//
+			//       the epsilon value is used to allow some requests to go over the defined
+			//       rate limit at any point of the calculation (start of window, end of ...).
+			limiter := limiters.NewSlidingWindow(rate, ttl, storage, limiters.NewSystemClock(), 0)
 
 			// Rate limiter returns a zero duration and a possible ErrLimitExhausted when no tokens are available.
 			_, err := limiter.Limit(r.Context())
