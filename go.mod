@@ -2,6 +2,8 @@ module github.com/TykTechnologies/tyk
 
 go 1.21.0
 
+toolchain go1.21.4
+
 require (
 	github.com/Jeffail/tunny v0.1.4
 	github.com/Masterminds/sprig/v3 v3.2.3
