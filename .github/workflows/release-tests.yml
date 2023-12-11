@@ -5,6 +5,8 @@ on:
 
 jobs:
   ecr:
+    name: ECR login for docker
+    runs-on: ubuntu-latest
     outputs:
       registry: $${ steps.ecr.outputs.registry }}
     steps:
