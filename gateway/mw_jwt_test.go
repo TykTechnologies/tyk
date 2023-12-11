@@ -2320,3 +2320,40 @@ func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
 		assert.ErrorIs(t, err, ErrKIDNotAString)
 	})
 }
+
+func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.Proxy.ListenPath = "/"
+	})
+
+	pID := ts.CreatePolicy()
+	userID := uuid.New()
+	const myOKTAClientID = "myOKTAClientID"
+
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["sub"] = userID
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["cid"] = myOKTAClientID // cid is specific to OKTA
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Second * 72).Unix()
+	})
+
+	authHeaders := map[string]string{"authorization": jwtToken}
+
+	_, _ = ts.Run(t, test.TestCase{Headers: authHeaders, Code: http.StatusOK})
+
+	keyID := fmt.Sprintf("%x", md5.Sum([]byte(userID)))
+	sessionID := ts.Gw.generateToken("default", keyID)
+
+	privateSession, found := ts.Gw.GlobalSessionManager.SessionDetail("default", sessionID, false)
+	assert.True(t, found)
+	assert.Equal(t, myOKTAClientID, privateSession.OauthClientID)
+}
