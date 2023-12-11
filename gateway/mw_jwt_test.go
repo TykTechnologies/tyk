@@ -2357,3 +2357,51 @@ func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
 	assert.True(t, found)
 	assert.Equal(t, myOKTAClientID, privateSession.OauthClientID)
 }
+
+func Test_getOAuthClientIDFromClaim(t *testing.T) {
+	testCases := []struct {
+		name             string
+		claims           jwt.MapClaims
+		expectedClientID string
+	}{
+		{
+			name: "unknown",
+			claims: jwt.MapClaims{
+				"unknown": "value",
+			},
+			expectedClientID: "",
+		},
+		{
+			name: "clientId",
+			claims: jwt.MapClaims{
+				"clientId": "value1",
+			},
+			expectedClientID: "value1",
+		},
+		{
+			name: "cid",
+			claims: jwt.MapClaims{
+				"cid": "value2",
+			},
+			expectedClientID: "value2",
+		},
+		{
+			name: "client_id",
+			claims: jwt.MapClaims{
+				"client_id": "value3",
+			},
+			expectedClientID: "value3",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			j := JWTMiddleware{}
+			j.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+			oauthClientID := j.getOAuthClientIDFromClaim(tc.claims)
+
+			assert.Equal(t, tc.expectedClientID, oauthClientID)
+		})
+	}
+}
