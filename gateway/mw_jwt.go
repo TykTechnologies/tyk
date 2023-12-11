@@ -562,10 +562,18 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
+	oauthClientID := ""
 	// Get the OAuth client ID if available:
-	oauthClientID := k.getOAuthClientIDFromClaim(claims)
-	session.OauthClientID = oauthClientID
-	if session.OauthClientID != "" {
+	if k.Spec.DCR.Enabled {
+		oauthClientID = k.getOAuthClientIDFromClaim(claims)
+	}
+
+	if session.OauthClientID != oauthClientID {
+		session.OauthClientID = oauthClientID
+		updateSession = true
+	}
+
+	if k.Spec.DCR.Enabled && oauthClientID != "" {
 		// Initialize the OAuthManager if empty:
 		if k.Spec.OAuthManager == nil {
 			prefix := generateOAuthPrefix(k.Spec.APIID)

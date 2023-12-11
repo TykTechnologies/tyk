@@ -608,6 +608,7 @@ type APIDefinition struct {
 	JWTNotBeforeValidationSkew           uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	JWTSkipKid                           bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
 	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
+	DCR                                  DCR                    `bson:"dynamic_client_registration" json:"dynamic_client_registration"`
 	JWTScopeToPolicyMapping              map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
 	JWTScopeClaimName                    string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
 	NotificationsDetails                 NotificationsManager   `bson:"notifications" json:"notifications"`
@@ -1366,4 +1367,8 @@ type Introspection struct {
 type IntrospectionCache struct {
 	Enabled bool  `bson:"enabled" json:"enabled"`
 	Timeout int64 `bson:"timeout" json:"timeout"`
+}
+
+type DCR struct {
+	Enabled bool `bson:"enabled" json:"enabled"`
 }
