@@ -1,6 +1,9 @@
 ---
 version: "3"
 
+includes:
+  tracetest: ./tracetest/Taskfile.yml
+
 tasks:
   default:
     desc: "setup, execute and shutdown e2e opentelemetry tests"
@@ -14,7 +17,6 @@ tasks:
     desc: "setup e2e opentelemetry tests"
     deps:
       - tracetest
-      - docker
     status:
       - tracetest version
     cmds:

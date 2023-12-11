@@ -3,7 +3,6 @@ version: "3"
 
 includes:
   deps: ./.taskfiles/deps/Taskfile.yml
-  tracetest: ./.taskfiles/tracetest/Taskfile.yml
   opentelemetry: ./.taskfiles/opentelemetry.yml
 
 tasks:
