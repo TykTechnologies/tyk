@@ -8,7 +8,7 @@ jobs:
     name: ECR login for docker
     runs-on: ubuntu-latest
     outputs:
-      registry: $${ steps.ecr.outputs.registry }}
+      registry: ${{ steps.ecr.outputs.registry }}
     steps:
       - uses: aws-actions/configure-aws-credentials@v2
         with:
