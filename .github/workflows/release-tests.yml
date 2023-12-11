@@ -4,14 +4,10 @@ on:
   workflow_call:
 
 jobs:
-  ci-tests:
-    runs-on: ubuntu-latest
-
+  ecr:
+    outputs:
+      registry: $${ steps.ecr.outputs.registry }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
       - uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
@@ -23,12 +19,41 @@ jobs:
         with:
           mask-password: 'true'
 
+  opentelemetry-e2e:
+    needs: ecr
+    name: Opentelemetry e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Task
+        uses: arduino/setup-task@v1
+        with:
+          version: 3
+
+      - name: Run e2e opentelemetry tests
+        env:
+          GATEWAY_IMAGE: ${{ needs.ecr.outputs.registry }}/tyk:sha-${{ github.sha }}
+        run: task opentelemetry
+
+  ci-tests:
+    needs: ecr
+    name: CI Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Run /ci/tests
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
-          GATEWAY_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk:sha-${{ github.sha }}
-          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
+          GATEWAY_IMAGE: ${{ needs.ecr.outputs.registry }}/tyk:sha-${{ github.sha }}
+          PLUGIN_COMPILER_IMAGE: ${{ needs.ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
         run: |
           set -eaxo pipefail
           for d in ci/tests/*/
@@ -42,6 +67,8 @@ jobs:
           done
 
   smoke-tests:
+    needs: ecr
+    name: Smoke tests
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags')
 
@@ -49,17 +76,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
-      - uses: aws-actions/configure-aws-credentials@v2
-        with:
-          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
-          role-session-name: cipush
-          aws-region: eu-central-1
-
-      - id: ecr
-        uses: aws-actions/amazon-ecr-login@v1
-        with:
-          mask-password: 'true'
 
       - name: Run /smoke-tests
 
@@ -73,8 +89,8 @@ jobs:
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
-          GATEWAY_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk:sha-${{ github.sha }}
-          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
+          GATEWAY_IMAGE: ${{ needs.ecr.outputs.registry }}/tyk:sha-${{ github.sha }}
+          PLUGIN_COMPILER_IMAGE: ${{ needs.ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
         run: |
           set -eaxo pipefail
           for d in smoke-tests/*/

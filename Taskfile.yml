@@ -4,6 +4,7 @@ version: "3"
 includes:
   deps: ./.taskfiles/deps/Taskfile.yml
   tracetest: ./.taskfiles/tracetest/Taskfile.yml
+  opentelemetry: ./.taskfiles/opentelemetry.yml
 
 tasks:
   docker:
@@ -38,47 +39,3 @@ tasks:
         yq -i ".dockers[0].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser-el7.yml
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
-
-  test:opentelemetry:setup:
-    desc: "setup e2e opentelemetry tests"
-    deps:
-      - tracetest
-      - docker
-    status:
-      - tracetest version
-    cmds:
-      - docker compose -f ci/tests/tracing/docker-compose.yml up -d
-      - tracetest configure -g --endpoint http://localhost:11633
-
-  test:opentelemetry:test:
-    desc: "run e2e opentelemetry tests"
-    deps:
-      - test:opentelemetry:setup
-    cmds:
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test_200.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test_500.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_testauth_401.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_tykprotocol_200.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_tykprotocol-auth_401.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_grpcapi_200.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_200.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_403.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_not_detailed_200.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_not_detailed_403.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test-graphql-tracing_200.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test-graphql-tracing-invalid_404.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test-graphql-detailed-tracing-disabled_200.yaml -w -o pretty
-
-  test:opentelemetry:teardown:
-    desc: "teardown e2e opentelemetry tests enviroment"
-    cmds:
-      - docker compose -f ci/tests/tracing/docker-compose.yml down --remove-orphans
-
-  test:opentelemetry:
-    desc: "setup, execute and shutdown e2e opentelemetry tests"
-    cmds:
-      - |
-        set -e
-        task test:opentelemetry:setup
-        trap 'task test:opentelemetry:teardown' EXIT
-        task test:opentelemetry:test
