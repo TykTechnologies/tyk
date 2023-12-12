@@ -4,13 +4,14 @@ on:
   workflow_call:
 
 jobs:
-  ecr:
+  ecr-login:
     name: ECR login for docker
     runs-on: ubuntu-latest
     outputs:
       registry: ${{ steps.ecr.outputs.registry }}
+
     steps:
-      - uses: aws-actions/configure-aws-credentials@v2
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
           role-session-name: cipush
@@ -22,7 +23,7 @@ jobs:
           mask-password: 'true'
 
   opentelemetry-e2e:
-    needs: ecr
+    needs: ecr-login
     name: Opentelemetry e2e
     runs-on: ubuntu-latest
     steps:
@@ -37,11 +38,11 @@ jobs:
 
       - name: Run e2e opentelemetry tests
         env:
-          GATEWAY_IMAGE: ${{ needs.ecr.outputs.registry }}/tyk:sha-${{ github.sha }}
+          GATEWAY_IMAGE: ${{ needs.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}
         run: task opentelemetry
 
   ci-tests:
-    needs: ecr
+    needs: ecr-login
     name: CI Tests
     runs-on: ubuntu-latest
 
@@ -54,8 +55,8 @@ jobs:
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
-          GATEWAY_IMAGE: ${{ needs.ecr.outputs.registry }}/tyk:sha-${{ github.sha }}
-          PLUGIN_COMPILER_IMAGE: ${{ needs.ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
+          GATEWAY_IMAGE: ${{ needs.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}
+          PLUGIN_COMPILER_IMAGE: ${{ needs.ecr-login.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
         run: |
           set -eaxo pipefail
           for d in ci/tests/*/
@@ -69,7 +70,7 @@ jobs:
           done
 
   smoke-tests:
-    needs: ecr
+    needs: ecr-login
     name: Smoke tests
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags')
@@ -91,8 +92,8 @@ jobs:
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
-          GATEWAY_IMAGE: ${{ needs.ecr.outputs.registry }}/tyk:sha-${{ github.sha }}
-          PLUGIN_COMPILER_IMAGE: ${{ needs.ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
+          GATEWAY_IMAGE: ${{ needs.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}
+          PLUGIN_COMPILER_IMAGE: ${{ needs.ecr-login.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
         run: |
           set -eaxo pipefail
           for d in smoke-tests/*/
