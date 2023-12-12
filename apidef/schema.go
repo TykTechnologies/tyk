@@ -152,7 +152,15 @@ const Schema = `{
 				 }
 				}
 			}
-		},  
+		},
+        "dynamic_client_registration": {
+            "type":["object", "null"],
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
         "use_keyless": {
             "type": "boolean"
         },
