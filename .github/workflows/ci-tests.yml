@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        redis-version: [5]
+        redis-version: [6, 7]
         python-version: ['3.11']
         go-version: [1.21.x]
 
