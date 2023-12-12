@@ -1,0 +1,26 @@
+# yamllint disable rule:line-length
+---
+name: 'Login to ECR'
+
+description: "Reusable action for logging into ECR"
+
+outputs:
+  registry:
+    description: "Docker image registry"
+    value: ${{ steps.ecr.outputs.registry }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: aws-actions/configure-aws-credentials@v4
+      shell: bash
+      with:
+        role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+        role-session-name: cipush
+        aws-region: eu-central-1
+
+    - id: ecr
+      shell: bash
+      uses: aws-actions/amazon-ecr-login@v2
+      with:
+        mask-password: 'true'
