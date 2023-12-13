@@ -68,6 +68,8 @@ tasks:
       - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test-graphql-tracing_200.yml -w -o pretty
       - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test-graphql-tracing-invalid_404.yml -w -o pretty
       - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test-graphql-detailed-tracing-disabled_200.yaml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk-udg-internal-tracing.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk-udg-internal-tracing-transaction.yml -w -o pretty
 
   test:opentelemetry:teardown:
     desc: "teardown e2e opentelemetry tests enviroment"

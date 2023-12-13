@@ -923,12 +923,51 @@ func getMemConnProvider(addr string) (*memconn.Provider, error) {
 	return p.provider, nil
 }
 
+// customInternalMultiplexer is a multiplexer that should be used to create an in memory server to handle internal tyk requests
+// based on the value of the request's host (which should be the tyk apiID for internal calls) the struct returns a registered handler for it
+// if no handler is found, it will panic
+type customInternalMultiplexer struct {
+	mtx sync.RWMutex
+
+	// handlers holds a map of handler functions to the request HOST aka apiID
+	handlers map[string]http.HandlerFunc
+}
+
+func (c *customInternalMultiplexer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	apiID := req.Host
+	if handler, ok := c.handlers[apiID]; ok {
+		handler.ServeHTTP(rw, req)
+		return
+	} else {
+		panic("handler not found for apiID: " + apiID)
+	}
+}
+
+func (c *customInternalMultiplexer) RegisterHandler(apiID string, handler http.HandlerFunc) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+	if c.handlers == nil {
+		c.handlers = make(map[string]http.HandlerFunc)
+	}
+	c.handlers[apiID] = handler
+}
+
+var customMux = customInternalMultiplexer{
+	handlers: make(map[string]http.HandlerFunc),
+}
+
 // createMemConnProviderIfNeeded creates a new memconn.Provider and net.Listener
 // for the given host.
 func createMemConnProviderIfNeeded(handler http.Handler, r *http.Request) error {
 	memConnProviders.mtx.Lock()
 	defer memConnProviders.mtx.Unlock()
 
+	// use customMux to prevent the context of the initial request's context (that created the cached provider)
+	// from being used, and instead allows the follow up request context
+	customMux.RegisterHandler(r.Host, func(rw http.ResponseWriter, request *http.Request) {
+		reqWithPropagatedContext := request.WithContext(r.Context())
+		handler.ServeHTTP(rw, reqWithPropagatedContext)
+	})
 	p, ok := memConnProviders.m[r.Host]
 	if ok {
 		// Clean the providers and close its listener, if it is idle for a while.
@@ -943,15 +982,7 @@ func createMemConnProviderIfNeeded(handler http.Handler, r *http.Request) error 
 		return err
 	}
 
-	// start http server with in mem listener
-	// Note: do not try to use http.Server it is working only with mux
-	mux := http.NewServeMux()
-	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, wrappingHandlerReq *http.Request) {
-		reqWithPropagatedContext := wrappingHandlerReq.WithContext(r.Context())
-		handler.ServeHTTP(w, reqWithPropagatedContext)
-	}))
-
-	go func() { _ = http.Serve(lis, mux) }()
+	go func() { _ = http.Serve(lis, &customMux) }()
 
 	memConnProviders.m[r.Host] = &memConnProvider{
 		listener: lis,
@@ -1171,8 +1202,10 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		upstreamHeaders := p.graphqlEngineAdditionalUpstreamHeaders(outreq)
 		execOptions = append(execOptions, graphql.WithHeaderModifier(p.graphqlEngineHeaderModifier(outreq, upstreamHeaders)))
 
+		// set apiID in context for use by the custom executors
+		ctxWithID := context.WithValue(reqCtx, ctx.APIID, p.TykAPISpec.APIID)
 		if p.TykAPISpec.GraphQLExecutor.OtelExecutor != nil {
-			if err = p.TykAPISpec.GraphQLExecutor.OtelExecutor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
+			if err = p.TykAPISpec.GraphQLExecutor.OtelExecutor.Execute(ctxWithID, gqlRequest, &resultWriter, execOptions...); err != nil {
 				return
 			}
 		} else {

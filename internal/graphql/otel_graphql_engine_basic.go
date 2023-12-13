@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
+	tykctx "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
@@ -60,7 +61,12 @@ func (o *OtelGraphqlEngineV2Basic) Execute(inCtx context.Context, operation *gra
 		return err
 	}
 
+	var apiID string
+	if v := inCtx.Value(tykctx.APIID); v != nil {
+		apiID, _ = v.(string)
+	}
 	span.SetAttributes(
+		semconv.TykAPIID(apiID),
 		semconv.GraphQLOperationName(operation.OperationName),
 		semconv.GraphQLOperationType(printOperationType(ast.OperationType(operationType))),
 		semconv.GraphQLDocument(operation.Query),

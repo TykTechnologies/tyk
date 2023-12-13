@@ -1,0 +1,8 @@
+type: Transaction
+spec:
+  id: yaOxyFHIg
+  name: Test UDG internal span caching
+  description: This test suite should run the UDG internal tracing test twice and ensure the spans are descendants of the proper parents.
+  steps:
+    - UsQnoFHSg
+    - UsQnoFHSg
