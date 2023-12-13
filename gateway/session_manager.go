@@ -45,7 +45,7 @@ type SessionLimiter struct {
 	bucketStore leakybucket.Storage
 	Gw          *Gateway `json:"-"`
 
-	redis     *redis.Client
+	redis     redis.UniversalClient
 	redisLock limiters.DistLocker
 	localLock limiters.DistLocker
 	logger    limiters.Logger
@@ -85,7 +85,7 @@ func NewSessionLimiter(gateway *Gateway) SessionLimiter {
 }
 
 // newRedisClient is a typed copy of storage.NewRedisClusterPool.
-func (*SessionLimiter) newRedisClient(cfg *config.StorageOptionsConf) *redis.Client {
+func (*SessionLimiter) newRedisClient(cfg *config.StorageOptionsConf) redis.UniversalClient {
 	// poolSize applies per cluster node and not for the whole cluster.
 	poolSize := 500
 	if cfg.MaxActive > 0 {
@@ -126,11 +126,10 @@ func (*SessionLimiter) newRedisClient(cfg *config.StorageOptionsConf) *redis.Cli
 		return redis.NewFailoverClient(opts.Failover())
 	}
 
-	// Locker takes a *redis.Client, not a *ClusterClient
-	// if cfg.EnableCluster {
-	//	log.Info("--> [REDIS] Creating cluster client")
-	//	return redis.NewClusterClient(opts.Cluster())
-	// }
+	if cfg.EnableCluster {
+		log.Info("--> [REDIS] Creating cluster client")
+		return redis.NewClusterClient(opts.Cluster())
+	}
 
 	log.Info("--> [REDIS] Creating single-node client")
 	return redis.NewClient(opts.Simple())
