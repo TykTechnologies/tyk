@@ -995,8 +995,6 @@ type TykGoPluginResponseHandler interface {
 
 func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykResponseHandler) TykResponseHandler {
 	switch name {
-	case "header_injector":
-		return &HeaderInjector{BaseTykResponseHandler: baseHandler}
 	case "response_body_transform_jq":
 		return &ResponseTransformJQMiddleware{BaseTykResponseHandler: baseHandler}
 	case "header_transform":
