@@ -732,10 +732,10 @@ type Config struct {
 	EnableTokenBucketRateLimiter bool `json:"enable_token_bucket_rate_limiter"`
 
 	// EnableFixedWindowRateLimiter will use a fixed window implementation to limit the input rate of requests.
-	EnableFixedWindowRateLimiter bool `json:"enable_leaky_bucket_rate_limiter"`
+	EnableFixedWindowRateLimiter bool `json:"enable_fixed_window_rate_limiter"`
 
 	// EnableSlidingWindowRateLimiter will use a sliding window implementation to limit the input rate of requests.
-	EnableSlidingWindowRateLimiter bool `json:"enable_leaky_bucket_rate_limiter"`
+	EnableSlidingWindowRateLimiter bool `json:"enable_sliding_window_rate_limiter"`
 
 	// Redis based rate limiter with fixed window. Provides 100% rate limiting accuracy, but require two additional Redis roundtrip for each request.
 	EnableRedisRollingLimiter bool `json:"enable_redis_rolling_limiter"`
