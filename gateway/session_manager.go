@@ -75,6 +75,7 @@ func NewSessionLimiter(gateway *Gateway) SessionLimiter {
 
 	switch storageConf.Type {
 	case "redis":
+		log.Error("Setting up redis storage for rate limiting")
 		sessionLimiter.redis = sessionLimiter.newRedisClient(storageConf)
 		sessionLimiter.redisLock = limiters.NewLockRedis(goredis.NewPool(sessionLimiter.redis), "distributed-lock")
 	}
@@ -300,6 +301,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 		switch {
 		case globalConf.EnableLeakyBucketRateLimiter:
+			log.Error("leaky-bucket")
+
 			var (
 				storage limiters.LeakyBucketStateBackend
 				locker  limiters.DistLocker
@@ -330,6 +333,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			time.Sleep(res)
 
 		case globalConf.EnableTokenBucketRateLimiter:
+			log.Error("token-bucket")
+
 			var (
 				storage limiters.TokenBucketStateBackend
 				locker  limiters.DistLocker
@@ -359,6 +364,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			}
 
 		case globalConf.EnableFixedWindowRateLimiter:
+			log.Error("fixed-window")
+
 			var (
 				storage limiters.FixedWindowIncrementer
 			)
@@ -384,6 +391,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			}
 
 		case globalConf.EnableSlidingWindowRateLimiter:
+			log.Error("sliding-window")
+
 			var (
 				storage limiters.SlidingWindowIncrementer
 			)
@@ -415,10 +424,14 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			}
 
 		case globalConf.EnableSentinelRateLimiter:
+			log.Error("sentinel rate limit")
+
 			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		case globalConf.EnableRedisRollingLimiter:
+			log.Error("redis rate limit")
+
 			if l.limitRedis(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
@@ -435,6 +448,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			}
 
 			if n <= 1 || n*c < rate {
+				log.Error("dynamic rate limiter")
 				// If we have 1 server, there is no need to strain redis at all the leaky
 				// bucket algorithm will suffice.
 				if l.limitDRL(currentSession, key, rateScope, &accessDef.Limit, dryRun) {
