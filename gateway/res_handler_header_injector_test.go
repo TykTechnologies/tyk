@@ -172,3 +172,32 @@ func TestGlobalResponseHeaders(t *testing.T) {
 
 	_, _ = ts.Run(t, test.TestCase{HeadersMatch: addedHeaders, HeadersNotMatch: removedHeaders})
 }
+
+func TestLegacyHeaderInjectorWithResponseProcessorOptions(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	addedHeaders := map[string]string{"X-Tyk-Test": "1"}
+	removedHeaders := map[string]string{}
+	_, _ = ts.Run(t, test.TestCase{HeadersMatch: addedHeaders, HeadersNotMatch: removedHeaders})
+
+	api.ResponseProcessors = []apidef.ResponseProcessor{
+		{
+			Name: "header_injector",
+			Options: map[string]interface{}{
+				"add_headers":    map[string]string{"global-header": "global-value"},
+				"remove_headers": []string{"X-Tyk-Test"},
+			},
+		},
+	}
+	ts.Gw.LoadAPI(api)
+
+	addedHeaders = map[string]string{"global-header": "global-value"}
+	removedHeaders = map[string]string{"X-Tyk-Test": "1"}
+	_, _ = ts.Run(t, test.TestCase{HeadersMatch: addedHeaders, HeadersNotMatch: removedHeaders})
+}
