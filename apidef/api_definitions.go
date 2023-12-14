@@ -183,6 +183,7 @@ type TransformJQMeta struct {
 }
 
 type HeaderInjectionMeta struct {
+	Disabled      bool              `bson:"disabled" json:"disabled"`
 	DeleteHeaders []string          `bson:"delete_headers" json:"delete_headers"`
 	AddHeaders    map[string]string `bson:"add_headers" json:"add_headers"`
 	Path          string            `bson:"path" json:"path"`
