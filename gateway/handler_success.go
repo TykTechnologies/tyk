@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -322,10 +321,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 
 	// Report in health check
 	reportHealthValue(s.Spec, RequestLog, strconv.FormatInt(timing.Total, 10))
-
-	if memProfFile != nil {
-		pprof.WriteHeapProfile(memProfFile)
-	}
 }
 
 func recordDetail(r *http.Request, spec *APISpec) bool {

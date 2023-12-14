@@ -1633,7 +1633,10 @@ func Start() {
 		if memProfFile, err = os.Create(memprofile); err != nil {
 			panic(err)
 		}
-		defer memProfFile.Close()
+		defer func() {
+			pprof.WriteHeapProfile(memProfFile)
+			memProfFile.Close()
+		}()
 	}
 	if *cli.CPUProfile {
 		mainLog.Info("Cpu profiling active")
