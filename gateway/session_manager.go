@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/TykTechnologies/leakybucket"
@@ -34,8 +35,9 @@ const (
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
 type SessionLimiter struct {
-	bucketStore leakybucket.Storage
-	Gw          *Gateway `json:"-"`
+	bucketStore         leakybucket.Storage
+	Gw                  *Gateway `json:"-"`
+	nextAvailableRateAt *time.Time
 }
 
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
@@ -56,13 +58,23 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
-	pipeline := globalConf.EnableNonTransactionalRateLimiter
+
+	// Short circuit if rolling window start has not been dropped yet.
+	if l.nextAvailableRateAt != nil {
+		if !time.Now().After(*l.nextAvailableRateAt) {
+			log.Debug("[RATELIMIT] Rolling Window limit is still not available, next available at ", *l.nextAvailableRateAt)
+			return true
+		}
+	}
 
 	var ratePerPeriodNow int
+	var timestamps []interface{}
+	pipeline := globalConf.EnableNonTransactionalRateLimiter
+
 	if dryRun {
-		ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
+		ratePerPeriodNow, timestamps = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
 	} else {
-		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+		ratePerPeriodNow, timestamps = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
 	}
 
 	//log.Info("Num Requests: ", ratePerPeriodNow)
@@ -73,6 +85,28 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
 	}
+
+	if ratePerPeriodNow >= int(rate) {
+		// Get the first timestamp inserted which would be the beginning of the rolling window
+		unixTimestamp, err := strconv.ParseInt(timestamps[0].(string), 10, 64)
+		if err != nil {
+			log.Error("Error parsing Unix timestamp:", err)
+			return true
+		}
+
+		// Convert nanoseconds to seconds and remaining nanoseconds
+		seconds := unixTimestamp / int64(time.Second)
+		nanoseconds := unixTimestamp % int64(time.Second)
+
+		// Create a time.Time from the Unix timestamp
+		windowStartTimestamp := time.Unix(seconds, nanoseconds)
+		nextAvailableRateAt := windowStartTimestamp.Add(time.Duration(per * float64(time.Second)))
+		log.Debug(fmt.Sprintf("Rate limit exceeded, next available limit at %s", nextAvailableRateAt))
+		l.nextAvailableRateAt = &nextAvailableRateAt
+	} else {
+		l.nextAvailableRateAt = nil
+	}
+
 	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
 	// will only work with ththese two lines here
 	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
@@ -83,6 +117,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 				store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
 			}
 		}
+
 		return true
 	}
 
@@ -154,7 +189,7 @@ func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string,
 	}
 
 	if dryRun {
-		// if userBucket is empty and not expired.
+		// if userBucket is full and not expired.
 		if userBucket.Remaining() == 0 && time.Now().Before(userBucket.Reset()) {
 			return true
 		}
