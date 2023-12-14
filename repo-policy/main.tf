@@ -49,7 +49,7 @@ module "tyk" {
     { branch    = "master",
       reviewers = "1",
       convos    = "false",
-    required_tests = ["Go 1.21.x Redis 5", "1.21-bookworm", "test (1.21.x, ubuntu-latest, amd64, 15.x)", "api-tests (sha256, mongo44)", "api-tests (sha256, postgres15)", "api-tests (murmur64, mongo44)", "api-tests (murmur64, postgres15)"] },
+    required_tests = ["Go 1.21.x Redis 5", "1.21-bullseye", "test (1.21.x, ubuntu-latest, amd64, 15.x)", "api-tests (sha256, mongo44)", "api-tests (sha256, postgres15)", "api-tests (murmur64, mongo44)", "api-tests (murmur64, postgres15)"] },
     { branch        = "release-4-lts",
       reviewers     = "0",
       convos        = "false",
