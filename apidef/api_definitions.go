@@ -366,6 +366,7 @@ type VersionInfo struct {
 	GlobalHeaders                 map[string]string `bson:"global_headers" json:"global_headers"`
 	GlobalHeadersRemove           []string          `bson:"global_headers_remove" json:"global_headers_remove"`
 	GlobalResponseHeaders         map[string]string `bson:"global_response_headers" json:"global_response_headers"`
+	GlobalHeadersDisabled         bool              `bson:"global_headers_disabled" json:"global_headers_disabled"`
 	GlobalResponseHeadersRemove   []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
 	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
 	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
