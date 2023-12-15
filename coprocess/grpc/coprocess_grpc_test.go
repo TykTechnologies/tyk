@@ -733,7 +733,6 @@ func TestGRPC_MultiAuthentication(t *testing.T) {
 				sessionMetaKey: "$tyk_meta." + sessionMetaKey,
 			},
 		}
-		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
 		spec.CustomMiddleware.Driver = apidef.GrpcDriver
 		spec.CustomMiddleware.AuthCheck.Name = "testAuthHook1"
 		spec.CustomMiddleware.IdExtractor.Extractor = nil
