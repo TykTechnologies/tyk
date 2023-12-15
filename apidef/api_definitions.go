@@ -183,6 +183,7 @@ type TransformJQMeta struct {
 }
 
 type HeaderInjectionMeta struct {
+	Disabled      bool              `bson:"disabled" json:"disabled"`
 	DeleteHeaders []string          `bson:"delete_headers" json:"delete_headers"`
 	AddHeaders    map[string]string `bson:"add_headers" json:"add_headers"`
 	Path          string            `bson:"path" json:"path"`
@@ -360,15 +361,16 @@ type VersionInfo struct {
 		WhiteList []string `bson:"white_list" json:"white_list"`
 		BlackList []string `bson:"black_list" json:"black_list"`
 	} `bson:"paths" json:"paths"`
-	UseExtendedPaths            bool              `bson:"use_extended_paths" json:"use_extended_paths"`
-	ExtendedPaths               ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
-	GlobalHeaders               map[string]string `bson:"global_headers" json:"global_headers"`
-	GlobalHeadersRemove         []string          `bson:"global_headers_remove" json:"global_headers_remove"`
-	GlobalResponseHeaders       map[string]string `bson:"global_response_headers" json:"global_response_headers"`
-	GlobalResponseHeadersRemove []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
-	IgnoreEndpointCase          bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
-	GlobalSizeLimit             int64             `bson:"global_size_limit" json:"global_size_limit"`
-	OverrideTarget              string            `bson:"override_target" json:"override_target"`
+	UseExtendedPaths              bool              `bson:"use_extended_paths" json:"use_extended_paths"`
+	ExtendedPaths                 ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
+	GlobalHeaders                 map[string]string `bson:"global_headers" json:"global_headers"`
+	GlobalHeadersRemove           []string          `bson:"global_headers_remove" json:"global_headers_remove"`
+	GlobalResponseHeaders         map[string]string `bson:"global_response_headers" json:"global_response_headers"`
+	GlobalResponseHeadersRemove   []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
+	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
+	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
+	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit"`
+	OverrideTarget                string            `bson:"override_target" json:"override_target"`
 }
 
 type AuthProviderMeta struct {
