@@ -365,13 +365,17 @@ type VersionInfo struct {
 	ExtendedPaths                 ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
 	GlobalHeaders                 map[string]string `bson:"global_headers" json:"global_headers"`
 	GlobalHeadersRemove           []string          `bson:"global_headers_remove" json:"global_headers_remove"`
-	GlobalResponseHeaders         map[string]string `bson:"global_response_headers" json:"global_response_headers"`
 	GlobalHeadersDisabled         bool              `bson:"global_headers_disabled" json:"global_headers_disabled"`
+	GlobalResponseHeaders         map[string]string `bson:"global_response_headers" json:"global_response_headers"`
 	GlobalResponseHeadersRemove   []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
 	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
 	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
 	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit"`
 	OverrideTarget                string            `bson:"override_target" json:"override_target"`
+}
+
+func (v *VersionInfo) GlobalHeadersEnabled() bool {
+	return !v.GlobalHeadersDisabled && (len(v.GlobalHeaders) > 0 || len(v.GlobalHeadersRemove) > 0)
 }
 
 type AuthProviderMeta struct {

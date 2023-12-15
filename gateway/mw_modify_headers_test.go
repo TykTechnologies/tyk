@@ -25,20 +25,32 @@ func TestTransformHeaders_EnabledForSpec(t *testing.T) {
 
 	// version level add headers
 	versionInfo.GlobalHeaders["a"] = "b"
+	assert.True(t, versionInfo.GlobalHeadersEnabled())
 	assert.True(t, th.EnabledForSpec())
-	versionInfo.GlobalHeadersDisabled = true
-	versions["Default"] = versionInfo
-	assert.False(t, th.EnabledForSpec())
+}
+
+func TestVersionInfoGlobalHeadersEnabled(t *testing.T) {
+	v := apidef.VersionInfo{
+		GlobalHeaders:       map[string]string{},
+		GlobalHeadersRemove: []string{},
+	}
+
+	assert.False(t, v.GlobalHeadersEnabled())
+
+	// add headers
+	v.GlobalHeaders["a"] = "b"
+	assert.True(t, v.GlobalHeadersEnabled())
+	v.GlobalHeadersDisabled = true
+	assert.False(t, v.GlobalHeadersEnabled())
 
 	// reset
-	versionInfo.GlobalResponseHeaders = map[string]string{}
-	versionInfo.GlobalHeadersDisabled = false
-	versions["Default"] = versionInfo
+	v.GlobalHeaders = map[string]string{}
+	v.GlobalHeadersDisabled = false
+	assert.False(t, v.GlobalHeadersEnabled())
 
-	// version level remove headers
-	versionInfo.GlobalResponseHeadersRemove = []string{"a"}
-	assert.True(t, th.EnabledForSpec())
-	versionInfo.GlobalHeadersDisabled = true
-	versions["Default"] = versionInfo
-	assert.False(t, th.EnabledForSpec())
+	// remove headers
+	v.GlobalHeadersRemove = []string{"a"}
+	assert.True(t, v.GlobalHeadersEnabled())
+	v.GlobalHeadersDisabled = true
+	assert.False(t, v.GlobalHeadersEnabled())
 }
