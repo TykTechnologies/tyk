@@ -128,7 +128,11 @@ func TokenOrg(token string) string {
 
 	// 24 is mongo bson id length
 	if len(token) > 24 {
-		return token[:24]
+		newToken := token[:24]
+		_, err := hex.DecodeString(newToken)
+		if err == nil {
+			return newToken
+		}
 	}
 
 	return ""
