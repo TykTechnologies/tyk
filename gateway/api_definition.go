@@ -903,6 +903,10 @@ func (a APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInje
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions

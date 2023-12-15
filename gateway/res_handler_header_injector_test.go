@@ -37,6 +37,14 @@ func testPrepareResponseHeaderInjection(ts *Test) {
 					"path": "/rewrite-test",
 					"method": "GET",
 					"act_on": false
+				},
+				{
+					"disabled": true,
+					"delete_headers": ["X-Tyk-Test"],
+					"add_headers": {"X-Test": "test"},
+					"path": "/disabled",
+					"method": "GET",
+					"act_on": false
 				}
 			]`), &v.ExtendedPaths.TransformResponseHeader)
 			json.Unmarshal([]byte(`[
@@ -44,6 +52,14 @@ func testPrepareResponseHeaderInjection(ts *Test) {
 					"delete_headers": ["User-Agent"],
 					"add_headers": {"X-I-Am": "Request"},
 					"path": "/rewrite-test",
+					"method": "GET",
+					"act_on": false
+				},
+				{
+					"disabled": true,
+					"delete_headers": ["User-Agent"],
+					"add_headers": {"X-I-Am": "Request"},
+					"path": "/disabled",
 					"method": "GET",
 					"act_on": false
 				}
@@ -98,6 +114,7 @@ func TestResponseHeaderInjection(t *testing.T) {
 		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"Url":"/newpath"`},
 		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeadersCached, HeadersNotMatch: deleteHeadersCached, BodyMatch: `"X-I-Am":"Request"`},
 		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeadersCached, HeadersNotMatch: deleteHeadersCached, BodyMatch: userAgent},
+		{Method: "GET", Path: "/disabled", HeadersNotMatch: addHeaders, HeadersMatch: deleteHeadersCached, BodyNotMatch: `"X-I-Am":"Request"`},
 	}...)
 }
 
@@ -171,6 +188,15 @@ func TestGlobalResponseHeaders(t *testing.T) {
 	removedHeaders = map[string]string{"X-Tyk-Test": "1"}
 
 	_, _ = ts.Run(t, test.TestCase{HeadersMatch: addedHeaders, HeadersNotMatch: removedHeaders})
+
+	t.Run("disabled", func(t *testing.T) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.GlobalResponseHeadersDisabled = true
+		})
+		ts.Gw.LoadAPI(spec)
+
+		_, _ = ts.Run(t, test.TestCase{HeadersNotMatch: addedHeaders, HeadersMatch: removedHeaders})
+	})
 }
 
 func TestLegacyHeaderInjectorWithResponseProcessorOptions(t *testing.T) {
