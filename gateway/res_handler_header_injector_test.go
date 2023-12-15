@@ -188,6 +188,15 @@ func TestGlobalResponseHeaders(t *testing.T) {
 	removedHeaders = map[string]string{"X-Tyk-Test": "1"}
 
 	_, _ = ts.Run(t, test.TestCase{HeadersMatch: addedHeaders, HeadersNotMatch: removedHeaders})
+
+	t.Run("disabled", func(t *testing.T) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.GlobalResponseHeadersDisabled = true
+		})
+		ts.Gw.LoadAPI(spec)
+
+		_, _ = ts.Run(t, test.TestCase{HeadersNotMatch: addedHeaders, HeadersMatch: removedHeaders})
+	})
 }
 
 func TestLegacyHeaderInjectorWithResponseProcessorOptions(t *testing.T) {
