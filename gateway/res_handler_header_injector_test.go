@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -223,4 +225,80 @@ func TestLegacyHeaderInjectorWithResponseProcessorOptions(t *testing.T) {
 	addedHeaders = map[string]string{"global-header": "global-value"}
 	removedHeaders = map[string]string{"X-Tyk-Test": "1"}
 	_, _ = ts.Run(t, test.TestCase{HeadersMatch: addedHeaders, HeadersNotMatch: removedHeaders})
+}
+
+func TestHeaderInjector_Enabled(t *testing.T) {
+	versionInfo := apidef.VersionInfo{
+		GlobalResponseHeaders: map[string]string{},
+	}
+
+	versions := map[string]apidef.VersionInfo{
+		"Default": versionInfo,
+	}
+
+	hi := HeaderInjector{}
+	hi.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	hi.Spec.VersionData.Versions = versions
+
+	assert.False(t, hi.Enabled())
+
+	// version level add headers
+	versionInfo.GlobalResponseHeaders["a"] = "b"
+	assert.True(t, versionInfo.GlobalResponseHeadersEnabled())
+	assert.True(t, hi.Enabled())
+
+	versionInfo.GlobalResponseHeaders = nil
+	versions["Default"] = versionInfo
+	assert.False(t, hi.Enabled())
+
+	// endpoint level add headers
+	versionInfo.UseExtendedPaths = true
+	versionInfo.ExtendedPaths.TransformResponseHeader = []apidef.HeaderInjectionMeta{{Disabled: false, DeleteHeaders: []string{"a"}}}
+	versions["Default"] = versionInfo
+	assert.True(t, hi.Enabled())
+}
+
+func TestVersionInfo_GlobalResponseHeadersEnabled(t *testing.T) {
+	v := apidef.VersionInfo{
+		GlobalResponseHeaders:       map[string]string{},
+		GlobalResponseHeadersRemove: []string{},
+	}
+
+	assert.False(t, v.GlobalResponseHeadersEnabled())
+
+	// add headers
+	v.GlobalResponseHeaders["a"] = "b"
+	assert.True(t, v.GlobalResponseHeadersEnabled())
+	v.GlobalResponseHeadersDisabled = true
+	assert.False(t, v.GlobalResponseHeadersEnabled())
+
+	// reset
+	v.GlobalResponseHeaders = map[string]string{}
+	v.GlobalResponseHeadersDisabled = false
+	assert.False(t, v.GlobalResponseHeadersEnabled())
+
+	// remove headers
+	v.GlobalResponseHeadersRemove = []string{"a"}
+	assert.True(t, v.GlobalResponseHeadersEnabled())
+	v.GlobalResponseHeadersDisabled = true
+	assert.False(t, v.GlobalResponseHeadersEnabled())
+}
+
+func TestVersionInfo_HasEndpointResHeader(t *testing.T) {
+	v := apidef.VersionInfo{}
+
+	assert.False(t, v.HasEndpointResHeader())
+	v.UseExtendedPaths = true
+	assert.False(t, v.HasEndpointResHeader())
+
+	v.ExtendedPaths.TransformResponseHeader = make([]apidef.HeaderInjectionMeta, 2)
+	assert.False(t, v.HasEndpointResHeader())
+
+	v.ExtendedPaths.TransformResponseHeader[0].Disabled = true
+	v.ExtendedPaths.TransformResponseHeader[0].AddHeaders = map[string]string{"a": "b"}
+	assert.False(t, v.HasEndpointResHeader())
+
+	v.ExtendedPaths.TransformResponseHeader[1].Disabled = false
+	v.ExtendedPaths.TransformResponseHeader[1].DeleteHeaders = []string{"a"}
+	assert.True(t, v.HasEndpointResHeader())
 }

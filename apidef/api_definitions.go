@@ -382,12 +382,30 @@ func (v *VersionInfo) GlobalHeadersEnabled() bool {
 	return !v.GlobalHeadersDisabled && (len(v.GlobalHeaders) > 0 || len(v.GlobalHeadersRemove) > 0)
 }
 
+func (v *VersionInfo) GlobalResponseHeadersEnabled() bool {
+	return !v.GlobalResponseHeadersDisabled && (len(v.GlobalResponseHeaders) > 0 || len(v.GlobalResponseHeadersRemove) > 0)
+}
+
 func (v *VersionInfo) HasEndpointReqHeader() bool {
 	if !v.UseExtendedPaths {
 		return false
 	}
 
 	for _, trh := range v.ExtendedPaths.TransformHeader {
+		if trh.Enabled() {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (v *VersionInfo) HasEndpointResHeader() bool {
+	if !v.UseExtendedPaths {
+		return false
+	}
+
+	for _, trh := range v.ExtendedPaths.TransformResponseHeader {
 		if trh.Enabled() {
 			return true
 		}
