@@ -826,8 +826,6 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 					}
 				]`), &v.ExtendedPaths.TransformResponseHeader)
 			})
-			spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
-
 		})
 
 		//headers := map[string]string{"foo": "bar"}

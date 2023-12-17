@@ -72,7 +72,6 @@ func testPrepareResponseHeaderInjection(ts *Test) {
 				RewriteTo:    "newpath",
 			}}
 		})
-		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
 
 		spec.CacheOptions = apidef.CacheOptions{
 			EnableCache:                cacheEnabled,
