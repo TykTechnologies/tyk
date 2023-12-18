@@ -4,9 +4,8 @@ from json import loads, dumps
 
 class TykCoProcessObject:
     def __init__(self, object_msg):
-        self.object = loads(object_msg)
         try:
-            self.object.ParseFromString(object_msg)
+            self.object = loads(object_msg)
         except:
             # TODO: add error handling
             pass

@@ -16,4 +16,5 @@ trap "docker compose down --remove-orphans" EXIT
 
 docker compose up -d --wait --force-recreate || { docker compose logs; exit 1; }
 
-curl -s http://localhost:8080/pyplugin/headers | jq -e '.headers.Foo == "Bar"'
+curl -s http://localhost:8080/pyplugin/headers | jq -e '.headers.Foo == "Bar"' || { docker compose logs gw; exit 1; }
+
