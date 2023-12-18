@@ -3,8 +3,9 @@ class TykCoProcessRequest():
         self.object = request
 
     def add_header(self, key, value):
-        self.object.set_headers[key] = value
-
+        if "set_headers" not in self.object:
+            self.object["set_headers"] = {}
+        self.object["set_headers"][key] = value
     def delete_header(self, key):
         self.object.delete_headers.append(key)
 
