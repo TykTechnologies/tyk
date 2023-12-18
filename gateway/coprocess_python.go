@@ -5,6 +5,7 @@ package gateway
 
 import (
 	"C"
+	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
 	"runtime"
@@ -41,7 +42,7 @@ type PythonDispatcher struct {
 // Dispatch takes a CoProcessMessage and sends it to the CP.
 func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
 	// Prepare the PB object:
-	objectMsg, err := proto.Marshal(object)
+	objectMsg, err := json.Marshal(object)
 	if err != nil {
 		return nil, err
 	}
