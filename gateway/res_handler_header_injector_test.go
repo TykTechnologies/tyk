@@ -163,9 +163,6 @@ func TestGlobalResponseHeaders(t *testing.T) {
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
-
-		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
-
 	})[0]
 	ts.Gw.LoadAPI(spec)
 

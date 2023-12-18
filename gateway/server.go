@@ -902,16 +902,34 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
 	)
 	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler})
+
+	headerInjector := &HeaderInjector{BaseTykResponseHandler: baseHandler}
+	headerInjectorAdded := gw.responseMWAppendEnabled(&responseMWChain, headerInjector)
 	for _, processorDetail := range spec.ResponseProcessors {
+		// This if statement will be removed in 5.4 as header_injector response processor will be removed
+		if processorDetail.Name == "header_injector" {
+			if !headerInjectorAdded {
+				responseMWChain = append(responseMWChain, headerInjector)
+			}
+
+			if err := headerInjector.Init(processorDetail.Options, spec); err != nil {
+				mainLog.Debug("Failed to init header injector processor: ", err)
+			}
+
+			continue
+		}
+
 		processor := gw.responseProcessorByName(processorDetail.Name, baseHandler)
 		if processor == nil {
 			mainLog.Error("No such processor: ", processorDetail.Name)
 			continue
 		}
+
 		if err := processor.Init(processorDetail.Options, spec); err != nil {
 			mainLog.Debug("Failed to init processor: ", err)
 		}
 		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
+
 		responseMWChain = append(responseMWChain, processor)
 	}
 

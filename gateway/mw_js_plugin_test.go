@@ -287,7 +287,6 @@ testJSVMMiddleware.NewProcessRequest(function(request, session) {
 		spec.CustomMiddleware.AuthCheck.Path = ts.Gw.GetConfig().MiddlewarePath + "/my-api-id/auth.js"
 		spec.UseStandardAuth = true
 		spec.BaseIdentityProvidedBy = apidef.AuthToken
-		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
 		spec.VersionData.Versions["v1"] = apidef.VersionInfo{
 			GlobalResponseHeaders: map[string]string{
 				sessionMetaKey: "$tyk_meta." + sessionMetaKey,
