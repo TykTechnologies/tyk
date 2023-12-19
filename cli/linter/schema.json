@@ -3,6 +3,30 @@
   "type": "object",
   "additionalProperties": false,
   "definitions": {
+    "RateLimit": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "enable_leaky_bucket": {
+          "type": "boolean"
+        },
+        "enable_token_bucket": {
+          "type": "boolean"
+        },
+        "enable_fixed_window": {
+          "type": "boolean"
+        },
+        "enable_sliding_window": {
+          "type": "boolean"
+        },
+        "storage": {
+          "$ref": "#/definitions/StorageOptions"
+        }
+      }
+    },
     "StorageOptions": {
       "type": [
         "object",
@@ -443,17 +467,8 @@
     "jsvm_timeout": {
       "type": "integer"
     },
-    "enable_leaky_bucket_rate_limiter": {
-      "type": "boolean"
-    },
-    "enable_token_bucket_rate_limiter": {
-      "type": "boolean"
-    },
-    "enable_fixed_window_rate_limiter": {
-      "type": "boolean"
-    },
-    "enable_sliding_window_rate_limiter": {
-      "type": "boolean"
+    "rate_limit": {
+      "$ref": "#/definitions/RateLimit"
     },
     "enable_non_transactional_rate_limiter": {
       "type": "boolean"
@@ -1053,9 +1068,6 @@
       "type": "string"
     },
     "storage": {
-      "$ref": "#/definitions/StorageOptions"
-    },
-    "rate_limiter_storage": {
       "$ref": "#/definitions/StorageOptions"
     },
     "suppress_default_org_store": {
