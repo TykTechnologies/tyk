@@ -23,9 +23,24 @@ func (h *HeaderInjector) Base() *BaseTykResponseHandler {
 	return &h.BaseTykResponseHandler
 }
 
-func (HeaderInjector) Name() string {
+func (*HeaderInjector) Name() string {
 	return "HeaderInjector"
 }
+
+func (h *HeaderInjector) Enabled() bool {
+	for _, version := range h.Spec.VersionData.Versions {
+		if version.GlobalResponseHeadersEnabled() {
+			return true
+		}
+
+		if version.HasEndpointResHeader() {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (h *HeaderInjector) Init(c interface{}, spec *APISpec) error {
 	h.Spec = spec
 	return mapstructure.Decode(c, &h.config)
