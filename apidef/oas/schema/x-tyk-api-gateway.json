@@ -1261,6 +1261,9 @@
           "type": "integer",
           "format": "int64",
           "minimum": 0
+        },
+        "idpClientIdMappingDisabled": {
+          "type": "boolean"
         }
       },
       "required": [
