@@ -153,13 +153,8 @@ const Schema = `{
 				}
 			}
 		},
-        "dynamic_client_registration": {
-            "type":["object", "null"],
-            "properties": {
-                "enabled": {
-                    "type": "boolean"
-                }
-            }
+        "idp_client_id_mapping_disabled": {
+            "type": "boolean"
         },
         "use_keyless": {
             "type": "boolean"

@@ -2329,7 +2329,6 @@ func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
-		spec.DCR.Enabled = true
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
@@ -2361,7 +2360,7 @@ func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
 	})
 
 	t.Run("DCR disabled", func(t *testing.T) {
-		api.DCR.Enabled = false
+		api.IDPClientIDMappingDisabled = true
 		ts.Gw.LoadAPI(api)
 		_, _ = ts.Run(t, test.TestCase{Headers: authHeaders, Code: http.StatusOK})
 

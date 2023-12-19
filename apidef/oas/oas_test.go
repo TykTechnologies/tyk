@@ -181,7 +181,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.ListenPort",
 		"APIDefinition.Protocol",
 		"APIDefinition.EnableProxyProtocol",
-		"APIDefinition.DCR.Enabled",
+		"APIDefinition.IDPClientIDMappingDisabled",
 		"APIDefinition.RequestSigning.IsEnabled",
 		"APIDefinition.RequestSigning.Secret",
 		"APIDefinition.RequestSigning.KeyId",
