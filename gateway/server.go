@@ -212,9 +212,12 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 		},
 		ctx: ctx,
 	}
+	gw.SetConfig(config)
+
+	gw.SetNodeID("solo-" + uuid.New())
+	gw.SessionID = uuid.New()
 
 	gw.Analytics = RedisAnalyticsHandler{Gw: gw}
-	gw.SetConfig(config)
 	sessionManager := DefaultSessionManager{Gw: gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
 	gw.DefaultOrgStore = DefaultSessionManager{Gw: gw}
@@ -1234,15 +1237,6 @@ func (gw *Gateway) initialiseSystem() error {
 	mainLog.Infof("Tyk API Gateway %s", VERSION)
 
 	if !gw.isRunningTests() {
-		gwConfig := config.Config{}
-		if err := config.Load(confPaths, &gwConfig); err != nil {
-			return err
-		}
-
-		if gwConfig.PIDFileLocation == "" {
-			gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
-		}
-		gw.SetConfig(gwConfig)
 		gw.afterConfSetup()
 	}
 
@@ -1579,17 +1573,24 @@ func Start() {
 		os.Exit(0)
 	}
 
-	// ToDo:Config replace for get default conf
-	gw := NewGateway(config.Default, ctx)
+	gwConfig := config.Config{}
+	if err := config.Load(confPaths, &gwConfig); err != nil {
+		mainLog.Errorf("Error loading config, using defaults: %v", err)
+	}
+	if gwConfig.ControlAPIPort == 0 {
+		mainLog.Warn("The control_api_port should be changed for production")
+	}
+	if gwConfig.PIDFileLocation == "" {
+		gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
+	}
 
+	gw := NewGateway(gwConfig, ctx)
 	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 
-	gwConfig := gw.GetConfig()
-	if gwConfig.ControlAPIPort == 0 {
-		mainLog.Warn("The control_api_port should be changed for production")
-	}
+	gwConfig = gw.GetConfig()
+
 	gw.setupPortsWhitelist()
 	gw.keyGen = DefaultKeyGenerator{Gw: gw}
 
