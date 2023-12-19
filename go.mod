@@ -48,7 +48,7 @@ require (
 	github.com/miekg/dns v1.1.57
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e // test
+	github.com/nsf/jsondiff v0.0.0-20230430225905-43f6cf3098c1 // test
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/openzipkin/zipkin-go v0.4.2
 	github.com/oschwald/maxminddb-golang v1.12.0

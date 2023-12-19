@@ -465,8 +465,8 @@ github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRW
 github.com/newrelic/go-agent v2.13.0+incompatible h1:Dl6m75MHAzfB0kicv9GiLxzQatRjTLUAdrnYyoT8s4M=
 github.com/newrelic/go-agent v2.13.0+incompatible/go.mod h1:a8Fv1b/fYhFSReoTU6HDkTYIMZeSVNffmoS726Y0LzQ=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
-github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e h1:S+/ptYdZtpK/MDstwCyt+ZHdXEpz86RJZ5gyZU4txJY=
-github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e/go.mod h1:uFMI8w+ref4v2r9jz+c9i1IfIttS/OkmLfrk1jne5hs=
+github.com/nsf/jsondiff v0.0.0-20230430225905-43f6cf3098c1 h1:dOYG7LS/WK00RWZc8XGgcUTlTxpp3mKhdR2Q9z9HbXM=
+github.com/nsf/jsondiff v0.0.0-20230430225905-43f6cf3098c1/go.mod h1:mpRZBD8SJ55OIICQ3iWH0Yz3cjzA61JdqMLoWXeB2+8=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/nxadm/tail v1.4.8/go.mod h1:+ncqLTQzXmGhMZNUePPaPqPvBxHAIsmXswZKocGu+AU=
