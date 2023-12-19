@@ -70,9 +70,6 @@ func TestRLOpen(t *testing.T) {
 
 	spec := ts.Gw.LoadSampleAPI(openRLDefSmall)
 
-	ts.Gw.DRLManager.SetCurrentTokenValue(1)
-	ts.Gw.DRLManager.RequestTokenValue = 1
-
 	ts.Gw.DoReload()
 	chain := ts.getRLOpenChain(spec)
 	for a := 0; a <= 10; a++ {
@@ -104,8 +101,6 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 
 		switch limiter {
 		case "InMemoryRateLimiter":
-			ts.Gw.DRLManager.SetCurrentTokenValue(1)
-			ts.Gw.DRLManager.RequestTokenValue = 1
 		case "SentinelRateLimiter":
 			globalCfg.EnableSentinelRateLimiter = true
 		case "RedisRollingRateLimiter":
@@ -232,9 +227,6 @@ func TestRLClosed(t *testing.T) {
 		t.Error("could not update session in Session Manager. " + err.Error())
 	}
 
-	ts.Gw.DRLManager.SetCurrentTokenValue(1)
-	ts.Gw.DRLManager.RequestTokenValue = 1
-
 	chain := ts.getGlobalRLAuthKeyChain(spec)
 	for a := 0; a <= 10; a++ {
 		recorder := httptest.NewRecorder()
@@ -264,9 +256,6 @@ func TestRLOpenWithReload(t *testing.T) {
 	defer ts.Close()
 
 	spec := ts.Gw.LoadSampleAPI(openRLDefSmall)
-
-	ts.Gw.DRLManager.SetCurrentTokenValue(1)
-	ts.Gw.DRLManager.RequestTokenValue = 1
 
 	chain := ts.getRLOpenChain(spec)
 	for a := 0; a <= 10; a++ {
