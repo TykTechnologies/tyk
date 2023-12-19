@@ -17,8 +17,11 @@ func (t *TransformHeaders) Name() string {
 
 func (t *TransformHeaders) EnabledForSpec() bool {
 	for _, version := range t.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.TransformHeader) > 0 ||
-			version.GlobalHeadersEnabled() {
+		if version.GlobalHeadersEnabled() {
+			return true
+		}
+
+		if version.HasEndpointReqHeader() {
 			return true
 		}
 	}

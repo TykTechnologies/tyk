@@ -27,9 +27,19 @@ func TestTransformHeaders_EnabledForSpec(t *testing.T) {
 	versionInfo.GlobalHeaders["a"] = "b"
 	assert.True(t, versionInfo.GlobalHeadersEnabled())
 	assert.True(t, th.EnabledForSpec())
+
+	versionInfo.GlobalHeaders = nil
+	versions["Default"] = versionInfo
+	assert.False(t, th.EnabledForSpec())
+
+	// endpoint level add headers
+	versionInfo.UseExtendedPaths = true
+	versionInfo.ExtendedPaths.TransformHeader = []apidef.HeaderInjectionMeta{{Disabled: false, DeleteHeaders: []string{"a"}}}
+	versions["Default"] = versionInfo
+	assert.True(t, th.EnabledForSpec())
 }
 
-func TestVersionInfoGlobalHeadersEnabled(t *testing.T) {
+func TestVersionInfo_GlobalHeadersEnabled(t *testing.T) {
 	v := apidef.VersionInfo{
 		GlobalHeaders:       map[string]string{},
 		GlobalHeadersRemove: []string{},
@@ -53,4 +63,40 @@ func TestVersionInfoGlobalHeadersEnabled(t *testing.T) {
 	assert.True(t, v.GlobalHeadersEnabled())
 	v.GlobalHeadersDisabled = true
 	assert.False(t, v.GlobalHeadersEnabled())
+}
+
+func TestVersionInfo_HasEndpointReqHeader(t *testing.T) {
+	v := apidef.VersionInfo{}
+
+	assert.False(t, v.HasEndpointReqHeader())
+	v.UseExtendedPaths = true
+	assert.False(t, v.HasEndpointReqHeader())
+
+	v.ExtendedPaths.TransformHeader = make([]apidef.HeaderInjectionMeta, 2)
+	assert.False(t, v.HasEndpointReqHeader())
+
+	v.ExtendedPaths.TransformHeader[0].Disabled = true
+	v.ExtendedPaths.TransformHeader[0].AddHeaders = map[string]string{"a": "b"}
+	assert.False(t, v.HasEndpointReqHeader())
+
+	v.ExtendedPaths.TransformHeader[1].Disabled = false
+	v.ExtendedPaths.TransformHeader[1].DeleteHeaders = []string{"a"}
+	assert.True(t, v.HasEndpointReqHeader())
+}
+
+func TestHeaderInjectionMeta_Enabled(t *testing.T) {
+	h := apidef.HeaderInjectionMeta{Disabled: true}
+	assert.False(t, h.Enabled())
+
+	h.Disabled = false
+	assert.False(t, h.Enabled())
+
+	h.AddHeaders = map[string]string{"a": "b"}
+	assert.True(t, h.Enabled())
+
+	h.AddHeaders = nil
+	assert.False(t, h.Enabled())
+
+	h.DeleteHeaders = []string{"a"}
+	assert.True(t, h.Enabled())
 }
