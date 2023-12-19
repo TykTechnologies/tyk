@@ -3,7 +3,6 @@ module github.com/TykTechnologies/tyk
 go 1.21
 
 require (
-	github.com/Jeffail/gabs v1.4.0
 	github.com/Jeffail/tunny v0.1.4
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed
@@ -77,6 +76,7 @@ require (
 )
 
 require (
+	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/TykTechnologies/kin-openapi v0.90.0
 	github.com/TykTechnologies/opentelemetry v0.0.20
 	github.com/alecthomas/kingpin/v2 v2.4.0
