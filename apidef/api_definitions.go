@@ -191,6 +191,10 @@ type HeaderInjectionMeta struct {
 	ActOnResponse bool              `bson:"act_on" json:"act_on"`
 }
 
+func (h *HeaderInjectionMeta) Enabled() bool {
+	return !h.Disabled && (len(h.AddHeaders) > 0 || len(h.DeleteHeaders) > 0)
+}
+
 type HardTimeoutMeta struct {
 	Disabled bool   `bson:"disabled" json:"disabled"`
 	Path     string `bson:"path" json:"path"`
@@ -376,6 +380,38 @@ type VersionInfo struct {
 
 func (v *VersionInfo) GlobalHeadersEnabled() bool {
 	return !v.GlobalHeadersDisabled && (len(v.GlobalHeaders) > 0 || len(v.GlobalHeadersRemove) > 0)
+}
+
+func (v *VersionInfo) GlobalResponseHeadersEnabled() bool {
+	return !v.GlobalResponseHeadersDisabled && (len(v.GlobalResponseHeaders) > 0 || len(v.GlobalResponseHeadersRemove) > 0)
+}
+
+func (v *VersionInfo) HasEndpointReqHeader() bool {
+	if !v.UseExtendedPaths {
+		return false
+	}
+
+	for _, trh := range v.ExtendedPaths.TransformHeader {
+		if trh.Enabled() {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (v *VersionInfo) HasEndpointResHeader() bool {
+	if !v.UseExtendedPaths {
+		return false
+	}
+
+	for _, trh := range v.ExtendedPaths.TransformResponseHeader {
+		if trh.Enabled() {
+			return true
+		}
+	}
+
+	return false
 }
 
 type AuthProviderMeta struct {
