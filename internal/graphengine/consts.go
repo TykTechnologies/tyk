@@ -15,3 +15,12 @@ const (
 	GranularAccessFailReasonInternalError
 	GranularAccessFailReasonValidationError
 )
+
+type ReverseProxyType int
+
+const (
+	ReverseProxyTypeNone ReverseProxyType = iota
+	ReverseProxyTypeIntrospection
+	ReverseProxyTypeWebsocketUpgrade
+	ReverseProxyTypeGraphEngine
+)

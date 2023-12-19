@@ -4,6 +4,10 @@ import (
 	"context"
 	"io"
 	"net/http"
+
+	"github.com/gorilla/websocket"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type ProcessGraphQLComplexityParams struct {
@@ -16,7 +20,7 @@ type Engine interface {
 	ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.Request) (err error, statusCode int)
 	ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int)
 	ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int)
-	HandleReverseProxy(roundTripper http.RoundTripper, w http.ResponseWriter, r *http.Request) (res *http.Response, err error)
+	HandleReverseProxy(params ReverseProxyParams) (res *http.Response, hijacked bool, err error)
 }
 
 type ComplexityAccessDefinition struct {
@@ -71,11 +75,14 @@ type ReverseProxyParams struct {
 	RoundTripper       http.RoundTripper
 	ResponseWriter     http.ResponseWriter
 	OutRequest         *http.Request
+	WebSocketUpgrader  *websocket.Upgrader
 	NeedsEngine        bool
 	IsCORSPreflight    bool
 	IsWebSocketUpgrade bool
 }
 
-type ReverseProxyHandler interface {
-	Handle(params ReverseProxyParams) (res *http.Response, err error)
+type ReverseProxyPreHandler interface {
+	PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error)
 }
+
+type TransportModifier func(roundTripper http.RoundTripper, apiDefinition *apidef.APIDefinition) http.RoundTripper
