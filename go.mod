@@ -71,7 +71,7 @@ require (
 	google.golang.org/grpc v1.61.0-dev
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
 	google.golang.org/protobuf v1.31.0
-	gopkg.in/vmihailenco/msgpack.v2 v2.9.1
+	gopkg.in/vmihailenco/msgpack.v2 v2.9.2
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
 	gopkg.in/yaml.v3 v3.0.1
 )
