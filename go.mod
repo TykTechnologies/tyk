@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/Jeffail/tunny v0.1.4
-	github.com/Masterminds/sprig/v3 v3.2.2
+	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed
 	github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible
 	github.com/TykTechnologies/drl v0.0.0-20231218155806-88e4363884a2
@@ -55,7 +55,7 @@ require (
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/pires/go-proxyproto v0.7.0
 	github.com/pmylund/go-cache v2.1.0+incompatible
-	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d
+	github.com/robertkrimen/otto v0.2.1
 	github.com/rs/cors v1.10.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/afero v1.11.0
@@ -92,7 +92,7 @@ require (
 	github.com/IBM/sarama v1.42.1 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
-	github.com/Masterminds/semver/v3 v3.1.1 // indirect
+	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
@@ -137,7 +137,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/serf v0.10.1 // indirect
-	github.com/huandu/xstrings v1.3.2 // indirect
+	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/iancoleman/strcase v0.2.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/invopop/yaml v0.2.0 // indirect
