@@ -726,21 +726,9 @@ type Config struct {
 	// This is used as part of the RPC / Hybrid back-end configuration in a Tyk Enterprise installation and isn’t used anywhere else.
 	AuthOverride AuthOverrideConf `json:"auth_override"`
 
-	// RateLimiterStorage configures the storage for rate limiters. If unconfigured, will use the default storage.
-	// Configuring the storage type as "local", will use non-distributed implementations of rate limiters.
-	RateLimiterStorage *StorageOptionsConf `json:"rate_limiter_storage"`
-
-	// EnableLeakyBucketRateLimiter will use a leaky bucket implementation to limit the output rate of requests.
-	EnableLeakyBucketRateLimiter bool `json:"enable_leaky_bucket_rate_limiter"`
-
-	// EnableTokenBucketRateLimiter will use a token bucket implementation to limit the input rate of requests.
-	EnableTokenBucketRateLimiter bool `json:"enable_token_bucket_rate_limiter"`
-
-	// EnableFixedWindowRateLimiter will use a fixed window implementation to limit the input rate of requests.
-	EnableFixedWindowRateLimiter bool `json:"enable_fixed_window_rate_limiter"`
-
-	// EnableSlidingWindowRateLimiter will use a sliding window implementation to limit the input rate of requests.
-	EnableSlidingWindowRateLimiter bool `json:"enable_sliding_window_rate_limiter"`
+	// RateLimit is used to configure rate limiting behaviour. Within this configuration, several
+	// rate limiter behaviours can be enabled to configure a desired rate limit strategy.
+	RateLimit RateLimit `json:"rate_limit"`
 
 	// Redis based rate limiter with fixed window. Provides 100% rate limiting accuracy, but require two additional Redis roundtrip for each request.
 	EnableRedisRollingLimiter bool `json:"enable_redis_rolling_limiter"`

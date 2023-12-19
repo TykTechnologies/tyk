@@ -81,7 +81,7 @@ require (
 )
 
 require (
-	github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231213080742-e1439885f523
+	github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231214174503-0d416f3bcea2
 	github.com/TykTechnologies/kin-openapi v0.90.0
 	github.com/TykTechnologies/opentelemetry v0.0.20
 	github.com/go-redsync/redsync/v4 v4.11.0

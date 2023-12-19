@@ -43,10 +43,11 @@ type SessionLimiter struct {
 	bucketStore leakybucket.Storage
 	Gw          *Gateway `json:"-"`
 
-	redis     redis.UniversalClient
-	redisLock limiters.DistLocker
+	redis redis.UniversalClient
+
 	localLock limiters.DistLocker
 	logger    limiters.Logger
+	clock     limiters.Clock
 }
 
 // NewSessionLimiter initializes the session limiter.
@@ -56,31 +57,34 @@ type SessionLimiter struct {
 // configured, then redis will be used. If local storage is configured, then
 // in-memory counters will be used. If no storage is configured, it falls
 // back onto the default gateway storage configuration.
-//
-// Redis clusters (EnableCluster) has no effect here.
 func NewSessionLimiter(gateway *Gateway) SessionLimiter {
 	sessionLimiter := SessionLimiter{
-		Gw:        gateway,
-		localLock: limiters.NewLockNoop(),
-		logger:    limiters.NewStdLogger(),
+		Gw:          gateway,
+		localLock:   limiters.NewLockNoop(),
+		logger:      limiters.NewStdLogger(),
+		clock:       limiters.NewSystemClock(),
+		bucketStore: memorycache.New(),
 	}
 
 	cfg := gateway.GetConfig()
 
 	// Use default storage if rate limiter storage is unconfigured.
 	storageConf := &cfg.Storage
-	if cfg.RateLimiterStorage != nil {
-		storageConf = cfg.RateLimiterStorage
+	if cfg.RateLimit.Storage != nil {
+		storageConf = cfg.RateLimit.Storage
 	}
 
 	switch storageConf.Type {
 	case "redis":
-		log.Error("Setting up redis storage for rate limiting")
 		sessionLimiter.redis = sessionLimiter.newRedisClient(storageConf)
-		sessionLimiter.redisLock = limiters.NewLockRedis(goredis.NewPool(sessionLimiter.redis), "distributed-lock")
 	}
 
 	return sessionLimiter
+}
+
+// redisLock creates an instance of a redis lock with redsync.
+func (l *SessionLimiter) redisLock() *limiters.LockRedis {
+	return limiters.NewLockRedis(goredis.NewPool(l.redis), "distributed-lock")
 }
 
 // newRedisClient is a typed copy of storage.NewRedisClusterPool.
@@ -229,20 +233,18 @@ func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key strin
 func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string, rateScope string,
 	apiLimit *user.APILimit, dryRun bool) bool {
 
-	// In-memory limiter
-	if l.bucketStore == nil {
-		l.bucketStore = memorycache.New()
-	}
-
 	bucketKey := key + ":" + rateScope + currentSession.LastUpdated
 	currRate := apiLimit.Rate
 	per := apiLimit.Per
 
+	tokenValue := uint(l.Gw.DRLManager.CurrentTokenValue())
+
 	// DRL will always overflow with more servers on low rates
 	rate := uint(currRate * float64(l.Gw.DRLManager.RequestTokenValue))
-	if rate < uint(l.Gw.DRLManager.CurrentTokenValue()) {
-		rate = uint(l.Gw.DRLManager.CurrentTokenValue())
+	if rate < tokenValue {
+		rate = tokenValue
 	}
+
 	userBucket, err := l.bucketStore.Create(bucketKey, rate, time.Duration(per)*time.Second)
 	if err != nil {
 		log.Error("Failed to create bucket!")
@@ -255,7 +257,7 @@ func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string,
 			return true
 		}
 	} else {
-		_, errF := userBucket.Add(uint(l.Gw.DRLManager.CurrentTokenValue()))
+		_, errF := userBucket.Add(tokenValue)
 		if errF != nil {
 			return true
 		}
@@ -292,6 +294,13 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		panic("gateway not set in session limiter")
 	}
 
+	prefix := func(prefix, key, scope string) string {
+		if scope != "" {
+			return prefix + "-" + key + "-" + scope
+		}
+		return prefix + "-" + key
+	}
+
 	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
 	if enableRL && accessDef.Limit.Rate > 0 {
 		rateScope := ""
@@ -300,30 +309,33 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		}
 
 		switch {
-		case globalConf.EnableLeakyBucketRateLimiter:
-			log.Error("leaky-bucket")
-
+		case globalConf.RateLimit.EnableLeakyBucket:
 			var (
 				storage limiters.LeakyBucketStateBackend
 				locker  limiters.DistLocker
 			)
 
 			var (
-				rate      = int64(accessDef.Limit.Rate)
-				per       = accessDef.Limit.Per
-				ttl       = time.Duration(per) * time.Second
+				rate = int64(accessDef.Limit.Rate)
+				per  = accessDef.Limit.Per
+				ttl  = time.Duration(per) * time.Second
+
+				outputRate = ttl / time.Duration(rate)
+
 				raceCheck = false
 			)
 
+			rateLimitPrefix := prefix("leaky-bucket", key, allowanceScope)
+
 			if l.redis != nil {
-				locker = l.redisLock
-				storage = limiters.NewLeakyBucketRedis(l.redis, key, ttl, raceCheck)
+				locker = l.redisLock()
+				storage = limiters.NewLeakyBucketRedis(l.redis, rateLimitPrefix, ttl, raceCheck)
 			} else {
 				locker = l.localLock
-				storage = limiters.LocalLeakyBucket(key)
+				storage = limiters.LocalLeakyBucket(rateLimitPrefix)
 			}
 
-			limiter := limiters.NewLeakyBucket(rate, ttl, locker, storage, limiters.NewSystemClock(), l.logger)
+			limiter := limiters.NewLeakyBucket(rate, outputRate, locker, storage, l.clock, l.logger)
 
 			// Rate limiter returns a duration for how long to queue the request, or ErrLimitExhausted.
 			res, err := limiter.Limit(r.Context())
@@ -332,9 +344,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			}
 			time.Sleep(res)
 
-		case globalConf.EnableTokenBucketRateLimiter:
-			log.Error("token-bucket")
-
+		case globalConf.RateLimit.EnableTokenBucket:
 			var (
 				storage limiters.TokenBucketStateBackend
 				locker  limiters.DistLocker
@@ -347,15 +357,17 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				raceCheck = false
 			)
 
+			rateLimitPrefix := prefix("token-bucket", key, allowanceScope)
+
 			if l.redis != nil {
-				locker = l.redisLock
-				storage = limiters.NewTokenBucketRedis(l.redis, key, ttl, raceCheck)
+				locker = l.redisLock()
+				storage = limiters.NewTokenBucketRedis(l.redis, rateLimitPrefix, ttl, raceCheck)
 			} else {
 				locker = l.localLock
-				storage = limiters.LocalTokenBucket(key)
+				storage = limiters.LocalTokenBucket(rateLimitPrefix)
 			}
 
-			limiter := limiters.NewTokenBucket(rate, ttl, locker, storage, limiters.NewSystemClock(), l.logger)
+			limiter := limiters.NewTokenBucket(rate, ttl, locker, storage, l.clock, l.logger)
 
 			// Rate limiter returns a zero duration and a possible ErrLimitExhausted when no tokens are available.
 			_, err := limiter.Limit(r.Context())
@@ -363,9 +375,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				return sessionFailRateLimit
 			}
 
-		case globalConf.EnableFixedWindowRateLimiter:
-			log.Error("fixed-window")
-
+		case globalConf.RateLimit.EnableFixedWindow:
 			var (
 				storage limiters.FixedWindowIncrementer
 			)
@@ -376,13 +386,15 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				ttl  = time.Duration(per) * time.Second
 			)
 
+			rateLimitPrefix := prefix("fixed-window", key, allowanceScope)
+
 			if l.redis != nil {
-				storage = limiters.NewFixedWindowRedis(l.redis, key)
+				storage = limiters.NewFixedWindowRedis(l.redis, rateLimitPrefix)
 			} else {
-				storage = limiters.LocalFixedWindow(key)
+				storage = limiters.LocalFixedWindow(rateLimitPrefix)
 			}
 
-			limiter := limiters.NewFixedWindow(rate, ttl, storage, limiters.NewSystemClock())
+			limiter := limiters.NewFixedWindow(rate, ttl, storage, l.clock)
 
 			// Rate limiter returns a zero duration and a possible ErrLimitExhausted when no tokens are available.
 			_, err := limiter.Limit(r.Context())
@@ -390,9 +402,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				return sessionFailRateLimit
 			}
 
-		case globalConf.EnableSlidingWindowRateLimiter:
-			log.Error("sliding-window")
-
+		case globalConf.RateLimit.EnableSlidingWindow:
 			var (
 				storage limiters.SlidingWindowIncrementer
 			)
@@ -403,10 +413,12 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				ttl  = time.Duration(per) * time.Second
 			)
 
+			rateLimitPrefix := prefix("sliding-window", key, allowanceScope)
+
 			if l.redis != nil {
-				storage = limiters.NewSlidingWindowRedis(l.redis, key)
+				storage = limiters.NewSlidingWindowRedis(l.redis, rateLimitPrefix)
 			} else {
-				storage = limiters.LocalSlidingWindow(key)
+				storage = limiters.LocalSlidingWindow(rateLimitPrefix)
 			}
 
 			// TODO: when doing rate sliding rate limits, the counts for two windows are
@@ -415,7 +427,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			//
 			//       the epsilon value is used to allow some requests to go over the defined
 			//       rate limit at any point of the calculation (start of window, end of ...).
-			limiter := limiters.NewSlidingWindow(rate, ttl, storage, limiters.NewSystemClock(), 0)
+			limiter := limiters.NewSlidingWindow(rate, ttl, storage, l.clock, 0)
 
 			// Rate limiter returns a zero duration and a possible ErrLimitExhausted when no tokens are available.
 			_, err := limiter.Limit(r.Context())
@@ -424,14 +436,10 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			}
 
 		case globalConf.EnableSentinelRateLimiter:
-			log.Error("sentinel rate limit")
-
 			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		case globalConf.EnableRedisRollingLimiter:
-			log.Error("redis rate limit")
-
 			if l.limitRedis(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
@@ -448,7 +456,6 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			}
 
 			if n <= 1 || n*c < rate {
-				log.Error("dynamic rate limiter")
 				// If we have 1 server, there is no need to strain redis at all the leaky
 				// bucket algorithm will suffice.
 				if l.limitDRL(currentSession, key, rateScope, &accessDef.Limit, dryRun) {
