@@ -1,3 +1,4 @@
+//go:generate mockgen -destination=./engine_mock_test.go -package=graphengine . Engine,ComplexityChecker,GraphQLRequestProcessor,GranularAccessChecker,ReverseProxyPreHandler
 package graphengine
 
 import (
