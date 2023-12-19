@@ -14,7 +14,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	internalgraphql "github.com/TykTechnologies/tyk/internal/graphql"
-	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
 const (
@@ -25,8 +24,8 @@ const (
 	TykGraphQLDataSource = "TykGraphQLDataSource"
 )
 
-type contextRetrieveRequestV1Func func(r *http.Request) *graphql.Request
-type contextStoreRequestV1Func func(r *http.Request, gqlRequest *graphql.Request)
+type ContextRetrieveRequestV1Func func(r *http.Request) *graphql.Request
+type ContextStoreRequestV1Func func(r *http.Request, gqlRequest *graphql.Request)
 
 type createExecutionEngineV1Params struct {
 	logger              *abstractlogger.LogrusLogger
@@ -142,7 +141,7 @@ func (g graphqlGoToolsV1) createExecutionEngine(params createExecutionEngineV1Pa
 type graphqlRequestProcessorV1 struct {
 	logger             *abstractlogger.LogrusLogger
 	schema             *graphql.Schema
-	ctxRetrieveRequest contextRetrieveRequestV1Func
+	ctxRetrieveRequest ContextRetrieveRequestV1Func
 }
 
 func (g *graphqlRequestProcessorV1) ProcessRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) (error, int) {
@@ -185,7 +184,7 @@ type graphqlRequestProcessorWithOtelV1 struct {
 	logger             *abstractlogger.LogrusLogger
 	schema             *graphql.Schema
 	otelExecutor       internalgraphql.TykOtelExecutorI
-	ctxRetrieveRequest contextRetrieveRequestV1Func
+	ctxRetrieveRequest ContextRetrieveRequestV1Func
 }
 
 func (g *graphqlRequestProcessorWithOtelV1) ProcessRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) (error, int) {
@@ -234,7 +233,7 @@ func (g *graphqlRequestProcessorWithOtelV1) ProcessRequest(ctx context.Context, 
 type complexityCheckerV1 struct {
 	logger             *abstractlogger.LogrusLogger
 	schema             *graphql.Schema
-	ctxRetrieveRequest contextRetrieveRequestV1Func
+	ctxRetrieveRequest ContextRetrieveRequestV1Func
 }
 
 func (c *complexityCheckerV1) DepthLimitExceeded(r *http.Request, accessDefinition *ComplexityAccessDefinition) ComplexityFailReason {
@@ -337,7 +336,7 @@ func (c *complexityCheckerV1) DepthLimitExceeded(r *http.Request, accessDefiniti
 type granularAccessCheckerV1 struct {
 	logger                    *abstractlogger.LogrusLogger
 	schema                    *graphql.Schema
-	ctxRetrieveGraphQLRequest contextRetrieveRequestV1Func
+	ctxRetrieveGraphQLRequest ContextRetrieveRequestV1Func
 }
 
 func (g *granularAccessCheckerV1) CheckGraphQLRequestFieldAllowance(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) GraphQLGranularAccessResult {
@@ -390,13 +389,21 @@ func (g *granularAccessCheckerV1) writeErrorResponse(w io.Writer, providedErr er
 	return graphql.RequestErrorsFromError(providedErr).WriteResponse(w)
 }
 
-type reverseProxyV1 struct {
-	logger                    *abstractlogger.LogrusLogger
-	schema                    *graphql.Schema
-	ctxRetrieveGraphQLRequest contextRetrieveRequestV1Func
+type reverseProxyPreHandlerV1 struct {
+	ctxRetrieveGraphQLRequest ContextRetrieveRequestV1Func
+	apiDefinition             *apidef.APIDefinition
+	httpClient                *http.Client
+	transportModifier         TransportModifier
 }
 
-func (r *reverseProxyV1) Handle(params ReverseProxyParams) (res *http.Response, err error) {
+func (r *reverseProxyPreHandlerV1) PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error) {
+	r.httpClient.Transport = r.transportModifier(params.RoundTripper, r.apiDefinition)
+	gqlRequest := r.ctxRetrieveGraphQLRequest(params.OutRequest)
+	if gqlRequest == nil {
+		err = errors.New("graphql request is nil")
+		return
+	}
+
 	switch {
 	case params.IsCORSPreflight:
 		if params.NeedsEngine {
@@ -405,14 +412,9 @@ func (r *reverseProxyV1) Handle(params ReverseProxyParams) (res *http.Response, 
 		}
 	case params.IsWebSocketUpgrade:
 		if params.NeedsEngine {
-			return r.handleGraphQLEngineWebsocketUpgrade(roundTripper, outreq, w)
+			return ReverseProxyTypeWebsocketUpgrade, nil
 		}
 	default:
-		gqlRequest := r.ctxRetrieveGraphQLRequest(params.OutRequest)
-		if gqlRequest == nil {
-			err = errors.New("graphql request is nil")
-			return
-		}
 		gqlRequest.SetHeader(params.OutRequest.Header)
 
 		var isIntrospection bool
@@ -422,108 +424,12 @@ func (r *reverseProxyV1) Handle(params ReverseProxyParams) (res *http.Response, 
 		}
 
 		if isIntrospection {
-			res, err = r.handleGraphQLIntrospection()
-			return
+			return ReverseProxyTypeIntrospection, nil
 		}
 		if params.NeedsEngine {
-			return r.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest, outreq)
+			return ReverseProxyTypeGraphEngine, nil
 		}
 	}
 
-	res, err = params.RoundTripper.RoundTrip(params.OutRequest)
-	return
-}
-
-func (r *reverseProxyV1) handleGraphQLIntrospection() (res *http.Response, err error) {
-	var result *graphql.ExecutionResult
-	result, err = graphql.SchemaIntrospection(r.schema)
-	if err != nil {
-		return
-	}
-
-	res = result.GetAsHTTPResponse()
-	return
-}
-
-func (r *reverseProxyV1) handoverRequestToGraphQLExecutionEngine(roundTripper http.RoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
-	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
-
-	switch p.TykAPISpec.GraphQL.Version {
-	case apidef.GraphQLConfigVersionNone:
-		fallthrough
-	case apidef.GraphQLConfigVersion1:
-		if p.TykAPISpec.GraphQLExecutor.Engine == nil {
-			err = errors.New("execution engine is nil")
-			return
-		}
-
-		var result *graphql.ExecutionResult
-		result, err = p.TykAPISpec.GraphQLExecutor.Engine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
-		if err != nil {
-			return
-		}
-
-		res = result.GetAsHTTPResponse()
-		return
-	case apidef.GraphQLConfigVersion2:
-		if p.TykAPISpec.GraphQLExecutor.EngineV2 == nil {
-			err = errors.New("execution engine is nil")
-			return
-		}
-
-		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
-		span := otel.SpanFromContext(outreq.Context())
-		reqCtx := otel.ContextWithSpan(context.Background(), span)
-		if isProxyOnly {
-			reqCtx = NewGraphQLProxyOnlyContext(reqCtx, outreq)
-		}
-
-		resultWriter := graphql.NewEngineResultWriter()
-		execOptions := []graphql.ExecutionOptionsV2{
-			graphql.WithBeforeFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.BeforeFetchHook),
-			graphql.WithAfterFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.AfterFetchHook),
-		}
-
-		upstreamHeaders := p.graphqlEngineAdditionalUpstreamHeaders(outreq)
-		execOptions = append(execOptions, graphql.WithHeaderModifier(p.graphqlEngineHeaderModifier(outreq, upstreamHeaders)))
-
-		if p.TykAPISpec.GraphQLExecutor.OtelExecutor != nil {
-			if err = p.TykAPISpec.GraphQLExecutor.OtelExecutor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
-				return
-			}
-		} else {
-			err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
-			if err != nil {
-				return
-			}
-		}
-
-		httpStatus := http.StatusOK
-		header := make(http.Header)
-		header.Set("Content-Type", "application/json")
-
-		if isProxyOnly {
-			proxyOnlyCtx := reqCtx.(*GraphQLProxyOnlyContext)
-			// There is a case in the proxy-only mode where the request can be handled
-			// by the library without calling the upstream.
-			// This is a valid query for proxy-only mode: query { __typename }
-			// In this case, upstreamResponse is nil.
-			// See TT-6419 for further info.
-			if proxyOnlyCtx.upstreamResponse != nil {
-				header = proxyOnlyCtx.upstreamResponse.Header
-				httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
-				if p.TykAPISpec.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding && httpStatus >= http.StatusBadRequest {
-					err = returnErrorsFromUpstream(proxyOnlyCtx, &resultWriter)
-					if err != nil {
-						return
-					}
-				}
-			}
-		}
-
-		res = resultWriter.AsHTTPResponse(httpStatus, header)
-		return
-	}
-
-	return nil, false, errors.New("graphql configuration is invalid")
+	return ReverseProxyTypeNone, nil
 }
