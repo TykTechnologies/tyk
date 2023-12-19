@@ -151,6 +151,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.CustomMiddleware.IdExtractor.Disabled = false
 	a.TagsDisabled = false
 	a.IsOAS = false
+	a.IDPClientIDMappingDisabled = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -181,7 +182,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.ListenPort",
 		"APIDefinition.Protocol",
 		"APIDefinition.EnableProxyProtocol",
-		"APIDefinition.IDPClientIDMappingDisabled",
 		"APIDefinition.RequestSigning.IsEnabled",
 		"APIDefinition.RequestSigning.Secret",
 		"APIDefinition.RequestSigning.KeyId",
