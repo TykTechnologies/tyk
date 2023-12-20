@@ -865,6 +865,9 @@ When both `path` and `body` are provided, body would take precedence.
 TransformResponseBody allows you to transform response body.
 When both `path` and `body` are provided, body would take precedence.
 
+**Field: `transformRequestHeaders` ([TransformHeaders](#transformheaders))**
+TransformRequestHeaders allows you to transform request headers.
+
 **Field: `cache` ([CachePlugin](#cacheplugin))**
 Cache contains the caching plugin configuration.
 
@@ -915,6 +918,27 @@ Path file path for the template.
 
 **Field: `body` (`string`)**
 Body base64 encoded representation of the template.
+
+
+### **TransformHeaders**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables Header Transform for the given path and method.
+
+**Field: `remove` (`[]string`)**
+Remove specifies header names to be removed from the request/response.
+
+**Field: `add` (`[]`[Header](#header))**
+Add specifies headers to be added to the request/response.
+
+
+### **Header**
+
+**Field: `name` (`string`)**
+Name is the name of the header.
+
+**Field: `value` (`string`)**
+Value is the value of the header.
 
 
 ### **CachePlugin**
@@ -968,15 +992,6 @@ Headers are the HTTP response headers that will be returned.
 
 **Field: `fromOASExamples` ([FromOASExamples](#fromoasexamples))**
 FromOASExamples is the configuration to extract a mock response from OAS documentation.
-
-
-### **Header**
-
-**Field: `name` (`string`)**
-Name is the name of the header.
-
-**Field: `value` (`string`)**
-Value is the value of the header.
 
 
 ### **FromOASExamples**

@@ -868,6 +868,44 @@ func (tr *TransformBody) ExtractTo(meta *apidef.TemplateMeta) {
 	}
 }
 
+// TransformHeaders holds configuration about request/response header transformations.
+type TransformHeaders struct {
+	// Enabled enables Header Transform for the given path and method.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Remove specifies header names to be removed from the request/response.
+	Remove []string `bson:"remove" json:"remove"`
+	// Add specifies headers to be added to the request/response.
+	Add []Header `bson:"add" json:"add"`
+}
+
+// Fill fills *TransformHeaders from apidef.HeaderInjectionMeta.
+func (th *TransformHeaders) Fill(meta apidef.HeaderInjectionMeta) {
+	th.Enabled = !meta.Disabled
+	th.Remove = meta.DeleteHeaders
+
+	th.Add = make([]Header, len(meta.AddHeaders))
+	i := 0
+	for k, v := range meta.AddHeaders {
+		th.Add[i] = Header{Name: k, Value: v}
+		i++
+	}
+
+	if len(th.Add) == 0 {
+		th.Add = nil
+	}
+}
+
+// ExtractTo extracts *TransformHeaders into *apidef.HeaderInjectionMeta.
+func (th *TransformHeaders) ExtractTo(meta *apidef.HeaderInjectionMeta) {
+	meta.Disabled = !th.Enabled
+	meta.DeleteHeaders = th.Remove
+
+	meta.AddHeaders = make(map[string]string, len(th.Remove))
+	for _, header := range th.Add {
+		meta.AddHeaders[header.Name] = header.Value
+	}
+}
+
 // CachePlugin holds the configuration for the cache plugins.
 type CachePlugin struct {
 	// Enabled is a boolean flag. If set to `true`, the advanced caching plugin will be enabled.
