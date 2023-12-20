@@ -56,6 +56,9 @@ type Operation struct {
 
 	// PostPlugins contains endpoint level post plugins configuration.
 	PostPlugins EndpointPostPlugins `bson:"postPlugins,omitempty" json:"postPlugins,omitempty"`
+
+	// CircuitBreaker contains the configuration for our circuit breaker functionality
+	CircuitBreaker *CircuitBreaker `bson:"circuitBreaker,omitempty" json:"circuitBreaker,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -130,6 +133,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillOASValidateRequest(ep.ValidateJSON)
 	s.fillVirtualEndpoint(ep.Virtual)
 	s.fillEndpointPostPlugins(ep.GoPlugin)
+	s.fillCircuitBreaker(ep.CircuitBreaker)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -166,6 +170,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
 					tykOp.extractVirtualEndpointTo(ep, path, method)
 					tykOp.extractEndpointPostPluginTo(ep, path, method)
+					tykOp.extractCircuitBreakerTo(ep, path, method)
 					break found
 				}
 			}
@@ -733,4 +738,29 @@ func (o *Operation) extractEndpointPostPluginTo(ep *apidef.ExtendedPathsSet, pat
 	meta := apidef.GoPluginMeta{Path: path, Method: method}
 	o.PostPlugins.ExtractTo(&meta)
 	ep.GoPlugin = append(ep.GoPlugin, meta)
+}
+
+func (o *Operation) extractCircuitBreakerTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.CircuitBreaker == nil {
+		return
+	}
+
+	meta := apidef.CircuitBreakerMeta{Path: path, Method: method}
+	o.CircuitBreaker.ExtractTo(&meta)
+	ep.CircuitBreaker = append(ep.CircuitBreaker, meta)
+}
+
+func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.CircuitBreaker == nil {
+			operation.CircuitBreaker = &CircuitBreaker{}
+		}
+
+		operation.CircuitBreaker.Fill(meta)
+		if ShouldOmit(operation.CircuitBreaker) {
+			operation.CircuitBreaker = nil
+		}
+	}
 }

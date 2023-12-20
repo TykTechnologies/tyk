@@ -1199,3 +1199,32 @@ func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
 	meta.PluginPath = e[0].Path
 	meta.SymbolName = e[0].Name
 }
+
+type CircuitBreaker struct {
+	// Enabled enables the Circuit Breaker functionality
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Threshold represents the percentage of requests that can error before the breaker is tripped. This must be a value between 0.0 and 1.0.
+	Threshold float64 `bson:"threshold" json:"threshold"`
+	// SampleSize represents the number of samples to take for a circuit breaker window
+	SampleSize int `bson:"sampleSize" json:"sampleSize"`
+	// CoolDownPeriod represents the amount of time (in seconds) needed to pass before returning to service.
+	CoolDownPeriod int `bson:"coolDownPeriod" json:"coolDownPeriod"`
+	// HalfOpened allows some requests to pass through the circuit breaker during the cool down period.
+	HalfOpenStateEnabled bool `bson:"halfOpened" json:"halfOpened"`
+}
+
+func (cb *CircuitBreaker) Fill(circuitBreaker apidef.CircuitBreakerMeta) {
+	cb.Enabled = !circuitBreaker.Disabled
+	cb.Threshold = circuitBreaker.ThresholdPercent
+	cb.SampleSize = int(circuitBreaker.Samples)
+	cb.CoolDownPeriod = circuitBreaker.ReturnToServiceAfter
+	cb.HalfOpenStateEnabled = !circuitBreaker.DisableHalfOpenState
+}
+
+func (cb *CircuitBreaker) ExtractTo(circuitBreaker *apidef.CircuitBreakerMeta) {
+	circuitBreaker.Disabled = !cb.Enabled
+	circuitBreaker.ThresholdPercent = cb.Threshold
+	circuitBreaker.Samples = int64(cb.SampleSize)
+	circuitBreaker.ReturnToServiceAfter = cb.CoolDownPeriod
+	circuitBreaker.DisableHalfOpenState = !cb.HalfOpenStateEnabled
+}

@@ -886,6 +886,8 @@ VirtualEndpoint contains virtual endpoint configuration.
 **Field: `postPlugins` (`[]`[EndpointPostPlugin](#endpointpostplugin))**
 PostPlugins contains endpoint level post plugins configuration.
 
+**Field `circuitBreaker` ([CircuitBreaker](#circuitbreaker))**
+CircuitBreaker contains circuit breaker configuration.
 
 ### **Allowance**
 
@@ -1029,6 +1031,30 @@ ProxyOnError proxies if virtual endpoint errors out.
 **Field: `requireSession` (`boolean`)**
 RequireSession if enabled passes session to virtual endpoint.
 
+### **CircuitBreaker**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables circuit breaker.
+
+**Field: `path` (`string`)**
+The path to match on.
+
+**Field: `method` (`string`)**
+The method to match on.
+
+**Field: `thresholdPercent` (`float64`)**
+The percentage of requests that can error before the breaker is tripped. This must be a value between 0.0 and 1.0.
+
+**Field: `samples` (`int64`)**
+The number of samples to take for a circuit breaker window.
+
+**Field: `returnToServiceAfter` (`int`)**
+The cool-down period of the breaker to return to service (seconds).
+
+**Field: `disableHalfOpenState` (`boolean`)**
+By default the Tyk circuit breaker has enabled the half-open state,
+if the desired behavior is to only check after the time configured 
+in return_to_service_after is consumed then you can disable this by this option to true.
 
 ### **EndpointPostPlugin**
 
