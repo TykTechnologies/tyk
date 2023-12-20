@@ -2,6 +2,7 @@ package graphengine
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,9 +15,10 @@ import (
 )
 
 type engineV1Mocks struct {
-	controller        *gomock.Controller
-	requestProcessor  *MockGraphQLRequestProcessor
-	complexityChecker *MockComplexityChecker
+	controller            *gomock.Controller
+	requestProcessor      *MockGraphQLRequestProcessor
+	complexityChecker     *MockComplexityChecker
+	granularAccessChecker *MockGranularAccessChecker
 }
 
 func TestEngineV1_HasSchema(t *testing.T) {
@@ -118,18 +120,77 @@ func TestEngineV1_ProcessGraphQLComplexity(t *testing.T) {
 	})
 }
 
+func TestEngineV1_ProcessGraphQLGranularAccess(t *testing.T) {
+	t.Run("should return error and status code 500 if the underlying granular access checker returns an internal fail reason", func(t *testing.T) {
+		engine, mocks := newTestEngineV1(t)
+		defer mocks.controller.Finish()
+		request, err := http.NewRequest(http.MethodPost, "http://example.com", bytes.NewBuffer([]byte(`{"query": "query { hello }"}`)))
+		require.NoError(t, err)
+
+		recorder := httptest.NewRecorder()
+		accessDefinition := &GranularAccessDefinition{}
+		mocks.granularAccessChecker.EXPECT().CheckGraphQLRequestFieldAllowance(gomock.Eq(recorder), gomock.Eq(request), gomock.Eq(accessDefinition)).
+			Return(GraphQLGranularAccessResult{
+				FailReason: GranularAccessFailReasonInternalError,
+			})
+
+		err, statusCode := engine.ProcessGraphQLGranularAccess(recorder, request, accessDefinition)
+		assert.Error(t, err)
+		assert.Equal(t, 500, statusCode)
+	})
+
+	t.Run("should return error and status code 400 if the underlying granular access checker returns a validation fail reason", func(t *testing.T) {
+		engine, mocks := newTestEngineV1(t)
+		defer mocks.controller.Finish()
+		request, err := http.NewRequest(http.MethodPost, "http://example.com", bytes.NewBuffer([]byte(`{"query": "query { hello }"}`)))
+		require.NoError(t, err)
+
+		recorder := httptest.NewRecorder()
+		accessDefinition := &GranularAccessDefinition{}
+		mocks.granularAccessChecker.EXPECT().CheckGraphQLRequestFieldAllowance(gomock.Eq(recorder), gomock.Eq(request), gomock.Eq(accessDefinition)).
+			Return(GraphQLGranularAccessResult{
+				FailReason:      GranularAccessFailReasonValidationError,
+				ValidationError: errors.New("failed validation"),
+			})
+
+		err, statusCode := engine.ProcessGraphQLGranularAccess(recorder, request, accessDefinition)
+		assert.Error(t, err)
+		assert.Equal(t, 400, statusCode)
+	})
+
+	t.Run("should return no error and status code 200 if the underlying granular access checker returns no fail reason", func(t *testing.T) {
+		engine, mocks := newTestEngineV1(t)
+		defer mocks.controller.Finish()
+		request, err := http.NewRequest(http.MethodPost, "http://example.com", bytes.NewBuffer([]byte(`{"query": "query { hello }"}`)))
+		require.NoError(t, err)
+
+		recorder := httptest.NewRecorder()
+		accessDefinition := &GranularAccessDefinition{}
+		mocks.granularAccessChecker.EXPECT().CheckGraphQLRequestFieldAllowance(gomock.Eq(recorder), gomock.Eq(request), gomock.Eq(accessDefinition)).
+			Return(GraphQLGranularAccessResult{
+				FailReason: GranularAccessFailReasonNone,
+			})
+
+		err, statusCode := engine.ProcessGraphQLGranularAccess(recorder, request, accessDefinition)
+		assert.NoError(t, err)
+		assert.Equal(t, 200, statusCode)
+	})
+}
+
 func newTestEngineV1(t *testing.T) (*EngineV1, engineV1Mocks) {
 	ctrl := gomock.NewController(t)
 	mocks := engineV1Mocks{
-		controller:        ctrl,
-		requestProcessor:  NewMockGraphQLRequestProcessor(ctrl),
-		complexityChecker: NewMockComplexityChecker(ctrl),
+		controller:            ctrl,
+		requestProcessor:      NewMockGraphQLRequestProcessor(ctrl),
+		complexityChecker:     NewMockComplexityChecker(ctrl),
+		granularAccessChecker: NewMockGranularAccessChecker(ctrl),
 	}
 
 	engine := &EngineV1{
 		logger:                  abstractlogger.NoopLogger,
 		graphqlRequestProcessor: mocks.requestProcessor,
 		complexityChecker:       mocks.complexityChecker,
+		granularAccessChecker:   mocks.granularAccessChecker,
 	}
 
 	return engine, mocks
