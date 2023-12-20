@@ -26,7 +26,7 @@ type EngineV1 struct {
 	OTelConfig         otel.OpenTelemetry
 	OTelTracerProvider otel.TracerProvider
 
-	logger                  *abstractlogger.LogrusLogger
+	logger                  abstractlogger.Logger
 	gqlTools                graphqlGoToolsV1
 	graphqlRequestProcessor GraphQLRequestProcessor
 	complexityChecker       ComplexityChecker
