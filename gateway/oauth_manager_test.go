@@ -44,7 +44,7 @@ const (
 const keyRules = `{
 	"last_check": 1402492859,
 	"org_id": "53ac07777cbb8c2d53000002",
-	"rate": 1,
+	"rate": 3,
 	"per": 1,
 	"quota_max": -1,
 	"quota_renews": 1399567002,
@@ -55,7 +55,7 @@ const keyRules = `{
 const keyRulesWithMetadata = `{
 	"last_check": 1402492859,
 	"org_id": "53ac07777cbb8c2d53000002",
-	"rate": 1,
+	"rate": 3,
 	"per": 1,
 	"quota_max": -1,
 	"quota_renews": 1399567002,

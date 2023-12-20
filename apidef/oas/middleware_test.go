@@ -698,3 +698,15 @@ func TestEndpointPostPlugins(t *testing.T) {
 		assert.Equal(t, expectedEndpointPostPlugins, actualEndpointPostPlugins)
 	})
 }
+
+func TestTransformHeaders(t *testing.T) {
+	var emptyTransformHeaders TransformHeaders
+
+	var converted apidef.HeaderInjectionMeta
+	emptyTransformHeaders.ExtractTo(&converted)
+
+	var resultTransformHeaders TransformHeaders
+	resultTransformHeaders.Fill(converted)
+
+	assert.Equal(t, emptyTransformHeaders, resultTransformHeaders)
+}
