@@ -39,6 +39,9 @@ type Operation struct {
 	// TransformRequestHeaders allows you to transform request headers.
 	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
 
+	// TransformResponseHeaders allows you to transform response headers.
+	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
+
 	// Cache contains the caching plugin configuration.
 	Cache *CachePlugin `bson:"cache,omitempty" json:"cache,omitempty"`
 
@@ -125,6 +128,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTransformRequestBody(ep.Transform)
 	s.fillTransformResponseBody(ep.TransformResponse)
 	s.fillTransformRequestHeaders(ep.TransformHeader)
+	s.fillTransformResponseHeaders(ep.TransformResponseHeader)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillOASValidateRequest(ep.ValidateJSON)
@@ -162,6 +166,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTransformRequestBodyTo(ep, path, method)
 					tykOp.extractTransformResponseBodyTo(ep, path, method)
 					tykOp.extractTransformRequestHeadersTo(ep, path, method)
+					tykOp.extractTransformResponseHeadersTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
 					tykOp.extractVirtualEndpointTo(ep, path, method)
@@ -267,6 +272,22 @@ func (s *OAS) fillTransformRequestHeaders(metas []apidef.HeaderInjectionMeta) {
 	}
 }
 
+func (s *OAS) fillTransformResponseHeaders(metas []apidef.HeaderInjectionMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		if operation.TransformResponseHeaders == nil {
+			operation.TransformResponseHeaders = &TransformHeaders{}
+		}
+
+		operation.TransformResponseHeaders.Fill(meta)
+		if ShouldOmit(operation.TransformResponseHeaders) {
+			operation.TransformResponseHeaders = nil
+		}
+	}
+}
+
 func (s *OAS) fillCache(metas []apidef.CacheMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -357,6 +378,16 @@ func (o *Operation) extractTransformRequestHeadersTo(ep *apidef.ExtendedPathsSet
 	meta := apidef.HeaderInjectionMeta{Path: path, Method: method}
 	o.TransformRequestHeaders.ExtractTo(&meta)
 	ep.TransformHeader = append(ep.TransformHeader, meta)
+}
+
+func (o *Operation) extractTransformResponseHeadersTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.TransformResponseHeaders == nil {
+		return
+	}
+
+	meta := apidef.HeaderInjectionMeta{Path: path, Method: method}
+	o.TransformResponseHeaders.ExtractTo(&meta)
+	ep.TransformResponseHeader = append(ep.TransformResponseHeader, meta)
 }
 
 func (o *Operation) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {

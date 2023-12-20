@@ -762,6 +762,9 @@
         "transformRequestHeaders": {
           "$ref": "#/definitions/X-Tyk-TransformHeaders"
         },
+        "transformResponseHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders"
+        },
         "virtualEndpoint": {
           "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
         },
