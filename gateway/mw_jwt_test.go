@@ -2325,7 +2325,7 @@ func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -2333,7 +2333,7 @@ func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/"
-	})
+	})[0]
 
 	pID := ts.CreatePolicy()
 	userID := uuid.New()
@@ -2348,14 +2348,26 @@ func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 
-	_, _ = ts.Run(t, test.TestCase{Headers: authHeaders, Code: http.StatusOK})
-
 	keyID := fmt.Sprintf("%x", md5.Sum([]byte(userID)))
 	sessionID := ts.Gw.generateToken("default", keyID)
 
-	privateSession, found := ts.Gw.GlobalSessionManager.SessionDetail("default", sessionID, false)
-	assert.True(t, found)
-	assert.Equal(t, myOKTAClientID, privateSession.OauthClientID)
+	t.Run("DCR enabled", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{Headers: authHeaders, Code: http.StatusOK})
+
+		privateSession, found := ts.Gw.GlobalSessionManager.SessionDetail("default", sessionID, false)
+		assert.True(t, found)
+		assert.Equal(t, myOKTAClientID, privateSession.OauthClientID)
+	})
+
+	t.Run("DCR disabled", func(t *testing.T) {
+		api.IDPClientIDMappingDisabled = true
+		ts.Gw.LoadAPI(api)
+		_, _ = ts.Run(t, test.TestCase{Headers: authHeaders, Code: http.StatusOK})
+
+		privateSession, found := ts.Gw.GlobalSessionManager.SessionDetail("default", sessionID, false)
+		assert.True(t, found)
+		assert.Empty(t, privateSession.OauthClientID)
+	})
 }
 
 func Test_getOAuthClientIDFromClaim(t *testing.T) {

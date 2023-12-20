@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -171,10 +170,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 	}
 
-	if memProfFile != nil {
-		pprof.WriteHeapProfile(memProfFile)
-	}
-
 	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
@@ -318,8 +313,4 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
-
-	if memProfFile != nil {
-		pprof.WriteHeapProfile(memProfFile)
-	}
 }

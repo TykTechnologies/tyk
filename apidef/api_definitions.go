@@ -183,11 +183,16 @@ type TransformJQMeta struct {
 }
 
 type HeaderInjectionMeta struct {
+	Disabled      bool              `bson:"disabled" json:"disabled"`
 	DeleteHeaders []string          `bson:"delete_headers" json:"delete_headers"`
 	AddHeaders    map[string]string `bson:"add_headers" json:"add_headers"`
 	Path          string            `bson:"path" json:"path"`
 	Method        string            `bson:"method" json:"method"`
 	ActOnResponse bool              `bson:"act_on" json:"act_on"`
+}
+
+func (h *HeaderInjectionMeta) Enabled() bool {
+	return !h.Disabled && (len(h.AddHeaders) > 0 || len(h.DeleteHeaders) > 0)
 }
 
 type HardTimeoutMeta struct {
@@ -360,15 +365,53 @@ type VersionInfo struct {
 		WhiteList []string `bson:"white_list" json:"white_list"`
 		BlackList []string `bson:"black_list" json:"black_list"`
 	} `bson:"paths" json:"paths"`
-	UseExtendedPaths            bool              `bson:"use_extended_paths" json:"use_extended_paths"`
-	ExtendedPaths               ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
-	GlobalHeaders               map[string]string `bson:"global_headers" json:"global_headers"`
-	GlobalHeadersRemove         []string          `bson:"global_headers_remove" json:"global_headers_remove"`
-	GlobalResponseHeaders       map[string]string `bson:"global_response_headers" json:"global_response_headers"`
-	GlobalResponseHeadersRemove []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
-	IgnoreEndpointCase          bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
-	GlobalSizeLimit             int64             `bson:"global_size_limit" json:"global_size_limit"`
-	OverrideTarget              string            `bson:"override_target" json:"override_target"`
+	UseExtendedPaths              bool              `bson:"use_extended_paths" json:"use_extended_paths"`
+	ExtendedPaths                 ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
+	GlobalHeaders                 map[string]string `bson:"global_headers" json:"global_headers"`
+	GlobalHeadersRemove           []string          `bson:"global_headers_remove" json:"global_headers_remove"`
+	GlobalHeadersDisabled         bool              `bson:"global_headers_disabled" json:"global_headers_disabled"`
+	GlobalResponseHeaders         map[string]string `bson:"global_response_headers" json:"global_response_headers"`
+	GlobalResponseHeadersRemove   []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
+	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
+	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
+	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit"`
+	OverrideTarget                string            `bson:"override_target" json:"override_target"`
+}
+
+func (v *VersionInfo) GlobalHeadersEnabled() bool {
+	return !v.GlobalHeadersDisabled && (len(v.GlobalHeaders) > 0 || len(v.GlobalHeadersRemove) > 0)
+}
+
+func (v *VersionInfo) GlobalResponseHeadersEnabled() bool {
+	return !v.GlobalResponseHeadersDisabled && (len(v.GlobalResponseHeaders) > 0 || len(v.GlobalResponseHeadersRemove) > 0)
+}
+
+func (v *VersionInfo) HasEndpointReqHeader() bool {
+	if !v.UseExtendedPaths {
+		return false
+	}
+
+	for _, trh := range v.ExtendedPaths.TransformHeader {
+		if trh.Enabled() {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (v *VersionInfo) HasEndpointResHeader() bool {
+	if !v.UseExtendedPaths {
+		return false
+	}
+
+	for _, trh := range v.ExtendedPaths.TransformResponseHeader {
+		if trh.Enabled() {
+			return true
+		}
+	}
+
+	return false
 }
 
 type AuthProviderMeta struct {
@@ -565,6 +608,7 @@ type APIDefinition struct {
 	JWTNotBeforeValidationSkew           uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	JWTSkipKid                           bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
 	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
+	IDPClientIDMappingDisabled           bool                   `bson:"idp_client_id_mapping_disabled" json:"idp_client_id_mapping_disabled"`
 	JWTScopeToPolicyMapping              map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
 	JWTScopeClaimName                    string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
 	NotificationsDetails                 NotificationsManager   `bson:"notifications" json:"notifications"`
