@@ -564,6 +564,33 @@
       ],
       "minProperties": 3
     },
+    "X-Tyk-TransformHeaders": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "remove": {
+          "type": "array",
+          "items": [
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "add": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-Header"
+            }
+          ]
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-CachePlugin": {
       "type": "object",
       "properties": {
@@ -731,6 +758,9 @@
         },
         "transformResponseBody": {
           "$ref": "#/definitions/X-Tyk-TransformBody"
+        },
+        "transformRequestHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders"
         },
         "virtualEndpoint": {
           "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
