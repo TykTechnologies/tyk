@@ -1575,18 +1575,21 @@ func Start() {
 		os.Exit(0)
 	}
 
-	gwConfig := config.Config{}
-	if err := config.Load(confPaths, &gwConfig); err != nil {
-		mainLog.Errorf("Error loading config, using defaults: %v", err)
-		gwConfig = config.Default
+	loadConfig := func() config.Config {
+		gwConfig := config.Config{}
+		if err := config.Load(confPaths, &gwConfig); err != nil {
+			mainLog.Errorf("Error loading config, using defaults: %v", err)
+			return config.Default
+		}
+		return gwConfig
 	}
 
-	gw := NewGateway(gwConfig, ctx)
+	gw := NewGateway(loadConfig(), ctx)
 	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 
-	gwConfig = gw.GetConfig()
+	gwConfig := gw.GetConfig()
 	if gwConfig.ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
