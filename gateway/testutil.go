@@ -1714,12 +1714,12 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	gwConf := gw.GetConfig()
 	oldPath := gwConf.AppPath
 	gwConf.AppPath, _ = ioutil.TempDir("", "apps")
-	gw.SetConfig(gwConf, true)
+	gw.SetConfig(gwConf)
 	defer func() {
 		globalConf := gw.GetConfig()
 		os.RemoveAll(globalConf.AppPath)
 		globalConf.AppPath = oldPath
-		gw.SetConfig(globalConf, true)
+		gw.SetConfig(globalConf)
 	}()
 
 	for i, spec := range specs {
