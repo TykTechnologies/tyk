@@ -2090,7 +2090,7 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 		storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
 			fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
 
-		storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+		storageManager := ts.Gw.getGlobalStorageHandler(generateOAuthPrefix(spec.APIID), false)
 		storageManager.Connect()
 
 		assertTokensLen(t, storageManager, storageKey1, 3)
