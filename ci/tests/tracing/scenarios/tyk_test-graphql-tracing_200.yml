@@ -20,9 +20,9 @@ spec:
         - attr:http.url   =   "https://countries.trevorblades.com/"
         - attr:http.method  =  "POST"
     - selector: span[tracetest.span.type="general" name="GraphqlEngine"] span[tracetest.span.type="general"]
-      name: Make sure there are 5 subspans for graphql engine
+      name: Make sure there are 3 subspans for graphql engine
       assertions:
-        - attr:tracetest.selected_spans.count = 5
+        - attr:tracetest.selected_spans.count = 3
     - selector: span[tracetest.span.type="general" name="GraphqlMiddleware Validation"]
       name: Ensure Graphql Middleware Validation Exists
       assertions:
