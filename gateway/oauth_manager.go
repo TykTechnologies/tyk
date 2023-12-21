@@ -13,28 +13,18 @@ import (
 	"sync"
 	"time"
 
-<<<<<<< HEAD
 	"github.com/TykTechnologies/tyk/request"
-	"github.com/sirupsen/logrus"
-
-=======
 	"github.com/hashicorp/go-multierror"
->>>>>>> 63739304... [TT-10189/TT-10467] Add OAuthPurgeLapsedTokens (#5766)
 	"github.com/lonelycode/osin"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/TykTechnologies/tyk/internal/uuid"
-	"github.com/TykTechnologies/tyk/request"
-
 	"strconv"
 
-<<<<<<< HEAD
+	"github.com/TykTechnologies/tyk/internal/uuid"
+
 	"github.com/TykTechnologies/tyk/headers"
-=======
-	"github.com/TykTechnologies/tyk/header"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
->>>>>>> 63739304... [TT-10189/TT-10467] Add OAuthPurgeLapsedTokens (#5766)
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
