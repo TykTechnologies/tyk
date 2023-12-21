@@ -28,7 +28,7 @@ type ContextRetrieveRequestV1Func func(r *http.Request) *graphql.Request
 type ContextStoreRequestV1Func func(r *http.Request, gqlRequest *graphql.Request)
 
 type createExecutionEngineV1Params struct {
-	logger              *abstractlogger.LogrusLogger
+	logger              abstractlogger.Logger
 	apiDef              *apidef.APIDefinition
 	schema              *graphql.Schema
 	httpClient          *http.Client
