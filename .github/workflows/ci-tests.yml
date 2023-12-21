@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - release-**
+      - test/tt-10838/fix-nodeid-tests
     types:
       - opened
       - reopened
