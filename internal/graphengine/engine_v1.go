@@ -170,7 +170,7 @@ func (e *EngineV1) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 	case ReverseProxyTypeIntrospection:
 		return e.handleGraphQLIntrospection()
 	case ReverseProxyTypeWebsocketUpgrade:
-		break
+		return e.handleWebsocketUpgrade(&params)
 	case ReverseProxyTypeGraphEngine:
 		return e.handoverRequestToGraphQLExecutionEngine(params.RoundTripper, gqlRequest, params.OutRequest)
 	default:

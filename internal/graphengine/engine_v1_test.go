@@ -2,23 +2,28 @@ package graphengine
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/golang/mock/gomock"
 	"github.com/jensneuse/abstractlogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type engineV1Mocks struct {
-	controller            *gomock.Controller
-	requestProcessor      *MockGraphQLRequestProcessor
-	complexityChecker     *MockComplexityChecker
-	granularAccessChecker *MockGranularAccessChecker
+	controller             *gomock.Controller
+	requestProcessor       *MockGraphQLRequestProcessor
+	complexityChecker      *MockComplexityChecker
+	granularAccessChecker  *MockGranularAccessChecker
+	reverseProxyPreHandler *MockReverseProxyPreHandler
 }
 
 func TestEngineV1_HasSchema(t *testing.T) {
@@ -177,21 +182,186 @@ func TestEngineV1_ProcessGraphQLGranularAccess(t *testing.T) {
 	})
 }
 
-func newTestEngineV1(t *testing.T) (*EngineV1, engineV1Mocks) {
-	ctrl := gomock.NewController(t)
-	mocks := engineV1Mocks{
-		controller:            ctrl,
-		requestProcessor:      NewMockGraphQLRequestProcessor(ctrl),
-		complexityChecker:     NewMockComplexityChecker(ctrl),
-		granularAccessChecker: NewMockGranularAccessChecker(ctrl),
+func TestEngineV1_HandleReverseProxy(t *testing.T) {
+	t.Run("should return error if reverse proxy pre handler returns error", func(t *testing.T) {
+		engine, mocks := newTestEngineV1(t)
+		defer mocks.controller.Finish()
+		params := ReverseProxyParams{
+			OutRequest: &http.Request{},
+		}
+		mocks.reverseProxyPreHandler.EXPECT().PreHandle(gomock.Eq(params)).
+			Return(ReverseProxyTypeNone, errors.New("error"))
+
+		_, hijacked, err := engine.HandleReverseProxy(params)
+		assert.Error(t, err)
+		assert.False(t, hijacked)
+	})
+
+	t.Run("should return error if execution engine is nil", func(t *testing.T) {
+		engine, mocks := newTestEngineV1(t)
+		defer mocks.controller.Finish()
+		params := ReverseProxyParams{
+			OutRequest: &http.Request{},
+		}
+		mocks.reverseProxyPreHandler.EXPECT().PreHandle(gomock.Eq(params)).
+			Return(ReverseProxyTypeGraphEngine, nil)
+
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
+			return &graphql.Request{} // return empty request to avoid nil pointer dereference. We don't care about the request in this test
+		}
+
+		engine.ExecutionEngine = nil
+
+		_, hijacked, err := engine.HandleReverseProxy(params)
+		assert.Error(t, err)
+		assert.False(t, hijacked)
+	})
+
+	t.Run("should execute graphql introspection if reverse proxy pre handler returns reverse proxy type introspection", func(t *testing.T) {
+		engine, mocks := newTestEngineV1(t)
+		defer mocks.controller.Finish()
+		params := ReverseProxyParams{
+			OutRequest: &http.Request{},
+		}
+		mocks.reverseProxyPreHandler.EXPECT().PreHandle(gomock.Eq(params)).
+			Return(ReverseProxyTypeIntrospection, nil)
+
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
+			return &graphql.Request{} // return empty request to avoid nil pointer dereference. We don't care about the request in this test
+		}
+
+		result, hijacked, err := engine.HandleReverseProxy(params)
+		body := bytes.Buffer{}
+		_, _ = body.ReadFrom(result.Body)
+
+		assert.NoError(t, err)
+		assert.False(t, hijacked)
+		assert.Equal(t, 200, result.StatusCode)
+		assert.Equal(t, testIntrospectionResultEngineV1, body.String())
+	})
+
+	t.Run("should handover request to graphql execution engine if reverse proxy pre handler returns reverse proxy type graph engine", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"hello": "world"}`))
+		}))
+		t.Cleanup(server.Close)
+
+		engine, mocks := newTestEngineV1(t, withTargetURLTestEngineV1(server.URL))
+		defer mocks.controller.Finish()
+		params := ReverseProxyParams{
+			OutRequest: &http.Request{},
+		}
+		mocks.reverseProxyPreHandler.EXPECT().PreHandle(gomock.Eq(params)).
+			Return(ReverseProxyTypeGraphEngine, nil)
+
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
+			return &graphql.Request{
+				Query: "query { hello }",
+			}
+		}
+
+		result, hijacked, err := engine.HandleReverseProxy(params)
+		body := bytes.Buffer{}
+		_, _ = body.ReadFrom(result.Body)
+
+		assert.NoError(t, err)
+		assert.False(t, hijacked)
+		assert.Equal(t, 200, result.StatusCode)
+		assert.Equal(t, `{"data":{"hello":"world"}}`, body.String())
+	})
+}
+
+type testEngineV1Options struct {
+	targetURL string
+}
+
+type testEngineV1Option func(*testEngineV1Options)
+
+func withTargetURLTestEngineV1(targetURL string) testEngineV1Option {
+	return func(options *testEngineV1Options) {
+		options.targetURL = targetURL
+	}
+}
+
+func newTestEngineV1(t *testing.T, options ...testEngineV1Option) (*EngineV1, engineV1Mocks) {
+	definedOptions := testEngineV1Options{}
+	for _, option := range options {
+		option(&definedOptions)
 	}
 
+	ctrl := gomock.NewController(t)
+	mocks := engineV1Mocks{
+		controller:             ctrl,
+		requestProcessor:       NewMockGraphQLRequestProcessor(ctrl),
+		complexityChecker:      NewMockComplexityChecker(ctrl),
+		granularAccessChecker:  NewMockGranularAccessChecker(ctrl),
+		reverseProxyPreHandler: NewMockReverseProxyPreHandler(ctrl),
+	}
+
+	gqlTools := graphqlGoToolsV1{}
+	schema, err := gqlTools.parseSchema(testSchemaEngineV1)
+	require.NoError(t, err)
+
+	executionEngine, err := gqlTools.createExecutionEngine(createExecutionEngineV1Params{
+		logger: abstractlogger.NoopLogger,
+		apiDef: generateApiDefinitionEngineV1(definedOptions.targetURL),
+		schema: schema,
+	})
+
 	engine := &EngineV1{
+		ExecutionEngine:         executionEngine,
+		Schema:                  schema,
 		logger:                  abstractlogger.NoopLogger,
 		graphqlRequestProcessor: mocks.requestProcessor,
 		complexityChecker:       mocks.complexityChecker,
 		granularAccessChecker:   mocks.granularAccessChecker,
+		reverseProxyPreHandler:  mocks.reverseProxyPreHandler,
 	}
 
 	return engine, mocks
 }
+
+func generateApiDefinitionEngineV1(targetURL string) *apidef.APIDefinition {
+	return &apidef.APIDefinition{
+		GraphQL: apidef.GraphQLConfig{
+			Enabled:          true,
+			ExecutionMode:    apidef.GraphQLExecutionModeExecutionEngine,
+			Version:          apidef.GraphQLConfigVersion1,
+			Schema:           testSchemaEngineV1,
+			LastSchemaUpdate: nil,
+			TypeFieldConfigurations: []datasource.TypeFieldConfiguration{
+				{
+					TypeName:  "Query",
+					FieldName: "hello",
+					Mapping:   nil,
+					DataSource: datasource.SourceConfig{
+						Name: "HTTPJSONDataSource",
+						Config: json.RawMessage(`{
+						  "url": "` + targetURL + `",
+						  "method": "GET",
+						  "body": "",
+						  "headers": [],
+						  "default_type_name": "String",
+						  "status_code_type_name_mappings": [
+							{
+							  "status_code": 200,
+							  "type_name": ""
+							}
+						  ]
+						}`),
+					},
+					DataSourcePlannerFactory: nil,
+				},
+			},
+		},
+	}
+}
+
+var testSchemaEngineV1 = `
+type Query {
+	hello: String
+}
+`
+
+var testIntrospectionResultEngineV1 = `{"data":{"__schema":{"queryType":{"name":"Query"},"mutationType":null,"subscriptionType":null,"types":[{"kind":"OBJECT","name":"Query","description":"","fields":[{"name":"hello","description":"","args":[],"type":{"kind":"SCALAR","name":"String","ofType":null},"isDeprecated":false,"deprecationReason":null}],"inputFields":[],"interfaces":[],"enumValues":[],"possibleTypes":[]},{"kind":"SCALAR","name":"Int","description":"The 'Int' scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.","fields":[],"inputFields":[],"interfaces":[],"enumValues":[],"possibleTypes":[]},{"kind":"SCALAR","name":"Float","description":"The 'Float' scalar type represents signed double-precision fractional values as specified by [IEEE 754](http://en.wikipedia.org/wiki/IEEE_floating_point).","fields":[],"inputFields":[],"interfaces":[],"enumValues":[],"possibleTypes":[]},{"kind":"SCALAR","name":"String","description":"The 'String' scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.","fields":[],"inputFields":[],"interfaces":[],"enumValues":[],"possibleTypes":[]},{"kind":"SCALAR","name":"Boolean","description":"The 'Boolean' scalar type represents 'true' or 'false' .","fields":[],"inputFields":[],"interfaces":[],"enumValues":[],"possibleTypes":[]},{"kind":"SCALAR","name":"ID","description":"The 'ID' scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as '4') or integer (such as 4) input value will be accepted as an ID.","fields":[],"inputFields":[],"interfaces":[],"enumValues":[],"possibleTypes":[]}],"directives":[{"name":"include","description":"Directs the executor to include this field or fragment only when the argument is true.","locations":["FIELD","FRAGMENT_SPREAD","INLINE_FRAGMENT"],"args":[{"name":"if","description":"Included when true.","type":{"kind":"NON_NULL","name":null,"ofType":{"kind":"SCALAR","name":"Boolean","ofType":null}},"defaultValue":null}],"isRepeatable":false},{"name":"skip","description":"Directs the executor to skip this field or fragment when the argument is true.","locations":["FIELD","FRAGMENT_SPREAD","INLINE_FRAGMENT"],"args":[{"name":"if","description":"Skipped when true.","type":{"kind":"NON_NULL","name":null,"ofType":{"kind":"SCALAR","name":"Boolean","ofType":null}},"defaultValue":null}],"isRepeatable":false},{"name":"deprecated","description":"Marks an element of a GraphQL schema as no longer supported.","locations":["FIELD_DEFINITION","ENUM_VALUE"],"args":[{"name":"reason","description":"Explains why this element was deprecated, usually also including a suggestion\n    for how to access supported similar data. Formatted in\n    [Markdown](https://daringfireball.net/projects/markdown/).","type":{"kind":"SCALAR","name":"String","ofType":null},"defaultValue":"\"No longer supported\""}],"isRepeatable":false}]}}}
+`
