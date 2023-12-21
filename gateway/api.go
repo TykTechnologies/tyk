@@ -34,7 +34,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -51,12 +50,21 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/internal/url"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
+)
+
+const (
+	oAuthClientTokensKeyPattern = "oauth-data.*oauth-client-tokens.*"
+)
+
+var (
+	ErrRequestMalformed = errors.New("request malformed")
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful
@@ -2042,6 +2050,26 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 	}).Info("Retrieved OAuth client ID")
 
 	return reportableClientData, http.StatusOK
+}
+
+func (gw *Gateway) oAuthTokensHandler(w http.ResponseWriter, r *http.Request) {
+	if !url.QueryHas(r.URL.Query(), "scope") {
+		doJSONWrite(w, http.StatusUnprocessableEntity, apiError("scope parameter is required"))
+		return
+	}
+
+	if r.URL.Query().Get("scope") != "lapsed" {
+		doJSONWrite(w, http.StatusBadRequest, apiError("unknown scope"))
+		return
+	}
+
+	err := gw.purgeLapsedOAuthTokens()
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError("error purging lapsed tokens"))
+		return
+	}
+
+	doJSONWrite(w, http.StatusOK, apiOk("lapsed tokens purged"))
 }
 
 // Delete Client

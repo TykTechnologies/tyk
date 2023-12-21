@@ -10,19 +10,21 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/TykTechnologies/tyk/request"
-	"github.com/sirupsen/logrus"
-
+	"github.com/hashicorp/go-multierror"
 	"github.com/lonelycode/osin"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
-
-	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"strconv"
 
+	"github.com/TykTechnologies/tyk/internal/uuid"
+
 	"github.com/TykTechnologies/tyk/headers"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1185,4 +1187,49 @@ func (r *RedisOsinStorageInterface) SetUser(username string, session *user.Sessi
 
 	return nil
 
+}
+
+func (gw *Gateway) purgeLapsedOAuthTokens() error {
+	if gw.GetConfig().OauthTokenExpiredRetainPeriod <= 0 {
+		return nil
+	}
+
+	redisCluster := &storage.RedisCluster{KeyPrefix: "", HashKeys: false, RedisController: gw.RedisController}
+	keys, err := redisCluster.ScanKeys(oAuthClientTokensKeyPattern)
+
+	if err != nil {
+		log.WithError(err).Debug("error while scanning for tokens")
+		return err
+	}
+
+	nowTs := time.Now().Unix()
+	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
+	cleanupStartScore := strconv.FormatInt(nowTs-int64(gw.GetConfig().OauthTokenExpiredRetainPeriod), 10)
+
+	var wg sync.WaitGroup
+
+	errs := make(chan error, len(keys))
+	for _, key := range keys {
+		wg.Add(1)
+		go func(k string) {
+			defer wg.Done()
+			if err := redisCluster.RemoveSortedSetRange(k, "-inf", cleanupStartScore); err != nil {
+				errs <- err
+			}
+		}(key)
+	}
+
+	// Wait for all goroutines to finish
+	wg.Wait()
+	close(errs)
+
+	combinedErr := &multierror.Error{
+		ErrorFormat: tykerrors.Formatter,
+	}
+
+	for err := range errs {
+		combinedErr = multierror.Append(combinedErr, err)
+	}
+
+	return combinedErr.ErrorOrNil()
 }
