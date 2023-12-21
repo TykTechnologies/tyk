@@ -99,8 +99,9 @@ type Gateway struct {
 
 	ctx context.Context
 
-	muNodeID   sync.Mutex // guards NodeID
-	NodeID     string
+	nodeIDMu sync.Mutex
+	nodeID   string
+
 	drlOnce    sync.Once
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
@@ -205,21 +206,21 @@ type hostDetails struct {
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
-	gw := Gateway{
+	gw := &Gateway{
 		DefaultProxyMux: &proxyMux{
 			again: again.New(),
 		},
 		ctx: ctx,
 	}
 
-	gw.Analytics = RedisAnalyticsHandler{Gw: &gw}
+	gw.Analytics = RedisAnalyticsHandler{Gw: gw}
 	gw.SetConfig(config)
-	sessionManager := DefaultSessionManager{Gw: &gw}
+	sessionManager := DefaultSessionManager{Gw: gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
-	gw.DefaultOrgStore = DefaultSessionManager{Gw: &gw}
-	gw.DefaultQuotaStore = DefaultSessionManager{Gw: &gw}
-	gw.SessionLimiter = SessionLimiter{Gw: &gw}
-	gw.SessionMonitor = Monitor{Gw: &gw}
+	gw.DefaultOrgStore = DefaultSessionManager{Gw: gw}
+	gw.DefaultQuotaStore = DefaultSessionManager{Gw: gw}
+	gw.SessionLimiter = SessionLimiter{Gw: gw}
+	gw.SessionMonitor = Monitor{Gw: gw}
 	gw.HostCheckTicker = make(chan struct{})
 	gw.HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
@@ -250,7 +251,10 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.RedisController = storage.NewRedisController(ctx)
 
-	return &gw
+	gw.SetNodeID("solo-" + uuid.New())
+	gw.SessionID = uuid.New()
+
+	return gw
 }
 
 func (gw *Gateway) UnmarshalJSON(data []byte) error {
@@ -268,16 +272,16 @@ func (gw *Gateway) InitializeRPCCache() {
 
 // SetNodeID writes NodeID safely.
 func (gw *Gateway) SetNodeID(nodeID string) {
-	gw.muNodeID.Lock()
-	gw.NodeID = nodeID
-	gw.muNodeID.Unlock()
+	gw.nodeIDMu.Lock()
+	gw.nodeID = nodeID
+	gw.nodeIDMu.Unlock()
 }
 
 // GetNodeID reads NodeID safely.
 func (gw *Gateway) GetNodeID() string {
-	gw.muNodeID.Lock()
-	defer gw.muNodeID.Unlock()
-	return gw.NodeID
+	gw.nodeIDMu.Lock()
+	defer gw.nodeIDMu.Unlock()
+	return gw.nodeID
 }
 
 func (gw *Gateway) isRunningTests() bool {
@@ -1577,9 +1581,6 @@ func Start() {
 
 	// ToDo:Config replace for get default conf
 	gw := NewGateway(config.Default, ctx)
-	gw.SetNodeID("solo-" + uuid.New())
-
-	gw.SessionID = uuid.New()
 
 	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
