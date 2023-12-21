@@ -169,6 +169,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	vInfo.Paths.BlackList = nil
 	vInfo.OverrideTarget = ""
 	vInfo.GlobalHeadersDisabled = false
+	vInfo.GlobalResponseHeadersDisabled = false
 	vInfo.UseExtendedPaths = false
 	vInfo.ExtendedPaths.MockResponse = nil
 	vInfo.ExtendedPaths.Cached = nil
@@ -245,9 +246,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Variables[0]",
-		"APIDefinition.VersionData.Versions[0].GlobalResponseHeaders[0]",
-		"APIDefinition.VersionData.Versions[0].GlobalResponseHeadersRemove[0]",
-		"APIDefinition.VersionData.Versions[0].GlobalResponseHeadersDisabled",
 		"APIDefinition.VersionData.Versions[0].IgnoreEndpointCase",
 		"APIDefinition.VersionData.Versions[0].GlobalSizeLimit",
 		"APIDefinition.UptimeTests.CheckList[0].CheckURL",

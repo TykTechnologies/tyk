@@ -73,6 +73,10 @@ type Global struct {
 	// TransformRequestHeaders contains the configurations related to API level request header transformation.
 	// Tyk classic API definition: `global_headers`/`global_headers_remove`.
 	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
+
+	// TransformResponseHeaders contains the configurations related to API level response header transformation.
+	// Tyk classic API definition: `global_response_headers`/`global_response_headers_remove`.
+	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
 }
 
 // Fill fills *Global from apidef.APIDefinition.
@@ -153,6 +157,19 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(g.TransformRequestHeaders) {
 		g.TransformRequestHeaders = nil
 	}
+
+	if g.TransformResponseHeaders == nil {
+		g.TransformResponseHeaders = &TransformHeaders{}
+	}
+
+	g.TransformResponseHeaders.Fill(apidef.HeaderInjectionMeta{
+		Disabled:      vInfo.GlobalResponseHeadersDisabled,
+		AddHeaders:    vInfo.GlobalResponseHeaders,
+		DeleteHeaders: vInfo.GlobalResponseHeadersRemove,
+	})
+	if ShouldOmit(g.TransformResponseHeaders) {
+		g.TransformResponseHeaders = nil
+	}
 }
 
 // ExtractTo extracts *Global into *apidef.APIDefinition.
@@ -230,6 +247,16 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	var headerMeta apidef.HeaderInjectionMeta
 	g.TransformRequestHeaders.ExtractTo(&headerMeta)
 
+	if g.TransformResponseHeaders == nil {
+		g.TransformResponseHeaders = &TransformHeaders{}
+		defer func() {
+			g.TransformResponseHeaders = nil
+		}()
+	}
+
+	var resHeaderMeta apidef.HeaderInjectionMeta
+	g.TransformResponseHeaders.ExtractTo(&resHeaderMeta)
+
 	if len(api.VersionData.Versions) == 0 {
 		api.VersionData.Versions = map[string]apidef.VersionInfo{
 			Main: {},
@@ -240,6 +267,10 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	vInfo.GlobalHeadersDisabled = headerMeta.Disabled
 	vInfo.GlobalHeaders = headerMeta.AddHeaders
 	vInfo.GlobalHeadersRemove = headerMeta.DeleteHeaders
+
+	vInfo.GlobalResponseHeadersDisabled = resHeaderMeta.Disabled
+	vInfo.GlobalResponseHeaders = resHeaderMeta.AddHeaders
+	vInfo.GlobalResponseHeadersRemove = resHeaderMeta.DeleteHeaders
 	api.VersionData.Versions[Main] = vInfo
 }
 
