@@ -246,9 +246,11 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 
 	a.MigrateEndpointMeta()
 	a.MigrateCachePlugin()
+	a.migrateGlobalHeaders()
 	for i := 0; i < len(versions); i++ {
 		versions[i].MigrateEndpointMeta()
 		versions[i].MigrateCachePlugin()
+		versions[i].migrateGlobalHeaders()
 	}
 
 	return versions, nil
@@ -308,6 +310,14 @@ func (a *APIDefinition) migrateIDExtractor() {
 func (a *APIDefinition) migrateCustomDomain() {
 	if !a.DomainDisabled && a.Domain == "" {
 		a.DomainDisabled = true
+	}
+}
+
+func (a *APIDefinition) migrateGlobalHeaders() {
+	vInfo := a.VersionData.Versions[""]
+	if len(vInfo.GlobalHeaders) == 0 && len(vInfo.GlobalHeadersRemove) == 0 {
+		vInfo.GlobalHeadersDisabled = true
+		a.VersionData.Versions[""] = vInfo
 	}
 }
 

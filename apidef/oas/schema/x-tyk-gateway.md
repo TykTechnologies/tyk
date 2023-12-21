@@ -665,6 +665,11 @@ Cache contains the configurations related to caching.
 
 Tyk classic API definition: `cache_options`.
 
+**Field: `transformRequestHeaders` ([TransformHeaders](#transformheaders))**
+TransformRequestHeaders contains the configurations related to API level request header transformation.
+
+Tyk classic API definition: `global_headers`/`global_headers_remove`.
+
 
 ### **PluginConfig**
 
@@ -843,6 +848,27 @@ ControlTTLHeaderName is the response header which tells Tyk how long it is safe 
 Tyk classic API definition: `cache_options.cache_control_ttl_header`.
 
 
+### **TransformHeaders**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables Header Transform for the given path and method.
+
+**Field: `remove` (`[]string`)**
+Remove specifies header names to be removed from the request/response.
+
+**Field: `add` (`[]`[Header](#header))**
+Add specifies headers to be added to the request/response.
+
+
+### **Header**
+
+**Field: `name` (`string`)**
+Name is the name of the header.
+
+**Field: `value` (`string`)**
+Value is the value of the header.
+
+
 ### **Operation**
 
 **Field: `allow` ([Allowance](#allowance))**
@@ -918,27 +944,6 @@ Path file path for the template.
 
 **Field: `body` (`string`)**
 Body base64 encoded representation of the template.
-
-
-### **TransformHeaders**
-
-**Field: `enabled` (`boolean`)**
-Enabled enables Header Transform for the given path and method.
-
-**Field: `remove` (`[]string`)**
-Remove specifies header names to be removed from the request/response.
-
-**Field: `add` (`[]`[Header](#header))**
-Add specifies headers to be added to the request/response.
-
-
-### **Header**
-
-**Field: `name` (`string`)**
-Name is the name of the header.
-
-**Field: `value` (`string`)**
-Value is the value of the header.
 
 
 ### **CachePlugin**
