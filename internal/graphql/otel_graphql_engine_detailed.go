@@ -50,11 +50,11 @@ type OtelGraphqlEngineV2Detailed struct {
 	otelGraphqlEngineV2Common
 }
 
-func (o *OtelGraphqlEngineV2Detailed) Normalize(*graphql.Request) error {
+func (o *OtelGraphqlEngineV2Detailed) Normalize() error {
 	return nil
 }
 
-func (o *OtelGraphqlEngineV2Detailed) ValidateForSchema(*graphql.Request) error {
+func (o *OtelGraphqlEngineV2Detailed) ValidateForSchema() error {
 	return nil
 }
 
