@@ -425,8 +425,6 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 						"p1-meta": "p1-value",
 					}
 				})
-
-				ts.Gw.SetNodeID("")
 				return ts
 			},
 			expectedNodeInfo: apidef.NodeData{
