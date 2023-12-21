@@ -21,11 +21,11 @@ type OtelGraphqlEngineV2Basic struct {
 }
 
 func (o *OtelGraphqlEngineV2Basic) Normalize(operation *graphql.Request) error {
-	return o.engine.Normalize(operation)
+	return nil
 }
 
 func (o *OtelGraphqlEngineV2Basic) ValidateForSchema(operation *graphql.Request) error {
-	return o.engine.ValidateForSchema(operation)
+	return nil
 }
 
 func (o *OtelGraphqlEngineV2Basic) Setup(ctx context.Context, postProcessor *postprocess.Processor, resolveContext *resolve.Context, operation *graphql.Request, options ...graphql.ExecutionOptionsV2) {
