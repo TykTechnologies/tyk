@@ -109,3 +109,4 @@ require (
 )
 
 //replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools
+replace sourcegraph.com/sourcegraph/appdash => github.com/sourcegraph/appdash v0.0.0-20211028080628-e2786a622600
