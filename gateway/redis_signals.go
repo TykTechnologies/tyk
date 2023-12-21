@@ -210,6 +210,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 		}
 	}
 
+	pubSubLog.Error("Unknown payload signature algo: %s", notification.SignatureAlgo)
 	return false
 }
 
