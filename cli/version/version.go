@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	kingpin "github.com/alecthomas/kingpin/v2"
 
 	"github.com/TykTechnologies/tyk/internal/build"
 )

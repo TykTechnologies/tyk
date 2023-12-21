@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Jeffail/gabs"
+	"github.com/Jeffail/gabs/v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -69,7 +69,7 @@ func (s *ServiceDiscovery) decodeToNameSpace(namespace string, jsonParsed *gabs.
 func (s *ServiceDiscovery) decodeToNameSpaceAsArray(namespace string, jsonParsed *gabs.Container) []*gabs.Container {
 	log.Debug("Array Namespace: ", namespace)
 	log.Debug("Container: ", jsonParsed)
-	value, _ := jsonParsed.Path(namespace).Children()
+	value := jsonParsed.Path(namespace).Children()
 	log.Debug("Array value:", value)
 	return value
 }
