@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	kingpin "github.com/alecthomas/kingpin/v2"
 
@@ -51,8 +52,9 @@ var (
 	log = logger.Get()
 )
 
-// Init sets all flags and subcommands.
-func Init(confPaths []string) {
+// Init sets all flags and subcommands. It will update the passed `confPaths`
+// argument, if a config file is provided using the `conf` flag.
+func Init(confPaths *[]string) {
 	app = kingpin.New(appName, appDesc)
 	app.HelpFlag.Short('h')
 	app.Version(build.Version)
@@ -75,6 +77,13 @@ func Init(confPaths []string) {
 	})
 	startCmd.Default()
 
+	if *Conf != "" {
+		log.Debugf("Using %s for configuration", *Conf)
+		*confPaths = []string{*Conf}
+	} else {
+		log.Debugf("No configuration file defined, will try to use default (%s)", strings.Join(*confPaths, ", "))
+	}
+
 	// Linter:
 	lintCmd := app.Command("lint", "Runs a linter on Tyk configuration file")
 	lintCmd.Action(func(c *kingpin.ParseContext) error {
@@ -82,7 +91,7 @@ func Init(confPaths []string) {
 		if err != nil {
 			return err
 		}
-		path, lines, err := linter.Run(string(confSchema), confPaths)
+		path, lines, err := linter.Run(string(confSchema), *confPaths)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)

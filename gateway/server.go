@@ -95,8 +95,8 @@ const appName = "tyk-gateway"
 type Gateway struct {
 	DefaultProxyMux *proxyMux
 
-	config          *config.Config
-	configMu        sync.Mutex
+	config   *config.Config
+	configMu sync.Mutex
 
 	ctx context.Context
 
@@ -206,16 +206,16 @@ type hostDetails struct {
 	PID      int
 }
 
-func NewGateway(config config.Config, ctx context.Context) *Gateway {
+func NewGateway(gwConfig config.Config, ctx context.Context) *Gateway {
 	gw := &Gateway{
 		DefaultProxyMux: &proxyMux{
 			again: again.New(),
 		},
 		ctx: ctx,
 	}
+	gw.SetConfig(gwConfig)
 
 	gw.Analytics = RedisAnalyticsHandler{Gw: gw}
-	gw.SetConfig(config)
 	sessionManager := DefaultSessionManager{Gw: gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
 	gw.DefaultOrgStore = DefaultSessionManager{Gw: gw}
@@ -232,7 +232,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.ExpiryCache = cache.New(600, 10*60)
 	gw.UtilCache = cache.New(3600, 10*60)
 
-	var timeout = int64(config.ServiceDiscovery.DefaultCacheTimeout)
+	var timeout = int64(gwConfig.ServiceDiscovery.DefaultCacheTimeout)
 	if timeout <= 0 {
 		timeout = 120 // 2 minutes
 	}
@@ -1225,13 +1225,6 @@ func (gw *Gateway) initialiseSystem() error {
 		mainLog.Debug("Enabling debug-level output")
 	}
 
-	if *cli.Conf != "" {
-		mainLog.Debugf("Using %s for configuration", *cli.Conf)
-		confPaths = []string{*cli.Conf}
-	} else {
-		mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
-	}
-
 	mainLog.Infof("Tyk API Gateway %s", VERSION)
 
 	if !gw.isRunningTests() {
@@ -1569,8 +1562,9 @@ func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cli.Init(confPaths)
+	cli.Init(&confPaths)
 	cli.Parse()
+
 	// Stop gateway process if not running in "start" mode:
 	if !cli.DefaultMode {
 		os.Exit(0)

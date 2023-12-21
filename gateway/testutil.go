@@ -44,7 +44,6 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
@@ -1142,8 +1141,6 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	defaultTestConfig = gwConfig
 	gw.SetConfig(gwConfig)
-
-	cli.Init(confPaths)
 
 	err = gw.initialiseSystem()
 	if err != nil {
