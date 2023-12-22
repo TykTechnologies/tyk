@@ -62,10 +62,9 @@ var (
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
 
-	defaultTestConfig        config.Config
-	EnableTestDNSMock        = false
-	MockHandle               *test.DnsMockHandle
-	oAuthTokensPurgeInterval time.Duration
+	defaultTestConfig config.Config
+	EnableTestDNSMock = false
+	MockHandle        *test.DnsMockHandle
 )
 
 // ReloadMachinery is a helper struct to use when writing tests that do manual
@@ -1011,9 +1010,7 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 	gw.setupPortsWhitelist()
 	gw.startServer()
 
-	if oAuthTokensPurgeInterval > 0 {
-		gw.oAuthTokensPurgeInterval = oAuthTokensPurgeInterval
-	}
+	gw.oAuthTokensPurgeInterval = time.Second
 
 	gw.setupGlobals()
 

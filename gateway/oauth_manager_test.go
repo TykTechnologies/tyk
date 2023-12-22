@@ -14,7 +14,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -1366,10 +1368,6 @@ func TestPurgeOAuthClientTokensInBackground(t *testing.T) {
 		// cleanup tokens older than 2 seconds
 		globalConf.OauthTokenExpiredRetainPeriod = 2
 	}
-	oAuthTokensPurgeInterval = time.Second
-	defer func() {
-		oAuthTokensPurgeInterval = 0
-	}()
 
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -1394,4 +1392,74 @@ func TestPurgeOAuthClientTokensInBackground(t *testing.T) {
 	assertTokensLen(t, storageManager, storageKey1, 0)
 	assertTokensLen(t, storageManager, storageKey2, 0)
 
+}
+
+func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
+	conf := func(globalConf *config.Config) {
+		// set tokens to be expired after 1 second
+		globalConf.OauthTokenExpire = 1
+		// cleanup tokens older than 2 seconds
+		globalConf.OauthTokenExpiredRetainPeriod = 2
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	const (
+		apiCount     = 20
+		clientsCount = 50
+		tokensCount  = 1000
+	)
+
+	cfg := ts.Gw.GetConfig().Storage
+	timeout := 5 * time.Second
+	var client redis.UniversalClient
+	opts := &redis.UniversalOptions{
+		Addrs:        storage.GetRedisAddrs(cfg),
+		Username:     cfg.Username,
+		Password:     cfg.Password,
+		DB:           cfg.Database,
+		DialTimeout:  timeout,
+		ReadTimeout:  timeout,
+		WriteTimeout: timeout,
+		IdleTimeout:  240 * timeout,
+	}
+	client = redis.NewClient(opts.Simple())
+
+	setup := func(tb testing.TB) {
+		tb.Helper()
+		nowTs := time.Now().Unix()
+		for i := 0; i < apiCount; i++ {
+			oauthAPIIDPrefix := generateOAuthPrefix(fmt.Sprintf("api-%d", i))
+			for j := 0; j < clientsCount; j++ {
+				clientID := fmt.Sprintf("client-%d", j)
+				var setMembers []*redis.Z
+				for k := 0; k < tokensCount; k++ {
+					setMembers = append(setMembers, &redis.Z{
+						Score:  float64(nowTs - int64(i+j+k)),
+						Member: fmt.Sprintf("dummy-value-%s-%d", clientID, k),
+					})
+				}
+
+				// add 10 more tokens to be not expired
+				for k := 0; k < 10; k++ {
+					setMembers = append(setMembers, &redis.Z{
+						Score:  float64(nowTs + int64((i+j)*1000)),
+						Member: fmt.Sprintf("dummy-value-%s-%d", clientID, k),
+					})
+				}
+
+				sortedListKey := fmt.Sprintf("%s%s", oauthAPIIDPrefix, prefixClientTokens+clientID)
+				client.ZAdd(ts.Gw.ctx, sortedListKey, setMembers...)
+				b.Logf("added tokens for %s", sortedListKey)
+			}
+		}
+	}
+
+	for i := 0; i < b.N; i++ {
+		setup(b)
+		b.ReportAllocs()
+		b.ResetTimer()
+		require.NoError(b, ts.Gw.purgeLapsedOAuthTokens())
+	}
 }

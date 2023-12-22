@@ -92,6 +92,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: Run CI benchmarks
+        id: ci-benchmarks
+        run: |
+          ./bin/run-benchmarks.sh 2>&1
+
       - name: Run Gateway Tests
         id: ci-tests
         run: |

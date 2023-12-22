@@ -104,7 +104,7 @@ func TestRedisAddressConfiguration(t *testing.T) {
 
 	t.Run("Host but no port", func(t *testing.T) {
 		cfg := config.StorageOptionsConf{Host: "host"}
-		if len(getRedisAddrs(cfg)) != 0 {
+		if len(GetRedisAddrs(cfg)) != 0 {
 			t.Fatal("Port is 0, there is no valid addr")
 		}
 	})
@@ -112,7 +112,7 @@ func TestRedisAddressConfiguration(t *testing.T) {
 	t.Run("Port but no host", func(t *testing.T) {
 		cfg := config.StorageOptionsConf{Port: 30000}
 
-		addrs := getRedisAddrs(cfg)
+		addrs := GetRedisAddrs(cfg)
 		if addrs[0] != ":30000" || len(addrs) != 1 {
 			t.Fatal("Port is valid, it is a valid addr")
 		}
@@ -121,14 +121,14 @@ func TestRedisAddressConfiguration(t *testing.T) {
 	t.Run("addrs parameter should have precedence", func(t *testing.T) {
 		cfg := config.StorageOptionsConf{Host: "host", Port: 30000}
 
-		addrs := getRedisAddrs(cfg)
+		addrs := GetRedisAddrs(cfg)
 		if addrs[0] != "host:30000" || len(addrs) != 1 {
 			t.Fatal("Wrong address")
 		}
 
 		cfg.Addrs = []string{"override:30000"}
 
-		addrs = getRedisAddrs(cfg)
+		addrs = GetRedisAddrs(cfg)
 		if addrs[0] != "override:30000" || len(addrs) != 1 {
 			t.Fatal("Wrong address")
 		}
