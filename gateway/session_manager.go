@@ -9,6 +9,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	"github.com/TykTechnologies/drl"
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
 
@@ -38,9 +39,10 @@ const (
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
 type SessionLimiter struct {
-	gw          *Gateway
-	bucketStore leakybucket.Storage
-	storage     redis.UniversalClient
+	drlManager     *drl.DRL
+	config         *config.Config
+	bucketStore    leakybucket.Storage
+	limiterStorage redis.UniversalClient
 }
 
 // NewSessionLimiter initializes the session limiter.
@@ -50,23 +52,22 @@ type SessionLimiter struct {
 // configured, then redis will be used. If local storage is configured, then
 // in-memory counters will be used. If no storage is configured, it falls
 // back onto the default gateway storage configuration.
-func NewSessionLimiter(gateway *Gateway) SessionLimiter {
+func NewSessionLimiter(conf *config.Config, drlManager *drl.DRL) SessionLimiter {
 	sessionLimiter := SessionLimiter{
-		gw:          gateway,
+		drlManager:  drlManager,
+		config:      conf,
 		bucketStore: memorycache.New(),
 	}
 
-	cfg := gateway.GetConfig()
-
 	// Use default storage if rate limiter storage is unconfigured.
-	storageConf := &cfg.Storage
-	if cfg.EnableRateLimiterStorage && cfg.RateLimiterStorage != nil {
-		storageConf = cfg.RateLimiterStorage
+	storageConf := &conf.Storage
+	if conf.EnableRateLimiterStorage && conf.RateLimiterStorage != nil {
+		storageConf = conf.RateLimiterStorage
 	}
 
 	switch storageConf.Type {
 	case "redis":
-		sessionLimiter.storage = rate.NewStorage(storageConf)
+		sessionLimiter.limiterStorage = rate.NewStorage(storageConf)
 	}
 
 	return sessionLimiter
@@ -185,10 +186,10 @@ func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string,
 	currRate := apiLimit.Rate
 	per := apiLimit.Per
 
-	tokenValue := uint(l.gw.DRLManager.CurrentTokenValue())
+	tokenValue := uint(l.drlManager.CurrentTokenValue())
 
 	// DRL will always overflow with more servers on low rates
-	rate := uint(currRate * float64(l.gw.DRLManager.RequestTokenValue))
+	rate := uint(currRate * float64(l.drlManager.RequestTokenValue))
 	if rate < tokenValue {
 		rate = tokenValue
 	}
@@ -245,8 +246,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			rateScope = allowanceScope + "-"
 		}
 
-		gwConfig := l.gw.GetConfig()
-		limiter := rate.Limiter(&gwConfig, l.storage)
+		limiter := rate.Limiter(l.config, l.limiterStorage)
 		if limiter != nil {
 			prefix := rate.Prefix(key, allowanceScope)
 
@@ -268,8 +268,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			}
 		default:
 			var n float64
-			if l.gw.DRLManager.Servers != nil {
-				n = float64(l.gw.DRLManager.Servers.Count())
+			if l.drlManager.Servers != nil {
+				n = float64(l.drlManager.Servers.Count())
 			}
 			rate := accessDef.Limit.Rate / accessDef.Limit.Per
 			c := globalConf.DRLThreshold
