@@ -1234,6 +1234,15 @@ func (gw *Gateway) initialiseSystem() error {
 	mainLog.Infof("Tyk API Gateway %s", VERSION)
 
 	if !gw.isRunningTests() {
+		gwConfig := config.Config{}
+		if err := config.Load(confPaths, &gwConfig); err != nil {
+			return err
+		}
+
+		if gwConfig.PIDFileLocation == "" {
+			gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
+		}
+		gw.SetConfig(gwConfig)
 		gw.afterConfSetup()
 	}
 
