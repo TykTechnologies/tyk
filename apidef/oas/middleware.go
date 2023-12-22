@@ -890,6 +890,10 @@ func (th *TransformHeaders) Fill(meta apidef.HeaderInjectionMeta) {
 		i++
 	}
 
+	sort.Slice(th.Add, func(i, j int) bool {
+		return th.Add[i].Name < th.Add[j].Name
+	})
+
 	if len(th.Add) == 0 {
 		th.Add = nil
 	}

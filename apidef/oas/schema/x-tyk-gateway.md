@@ -868,6 +868,9 @@ When both `path` and `body` are provided, body would take precedence.
 **Field: `transformRequestHeaders` ([TransformHeaders](#transformheaders))**
 TransformRequestHeaders allows you to transform request headers.
 
+**Field: `transformResponseHeaders` ([TransformHeaders](#transformheaders))**
+TransformResponseHeaders allows you to transform response headers.
+
 **Field: `cache` ([CachePlugin](#cacheplugin))**
 Cache contains the caching plugin configuration.
 
