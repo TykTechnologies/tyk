@@ -375,6 +375,23 @@ func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 	return nil
 }
 
+func (r *RedisCluster) SetNX(keyName string, value interface{}, timeout int64) (bool, error) {
+	if err := r.up(); err != nil {
+		return false, err
+	}
+	singleton, err := r.singleton()
+	if err != nil {
+		return false, err
+	}
+
+	res := singleton.SetNX(r.RedisController.ctx, keyName, value, time.Duration(timeout)*time.Second)
+	if err := res.Err(); err != nil {
+		log.Error("Error trying to set value: ", err)
+		return false, err
+	}
+	return res.Val(), nil
+}
+
 // Decrement will decrement a key in redis
 func (r *RedisCluster) Decrement(keyName string) {
 	keyName = r.fixKey(keyName)

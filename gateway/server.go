@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
 
 	"sync/atomic"
 	textTemplate "text/template"
@@ -197,6 +198,8 @@ type Gateway struct {
 	healthCheckInfo atomic.Value
 
 	dialCtxFn test.DialContext
+
+	oAuthTokensPurgeInterval time.Duration
 }
 
 type hostDetails struct {
@@ -405,6 +408,14 @@ func (gw *Gateway) setupGlobals() {
 		}
 		go gw.flushNetworkAnalytics(gw.ctx)
 	}
+
+	if gw.oAuthTokensPurgeInterval == 0 {
+		gw.oAuthTokensPurgeInterval = time.Hour
+	}
+
+	oauthTokensPurger := scheduler.NewScheduler("purge-oauth-tokens", gw.oAuthTokensPurgeInterval,
+		log, gw.purgeLapsedOAuthTokens)
+	go oauthTokensPurger.Exec(gw.ctx)
 
 	// Load all the files that have the "error" prefix.
 	//	gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
