@@ -69,6 +69,10 @@ type Global struct {
 	// Cache contains the configurations related to caching.
 	// Tyk classic API definition: `cache_options`.
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
+
+	// TransformRequestHeaders contains the configurations related to API level request header transformation.
+	// Tyk classic API definition: `global_headers`/`global_headers_remove`.
+	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
 }
 
 // Fill fills *Global from apidef.APIDefinition.
@@ -134,6 +138,20 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.ResponsePlugin.Fill(api)
 	if ShouldOmit(g.ResponsePlugin) {
 		g.ResponsePlugin = nil
+	}
+
+	if g.TransformRequestHeaders == nil {
+		g.TransformRequestHeaders = &TransformHeaders{}
+	}
+
+	vInfo := api.VersionData.Versions[Main]
+	g.TransformRequestHeaders.Fill(apidef.HeaderInjectionMeta{
+		Disabled:      vInfo.GlobalHeadersDisabled,
+		AddHeaders:    vInfo.GlobalHeaders,
+		DeleteHeaders: vInfo.GlobalHeadersRemove,
+	})
+	if ShouldOmit(g.TransformRequestHeaders) {
+		g.TransformRequestHeaders = nil
 	}
 }
 
@@ -201,6 +219,28 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	g.ResponsePlugin.ExtractTo(api)
+
+	if g.TransformRequestHeaders == nil {
+		g.TransformRequestHeaders = &TransformHeaders{}
+		defer func() {
+			g.TransformRequestHeaders = nil
+		}()
+	}
+
+	var headerMeta apidef.HeaderInjectionMeta
+	g.TransformRequestHeaders.ExtractTo(&headerMeta)
+
+	if len(api.VersionData.Versions) == 0 {
+		api.VersionData.Versions = map[string]apidef.VersionInfo{
+			Main: {},
+		}
+	}
+
+	vInfo := api.VersionData.Versions[Main]
+	vInfo.GlobalHeadersDisabled = headerMeta.Disabled
+	vInfo.GlobalHeaders = headerMeta.AddHeaders
+	vInfo.GlobalHeadersRemove = headerMeta.DeleteHeaders
+	api.VersionData.Versions[Main] = vInfo
 }
 
 // PluginConfigData configures config data for custom plugins.
@@ -873,9 +913,9 @@ type TransformHeaders struct {
 	// Enabled enables Header Transform for the given path and method.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Remove specifies header names to be removed from the request/response.
-	Remove []string `bson:"remove" json:"remove"`
+	Remove []string `bson:"remove,omitempty" json:"remove,omitempty"`
 	// Add specifies headers to be added to the request/response.
-	Add []Header `bson:"add" json:"add"`
+	Add []Header `bson:"add,omitempty" json:"add,omitempty"`
 }
 
 // Fill fills *TransformHeaders from apidef.HeaderInjectionMeta.

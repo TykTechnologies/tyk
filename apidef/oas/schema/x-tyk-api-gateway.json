@@ -494,6 +494,9 @@
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-Cache"
+        },
+        "transformRequestHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders"
         }
       }
     },
