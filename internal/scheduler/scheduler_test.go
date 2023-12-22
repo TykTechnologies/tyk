@@ -24,12 +24,8 @@ func TestNewScheduler(t *testing.T) {
 
 func TestExec(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		logger, _ := test.NewNullLogger()
-		execFuncCalled := false
-		execFunc := func() error {
-			execFuncCalled = true
-			return nil
-		}
+		logger, hook := test.NewNullLogger()
+		execFunc := func() error { return nil }
 
 		s := scheduler.NewScheduler("test", 100*time.Millisecond, logger, execFunc)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -40,7 +36,8 @@ func TestExec(t *testing.T) {
 		time.Sleep(200 * time.Millisecond) // Wait for the ticker to tick at least once
 		cancel()
 
-		assert.True(t, execFuncCalled, "Expected execFunc to be called")
+		assert.Len(t, hook.Entries, 1)
+		assert.Equal(t, "test execution success", hook.LastEntry().Message)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -61,10 +58,8 @@ func TestExec(t *testing.T) {
 	})
 
 	t.Run("cancelled context", func(t *testing.T) {
-		logger, _ := test.NewNullLogger()
-		execFuncCalled := false
+		logger, hook := test.NewNullLogger()
 		execFunc := func() error {
-			execFuncCalled = true
 			return nil
 		}
 
@@ -77,14 +72,12 @@ func TestExec(t *testing.T) {
 		cancel()
 		time.Sleep(100 * time.Millisecond) // Give some time to propagate the cancel
 
-		assert.False(t, execFuncCalled, "execFunc should not have been called")
+		assert.Empty(t, hook.Entries)
 	})
 
 	t.Run("repeated exec calls", func(t *testing.T) {
-		logger, _ := test.NewNullLogger()
-		callCount := 0
+		logger, hook := test.NewNullLogger()
 		execFunc := func() error {
-			callCount++
 			return nil
 		}
 
@@ -97,6 +90,12 @@ func TestExec(t *testing.T) {
 		time.Sleep(350 * time.Millisecond) // Enough time for multiple ticks
 		cancel()
 
-		assert.True(t, callCount >= 3, "execFunc should have been called at least 3 times")
+		i := 0
+		for _, entry := range hook.Entries {
+			assert.Equal(t, "testRepeated execution success", entry.Message)
+			i++
+		}
+
+		assert.GreaterOrEqual(t, i, 3)
 	})
 }
