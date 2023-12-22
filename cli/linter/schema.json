@@ -3,12 +3,6 @@
   "type": "object",
   "additionalProperties": false,
   "definitions": {
-    "RateLimit": {
-      "type": [
-        "object",
-        "null"
-      ]
-    },
     "StorageOptions": {
       "type": [
         "object",
@@ -448,9 +442,6 @@
     },
     "jsvm_timeout": {
       "type": "integer"
-    },
-    "rate_limit": {
-      "$ref": "#/definitions/RateLimit"
     },
     "enable_leaky_bucket_rate_limiter": {
       "type": "boolean"
