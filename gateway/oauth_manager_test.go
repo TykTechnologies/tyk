@@ -1309,6 +1309,15 @@ func TestJSONToFormValues(t *testing.T) {
 	})
 }
 
+func assertTokensLen(t *testing.T, storageManager storage.Handler, storageKey string, expectedTokensLen int) {
+	t.Helper()
+	nowTs := time.Now().Unix()
+	startScore := strconv.FormatInt(nowTs, 10)
+	tokens, _, err := storageManager.GetSortedSetRange(storageKey, startScore, "+inf")
+	assert.NoError(t, err)
+	assert.Equal(t, expectedTokensLen, len(tokens))
+}
+
 func TestPurgeOAuthClientTokensEvent(t *testing.T) {
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second
@@ -1319,14 +1328,6 @@ func TestPurgeOAuthClientTokensEvent(t *testing.T) {
 
 	ts := StartTest(conf)
 	defer ts.Close()
-
-	assertTokensLen := func(t *testing.T, storageManager storage.Handler, storageKey string, expectedTokensLen int) {
-		nowTs := time.Now().Unix()
-		startScore := strconv.FormatInt(nowTs, 10)
-		tokens, _, err := storageManager.GetSortedSetRange(storageKey, startScore, "+inf")
-		assert.NoError(t, err)
-		assert.Equal(t, expectedTokensLen, len(tokens))
-	}
 
 	spec := ts.LoadTestOAuthSpec()
 
@@ -1352,6 +1353,43 @@ func TestPurgeOAuthClientTokensEvent(t *testing.T) {
 		Gw:      ts.Gw,
 	}
 	ts.Gw.MainNotifier.Notify(n)
+
+	assertTokensLen(t, storageManager, storageKey1, 0)
+	assertTokensLen(t, storageManager, storageKey2, 0)
+
+}
+
+func TestPurgeOAuthClientTokensInBackground(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		// set tokens to be expired after 1 second
+		globalConf.OauthTokenExpire = 1
+		// cleanup tokens older than 2 seconds
+		globalConf.OauthTokenExpiredRetainPeriod = 2
+	}
+	oAuthTokensPurgeInterval = time.Second
+	defer func() {
+		oAuthTokensPurgeInterval = 0
+	}()
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	spec := ts.LoadTestOAuthSpec()
+
+	clientID1, clientID2 := uuid.New(), uuid.New()
+
+	ts.createOAuthClientIDAndTokens(t, spec, clientID1)
+	ts.createOAuthClientIDAndTokens(t, spec, clientID2)
+	storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
+		fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
+
+	storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+	storageManager.Connect()
+
+	assertTokensLen(t, storageManager, storageKey1, 3)
+	assertTokensLen(t, storageManager, storageKey2, 3)
+
+	time.Sleep(time.Second * 3)
 
 	assertTokensLen(t, storageManager, storageKey1, 0)
 	assertTokensLen(t, storageManager, storageKey2, 0)

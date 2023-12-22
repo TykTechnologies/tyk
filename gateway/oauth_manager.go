@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lonelycode/osin"
 	"github.com/sirupsen/logrus"
@@ -24,7 +25,6 @@ import (
 	"strconv"
 
 	"github.com/TykTechnologies/tyk/header"
-	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1191,6 +1191,18 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	}
 
 	redisCluster := &storage.RedisCluster{KeyPrefix: "", HashKeys: false, RedisController: gw.RedisController}
+
+	ok, err := redisCluster.SetNX("oauth-purge-lock", "1", int64(time.Minute))
+	if err != nil {
+		log.WithError(err).Error("error acquiring lock to purge oauth tokens")
+		return err
+	}
+
+	if !ok {
+		log.Info("oauth tokens purge lock not acquired, purgin in background")
+		return nil
+	}
+
 	keys, err := redisCluster.ScanKeys(oAuthClientTokensKeyPattern)
 
 	if err != nil {
