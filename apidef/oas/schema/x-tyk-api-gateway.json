@@ -497,6 +497,9 @@
         },
         "transformRequestHeaders": {
           "$ref": "#/definitions/X-Tyk-TransformHeaders"
+        },
+        "transformResponseHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders"
         }
       }
     },

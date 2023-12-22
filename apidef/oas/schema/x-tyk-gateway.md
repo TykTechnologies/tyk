@@ -670,6 +670,11 @@ TransformRequestHeaders contains the configurations related to API level request
 
 Tyk classic API definition: `global_headers`/`global_headers_remove`.
 
+**Field: `transformResponseHeaders` ([TransformHeaders](#transformheaders))**
+TransformResponseHeaders contains the configurations related to API level response header transformation.
+
+Tyk classic API definition: `global_response_headers`/`global_response_headers_remove`.
+
 
 ### **PluginConfig**
 
