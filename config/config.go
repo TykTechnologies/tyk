@@ -1041,7 +1041,11 @@ type Config struct {
 	// ResourceSync configures mitigation strategy in case sync fails.
 	ResourceSync ResourceSyncConfig `json:"resource_sync"`
 
+	// Private contains configuration fields for internal app usage.
 	Private Private `json:"-"`
+
+	// DevelopmentConfig struct extends configuration for development builds.
+	DevelopmentConfig
 }
 
 type ResourceSyncConfig struct {

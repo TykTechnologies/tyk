@@ -1,6 +1,7 @@
 package config
 
 // RateLimit contains flags and configuration for controlling rate limiting behaviour.
+// It is embedded in the main config structure.
 type RateLimit struct {
 	// EnableLeakyBucketRateLimiter enables leaky bucket rate limiting.
 	//
