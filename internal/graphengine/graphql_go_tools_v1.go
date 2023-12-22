@@ -139,12 +139,17 @@ func (g graphqlGoToolsV1) createExecutionEngine(params createExecutionEngineV1Pa
 }
 
 type graphqlRequestProcessorV1 struct {
-	logger             *abstractlogger.LogrusLogger
+	logger             abstractlogger.Logger
 	schema             *graphql.Schema
 	ctxRetrieveRequest ContextRetrieveRequestV1Func
 }
 
 func (g *graphqlRequestProcessorV1) ProcessRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) (error, int) {
+	if r == nil {
+		g.logger.Error("request is nil")
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+
 	gqlRequest := g.ctxRetrieveRequest(r)
 	normalizationResult, err := gqlRequest.Normalize(g.schema)
 	if err != nil {
@@ -181,14 +186,18 @@ func (g *graphqlRequestProcessorV1) ProcessRequest(ctx context.Context, w http.R
 }
 
 type graphqlRequestProcessorWithOtelV1 struct {
-	logger             *abstractlogger.LogrusLogger
+	logger             abstractlogger.Logger
 	schema             *graphql.Schema
 	otelExecutor       internalgraphql.TykOtelExecutorI
 	ctxRetrieveRequest ContextRetrieveRequestV1Func
 }
 
 func (g *graphqlRequestProcessorWithOtelV1) ProcessRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) (error, int) {
-	//m.Spec.GraphQLExecutor.OtelExecutor.SetContext(ctx)
+	if r == nil {
+		g.logger.Error("request is nil")
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+
 	g.otelExecutor.SetContext(ctx)
 	gqlRequest := g.ctxRetrieveRequest(r)
 
