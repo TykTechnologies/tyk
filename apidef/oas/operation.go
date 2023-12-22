@@ -143,6 +143,8 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 	ep.AdvanceCacheConfig = nil
 	ep.Transform = nil
 	ep.TransformResponse = nil
+	ep.TransformHeader = nil
+	ep.TransformResponseHeader = nil
 	ep.HardTimeouts = nil
 	ep.Virtual = nil
 	ep.MethodTransforms = nil

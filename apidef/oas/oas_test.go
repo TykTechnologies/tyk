@@ -114,7 +114,7 @@ func TestOAS_ExtractTo_DontTouchExistingClassicFields(t *testing.T) {
 	api.VersionData.Versions = map[string]apidef.VersionInfo{
 		Main: {
 			ExtendedPaths: apidef.ExtendedPathsSet{
-				TransformHeader: []apidef.HeaderInjectionMeta{
+				PersistGraphQL: []apidef.PersistGraphQLMeta{
 					{},
 				},
 			},
@@ -124,7 +124,7 @@ func TestOAS_ExtractTo_DontTouchExistingClassicFields(t *testing.T) {
 	var s OAS
 	s.ExtractTo(&api)
 
-	assert.Len(t, api.VersionData.Versions[Main].ExtendedPaths.TransformHeader, 1)
+	assert.Len(t, api.VersionData.Versions[Main].ExtendedPaths.PersistGraphQL, 1)
 }
 
 func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
@@ -197,18 +197,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Filter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].Disabled",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].DeleteHeaders[0]",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].AddHeaders[0]",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].Path",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].ActOnResponse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].Disabled",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].DeleteHeaders[0]",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].AddHeaders[0]",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].Path",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].ActOnResponse",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].ThresholdPercent",
