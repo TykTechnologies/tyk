@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-redis/redis/v8"
@@ -1429,6 +1430,7 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 	setup := func(tb testing.TB) {
 		tb.Helper()
 		nowTs := time.Now().Unix()
+		wg := sync.WaitGroup{}
 		for i := 0; i < apiCount; i++ {
 			oauthAPIIDPrefix := generateOAuthPrefix(fmt.Sprintf("api-%d", i))
 			for j := 0; j < clientsCount; j++ {
@@ -1450,16 +1452,23 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 				}
 
 				sortedListKey := fmt.Sprintf("%s%s", oauthAPIIDPrefix, prefixClientTokens+clientID)
-				client.ZAdd(ts.Gw.ctx, sortedListKey, setMembers...)
-				b.Logf("added tokens for %s", sortedListKey)
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					client.ZAdd(ts.Gw.ctx, sortedListKey, setMembers...)
+				}()
 			}
 		}
+		wg.Wait()
 	}
 
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
+		b.StopTimer()
 		setup(b)
-		b.ReportAllocs()
-		b.ResetTimer()
+		b.StartTimer()
+
 		require.NoError(b, ts.Gw.purgeLapsedOAuthTokens())
+		b.StopTimer()
 	}
 }
