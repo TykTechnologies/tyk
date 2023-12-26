@@ -229,7 +229,7 @@ jobs:
           github_base_ref: ${{ github.base_ref }}
           build_sha: ${{ github.sha }}         
           
-      - name: debug outputs
+      - name: debug outputs 
         run: |
           echo "tyk=${{ steps.versions.outputs.tyk }}"
           echo "tyk-analytics=${{ steps.versions.outputs.tyk-analytics }}"
