@@ -227,7 +227,15 @@ jobs:
           github_event: ${{ github.event_name }}
           github_ref: ${{ github.ref }}
           github_base_ref: ${{ github.base_ref }}
-          build_sha: ${{ github.sha }}          
+          build_sha: ${{ github.sha }}         
+          
+      - name: debug outputs
+        run: |
+          echo "tyk=${{ steps.versions.outputs.tyk }}"
+          echo "tyk-analytics=${{ steps.versions.outputs.tyk-analytics }}"
+          echo "tyk-pump=${{ steps.versions.outputs.tyk-pump }}"
+          echo "tyk-sink=${{ steps.versions.outputs.tyk-sink }}"
+          echo "tyk-automated-tests=${{ steps.versions.outputs.tyk-automated-tests }}"            
 
       - name: env up
         shell: bash
