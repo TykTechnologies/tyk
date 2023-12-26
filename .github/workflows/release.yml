@@ -222,6 +222,12 @@ jobs:
       - name: get versions
         id: versions
         uses: TykTechnologies/github-actions/.github/actions/latest-versions@main
+        with:
+          repo: ${{ github.repository }}
+          github_event: ${{ github.event_name }}
+          github_ref: ${{ github.ref }}
+          github_base_ref: ${{ github.base_ref }}
+          build_sha: ${{ github.sha }}          
 
       - name: env up
         shell: bash
