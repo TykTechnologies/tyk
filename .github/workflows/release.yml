@@ -264,6 +264,9 @@ jobs:
           # pick database to use
           env_file=local-${{ matrix.db }}.env
           " > versions.env
+          #debug
+          echo "DEBUG VERSIONS.env"
+          cat versions.env
           # Add Tyk component config variations to $env_file
           cat confs/${{ matrix.conf }}.env >> local-${{ matrix.db }}.env
           # bring up env, the project name is important
