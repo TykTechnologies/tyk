@@ -252,8 +252,8 @@ jobs:
           echo "registry=${{ steps.ecr.outputs.registry }}
           tyk_image=\${registry}/tyk:${tyk_image_tag}
           tyk_analytics_image=\${registry}/tyk-analytics:${tyk_analytics_image_tag}
-          tyk_sink_image=\${registry}/tyk-sink:${tyk_sink_image}
-          tyk_pump_image=\${registry}/tyk-pump:${tyk_pump_image}
+          tyk_sink_image=\${registry}/tyk-sink:${tyk_sink_image_tag}
+          tyk_pump_image=\${registry}/tyk-pump:${tyk_pump_image_tag}
           # override default above with just built tag
           tyk_image=${tags[0]}
           # alfa and beta have to come after the override
@@ -277,7 +277,7 @@ jobs:
         run: |
           echo "## API tests ${{ matrix.db }} ${{ matrix.conf }}" >> $GITHUB_STEP_SUMMARY
           if docker run --rm --network auto_default --env-file pytest.env -v ${{ github.workspace }}/reports:/app/reports \
-             ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ startsWith(github.ref_name, 'release-') && github.ref_name || 'master' }} \
+             ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ steps.versions.outputs.tyk-automated-tests }} \
              pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}" > tests.out; then
                echo "All tests passed!" >> $GITHUB_STEP_SUMMARY
           else
