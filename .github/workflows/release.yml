@@ -147,8 +147,16 @@ jobs:
           retention-days: 1
           path: |
             dist/*.rpm
-            !dist/*PAYG*.rpm
-            
+            !dist/*PAYG*.rpm       
+  ci:
+    needs:
+      - goreleaser
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # This is required for requesting the JWT
+      contents: read    # This is required for actions/checkout
+
+    steps:
       - name: get versions
         id: versions
         uses: TykTechnologies/github-actions/.github/actions/latest-versions@main
@@ -165,16 +173,8 @@ jobs:
           echo "tyk-analytics=${{ steps.versions.outputs.tyk-analytics }}"
           echo "tyk-pump=${{ steps.versions.outputs.tyk-pump }}"
           echo "tyk-sink=${{ steps.versions.outputs.tyk-sink }}"
-          echo "tyk-automated-tests=${{ steps.versions.outputs.tyk-automated-tests }}"            
-  ci:
-    needs:
-      - goreleaser
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write   # This is required for requesting the JWT
-      contents: read    # This is required for actions/checkout
-
-    steps:
+          echo "tyk-automated-tests=${{ steps.versions.outputs.tyk-automated-tests }}"     
+      
       - name: Shallow checkout of tyk
         uses: actions/checkout@v3
         with:
