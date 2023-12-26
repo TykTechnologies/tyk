@@ -25,6 +25,31 @@ env:
   GOPRIVATE: github.com/TykTechnologies
   
 jobs:
+  VERSIONS:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # This is required for requesting the JWT
+      contents: read    # This is required for actions/checkout
+
+    steps:
+      - name: get versions
+        id: versions
+        uses: TykTechnologies/github-actions/.github/actions/latest-versions@main
+        with:
+          repo: ${{ github.repository }}
+          github_event: ${{ github.event_name }}
+          github_ref: ${{ github.ref }}
+          github_base_ref: ${{ github.base_ref }}
+          build_sha: ${{ github.sha }}
+          
+      - name: debug outputs
+        run: |
+          echo "tyk=${{ steps.versions.outputs.tyk }}"
+          echo "tyk-analytics=${{ steps.versions.outputs.tyk-analytics }}"
+          echo "tyk-pump=${{ steps.versions.outputs.tyk-pump }}"
+          echo "tyk-sink=${{ steps.versions.outputs.tyk-sink }}"
+          echo "tyk-automated-tests=${{ steps.versions.outputs.tyk-automated-tests }}"  
+
   goreleaser:
     name: '${{ matrix.golang_cross }}'
     runs-on: ubuntu-latest
