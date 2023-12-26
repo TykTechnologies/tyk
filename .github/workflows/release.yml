@@ -280,7 +280,7 @@ jobs:
         run: |
           echo "## API tests ${{ matrix.db }} ${{ matrix.conf }}" >> $GITHUB_STEP_SUMMARY
           if docker run --rm --network auto_default --env-file pytest.env -v ${{ github.workspace }}/reports:/app/reports \
-             ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ steps.versions.outputs.tyk_automated_tests }} \
+             ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ steps.versions.outputs.tyk-automated-tests }} \
              pytest -c pytest_ci.ini --ci -m "not local and not dind ${{ matrix.markers }}" > tests.out; then
                echo "All tests passed!" >> $GITHUB_STEP_SUMMARY
           else
