@@ -219,6 +219,10 @@ jobs:
           gh release download v1.2 --repo github.com/TykTechnologies/tyk-ci -O env.tgz
           tar xzvf env.tgz
 
+      - name: get versions
+        id: versions
+        uses: TykTechnologies/github-actions/.github/actions/latest-versions@main
+
       - name: env up
         shell: bash
         working-directory: auto
@@ -227,9 +231,10 @@ jobs:
           t: ${{ needs.goreleaser.outputs.tags }}
           pull_policy: 'if_not_present'
           # default tag to use
-          tyk_image_tag: ${{ startsWith(github.base_ref, 'release-') && github.base_ref || 'master' }}
-          tyk_analytics_image_tag: ${{ startsWith(github.base_ref, 'release-') && github.base_ref || 'master' }}
-          default_image_tag: 'master'
+          tyk_image_tag: ${{ steps.versions.outputs.tyk }}
+          tyk_analytics_image_tag: ${{ steps.versions.outputs.tyk-analytics }}
+          tyk_pump_image_tag: ${{ steps.versions.outputs.tyk-pump }}
+          tyk_sink_image_tag: ${{ steps.versions.outputs.tyk-sink }}
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
@@ -241,8 +246,8 @@ jobs:
           echo "registry=${{ steps.ecr.outputs.registry }}
           tyk_image=\${registry}/tyk:${tyk_image_tag}
           tyk_analytics_image=\${registry}/tyk-analytics:${tyk_analytics_image_tag}
-          tyk_sink_image=\${registry}/tyk-sink:${default_image_tag}
-          tyk_pump_image=\${registry}/tyk-pump:${default_image_tag}
+          tyk_sink_image=\${registry}/tyk-sink:${tyk_sink_image}
+          tyk_pump_image=\${registry}/tyk-pump:${tyk_pump_image}
           # override default above with just built tag
           tyk_image=${tags[0]}
           # alfa and beta have to come after the override
