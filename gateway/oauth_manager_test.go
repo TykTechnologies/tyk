@@ -1415,8 +1415,7 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 
 	cfg := ts.Gw.GetConfig().Storage
 	timeout := 5 * time.Second
-	var client redis.UniversalClient
-	var clientMu sync.Mutex
+
 	opts := &redis.UniversalOptions{
 		Addrs:        storage.GetRedisAddrs(cfg),
 		Username:     cfg.Username,
@@ -1427,10 +1426,12 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 		WriteTimeout: timeout,
 		IdleTimeout:  240 * timeout,
 	}
-	client = redis.NewClient(opts.Simple())
 
 	setup := func(tb testing.TB) {
 		tb.Helper()
+		var client redis.UniversalClient
+		var clientMu sync.Mutex
+		client = redis.NewClient(opts.Simple())
 		nowTs := time.Now().Unix()
 		wg := sync.WaitGroup{}
 		for i := 0; i < apiCount; i++ {
@@ -1455,12 +1456,12 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 
 				sortedListKey := fmt.Sprintf("%s%s", oauthAPIIDPrefix, prefixClientTokens+clientID)
 				wg.Add(1)
-				go func(key string, members []*redis.Z) {
+				go func(wg *sync.WaitGroup, mu *sync.Mutex, key string, members []*redis.Z) {
 					defer wg.Done()
-					clientMu.Lock()
-					defer clientMu.Unlock()
+					mu.Lock()
+					defer mu.Unlock()
 					client.ZAdd(context.Background(), key, members...)
-				}(sortedListKey, setMembers)
+				}(&wg, &clientMu, sortedListKey, setMembers)
 			}
 		}
 		wg.Wait()
