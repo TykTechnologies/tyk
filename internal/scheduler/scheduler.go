@@ -2,40 +2,55 @@ package scheduler
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
 func NewScheduler(name string, interval time.Duration, logger *logrus.Logger, purgeFunc func() error) *Scheduler {
-	return &Scheduler{
-		name:     name,
+	scheduler := &Scheduler{
 		interval: interval,
-		execFunc: purgeFunc,
-		logger:   logger,
+		jobFn:    purgeFunc,
+		logger:   logger.WithField("scheduler", name),
 	}
+
+	return scheduler
 }
 
 type Scheduler struct {
-	name     string
 	interval time.Duration
-	execFunc func() error
-	logger   *logrus.Logger
+	logger   *logrus.Entry
+	jobFn    func() error
 }
 
 func (s *Scheduler) Exec(ctx context.Context) {
+	for {
+		if err := s.runExecFunc(ctx); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return
+			}
+
+			s.logger.Error(err)
+			continue
+		}
+
+		s.logger.Infof("execution success")
+	}
+}
+
+func (s *Scheduler) runExecFunc(ctx context.Context) error {
 	tick := time.NewTicker(s.interval)
 	defer tick.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-tick.C:
-			if err := s.execFunc(); err != nil {
-				s.logger.WithError(err).Errorf("error while executing func %s", s.name)
-			} else {
-				s.logger.Infof("%s execution success", s.name)
-			}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-tick.C:
+		if err := s.jobFn(); err != nil {
+			return fmt.Errorf("error while executing func: %w", err)
 		}
 	}
+
+	return nil
 }

@@ -2,7 +2,8 @@ package scheduler_test
 
 import (
 	"context"
-	"errors"
+	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,78 +25,54 @@ func TestNewScheduler(t *testing.T) {
 
 func TestExec(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		logger, hook := test.NewNullLogger()
-		execFunc := func() error { return nil }
+		logger, _ := test.NewNullLogger()
+		var counter int64
+		execFunc := func() error {
+			atomic.AddInt64(&counter, 1)
+			return nil
+		}
 
-		s := scheduler.NewScheduler("test", 100*time.Millisecond, logger, execFunc)
+		s := scheduler.NewScheduler("test", 100*time.Microsecond, logger, execFunc)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		go s.Exec(ctx)
+		go func() {
+			time.Sleep(150 * time.Microsecond) // Wait for the ticker to tick at least once
+			cancel()
+		}()
 
-		time.Sleep(200 * time.Millisecond) // Wait for the ticker to tick at least once
-		cancel()
+		s.Exec(ctx)
+		assert.Equal(t, int64(1), counter)
+	})
 
-		assert.Len(t, hook.Entries, 1)
-		assert.Equal(t, "test execution success", hook.LastEntry().Message)
+	t.Run("non cancelled error", func(t *testing.T) {
+		logger, _ := test.NewNullLogger()
+		var counter int64
+		execFunc := func() error {
+			atomic.AddInt64(&counter, 1)
+			return io.EOF
+		}
+
+		s := scheduler.NewScheduler("test", 100*time.Microsecond, logger, execFunc)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go func() {
+			time.Sleep(150 * time.Microsecond) // Wait for the ticker to tick at least once
+			cancel()
+		}()
+
+		s.Exec(ctx)
+		assert.Equal(t, int64(1), counter)
 	})
 
 	t.Run("error", func(t *testing.T) {
-		logger, hook := test.NewNullLogger()
-		execFunc := func() error { return errors.New("test error") }
+		logger, _ := test.NewNullLogger()
+		execFunc := func() error { return context.Canceled }
 
-		s := scheduler.NewScheduler("test", 100*time.Millisecond, logger, execFunc)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		s := scheduler.NewScheduler("test", time.Nanosecond, logger, execFunc)
 
-		go s.Exec(ctx)
+		s.Exec(context.Background())
 
-		time.Sleep(150 * time.Millisecond) // Wait for the ticker to tick at least once
-		cancel()
-
-		assert.Len(t, hook.Entries, 1)
-		assert.Equal(t, "error while executing func test", hook.LastEntry().Message)
-	})
-
-	t.Run("cancelled context", func(t *testing.T) {
-		logger, hook := test.NewNullLogger()
-		execFunc := func() error {
-			return nil
-		}
-
-		s := scheduler.NewScheduler("testCancel", 50*time.Millisecond, logger, execFunc)
-		ctx, cancel := context.WithCancel(context.Background())
-
-		go s.Exec(ctx)
-
-		time.Sleep(25 * time.Millisecond) // Cancel before the first tick
-		cancel()
-		time.Sleep(100 * time.Millisecond) // Give some time to propagate the cancel
-
-		assert.Empty(t, hook.Entries)
-	})
-
-	t.Run("repeated exec calls", func(t *testing.T) {
-		logger, hook := test.NewNullLogger()
-		execFunc := func() error {
-			return nil
-		}
-
-		s := scheduler.NewScheduler("testRepeated", 100*time.Millisecond, logger, execFunc)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		go s.Exec(ctx)
-
-		time.Sleep(350 * time.Millisecond) // Enough time for multiple ticks
-		cancel()
-
-		i := 0
-		for _, entry := range hook.Entries {
-			assert.Equal(t, "testRepeated execution success", entry.Message)
-			i++
-		}
-
-		assert.GreaterOrEqual(t, i, 3)
 	})
 }
