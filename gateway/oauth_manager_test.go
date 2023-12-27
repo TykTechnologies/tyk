@@ -1425,6 +1425,7 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 		ReadTimeout:  timeout,
 		WriteTimeout: timeout,
 		IdleTimeout:  240 * timeout,
+		PoolSize:     100,
 	}
 
 	setup := func(tb testing.TB) {
