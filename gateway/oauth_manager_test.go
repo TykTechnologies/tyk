@@ -6,6 +6,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/url"
 	"path"
@@ -1453,10 +1454,10 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 
 				sortedListKey := fmt.Sprintf("%s%s", oauthAPIIDPrefix, prefixClientTokens+clientID)
 				wg.Add(1)
-				go func() {
+				go func(key string, members []*redis.Z) {
 					defer wg.Done()
-					client.ZAdd(ts.Gw.ctx, sortedListKey, setMembers...)
-				}()
+					client.ZAdd(context.Background(), key, members...)
+				}(sortedListKey, setMembers)
 			}
 		}
 		wg.Wait()
