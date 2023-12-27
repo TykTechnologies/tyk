@@ -1430,7 +1430,6 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 	setup := func(tb testing.TB) {
 		tb.Helper()
 		var client redis.UniversalClient
-		var clientMu sync.Mutex
 		client = redis.NewClient(opts.Simple())
 		nowTs := time.Now().Unix()
 		wg := sync.WaitGroup{}
@@ -1456,12 +1455,10 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 
 				sortedListKey := fmt.Sprintf("%s%s", oauthAPIIDPrefix, prefixClientTokens+clientID)
 				wg.Add(1)
-				go func(wg *sync.WaitGroup, mu *sync.Mutex, key string, members []*redis.Z) {
+				go func(wg *sync.WaitGroup, key string, members []*redis.Z) {
 					defer wg.Done()
-					mu.Lock()
-					defer mu.Unlock()
 					client.ZAdd(context.Background(), key, members...)
-				}(&wg, &clientMu, sortedListKey, setMembers)
+				}(&wg, sortedListKey, setMembers)
 			}
 		}
 		wg.Wait()
