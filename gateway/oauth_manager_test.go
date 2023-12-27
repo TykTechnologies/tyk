@@ -1416,6 +1416,7 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 	cfg := ts.Gw.GetConfig().Storage
 	timeout := 5 * time.Second
 	var client redis.UniversalClient
+	var clientMu sync.Mutex
 	opts := &redis.UniversalOptions{
 		Addrs:        storage.GetRedisAddrs(cfg),
 		Username:     cfg.Username,
@@ -1456,6 +1457,8 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 				wg.Add(1)
 				go func(key string, members []*redis.Z) {
 					defer wg.Done()
+					clientMu.Lock()
+					defer clientMu.Unlock()
 					client.ZAdd(context.Background(), key, members...)
 				}(sortedListKey, setMembers)
 			}
