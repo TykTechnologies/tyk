@@ -1753,8 +1753,10 @@ func writeProfiles() {
 }
 
 func (gw *Gateway) start() {
+	conf := gw.GetConfig()
+
 	// Set up a default org manager so we can traverse non-live paths
-	if !gw.GetConfig().SupressDefaultOrgStore {
+	if !conf.SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
 		gw.DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
@@ -1762,15 +1764,14 @@ func (gw *Gateway) start() {
 	}
 
 	// Start listening for reload messages
-	if !gw.GetConfig().SuppressRedisSignalReload {
+	if !conf.SuppressRedisSignalReload {
 		go gw.startPubSubLoop()
 	}
 
-	oauthTokensPurger := scheduler.NewScheduler("purge-oauth-tokens", gw.GetConfig().Private.GetOAuthTokensPurgeInterval(),
+	oauthTokensPurger := scheduler.NewScheduler("purge-oauth-tokens", conf.Private.GetOAuthTokensPurgeInterval(),
 		log, gw.purgeLapsedOAuthTokens)
 	go oauthTokensPurger.Start(gw.ctx)
 
-	conf := gw.GetConfig()
 	if slaveOptions := conf.SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
 		gw.RPCListener = RPCStorageHandler{
