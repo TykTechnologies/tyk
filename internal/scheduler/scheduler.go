@@ -25,7 +25,7 @@ type Scheduler struct {
 	jobFn    func() error
 }
 
-func (s *Scheduler) Exec(ctx context.Context) {
+func (s *Scheduler) Start(ctx context.Context) {
 	for {
 		if err := s.runExecFunc(ctx); err != nil {
 			if errors.Is(err, context.Canceled) {

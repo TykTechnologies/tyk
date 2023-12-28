@@ -1009,7 +1009,6 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 	gw := s.newGateway(genConf)
 	gw.setupPortsWhitelist()
 	gw.startServer()
-
 	gw.setupGlobals()
 
 	// Set up a default org manager so we can traverse non-live paths

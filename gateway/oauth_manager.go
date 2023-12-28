@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -18,8 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
-
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/request"
 
@@ -1233,7 +1231,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	close(errs)
 
 	combinedErr := &multierror.Error{
-		ErrorFormat: tykerrors.Formatter,
+		ErrorFormat: errors.Formatter,
 	}
 
 	for err := range errs {

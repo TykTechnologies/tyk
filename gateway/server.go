@@ -21,12 +21,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/scheduler"
-
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -406,17 +406,6 @@ func (gw *Gateway) setupGlobals() {
 		}
 		go gw.flushNetworkAnalytics(gw.ctx)
 	}
-
-	var oAuthTokensPurgeInterval time.Duration
-	if purgeInterval := gw.GetConfig().Private.OAuthTokensPurgeInterval; purgeInterval == 0 {
-		oAuthTokensPurgeInterval = time.Hour
-	} else {
-		oAuthTokensPurgeInterval = time.Second * time.Duration(purgeInterval)
-	}
-
-	oauthTokensPurger := scheduler.NewScheduler("purge-oauth-tokens", oAuthTokensPurgeInterval,
-		log, gw.purgeLapsedOAuthTokens)
-	go oauthTokensPurger.Exec(gw.ctx)
 
 	// Load all the files that have the "error" prefix.
 	//	gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
@@ -1776,6 +1765,10 @@ func (gw *Gateway) start() {
 	if !gw.GetConfig().SuppressRedisSignalReload {
 		go gw.startPubSubLoop()
 	}
+
+	oauthTokensPurger := scheduler.NewScheduler("purge-oauth-tokens", gw.GetConfig().Private.GetOAuthTokensPurgeInterval(),
+		log, gw.purgeLapsedOAuthTokens)
+	go oauthTokensPurger.Start(gw.ctx)
 
 	conf := gw.GetConfig()
 	if slaveOptions := conf.SlaveOptions; slaveOptions.UseRPC {
