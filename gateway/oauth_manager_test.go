@@ -1408,7 +1408,7 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 	defer ts.Close()
 
 	const (
-		apiCount     = 1
+		apiCount     = 20
 		clientsCount = 50
 		tokensCount  = 1000
 	)
@@ -1482,10 +1482,9 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 
 	b.ReportAllocs()
 
-	//b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		setup(b, i*tokensCount)
+		setup(b, tokensCount)
 		b.StartTimer()
 		require.NoError(b, ts.Gw.purgeLapsedOAuthTokens())
 		b.StopTimer()
