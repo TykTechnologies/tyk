@@ -8,12 +8,9 @@ type Private struct {
 }
 
 func (p Private) GetOAuthTokensPurgeInterval() time.Duration {
-	var purgeInterval time.Duration
-	if p.OAuthTokensPurgeInterval == 0 {
-		purgeInterval = time.Hour
-	} else {
-		purgeInterval = time.Second * time.Duration(p.OAuthTokensPurgeInterval)
+	if p.OAuthTokensPurgeInterval != 0 {
+		return time.Second * time.Duration(p.OAuthTokensPurgeInterval)
 	}
 
-	return purgeInterval
+	return time.Hour
 }
