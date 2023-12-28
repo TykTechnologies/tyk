@@ -361,6 +361,7 @@ func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 	return nil
 }
 
+// Lock implements a distributed lock in a cluster.
 func (r *RedisCluster) Lock(key string, timeout time.Duration) (bool, error) {
 	if err := r.up(); err != nil {
 		return false, err

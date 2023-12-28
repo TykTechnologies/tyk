@@ -12,6 +12,7 @@ type Private struct {
 	OriginalPath string `json:"-"`
 }
 
+// GetOAuthTokensPurgeInterval returns purge interval for lapsed OAuth tokens.
 func (p Private) GetOAuthTokensPurgeInterval() time.Duration {
 	if p.OAuthTokensPurgeInterval != 0 {
 		return time.Second * time.Duration(p.OAuthTokensPurgeInterval)
