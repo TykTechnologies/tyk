@@ -198,8 +198,6 @@ type Gateway struct {
 	healthCheckInfo atomic.Value
 
 	dialCtxFn test.DialContext
-
-	oAuthTokensPurgeInterval time.Duration
 }
 
 type hostDetails struct {
@@ -409,11 +407,14 @@ func (gw *Gateway) setupGlobals() {
 		go gw.flushNetworkAnalytics(gw.ctx)
 	}
 
-	if gw.oAuthTokensPurgeInterval == 0 {
-		gw.oAuthTokensPurgeInterval = time.Hour
+	var oAuthTokensPurgeInterval time.Duration
+	if purgeInterval := gw.GetConfig().Private.OAuthTokensPurgeInterval; purgeInterval == 0 {
+		oAuthTokensPurgeInterval = time.Hour
+	} else {
+		oAuthTokensPurgeInterval = time.Second * time.Duration(purgeInterval)
 	}
 
-	oauthTokensPurger := scheduler.NewScheduler("purge-oauth-tokens", gw.oAuthTokensPurgeInterval,
+	oauthTokensPurger := scheduler.NewScheduler("purge-oauth-tokens", oAuthTokensPurgeInterval,
 		log, gw.purgeLapsedOAuthTokens)
 	go oauthTokensPurger.Exec(gw.ctx)
 

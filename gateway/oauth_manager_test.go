@@ -13,14 +13,12 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/TykTechnologies/tyk/config"
 
 	"fmt"
 
@@ -1402,22 +1400,26 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 		globalConf.OauthTokenExpire = 1
 		// cleanup tokens older than 2 seconds
 		globalConf.OauthTokenExpiredRetainPeriod = 2
+
+		globalConf.Private.OAuthTokensPurgeInterval = 1
 	}
 
 	ts := StartTest(conf)
 	defer ts.Close()
 
 	const (
-		apiCount     = 20
+		apiCount     = 1
 		clientsCount = 50
 		tokensCount  = 1000
 	)
 
-	cfg := ts.Gw.GetConfig().Storage
+	gwConf := ts.Gw.GetConfig()
+
+	cfg := gwConf.Storage
 	timeout := 5 * time.Second
 
 	opts := &redis.UniversalOptions{
-		Addrs:        storage.GetRedisAddrs(cfg),
+		Addrs:        cfg.HostAddrs(),
 		Username:     cfg.Username,
 		Password:     cfg.Password,
 		DB:           cfg.Database,
@@ -1425,52 +1427,66 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 		ReadTimeout:  timeout,
 		WriteTimeout: timeout,
 		IdleTimeout:  240 * timeout,
-		PoolSize:     100,
+		PoolSize:     500,
 	}
 
-	setup := func(tb testing.TB) {
+	fillZSet := func(client redis.UniversalClient, key string, count int) {
+		ctx := context.Background()
+		now := time.Now()
+		nowTs := now.Unix()
+		var setMembers []*redis.Z
+		for k := 0; k < count; k++ {
+			setMembers = append(setMembers, &redis.Z{
+				Score:  float64(nowTs - int64(k)),
+				Member: fmt.Sprintf("dummy-value-%d", k),
+			})
+		}
+
+		// add 10 more tokens to be not expired
+		for k := 0; k < count/10; k++ {
+			setMembers = append(setMembers, &redis.Z{
+				Score:  float64(nowTs + int64((k)*1000)),
+				Member: fmt.Sprintf("dummy-value-%d", k),
+			})
+		}
+		client.ZAdd(ctx, key, setMembers...)
+	}
+
+	copyZSet := func(client redis.UniversalClient, src, dst string) {
+		ctx := context.Background()
+		client.ZRangeStore(ctx, dst, redis.ZRangeArgs{
+			Key:   src,
+			Start: "0",
+			Stop:  "+inf",
+		})
+	}
+
+	setup := func(tb testing.TB, count int) {
 		tb.Helper()
 		var client redis.UniversalClient
 		client = redis.NewClient(opts.Simple())
-		nowTs := time.Now().Unix()
-		wg := sync.WaitGroup{}
+		now := time.Now()
+		fillZSet(client, "api", count)
+		tb.Logf("fill zet elapsed %f", time.Since(now).Seconds())
 		for i := 0; i < apiCount; i++ {
-			oauthAPIIDPrefix := generateOAuthPrefix(fmt.Sprintf("api-%d", i))
 			for j := 0; j < clientsCount; j++ {
-				clientID := fmt.Sprintf("client-%d", j)
-				var setMembers []*redis.Z
-				for k := 0; k < tokensCount; k++ {
-					setMembers = append(setMembers, &redis.Z{
-						Score:  float64(nowTs - int64(i+j+k)),
-						Member: fmt.Sprintf("dummy-value-%s-%d", clientID, k),
-					})
-				}
-
-				// add 10 more tokens to be not expired
-				for k := 0; k < 10; k++ {
-					setMembers = append(setMembers, &redis.Z{
-						Score:  float64(nowTs + int64((i+j)*1000)),
-						Member: fmt.Sprintf("dummy-value-%s-%d", clientID, k),
-					})
-				}
-
-				sortedListKey := fmt.Sprintf("%s%s", oauthAPIIDPrefix, prefixClientTokens+clientID)
-				wg.Add(1)
-				go func(wg *sync.WaitGroup, key string, members []*redis.Z) {
-					defer wg.Done()
-					client.ZAdd(context.Background(), key, members...)
-				}(&wg, sortedListKey, setMembers)
+				now := time.Now()
+				dst := fmt.Sprintf("oauth-data.%doauth-client-tokens.%d", i, j)
+				copyZSet(client, "api", dst)
+				tb.Logf("copy zet elapsed %f", time.Since(now).Seconds())
 			}
+
 		}
-		wg.Wait()
+		tb.Logf("setup time elapsed %f", time.Since(now).Seconds())
 	}
 
 	b.ReportAllocs()
+
+	//b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		setup(b)
+		setup(b, i*tokensCount)
 		b.StartTimer()
-
 		require.NoError(b, ts.Gw.purgeLapsedOAuthTokens())
 		b.StopTimer()
 	}

@@ -68,7 +68,7 @@ func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.Un
 
 	var client redis.UniversalClient
 	opts := &redis.UniversalOptions{
-		Addrs:            GetRedisAddrs(cfg),
+		Addrs:            getRedisAddrs(cfg),
 		MasterName:       cfg.MasterName,
 		SentinelPassword: cfg.SentinelPassword,
 		Username:         cfg.Username,
@@ -96,22 +96,8 @@ func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.Un
 	return client
 }
 
-func GetRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
-	if len(config.Addrs) != 0 {
-		addrs = config.Addrs
-	} else {
-		for h, p := range config.Hosts {
-			addr := h + ":" + p
-			addrs = append(addrs, addr)
-		}
-	}
-
-	if len(addrs) == 0 && config.Port != 0 {
-		addr := config.Host + ":" + strconv.Itoa(config.Port)
-		addrs = append(addrs, addr)
-	}
-
-	return addrs
+func getRedisAddrs(conf config.StorageOptionsConf) (addrs []string) {
+	return conf.HostAddrs()
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {

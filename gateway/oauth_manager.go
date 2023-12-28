@@ -1200,7 +1200,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	}
 
 	if !ok {
-		log.Info("oauth tokens purge lock not acquired, purgin in background")
+		log.Info("oauth tokens purge lock not acquired, purging in background")
 		return nil
 	}
 

@@ -1010,8 +1010,6 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 	gw.setupPortsWhitelist()
 	gw.startServer()
 
-	gw.oAuthTokensPurgeInterval = time.Second
-
 	gw.setupGlobals()
 
 	// Set up a default org manager so we can traverse non-live paths

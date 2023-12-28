@@ -151,7 +151,7 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(
 		rc.connectSingleton(v.IsCache, v.IsAnalytics, *conf)
 		err := backoff.Retry(v.checkIsOpen, getExponentialBackoff())
 		if err != nil {
-			log.WithError(err).Errorf("Could not connect to Redis cluster after many attempts. Host(s): %v", GetRedisAddrs(conf.Storage))
+			log.WithError(err).Errorf("Could not connect to Redis cluster after many attempts. Host(s): %v", getRedisAddrs(conf.Storage))
 		}
 	}
 

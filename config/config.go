@@ -1066,6 +1066,8 @@ type Config struct {
 
 	// ResourceSync configures mitigation strategy in case sync fails.
 	ResourceSync ResourceSyncConfig `json:"resource_sync"`
+
+	Private Private `json:"-"`
 }
 
 type ResourceSyncConfig struct {
