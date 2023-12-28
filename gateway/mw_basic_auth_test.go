@@ -169,7 +169,9 @@ func TestBasicAuthHashKeyFunc(t *testing.T) {
 
 			ts.Gw.apisMu.Lock()
 			assert.Len(t, ts.Gw.apiSpecs, 1)
-			k := &BasicAuthKeyIsValid{}
+			k := &BasicAuthKeyIsValid{
+				BaseMiddleware: &BaseMiddleware{},
+			}
 			k.Spec = ts.Gw.apiSpecs[0]
 			ts.Gw.apisMu.Unlock()
 
