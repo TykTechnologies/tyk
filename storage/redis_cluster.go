@@ -372,7 +372,7 @@ func (r *RedisCluster) SetNX(keyName string, value interface{}, timeout int64) (
 
 	res := singleton.SetNX(r.RedisController.ctx, keyName, value, time.Duration(timeout)*time.Second)
 	if err := res.Err(); err != nil {
-		log.Error("Error trying to set value: ", err)
+		log.WithError(err).Error("Error trying to set value")
 		return false, err
 	}
 	return res.Val(), nil

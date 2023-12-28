@@ -1477,8 +1477,7 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 		tb.Logf("setup time elapsed %f", time.Since(now).Seconds())
 	}
 
-	var client redis.UniversalClient
-	client = redis.NewClient(opts.Simple())
+	client := redis.NewClient(opts.Simple()) // no S1021
 	now := time.Now()
 	fillZSet(client, "api", tokensCount)
 	b.Logf("fill zet elapsed %f", time.Since(now).Seconds())
