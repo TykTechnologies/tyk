@@ -42,7 +42,7 @@ func TestIPBlacklistMiddleware(t *testing.T) {
 			req.Header.Set(header.XRealIP, tc.xRealIP)
 		}
 
-		mw := &IPBlackListMiddleware{}
+		mw := &IPBlackListMiddleware{BaseMiddleware: &BaseMiddleware{}}
 		mw.Spec = spec
 		_, code := mw.ProcessRequest(rec, req, nil)
 
@@ -58,7 +58,7 @@ func BenchmarkIPBlacklistMiddleware(b *testing.B) {
 
 	spec := testPrepareIPBlacklistMiddleware()
 
-	mw := &IPBlackListMiddleware{}
+	mw := &IPBlackListMiddleware{BaseMiddleware: &BaseMiddleware{}}
 	mw.Spec = spec
 
 	rec := httptest.NewRecorder()

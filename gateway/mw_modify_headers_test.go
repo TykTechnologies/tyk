@@ -17,7 +17,7 @@ func TestTransformHeaders_EnabledForSpec(t *testing.T) {
 		"Default": versionInfo,
 	}
 
-	th := TransformHeaders{}
+	th := TransformHeaders{BaseMiddleware: &BaseMiddleware{}}
 	th.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	th.Spec.VersionData.Versions = versions
 

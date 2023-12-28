@@ -2306,7 +2306,7 @@ func TestGetUserIDFromClaim(t *testing.T) {
 func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
 	const jwkURL = "https://jwk.com"
 
-	m := JWTMiddleware{}
+	m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{}}
 	api := &apidef.APIDefinition{JWTSource: jwkURL}
 	m.Spec = &APISpec{APIDefinition: api}
 
@@ -2408,7 +2408,7 @@ func Test_getOAuthClientIDFromClaim(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			j := JWTMiddleware{}
+			j := JWTMiddleware{BaseMiddleware: &BaseMiddleware{}}
 			j.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
 
 			oauthClientID := j.getOAuthClientIDFromClaim(tc.claims)
