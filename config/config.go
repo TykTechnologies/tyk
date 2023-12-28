@@ -594,11 +594,6 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
-	// OriginalPath is the path to the config file that is read. If
-	// none was found, it's the path to the default config file that
-	// was written.
-	OriginalPath string `json:"-"`
-
 	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
 	HostName string `json:"hostname"`
 
@@ -1240,7 +1235,7 @@ func Load(paths []string, conf *Config) error {
 		if err == nil {
 			r = f
 			defer r.Close()
-			conf.OriginalPath = filename
+			conf.Private.OriginalPath = filename
 			break
 		}
 		if os.IsNotExist(err) {
