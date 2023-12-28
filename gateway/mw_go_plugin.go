@@ -91,7 +91,8 @@ func (w *customResponseWriter) getHttpResponse(r *http.Request) *http.Response {
 
 // GoPluginMiddleware is a generic middleware that will execute Go-plugin code before continuing
 type GoPluginMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
+
 	Path           string // path to .so file
 	SymbolName     string // function symbol to look up
 	handler        http.HandlerFunc

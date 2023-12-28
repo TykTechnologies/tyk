@@ -672,7 +672,7 @@ func TestGRPCAuthHook(t *testing.T) {
 
 	t.Run("id extractor enabled", func(t *testing.T) {
 		path := "/grpc-auth-hook-test-api-1/"
-		baseMW := gateway.BaseMiddleware{
+		baseMW := &gateway.BaseMiddleware{
 			Gw: ts.Gw,
 			Spec: &gateway.APISpec{
 				APIDefinition: &apidef.APIDefinition{

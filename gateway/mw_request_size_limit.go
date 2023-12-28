@@ -15,7 +15,7 @@ import (
 // already been copied to memory when this middleware is called. Therefore, this middleware can't protect the gateway
 // itself from large requests.
 type RequestSizeLimitMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (t *RequestSizeLimitMiddleware) Name() string {

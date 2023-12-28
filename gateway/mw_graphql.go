@@ -40,7 +40,7 @@ var (
 )
 
 type GraphQLMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (m *GraphQLMiddleware) Name() string {

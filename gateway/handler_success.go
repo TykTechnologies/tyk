@@ -43,7 +43,7 @@ type ReturningHttpHandler interface {
 
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
 type SuccessHandler struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func tagHeaders(r *http.Request, th []string, tags []string) []string {

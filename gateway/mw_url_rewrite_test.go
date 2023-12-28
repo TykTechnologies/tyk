@@ -1126,7 +1126,7 @@ func TestInitTriggerRx(t *testing.T) {
 
 	// prepare test data
 	testRewriteMW := &URLRewriteMiddleware{
-		BaseMiddleware: BaseMiddleware{
+		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{
 				APIDefinition: &apidef.APIDefinition{},
 			},
