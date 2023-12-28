@@ -1325,8 +1325,8 @@ func TestPurgeOAuthClientTokensEvent(t *testing.T) {
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second
 		globalConf.OauthTokenExpire = 1
-		// cleanup tokens older than 2 seconds
-		globalConf.OauthTokenExpiredRetainPeriod = 2
+		// cleanup tokens older than 1 seconds
+		globalConf.OauthTokenExpiredRetainPeriod = 1
 	}
 
 	ts := StartTest(conf)
@@ -1347,7 +1347,7 @@ func TestPurgeOAuthClientTokensEvent(t *testing.T) {
 	assertTokensLen(t, storageManager, storageKey1, 3)
 	assertTokensLen(t, storageManager, storageKey2, 3)
 
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 2)
 
 	// emit event
 
@@ -1367,7 +1367,7 @@ func TestPurgeOAuthClientTokensInBackground(t *testing.T) {
 		// set tokens to be expired after 1 second
 		globalConf.OauthTokenExpire = 1
 		// cleanup tokens older than 2 seconds
-		globalConf.OauthTokenExpiredRetainPeriod = 2
+		globalConf.OauthTokenExpiredRetainPeriod = 1
 	}
 
 	ts := StartTest(conf)
@@ -1388,7 +1388,7 @@ func TestPurgeOAuthClientTokensInBackground(t *testing.T) {
 	assertTokensLen(t, storageManager, storageKey1, 3)
 	assertTokensLen(t, storageManager, storageKey2, 3)
 
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 2)
 
 	assertTokensLen(t, storageManager, storageKey1, 0)
 	assertTokensLen(t, storageManager, storageKey2, 0)
