@@ -15,10 +15,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"fmt"
 
@@ -1408,7 +1409,7 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 	defer ts.Close()
 
 	const (
-		apiCount     = 20
+		apiCount     = 10
 		clientsCount = 50
 		tokensCount  = 1000
 	)
@@ -1461,30 +1462,32 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 		})
 	}
 
-	setup := func(tb testing.TB, count int) {
+	setup := func(tb testing.TB, client redis.UniversalClient) {
 		tb.Helper()
-		var client redis.UniversalClient
-		client = redis.NewClient(opts.Simple())
 		now := time.Now()
-		fillZSet(client, "api", count)
-		tb.Logf("fill zet elapsed %f", time.Since(now).Seconds())
 		for i := 0; i < apiCount; i++ {
 			for j := 0; j < clientsCount; j++ {
-				now := time.Now()
+				//now := time.Now()
 				dst := fmt.Sprintf("oauth-data.%doauth-client-tokens.%d", i, j)
 				copyZSet(client, "api", dst)
-				tb.Logf("copy zet elapsed %f", time.Since(now).Seconds())
+				//tb.Logf("copy zet elapsed %f", time.Since(now).Seconds())
 			}
 
 		}
 		tb.Logf("setup time elapsed %f", time.Since(now).Seconds())
 	}
 
+	var client redis.UniversalClient
+	client = redis.NewClient(opts.Simple())
+	now := time.Now()
+	fillZSet(client, "api", tokensCount)
+	b.Logf("fill zet elapsed %f", time.Since(now).Seconds())
+
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		setup(b, tokensCount)
+		setup(b, client)
 		b.StartTimer()
 		require.NoError(b, ts.Gw.purgeLapsedOAuthTokens())
 		b.StopTimer()
