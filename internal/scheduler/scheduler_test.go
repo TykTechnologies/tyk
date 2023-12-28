@@ -3,79 +3,74 @@ package scheduler_test
 import (
 	"context"
 	"io"
-	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/test"
 	logrus "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 )
 
-func TestNewScheduler(t *testing.T) {
+func TestScheduler_Break(t *testing.T) {
 	logger, _ := logrus.NewNullLogger()
-	execFunc := func() error { return nil }
-	interval := 1 * time.Second
 
-	s := scheduler.NewScheduler("testScheduler", interval, logger, execFunc)
+	s := scheduler.NewScheduler(logger)
 
 	assert.NotEmpty(t, s)
+
+	job := scheduler.NewJob("test", func() error {
+		return scheduler.Break
+	}, 1)
+
+	s.Start(context.Background(), job)
+
+	assert.NotNil(t, s)
 }
 
-func TestExec(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		test.Flaky(t) // test using time.Sleep
-		logger, _ := logrus.NewNullLogger()
-		var counter int64
-		execFunc := func() error {
-			atomic.AddInt64(&counter, 1)
-			return nil
-		}
+func TestScheduler_Close(t *testing.T) {
+	logger, _ := logrus.NewNullLogger()
 
-		s := scheduler.NewScheduler("test", 100*time.Microsecond, logger, execFunc)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+	s := scheduler.NewScheduler(logger)
+	defer s.Close()
 
-		go func() {
-			time.Sleep(150 * time.Microsecond) // Wait for the ticker to tick at least once
-			cancel()
-		}()
+	job := scheduler.NewJob("test", func() error {
+		return nil
+	}, 1)
 
-		s.Start(ctx)
-		assert.Equal(t, int64(1), counter)
-	})
+	go s.Start(context.Background(), job)
 
-	t.Run("non cancelled error", func(t *testing.T) {
-		test.Flaky(t) // test using time.Sleep
-		logger, _ := logrus.NewNullLogger()
-		var counter int64
-		execFunc := func() error {
-			atomic.AddInt64(&counter, 1)
-			return io.EOF
-		}
+	assert.NotNil(t, s)
+}
 
-		s := scheduler.NewScheduler("test", 100*time.Microsecond, logger, execFunc)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+func TestScheduler_Job_Errors(t *testing.T) {
+	logger, _ := logrus.NewNullLogger()
 
-		go func() {
-			time.Sleep(150 * time.Microsecond) // Wait for the ticker to tick at least once
-			cancel()
-		}()
+	testcases := []struct {
+		name string
+		err  error
+	}{
+		{name: "no error", err: nil},
+		{name: "error", err: io.EOF},
+		{name: "cancelled", err: context.Canceled},
+		{name: "break", err: scheduler.Break},
+	}
 
-		s.Start(ctx)
-		assert.Equal(t, int64(1), counter)
-	})
+	for _, tc := range testcases {
+		tc := tc
 
-	t.Run("error", func(t *testing.T) {
-		logger, _ := logrus.NewNullLogger()
-		execFunc := func() error { return context.Canceled }
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
 
-		s := scheduler.NewScheduler("test", time.Nanosecond, logger, execFunc)
+			job := scheduler.NewJob("test", func() error {
+				return tc.err
+			}, 1)
 
-		s.Start(context.Background())
+			runner := scheduler.NewScheduler(logger)
+			go runner.Start(ctx, job)
 
-	})
+			time.Sleep(time.Millisecond)
+		})
+	}
 }

@@ -3,54 +3,87 @@ package scheduler
 import (
 	"context"
 	"errors"
-	"fmt"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
-func NewScheduler(name string, interval time.Duration, logger *logrus.Logger, purgeFunc func() error) *Scheduler {
-	scheduler := &Scheduler{
-		interval: interval,
-		jobFn:    purgeFunc,
-		logger:   logger.WithField("scheduler", name),
-	}
+var Break = errors.New("internal: break scheduler loop")
 
-	return scheduler
+type Job struct {
+	Name     string
+	Run      func() error
+	Interval time.Duration
+}
+
+func NewJob(name string, run func() error, interval time.Duration) *Job {
+	return &Job{
+		Name:     name,
+		Run:      run,
+		Interval: interval,
+	}
 }
 
 type Scheduler struct {
-	interval time.Duration
-	logger   *logrus.Entry
-	jobFn    func() error
+	logger *logrus.Logger
+
+	mustBreak bool
+	stop      chan bool
+	stopOnce  sync.Once
 }
 
-func (s *Scheduler) Start(ctx context.Context) {
+func NewScheduler(logger *logrus.Logger) *Scheduler {
+	return &Scheduler{
+		logger: logger,
+		stop:   make(chan bool),
+	}
+}
+
+func (s *Scheduler) Logger() *logrus.Entry {
+	return s.logger.WithField("prefix", "scheduler")
+}
+
+func (s *Scheduler) Start(ctx context.Context, job *Job) {
+	tick := time.NewTicker(job.Interval)
+
+	defer func() {
+		tick.Stop()
+	}()
+
 	for {
-		if err := s.runExecFunc(ctx); err != nil {
-			if errors.Is(err, context.Canceled) {
-				return
-			}
+		logger := s.Logger().WithField("name", job.Name)
 
-			s.logger.Error(err)
-			continue
+		err := job.Run()
+
+		switch {
+		case errors.Is(err, Break):
+			s.mustBreak = true
+			logger.Info("job scheduler stopping")
+		case err != nil:
+			logger.WithError(err).Errorf("job run error")
+		default:
+			logger.Info("job run successful")
 		}
 
-		s.logger.Infof("execution success")
+		if s.mustBreak {
+			break
+		}
+
+		select {
+		case <-s.stop:
+			return
+		case <-ctx.Done():
+			s.Close()
+			return
+		case <-tick.C:
+		}
 	}
 }
 
-func (s *Scheduler) runExecFunc(ctx context.Context) error {
-	tick := time.NewTicker(s.interval)
-	defer tick.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-tick.C:
-		if err := s.jobFn(); err != nil {
-			return fmt.Errorf("error while executing func: %w", err)
-		}
-	}
-
+func (s *Scheduler) Close() error {
+	s.stopOnce.Do(func() {
+		close(s.stop)
+	})
 	return nil
 }

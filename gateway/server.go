@@ -25,11 +25,10 @@ import (
 	textTemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/scheduler"
-
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/test"
 
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -1768,9 +1767,11 @@ func (gw *Gateway) start() {
 		go gw.startPubSubLoop()
 	}
 
-	oauthTokensPurger := scheduler.NewScheduler("purge-oauth-tokens", conf.Private.GetOAuthTokensPurgeInterval(),
-		log, gw.purgeLapsedOAuthTokens)
-	go oauthTokensPurger.Start(gw.ctx)
+	purgeInterval := conf.Private.GetOAuthTokensPurgeInterval()
+	purgeJob := scheduler.NewJob("purge-oauth-tokens", gw.purgeLapsedOAuthTokens, purgeInterval)
+
+	oauthTokensPurger := scheduler.NewScheduler(log)
+	go oauthTokensPurger.Start(gw.ctx, purgeJob)
 
 	if slaveOptions := conf.SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
