@@ -4,4 +4,4 @@ set -e
 echo "Running benchmarks"
 
 
-go test -count=5 -run='^$' -bench BenchmarkPurgeLapsedOAuthTokens github.com/TykTechnologies/tyk/gateway
+go test -json -benchtime 30s -run='^$' -bench BenchmarkPurgeLapsedOAuthTokens github.com/TykTechnologies/tyk/gateway
