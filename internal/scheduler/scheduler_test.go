@@ -7,14 +7,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus/hooks/test"
+	"github.com/TykTechnologies/tyk/test"
+	logrus "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 )
 
 func TestNewScheduler(t *testing.T) {
-	logger, _ := test.NewNullLogger()
+	logger, _ := logrus.NewNullLogger()
 	execFunc := func() error { return nil }
 	interval := 1 * time.Second
 
@@ -25,8 +26,8 @@ func TestNewScheduler(t *testing.T) {
 
 func TestExec(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		t.Skip()
-		logger, _ := test.NewNullLogger()
+		test.Flaky(t) // test using time.Sleep
+		logger, _ := logrus.NewNullLogger()
 		var counter int64
 		execFunc := func() error {
 			atomic.AddInt64(&counter, 1)
@@ -47,8 +48,8 @@ func TestExec(t *testing.T) {
 	})
 
 	t.Run("non cancelled error", func(t *testing.T) {
-		t.Skip()
-		logger, _ := test.NewNullLogger()
+		test.Flaky(t) // test using time.Sleep
+		logger, _ := logrus.NewNullLogger()
 		var counter int64
 		execFunc := func() error {
 			atomic.AddInt64(&counter, 1)
@@ -69,7 +70,7 @@ func TestExec(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		logger, _ := test.NewNullLogger()
+		logger, _ := logrus.NewNullLogger()
 		execFunc := func() error { return context.Canceled }
 
 		s := scheduler.NewScheduler("test", time.Nanosecond, logger, execFunc)
