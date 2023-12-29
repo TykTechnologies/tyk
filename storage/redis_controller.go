@@ -242,6 +242,7 @@ func (rc *RedisController) establishConnection(v *RedisCluster, conf config.Conf
 	return clusterConnectionIsOpen(v)
 }
 
+// Mock is used to mock redis controller with a redis client.
 func (rc *RedisController) Mock(pool redis.UniversalClient, redisUp bool) {
 	rc.singlePool = pool
 	rc.singleAnalyticsPool = pool
