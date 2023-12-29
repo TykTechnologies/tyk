@@ -2043,7 +2043,7 @@ func TestOrgKeyHandler_LastUpdated(t *testing.T) {
 	}...)
 }
 
-func TestPurgeOAuthClientTokens(t *testing.T) {
+func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second
 		globalConf.OauthTokenExpire = 1

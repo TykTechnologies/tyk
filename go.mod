@@ -34,10 +34,11 @@ require (
 	github.com/frankban/quicktest v1.11.0 // indirect
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
 	github.com/getsentry/raven-go v0.2.0 // indirect
-	github.com/go-redis/redis/v8 v8.3.1
+	github.com/go-redis/redis/v8 v8.11.5
+	github.com/go-redis/redismock/v8 v8.11.5
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/gofrs/uuid v3.3.0+incompatible
-	github.com/golang/protobuf v1.4.2
+	github.com/golang/protobuf v1.5.2
 	github.com/google/btree v1.0.0 // indirect
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/gorilla/mux v1.8.0
@@ -49,7 +50,6 @@ require (
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/go-multierror v1.1.0
 	github.com/hashicorp/go-retryablehttp v0.6.7 // indirect
-	github.com/hashicorp/go-version v1.1.0
 	github.com/hashicorp/memberlist v0.1.6 // indirect
 	github.com/hashicorp/serf v0.8.6 // indirect
 	github.com/hashicorp/vault/api v1.0.5-0.20200717191844-f687267c8086
@@ -94,7 +94,6 @@ require (
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
 	golang.org/x/net v0.0.0-20211209124913-491a49abca63
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211013075003-97ac67df715c // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/grpc v1.29.1
