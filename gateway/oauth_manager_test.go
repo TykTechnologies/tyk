@@ -69,6 +69,10 @@ const keyRulesWithMetadata = `{
 	"meta_data": {"key": "meta", "foo": "keybar"}
 }`
 
+var (
+	dummyErr = errors.New("dummy")
+)
+
 func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 	return BuildAPI(func(spec *APISpec) {
 		spec.APIID = "999999"
@@ -1405,9 +1409,9 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 			redisController := storage.NewRedisController(context.Background())
 			redisController.MockWith(db, true)
 			gw.RedisController = redisController
-			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetErr(errors.ErrUnsupported)
+			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetErr(dummyErr)
 			err := gw.purgeLapsedOAuthTokens()
-			assert.ErrorIs(t, err, errors.ErrUnsupported)
+			assert.ErrorIs(t, err, dummyErr)
 		})
 
 		t.Run("lock failure", func(t *testing.T) {
@@ -1434,9 +1438,9 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 			redisController.MockWith(db, true)
 			gw.RedisController = redisController
 			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetVal(true)
-			mock.ExpectScan(0, oAuthClientTokensKeyPattern, 0).SetErr(errors.ErrUnsupported)
+			mock.ExpectScan(0, oAuthClientTokensKeyPattern, 0).SetErr(dummyErr)
 			err := gw.purgeLapsedOAuthTokens()
-			assert.ErrorIs(t, err, errors.ErrUnsupported)
+			assert.ErrorIs(t, err, dummyErr)
 		})
 	})
 }
