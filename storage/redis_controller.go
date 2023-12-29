@@ -241,3 +241,10 @@ func (rc *RedisController) establishConnection(v *RedisCluster, conf config.Conf
 	}
 	return clusterConnectionIsOpen(v)
 }
+
+func (rc *RedisController) Mock(pool redis.UniversalClient, redisUp bool) {
+	rc.singlePool = pool
+	rc.singleAnalyticsPool = pool
+	rc.singleAnalyticsPool = pool
+	rc.redisUp.Store(redisUp)
+}

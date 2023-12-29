@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/url"
 	"path"
 	"reflect"
@@ -16,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redismock/v8"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1321,78 +1323,124 @@ func assertTokensLen(t *testing.T, storageManager storage.Handler, storageKey st
 	assert.Equal(t, expectedTokensLen, len(tokens))
 }
 
-func TestPurgeOAuthClientTokensEvent(t *testing.T) {
-	conf := func(globalConf *config.Config) {
-		// set tokens to be expired after 1 second
-		globalConf.OauthTokenExpire = 1
-		// cleanup tokens older than 1 seconds
-		globalConf.OauthTokenExpiredRetainPeriod = 1
-	}
+func TestPurgeOAuthClientTokens(t *testing.T) {
+	t.Run("event", func(t *testing.T) {
+		conf := func(globalConf *config.Config) {
+			// set tokens to be expired after 1 second
+			globalConf.OauthTokenExpire = 1
+			// cleanup tokens older than 1 seconds
+			globalConf.OauthTokenExpiredRetainPeriod = 1
+		}
 
-	ts := StartTest(conf)
-	defer ts.Close()
+		ts := StartTest(conf)
+		defer ts.Close()
 
-	spec := ts.LoadTestOAuthSpec()
+		spec := ts.LoadTestOAuthSpec()
 
-	clientID1, clientID2 := uuid.New(), uuid.New()
+		clientID1, clientID2 := uuid.New(), uuid.New()
 
-	ts.createOAuthClientIDAndTokens(t, spec, clientID1)
-	ts.createOAuthClientIDAndTokens(t, spec, clientID2)
-	storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
-		fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
+		ts.createOAuthClientIDAndTokens(t, spec, clientID1)
+		ts.createOAuthClientIDAndTokens(t, spec, clientID2)
+		storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
+			fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
 
-	storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
-	storageManager.Connect()
+		storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+		storageManager.Connect()
 
-	assertTokensLen(t, storageManager, storageKey1, 3)
-	assertTokensLen(t, storageManager, storageKey2, 3)
+		assertTokensLen(t, storageManager, storageKey1, 3)
+		assertTokensLen(t, storageManager, storageKey2, 3)
 
-	time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 2)
 
-	// emit event
+		// emit event
 
-	n := Notification{
-		Command: OAuthPurgeLapsedTokens,
-		Gw:      ts.Gw,
-	}
-	ts.Gw.MainNotifier.Notify(n)
+		n := Notification{
+			Command: OAuthPurgeLapsedTokens,
+			Gw:      ts.Gw,
+		}
+		ts.Gw.MainNotifier.Notify(n)
 
-	assertTokensLen(t, storageManager, storageKey1, 0)
-	assertTokensLen(t, storageManager, storageKey2, 0)
+		assertTokensLen(t, storageManager, storageKey1, 0)
+		assertTokensLen(t, storageManager, storageKey2, 0)
+	})
 
-}
+	t.Run("background", func(t *testing.T) {
 
-func TestPurgeOAuthClientTokensInBackground(t *testing.T) {
-	conf := func(globalConf *config.Config) {
-		// set tokens to be expired after 1 second
-		globalConf.OauthTokenExpire = 1
-		// cleanup tokens older than 2 seconds
-		globalConf.OauthTokenExpiredRetainPeriod = 1
-	}
+		conf := func(globalConf *config.Config) {
+			// set tokens to be expired after 1 second
+			globalConf.OauthTokenExpire = 1
+			// cleanup tokens older than 2 seconds
+			globalConf.OauthTokenExpiredRetainPeriod = 1
+		}
 
-	ts := StartTest(conf)
-	defer ts.Close()
+		ts := StartTest(conf)
+		defer ts.Close()
 
-	spec := ts.LoadTestOAuthSpec()
+		spec := ts.LoadTestOAuthSpec()
 
-	clientID1, clientID2 := uuid.New(), uuid.New()
+		clientID1, clientID2 := uuid.New(), uuid.New()
 
-	ts.createOAuthClientIDAndTokens(t, spec, clientID1)
-	ts.createOAuthClientIDAndTokens(t, spec, clientID2)
-	storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
-		fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
+		ts.createOAuthClientIDAndTokens(t, spec, clientID1)
+		ts.createOAuthClientIDAndTokens(t, spec, clientID2)
+		storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
+			fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
 
-	storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
-	storageManager.Connect()
+		storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+		storageManager.Connect()
 
-	assertTokensLen(t, storageManager, storageKey1, 3)
-	assertTokensLen(t, storageManager, storageKey2, 3)
+		assertTokensLen(t, storageManager, storageKey1, 3)
+		assertTokensLen(t, storageManager, storageKey2, 3)
 
-	time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 2)
 
-	assertTokensLen(t, storageManager, storageKey1, 0)
-	assertTokensLen(t, storageManager, storageKey2, 0)
+		assertTokensLen(t, storageManager, storageKey1, 0)
+		assertTokensLen(t, storageManager, storageKey2, 0)
+	})
 
+	t.Run("errors", func(t *testing.T) {
+		t.Run("lock err", func(t *testing.T) {
+			gw := Gateway{}
+			gw.SetConfig(config.Config{
+				OauthTokenExpiredRetainPeriod: 1,
+			})
+			db, mock := redismock.NewClientMock()
+			redisController := storage.NewRedisController(context.Background())
+			redisController.Mock(db, true)
+			gw.RedisController = redisController
+			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetErr(errors.ErrUnsupported)
+			err := gw.purgeLapsedOAuthTokens()
+			assert.ErrorIs(t, err, errors.ErrUnsupported)
+		})
+
+		t.Run("lock failure", func(t *testing.T) {
+			gw := Gateway{}
+			gw.SetConfig(config.Config{
+				OauthTokenExpiredRetainPeriod: 1,
+			})
+			db, mock := redismock.NewClientMock()
+			redisController := storage.NewRedisController(context.Background())
+			redisController.Mock(db, true)
+			gw.RedisController = redisController
+			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetVal(false)
+			err := gw.purgeLapsedOAuthTokens()
+			assert.NoError(t, err)
+		})
+
+		t.Run("scan keys error", func(t *testing.T) {
+			gw := Gateway{}
+			gw.SetConfig(config.Config{
+				OauthTokenExpiredRetainPeriod: 1,
+			})
+			db, mock := redismock.NewClientMock()
+			redisController := storage.NewRedisController(context.Background())
+			redisController.Mock(db, true)
+			gw.RedisController = redisController
+			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetVal(true)
+			mock.ExpectScan(0, oAuthClientTokensKeyPattern, 0).SetErr(errors.ErrUnsupported)
+			err := gw.purgeLapsedOAuthTokens()
+			assert.ErrorIs(t, err, errors.ErrUnsupported)
+		})
+	})
 }
 
 func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {

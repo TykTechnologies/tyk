@@ -1205,7 +1205,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	keys, err := redisCluster.ScanKeys(oAuthClientTokensKeyPattern)
 
 	if err != nil {
-		log.WithError(err).Debug("error while scanning for tokens")
+		log.WithError(err).Error("error while scanning for tokens")
 		return err
 	}
 
