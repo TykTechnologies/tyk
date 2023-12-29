@@ -6,11 +6,9 @@ import (
 )
 
 var (
-	New            = errors.New
-	Is             = errors.Is
-	Join           = errors.Join
-	Unwrap         = errors.Unwrap
-	ErrUnsupported = errors.ErrUnsupported
+	New    = errors.New
+	Is     = errors.Is
+	Unwrap = errors.Unwrap
 )
 
 func Formatter(errs []error) string {

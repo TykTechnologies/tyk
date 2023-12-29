@@ -21,29 +21,17 @@ import (
 	"strings"
 	"sync"
 
-<<<<<<< HEAD
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/test"
 
-=======
->>>>>>> ee5dc29b... [TT-10826] self trim oAuth sorted set (#5907)
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
 
-<<<<<<< HEAD
-=======
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/scheduler"
-	"github.com/TykTechnologies/tyk/test"
-
-	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
->>>>>>> ee5dc29b... [TT-10826] self trim oAuth sorted set (#5907)
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
