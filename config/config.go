@@ -1011,17 +1011,7 @@ type Config struct {
 	// Skip TLS verification for JWT JWKs url validation
 	JWTSSLInsecureSkipVerify bool `json:"jwt_ssl_insecure_skip_verify"`
 
-	// ResourceSync configures mitigation strategy in case sync fails.
-	ResourceSync ResourceSyncConfig `json:"resource_sync"`
-
 	Private Private `json:"-"`
-}
-
-type ResourceSyncConfig struct {
-	// RetryAttempts defines the number of retries that the Gateway
-	// should perform during a resource sync (APIs or policies), defaulting
-	// to zero which means no retries are attempted.
-	RetryAttempts int `json:"retry_attempts"`
 }
 
 type TykError struct {
