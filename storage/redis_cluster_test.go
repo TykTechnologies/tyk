@@ -312,7 +312,8 @@ func TestLock(t *testing.T) {
 
 	t.Run("lock error", func(t *testing.T) {
 		db, mock := redismock.NewClientMock()
-		mock.ExpectSetNX("lock-key", "1", time.Second).SetErr(errors.ErrUnsupported)
+		dummyErr := errors.New("dummy")
+		mock.ExpectSetNX("lock-key", "1", time.Second).SetErr(dummyErr)
 
 		redisCluster := &RedisCluster{
 			RedisController: &RedisController{
@@ -323,7 +324,7 @@ func TestLock(t *testing.T) {
 		redisCluster.RedisController.redisUp.Store(true)
 
 		ok, err := redisCluster.Lock("lock-key", time.Second)
-		assert.Equal(t, errors.ErrUnsupported, err)
+		assert.Equal(t, dummyErr, err)
 		assert.False(t, ok)
 	})
 }
