@@ -6,14 +6,11 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-<<<<<<< HEAD
-=======
+
 	"github.com/go-redis/redismock/v8"
 	"github.com/stretchr/testify/assert"
->>>>>>> ee5dc29b... [TT-10826] self trim oAuth sorted set (#5907)
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/stretchr/testify/assert"
 )
 
 var rc RedisController

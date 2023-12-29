@@ -1342,7 +1342,7 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 		storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
 			fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
 
-		storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+		storageManager := ts.Gw.getGlobalStorageHandler(generateOAuthPrefix(spec.APIID), false)
 		storageManager.Connect()
 
 		assertTokensLen(t, storageManager, storageKey1, 3)
@@ -1383,7 +1383,7 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 		storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
 			fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
 
-		storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+		storageManager := ts.Gw.getGlobalStorageHandler(generateOAuthPrefix(spec.APIID), false)
 		storageManager.Connect()
 
 		assertTokensLen(t, storageManager, storageKey1, 3)
@@ -1508,10 +1508,6 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 		})
 	}
 
-<<<<<<< HEAD
-	storageManager := ts.Gw.getGlobalStorageHandler(generateOAuthPrefix(spec.APIID), false)
-	storageManager.Connect()
-=======
 	setup := func(tb testing.TB, client redis.UniversalClient) {
 		tb.Helper()
 		now := time.Now()
@@ -1522,7 +1518,6 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 				copyZSet(client, "api", dst)
 				//tb.Logf("copy zet elapsed %f", time.Since(now).Seconds())
 			}
->>>>>>> ee5dc29b... [TT-10826] self trim oAuth sorted set (#5907)
 
 		}
 		tb.Logf("setup time elapsed %f", time.Since(now).Seconds())

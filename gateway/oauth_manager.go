@@ -12,28 +12,18 @@ import (
 	"sync"
 	"time"
 
+	"strconv"
+
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lonelycode/osin"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-<<<<<<< HEAD
-	"strconv"
-
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/headers"
-	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
-=======
 	"github.com/TykTechnologies/tyk/internal/errors"
-	"github.com/TykTechnologies/tyk/internal/uuid"
-	"github.com/TykTechnologies/tyk/request"
-
-	"strconv"
-
-	"github.com/TykTechnologies/tyk/header"
->>>>>>> ee5dc29b... [TT-10826] self trim oAuth sorted set (#5907)
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -243,8 +233,8 @@ const (
 	refreshToken = "refresh_token"
 )
 
-//in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
-//ToDo: set an authentication mechanism
+// in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
+// ToDo: set an authentication mechanism
 func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
