@@ -1405,7 +1405,7 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 			})
 			db, mock := redismock.NewClientMock()
 			redisController := storage.NewRedisController(context.Background())
-			redisController.Mock(db, true)
+			redisController.MockWith(db, true)
 			gw.RedisController = redisController
 			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetErr(errors.ErrUnsupported)
 			err := gw.purgeLapsedOAuthTokens()
@@ -1419,7 +1419,7 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 			})
 			db, mock := redismock.NewClientMock()
 			redisController := storage.NewRedisController(context.Background())
-			redisController.Mock(db, true)
+			redisController.MockWith(db, true)
 			gw.RedisController = redisController
 			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetVal(false)
 			err := gw.purgeLapsedOAuthTokens()
@@ -1433,7 +1433,7 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 			})
 			db, mock := redismock.NewClientMock()
 			redisController := storage.NewRedisController(context.Background())
-			redisController.Mock(db, true)
+			redisController.MockWith(db, true)
 			gw.RedisController = redisController
 			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetVal(true)
 			mock.ExpectScan(0, oAuthClientTokensKeyPattern, 0).SetErr(errors.ErrUnsupported)
