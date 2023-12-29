@@ -1,6 +1,15 @@
 package errors
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
+
+var (
+	New    = errors.New
+	Is     = errors.Is
+	Unwrap = errors.Unwrap
+)
 
 func Formatter(errs []error) string {
 	var result strings.Builder
