@@ -557,12 +557,7 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
-	// OriginalPath is the path to the config file that is read. If
-	// none was found, it's the path to the default config file that
-	// was written.
-	OriginalPath string `json:"-"`
-
-	// Force your Gateway to work only on a specifc domain name. Can be overriden by API custom domain.
+	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
 	HostName string `json:"hostname"`
 
 	// If your machine has mulitple network devices or IPs you can force the Gateway to use the IP address you want.
@@ -1015,6 +1010,8 @@ type Config struct {
 
 	// Skip TLS verification for JWT JWKs url validation
 	JWTSSLInsecureSkipVerify bool `json:"jwt_ssl_insecure_skip_verify"`
+
+	Private Private `json:"-"`
 }
 
 type TykError struct {
@@ -1171,12 +1168,12 @@ func WriteDefault(path string, conf *Config) error {
 // An error will be returned only if any of the paths existed but was
 // not a valid config file.
 func Load(paths []string, conf *Config) error {
-	var r io.Reader
+	var r io.ReadCloser
 	for _, path := range paths {
 		f, err := os.Open(path)
 		if err == nil {
 			r = f
-			conf.OriginalPath = path
+			conf.Private.OriginalPath = path
 			break
 		}
 		if os.IsNotExist(err) {

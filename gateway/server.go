@@ -19,19 +19,20 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"sync/atomic"
 	textTemplate "text/template"
-	"time"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/drl"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
@@ -1551,8 +1552,10 @@ func writeProfiles() {
 }
 
 func (gw *Gateway) start() {
+	conf := gw.GetConfig()
+
 	// Set up a default org manager so we can traverse non-live paths
-	if !gw.GetConfig().SupressDefaultOrgStore {
+	if !conf.SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
 		gw.DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
@@ -1560,11 +1563,16 @@ func (gw *Gateway) start() {
 	}
 
 	// Start listening for reload messages
-	if !gw.GetConfig().SuppressRedisSignalReload {
+	if !conf.SuppressRedisSignalReload {
 		go gw.startPubSubLoop()
 	}
 
-	conf := gw.GetConfig()
+	purgeInterval := conf.Private.GetOAuthTokensPurgeInterval()
+	purgeJob := scheduler.NewJob("purge-oauth-tokens", gw.purgeLapsedOAuthTokens, purgeInterval)
+
+	oauthTokensPurger := scheduler.NewScheduler(log)
+	go oauthTokensPurger.Start(gw.ctx, purgeJob)
+
 	if slaveOptions := conf.SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
 		gw.RPCListener = RPCStorageHandler{

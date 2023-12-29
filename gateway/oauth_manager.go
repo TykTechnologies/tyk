@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -13,18 +12,18 @@ import (
 	"sync"
 	"time"
 
+	"strconv"
+
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lonelycode/osin"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-	"strconv"
-
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/headers"
-	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -234,8 +233,8 @@ const (
 	refreshToken = "refresh_token"
 )
 
-//in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
-//ToDo: set an authentication mechanism
+// in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
+// ToDo: set an authentication mechanism
 func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
@@ -1195,10 +1194,22 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	}
 
 	redisCluster := &storage.RedisCluster{KeyPrefix: "", HashKeys: false, RedisController: gw.RedisController}
+
+	ok, err := redisCluster.Lock("oauth-purge-lock", time.Minute)
+	if err != nil {
+		log.WithError(err).Error("error acquiring lock to purge oauth tokens")
+		return err
+	}
+
+	if !ok {
+		log.Info("oauth tokens purge lock not acquired, purging in background")
+		return nil
+	}
+
 	keys, err := redisCluster.ScanKeys(oAuthClientTokensKeyPattern)
 
 	if err != nil {
-		log.WithError(err).Debug("error while scanning for tokens")
+		log.WithError(err).Error("error while scanning for tokens")
 		return err
 	}
 
@@ -1224,7 +1235,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	close(errs)
 
 	combinedErr := &multierror.Error{
-		ErrorFormat: tykerrors.Formatter,
+		ErrorFormat: errors.Formatter,
 	}
 
 	for err := range errs {
