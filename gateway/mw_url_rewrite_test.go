@@ -1126,7 +1126,7 @@ func TestInitTriggerRx(t *testing.T) {
 
 	// prepare test data
 	testRewriteMW := &URLRewriteMiddleware{
-		BaseMiddleware: BaseMiddleware{
+		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{
 				APIDefinition: &apidef.APIDefinition{},
 			},
@@ -1376,7 +1376,7 @@ func TestURLRewriteMiddleware_CheckHostRewrite(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &URLRewriteMiddleware{}
+			m := &URLRewriteMiddleware{BaseMiddleware: &BaseMiddleware{}}
 			r := &http.Request{}
 			err := m.CheckHostRewrite(tt.args.oldPath, tt.args.newTarget, r)
 			assert.Equal(t, tt.errExpected, err != nil)

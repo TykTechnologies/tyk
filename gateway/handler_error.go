@@ -78,7 +78,7 @@ type APIError struct {
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
 // the ErrorHandler if something is wrong with the request and halt the request processing through the chain
 type ErrorHandler struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 // TemplateExecutor is an interface used to switch between text/templates and html/template.

@@ -345,7 +345,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		},
 		Gw: gw,
 	}
-	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy, Gw: gw}
+	proxy.ErrorHandler.BaseMiddleware = &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: gw}
 	return proxy
 }
 

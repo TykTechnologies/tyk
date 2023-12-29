@@ -27,7 +27,7 @@ import (
 )
 
 type JWTMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 const (

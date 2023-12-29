@@ -15,7 +15,7 @@ func init() {
 }
 
 type ValidateRequest struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (k *ValidateRequest) Name() string {
