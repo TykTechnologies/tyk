@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-
+	"github.com/go-redis/redismock/v8"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -245,4 +245,85 @@ func TestCheckIsOpen(t *testing.T) {
 	assert.EqualError(t, err, ErrRedisIsDown.Error())
 	assert.True(t, rc.connectSingleton(false, false, *conf))
 	assert.NoError(t, cluster.checkIsOpen())
+}
+
+func TestLock(t *testing.T) {
+	t.Run("redis down", func(t *testing.T) {
+		db, _ := redismock.NewClientMock()
+		redisCluster := &RedisCluster{
+			RedisController: &RedisController{
+				ctx:        context.Background(),
+				singlePool: db,
+			},
+		}
+		redisCluster.RedisController.redisUp.Store(false)
+
+		ok, err := redisCluster.Lock("lock-key", time.Second)
+		assert.Error(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("redis not configured", func(t *testing.T) {
+		redisCluster := &RedisCluster{
+			RedisController: &RedisController{
+				ctx: context.Background(),
+			},
+		}
+		redisCluster.RedisController.redisUp.Store(true)
+
+		ok, err := redisCluster.Lock("lock-key", time.Second)
+		assert.ErrorContains(t, err, "Error trying to get singleton instance")
+		assert.False(t, ok)
+	})
+
+	t.Run("lock success", func(t *testing.T) {
+		db, mock := redismock.NewClientMock()
+		mock.ExpectSetNX("lock-key", "1", time.Second).SetVal(true)
+
+		redisCluster := &RedisCluster{
+			RedisController: &RedisController{
+				ctx:        context.Background(),
+				singlePool: db,
+			},
+		}
+		redisCluster.RedisController.redisUp.Store(true)
+
+		ok, err := redisCluster.Lock("lock-key", time.Second)
+		assert.NoError(t, err)
+		assert.True(t, ok)
+	})
+
+	t.Run("lock failure", func(t *testing.T) {
+		db, mock := redismock.NewClientMock()
+		mock.ExpectSetNX("lock-key", "1", time.Second).SetVal(false)
+
+		redisCluster := &RedisCluster{
+			RedisController: &RedisController{
+				ctx:        context.Background(),
+				singlePool: db,
+			},
+		}
+		redisCluster.RedisController.redisUp.Store(true)
+
+		ok, err := redisCluster.Lock("lock-key", time.Second)
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("lock error", func(t *testing.T) {
+		db, mock := redismock.NewClientMock()
+		mock.ExpectSetNX("lock-key", "1", time.Second).SetErr(errors.ErrUnsupported)
+
+		redisCluster := &RedisCluster{
+			RedisController: &RedisController{
+				ctx:        context.Background(),
+				singlePool: db,
+			},
+		}
+		redisCluster.RedisController.redisUp.Store(true)
+
+		ok, err := redisCluster.Lock("lock-key", time.Second)
+		assert.Equal(t, errors.ErrUnsupported, err)
+		assert.False(t, ok)
+	})
 }

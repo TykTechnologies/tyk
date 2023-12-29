@@ -1,6 +1,17 @@
 package errors
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
+
+var (
+	New            = errors.New
+	Is             = errors.Is
+	Join           = errors.Join
+	Unwrap         = errors.Unwrap
+	ErrUnsupported = errors.ErrUnsupported
+)
 
 func Formatter(errs []error) string {
 	var result strings.Builder
