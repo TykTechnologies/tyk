@@ -557,12 +557,16 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
+<<<<<<< HEAD
 	// OriginalPath is the path to the config file that is read. If
 	// none was found, it's the path to the default config file that
 	// was written.
 	OriginalPath string `json:"-"`
 
 	// Force your Gateway to work only on a specifc domain name. Can be overriden by API custom domain.
+=======
+	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
+>>>>>>> ee5dc29b... [TT-10826] self trim oAuth sorted set (#5907)
 	HostName string `json:"hostname"`
 
 	// If your machine has mulitple network devices or IPs you can force the Gateway to use the IP address you want.
@@ -1015,6 +1019,24 @@ type Config struct {
 
 	// Skip TLS verification for JWT JWKs url validation
 	JWTSSLInsecureSkipVerify bool `json:"jwt_ssl_insecure_skip_verify"`
+<<<<<<< HEAD
+=======
+
+	// ResourceSync configures mitigation strategy in case sync fails.
+	ResourceSync ResourceSyncConfig `json:"resource_sync"`
+
+	Private Private `json:"-"`
+}
+
+type ResourceSyncConfig struct {
+	// RetryAttempts defines the number of retries that the Gateway
+	// should perform during a resource sync (APIs or policies), defaulting
+	// to zero which means no retries are attempted.
+	RetryAttempts int `json:"retry_attempts"`
+
+	// Interval configures the interval in seconds between each retry on a resource sync error.
+	Interval int `json:"interval"`
+>>>>>>> ee5dc29b... [TT-10826] self trim oAuth sorted set (#5907)
 }
 
 type TykError struct {
@@ -1176,7 +1198,12 @@ func Load(paths []string, conf *Config) error {
 		f, err := os.Open(path)
 		if err == nil {
 			r = f
+<<<<<<< HEAD
 			conf.OriginalPath = path
+=======
+			defer r.Close()
+			conf.Private.OriginalPath = filename
+>>>>>>> ee5dc29b... [TT-10826] self trim oAuth sorted set (#5907)
 			break
 		}
 		if os.IsNotExist(err) {
