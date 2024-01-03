@@ -11,9 +11,9 @@
 name: Release
 
 on:
-  # Trigger release every monday for master CI images
+  # Trigger release every monday at midnight for master CI images
   schedule:
-    - cron: "* * * * 1"
+    - cron: "0 0 * * 1"
   pull_request:
   push:
     branches:
