@@ -13,8 +13,9 @@ import (
 	x509 "crypto/x509"
 	reflect "reflect"
 
-	certs "github.com/TykTechnologies/tyk/certs"
 	gomock "go.uber.org/mock/gomock"
+
+	certs "github.com/TykTechnologies/tyk/certs"
 )
 
 // MockCertificateManager is a mock of CertificateManager interface.
