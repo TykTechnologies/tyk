@@ -1407,6 +1407,14 @@
         "name",
         "value"
       ]
+    },
+    "X-Tyk-DetailedActivityLogs": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }
