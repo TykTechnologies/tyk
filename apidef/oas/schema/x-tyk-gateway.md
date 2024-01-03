@@ -310,6 +310,9 @@ CustomDomain is the domain to bind this API to.
 
 Tyk classic API definition: `domain`.
 
+**Field: `detailedActivityLogs` ([DetailedActivityLogs](#detailedactivitylogs))**
+DetailedActivityLogs configures detailed analytics recording.
+
 
 ### **ListenPath**
 
@@ -619,6 +622,12 @@ Enabled allow/disallow the usage of the domain.
 
 **Field: `name` (`string`)**
 Name is the name of the domain.
+
+
+### **DetailedActivityLogs**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables/disables detailed activity logs.
 
 
 ### **Middleware**

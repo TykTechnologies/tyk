@@ -27,6 +27,9 @@ type Server struct {
 	//
 	// Tyk classic API definition: `domain`
 	CustomDomain *Domain `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
+
+	// DetailedActivityLogs configures detailed analytics recording.
+	DetailedActivityLogs *DetailedActivityLogs `bson:"detailedActivityLogs" json:"detailedActivityLogs"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -58,6 +61,15 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	s.CustomDomain.Fill(api)
 	if ShouldOmit(s.CustomDomain) {
 		s.CustomDomain = nil
+	}
+
+	if s.DetailedActivityLogs == nil {
+		s.DetailedActivityLogs = &DetailedActivityLogs{}
+	}
+
+	s.DetailedActivityLogs.Fill(api)
+	if ShouldOmit(s.DetailedActivityLogs) {
+		s.DetailedActivityLogs = nil
 	}
 }
 
@@ -92,6 +104,15 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	s.CustomDomain.ExtractTo(api)
+
+	if s.DetailedActivityLogs == nil {
+		s.DetailedActivityLogs = &DetailedActivityLogs{}
+		defer func() {
+			s.DetailedActivityLogs = nil
+		}()
+	}
+
+	s.DetailedActivityLogs.ExtractTo(api)
 }
 
 // ListenPath represents the path the server should listen on.
@@ -176,4 +197,20 @@ func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {
 func (cd *Domain) Fill(api apidef.APIDefinition) {
 	cd.Enabled = !api.DomainDisabled
 	cd.Name = api.Domain
+}
+
+// DetailedActivityLogs holds the configuration related to recording detailed analytics.
+type DetailedActivityLogs struct {
+	// Enabled enables/disables detailed activity logs.
+	Enabled bool `bson:"enabled" json:"enabled"`
+}
+
+// ExtractTo extracts *DetailedActivityLogs into *apidef.APIDefinition.
+func (d *DetailedActivityLogs) ExtractTo(api *apidef.APIDefinition) {
+	api.EnableDetailedRecording = !d.Enabled
+}
+
+// Fill fills *DetailedActivityLogs from apidef.APIDefinition.
+func (d *DetailedActivityLogs) Fill(api apidef.APIDefinition) {
+	d.Enabled = !api.EnableDetailedRecording
 }
