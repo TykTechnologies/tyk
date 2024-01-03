@@ -2,6 +2,7 @@ package otel
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/sirupsen/logrus"
@@ -59,6 +60,8 @@ func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *Ope
 		"connection_timeout": gwConfig.ConnectionTimeout,
 	})
 
+	fmt.Println("OPENTELEMETRY BATCHSIZE: ", gwConfig.BatchSize)
+	fmt.Println("OPENTELEMETRY QUEUESIZE: ", gwConfig.BatchQueueSize)
 	provider, errOtel := tyktrace.NewProvider(
 		tyktrace.WithContext(ctx),
 		tyktrace.WithConfig(gwConfig),
