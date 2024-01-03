@@ -11,6 +11,8 @@
 name: Release
 
 on:
+  schedule:
+    - cron: "10 * * * *"
   pull_request:
   push:
     branches:
