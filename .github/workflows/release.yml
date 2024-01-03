@@ -18,6 +18,7 @@ on:
     branches:
       - master
       - release-**
+      - SYSE-309/run-release-on-schedule
     tags:
       - 'v*'
 
