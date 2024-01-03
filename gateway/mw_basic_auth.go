@@ -30,7 +30,7 @@ var cacheGroup singleflight.Group
 
 // BasicAuthKeyIsValid uses a username instead of
 type BasicAuthKeyIsValid struct {
-	BaseMiddleware
+	*BaseMiddleware
 
 	bodyUserRegexp     *regexp.Regexp
 	bodyPasswordRegexp *regexp.Regexp

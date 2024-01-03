@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -18,13 +17,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/request"
 
 	"strconv"
 
 	"github.com/TykTechnologies/tyk/header"
-	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1191,10 +1190,22 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	}
 
 	redisCluster := &storage.RedisCluster{KeyPrefix: "", HashKeys: false, RedisController: gw.RedisController}
+
+	ok, err := redisCluster.Lock("oauth-purge-lock", time.Minute)
+	if err != nil {
+		log.WithError(err).Error("error acquiring lock to purge oauth tokens")
+		return err
+	}
+
+	if !ok {
+		log.Info("oauth tokens purge lock not acquired, purging in background")
+		return nil
+	}
+
 	keys, err := redisCluster.ScanKeys(oAuthClientTokensKeyPattern)
 
 	if err != nil {
-		log.WithError(err).Debug("error while scanning for tokens")
+		log.WithError(err).Error("error while scanning for tokens")
 		return err
 	}
 
@@ -1220,7 +1231,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	close(errs)
 
 	combinedErr := &multierror.Error{
-		ErrorFormat: tykerrors.Formatter,
+		ErrorFormat: errors.Formatter,
 	}
 
 	for err := range errs {

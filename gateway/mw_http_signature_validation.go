@@ -30,7 +30,8 @@ const altHeaderSpec = "x-aux-date"
 
 // HTTPSignatureValidationMiddleware will check if the request has a signature, and if the request is allowed through
 type HTTPSignatureValidationMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
+
 	lowercasePattern *regexp.Regexp
 }
 

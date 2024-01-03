@@ -394,7 +394,7 @@ type TestHttpResponse struct {
 // ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
 func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		baseMid := BaseMiddleware{Spec: apiSpec, Proxy: p, Gw: p.Gw}
+		baseMid := &BaseMiddleware{Spec: apiSpec, Proxy: p, Gw: p.Gw}
 		handler := SuccessHandler{baseMid}
 		// Skip all other execution
 		handler.ServeHTTP(w, r)

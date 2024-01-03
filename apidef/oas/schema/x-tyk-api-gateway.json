@@ -494,6 +494,12 @@
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-Cache"
+        },
+        "transformRequestHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders"
+        },
+        "transformResponseHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders"
         }
       }
     },
@@ -760,6 +766,9 @@
           "$ref": "#/definitions/X-Tyk-TransformBody"
         },
         "transformRequestHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders"
+        },
+        "transformResponseHeaders": {
           "$ref": "#/definitions/X-Tyk-TransformHeaders"
         },
         "virtualEndpoint": {
@@ -1398,6 +1407,14 @@
         "name",
         "value"
       ]
+    },
+    "X-Tyk-DetailedActivityLogs": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }

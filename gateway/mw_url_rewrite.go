@@ -382,7 +382,7 @@ func valToStr(v interface{}) string {
 
 // URLRewriteMiddleware Will rewrite an inbund URL to a matching outbound one, it can also handle dynamic variable substitution
 type URLRewriteMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (m *URLRewriteMiddleware) Name() string {

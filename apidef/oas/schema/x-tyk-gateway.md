@@ -310,6 +310,9 @@ CustomDomain is the domain to bind this API to.
 
 Tyk classic API definition: `domain`.
 
+**Field: `detailedActivityLogs` ([DetailedActivityLogs](#detailedactivitylogs))**
+DetailedActivityLogs configures detailed analytics recording.
+
 
 ### **ListenPath**
 
@@ -621,6 +624,12 @@ Enabled allow/disallow the usage of the domain.
 Name is the name of the domain.
 
 
+### **DetailedActivityLogs**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables/disables detailed activity logs.
+
+
 ### **Middleware**
 
 **Field: `global` ([Global](#global))**
@@ -664,6 +673,16 @@ Tyk classic API definition: `custom_middleware.response`.
 Cache contains the configurations related to caching.
 
 Tyk classic API definition: `cache_options`.
+
+**Field: `transformRequestHeaders` ([TransformHeaders](#transformheaders))**
+TransformRequestHeaders contains the configurations related to API level request header transformation.
+
+Tyk classic API definition: `global_headers`/`global_headers_remove`.
+
+**Field: `transformResponseHeaders` ([TransformHeaders](#transformheaders))**
+TransformResponseHeaders contains the configurations related to API level response header transformation.
+
+Tyk classic API definition: `global_response_headers`/`global_response_headers_remove`.
 
 
 ### **PluginConfig**
@@ -843,6 +862,27 @@ ControlTTLHeaderName is the response header which tells Tyk how long it is safe 
 Tyk classic API definition: `cache_options.cache_control_ttl_header`.
 
 
+### **TransformHeaders**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables Header Transform for the given path and method.
+
+**Field: `remove` (`[]string`)**
+Remove specifies header names to be removed from the request/response.
+
+**Field: `add` (`[]`[Header](#header))**
+Add specifies headers to be added to the request/response.
+
+
+### **Header**
+
+**Field: `name` (`string`)**
+Name is the name of the header.
+
+**Field: `value` (`string`)**
+Value is the value of the header.
+
+
 ### **Operation**
 
 **Field: `allow` ([Allowance](#allowance))**
@@ -867,6 +907,9 @@ When both `path` and `body` are provided, body would take precedence.
 
 **Field: `transformRequestHeaders` ([TransformHeaders](#transformheaders))**
 TransformRequestHeaders allows you to transform request headers.
+
+**Field: `transformResponseHeaders` ([TransformHeaders](#transformheaders))**
+TransformResponseHeaders allows you to transform response headers.
 
 **Field: `cache` ([CachePlugin](#cacheplugin))**
 Cache contains the caching plugin configuration.
@@ -918,27 +961,6 @@ Path file path for the template.
 
 **Field: `body` (`string`)**
 Body base64 encoded representation of the template.
-
-
-### **TransformHeaders**
-
-**Field: `enabled` (`boolean`)**
-Enabled enables Header Transform for the given path and method.
-
-**Field: `remove` (`[]string`)**
-Remove specifies header names to be removed from the request/response.
-
-**Field: `add` (`[]`[Header](#header))**
-Add specifies headers to be added to the request/response.
-
-
-### **Header**
-
-**Field: `name` (`string`)**
-Name is the name of the header.
-
-**Field: `value` (`string`)**
-Value is the value of the header.
 
 
 ### **CachePlugin**
