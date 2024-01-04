@@ -189,12 +189,12 @@ func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string,
 	tokenValue := uint(l.drlManager.CurrentTokenValue())
 
 	// DRL will always overflow with more servers on low rates
-	rate := uint(currRate * float64(l.drlManager.RequestTokenValue))
-	if rate < tokenValue {
-		rate = tokenValue
+	cost := uint(currRate * float64(l.drlManager.RequestTokenValue))
+	if cost < tokenValue {
+		cost = tokenValue
 	}
 
-	userBucket, err := l.bucketStore.Create(bucketKey, rate, time.Duration(per)*time.Second)
+	userBucket, err := l.bucketStore.Create(bucketKey, cost, time.Duration(per)*time.Second)
 	if err != nil {
 		log.Error("Failed to create bucket!")
 		return true
@@ -271,14 +271,14 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			if l.drlManager.Servers != nil {
 				n = float64(l.drlManager.Servers.Count())
 			}
-			rate := accessDef.Limit.Rate / accessDef.Limit.Per
+			cost := accessDef.Limit.Rate / accessDef.Limit.Per
 			c := globalConf.DRLThreshold
 			if c == 0 {
 				// defaults to 5
 				c = 5
 			}
 
-			if n <= 1 || n*c < rate {
+			if n <= 1 || n*c < cost {
 				// If we have 1 server, there is no need to strain redis at all the leaky
 				// bucket algorithm will suffice.
 				if l.limitDRL(currentSession, key, rateScope, &accessDef.Limit, dryRun) {
