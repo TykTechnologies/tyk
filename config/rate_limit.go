@@ -12,13 +12,6 @@ type RateLimit struct {
 	// blocking the requests when they go over the defined rate limits.
 	EnableLeakyBucketRateLimiter bool `json:"enable_leaky_bucket_rate_limiter"`
 
-	// EnableRateLimiterStorage enables or disables the configured rate limiter storage under `rate_limiter_storage`.
-	EnableRateLimiterStorage bool `json:"enable_rate_limiter_storage"`
-
-	// Storage configures the storage for rate limiters. If unconfigured, will use the default storage.
-	// Configuring the storage type as "local", will use non-distributed implementations of rate limiters.
-	RateLimiterStorage *StorageOptionsConf `json:"rate_limiter_storage"`
-
 	// Redis based rate limiter with fixed window. Provides 100% rate limiting accuracy, but require two additional Redis roundtrip for each request.
 	EnableRedisRollingLimiter bool `json:"enable_redis_rolling_limiter"`
 

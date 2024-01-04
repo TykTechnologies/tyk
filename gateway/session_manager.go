@@ -59,11 +59,7 @@ func NewSessionLimiter(conf *config.Config, drlManager *drl.DRL) SessionLimiter 
 		bucketStore: memorycache.New(),
 	}
 
-	// Use default storage if rate limiter storage is unconfigured.
-	storageConf := &conf.Storage
-	if conf.EnableRateLimiterStorage && conf.RateLimiterStorage != nil {
-		storageConf = conf.RateLimiterStorage
-	}
+	storageConf := conf.GetRateLimiterStorage()
 
 	switch storageConf.Type {
 	case "redis":
