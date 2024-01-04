@@ -1896,11 +1896,9 @@ func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
 	}).Info("Org key deleted.")
 
 	// identify that spec has no org session
-	if spec != nil {
-		spec.Lock()
-		spec.OrgHasNoSession = true
-		spec.Unlock()
-	}
+	spec.Lock()
+	spec.OrgHasNoSession = true
+	spec.Unlock()
 
 	statusObj := apiModifyKeySuccess{
 		Key:    orgID,

@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
@@ -775,9 +774,7 @@ func TestNopCloseRequestBody(t *testing.T) {
 	// try to pass nil request
 	var req *http.Request
 	nopCloseRequestBody(req)
-	if req != nil {
-		t.Error("nil Request should remain nil")
-	}
+	assert.Nil(t, req, "nil Request should remain nil")
 
 	// try to pass nil body
 	req = &http.Request{}
@@ -819,9 +816,7 @@ func TestNopCloseRequestBody(t *testing.T) {
 func TestNopCloseResponseBody(t *testing.T) {
 	var resp *http.Response
 	nopCloseResponseBody(resp)
-	if resp != nil {
-		t.Error("nil Response should remain nil")
-	}
+	assert.Nil(t, resp, "nil Response should remain nil")
 
 	// try to pass nil body
 	resp = &http.Response{}
