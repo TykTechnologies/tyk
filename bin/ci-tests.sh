@@ -20,16 +20,13 @@ echo "Building go plugin"
 go build -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
 go build -race -o ./test/goplugins/goplugins_race.so -buildmode=plugin ./test/goplugins
 
-for pkg in ${PKGS}; do
-    tags=""
-    if [[ ${pkg} == *"goplugin" ]]; then
-        tags="-tags 'goplugin'"
-    fi
+tags="goplugin dev"
 
+for pkg in ${PKGS}; do
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
 
-    echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
-    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
+    echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} -tags "${tags}"
+    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} -tags "${tags}"
 done
 
 # run rpc tests separately
