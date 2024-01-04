@@ -446,13 +446,11 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 					}
 					newConfig.Certificates = append(newConfig.Certificates, *cert)
 
-					if cert != nil {
-						if len(cert.Leaf.Subject.CommonName) > 0 {
-							newConfig.NameToCertificate[cert.Leaf.Subject.CommonName] = cert
-						}
-						for _, san := range cert.Leaf.DNSNames {
-							newConfig.NameToCertificate[san] = cert
-						}
+					if len(cert.Leaf.Subject.CommonName) > 0 {
+						newConfig.NameToCertificate[cert.Leaf.Subject.CommonName] = cert
+					}
+					for _, san := range cert.Leaf.DNSNames {
+						newConfig.NameToCertificate[san] = cert
 					}
 				}
 			}

@@ -131,7 +131,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 		code      int
 		request   graphql.Request
 		checkFunc func(*testing.T, *analytics.AnalyticsRecord)
-		reloadAPI func(APISpec) *APISpec
+		reloadAPI func(*APISpec)
 	}{
 		{
 			name: "successfully generate stats",
@@ -170,10 +170,9 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				Query:     `{ hello(name: "World") httpMethod }`,
 				Variables: []byte(`{"in":"hello"}`),
 			},
-			reloadAPI: func(spec APISpec) *APISpec {
+			reloadAPI: func(spec *APISpec) {
 				spec.Proxy.TargetURL = testGraphQLProxyUpstreamError
 				spec.EnableDetailedRecording = true
-				return &spec
 			},
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
 				assert.True(t, record.GraphQLStats.IsGraphQL)
@@ -194,9 +193,8 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				Query:     `{ hello(name: "World") httpMethod }`,
 				Variables: []byte(`{"in":"hello"}`),
 			},
-			reloadAPI: func(spec APISpec) *APISpec {
+			reloadAPI: func(spec *APISpec) {
 				spec.Proxy.TargetURL = testGraphQLProxyUpstreamError
-				return &spec
 			},
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
 				assert.True(t, record.GraphQLStats.IsGraphQL)
@@ -216,7 +214,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			spec := apiDef
 			if tc.reloadAPI != nil {
-				spec = tc.reloadAPI(*apiDef)
+				tc.reloadAPI(spec)
 			}
 
 			ts := StartTest(nil)
