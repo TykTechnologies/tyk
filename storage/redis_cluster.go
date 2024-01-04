@@ -1317,3 +1317,22 @@ func (r *RedisCluster) ScanKeys(pattern string) ([]string, error) {
 
 	return keys, nil
 }
+
+func (r *RedisCluster) RunScript(script string, keys []string, args ...interface{}) interface{} {
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return nil
+	}
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+
+	val, err := singleton.Eval(r.RedisController.ctx, script, keys, args).Result()
+	if err != nil {
+		return nil
+	}
+	return val
+}

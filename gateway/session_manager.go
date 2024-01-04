@@ -89,6 +89,53 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	return false
 }
 
+func (l *SessionLimiter) doRedisScript(key, rateLimiterKey, rateLimiterSentinelKey string,
+	currentSession *user.SessionState,
+	store storage.Handler,
+	globalConf *config.Config,
+	apiLimit *user.APILimit, dryRun bool) bool {
+	var per, rate float64
+
+	if apiLimit != nil { // respect limit on API level
+		per = apiLimit.Per
+		rate = apiLimit.Rate
+	} else {
+		per = currentSession.Per
+		rate = currentSession.Rate
+	}
+
+	now := time.Now()
+	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
+	var ratePerPeriodNow interface{}
+	if dryRun {
+		script := `local key = KEYS[1]
+local onePeriodAgo = ARGV[1]
+redis.call('ZRemRangeByScore', key, 0, onePeriodAgo)
+local req_count = redis.call('ZCARD', key)
+return req_count`
+		ratePerPeriodNow = store.RunScript(script, []string{rateLimiterKey}, onePeriodAgo.UnixNano())
+	} else {
+		script := `local key = KEYS[1]
+local window = ARGV[1]
+local max_requests = tonumber(ARGV[2])
+local onePeriodAgo = ARGV[3]
+local now = ARGV[4]
+redis.call('ZRemRangeByScore', key, 0, onePeriodAgo)
+local req_count = redis.call('ZCARD', key)
+if req_count <= max_requests then
+	redis.call('ZADD', key, now, now)
+	redis.call('EXPIRE', key, window)
+	req_count = req_count + 1
+end
+return req_count`
+		ratePerPeriodNow = store.RunScript(script, []string{rateLimiterKey}, int(per), int(rate), onePeriodAgo.UnixNano(), now.UnixNano())
+	}
+	if ratePerPeriodNow != nil && ratePerPeriodNow.(int64) > int64(rate) {
+		return true
+	}
+	return false
+}
+
 type sessionFailReason uint
 
 const (
@@ -124,10 +171,10 @@ func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key strin
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
-	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
-		return true
+	if globalConf.EnableRedisScriptLimiter {
+		return l.doRedisScript(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
 	}
-	return false
+	return l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
 }
 
 func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string, rateScope string,

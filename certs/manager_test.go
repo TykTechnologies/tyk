@@ -118,6 +118,10 @@ func (s *dummyStorage) RemoveSortedSetRange(string, string, string) error {
 	panic("implement me")
 }
 
+func (s *dummyStorage) RunScript(script string, keys []string, args ...interface{}) interface{} {
+	panic("implement me")
+}
+
 func newDummyStorage() *dummyStorage {
 	return &dummyStorage{
 		data:      make(map[string]string),

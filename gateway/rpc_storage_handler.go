@@ -1154,3 +1154,8 @@ func (r *RPCStorageHandler) Exists(keyName string) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
 }
+
+func (r *RPCStorageHandler) RunScript(script string, keys []string, args ...interface{}) interface{} {
+	log.Error("Not implemented")
+	return 0
+}
