@@ -1606,10 +1606,6 @@ func Start() {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
-	if gwConfig.ControlAPIPort == 0 {
-		mainLog.Warn("The control_api_port should be changed for production")
-	}
-
 	gw.setupPortsWhitelist()
 	gw.keyGen = DefaultKeyGenerator{Gw: gw}
 
