@@ -1,0 +1,32 @@
+---
+version: "3"
+
+vars:
+  package:
+    sh: go mod edit -json | jq .Module.Path -r
+
+tasks:
+  default:
+    desc: "Run linters"
+    cmds:
+      - task: vet
+
+  vet:
+    desc: "Run go vet"
+    cmds:
+      - go vet ./...
+
+  golangci-lint:
+    desc: "Run golangci-lint"
+    cmds:
+      - golangci-lint run ./...
+
+  goimports:
+    desc: "Run goimports"
+    cmds:
+      - goimports -local {{.package | dir}},{{.package}}/internal -w .
+
+  gofmt:
+    desc: "Run gofmt"
+    cmds:
+      - gofmt -w .
