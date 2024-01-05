@@ -62,6 +62,9 @@ func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *Ope
 
 	fmt.Println("OPENTELEMETRY BATCHSIZE: ", gwConfig.BatchSize)
 	fmt.Println("OPENTELEMETRY QUEUESIZE: ", gwConfig.BatchQueueSize)
+	fmt.Println("OPENTELEMETRY BATCHTIMEOUT: ", gwConfig.BatchTimeout)
+	fmt.Println("OPENTELEMETRY SP: ", gwConfig.SpanProcessorType)
+
 	provider, errOtel := tyktrace.NewProvider(
 		tyktrace.WithContext(ctx),
 		tyktrace.WithConfig(gwConfig),
