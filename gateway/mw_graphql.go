@@ -294,7 +294,7 @@ func (m *GraphQLMiddleware) validateRequestWithOtel(ctx context.Context, w http.
 	// normalization
 	_, normalizationSpan := m.Gw.TracerProvider.Tracer().Start(ctx, "NormalizationRequest")
 	defer normalizationSpan.End()
-	err := m.Spec.GraphQLExecutor.OtelExecutor.Normalize(req)
+	_, err := req.Normalize(m.Spec.GraphQLExecutor.Schema)
 	if err != nil {
 		m.Logger().Errorf("Error while normalizing GraphqlRequest: %v", err)
 		var reqErr gql.RequestErrors
@@ -307,7 +307,7 @@ func (m *GraphQLMiddleware) validateRequestWithOtel(ctx context.Context, w http.
 	// validation
 	_, validationSpan := m.Gw.TracerProvider.Tracer().Start(ctx, "ValidationRequest")
 	defer validationSpan.End()
-	err = m.Spec.GraphQLExecutor.OtelExecutor.ValidateForSchema(req)
+	_, err = req.ValidateForSchema(m.Spec.GraphQLExecutor.Schema)
 	if err != nil {
 		m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
 		var reqErr gql.RequestErrors
