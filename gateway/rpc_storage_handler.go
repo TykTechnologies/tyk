@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -1153,4 +1154,8 @@ func (r *RPCStorageHandler) GetListRange(keyName string, from, to int64) ([]stri
 func (r *RPCStorageHandler) Exists(keyName string) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
+}
+
+func (r *RPCStorageHandler) As(interface{}) error {
+	return errors.New("not implemented")
 }

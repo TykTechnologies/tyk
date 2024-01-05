@@ -36,6 +36,15 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestRedisCluster_As(t *testing.T) {
+	cluster := &RedisCluster{KeyPrefix: "test-cluster", RedisController: rc}
+
+	client := new(redis.UniversalClient)
+	err := cluster.As(client)
+
+	assert.NoError(t, err)
+}
+
 func TestHandleMessage(t *testing.T) {
 	cluster := &RedisCluster{}
 

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/TykTechnologies/leakybucket/memorycache"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -38,45 +40,59 @@ type SessionLimiter struct {
 	Gw          *Gateway `json:"-"`
 }
 
+func (l *SessionLimiter) Context() context.Context {
+	return l.Gw.ctx
+}
+
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
 	currentSession *user.SessionState,
 	store storage.Handler,
 	globalConf *config.Config,
 	apiLimit *user.APILimit, dryRun bool) bool {
 
-	var per, rate float64
+	ctx := l.Context()
+
+	var per, cost float64
 
 	if apiLimit != nil { // respect limit on API level
 		per = apiLimit.Per
-		rate = apiLimit.Rate
+		cost = apiLimit.Rate
 	} else {
 		per = currentSession.Per
-		rate = currentSession.Rate
+		cost = currentSession.Rate
 	}
 
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	pipeline := globalConf.EnableNonTransactionalRateLimiter
 
-	var ratePerPeriodNow int
-	if dryRun {
-		ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
-	} else {
-		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+	ratelimit, err := rate.NewSlidingLog(store, pipeline)
+	if err != nil {
+		log.WithError(err).Error("error creating sliding log")
+		return true
 	}
 
-	//log.Info("Num Requests: ", ratePerPeriodNow)
+	var ratePerPeriodNow int64
+	if dryRun {
+		ratePerPeriodNow, err = ratelimit.GetCount(ctx, rateLimiterKey, int64(per))
+	} else {
+		ratePerPeriodNow, err = ratelimit.SetCount(ctx, rateLimiterKey, int64(per))
+	}
+
+	if err != nil {
+		log.WithError(err).Error("error writing sliding log")
+	}
 
 	// Subtract by 1 because of the delayed add in the window
-	subtractor := 1
+	var subtractor int64 = 1
 	if globalConf.EnableSentinelRateLimiter || globalConf.DRLEnableSentinelRateLimiter {
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
 	}
+
 	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
-	// will only work with ththese two lines here
-	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
-	if ratePerPeriodNow > int(rate)-subtractor {
+	// will only work with these two lines here
+	if ratePerPeriodNow > int64(cost)-subtractor {
 		// Set a sentinel value with expire
 		if globalConf.EnableSentinelRateLimiter || globalConf.DRLEnableSentinelRateLimiter {
 			if !dryRun {
