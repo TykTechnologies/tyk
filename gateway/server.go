@@ -1594,8 +1594,6 @@ func Start() {
 	}
 
 	gw := NewGateway(gwConfig, ctx)
-	gw.SetNodeID("solo-" + uuid.New())
-	gw.SessionID = uuid.New()
 
 	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
