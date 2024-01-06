@@ -45,11 +45,10 @@ func NewSlidingLog(client interface{}, pipeline bool) (*SlidingLog, error) {
 
 // NewSlidingLogRedis creates a new SlidingLog instance with a redis.UniversalClient.
 func NewSlidingLogRedis(conn redis.UniversalClient, pipeline bool) *SlidingLog {
-	r := &SlidingLog{
+	return &SlidingLog{
 		conn:     conn,
 		pipeline: pipeline,
 	}
-	return r
 }
 
 // ExecPipeline will run a pipeline function in a pipeline or transaction.
