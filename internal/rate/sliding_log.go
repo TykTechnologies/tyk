@@ -6,16 +6,22 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-
-	"github.com/TykTechnologies/tyk/storage"
 )
 
 type SlidingLog struct {
-	conn     redis.UniversalClient
-	pipeline bool
+	conn redis.UniversalClient
+
+	// PipelineFn is exposed for black box tests in the same package.
+	PipelineFn func(context.Context, func(redis.Pipeliner) error) ([]redis.Cmder, error)
 }
 
-func NewSlidingLog(cluster storage.Handler, pipeline bool) (*SlidingLog, error) {
+type StorageHandler interface {
+	As(interface{}) error
+}
+
+// NewSlidingLog creates a new SlidingLog instance with a storage.Handler. In case
+// the storage is offline, it's expected to return nil and an error to handle.
+func NewSlidingLog(cluster StorageHandler, pipeline bool) (*SlidingLog, error) {
 	conn := new(redis.UniversalClient)
 	if err := cluster.As(conn); err != nil {
 		return nil, err
@@ -24,16 +30,20 @@ func NewSlidingLog(cluster storage.Handler, pipeline bool) (*SlidingLog, error) 
 	return NewSlidingLogRedis(*conn, pipeline), nil
 }
 
+// NewSlidingLogRedis creates a new SlidingLog instance with a redis.UniversalClient.
 func NewSlidingLogRedis(conn redis.UniversalClient, pipeline bool) *SlidingLog {
-	return &SlidingLog{
-		conn:     conn,
-		pipeline: pipeline,
+	r := &SlidingLog{
+		conn: conn,
 	}
+	r.PipelineFn = r.conn.TxPipelined
+	if pipeline {
+		r.PipelineFn = r.conn.Pipelined
+	}
+	return r
 }
 
 // SetCount will trim the rolling window log, add an item and return the count of the items in a window before the add.
-func (r *SlidingLog) SetCount(ctx context.Context, keyName string, per int64) (int64, error) {
-	now := time.Now()
+func (r *SlidingLog) SetCount(ctx context.Context, now time.Time, keyName string, per int64) (int64, error) {
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
 	var res *redis.IntCmd
@@ -54,7 +64,7 @@ func (r *SlidingLog) SetCount(ctx context.Context, keyName string, per int64) (i
 		return nil
 	}
 
-	if err := r.pipeliner(ctx, pipeFn); err != nil {
+	if _, err := r.PipelineFn(ctx, pipeFn); err != nil {
 		return 0, err
 	}
 
@@ -62,8 +72,7 @@ func (r *SlidingLog) SetCount(ctx context.Context, keyName string, per int64) (i
 }
 
 // GetCount will trim the rolling window log and return the count of items remaining.
-func (r *SlidingLog) GetCount(ctx context.Context, keyName string, per int64) (int64, error) {
-	now := time.Now()
+func (r *SlidingLog) GetCount(ctx context.Context, now time.Time, keyName string, per int64) (int64, error) {
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
 	var res *redis.IntCmd
@@ -75,7 +84,7 @@ func (r *SlidingLog) GetCount(ctx context.Context, keyName string, per int64) (i
 		return nil
 	}
 
-	if err := r.pipeliner(ctx, pipeFn); err != nil {
+	if _, err := r.PipelineFn(ctx, pipeFn); err != nil {
 		return 0, err
 	}
 
@@ -83,8 +92,7 @@ func (r *SlidingLog) GetCount(ctx context.Context, keyName string, per int64) (i
 }
 
 // Set will append to a sorted set in redis and return the contents of the window as a slice.
-func (r *SlidingLog) Set(ctx context.Context, keyName string, per int64) ([]string, error) {
-	now := time.Now()
+func (r *SlidingLog) Set(ctx context.Context, now time.Time, keyName string, per int64) ([]string, error) {
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
 	var res *redis.StringSliceCmd
@@ -105,7 +113,7 @@ func (r *SlidingLog) Set(ctx context.Context, keyName string, per int64) ([]stri
 		return nil
 	}
 
-	if err := r.pipeliner(ctx, pipeFn); err != nil {
+	if _, err := r.PipelineFn(ctx, pipeFn); err != nil {
 		return nil, err
 	}
 
@@ -113,8 +121,7 @@ func (r *SlidingLog) Set(ctx context.Context, keyName string, per int64) ([]stri
 }
 
 // Get will trim the rolling window log and return the contents of the window as a slice.
-func (r *SlidingLog) Get(ctx context.Context, keyName string, per int64) ([]string, error) {
-	now := time.Now()
+func (r *SlidingLog) Get(ctx context.Context, now time.Time, keyName string, per int64) ([]string, error) {
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
 	var res *redis.StringSliceCmd
@@ -126,19 +133,9 @@ func (r *SlidingLog) Get(ctx context.Context, keyName string, per int64) ([]stri
 		return nil
 	}
 
-	if err := r.pipeliner(ctx, pipeFn); err != nil {
+	if _, err := r.PipelineFn(ctx, pipeFn); err != nil {
 		return nil, err
 	}
 
 	return res.Result()
-}
-
-func (r *SlidingLog) pipeliner(ctx context.Context, pipeFn func(pipeFn redis.Pipeliner) error) error {
-	var err error
-	if r.pipeline {
-		_, err = r.conn.Pipelined(ctx, pipeFn)
-		return err
-	}
-	_, err = r.conn.TxPipelined(ctx, pipeFn)
-	return err
 }

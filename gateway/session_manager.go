@@ -74,9 +74,9 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	var ratePerPeriodNow int64
 	if dryRun {
-		ratePerPeriodNow, err = ratelimit.GetCount(ctx, rateLimiterKey, int64(per))
+		ratePerPeriodNow, err = ratelimit.GetCount(ctx, time.Now(), rateLimiterKey, int64(per))
 	} else {
-		ratePerPeriodNow, err = ratelimit.SetCount(ctx, rateLimiterKey, int64(per))
+		ratePerPeriodNow, err = ratelimit.SetCount(ctx, time.Now(), rateLimiterKey, int64(per))
 	}
 
 	if err != nil {
