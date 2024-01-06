@@ -9,6 +9,7 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
+// SlidingLog implements sliding log storage in redis.
 type SlidingLog struct {
 	conn     redis.UniversalClient
 	pipeline bool
@@ -17,19 +18,21 @@ type SlidingLog struct {
 	PipelineFn func(context.Context, func(redis.Pipeliner) error) error
 }
 
-type StorageHandler interface {
+// RedisClientProvider is a hidden storage API, providing us with a redis.UniversalClient.
+type RedisClientProvider interface {
 	// Client returns the redis.UniversalClient or an error if not available.
 	Client() (redis.UniversalClient, error)
 }
 
-var ErrStorageHandler = errors.New("Client doesn't implement StorageHandler")
+// ErrRedisClientProvider is returned if NewSlidingLog isn't passed a valid RedisClientProvider parameter.
+var ErrRedisClientProvider = errors.New("Client doesn't implement RedisClientProvider")
 
 // NewSlidingLog creates a new SlidingLog instance with a storage.Handler. In case
 // the storage is offline, it's expected to return nil and an error to handle.
 func NewSlidingLog(client interface{}, pipeline bool) (*SlidingLog, error) {
-	cluster, ok := client.(StorageHandler)
+	cluster, ok := client.(RedisClientProvider)
 	if !ok {
-		return nil, ErrStorageHandler
+		return nil, ErrRedisClientProvider
 	}
 
 	conn, err := cluster.Client()
@@ -49,6 +52,7 @@ func NewSlidingLogRedis(conn redis.UniversalClient, pipeline bool) *SlidingLog {
 	return r
 }
 
+// ExecPipeline will run a pipeline function in a pipeline or transaction.
 func (r *SlidingLog) ExecPipeline(ctx context.Context, pipeFn func(redis.Pipeliner) error) error {
 	if r.PipelineFn != nil {
 		return r.PipelineFn(ctx, pipeFn)
@@ -67,7 +71,8 @@ func (r *SlidingLog) execPipeline(ctx context.Context, pipeFn func(redis.Pipelin
 	return err
 }
 
-// SetCount will trim the rolling window log, add an item and return the count of the items in a window before the add.
+// SetCount returns the number of items in the current sliding log window, before adding a new item.
+// The sliding log is trimmed removing older items, and a `per` seconds expiration is set on the complete log.
 func (r *SlidingLog) SetCount(ctx context.Context, now time.Time, keyName string, per int64) (int64, error) {
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
@@ -95,7 +100,8 @@ func (r *SlidingLog) SetCount(ctx context.Context, now time.Time, keyName string
 	return res.Result()
 }
 
-// GetCount will trim the rolling window log and return the count of items remaining.
+// GetCount returns the number of items in the current sliding log window.
+// The sliding log is trimmed removing older items.
 func (r *SlidingLog) GetCount(ctx context.Context, now time.Time, keyName string, per int64) (int64, error) {
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
@@ -115,7 +121,8 @@ func (r *SlidingLog) GetCount(ctx context.Context, now time.Time, keyName string
 	return res.Result()
 }
 
-// Set will append to a sorted set in redis and return the contents of the window as a slice.
+// Set returns the items in the current sliding log window, before adding a new item.
+// The sliding log is trimmed removing older items, and a `per` seconds expiration is set on the complete log.
 func (r *SlidingLog) Set(ctx context.Context, now time.Time, keyName string, per int64) ([]string, error) {
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
@@ -145,7 +152,8 @@ func (r *SlidingLog) Set(ctx context.Context, now time.Time, keyName string, per
 	return res.Result()
 }
 
-// Get will trim the rolling window log and return the contents of the window as a slice.
+// Get returns the items in the current sliding log window.
+// The sliding log is trimmed removing older items.
 func (r *SlidingLog) Get(ctx context.Context, now time.Time, keyName string, per int64) ([]string, error) {
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
