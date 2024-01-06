@@ -153,10 +153,6 @@ func (m MdcbStorage) SetRollingWindow(key string, per int64, val string, pipelin
 	panic("implement me")
 }
 
-func (m MdcbStorage) As(interface{}) error {
-	return errors.New("not implemented")
-}
-
 func (m MdcbStorage) GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{}) {
 	panic("implement me")
 }

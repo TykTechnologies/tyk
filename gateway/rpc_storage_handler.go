@@ -1155,7 +1155,3 @@ func (r *RPCStorageHandler) Exists(keyName string) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
 }
-
-func (r *RPCStorageHandler) As(interface{}) error {
-	return errors.New("not implemented")
-}

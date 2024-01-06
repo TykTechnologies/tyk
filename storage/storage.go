@@ -29,8 +29,6 @@ const MongoBsonIdLength = 24
 // Handler is a standard interface to a storage backend, used by
 // AuthorisationManager to read and write key values to the backend
 type Handler interface {
-	As(i interface{}) error
-
 	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
 	GetMultiKey([]string) ([]string, error)
 	GetRawKey(string) (string, error)

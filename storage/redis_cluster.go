@@ -130,21 +130,6 @@ func (r *RedisCluster) Client() (redis.UniversalClient, error) {
 	return r.singleton()
 }
 
-// As fills i as a *redis.UniversalClient type.
-func (r *RedisCluster) As(i interface{}) error {
-	conn, err := r.Client()
-	if err != nil {
-		return err
-	}
-
-	if x, ok := i.(*redis.UniversalClient); ok {
-		*x = conn
-		return nil
-	}
-
-	return fmt.Errorf("Unknown client requested: %T", i)
-}
-
 func (r *RedisCluster) singleton() (redis.UniversalClient, error) {
 	if r.RedisController == nil {
 		return nil, fmt.Errorf("Error trying to get singleton instance: RedisController is nil")

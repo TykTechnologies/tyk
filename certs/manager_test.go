@@ -26,10 +26,6 @@ type dummyStorage struct {
 	indexList map[string][]string
 }
 
-func (s *dummyStorage) As(interface{}) error {
-	return errors.New("not implemented")
-}
-
 func (s *dummyStorage) GetMultiKey([]string) ([]string, error) {
 	panic("implement me")
 }
