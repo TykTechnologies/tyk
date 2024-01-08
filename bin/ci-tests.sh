@@ -15,12 +15,14 @@ export PKG_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
 # exit on non-zero exit from go test/vet
 set -e
 
-# build Go-plugin used in tests
-echo "Building go plugin"
-go build -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
-go build -race -o ./test/goplugins/goplugins_race.so -buildmode=plugin ./test/goplugins
+# set tags for the CI tests run / plugin builds
 
 tags="goplugin dev"
+
+# build Go-plugin used in tests
+echo "Building go plugin"
+go build -tags "${tags}" -buildmode=plugin       -o ./test/goplugins/goplugins.so      ./test/goplugins
+go build -tags "${tags}" -buildmode=plugin -race -o ./test/goplugins/goplugins_race.so ./test/goplugins
 
 for pkg in ${PKGS}; do
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
