@@ -39,6 +39,7 @@ const (
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
 type SessionLimiter struct {
+	ctx            context.Context
 	drlManager     *drl.DRL
 	config         *config.Config
 	bucketStore    leakybucket.Storage
@@ -52,8 +53,9 @@ type SessionLimiter struct {
 // configured, then redis will be used. If local storage is configured, then
 // in-memory counters will be used. If no storage is configured, it falls
 // back onto the default gateway storage configuration.
-func NewSessionLimiter(conf *config.Config, drlManager *drl.DRL) SessionLimiter {
+func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL) SessionLimiter {
 	sessionLimiter := SessionLimiter{
+		ctx:         ctx,
 		drlManager:  drlManager,
 		config:      conf,
 		bucketStore: memorycache.New(),
@@ -70,7 +72,7 @@ func NewSessionLimiter(conf *config.Config, drlManager *drl.DRL) SessionLimiter 
 }
 
 func (l *SessionLimiter) Context() context.Context {
-	return l.gw.ctx
+	return l.ctx
 }
 
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,

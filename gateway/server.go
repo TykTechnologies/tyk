@@ -1850,7 +1850,7 @@ func (gw *Gateway) startDRL() {
 
 	gw.drlOnce.Do(func() {
 		drlManager := &drl.DRL{}
-		gw.SessionLimiter = NewSessionLimiter(&gwConfig, drlManager)
+		gw.SessionLimiter = NewSessionLimiter(gw.ctx, &gwConfig, drlManager)
 
 		gw.DRLManager = drlManager
 
