@@ -629,6 +629,8 @@ Name is the name of the domain.
 **Field: `enabled` (`boolean`)**
 Enabled enables/disables detailed activity logs.
 
+Tyk classic API definition: `enable_detailed_recording`.
+
 
 ### **Middleware**
 

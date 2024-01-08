@@ -29,7 +29,7 @@ type Server struct {
 	CustomDomain *Domain `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
 
 	// DetailedActivityLogs configures detailed analytics recording.
-	DetailedActivityLogs *DetailedActivityLogs `bson:"detailedActivityLogs" json:"detailedActivityLogs"`
+	DetailedActivityLogs *DetailedActivityLogs `bson:"detailedActivityLogs,omitempty" json:"detailedActivityLogs,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -202,6 +202,8 @@ func (cd *Domain) Fill(api apidef.APIDefinition) {
 // DetailedActivityLogs holds the configuration related to recording detailed analytics.
 type DetailedActivityLogs struct {
 	// Enabled enables/disables detailed activity logs.
+	//
+	// Tyk classic API definition: `enable_detailed_recording`
 	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
