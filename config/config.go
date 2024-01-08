@@ -721,6 +721,9 @@ type Config struct {
 	// This is used as part of the RPC / Hybrid back-end configuration in a Tyk Enterprise installation and isn’t used anywhere else.
 	AuthOverride AuthOverrideConf `json:"auth_override"`
 
+	// Rate limit using Lua script
+	EnableRedisScriptLimiter bool `json:"enable_redis_script_limiter"`
+
 	// Redis based rate limiter with fixed window. Provides 100% rate limiting accuracy, but require two additional Redis roundtrip for each request.
 	EnableRedisRollingLimiter bool `json:"enable_redis_rolling_limiter"`
 

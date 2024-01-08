@@ -61,6 +61,7 @@ type Handler interface {
 	RemoveFromList(string, string) error
 	AppendToSet(string, string)
 	Exists(string) (bool, error)
+	RunScript(script string, keys []string, args ...interface{}) interface{}
 }
 
 type AnalyticsHandler interface {

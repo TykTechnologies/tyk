@@ -240,3 +240,8 @@ func (l LDAPStorageHandler) Exists(keyName string) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
 }
+
+func (l LDAPStorageHandler) RunScript(script string, keys []string, args ...interface{}) interface{} {
+	log.Error("Not implemented")
+	return 0
+}

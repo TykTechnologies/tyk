@@ -243,3 +243,7 @@ func (m MdcbStorage) Exists(key string) (bool, error) {
 
 	return foundLocal && foundRpc, nil
 }
+
+func (m MdcbStorage) RunScript(script string, keys []string, args ...interface{}) interface{} {
+	panic("implement me")
+}
