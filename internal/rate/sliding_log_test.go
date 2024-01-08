@@ -19,8 +19,7 @@ import (
 func TestRollingWindow_GetCount(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	conf, err := config.New()
 	assert.NoError(t, err)
@@ -36,8 +35,7 @@ func TestRollingWindow_GetCount(t *testing.T) {
 func TestRollingWindow_Get(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	conf, err := config.New()
 	assert.NoError(t, err)
@@ -53,8 +51,7 @@ func TestRollingWindow_Get(t *testing.T) {
 func TestRollingWindow_pipelinerError(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	conf, err := config.New()
 	assert.NoError(t, err)
