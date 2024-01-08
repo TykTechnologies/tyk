@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path"
@@ -27,6 +28,27 @@ func New() (*Config, error) {
 	}
 
 	if err := Load([]string{cfgFile}, cfg); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+// NewDefaultWithEnv gives a deep clone of the Default configuration and
+// fills it from environment provided.
+func NewDefaultWithEnv() (*Config, error) {
+	cfg := new(Config)
+
+	b, err := json.Marshal(Default)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(b, cfg); err != nil {
+		return nil, err
+	}
+
+	if err := FillEnv(cfg); err != nil {
 		return nil, err
 	}
 
