@@ -184,7 +184,7 @@ func BenchmarkRollingWindow_Count(b *testing.B) {
 		}
 	})
 
-	b.Run("set/get count not pipelined", func(b *testing.B) {
+	b.Run("set/get count transaction", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			assertGetCount(ctx, b, conn, true)
 		}
@@ -196,7 +196,7 @@ func BenchmarkRollingWindow_Count(b *testing.B) {
 		}
 	})
 
-	b.Run("set/get not pipelined", func(b *testing.B) {
+	b.Run("set/get transaction", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			assertGet(ctx, b, conn, true)
 		}
