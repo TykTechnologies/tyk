@@ -913,6 +913,9 @@ TransformRequestHeaders allows you to transform request headers.
 **Field: `transformResponseHeaders` ([TransformHeaders](#transformheaders))**
 TransformResponseHeaders allows you to transform response headers.
 
+**Field: `urlRewrite` ([URLRewrite](#urlrewrite))**
+URLRewrite contains the url rewriting configuration.
+
 **Field: `cache` ([CachePlugin](#cacheplugin))**
 Cache contains the caching plugin configuration.
 
@@ -963,6 +966,53 @@ Path file path for the template.
 
 **Field: `body` (`string`)**
 Body base64 encoded representation of the template.
+
+
+### **URLRewrite**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables URL rewriting if set to true.
+
+**Field: `pattern` (`string`)**
+Pattern is the regular expression to match values against. If a value matches the defined pattern, the URL rewrite is triggered for the rule.
+
+**Field: `rewriteTo` (`string`)**
+RewriteTo specifies a URL to rewrite the request to, if the embedded URL rewrite rule is a match.
+
+**Field: `triggers` (`[]`[URLRewriteTrigger](#urlrewritetrigger))**
+Triggers contain advanced additional triggers for the URL rewrite.
+The triggers are processed only if the requested URL matches the pattern above.
+
+
+### **URLRewriteTrigger**
+
+**Field: `condition` ([](#))**
+Condition represents a boolean operator for rules.
+If set to "and", all rules must match to trigger the rewrite.
+If set to "or", any of the rules can match to trigger the rewrite.
+
+**Field: `rules` (`[]`[URLRewriteRule](#urlrewriterule))**
+Rules contain conditional triggers for URL rewriting.
+If empty, it enables non-conditional rewrites.
+
+**Field: `rewriteTo` (`string`)**
+RewriteTo specifies a URL to rewrite the request to, if the conditions match.
+
+
+### **URLRewriteRule**
+
+**Field: `in` ([](#))**
+In specifies one of the valid inputs for URL rewriting.
+By default, it uses `url` as the input source.
+
+**Field: `name` (`string`)**
+Name is the index in the inputs. It is ignored for InputRequestBody as it contains only a single value, while the others are objects.
+
+**Field: `pattern` (`string`)**
+Pattern is the regular expression to match values against. If a value matches the defined pattern, the URL rewrite is triggered for the rule.
+
+**Field: `negate` (`boolean`)**
+Negate is a boolean negation operator. Setting it to true allows to negate the match if any, allowing for a "match all except <pattern>" style matching.
 
 
 ### **CachePlugin**

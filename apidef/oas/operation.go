@@ -42,6 +42,9 @@ type Operation struct {
 	// TransformResponseHeaders allows you to transform response headers.
 	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
 
+	// URLRewrite contains the url rewriting configuration.
+	URLRewrite *URLRewrite `bson:"urlRewrite,omitempty" json:"urlRewrite,omitempty"`
+
 	// Cache contains the caching plugin configuration.
 	Cache *CachePlugin `bson:"cache,omitempty" json:"cache,omitempty"`
 
