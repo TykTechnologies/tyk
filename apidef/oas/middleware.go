@@ -1209,7 +1209,7 @@ type CircuitBreaker struct {
 	SampleSize int `bson:"sampleSize" json:"sampleSize"`
 	// CoolDownPeriod represents the amount of time (in seconds) needed to pass before returning to service.
 	CoolDownPeriod int `bson:"coolDownPeriod" json:"coolDownPeriod"`
-	// HalfOpened allows some requests to pass through the circuit breaker during the cool down period.
+	// HalfOpenStateEnabled allows some requests to pass through the circuit breaker during the cool down period.
 	HalfOpenStateEnabled bool `bson:"halfOpened" json:"halfOpened"`
 }
 
