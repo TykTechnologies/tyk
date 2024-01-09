@@ -1415,7 +1415,7 @@
           "type": "boolean"
         }
       }
-    }
+    },
     "X-Tyk-CircuitBreaker": {
       "type": "object",
       "properties": {
