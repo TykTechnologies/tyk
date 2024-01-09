@@ -932,7 +932,7 @@ VirtualEndpoint contains virtual endpoint configuration.
 PostPlugins contains endpoint level post plugins configuration.
 
 **Field: `circuitBreaker` ([CircuitBreaker](#circuitbreaker))**
-CircuitBreaker contains the configuration for our circuit breaker functionality
+CircuitBreaker contains the configuration for our circuit breaker functionality.
 
 
 ### **Allowance**
@@ -1072,13 +1072,13 @@ Path is the path to plugin.
 ### **CircuitBreaker**
 
 **Field: `enabled` (`boolean`)**
-Enabled enables the Circuit Breaker functionality
+Enabled enables the Circuit Breaker functionality.
 
 **Field: `threshold` (`double`)**
 Threshold represents the percentage of requests that can error before the breaker is tripped. This must be a value between 0.0 and 1.0.
 
 **Field: `sampleSize` (`int`)**
-SampleSize represents the number of samples to take for a circuit breaker window
+SampleSize represents the number of samples to take for a circuit breaker window.
 
 **Field: `coolDownPeriod` (`int`)**
 CoolDownPeriod represents the amount of time (in seconds) needed to pass before returning to service.

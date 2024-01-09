@@ -60,7 +60,7 @@ type Operation struct {
 	// PostPlugins contains endpoint level post plugins configuration.
 	PostPlugins EndpointPostPlugins `bson:"postPlugins,omitempty" json:"postPlugins,omitempty"`
 
-	// CircuitBreaker contains the configuration for our circuit breaker functionality
+	// CircuitBreaker contains the configuration for the circuit breaker functionality.
 	CircuitBreaker *CircuitBreaker `bson:"circuitBreaker,omitempty" json:"circuitBreaker,omitempty"`
 }
 
