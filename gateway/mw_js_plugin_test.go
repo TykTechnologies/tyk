@@ -155,7 +155,7 @@ func TestJSVMBody(t *testing.T) {
 	defer ts.Close()
 
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware: BaseMiddleware{
+		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 			Gw:   ts.Gw,
 		},
@@ -196,7 +196,7 @@ func TestJSVMSessionMetadataUpdate(t *testing.T) {
 	defer ts.Close()
 
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware: BaseMiddleware{
+		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 			Gw:   ts.Gw,
 		},
@@ -334,7 +334,7 @@ func TestJSVMProcessTimeout(t *testing.T) {
 	defer ts.Close()
 
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware: BaseMiddleware{
+		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 			Gw:   ts.Gw,
 		},
@@ -390,7 +390,7 @@ func TestJSVMConfigData(t *testing.T) {
 			"foo": "bar",
 		}
 		dynMid := &DynamicMiddleware{
-			BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+			BaseMiddleware:      &BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
 			MiddlewareClassName: "testJSVMData",
 			Pre:                 true,
 		}
@@ -414,7 +414,7 @@ func TestJSVMConfigData(t *testing.T) {
 		spec.ConfigDataDisabled = true
 
 		dynMid := &DynamicMiddleware{
-			BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+			BaseMiddleware:      &BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
 			MiddlewareClassName: "testJSVMData",
 			Pre:                 true,
 		}
@@ -444,7 +444,7 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+		BaseMiddleware:      &BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
@@ -488,7 +488,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	return testJSVMCore.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+		BaseMiddleware:      &BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
 		MiddlewareClassName: "testJSVMCore",
 		Pre:                 true,
 	}
@@ -527,7 +527,7 @@ func TestJSVMRequestScheme(t *testing.T) {
 	defer ts.Close()
 
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware: BaseMiddleware{
+		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 			Gw:   ts.Gw,
 		},

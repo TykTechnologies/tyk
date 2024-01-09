@@ -69,6 +69,14 @@ type Global struct {
 	// Cache contains the configurations related to caching.
 	// Tyk classic API definition: `cache_options`.
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
+
+	// TransformRequestHeaders contains the configurations related to API level request header transformation.
+	// Tyk classic API definition: `global_headers`/`global_headers_remove`.
+	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
+
+	// TransformResponseHeaders contains the configurations related to API level response header transformation.
+	// Tyk classic API definition: `global_response_headers`/`global_response_headers_remove`.
+	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
 }
 
 // Fill fills *Global from apidef.APIDefinition.
@@ -134,6 +142,33 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.ResponsePlugin.Fill(api)
 	if ShouldOmit(g.ResponsePlugin) {
 		g.ResponsePlugin = nil
+	}
+
+	if g.TransformRequestHeaders == nil {
+		g.TransformRequestHeaders = &TransformHeaders{}
+	}
+
+	vInfo := api.VersionData.Versions[Main]
+	g.TransformRequestHeaders.Fill(apidef.HeaderInjectionMeta{
+		Disabled:      vInfo.GlobalHeadersDisabled,
+		AddHeaders:    vInfo.GlobalHeaders,
+		DeleteHeaders: vInfo.GlobalHeadersRemove,
+	})
+	if ShouldOmit(g.TransformRequestHeaders) {
+		g.TransformRequestHeaders = nil
+	}
+
+	if g.TransformResponseHeaders == nil {
+		g.TransformResponseHeaders = &TransformHeaders{}
+	}
+
+	g.TransformResponseHeaders.Fill(apidef.HeaderInjectionMeta{
+		Disabled:      vInfo.GlobalResponseHeadersDisabled,
+		AddHeaders:    vInfo.GlobalResponseHeaders,
+		DeleteHeaders: vInfo.GlobalResponseHeadersRemove,
+	})
+	if ShouldOmit(g.TransformResponseHeaders) {
+		g.TransformResponseHeaders = nil
 	}
 }
 
@@ -201,6 +236,42 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	g.ResponsePlugin.ExtractTo(api)
+
+	if g.TransformRequestHeaders == nil {
+		g.TransformRequestHeaders = &TransformHeaders{}
+		defer func() {
+			g.TransformRequestHeaders = nil
+		}()
+	}
+
+	var headerMeta apidef.HeaderInjectionMeta
+	g.TransformRequestHeaders.ExtractTo(&headerMeta)
+
+	if g.TransformResponseHeaders == nil {
+		g.TransformResponseHeaders = &TransformHeaders{}
+		defer func() {
+			g.TransformResponseHeaders = nil
+		}()
+	}
+
+	var resHeaderMeta apidef.HeaderInjectionMeta
+	g.TransformResponseHeaders.ExtractTo(&resHeaderMeta)
+
+	if len(api.VersionData.Versions) == 0 {
+		api.VersionData.Versions = map[string]apidef.VersionInfo{
+			Main: {},
+		}
+	}
+
+	vInfo := api.VersionData.Versions[Main]
+	vInfo.GlobalHeadersDisabled = headerMeta.Disabled
+	vInfo.GlobalHeaders = headerMeta.AddHeaders
+	vInfo.GlobalHeadersRemove = headerMeta.DeleteHeaders
+
+	vInfo.GlobalResponseHeadersDisabled = resHeaderMeta.Disabled
+	vInfo.GlobalResponseHeaders = resHeaderMeta.AddHeaders
+	vInfo.GlobalResponseHeadersRemove = resHeaderMeta.DeleteHeaders
+	api.VersionData.Versions[Main] = vInfo
 }
 
 // PluginConfigData configures config data for custom plugins.
@@ -873,9 +944,9 @@ type TransformHeaders struct {
 	// Enabled enables Header Transform for the given path and method.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Remove specifies header names to be removed from the request/response.
-	Remove []string `bson:"remove" json:"remove"`
+	Remove []string `bson:"remove,omitempty" json:"remove,omitempty"`
 	// Add specifies headers to be added to the request/response.
-	Add []Header `bson:"add" json:"add"`
+	Add []Header `bson:"add,omitempty" json:"add,omitempty"`
 }
 
 // Fill fills *TransformHeaders from apidef.HeaderInjectionMeta.
@@ -889,6 +960,10 @@ func (th *TransformHeaders) Fill(meta apidef.HeaderInjectionMeta) {
 		th.Add[i] = Header{Name: k, Value: v}
 		i++
 	}
+
+	sort.Slice(th.Add, func(i, j int) bool {
+		return th.Add[i].Name < th.Add[j].Name
+	})
 
 	if len(th.Add) == 0 {
 		th.Add = nil

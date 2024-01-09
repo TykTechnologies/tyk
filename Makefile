@@ -9,7 +9,7 @@ GOINSTALL=$(GOCMD) install
 BINARY_NAME=tyk
 BINARY_LINUX=tyk
 BUILD_PLATFORM=linux/amd64
-TAGS=coprocess grpc goplugin
+TAGS=coprocess grpc goplugin dev
 CONF=tyk.conf
 
 TEST_REGEX=.
@@ -39,7 +39,7 @@ lint-install:
 	go install golang.org/x/tools/cmd/goimports@latest
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.0
 	go install github.com/fatih/faillint@latest
-	go install go.uber.org/mock/mockgen@v0.3.0
+	go install go.uber.org/mock/mockgen@v0.4.0
 
 .PHONY: bench
 bench:
@@ -57,7 +57,7 @@ dev:
 
 .PHONY: build
 build:
-	$(GOBUILD) -tags "$(TAGS)" -o $(BINARY_NAME) -trimpath -v .
+	$(GOBUILD) -tags "$(TAGS)" -o $(BINARY_NAME) -trimpath .
 
 .PHONY: build-linux
 build-linux:

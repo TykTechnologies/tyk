@@ -96,22 +96,8 @@ func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.Un
 	return client
 }
 
-func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
-	if len(config.Addrs) != 0 {
-		addrs = config.Addrs
-	} else {
-		for h, p := range config.Hosts {
-			addr := h + ":" + p
-			addrs = append(addrs, addr)
-		}
-	}
-
-	if len(addrs) == 0 && config.Port != 0 {
-		addr := config.Host + ":" + strconv.Itoa(config.Port)
-		addrs = append(addrs, addr)
-	}
-
-	return addrs
+func getRedisAddrs(conf config.StorageOptionsConf) (addrs []string) {
+	return conf.HostAddrs()
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
@@ -133,6 +119,15 @@ func clusterConnectionIsOpen(cluster *RedisCluster) bool {
 // dynamically using redis
 func (r *RedisCluster) Connect() bool {
 	return true
+}
+
+// Client will return a redis v8 RedisClient. This function allows
+// implementation using the old storage clients.
+func (r *RedisCluster) Client() (redis.UniversalClient, error) {
+	if err := r.up(); err != nil {
+		return nil, err
+	}
+	return r.singleton()
 }
 
 func (r *RedisCluster) singleton() (redis.UniversalClient, error) {
@@ -373,6 +368,24 @@ func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 		return err
 	}
 	return nil
+}
+
+// Lock implements a distributed lock in a cluster.
+func (r *RedisCluster) Lock(key string, timeout time.Duration) (bool, error) {
+	if err := r.up(); err != nil {
+		return false, err
+	}
+	singleton, err := r.singleton()
+	if err != nil {
+		return false, err
+	}
+
+	res := singleton.SetNX(r.RedisController.ctx, key, "1", timeout)
+	if err := res.Err(); err != nil {
+		log.WithError(err).Error("Error trying to set value")
+		return false, err
+	}
+	return res.Val(), nil
 }
 
 // Decrement will decrement a key in redis

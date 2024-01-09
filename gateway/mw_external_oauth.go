@@ -30,7 +30,7 @@ var (
 )
 
 type ExternalOAuthMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (k *ExternalOAuthMiddleware) Name() string {

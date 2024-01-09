@@ -313,26 +313,26 @@ func TestGetGroupLoginCallback(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.testName, func(t *testing.T) {
-			g := StartTest(func(globalConf *config.Config) {
+			ts := StartTest(func(globalConf *config.Config) {
 				globalConf.SlaveOptions.SynchroniserEnabled = tc.syncEnabled
 			})
-			defer g.Close()
-			defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			defer ts.Close()
+			defer ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 
 			rpcListener := RPCStorageHandler{
 				KeyPrefix:        "rpc.listener.",
 				SuppressRegister: true,
-				Gw:               g.Gw,
+				Gw:               ts.Gw,
 			}
 
 			expectedNodeInfo := apidef.NodeData{
-				NodeID:      "",
+				NodeID:      ts.Gw.GetNodeID(),
 				GroupID:     "",
 				APIKey:      "",
 				TTL:         0,
 				Tags:        nil,
 				NodeVersion: VERSION,
-				Health:      g.Gw.getHealthCheckInfo(),
+				Health:      ts.Gw.getHealthCheckInfo(),
 				Stats: apidef.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
@@ -367,7 +367,6 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				return ts
 			},
 			expectedNodeInfo: apidef.NodeData{
-				NodeID:      "",
 				GroupID:     "",
 				APIKey:      "",
 				TTL:         0,
@@ -392,7 +391,6 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				return ts
 			},
 			expectedNodeInfo: apidef.NodeData{
-				NodeID:      "",
 				GroupID:     "group",
 				APIKey:      "apikey-test",
 				TTL:         1,
@@ -427,11 +425,9 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 						"p1-meta": "p1-value",
 					}
 				})
-
 				return ts
 			},
 			expectedNodeInfo: apidef.NodeData{
-				NodeID:      "",
 				GroupID:     "group",
 				TTL:         1,
 				Tags:        []string{"tag1"},
@@ -476,6 +472,10 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			r := &RPCStorageHandler{Gw: ts.Gw}
 
 			tc.expectedNodeInfo.Health = ts.Gw.getHealthCheckInfo()
+
+			if tc.expectedNodeInfo.NodeID == "" {
+				tc.expectedNodeInfo.NodeID = ts.Gw.GetNodeID()
+			}
 
 			expected, err := json.Marshal(tc.expectedNodeInfo)
 			assert.Nil(t, err)

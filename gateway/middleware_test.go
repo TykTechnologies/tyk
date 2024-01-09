@@ -37,7 +37,7 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	m := BaseMiddleware{
+	m := &BaseMiddleware{
 		Spec: &APISpec{
 			GlobalConfig: config.Config{
 				EnforceOrgDataAge: true,
@@ -80,7 +80,7 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+	baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 	r, _ := http.NewRequest(http.MethodGet, "", nil)
 	r.Header.Set("h1", "t1")
@@ -133,7 +133,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.AddCookie(&http.Cookie{
@@ -161,7 +161,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.AddCookie(&http.Cookie{
@@ -189,7 +189,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.Header.Set("h1", "t1")
@@ -214,7 +214,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.URL.RawQuery = "q1=t1"
@@ -239,7 +239,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.URL.RawQuery = "q1=t1"

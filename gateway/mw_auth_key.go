@@ -65,7 +65,7 @@ func initAuthKeyErrors() {
 // KeyExists will check if the key being used to access the API is in the request data,
 // and then if the key is in the storage engine
 type AuthKey struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (k *AuthKey) Name() string {

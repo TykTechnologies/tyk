@@ -1,11 +1,13 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
+	"strconv"
 )
 
 // New produces a new config object by parsing
@@ -26,6 +28,27 @@ func New() (*Config, error) {
 	}
 
 	if err := Load([]string{cfgFile}, cfg); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+// NewDefaultWithEnv gives a deep clone of the Default configuration and
+// fills it from environment provided.
+func NewDefaultWithEnv() (*Config, error) {
+	cfg := new(Config)
+
+	b, err := json.Marshal(Default)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(b, cfg); err != nil {
+		return nil, err
+	}
+
+	if err := FillEnv(cfg); err != nil {
 		return nil, err
 	}
 
@@ -60,4 +83,23 @@ func findFile(filename string) (string, error) {
 
 	// File not found
 	return "", os.ErrNotExist
+}
+
+// HostAddrs returns a sanitized list of hosts to connect to.
+func (config *StorageOptionsConf) HostAddrs() (addrs []string) {
+	if len(config.Addrs) != 0 {
+		addrs = config.Addrs
+	} else {
+		for h, p := range config.Hosts {
+			addr := h + ":" + p
+			addrs = append(addrs, addr)
+		}
+	}
+
+	if len(addrs) == 0 && config.Port != 0 {
+		addr := config.Host + ":" + strconv.Itoa(config.Port)
+		addrs = append(addrs, addr)
+	}
+
+	return addrs
 }

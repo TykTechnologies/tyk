@@ -21,14 +21,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/test"
 
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -99,8 +99,9 @@ type Gateway struct {
 
 	ctx context.Context
 
-	muNodeID   sync.Mutex // guards NodeID
-	NodeID     string
+	nodeIDMu sync.Mutex
+	nodeID   string
+
 	drlOnce    sync.Once
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
@@ -205,21 +206,20 @@ type hostDetails struct {
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
-	gw := Gateway{
+	gw := &Gateway{
 		DefaultProxyMux: &proxyMux{
 			again: again.New(),
 		},
 		ctx: ctx,
 	}
-
-	gw.Analytics = RedisAnalyticsHandler{Gw: &gw}
 	gw.SetConfig(config)
-	sessionManager := DefaultSessionManager{Gw: &gw}
+
+	gw.Analytics = RedisAnalyticsHandler{Gw: gw}
+	sessionManager := DefaultSessionManager{Gw: gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
-	gw.DefaultOrgStore = DefaultSessionManager{Gw: &gw}
-	gw.DefaultQuotaStore = DefaultSessionManager{Gw: &gw}
-	gw.SessionLimiter = SessionLimiter{Gw: &gw}
-	gw.SessionMonitor = Monitor{Gw: &gw}
+	gw.DefaultOrgStore = DefaultSessionManager{Gw: gw}
+	gw.DefaultQuotaStore = DefaultSessionManager{Gw: gw}
+	gw.SessionMonitor = Monitor{Gw: gw}
 	gw.HostCheckTicker = make(chan struct{})
 	gw.HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
@@ -250,7 +250,10 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.RedisController = storage.NewRedisController(ctx)
 
-	return &gw
+	gw.SetNodeID("solo-" + uuid.New())
+	gw.SessionID = uuid.New()
+
+	return gw
 }
 
 func (gw *Gateway) UnmarshalJSON(data []byte) error {
@@ -268,16 +271,16 @@ func (gw *Gateway) InitializeRPCCache() {
 
 // SetNodeID writes NodeID safely.
 func (gw *Gateway) SetNodeID(nodeID string) {
-	gw.muNodeID.Lock()
-	gw.NodeID = nodeID
-	gw.muNodeID.Unlock()
+	gw.nodeIDMu.Lock()
+	gw.nodeID = nodeID
+	gw.nodeIDMu.Unlock()
 }
 
 // GetNodeID reads NodeID safely.
 func (gw *Gateway) GetNodeID() string {
-	gw.muNodeID.Lock()
-	defer gw.muNodeID.Unlock()
-	return gw.NodeID
+	gw.nodeIDMu.Lock()
+	defer gw.nodeIDMu.Unlock()
+	return gw.nodeID
 }
 
 func (gw *Gateway) isRunningTests() bool {
@@ -1575,20 +1578,32 @@ func Start() {
 		os.Exit(0)
 	}
 
-	// ToDo:Config replace for get default conf
-	gw := NewGateway(config.Default, ctx)
-	gw.SetNodeID("solo-" + uuid.New())
+	gwConfig := config.Config{}
+	if err := config.Load(confPaths, &gwConfig); err != nil {
+		mainLog.Errorf("Error loading config, using defaults: %v", err)
 
-	gw.SessionID = uuid.New()
+		defaultConfig, err := config.NewDefaultWithEnv()
+		if err != nil {
+			mainLog.Fatalf("Error falling back to default config with env: %v", err)
+		}
+		gwConfig = *defaultConfig
+	}
+
+	if gwConfig.PIDFileLocation == "" {
+		gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
+	}
+
+	gw := NewGateway(gwConfig, ctx)
 
 	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 
-	gwConfig := gw.GetConfig()
+	gwConfig = gw.GetConfig()
 	if gwConfig.ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
+
 	gw.setupPortsWhitelist()
 	gw.keyGen = DefaultKeyGenerator{Gw: gw}
 
@@ -1752,8 +1767,10 @@ func writeProfiles() {
 }
 
 func (gw *Gateway) start() {
+	conf := gw.GetConfig()
+
 	// Set up a default org manager so we can traverse non-live paths
-	if !gw.GetConfig().SupressDefaultOrgStore {
+	if !conf.SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
 		gw.DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
@@ -1761,11 +1778,16 @@ func (gw *Gateway) start() {
 	}
 
 	// Start listening for reload messages
-	if !gw.GetConfig().SuppressRedisSignalReload {
+	if !conf.SuppressRedisSignalReload {
 		go gw.startPubSubLoop()
 	}
 
-	conf := gw.GetConfig()
+	purgeInterval := conf.Private.GetOAuthTokensPurgeInterval()
+	purgeJob := scheduler.NewJob("purge-oauth-tokens", gw.purgeLapsedOAuthTokens, purgeInterval)
+
+	oauthTokensPurger := scheduler.NewScheduler(log)
+	go oauthTokensPurger.Start(gw.ctx, purgeJob)
+
 	if slaveOptions := conf.SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
 		gw.RPCListener = RPCStorageHandler{
@@ -1828,6 +1850,8 @@ func (gw *Gateway) startDRL() {
 
 	gw.drlOnce.Do(func() {
 		drlManager := &drl.DRL{}
+		gw.SessionLimiter = NewSessionLimiter(gw.ctx, &gwConfig, drlManager)
+
 		gw.DRLManager = drlManager
 
 		if disabled {

@@ -2,8 +2,9 @@
 version: "3"
 
 includes:
-  deps: ./.taskfiles/deps/Taskfile.yml
-  opentelemetry: ./.taskfiles/opentelemetry.yml
+  lint: .taskfiles/lint.yml
+  deps: .taskfiles/deps/Taskfile.yml
+  opentelemetry: .taskfiles/opentelemetry.yml
 
 tasks:
   docker:

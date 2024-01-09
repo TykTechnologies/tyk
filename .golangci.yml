@@ -75,6 +75,7 @@ linters:
     - ireturn
     - goerr113
   enable:
+    - govet
     - gochecknoinits
     - thelper
     - errcheck
@@ -86,6 +87,13 @@ linters:
     - goimports
 
 linters-settings:
+  govet:
+    check-shadowing: true
+    enable-all: true
+    disable:
+      - fieldalignment
+      - shadow
+
   goimports:
     local-prefixes: github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal
 

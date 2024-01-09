@@ -266,7 +266,7 @@ func TestGetSecretFromJWKOrConfig(t *testing.T) {
 	})[0]
 
 	k := ExternalOAuthMiddleware{
-		BaseMiddleware{
+		&BaseMiddleware{
 			Gw:   ts.Gw,
 			Spec: spec,
 		},

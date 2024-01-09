@@ -17,7 +17,7 @@ import (
 )
 
 type RequestSigning struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (s *RequestSigning) Name() string {
