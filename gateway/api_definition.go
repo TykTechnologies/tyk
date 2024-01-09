@@ -986,7 +986,7 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
-		if stringSpec.Disabled == true {
+		if stringSpec.Disabled {
 			continue
 		}
 
