@@ -132,6 +132,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTransformResponseBody(ep.TransformResponse)
 	s.fillTransformRequestHeaders(ep.TransformHeader)
 	s.fillTransformResponseHeaders(ep.TransformResponseHeader)
+	s.fillURLRewrite(ep.URLRewrite)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillOASValidateRequest(ep.ValidateJSON)
@@ -212,6 +213,22 @@ func newAllowance(prev **Allowance) *Allowance {
 	}
 
 	return *prev
+}
+
+func (s *OAS) fillURLRewrite(metas []apidef.URLRewriteMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		if operation.URLRewrite == nil {
+			operation.URLRewrite = &URLRewrite{}
+		}
+
+		operation.URLRewrite.Fill(meta)
+		if ShouldOmit(operation.URLRewrite) {
+			operation.URLRewrite = nil
+		}
+	}
 }
 
 func (s *OAS) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {
