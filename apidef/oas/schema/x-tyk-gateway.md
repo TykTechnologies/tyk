@@ -932,7 +932,7 @@ VirtualEndpoint contains virtual endpoint configuration.
 PostPlugins contains endpoint level post plugins configuration.
 
 **Field: `circuitBreaker` ([CircuitBreaker](#circuitbreaker))**
-CircuitBreaker contains the configuration for our circuit breaker functionality.
+CircuitBreaker contains the configuration for the circuit breaker functionality.
 
 
 ### **Allowance**
