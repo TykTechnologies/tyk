@@ -9,6 +9,8 @@ import (
 )
 
 // XTykAPIGateway contains custom Tyk API extensions for the OAS definition.
+// The values for the extensions are stored inside the OAS document, under
+// the key `x-tyk-gateway`.
 type XTykAPIGateway struct {
 	// Info contains the main metadata about the API definition.
 	Info Info `bson:"info" json:"info"` // required
