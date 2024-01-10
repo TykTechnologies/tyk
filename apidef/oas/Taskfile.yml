@@ -1,0 +1,8 @@
+---
+version: "3"
+
+tasks:
+  gen:
+    desc: "Generate package documentation"
+    cmds:
+      - schema-gen extract -o - | schema-gen markdown -i - -o schema/x-tyk-gateway.md --root XTykAPIGateway
