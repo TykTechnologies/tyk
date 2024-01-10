@@ -524,7 +524,7 @@
           "type": "boolean"
         },
         "toMethod": {
-          "type": "boolean"
+          "type": "string"
         }
       },
       "required": [
