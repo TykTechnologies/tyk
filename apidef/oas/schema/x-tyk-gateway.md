@@ -1074,26 +1074,26 @@ Path is the path to plugin.
 **Field: `enabled` (`boolean`)**
 Enabled enables the Circuit Breaker functionality.
 
-Tyk classic API definition: `version_data[].versions.extended_paths[].circuit_breakers.disabled`.
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.
 
 **Field: `threshold` (`double`)**
 Threshold represents the percentage of requests that can error before the breaker is tripped. This must be a value between 0.0 and 1.0.
 
-Tyk classic API definition: `version_data[].versions.extended_paths[].circuit_breakers.threshold_percent`.
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].threshold_percent`.
 
 **Field: `sampleSize` (`int`)**
 SampleSize represents the number of samples to take for a circuit breaker window.
 
-Tyk classic API definition: `version_data[].versions.extended_paths[].circuit_breakers.samples`.
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].samples`.
 
 **Field: `coolDownPeriod` (`int`)**
 CoolDownPeriod represents the amount of time (in seconds) needed to pass before returning to service.
 
-Tyk classic API definition: `version_data[].versions.extended_paths[].circuit_breakers.return_to_service_after`.
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].return_to_service_after`.
 
 **Field: `halfOpened` (`boolean`)**
 HalfOpenStateEnabled allows some requests to pass through the circuit breaker during the cool down period.
 
-Tyk classic API definition: `version_data[].versions.extended_paths[].circuit_breakers.disable_half_open_state`.
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disable_half_open_state`.
 
 

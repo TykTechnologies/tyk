@@ -1277,19 +1277,19 @@ func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
 
 type CircuitBreaker struct {
 	// Enabled enables the Circuit Breaker functionality.
-	// Tyk classic API definition: `version_data[].versions.extended_paths[].circuit_breakers.disabled`
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Threshold represents the percentage of requests that can error before the breaker is tripped. This must be a value between 0.0 and 1.0.
-	// Tyk classic API definition: `version_data[].versions.extended_paths[].circuit_breakers.threshold_percent`
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].threshold_percent`.
 	Threshold float64 `bson:"threshold" json:"threshold"`
 	// SampleSize represents the number of samples to take for a circuit breaker window.
-	// Tyk classic API definition: `version_data[].versions.extended_paths[].circuit_breakers.samples`
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].samples`.
 	SampleSize int `bson:"sampleSize" json:"sampleSize"`
 	// CoolDownPeriod represents the amount of time (in seconds) needed to pass before returning to service.
-	// Tyk classic API definition: `version_data[].versions.extended_paths[].circuit_breakers.return_to_service_after`
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].return_to_service_after`.
 	CoolDownPeriod int `bson:"coolDownPeriod" json:"coolDownPeriod"`
 	// HalfOpenStateEnabled allows some requests to pass through the circuit breaker during the cool down period.
-	// Tyk classic API definition: `version_data[].versions.extended_paths[].circuit_breakers.disable_half_open_state`
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disable_half_open_state`.
 	HalfOpenStateEnabled bool `bson:"halfOpened" json:"halfOpened"`
 }
 
