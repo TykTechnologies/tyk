@@ -1,15 +1,20 @@
 package gateway
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
+	"github.com/TykTechnologies/drl"
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -34,8 +39,40 @@ const (
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
 type SessionLimiter struct {
-	bucketStore leakybucket.Storage
-	Gw          *Gateway `json:"-"`
+	ctx            context.Context
+	drlManager     *drl.DRL
+	config         *config.Config
+	bucketStore    leakybucket.Storage
+	limiterStorage redis.UniversalClient
+}
+
+// NewSessionLimiter initializes the session limiter.
+//
+// The session limiter initializes the storage required for rate limiters.
+// It supports two storage types: `redis` and `local`. If redis storage is
+// configured, then redis will be used. If local storage is configured, then
+// in-memory counters will be used. If no storage is configured, it falls
+// back onto the default gateway storage configuration.
+func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL) SessionLimiter {
+	sessionLimiter := SessionLimiter{
+		ctx:         ctx,
+		drlManager:  drlManager,
+		config:      conf,
+		bucketStore: memorycache.New(),
+	}
+
+	storageConf := conf.GetRateLimiterStorage()
+
+	switch storageConf.Type {
+	case "redis":
+		sessionLimiter.limiterStorage = rate.NewStorage(storageConf)
+	}
+
+	return sessionLimiter
+}
+
+func (l *SessionLimiter) Context() context.Context {
+	return l.ctx
 }
 
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
@@ -44,39 +81,49 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	globalConf *config.Config,
 	apiLimit *user.APILimit, dryRun bool) bool {
 
-	var per, rate float64
+	ctx := l.Context()
+
+	var per, cost float64
 
 	if apiLimit != nil { // respect limit on API level
 		per = apiLimit.Per
-		rate = apiLimit.Rate
+		cost = apiLimit.Rate
 	} else {
 		per = currentSession.Per
-		rate = currentSession.Rate
+		cost = currentSession.Rate
 	}
 
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	pipeline := globalConf.EnableNonTransactionalRateLimiter
 
-	var ratePerPeriodNow int
-	if dryRun {
-		ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
-	} else {
-		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+	ratelimit, err := rate.NewSlidingLog(store, pipeline)
+	if err != nil {
+		log.WithError(err).Error("error creating sliding log")
+		return true
 	}
 
-	//log.Info("Num Requests: ", ratePerPeriodNow)
+	var ratePerPeriodNow int64
+	if dryRun {
+		ratePerPeriodNow, err = ratelimit.GetCount(ctx, time.Now(), rateLimiterKey, int64(per))
+	} else {
+		ratePerPeriodNow, err = ratelimit.SetCount(ctx, time.Now(), rateLimiterKey, int64(per))
+	}
+
+	if err != nil {
+		log.WithError(err).Error("error writing sliding log")
+	}
 
 	// Subtract by 1 because of the delayed add in the window
-	subtractor := 1
+	var subtractor int64 = 1
 	if globalConf.EnableSentinelRateLimiter || globalConf.DRLEnableSentinelRateLimiter {
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
 	}
+
 	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
-	// will only work with ththese two lines here
-	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
-	if ratePerPeriodNow > int(rate)-subtractor {
+	// will only work with these two lines here
+	if ratePerPeriodNow > int64(cost)-subtractor {
 		// Set a sentinel value with expire
 		if globalConf.EnableSentinelRateLimiter || globalConf.DRLEnableSentinelRateLimiter {
 			if !dryRun {
@@ -133,21 +180,19 @@ func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key strin
 func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string, rateScope string,
 	apiLimit *user.APILimit, dryRun bool) bool {
 
-	// In-memory limiter
-	if l.bucketStore == nil {
-		l.bucketStore = memorycache.New()
-	}
-
 	bucketKey := key + ":" + rateScope + currentSession.LastUpdated
 	currRate := apiLimit.Rate
 	per := apiLimit.Per
 
+	tokenValue := uint(l.drlManager.CurrentTokenValue())
+
 	// DRL will always overflow with more servers on low rates
-	rate := uint(currRate * float64(l.Gw.DRLManager.RequestTokenValue))
-	if rate < uint(l.Gw.DRLManager.CurrentTokenValue()) {
-		rate = uint(l.Gw.DRLManager.CurrentTokenValue())
+	cost := uint(currRate * float64(l.drlManager.RequestTokenValue))
+	if cost < tokenValue {
+		cost = tokenValue
 	}
-	userBucket, err := l.bucketStore.Create(bucketKey, rate, time.Duration(per)*time.Second)
+
+	userBucket, err := l.bucketStore.Create(bucketKey, cost, time.Duration(per)*time.Second)
 	if err != nil {
 		log.Error("Failed to create bucket!")
 		return true
@@ -159,7 +204,7 @@ func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string,
 			return true
 		}
 	} else {
-		_, errF := userBucket.Add(uint(l.Gw.DRLManager.CurrentTokenValue()))
+		_, errF := userBucket.Add(tokenValue)
 		if errF != nil {
 			return true
 		}
@@ -192,37 +237,46 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		return sessionFailRateLimit
 	}
 
-	if l.Gw == nil {
-		panic("gateway not set in session limiter")
-	}
-
 	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
 	if enableRL && accessDef.Limit.Rate > 0 {
 		rateScope := ""
 		if allowanceScope != "" {
 			rateScope = allowanceScope + "-"
 		}
-		if globalConf.EnableSentinelRateLimiter {
+
+		limiter := rate.Limiter(l.config, l.limiterStorage)
+		if limiter != nil {
+			prefix := rate.Prefix(key, allowanceScope)
+
+			err := limiter(r.Context(), prefix, accessDef.Limit.Rate, accessDef.Limit.Per)
+
+			if errors.Is(err, rate.ErrLimitExhausted) {
+				return sessionFailRateLimit
+			}
+		}
+
+		switch {
+		case globalConf.EnableSentinelRateLimiter:
 			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
-		} else if globalConf.EnableRedisRollingLimiter {
+		case globalConf.EnableRedisRollingLimiter:
 			if l.limitRedis(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
-		} else {
+		default:
 			var n float64
-			if l.Gw.DRLManager.Servers != nil {
-				n = float64(l.Gw.DRLManager.Servers.Count())
+			if l.drlManager.Servers != nil {
+				n = float64(l.drlManager.Servers.Count())
 			}
-			rate := accessDef.Limit.Rate / accessDef.Limit.Per
+			cost := accessDef.Limit.Rate / accessDef.Limit.Per
 			c := globalConf.DRLThreshold
 			if c == 0 {
 				// defaults to 5
 				c = 5
 			}
 
-			if n <= 1 || n*c < rate {
+			if n <= 1 || n*c < cost {
 				// If we have 1 server, there is no need to strain redis at all the leaky
 				// bucket algorithm will suffice.
 				if l.limitDRL(currentSession, key, rateScope, &accessDef.Limit, dryRun) {

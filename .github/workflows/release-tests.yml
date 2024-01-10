@@ -70,7 +70,7 @@ jobs:
       - id: ecr-login
         uses: ./.github/actions/ecr-login
 
-      - name: Run /smoke-tests
+      - name: Run /ci/smoke-tests
 
         # This job only runs whenever a tag is created. A tag is required
         # for a functional plugin compiler build for when the GO_GET=1 env
@@ -86,7 +86,7 @@ jobs:
           PLUGIN_COMPILER_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
         run: |
           set -eaxo pipefail
-          for d in smoke-tests/*/
+          for d in ci/smoke-tests/*/
           do
               echo Attempting to test $d
               if [ -d $d ] && [ -e $d/test.sh ]; then

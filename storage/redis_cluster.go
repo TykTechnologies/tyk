@@ -121,6 +121,15 @@ func (r *RedisCluster) Connect() bool {
 	return true
 }
 
+// Client will return a redis v8 RedisClient. This function allows
+// implementation using the old storage clients.
+func (r *RedisCluster) Client() (redis.UniversalClient, error) {
+	if err := r.up(); err != nil {
+		return nil, err
+	}
+	return r.singleton()
+}
+
 func (r *RedisCluster) singleton() (redis.UniversalClient, error) {
 	if r.RedisController == nil {
 		return nil, fmt.Errorf("Error trying to get singleton instance: RedisController is nil")

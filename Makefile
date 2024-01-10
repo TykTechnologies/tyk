@@ -9,7 +9,7 @@ GOINSTALL=$(GOCMD) install
 BINARY_NAME=tyk
 BINARY_LINUX=tyk
 BUILD_PLATFORM=linux/amd64
-TAGS=coprocess grpc goplugin
+TAGS=coprocess grpc goplugin dev
 CONF=tyk.conf
 
 TEST_REGEX=.
@@ -57,7 +57,7 @@ dev:
 
 .PHONY: build
 build:
-	$(GOBUILD) -tags "$(TAGS)" -o $(BINARY_NAME) -trimpath -v .
+	$(GOBUILD) -tags "$(TAGS)" -o $(BINARY_NAME) -trimpath .
 
 .PHONY: build-linux
 build-linux:
