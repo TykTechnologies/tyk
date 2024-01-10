@@ -5,4 +5,4 @@ tasks:
   gen:
     desc: "Generate package documentation"
     cmds:
-      - schema-gen extract -o - | schema-gen markdown -i - -o schema/x-tyk-gateway.md --root XTykAPIGateway
+      - schema-gen extract -o - | schema-gen markdown -i - --trim "Tyk classic API definition" -o schema/x-tyk-gateway.md --root XTykAPIGateway
