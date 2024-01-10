@@ -11,6 +11,7 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/lexer/literal"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
+	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
@@ -51,10 +52,45 @@ type OtelGraphqlEngineV2Detailed struct {
 }
 
 func (o *OtelGraphqlEngineV2Detailed) Normalize(operation *graphql.Request) error {
+	if operation.IsNormalized() {
+		return nil
+	}
+	var operationName = "NormalizeRequest"
+	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
+	defer span.End()
+	err := o.engine.Normalize(operation)
+	if err != nil {
+		span.SetStatus(otel.SPAN_STATUS_ERROR, "request normalization failed")
+		return err
+	}
 	return nil
 }
 
 func (o *OtelGraphqlEngineV2Detailed) ValidateForSchema(operation *graphql.Request) error {
+	if operation.IsValidated() {
+		return nil
+	}
+	var operationName = "ValidateRequest"
+	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
+	defer span.End()
+
+	operationType, err := operation.OperationType()
+	if err != nil {
+		span.SetStatus(otel.SPAN_STATUS_ERROR, "request validation failed")
+		return err
+	}
+
+	span.SetAttributes(
+		semconv.GraphQLOperationName(operation.OperationName),
+		semconv.GraphQLOperationType(printOperationType(ast.OperationType(operationType))),
+		semconv.GraphQLDocument(operation.Query),
+	)
+
+	err = o.engine.ValidateForSchema(operation)
+	if err != nil {
+		span.SetStatus(otel.SPAN_STATUS_ERROR, "request validation failed")
+		return err
+	}
 	return nil
 }
 

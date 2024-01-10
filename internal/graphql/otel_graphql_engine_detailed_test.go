@@ -13,6 +13,7 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
+	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 
 	"github.com/stretchr/testify/assert"
@@ -53,17 +54,35 @@ func TestMain(m *testing.M) {
 }
 
 func TestOtelGraphqlEngineV2Detailed_Normalize(t *testing.T) {
-	t.Run("normalize always returns nil", func(t *testing.T) {
+	t.Run("successfully normalize", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
 		mockExecutor := NewMockExecutionEngineI(ctrl)
+		mockExecutor.EXPECT().Normalize(gomock.Any()).MaxTimes(1).Return(nil)
 
 		engine, err := NewOtelGraphqlEngineV2Detailed(tracerProvider, mockExecutor)
 		assert.NoError(t, err)
+		engine.SetContext(context.Background())
 
-		result := engine.Normalize(&request)
-		assert.NoError(t, result)
+		err = engine.Normalize(&request)
+		assert.NoError(t, err)
+	})
+
+	t.Run("fail normalize", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockExecutor := NewMockExecutionEngineI(ctrl)
+		mockExecutor.EXPECT().Normalize(gomock.Any()).MaxTimes(1).Return(graphql.RequestErrorsFromError(errors.New("error normalizing request")))
+
+		engine, err := NewOtelGraphqlEngineV2Detailed(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
+		engine.SetContext(context.Background())
+
+		err = engine.Normalize(&request)
+		var reqErr graphql.RequestErrors
+		assert.True(t, errors.As(err, &reqErr), "errors should be of type request errors")
 	})
 }
 
@@ -116,7 +135,7 @@ func TestOtelGraphqlEngineV2Detailed_InputValidation(t *testing.T) {
 }
 
 func TestOtelGraphqlEngineV2Detailed_ValidateForSchema(t *testing.T) {
-	t.Run("validate for schema always returns nil", func(t *testing.T) {
+	t.Run("successfully validate", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -129,6 +148,23 @@ func TestOtelGraphqlEngineV2Detailed_ValidateForSchema(t *testing.T) {
 
 		err = engine.ValidateForSchema(&request)
 		assert.NoError(t, err)
+	})
+
+	t.Run("fail validation", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockExecutor := NewMockExecutionEngineI(ctrl)
+		mockExecutor.EXPECT().ValidateForSchema(gomock.Any()).MaxTimes(1).Return(graphql.RequestErrorsFromError(errors.New("error normalizing request")))
+
+		engine, err := NewOtelGraphqlEngineV2Detailed(tracerProvider, mockExecutor)
+		assert.NoError(t, err)
+		engine.SetContext(context.Background())
+
+		err = engine.ValidateForSchema(&request)
+		var reqErr graphql.RequestErrors
+		assert.True(t, errors.As(err, &reqErr), "errors should be of type request errors")
+
 	})
 }
 
@@ -253,6 +289,42 @@ func TestOtelGraphqlEngineV2Detailed_Execute(t *testing.T) {
 
 		err = engine.Execute(context.Background(), &request, nil)
 		assert.ErrorIs(t, err, expectedErr)
+	})
+}
+
+func TestOtelGraphqlEngineV2Detailed_ValidateForSchema_SemanticConventionAttributes(t *testing.T) {
+	checkStringAttribute := func(attributes []attribute.KeyValue, name attribute.Key, expectedValue string) {
+		for _, attr := range attributes {
+			if attr.Key == name {
+				assert.Equal(t, attr.Value.AsString(), expectedValue)
+				return
+			}
+		}
+		assert.Failf(t, "attribute not found", string(name))
+	}
+
+	t.Run("successfully validate", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockExecutor := NewMockExecutionEngineI(ctrl)
+		mockExecutor.EXPECT().ValidateForSchema(gomock.Any()).MaxTimes(1).Return(nil)
+
+		wrappedTraceProvider := newTracerProviderWrapper(tracerProvider)
+		engine, err := NewOtelGraphqlEngineV2Detailed(wrappedTraceProvider, mockExecutor)
+		assert.NoError(t, err)
+		engine.SetContext(context.Background())
+
+		err = engine.ValidateForSchema(&namedRequest)
+		assert.NoError(t, err)
+
+		attributes := wrappedTraceProvider.spanAttributes["ValidateRequest"]
+		assert.NotNil(t, attributes)
+
+		checkStringAttribute(attributes, semconv.GraphQLOperationNameKey, namedRequest.OperationName)
+		checkStringAttribute(attributes, semconv.GraphQLOperationTypeKey, "query")
+		checkStringAttribute(attributes, semconv.GraphQLDocumentKey, namedRequest.Query)
+
 	})
 }
 
