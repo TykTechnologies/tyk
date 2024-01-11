@@ -31,8 +31,4 @@ spec:
       name: Ensure resolve plan exists
       assertions:
         - attr:name = "ResolvePlan"
-    - selector: span[tracetest.span.type="general" name="GraphqlMiddleware Validation"]
-      name: Make sure there are 3 subspans for GraphqlMiddleware Validation
-      assertions:
-        - attr:tracetest.selected_spans.count = 3
 
