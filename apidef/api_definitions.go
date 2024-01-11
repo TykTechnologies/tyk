@@ -81,9 +81,8 @@ const (
 	UnsetAuth     AuthTypeEnum = ""
 
 	// For routing triggers
-	All    RoutingTriggerOnType = "all"
-	Any    RoutingTriggerOnType = "any"
-	Ignore RoutingTriggerOnType = ""
+	All RoutingTriggerOnType = "all"
+	Any RoutingTriggerOnType = "any"
 
 	// Subscription Types
 	GQLSubscriptionUndefined   SubscriptionType = ""
