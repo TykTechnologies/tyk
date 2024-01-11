@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -167,6 +168,169 @@ func TestGraphqlRequestProcessorWithOtelV1_ProcessRequest(t *testing.T) {
 	})
 }
 
+func TestComplexityCheckerV1_DepthLimitExceeded(t *testing.T) {
+	t.Run("should return ComplexityFailReasonNone if it is an introspection query", func(t *testing.T) {
+		request, err := http.NewRequest(
+			http.MethodPost,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, testIntrospectionQuery),
+			)))
+		require.NoError(t, err)
+
+		complexityChecker := newTestComplexityCheckerV1(t)
+		complexityChecker.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+			if r == request {
+				return &graphql.Request{
+					Query: testIntrospectionQuery,
+				}
+			}
+
+			return nil
+		}
+
+		result := complexityChecker.DepthLimitExceeded(request, nil)
+		assert.Equal(t, ComplexityFailReasonNone, result)
+	})
+
+	t.Run("global query depth limit", func(t *testing.T) {
+		t.Run("should return ComplexityFailReasonDepthLimitExceeded if global depth limit is exceeded", func(t *testing.T) {
+			operation := `{ countries { continent { countries { continent } } } }` // depth 4
+
+			request, err := http.NewRequest(
+				http.MethodPost,
+				"http://example.com",
+				bytes.NewBuffer([]byte(
+					fmt.Sprintf(`{"query": "%s"}`, operation),
+				)))
+			require.NoError(t, err)
+
+			complexityChecker := newTestComplexityCheckerV1(t, withTestComplexityCheckerV1Schema(testSchemaNestedEngineV1))
+			complexityChecker.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+				if r == request {
+					return &graphql.Request{
+						Query: operation,
+					}
+				}
+
+				return nil
+			}
+
+			result := complexityChecker.DepthLimitExceeded(request, &ComplexityAccessDefinition{
+				Limit: ComplexityLimit{
+					MaxQueryDepth: 3,
+				},
+			})
+			assert.Equal(t, ComplexityFailReasonDepthLimitExceeded, result)
+		})
+
+		t.Run("should return ComplexityFailReasonNone if global depth limit is not exceeded", func(t *testing.T) {
+			operation := `{ countries { continent } }` // depth 2
+
+			request, err := http.NewRequest(
+				http.MethodPost,
+				"http://example.com",
+				bytes.NewBuffer([]byte(
+					fmt.Sprintf(`{"query": "%s"}`, operation),
+				)))
+			require.NoError(t, err)
+
+			complexityChecker := newTestComplexityCheckerV1(t, withTestComplexityCheckerV1Schema(testSchemaNestedEngineV1))
+			complexityChecker.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+				if r == request {
+					return &graphql.Request{
+						Query: operation,
+					}
+				}
+
+				return nil
+			}
+
+			result := complexityChecker.DepthLimitExceeded(request, &ComplexityAccessDefinition{
+				Limit: ComplexityLimit{
+					MaxQueryDepth: 3,
+				},
+			})
+			assert.Equal(t, ComplexityFailReasonNone, result)
+		})
+	})
+
+	t.Run("per query depth limit", func(t *testing.T) {
+		t.Run("should return ComplexityFailReasonDepthLimitExceeded if per query depth limit is exceeded", func(t *testing.T) {
+			operation := `{ countries { continent { countries { continent { countries } } } } }` // depth 5
+
+			request, err := http.NewRequest(
+				http.MethodPost,
+				"http://example.com",
+				bytes.NewBuffer([]byte(
+					fmt.Sprintf(`{"query": "%s"}`, operation),
+				)))
+			require.NoError(t, err)
+
+			complexityChecker := newTestComplexityCheckerV1(t, withTestComplexityCheckerV1Schema(testSchemaNestedEngineV1))
+			complexityChecker.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+				if r == request {
+					return &graphql.Request{
+						Query: operation,
+					}
+				}
+
+				return nil
+			}
+
+			result := complexityChecker.DepthLimitExceeded(request, &ComplexityAccessDefinition{
+				FieldAccessRights: []ComplexityFieldAccessDefinition{
+					{
+						TypeName:  "Query",
+						FieldName: "countries",
+						Limits: ComplexityFieldLimits{
+							MaxQueryDepth: 3,
+						},
+					},
+				},
+			})
+			assert.Equal(t, ComplexityFailReasonDepthLimitExceeded, result)
+		})
+
+		t.Run("should return ComplexityFailReasonNone if global depth limit is not exceeded", func(t *testing.T) {
+			operation := `{ countries { continent } }` // depth 2
+
+			request, err := http.NewRequest(
+				http.MethodPost,
+				"http://example.com",
+				bytes.NewBuffer([]byte(
+					fmt.Sprintf(`{"query": "%s"}`, operation),
+				)))
+			require.NoError(t, err)
+
+			complexityChecker := newTestComplexityCheckerV1(t, withTestComplexityCheckerV1Schema(testSchemaNestedEngineV1))
+			complexityChecker.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+				if r == request {
+					return &graphql.Request{
+						Query: operation,
+					}
+				}
+
+				return nil
+			}
+
+			result := complexityChecker.DepthLimitExceeded(request, &ComplexityAccessDefinition{
+				FieldAccessRights: []ComplexityFieldAccessDefinition{
+					{
+						TypeName:  "Query",
+						FieldName: "countries",
+						Limits: ComplexityFieldLimits{
+							MaxQueryDepth: 3,
+						},
+					},
+				},
+			})
+			assert.Equal(t, ComplexityFailReasonNone, result)
+		})
+	})
+
+}
+
 func newTestGraphqlRequestProcessorV1(t *testing.T) *graphqlRequestProcessorV1 {
 	gqlTools := graphqlGoToolsV1{}
 	parsedSchema, err := gqlTools.parseSchema(testSchemaEngineV1)
@@ -198,5 +362,37 @@ func newTestGraphqlRequestProcessorWithOtelV1(t *testing.T) *graphqlRequestProce
 		schema:             parsedSchema,
 		ctxRetrieveRequest: nil,
 		otelExecutor:       otelExecutor,
+	}
+}
+
+type testComplexityCheckerV1Options struct {
+	schema string
+}
+
+type testComplexityCheckerV1Option func(*testComplexityCheckerV1Options)
+
+func withTestComplexityCheckerV1Schema(schema string) testComplexityCheckerV1Option {
+	return func(opts *testComplexityCheckerV1Options) {
+		opts.schema = schema
+	}
+}
+
+func newTestComplexityCheckerV1(t *testing.T, options ...testComplexityCheckerV1Option) *complexityCheckerV1 {
+	opts := &testComplexityCheckerV1Options{
+		schema: testSchemaEngineV1,
+	}
+
+	for _, option := range options {
+		option(opts)
+	}
+
+	gqlTools := graphqlGoToolsV1{}
+	parsedSchema, err := gqlTools.parseSchema(opts.schema)
+	require.NoError(t, err)
+
+	return &complexityCheckerV1{
+		logger:             abstractlogger.NoopLogger,
+		schema:             parsedSchema,
+		ctxRetrieveRequest: nil,
 	}
 }

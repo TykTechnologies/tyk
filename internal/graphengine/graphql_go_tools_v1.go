@@ -240,7 +240,7 @@ func (g *graphqlRequestProcessorWithOtelV1) ProcessRequest(ctx context.Context, 
 }
 
 type complexityCheckerV1 struct {
-	logger             *abstractlogger.LogrusLogger
+	logger             abstractlogger.Logger
 	schema             *graphql.Schema
 	ctxRetrieveRequest ContextRetrieveRequestV1Func
 }
