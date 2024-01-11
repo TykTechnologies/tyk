@@ -46,12 +46,12 @@ func TestURLRewrite_ExtractTo(t *testing.T) {
 	assert.Equal(t, native, extracted)
 }
 
-func decode(t testing.TB, fs embed.FS, dest interface{}, filename string) {
-	t.Helper()
+func decode(tb testing.TB, fs embed.FS, dest interface{}, filename string) {
+	tb.Helper()
 
 	f, err := fs.ReadFile(filename)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	err = json.Unmarshal(f, dest)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 }
