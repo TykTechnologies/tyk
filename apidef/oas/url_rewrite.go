@@ -83,7 +83,7 @@ type URLRewriteTrigger struct {
 
 	// RewriteTo specifies a URL to rewrite the request to, if the
 	// conditions match.
-	RewriteTo string `bson:"rewriteTo,omitempty" json:"rewriteTo,omitempty"`
+	RewriteTo string `bson:"rewriteTo" json:"rewriteTo"`
 }
 
 // URLRewriteRule represents a rewrite matching rules.
@@ -98,7 +98,7 @@ type URLRewriteRule struct {
 
 	// Pattern is the regular expression to match values against. If a value matches the
 	// defined pattern, the URL rewrite is triggered for the rule.
-	Pattern string `bson:"pattern,omitempty" json:"pattern,omitempty"`
+	Pattern string `bson:"pattern" json:"pattern"`
 
 	// Negate is a boolean negation operator. Setting it to true allows to negate
 	// the match if any, allowing for a "match all except <pattern>" style matching.
