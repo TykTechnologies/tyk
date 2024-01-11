@@ -22,7 +22,7 @@ type URLRewrite struct {
 
 	// Triggers contain advanced additional triggers for the URL rewrite.
 	// The triggers are processed only if the requested URL matches the pattern above.
-	Triggers []URLRewriteTrigger `bson:"triggers,omitempty" json:"triggers,omitempty"`
+	Triggers []*URLRewriteTrigger `bson:"triggers,omitempty" json:"triggers,omitempty"`
 }
 
 // URLRewriteInput defines the input for an URL rewrite rule.
@@ -79,7 +79,7 @@ type URLRewriteTrigger struct {
 
 	// Rules contain conditional triggers for URL rewriting.
 	// If empty, it enables non-conditional rewrites.
-	Rules []URLRewriteRule `bson:"rules,omitempty" json:"rules,omitempty"`
+	Rules []*URLRewriteRule `bson:"rules,omitempty" json:"rules,omitempty"`
 
 	// RewriteTo specifies a URL to rewrite the request to, if the
 	// conditions match.
@@ -120,15 +120,15 @@ func (v *URLRewrite) Fill(meta apidef.URLRewriteMeta) {
 	v.Sort()
 }
 
-func (v *URLRewrite) fillTriggers(from []apidef.RoutingTrigger) []URLRewriteTrigger {
-	result := make([]URLRewriteTrigger, 0)
+func (v *URLRewrite) fillTriggers(from []apidef.RoutingTrigger) []*URLRewriteTrigger {
+	result := make([]*URLRewriteTrigger, 0)
 	for _, t := range from {
 		rules := v.fillRules(t.Options)
 		if len(rules) == 0 {
 			continue
 		}
 
-		trigger := URLRewriteTrigger{
+		trigger := &URLRewriteTrigger{
 			Condition: URLRewriteCondition(t.On),
 			Rules:     rules,
 			RewriteTo: t.RewriteTo,
@@ -149,8 +149,8 @@ func (v *URLRewrite) Sort() {
 	}
 }
 
-func (v *URLRewrite) fillRules(from apidef.RoutingTriggerOptions) []URLRewriteRule {
-	result := []URLRewriteRule{}
+func (v *URLRewrite) fillRules(from apidef.RoutingTriggerOptions) []*URLRewriteRule {
+	result := []*URLRewriteRule{}
 
 	v.appendRules(&result, from.HeaderMatches, InputHeader)
 	v.appendRules(&result, from.QueryValMatches, InputQuery)
@@ -165,13 +165,13 @@ func (v *URLRewrite) fillRules(from apidef.RoutingTriggerOptions) []URLRewriteRu
 	return result
 }
 
-func (v *URLRewrite) appendRules(rules *[]URLRewriteRule, from map[string]apidef.StringRegexMap, in URLRewriteInput) {
+func (v *URLRewrite) appendRules(rules *[]*URLRewriteRule, from map[string]apidef.StringRegexMap, in URLRewriteInput) {
 	for name, v := range from {
 		if v.Empty() {
 			continue
 		}
 
-		rule := URLRewriteRule{
+		rule := &URLRewriteRule{
 			In:      in,
 			Name:    name,
 			Pattern: v.MatchPattern,
@@ -205,7 +205,7 @@ func (v *URLRewrite) extractTriggers() []apidef.RoutingTrigger {
 	return triggers
 }
 
-func (v *URLRewrite) extractTriggerOptions(rules []URLRewriteRule) apidef.RoutingTriggerOptions {
+func (v *URLRewrite) extractTriggerOptions(rules []*URLRewriteRule) apidef.RoutingTriggerOptions {
 	result := apidef.NewRoutingTriggerOptions()
 
 	for _, rule := range rules {

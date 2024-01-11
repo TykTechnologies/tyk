@@ -820,7 +820,7 @@
       "additionalProperties": false,
       "properties": {
         "condition": {
-          "type": "string"
+          "enum": ["any", "all"]
         },
         "rewriteTo": {
           "type": "string"
@@ -844,7 +844,7 @@
       "additionalProperties": false,
       "properties": {
         "in": {
-          "type": "string"
+          "enum": ["query", "path", "header", "sessionMetadata", "requestContext", "requestBody"]
         },
         "name": {
           "type": "string"

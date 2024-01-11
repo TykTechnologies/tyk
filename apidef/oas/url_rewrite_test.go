@@ -3,7 +3,6 @@ package oas
 import (
 	"embed"
 	"encoding/json"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

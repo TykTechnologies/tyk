@@ -30,6 +30,19 @@ func TestXTykGateway_Lint(t *testing.T) {
 			if op.TransformResponseBody != nil {
 				op.TransformResponseBody.Format = "json"
 			}
+			if op.URLRewrite != nil {
+				for _, t := range op.URLRewrite.Triggers {
+					t.Condition = "any"
+					t.Rules = []*URLRewriteRule{}
+					for _, in := range URLRewriteInputs {
+						rule := &URLRewriteRule{
+							In:      in,
+							Pattern: ".*",
+						}
+						t.Rules = append(t.Rules, rule)
+					}
+				}
+			}
 		}
 		settings.Server.Authentication.BaseIdentityProvider = ""
 		settings.Server.Authentication.Custom.Config.IDExtractor.Source = "body"
