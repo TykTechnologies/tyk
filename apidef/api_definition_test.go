@@ -32,7 +32,7 @@ func TestStringRegexMap(t *testing.T) {
 	var v StringRegexMap
 	assert.True(t, v.Empty())
 
-	v = StringRegexMap{MatchPattern:".*"}
+	v = StringRegexMap{MatchPattern: ".*"}
 	assert.False(t, v.Empty())
 
 	v = StringRegexMap{Reverse: true}
