@@ -45,12 +45,6 @@ func TestURLRewrite_ExtractTo(t *testing.T) {
 	oasDef.ExtractTo(&extracted)
 
 	assert.Equal(t, native, extracted)
-
-	if false {
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		enc.Encode(extracted)
-	}
 }
 
 func decode(t testing.TB, fs embed.FS, dest interface{}, filename string) {
