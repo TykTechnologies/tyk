@@ -52,13 +52,18 @@ const (
 	InputRequestBody     URLRewriteInput = "requestBody"
 	InputRequestContext  URLRewriteInput = "requestContext"
 
-	ConditionAll    URLRewriteCondition = "all"
-	ConditionAny    URLRewriteCondition = "any"
-	ConditionIgnore URLRewriteCondition = ""
+	ConditionAll URLRewriteCondition = "all"
+	ConditionAny URLRewriteCondition = "any"
 )
 
 var (
-	// URLRewriteInputs contains all valid URL rewrite input types.
+	// URLRewriteConditions contains all valid URL rewrite condition values.
+	URLRewriteConditions = []URLRewriteCondition{
+		ConditionAll,
+		ConditionAny,
+	}
+
+	// URLRewriteInputs contains all valid URL rewrite input values.
 	URLRewriteInputs = []URLRewriteInput{
 		InputQuery,
 		InputPath,

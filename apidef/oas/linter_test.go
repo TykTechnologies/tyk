@@ -31,17 +31,22 @@ func TestXTykGateway_Lint(t *testing.T) {
 				op.TransformResponseBody.Format = "json"
 			}
 			if op.URLRewrite != nil {
-				for _, t := range op.URLRewrite.Triggers {
-					t.Condition = "any"
-					t.Rules = []*URLRewriteRule{}
+				triggers := []*URLRewriteTrigger{}
+				for _, cond := range URLRewriteConditions {
+					trigger := &URLRewriteTrigger{
+						Condition: cond,
+						Rules:     []*URLRewriteRule{},
+					}
 					for _, in := range URLRewriteInputs {
 						rule := &URLRewriteRule{
 							In:      in,
 							Pattern: ".*",
 						}
-						t.Rules = append(t.Rules, rule)
+						trigger.Rules = append(trigger.Rules, rule)
 					}
+					triggers = append(triggers, trigger)
 				}
+				op.URLRewrite.Triggers = triggers
 			}
 		}
 		settings.Server.Authentication.BaseIdentityProvider = ""
