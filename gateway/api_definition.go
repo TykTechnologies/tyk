@@ -1066,6 +1066,10 @@ func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewrit
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		curStringSpec := stringSpec
 		newSpec := URLSpec{}
 		a.generateRegex(curStringSpec.Path, &newSpec, stat, conf)
