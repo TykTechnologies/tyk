@@ -3,6 +3,8 @@ version: "3"
 
 vars:
   golangci: '--max-same-issues=0 --max-issues-per-linter=0'
+  root:
+    sh: git rev-parse --show-toplevel
   package:
     sh: go mod edit -json | jq .Module.Path -r
 
