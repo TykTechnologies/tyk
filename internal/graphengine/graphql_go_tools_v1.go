@@ -355,7 +355,7 @@ func (c *complexityCheckerV1) depthLimitEnabled(accessDefinition *ComplexityAcce
 }
 
 type granularAccessCheckerV1 struct {
-	logger                    *abstractlogger.LogrusLogger
+	logger                    abstractlogger.Logger
 	schema                    *graphql.Schema
 	ctxRetrieveGraphQLRequest ContextRetrieveRequestV1Func
 }
