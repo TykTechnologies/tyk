@@ -162,6 +162,7 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 				}
 				if total == setCount {
 					rewriteToPath = triggerOpts.RewriteTo
+					break
 				}
 			}
 		}
