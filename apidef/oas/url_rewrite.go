@@ -171,7 +171,7 @@ func (v *URLRewrite) fillRules(from apidef.RoutingTriggerOptions) []*URLRewriteR
 	return result
 }
 
-func (v *URLRewrite) appendRules(rules *[]*URLRewriteRule, from map[string]apidef.StringRegexMap, in URLRewriteInput) {
+func (*URLRewrite) appendRules(rules *[]*URLRewriteRule, from map[string]apidef.StringRegexMap, in URLRewriteInput) {
 	for name, v := range from {
 		if v.Empty() {
 			continue
@@ -211,7 +211,7 @@ func (v *URLRewrite) extractTriggers() []apidef.RoutingTrigger {
 	return triggers
 }
 
-func (v *URLRewrite) extractTriggerOptions(rules []*URLRewriteRule) apidef.RoutingTriggerOptions {
+func (*URLRewrite) extractTriggerOptions(rules []*URLRewriteRule) apidef.RoutingTriggerOptions {
 	result := apidef.NewRoutingTriggerOptions()
 
 	for _, rule := range rules {
