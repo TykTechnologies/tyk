@@ -85,8 +85,17 @@ linters:
     - nilerr
     - misspell
     - goimports
+    - revive
 
 linters-settings:
+  revive:
+    ignore-generated-header: true
+    severity: error
+    enable-all-rules: false
+    rules:
+      - name: exported
+        disabled: false
+
   govet:
     check-shadowing: true
     enable-all: true
@@ -104,6 +113,7 @@ linters-settings:
       - (*github.com/TykTechnologies/tyk/gateway.Test).Run
 
 issues:
+  exclude-use-default: false
   exclude-rules:
     - path: _test\.go
       linters:
