@@ -417,6 +417,170 @@ func TestComplexityCheckerV1_DepthLimitEnabled(t *testing.T) {
 	})
 }
 
+func TestGranularAccessCheckerV1_CheckGraphQLRequestFieldAllowance(t *testing.T) {
+	t.Run("allowed list", func(t *testing.T) {
+		t.Run("should return GranularAccessFailReasonNone if the field is listed in allowed list", func(t *testing.T) {
+			operation := `{ hello }`
+
+			request, err := http.NewRequest(
+				http.MethodPost,
+				"http://example.com",
+				bytes.NewBuffer([]byte(
+					fmt.Sprintf(`{"query": "%s"}`, operation),
+				)))
+			require.NoError(t, err)
+
+			granularAccessChecker := newTestGranularAccessCheckerV1(t)
+			granularAccessChecker.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+				if r == request {
+					return &graphql.Request{
+						Query: operation,
+					}
+				}
+
+				return nil
+			}
+
+			result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{
+				AllowedTypes: []GranularAccessType{
+					{
+						Name:   "Query",
+						Fields: []string{"hello"},
+					},
+				},
+			})
+			assert.Equal(t, GranularAccessFailReasonNone, result.FailReason)
+		})
+
+		t.Run("should return GranularAccessFailReasonValidationError if the field is not listed in allowed list", func(t *testing.T) {
+			operation := `{ helloName("eddy") }`
+
+			request, err := http.NewRequest(
+				http.MethodPost,
+				"http://example.com",
+				bytes.NewBuffer([]byte(
+					fmt.Sprintf(`{"query": "%s"}`, operation),
+				)))
+			require.NoError(t, err)
+
+			granularAccessChecker := newTestGranularAccessCheckerV1(t)
+			granularAccessChecker.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+				if r == request {
+					return &graphql.Request{
+						Query: operation,
+					}
+				}
+
+				return nil
+			}
+
+			result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{
+				AllowedTypes: []GranularAccessType{
+					{
+						Name:   "Query",
+						Fields: []string{"hello"},
+					},
+				},
+			})
+			assert.Equal(t, GranularAccessFailReasonValidationError, result.FailReason)
+		})
+	})
+
+	t.Run("restricted list", func(t *testing.T) {
+		t.Run("should return GranularAccessFailReasonNone if the field is not listed in restricted list", func(t *testing.T) {
+			operation := `{ hello }`
+
+			request, err := http.NewRequest(
+				http.MethodPost,
+				"http://example.com",
+				bytes.NewBuffer([]byte(
+					fmt.Sprintf(`{"query": "%s"}`, operation),
+				)))
+			require.NoError(t, err)
+
+			granularAccessChecker := newTestGranularAccessCheckerV1(t)
+			granularAccessChecker.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+				if r == request {
+					return &graphql.Request{
+						Query: operation,
+					}
+				}
+
+				return nil
+			}
+
+			result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{
+				RestrictedTypes: []GranularAccessType{
+					{
+						Name:   "Query",
+						Fields: []string{"helloName"},
+					},
+				},
+			})
+			assert.Equal(t, GranularAccessFailReasonNone, result.FailReason)
+		})
+
+		t.Run("should return GranularAccessFailReasonValidationError if the field is listed in restricted list", func(t *testing.T) {
+			operation := `{ helloName("eddy") }`
+
+			request, err := http.NewRequest(
+				http.MethodPost,
+				"http://example.com",
+				bytes.NewBuffer([]byte(
+					fmt.Sprintf(`{"query": "%s"}`, operation),
+				)))
+			require.NoError(t, err)
+
+			granularAccessChecker := newTestGranularAccessCheckerV1(t)
+			granularAccessChecker.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+				if r == request {
+					return &graphql.Request{
+						Query: operation,
+					}
+				}
+
+				return nil
+			}
+
+			result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{
+				RestrictedTypes: []GranularAccessType{
+					{
+						Name:   "Query",
+						Fields: []string{"helloName"},
+					},
+				},
+			})
+			assert.Equal(t, GranularAccessFailReasonValidationError, result.FailReason)
+		})
+	})
+
+	t.Run("should return GranularAccessFailReasonNone if no lists are provided", func(t *testing.T) {
+		operation := `{ helloName("eddy") }`
+
+		request, err := http.NewRequest(
+			http.MethodPost,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, operation),
+			)))
+		require.NoError(t, err)
+
+		granularAccessChecker := newTestGranularAccessCheckerV1(t)
+		granularAccessChecker.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			if r == request {
+				return &graphql.Request{
+					Query: operation,
+				}
+			}
+
+			return nil
+		}
+
+		result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{})
+		assert.Equal(t, GranularAccessFailReasonNone, result.FailReason)
+	})
+}
+
 func newTestGraphqlRequestProcessorV1(t *testing.T) *graphqlRequestProcessorV1 {
 	gqlTools := graphqlGoToolsV1{}
 	parsedSchema, err := gqlTools.parseSchema(testSchemaEngineV1)
@@ -480,5 +644,17 @@ func newTestComplexityCheckerV1(t *testing.T, options ...testComplexityCheckerV1
 		logger:             abstractlogger.NoopLogger,
 		schema:             parsedSchema,
 		ctxRetrieveRequest: nil,
+	}
+}
+
+func newTestGranularAccessCheckerV1(t *testing.T) *granularAccessCheckerV1 {
+	gqlTools := graphqlGoToolsV1{}
+	parsedSchema, err := gqlTools.parseSchema(testSchemaEngineV1)
+	require.NoError(t, err)
+
+	return &granularAccessCheckerV1{
+		logger:                    abstractlogger.NoopLogger,
+		schema:                    parsedSchema,
+		ctxRetrieveGraphQLRequest: nil,
 	}
 }
