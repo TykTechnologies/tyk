@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	internalgraphql "github.com/TykTechnologies/tyk/internal/graphql"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
@@ -567,6 +568,28 @@ func TestGranularAccessCheckerV1_CheckGraphQLRequestFieldAllowance(t *testing.T)
 
 		granularAccessChecker := newTestGranularAccessCheckerV1(t)
 		granularAccessChecker.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			return nil
+		}
+
+		result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{})
+		assert.Equal(t, GranularAccessFailReasonNone, result.FailReason)
+	})
+}
+
+func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
+	t.Run("should return error on CORS preflight request", func(t *testing.T) {
+		operation := `{ hello }`
+
+		request, err := http.NewRequest(
+			http.MethodOptions,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, operation),
+			)))
+		require.NoError(t, err)
+
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t)
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
 			if r == request {
 				return &graphql.Request{
 					Query: operation,
@@ -576,8 +599,133 @@ func TestGranularAccessCheckerV1_CheckGraphQLRequestFieldAllowance(t *testing.T)
 			return nil
 		}
 
-		result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{})
-		assert.Equal(t, GranularAccessFailReasonNone, result.FailReason)
+		result, err := reverseProxyPreHandler.PreHandle(ReverseProxyParams{
+			OutRequest:      request,
+			NeedsEngine:     true,
+			IsCORSPreflight: true,
+		})
+		assert.Error(t, err)
+		assert.Equal(t, ReverseProxyTypeNone, result)
+	})
+
+	t.Run("should return ReverseProxyTypeWebsocketUpgrade on websocket upgrade", func(t *testing.T) {
+		operation := `{ hello }`
+
+		request, err := http.NewRequest(
+			http.MethodPost,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, operation),
+			)))
+		require.NoError(t, err)
+
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t)
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			if r == request {
+				return &graphql.Request{
+					Query: operation,
+				}
+			}
+
+			return nil
+		}
+
+		result, err := reverseProxyPreHandler.PreHandle(ReverseProxyParams{
+			OutRequest:         request,
+			NeedsEngine:        true,
+			IsWebSocketUpgrade: true,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, ReverseProxyTypeWebsocketUpgrade, result)
+	})
+
+	t.Run("should return ReverseProxyTypeIntrospection on introspection request", func(t *testing.T) {
+		operation := testIntrospectionQuery
+
+		request, err := http.NewRequest(
+			http.MethodPost,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, operation),
+			)))
+		require.NoError(t, err)
+
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t)
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			if r == request {
+				return &graphql.Request{
+					Query: operation,
+				}
+			}
+
+			return nil
+		}
+
+		result, err := reverseProxyPreHandler.PreHandle(ReverseProxyParams{
+			OutRequest: request,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, ReverseProxyTypeIntrospection, result)
+	})
+
+	t.Run("should return ReverseProxyTypeGraphEngine if engine is needed", func(t *testing.T) {
+		operation := `{ hello }`
+
+		request, err := http.NewRequest(
+			http.MethodPost,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, operation),
+			)))
+		require.NoError(t, err)
+
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t)
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			if r == request {
+				return &graphql.Request{
+					Query: operation,
+				}
+			}
+
+			return nil
+		}
+
+		result, err := reverseProxyPreHandler.PreHandle(ReverseProxyParams{
+			OutRequest:  request,
+			NeedsEngine: true,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, ReverseProxyTypeGraphEngine, result)
+	})
+
+	t.Run("should return ReverseProxyTypeNone if no engine is needed", func(t *testing.T) {
+		operation := `{ hello }`
+
+		request, err := http.NewRequest(
+			http.MethodPost,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, operation),
+			)))
+		require.NoError(t, err)
+
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t)
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			if r == request {
+				return &graphql.Request{
+					Query: operation,
+				}
+			}
+
+			return nil
+		}
+
+		result, err := reverseProxyPreHandler.PreHandle(ReverseProxyParams{
+			OutRequest:  request,
+			NeedsEngine: false,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, ReverseProxyTypeNone, result)
 	})
 }
 
@@ -656,5 +804,14 @@ func newTestGranularAccessCheckerV1(t *testing.T) *granularAccessCheckerV1 {
 		logger:                    abstractlogger.NoopLogger,
 		schema:                    parsedSchema,
 		ctxRetrieveGraphQLRequest: nil,
+	}
+}
+
+func newTestReverseProxyPreHandlerV1(t *testing.T) *reverseProxyPreHandlerV1 {
+	return &reverseProxyPreHandlerV1{
+		httpClient: &http.Client{},
+		transportModifier: func(roundTripper http.RoundTripper, _ *apidef.APIDefinition) http.RoundTripper {
+			return roundTripper
+		},
 	}
 }

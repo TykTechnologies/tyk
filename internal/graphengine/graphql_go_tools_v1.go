@@ -429,7 +429,7 @@ func (r *reverseProxyPreHandlerV1) PreHandle(params ReverseProxyParams) (reverse
 	case params.IsCORSPreflight:
 		if params.NeedsEngine {
 			err = errors.New("options passthrough not allowed")
-			return
+			return ReverseProxyTypeNone, err
 		}
 	case params.IsWebSocketUpgrade:
 		if params.NeedsEngine {
