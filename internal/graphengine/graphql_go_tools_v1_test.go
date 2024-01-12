@@ -327,8 +327,94 @@ func TestComplexityCheckerV1_DepthLimitExceeded(t *testing.T) {
 			})
 			assert.Equal(t, ComplexityFailReasonNone, result)
 		})
+
+		t.Run("should fallback to global depth limit and return ComplexityFailReasonDepthLimitExceeded if it exceeds it", func(t *testing.T) {
+			operation := `{ countries { continent { countries { continent { countries } } } } }` // depth 5
+
+			request, err := http.NewRequest(
+				http.MethodPost,
+				"http://example.com",
+				bytes.NewBuffer([]byte(
+					fmt.Sprintf(`{"query": "%s"}`, operation),
+				)))
+			require.NoError(t, err)
+
+			complexityChecker := newTestComplexityCheckerV1(t, withTestComplexityCheckerV1Schema(testSchemaNestedEngineV1))
+			complexityChecker.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+				if r == request {
+					return &graphql.Request{
+						Query: operation,
+					}
+				}
+
+				return nil
+			}
+
+			result := complexityChecker.DepthLimitExceeded(request, &ComplexityAccessDefinition{
+				Limit: ComplexityLimit{MaxQueryDepth: 4},
+				FieldAccessRights: []ComplexityFieldAccessDefinition{
+					{
+						TypeName:  "Query",
+						FieldName: "continents",
+						Limits: ComplexityFieldLimits{
+							MaxQueryDepth: 6,
+						},
+					},
+				},
+			})
+			assert.Equal(t, ComplexityFailReasonDepthLimitExceeded, result)
+		})
 	})
 
+}
+
+func TestComplexityCheckerV1_DepthLimitEnabled(t *testing.T) {
+	t.Run("should return false if access definition is nil", func(t *testing.T) {
+		complexityChecker := newTestComplexityCheckerV1(t)
+		result := complexityChecker.depthLimitEnabled(nil)
+		assert.False(t, result)
+	})
+
+	t.Run("should return false if global depth limit is set to -1 and no field access rights do exist", func(t *testing.T) {
+		complexityChecker := newTestComplexityCheckerV1(t)
+		result := complexityChecker.depthLimitEnabled(&ComplexityAccessDefinition{
+			Limit: ComplexityLimit{
+				MaxQueryDepth: -1,
+			},
+			FieldAccessRights: nil,
+		})
+		assert.False(t, result)
+	})
+
+	t.Run("should return true if global depth limit is not set to -1 and no field access rights do exist", func(t *testing.T) {
+		complexityChecker := newTestComplexityCheckerV1(t)
+		result := complexityChecker.depthLimitEnabled(&ComplexityAccessDefinition{
+			Limit: ComplexityLimit{
+				MaxQueryDepth: 1,
+			},
+			FieldAccessRights: nil,
+		})
+		assert.True(t, result)
+	})
+
+	t.Run("should return true if global depth limit is set to -1 and field access rights do exist", func(t *testing.T) {
+		complexityChecker := newTestComplexityCheckerV1(t)
+		result := complexityChecker.depthLimitEnabled(&ComplexityAccessDefinition{
+			Limit: ComplexityLimit{
+				MaxQueryDepth: -1,
+			},
+			FieldAccessRights: []ComplexityFieldAccessDefinition{
+				{
+					TypeName:  "Query",
+					FieldName: "continents",
+					Limits: ComplexityFieldLimits{
+						MaxQueryDepth: 1,
+					},
+				},
+			},
+		})
+		assert.True(t, result)
+	})
 }
 
 func newTestGraphqlRequestProcessorV1(t *testing.T) *graphqlRequestProcessorV1 {

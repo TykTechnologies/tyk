@@ -246,9 +246,9 @@ type complexityCheckerV1 struct {
 }
 
 func (c *complexityCheckerV1) DepthLimitExceeded(r *http.Request, accessDefinition *ComplexityAccessDefinition) ComplexityFailReason {
-	/*if !c.DepthLimitEnabled(accessDef) {
+	if !c.depthLimitEnabled(accessDefinition) {
 		return ComplexityFailReasonNone
-	}*/
+	}
 
 	gqlRequest := c.ctxRetrieveRequest(r)
 
@@ -340,6 +340,18 @@ func (c *complexityCheckerV1) DepthLimitExceeded(r *http.Request, accessDefiniti
 		}
 	}
 	return ComplexityFailReasonNone
+}
+
+func (c *complexityCheckerV1) depthLimitEnabled(accessDefinition *ComplexityAccessDefinition) bool {
+	if accessDefinition == nil {
+		return false
+	}
+
+	if accessDefinition.Limit.MaxQueryDepth == -1 && len(accessDefinition.FieldAccessRights) == 0 {
+		return false
+	}
+
+	return accessDefinition.Limit.MaxQueryDepth != -1 || len(accessDefinition.FieldAccessRights) != 0
 }
 
 type granularAccessCheckerV1 struct {
