@@ -8,6 +8,7 @@ import (
 )
 
 // URLRewrite configures URL rewriting.
+// Tyk classic API definition: `version_data.versions[].extended_paths.url_rewrite`.
 type URLRewrite struct {
 	// Enabled enables URL rewriting if set to true.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -40,8 +41,8 @@ type URLRewriteInput string
 
 // URLRewriteConditions defines the matching mode for an URL rewrite rules.
 //
-// - Value `or` means any of the defined trigger rules may match
-// - Value `and` means all the defined trigger rules must match
+// - Value `any` means any of the defined trigger rules may match
+// - Value `all` means all the defined trigger rules must match
 type URLRewriteCondition string
 
 const (
@@ -78,8 +79,8 @@ var (
 type URLRewriteTrigger struct {
 	// Condition represents a boolean operator for rules.
 	//
-	// If set to "and", all rules must match to trigger the rewrite.
-	// If set to "or", any of the rules can match to trigger the rewrite.
+	// - Value `any` means any of the defined trigger rules may match
+	// - Value `all` means all the defined trigger rules must match
 	Condition URLRewriteCondition `bson:"condition" json:"condition"`
 
 	// Rules contain conditional triggers for URL rewriting.
