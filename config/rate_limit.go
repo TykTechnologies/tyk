@@ -1,5 +1,9 @@
 package config
 
+import (
+	"fmt"
+)
+
 // RateLimit contains flags and configuration for controlling rate limiting behaviour.
 // It is embedded in the main config structure.
 type RateLimit struct {
@@ -35,4 +39,30 @@ type RateLimit struct {
 
 	// Controls which algorthm to use as a fallback when your distributed rate limiter can't be used.
 	DRLEnableSentinelRateLimiter bool `json:"drl_enable_sentinel_rate_limiter"`
+}
+
+// String returns a readable setting for the rate limiter in effect.
+func (r *RateLimit) String() string {
+	info := "using transactions"
+	if r.EnableNonTransactionalRateLimiter {
+		info = "using pipeline"
+	}
+
+	if r.EnableLeakyBucketRateLimiter {
+		return "Leaky Bucket Rate Limiter enabled"
+	}
+
+	if r.EnableRedisRollingLimiter {
+		return fmt.Sprintf("Redis Rate Limiter enabled (%s)", info)
+	}
+
+	if r.EnableSentinelRateLimiter {
+		return fmt.Sprintf("Redis Sentinel Rate Limiter enabled (%s)", info)
+	}
+
+	if r.DRLEnableSentinelRateLimiter {
+		return fmt.Sprintf("DRL with Redis Sentinel Rate Limiter enabled (%s)", info)
+	}
+
+	return fmt.Sprintf("DRL with Redis Rate Limiter enabled (%s)", info)
 }
