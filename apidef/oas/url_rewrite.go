@@ -39,12 +39,13 @@ type URLRewrite struct {
 // - `requestContext`, match pattern against request context
 type URLRewriteInput string
 
-// URLRewriteConditions defines the matching mode for an URL rewrite rules.
+// URLRewriteCondition defines the matching mode for an URL rewrite rules.
 //
 // - Value `any` means any of the defined trigger rules may match
 // - Value `all` means all the defined trigger rules must match
 type URLRewriteCondition string
 
+// Enumerated constants for inputs and conditions.
 const (
 	InputQuery           URLRewriteInput = "query"
 	InputPath            URLRewriteInput = "path"

@@ -390,6 +390,8 @@ func (m *URLRewriteMiddleware) Name() string {
 	return "URLRewriteMiddleware"
 }
 
+// InitTriggerRx will go over all defined URLRewrite triggers and initialize them. It
+// will skip disabled triggers, returning true if at least one trigger is enabled.
 func (m *URLRewriteMiddleware) InitTriggerRx() (enabled bool) {
 	// Generate regexp for each special match parameter
 	for verKey := range m.Spec.VersionData.Versions {
