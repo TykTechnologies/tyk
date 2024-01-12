@@ -988,8 +988,9 @@ The triggers are processed only if the requested URL matches the pattern above.
 
 **Field: `condition` ([](#))**
 Condition represents a boolean operator for rules.
-If set to "and", all rules must match to trigger the rewrite.
-If set to "or", any of the rules can match to trigger the rewrite.
+
+- Value `any` means any of the defined trigger rules may match
+- Value `all` means all the defined trigger rules must match
 
 **Field: `rules` (`[]`[URLRewriteRule](#urlrewriterule))**
 Rules contain conditional triggers for URL rewriting.
