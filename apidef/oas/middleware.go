@@ -8,12 +8,12 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-// Middleware holds configuration for middleware.
+// Middleware holds configuration for Tyk's native middleware.
 type Middleware struct {
-	// Global contains the configurations related to the global middleware.
+	// Global contains configuration for middleware that affects the whole API (all endpoints).
 	Global *Global `bson:"global,omitempty" json:"global,omitempty"`
 
-	// Operations configuration.
+	// Operations contains configuration for middleware that can be applied to individual endpoints within the API (per-endpoint).
 	Operations Operations `bson:"operations,omitempty" json:"operations,omitempty"`
 }
 

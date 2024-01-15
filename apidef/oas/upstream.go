@@ -7,9 +7,9 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-// Upstream holds configuration for an upstream server.
+// Upstream holds configuration for the upstream server to which Tyk should proxy requests.
 type Upstream struct {
-	// URL defines the target URL that the request should be proxied to.
+	// URL defines the upstream address (or Target URL) to which requests should be proxied.
 	// Tyk classic API definition: `proxy.target_url`
 	URL string `bson:"url" json:"url"` // required
 
@@ -20,7 +20,7 @@ type Upstream struct {
 	// Test contains the configuration related to uptime tests.
 	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
 
-	// MutualTLS contains the configuration related to upstream mutual TLS.
+	// MutualTLS contains the configuration for establishment of mutual TLS between Tyk and the upstream server.
 	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
 
 	// CertificatePinning contains the configuration related to certificate pinning.
@@ -140,7 +140,7 @@ type ServiceDiscovery struct {
 	// Tyk classic API definition: `service_discovery.data_path`
 	DataPath string `bson:"dataPath,omitempty" json:"dataPath,omitempty"`
 
-	// UseNestedQuery enables using a combination of `dataPath` and `parentDataPath`.
+	// UseNestedQuery enables the use of a combination of `dataPath` and `parentDataPath`.
 	// It is necessary when the data lives within this string-encoded JSON object.
 	//
 	// ```

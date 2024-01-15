@@ -4,26 +4,28 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-// Server contains the configuration related to the OAS API definition.
+// Server contains the configuration that sets Tyk up to receive requests from the client applications.
 type Server struct {
-	// ListenPath represents the path to listen on. Any requests coming into the host, on the port that Tyk is configured to run on,
-	// that match this path will have the rules defined in the API definition applied.
+	// ListenPath is the base path on Tyk to which requests for this API should
+	// be sent. Tyk listens for any requests coming into the host at this
+	// path, on the port that Tyk is configured to run on, and processes these
+	// accordingly.
 	ListenPath ListenPath `bson:"listenPath" json:"listenPath"` // required
 
 	// Slug is the Tyk Cloud equivalent of listen path.
 	// Tyk classic API definition: `slug`
 	Slug string `bson:"slug,omitempty" json:"slug,omitempty"`
 
-	// Authentication contains the configurations related to authentication to the API.
+	// Authentication contains the configurations that manage how clients can authenticate with Tyk to access the API.
 	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
 
-	// ClientCertificates contains the configurations related to static mTLS.
+	// ClientCertificates contains the configurations related to establishing static mutual TLS beetween the client and Tyk.
 	ClientCertificates *ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty"`
 
 	// GatewayTags contains segment tags to configure which GWs your APIs connect to.
 	GatewayTags *GatewayTags `bson:"gatewayTags,omitempty" json:"gatewayTags,omitempty"`
 
-	// CustomDomain is the domain to bind this API to.
+	// CustomDomain is the domain to bind this API to. This enforces domain matching for client requests.
 	//
 	// Tyk classic API definition: `domain`
 	CustomDomain *Domain `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
