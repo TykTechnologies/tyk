@@ -42,7 +42,7 @@ type Operation struct {
 	// TransformResponseHeaders allows you to transform response headers.
 	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
 
-	// URLRewrite contains the url rewriting configuration.
+	// URLRewrite contains the URL rewriting configuration.
 	URLRewrite *URLRewrite `bson:"urlRewrite,omitempty" json:"urlRewrite,omitempty"`
 
 	// Cache contains the caching plugin configuration.
@@ -468,10 +468,10 @@ func isRegex(value string) bool {
 	return false
 }
 
-// splitPath splits url into folder parts, detecting regex patterns.
+// splitPath splits URL into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
-	// Each url fragment can contain a regex, but the whole
-	// url isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
+	// Each URL fragment can contain a regex, but the whole
+	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
 	parts := strings.Split(strings.Trim(inPath, "/"), "/")
 	result := make([]pathPart, len(parts))
 	found := 0
@@ -493,7 +493,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 	return result, found > 0
 }
 
-// buildPath converts the url paths with regex to named parameters
+// buildPath converts the URL paths with regex to named parameters
 // e.g. ["a", ".*"] becomes /a/{customRegex1}.
 func buildPath(parts []pathPart, appendSlash bool) string {
 	newPath := ""

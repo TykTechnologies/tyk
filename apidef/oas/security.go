@@ -413,8 +413,8 @@ type JWTValidation struct {
 	SigningMethod string `bson:"signingMethod" json:"signingMethod"`
 	// Source is the secret to verify signature, it could be one among:
 	// - a base64 encoded static secret,
-	// - a valid JWK url in plain text,
-	// - a valid JWK url in base64 encoded format.
+	// - a valid JWK URL in plain text,
+	// - a valid JWK URL in base64 encoded format.
 	Source string `bson:"source" json:"source"`
 	// IdentityBaseField is the identity claim name.
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
