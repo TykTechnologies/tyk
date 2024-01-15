@@ -1295,6 +1295,7 @@ type CircuitBreaker struct {
 	HalfOpenStateEnabled bool `bson:"halfOpened" json:"halfOpened"`
 }
 
+// Fill fills *CircuitBreaker from apidef.CircuitBreakerMeta.
 func (cb *CircuitBreaker) Fill(circuitBreaker apidef.CircuitBreakerMeta) {
 	cb.Enabled = !circuitBreaker.Disabled
 	cb.Threshold = circuitBreaker.ThresholdPercent
@@ -1303,6 +1304,7 @@ func (cb *CircuitBreaker) Fill(circuitBreaker apidef.CircuitBreakerMeta) {
 	cb.HalfOpenStateEnabled = !circuitBreaker.DisableHalfOpenState
 }
 
+// ExtractTo extracts *CircuitBreaker into *apidef.CircuitBreakerMeta.
 func (cb *CircuitBreaker) ExtractTo(circuitBreaker *apidef.CircuitBreakerMeta) {
 	circuitBreaker.Disabled = !cb.Enabled
 	circuitBreaker.ThresholdPercent = cb.Threshold
