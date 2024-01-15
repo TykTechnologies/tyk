@@ -41,28 +41,28 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	m.Global.ExtractTo(api)
 }
 
-// Global holds configuration applies globally: CORS and caching.
+// Global contains configuration that affects the whole API (all endpoints).
 type Global struct {
-	// PluginConfig contains the configuration related custom plugin bundles/driver.
+	// PluginConfig contains the common configuration for custom plugins.
 	PluginConfig *PluginConfig `bson:"pluginConfig,omitempty" json:"pluginConfig,omitempty"`
 
-	// CORS contains the configuration related to cross origin resource sharing.
+	// CORS contains the configuration related to Cross Origin Resource Sharing.
 	// Tyk classic API definition: `CORS`.
 	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
 
-	// PrePlugin contains configuration related to custom pre-authentication plugin.
+	// PrePlugin contains configuration related to the custom plugin that is run before authentication.
 	// Tyk classic API definition: `custom_middleware.pre`.
 	PrePlugin *PrePlugin `bson:"prePlugin,omitempty" json:"prePlugin,omitempty"`
 
-	// PostAuthenticationPlugin contains configuration related to custom post authentication plugin.
+	// PostAuthenticationPlugin contains configuration related to the custom plugin that is run immediately after authentication.
 	// Tyk classic API definition: `custom_middleware.post_key_auth`.
 	PostAuthenticationPlugin *PostAuthenticationPlugin `bson:"postAuthenticationPlugin,omitempty" json:"postAuthenticationPlugin,omitempty"`
 
-	// PostPlugin contains configuration related to custom post plugin.
+	// PostPlugin contains configuration related to the custom plugin that is run immediately prior to proxying the request to the upstream.
 	// Tyk classic API definition: `custom_middleware.post`.
 	PostPlugin *PostPlugin `bson:"postPlugin,omitempty" json:"postPlugin,omitempty"`
 
-	// ResponsePlugin contains configuration related to custom post plugin.
+	// ResponsePlugin contains configuration related to the custom plugin that generates a response.
 	// Tyk classic API definition: `custom_middleware.response`.
 	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty"`
 

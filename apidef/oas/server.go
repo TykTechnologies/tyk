@@ -117,14 +117,22 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	s.DetailedActivityLogs.ExtractTo(api)
 }
 
-// ListenPath represents the path the server should listen on.
+// ListenPath is the base path on Tyk to which requests for this API
+// should be sent. Tyk listens out for any requests coming into the host at
+// this path, on the port that Tyk is configured to run on, and processes
+// these accordingly.
 type ListenPath struct {
 	// Value is the value of the listen path e.g. `/api/` or `/` or `/httpbin/`.
 	// Tyk classic API definition: `proxy.listen_path`
 	Value string `bson:"value" json:"value"` // required
-	// Strip removes the inbound listen path in the outgoing request. e.g. `http://acme.com/httpbin/get` where `httpbin`
-	// is the listen path. The `httpbin` listen path which is used to identify the API loaded in Tyk is removed,
-	// and the outbound request would be `http://httpbin.org/get`.
+
+	// Strip removes the inbound listen path (as accessed by the client) when generating the outgoing request (to the upstream service).
+	//
+	// For example, a scenario where the Tyk base address is `http://acme.com/', the listen path is `example/` and the upstream URL is `http://httpbin.org/`:
+	//
+	// - If the client application sends a request to `http://acme.com/example/get` then the request will be proxied to `http://httpbin.org/example/get`
+	// - If stripListenPath is set to `true`, the `example` listen path is removed and the request would be proxied to `http://httpbin.org/get`.
+	//
 	// Tyk classic API definition: `proxy.strip_listen_path`
 	Strip bool `bson:"strip,omitempty" json:"strip,omitempty"`
 }
@@ -141,7 +149,7 @@ func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.StripListenPath = lp.Strip
 }
 
-// ClientCertificates holds a list of client certificates which are allowed to make requests against the server.
+// ClientCertificates contains the configurations related to establishing static mutual TLS beetween the client and Tyk.
 type ClientCertificates struct {
 	// Enabled enables static mTLS for the API.
 	Enabled bool `bson:"enabled" json:"enabled"`
