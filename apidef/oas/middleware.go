@@ -1285,7 +1285,7 @@ type CircuitBreaker struct {
 	// SampleSize is the size of the circuit breaker sampling window. Combining this with `threshold` gives the failure rate required to trip the circuit breaker.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].samples`.
 	SampleSize int `bson:"sampleSize" json:"sampleSize"`
-	// CoolDownPeriod represents the amount of time (in seconds) needed to pass before returning to service.
+	// CoolDownPeriod is the period of time (in seconds) for which the circuit breaker will remain open before returning to service.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].return_to_service_after`.
 	CoolDownPeriod int `bson:"coolDownPeriod" json:"coolDownPeriod"`
 	// HalfOpenStateEnabled allows some requests to pass through the circuit breaker during the cool down period.
