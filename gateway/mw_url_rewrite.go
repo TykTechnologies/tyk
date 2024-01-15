@@ -162,6 +162,7 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 				}
 				if total == setCount {
 					rewriteToPath = triggerOpts.RewriteTo
+					break
 				}
 			}
 		}
@@ -389,11 +390,19 @@ func (m *URLRewriteMiddleware) Name() string {
 	return "URLRewriteMiddleware"
 }
 
-func (m *URLRewriteMiddleware) InitTriggerRx() {
+// InitTriggerRx will go over all defined URLRewrite triggers and initialize them. It
+// will skip disabled triggers, returning true if at least one trigger is enabled.
+func (m *URLRewriteMiddleware) InitTriggerRx() (enabled bool) {
 	// Generate regexp for each special match parameter
 	for verKey := range m.Spec.VersionData.Versions {
 		for pathKey := range m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite {
 			rewrite := m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey]
+
+			if rewrite.Disabled {
+				continue
+			}
+
+			enabled = true
 
 			for trKey := range rewrite.Triggers {
 				tr := rewrite.Triggers[trKey]
@@ -428,15 +437,14 @@ func (m *URLRewriteMiddleware) InitTriggerRx() {
 			m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey] = rewrite
 		}
 	}
+
+	return
 }
 
 func (m *URLRewriteMiddleware) EnabledForSpec() bool {
-	for _, version := range m.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.URLRewrite) > 0 {
-			m.Spec.URLRewriteEnabled = true
-			m.InitTriggerRx()
-			return true
-		}
+	if m.InitTriggerRx() {
+		m.Spec.URLRewriteEnabled = true
+		return true
 	}
 	return false
 }

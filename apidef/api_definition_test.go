@@ -28,6 +28,28 @@ func TestSchema(t *testing.T) {
 	}
 }
 
+func TestStringRegexMap(t *testing.T) {
+	var v StringRegexMap
+	assert.True(t, v.Empty())
+
+	v = StringRegexMap{MatchPattern: ".*"}
+	assert.False(t, v.Empty())
+
+	v = StringRegexMap{Reverse: true}
+	assert.False(t, v.Empty())
+}
+
+func TestRoutingTriggerOptions(t *testing.T) {
+	opts := NewRoutingTriggerOptions()
+
+	assert.NotNil(t, opts.HeaderMatches)
+	assert.NotNil(t, opts.QueryValMatches)
+	assert.NotNil(t, opts.PathPartMatches)
+	assert.NotNil(t, opts.SessionMetaMatches)
+	assert.NotNil(t, opts.RequestContextMatches)
+	assert.Empty(t, opts.PayloadMatches)
+}
+
 func TestEncodeForDB(t *testing.T) {
 	t.Run("EncodeForDB persist schema objects from extended path", func(t *testing.T) {
 		spec := DummyAPI()

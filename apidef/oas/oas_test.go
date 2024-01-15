@@ -203,6 +203,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Samples",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].ReturnToServiceAfter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].DisableHalfOpenState",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Disabled",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].MatchPattern",
