@@ -1275,6 +1275,8 @@ func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
 	meta.SymbolName = e[0].Name
 }
 
+// CircuitBreaker holds configuration for the circuit breaker middleware.
+// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*]`.
 type CircuitBreaker struct {
 	// Enabled enables the Circuit Breaker functionality.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.
