@@ -1077,22 +1077,22 @@ Enabled enables the Circuit Breaker functionality.
 Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.
 
 **Field: `threshold` (`double`)**
-Threshold represents the percentage of requests that can error before the breaker is tripped. This must be a value between 0.0 and 1.0.
+Threshold is the proportion from each `sampleSize` requests that must fail for the breaker to be tripped. This must be a value between 0.0 and 1.0. If `sampleSize` is 100 then a threshold of 0.4 means that the breaker will be tripped if 40 out of every 100 requests fails.
 
 Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].threshold_percent`.
 
 **Field: `sampleSize` (`int`)**
-SampleSize represents the number of samples to take for a circuit breaker window.
+SampleSize is the size of the circuit breaker sampling window. Combining this with `threshold` gives the failure rate required to trip the circuit breaker.
 
 Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].samples`.
 
 **Field: `coolDownPeriod` (`int`)**
-CoolDownPeriod represents the amount of time (in seconds) needed to pass before returning to service.
+CoolDownPeriod is the period of time (in seconds) for which the circuit breaker will remain open before returning to service.
 
 Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].return_to_service_after`.
 
 **Field: `halfOpened` (`boolean`)**
-HalfOpenStateEnabled allows some requests to pass through the circuit breaker during the cool down period.
+HalfOpenStateEnabled , if enabled, allows some requests to pass through the circuit breaker during the cool down period. If Tyk detects that the path is now working, the circuit breaker will be automatically reset and traffic will be resumed to the upstream.
 
 Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disable_half_open_state`.
 
