@@ -1279,7 +1279,7 @@ type CircuitBreaker struct {
 	// Enabled enables the Circuit Breaker functionality.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// Threshold represents the percentage of requests that can error before the breaker is tripped. This must be a value between 0.0 and 1.0.
+	// Threshold is the proportion from each `sampleSize` requests that must fail for the breaker to be tripped. This must be a value between 0.0 and 1.0. If `sampleSize` is 100 then a threshold of 0.4 means that the breaker will be tripped if 40 out of every 100 requests fails.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].threshold_percent`.
 	Threshold float64 `bson:"threshold" json:"threshold"`
 	// SampleSize represents the number of samples to take for a circuit breaker window.
