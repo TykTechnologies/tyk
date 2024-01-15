@@ -789,6 +789,78 @@
         "name"
       ]
     },
+    "X-Tyk-URLRewrite": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "rewriteTo": {
+          "type": "string"
+        },
+        "triggers": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-URLRewriteTrigger"
+            }
+          ]
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-URLRewriteTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "enum": ["any", "all"]
+        },
+        "rewriteTo": {
+          "type": "string"
+        },
+        "rules": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-URLRewriteRule"
+            }
+          ]
+        }
+      },
+      "required": [
+        "condition",
+        "rewriteTo"
+      ]
+    },
+    "X-Tyk-URLRewriteRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "in": {
+          "enum": ["query", "path", "header", "sessionMetadata", "requestContext", "requestBody"]
+        },
+        "name": {
+          "type": "string"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "negate": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "in",
+        "pattern"
+      ]
+    },
     "X-Tyk-EndpointPostPlugin": {
       "type": "object",
       "additionalProperties": false,
@@ -842,6 +914,9 @@
         },
         "circuitBreaker":{
           "$ref": "#/definitions/X-Tyk-CircuitBreaker"
+        },
+        "urlRewrite": {
+          "$ref": "#/definitions/X-Tyk-URLRewrite"
         },
         "postPlugins": {
           "type": "array",

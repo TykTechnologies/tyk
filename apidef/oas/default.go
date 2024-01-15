@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	invalidServerURLFmt          = "Please update %q to be a valid url or pass a valid url with upstreamURL query param"
+	invalidServerURLFmt          = "Please update %q to be a valid URL or pass a valid URL with upstreamURL query param"
 	unsupportedSecuritySchemeFmt = "unsupported security scheme: %s"
 
 	middlewareValidateRequest = "validateRequest"

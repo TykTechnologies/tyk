@@ -81,9 +81,8 @@ const (
 	UnsetAuth     AuthTypeEnum = ""
 
 	// For routing triggers
-	All    RoutingTriggerOnType = "all"
-	Any    RoutingTriggerOnType = "any"
-	Ignore RoutingTriggerOnType = ""
+	All RoutingTriggerOnType = "all"
+	Any RoutingTriggerOnType = "any"
 
 	// Subscription Types
 	GQLSubscriptionUndefined   SubscriptionType = ""
@@ -234,6 +233,11 @@ type StringRegexMap struct {
 	matchRegex   *regexp.Regexp
 }
 
+// Empty is a utility function that returns true if the value is empty.
+func (r StringRegexMap) Empty() bool {
+	return r.MatchPattern == "" && !r.Reverse
+}
+
 type RoutingTriggerOptions struct {
 	HeaderMatches         map[string]StringRegexMap `bson:"header_matches" json:"header_matches"`
 	QueryValMatches       map[string]StringRegexMap `bson:"query_val_matches" json:"query_val_matches"`
@@ -243,6 +247,18 @@ type RoutingTriggerOptions struct {
 	PayloadMatches        StringRegexMap            `bson:"payload_matches" json:"payload_matches"`
 }
 
+// NewRoutingTriggerOptions allocates the maps inside RoutingTriggerOptions.
+func NewRoutingTriggerOptions() RoutingTriggerOptions {
+	return RoutingTriggerOptions{
+		HeaderMatches:         make(map[string]StringRegexMap),
+		QueryValMatches:       make(map[string]StringRegexMap),
+		PathPartMatches:       make(map[string]StringRegexMap),
+		SessionMetaMatches:    make(map[string]StringRegexMap),
+		RequestContextMatches: make(map[string]StringRegexMap),
+		PayloadMatches:        StringRegexMap{},
+	}
+}
+
 type RoutingTrigger struct {
 	On        RoutingTriggerOnType  `bson:"on" json:"on"`
 	Options   RoutingTriggerOptions `bson:"options" json:"options"`
@@ -250,6 +266,7 @@ type RoutingTrigger struct {
 }
 
 type URLRewriteMeta struct {
+	Disabled     bool             `bson:"disabled" json:"disabled"`
 	Path         string           `bson:"path" json:"path"`
 	Method       string           `bson:"method" json:"method"`
 	MatchPattern string           `bson:"match_pattern" json:"match_pattern"`
