@@ -1282,7 +1282,7 @@ type CircuitBreaker struct {
 	// Threshold is the proportion from each `sampleSize` requests that must fail for the breaker to be tripped. This must be a value between 0.0 and 1.0. If `sampleSize` is 100 then a threshold of 0.4 means that the breaker will be tripped if 40 out of every 100 requests fails.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].threshold_percent`.
 	Threshold float64 `bson:"threshold" json:"threshold"`
-	// SampleSize represents the number of samples to take for a circuit breaker window.
+	// SampleSize is the size of the circuit breaker sampling window. Combining this with `threshold` gives the failure rate required to trip the circuit breaker.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].samples`.
 	SampleSize int `bson:"sampleSize" json:"sampleSize"`
 	// CoolDownPeriod represents the amount of time (in seconds) needed to pass before returning to service.
