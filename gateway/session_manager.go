@@ -61,6 +61,8 @@ func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl
 		bucketStore: memorycache.New(),
 	}
 
+	log.Infof("[RATELIMIT] %s", conf.RateLimit.String())
+
 	storageConf := conf.GetRateLimiterStorage()
 
 	switch storageConf.Type {
