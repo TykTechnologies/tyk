@@ -840,6 +840,9 @@
         "virtualEndpoint": {
           "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
         },
+        "circuitBreaker":{
+          "$ref": "#/definitions/X-Tyk-CircuitBreaker"
+        },
         "postPlugins": {
           "type": "array",
           "items": [
@@ -1528,7 +1531,7 @@
           "type": "integer",
           "minimum": 0
         },
-        "halfOpenStateEnabled": {
+        "halfOpened": {
           "type": "boolean"
         }
       },
@@ -1537,7 +1540,7 @@
         "threshold",
         "sampleSize",
         "coolDownPeriod",
-        "halfOpenStateEnabled"
+        "halfOpened"
       ]
     }
   }
