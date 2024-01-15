@@ -13,12 +13,11 @@ type URLRewrite struct {
 	// Enabled enables URL rewriting if set to true.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// Pattern is the regular expression to match values against. If a value matches the
-	// defined pattern, the URL rewrite is triggered for the rule.
+	// Pattern is the regular expression against which the request URL is compared for the primary rewrite check.
+	// If this matches the defined pattern, the primary URL rewrite is triggered.
 	Pattern string `bson:"pattern,omitempty" json:"pattern,omitempty"`
 
-	// RewriteTo specifies a URL to rewrite the request to, if the
-	// embedded URL rewrite rule is a match.
+	// RewriteTo specifies the URL to which the request shall be rewritten if the primary URL rewrite is triggered.
 	RewriteTo string `bson:"rewriteTo,omitempty" json:"rewriteTo,omitempty"`
 
 	// Triggers contain advanced additional triggers for the URL rewrite.
@@ -78,18 +77,19 @@ var (
 
 // URLRewriteTrigger represents a set of matching rules for a rewrite.
 type URLRewriteTrigger struct {
-	// Condition represents a boolean operator for rules.
+	// Condition indicates the logical combination that will be applied to the rules for an advanced trigger:
 	//
 	// - Value `any` means any of the defined trigger rules may match
 	// - Value `all` means all the defined trigger rules must match
 	Condition URLRewriteCondition `bson:"condition" json:"condition"`
 
-	// Rules contain conditional triggers for URL rewriting.
-	// If empty, it enables non-conditional rewrites.
+	// Rules contain individual checks that are combined according to the
+	// `condition` to determine whether the URL rewrite will be triggered.
+	// If empty, the trigger is ignored.
 	Rules []*URLRewriteRule `bson:"rules,omitempty" json:"rules,omitempty"`
 
-	// RewriteTo specifies a URL to rewrite the request to, if the
-	// conditions match.
+	// RewriteTo specifies the URL to which the request shall be rewritten
+	// if indicated by the combination of `condition` and `rules`.
 	RewriteTo string `bson:"rewriteTo" json:"rewriteTo"`
 }
 
@@ -97,18 +97,29 @@ type URLRewriteTrigger struct {
 type URLRewriteRule struct {
 	// In specifies one of the valid inputs for URL rewriting.
 	// By default, it uses `url` as the input source.
+	//
+	// The following values are valid:
+	//
+	// - `url`, match pattern against URL
+	// - `query`, match pattern against named query parameter value
+	// - `path`, match pattern against named path parameter value
+	// - `header`, match pattern against named header value
+	// - `sessionMetadata`, match pattern against session metadata
+	// - `requestBody`, match pattern against request body
+	// - `requestContext`, match pattern against request context
 	In URLRewriteInput `bson:"in" json:"in"`
 
-	// Name is the index in the inputs. It is ignored for InputRequestBody
-	// as it contains only a single value, while the others are objects.
+	// Name is the index in the input identified in `in` that should be used to
+	// locate the value for this rule. `Name` is ignored for `InputRequestBody`
+	// rules as it contains only a single value, while the others are objects.
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
 
-	// Pattern is the regular expression to match values against. If a value matches the
-	// defined pattern, the URL rewrite is triggered for the rule.
+	// Pattern is the regular expression against which the `in` values are compared for this rule check.
+	// If the value matches the defined `pattern`, the URL rewrite is triggered for this rule.
 	Pattern string `bson:"pattern" json:"pattern"`
 
-	// Negate is a boolean negation operator. Setting it to true allows to negate
-	// the match if any, allowing for a "match all except <pattern>" style matching.
+	// Negate is a boolean negation operator. Setting it to true inverts the matching behaviour
+	// such that the rewrite will be triggered if the value does not match the `pattern` for this rule.
 	Negate bool `bson:"negate,omitempty" json:"negate,omitempty"`
 }
 
