@@ -110,8 +110,8 @@ type URLRewriteRule struct {
 	In URLRewriteInput `bson:"in" json:"in"`
 
 	// Name is the index in the input identified in `in` that should be used to
-	// locate the value for this rule. `Name` is ignored for `InputRequestBody`
-	// rules as it contains only a single value, while the others are objects.
+	// locate the value for this rule. When `in` is set to `requestBody`, the
+	// value is ignored.
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
 
 	// Pattern is the regular expression against which the `in` values are compared for this rule check.
