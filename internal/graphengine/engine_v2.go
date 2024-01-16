@@ -15,19 +15,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
-/*
-type EngineV2 struct {
-	HttpClient      *http.Client
-	StreamingClient *http.Client
-}
-
-type EngineV2Options struct {
-	logger          *logrus.Logger
-	apiDefinition   *apidef.APIDefinition
-	HttpClient      *http.Client
-	StreamingClient *http.Client
-}*/
-
 type EngineV2OTelConfig struct {
 	Enabled        bool
 	Config         otel.OpenTelemetry
@@ -164,6 +151,14 @@ func NewEngineV2(options EngineV2Options) (*EngineV2, error) {
 			cancel()
 			return nil, err
 		}
+
+		otelRequestProcessor := &graphqlRequestProcessorWithOTelV1{
+			logger:             logger,
+			schema:             parsedSchema,
+			otelExecutor:       executor,
+			ctxRetrieveRequest: options.ContextRetrieveRequest,
+		}
+		engineV2.graphqlRequestProcessor = otelRequestProcessor
 		engineV2.OpenTelemetry.Executor = executor
 	}
 
@@ -179,18 +174,30 @@ func (e EngineV2) HasSchema() bool {
 }
 
 func (e EngineV2) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.Request) (err error, statusCode int) {
-	//TODO implement me
-	panic("implement me")
+	var gqlRequest graphql.Request
+	err = graphql.UnmarshalRequest(r.Body, &gqlRequest)
+	if err != nil {
+		e.logger.Debug("error while unmarshalling GraphQL request", abstractlogger.Error(err))
+		return err, http.StatusBadRequest
+	}
+
+	defer e.ctxStoreRequestFunc(r, &gqlRequest)
+	if e.OpenTelemetry.Enabled && e.ApiDefinition.DetailedTracing {
+		ctx, span := e.OpenTelemetry.TracerProvider.Tracer().Start(r.Context(), "GraphqlMiddleware Validation")
+		defer span.End()
+		*r = *r.WithContext(ctx)
+	}
+
+	return e.graphqlRequestProcessor.ProcessRequest(r.Context(), w, r)
 }
 
 func (e EngineV2) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int) {
-	//TODO implement me
-	panic("implement me")
+	return complexityFailReasonAsHttpStatusCode(e.complexityChecker.DepthLimitExceeded(r, accessDefinition))
 }
 
 func (e EngineV2) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int) {
-	//TODO implement me
-	panic("implement me")
+	result := e.granularAccessChecker.CheckGraphQLRequestFieldAllowance(w, r, accessDefinition)
+	return granularAccessFailReasonAsHttpStatusCode(e.logger, &result, w)
 }
 
 func (e EngineV2) HandleReverseProxy(params ReverseProxyParams) (res *http.Response, hijacked bool, err error) {

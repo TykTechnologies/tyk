@@ -741,7 +741,7 @@ func newTestGraphqlRequestProcessorV1(t *testing.T) *graphqlRequestProcessorV1 {
 	}
 }
 
-func newTestGraphqlRequestProcessorWithOtelV1(t *testing.T) *graphqlRequestProcessorWithOtelV1 {
+func newTestGraphqlRequestProcessorWithOtelV1(t *testing.T) *graphqlRequestProcessorWithOTelV1 {
 	gqlTools := graphqlGoToolsV1{}
 	parsedSchema, err := gqlTools.parseSchema(testSchemaEngineV1)
 	require.NoError(t, err)
@@ -755,7 +755,7 @@ func newTestGraphqlRequestProcessorWithOtelV1(t *testing.T) *graphqlRequestProce
 	otelExecutor, err := internalgraphql.NewOtelGraphqlEngineV2Basic(traceProvider, executionEngineV2)
 	require.NoError(t, err)
 
-	return &graphqlRequestProcessorWithOtelV1{
+	return &graphqlRequestProcessorWithOTelV1{
 		logger:             abstractlogger.NoopLogger,
 		schema:             parsedSchema,
 		ctxRetrieveRequest: nil,

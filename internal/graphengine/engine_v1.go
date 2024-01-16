@@ -123,28 +123,11 @@ func (e *EngineV1) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.
 	var gqlRequest graphql.Request
 	err = graphql.UnmarshalRequest(r.Body, &gqlRequest)
 	if err != nil {
-		//m.Logger().Debugf("Error while unmarshalling GraphQL request: '%s'", err)
 		e.logger.Debug("error while unmarshalling GraphQL request", abstractlogger.Error(err))
 		return err, http.StatusBadRequest
 	}
 
 	defer e.ctxStoreRequestFunc(r, &gqlRequest)
-	if e.OTelConfig.Enabled && e.ApiDefinition.DetailedTracing {
-		// REMOVE FOR V1
-		/*ctx, span := e.OTelTracerProvider.Tracer().Start(r.Context(), "GraphqlMiddleware Validation")
-		defer span.End()
-		*r = *r.WithContext(ctx)
-		//return e.gqlTools.validateRequestWithOtel(r.Context(), w, &gqlRequest)
-		return e.gqlTools.validateRequestWithOtel(validateRequestWithOtelV1Params{
-			logger:       e.logger,
-			ctx:          r.Context(),
-			w:            w,
-			gqlRequest:   &gqlRequest,
-			otelExecutor: nil,
-		})*/
-		// END REMOVE FOR v1
-	}
-
 	return e.graphqlRequestProcessor.ProcessRequest(r.Context(), w, r)
 }
 
