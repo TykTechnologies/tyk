@@ -1020,7 +1020,7 @@ The following values are valid:
 - `requestContext`, match pattern against request context
 
 **Field: `name` (`string`)**
-Name is the index in the input identified in `in` that should be used to locate the value for this rule. `Name` is ignored for `InputRequestBody`rules as it contains only a single value, while the others are objects.
+Name is the index in the input identified in `in` that should be used to locate the value for this rule. When `in` is set to `requestBody`, the value is ignored.
 
 **Field: `pattern` (`string`)**
 Pattern is the regular expression against which the `in` values are compared for this rule check.
