@@ -185,14 +185,14 @@ func (g *graphqlRequestProcessorV1) ProcessRequest(ctx context.Context, w http.R
 	return nil, http.StatusOK
 }
 
-type graphqlRequestProcessorWithOtelV1 struct {
+type graphqlRequestProcessorWithOTelV1 struct {
 	logger             abstractlogger.Logger
 	schema             *graphql.Schema
 	otelExecutor       internalgraphql.TykOtelExecutorI
 	ctxRetrieveRequest ContextRetrieveRequestV1Func
 }
 
-func (g *graphqlRequestProcessorWithOtelV1) ProcessRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) (error, int) {
+func (g *graphqlRequestProcessorWithOTelV1) ProcessRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) (error, int) {
 	if r == nil {
 		g.logger.Error("request is nil")
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
