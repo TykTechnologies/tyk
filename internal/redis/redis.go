@@ -1,5 +1,7 @@
 // The package redis serves as a refactoring aid. The complete gateway depends
 // on this package, and lists the symbols from the upstream dependency in use.
+//
+// nolint:revive
 package redis
 
 import (
