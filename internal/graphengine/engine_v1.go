@@ -72,7 +72,7 @@ func NewEngineV1(options EngineV1Options) (*EngineV1, error) {
 		return nil, err
 	}
 
-	requestProcessor := graphqlRequestProcessorV1{
+	requestProcessor := &graphqlRequestProcessorV1{
 		logger:             logger,
 		schema:             parsedSchema,
 		ctxRetrieveRequest: options.ContextRetrieveRequest,
@@ -106,7 +106,7 @@ func NewEngineV1(options EngineV1Options) (*EngineV1, error) {
 		OTelTracerProvider:      options.OTelTracerProvider,
 		logger:                  logger,
 		gqlTools:                gqlTools,
-		graphqlRequestProcessor: &requestProcessor,
+		graphqlRequestProcessor: requestProcessor,
 		complexityChecker:       complexityChecker,
 		granularAccessChecker:   granularAccessChecker,
 		reverseProxyPreHandler:  reverseProxyPreHandler,
