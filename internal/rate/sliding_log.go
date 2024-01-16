@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/TykTechnologies/tyk/internal/redis"
 )
 
 // SlidingLog implements sliding log storage in redis.
@@ -81,7 +81,7 @@ func (r *SlidingLog) SetCount(ctx context.Context, now time.Time, keyName string
 		pipe.ZRemRangeByScore(ctx, keyName, "-inf", strconv.Itoa(int(onePeriodAgo.UnixNano())))
 		res = pipe.ZCard(ctx, keyName)
 
-		element := &redis.Z{
+		element := redis.Z{
 			Score:  float64(now.UnixNano()),
 			Member: strconv.Itoa(int(now.UnixNano())),
 		}
@@ -131,12 +131,10 @@ func (r *SlidingLog) Set(ctx context.Context, now time.Time, keyName string, per
 		pipe.ZRemRangeByScore(ctx, keyName, "-inf", strconv.Itoa(int(onePeriodAgo.UnixNano())))
 		res = pipe.ZRange(ctx, keyName, 0, -1)
 
-		element := &redis.Z{
+		element := redis.Z{
 			Score:  float64(now.UnixNano()),
 			Member: strconv.Itoa(int(now.UnixNano())),
 		}
-
-		element.Member = strconv.Itoa(int(now.UnixNano()))
 
 		pipe.ZAdd(ctx, keyName, element)
 		pipe.Expire(ctx, keyName, time.Duration(per)*time.Second)
