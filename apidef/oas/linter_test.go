@@ -55,6 +55,9 @@ func TestXTykGateway_Lint(t *testing.T) {
 		settings.Server.Authentication.SecuritySchemes = map[string]interface{}{
 			"test-basic": securityScheme,
 		}
+		for idx, _ := range settings.Middleware.Operations {
+			settings.Middleware.Operations[idx].CircuitBreaker.Threshold = 0.5
+		}
 	}
 
 	// Encode data to json

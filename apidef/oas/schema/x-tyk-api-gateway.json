@@ -912,6 +912,9 @@
         "virtualEndpoint": {
           "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
         },
+        "circuitBreaker":{
+          "$ref": "#/definitions/X-Tyk-CircuitBreaker"
+        },
         "urlRewrite": {
           "$ref": "#/definitions/X-Tyk-URLRewrite"
         },
@@ -1582,6 +1585,38 @@
           "type": "boolean"
         }
       }
+    },
+    "X-Tyk-CircuitBreaker": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "multipleOf": 0.01
+        },
+        "sampleSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coolDownPeriod": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "halfOpened": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "threshold",
+        "sampleSize",
+        "coolDownPeriod",
+        "halfOpened"
+      ]
     }
   }
 }

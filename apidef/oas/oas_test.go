@@ -197,6 +197,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Filter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Disabled",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].ThresholdPercent",
