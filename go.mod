@@ -80,7 +80,7 @@ require (
 require (
 	github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231219151617-0c4f9315fe5c
 	github.com/go-redsync/redsync/v4 v4.11.0
-	github.com/redis/go-redis/v9 v9.3.1
+	github.com/redis/go-redis/v9 v9.4.0
 )
 
 require (
