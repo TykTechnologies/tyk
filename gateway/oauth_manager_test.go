@@ -16,10 +16,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/go-redis/redismock/v8"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -1403,7 +1403,7 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 			gw.SetConfig(config.Config{
 				OauthTokenExpiredRetainPeriod: 1,
 			})
-			db, mock := redismock.NewClientMock()
+			db, mock := redis.NewClientMock()
 			redisController := storage.NewRedisController(context.Background())
 			redisController.MockWith(db, true)
 			gw.RedisController = redisController
@@ -1417,7 +1417,7 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 			gw.SetConfig(config.Config{
 				OauthTokenExpiredRetainPeriod: 1,
 			})
-			db, mock := redismock.NewClientMock()
+			db, mock := redis.NewClientMock()
 			redisController := storage.NewRedisController(context.Background())
 			redisController.MockWith(db, true)
 			gw.RedisController = redisController
@@ -1431,7 +1431,7 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 			gw.SetConfig(config.Config{
 				OauthTokenExpiredRetainPeriod: 1,
 			})
-			db, mock := redismock.NewClientMock()
+			db, mock := redis.NewClientMock()
 			redisController := storage.NewRedisController(context.Background())
 			redisController.MockWith(db, true)
 			gw.RedisController = redisController
@@ -1475,7 +1475,6 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 		DialTimeout:  timeout,
 		ReadTimeout:  timeout,
 		WriteTimeout: timeout,
-		IdleTimeout:  240 * timeout,
 		PoolSize:     500,
 	}
 
@@ -1483,9 +1482,9 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 		ctx := context.Background()
 		now := time.Now()
 		nowTs := now.Unix()
-		var setMembers []*redis.Z
+		var setMembers []redis.Z
 		for k := 0; k < count; k++ {
-			setMembers = append(setMembers, &redis.Z{
+			setMembers = append(setMembers, redis.Z{
 				Score:  float64(nowTs - int64(k)),
 				Member: fmt.Sprintf("dummy-value-%d", k),
 			})
@@ -1493,7 +1492,7 @@ func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
 
 		// add 10 more tokens to be not expired
 		for k := 0; k < count/10; k++ {
-			setMembers = append(setMembers, &redis.Z{
+			setMembers = append(setMembers, redis.Z{
 				Score:  float64(nowTs + int64((k)*1000)),
 				Member: fmt.Sprintf("dummy-value-%d", k),
 			})

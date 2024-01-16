@@ -1,10 +1,9 @@
 package rate
 
 import (
-	"github.com/redis/go-redis/v9"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/rate/limiter"
+	"github.com/TykTechnologies/tyk/internal/redis"
 )
 
 func Limiter(gwConfig *config.Config, redis redis.UniversalClient) limiter.LimiterFunc {

@@ -7,11 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/go-redis/redismock/v8"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/redis"
 )
 
 var rc *RedisController
@@ -249,7 +248,7 @@ func TestCheckIsOpen(t *testing.T) {
 
 func TestLock(t *testing.T) {
 	t.Run("redis down", func(t *testing.T) {
-		db, _ := redismock.NewClientMock()
+		db, _ := redis.NewClientMock()
 		redisCluster := &RedisCluster{
 			RedisController: &RedisController{
 				ctx:        context.Background(),
@@ -277,7 +276,7 @@ func TestLock(t *testing.T) {
 	})
 
 	t.Run("lock success", func(t *testing.T) {
-		db, mock := redismock.NewClientMock()
+		db, mock := redis.NewClientMock()
 		mock.ExpectSetNX("lock-key", "1", time.Second).SetVal(true)
 
 		redisCluster := &RedisCluster{
@@ -294,7 +293,7 @@ func TestLock(t *testing.T) {
 	})
 
 	t.Run("lock failure", func(t *testing.T) {
-		db, mock := redismock.NewClientMock()
+		db, mock := redis.NewClientMock()
 		mock.ExpectSetNX("lock-key", "1", time.Second).SetVal(false)
 
 		redisCluster := &RedisCluster{
@@ -311,7 +310,7 @@ func TestLock(t *testing.T) {
 	})
 
 	t.Run("lock error", func(t *testing.T) {
-		db, mock := redismock.NewClientMock()
+		db, mock := redis.NewClientMock()
 		mock.ExpectSetNX("lock-key", "1", time.Second).SetErr(errors.ErrUnsupported)
 
 		redisCluster := &RedisCluster{
