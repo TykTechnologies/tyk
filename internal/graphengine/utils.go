@@ -7,6 +7,7 @@ import (
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
 )
 
@@ -82,4 +83,8 @@ func greaterThanIntConsideringUnlimited(first, second int) bool {
 	}
 
 	return first > second
+}
+
+func isSupergraphAPIDefinition(apiDefinition *apidef.APIDefinition) bool {
+	return apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
 }
