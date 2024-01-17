@@ -75,6 +75,31 @@ func TestOtelGraphqlEngineV2Detailed_Normalize(t *testing.T) {
 		assert.NoError(t, err)
 		engine.SetContext(context.Background())
 
+		result := request.IsNormalized()
+		assert.False(t, result)
+
+		err = engine.Normalize(&request)
+		assert.NoError(t, err)
+	})
+
+	t.Run("already normalized", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockExecutor := NewMockExecutionEngineI(ctrl)
+		mockExecutor.EXPECT().Normalize(gomock.Any()).MaxTimes(1).Return(nil)
+
+		normalizeRequest, err := request.Normalize(schema)
+		assert.NoError(t, err)
+		assert.True(t, normalizeRequest.Successful)
+
+		engine, err := NewOtelGraphqlEngineV2Detailed(tracerProvider, mockExecutor, schema)
+		assert.NoError(t, err)
+		engine.SetContext(context.Background())
+
+		result := request.IsNormalized()
+		assert.True(t, result)
+
 		err = engine.Normalize(&request)
 		assert.NoError(t, err)
 	})
@@ -155,6 +180,31 @@ func TestOtelGraphqlEngineV2Detailed_ValidateForSchema(t *testing.T) {
 		engine, err := NewOtelGraphqlEngineV2Detailed(tracerProvider, mockExecutor, schema)
 		assert.NoError(t, err)
 		engine.SetContext(context.Background())
+
+		result := request.IsValidated(schema)
+		assert.False(t, result)
+
+		err = engine.ValidateForSchema(&request)
+		assert.NoError(t, err)
+	})
+
+	t.Run("already validated", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockExecutor := NewMockExecutionEngineI(ctrl)
+		mockExecutor.EXPECT().ValidateForSchema(gomock.Any()).MaxTimes(1).Return(nil)
+
+		validateSchema, err := request.ValidateForSchema(schema)
+		assert.NoError(t, err)
+		assert.True(t, validateSchema.Valid)
+
+		engine, err := NewOtelGraphqlEngineV2Detailed(tracerProvider, mockExecutor, schema)
+		assert.NoError(t, err)
+		engine.SetContext(context.Background())
+
+		result := request.IsValidated(schema)
+		assert.True(t, result)
 
 		err = engine.ValidateForSchema(&request)
 		assert.NoError(t, err)
