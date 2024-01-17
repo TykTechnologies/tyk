@@ -25,7 +25,7 @@ fi
 api-spec-converter --from=swagger_2 --to=openapi_3 --syntax=yaml "$swagger2fileName" > "$tempOpenAPIFileName"
 
 if [ $? -ne 0 ]; then
-	fatal "could not convert swagger2.0 spec to opeenapi 3.0"
+	fatal "failed to convert Swagger 2.0 spec to OpenAPI 3.0"
 fi
 
 ## clean up
