@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=tykio/golang-cross:1.21-bookworm
+ARG BASE_IMAGE=754489498669.dkr.ecr.eu-central-1.amazonaws.com/tykio/golang-cross:1.21-bookworm
 FROM ${BASE_IMAGE}
 
 LABEL description="Image for plugin development"
@@ -17,6 +17,7 @@ RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby* pyt
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 ADD go.mod go.sum $TYK_GW_PATH
+ARG BASE_IMAGE=754489498669.dkr.ecr.eu-central-1.amazonaws.com/tykio/golang-cross:1.21-bookworm
 WORKDIR $TYK_GW_PATH
 
 RUN --mount=type=cache,mode=0755,target=/go/pkg/mod go mod download
