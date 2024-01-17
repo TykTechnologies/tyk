@@ -177,6 +177,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTransformResponseBodyTo(ep, path, method)
 					tykOp.extractTransformRequestHeadersTo(ep, path, method)
 					tykOp.extractTransformResponseHeadersTo(ep, path, method)
+					tykOp.extractURLRewriteTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
 					tykOp.extractVirtualEndpointTo(ep, path, method)
@@ -218,22 +219,6 @@ func newAllowance(prev **Allowance) *Allowance {
 	}
 
 	return *prev
-}
-
-func (s *OAS) fillURLRewrite(metas []apidef.URLRewriteMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
-
-		if operation.URLRewrite == nil {
-			operation.URLRewrite = &URLRewrite{}
-		}
-
-		operation.URLRewrite.Fill(meta)
-		if ShouldOmit(operation.URLRewrite) {
-			operation.URLRewrite = nil
-		}
-	}
 }
 
 func (s *OAS) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {

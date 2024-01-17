@@ -277,3 +277,28 @@ func (i URLRewriteInput) Err() error {
 	}
 	return nil
 }
+
+func (s *OAS) fillURLRewrite(metas []apidef.URLRewriteMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		if operation.URLRewrite == nil {
+			operation.URLRewrite = &URLRewrite{}
+		}
+
+		operation.URLRewrite.Fill(meta)
+		if ShouldOmit(operation.URLRewrite) {
+			operation.URLRewrite = nil
+		}
+	}
+}
+
+func (o *Operation) extractURLRewriteTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.URLRewrite == nil {
+		return
+	}
+
+	meta := apidef.URLRewriteMeta{Path: path, Method: method}
+	o.URLRewrite.ExtractTo(&meta)
+}
