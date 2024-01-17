@@ -1,0 +1,14 @@
+---
+version: "3"
+
+tasks:
+  default:
+    desc: "Run tests with dev image"
+    env:
+      GATEWAY_IMAGE: internal/tyk-gateway
+    cmds:
+      - defer: docker compose down --remove-orphans
+      - docker compose up -d --wait --force-recreate
+      - docker compose logs -f &
+      - 'curl -s --retry 5 --retry-delay 10 --retry-connrefused -XGET -H "Accept: application/json" "http://localhost:8080/smoke-test-api/status/200"'
+      - 'curl -s --retry 5 --retry-delay 10 --retry-connrefused -XGET -H "Accept: application/json" "http://localhost:8080/smoke-test-api/get?arg=test"'
