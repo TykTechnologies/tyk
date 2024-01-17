@@ -29,7 +29,7 @@ if [ $? -ne 0 ]; then
 fi
 
 ## clean up
-rm "$swagger2fileName"
+rm "swagger2.yaml"
 
 ## If running this on macOS, you might need to change sed to gsed
 
