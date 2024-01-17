@@ -93,6 +93,10 @@ linters-settings:
     severity: error
     enable-all-rules: false
     rules:
+      - name: unused-parameter
+        disabled: false
+        arguments:
+          - allowRegex: "^_"
       - name: exported
         disabled: false
 
