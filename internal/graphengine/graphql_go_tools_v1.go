@@ -10,6 +10,8 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
+	"github.com/buger/jsonparser"
 	"github.com/jensneuse/abstractlogger"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -36,7 +38,8 @@ type createExecutionEngineV1Params struct {
 	postReceiveHttpHook datasource.PostReceiveHttpHook
 }
 
-// graphqlGoToolsV1 is a stateless utility struct that abstracts graphql-go-tools/v1 functionality.
+// graphqlGoToolsV1 is a stateless utility struct that abstracts graphql-go-tools/v1 functionality. Also
+// useful for namespacing.
 type graphqlGoToolsV1 struct{}
 
 func (g graphqlGoToolsV1) parseSchema(schema string) (*graphql.Schema, error) {
@@ -55,6 +58,62 @@ func (g graphqlGoToolsV1) parseSchema(schema string) (*graphql.Schema, error) {
 	}
 
 	return parsedSchema, nil
+}
+
+func (g graphqlGoToolsV1) handleIntrospection(schema *graphql.Schema) (res *http.Response, hijacked bool, err error) {
+	var result *graphql.ExecutionResult
+	result, err = graphql.SchemaIntrospection(schema)
+	if err != nil {
+		return
+	}
+
+	res = result.GetAsHTTPResponse()
+	return
+}
+
+func (g graphqlGoToolsV1) headerModifier(outreq *http.Request, additionalHeaders http.Header, variableReplacer TykVariableReplacer) postprocess.HeaderModifier {
+	return func(header http.Header) {
+		for key := range additionalHeaders {
+			if header.Get(key) == "" {
+				header.Set(key, additionalHeaders.Get(key))
+			}
+		}
+
+		for key := range header {
+			val := variableReplacer(outreq, header.Get(key), false)
+			header.Set(key, val)
+		}
+	}
+}
+
+func (g graphqlGoToolsV1) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWriter *graphql.EngineResultWriter, seekReadCloser SeekReadCloserFunc) error {
+	/*body, ok := proxyOnlyCtx.upstreamResponse.Body.(*nopCloserBuffer)
+	if !ok {
+		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
+		return nil
+	}
+	_, err := body.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}*/
+	body, err := seekReadCloser(proxyOnlyCtx.upstreamResponse.Body)
+	if err != nil {
+		return err
+	}
+
+	responseBody, err := io.ReadAll(body)
+	if err != nil {
+		return err
+	}
+	// graphql-go-tools error message format: {"errors": [...]}
+	// Insert the upstream error into the first error message.
+	result, err := jsonparser.Set(resultWriter.Bytes(), responseBody, "errors", "[0]", "extensions")
+	if err != nil {
+		return err
+	}
+	resultWriter.Reset()
+	_, err = resultWriter.Write(result)
+	return err
 }
 
 func (g graphqlGoToolsV1) createExecutionEngine(params createExecutionEngineV1Params) (*graphql.ExecutionEngine, error) {
@@ -414,11 +473,17 @@ type reverseProxyPreHandlerV1 struct {
 	ctxRetrieveGraphQLRequest ContextRetrieveRequestV1Func
 	apiDefinition             *apidef.APIDefinition
 	httpClient                *http.Client
-	transportModifier         TransportModifier
+	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
 }
 
 func (r *reverseProxyPreHandlerV1) PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error) {
-	r.httpClient.Transport = r.transportModifier(params.RoundTripper, r.apiDefinition)
+	//r.httpClient.Transport = r.transportModifier(params.RoundTripper, r.apiDefinition)
+	r.httpClient.Transport = NewGraphQLEngineTransport(
+		DetermineGraphQLEngineTransportType(r.apiDefinition),
+		params.RoundTripper,
+		r.newReusableBodyReadCloser,
+	)
+
 	gqlRequest := r.ctxRetrieveGraphQLRequest(params.OutRequest)
 	if gqlRequest == nil {
 		err = errors.New("graphql request is nil")

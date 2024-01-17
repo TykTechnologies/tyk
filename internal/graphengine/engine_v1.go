@@ -3,7 +3,6 @@ package graphengine
 import (
 	"context"
 	"errors"
-	"net"
 	"net/http"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
@@ -14,40 +13,38 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
-type EngineV1 struct {
-	ExecutionEngine    *graphql.ExecutionEngine
-	Schema             *graphql.Schema
-	ApiDefinition      *apidef.APIDefinition
-	HttpClient         *http.Client
-	OTelConfig         otel.OpenTelemetry
-	OTelTracerProvider otel.TracerProvider
+type EngineV1Injections struct {
+	PreSendHttpHook           datasource.PreSendHttpHook
+	PostReceiveHttpHook       datasource.PostReceiveHttpHook
+	ContextStoreRequest       ContextStoreRequestV1Func
+	ContextRetrieveRequest    ContextRetrieveRequestV1Func
+	NewReusableBodyReadCloser NewReusableBodyReadCloserFunc
+}
 
-	logger                  abstractlogger.Logger
-	gqlTools                graphqlGoToolsV1
-	graphqlRequestProcessor GraphQLRequestProcessor
-	complexityChecker       ComplexityChecker
-	granularAccessChecker   GranularAccessChecker
-	reverseProxyPreHandler  ReverseProxyPreHandler
-	ctxStoreRequestFunc     func(r *http.Request, gqlRequest *graphql.Request)
-	ctxRetrieveRequestFunc  func(r *http.Request) *graphql.Request
-	engineTransportModifier TransportModifier
+type EngineV1 struct {
+	ExecutionEngine *graphql.ExecutionEngine
+	Schema          *graphql.Schema
+	ApiDefinition   *apidef.APIDefinition
+	HttpClient      *http.Client
+
+	logger                    abstractlogger.Logger
+	gqlTools                  graphqlGoToolsV1
+	graphqlRequestProcessor   GraphQLRequestProcessor
+	complexityChecker         ComplexityChecker
+	granularAccessChecker     GranularAccessChecker
+	reverseProxyPreHandler    ReverseProxyPreHandler
+	ctxStoreRequestFunc       func(r *http.Request, gqlRequest *graphql.Request)
+	ctxRetrieveRequestFunc    func(r *http.Request) *graphql.Request
+	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
 }
 
 type EngineV1Options struct {
-	Logger                  *logrus.Logger
-	ApiDefinition           *apidef.APIDefinition
-	HttpClient              *http.Client
-	OTelConfig              otel.OpenTelemetry
-	OTelTracerProvider      otel.TracerProvider
-	PreSendHttpHook         datasource.PreSendHttpHook
-	PostReceiveHttpHook     datasource.PostReceiveHttpHook
-	ContextStoreRequest     ContextStoreRequestV1Func
-	ContextRetrieveRequest  ContextRetrieveRequestV1Func
-	EngineTransportModifier TransportModifier
+	Logger        *logrus.Logger
+	ApiDefinition *apidef.APIDefinition
+	HttpClient    *http.Client
+	Injections    EngineV1Injections
 }
 
 func NewEngineV1(options EngineV1Options) (*EngineV1, error) {
@@ -64,8 +61,8 @@ func NewEngineV1(options EngineV1Options) (*EngineV1, error) {
 		apiDef:              options.ApiDefinition,
 		schema:              parsedSchema,
 		httpClient:          options.HttpClient,
-		preSendHttpHook:     options.PreSendHttpHook,
-		postReceiveHttpHook: options.PostReceiveHttpHook,
+		preSendHttpHook:     options.Injections.PreSendHttpHook,
+		postReceiveHttpHook: options.Injections.PostReceiveHttpHook,
 	})
 	if err != nil {
 		logger.Error("error on execution engine creation", abstractlogger.Error(err))
@@ -75,26 +72,26 @@ func NewEngineV1(options EngineV1Options) (*EngineV1, error) {
 	requestProcessor := &graphqlRequestProcessorV1{
 		logger:             logger,
 		schema:             parsedSchema,
-		ctxRetrieveRequest: options.ContextRetrieveRequest,
+		ctxRetrieveRequest: options.Injections.ContextRetrieveRequest,
 	}
 
 	complexityChecker := &complexityCheckerV1{
 		logger:             logger,
 		schema:             parsedSchema,
-		ctxRetrieveRequest: options.ContextRetrieveRequest,
+		ctxRetrieveRequest: options.Injections.ContextRetrieveRequest,
 	}
 
 	granularAccessChecker := &granularAccessCheckerV1{
 		logger:                    logger,
 		schema:                    parsedSchema,
-		ctxRetrieveGraphQLRequest: options.ContextRetrieveRequest,
+		ctxRetrieveGraphQLRequest: options.Injections.ContextRetrieveRequest,
 	}
 
 	reverseProxyPreHandler := &reverseProxyPreHandlerV1{
-		ctxRetrieveGraphQLRequest: options.ContextRetrieveRequest,
+		ctxRetrieveGraphQLRequest: options.Injections.ContextRetrieveRequest,
 		apiDefinition:             options.ApiDefinition,
 		httpClient:                options.HttpClient,
-		transportModifier:         options.EngineTransportModifier,
+		newReusableBodyReadCloser: options.Injections.NewReusableBodyReadCloser,
 	}
 
 	return &EngineV1{
@@ -102,16 +99,14 @@ func NewEngineV1(options EngineV1Options) (*EngineV1, error) {
 		Schema:                  parsedSchema,
 		ApiDefinition:           options.ApiDefinition,
 		HttpClient:              options.HttpClient,
-		OTelConfig:              options.OTelConfig,
-		OTelTracerProvider:      options.OTelTracerProvider,
 		logger:                  logger,
 		gqlTools:                gqlTools,
 		graphqlRequestProcessor: requestProcessor,
 		complexityChecker:       complexityChecker,
 		granularAccessChecker:   granularAccessChecker,
 		reverseProxyPreHandler:  reverseProxyPreHandler,
-		ctxStoreRequestFunc:     options.ContextStoreRequest,
-		ctxRetrieveRequestFunc:  options.ContextRetrieveRequest,
+		ctxStoreRequestFunc:     options.Injections.ContextStoreRequest,
+		ctxRetrieveRequestFunc:  options.Injections.ContextRetrieveRequest,
 	}, nil
 }
 
@@ -151,11 +146,11 @@ func (e *EngineV1) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 
 	switch reverseProxyType {
 	case ReverseProxyTypeIntrospection:
-		return e.handleGraphQLIntrospection()
+		return e.gqlTools.handleIntrospection(e.Schema)
 	case ReverseProxyTypeWebsocketUpgrade:
-		return e.handleWebsocketUpgrade(&params)
+		return e.handoverWebSocketConnectionToGraphQLExecutionEngine(&params)
 	case ReverseProxyTypeGraphEngine:
-		return e.handoverRequestToGraphQLExecutionEngine(params.RoundTripper, gqlRequest, params.OutRequest)
+		return e.handoverRequestToGraphQLExecutionEngine(gqlRequest, params.OutRequest)
 	default:
 		e.logger.Error("unknown reverse proxy type", abstractlogger.Int("reverseProxyType", int(reverseProxyType)))
 	}
@@ -163,6 +158,7 @@ func (e *EngineV1) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 	return nil, false, nil
 }
 
+/*
 func (e *EngineV1) handleGraphQLIntrospection() (res *http.Response, hijacked bool, err error) {
 	var result *graphql.ExecutionResult
 	result, err = graphql.SchemaIntrospection(e.Schema)
@@ -173,10 +169,9 @@ func (e *EngineV1) handleGraphQLIntrospection() (res *http.Response, hijacked bo
 	res = result.GetAsHTTPResponse()
 	return
 }
+*/
 
-func (e *EngineV1) handoverRequestToGraphQLExecutionEngine(roundTripper http.RoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
-	//p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
-
+func (e *EngineV1) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
 	if e.ExecutionEngine == nil {
 		err = errors.New("execution engine is nil")
 		return
@@ -192,6 +187,7 @@ func (e *EngineV1) handoverRequestToGraphQLExecutionEngine(roundTripper http.Rou
 	return
 }
 
+/*
 func (e *EngineV1) handleWebsocketUpgrade(params *ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
 	conn, err := params.WebSocketUpgrader.Upgrade(params.ResponseWriter, params.OutRequest, http.Header{
 		header.SecWebSocketProtocol: {params.OutRequest.Header.Get(header.SecWebSocketProtocol)},
@@ -203,9 +199,15 @@ func (e *EngineV1) handleWebsocketUpgrade(params *ReverseProxyParams) (res *http
 
 	e.handoverWebSocketConnectionToGraphQLExecutionEngine(params.RoundTripper, conn.UnderlyingConn(), params.OutRequest)
 	return nil, true, nil
-}
+}*/
 
-func (e *EngineV1) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper http.RoundTripper, conn net.Conn, req *http.Request) {
+func (e *EngineV1) handoverWebSocketConnectionToGraphQLExecutionEngine(params *ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
+	conn, err := websocketConnWithUpgradeHeader(e.logger, params)
+	if err != nil {
+		e.logger.Error("could not upgrade websocket connection", abstractlogger.Error(err))
+		return nil, false, err
+	}
+
 	done := make(chan bool)
 	errChan := make(chan error)
 
@@ -222,13 +224,15 @@ func (e *EngineV1) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTrip
 		conn,
 		executorPool,
 		gqlwebsocket.WithLogger(e.logger),
-		gqlwebsocket.WithProtocolFromRequestHeaders(req),
+		gqlwebsocket.WithProtocolFromRequestHeaders(params.OutRequest),
 	)
 	select {
 	case err := <-errChan:
 		e.logger.Error("could not start graphql websocket handler: ", abstractlogger.Error(err))
 	case <-done:
 	}
+
+	return nil, true, nil
 }
 
 // Interface Guard
