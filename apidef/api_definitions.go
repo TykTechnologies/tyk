@@ -355,8 +355,7 @@ type ExtendedPathsSet struct {
 	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
 }
 
-// Clear clears any value in ExtendedPathsSet. It is used in converting the values from
-// the OAS API definition, so old values don't persist when converting to classic api definition.
+// Clear omits values that have OAS API definition conversions in place.
 func (e *ExtendedPathsSet) Clear() {
 	// The values listed within don't have a conversion from OAS in place.
 	// When the conversion is added, delete the individual field to clear it.
