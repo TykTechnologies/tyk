@@ -33,7 +33,7 @@ rm "$swagger2fileName"
 
 ## If running this on macOS, you might need to change sed to gsed
 
-sed -n '1,/components:/p' $openAPIspecfileName > $tempUpdatedOpenAPIFileName
+sed -n '1,/components:/p' "$openAPIspecfileName" > "$tempUpdatedOpenAPIFileName"
 
 if [ $? -ne 0 ]; then
 	fatal "replace operation failed step 1"
