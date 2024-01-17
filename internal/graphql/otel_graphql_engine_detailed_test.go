@@ -3,10 +3,12 @@ package graphql
 import (
 	"context"
 	"errors"
-	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"testing"
+
+	log "github.com/sirupsen/logrus"
+
+	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
