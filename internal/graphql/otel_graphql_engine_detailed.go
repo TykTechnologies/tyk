@@ -49,6 +49,7 @@ func (o *otelGraphqlEngineV2Common) SetContext(ctx context.Context) {
 // OtelGraphqlEngineV2Detailed defines an execution engine that can be used for detailed tracing with OTel.
 type OtelGraphqlEngineV2Detailed struct {
 	otelGraphqlEngineV2Common
+	schema *graphql.Schema
 }
 
 func (o *OtelGraphqlEngineV2Detailed) Normalize(operation *graphql.Request) error {
@@ -67,7 +68,7 @@ func (o *OtelGraphqlEngineV2Detailed) Normalize(operation *graphql.Request) erro
 }
 
 func (o *OtelGraphqlEngineV2Detailed) ValidateForSchema(operation *graphql.Request) error {
-	if operation.IsValidated() {
+	if operation.IsValidated(o.schema) {
 		return nil
 	}
 	var operationName = "ValidateRequest"
@@ -150,12 +151,13 @@ func (o *OtelGraphqlEngineV2Detailed) Execute(inCtx context.Context, operation *
 	return nil
 }
 
-func NewOtelGraphqlEngineV2Detailed(tracerProvider otel.TracerProvider, engine ExecutionEngineI) (*OtelGraphqlEngineV2Detailed, error) {
+func NewOtelGraphqlEngineV2Detailed(tracerProvider otel.TracerProvider, engine ExecutionEngineI, schema *graphql.Schema) (*OtelGraphqlEngineV2Detailed, error) {
 	otelEngine := &OtelGraphqlEngineV2Detailed{
-		otelGraphqlEngineV2Common{
+		otelGraphqlEngineV2Common: otelGraphqlEngineV2Common{
 			tracerProvider: tracerProvider,
 			engine:         engine,
 		},
+		schema: schema,
 	}
 	executor, err := graphql.NewCustomExecutionEngineV2Executor(otelEngine)
 	if err != nil {
