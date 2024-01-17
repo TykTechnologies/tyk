@@ -19,7 +19,7 @@ fi
 swagger validate "$swagger2fileName"
 
 if [ $? -ne 0 ]; then
-	fatal "swagger spec is invalid... swagger spec is located at $swagger2fileName"
+	fatal "invalid Swagger spec found at: $swagger2fileName"
 fi
 
 api-spec-converter --from=swagger_2 --to=openapi_3 --syntax=yaml "$swagger2fileName" > "$tempOpenAPIFileName"
