@@ -366,7 +366,6 @@ func (e *ExtendedPathsSet) Clear() {
 		TransformJQResponse: e.TransformJQResponse,
 		CircuitBreaker:      e.CircuitBreaker,
 		SizeLimit:           e.SizeLimit,
-		Internal:            e.Internal,
 		PersistGraphQL:      e.PersistGraphQL,
 	}
 }
