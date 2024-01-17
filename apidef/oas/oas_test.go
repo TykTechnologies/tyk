@@ -174,11 +174,16 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	vInfo.ExtendedPaths.MockResponse = nil
 	vInfo.ExtendedPaths.Cached = nil
 	vInfo.ExtendedPaths.ValidateJSON = nil
+	vInfo.ExtendedPaths.URLRewrite = nil
 	a.VersionData.Versions[""] = vInfo
 
 	assert.Empty(t, a.Name)
 
 	noOASSupportFields := getNonEmptyFields(a, "APIDefinition")
+
+	// The expectedFields value lists fields that do not support migration.
+	// When adding a migration for ExtendedPaths sections, clear the list of
+	// fields below, and clear the value to nil above.
 
 	expectedFields := []string{
 		"APIDefinition.ListenPort",
@@ -204,25 +209,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Samples",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].ReturnToServiceAfter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].DisableHalfOpenState",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Disabled",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Path",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].RewriteTo",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].On",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.HeaderMatches[0].MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.HeaderMatches[0].Reverse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.QueryValMatches[0].MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.QueryValMatches[0].Reverse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PathPartMatches[0].MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PathPartMatches[0].Reverse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.SessionMetaMatches[0].MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.SessionMetaMatches[0].Reverse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.RequestContextMatches[0].MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.RequestContextMatches[0].Reverse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PayloadMatches.MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PayloadMatches.Reverse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].RewriteTo",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].SizeLimit",
