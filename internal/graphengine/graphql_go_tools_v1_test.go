@@ -809,9 +809,15 @@ func newTestGranularAccessCheckerV1(t *testing.T) *granularAccessCheckerV1 {
 
 func newTestReverseProxyPreHandlerV1(t *testing.T) *reverseProxyPreHandlerV1 {
 	return &reverseProxyPreHandlerV1{
+		apiDefinition: &apidef.APIDefinition{
+			GraphQL: apidef.GraphQLConfig{
+				Enabled:       true,
+				ExecutionMode: apidef.GraphQLExecutionModeProxyOnly,
+			},
+		},
 		httpClient: &http.Client{},
-		transportModifier: func(roundTripper http.RoundTripper, _ *apidef.APIDefinition) http.RoundTripper {
-			return roundTripper
+		newReusableBodyReadCloser: func(closer io.ReadCloser) (io.ReadCloser, error) {
+			return closer, nil
 		},
 	}
 }

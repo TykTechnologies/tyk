@@ -231,6 +231,95 @@ func TestEngineV2_ProcessGraphQLGranularAccess(t *testing.T) {
 	})
 }
 
+func TestEngineV2_HandleReverseProxy(t *testing.T) {
+	t.Run("should return error if reverse proxy pre handler returns error", func(t *testing.T) {
+		engine, mocks := newTestEngineV2(t)
+		defer mocks.controller.Finish()
+		params := ReverseProxyParams{
+			OutRequest: &http.Request{},
+		}
+		mocks.reverseProxyPreHandler.EXPECT().PreHandle(gomock.Eq(params)).
+			Return(ReverseProxyTypeNone, errors.New("error"))
+
+		_, hijacked, err := engine.HandleReverseProxy(params)
+		assert.Error(t, err)
+		assert.False(t, hijacked)
+	})
+
+	t.Run("should return error if execution engine is nil", func(t *testing.T) {
+		engine, mocks := newTestEngineV2(t)
+		defer mocks.controller.Finish()
+		params := ReverseProxyParams{
+			OutRequest: &http.Request{},
+		}
+		mocks.reverseProxyPreHandler.EXPECT().PreHandle(gomock.Eq(params)).
+			Return(ReverseProxyTypeGraphEngine, nil)
+
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
+			return &graphql.Request{} // return empty request to avoid nil pointer dereference. We don't care about the request in this test
+		}
+
+		engine.ExecutionEngine = nil
+
+		_, hijacked, err := engine.HandleReverseProxy(params)
+		assert.Error(t, err)
+		assert.False(t, hijacked)
+	})
+
+	t.Run("should execute graphql introspection if reverse proxy pre handler returns reverse proxy type introspection", func(t *testing.T) {
+		engine, mocks := newTestEngineV2(t)
+		defer mocks.controller.Finish()
+		params := ReverseProxyParams{
+			OutRequest: &http.Request{},
+		}
+		mocks.reverseProxyPreHandler.EXPECT().PreHandle(gomock.Eq(params)).
+			Return(ReverseProxyTypeIntrospection, nil)
+
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
+			return &graphql.Request{} // return empty request to avoid nil pointer dereference. We don't care about the request in this test
+		}
+
+		result, hijacked, err := engine.HandleReverseProxy(params)
+		body := bytes.Buffer{}
+		_, _ = body.ReadFrom(result.Body)
+
+		assert.NoError(t, err)
+		assert.False(t, hijacked)
+		assert.Equal(t, 200, result.StatusCode)
+		assert.Equal(t, testIntrospectionResultEngineV1, body.String())
+	})
+
+	t.Run("should handover request to graphql execution engine if reverse proxy pre handler returns reverse proxy type graph engine", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"hello": "world"}`))
+		}))
+		t.Cleanup(server.Close)
+
+		engine, mocks := newTestEngineV2(t, withApiDefinitionTestEngineV2(newTestApiDefinitionV2(apidef.GraphQLExecutionModeExecutionEngine, server.URL)))
+		defer mocks.controller.Finish()
+		params := ReverseProxyParams{
+			OutRequest: &http.Request{},
+		}
+		mocks.reverseProxyPreHandler.EXPECT().PreHandle(gomock.Eq(params)).
+			Return(ReverseProxyTypeGraphEngine, nil)
+
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
+			return &graphql.Request{
+				Query: "query { hello }",
+			}
+		}
+
+		result, hijacked, err := engine.HandleReverseProxy(params)
+		body := bytes.Buffer{}
+		_, _ = body.ReadFrom(result.Body)
+
+		assert.NoError(t, err)
+		assert.False(t, hijacked)
+		assert.Equal(t, 200, result.StatusCode)
+		assert.Equal(t, `{"data":{"hello":"world"}}`, body.String())
+	})
+}
+
 type testEngineV2Options struct {
 	targetURL     string
 	apiDefinition *apidef.APIDefinition
@@ -238,12 +327,6 @@ type testEngineV2Options struct {
 }
 
 type testEngineV2Option func(*testEngineV2Options)
-
-func withTargetURLTestEngineV2(targetURL string) testEngineV2Option {
-	return func(options *testEngineV2Options) {
-		options.targetURL = targetURL
-	}
-}
 
 func withApiDefinitionTestEngineV2(apiDefinition *apidef.APIDefinition) testEngineV2Option {
 	return func(options *testEngineV2Options) {
@@ -280,7 +363,7 @@ func withOpenTelemetryTestEngineV2(detailedTracing bool) testEngineV2Option {
 func newTestEngineV2(t *testing.T, options ...testEngineV2Option) (*EngineV2, engineV2Mocks) {
 	definedOptions := testEngineV2Options{
 		otelConfig:    &EngineV2OTelConfig{},
-		apiDefinition: newTestProxyOnlyApiDefinitionV2(),
+		apiDefinition: newTestApiDefinitionV2(apidef.GraphQLExecutionModeProxyOnly, "http://example.com"),
 	}
 
 	for _, option := range options {
@@ -300,17 +383,12 @@ func newTestEngineV2(t *testing.T, options ...testEngineV2Option) (*EngineV2, en
 	}
 
 	engineV2, err := NewEngineV2(EngineV2Options{
-		Logger:                  logrusLogger,
-		ApiDefinition:           definedOptions.apiDefinition,
-		HttpClient:              &http.Client{},
-		StreamingClient:         &http.Client{},
-		OpenTelemetry:           definedOptions.otelConfig,
-		BeforeFetchHook:         nil,
-		AfterFetchHook:          nil,
-		WebsocketOnBeforeStart:  nil,
-		ContextStoreRequest:     nil,
-		ContextRetrieveRequest:  nil,
-		EngineTransportModifier: nil,
+		Logger:          logrusLogger,
+		ApiDefinition:   definedOptions.apiDefinition,
+		HttpClient:      &http.Client{},
+		StreamingClient: &http.Client{},
+		OpenTelemetry:   definedOptions.otelConfig,
+		Injections:      EngineV2Injections{},
 	})
 	require.NoError(t, err)
 
@@ -323,13 +401,34 @@ func newTestEngineV2(t *testing.T, options ...testEngineV2Option) (*EngineV2, en
 	return engineV2, mocks
 }
 
-func newTestProxyOnlyApiDefinitionV2() *apidef.APIDefinition {
+func newTestApiDefinitionV2(executionMode apidef.GraphQLExecutionMode, targetUrl string) *apidef.APIDefinition {
 	return &apidef.APIDefinition{
 		GraphQL: apidef.GraphQLConfig{
 			Enabled:       true,
-			ExecutionMode: apidef.GraphQLExecutionModeProxyOnly,
+			ExecutionMode: executionMode,
 			Version:       apidef.GraphQLConfigVersion2,
 			Schema:        testSchemaEngineV2,
+			Engine: apidef.GraphQLEngineConfig{
+				FieldConfigs: nil,
+				DataSources: []apidef.GraphQLEngineDataSource{
+					{
+						Kind:     apidef.GraphQLEngineDataSourceKindREST,
+						Name:     "Default",
+						Internal: false,
+						RootFields: []apidef.GraphQLTypeFields{
+							{
+								Type:   "Query",
+								Fields: []string{"hello", "helloName"},
+							},
+						},
+						Config: []byte(`{
+							"url": "` + targetUrl + `",
+							"method": "POST"
+						}`),
+					},
+				},
+				GlobalHeaders: nil,
+			},
 		},
 	}
 }

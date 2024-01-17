@@ -1,6 +1,7 @@
 package graphengine
 
 import (
+	"net"
 	"net/http"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -8,8 +9,11 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 )
+
+type TykVariableReplacer func(r *http.Request, in string, escape bool) string
 
 func createAbstractLogrusLogger(logger *logrus.Logger) *abstractlogger.LogrusLogger {
 	return abstractlogger.NewLogrusLogger(logger, absLoggerLevel(logger.Level))
@@ -85,6 +89,62 @@ func greaterThanIntConsideringUnlimited(first, second int) bool {
 	return first > second
 }
 
-func isSupergraphAPIDefinition(apiDefinition *apidef.APIDefinition) bool {
-	return apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
+func isSupergraph(apiDefinition *apidef.APIDefinition) bool {
+	return apiDefinition.GraphQL.Enabled && apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
+}
+
+func isProxyOnly(apiDefinition *apidef.APIDefinition) bool {
+	return apiDefinition.GraphQL.Enabled &&
+		(apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly || apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph)
+}
+
+func additionalUpstreamHeaders(logger abstractlogger.Logger, outreq *http.Request, apiDefinition *apidef.APIDefinition) http.Header {
+	upstreamHeaders := http.Header{}
+	switch apiDefinition.GraphQL.ExecutionMode {
+	case apidef.GraphQLExecutionModeSupergraph:
+		// if this context vars are enabled and this is a supergraph, inject the sub request id header
+		if !apiDefinition.EnableContextVars {
+			break
+		}
+		ctxData := ctxGetData(outreq)
+		if reqID, exists := ctxData["request_id"]; !exists {
+			logger.Warn("context variables enabled but request_id missing")
+		} else if requestID, ok := reqID.(string); ok {
+			upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
+		}
+	case apidef.GraphQLExecutionModeExecutionEngine:
+		globalHeaders := headerStructToHeaderMap(apiDefinition.GraphQL.Engine.GlobalHeaders)
+		for key, value := range globalHeaders {
+			upstreamHeaders.Set(key, value)
+		}
+	}
+
+	return upstreamHeaders
+}
+
+func headerStructToHeaderMap(headers []apidef.UDGGlobalHeader) map[string]string {
+	headerMap := make(map[string]string)
+	for _, header := range headers {
+		headerMap[header.Key] = header.Value
+	}
+	return headerMap
+}
+
+func ctxGetData(r *http.Request) map[string]interface{} {
+	if v := r.Context().Value(ctx.ContextData); v != nil {
+		return v.(map[string]interface{})
+	}
+	return nil
+}
+
+func websocketConnWithUpgradeHeader(logger abstractlogger.Logger, params *ReverseProxyParams) (underlyingConn net.Conn, err error) {
+	conn, err := params.WebSocketUpgrader.Upgrade(params.ResponseWriter, params.OutRequest, http.Header{
+		header.SecWebSocketProtocol: {params.OutRequest.Header.Get(header.SecWebSocketProtocol)},
+	})
+	if err != nil {
+		logger.Error("websocket upgrade for GraphQL engine failed", abstractlogger.Error(err))
+		return nil, err
+	}
+
+	return conn.UnderlyingConn(), nil
 }
