@@ -3,6 +3,7 @@ package oas_test
 import (
 	"embed"
 	"encoding/json"
+	"os"
 	"sort"
 	"testing"
 
@@ -38,6 +39,15 @@ func TestLoad_URLRewrite(t *testing.T) {
 	urlRewriteOAS.ExtractTo(&native)
 
 	assert.Len(t, native.VersionData.Versions[oas.Main].ExtendedPaths.URLRewrite, 1)
+
+	enc := json.NewEncoder(os.Stderr)
+	enc.SetIndent("", "  ")
+	enc.Encode(native)
+
+	assert.Len(t, native.VersionData.Versions[oas.Main].ExtendedPaths.URLRewrite, 1)
+
+	res := apidef.Validate(&native, apidef.DefaultValidationRuleSet)
+	assert.True(t, res.IsValid)
 }
 
 // TestImportValidateRequest
