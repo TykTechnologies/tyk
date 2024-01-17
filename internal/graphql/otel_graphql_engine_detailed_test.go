@@ -82,6 +82,22 @@ func TestOtelGraphqlEngineV2Detailed_Normalize(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("fail normalize", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockExecutor := NewMockExecutionEngineI(ctrl)
+		mockExecutor.EXPECT().Normalize(gomock.Any()).MaxTimes(1).Return(graphql.RequestErrorsFromError(errors.New("error normalizing request")))
+
+		engine, err := NewOtelGraphqlEngineV2Detailed(tracerProvider, mockExecutor, schema)
+		assert.NoError(t, err)
+		engine.SetContext(context.Background())
+
+		err = engine.Normalize(&request)
+		var reqErr graphql.RequestErrors
+		assert.True(t, errors.As(err, &reqErr), "errors should be of type request errors")
+	})
+
 	t.Run("already normalized", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -102,22 +118,6 @@ func TestOtelGraphqlEngineV2Detailed_Normalize(t *testing.T) {
 
 		err = engine.Normalize(&request)
 		assert.NoError(t, err)
-	})
-
-	t.Run("fail normalize", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		mockExecutor := NewMockExecutionEngineI(ctrl)
-		mockExecutor.EXPECT().Normalize(gomock.Any()).MaxTimes(1).Return(graphql.RequestErrorsFromError(errors.New("error normalizing request")))
-
-		engine, err := NewOtelGraphqlEngineV2Detailed(tracerProvider, mockExecutor, schema)
-		assert.NoError(t, err)
-		engine.SetContext(context.Background())
-
-		err = engine.Normalize(&request)
-		var reqErr graphql.RequestErrors
-		assert.True(t, errors.As(err, &reqErr), "errors should be of type request errors")
 	})
 }
 
@@ -188,6 +188,23 @@ func TestOtelGraphqlEngineV2Detailed_ValidateForSchema(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("fail validation", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockExecutor := NewMockExecutionEngineI(ctrl)
+		mockExecutor.EXPECT().ValidateForSchema(gomock.Any()).MaxTimes(1).Return(graphql.RequestErrorsFromError(errors.New("error normalizing request")))
+
+		engine, err := NewOtelGraphqlEngineV2Detailed(tracerProvider, mockExecutor, schema)
+		assert.NoError(t, err)
+		engine.SetContext(context.Background())
+
+		err = engine.ValidateForSchema(&request)
+		var reqErr graphql.RequestErrors
+		assert.True(t, errors.As(err, &reqErr), "errors should be of type request errors")
+
+	})
+
 	t.Run("already validated", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -208,23 +225,6 @@ func TestOtelGraphqlEngineV2Detailed_ValidateForSchema(t *testing.T) {
 
 		err = engine.ValidateForSchema(&request)
 		assert.NoError(t, err)
-	})
-
-	t.Run("fail validation", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		mockExecutor := NewMockExecutionEngineI(ctrl)
-		mockExecutor.EXPECT().ValidateForSchema(gomock.Any()).MaxTimes(1).Return(graphql.RequestErrorsFromError(errors.New("error normalizing request")))
-
-		engine, err := NewOtelGraphqlEngineV2Detailed(tracerProvider, mockExecutor, schema)
-		assert.NoError(t, err)
-		engine.SetContext(context.Background())
-
-		err = engine.ValidateForSchema(&request)
-		var reqErr graphql.RequestErrors
-		assert.True(t, errors.As(err, &reqErr), "errors should be of type request errors")
-
 	})
 }
 
