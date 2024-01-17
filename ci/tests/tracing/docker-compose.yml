@@ -78,7 +78,7 @@ services:
             timeout: 3s
             interval: 1s
             retries: 60
-        image: kubeshop/tracetest:v0.12.2
+        image: 754489498669.dkr.ecr.eu-central-1.amazonaws.com/kubeshop/tracetest:v0.12.2
         networks:
             default: null
         ports:
@@ -94,7 +94,7 @@ services:
               source: ./configs/tracetest/tracetest-provision.yml
               target: /app/provision.yml
     tyk:
-        image: ${GATEWAY_IMAGE:-internal/tyk-gateway}
+        image: 754489498669.dkr.ecr.eu-central-1.amazonaws.com/internal/tyk-gateway
         networks:
             default: null
         ports:
