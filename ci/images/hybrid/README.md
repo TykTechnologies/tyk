@@ -14,6 +14,12 @@ This is not optional.  Should you choose to run your own Redis configuration, yo
 This Hybrid image runs with an included Nginx server.
 
 In order to disable it, just add an environment variable 
+-e DISABLENGINX=1
+If you are running multi-cloud through the start.sh script, you will need to modify it there.
+-e DISABLENGINX=1
+If you are running multi-cloud through the start.sh script, you will need to modify it there.
+-e DISABLENGINX=1
+If you are running multi-cloud through the start.sh script, you will need to modify it there.
 `-e DISABLENGINX=1`
 If you are running multi-cloud through the start.sh script, you will need to modify it there.
 
