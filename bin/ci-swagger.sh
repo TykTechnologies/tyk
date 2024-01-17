@@ -13,7 +13,7 @@ fatal() {
 swagger generate spec -o "$swagger2fileName"
 
 if [ $? -ne 0 ]; then
-	display_error_message "failed to generate the Swagger 2.0 spec at the specified path: $swagger2fileName"
+	error 'failed to generate the Swagger 2.0 spec at the specified path: $swagger2fileName'
 fi
 
 swagger validate "$swagger2fileName"
