@@ -6,7 +6,7 @@ function setup {
 
 	# Setup required env vars for docker compose
 	export GATEWAY_IMAGE=${GATEWAY_IMAGE:-"tykio/tyk-gateway:${tag}"}
-	export PLUGIN_COMPILER_IMAGE=${PLUGIN_COMPILER_IMAGE:-"tykio/tyk-plugin-compiler:${tag}"}
+	export PLUGIN_COMPILER_IMAGE=${PLUGIN_COMPILER_IMAGE:-"754489498669.dkr.ecr.eu-central-1.amazonaws.com/tykio/tyk-plugin-compiler:${tag}"}
 
 	docker pull -q $GATEWAY_IMAGE
 	docker pull -q $PLUGIN_COMPILER_IMAGE
