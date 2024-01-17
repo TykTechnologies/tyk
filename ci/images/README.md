@@ -11,7 +11,7 @@ Since 3.2, tyk has started using go.mod and thus your vendor'd code will no long
 Assuming that you are in the plugin source directory and that you want to build a plugin for v3.0.4 of the the gateway,
 
 ``` shell
-% docker run --rm -v `pwd`:/plugin-source tykio/tyk-plugin-compiler:v3.0.4 testplugin.so
+% docker run --rm -v `pwd`:/plugin-source 754489498669.dkr.ecr.eu-central-1.amazonaws.com/tykio/tyk-plugin-compiler:v3.0.4 testplugin.so
 ```
 
 You will find a `testplugin.so` in the current directory which is the file that goes into the API definition
