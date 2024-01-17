@@ -31,4 +31,8 @@ spec:
       name: Ensure resolve plan exists
       assertions:
         - attr:name = "ResolvePlan"
+    - selector: span[tracetest.span.type="general" name="GraphqlEngine"] span[tracetest.span.type="general"]
+      name: Make sure there is no subspan for graphql engine
+      assertions:
+        - attr:tracetest.selected_spans.count = 3
 
