@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - release-**
+      - update/urlrewrite-migrations-test
     types:
       - opened
       - reopened
