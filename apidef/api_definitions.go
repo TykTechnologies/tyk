@@ -355,6 +355,22 @@ type ExtendedPathsSet struct {
 	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
 }
 
+// Clear omits values that have OAS API definition conversions in place.
+func (e *ExtendedPathsSet) Clear() {
+	// The values listed within don't have a conversion from OAS in place.
+	// When the conversion is added, delete the individual field to clear it.
+	*e = ExtendedPathsSet{
+		TransformJQ:         e.TransformJQ,
+		TransformJQResponse: e.TransformJQResponse,
+		CircuitBreaker:      e.CircuitBreaker,
+		SizeLimit:           e.SizeLimit,
+		TrackEndpoints:      e.TrackEndpoints,
+		DoNotTrackEndpoints: e.DoNotTrackEndpoints,
+		Internal:            e.Internal,
+		PersistGraphQL:      e.PersistGraphQL,
+	}
+}
+
 type VersionDefinition struct {
 	Enabled             bool              `bson:"enabled" json:"enabled"`
 	Name                string            `bson:"name" json:"name"`
