@@ -7,14 +7,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-
 	"github.com/TykTechnologies/drl"
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/rate"
+	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -60,6 +59,8 @@ func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl
 		config:      conf,
 		bucketStore: memorycache.New(),
 	}
+
+	log.Infof("[RATELIMIT] %s", conf.RateLimit.String())
 
 	storageConf := conf.GetRateLimiterStorage()
 
@@ -253,6 +254,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			if errors.Is(err, rate.ErrLimitExhausted) {
 				return sessionFailRateLimit
 			}
+			return sessionFailNone
 		}
 
 		switch {

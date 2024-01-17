@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
-	redis "github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
+
+	redis "github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -77,7 +78,6 @@ func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.Un
 		DialTimeout:      timeout,
 		ReadTimeout:      timeout,
 		WriteTimeout:     timeout,
-		IdleTimeout:      240 * timeout,
 		PoolSize:         poolSize,
 		TLSConfig:        tlsConfig,
 	}
@@ -1076,7 +1076,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 			element.Member = strconv.Itoa(int(now.UnixNano()))
 		}
 
-		pipe.ZAdd(r.RedisController.ctx, keyName, &element)
+		pipe.ZAdd(r.RedisController.ctx, keyName, element)
 		pipe.Expire(r.RedisController.ctx, keyName, time.Duration(per)*time.Second)
 
 		return nil
@@ -1189,7 +1189,7 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 		return
 	}
 
-	if err := singleton.ZAdd(r.RedisController.ctx, fixedKey, &member).Err(); err != nil {
+	if err := singleton.ZAdd(r.RedisController.ctx, fixedKey, member).Err(); err != nil {
 		log.WithFields(logEntry).WithError(err).Error("ZADD command failed")
 	}
 }

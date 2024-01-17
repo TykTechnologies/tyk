@@ -30,7 +30,7 @@ require (
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
 	github.com/getkin/kin-openapi v0.115.0
 	github.com/go-jose/go-jose/v3 v3.0.1
-	github.com/go-redis/redis/v8 v8.11.5
+	github.com/go-redis/redis/v8 v8.11.5 // indirect
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.5.0
@@ -88,7 +88,7 @@ require (
 	github.com/TykTechnologies/kin-openapi v0.90.0
 	github.com/TykTechnologies/opentelemetry v0.0.20
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/go-redis/redismock/v8 v8.11.5
+	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/google/go-cmp v0.6.0
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	go.opentelemetry.io/otel v1.19.0

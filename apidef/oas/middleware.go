@@ -1274,3 +1274,41 @@ func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
 	meta.PluginPath = e[0].Path
 	meta.SymbolName = e[0].Name
 }
+
+// CircuitBreaker holds configuration for the circuit breaker middleware.
+// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*]`.
+type CircuitBreaker struct {
+	// Enabled enables the Circuit Breaker functionality.
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Threshold is the proportion from each `sampleSize` requests that must fail for the breaker to be tripped. This must be a value between 0.0 and 1.0. If `sampleSize` is 100 then a threshold of 0.4 means that the breaker will be tripped if 40 out of every 100 requests fails.
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].threshold_percent`.
+	Threshold float64 `bson:"threshold" json:"threshold"`
+	// SampleSize is the size of the circuit breaker sampling window. Combining this with `threshold` gives the failure rate required to trip the circuit breaker.
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].samples`.
+	SampleSize int `bson:"sampleSize" json:"sampleSize"`
+	// CoolDownPeriod is the period of time (in seconds) for which the circuit breaker will remain open before returning to service.
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].return_to_service_after`.
+	CoolDownPeriod int `bson:"coolDownPeriod" json:"coolDownPeriod"`
+	// HalfOpenStateEnabled , if enabled, allows some requests to pass through the circuit breaker during the cool down period. If Tyk detects that the path is now working, the circuit breaker will be automatically reset and traffic will be resumed to the upstream.
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disable_half_open_state`.
+	HalfOpenStateEnabled bool `bson:"halfOpened" json:"halfOpened"`
+}
+
+// Fill fills *CircuitBreaker from apidef.CircuitBreakerMeta.
+func (cb *CircuitBreaker) Fill(circuitBreaker apidef.CircuitBreakerMeta) {
+	cb.Enabled = !circuitBreaker.Disabled
+	cb.Threshold = circuitBreaker.ThresholdPercent
+	cb.SampleSize = int(circuitBreaker.Samples)
+	cb.CoolDownPeriod = circuitBreaker.ReturnToServiceAfter
+	cb.HalfOpenStateEnabled = !circuitBreaker.DisableHalfOpenState
+}
+
+// ExtractTo extracts *CircuitBreaker into *apidef.CircuitBreakerMeta.
+func (cb *CircuitBreaker) ExtractTo(circuitBreaker *apidef.CircuitBreakerMeta) {
+	circuitBreaker.Disabled = !cb.Enabled
+	circuitBreaker.ThresholdPercent = cb.Threshold
+	circuitBreaker.Samples = int64(cb.SampleSize)
+	circuitBreaker.ReturnToServiceAfter = cb.CoolDownPeriod
+	circuitBreaker.DisableHalfOpenState = !cb.HalfOpenStateEnabled
+}

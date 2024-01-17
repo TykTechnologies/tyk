@@ -913,6 +913,9 @@ TransformRequestHeaders allows you to transform request headers.
 **Field: `transformResponseHeaders` ([TransformHeaders](#transformheaders))**
 TransformResponseHeaders allows you to transform response headers.
 
+**Field: `urlRewrite` ([URLRewrite](#urlrewrite))**
+URLRewrite contains the URL rewriting configuration.
+
 **Field: `cache` ([CachePlugin](#cacheplugin))**
 Cache contains the caching plugin configuration.
 
@@ -930,6 +933,9 @@ VirtualEndpoint contains virtual endpoint configuration.
 
 **Field: `postPlugins` (`[]`[EndpointPostPlugin](#endpointpostplugin))**
 PostPlugins contains endpoint level post plugins configuration.
+
+**Field: `circuitBreaker` ([CircuitBreaker](#circuitbreaker))**
+CircuitBreaker contains the configuration for the circuit breaker functionality.
 
 
 ### **Allowance**
@@ -963,6 +969,65 @@ Path file path for the template.
 
 **Field: `body` (`string`)**
 Body base64 encoded representation of the template.
+
+
+### **URLRewrite**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables URL rewriting if set to true.
+
+**Field: `pattern` (`string`)**
+Pattern is the regular expression against which the request URL is compared for the primary rewrite check.
+If this matches the defined pattern, the primary URL rewrite is triggered.
+
+**Field: `rewriteTo` (`string`)**
+RewriteTo specifies the URL to which the request shall be rewritten if the primary URL rewrite is triggered.
+
+**Field: `triggers` (`[]`[URLRewriteTrigger](#urlrewritetrigger))**
+Triggers contain advanced additional triggers for the URL rewrite.
+The triggers are processed only if the requested URL matches the pattern above.
+
+
+### **URLRewriteTrigger**
+
+**Field: `condition` ([](#))**
+Condition indicates the logical combination that will be applied to the rules for an advanced trigger:
+
+- Value `any` means any of the defined trigger rules may match
+- Value `all` means all the defined trigger rules must match
+
+**Field: `rules` (`[]`[URLRewriteRule](#urlrewriterule))**
+Rules contain individual checks that are combined according to the `condition` to determine whether the URL rewrite will be triggered.
+If empty, the trigger is ignored.
+
+**Field: `rewriteTo` (`string`)**
+RewriteTo specifies the URL to which the request shall be rewritten if indicated by the combination of `condition` and `rules`.
+
+
+### **URLRewriteRule**
+
+**Field: `in` ([](#))**
+In specifies one of the valid inputs for URL rewriting.
+By default, it uses `url` as the input source.
+The following values are valid:
+
+- `url`, match pattern against URL
+- `query`, match pattern against named query parameter value
+- `path`, match pattern against named path parameter value
+- `header`, match pattern against named header value
+- `sessionMetadata`, match pattern against session metadata
+- `requestBody`, match pattern against request body
+- `requestContext`, match pattern against request context
+
+**Field: `name` (`string`)**
+Name is the index in the input identified in `in` that should be used to locate the value for this rule. When `in` is set to `requestBody`, the value is ignored.
+
+**Field: `pattern` (`string`)**
+Pattern is the regular expression against which the `in` values are compared for this rule check.
+If the value matches the defined `pattern`, the URL rewrite is triggered for this rule.
+
+**Field: `negate` (`boolean`)**
+Negate is a boolean negation operator. Setting it to true inverts the matching behaviour such that the rewrite will be triggered if the value does not match the `pattern` for this rule.
 
 
 ### **CachePlugin**
@@ -1064,5 +1129,33 @@ Name is the name of plugin function to be executed.
 
 **Field: `path` (`string`)**
 Path is the path to plugin.
+
+
+### **CircuitBreaker**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables the Circuit Breaker functionality.
+
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.
+
+**Field: `threshold` (`double`)**
+Threshold is the proportion from each `sampleSize` requests that must fail for the breaker to be tripped. This must be a value between 0.0 and 1.0. If `sampleSize` is 100 then a threshold of 0.4 means that the breaker will be tripped if 40 out of every 100 requests fails.
+
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].threshold_percent`.
+
+**Field: `sampleSize` (`int`)**
+SampleSize is the size of the circuit breaker sampling window. Combining this with `threshold` gives the failure rate required to trip the circuit breaker.
+
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].samples`.
+
+**Field: `coolDownPeriod` (`int`)**
+CoolDownPeriod is the period of time (in seconds) for which the circuit breaker will remain open before returning to service.
+
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].return_to_service_after`.
+
+**Field: `halfOpened` (`boolean`)**
+HalfOpenStateEnabled , if enabled, allows some requests to pass through the circuit breaker during the cool down period. If Tyk detects that the path is now working, the circuit breaker will be automatically reset and traffic will be resumed to the upstream.
+
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disable_half_open_state`.
 
 

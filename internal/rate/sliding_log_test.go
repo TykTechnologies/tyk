@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/rate"
