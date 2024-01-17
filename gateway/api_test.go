@@ -21,10 +21,11 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/go-redis/redis/v8"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 

@@ -4,10 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
-	"github.com/redis/go-redis/v9"
-
 	"github.com/TykTechnologies/exp/pkg/limiters"
+
+	"github.com/TykTechnologies/tyk/internal/redis"
 )
 
 var ErrLimitExhausted = limiters.ErrLimitExhausted
@@ -34,7 +33,7 @@ func NewLimiter(prefix string, redis redis.UniversalClient) *Limiter {
 }
 
 func (l *Limiter) redisLock(name string) limiters.DistLocker {
-	return limiters.NewLockRedis(goredis.NewPool(l.redis), name+"-lock")
+	return limiters.NewLockRedis(redis.NewPool(l.redis), name+"-lock")
 }
 
 func Prefix(params ...string) string {

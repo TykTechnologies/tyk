@@ -4,9 +4,8 @@ import (
 	"crypto/tls"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/redis"
 )
 
 // NewStorage provides a redis v9 client for rate limiter use.
