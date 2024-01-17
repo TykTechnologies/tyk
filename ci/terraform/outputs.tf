@@ -16,11 +16,11 @@ data "terraform_remote_state" "integration" {
 }
 
 output "tyk" {
-  value = data.terraform_remote_state.integration.outputs.tyk
+  value = "754489498669.dkr.ecr.eu-central-1.amazonaws.com/tykio/tyk-gateway"
   description = "ECR creds for tyk repo"
 }
 
 output "region" {
-  value = data.terraform_remote_state.integration.outputs.region
+  value = "754489498669.dkr.ecr.eu-central-1.amazonaws.com/tykio/tyk-gateway"
   description = "Region in which the env is running"
 }
