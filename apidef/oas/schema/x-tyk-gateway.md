@@ -896,6 +896,9 @@ Block request by allowance.
 **Field: `ignoreAuthentication` ([Allowance](#allowance))**
 IgnoreAuthentication ignores authentication on request by allowance.
 
+**Field: `internal` ([Internal](#internal))**
+Internal makes the endpoint only respond to internal requests.
+
 **Field: `transformRequestMethod` ([TransformRequestMethod](#transformrequestmethod))**
 TransformRequestMethod allows you to transform the method of a request.
 
@@ -951,6 +954,12 @@ Enabled is a boolean flag, if set to `true`, then individual allowances (allow, 
 
 **Field: `ignoreCase` (`boolean`)**
 IgnoreCase is a boolean flag, If set to `true`, checks for requests allowance will be case insensitive.
+
+
+### **Internal**
+
+**Field: `enabled` (`boolean`)**
+Enabled if set to true makes the endpoint available only for internal requests.
 
 
 ### **TransformRequestMethod**

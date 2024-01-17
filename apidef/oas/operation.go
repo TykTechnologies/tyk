@@ -172,6 +172,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractAllowanceTo(ep, path, method, allow)
 					tykOp.extractAllowanceTo(ep, path, method, block)
 					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
+					tykOp.extractInternalTo(ep, path, method)
 					tykOp.extractTransformRequestMethodTo(ep, path, method)
 					tykOp.extractTransformRequestBodyTo(ep, path, method)
 					tykOp.extractTransformResponseBodyTo(ep, path, method)
@@ -221,22 +222,6 @@ func newAllowance(prev **Allowance) *Allowance {
 	}
 
 	return *prev
-}
-
-func (s *OAS) fillInternal(metas []apidef.InternalMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
-
-		if operation.Internal == nil {
-			operation.Internal = &Internal{}
-		}
-
-		operation.Internal.Fill(meta)
-		if ShouldOmit(operation.Internal) {
-			operation.Internal = nil
-		}
-	}
 }
 
 func (s *OAS) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {

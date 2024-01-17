@@ -17,3 +17,28 @@ func (i *Internal) Fill(meta apidef.InternalMeta) {
 func (i *Internal) ExtractTo(meta *apidef.InternalMeta) {
 	meta.Disabled = !i.Enabled
 }
+
+func (s *OAS) fillInternal(metas []apidef.InternalMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		if operation.Internal == nil {
+			operation.Internal = &Internal{}
+		}
+
+		operation.Internal.Fill(meta)
+		if ShouldOmit(operation.Internal) {
+			operation.Internal = nil
+		}
+	}
+}
+
+func (o *Operation) extractInternalTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.Internal == nil {
+		return
+	}
+
+	meta := apidef.InternalMeta{Path: path, Method: method}
+	o.Internal.ExtractTo(&meta)
+}
