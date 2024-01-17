@@ -25,6 +25,9 @@ type Operation struct {
 	// IgnoreAuthentication ignores authentication on request by allowance.
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 
+	// Internal makes the endpoint only respond to internal requests.
+	Internal *Internal `bson:"internal,omitempty" json:"internal,omitempty"`
+
 	// TransformRequestMethod allows you to transform the method of a request.
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
 
@@ -142,6 +145,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTransformRequestHeaders(ep.TransformHeader)
 	s.fillTransformResponseHeaders(ep.TransformResponseHeader)
 	s.fillURLRewrite(ep.URLRewrite)
+	s.fillInternal(ep.Internal)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillOASValidateRequest(ep.ValidateJSON)
@@ -217,6 +221,22 @@ func newAllowance(prev **Allowance) *Allowance {
 	}
 
 	return *prev
+}
+
+func (s *OAS) fillInternal(metas []apidef.InternalMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		if operation.Internal == nil {
+			operation.Internal = &Internal{}
+		}
+
+		operation.Internal.Fill(meta)
+		if ShouldOmit(operation.Internal) {
+			operation.Internal = nil
+		}
+	}
 }
 
 func (s *OAS) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {
