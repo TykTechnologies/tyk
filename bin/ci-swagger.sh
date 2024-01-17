@@ -13,27 +13,27 @@ fatal() {
 swagger generate spec -o "$swagger2fileName"
 
 if [ $? -ne 0 ]; then
-	fatal "could not generate swagger2.0 spec to the specified path, $swagger2fileName"
+	error 'failed to generate the Swagger 2.0 spec at the specified path: $swagger2fileName'
 fi
 
 swagger validate "$swagger2fileName"
 
 if [ $? -ne 0 ]; then
-	fatal "swagger spec is invalid... swagger spec is located at $swagger2fileName"
+	display_error_message "invalid Swagger spec found at: $swagger2fileName"
 fi
 
 api-spec-converter --from=swagger_2 --to=openapi_3 --syntax=yaml "$swagger2fileName" > "$tempOpenAPIFileName"
 
 if [ $? -ne 0 ]; then
-	fatal "could not convert swagger2.0 spec to opeenapi 3.0"
+	fatal "failed to convert Swagger 2.0 spec to OpenAPI 3.0"
 fi
 
 ## clean up
-rm "$swagger2fileName"
+rm "swagger2.yaml"
 
 ## If running this on macOS, you might need to change sed to gsed
 
-sed -n '1,/components:/p' $openAPIspecfileName > $tempUpdatedOpenAPIFileName
+sed -n "1,/components:/p" "$openAPIspecfileName" > "$tempUpdatedOpenAPIFileName"
 
 if [ $? -ne 0 ]; then
 	fatal "replace operation failed step 1"
