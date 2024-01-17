@@ -152,9 +152,9 @@ func (o *OtelGraphqlEngineV2Detailed) Execute(inCtx context.Context, operation *
 }
 
 /*
-	NewOtelGraphqlEngineV2Detailed creates a new instance of OtelGraphqlEngineV2Detailed.
-	It takes a tracer provider, an execution engine, and a GraphQL schema as parameters.
-	The function returns a pointer to OtelGraphqlEngineV2Detailed and an error if any.
+NewOtelGraphqlEngineV2Detailed creates a new instance of OtelGraphqlEngineV2Detailed.
+It takes a tracer provider, an execution engine, and a GraphQL schema as parameters.
+The function returns a pointer to OtelGraphqlEngineV2Detailed and an error if any.
 */
 func NewOtelGraphqlEngineV2Detailed(tracerProvider otel.TracerProvider, engine ExecutionEngineI, schema *graphql.Schema) (*OtelGraphqlEngineV2Detailed, error) {
 	otelEngine := &OtelGraphqlEngineV2Detailed{
