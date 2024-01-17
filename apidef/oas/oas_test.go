@@ -230,6 +230,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TrackEndpoints[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.DoNotTrackEndpoints[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.DoNotTrackEndpoints[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.Internal[0].Disabled",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.Internal[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.Internal[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Path",

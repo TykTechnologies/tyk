@@ -207,8 +207,9 @@ type TrackEndpointMeta struct {
 }
 
 type InternalMeta struct {
-	Path   string `bson:"path" json:"path"`
-	Method string `bson:"method" json:"method"`
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
 }
 
 type RequestSizeMeta struct {
