@@ -171,10 +171,9 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	vInfo.GlobalHeadersDisabled = false
 	vInfo.GlobalResponseHeadersDisabled = false
 	vInfo.UseExtendedPaths = false
-	vInfo.ExtendedPaths.MockResponse = nil
-	vInfo.ExtendedPaths.Cached = nil
-	vInfo.ExtendedPaths.ValidateJSON = nil
-	vInfo.ExtendedPaths.URLRewrite = nil
+
+	vInfo.ExtendedPaths.Clear()
+
 	a.VersionData.Versions[""] = vInfo
 
 	assert.Empty(t, a.Name)
@@ -183,7 +182,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 
 	// The expectedFields value lists fields that do not support migration.
 	// When adding a migration for ExtendedPaths sections, clear the list of
-	// fields below, and clear the value to nil above.
+	// fields below, and clear the value in ExtendedPaths.Clear() function.
 
 	expectedFields := []string{
 		"APIDefinition.ListenPort",
