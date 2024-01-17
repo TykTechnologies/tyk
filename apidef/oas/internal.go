@@ -41,4 +41,5 @@ func (o *Operation) extractInternalTo(ep *apidef.ExtendedPathsSet, path string, 
 
 	meta := apidef.InternalMeta{Path: path, Method: method}
 	o.Internal.ExtractTo(&meta)
+	ep.Internal = append(ep.Internal, meta)
 }
