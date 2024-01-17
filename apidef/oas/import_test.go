@@ -1,23 +1,43 @@
 package oas_test
 
 import (
+	"embed"
 	"encoding/json"
-	"io/ioutil"
-	"path"
-	"runtime"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
-// findTestPath makes tests work with any working dir.
-func findTestPath(filename string) string {
-	_, testFilename, _, _ := runtime.Caller(0)
-	testDir := path.Dir(testFilename)
-	return path.Join(testDir, filename)
+//go:embed testdata/urlRewrite.json testdata/petstore-no-responses.json
+var oasTestAPIs embed.FS
+
+// TestLoad_URLRewrite(t *testing.T)
+//
+// - Loads the urlRewrite OAS spec with tyk extensions
+func TestLoad_URLRewrite(t *testing.T) {
+	oasContents, err := oasTestAPIs.ReadFile("testdata/urlRewrite.json")
+	assert.NoError(t, err)
+	assert.NotNil(t, oasContents)
+
+	var urlRewriteOAS oas.OAS
+	assert.NoError(t, json.Unmarshal(oasContents, &urlRewriteOAS))
+
+	extension := urlRewriteOAS.GetTykExtension()
+	assert.NotNil(t, extension, "Expected Tyk Extension")
+	assert.NotNil(t, extension.Middleware, "Expected middleware")
+	assert.NotNil(t, extension.Middleware.Operations, "Expected operations")
+	for _, op := range extension.Middleware.Operations {
+		assert.NotNil(t, op.URLRewrite, "Expected URLRewrite")
+	}
+
+	var native apidef.APIDefinition
+	urlRewriteOAS.ExtractTo(&native)
+
+	assert.Len(t, native.VersionData.Versions[oas.Main].ExtendedPaths.URLRewrite, 1)
 }
 
 // TestImportValidateRequest
@@ -27,7 +47,7 @@ func findTestPath(filename string) string {
 // - Asserts expected routes for validateRequest.
 func TestImportValidateRequest(t *testing.T) {
 	// Load petstore
-	oasContents, err := ioutil.ReadFile(findTestPath("testdata/petstore-no-responses.json"))
+	oasContents, err := oasTestAPIs.ReadFile("testdata/petstore-no-responses.json")
 	assert.NoError(t, err)
 	assert.NotNil(t, oasContents)
 

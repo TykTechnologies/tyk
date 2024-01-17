@@ -301,4 +301,5 @@ func (o *Operation) extractURLRewriteTo(ep *apidef.ExtendedPathsSet, path string
 
 	meta := apidef.URLRewriteMeta{Path: path, Method: method}
 	o.URLRewrite.ExtractTo(&meta)
+	ep.URLRewrite = append(ep.URLRewrite, meta)
 }
