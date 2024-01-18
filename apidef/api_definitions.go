@@ -208,8 +208,9 @@ type TrackEndpointMeta struct {
 }
 
 type InternalMeta struct {
-	Path   string `bson:"path" json:"path"`
-	Method string `bson:"method" json:"method"`
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
 }
 
 type RequestSizeMeta struct {
@@ -363,9 +364,7 @@ func (e *ExtendedPathsSet) Clear() {
 	*e = ExtendedPathsSet{
 		TransformJQ:         e.TransformJQ,
 		TransformJQResponse: e.TransformJQResponse,
-		CircuitBreaker:      e.CircuitBreaker,
 		SizeLimit:           e.SizeLimit,
-		Internal:            e.Internal,
 		PersistGraphQL:      e.PersistGraphQL,
 	}
 }

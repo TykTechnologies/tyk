@@ -25,6 +25,9 @@ type Operation struct {
 	// IgnoreAuthentication ignores authentication on request by allowance.
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 
+	// Internal makes the endpoint only respond to internal requests.
+	Internal *Internal `bson:"internal,omitempty" json:"internal,omitempty"`
+
 	// TransformRequestMethod allows you to transform the method of a request.
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
 
@@ -142,6 +145,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTransformRequestHeaders(ep.TransformHeader)
 	s.fillTransformResponseHeaders(ep.TransformResponseHeader)
 	s.fillURLRewrite(ep.URLRewrite)
+	s.fillInternal(ep.Internal)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillOASValidateRequest(ep.ValidateJSON)
@@ -168,6 +172,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractAllowanceTo(ep, path, method, allow)
 					tykOp.extractAllowanceTo(ep, path, method, block)
 					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
+					tykOp.extractInternalTo(ep, path, method)
 					tykOp.extractTransformRequestMethodTo(ep, path, method)
 					tykOp.extractTransformRequestBodyTo(ep, path, method)
 					tykOp.extractTransformResponseBodyTo(ep, path, method)
