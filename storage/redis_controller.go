@@ -168,6 +168,46 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(
 	// We need the ticker to constantly checking the connection status of Redis. If Redis gets down and up again, we should be able to recover.
 	rc.statusCheck(ctx, conf, c)
 }
+	if onReconnect == nil {
+		onReconnect = func() {
+			// an empty function to avoid repeated nil checks below
+		}
+	}
+	c := []RedisCluster{
+		{
+			RedisController: rc,
+		},
+		{
+			RedisController: rc,
+			IsCache:         true,
+		},
+		{
+			RedisController: rc,
+			IsAnalytics:     true,
+		},
+	}
+
+	// First time connecting to the clusters. We need this for the first connection (and avoid waiting 1second for the rc.statusCheck loop).
+	for _, v := range c {
+		rc.connectSingleton(v.IsCache, v.IsAnalytics, *conf)
+		err := backoff.Retry(v.checkIsOpen, getExponentialBackoff())
+		if err != nil {
+			log.WithError(err).Errorf("Could not connect to Redis cluster after many attempts. Host(s): %v", getRedisAddrs(conf.Storage))
+		}
+	}
+
+	rc.redisUp.Store(true)
+
+	defer func() {
+		close(rc.reconnect)
+		rc.disconnect()
+	}()
+
+	go rc.recoverLoop(ctx, onReconnect)
+
+	// We need the ticker to constantly checking the connection status of Redis. If Redis gets down and up again, we should be able to recover.
+	rc.statusCheck(ctx, conf, c)
+}
 
 // getExponentialBackoff returns a backoff.ExponentialBackOff with the following settings:
 //   - Multiplier: 2
@@ -249,4 +289,34 @@ func (rc *RedisController) MockWith(client redis.UniversalClient, redisUp bool) 
 	rc.singleAnalyticsPool = client
 	rc.singleAnalyticsPool = client
 	rc.redisUp.Store(redisUp)
+}
+func (rc *RedisController) statusCheck(ctx context.Context, conf *config.Config, clusters []RedisCluster) {
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			//if we disabled redis - we don't want to check anything
+			if !rc.enabled() {
+				continue
+			}
+
+			//we check if the clusters are initialised and if connections are open
+			connected := rc.connectCluster(*conf, clusters...)
+
+			//we check if we are already connected connected
+			alreadyConnected := rc.Connected()
+
+			//store the actual status of redis
+			rc.redisUp.Store(connected)
+
+			//if we weren't alerady connected but now we are connected, we trigger the reconnect
+			if !alreadyConnected && connected {
+				rc.reconnect <- struct{}{}
+			}
+		}
+	}
 }

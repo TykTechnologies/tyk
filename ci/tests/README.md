@@ -1,8 +1,9 @@
 # How to write a test
 
 - Create a sub-directory for your test
-- Implement a script `test.sh` in your directory
-- Document the test in this file (if needed)
+- Follow the structure of existing test scripts for reference
+- Ensure the script takes the release version as the first argument
+- Document the test in the test script if needed
 
 When invoking `test.sh`, the first argument needs to be the release
 version being tested, e.g. `v5.2.0`. If the test fails, it should exit
@@ -49,7 +50,10 @@ individual test suite details below.
 
 # Test suites
 
-## Plugin compiler
+### Plugin compiler
+- Compiles testplugin/main.go using the appropriate plugin-compiler
+- Mounts testplugin/apidef.json into apps
+- Run it as `./test.sh <version>`. Make sure that `<version>` is available in Docker Hub. Refer to `plugin-compiler/test.sh` for an example.
 
 - compiles testplugin/main.go using the appropriate plugin-compiler
 - mounts testplugin/apidef.json into apps/
@@ -63,7 +67,10 @@ It's possible to override the docker images used with:
 
 The plugin adds a header `Foo: Bar` to all requests.
 
-## Python plugins
+### Python plugins
+The `bundler` service serves two purposes:
+- Compiles src/middleware.py using src/manifest.json using `tyk bundle`. This is done during the build phase.
+- Serves `bundle.zip` from `tyk bundle` for the `gw` service. The plugin adds a header `Foo: Bar` to all requests. Run it as `./test.sh <version>`. Make sure that `<version>` is available in Docker Hub. Refer to `python-plugins/test.sh` for an example.
 
 The `bundler` service serves two purposes:
 
