@@ -242,6 +242,7 @@ func TestTagsExportServer(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 

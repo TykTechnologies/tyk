@@ -23,7 +23,7 @@ const (
 const RestrictedFieldValidationFailedLogMsg = "Error during GraphQL request restricted fields validation: '%s'"
 
 type GraphQLGranularAccessMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (m *GraphQLGranularAccessMiddleware) Name() string {

@@ -310,6 +310,9 @@ CustomDomain is the domain to bind this API to.
 
 Tyk classic API definition: `domain`.
 
+**Field: `detailedActivityLogs` ([DetailedActivityLogs](#detailedactivitylogs))**
+DetailedActivityLogs configures detailed analytics recording.
+
 
 ### **ListenPath**
 
@@ -621,6 +624,14 @@ Enabled allow/disallow the usage of the domain.
 Name is the name of the domain.
 
 
+### **DetailedActivityLogs**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables/disables detailed activity logs.
+
+Tyk classic API definition: `enable_detailed_recording`.
+
+
 ### **Middleware**
 
 **Field: `global` ([Global](#global))**
@@ -664,6 +675,16 @@ Tyk classic API definition: `custom_middleware.response`.
 Cache contains the configurations related to caching.
 
 Tyk classic API definition: `cache_options`.
+
+**Field: `transformRequestHeaders` ([TransformHeaders](#transformheaders))**
+TransformRequestHeaders contains the configurations related to API level request header transformation.
+
+Tyk classic API definition: `global_headers`/`global_headers_remove`.
+
+**Field: `transformResponseHeaders` ([TransformHeaders](#transformheaders))**
+TransformResponseHeaders contains the configurations related to API level response header transformation.
+
+Tyk classic API definition: `global_response_headers`/`global_response_headers_remove`.
 
 
 ### **PluginConfig**
@@ -843,6 +864,27 @@ ControlTTLHeaderName is the response header which tells Tyk how long it is safe 
 Tyk classic API definition: `cache_options.cache_control_ttl_header`.
 
 
+### **TransformHeaders**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables Header Transform for the given path and method.
+
+**Field: `remove` (`[]string`)**
+Remove specifies header names to be removed from the request/response.
+
+**Field: `add` (`[]`[Header](#header))**
+Add specifies headers to be added to the request/response.
+
+
+### **Header**
+
+**Field: `name` (`string`)**
+Name is the name of the header.
+
+**Field: `value` (`string`)**
+Value is the value of the header.
+
+
 ### **Operation**
 
 **Field: `allow` ([Allowance](#allowance))**
@@ -854,6 +896,9 @@ Block request by allowance.
 **Field: `ignoreAuthentication` ([Allowance](#allowance))**
 IgnoreAuthentication ignores authentication on request by allowance.
 
+**Field: `internal` ([Internal](#internal))**
+Internal makes the endpoint only respond to internal requests.
+
 **Field: `transformRequestMethod` ([TransformRequestMethod](#transformrequestmethod))**
 TransformRequestMethod allows you to transform the method of a request.
 
@@ -864,6 +909,15 @@ When both `path` and `body` are provided, body would take precedence.
 **Field: `transformResponseBody` ([TransformBody](#transformbody))**
 TransformResponseBody allows you to transform response body.
 When both `path` and `body` are provided, body would take precedence.
+
+**Field: `transformRequestHeaders` ([TransformHeaders](#transformheaders))**
+TransformRequestHeaders allows you to transform request headers.
+
+**Field: `transformResponseHeaders` ([TransformHeaders](#transformheaders))**
+TransformResponseHeaders allows you to transform response headers.
+
+**Field: `urlRewrite` ([URLRewrite](#urlrewrite))**
+URLRewrite contains the URL rewriting configuration.
 
 **Field: `cache` ([CachePlugin](#cacheplugin))**
 Cache contains the caching plugin configuration.
@@ -883,6 +937,15 @@ VirtualEndpoint contains virtual endpoint configuration.
 **Field: `postPlugins` (`[]`[EndpointPostPlugin](#endpointpostplugin))**
 PostPlugins contains endpoint level post plugins configuration.
 
+**Field: `circuitBreaker` ([CircuitBreaker](#circuitbreaker))**
+CircuitBreaker contains the configuration for the circuit breaker functionality.
+
+**Field: `trackEndpoint` ([TrackEndpoint](#trackendpoint))**
+TrackEndpoint contains the configuration for enabling analytics and logs.
+
+**Field: `doNotTrackEndpoint` ([TrackEndpoint](#trackendpoint))**
+DoNotTrackEndpoint contains the configuration for disabling analytics and logs.
+
 
 ### **Allowance**
 
@@ -891,6 +954,12 @@ Enabled is a boolean flag, if set to `true`, then individual allowances (allow, 
 
 **Field: `ignoreCase` (`boolean`)**
 IgnoreCase is a boolean flag, If set to `true`, checks for requests allowance will be case insensitive.
+
+
+### **Internal**
+
+**Field: `enabled` (`boolean`)**
+Enabled if set to true makes the endpoint available only for internal requests.
 
 
 ### **TransformRequestMethod**
@@ -915,6 +984,65 @@ Path file path for the template.
 
 **Field: `body` (`string`)**
 Body base64 encoded representation of the template.
+
+
+### **URLRewrite**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables URL rewriting if set to true.
+
+**Field: `pattern` (`string`)**
+Pattern is the regular expression against which the request URL is compared for the primary rewrite check.
+If this matches the defined pattern, the primary URL rewrite is triggered.
+
+**Field: `rewriteTo` (`string`)**
+RewriteTo specifies the URL to which the request shall be rewritten if the primary URL rewrite is triggered.
+
+**Field: `triggers` (`[]`[URLRewriteTrigger](#urlrewritetrigger))**
+Triggers contain advanced additional triggers for the URL rewrite.
+The triggers are processed only if the requested URL matches the pattern above.
+
+
+### **URLRewriteTrigger**
+
+**Field: `condition` ([](#))**
+Condition indicates the logical combination that will be applied to the rules for an advanced trigger:
+
+- Value `any` means any of the defined trigger rules may match
+- Value `all` means all the defined trigger rules must match
+
+**Field: `rules` (`[]`[URLRewriteRule](#urlrewriterule))**
+Rules contain individual checks that are combined according to the `condition` to determine whether the URL rewrite will be triggered.
+If empty, the trigger is ignored.
+
+**Field: `rewriteTo` (`string`)**
+RewriteTo specifies the URL to which the request shall be rewritten if indicated by the combination of `condition` and `rules`.
+
+
+### **URLRewriteRule**
+
+**Field: `in` ([](#))**
+In specifies one of the valid inputs for URL rewriting.
+By default, it uses `url` as the input source.
+The following values are valid:
+
+- `url`, match pattern against URL
+- `query`, match pattern against named query parameter value
+- `path`, match pattern against named path parameter value
+- `header`, match pattern against named header value
+- `sessionMetadata`, match pattern against session metadata
+- `requestBody`, match pattern against request body
+- `requestContext`, match pattern against request context
+
+**Field: `name` (`string`)**
+Name is the index in the input identified in `in` that should be used to locate the value for this rule. When `in` is set to `requestBody`, the value is ignored.
+
+**Field: `pattern` (`string`)**
+Pattern is the regular expression against which the `in` values are compared for this rule check.
+If the value matches the defined `pattern`, the URL rewrite is triggered for this rule.
+
+**Field: `negate` (`boolean`)**
+Negate is a boolean negation operator. Setting it to true inverts the matching behaviour such that the rewrite will be triggered if the value does not match the `pattern` for this rule.
 
 
 ### **CachePlugin**
@@ -970,15 +1098,6 @@ Headers are the HTTP response headers that will be returned.
 FromOASExamples is the configuration to extract a mock response from OAS documentation.
 
 
-### **Header**
-
-**Field: `name` (`string`)**
-Name is the name of the header.
-
-**Field: `value` (`string`)**
-Value is the value of the header.
-
-
 ### **FromOASExamples**
 
 **Field: `enabled` (`boolean`)**
@@ -1025,5 +1144,39 @@ Name is the name of plugin function to be executed.
 
 **Field: `path` (`string`)**
 Path is the path to plugin.
+
+
+### **CircuitBreaker**
+
+**Field: `enabled` (`boolean`)**
+Enabled enables the Circuit Breaker functionality.
+
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.
+
+**Field: `threshold` (`double`)**
+Threshold is the proportion from each `sampleSize` requests that must fail for the breaker to be tripped. This must be a value between 0.0 and 1.0. If `sampleSize` is 100 then a threshold of 0.4 means that the breaker will be tripped if 40 out of every 100 requests fails.
+
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].threshold_percent`.
+
+**Field: `sampleSize` (`int`)**
+SampleSize is the size of the circuit breaker sampling window. Combining this with `threshold` gives the failure rate required to trip the circuit breaker.
+
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].samples`.
+
+**Field: `coolDownPeriod` (`int`)**
+CoolDownPeriod is the period of time (in seconds) for which the circuit breaker will remain open before returning to service.
+
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].return_to_service_after`.
+
+**Field: `halfOpened` (`boolean`)**
+HalfOpenStateEnabled , if enabled, allows some requests to pass through the circuit breaker during the cool down period. If Tyk detects that the path is now working, the circuit breaker will be automatically reset and traffic will be resumed to the upstream.
+
+Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disable_half_open_state`.
+
+
+### **TrackEndpoint**
+
+**Field: `enabled` (`boolean`)**
+Enabled if set to true enables or disables tracking for an endpoint depending if it's used in `trackEndpoint` or `doNotTrackEndpoint`.
 
 

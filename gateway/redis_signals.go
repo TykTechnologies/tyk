@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/internal/crypto"

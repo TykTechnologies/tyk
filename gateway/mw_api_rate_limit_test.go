@@ -35,7 +35,7 @@ func (ts *Test) getRLOpenChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
+	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
@@ -50,7 +50,7 @@ func (ts *Test) getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
+	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
@@ -69,9 +69,6 @@ func TestRLOpen(t *testing.T) {
 	defer ts.Close()
 
 	spec := ts.Gw.LoadSampleAPI(openRLDefSmall)
-
-	ts.Gw.DRLManager.SetCurrentTokenValue(1)
-	ts.Gw.DRLManager.RequestTokenValue = 1
 
 	ts.Gw.DoReload()
 	chain := ts.getRLOpenChain(spec)
@@ -104,8 +101,6 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 
 		switch limiter {
 		case "InMemoryRateLimiter":
-			ts.Gw.DRLManager.SetCurrentTokenValue(1)
-			ts.Gw.DRLManager.RequestTokenValue = 1
 		case "SentinelRateLimiter":
 			globalCfg.EnableSentinelRateLimiter = true
 		case "RedisRollingRateLimiter":
@@ -232,9 +227,6 @@ func TestRLClosed(t *testing.T) {
 		t.Error("could not update session in Session Manager. " + err.Error())
 	}
 
-	ts.Gw.DRLManager.SetCurrentTokenValue(1)
-	ts.Gw.DRLManager.RequestTokenValue = 1
-
 	chain := ts.getGlobalRLAuthKeyChain(spec)
 	for a := 0; a <= 10; a++ {
 		recorder := httptest.NewRecorder()
@@ -264,9 +256,6 @@ func TestRLOpenWithReload(t *testing.T) {
 	defer ts.Close()
 
 	spec := ts.Gw.LoadSampleAPI(openRLDefSmall)
-
-	ts.Gw.DRLManager.SetCurrentTokenValue(1)
-	ts.Gw.DRLManager.RequestTokenValue = 1
 
 	chain := ts.getRLOpenChain(spec)
 	for a := 0; a <= 10; a++ {

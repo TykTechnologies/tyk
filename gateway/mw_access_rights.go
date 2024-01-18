@@ -9,7 +9,7 @@ import (
 // permission to access the specific version. If no permission data is in the user.SessionState, then
 // it is assumed that the user can go through.
 type AccessRightsCheck struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (a *AccessRightsCheck) Name() string {

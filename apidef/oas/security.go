@@ -108,6 +108,10 @@ type JWT struct {
 	IssuedAtValidationSkew  uint64   `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
 	NotBeforeValidationSkew uint64   `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
 	ExpiresAtValidationSkew uint64   `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
+	// IDPClientIDMappingDisabled prevents Tyk from automatically detecting the use of certain IDPs based on standard claims
+	// that they include in the JWT: `client_id`, `cid`, `clientId`. Setting this flag to `true` disables the mapping and avoids
+	// accidentally misidentifying the use of one of these IDPs if one of their standard values is configured in your JWT.
+	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty"`
 }
 
 // Import populates *JWT based on arguments.
@@ -166,6 +170,7 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.IssuedAtValidationSkew = api.JWTIssuedAtValidationSkew
 	jwt.NotBeforeValidationSkew = api.JWTNotBeforeValidationSkew
 	jwt.ExpiresAtValidationSkew = api.JWTExpiresAtValidationSkew
+	jwt.IDPClientIDMappingDisabled = api.IDPClientIDMappingDisabled
 
 	s.getTykSecuritySchemes()[ac.Name] = jwt
 
@@ -195,6 +200,7 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.JWTIssuedAtValidationSkew = jwt.IssuedAtValidationSkew
 	api.JWTNotBeforeValidationSkew = jwt.NotBeforeValidationSkew
 	api.JWTExpiresAtValidationSkew = jwt.ExpiresAtValidationSkew
+	api.IDPClientIDMappingDisabled = jwt.IDPClientIDMappingDisabled
 
 	api.AuthConfigs[apidef.JWTType] = ac
 }
@@ -407,8 +413,8 @@ type JWTValidation struct {
 	SigningMethod string `bson:"signingMethod" json:"signingMethod"`
 	// Source is the secret to verify signature, it could be one among:
 	// - a base64 encoded static secret,
-	// - a valid JWK url in plain text,
-	// - a valid JWK url in base64 encoded format.
+	// - a valid JWK URL in plain text,
+	// - a valid JWK URL in base64 encoded format.
 	Source string `bson:"source" json:"source"`
 	// IdentityBaseField is the identity claim name.
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`

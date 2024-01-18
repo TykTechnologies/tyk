@@ -256,7 +256,7 @@ func (gw *Gateway) checkAndApplyTrialPeriod(keyName string, newSession *user.Ses
 
 func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APISpec, isHashed bool) error {
 	// use basic middleware to apply policies to key/session (it also saves it)
-	mw := BaseMiddleware{
+	mw := &BaseMiddleware{
 		Spec: spec,
 		Gw:   gw,
 	}
@@ -447,7 +447,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
-	mw := BaseMiddleware{Gw: gw}
+	mw := &BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 	// DO ADD OR UPDATE
@@ -607,7 +607,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 		return apiError("Key not found"), http.StatusNotFound
 	}
 
-	mw := BaseMiddleware{Spec: spec, Gw: gw}
+	mw := &BaseMiddleware{Spec: spec, Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(&session)
 
@@ -743,12 +743,13 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 			"status": "fail",
 			"err":    err,
 		}).Error("Failed to update key.")
+		return
 	}
 	log.WithFields(logrus.Fields{
 		"prefix": "RPC",
 		"key":    gw.obfuscateKey(keyName),
 		"status": "ok",
-	}).Info("Updated hashed key in slave storage.")
+	}).Info("Updated key in slave storage.")
 }
 
 func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
@@ -1895,11 +1896,9 @@ func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
 	}).Info("Org key deleted.")
 
 	// identify that spec has no org session
-	if spec != nil {
-		spec.Lock()
-		spec.OrgHasNoSession = true
-		spec.Unlock()
-	}
+	spec.Lock()
+	spec.OrgHasNoSession = true
+	spec.Unlock()
 
 	statusObj := apiModifyKeySuccess{
 		Key:    orgID,
@@ -1979,7 +1978,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	sessionManager := gw.GlobalSessionManager
 
-	mw := BaseMiddleware{Gw: gw}
+	mw := &BaseMiddleware{Gw: gw}
 	if err := mw.ApplyPolicies(newSession); err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
 		return
@@ -2101,7 +2100,7 @@ func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	newSession.DateCreated = time.Now()
 
-	mw := BaseMiddleware{Gw: gw}
+	mw := &BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 

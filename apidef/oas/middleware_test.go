@@ -550,6 +550,40 @@ func TestPluginConfigData(t *testing.T) {
 	})
 }
 
+func TestCircuitBreaker(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var emptyCircuitBreaker CircuitBreaker
+
+		var convertedCircuitBreaker apidef.CircuitBreakerMeta
+		emptyCircuitBreaker.ExtractTo(&convertedCircuitBreaker)
+
+		var resultCircuitBreaker CircuitBreaker
+		resultCircuitBreaker.Fill(convertedCircuitBreaker)
+
+		assert.Equal(t, emptyCircuitBreaker, resultCircuitBreaker)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		t.Parallel()
+		expectedCircuitBreaker := CircuitBreaker{
+			Enabled:              true,
+			Threshold:            10,
+			SampleSize:           5,
+			CoolDownPeriod:       50,
+			HalfOpenStateEnabled: true,
+		}
+
+		meta := apidef.CircuitBreakerMeta{}
+		expectedCircuitBreaker.ExtractTo(&meta)
+
+		actualCircuitBreaker := CircuitBreaker{}
+		actualCircuitBreaker.Fill(meta)
+		assert.Equal(t, expectedCircuitBreaker, actualCircuitBreaker)
+	})
+}
+
 func TestVirtualEndpoint(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -697,4 +731,16 @@ func TestEndpointPostPlugins(t *testing.T) {
 
 		assert.Equal(t, expectedEndpointPostPlugins, actualEndpointPostPlugins)
 	})
+}
+
+func TestTransformHeaders(t *testing.T) {
+	var emptyTransformHeaders TransformHeaders
+
+	var converted apidef.HeaderInjectionMeta
+	emptyTransformHeaders.ExtractTo(&converted)
+
+	var resultTransformHeaders TransformHeaders
+	resultTransformHeaders.Fill(converted)
+
+	assert.Equal(t, emptyTransformHeaders, resultTransformHeaders)
 }

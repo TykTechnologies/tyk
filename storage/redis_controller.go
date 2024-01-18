@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"github.com/cenk/backoff"
-	redis "github.com/go-redis/redis/v8"
+
+	redis "github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/TykTechnologies/tyk/config"
 )
@@ -240,4 +241,12 @@ func (rc *RedisController) establishConnection(v *RedisCluster, conf config.Conf
 		return false
 	}
 	return clusterConnectionIsOpen(v)
+}
+
+// MockWith is used to mock redis controller with a redis client.
+func (rc *RedisController) MockWith(client redis.UniversalClient, redisUp bool) {
+	rc.singlePool = client
+	rc.singleAnalyticsPool = client
+	rc.singleAnalyticsPool = client
+	rc.redisUp.Store(redisUp)
 }

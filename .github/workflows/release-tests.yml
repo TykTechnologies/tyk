@@ -1,0 +1,97 @@
+# yamllint disable rule:line-length
+---
+name: Run CI tests and smoke tests
+
+on:  # yamllint disable-line rule:truthy
+  workflow_call:
+
+jobs:
+  opentelemetry-e2e:
+    name: Opentelemetry e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Task
+        uses: arduino/setup-task@v1
+        with:
+          version: 3
+
+      - id: ecr-login
+        uses: ./.github/actions/ecr-login
+
+      - name: Run e2e opentelemetry tests
+        env:
+          GATEWAY_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}
+        run: task opentelemetry
+
+  ci-tests:
+    name: CI Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - id: ecr-login
+        uses: ./.github/actions/ecr-login
+
+      - name: Run /ci/tests
+        shell: bash
+        env:
+          GITHUB_TAG: ${{ github.ref }}
+          GATEWAY_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}
+          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
+        run: |
+          set -eaxo pipefail
+          for d in ci/tests/*/
+          do
+              echo Attempting to test $d
+              if [ -d $d ] && [ -e $d/test.sh ]; then
+                  cd $d
+                  ./test.sh
+                  cd -
+              fi
+          done
+
+  smoke-tests:
+    name: Smoke tests
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags')
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - id: ecr-login
+        uses: ./.github/actions/ecr-login
+
+      - name: Run /ci/smoke-tests
+
+        # This job only runs whenever a tag is created. A tag is required
+        # for a functional plugin compiler build for when the GO_GET=1 env
+        # is provided. The plugin compiler cannot fetch the referenced
+        # commit from a PR, but requires a /heads or /tags reference.
+        #
+        # See https://github.com/golang/go/issues/31191 for more info.
+
+        shell: bash
+        env:
+          GITHUB_TAG: ${{ github.ref }}
+          GATEWAY_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}
+          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
+        run: |
+          set -eaxo pipefail
+          for d in ci/smoke-tests/*/
+          do
+              echo Attempting to test $d
+              if [ -d $d ] && [ -e $d/test.sh ]; then
+                  cd $d
+                  ./test.sh
+                  cd -
+              fi
+          done

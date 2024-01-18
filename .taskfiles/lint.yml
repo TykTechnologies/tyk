@@ -1,0 +1,54 @@
+---
+version: "3"
+
+vars:
+  golangci: '--max-same-issues=0 --max-issues-per-linter=0'
+  root:
+    sh: git rev-parse --show-toplevel
+  package:
+    sh: go mod edit -json | jq .Module.Path -r
+
+tasks:
+  default:
+    desc: "Run linters"
+    cmds:
+      - task: vet
+      - task: golangci-lint
+        vars:
+          args: "{{.golangci}} --new-from-rev=origin/master"
+      - task: x-tyk-gateway
+
+  all:
+    desc: "Run linters (full source)"
+    cmds:
+      - task: vet
+      - task: golangci-lint
+        vars:
+          args: "{{.golangci}}"
+      - task: x-tyk-gateway
+
+  x-tyk-gateway:
+    desc: "Lint x-tyk-gateway schema"
+    cmds:
+      - go test -run=TestXTykGateway_Lint -v ./apidef/oas/
+
+  vet:
+    desc: "Run go vet"
+    cmds:
+      - go vet ./...
+
+  golangci-lint:
+    desc: "Run golangci-lint"
+    require: [args]
+    cmds:
+      - golangci-lint run {{.args}} -v ./...
+
+  goimports:
+    desc: "Run goimports"
+    cmds:
+      - goimports -local {{.package | dir}},{{.package}}/internal -w .
+
+  gofmt:
+    desc: "Run gofmt"
+    cmds:
+      - gofmt -w .

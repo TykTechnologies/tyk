@@ -19,7 +19,7 @@ const (
 )
 
 type GraphQLComplexityMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (m *GraphQLComplexityMiddleware) Name() string {

@@ -56,7 +56,7 @@ func (ts *Test) prepareExtractor(tb testing.TB, extractorSource apidef.IdExtract
 	}
 
 	spec := ts.createSpecTestFrom(tb, def)
-	mw := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+	mw := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 	newExtractor(spec, mw)
 
 	extractor, ok := spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)

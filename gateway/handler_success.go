@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -44,7 +43,7 @@ type ReturningHttpHandler interface {
 
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
 type SuccessHandler struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func tagHeaders(r *http.Request, th []string, tags []string) []string {
@@ -322,10 +321,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 
 	// Report in health check
 	reportHealthValue(s.Spec, RequestLog, strconv.FormatInt(timing.Total, 10))
-
-	if memProfFile != nil {
-		pprof.WriteHeapProfile(memProfFile)
-	}
 }
 
 func recordDetail(r *http.Request, spec *APISpec) bool {

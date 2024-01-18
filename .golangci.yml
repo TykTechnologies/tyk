@@ -63,7 +63,7 @@ run:
   # Define the Go version limit.
   # Mainly related to generics support since go1.18.
   # Default: use Go version from the go.mod file, fallback on the env var `GOVERSION`, fallback on 1.18
-  go: '1.19'
+  go: '1.21'
 
 linters:
   disable:
@@ -75,6 +75,7 @@ linters:
     - ireturn
     - goerr113
   enable:
+    - govet
     - gochecknoinits
     - thelper
     - errcheck
@@ -84,8 +85,28 @@ linters:
     - nilerr
     - misspell
     - goimports
+    - revive
 
 linters-settings:
+  revive:
+    ignore-generated-header: true
+    severity: error
+    enable-all-rules: false
+    rules:
+      - name: unused-parameter
+        disabled: false
+        arguments:
+          - allowRegex: "^_"
+      - name: exported
+        disabled: false
+
+  govet:
+    check-shadowing: true
+    enable-all: true
+    disable:
+      - fieldalignment
+      - shadow
+
   goimports:
     local-prefixes: github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal
 
@@ -96,6 +117,7 @@ linters-settings:
       - (*github.com/TykTechnologies/tyk/gateway.Test).Run
 
 issues:
+  exclude-use-default: false
   exclude-rules:
     - path: _test\.go
       linters:

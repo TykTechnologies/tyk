@@ -17,9 +17,6 @@ func TestRateLimit_Unlimited(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
 
-	g.Gw.DRLManager.SetCurrentTokenValue(1)
-	g.Gw.DRLManager.RequestTokenValue = 1
-
 	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false

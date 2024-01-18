@@ -50,7 +50,8 @@ type VMResponseObject struct {
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
 type VirtualEndpoint struct {
-	BaseMiddleware
+	*BaseMiddleware
+
 	sh SuccessHandler
 }
 

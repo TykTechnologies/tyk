@@ -25,6 +25,9 @@ type Operation struct {
 	// IgnoreAuthentication ignores authentication on request by allowance.
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 
+	// Internal makes the endpoint only respond to internal requests.
+	Internal *Internal `bson:"internal,omitempty" json:"internal,omitempty"`
+
 	// TransformRequestMethod allows you to transform the method of a request.
 	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
 
@@ -35,6 +38,15 @@ type Operation struct {
 	// TransformResponseBody allows you to transform response body.
 	// When both `path` and `body` are provided, body would take precedence.
 	TransformResponseBody *TransformBody `bson:"transformResponseBody,omitempty" json:"transformResponseBody,omitempty"`
+
+	// TransformRequestHeaders allows you to transform request headers.
+	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
+
+	// TransformResponseHeaders allows you to transform response headers.
+	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
+
+	// URLRewrite contains the URL rewriting configuration.
+	URLRewrite *URLRewrite `bson:"urlRewrite,omitempty" json:"urlRewrite,omitempty"`
 
 	// Cache contains the caching plugin configuration.
 	Cache *CachePlugin `bson:"cache,omitempty" json:"cache,omitempty"`
@@ -53,6 +65,15 @@ type Operation struct {
 
 	// PostPlugins contains endpoint level post plugins configuration.
 	PostPlugins EndpointPostPlugins `bson:"postPlugins,omitempty" json:"postPlugins,omitempty"`
+
+	// CircuitBreaker contains the configuration for the circuit breaker functionality.
+	CircuitBreaker *CircuitBreaker `bson:"circuitBreaker,omitempty" json:"circuitBreaker,omitempty"`
+
+	// TrackEndpoint contains the configuration for enabling analytics and logs.
+	TrackEndpoint *TrackEndpoint `bson:"trackEndpoint,omitempty" json:"trackEndpoint,omitempty"`
+
+	// DoNotTrackEndpoint contains the configuration for disabling analytics and logs.
+	DoNotTrackEndpoint *TrackEndpoint `bson:"doNotTrackEndpoint,omitempty" json:"doNotTrackEndpoint,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -121,25 +142,22 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTransformRequestMethod(ep.MethodTransforms)
 	s.fillTransformRequestBody(ep.Transform)
 	s.fillTransformResponseBody(ep.TransformResponse)
+	s.fillTransformRequestHeaders(ep.TransformHeader)
+	s.fillTransformResponseHeaders(ep.TransformResponseHeader)
+	s.fillURLRewrite(ep.URLRewrite)
+	s.fillInternal(ep.Internal)
 	s.fillCache(ep.AdvanceCacheConfig)
 	s.fillEnforceTimeout(ep.HardTimeouts)
 	s.fillOASValidateRequest(ep.ValidateJSON)
 	s.fillVirtualEndpoint(ep.Virtual)
 	s.fillEndpointPostPlugins(ep.GoPlugin)
+	s.fillCircuitBreaker(ep.CircuitBreaker)
+	s.fillTrackEndpoint(ep.TrackEndpoints)
+	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
-	ep.Ignored = nil
-	ep.WhiteList = nil
-	ep.BlackList = nil
-	ep.AdvanceCacheConfig = nil
-	ep.Transform = nil
-	ep.TransformResponse = nil
-	ep.HardTimeouts = nil
-	ep.Virtual = nil
-	ep.MethodTransforms = nil
-	ep.ValidateRequest = nil
-	ep.GoPlugin = nil
+	ep.Clear()
 
 	tykOperations := s.getTykOperations()
 	if len(tykOperations) == 0 {
@@ -154,13 +172,20 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractAllowanceTo(ep, path, method, allow)
 					tykOp.extractAllowanceTo(ep, path, method, block)
 					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
+					tykOp.extractInternalTo(ep, path, method)
 					tykOp.extractTransformRequestMethodTo(ep, path, method)
 					tykOp.extractTransformRequestBodyTo(ep, path, method)
 					tykOp.extractTransformResponseBodyTo(ep, path, method)
+					tykOp.extractTransformRequestHeadersTo(ep, path, method)
+					tykOp.extractTransformResponseHeadersTo(ep, path, method)
+					tykOp.extractURLRewriteTo(ep, path, method)
 					tykOp.extractCacheTo(ep, path, method)
 					tykOp.extractEnforceTimeoutTo(ep, path, method)
 					tykOp.extractVirtualEndpointTo(ep, path, method)
 					tykOp.extractEndpointPostPluginTo(ep, path, method)
+					tykOp.extractCircuitBreakerTo(ep, path, method)
+					tykOp.extractTrackEndpointTo(ep, path, method)
+					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					break found
 				}
 			}
@@ -242,6 +267,38 @@ func (s *OAS) fillTransformResponseBody(metas []apidef.TemplateMeta) {
 		operation.TransformResponseBody.Fill(meta)
 		if ShouldOmit(operation.TransformResponseBody) {
 			operation.TransformResponseBody = nil
+		}
+	}
+}
+
+func (s *OAS) fillTransformRequestHeaders(metas []apidef.HeaderInjectionMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		if operation.TransformRequestHeaders == nil {
+			operation.TransformRequestHeaders = &TransformHeaders{}
+		}
+
+		operation.TransformRequestHeaders.Fill(meta)
+		if ShouldOmit(operation.TransformRequestHeaders) {
+			operation.TransformRequestHeaders = nil
+		}
+	}
+}
+
+func (s *OAS) fillTransformResponseHeaders(metas []apidef.HeaderInjectionMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		if operation.TransformResponseHeaders == nil {
+			operation.TransformResponseHeaders = &TransformHeaders{}
+		}
+
+		operation.TransformResponseHeaders.Fill(meta)
+		if ShouldOmit(operation.TransformResponseHeaders) {
+			operation.TransformResponseHeaders = nil
 		}
 	}
 }
@@ -328,6 +385,26 @@ func (o *Operation) extractTransformResponseBodyTo(ep *apidef.ExtendedPathsSet, 
 	ep.TransformResponse = append(ep.TransformResponse, meta)
 }
 
+func (o *Operation) extractTransformRequestHeadersTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.TransformRequestHeaders == nil {
+		return
+	}
+
+	meta := apidef.HeaderInjectionMeta{Path: path, Method: method}
+	o.TransformRequestHeaders.ExtractTo(&meta)
+	ep.TransformHeader = append(ep.TransformHeader, meta)
+}
+
+func (o *Operation) extractTransformResponseHeadersTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.TransformResponseHeaders == nil {
+		return
+	}
+
+	meta := apidef.HeaderInjectionMeta{Path: path, Method: method}
+	o.TransformResponseHeaders.ExtractTo(&meta)
+	ep.TransformResponseHeader = append(ep.TransformResponseHeader, meta)
+}
+
 func (o *Operation) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.Cache == nil {
 		return
@@ -384,10 +461,10 @@ func isRegex(value string) bool {
 	return false
 }
 
-// splitPath splits url into folder parts, detecting regex patterns.
+// splitPath splits URL into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
-	// Each url fragment can contain a regex, but the whole
-	// url isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
+	// Each URL fragment can contain a regex, but the whole
+	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
 	parts := strings.Split(strings.Trim(inPath, "/"), "/")
 	result := make([]pathPart, len(parts))
 	found := 0
@@ -409,7 +486,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 	return result, found > 0
 }
 
-// buildPath converts the url paths with regex to named parameters
+// buildPath converts the URL paths with regex to named parameters
 // e.g. ["a", ".*"] becomes /a/{customRegex1}.
 func buildPath(parts []pathPart, appendSlash bool) string {
 	newPath := ""
@@ -702,4 +779,29 @@ func (o *Operation) extractEndpointPostPluginTo(ep *apidef.ExtendedPathsSet, pat
 	meta := apidef.GoPluginMeta{Path: path, Method: method}
 	o.PostPlugins.ExtractTo(&meta)
 	ep.GoPlugin = append(ep.GoPlugin, meta)
+}
+
+func (o *Operation) extractCircuitBreakerTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.CircuitBreaker == nil {
+		return
+	}
+
+	meta := apidef.CircuitBreakerMeta{Path: path, Method: method}
+	o.CircuitBreaker.ExtractTo(&meta)
+	ep.CircuitBreaker = append(ep.CircuitBreaker, meta)
+}
+
+func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.CircuitBreaker == nil {
+			operation.CircuitBreaker = &CircuitBreaker{}
+		}
+
+		operation.CircuitBreaker.Fill(meta)
+		if ShouldOmit(operation.CircuitBreaker) {
+			operation.CircuitBreaker = nil
+		}
+	}
 }

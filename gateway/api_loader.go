@@ -295,7 +295,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	// Create the response processors, pass all the loaded custom middleware response functions:
 	gw.createResponseMiddlewareChain(spec, mwResponseFuncs)
 
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger, Gw: gw}
+	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger, Gw: gw}
 
 	for _, v := range baseMid.Spec.VersionData.Versions {
 		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
@@ -576,7 +576,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if found, err := isLoop(r); found {
 		if err != nil {
-			handler := ErrorHandler{*d.SH.Base()}
+			handler := ErrorHandler{d.SH.Base()}
 			handler.HandleError(w, r, err.Error(), http.StatusInternalServerError, true)
 			return
 		}
@@ -607,7 +607,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			} else {
-				handler := ErrorHandler{*d.SH.Base()}
+				handler := ErrorHandler{d.SH.Base()}
 				handler.HandleError(w, r, "Can't detect loop target", http.StatusInternalServerError, true)
 				return
 			}
@@ -631,7 +631,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if d.SH.Spec.target.Scheme == "tyk" {
 		handler, _, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
 		if !found {
-			handler := ErrorHandler{*d.SH.Base()}
+			handler := ErrorHandler{d.SH.Base()}
 			handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
 			return
 		}
