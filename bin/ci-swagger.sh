@@ -32,15 +32,17 @@ fi
 
 ## If running this on macOS, you might need to change sed to gsed
 
-sed -n '1,/components:/p' $openAPIspecfileName > $tempUpdatedOpenAPIFileName
+sed -n '1,/components:/p' swagger.yml > $tempUpdatedOpenAPIFileName
 
 if [ $? -ne 0 ]; then
-	fatal "replace operation failed step 1"
+	fatal_error "sed replace operation failed for file: $openAPIspecfileName"
 fi
 
 lineToStartReplaceFrom=$(grep -n "responses:" swagger.yml | tail -1 |  awk '{split($0,a,":"); print a[1]}')
 
-sed -n "$lineToStartReplaceFrom,/components:/p" $openAPIspecfileName >> $tempUpdatedOpenAPIFileName
+if ! sed -n "$lineToStartReplaceFrom,/components:/p" swagger.yml >> $tempUpdatedOpenAPIFileName; then
+	fatal_error "sed replace operation failed for file: $openAPIspecfileName"
+fi
 if [ $? -ne 0 ]; then
 	fatal "replace operation failed"
 fi
