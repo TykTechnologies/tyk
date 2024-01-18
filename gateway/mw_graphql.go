@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
@@ -35,8 +36,10 @@ const (
 )
 
 var (
-	ProxyingRequestFailedErr     = errors.New("there was a problem proxying the request")
-	GraphQLDepthLimitExceededErr = errors.New("depth limit exceeded")
+	ProxyingRequestFailedErr          = errors.New("there was a problem proxying the request")
+	GraphQLDepthLimitExceededErr      = errors.New("depth limit exceeded")
+	GraphQLNodeLimitExceededErr       = errors.New("max number of nodes exceeded")
+	GraphQLComplexityLimitExceededErr = errors.New("max graphql complexity reached")
 )
 
 type GraphQLMiddleware struct {
@@ -246,6 +249,12 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	defer ctxSetGraphQLRequest(r, &gqlRequest)
+
+	// first validate the complexity before normalizing
+	err, code := m.validateComplexity(w, &gqlRequest)
+	if err != nil {
+		return err, code
+	}
 	if conf := m.Gw.GetConfig(); conf.OpenTelemetry.Enabled && m.Spec.DetailedTracing {
 		ctx, span := m.Gw.TracerProvider.Tracer().Start(r.Context(), "GraphqlMiddleware Validation")
 		defer span.End()
@@ -254,6 +263,49 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	} else {
 		return m.validateRequest(w, &gqlRequest)
 	}
+}
+
+func (m *GraphQLMiddleware) validateComplexity(rw http.ResponseWriter, req *gql.Request) (error, int) {
+	result, err := req.CalculateComplexity(gql.DefaultComplexityCalculator, m.Spec.GraphQLExecutor.Schema)
+	if err != nil {
+		m.Logger().Errorf("Error while validating complexity: %v", err)
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+
+	if result.Errors != nil && result.Errors.Count() > 0 {
+		return m.writeGraphQLError(rw, result.Errors)
+	}
+
+	if result.Depth > m.Spec.GraphQL.Complexity.MaxDepth {
+		return GraphQLDepthLimitExceededErr, http.StatusBadRequest
+	}
+
+	// global result checks
+	switch {
+	case result.Depth > m.Spec.GraphQL.Complexity.MaxDepth:
+		return GraphQLDepthLimitExceededErr, http.StatusBadRequest
+	case result.NodeCount > m.Spec.GraphQL.Complexity.MaxNodes:
+		return GraphQLNodeLimitExceededErr, http.StatusBadRequest
+	case result.Complexity > m.Spec.GraphQL.Complexity.MaxComplexity:
+		return GraphQLComplexityLimitExceededErr, http.StatusBadRequest
+	}
+
+	for _, fieldConfig := range m.Spec.GraphQL.Complexity.Fields {
+		for _, fieldResult := range result.PerRootField {
+			if fieldConfig.TypeName != fieldResult.TypeName || fieldConfig.FieldName != fieldResult.FieldName {
+				continue
+			}
+			switch {
+			case fieldResult.Complexity > fieldConfig.MaxComplexity:
+				return fmt.Errorf("error on field \"%s\" of type %s: %w", fieldConfig.FieldName, fieldConfig.TypeName, GraphQLComplexityLimitExceededErr), http.StatusBadRequest
+			case fieldResult.Depth > fieldConfig.MaxDepth:
+				return fmt.Errorf("error on field \"%s\" of type %s: %w", fieldConfig.FieldName, fieldConfig.TypeName, GraphQLDepthLimitExceededErr), http.StatusBadRequest
+			case fieldResult.NodeCount > fieldConfig.MaxNodes:
+				return fmt.Errorf("error on field \"%s\" of type %s: %w", fieldConfig.FieldName, fieldConfig.TypeName, GraphQLNodeLimitExceededErr), http.StatusBadRequest
+			}
+		}
+	}
+	return nil, http.StatusOK
 }
 
 func (m *GraphQLMiddleware) validateRequest(w http.ResponseWriter, gqlRequest *gql.Request) (error, int) {

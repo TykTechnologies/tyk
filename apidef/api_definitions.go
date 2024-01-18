@@ -782,6 +782,22 @@ type CORSConfig struct {
 	Debug              bool     `bson:"debug" json:"debug"`
 }
 
+type GraphQLComplexityConfig struct {
+	Enabled       bool                           `bson:"enabled" json:"enabled"`
+	MaxNodes      int                            `bson:"max_nodes" json:"max_nodes"`
+	MaxDepth      int                            `bson:"max_depth" json:"max_depth"`
+	MaxComplexity int                            `bson:"max_complexity" json:"max_complexity"`
+	Fields        []GraphQLFieldComplexityConfig `bson:"fields" json:"fields"`
+}
+
+type GraphQLFieldComplexityConfig struct {
+	TypeName      string `bson:"type_name" json:"type_name"`
+	FieldName     string `bson:"field_name" json:"field_name"`
+	MaxNodes      int    `bson:"max_nodes" json:"max_nodes"`
+	MaxComplexity int    `bson:"max_complexity" json:"max_complexity"`
+	MaxDepth      int    `bson:"max_depth" json:"max_depth"`
+}
+
 // GraphQLConfig is the root config object for a GraphQL API.
 type GraphQLConfig struct {
 	// Enabled indicates if GraphQL should be enabled.
@@ -808,6 +824,8 @@ type GraphQLConfig struct {
 	Supergraph GraphQLSupergraphConfig `bson:"supergraph" json:"supergraph"`
 	// Introspection holds the configuration for GraphQL Introspection
 	Introspection GraphQLIntrospectionConfig `bson:"introspection" json:"introspection"`
+	// Complexity holds the configuration for graphql complexity and limitation
+	Complexity GraphQLComplexityConfig `bson:"complexity" json:"complexity"`
 }
 
 type GraphQLConfigVersion string

@@ -713,7 +713,46 @@ const Schema = `{
                     "required": [
                         "enabled"
                     ]
-                }
+                },
+				 "complexity": {
+          			"type": ["object","null"],
+          			"properties": {
+            			"enabled": {
+              				"type": "boolean"
+            			},
+            			"max_nodes": {
+              				"type": "integer"
+						},
+						"max_depth": {
+							"type": "integer"
+						},
+						"max_complexity": {
+							"type": "integer"
+						},
+						"fields": {
+              				"type": ["array","null"],
+              				"required": ["type_name", "field_name"],
+							"properties": {
+				                "type_name": {
+									"type": "string"
+				                },
+                				"field_name": {
+									"type": "string"
+				                },
+                				"max_nodes": {
+									"type": "integer"
+				                },
+                				"max_depth": {
+				                  "type": "integer"
+                				},
+				                "max_complexity": {
+									"type": "integer"
+				                }
+							}
+			            }
+          			},
+          			"required": ["enabled"]
+				}
             },
             "required": [
                 "enabled"
