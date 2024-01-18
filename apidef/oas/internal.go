@@ -3,6 +3,7 @@ package oas
 import "github.com/TykTechnologies/tyk/apidef"
 
 // Internal holds the endpoint configuration, configuring the endpoint for internal requests.
+// Tyk classic API definition: `version_data.versions[].extended_paths.internal`.
 type Internal struct {
 	// Enabled if set to true makes the endpoint available only for internal requests.
 	Enabled bool `bson:"enabled" json:"enabled"`
