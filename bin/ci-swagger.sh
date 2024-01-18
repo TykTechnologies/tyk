@@ -5,7 +5,7 @@ tempOpenAPIFileName="temp-swagger.yml"
 tempUpdatedOpenAPIFileName="temp-swagger2.yml"
 openAPIspecfileName="swagger.yml"
 
-fatal() {
+fatal_error() {
 	echo "$@" >&2
 	exit 1
 }
@@ -28,8 +28,7 @@ if [ $? -ne 0 ]; then
 	fatal "could not convert swagger2.0 spec to opeenapi 3.0"
 fi
 
-## clean up
-rm "$swagger2fileName"
+
 
 ## If running this on macOS, you might need to change sed to gsed
 
