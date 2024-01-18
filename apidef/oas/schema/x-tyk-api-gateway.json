@@ -815,6 +815,18 @@
         "enabled"
       ]
     },
+    "X-Tyk-TrackEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-URLRewriteTrigger": {
       "type": "object",
       "additionalProperties": false,
@@ -911,6 +923,12 @@
         },
         "virtualEndpoint": {
           "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
+        },
+        "trackEndpoint": {
+          "$ref": "#/definitions/X-Tyk-TrackEndpoint"
+        },
+        "doNotTrackEndpoint": {
+          "$ref": "#/definitions/X-Tyk-TrackEndpoint"
         },
         "circuitBreaker":{
           "$ref": "#/definitions/X-Tyk-CircuitBreaker"

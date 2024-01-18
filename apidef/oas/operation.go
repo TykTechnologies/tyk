@@ -65,6 +65,12 @@ type Operation struct {
 
 	// CircuitBreaker contains the configuration for the circuit breaker functionality.
 	CircuitBreaker *CircuitBreaker `bson:"circuitBreaker,omitempty" json:"circuitBreaker,omitempty"`
+
+	// TrackEndpoint contains the configuration for enabling analytics and logs.
+	TrackEndpoint *TrackEndpoint `bson:"trackEndpoint,omitempty" json:"trackEndpoint,omitempty"`
+
+	// DoNotTrackEndpoint contains the configuration for disabling analytics and logs.
+	DoNotTrackEndpoint *TrackEndpoint `bson:"doNotTrackEndpoint,omitempty" json:"doNotTrackEndpoint,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -142,6 +148,8 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillVirtualEndpoint(ep.Virtual)
 	s.fillEndpointPostPlugins(ep.GoPlugin)
 	s.fillCircuitBreaker(ep.CircuitBreaker)
+	s.fillTrackEndpoint(ep.TrackEndpoints)
+	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -171,6 +179,8 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractVirtualEndpointTo(ep, path, method)
 					tykOp.extractEndpointPostPluginTo(ep, path, method)
 					tykOp.extractCircuitBreakerTo(ep, path, method)
+					tykOp.extractTrackEndpointTo(ep, path, method)
+					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					break found
 				}
 			}

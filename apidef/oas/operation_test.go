@@ -40,6 +40,8 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 
 	var operation Operation
 	Fill(t, &operation, 0)
+	operation.TrackEndpoint = nil                     // This one also fills native part, let's skip it for this test.
+	operation.DoNotTrackEndpoint = nil                // This one also fills native part, let's skip it for this test.
 	operation.ValidateRequest = nil                   // This one also fills native part, let's skip it for this test.
 	operation.MockResponse = nil                      // This one also fills native part, let's skip it for this test.
 	operation.URLRewrite = nil                        // This one also fills native part, let's skip it for this test.

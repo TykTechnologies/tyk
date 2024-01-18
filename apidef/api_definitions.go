@@ -202,8 +202,9 @@ type HardTimeoutMeta struct {
 }
 
 type TrackEndpointMeta struct {
-	Path   string `bson:"path" json:"path"`
-	Method string `bson:"method" json:"method"`
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
 }
 
 type InternalMeta struct {
@@ -364,8 +365,6 @@ func (e *ExtendedPathsSet) Clear() {
 		TransformJQResponse: e.TransformJQResponse,
 		CircuitBreaker:      e.CircuitBreaker,
 		SizeLimit:           e.SizeLimit,
-		TrackEndpoints:      e.TrackEndpoints,
-		DoNotTrackEndpoints: e.DoNotTrackEndpoints,
 		Internal:            e.Internal,
 		PersistGraphQL:      e.PersistGraphQL,
 	}
