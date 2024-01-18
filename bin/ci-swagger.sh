@@ -2,10 +2,10 @@
 
 swagger2fileName="swagger2.yaml"
 tempOpenAPIFileName="temp-swagger.yml"
-tempUpdatedOpenAPIFileName="temp-swagger2.yml"
+tempUpdatedOpenAPIFileName="temp-swagger.yml"
 openAPIspecfileName="swagger.yml"
 
-fatal() {
+fatal_error() {
 	echo "$@" >&2
 	exit 1
 }
@@ -28,25 +28,30 @@ if [ $? -ne 0 ]; then
 	fatal "could not convert swagger2.0 spec to opeenapi 3.0"
 fi
 
-## clean up
-rm "$swagger2fileName"
+
 
 ## If running this on macOS, you might need to change sed to gsed
 
-sed -n '1,/components:/p' $openAPIspecfileName > $tempUpdatedOpenAPIFileName
+sed -n '1,/components:/p' swagger.yml > $tempUpdatedOpenAPIFileName
 
 if [ $? -ne 0 ]; then
-	fatal "replace operation failed step 1"
+	fatal_error "sed replace operation failed for file: $openAPIspecfileName"
 fi
 
 lineToStartReplaceFrom=$(grep -n "responses:" swagger.yml | tail -1 |  awk '{split($0,a,":"); print a[1]}')
 
-sed -n "$lineToStartReplaceFrom,/components:/p" $openAPIspecfileName >> $tempUpdatedOpenAPIFileName
+if ! sed -n "$lineToStartReplaceFrom,/components:/p" swagger.yml >> $tempUpdatedOpenAPIFileName; then
+	fatal_error "sed replace operation failed for file: $openAPIspecfileName"
+fi
 if [ $? -ne 0 ]; then
 	fatal "replace operation failed"
 fi
 
-mv $tempUpdatedOpenAPIFileName $openAPIspecfileName
+if ! if ! mv $tempUpdatedOpenAPIFileName $openAPIspecfileName; then
+	fatal_error "mv command failed for file: $tempUpdatedOpenAPIFileName to $openAPIspecfileName"
+fi; then
+	fatal_error "mv command failed for file: $tempUpdatedOpenAPIFileName to $openAPIspecfileName"
+fi
 
 ## Ideally, CI should push $openAPIspecfileName to GitHub
 ## but for now, it can be committed by users and pushed alonside their changes.
