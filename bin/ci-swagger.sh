@@ -2,7 +2,7 @@
 
 swagger2fileName="swagger2.yaml"
 tempOpenAPIFileName="temp-swagger.yml"
-tempUpdatedOpenAPIFileName="temp-swagger2.yml"
+tempUpdatedOpenAPIFileName="temp-swagger.yml"
 openAPIspecfileName="swagger.yml"
 
 fatal_error() {
@@ -47,7 +47,11 @@ if [ $? -ne 0 ]; then
 	fatal "replace operation failed"
 fi
 
-mv $tempUpdatedOpenAPIFileName $openAPIspecfileName
+if ! if ! mv $tempUpdatedOpenAPIFileName $openAPIspecfileName; then
+	fatal_error "mv command failed for file: $tempUpdatedOpenAPIFileName to $openAPIspecfileName"
+fi; then
+	fatal_error "mv command failed for file: $tempUpdatedOpenAPIFileName to $openAPIspecfileName"
+fi
 
 ## Ideally, CI should push $openAPIspecfileName to GitHub
 ## but for now, it can be committed by users and pushed alonside their changes.
