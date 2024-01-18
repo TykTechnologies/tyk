@@ -29,6 +29,72 @@ Tyk runs natively on _Kubernetes_, if you prefer, thanks to the _[Tyk Kubernetes
    <td>The Enterprise API Management platform: Management Control Plane, Dashboard GUI & Developer Portal. Install <a href="https://tyk.io/api-lifecycle-management/">Tyk Self Managed</a>
    </td>
   </tr>
+  <tr>
+   <td>**Troubleshooting Steps and Possible Solutions**
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>**Issue**: GitHub Actions run failed with the following error logs
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>**Troubleshooting Steps**:
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>1. Check the GitHub Actions workflow file (e.g., `.github/workflows/main.yml`) for any syntax errors or incorrect configuration.
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>2. Verify that all required environment variables are correctly set in the GitHub repository secrets or workflow file.
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>3. Review the error logs and identify any specific error messages or stack traces.
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>**Possible Solutions**:
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>1. Fix any syntax errors or incorrect configuration in the GitHub Actions workflow file.
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>2. Double-check the environment variables and ensure they are correctly set with the required values.
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>3. Analyze the error logs and search for the specific error messages or stack traces to find relevant solutions.
+   </td>
+   <td>
+   </td>
+  </tr>
+  <tr>
+   <td>4. If the error persists, consult the Tyk Technologies community board or create a GitHub issue for further assistance.
+   </td>
+   <td>
+   </td>
+  </tr>
 </table>
 
 
