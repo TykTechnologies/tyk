@@ -815,6 +815,18 @@
         "enabled"
       ]
     },
+    "X-Tyk-TrackEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-URLRewriteTrigger": {
       "type": "object",
       "additionalProperties": false,
@@ -881,6 +893,18 @@
         "path"
       ]
     },
+    "X-Tyk-Internal": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-Operation": {
       "type": "object",
       "additionalProperties": false,
@@ -893,6 +917,9 @@
         },
         "ignoreAuthentication": {
           "$ref": "#/definitions/X-Tyk-Allowance"
+        },
+        "internal": {
+          "$ref": "#/definitions/X-Tyk-Internal"
         },
         "transformRequestMethod": {
           "$ref": "#/definitions/X-Tyk-TransformRequestMethod"
@@ -911,6 +938,12 @@
         },
         "virtualEndpoint": {
           "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
+        },
+        "trackEndpoint": {
+          "$ref": "#/definitions/X-Tyk-TrackEndpoint"
+        },
+        "doNotTrackEndpoint": {
+          "$ref": "#/definitions/X-Tyk-TrackEndpoint"
         },
         "circuitBreaker":{
           "$ref": "#/definitions/X-Tyk-CircuitBreaker"
