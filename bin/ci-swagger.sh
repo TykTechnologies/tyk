@@ -36,6 +36,7 @@ rm "$swagger2fileName"
 sed -n '1,/components:/p' $openAPIspecfileName > $tempUpdatedOpenAPIFileName
 
 if [ $? -ne 0 ]; then
+	rm "$swagger2fileName"
 	fatal "replace operation failed step 1"
 fi
 
