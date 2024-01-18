@@ -60,6 +60,7 @@ func (o *Operation) extractTrackEndpointTo(ep *apidef.ExtendedPathsSet, path str
 
 	meta := apidef.TrackEndpointMeta{Path: path, Method: method}
 	o.TrackEndpoint.ExtractTo(&meta)
+	ep.TrackEndpoints = append(ep.TrackEndpoints, meta)
 }
 
 func (o *Operation) extractDoNotTrackEndpointTo(ep *apidef.ExtendedPathsSet, path string, method string) {
@@ -69,4 +70,5 @@ func (o *Operation) extractDoNotTrackEndpointTo(ep *apidef.ExtendedPathsSet, pat
 
 	meta := apidef.TrackEndpointMeta{Path: path, Method: method}
 	o.DoNotTrackEndpoint.ExtractTo(&meta)
+	ep.DoNotTrackEndpoints = append(ep.DoNotTrackEndpoints, meta)
 }
