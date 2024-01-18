@@ -5,7 +5,7 @@ import (
 )
 
 // TrackEndpoint configures Track or DoNotTrack behaviour for an endpoint.
-// Tyk classic API definition: `version_data.versions[].extended_paths.(track_endpoints|do_not_track_endpoints)`.
+// Tyk classic API definition: `version_data.versions..extended_paths.track_endpoints`, `version_data.versions..extended_paths.do_not_track_endpoints`.
 type TrackEndpoint struct {
 	// Enabled if set to true enables or disables tracking for an endpoint depending
 	// if it's used in `trackEndpoint` or `doNotTrackEndpoint`.
