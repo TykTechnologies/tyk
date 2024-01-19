@@ -1,7 +1,7 @@
 ARG BASE_IMAGE=tykio/golang-cross:1.22
 FROM ${BASE_IMAGE}
 
-LABEL description="Image for plugin development"
+LABEL description="Image for compiling and testing Tyk Gateway plugins"
 
 ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
 
