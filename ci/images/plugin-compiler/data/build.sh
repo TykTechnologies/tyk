@@ -15,11 +15,8 @@ GATEWAY_VERSION=$(echo $GITHUB_TAG | perl -n -e'/v(\d+).(\d+).(\d+)/'' && print 
 # - 3. GOOS = optional override of GOOS
 # - 4. GOARCH = optional override of GOARCH
 #
-# The script will build a plugin named according to the following:
-#
-# - `{plugin_name%.*}_{GATEWAY_VERSION}_{GOOS}_{GOARCH}.so`
-#
-# If GOOS and GOARCH are not set, it will build `{plugin_name}`.
+    echo "Example command: $0 tyk-extras 1 linux amd64"
+    echo "Example output: tyk-extras_5.0.0_linux_amd64.so"
 #
 # Example command: ./build.sh 
 # Example output: tyk-extras_5.0.0_linux_amd64.so
@@ -48,7 +45,6 @@ Example:"
     cat <<EOF
 To build a plugin:
       $0 <plugin_name> <plugin_id>
-
 <plugin_id> is optional
 EOF
 }
