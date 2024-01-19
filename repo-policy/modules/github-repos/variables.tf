@@ -45,7 +45,7 @@ variable "rebase_merge" {
 variable "delete_branch_on_merge" {
   type        = bool
   description = "Automatically delete head branch after a pull request is merged"
-  default     = true
+  default     = false
 }
 
 variable "vulnerability_alerts" {
