@@ -9,7 +9,7 @@ ENV GO111MODULE=on
 
 # This directory will contain the plugin source and will be
 # mounted from the host box by the user using docker volumes
-ENV PLUGIN_SOURCE_PATH=/plugin-source
+ENV PLUGIN_SOURCE_PATH=/opt/plugin-source
 
 RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
