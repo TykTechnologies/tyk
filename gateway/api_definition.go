@@ -195,7 +195,6 @@ type APISpec struct {
 	AuthManager              SessionHandler
 	OAuthManager             *OAuthManager
 	OrgSessionManager        SessionHandler
-	OrgSessionManagerNew     storage.MdcbStorage
 	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
 	Health                   HealthChecker
 	JSVM                     JSVM

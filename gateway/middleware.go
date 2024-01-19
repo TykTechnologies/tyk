@@ -313,7 +313,6 @@ func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 }
 
 func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
-	orgse
 	t.Gw.ExpiryCache.Set(orgid, expiry, cache.DefaultExpiration)
 }
 
