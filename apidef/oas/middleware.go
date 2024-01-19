@@ -62,7 +62,8 @@ type Global struct {
 	// Tyk classic API definition: `custom_middleware.post`.
 	PostPlugin *PostPlugin `bson:"postPlugin,omitempty" json:"postPlugin,omitempty"`
 
-	// ResponsePlugin contains configuration related to the custom plugin that generates a response.
+	// ResponsePlugin contains configuration related to to the custom plugin that is run during processing of the response from the upstream service.
+	//
 	// Tyk classic API definition: `custom_middleware.response`.
 	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty"`
 
