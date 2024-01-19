@@ -34,7 +34,11 @@ PLUGIN_BUILD_PATH=${PLUGIN_BUILD_PATH:-"${WORKSPACE_ROOT}/plugin_${plugin_name%.
 
 # Provide usage instructions for building a plugin:
 function usage() {
-    echo "Usage: $0 <plugin_name> [<plugin_id>] [<GOOS>] [<GOARCH>]"
+    echo "Usage: $0 <plugin_name> [<plugin_id>] [<GOOS>] [<GOARCH>]
+    <plugin_name>  : Name of the plugin to build (e.g. vendor-plugin.so) (required)
+    <plugin_id>   : Optional - sets the build folder to `/opt/plugin_{plugin_name}{plugin_id}` or uses the default build folder (optional) (optional)
+    <GOOS>        : Optional - override the GOOS value (default: linux)
+    <GOARCH>      : Optional - override the GOARCH value (default: amd64)"
     echo "    <plugin_name>  : Name of the plugin to build (e.g. vendor-plugin.so)"
     echo "    <plugin_id>   : Optional - sets the build folder to `/opt/plugin_{plugin_name}{plugin_id}`"
     echo "    <GOOS>        : Optional - override the GOOS value"
