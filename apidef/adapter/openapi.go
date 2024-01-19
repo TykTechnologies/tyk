@@ -19,6 +19,11 @@ import (
 
 const defaultRequestBodyMimeType = "application/json"
 
+const (
+	GraphQLTypeQuery    = "Query"
+	GraphQLTypeMutation = "Mutation"
+)
+
 type openAPI struct {
 	orgId         string
 	input         []byte
@@ -49,8 +54,8 @@ func (o *openAPI) prepareGraphQLEngineConfig() error {
 	}
 
 	graphqlTypes := map[string][]string{
-		"Query":    {http.MethodGet},
-		"Mutation": {http.MethodPost, http.MethodPut, http.MethodDelete},
+		GraphQLTypeQuery:    {http.MethodGet},
+		GraphQLTypeMutation: {http.MethodPost, http.MethodPut, http.MethodDelete},
 	}
 
 	// We only support one server definition and always pick the first one.
@@ -94,7 +99,12 @@ func (o *openAPI) prepareGraphQLEngineConfig() error {
 				if fieldName == "" {
 					// If "operationId" is not defined by the user, try to make an operationId
 					// from endpoint's itself. The same technique is used by IBM/openapi-to-graphql tool.
-					fieldName = openapi.MakeFieldNameFromEndpoint(method, rawEndpoint)
+					if graphqlType == GraphQLTypeQuery {
+						fieldName = openapi.MakeFieldNameFromEndpoint(rawEndpoint)
+					} else if graphqlType == GraphQLTypeMutation {
+						// IBM/openapi-to-graphql adds method name to the generated field name.
+						fieldName = openapi.MakeFieldNameFromEndpointForMutation(method, rawEndpoint)
+					}
 				}
 
 				fieldConfig := apidef.GraphQLFieldConfig{
