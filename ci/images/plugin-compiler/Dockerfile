@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=tykio/golang-cross:1.21-bookworm
+ARG BASE_IMAGE=tykio/golang-cross:1.22
 FROM ${BASE_IMAGE}
 
 LABEL description="Image for plugin development"
@@ -28,6 +28,8 @@ RUN --mount=type=cache,mode=0755,target=/go/pkg/mod GOBIN=/usr/local/bin go inst
 
 ARG GITHUB_SHA
 ARG GITHUB_TAG
+ARG GO_VERSION=1.17
+ARG PYTHON_VERSION=3.9
 ENV GITHUB_SHA ${GITHUB_SHA}
 ENV GITHUB_TAG ${GITHUB_TAG}
 
