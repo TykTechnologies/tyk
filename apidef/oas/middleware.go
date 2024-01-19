@@ -8,12 +8,12 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-// Middleware holds configuration for middleware.
+// Middleware holds configuration for Tyk's native middleware.
 type Middleware struct {
-	// Global contains the configurations related to the global middleware.
+	// Global contains configuration for middleware that affects the whole API (all endpoints).
 	Global *Global `bson:"global,omitempty" json:"global,omitempty"`
 
-	// Operations configuration.
+	// Operations contains configuration for middleware that can be applied to individual endpoints within the API (per-endpoint).
 	Operations Operations `bson:"operations,omitempty" json:"operations,omitempty"`
 }
 
@@ -41,28 +41,29 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	m.Global.ExtractTo(api)
 }
 
-// Global holds configuration applies globally: CORS and caching.
+// Global contains configuration that affects the whole API (all endpoints).
 type Global struct {
-	// PluginConfig contains the configuration related custom plugin bundles/driver.
+	// PluginConfig contains the common configuration for custom plugins.
 	PluginConfig *PluginConfig `bson:"pluginConfig,omitempty" json:"pluginConfig,omitempty"`
 
-	// CORS contains the configuration related to cross origin resource sharing.
+	// CORS contains the configuration related to Cross Origin Resource Sharing.
 	// Tyk classic API definition: `CORS`.
 	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
 
-	// PrePlugin contains configuration related to custom pre-authentication plugin.
+	// PrePlugin contains configuration related to the custom plugin that is run before authentication.
 	// Tyk classic API definition: `custom_middleware.pre`.
 	PrePlugin *PrePlugin `bson:"prePlugin,omitempty" json:"prePlugin,omitempty"`
 
-	// PostAuthenticationPlugin contains configuration related to custom post authentication plugin.
+	// PostAuthenticationPlugin contains configuration related to the custom plugin that is run immediately after authentication.
 	// Tyk classic API definition: `custom_middleware.post_key_auth`.
 	PostAuthenticationPlugin *PostAuthenticationPlugin `bson:"postAuthenticationPlugin,omitempty" json:"postAuthenticationPlugin,omitempty"`
 
-	// PostPlugin contains configuration related to custom post plugin.
+	// PostPlugin contains configuration related to the custom plugin that is run immediately prior to proxying the request to the upstream.
 	// Tyk classic API definition: `custom_middleware.post`.
 	PostPlugin *PostPlugin `bson:"postPlugin,omitempty" json:"postPlugin,omitempty"`
 
-	// ResponsePlugin contains configuration related to custom post plugin.
+	// ResponsePlugin contains configuration related to to the custom plugin that is run during processing of the response from the upstream service.
+	//
 	// Tyk classic API definition: `custom_middleware.response`.
 	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty"`
 
@@ -297,8 +298,8 @@ func (p *PluginConfigData) ExtractTo(api *apidef.APIDefinition) {
 
 // PluginConfig holds configuration for custom plugins.
 type PluginConfig struct {
-	// Driver configures which custom plugin to be used.
-	// It's value should be set to one of the following:
+	// Driver configures which custom plugin driver to use.
+	// The value should be set to one of the following:
 	//
 	// - `otto`,
 	// - `python`,
