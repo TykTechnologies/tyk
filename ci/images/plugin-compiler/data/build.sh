@@ -12,8 +12,8 @@ GATEWAY_VERSION=$(echo $GITHUB_TAG | perl -n -e'/v(\d+).(\d+).(\d+)/'' && print 
 #
 # - 1. plugin_name = vendor-plugin.so
 # - 2. plugin_id = optional, sets build folder to `/opt/plugin_{plugin_name}{plugin_id}`
-# - 3. GOOS = optional override of GOOS
-# - 4. GOARCH = optional override of GOARCH
+# - 3. GOOS: Optional - The operating system for which to build the plugin (e.g. linux, darwin)
+# - 4. GOARCH: Optional - The architecture for which to build the plugin (e.g. amd64, arm64)
 #
     echo "Example command: $0 tyk-extras 1 linux amd64"
     echo "Example output: The resulting plugin file will be named according to the provided parameters."
