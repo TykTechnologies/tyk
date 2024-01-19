@@ -37,6 +37,14 @@ PLUGIN_BUILD_PATH=${PLUGIN_BUILD_PATH:-"${WORKSPACE_ROOT}/plugin_${plugin_name%.
 
 # Provide usage instructions for building a plugin:
 function usage() {
+    echo "Usage: $0 <plugin_name> [<plugin_id>] [<GOOS>] [<GOARCH>]"
+    echo "    <plugin_name>  : Name of the plugin to build (e.g. vendor-plugin.so)"
+    echo "    <plugin_id>   : Optional - sets the build folder to `/opt/plugin_{plugin_name}{plugin_id}`"
+    echo "    <GOOS>        : Optional - override the GOOS value"
+    echo "    <GOARCH>      : Optional - override the GOARCH value"
+    echo "
+Example:"
+    echo "    $0 tyk-extras 1 linux amd64"
     cat <<EOF
 To build a plugin:
       $0 <plugin_name> <plugin_id>
@@ -89,6 +97,8 @@ fi
 
 # ensureGoMod rewrites a go module based on plugin_id if available.
 function ensureGoMod {
+    echo "INFO: Create or update the go.mod file with the specified plugin_id"
+    echo "Plugin_id: $plugin_id"
 	NEW_MODULE=tyk.internal/tyk_plugin${plugin_id}
 
 	# Create go.mod if it doesn't exist.
