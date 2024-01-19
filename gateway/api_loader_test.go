@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -8,6 +9,7 @@ import (
 	"net/http/httptest"
 	"path"
 	_ "path"
+	"reflect"
 	"sync/atomic"
 	"testing"
 
@@ -527,4 +529,79 @@ func httpCollectorMock(t *testing.T, fn http.HandlerFunc, address string) *httpt
 	otelCollectorMock.Listener = l
 
 	return otelCollectorMock
+}
+
+func TestConfigureAuthAndOrgStores(t *testing.T) {
+
+	testCases := []struct {
+		name                 string
+		storageEngine        apidef.StorageEngineCode
+		expectedAuthStore    string
+		expectedOrgStore     string
+		expectedSessionStore string
+		configureGateway     func(gw *Gateway)
+	}{
+		{
+			name:                 "LDAP Storage Engine",
+			storageEngine:        LDAPStorageEngine,
+			expectedAuthStore:    "*gateway.LDAPStorageHandler",
+			expectedOrgStore:     "*storage.RedisCluster",
+			expectedSessionStore: "*storage.RedisCluster",
+			configureGateway: func(gw *Gateway) {
+			},
+		}, {
+			name:                 "RPC Storage engine",
+			storageEngine:        RPCStorageEngine,
+			expectedAuthStore:    "*gateway.RPCStorageHandler",
+			expectedOrgStore:     "*storage.MdcbStorage",
+			expectedSessionStore: "*gateway.RPCStorageHandler",
+			configureGateway: func(gw *Gateway) {
+				conf := gw.GetConfig()
+				conf.SlaveOptions.UseRPC = true
+				gw.SetConfig(conf, true)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gw := NewGateway(config.Config{}, context.Background())
+			tc.configureGateway(gw)
+			gs := gw.prepareStorage()
+
+			spec := BuildAPI(func(spec *APISpec) {
+				spec.AuthProvider.StorageEngine = tc.storageEngine
+
+				if tc.storageEngine == RPCStorageEngine {
+					spec.SessionProvider.StorageEngine = RPCStorageEngine
+				}
+
+				if tc.storageEngine == LDAPStorageEngine {
+					// populate ldap meta
+					meta := map[string]interface{}{
+						"ldap_server":            "dummy-ldap-server",
+						"ldap_port":              389.0,
+						"base_dn":                "base-dn",
+						"attributes":             []interface{}{"attr1", "attr2", "attr3"},
+						"session_attribute_name": "attr-name",
+						"search_string":          "the-search",
+					}
+					spec.AuthProvider.Meta = meta
+				}
+			})
+
+			// Call configureAuthAndOrgStores
+			authStore, orgStore, sessionStore := gw.configureAuthAndOrgStores(&gs, spec[0])
+
+			if reflect.TypeOf(authStore).String() != tc.expectedAuthStore {
+				t.Errorf("Expected authStore type %s, got %s", tc.expectedAuthStore, reflect.TypeOf(authStore).String())
+			}
+			if reflect.TypeOf(orgStore).String() != tc.expectedOrgStore {
+				t.Errorf("Expected orgStore type %s, got %s", tc.expectedOrgStore, reflect.TypeOf(orgStore).String())
+			}
+			if reflect.TypeOf(sessionStore).String() != tc.expectedSessionStore {
+				t.Errorf("Expected sessionStore type %s, got %s", tc.expectedSessionStore, reflect.TypeOf(sessionStore).String())
+			}
+		})
+	}
 }
