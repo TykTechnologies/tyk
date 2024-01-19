@@ -298,8 +298,8 @@ func (p *PluginConfigData) ExtractTo(api *apidef.APIDefinition) {
 
 // PluginConfig holds configuration for custom plugins.
 type PluginConfig struct {
-	// Driver configures which custom plugin to be used.
-	// It's value should be set to one of the following:
+	// Driver configures which custom plugin driver to use.
+	// The value should be set to one of the following:
 	//
 	// - `otto`,
 	// - `python`,

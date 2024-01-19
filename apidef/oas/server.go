@@ -19,10 +19,10 @@ type Server struct {
 	// Authentication contains the configurations that manage how clients can authenticate with Tyk to access the API.
 	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
 
-	// ClientCertificates contains the configurations related to establishing static mutual TLS beetween the client and Tyk.
+	// ClientCertificates contains the configurations related to establishing static mutual TLS between the client and Tyk.
 	ClientCertificates *ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty"`
 
-	// GatewayTags contains segment tags to configure which GWs your APIs connect to.
+	// GatewayTags contain segment tags to indicate which Gateways your upstream service is connected to (and hence where to deploy the API).
 	GatewayTags *GatewayTags `bson:"gatewayTags,omitempty" json:"gatewayTags,omitempty"`
 
 	// CustomDomain is the domain to bind this API to. This enforces domain matching for client requests.
@@ -149,7 +149,7 @@ func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.StripListenPath = lp.Strip
 }
 
-// ClientCertificates contains the configurations related to establishing static mutual TLS beetween the client and Tyk.
+// ClientCertificates contains the configurations related to establishing static mutual TLS between the client and Tyk.
 type ClientCertificates struct {
 	// Enabled enables static mTLS for the API.
 	Enabled bool `bson:"enabled" json:"enabled"`

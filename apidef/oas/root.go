@@ -8,7 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-// XTykAPIGateway contains custom Tyk API extensions for the OAS definition.
+// XTykAPIGateway contains custom Tyk API extensions for the OpenAPI definition.
 // The values for the extensions are stored inside the OpenAPI document, under
 // the key `x-tyk-api-gateway`.
 type XTykAPIGateway struct {
