@@ -3,7 +3,7 @@ FROM ${BASE_IMAGE}
 
 LABEL description="Image for compiling and testing Tyk Gateway plugins"
 
-ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
+ENV WORKSPACE_ROOT=/opt/tyk github.com/TykTechnologies/tyk
 
 ENV GO111MODULE=on
 
