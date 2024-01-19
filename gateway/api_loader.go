@@ -217,27 +217,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
-	authStore := gs.redisStore
-	orgStore := gs.redisOrgStore
-	switch spec.AuthProvider.StorageEngine {
-	case LDAPStorageEngine:
-		storageEngine := LDAPStorageHandler{}
-		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
-		authStore = &storageEngine
-	case RPCStorageEngine:
-		authStore = gs.rpcAuthStore
-		orgStore = gs.rpcOrgStore
-		spec.GlobalConfig.EnforceOrgDataAge = true
-		globalConf := gw.GetConfig()
-		globalConf.EnforceOrgDataAge = true
-		gw.SetConfig(globalConf)
-	}
-
-	sessionStore := gs.redisStore
-	switch spec.SessionProvider.StorageEngine {
-	case RPCStorageEngine:
-		sessionStore = gs.rpcAuthStore
-	}
+	authStore, orgStore, sessionStore := gw.configureAuthAndOrgStores(gs, spec)
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
 	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
@@ -539,6 +519,33 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}).Info("API Loaded")
 
 	return &chainDef
+}
+
+func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (storage.Handler, storage.Handler, storage.Handler) {
+	authStore := gs.redisStore
+	orgStore := gs.redisOrgStore
+
+	switch spec.AuthProvider.StorageEngine {
+	case LDAPStorageEngine:
+		storageEngine := LDAPStorageHandler{}
+		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
+		authStore = &storageEngine
+	case RPCStorageEngine:
+		authStore = gs.rpcAuthStore
+		orgStore = gs.rpcOrgStore
+		spec.GlobalConfig.EnforceOrgDataAge = true
+		globalConf := gw.GetConfig()
+		globalConf.EnforceOrgDataAge = true
+		gw.SetConfig(globalConf)
+	}
+
+	sessionStore := gs.redisStore
+	switch spec.SessionProvider.StorageEngine {
+	case RPCStorageEngine:
+		sessionStore = gs.rpcAuthStore
+	}
+
+	return authStore, orgStore, sessionStore
 }
 
 // Check for recursion
