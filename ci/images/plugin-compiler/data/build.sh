@@ -16,7 +16,7 @@ GATEWAY_VERSION=$(echo $GITHUB_TAG | perl -n -e'/v(\d+).(\d+).(\d+)/'' && print 
 # - 4. GOARCH = optional override of GOARCH
 #
     echo "Example command: $0 tyk-extras 1 linux amd64"
-    echo "Example output: tyk-extras_5.0.0_linux_amd64.so"
+    echo "Example output: The resulting plugin file will be named according to the provided parameters."
 #
 # Example command: ./build.sh 
 # Example output: tyk-extras_5.0.0_linux_amd64.so
