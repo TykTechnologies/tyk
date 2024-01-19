@@ -3,7 +3,12 @@ set -e
 
 GATEWAY_VERSION=$(echo $GITHUB_TAG | perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"')
 
-# Plugin compiler arguments:
+# This script builds a plugin for the Tyk Gateway with the specified name, version, OS, and architecture.
+# Usage: ./build.sh <plugin_name> <plugin_id> [GOOS] [GOARCH]
+# - <plugin_id> is optional
+# - [GOOS] is an optional override of GOOS
+# - [GOARCH] is an optional override of GOARCH
+# Example: ./build.sh tyk-extras 1 linux amd64
 #
 # - 1. plugin_name = vendor-plugin.so
 # - 2. plugin_id = optional, sets build folder to `/opt/plugin_{plugin_name}{plugin_id}`
@@ -30,6 +35,7 @@ WORKSPACE_ROOT=$(dirname $TYK_GW_PATH)
 PLUGIN_SOURCE_PATH=${PLUGIN_SOURCE_PATH:-"/plugin-source"}
 PLUGIN_BUILD_PATH=${PLUGIN_BUILD_PATH:-"${WORKSPACE_ROOT}/plugin_${plugin_name%.*}$plugin_id"}
 
+# Provide usage instructions for building a plugin:
 function usage() {
     cat <<EOF
 To build a plugin:
