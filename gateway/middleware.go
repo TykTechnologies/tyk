@@ -319,12 +319,14 @@ func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
 	// Cache failed attempt
+
 	id, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
 		cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
 		if found {
 			return cachedVal, nil
 		}
 
+		fmt.Printf("\nattempt to pull org id key: %v \n", orgid)
 		s, found := t.OrgSession(orgid)
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 			return s.DataExpires, nil
