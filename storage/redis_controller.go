@@ -187,7 +187,6 @@ func getExponentialBackoff() *backoff.ExponentialBackOff {
 func (rc *RedisController) statusCheck(ctx context.Context, conf *config.Config, clusters []RedisCluster) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -234,6 +233,38 @@ func (rc *RedisController) connectCluster(conf config.Config, v ...RedisCluster)
 		}
 	}
 	return true
+// statusCheck will check the Redis status each second. If we transition from a disconnected to connected state, it will send a msg to the reconnect chan.
+// This method will be constantly modifying the redisUp control flag.
+func (rc *RedisController) statusCheck(ctx context.Context, conf *config.Config, clusters []RedisCluster) {
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			//if we disabled redis - we don't want to check anything
+			if !rc.enabled() {
+				continue
+			}
+
+			//we check if the clusters are initialised and if connections are open
+			connected := rc.connectCluster(*conf, clusters...)
+
+			//we check if we are already connected connected
+			alreadyConnected := rc.Connected()
+
+			//store the actual status of redis
+			rc.redisUp.Store(connected)
+
+			//if we weren't alerady connected but now we are connected, we trigger the reconnect
+			if !alreadyConnected && connected {
+				rc.reconnect <- struct{}{}
+			}
+		}
+	}
+}
 }
 
 func (rc *RedisController) establishConnection(v *RedisCluster, conf config.Config) bool {
