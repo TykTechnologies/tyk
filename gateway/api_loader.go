@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -45,8 +46,6 @@ func (gw *Gateway) prepareStorage() generalStores {
 	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey.", RedisController: gw.RedisController}
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth.", RedisController: gw.RedisController}
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw: gw}
-	//gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", Gw: gw}
-
 	gs.rpcOrgStore = gw.getGlobalMDCBStorageHandler("orgkey.", false)
 
 	gw.GlobalSessionManager.Init(gs.redisStore)
@@ -944,12 +943,12 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	for _, spec := range specs {
 		func() {
-			/*defer func() {
+			defer func() {
 				// recover from panic if one occurred. Set err to nil otherwise.
 				if err := recover(); err != nil {
 					log.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
 				}
-			}()*/
+			}()
 
 			if spec.ListenPort != spec.GlobalConfig.ListenPort {
 				mainLog.Info("API bind on custom port:", spec.ListenPort)

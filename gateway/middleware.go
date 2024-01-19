@@ -313,29 +313,28 @@ func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 }
 
 func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
+	orgse
 	t.Gw.ExpiryCache.Set(orgid, expiry, cache.DefaultExpiration)
 }
 
 func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
-	// Cache failed attempt
 
+	// Cache failed attempt
 	id, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
 		cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
 		if found {
 			return cachedVal, nil
 		}
 
-		fmt.Printf("\nattempt to pull org id key: %v \n", orgid)
 		s, found := t.OrgSession(orgid)
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 			return s.DataExpires, nil
 		}
-
 		return 0, errors.New("missing session")
 	})
-	if err != nil {
 
+	if err != nil {
 		t.Logger().Debug("no cached entry found, returning 7 days")
 		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
 		return DEFAULT_ORG_SESSION_EXPIRATION
