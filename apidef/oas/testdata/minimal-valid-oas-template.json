@@ -1,0 +1,30 @@
+{
+  "info": {
+    "title": "",
+    "version": ""
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/pets": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "A paged array of pets"
+          }
+        }
+      }
+    }
+  },
+  "x-tyk-api-gateway": {
+    "info": {
+      "name": "oas-api",
+      "state": {}
+    },
+    "upstream": {
+    },
+    "server": {
+      "listenPath": {
+      }
+    }
+  }
+}
