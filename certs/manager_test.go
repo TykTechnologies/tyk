@@ -8,13 +8,14 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"github.com/TykTechnologies/tyk/storage"
 	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/stretchr/testify/assert"
 
