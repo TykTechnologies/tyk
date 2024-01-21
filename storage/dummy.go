@@ -1,144 +1,144 @@
-package certs
+package storage
 
 import "errors"
 
-type dummyStorage struct {
-	data      map[string]string
-	indexList map[string][]string
+type DummyStorage struct {
+	Data      map[string]string
+	IndexList map[string][]string
 }
 
-func newDummyStorage() *dummyStorage {
-	return &dummyStorage{
-		data:      make(map[string]string),
-		indexList: make(map[string][]string),
+func NewDummyStorage() *DummyStorage {
+	return &DummyStorage{
+		Data:      make(map[string]string),
+		IndexList: make(map[string][]string),
 	}
 }
 
-func (s *dummyStorage) GetMultiKey([]string) ([]string, error) {
+func (s *DummyStorage) GetMultiKey([]string) ([]string, error) {
 	panic("implement me")
 }
 
-func (s *dummyStorage) GetRawKey(string) (string, error) {
+func (s *DummyStorage) GetRawKey(string) (string, error) {
 	panic("implement me")
 }
 
-func (s *dummyStorage) SetRawKey(string, string, int64) error {
+func (s *DummyStorage) SetRawKey(string, string, int64) error {
 	panic("implement me")
 }
 
-func (s *dummyStorage) SetExp(string, int64) error {
+func (s *DummyStorage) SetExp(string, int64) error {
 	panic("implement me")
 }
 
-func (s *dummyStorage) GetExp(string) (int64, error) {
+func (s *DummyStorage) GetExp(string) (int64, error) {
 	panic("implement me")
 }
 
-func (s *dummyStorage) DeleteAllKeys() bool {
+func (s *DummyStorage) DeleteAllKeys() bool {
 	panic("implement me")
 }
 
-func (s *dummyStorage) DeleteRawKey(string) bool {
+func (s *DummyStorage) DeleteRawKey(string) bool {
 	panic("implement me")
 }
 
-func (s *dummyStorage) Connect() bool {
+func (s *DummyStorage) Connect() bool {
 	panic("implement me")
 }
 
-func (s *dummyStorage) GetKeysAndValues() map[string]string {
+func (s *DummyStorage) GetKeysAndValues() map[string]string {
 	panic("implement me")
 }
 
-func (s *dummyStorage) GetKeysAndValuesWithFilter(string) map[string]string {
+func (s *DummyStorage) GetKeysAndValuesWithFilter(string) map[string]string {
 	panic("implement me")
 }
 
-func (s *dummyStorage) DeleteKeys([]string) bool {
+func (s *DummyStorage) DeleteKeys([]string) bool {
 	panic("implement me")
 }
 
-func (s *dummyStorage) Decrement(string) {
+func (s *DummyStorage) Decrement(string) {
 	panic("implement me")
 }
 
-func (s *dummyStorage) IncrememntWithExpire(string, int64) int64 {
+func (s *DummyStorage) IncrememntWithExpire(string, int64) int64 {
 	panic("implement me")
 }
 
-func (s *dummyStorage) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
+func (s *DummyStorage) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
 	panic("implement me")
 }
 
-func (s *dummyStorage) GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{}) {
+func (s *DummyStorage) GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{}) {
 	panic("implement me")
 }
 
-func (s *dummyStorage) GetSet(string) (map[string]string, error) {
+func (s *DummyStorage) GetSet(string) (map[string]string, error) {
 	panic("implement me")
 }
 
-func (s *dummyStorage) AddToSet(string, string) {
+func (s *DummyStorage) AddToSet(string, string) {
 	panic("implement me")
 }
 
-func (s *dummyStorage) GetAndDeleteSet(string) []interface{} {
+func (s *DummyStorage) GetAndDeleteSet(string) []interface{} {
 	panic("implement me")
 }
 
-func (s *dummyStorage) RemoveFromSet(string, string) {
+func (s *DummyStorage) RemoveFromSet(string, string) {
 	panic("implement me")
 }
 
-func (s *dummyStorage) GetKeyPrefix() string {
+func (s *DummyStorage) GetKeyPrefix() string {
 	panic("implement me")
 }
 
-func (s *dummyStorage) AddToSortedSet(string, string, float64) {
+func (s *DummyStorage) AddToSortedSet(string, string, float64) {
 	panic("implement me")
 }
 
-func (s *dummyStorage) GetSortedSetRange(string, string, string) ([]string, []float64, error) {
+func (s *DummyStorage) GetSortedSetRange(string, string, string) ([]string, []float64, error) {
 	panic("implement me")
 }
 
-func (s *dummyStorage) RemoveSortedSetRange(string, string, string) error {
+func (s *DummyStorage) RemoveSortedSetRange(string, string, string) error {
 	panic("implement me")
 }
 
-func (s *dummyStorage) GetKey(key string) (string, error) {
-	if value, ok := s.data[key]; ok {
+func (s *DummyStorage) GetKey(key string) (string, error) {
+	if value, ok := s.Data[key]; ok {
 		return value, nil
 	}
 
 	return "", errors.New("Not found")
 }
 
-func (s *dummyStorage) SetKey(key, value string, exp int64) error {
-	s.data[key] = value
+func (s *DummyStorage) SetKey(key, value string, exp int64) error {
+	s.Data[key] = value
 	return nil
 }
 
-func (s *dummyStorage) DeleteKey(key string) bool {
-	if _, ok := s.data[key]; !ok {
+func (s *DummyStorage) DeleteKey(key string) bool {
+	if _, ok := s.Data[key]; !ok {
 		return false
 	}
 
-	delete(s.data, key)
+	delete(s.Data, key)
 	return true
 }
 
-func (s *dummyStorage) DeleteScanMatch(pattern string) bool {
+func (s *DummyStorage) DeleteScanMatch(pattern string) bool {
 	if pattern == "*" {
-		s.data = make(map[string]string)
+		s.Data = make(map[string]string)
 		return true
 	}
 
 	return false
 }
 
-func (s *dummyStorage) RemoveFromList(keyName, value string) error {
-	for key, keyList := range s.indexList {
+func (s *DummyStorage) RemoveFromList(keyName, value string) error {
+	for key, keyList := range s.IndexList {
 		if key == keyName {
 			new := keyList[:]
 			newL := 0
@@ -151,38 +151,38 @@ func (s *dummyStorage) RemoveFromList(keyName, value string) error {
 				newL++
 			}
 			new = new[:newL]
-			s.indexList[key] = new
+			s.IndexList[key] = new
 		}
 	}
 
 	return nil
 }
 
-func (s *dummyStorage) GetListRange(keyName string, from, to int64) ([]string, error) {
-	for key := range s.indexList {
+func (s *DummyStorage) GetListRange(keyName string, from, to int64) ([]string, error) {
+	for key := range s.IndexList {
 		if key == keyName {
-			return s.indexList[key], nil
+			return s.IndexList[key], nil
 		}
 	}
 	return []string{}, nil
 }
 
-func (s *dummyStorage) Exists(keyName string) (bool, error) {
-	_, existIndex := s.indexList[keyName]
-	_, existRaw := s.data[keyName]
+func (s *DummyStorage) Exists(keyName string) (bool, error) {
+	_, existIndex := s.IndexList[keyName]
+	_, existRaw := s.Data[keyName]
 	return existIndex || existRaw, nil
 }
 
-func (s *dummyStorage) AppendToSet(keyName string, value string) {
-	s.indexList[keyName] = append(s.indexList[keyName], value)
+func (s *DummyStorage) AppendToSet(keyName string, value string) {
+	s.IndexList[keyName] = append(s.IndexList[keyName], value)
 }
 
-func (s *dummyStorage) GetKeys(pattern string) (keys []string) {
+func (s *DummyStorage) GetKeys(pattern string) (keys []string) {
 	if pattern != "*" {
 		return nil
 	}
 
-	for k := range s.data {
+	for k := range s.Data {
 		keys = append(keys, k)
 	}
 
