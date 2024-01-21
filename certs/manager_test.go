@@ -193,7 +193,11 @@ func TestCertificateStorage(t *testing.T) {
 func TestStorageIndex(t *testing.T) {
 	m := newManager()
 	storageCert, _ := genCertificateFromCommonName("dummy", false)
-	storage := m.storage.(*storage.DummyStorage)
+	storage, ok := m.storage.(*storage.DummyStorage)
+
+	if !ok {
+		t.Error("cannot make storage.DummyStorage of type storage.Handler")
+	}
 
 	if len(storage.IndexList) != 0 {
 		t.Error("Storage index list should have 0 certificates and indexes after creation")
