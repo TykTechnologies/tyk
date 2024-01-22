@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -32,14 +32,23 @@ func TestGetResourceType(t *testing.T) {
 
 func TestMdcbStorage_GetMultiKey(t *testing.T) {
 	rpcHandler := NewDummyStorage()
-	rpcHandler.SetKey("key1", "1", 0)
+	err := rpcHandler.SetKey("key1", "1", 0)
+	if err != nil {
+		t.Error(err.Error())
+	}
 
 	localHandler := NewDummyStorage()
-	localHandler.SetKey("key2", "1", 0)
-	localHandler.SetKey("key3", "1", 0)
+	err = localHandler.SetKey("key2", "1", 0)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	err = localHandler.SetKey("key3", "1", 0)
+	if err != nil {
+		t.Error(err.Error())
+	}
 
 	logger := logrus.New()
-	logger.Out = ioutil.Discard
+	logger.Out = io.Discard
 	log := logger.WithContext(context.Background())
 
 	mdcb := NewMdcbStorage(localHandler, rpcHandler, log)
