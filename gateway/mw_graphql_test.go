@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/buger/jsonparser"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
@@ -288,7 +289,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				Query: "query Query { countries { name } }",
 			}
 			_, _ = g.Run(t, []test.TestCase{
-				{Data: countries1, BodyMatch: `"There was a problem proxying the request`, Code: http.StatusInternalServerError},
+				{Data: countries1, BodyMatch: `"there was a problem proxying the request`, Code: http.StatusInternalServerError},
 			}...)
 		})
 	})
@@ -698,6 +699,9 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				t.Run("should send configured headers upstream", func(t *testing.T) {
 					run := func(apiSpec func(testServerURL string) func(apiSpec *APISpec), requestHeaders, expectedHeaders http.Header) func(t *testing.T) {
 						return func(t *testing.T) {
+							wg := sync.WaitGroup{}
+							wg.Add(2)
+
 							wsTestServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 								for expectedHeaderKey := range expectedHeaders {
 									values := r.Header.Values(expectedHeaderKey)
@@ -709,6 +713,8 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 										assert.Contains(t, values, expectedHeaderValue, fmt.Sprintf("expected header value '%s' was not found for '%s'", expectedHeaderValue, expectedHeaderKey))
 									}
 								}
+								_, _ = w.Write(nil)
+								wg.Done()
 							}))
 							defer wsTestServer.Close()
 
@@ -739,15 +745,9 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 							err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id":"1","type":"start","payload":{"query":"subscription { subscribe }"}}`))
 							require.NoError(t, err)
 
-							for {
-								_, msg, err = wsConn.ReadMessage()
-								require.NoError(t, err)
-								if string(msg) == `{"type":"ka"}` {
-									continue
-								}
-								require.Equal(t, `{"id":"1","type":"error","payload":[{"message":"error executing subscription: failed to WebSocket dial: expected handshake response status code 101 but got 200"}]}`, string(msg))
-								break
-							}
+							// wait for assertions to be done
+							wg.Done()
+							wg.Wait()
 						}
 					}
 

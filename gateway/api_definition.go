@@ -19,9 +19,9 @@ import (
 	textTemplate "text/template"
 	"time"
 
-	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
-
 	"github.com/getkin/kin-openapi/routers"
+
+	"github.com/TykTechnologies/tyk/internal/graphengine"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -31,16 +31,12 @@ import (
 
 	"github.com/cenk/backoff"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
-
 	"github.com/Masterminds/sprig/v3"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
-
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/gojsonschema"
 
@@ -218,19 +214,23 @@ type APISpec struct {
 
 	network analytics.NetworkStats
 
-	GraphQLExecutor struct {
-		Engine       *graphql.ExecutionEngine
-		CancelV2     context.CancelFunc
-		EngineV2     *graphql.ExecutionEngineV2
-		OtelExecutor graphqlinternal.TykOtelExecutorI
-		HooksV2      struct {
-			BeforeFetchHook resolve.BeforeFetchHook
-			AfterFetchHook  resolve.AfterFetchHook
-		}
-		Client          *http.Client
-		StreamingClient *http.Client
-		Schema          *graphql.Schema
-	} `json:"-"`
+	GraphEngine graphengine.Engine
+	// TODO: graphengine
+	/*
+		GraphQLExecutor struct {
+			Engine       *graphql.ExecutionEngine
+			CancelV2     context.CancelFunc
+			EngineV2     *graphql.ExecutionEngineV2
+			OtelExecutor graphqlinternal.TykOtelExecutorI
+			HooksV2      struct {
+				BeforeFetchHook resolve.BeforeFetchHook
+				AfterFetchHook  resolve.AfterFetchHook
+			}
+			Client          *http.Client
+			StreamingClient *http.Client
+			Schema          *graphql.Schema
+		} `json:"-"`
+	*/
 
 	HasMock            bool
 	HasValidateRequest bool
@@ -260,8 +260,8 @@ func (s *APISpec) Release() {
 	}
 
 	// cancel execution contexts
-	if s.GraphQLExecutor.CancelV2 != nil {
-		s.GraphQLExecutor.CancelV2()
+	if s.GraphEngine != nil {
+		s.GraphEngine.Cancel()
 	}
 
 	// release all other resources associated with spec

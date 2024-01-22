@@ -170,6 +170,23 @@ func TestGraphqlRequestProcessorWithOtelV1_ProcessRequest(t *testing.T) {
 }
 
 func TestComplexityCheckerV1_DepthLimitExceeded(t *testing.T) {
+	t.Run("should return ComplexityFailReasonNone if no graphql request is stored in the context", func(t *testing.T) {
+		request, err := http.NewRequest(
+			http.MethodPost,
+			"http://example.com",
+			nil,
+		)
+		require.NoError(t, err)
+
+		complexityChecker := newTestComplexityCheckerV1(t)
+		complexityChecker.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+			return nil // could be a websocket upgrade request, so no graphql operation stored in that case
+		}
+
+		result := complexityChecker.DepthLimitExceeded(request, &ComplexityAccessDefinition{})
+		assert.Equal(t, ComplexityFailReasonNone, result)
+	})
+
 	t.Run("should return ComplexityFailReasonNone if it is an introspection query", func(t *testing.T) {
 		request, err := http.NewRequest(
 			http.MethodPost,
@@ -190,7 +207,7 @@ func TestComplexityCheckerV1_DepthLimitExceeded(t *testing.T) {
 			return nil
 		}
 
-		result := complexityChecker.DepthLimitExceeded(request, nil)
+		result := complexityChecker.DepthLimitExceeded(request, &ComplexityAccessDefinition{})
 		assert.Equal(t, ComplexityFailReasonNone, result)
 	})
 
@@ -250,6 +267,36 @@ func TestComplexityCheckerV1_DepthLimitExceeded(t *testing.T) {
 			result := complexityChecker.DepthLimitExceeded(request, &ComplexityAccessDefinition{
 				Limit: ComplexityLimit{
 					MaxQueryDepth: 3,
+				},
+			})
+			assert.Equal(t, ComplexityFailReasonNone, result)
+		})
+
+		t.Run("should return ComplexityFailReasonNone if global depth limit is set to 0", func(t *testing.T) {
+			operation := `{ countries { continent } }` // depth 2
+
+			request, err := http.NewRequest(
+				http.MethodPost,
+				"http://example.com",
+				bytes.NewBuffer([]byte(
+					fmt.Sprintf(`{"query": "%s"}`, operation),
+				)))
+			require.NoError(t, err)
+
+			complexityChecker := newTestComplexityCheckerV1(t, withTestComplexityCheckerV1Schema(testSchemaNestedEngineV1))
+			complexityChecker.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+				if r == request {
+					return &graphql.Request{
+						Query: operation,
+					}
+				}
+
+				return nil
+			}
+
+			result := complexityChecker.DepthLimitExceeded(request, &ComplexityAccessDefinition{
+				Limit: ComplexityLimit{
+					MaxQueryDepth: 0,
 				},
 			})
 			assert.Equal(t, ComplexityFailReasonNone, result)
@@ -419,6 +466,50 @@ func TestComplexityCheckerV1_DepthLimitEnabled(t *testing.T) {
 }
 
 func TestGranularAccessCheckerV1_CheckGraphQLRequestFieldAllowance(t *testing.T) {
+	t.Run("should return GranularAccessFailReasonNone if no graphql request is stored in context", func(t *testing.T) {
+		request, err := http.NewRequest(
+			http.MethodPost,
+			"http://example.com",
+			nil,
+		)
+		require.NoError(t, err)
+
+		granularAccessChecker := newTestGranularAccessCheckerV1(t)
+		granularAccessChecker.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			return nil // could be a websocket upgrade request, so no graphql operation stored in that case
+		}
+
+		result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{
+			RestrictedTypes: []GranularAccessType{
+				{
+					Name:   "Query",
+					Fields: []string{"helloName"},
+				},
+			},
+		})
+		assert.Equal(t, GranularAccessFailReasonNone, result.FailReason)
+	})
+
+	t.Run("should return GranularAccessFailReasonNone if no lists are provided", func(t *testing.T) {
+		operation := `{ helloName("eddy") }`
+
+		request, err := http.NewRequest(
+			http.MethodPost,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, operation),
+			)))
+		require.NoError(t, err)
+
+		granularAccessChecker := newTestGranularAccessCheckerV1(t)
+		granularAccessChecker.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			return nil
+		}
+
+		result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{})
+		assert.Equal(t, GranularAccessFailReasonNone, result.FailReason)
+	})
+
 	t.Run("allowed list", func(t *testing.T) {
 		t.Run("should return GranularAccessFailReasonNone if the field is listed in allowed list", func(t *testing.T) {
 			operation := `{ hello }`
@@ -554,26 +645,6 @@ func TestGranularAccessCheckerV1_CheckGraphQLRequestFieldAllowance(t *testing.T)
 			assert.Equal(t, GranularAccessFailReasonValidationError, result.FailReason)
 		})
 	})
-
-	t.Run("should return GranularAccessFailReasonNone if no lists are provided", func(t *testing.T) {
-		operation := `{ helloName("eddy") }`
-
-		request, err := http.NewRequest(
-			http.MethodPost,
-			"http://example.com",
-			bytes.NewBuffer([]byte(
-				fmt.Sprintf(`{"query": "%s"}`, operation),
-			)))
-		require.NoError(t, err)
-
-		granularAccessChecker := newTestGranularAccessCheckerV1(t)
-		granularAccessChecker.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
-			return nil
-		}
-
-		result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{})
-		assert.Equal(t, GranularAccessFailReasonNone, result.FailReason)
-	})
 }
 
 func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
@@ -621,13 +692,7 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t)
 		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
-			if r == request {
-				return &graphql.Request{
-					Query: operation,
-				}
-			}
-
-			return nil
+			return nil // an upgrade request won't contain a graphql operation
 		}
 
 		result, err := reverseProxyPreHandler.PreHandle(ReverseProxyParams{

@@ -249,13 +249,13 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 }
 
 func TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits(t *testing.T) {
-	countriesSchema, err := graphql.NewSchemaFromString(gqlCountriesSchema)
-	require.NoError(t, err)
+	/*countriesSchema, err := graphql.NewSchemaFromString(gqlCountriesSchema)
+	require.NoError(t, err)*/
 
 	apiSpec := BuildAPI(func(spec *APISpec) {
 		spec.GraphQL.Enabled = true
 		spec.GraphQL.Schema = gqlCountriesSchema
-		spec.GraphQLExecutor.Schema = countriesSchema
+		//spec.GraphQLExecutor.Schema = countriesSchema
 	})[0]
 	m := GraphQLComplexityMiddleware{
 		&BaseMiddleware{

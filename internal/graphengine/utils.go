@@ -1,10 +1,12 @@
 package graphengine
 
 import (
+	"errors"
 	"net"
 	"net/http"
 
-	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
 
@@ -14,6 +16,24 @@ import (
 )
 
 type TykVariableReplacer func(r *http.Request, in string, escape bool) string
+
+func GetSchemaV1(engine Engine) (*graphql.Schema, error) {
+	switch engine.Version() {
+	case EngineVersionV1:
+		return engine.(*EngineV1).Schema, nil
+	case EngineVersionV2:
+		return engine.(*EngineV2).Schema, nil
+	}
+	return nil, errors.New("schema not supported for engine type")
+}
+
+func GetSchemaV2(engine Engine) (*graphqlv2.Schema, error) {
+	switch engine.Version() {
+	case EngineVersionV3:
+		// Handle for v3
+	}
+	return nil, errors.New("schema not supported for engine type")
+}
 
 func createAbstractLogrusLogger(logger *logrus.Logger) *abstractlogger.LogrusLogger {
 	return abstractlogger.NewLogrusLogger(logger, absLoggerLevel(logger.Level))
@@ -31,7 +51,7 @@ func absLoggerLevel(level logrus.Level) abstractlogger.Level {
 	return abstractlogger.InfoLevel
 }
 
-func writeGraphQLError(logger abstractlogger.Logger, w http.ResponseWriter, errors gql.Errors) (error, int) {
+func writeGraphQLError(logger abstractlogger.Logger, w http.ResponseWriter, errors graphql.Errors) (error, int) {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(http.StatusBadRequest)
 	_, _ = errors.WriteResponse(w)

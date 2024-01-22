@@ -323,7 +323,7 @@ func TestEngineV2_HandleReverseProxy(t *testing.T) {
 type testEngineV2Options struct {
 	targetURL     string
 	apiDefinition *apidef.APIDefinition
-	otelConfig    *EngineV2OTelConfig
+	otelConfig    EngineV2OTelConfig
 }
 
 type testEngineV2Option func(*testEngineV2Options)
@@ -352,7 +352,7 @@ func withOpenTelemetryTestEngineV2(detailedTracing bool) testEngineV2Option {
 			[]string{},
 		)
 
-		options.otelConfig = &EngineV2OTelConfig{
+		options.otelConfig = EngineV2OTelConfig{
 			Enabled:        true,
 			Config:         otel.OpenTelemetry{},
 			TracerProvider: traceProvider,
@@ -362,7 +362,7 @@ func withOpenTelemetryTestEngineV2(detailedTracing bool) testEngineV2Option {
 
 func newTestEngineV2(t *testing.T, options ...testEngineV2Option) (*EngineV2, engineV2Mocks) {
 	definedOptions := testEngineV2Options{
-		otelConfig:    &EngineV2OTelConfig{},
+		otelConfig:    EngineV2OTelConfig{},
 		apiDefinition: newTestApiDefinitionV2(apidef.GraphQLExecutionModeProxyOnly, "http://example.com"),
 	}
 
