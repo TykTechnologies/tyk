@@ -57,16 +57,6 @@ func (m *GraphQLComplexityMiddleware) ProcessRequest(w http.ResponseWriter, r *h
 	}
 
 	return m.Spec.GraphEngine.ProcessGraphQLComplexity(r, graphEngineComplexityAccessDefinition)
-
-	/*
-		gqlRequest := ctxGetGraphQLRequest(r)
-		if gqlRequest == nil {
-			return nil, http.StatusOK
-		}
-
-		complexityCheck := &GraphqlComplexityChecker{logger: m.Logger()}
-		failReason := complexityCheck.DepthLimitExceeded(gqlRequest, accessDef, m.Spec.GraphQLExecutor.Schema)
-		return m.handleComplexityFailReason(failReason)*/
 }
 
 func (m *GraphQLComplexityMiddleware) handleComplexityFailReason(failReason ComplexityFailReason) (error, int) {

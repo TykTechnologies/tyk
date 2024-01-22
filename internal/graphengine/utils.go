@@ -30,7 +30,7 @@ func GetSchemaV1(engine Engine) (*graphql.Schema, error) {
 func GetSchemaV2(engine Engine) (*graphqlv2.Schema, error) {
 	switch engine.Version() {
 	case EngineVersionV3:
-		// Handle for v3
+		// Handle for tyk graph engine v3
 	}
 	return nil, errors.New("schema not supported for engine type")
 }
@@ -55,7 +55,6 @@ func writeGraphQLError(logger abstractlogger.Logger, w http.ResponseWriter, erro
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(http.StatusBadRequest)
 	_, _ = errors.WriteResponse(w)
-	//m.Logger().Debugf("Error while validating GraphQL request: '%s'", errors)
 	logger.Error("error while validating GraphQL request", abstractlogger.Error(errors))
 	return errCustomBodyResponse, http.StatusBadRequest
 }
@@ -78,18 +77,15 @@ func granularAccessFailReasonAsHttpStatusCode(logger abstractlogger.Logger, resu
 	case GranularAccessFailReasonNone:
 		return nil, http.StatusOK
 	case GranularAccessFailReasonInternalError:
-		//m.Logger().Errorf(RestrictedFieldValidationFailedLogMsg, result.internalErr)
 		logger.Error(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.InternalErr))
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	case GranularAccessFailReasonValidationError:
 		w.Header().Set(header.ContentType, header.ApplicationJSON)
 		w.WriteHeader(http.StatusBadRequest)
-		//_, _ = result.validationResult.Errors.WriteResponse(w)
 		if result.writeErrorResponse != nil {
 			_, _ = result.writeErrorResponse(w, result.ValidationError)
 		}
 
-		//m.Logger().Debugf(RestrictedFieldValidationFailedLogMsg, result.validationResult.Errors)
 		logger.Debug(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.ValidationError))
 		return errCustomBodyResponse, http.StatusBadRequest
 	}

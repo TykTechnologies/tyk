@@ -87,15 +87,6 @@ func (g graphqlGoToolsV1) headerModifier(outreq *http.Request, additionalHeaders
 }
 
 func (g graphqlGoToolsV1) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWriter *graphql.EngineResultWriter, seekReadCloser SeekReadCloserFunc) error {
-	/*body, ok := proxyOnlyCtx.upstreamResponse.Body.(*nopCloserBuffer)
-	if !ok {
-		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
-		return nil
-	}
-	_, err := body.Seek(0, io.SeekStart)
-	if err != nil {
-		return err
-	}*/
 	body, err := seekReadCloser(proxyOnlyCtx.upstreamResponse.Body)
 	if body == nil {
 		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
@@ -145,7 +136,6 @@ func (g graphqlGoToolsV1) createExecutionEngine(params createExecutionEngineV1Pa
 
 	engine, err := graphql.NewExecutionEngine(params.logger, params.schema, plannerConfig)
 	if err != nil {
-		//g.logger.Error("GraphQL execution engine couldn't be created", abstractlogger.Error(err))
 		params.logger.Error("graphql execution engine couldn't be created", abstractlogger.Error(err))
 		return nil, err
 	}
@@ -199,8 +189,6 @@ func (g graphqlGoToolsV1) createExecutionEngine(params createExecutionEngineV1Pa
 		params.logger.Error(fmt.Sprintf(errMsgFormat, SchemaDataSource), abstractlogger.Error(err))
 	}
 
-	//m.Spec.GraphQLExecutor.Client = httpJSONOptions.HttpClient
-
 	return engine, err
 }
 
@@ -219,7 +207,6 @@ func (g *graphqlRequestProcessorV1) ProcessRequest(ctx context.Context, w http.R
 	gqlRequest := g.ctxRetrieveRequest(r)
 	normalizationResult, err := gqlRequest.Normalize(g.schema)
 	if err != nil {
-		//m.Logger().Errorf("Error while normalizing GraphQL request: '%s'", err)
 		g.logger.Error("error while normalizing GraphQL request", abstractlogger.Error(err))
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
@@ -230,7 +217,6 @@ func (g *graphqlRequestProcessorV1) ProcessRequest(ctx context.Context, w http.R
 
 	validationResult, err := gqlRequest.ValidateForSchema(g.schema)
 	if err != nil {
-		//m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
 		g.logger.Error("error while validating GraphQL request", abstractlogger.Error(err))
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
@@ -241,7 +227,6 @@ func (g *graphqlRequestProcessorV1) ProcessRequest(ctx context.Context, w http.R
 
 	inputValidationResult, err := gqlRequest.ValidateInput(g.schema)
 	if err != nil {
-		//m.Logger().Errorf("Error while validating variables for request: %v", err)
 		g.logger.Error("error while validating variables for request", abstractlogger.Error(err))
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
@@ -270,7 +255,6 @@ func (g *graphqlRequestProcessorWithOTelV1) ProcessRequest(ctx context.Context, 
 	// normalization
 	err := g.otelExecutor.Normalize(gqlRequest)
 	if err != nil {
-		//m.Logger().Errorf("Error while normalizing GraphqlRequest: %v", err)
 		g.logger.Error("error while normalizing GraphqlRequest", abstractlogger.Error(err))
 		var reqErr graphql.RequestErrors
 		if errors.As(err, &reqErr) {
@@ -282,7 +266,6 @@ func (g *graphqlRequestProcessorWithOTelV1) ProcessRequest(ctx context.Context, 
 	// validation
 	err = g.otelExecutor.ValidateForSchema(gqlRequest)
 	if err != nil {
-		//m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
 		g.logger.Error("error while validating GraphQL request", abstractlogger.Error(err))
 		var reqErr graphql.RequestErrors
 		if errors.As(err, &reqErr) {
@@ -294,7 +277,6 @@ func (g *graphqlRequestProcessorWithOTelV1) ProcessRequest(ctx context.Context, 
 	// input validation
 	err = g.otelExecutor.InputValidation(gqlRequest)
 	if err != nil {
-		//m.Logger().Errorf("Error while validating variables for request: %v", err)
 		g.logger.Error("error while validating variables for request", abstractlogger.Error(err))
 		var reqErr graphql.RequestErrors
 		if errors.As(err, &reqErr) {
@@ -373,8 +355,6 @@ func (c *complexityCheckerV1) DepthLimitExceeded(r *http.Request, accessDefiniti
 
 		if hasPerFieldLimits {
 			if greaterThanIntConsideringUnlimited(fieldComplexityRes.Depth, fieldAccessDefinition.Limits.MaxQueryDepth) {
-				//c.logger.Debugf("Depth '%d' of the root field: %s.%s is higher than the allowed field limit '%d'",
-				//	fieldComplexityRes.Depth, fieldAccessDefinition.TypeName, fieldAccessDefinition.FieldName, fieldAccessDefinition.Limits.MaxQueryDepth)
 				c.logger.Debug(
 					"depth of the root field is higher than the allowed field limit",
 					abstractlogger.Int("depth", fieldComplexityRes.Depth),
@@ -391,9 +371,6 @@ func (c *complexityCheckerV1) DepthLimitExceeded(r *http.Request, accessDefiniti
 		// have to increase resulting field depth by 1 to get a global depth
 		queryDepth := fieldComplexityRes.Depth + 1
 		if greaterThanIntConsideringUnlimited(queryDepth, accessDefinition.Limit.MaxQueryDepth) {
-			//c.logger.Debugf("Depth '%d' of the root field: %s.%s is higher than the allowed global limit '%d'",
-			//	queryDepth, fieldComplexityRes.TypeName, fieldComplexityRes.FieldName, accessDefinition.Limit.MaxQueryDepth)
-
 			c.logger.Debug(
 				"depth of the root field is higher than the allowed global limit",
 				abstractlogger.Int("depth", queryDepth),
@@ -486,7 +463,6 @@ type reverseProxyPreHandlerV1 struct {
 }
 
 func (r *reverseProxyPreHandlerV1) PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error) {
-	//r.httpClient.Transport = r.transportModifier(params.RoundTripper, r.apiDefinition)
 	r.httpClient.Transport = NewGraphQLEngineTransport(
 		DetermineGraphQLEngineTransportType(r.apiDefinition),
 		params.RoundTripper,
