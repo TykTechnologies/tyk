@@ -2,13 +2,10 @@ package storage
 
 import (
 	"context"
-	"sync/atomic"
-	"time"
-
+	"log"
 	"github.com/cenk/backoff"
-
-	redis "github.com/TykTechnologies/tyk/internal/redis"
-
+	"time"
+	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -148,6 +145,7 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(
 	}
 
 	// First time connecting to the clusters. We need this for the first connection (and avoid waiting 1second for the rc.statusCheck loop).
+log.Infof("Connecting to Redis clusters: %v", c)
 	for _, v := range c {
 		rc.connectSingleton(v.IsCache, v.IsAnalytics, *conf)
 		err := backoff.Retry(v.checkIsOpen, getExponentialBackoff())
