@@ -1,6 +1,9 @@
 package storage
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // DummyStorage is a simple in-memory storage structure used for testing or
 // demonstration purposes. It simulates a storage system.
@@ -20,19 +23,28 @@ func NewDummyStorage() *DummyStorage {
 // GetMultiKey retrieves multiple values from the DummyStorage based on a slice of keys.
 // It returns a slice of strings containing the values corresponding to each provided key,
 // and an error if the operation cannot be completed.
-// As of now, this method is not implemented and will panic if called.
-// TODO: Implement the functionality of this method or handle its non-implementation appropriately.
-func (s *DummyStorage) GetMultiKey([]string) ([]string, error) {
-	panic("implement me")
+func (s *DummyStorage) GetMultiKey(keys []string) ([]string, error) {
+	var values []string
+	for _, key := range keys {
+		value, ok := s.Data[key]
+		if !ok {
+			return nil, fmt.Errorf("key not found: %s", key)
+		}
+		values = append(values, value)
+	}
+	return values, nil
 }
 
 // GetRawKey retrieves the value associated with a given key from the DummyStorage.
 // The method accepts a single string as the key and returns the corresponding string value.
 // An error is also returned to indicate whether the retrieval was successful.
 // Currently, this method is not implemented and will cause a panic if invoked.
-// TODO: Implement this method to provide actual retrieval logic or handle its non-implementation.
-func (s *DummyStorage) GetRawKey(string) (string, error) {
-	panic("implement me")
+func (s *DummyStorage) GetRawKey(key string) (string, error) {
+	value, ok := s.Data[key]
+	if !ok {
+		return "", fmt.Errorf("key not found: %s", key)
+	}
+	return value, nil
 }
 
 // SetRawKey stores a value with a specified key in the DummyStorage.
@@ -72,7 +84,7 @@ func (s *DummyStorage) DeleteRawKey(string) bool {
 
 // Connect establishes a connection to the storage backend; not currently implemented.
 func (s *DummyStorage) Connect() bool {
-	panic("implement me")
+	return true
 }
 
 // GetKeysAndValues retrieves all key-value pairs from DummyStorage; currently not implemented.
