@@ -8,11 +8,12 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/buger/jsonparser"
+	"github.com/jensneuse/abstractlogger"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
-	"github.com/buger/jsonparser"
-	"github.com/jensneuse/abstractlogger"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	internalgraphql "github.com/TykTechnologies/tyk/internal/graphql"

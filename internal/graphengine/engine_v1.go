@@ -5,12 +5,13 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/jensneuse/abstractlogger"
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
 	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
-	"github.com/jensneuse/abstractlogger"
-	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )

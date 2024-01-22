@@ -90,7 +90,6 @@ require (
 	github.com/TykTechnologies/opentelemetry v0.0.20
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/go-redis/redismock/v9 v9.2.0
-	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.6.0
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	go.opentelemetry.io/otel v1.19.0
