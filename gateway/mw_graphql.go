@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
-	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
@@ -22,14 +21,6 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-)
-
-const (
-	HTTPJSONDataSource   = "HTTPJSONDataSource"
-	GraphQLDataSource    = "GraphQLDataSource"
-	SchemaDataSource     = "SchemaDataSource"
-	TykRESTDataSource    = "TykRESTDataSource"
-	TykGraphQLDataSource = "TykGraphQLDataSource"
 )
 
 var (
@@ -125,151 +116,7 @@ func (m *GraphQLMiddleware) Init() {
 	} else {
 		log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
 	}
-	// TODO: graphengine
-	/*
-		m.Spec.GraphQLExecutor.Schema = schema
-
-			if needsGraphQLExecutionEngine(m.Spec) {
-				absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
-				m.Spec.GraphQLExecutor.Client = &http.Client{
-					Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
-				}
-				m.Spec.GraphQLExecutor.StreamingClient = &http.Client{
-					Timeout:   0,
-					Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
-				}
-
-				if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 {
-					m.initGraphQLEngineV1(absLogger)
-				} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion2 {
-					m.initGraphQLEngineV2(absLogger)
-				} else {
-					log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
-				}
-			}
-	*/
 }
-
-/*
-func (m *GraphQLMiddleware) initGraphQLEngineV1(logger *abstractlogger.LogrusLogger) {
-	typeFieldConfigurations := m.Spec.GraphQL.TypeFieldConfigurations
-	if m.Spec.GraphQLExecutor.Schema.HasQueryType() {
-		typeFieldConfigurations = append(typeFieldConfigurations, datasource.TypeFieldConfiguration{
-			TypeName:  m.Spec.GraphQLExecutor.Schema.QueryTypeName(),
-			FieldName: "__schema",
-			DataSource: datasource.SourceConfig{
-				Name: SchemaDataSource,
-				Config: func() json.RawMessage {
-					res, _ := json.Marshal(datasource.SchemaDataSourcePlannerConfig{})
-					return res
-				}(),
-			},
-		})
-	}
-
-	plannerConfig := datasource.PlannerConfiguration{
-		TypeFieldConfigurations: typeFieldConfigurations,
-	}
-
-	engine, err := gql.NewExecutionEngine(logger, m.Spec.GraphQLExecutor.Schema, plannerConfig)
-	if err != nil {
-		log.Errorf("GraphQL execution engine couldn't created: %v", err)
-		return
-	}
-
-	hooks := &datasource.Hooks{
-		PreSendHttpHook:     preSendHttpHook{m},
-		PostReceiveHttpHook: postReceiveHttpHook{m},
-	}
-
-	httpJSONOptions := gql.DataSourceHttpJsonOptions{
-		HttpClient:         m.Spec.GraphQLExecutor.Client,
-		WhitelistedSchemes: []string{"tyk"},
-		Hooks:              hooks,
-	}
-
-	graphQLOptions := gql.DataSourceGraphqlOptions{
-		HttpClient:         m.Spec.GraphQLExecutor.Client,
-		WhitelistedSchemes: []string{"tyk"},
-		Hooks:              hooks,
-	}
-
-	errMsgFormat := "%s couldn't be added"
-
-	err = engine.AddHttpJsonDataSourceWithOptions(HTTPJSONDataSource, httpJSONOptions)
-	if err != nil {
-		m.Logger().WithError(err).Errorf(errMsgFormat, HTTPJSONDataSource)
-	}
-
-	err = engine.AddHttpJsonDataSourceWithOptions(TykRESTDataSource, httpJSONOptions)
-	if err != nil {
-		m.Logger().WithError(err).Errorf(errMsgFormat, HTTPJSONDataSource)
-	}
-
-	err = engine.AddGraphqlDataSourceWithOptions(GraphQLDataSource, graphQLOptions)
-	if err != nil {
-		m.Logger().WithError(err).Errorf(errMsgFormat, GraphQLDataSource)
-	}
-
-	err = engine.AddGraphqlDataSourceWithOptions(TykGraphQLDataSource, graphQLOptions)
-	if err != nil {
-		m.Logger().WithError(err).Errorf(errMsgFormat, GraphQLDataSource)
-	}
-
-	err = engine.AddDataSource(SchemaDataSource, datasource.SchemaDataSourcePlannerFactoryFactory{})
-	if err != nil {
-		m.Logger().WithError(err).Errorf(errMsgFormat, SchemaDataSource)
-	}
-
-	m.Spec.GraphQLExecutor.Engine = engine
-	m.Spec.GraphQLExecutor.Client = httpJSONOptions.HttpClient
-}*/
-/*
-func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLogger) {
-	configAdapter := adapter.NewGraphQLConfigAdapter(m.Spec.APIDefinition,
-		adapter.WithHttpClient(m.Spec.GraphQLExecutor.Client),
-		adapter.WithStreamingClient(m.Spec.GraphQLExecutor.StreamingClient),
-		adapter.WithSchema(m.Spec.GraphQLExecutor.Schema),
-	)
-
-	engineConfig, err := configAdapter.EngineConfigV2()
-	if err != nil {
-		m.Logger().WithError(err).Error("could not create engine v2 config")
-		return
-	}
-	engineConfig.SetWebsocketBeforeStartHook(m)
-	specCtx, cancel := context.WithCancel(context.Background())
-
-	engine, err := gql.NewExecutionEngineV2(specCtx, logger, *engineConfig)
-	if err != nil {
-		m.Logger().WithError(err).Error("could not create execution engine v2")
-		cancel()
-		return
-	}
-	m.Spec.GraphQLExecutor.EngineV2 = engine
-	conf := m.Gw.GetConfig()
-	if conf.OpenTelemetry.Enabled {
-		var executor graphqlinternal.TykOtelExecutorI
-		if m.Spec.DetailedTracing {
-			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Detailed(m.Gw.TracerProvider, engine, m.Spec.GraphQLExecutor.Schema)
-		} else {
-			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Basic(m.Gw.TracerProvider, engine)
-		}
-		if err != nil {
-			m.Logger().WithError(err).Error("error creating custom execution engine v2")
-			cancel()
-			return
-		}
-		m.Spec.GraphQLExecutor.OtelExecutor = executor
-	}
-	m.Spec.GraphQLExecutor.CancelV2 = cancel
-	m.Spec.GraphQLExecutor.HooksV2.BeforeFetchHook = m
-	m.Spec.GraphQLExecutor.HooksV2.AfterFetchHook = m
-
-	if m.isSupergraphAPIDefinition() {
-		m.loadSupergraphMergedSDLAsSchema()
-	}
-}*/
 
 func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	err := m.checkForUnsupportedUsage()
@@ -306,103 +153,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	nopCloseRequestBody(r)
 
 	return m.Spec.GraphEngine.ProcessAndStoreGraphQLRequest(w, r)
-	// TODO: graphengine
-	/*var gqlRequest gql.Request
-	err = gql.UnmarshalRequest(r.Body, &gqlRequest)
-	if err != nil {
-		m.Logger().Debugf("Error while unmarshalling GraphQL request: '%s'", err)
-		return err, http.StatusBadRequest
-	}
-
-	defer ctxSetGraphQLRequest(r, &gqlRequest)
-	if conf := m.Gw.GetConfig(); conf.OpenTelemetry.Enabled && m.Spec.DetailedTracing {
-		ctx, span := m.Gw.TracerProvider.Tracer().Start(r.Context(), "GraphqlMiddleware Validation")
-		defer span.End()
-		*r = *r.WithContext(ctx)
-		return m.validateRequestWithOtel(r.Context(), w, &gqlRequest)
-	} else {
-		return m.validateRequest(w, &gqlRequest)
-	}*/
 }
-
-/*
-func (m *GraphQLMiddleware) validateRequest(w http.ResponseWriter, gqlRequest *gql.Request) (error, int) {
-	normalizationResult, err := gqlRequest.Normalize(m.Spec.GraphQLExecutor.Schema)
-	if err != nil {
-		m.Logger().Errorf("Error while normalizing GraphQL request: '%s'", err)
-		return ProxyingRequestFailedErr, http.StatusInternalServerError
-	}
-
-	if normalizationResult.Errors != nil && normalizationResult.Errors.Count() > 0 {
-		return m.writeGraphQLError(w, normalizationResult.Errors)
-	}
-
-	validationResult, err := gqlRequest.ValidateForSchema(m.Spec.GraphQLExecutor.Schema)
-	if err != nil {
-		m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
-		return ProxyingRequestFailedErr, http.StatusInternalServerError
-	}
-
-	if validationResult.Errors != nil && validationResult.Errors.Count() > 0 {
-		return m.writeGraphQLError(w, validationResult.Errors)
-	}
-
-	inputValidationResult, err := gqlRequest.ValidateInput(m.Spec.GraphQLExecutor.Schema)
-	if err != nil {
-		m.Logger().Errorf("Error while validating variables for request: %v", err)
-		return ProxyingRequestFailedErr, http.StatusInternalServerError
-	}
-	if inputValidationResult.Errors != nil && inputValidationResult.Errors.Count() > 0 {
-		return m.writeGraphQLError(w, inputValidationResult.Errors)
-	}
-	return nil, http.StatusOK
-}*/
-/*
-func (m *GraphQLMiddleware) validateRequestWithOtel(ctx context.Context, w http.ResponseWriter, req *gql.Request) (error, int) {
-	m.Spec.GraphQLExecutor.OtelExecutor.SetContext(ctx)
-
-	// normalization
-	err := m.Spec.GraphQLExecutor.OtelExecutor.Normalize(req)
-	if err != nil {
-		m.Logger().Errorf("Error while normalizing GraphqlRequest: %v", err)
-		var reqErr gql.RequestErrors
-		if errors.As(err, &reqErr) {
-			return m.writeGraphQLError(w, reqErr)
-		}
-		return ProxyingRequestFailedErr, http.StatusInternalServerError
-	}
-
-	// validation
-	err = m.Spec.GraphQLExecutor.OtelExecutor.ValidateForSchema(req)
-	if err != nil {
-		m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
-		var reqErr gql.RequestErrors
-		if errors.As(err, &reqErr) {
-			return m.writeGraphQLError(w, reqErr)
-		}
-		return ProxyingRequestFailedErr, http.StatusInternalServerError
-	}
-
-	// input validation
-	err = m.Spec.GraphQLExecutor.OtelExecutor.InputValidation(req)
-	if err != nil {
-		m.Logger().Errorf("Error while validating variables for request: %v", err)
-		var reqErr gql.RequestErrors
-		if errors.As(err, &reqErr) {
-			return m.writeGraphQLError(w, reqErr)
-		}
-		return ProxyingRequestFailedErr, http.StatusInternalServerError
-	}
-	return nil, http.StatusOK
-}*/
-/*
-func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.Errors) (error, int) {
-	w.Header().Set(header.ContentType, header.ApplicationJSON)
-	w.WriteHeader(http.StatusBadRequest)
-	_, _ = errors.WriteResponse(w)
-	m.Logger().Debugf("Error while validating GraphQL request: '%s'", errors)
-	return errCustomBodyResponse, http.StatusBadRequest
-}*/
 
 func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request) bool {
 	websocketProtocol := r.Header.Get(header.SecWebSocketProtocol)
@@ -425,11 +176,6 @@ func (m *GraphQLMiddleware) isGraphQLConfigVersion1() bool {
 func (m *GraphQLMiddleware) isSupergraphAPIDefinition() bool {
 	return m.Spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
 }
-
-/*
-func (m *GraphQLMiddleware) loadSupergraphMergedSDLAsSchema() {
-	m.Spec.GraphQL.Schema = m.Spec.GraphQL.Supergraph.MergedSDL
-}*/
 
 // OnBeforeStart - is a graphql.WebsocketBeforeStartHook which allows to perform security checks for all operations over websocket connections
 func (m *GraphQLMiddleware) OnBeforeStart(reqCtx context.Context, operation *gql.Request) error {
@@ -537,18 +283,6 @@ func needsGraphQLExecutionEngine(apiSpec *APISpec) bool {
 func isGraphQLProxyOnly(apiSpec *APISpec) bool {
 	return apiSpec.GraphQL.Enabled &&
 		(apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly || apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph)
-}
-
-func absLoggerLevel(level logrus.Level) abstractlogger.Level {
-	switch level {
-	case logrus.ErrorLevel:
-		return abstractlogger.ErrorLevel
-	case logrus.WarnLevel:
-		return abstractlogger.WarnLevel
-	case logrus.DebugLevel:
-		return abstractlogger.DebugLevel
-	}
-	return abstractlogger.InfoLevel
 }
 
 type preSendHttpHook struct {

@@ -255,13 +255,7 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 		err = errors.New("execution engine is nil")
 		return
 	}
-	/*
-		e.HttpClient.Transport = NewGraphQLEngineTransport(
-			DetermineGraphQLEngineTransportType(e.ApiDefinition),
-			roundTripper,
-			e.newReusableBodyReadCloser,
-		)
-	*/
+
 	isProxyOnly := isProxyOnly(e.ApiDefinition)
 	span := otel.SpanFromContext(outreq.Context())
 	reqCtx := otel.ContextWithSpan(context.Background(), span)
@@ -315,20 +309,6 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	res = resultWriter.AsHTTPResponse(httpStatus, header)
 	return
 }
-
-/*
-func (e *EngineV2) handleWebsocketUpgrade(params *ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
-	conn, err := params.WebSocketUpgrader.Upgrade(params.ResponseWriter, params.OutRequest, http.Header{
-		header.SecWebSocketProtocol: {params.OutRequest.Header.Get(header.SecWebSocketProtocol)},
-	})
-	if err != nil {
-		e.logger.Error("websocket upgrade for GraphQL engine failed", abstractlogger.Error(err))
-		return nil, false, err
-	}
-
-	e.handoverWebSocketConnectionToGraphQLExecutionEngine(conn.UnderlyingConn(), params.OutRequest)
-	return nil, true, nil
-}*/
 
 func (e *EngineV2) handoverWebSocketConnectionToGraphQLExecutionEngine(params *ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
 	conn, err := websocketConnWithUpgradeHeader(e.logger, params)

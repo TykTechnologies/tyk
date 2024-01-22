@@ -215,22 +215,6 @@ type APISpec struct {
 	network analytics.NetworkStats
 
 	GraphEngine graphengine.Engine
-	// TODO: graphengine
-	/*
-		GraphQLExecutor struct {
-			Engine       *graphql.ExecutionEngine
-			CancelV2     context.CancelFunc
-			EngineV2     *graphql.ExecutionEngineV2
-			OtelExecutor graphqlinternal.TykOtelExecutorI
-			HooksV2      struct {
-				BeforeFetchHook resolve.BeforeFetchHook
-				AfterFetchHook  resolve.AfterFetchHook
-			}
-			Client          *http.Client
-			StreamingClient *http.Client
-			Schema          *graphql.Schema
-		} `json:"-"`
-	*/
 
 	HasMock            bool
 	HasValidateRequest bool

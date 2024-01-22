@@ -172,19 +172,6 @@ func (e *EngineV1) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 	return nil, false, nil
 }
 
-/*
-func (e *EngineV1) handleGraphQLIntrospection() (res *http.Response, hijacked bool, err error) {
-	var result *graphql.ExecutionResult
-	result, err = graphql.SchemaIntrospection(e.Schema)
-	if err != nil {
-		return
-	}
-
-	res = result.GetAsHTTPResponse()
-	return
-}
-*/
-
 func (e *EngineV1) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
 	if e.ExecutionEngine == nil {
 		err = errors.New("execution engine is nil")
@@ -200,20 +187,6 @@ func (e *EngineV1) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	res = result.GetAsHTTPResponse()
 	return
 }
-
-/*
-func (e *EngineV1) handleWebsocketUpgrade(params *ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
-	conn, err := params.WebSocketUpgrader.Upgrade(params.ResponseWriter, params.OutRequest, http.Header{
-		header.SecWebSocketProtocol: {params.OutRequest.Header.Get(header.SecWebSocketProtocol)},
-	})
-	if err != nil {
-		e.logger.Error("websocket upgrade for GraphQL engine failed", abstractlogger.Error(err))
-		return nil, false, err
-	}
-
-	e.handoverWebSocketConnectionToGraphQLExecutionEngine(params.RoundTripper, conn.UnderlyingConn(), params.OutRequest)
-	return nil, true, nil
-}*/
 
 func (e *EngineV1) handoverWebSocketConnectionToGraphQLExecutionEngine(params *ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
 	conn, err := websocketConnWithUpgradeHeader(e.logger, params)

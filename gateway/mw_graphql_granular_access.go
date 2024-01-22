@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -9,8 +8,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/user"
 )
-
-var errIntrospectionDisabled = errors.New("introspection is disabled")
 
 type GranularAccessFailReason int
 
@@ -66,40 +63,6 @@ func (m *GraphQLGranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, 
 	}
 
 	return m.Spec.GraphEngine.ProcessGraphQLGranularAccess(w, r, graphEngineGranularAccessDefinition)
-	/*
-		gqlRequest := ctxGetGraphQLRequest(r)
-		if gqlRequest == nil {
-			return nil, http.StatusOK
-		}
-
-		isIntrospection, err := gqlRequest.IsIntrospectionQueryStrict()
-		if err != nil {
-			return err, http.StatusInternalServerError
-		}
-		if isIntrospection {
-			if accessDef.DisableIntrospection {
-				return errIntrospectionDisabled, http.StatusForbidden
-			}
-		}
-
-		checker := &GraphqlGranularAccessChecker{}
-		result := checker.CheckGraphqlRequestFieldAllowance(gqlRequest, &accessDef, m.Spec.GraphQLExecutor.Schema)
-
-		switch result.failReason {
-		case GranularAccessFailReasonNone:
-			return nil, http.StatusOK
-		case GranularAccessFailReasonInternalError:
-			m.Logger().Errorf(RestrictedFieldValidationFailedLogMsg, result.internalErr)
-			return ProxyingRequestFailedErr, http.StatusInternalServerError
-		case GranularAccessFailReasonValidationError:
-			w.Header().Set(header.ContentType, header.ApplicationJSON)
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = result.validationResult.Errors.WriteResponse(w)
-			m.Logger().Debugf(RestrictedFieldValidationFailedLogMsg, result.validationResult.Errors)
-			return errCustomBodyResponse, http.StatusBadRequest
-		}
-
-		return nil, http.StatusOK*/
 }
 
 type GraphqlGranularAccessResult struct {
