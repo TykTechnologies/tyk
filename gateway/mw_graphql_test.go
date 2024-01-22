@@ -748,6 +748,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 							wg.Add(2)
 
 							wsTestServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+								defer wg.Done()
 								for expectedHeaderKey := range expectedHeaders {
 									values := r.Header.Values(expectedHeaderKey)
 									headerExists := assert.Greater(t, len(values), 0, fmt.Sprintf("no header values found for header '%s'", expectedHeaderKey))
@@ -759,7 +760,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 									}
 								}
 								_, _ = w.Write(nil)
-								wg.Done()
 							}))
 							defer wsTestServer.Close()
 

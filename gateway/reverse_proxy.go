@@ -1005,7 +1005,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
 	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
 
-	return p.TykAPISpec.GraphEngine.HandleReverseProxy(graphengine.ReverseProxyParams{
+	res, hijacked, err = p.TykAPISpec.GraphEngine.HandleReverseProxy(graphengine.ReverseProxyParams{
 		RoundTripper:       roundTripper,
 		ResponseWriter:     w,
 		OutRequest:         outreq,
@@ -1014,6 +1014,18 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 		IsCORSPreflight:    isCORSPreflight(outreq),
 		IsWebSocketUpgrade: isWebSocketUpgrade,
 	})
+	if err != nil {
+		return nil, hijacked, err
+	}
+
+	// If the response is nil, then we are dealing with the legacy v1 engine, so we will do a regular proxy.
+	// This should only apply when the connection was not hijacked (= upgraded to websocket).
+	if res == nil && !hijacked {
+		res, err = p.sendRequestToUpstream(roundTripper, outreq)
+		return
+	}
+
+	return res, hijacked, err
 }
 
 func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, err error) {

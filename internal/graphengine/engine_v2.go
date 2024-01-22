@@ -244,11 +244,12 @@ func (e *EngineV2) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 		return e.handoverWebSocketConnectionToGraphQLExecutionEngine(&params)
 	case ReverseProxyTypeGraphEngine:
 		return e.handoverRequestToGraphQLExecutionEngine(gqlRequest, params.OutRequest)
-	default:
-		e.logger.Error("unknown reverse proxy type", abstractlogger.Int("reverseProxyType", int(reverseProxyType)))
+	case ReverseProxyTypeNone:
+		return nil, false, nil
 	}
 
-	return nil, false, nil
+	e.logger.Error("unknown reverse proxy type", abstractlogger.Int("reverseProxyType", int(reverseProxyType)))
+	return nil, false, ErrUnknownReverseProxyType
 }
 
 func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
