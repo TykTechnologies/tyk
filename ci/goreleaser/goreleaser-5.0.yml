@@ -9,7 +9,11 @@ builds:
   - id: std-linux
     flags:
       - -tags=goplugin
-    ldflags:
+    ldflags: 
+      - -X GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+      - -X ANOTHER_SECRET=${{ secrets.ANOTHER_SECRET }} 
+      - -X GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+      - -X ANOTHER_SECRET=${{ secrets.ANOTHER_SECRET }}
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
       - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
