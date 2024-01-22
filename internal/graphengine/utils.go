@@ -162,5 +162,5 @@ func websocketConnWithUpgradeHeader(logger abstractlogger.Logger, params *Revers
 		return nil, err
 	}
 
-	return conn.UnderlyingConn(), nil
+	return conn.NetConn(), nil
 }
