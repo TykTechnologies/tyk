@@ -197,7 +197,10 @@ func TestDummyStorage_GetRollingWindow(t *testing.T) {
 func TestDummyStorage_GetSet(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
-		ds.GetSet("Set")
+		_, err := ds.GetSet("Set")
+		if err != nil {
+			return
+		}
 	})
 }
 
