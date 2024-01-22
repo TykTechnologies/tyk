@@ -20,6 +20,7 @@ EOF
 }
 
 if [ -z $1 ]; then
+    echo "Error: No package file specified"
     usage
     exit 1
 fi
