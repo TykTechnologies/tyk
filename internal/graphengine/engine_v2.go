@@ -160,7 +160,7 @@ func NewEngineV2(options EngineV2Options) (*EngineV2, error) {
 	if engineV2.OpenTelemetry.Enabled {
 		var executor graphqlinternal.TykOtelExecutorI
 		if options.ApiDefinition.DetailedTracing {
-			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Detailed(engineV2.OpenTelemetry.TracerProvider, executionEngine)
+			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Detailed(engineV2.OpenTelemetry.TracerProvider, executionEngine, parsedSchema)
 		} else {
 			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Basic(engineV2.OpenTelemetry.TracerProvider, executionEngine)
 		}

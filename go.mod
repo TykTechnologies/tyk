@@ -85,10 +85,12 @@ require (
 
 require (
 	github.com/Jeffail/gabs/v2 v2.7.0
+	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240119121455-385ba43daaa4
 	github.com/TykTechnologies/kin-openapi v0.90.0
 	github.com/TykTechnologies/opentelemetry v0.0.20
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/go-redis/redismock/v9 v9.2.0
+	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.6.0
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	go.opentelemetry.io/otel v1.19.0
@@ -106,7 +108,7 @@ require (
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
-	github.com/asyncapi/converter-go v0.0.0-20190802111537-d8459b2bd403 // indirect
+	github.com/asyncapi/converter-go v0.3.0 // indirect
 	github.com/asyncapi/parser-go v0.4.2 // indirect
 	github.com/asyncapi/spec-json-schemas/v2 v2.14.0 // indirect
 	github.com/cenkalti/backoff/v3 v3.0.0 // indirect
@@ -165,7 +167,7 @@ require (
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.17 // indirect
+	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/mavricknz/asn1-ber v0.0.0-20151103223136-b9df1c2f4213 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
