@@ -2,11 +2,9 @@ package gateway
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
-
-	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
@@ -16,9 +14,9 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/apidef/adapter"
+	"github.com/TykTechnologies/tyk/internal/graphengine"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
@@ -67,28 +65,92 @@ func (m *GraphQLMiddleware) Init() {
 		log.Errorf("Schema normalization was not successful. Reason: %v", normalizationResult.Errors)
 	}
 
-	m.Spec.GraphQLExecutor.Schema = schema
-
-	if needsGraphQLExecutionEngine(m.Spec) {
-		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
-		m.Spec.GraphQLExecutor.Client = &http.Client{
-			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
-		}
-		m.Spec.GraphQLExecutor.StreamingClient = &http.Client{
-			Timeout:   0,
-			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
-		}
-
-		if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 {
-			m.initGraphQLEngineV1(absLogger)
-		} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion2 {
-			m.initGraphQLEngineV2(absLogger)
-		} else {
-			log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
-		}
+	reusableBodyReadCloser := func(buf io.ReadCloser) (io.ReadCloser, error) {
+		return newNopCloserBuffer(buf)
 	}
+
+	if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 {
+		m.Spec.GraphEngine, err = graphengine.NewEngineV1(graphengine.EngineV1Options{
+			Logger:        log,
+			ApiDefinition: m.Spec.APIDefinition,
+			Schema:        schema,
+			HttpClient: &http.Client{
+				Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
+			},
+			Injections: graphengine.EngineV1Injections{
+				PreSendHttpHook:           preSendHttpHook{m},
+				PostReceiveHttpHook:       postReceiveHttpHook{m},
+				ContextStoreRequest:       ctxSetGraphQLRequest,
+				ContextRetrieveRequest:    ctxGetGraphQLRequest,
+				NewReusableBodyReadCloser: reusableBodyReadCloser,
+			},
+		})
+	} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion2 {
+		m.Spec.GraphEngine, err = graphengine.NewEngineV2(graphengine.EngineV2Options{
+			Logger:        log,
+			Schema:        schema,
+			ApiDefinition: m.Spec.APIDefinition,
+			HttpClient: &http.Client{
+				Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
+			},
+			StreamingClient: &http.Client{
+				Timeout:   0,
+				Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
+			},
+			OpenTelemetry: graphengine.EngineV2OTelConfig{
+				Enabled:        m.Gw.GetConfig().OpenTelemetry.Enabled,
+				TracerProvider: m.Gw.TracerProvider,
+			},
+			Injections: graphengine.EngineV2Injections{
+				BeforeFetchHook:           m,
+				AfterFetchHook:            m,
+				WebsocketOnBeforeStart:    m,
+				ContextStoreRequest:       ctxSetGraphQLRequest,
+				ContextRetrieveRequest:    ctxGetGraphQLRequest,
+				NewReusableBodyReadCloser: reusableBodyReadCloser,
+				SeekReadCloser: func(readCloser io.ReadCloser) (io.ReadCloser, error) {
+					body, ok := readCloser.(*nopCloserBuffer)
+					if !ok {
+						return nil, nil
+					}
+					_, err := body.Seek(0, io.SeekStart)
+					if err != nil {
+						return nil, err
+					}
+					return body, nil
+				},
+				TykVariableReplacer: m.Gw.replaceTykVariables,
+			},
+		})
+	} else {
+		log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
+	}
+	// TODO: graphengine
+	/*
+		m.Spec.GraphQLExecutor.Schema = schema
+
+			if needsGraphQLExecutionEngine(m.Spec) {
+				absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
+				m.Spec.GraphQLExecutor.Client = &http.Client{
+					Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
+				}
+				m.Spec.GraphQLExecutor.StreamingClient = &http.Client{
+					Timeout:   0,
+					Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
+				}
+
+				if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 {
+					m.initGraphQLEngineV1(absLogger)
+				} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion2 {
+					m.initGraphQLEngineV2(absLogger)
+				} else {
+					log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
+				}
+			}
+	*/
 }
 
+/*
 func (m *GraphQLMiddleware) initGraphQLEngineV1(logger *abstractlogger.LogrusLogger) {
 	typeFieldConfigurations := m.Spec.GraphQL.TypeFieldConfigurations
 	if m.Spec.GraphQLExecutor.Schema.HasQueryType() {
@@ -161,8 +223,8 @@ func (m *GraphQLMiddleware) initGraphQLEngineV1(logger *abstractlogger.LogrusLog
 
 	m.Spec.GraphQLExecutor.Engine = engine
 	m.Spec.GraphQLExecutor.Client = httpJSONOptions.HttpClient
-}
-
+}*/
+/*
 func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLogger) {
 	configAdapter := adapter.NewGraphQLConfigAdapter(m.Spec.APIDefinition,
 		adapter.WithHttpClient(m.Spec.GraphQLExecutor.Client),
@@ -207,7 +269,7 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 	if m.isSupergraphAPIDefinition() {
 		m.loadSupergraphMergedSDLAsSchema()
 	}
-}
+}*/
 
 func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	err := m.checkForUnsupportedUsage()
@@ -216,7 +278,12 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 
-	if m.Spec.GraphQLExecutor.Schema == nil {
+	if m.Spec.GraphEngine == nil {
+		m.Logger().Error("GraphEngine is not initialized")
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+
+	if !m.Spec.GraphEngine.HasSchema() {
 		m.Logger().Error("Schema is not created")
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
@@ -238,7 +305,9 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// as for proxy only API we are sending it as is
 	nopCloseRequestBody(r)
 
-	var gqlRequest gql.Request
+	return m.Spec.GraphEngine.ProcessAndStoreGraphQLRequest(w, r)
+	// TODO: graphengine
+	/*var gqlRequest gql.Request
 	err = gql.UnmarshalRequest(r.Body, &gqlRequest)
 	if err != nil {
 		m.Logger().Debugf("Error while unmarshalling GraphQL request: '%s'", err)
@@ -253,9 +322,10 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return m.validateRequestWithOtel(r.Context(), w, &gqlRequest)
 	} else {
 		return m.validateRequest(w, &gqlRequest)
-	}
+	}*/
 }
 
+/*
 func (m *GraphQLMiddleware) validateRequest(w http.ResponseWriter, gqlRequest *gql.Request) (error, int) {
 	normalizationResult, err := gqlRequest.Normalize(m.Spec.GraphQLExecutor.Schema)
 	if err != nil {
@@ -286,8 +356,8 @@ func (m *GraphQLMiddleware) validateRequest(w http.ResponseWriter, gqlRequest *g
 		return m.writeGraphQLError(w, inputValidationResult.Errors)
 	}
 	return nil, http.StatusOK
-}
-
+}*/
+/*
 func (m *GraphQLMiddleware) validateRequestWithOtel(ctx context.Context, w http.ResponseWriter, req *gql.Request) (error, int) {
 	m.Spec.GraphQLExecutor.OtelExecutor.SetContext(ctx)
 
@@ -324,15 +394,15 @@ func (m *GraphQLMiddleware) validateRequestWithOtel(ctx context.Context, w http.
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 	return nil, http.StatusOK
-}
-
+}*/
+/*
 func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.Errors) (error, int) {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(http.StatusBadRequest)
 	_, _ = errors.WriteResponse(w)
 	m.Logger().Debugf("Error while validating GraphQL request: '%s'", errors)
 	return errCustomBodyResponse, http.StatusBadRequest
-}
+}*/
 
 func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request) bool {
 	websocketProtocol := r.Header.Get(header.SecWebSocketProtocol)
@@ -356,14 +426,20 @@ func (m *GraphQLMiddleware) isSupergraphAPIDefinition() bool {
 	return m.Spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
 }
 
+/*
 func (m *GraphQLMiddleware) loadSupergraphMergedSDLAsSchema() {
 	m.Spec.GraphQL.Schema = m.Spec.GraphQL.Supergraph.MergedSDL
-}
+}*/
 
 // OnBeforeStart - is a graphql.WebsocketBeforeStartHook which allows to perform security checks for all operations over websocket connections
 func (m *GraphQLMiddleware) OnBeforeStart(reqCtx context.Context, operation *gql.Request) error {
 	if m.Spec.UseKeylessAccess {
 		return nil
+	}
+
+	schema, err := graphengine.GetSchemaV1(m.Spec.GraphEngine)
+	if err != nil {
+		return err
 	}
 
 	v := reqCtx.Value(ctx.SessionData)
@@ -380,7 +456,7 @@ func (m *GraphQLMiddleware) OnBeforeStart(reqCtx context.Context, operation *gql
 	}
 
 	complexityCheck := &GraphqlComplexityChecker{logger: m.Logger()}
-	depthResult := complexityCheck.DepthLimitExceeded(operation, accessDef, m.Spec.GraphQLExecutor.Schema)
+	depthResult := complexityCheck.DepthLimitExceeded(operation, accessDef, schema)
 	switch depthResult {
 	case ComplexityFailReasonInternalError:
 		return ProxyingRequestFailedErr
@@ -389,7 +465,7 @@ func (m *GraphQLMiddleware) OnBeforeStart(reqCtx context.Context, operation *gql
 	}
 
 	granularAccessCheck := &GraphqlGranularAccessChecker{}
-	result := granularAccessCheck.CheckGraphqlRequestFieldAllowance(operation, accessDef, m.Spec.GraphQLExecutor.Schema)
+	result := granularAccessCheck.CheckGraphqlRequestFieldAllowance(operation, accessDef, schema)
 	switch result.failReason {
 	case GranularAccessFailReasonInternalError:
 		m.Logger().Errorf(RestrictedFieldValidationFailedLogMsg, result.internalErr)

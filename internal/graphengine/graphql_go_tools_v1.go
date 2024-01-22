@@ -97,7 +97,10 @@ func (g graphqlGoToolsV1) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnl
 		return err
 	}*/
 	body, err := seekReadCloser(proxyOnlyCtx.upstreamResponse.Body)
-	if err != nil {
+	if body == nil {
+		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
+		return nil
+	} else if err != nil {
 		return err
 	}
 
@@ -134,6 +137,10 @@ func (g graphqlGoToolsV1) createExecutionEngine(params createExecutionEngineV1Pa
 
 	plannerConfig := datasource.PlannerConfiguration{
 		TypeFieldConfigurations: typeFieldConfigurations,
+	}
+
+	if params.logger == nil {
+		params.logger = abstractlogger.NoopLogger
 	}
 
 	engine, err := graphql.NewExecutionEngine(params.logger, params.schema, plannerConfig)
@@ -310,10 +317,12 @@ func (c *complexityCheckerV1) DepthLimitExceeded(r *http.Request, accessDefiniti
 	}
 
 	gqlRequest := c.ctxRetrieveRequest(r)
+	if gqlRequest == nil {
+		return ComplexityFailReasonNone
+	}
 
 	isIntrospectionQuery, err := gqlRequest.IsIntrospectionQuery()
 	if err != nil {
-		//c.logger.Debugf("Error while checking for introspection query: '%s'", err.Error())
 		c.logger.Debug("error while checking for introspection query", abstractlogger.Error(err))
 		return ComplexityFailReasonInternalError
 	}
@@ -324,21 +333,18 @@ func (c *complexityCheckerV1) DepthLimitExceeded(r *http.Request, accessDefiniti
 
 	complexityRes, err := gqlRequest.CalculateComplexity(graphql.DefaultComplexityCalculator, c.schema)
 	if err != nil {
-		//c.logger.Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
 		c.logger.Error("error while calculating complexity of GraphQL request", abstractlogger.Error(err))
 		return ComplexityFailReasonInternalError
 	}
 
 	if complexityRes.Errors != nil && complexityRes.Errors.Count() > 0 {
-		//c.logger.Errorf("Error while calculating complexity of GraphQL request: '%s'", complexityRes.Errors.ErrorByIndex(0))
 		c.logger.Error("error while calculating complexity of GraphQL request", abstractlogger.Error(complexityRes.Errors.ErrorByIndex(0)))
 		return ComplexityFailReasonInternalError
 	}
 
 	// do per query depth check
 	if len(accessDefinition.FieldAccessRights) == 0 {
-		if complexityRes.Depth > accessDefinition.Limit.MaxQueryDepth {
-			//c.logger.Debugf("Complexity of the request is higher than the allowed limit '%d'", accessDefinition.Limit.MaxQueryDepth)
+		if accessDefinition.Limit.MaxQueryDepth > 0 && complexityRes.Depth > accessDefinition.Limit.MaxQueryDepth {
 			c.logger.Debug("complexity of the request is higher than the allowed limit", abstractlogger.Int("maxQueryDepth", accessDefinition.Limit.MaxQueryDepth))
 			return ComplexityFailReasonDepthLimitExceeded
 		}
@@ -421,6 +427,9 @@ type granularAccessCheckerV1 struct {
 
 func (g *granularAccessCheckerV1) CheckGraphQLRequestFieldAllowance(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) GraphQLGranularAccessResult {
 	gqlRequest := g.ctxRetrieveGraphQLRequest(r)
+	if gqlRequest == nil {
+		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonNone}
+	}
 
 	if len(accessDefinition.AllowedTypes) != 0 {
 		fieldRestrictionList := graphql.FieldRestrictionList{
@@ -484,12 +493,6 @@ func (r *reverseProxyPreHandlerV1) PreHandle(params ReverseProxyParams) (reverse
 		r.newReusableBodyReadCloser,
 	)
 
-	gqlRequest := r.ctxRetrieveGraphQLRequest(params.OutRequest)
-	if gqlRequest == nil {
-		err = errors.New("graphql request is nil")
-		return
-	}
-
 	switch {
 	case params.IsCORSPreflight:
 		if params.NeedsEngine {
@@ -501,6 +504,11 @@ func (r *reverseProxyPreHandlerV1) PreHandle(params ReverseProxyParams) (reverse
 			return ReverseProxyTypeWebsocketUpgrade, nil
 		}
 	default:
+		gqlRequest := r.ctxRetrieveGraphQLRequest(params.OutRequest)
+		if gqlRequest == nil {
+			err = errors.New("graphql request is nil")
+			return
+		}
 		gqlRequest.SetHeader(params.OutRequest.Header)
 
 		var isIntrospection bool

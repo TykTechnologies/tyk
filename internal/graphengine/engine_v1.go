@@ -43,6 +43,7 @@ type EngineV1 struct {
 type EngineV1Options struct {
 	Logger        *logrus.Logger
 	ApiDefinition *apidef.APIDefinition
+	Schema        *graphql.Schema
 	HttpClient    *http.Client
 	Injections    EngineV1Injections
 }
@@ -51,13 +52,18 @@ func NewEngineV1(options EngineV1Options) (*EngineV1, error) {
 	logger := createAbstractLogrusLogger(options.Logger)
 	gqlTools := graphqlGoToolsV1{}
 
-	parsedSchema, err := gqlTools.parseSchema(options.ApiDefinition.GraphQL.Schema)
-	if err != nil {
-		logger.Error("error on schema parsing", abstractlogger.Error(err))
-		return nil, err
+	var parsedSchema = options.Schema
+	if parsedSchema == nil {
+		var err error
+		parsedSchema, err = gqlTools.parseSchema(options.ApiDefinition.GraphQL.Schema)
+		if err != nil {
+			logger.Error("error on schema parsing", abstractlogger.Error(err))
+			return nil, err
+		}
 	}
 
 	executionEngine, err := gqlTools.createExecutionEngine(createExecutionEngineV1Params{
+		logger:              logger,
 		apiDef:              options.ApiDefinition,
 		schema:              parsedSchema,
 		httpClient:          options.HttpClient,
@@ -110,8 +116,16 @@ func NewEngineV1(options EngineV1Options) (*EngineV1, error) {
 	}, nil
 }
 
+func (e *EngineV1) Version() EngineVersion {
+	return EngineVersionV1
+}
+
 func (e *EngineV1) HasSchema() bool {
 	return e.Schema != nil
+}
+
+func (e *EngineV1) Cancel() {
+	// V1 does not have a cancel callback
 }
 
 func (e *EngineV1) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.Request) (err error, statusCode int) {
@@ -122,7 +136,7 @@ func (e *EngineV1) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.
 		return err, http.StatusBadRequest
 	}
 
-	defer e.ctxStoreRequestFunc(r, &gqlRequest)
+	e.ctxStoreRequestFunc(r, &gqlRequest)
 	return e.graphqlRequestProcessor.ProcessRequest(r.Context(), w, r)
 }
 

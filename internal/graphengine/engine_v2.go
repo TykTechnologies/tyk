@@ -62,10 +62,11 @@ type EngineV2 struct {
 
 type EngineV2Options struct {
 	Logger          *logrus.Logger
+	Schema          *graphql.Schema
 	ApiDefinition   *apidef.APIDefinition
 	HttpClient      *http.Client
 	StreamingClient *http.Client
-	OpenTelemetry   *EngineV2OTelConfig
+	OpenTelemetry   EngineV2OTelConfig
 	Injections      EngineV2Injections
 }
 
@@ -73,10 +74,14 @@ func NewEngineV2(options EngineV2Options) (*EngineV2, error) {
 	logger := createAbstractLogrusLogger(options.Logger)
 	gqlTools := graphqlGoToolsV1{}
 
-	parsedSchema, err := gqlTools.parseSchema(options.ApiDefinition.GraphQL.Schema)
-	if err != nil {
-		logger.Error("error on schema parsing", abstractlogger.Error(err))
-		return nil, err
+	var parsedSchema = options.Schema
+	if parsedSchema == nil {
+		var err error
+		parsedSchema, err = gqlTools.parseSchema(options.ApiDefinition.GraphQL.Schema)
+		if err != nil {
+			logger.Error("error on schema parsing", abstractlogger.Error(err))
+			return nil, err
+		}
 	}
 
 	configAdapter := adapter.NewGraphQLConfigAdapter(options.ApiDefinition,
@@ -131,7 +136,7 @@ func NewEngineV2(options EngineV2Options) (*EngineV2, error) {
 		ApiDefinition:             options.ApiDefinition,
 		HttpClient:                options.HttpClient,
 		StreamingClient:           options.StreamingClient,
-		OpenTelemetry:             options.OpenTelemetry,
+		OpenTelemetry:             &options.OpenTelemetry,
 		logger:                    logger,
 		gqlTools:                  gqlTools,
 		graphqlRequestProcessor:   requestProcessor,
@@ -144,18 +149,20 @@ func NewEngineV2(options EngineV2Options) (*EngineV2, error) {
 		ctxStoreRequestFunc:       options.Injections.ContextStoreRequest,
 		ctxRetrieveRequestFunc:    options.Injections.ContextRetrieveRequest,
 		newReusableBodyReadCloser: options.Injections.NewReusableBodyReadCloser,
+		seekReadCloser:            options.Injections.SeekReadCloser,
+		tykVariableReplacer:       options.Injections.TykVariableReplacer,
 	}
 
 	if engineV2.OpenTelemetry == nil {
 		engineV2.OpenTelemetry = &EngineV2OTelConfig{}
 	}
 
-	if options.OpenTelemetry.Enabled {
+	if engineV2.OpenTelemetry.Enabled {
 		var executor graphqlinternal.TykOtelExecutorI
 		if options.ApiDefinition.DetailedTracing {
-			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Detailed(options.OpenTelemetry.TracerProvider, executionEngine)
+			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Detailed(engineV2.OpenTelemetry.TracerProvider, executionEngine)
 		} else {
-			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Basic(options.OpenTelemetry.TracerProvider, executionEngine)
+			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Basic(engineV2.OpenTelemetry.TracerProvider, executionEngine)
 		}
 		if err != nil {
 			options.Logger.WithError(err).Error("error creating custom execution engine v2")
@@ -180,8 +187,18 @@ func NewEngineV2(options EngineV2Options) (*EngineV2, error) {
 	return engineV2, nil
 }
 
+func (e *EngineV2) Version() EngineVersion {
+	return EngineVersionV2
+}
+
 func (e *EngineV2) HasSchema() bool {
 	return e.Schema != nil
+}
+
+func (e *EngineV2) Cancel() {
+	if e.contextCancel != nil {
+		e.contextCancel()
+	}
 }
 
 func (e *EngineV2) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.Request) (err error, statusCode int) {
@@ -192,7 +209,7 @@ func (e *EngineV2) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.
 		return err, http.StatusBadRequest
 	}
 
-	defer e.ctxStoreRequestFunc(r, &gqlRequest)
+	e.ctxStoreRequestFunc(r, &gqlRequest)
 	if e.OpenTelemetry.Enabled && e.ApiDefinition.DetailedTracing {
 		ctx, span := e.OpenTelemetry.TracerProvider.Tracer().Start(r.Context(), "GraphqlMiddleware Validation")
 		defer span.End()
@@ -225,7 +242,7 @@ func (e *EngineV2) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 	case ReverseProxyTypeWebsocketUpgrade:
 		return e.handoverWebSocketConnectionToGraphQLExecutionEngine(&params)
 	case ReverseProxyTypeGraphEngine:
-		return e.handoverRequestToGraphQLExecutionEngine(params.RoundTripper, gqlRequest, params.OutRequest)
+		return e.handoverRequestToGraphQLExecutionEngine(gqlRequest, params.OutRequest)
 	default:
 		e.logger.Error("unknown reverse proxy type", abstractlogger.Int("reverseProxyType", int(reverseProxyType)))
 	}
@@ -233,7 +250,7 @@ func (e *EngineV2) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 	return nil, false, nil
 }
 
-func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(roundTripper http.RoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
+func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
 	if e.ExecutionEngine == nil {
 		err = errors.New("execution engine is nil")
 		return

@@ -6,7 +6,7 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
-	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -47,39 +47,59 @@ func (m *GraphQLGranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, 
 		return nil, http.StatusOK
 	}
 
-	gqlRequest := ctxGetGraphQLRequest(r)
-	if gqlRequest == nil {
-		return nil, http.StatusOK
+	graphEngineGranularAccessDefinition := &graphengine.GranularAccessDefinition{
+		AllowedTypes:    make([]graphengine.GranularAccessType, 0),
+		RestrictedTypes: make([]graphengine.GranularAccessType, 0),
 	}
 
-	isIntrospection, err := gqlRequest.IsIntrospectionQueryStrict()
-	if err != nil {
-		return err, http.StatusInternalServerError
+	for _, allowedType := range accessDef.AllowedTypes {
+		graphEngineGranularAccessDefinition.AllowedTypes = append(graphEngineGranularAccessDefinition.AllowedTypes, graphengine.GranularAccessType{
+			Name:   allowedType.Name,
+			Fields: allowedType.Fields,
+		})
 	}
-	if isIntrospection {
-		if accessDef.DisableIntrospection {
-			return errIntrospectionDisabled, http.StatusForbidden
+	for _, restrictedType := range accessDef.RestrictedTypes {
+		graphEngineGranularAccessDefinition.RestrictedTypes = append(graphEngineGranularAccessDefinition.RestrictedTypes, graphengine.GranularAccessType{
+			Name:   restrictedType.Name,
+			Fields: restrictedType.Fields,
+		})
+	}
+
+	return m.Spec.GraphEngine.ProcessGraphQLGranularAccess(w, r, graphEngineGranularAccessDefinition)
+	/*
+		gqlRequest := ctxGetGraphQLRequest(r)
+		if gqlRequest == nil {
+			return nil, http.StatusOK
 		}
-	}
 
-	checker := &GraphqlGranularAccessChecker{}
-	result := checker.CheckGraphqlRequestFieldAllowance(gqlRequest, &accessDef, m.Spec.GraphQLExecutor.Schema)
+		isIntrospection, err := gqlRequest.IsIntrospectionQueryStrict()
+		if err != nil {
+			return err, http.StatusInternalServerError
+		}
+		if isIntrospection {
+			if accessDef.DisableIntrospection {
+				return errIntrospectionDisabled, http.StatusForbidden
+			}
+		}
 
-	switch result.failReason {
-	case GranularAccessFailReasonNone:
-		return nil, http.StatusOK
-	case GranularAccessFailReasonInternalError:
-		m.Logger().Errorf(RestrictedFieldValidationFailedLogMsg, result.internalErr)
-		return ProxyingRequestFailedErr, http.StatusInternalServerError
-	case GranularAccessFailReasonValidationError:
-		w.Header().Set(header.ContentType, header.ApplicationJSON)
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = result.validationResult.Errors.WriteResponse(w)
-		m.Logger().Debugf(RestrictedFieldValidationFailedLogMsg, result.validationResult.Errors)
-		return errCustomBodyResponse, http.StatusBadRequest
-	}
+		checker := &GraphqlGranularAccessChecker{}
+		result := checker.CheckGraphqlRequestFieldAllowance(gqlRequest, &accessDef, m.Spec.GraphQLExecutor.Schema)
 
-	return nil, http.StatusOK
+		switch result.failReason {
+		case GranularAccessFailReasonNone:
+			return nil, http.StatusOK
+		case GranularAccessFailReasonInternalError:
+			m.Logger().Errorf(RestrictedFieldValidationFailedLogMsg, result.internalErr)
+			return ProxyingRequestFailedErr, http.StatusInternalServerError
+		case GranularAccessFailReasonValidationError:
+			w.Header().Set(header.ContentType, header.ApplicationJSON)
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = result.validationResult.Errors.WriteResponse(w)
+			m.Logger().Debugf(RestrictedFieldValidationFailedLogMsg, result.validationResult.Errors)
+			return errCustomBodyResponse, http.StatusBadRequest
+		}
+
+		return nil, http.StatusOK*/
 }
 
 type GraphqlGranularAccessResult struct {

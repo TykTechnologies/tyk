@@ -86,6 +86,8 @@ github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj
 github.com/armon/go-radix v1.0.0/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/asyncapi/converter-go v0.0.0-20190802111537-d8459b2bd403 h1:HhobldPK/8Cnhliwl744pXSfyjtF956/vOJLyJ8mrXk=
 github.com/asyncapi/converter-go v0.0.0-20190802111537-d8459b2bd403/go.mod h1:mpJYWYy+USNiLENQxiyGgRc3qtFPxYSWdSd/eS+R6bo=
+github.com/asyncapi/converter-go v0.3.0 h1:tzLEDnFeOePNBoypxn5LmlyAG89ZZzzvOugGxaA2Uco=
+github.com/asyncapi/converter-go v0.3.0/go.mod h1:mpJYWYy+USNiLENQxiyGgRc3qtFPxYSWdSd/eS+R6bo=
 github.com/asyncapi/parser-go v0.4.2 h1:+PPo+Sk/u9IPH3JklXFrPUQnr9LURwNJU5jfcLBBITc=
 github.com/asyncapi/parser-go v0.4.2/go.mod h1:5iAT+irO9xKeBDnIhqT0ev8QJH1dHq4i2oU/UBhhwB8=
 github.com/asyncapi/spec-json-schemas/v2 v2.14.0 h1:t5Frb4WzaV2bTlcRqXhBdvqTjO6+n/oiPMjvCxYooag=

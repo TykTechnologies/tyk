@@ -28,26 +28,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/buger/jsonparser"
-
-	"github.com/gorilla/websocket"
-	"github.com/jensneuse/abstractlogger"
-
 	"github.com/akutz/memconn"
+	"github.com/gorilla/websocket"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
-	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
@@ -1011,45 +1003,58 @@ func isCORSPreflight(r *http.Request) bool {
 
 func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
-	needEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
+	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
 
-	switch {
-	case isCORSPreflight(outreq):
-		if needEngine {
-			err = errors.New("options passthrough not allowed")
-			return
-		}
-	case isWebSocketUpgrade:
-		if needEngine {
-			return p.handleGraphQLEngineWebsocketUpgrade(roundTripper, outreq, w)
-		}
-	default:
-		gqlRequest := ctxGetGraphQLRequest(outreq)
-		if gqlRequest == nil {
-			err = errors.New("graphql request is nil")
-			return
-		}
-		gqlRequest.SetHeader(outreq.Header)
+	return p.TykAPISpec.GraphEngine.HandleReverseProxy(graphengine.ReverseProxyParams{
+		RoundTripper:       roundTripper,
+		ResponseWriter:     w,
+		OutRequest:         outreq,
+		WebSocketUpgrader:  &p.wsUpgrader,
+		NeedsEngine:        needsEngine,
+		IsCORSPreflight:    isCORSPreflight(outreq),
+		IsWebSocketUpgrade: isWebSocketUpgrade,
+	})
 
-		var isIntrospection bool
-		isIntrospection, err = gqlRequest.IsIntrospectionQuery()
-		if err != nil {
-			return
+	/*
+		switch {
+		case isCORSPreflight(outreq):
+			if needEngine {
+				err = errors.New("options passthrough not allowed")
+				return
+			}
+		case isWebSocketUpgrade:
+			if needEngine {
+				return p.handleGraphQLEngineWebsocketUpgrade(roundTripper, outreq, w)
+			}
+		default:
+			gqlRequest := ctxGetGraphQLRequest(outreq)
+			if gqlRequest == nil {
+				err = errors.New("graphql request is nil")
+				return
+			}
+			gqlRequest.SetHeader(outreq.Header)
+
+			var isIntrospection bool
+			isIntrospection, err = gqlRequest.IsIntrospectionQuery()
+			if err != nil {
+				return
+			}
+
+			if isIntrospection {
+				res, err = p.handleGraphQLIntrospection(gqlRequest)
+				return
+			}
+			if needEngine {
+				return p.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest, outreq)
+			}
 		}
 
-		if isIntrospection {
-			res, err = p.handleGraphQLIntrospection(gqlRequest)
-			return
-		}
-		if needEngine {
-			return p.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest, outreq)
-		}
-	}
-
-	res, err = p.sendRequestToUpstream(roundTripper, outreq)
-	return
+		res, err = p.sendRequestToUpstream(roundTripper, outreq)
+		return
+	*/
 }
 
+/*
 func (p *ReverseProxy) handleGraphQLIntrospection(gqlRequest *graphql.Request) (res *http.Response, err error) {
 	switch p.TykAPISpec.GraphQL.Version {
 	case apidef.GraphQLConfigVersion2:
@@ -1081,20 +1086,23 @@ func (p *ReverseProxy) handleGraphQLIntrospection(gqlRequest *graphql.Request) (
 		return
 	}
 }
+*/
 
-func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoundTripper, r *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
-	conn, err := p.wsUpgrader.Upgrade(w, r, http.Header{
-		header.SecWebSocketProtocol: {r.Header.Get(header.SecWebSocketProtocol)},
-	})
-	if err != nil {
-		p.logger.Error("websocket upgrade for GraphQL engine failed: ", err)
-		return nil, false, err
+/*
+	func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoundTripper, r *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
+		conn, err := p.wsUpgrader.Upgrade(w, r, http.Header{
+			header.SecWebSocketProtocol: {r.Header.Get(header.SecWebSocketProtocol)},
+		})
+		if err != nil {
+			p.logger.Error("websocket upgrade for GraphQL engine failed: ", err)
+			return nil, false, err
+		}
+
+		p.handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper, conn.UnderlyingConn(), r)
+		return nil, true, nil
 	}
-
-	p.handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper, conn.UnderlyingConn(), r)
-	return nil, true, nil
-}
-
+*/
+/*
 func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWriter *graphql.EngineResultWriter) error {
 	body, ok := proxyOnlyCtx.upstreamResponse.Body.(*nopCloserBuffer)
 	if !ok {
@@ -1120,15 +1128,17 @@ func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWrite
 	_, err = resultWriter.Write(result)
 	return err
 }
-
+*/
+/*
 func headerStructToHeaderMap(headers []apidef.UDGGlobalHeader) map[string]string {
 	headerMap := make(map[string]string)
 	for _, header := range headers {
 		headerMap[header.Key] = header.Value
 	}
 	return headerMap
-}
+}*/
 
+/*
 func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
 
@@ -1211,7 +1221,9 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 
 	return nil, false, errors.New("graphql configuration is invalid")
 }
+*/
 
+/*
 func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn, req *http.Request) {
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
 
@@ -1256,7 +1268,7 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 		log.Error("could not start graphql websocket handler: ", err)
 	case <-done:
 	}
-}
+}*/
 
 func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, err error) {
 	return roundTripper.RoundTrip(outreq)
@@ -2065,6 +2077,7 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 	return false, ""
 }
 
+/*
 func (p *ReverseProxy) graphqlEngineAdditionalUpstreamHeaders(outreq *http.Request) http.Header {
 	upstreamHeaders := http.Header{}
 	switch p.TykAPISpec.GraphQL.ExecutionMode {
@@ -2087,8 +2100,9 @@ func (p *ReverseProxy) graphqlEngineAdditionalUpstreamHeaders(outreq *http.Reque
 	}
 
 	return upstreamHeaders
-}
+}*/
 
+/*
 func (p *ReverseProxy) graphqlEngineHeaderModifier(outreq *http.Request, additionalHeaders http.Header) postprocess.HeaderModifier {
 	return func(header http.Header) {
 		for key := range additionalHeaders {
@@ -2102,7 +2116,7 @@ func (p *ReverseProxy) graphqlEngineHeaderModifier(outreq *http.Request, additio
 			header.Set(key, val)
 		}
 	}
-}
+}*/
 
 // IsGrpcStreaming  determines wether a request represents a grpc streaming req
 func IsGrpcStreaming(r *http.Request) bool {

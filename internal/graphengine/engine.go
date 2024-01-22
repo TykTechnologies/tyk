@@ -11,13 +11,24 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+type EngineVersion int
+
+const (
+	EngineVersionUnknown EngineVersion = iota
+	EngineVersionV1
+	EngineVersionV2
+	EngineVersionV3
+)
+
 type ProcessGraphQLComplexityParams struct {
 	w http.ResponseWriter
 	r *http.Request
 }
 
 type Engine interface {
+	Version() EngineVersion
 	HasSchema() bool
+	Cancel()
 	ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.Request) (err error, statusCode int)
 	ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int)
 	ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int)
