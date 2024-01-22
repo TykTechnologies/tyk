@@ -6,6 +6,9 @@
 # - arm64
 # - amd64
 builds:
+  env:
+    - NAME=value
+    - SECRET=value
   - id: std-linux
     flags:
       - -trimpath
@@ -14,6 +17,8 @@ builds:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
       - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
+  - -X GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+  - -X ANOTHER_SECRET=${{ secrets.ANOTHER_SECRET }}
       - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
     goos:
       - linux
