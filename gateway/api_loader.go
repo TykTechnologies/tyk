@@ -15,6 +15,8 @@ import (
 	"sync"
 	textTemplate "text/template"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/rs/cors"
@@ -44,7 +46,8 @@ func (gw *Gateway) prepareStorage() generalStores {
 	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey.", RedisController: gw.RedisController}
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth.", RedisController: gw.RedisController}
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw: gw}
-	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", Gw: gw}
+	gs.rpcOrgStore = gw.getGlobalMDCBStorageHandler("orgkey.", false)
+
 	gw.GlobalSessionManager.Init(gs.redisStore)
 	return gs
 }
@@ -214,27 +217,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
-	authStore := gs.redisStore
-	orgStore := gs.redisOrgStore
-	switch spec.AuthProvider.StorageEngine {
-	case LDAPStorageEngine:
-		storageEngine := LDAPStorageHandler{}
-		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
-		authStore = &storageEngine
-	case RPCStorageEngine:
-		authStore = gs.rpcAuthStore
-		orgStore = gs.rpcOrgStore
-		spec.GlobalConfig.EnforceOrgDataAge = true
-		globalConf := gw.GetConfig()
-		globalConf.EnforceOrgDataAge = true
-		gw.SetConfig(globalConf)
-	}
-
-	sessionStore := gs.redisStore
-	switch spec.SessionProvider.StorageEngine {
-	case RPCStorageEngine:
-		sessionStore = gs.rpcAuthStore
-	}
+	authStore, orgStore, sessionStore := gw.configureAuthAndOrgStores(gs, spec)
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
 	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
@@ -410,6 +393,14 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 		chainArray = append(chainArray, authArray...)
 
+		// if gw is edge, then prefetch any existent org session expiry
+		if gw.GetConfig().SlaveOptions.UseRPC {
+			// if not in emergency so load from backup is not blocked
+			if !rpc.IsEmergencyMode() {
+				baseMid.OrgSessionExpiry(spec.OrgID)
+			}
+		}
+
 		for _, obj := range mwPostAuthCheckFuncs {
 			if mwDriver == apidef.GoPluginDriver {
 				gw.mwAppendEnabled(
@@ -528,6 +519,33 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}).Info("API Loaded")
 
 	return &chainDef
+}
+
+func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (storage.Handler, storage.Handler, storage.Handler) {
+	authStore := gs.redisStore
+	orgStore := gs.redisOrgStore
+
+	switch spec.AuthProvider.StorageEngine {
+	case LDAPStorageEngine:
+		storageEngine := LDAPStorageHandler{}
+		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
+		authStore = &storageEngine
+	case RPCStorageEngine:
+		authStore = gs.rpcAuthStore
+		orgStore = gs.rpcOrgStore
+		spec.GlobalConfig.EnforceOrgDataAge = true
+		globalConf := gw.GetConfig()
+		globalConf.EnforceOrgDataAge = true
+		gw.SetConfig(globalConf)
+	}
+
+	sessionStore := gs.redisStore
+	switch spec.SessionProvider.StorageEngine {
+	case RPCStorageEngine:
+		sessionStore = gs.rpcAuthStore
+	}
+
+	return authStore, orgStore, sessionStore
 }
 
 // Check for recursion

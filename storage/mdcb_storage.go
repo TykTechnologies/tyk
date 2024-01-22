@@ -65,8 +65,19 @@ func getResourceType(key string) string {
 	}
 }
 
-func (m MdcbStorage) GetMultiKey([]string) ([]string, error) {
-	panic("implement me")
+// GetMultiKey gets multiple keys from the MDCB layer
+func (m MdcbStorage) GetMultiKey(keyNames []string) ([]string, error) {
+	var err error
+	var value string
+
+	for _, key := range keyNames {
+		value, err = m.GetKey(key)
+		if err == nil {
+			return []string{value}, nil
+		}
+	}
+
+	return nil, err
 }
 
 func (m MdcbStorage) GetRawKey(string) (string, error) {
