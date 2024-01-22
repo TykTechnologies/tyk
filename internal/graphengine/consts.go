@@ -14,6 +14,7 @@ const (
 	GranularAccessFailReasonNone GranularAccessFailReason = iota
 	GranularAccessFailReasonInternalError
 	GranularAccessFailReasonValidationError
+	GranularAccessFailReasonIntrospectionDisabled
 )
 
 type ReverseProxyType int

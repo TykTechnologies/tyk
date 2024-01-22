@@ -249,7 +249,10 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 }
 
 func TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits(t *testing.T) {
-	apiSpec := BuildAPI(func(spec *APISpec) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	apiSpec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.GraphQL.Enabled = true
 		spec.GraphQL.Schema = gqlCountriesSchema
 	})[0]

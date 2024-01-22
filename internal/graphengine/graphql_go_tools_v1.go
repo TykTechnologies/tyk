@@ -409,6 +409,19 @@ func (g *granularAccessCheckerV1) CheckGraphQLRequestFieldAllowance(w http.Respo
 		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonNone}
 	}
 
+	isIntrospection, err := gqlRequest.IsIntrospectionQueryStrict()
+	if err != nil {
+		return GraphQLGranularAccessResult{
+			FailReason:  GranularAccessFailReasonInternalError,
+			InternalErr: err,
+		}
+	}
+	if isIntrospection {
+		if accessDefinition.DisableIntrospection {
+			return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonIntrospectionDisabled}
+		}
+	}
+
 	if len(accessDefinition.AllowedTypes) != 0 {
 		fieldRestrictionList := graphql.FieldRestrictionList{
 			Kind:  graphql.AllowList,

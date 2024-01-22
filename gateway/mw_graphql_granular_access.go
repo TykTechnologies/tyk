@@ -45,8 +45,9 @@ func (m *GraphQLGranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, 
 	}
 
 	graphEngineGranularAccessDefinition := &graphengine.GranularAccessDefinition{
-		AllowedTypes:    make([]graphengine.GranularAccessType, 0),
-		RestrictedTypes: make([]graphengine.GranularAccessType, 0),
+		AllowedTypes:         make([]graphengine.GranularAccessType, 0),
+		RestrictedTypes:      make([]graphengine.GranularAccessType, 0),
+		DisableIntrospection: accessDef.DisableIntrospection,
 	}
 
 	for _, allowedType := range accessDef.AllowedTypes {

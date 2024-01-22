@@ -511,6 +511,33 @@ func TestGranularAccessCheckerV1_CheckGraphQLRequestFieldAllowance(t *testing.T)
 		assert.Equal(t, GranularAccessFailReasonNone, result.FailReason)
 	})
 
+	t.Run("should return GranularAccessFailReasonIntrospectionDisabled if introspection check is disabled", func(t *testing.T) {
+		operation := testIntrospectionQuery
+
+		request, err := http.NewRequest(
+			http.MethodPost,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, operation),
+			)))
+		require.NoError(t, err)
+
+		granularAccessChecker := newTestGranularAccessCheckerV1(t)
+		granularAccessChecker.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			if r == request {
+				return &graphql.Request{
+					Query: operation,
+				}
+			}
+			return nil
+		}
+
+		result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{
+			DisableIntrospection: true,
+		})
+		assert.Equal(t, GranularAccessFailReasonIntrospectionDisabled, result.FailReason)
+	})
+
 	t.Run("allowed list", func(t *testing.T) {
 		t.Run("should return GranularAccessFailReasonNone if the field is listed in allowed list", func(t *testing.T) {
 			operation := `{ hello }`
@@ -546,7 +573,7 @@ func TestGranularAccessCheckerV1_CheckGraphQLRequestFieldAllowance(t *testing.T)
 		})
 
 		t.Run("should return GranularAccessFailReasonValidationError if the field is not listed in allowed list", func(t *testing.T) {
-			operation := `{ helloName("eddy") }`
+			operation := `{ helloName(name: "eddy") }`
 
 			request, err := http.NewRequest(
 				http.MethodPost,
@@ -614,7 +641,7 @@ func TestGranularAccessCheckerV1_CheckGraphQLRequestFieldAllowance(t *testing.T)
 		})
 
 		t.Run("should return GranularAccessFailReasonValidationError if the field is listed in restricted list", func(t *testing.T) {
-			operation := `{ helloName("eddy") }`
+			operation := `{ helloName(name:  "eddy") }`
 
 			request, err := http.NewRequest(
 				http.MethodPost,

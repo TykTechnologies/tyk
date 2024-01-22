@@ -70,8 +70,9 @@ type GraphQLGranularAccessResult struct {
 }
 
 type GranularAccessDefinition struct {
-	AllowedTypes    []GranularAccessType
-	RestrictedTypes []GranularAccessType
+	AllowedTypes         []GranularAccessType
+	RestrictedTypes      []GranularAccessType
+	DisableIntrospection bool
 }
 
 type GranularAccessType struct {

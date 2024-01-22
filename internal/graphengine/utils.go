@@ -89,6 +89,10 @@ func granularAccessFailReasonAsHttpStatusCode(logger abstractlogger.Logger, resu
 
 		logger.Debug(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.ValidationError))
 		return errCustomBodyResponse, http.StatusBadRequest
+	case GranularAccessFailReasonIntrospectionDisabled:
+		w.WriteHeader(http.StatusForbidden)
+		logger.Debug("introspection disabled")
+		return ErrIntrospectionDisabled, http.StatusForbidden
 	}
 
 	return nil, http.StatusOK
