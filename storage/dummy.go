@@ -113,12 +113,12 @@ func (s *DummyStorage) IncrememntWithExpire(string, int64) int64 {
 }
 
 // SetRollingWindow sets a rolling window for a key with specified parameters; implementation pending.
-func (s *DummyStorage) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
+func (s *DummyStorage) SetRollingWindow(string, int64, string, bool) (int, []interface{}) {
 	panic("implement me")
 }
 
 // GetRollingWindow retrieves data for a specified rolling window; currently not implemented.
-func (s *DummyStorage) GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{}) {
+func (s *DummyStorage) GetRollingWindow(string, int64, bool) (int, []interface{}) {
 	panic("implement me")
 }
 
@@ -172,7 +172,7 @@ func (s *DummyStorage) GetKey(key string) (string, error) {
 }
 
 // SetKey assigns a value to a key in DummyStorage with an expiration time; returns nil for success.
-func (s *DummyStorage) SetKey(key, value string, exp int64) error {
+func (s *DummyStorage) SetKey(key, value string, _ int64) error {
 	s.Data[key] = value
 	return nil
 }
@@ -220,7 +220,7 @@ func (s *DummyStorage) RemoveFromList(keyName, value string) error {
 }
 
 // GetListRange retrieves a range of list elements from DummyStorage for a specified key; returns an error if not found.
-func (s *DummyStorage) GetListRange(keyName string, from, to int64) ([]string, error) {
+func (s *DummyStorage) GetListRange(keyName string, _, _ int64) ([]string, error) {
 	for key := range s.IndexList {
 		if key == keyName {
 			return s.IndexList[key], nil

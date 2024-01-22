@@ -8,6 +8,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// assertPanic checks if the provided function f panics. It fails the test if no panic occurs.
+func assertPanic(t *testing.T, f func()) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		}
+	}()
+	f() // Call the provided function, expecting a panic
+}
+
 func TestDummyStorage_GetMultiKey(t *testing.T) {
 	ds := NewDummyStorage()
 	ds.Data["key1"] = "value1"
@@ -88,31 +99,30 @@ func TestDummyStorage_GetRawKey(t *testing.T) {
 func TestDummyStorage_SetRawKey(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
-		ds.SetRawKey("key", "val", 0)
-	})
-}
-
-// assertPanic checks if the provided function f panics. It fails the test if no panic occurs.
-func assertPanic(t *testing.T, f func()) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("The code did not panic")
+		err := ds.SetRawKey("key", "val", 0)
+		if err != nil {
+			return
 		}
-	}()
-	f() // Call the provided function, expecting a panic
+	})
 }
 
 func TestDummyStorage_SetExp(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
-		ds.SetExp("key", 0)
+		err := ds.SetExp("key", 0)
+		if err != nil {
+			return
+		}
 	})
 }
 
 func TestDummyStorage_GetExp(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
-		ds.GetExp("key")
+		_, err := ds.GetExp("key")
+		if err != nil {
+			return
+		}
 	})
 }
 
@@ -229,14 +239,20 @@ func TestDummyStorage_AddToSortedSet(t *testing.T) {
 func TestDummyStorage_GetSortedSetRange(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
-		ds.GetSortedSetRange("set", "from", "to")
+		_, _, err := ds.GetSortedSetRange("set", "from", "to")
+		if err != nil {
+			return
+		}
 	})
 }
 
 func TestDummyStorage_RemoveSortedSetRange(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
-		ds.RemoveSortedSetRange("set", "from", "to")
+		err := ds.RemoveSortedSetRange("set", "from", "to")
+		if err != nil {
+			return
+		}
 	})
 }
 
