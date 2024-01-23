@@ -35,12 +35,24 @@ func NewRedisController(ctx context.Context) *RedisController {
 func (rc *RedisController) DisableRedis(setRedisDown bool) {
 	if setRedisDown {
 		// we make sure x set that redis is down
-		rc.disableRedis.Store(true)
+		// Handling case when Redis is disabled
+	rc.disableRedis.Store(true)
+	rc.redisUp.Store(false)
+	return
 		rc.redisUp.Store(false)
 		return
 	}
 
+	// Handling case when Redis is re-enabled
 	rc.disableRedis.Store(false)
+
+	ctx, cancel := context.WithTimeout(rc.ctx, 5*time.Second)
+	defer cancel()
+
+	if !rc.WaitConnect(ctx) {
+		panic("Can't reconnect to redis after disable")
+	}
+	rc.reconnect <- struct{}{}
 	rc.redisUp.Store(false)
 
 	ctx, cancel := context.WithTimeout(rc.ctx, 5*time.Second)
