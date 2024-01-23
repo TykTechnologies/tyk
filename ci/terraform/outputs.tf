@@ -16,7 +16,7 @@ data "terraform_remote_state" "integration" {
 }
 
 output "tyk" {
-  value = data.terraform_remote_state.integration.outputs.tyk
+  value = data.terraform_remote_state.integration.outputs.new_correct_attribute_name
   description = "ECR creds for tyk repo"
 }
 
