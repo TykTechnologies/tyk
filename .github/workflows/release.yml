@@ -169,6 +169,9 @@ jobs:
   ci:
     needs:
       - goreleaser
+    permissions:
+      id-token: write   # AWS OIDC JWT
+      contents: read    # actions/checkout
     runs-on: ubuntu-latest
 
     steps:
