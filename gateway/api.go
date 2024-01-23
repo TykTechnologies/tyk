@@ -1764,11 +1764,11 @@ func (gw *Gateway) orgHandler(w http.ResponseWriter, r *http.Request) {
 		obj, code = gw.handleDeleteOrgKey(orgID)
 	}
 
+	code = http.StatusInternalServerError
 	doJSONWrite(w, code, obj)
 }
 
 func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
-	return apiError("Request malformed"), http.StatusBadRequest
 	newSession := new(user.SessionState)
 
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
