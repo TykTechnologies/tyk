@@ -28,7 +28,7 @@ import (
 
 const (
 	grpcListenAddr  = ":9999"
-	grpcListenPath  = "tcp://127.0.0.1:9999"
+	grpcListenPath  = "127.0.0.1:9999"
 	grpcTestMaxSize = 100000000
 	grpcAuthority   = "localhost"
 
@@ -312,7 +312,7 @@ func loadTestGRPCAPIs(s *gateway.Test) {
 
 func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
 	// Setup the gRPC server:
-	listener, _ := net.Listen("tcp", grpcListenAddr)
+	listener, _ := net.Listen("tcp", grpcListenPath)
 	grpcServer := newTestGRPCServer()
 	go grpcServer.Serve(listener)
 
