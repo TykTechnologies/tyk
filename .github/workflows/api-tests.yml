@@ -10,6 +10,7 @@ on:
 
 env:
   GOPRIVATE: github.com/TykTechnologies
+  TYK_TEST_FEDERATION_HOST: federation
 
 jobs:
   test:
@@ -23,7 +24,7 @@ jobs:
     
     steps:
     - name: Set up Python 3.7
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v2
       with:
         python-version: 3.7
 
@@ -33,69 +34,71 @@ jobs:
       run: >
         git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
     
-    - name: Checkout
-      uses: actions/checkout@v3
+    - name: Checkout test framework
+      uses: actions/checkout@v2
       with:
-        path: tyk
+        path: tyk-automated-tests
         token: ${{ secrets.ORG_GH_TOKEN }}
         submodules: true
     
-    - name: Check if test framework branch exists
+    - name: Check if dashboard branch exists
       id: check_test_branch
       env:
         TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
       run: |
-        echo "branch=master" >> $GITHUB_OUTPUT
-        if [ ! -z "${{ github.head_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.head_ref	}}; then
-          echo "branch=${{ github.head_ref	}}" >> $GITHUB_OUTPUT
+        echo "::set-output name=branch::master"
+        if [ ! -z "${{ github.head_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.head_ref	}}; then
+          echo "::set-output name=branch::${{ github.head_ref	}}"
         fi
-        if [ ! -z "${{ github.base_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.base_ref	}}; then
-          echo "branch=${{ github.base_ref	}}" >> $GITHUB_OUTPUT
+        if [ ! -z "${{ github.base_ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.base_ref	}}; then
+          echo "::set-output name=branch::${{ github.base_ref	}}"
         fi
-        if [ ! -z "${{ github.ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-automated-tests ${{ github.ref }}; then
-          echo "branch=${{ github.ref	}}" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Checkout test repository
-      uses: actions/checkout@v3
-      with:
-        repository: TykTechnologies/tyk-automated-tests
-        token: ${{ secrets.ORG_GH_TOKEN }}
-        path: tyk-automated-tests
-        ref: ${{ steps.check_test_branch.outputs.branch	 }}
-
-    - name: Check if dashboard branch exists
-      id: check_dashboard_branch
-      env:
-        TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
-      run: |
-        echo "branch=master" >> $GITHUB_OUTPUT
-        if [ ! -z "${{ github.head_ref }}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.head_ref }}; then
-          echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
-        fi
-        if [ ! -z "${{ github.base_ref }}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.base_ref }}; then
-          echo "branch=${{ github.base_ref }}" >> $GITHUB_OUTPUT
-        fi
-        if [ ! -z "${{ github.ref }}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.ref }}; then
-          echo "branch=${{ github.ref }}" >> $GITHUB_OUTPUT
+        if [ ! -z "${{ github.ref	}}" ] && git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk-analytics ${{ github.ref }}; then
+          echo "::set-output name=branch::${{ github.ref	}}"
         fi
 
     - name: Checkout dashboard
-      uses: actions/checkout@v3
+      uses: actions/checkout@v2
       with:
         repository: TykTechnologies/tyk-analytics
         token: ${{ secrets.ORG_GH_TOKEN }}
         submodules: true
         path: tyk-analytics
-        ref: ${{ steps.check_dashboard_branch.outputs.branch	 }}
+        ref: ${{ steps.check_test_branch.outputs.branch	 }}
+
+    - name: Check if GW branch exists
+      id: check_GW_branch
+      env:
+        TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
+      run: |
+        echo "::set-output name=branch::master"
+        if git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk ${{ github.base_ref	}}; then
+          echo "::set-output name=branch::${{ github.base_ref	}}"
+        fi
+        if git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk ${{ github.head_ref }}; then
+          echo "::set-output name=branch::${{ github.head_ref	}}"
+        fi
+        if git ls-remote --exit-code --heads https://${TOKEN}@github.com/TykTechnologies/tyk ${{ github.ref }}; then
+          echo "::set-output name=branch::${{ github.ref }}"
+        fi
+        echo "Branch from dash: ${branch}"
+    
+    - name: Checkout GW repository
+      uses: actions/checkout@v2
+      with:
+        repository: TykTechnologies/tyk
+        path: tyk
+        token: ${{ secrets.ORG_GH_TOKEN }}
+        submodules: true
+        ref: ${{ steps.check_GW_branch.outputs.branch	 }}
 
     - name: start docker compose
       run: docker-compose -f ci/ci_testing_env.yml up -d
       env:
         TYK_DB_LICENSEKEY: ${{secrets.DASH_LICENSE}}
-        DASH_REPO_PATH: /home/runner/work/tyk/tyk/tyk-analytics
-        GW_REPO_PATH: /home/runner/work/tyk/tyk/tyk
-        GOPATH: /home/runner/work/tyk/tyk
+        DASH_REPO_PATH: /home/runner/work/tyk-automated-tests/tyk-automated-tests/tyk-analytics
+        GW_REPO_PATH: /home/runner/work/tyk-automated-tests/tyk-automated-tests/tyk
+        GOPATH: /home/runner/work/tyk-automated-tests/tyk-automated-tests
         GOPRIVATE: github.com/TykTechnologies
         TOKEN: ${{ secrets.ORG_GH_TOKEN }}
       working-directory: tyk-automated-tests
@@ -126,32 +129,23 @@ jobs:
         TYK_TEST_BASE_URL: "http://localhost:3000/"
         TYK_TEST_GW_URL: "https://localhost:8080/"
         TYK_TEST_MONGODB: "tyk-mongo:27017"
-        TYK_TEST_REDIS: "tyk-redis"
+        TYK_TEST_REDIS: "localhost"
         TYK_TEST_DB_ADMIN: "12345"
         TYK_TEST_GW_SECRET: "352d20ee67be67f6340b4c0605b044b7"
         TYK_TEST_FEDERATION_HOST: federation
+        TYK_TEST_GRAPHQL_FAKER_HOST: graphql-faker
+        TYK_TEST_RESTCOUNTRIES_HOST: restcountries
       run: |
         pytest
       working-directory: tyk-automated-tests
-      timeout-minutes: 30
 
     - name: Archive Integration tests report
       if: ${{ always() }}
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v2
       with:
          name: api-test-report
          path: ./tyk-automated-tests/reports/
 
-    - name: Notify slack
-      if: ${{ always() }}
-      uses: rtCamp/action-slack-notify@v2
-      env:
-        SLACK_WEBHOOK: ${{ secrets.GW_SLACK_WEBHOOK }}
-        SLACK_COLOR: ${{ job.status }}
-        SLACK_TITLE: "Result: ${{ steps.test_execution.outcome }}"
-        SLACK_USERNAME: API GW test automation
-        SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|execution details>"
-  
     - name: Comment on PR
       if: ${{ always() }} && github.event.issue.pull_request
       uses: mshick/add-pr-comment@v1
@@ -166,19 +160,11 @@ jobs:
         allow-repeats: true
       env:
         STATUS: "${{ steps.test_execution.outcome == 'success' && ':white_check_mark:' || ':no_entry_sign:' }}"
-       
-    - name: Xray update
-      if: ${{ always() }} && github.event_name != 'pull_request'
-      run: |
-        ./update_xray.sh
-      working-directory: tyk-automated-tests
-      env:
-        TEST: "QA-901"
-        STATUS: "${{ steps.test_execution.outcome }}"
-        CLIENT_ID: ${{secrets.XRAY_CLIENT_ID}}
-        CLIENT_SECRET: ${{secrets.XRAY_CLIENT_SECRET}}
-        BRANCH: ${{ github.ref }}
 
-    - name: Getting docker logs on failure
+    - name: Getting dashboard logs on failure
       if: ${{ failure() }}
-      run: docker-compose -f ci/ci_testing_env.yml logs
+      run: docker logs tyk-dashboard
+      
+    - name: Getting gateway logs on failure
+      if: ${{ failure() }}
+      run: docker logs tyk-gateway
