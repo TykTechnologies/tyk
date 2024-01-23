@@ -183,25 +183,13 @@ jobs:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
           terraform_wrapper: false
 
-      - name: Get AWS creds from Terraform remote state
-        id: aws-creds
-        run: |
-          cd ci/terraform
-          terraform init -input=false
-          terraform refresh 2>&1 >/dev/null
-          eval $(terraform output -json tyk | jq -r 'to_entries[] | [.key,.value] | join("=")')
-          region=$(terraform output region | xargs)
-          [ -z "$key" -o -z "$secret" -o -z "$region" ] && exit 1
-          echo "secret=$secret" >> $GITHUB_OUTPUT
-          echo "key=$key" >> $GITHUB_OUTPUT
-          echo "region=$region" >> $GITHUB_OUTPUT
-
       - name: Configure AWS credentials for use
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ steps.aws-creds.outputs.key }}
-          aws-secret-access-key: ${{ steps.aws-creds.outputs.secret }}
-          aws-region: ${{ steps.aws-creds.outputs.region }}
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: cipush
+          aws-region: eu-central-1
+          mask-aws-account-id: false
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -225,35 +213,6 @@ jobs:
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/tyk:${{ needs.goreleaser.outputs.tag }}
             ${{ steps.login-ecr.outputs.registry }}/tyk:${{ github.sha }}
-
-      - name: Tell gromit about new build
-        id: gromit
-        run: |
-          # Remember to remove the true when TD-626 is fixed
-          curl -fsSL -H "Authorization: ${{secrets.GROMIT_TOKEN}}" 'https://domu-kun.cloud.tyk.io/gromit/newbuild' \
-                 -X POST -d '{ "repo": "${{ github.repository}}", "ref": "${{ github.ref }}", "sha": "${{ github.sha }}" }' || true
-
-      - name: Tell integration channel
-        if: ${{ failure() }}
-        run: |
-          colour=bad
-          pretext=":boom: Could not add new build $${{ github.ref }} from ${{ github.repository }} to CD. Please review this run and correct it if needed. See https://github.com/TykTechnologies/tyk-ci/wiki/IntegrationEnvironment for what this is about."
-          curl https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack -o /tmp/slack && chmod +x /tmp/slack
-          /tmp/slack chat send \
-          --actions '{"type": "button", "style": "primary", "text": "See log", "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' \
-          --author 'Bender' \
-          --author-icon 'https://hcoop.net/~alephnull/bender/bender-arms.jpg' \
-          --author-link 'https://github.com/TykTechnologies/tyk-ci' \
-          --channel '#service-integration' \
-          --color $colour \
-          --fields '{"title": "Repo", "value": "${{ github.repository }}", "short": false}' \
-          --footer 'github-actions' \
-          --footer-icon 'https://assets-cdn.github.com/images/modules/logos_page/Octocat.png' \
-          --image 'https://assets-cdn.github.com/images/modules/logos_page/Octocat.png' \
-          --pretext "$pretext" \
-          --text 'Commit message: ${{ github.event.head_commit.message }}' \
-          --title 'Failed to add new build for CD' \
-          --title-link 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
 
   sbom:
     needs: ci
