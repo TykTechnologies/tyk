@@ -262,3 +262,73 @@ func (rc *RedisController) MockWith(client redis.UniversalClient, redisUp bool) 
 	rc.singleAnalyticsPool = client
 	rc.redisUp.Store(redisUp)
 }
+// recoverLoop will be checking waiting for a rc.reconnect signal to trigger the onReconnect func.
+func (rc *RedisController) recoverLoop(ctx context.Context, onReconnect func()) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-rc.reconnect:
+			onReconnect()
+		}
+	}
+}
+
+func (rc *RedisController) connectCluster(conf config.Config, v ...RedisCluster) bool {
+	for _, x := range v {
+		if ok := rc.establishConnection(&x, conf); !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func (rc *RedisController) establishConnection(v *RedisCluster, conf config.Config) bool {
+	if !rc.connectSingleton(v.IsCache, v.IsAnalytics, conf) {
+		return false
+	}
+	return clusterConnectionIsOpen(v)
+}
+
+// MockWith is used to mock redis controller with a redis client.
+func (rc *RedisController) MockWith(client redis.UniversalClient, redisUp bool) {
+	rc.singlePool = client
+	rc.singleAnalyticsPool = client
+	rc.singleAnalyticsPool = client
+	rc.redisUp.Store(redisUp)
+}
+// recoverLoop will be checking waiting for a rc.reconnect signal to trigger the onReconnect func.
+func (rc *RedisController) recoverLoop(ctx context.Context, onReconnect func()) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-rc.reconnect:
+			onReconnect()
+		}
+	}
+}
+
+func (rc *RedisController) connectCluster(conf config.Config, v ...RedisCluster) bool {
+	for _, x := range v {
+		if ok := rc.establishConnection(&x, conf); !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func (rc *RedisController) establishConnection(v *RedisCluster, conf config.Config) bool {
+	if !rc.connectSingleton(v.IsCache, v.IsAnalytics, conf) {
+		return false
+	}
+	return clusterConnectionIsOpen(v)
+}
+
+// MockWith is used to mock redis controller with a redis client.
+func (rc *RedisController) MockWith(client redis.UniversalClient, redisUp bool) {
+	rc.singlePool = client
+	rc.singleAnalyticsPool = client
+	rc.singleAnalyticsPool = client
+	rc.redisUp.Store(redisUp)
+}
