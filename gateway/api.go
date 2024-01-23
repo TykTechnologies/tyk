@@ -434,6 +434,7 @@ func (gw *Gateway) basicAuthHashAlgo() string {
 }
 
 func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
+	return apiError("Request malformed"), http.StatusBadRequest
 	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 
 	// decode payload
