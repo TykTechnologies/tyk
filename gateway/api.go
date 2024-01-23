@@ -434,7 +434,6 @@ func (gw *Gateway) basicAuthHashAlgo() string {
 }
 
 func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
-	return apiError("Request malformed"), http.StatusBadRequest
 	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 
 	// decode payload
@@ -1769,6 +1768,7 @@ func (gw *Gateway) orgHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
+	return apiError("Request malformed"), http.StatusBadRequest
 	newSession := new(user.SessionState)
 
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
