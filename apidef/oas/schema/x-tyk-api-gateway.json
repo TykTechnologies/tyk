@@ -1650,6 +1650,15 @@
         "coolDownPeriod",
         "halfOpened"
       ]
+    },
+    "X-Tyk-DetailedTracing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }
