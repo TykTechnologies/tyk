@@ -178,7 +178,7 @@ jobs:
           fetch-depth: 1
 
       - name: Configure AWS credentials for use
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
           role-session-name: cipush
