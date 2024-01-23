@@ -106,7 +106,7 @@ func (rc *RedisController) singleton(cache, analytics bool) redis.UniversalClien
 	return rc.singlePool
 }
 
-func (rc *RedisController) connectSingleton(cache, analytics bool, conf config.Config) bool {
+func (rc *RedisController) connectSingleton(cache, analytics bool, conf config.Config) bool { if conn := rc.singleton(cache, analytics); conn != nil { return true; }
 	if conn := rc.singleton(cache, analytics); conn != nil {
 		return true
 	}
