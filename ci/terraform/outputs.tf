@@ -20,7 +20,7 @@ output "tyk" {
   description = "ECR creds for tyk repo"
 }
 
-output "region" {
-  value = data.terraform_remote_state.integration.outputs.region
+output "new_correct_region_attribute_name" {
+  value = data.terraform_remote_state.integration.outputs.new_correct_region_attribute_name
   description = "Region in which the env is running"
 }
