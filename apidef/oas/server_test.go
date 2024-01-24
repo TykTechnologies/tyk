@@ -124,6 +124,7 @@ func TestClientCertificates(t *testing.T) {
 }
 
 func TestCustomDomain(t *testing.T) {
+	certs := []string{"c1", "c2"}
 	t.Run("extractTo api definition", func(t *testing.T) {
 		testcases := []struct {
 			title       string
@@ -136,9 +137,9 @@ func TestCustomDomain(t *testing.T) {
 				apidef.APIDefinition{DomainDisabled: true},
 			},
 			{
-				"enabled=false, name=(valid-domain)",
-				Domain{Enabled: false, Name: "example.com"},
-				apidef.APIDefinition{DomainDisabled: true, Domain: "example.com"},
+				"enabled=false, vali",
+				Domain{Enabled: false, Name: "example.com", Certificates: certs},
+				apidef.APIDefinition{DomainDisabled: true, Domain: "example.com", Certificates: certs},
 			},
 			{
 				"enabled=true, name=nil",
@@ -146,9 +147,9 @@ func TestCustomDomain(t *testing.T) {
 				apidef.APIDefinition{DomainDisabled: false, Domain: ""},
 			},
 			{
-				"enabled=true, name=(valid-domain)",
-				Domain{Enabled: true, Name: "example.com"},
-				apidef.APIDefinition{DomainDisabled: false, Domain: "example.com"},
+				"enabled=true, valid",
+				Domain{Enabled: true, Name: "example.com", Certificates: certs},
+				apidef.APIDefinition{DomainDisabled: false, Domain: "example.com", Certificates: certs},
 			},
 		}
 
@@ -157,7 +158,7 @@ func TestCustomDomain(t *testing.T) {
 				var apiDef apidef.APIDefinition
 				tc.input.ExtractTo(&apiDef)
 
-				assert.Equal(t, tc.expectValue, apiDef)
+				assert.Equalf(t, tc.expectValue, apiDef, tc.title)
 			})
 		}
 	})
@@ -173,9 +174,9 @@ func TestCustomDomain(t *testing.T) {
 				Domain{Enabled: true},
 			},
 			{
-				"disabled=false, name=(valid-domain)",
-				apidef.APIDefinition{DomainDisabled: false, Domain: "example.com"},
-				Domain{Enabled: true, Name: "example.com"},
+				"disabled=false, valid",
+				apidef.APIDefinition{DomainDisabled: false, Domain: "example.com", Certificates: certs},
+				Domain{Enabled: true, Name: "example.com", Certificates: certs},
 			},
 			{
 				"disabled=true, name=nil",
@@ -183,9 +184,9 @@ func TestCustomDomain(t *testing.T) {
 				Domain{Enabled: false, Name: ""},
 			},
 			{
-				"disabled=true, name=(valid-domain)",
-				apidef.APIDefinition{DomainDisabled: true, Domain: "example.com"},
-				Domain{Enabled: false, Name: "example.com"},
+				"disabled=true, valid",
+				apidef.APIDefinition{DomainDisabled: true, Domain: "example.com", Certificates: certs},
+				Domain{Enabled: false, Name: "example.com", Certificates: certs},
 			},
 		}
 

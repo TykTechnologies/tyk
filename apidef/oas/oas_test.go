@@ -253,7 +253,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.ExpireAnalyticsAfter",
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
-		"APIDefinition.Certificates[0]",
 		"APIDefinition.DoNotTrack",
 		"APIDefinition.EnableContextVars",
 		"APIDefinition.TagHeaders[0]",
