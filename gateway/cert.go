@@ -439,7 +439,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			}
 
 			// Dynamically add API specific certificates
-			if len(spec.Certificates) != 0 {
+			if len(spec.Certificates) != 0 && !spec.DomainDisabled {
 				for _, cert := range gw.CertificateManager.List(spec.Certificates, certs.CertificatePrivate) {
 					if cert == nil {
 						continue

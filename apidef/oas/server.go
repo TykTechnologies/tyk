@@ -30,12 +30,6 @@ type Server struct {
 	// Tyk classic API definition: `domain`
 	CustomDomain *Domain `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
 
-	// CustomDomainCertificates defines a field for specifying certificate IDs or file paths
-	// that the Gateway can utilize to dynamically load certificates for your custom domain.
-	//
-	// Tyk classic API definition: `certificates`
-	CustomDomainCertificates []string `bson:"customDomainCertificates" json:"customDomainCertificates"`
-
 	// DetailedActivityLogs configures detailed analytics recording.
 	DetailedActivityLogs *DetailedActivityLogs `bson:"detailedActivityLogs,omitempty" json:"detailedActivityLogs,omitempty"`
 }
@@ -70,8 +64,6 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.CustomDomain) {
 		s.CustomDomain = nil
 	}
-
-	s.CustomDomainCertificates = api.Certificates
 
 	if s.DetailedActivityLogs == nil {
 		s.DetailedActivityLogs = &DetailedActivityLogs{}
@@ -114,8 +106,6 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	s.CustomDomain.ExtractTo(api)
-
-	api.Certificates = s.CustomDomainCertificates
 
 	if s.DetailedActivityLogs == nil {
 		s.DetailedActivityLogs = &DetailedActivityLogs{}
@@ -205,18 +195,25 @@ type Domain struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Name is the name of the domain.
 	Name string `bson:"name" json:"name"`
+	// Certificates defines a field for specifying certificate IDs or file paths
+	// that the Gateway can utilize to dynamically load certificates for your custom domain.
+	//
+	// Tyk classic API definition: `certificates`
+	Certificates []string `bson:"certificates,omitempty" json:"certificates,omitempty"`
 }
 
 // ExtractTo extracts *Domain into *apidef.APIDefinition.
 func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {
 	api.DomainDisabled = !cd.Enabled
 	api.Domain = cd.Name
+	api.Certificates = cd.Certificates
 }
 
 // Fill fills *Domain from apidef.APIDefinition.
 func (cd *Domain) Fill(api apidef.APIDefinition) {
 	cd.Enabled = !api.DomainDisabled
 	cd.Name = api.Domain
+	cd.Certificates = api.Certificates
 }
 
 // DetailedActivityLogs holds the configuration related to recording detailed analytics.

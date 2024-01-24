@@ -198,13 +198,13 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					Value: "/listen-api",
 					Strip: true,
 				},
-				CustomDomain: &Domain{true, "custom-domain.org"},
+				CustomDomain: &Domain{Enabled: true, Name: "custom-domain.org"},
 			},
 		}
 
 		oasDef.SetTykExtension(&existingTykExtension)
 
-		newCustomDomain := &Domain{true, "new-custom-domain.org"}
+		newCustomDomain := &Domain{Enabled: true, Name: "new-custom-domain.org"}
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
 			ListenPath:     "/new-listen-api",

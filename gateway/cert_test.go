@@ -1291,6 +1291,17 @@ func TestAPICertificate(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{Code: 200, Client: client})
 	})
 
+	t.Run("custom domain disabled", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Certificates = []string{serverCertID}
+			spec.UseKeylessAccess = true
+			spec.DomainDisabled = true
+			spec.Proxy.ListenPath = "/"
+		})
+
+		_, _ = ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr})
+	})
+
 	t.Run("Cert unknown", func(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = true
