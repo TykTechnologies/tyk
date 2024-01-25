@@ -73,7 +73,14 @@ echo "PLUGIN_BUILD_PATH: ${PLUGIN_BUILD_PATH}"
 echo "PLUGIN_SOURCE_PATH: ${PLUGIN_SOURCE_PATH}"
 
 set -x
-CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
+
+if [[ "$GO_USE_PROXY" == "1" ]] ; then
+  export GOPROXY='file:////tmp/myGoProxy/pkg/mod/cache/download'
+  CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
+else
+  CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
+fi
+
 set +x
 
 mv $plugin_name $PLUGIN_SOURCE_PATH

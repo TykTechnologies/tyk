@@ -13,7 +13,7 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 
 RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
-RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby-dev python3.9 \
+RUN apt-get -y update && apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby-dev python3.9 \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 ADD go.mod go.sum $TYK_GW_PATH
