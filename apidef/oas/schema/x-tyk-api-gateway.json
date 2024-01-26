@@ -1184,6 +1184,9 @@
         },
         "detailedActivityLogs": {
           "$ref": "#/definitions/X-Tyk-DetailedActivityLogs"
+        },
+        "detailedTracing" : {
+          "$ref": "#/definitions/X-Tyk-DetailedTracing"
         }
       },
       "required": [
