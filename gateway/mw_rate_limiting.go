@@ -70,13 +70,17 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 
 	session := ctxGetSession(r)
-	token := ctxGetAuthToken(r)
+	limit_key := ctxGetAuthToken(r)
+
+	if pattern, found := session.MetaData["limit_pattern"]; found {
+	   limit_key = k.Gw.replaceTykVariables(r, pattern, false)
+	}
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		session,
-		token,
+		limit_key,
 		storeRef,
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota,
@@ -100,7 +104,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	switch reason {
 	case sessionFailNone:
 	case sessionFailRateLimit:
-		err, errCode := k.handleRateLimitFailure(r, token)
+		err, errCode := k.handleRateLimitFailure(r, limit_key)
 		if throttleRetryLimit > 0 {
 			for {
 				ctxIncThrottleLevel(r, throttleRetryLimit)
@@ -109,7 +113,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				reason = k.Gw.SessionLimiter.ForwardMessage(
 					r,
 					session,
-					token,
+					limit_key,
 					storeRef,
 					!k.Spec.DisableRateLimit,
 					!k.Spec.DisableQuota,
@@ -135,7 +139,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		return err, errCode
 
 	case sessionFailQuota:
-		return k.handleQuotaFailure(r, token)
+		return k.handleQuotaFailure(r, limit_key)
 	case sessionFailInternalServerError:
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	default:
@@ -144,7 +148,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 	// Run the trigger monitor
 	if k.Spec.GlobalConfig.Monitor.MonitorUserKeys {
-		k.Gw.SessionMonitor.Check(session, token)
+		k.Gw.SessionMonitor.Check(session, limit_key)
 	}
 
 	// Request is valid, carry on
