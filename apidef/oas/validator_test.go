@@ -1,15 +1,20 @@
 package oas
 
 import (
+	"embed"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/buger/jsonparser"
+	"github.com/stretchr/testify/require"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 )
+
+//go:embed testdata/minimal-valid-oas-template.json
+var oasTemplateFS embed.FS
 
 func getStrPointer(str string) *string {
 	return &str
@@ -186,6 +191,13 @@ func TestValidateOASObject(t *testing.T) {
 		expectedErr := fmt.Errorf(oasSchemaVersionNotFoundFmt, reqOASVersion)
 		assert.Equal(t, expectedErr, err)
 	})
+}
+
+func TestValidateOASTemplate(t *testing.T) {
+	body, err := oasTemplateFS.ReadFile("testdata/minimal-valid-oas-template.json")
+	require.NoError(t, err)
+	err = ValidateOASTemplate(body, "")
+	assert.NoError(t, err)
 }
 
 func Test_loadOASSchema(t *testing.T) {

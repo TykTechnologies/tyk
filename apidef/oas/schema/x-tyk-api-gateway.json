@@ -1584,12 +1584,20 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
         "name": {
           "type": "string",
           "format": "hostname"
         },
-        "enabled": {
-          "type": "boolean"
+        "certificates": {
+          "type": "array",
+          "items": [
+            {
+              "type": "string"
+            }
+          ]
         }
       },
       "required": [
