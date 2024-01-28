@@ -26,6 +26,7 @@ func TestOAS(t *testing.T) {
 
 		var convertedAPI apidef.APIDefinition
 		emptyOASPaths.ExtractTo(&convertedAPI)
+		assert.True(t, convertedAPI.EnableContextVars)
 
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
@@ -152,6 +153,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.TagsDisabled = false
 	a.IsOAS = false
 	a.IDPClientIDMappingDisabled = false
+	a.EnableContextVars = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -254,7 +256,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
 		"APIDefinition.DoNotTrack",
-		"APIDefinition.EnableContextVars",
 		"APIDefinition.TagHeaders[0]",
 		"APIDefinition.GlobalRateLimit.Rate",
 		"APIDefinition.GlobalRateLimit.Per",
