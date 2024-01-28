@@ -38,5 +38,17 @@ func TestRequestSizeLimit(t *testing.T) {
 			{Method: http.MethodPost, Path: "/sample/get", Data: strings.Repeat("a", 512), Code: http.StatusOK},
 			{Method: http.MethodPost, Path: "/sample/get", Data: strings.Repeat("a", 513), Code: http.StatusBadRequest},
 		}...)
+
+		t.Run("disabled", func(t *testing.T) {
+			UpdateAPIVersion(api, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.SizeLimit[0].Disabled = true
+			})
+
+			ts.Gw.LoadAPI(api)
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Method: http.MethodPost, Path: "/sample/get", Data: strings.Repeat("a", 513), Code: http.StatusOK},
+			}...)
+		})
 	})
 }

@@ -203,6 +203,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Filter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Method",
+		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Disabled",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].SizeLimit",
