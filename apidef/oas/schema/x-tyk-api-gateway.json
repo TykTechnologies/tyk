@@ -134,7 +134,7 @@
       "additionalProperties": false,
       "properties": {
         "domain": {
-          "type": "string"
+          "$ref": "#/definitions/X-Tyk-DomainDef"
         },
         "certificate": {
           "type": "string"
@@ -171,7 +171,7 @@
       "additionalProperties": false,
       "properties": {
         "domain": {
-          "type": "string"
+          "$ref": "#/definitions/X-Tyk-DomainDef"
         },
         "publicKeys": {
           "type": "array",
@@ -1849,6 +1849,10 @@
     "X-Tyk-UInt": {
       "type": "integer",
       "minimum": 0
+    },
+    "X-Tyk-DomainDef": {
+      "type": "string",
+      "pattern": "^([*a-zA-Z0-9-]+(\\.[*a-zA-Z0-9-]+)*)(:\\d+)?$"
     }
   }
 }
