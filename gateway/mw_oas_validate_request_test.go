@@ -41,6 +41,14 @@ const testOASForValidateRequest = `{
           },
           "owner": {
             "$ref": "#/components/schemas/Owner"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiryOn": {
+            "type": "string",
+            "format": "date"
           }
         }
       }
@@ -193,6 +201,20 @@ func TestValidateRequest(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Data: `{"name": 123}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product/push"},
 			{Data: `{"name": 123}`, Code: http.StatusTeapot, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
+		}...)
+	})
+
+	t.Run("validate date/date-time format", func(t *testing.T) {
+		apiPath := "/product/post"
+		_, _ = ts.Run(t, []test.TestCase{
+			{Data: `{"name": "123", "createdAt": "2016-02-30T14:30:15Z"}`, Code: http.StatusUnprocessableEntity,
+				Method: http.MethodPost, Headers: headers, Path: apiPath},
+			{Data: `{"name": "123", "createdAt": "2016-02-28T30:30:15Z"}`, Code: http.StatusUnprocessableEntity,
+				Method: http.MethodPost, Headers: headers, Path: apiPath},
+			{Data: `{"name": "123", "createdAt": "2016-02-28T12:30:15Z"}`, Code: http.StatusOK,
+				Method: http.MethodPost, Headers: headers, Path: apiPath},
+			{Data: `{"name": "123", "expiryOn": "2016-02-28"}`, Code: http.StatusOK,
+				Method: http.MethodPost, Headers: headers, Path: apiPath},
 		}...)
 	})
 }
