@@ -1669,7 +1669,10 @@
         "enabled": {
           "type": "boolean"
         }
-      }
+      },
+      "required": [
+        "enabled"
+      ]
     }
   }
 }

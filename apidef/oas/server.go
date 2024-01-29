@@ -34,6 +34,8 @@ type Server struct {
 	DetailedActivityLogs *DetailedActivityLogs `bson:"detailedActivityLogs,omitempty" json:"detailedActivityLogs,omitempty"`
 
 	// DetailedTracing enables OpenTelemetry's detailed tracing for this API.
+	//
+	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
 }
 
